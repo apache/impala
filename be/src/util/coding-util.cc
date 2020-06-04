@@ -134,7 +134,7 @@ bool Base64Encode(const char* in, int64_t in_len, int64_t out_max, char* out,
   return true;
 }
 
-static inline void Base64Encode(const char* in, int64_t in_len, stringstream* out) {
+void Base64Encode(const char* in, int64_t in_len, stringstream* out) {
   if (in_len == 0) {
     (*out) << "";
     return;

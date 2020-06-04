@@ -119,7 +119,6 @@ table_name:complextypes_arrays, constraint:restrict_to, table_format:orc/def/blo
 
 table_name:alltypeserror, constraint:exclude, table_format:parquet/none/none
 table_name:alltypeserrornonulls, constraint:exclude, table_format:parquet/none/none
-table_name:unsupported_types, constraint:exclude, table_format:parquet/none/none
 table_name:escapechartesttable, constraint:exclude, table_format:parquet/none/none
 table_name:TblWithRaggedColumns, constraint:exclude, table_format:parquet/none/none
 
@@ -130,7 +129,8 @@ table_name:text_thorn_ecirc_newline, constraint:restrict_to, table_format:text/n
 
 table_name:bad_serde, constraint:restrict_to, table_format:text/none/none
 table_name:rcfile_lazy_binary_serde, constraint:restrict_to, table_format:rc/none/none
-table_name:unsupported_partition_types, constraint:restrict_to, table_format:text/none/none
+table_name:unsupported_timestamp_partition, constraint:restrict_to, table_format:text/none/none
+table_name:unsupported_binary_partition, constraint:restrict_to, table_format:text/none/none
 table_name:nullformat_custom, constraint:exclude, table_format:parquet/none/none
 
 table_name:alltypes_view, constraint:restrict_to, table_format:text/none/none
@@ -171,7 +171,6 @@ table_name:widerow, constraint:exclude, table_format:hbase/none/none
 # which is not supported in hbase. The schema is also specified in HIVE_CREATE
 # with no corresponding LOAD statement.
 table_name:nullformat_custom, constraint:exclude, table_format:hbase/none/none
-table_name:unsupported_types, constraint:exclude, table_format:hbase/none/none
 
 # Decimal can only be tested on formats Impala can write to (text and parquet).
 # TODO: add Avro once Hive or Impala can write Avro decimals
@@ -289,6 +288,11 @@ table_name:date_tbl_error, constraint:restrict_to, table_format:text/gzip/block
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/snap/block
 table_name:date_tbl_error, constraint:restrict_to, table_format:text/def/block
 table_name:insert_date_tbl, constraint:restrict_to, table_format:hbase/none/none
+
+table_name:binary_tbl, constraint:exclude, table_format:kudu/none/none
+table_name:binary_tbl_big, constraint:exclude, table_format:kudu/none/none
+table_name:binary_in_complex_types, constraint:restrict_to, table_format:parquet/none/none
+table_name:binary_in_complex_types, constraint:restrict_to, table_format:orc/def/block
 
 # Full transactional table is only supported for ORC
 table_name:full_transactional_table, constraint:restrict_to, table_format:orc/def/block

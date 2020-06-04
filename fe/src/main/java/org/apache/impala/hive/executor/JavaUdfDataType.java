@@ -101,6 +101,8 @@ import org.apache.impala.thrift.TPrimitiveType;
           return JavaUdfDataType.DOUBLE_WRITABLE;
         case STRING:
           return JavaUdfDataType.TEXT;
+        case BINARY:
+          return JavaUdfDataType.BYTES_WRITABLE;
         default:
           return null;
       }
@@ -151,10 +153,25 @@ import org.apache.impala.thrift.TPrimitiveType;
       if (TPrimitiveType.INVALID_TYPE == t.getPrimitiveType().toThrift()) {
         return false;
       }
+
+      // While BYTES_WRITABLE and BYTE_ARRAY maps to STRING to keep compatibility,
+      // BINARY is also accepted (IMPALA-11340).
+      if (t.isBinary()) return true;
+
       for(JavaUdfDataType javaType: JavaUdfDataType.values()) {
         if (javaType.getPrimitiveType() == t.getPrimitiveType().toThrift()) {
           return true;
         }
+      }
+      return false;
+    }
+
+    public boolean isCompatibleWith(TPrimitiveType t) {
+      if (t == getPrimitiveType()) return true;
+      if (t == TPrimitiveType.BINARY) {
+        // While BYTES_WRITABLE and BYTE_ARRAY maps to STRING to keep compatibility,
+        // BINARY is also accepted (IMPALA-11340).
+        if (this == BYTE_ARRAY || this == BYTES_WRITABLE) return true;
       }
       return false;
     }

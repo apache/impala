@@ -109,9 +109,9 @@ public abstract class Type {
     supportedTypes.add(TIMESTAMP);
     supportedTypes.add(DECIMAL);
     supportedTypes.add(DATE);
+    supportedTypes.add(BINARY);
 
     unsupportedTypes = new ArrayList<>();
-    unsupportedTypes.add(BINARY);
     unsupportedTypes.add(DATETIME);
   }
 
@@ -189,13 +189,14 @@ public abstract class Type {
   public boolean isDecimal() { return isScalarType(PrimitiveType.DECIMAL); }
   public boolean isFullySpecifiedDecimal() { return false; }
   public boolean isVarchar() { return isScalarType(PrimitiveType.VARCHAR); }
+  public boolean isBinary() { return isScalarType(PrimitiveType.BINARY); }
   public boolean isWildcardDecimal() { return false; }
   public boolean isWildcardVarchar() { return false; }
   public boolean isWildcardChar() { return false; }
 
   public boolean isStringType() {
     return isScalarType(PrimitiveType.STRING) || isScalarType(PrimitiveType.VARCHAR) ||
-        isScalarType(PrimitiveType.CHAR);
+        isScalarType(PrimitiveType.CHAR) || isScalarType(PrimitiveType.BINARY);
   }
 
   public boolean isScalarType() { return this instanceof ScalarType; }
@@ -508,6 +509,7 @@ public abstract class Type {
     ScalarType t = (ScalarType) this;
     switch (t.getPrimitiveType()) {
       case STRING:
+      case BINARY:
         return Integer.MAX_VALUE;
       case TIMESTAMP:
         return 29;
@@ -679,9 +681,12 @@ public abstract class Type {
     for (int i = 0; i < PrimitiveType.values().length; ++i) {
       // Each type is compatible with itself.
       compatibilityMatrix[i][i] = PrimitiveType.values()[i];
-      // BINARY is not supported.
-      compatibilityMatrix[BINARY.ordinal()][i] = PrimitiveType.INVALID_TYPE;
-      compatibilityMatrix[i][BINARY.ordinal()] = PrimitiveType.INVALID_TYPE;
+
+      if (i != BINARY.ordinal() && i != STRING.ordinal()) {
+        // BINARY can be only cast to / from STRING.
+        compatibilityMatrix[BINARY.ordinal()][i] = PrimitiveType.INVALID_TYPE;
+        compatibilityMatrix[i][BINARY.ordinal()] = PrimitiveType.INVALID_TYPE;
+      }
 
       // FIXED_UDA_INTERMEDIATE cannot be cast to/from another type
       if (i != FIXED_UDA_INTERMEDIATE.ordinal()) {
@@ -825,6 +830,11 @@ public abstract class Type {
 
     compatibilityMatrix[STRING.ordinal()][VARCHAR.ordinal()] = PrimitiveType.STRING;
     compatibilityMatrix[STRING.ordinal()][CHAR.ordinal()] = PrimitiveType.STRING;
+    // STRING <->  BINARY conversion is not lossy, but implicit cast is not allowed to
+    // enforce exact type match in function calls.
+    compatibilityMatrix[STRING.ordinal()][BINARY.ordinal()] = PrimitiveType.INVALID_TYPE;
+    strictCompatibilityMatrix[STRING.ordinal()][BINARY.ordinal()]
+        = PrimitiveType.INVALID_TYPE;
 
     compatibilityMatrix[VARCHAR.ordinal()][CHAR.ordinal()] = PrimitiveType.INVALID_TYPE;
 

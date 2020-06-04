@@ -159,6 +159,25 @@ public class LocalCatalogTest {
   }
 
   @Test
+  public void testLoadBinaryTableBasics() throws Exception {
+    FeDb functionalDb = catalog_.getDb("functional");
+    CatalogTest.checkTableCols(functionalDb, "binary_tbl", 0,
+        new String[] {"id", "string_col", "binary_col"},
+        new Type[] {Type.INT, Type.STRING, Type.BINARY});
+    FeTable t = functionalDb.getTable("binary_tbl");
+    assertEquals(8, t.getNumRows());
+
+    assertTrue(t instanceof LocalFsTable);
+    FeFsTable fsTable = (FeFsTable) t;
+    assertEquals(MetaStoreUtil.DEFAULT_NULL_PARTITION_KEY_VALUE,
+        fsTable.getNullPartitionKeyValue());
+
+    // Stats should have one row per partition, plus a "total" row.
+    TResultSet stats = fsTable.getTableStats();
+    assertEquals(1, stats.getRowsSize());
+  }
+
+  @Test
   public void testPartitioning() throws Exception {
     FeFsTable t = (FeFsTable) catalog_.getTable("functional",  "alltypes");
     CatalogTest.checkAllTypesPartitioning(t);
@@ -332,6 +351,16 @@ public class LocalCatalogTest {
   }
 
   @Test
+  public void testBinaryColumnStats() throws Exception {
+    FeFsTable t = (FeFsTable) catalog_.getTable("functional",  "binary_tbl");
+    ColumnStats stats = t.getColumn("binary_col").getStats();
+    assertEquals(26, stats.getMaxSize());
+    assertEquals(8.714285850524902, stats.getAvgSize(), 0.0001);
+    assertEquals(-1, stats.getNumDistinctValues());
+    assertEquals(1, stats.getNumNulls());
+  }
+
+  @Test
   public void testView() throws Exception {
     FeView v = (FeView) catalog_.getTable("functional",  "alltypes_view");
     assertEquals(TCatalogObjectType.VIEW, v.getCatalogObjectType());
@@ -426,6 +455,19 @@ public class LocalCatalogTest {
         ")\n" +
         "STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'\n" +
         "WITH SERDEPROPERTIES ('hbase.columns.mapping'=':key,d:date_col,d:date_part', " +
+        "'serialization.format'='1')"
+    ));
+
+    t = (LocalHbaseTable) catalog_.getTable("functional_hbase", "binary_tbl");
+    Assert.assertThat(ToSqlUtils.getCreateTableSql(t), CoreMatchers.startsWith(
+        "CREATE EXTERNAL TABLE functional_hbase.binary_tbl (\n" +
+        "  id INT,\n" +
+        "  binary_col BINARY,\n" +
+        "  string_col STRING\n" +
+        ")\n" +
+        "STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'\n" +
+        "WITH SERDEPROPERTIES (" +
+        "'hbase.columns.mapping'=':key,d:string_col,d:binary_col', " +
         "'serialization.format'='1')"
     ));
   }

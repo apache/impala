@@ -523,6 +523,7 @@ public class Function extends CatalogObjectImpl {
     case VARCHAR:
     case CHAR:
     case FIXED_UDA_INTERMEDIATE:
+    case BINARY:
       // These types are marshaled into a StringVal.
       return "StringVal";
     case TIMESTAMP:

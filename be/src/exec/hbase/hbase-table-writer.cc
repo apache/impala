@@ -30,6 +30,7 @@
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 #include "util/bit-util.h"
+#include "util/coding-util.h"
 #include "util/jni-util.h"
 
 #include "common/names.h"
@@ -129,6 +130,7 @@ Status HBaseTableWriter::AppendRows(RowBatch* batch) {
   // For every TupleRow in the row batch create a put, assign the row key,
   // and add all of the values generated from the expressions.
   string string_value; // text encoded value
+  string base64_encoded_value; // needed for BINARY columns
   char binary_value[8]; // binary encoded value; at most 8 bytes
   const void* data; // pointer to the column value in bytes
   int data_len; // length of the column value in bytes
@@ -152,8 +154,15 @@ Status HBaseTableWriter::AppendRows(RowBatch* batch) {
             // Text encoded
             string_value.clear();
             output_expr_evals_[j]->PrintValue(value, &string_value);
-            data = string_value.data();
-            data_len = string_value.length();
+            const ColumnDescriptor& col_desc = table_desc_->col_descs()[j];
+            if (col_desc.auxType().IsBinaryStringSubtype()) {
+              Base64Encode(string_value , &base64_encoded_value);
+              data = base64_encoded_value.data();
+              data_len = base64_encoded_value.length();
+            } else {
+              data = string_value.data();
+              data_len = string_value.length();
+            }
           } else {
             // Binary encoded
             // Only bool, tinyint, smallint, int, bigint, float and double can be binary

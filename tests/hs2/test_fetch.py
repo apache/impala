@@ -47,21 +47,27 @@ class TestFetch(HS2TestSuite):
     assert p.i32Value == precision
     assert s.i32Value == scale
 
+  def __fetch_result_column_types(self, query, expected_row_count, execute_statement_req):
+    """ Fetches the results for 'query' and return the response and the
+    array of column types."""
+    execute_statement_req.statement = query
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    HS2TestSuite.check_response(execute_statement_resp)
+    results = self.fetch_at_most(execute_statement_resp.operationHandle,
+                               TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
+    assert len(results.results.rows) == expected_row_count
+    metadata_resp = self.result_metadata(execute_statement_resp.operationHandle)
+    return execute_statement_resp, metadata_resp.schema.columns
+
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1)
   def test_result_metadata_v1(self):
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
 
     # Verify all primitive types in the alltypes table.
-    execute_statement_req.statement =\
-        "SELECT * FROM functional.alltypessmall ORDER BY id LIMIT 1"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    HS2TestSuite.check_response(execute_statement_resp)
-    results = self.fetch_at_most(execute_statement_resp.operationHandle,
-                                 TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
-    assert len(results.results.rows) == 1
-    metadata_resp = self.result_metadata(execute_statement_resp.operationHandle)
-    column_types = metadata_resp.schema.columns
+    execute_statement_resp, column_types = self.__fetch_result_column_types(
+        "SELECT * FROM functional.alltypessmall ORDER BY id LIMIT 1", 1,
+        execute_statement_req)
     assert len(column_types) == 13
     self.__verify_primitive_type(TTypeId.INT_TYPE, column_types[0])
     self.__verify_primitive_type(TTypeId.BOOLEAN_TYPE, column_types[1])
@@ -79,17 +85,9 @@ class TestFetch(HS2TestSuite):
     self.close(execute_statement_resp.operationHandle)
 
     # Verify the result metadata for the DECIMAL type.
-    execute_statement_req.statement =\
-        "SELECT d1,d5 FROM functional.decimal_tbl ORDER BY d1 LIMIT 1"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    HS2TestSuite.check_response(execute_statement_resp)
-    results = self.fetch_at_most(execute_statement_resp.operationHandle,
-                                 TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
-    assert len(results.results.rows) == 1
-    # Verify the result schema is what we expect. The result has 2 columns, the
-    # first is decimal(9,0) and the second is decimal(10,5)
-    metadata_resp = self.result_metadata(execute_statement_resp.operationHandle)
-    column_types = metadata_resp.schema.columns
+    execute_statement_resp, column_types = self.__fetch_result_column_types(
+        "SELECT d1,d5 FROM functional.decimal_tbl ORDER BY d1 LIMIT 1", 1,
+        execute_statement_req)
     assert len(column_types) == 2
     self.__verify_primitive_type(TTypeId.DECIMAL_TYPE, column_types[0])
     self.__verify_decimal_precision_scale(column_types[0], 9, 0)
@@ -98,15 +96,9 @@ class TestFetch(HS2TestSuite):
     self.close(execute_statement_resp.operationHandle)
 
     # Verify the result metadata for the CHAR/VARCHAR types.
-    execute_statement_req.statement =\
-        "SELECT * FROM functional.chars_tiny ORDER BY cs LIMIT 1"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    HS2TestSuite.check_response(execute_statement_resp)
-    results = self.fetch_at_most(execute_statement_resp.operationHandle,
-                                 TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
-    assert len(results.results.rows) == 1
-    metadata_resp = self.result_metadata(execute_statement_resp.operationHandle)
-    column_types = metadata_resp.schema.columns
+    execute_statement_resp, column_types = self.__fetch_result_column_types(
+        "SELECT * FROM functional.chars_tiny ORDER BY cs LIMIT 1", 1,
+        execute_statement_req)
     assert len(column_types) == 3
     self.__verify_primitive_type(TTypeId.CHAR_TYPE, column_types[0])
     self.__verify_char_max_len(column_types[0], 5)
@@ -117,19 +109,23 @@ class TestFetch(HS2TestSuite):
     self.close(execute_statement_resp.operationHandle)
 
     # Verify the result metadata for the DATE type.
-    execute_statement_req.statement =\
-        "SELECT * FROM functional.date_tbl ORDER BY date_col LIMIT 1"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    HS2TestSuite.check_response(execute_statement_resp)
-    results = self.fetch_at_most(execute_statement_resp.operationHandle,
-                                 TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
-    assert len(results.results.rows) == 1
-    metadata_resp = self.result_metadata(execute_statement_resp.operationHandle)
-    column_types = metadata_resp.schema.columns
+    execute_statement_resp, column_types = self.__fetch_result_column_types(
+        "SELECT * FROM functional.date_tbl ORDER BY date_col LIMIT 1", 1,
+        execute_statement_req)
     assert len(column_types) == 3
     self.__verify_primitive_type(TTypeId.INT_TYPE, column_types[0])
     self.__verify_primitive_type(TTypeId.DATE_TYPE, column_types[1])
     self.__verify_primitive_type(TTypeId.DATE_TYPE, column_types[2])
+    self.close(execute_statement_resp.operationHandle)
+
+    # Verify the result metadata for the BINARY type.
+    execute_statement_resp, column_types = self.__fetch_result_column_types(
+        "SELECT * from functional.binary_tbl ORDER BY binary_col LIMIT 1", 1,
+        execute_statement_req)
+    assert len(column_types) == 3
+    self.__verify_primitive_type(TTypeId.INT_TYPE, column_types[0])
+    self.__verify_primitive_type(TTypeId.STRING_TYPE, column_types[1])
+    self.__verify_primitive_type(TTypeId.BINARY_TYPE, column_types[2])
     self.close(execute_statement_resp.operationHandle)
 
   def __query_and_fetch(self, query):
@@ -185,6 +181,12 @@ class TestFetch(HS2TestSuite):
       "SELECT * from functional.date_tbl ORDER BY date_col LIMIT 1")
     num_rows, result = self.column_results_to_string(fetch_results_resp.results.columns)
     assert result == ("0, 0001-01-01, 0001-01-01\n")
+
+    # Binary
+    fetch_results_resp = self.__query_and_fetch(
+      "SELECT * from functional.binary_tbl ORDER BY id LIMIT 1")
+    num_rows, result = self.column_results_to_string(fetch_results_resp.results.columns)
+    assert result == ("1, ascii, binary1\n")
 
   @needs_session()
   def test_show_partitions(self):

@@ -1671,6 +1671,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select * from functional.alltypes a full outer join " +
         "functional.alltypes b",
         "FULL OUTER JOIN requires an ON or USING clause");
+
+    // BINARY columns can be used in joins.
+    AnalyzesOk("select * from functional.binary_tbl a join " +
+        "functional.binary_tbl b on a.binary_col = b.binary_col");
+    AnalyzesOk("select * from functional.binary_tbl a join " +
+        "functional.binary_tbl b using (binary_col)");
   }
 
   @Test
@@ -2302,6 +2308,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "SUM requires a numeric parameter: sum(string_col)");
     AnalysisError("select avg(string_col) from functional.alltypes",
         "AVG requires a numeric or timestamp parameter: avg(string_col)");
+    AnalysisError("select avg(binary_col) from functional.binary_tbl",
+        "AVG requires a numeric or timestamp parameter: avg(binary_col)");
+
 
     // aggregate requires table in the FROM clause
     AnalysisError("select count(*)", "aggregation without a FROM clause is not allowed");
@@ -2326,6 +2335,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         + "from functional.date_tbl");
     AnalyzesOk("select ndv(date_col), distinctpc(date_col), distinctpcsa(date_col), "
         + "count(distinct date_col) from functional.date_tbl");
+
+    // Binary
+    AnalyzesOk("select min(binary_col), max(binary_col), count(binary_col), "
+        + "max(length(binary_col)) from functional.binary_tbl");
+    AnalysisError("select ndv(binary_col) from functional.binary_tbl",
+        "No matching function with signature: ndv(BINARY).");
 
     // Test select stmt avg smap.
     AnalyzesOk("select cast(avg(c1) as decimal(10,4)) as c from " +
@@ -2899,6 +2914,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "group by 1, 2");
     AnalyzesOk("select date_part, date_col, count(*) from functional.date_tbl " +
         "group by 1, 2");
+    AnalyzesOk("select binary_col, count(*) from functional.binary_tbl " +
+        "group by binary_col");
 
     // doesn't group by all non-agg select list items
     AnalysisError("select zip, count(*) from functional.testtbl",
@@ -2998,6 +3015,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "order by true asc, false desc, NULL asc");
     AnalyzesOk("select d1, d2 from functional.decimal_tbl order by d1");
     AnalyzesOk("select date_col, date_part from functional.date_tbl order by date_col");
+    AnalyzesOk("select string_col from functional.binary_tbl order by binary_col");
 
     // resolves ordinals
     AnalyzesOk("select zip, id from functional.testtbl order by 1");
@@ -4256,7 +4274,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "from functional.alltypes");
 
     String hbaseQuery =  "INSERT " + qualifier + " TABLE " +
-        "functional_hbase.insertalltypesagg select id, bigint_col, bool_col, " +
+        "functional_hbase.insertalltypesagg select id, bigint_col, " +
+        "cast(string_col as binary), bool_col, " +
         "date_string_col, day, double_col, float_col, int_col, month, smallint_col, " +
         "string_col, timestamp_col, tinyint_col, year from functional.alltypesagg";
 

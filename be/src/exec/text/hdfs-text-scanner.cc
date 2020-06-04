@@ -949,10 +949,12 @@ void HdfsTextScanner::WritePartialTuple(FieldLocation* fields, int num_fields) {
       need_escape = true;
     }
 
-    const SlotDescriptor* desc = scan_node_->materialized_slots()[slot_idx_];
-    if (!text_converter_->WriteSlot(desc, partial_tuple_,
+    const SlotDescriptor* slot_desc = scan_node_->materialized_slots()[slot_idx_];
+    const AuxColumnType& aux_type =
+        scan_node_->hdfs_table()->GetColumnDesc(slot_desc).auxType();
+    if (!text_converter_->WriteSlot(slot_desc, &aux_type, partial_tuple_,
         fields[i].start, len, true, need_escape, boundary_pool_.get())) {
-      ReportColumnParseError(desc, fields[i].start, len);
+      ReportColumnParseError(slot_desc, fields[i].start, len);
       error_in_row_ = true;
     }
     ++slot_idx_;

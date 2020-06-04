@@ -212,6 +212,11 @@ StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const T& /*input_val*/)
   }
 }
 
+StringVal UtilityFunctions::TypeOfBinary(
+    FunctionContext* ctx, const StringVal& /*input_val*/) {
+  return AnyValUtil::FromString(ctx, "BINARY");
+}
+
 template StringVal UtilityFunctions::TypeOf(
     FunctionContext* ctx, const BooleanVal& input_val);
 template StringVal UtilityFunctions::TypeOf(

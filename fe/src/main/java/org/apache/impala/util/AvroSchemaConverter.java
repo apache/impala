@@ -151,6 +151,7 @@ public class AvroSchemaConverter {
       case STRING: return Schema.create(Schema.Type.STRING);
       case CHAR: return Schema.create(Schema.Type.STRING);
       case VARCHAR: return Schema.create(Schema.Type.STRING);
+      case BINARY: return Schema.create(Schema.Type.BYTES);
       case TINYINT: return Schema.create(Schema.Type.INT);
       case SMALLINT: return Schema.create(Schema.Type.INT);
       case INT: return Schema.create(Schema.Type.INT);

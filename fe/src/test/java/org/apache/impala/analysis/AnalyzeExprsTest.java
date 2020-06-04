@@ -279,6 +279,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       // Operator can compare bool column and literals
       AnalyzesOk("select * from functional.alltypes where bool_col " + operator
           + " true");
+      // Operator can compare binary columns and literals.
+      AnalyzesOk(
+          "select * from functional.binary_tbl where binary_col " + operator +
+           " cast('hi' as binary)");
 
       // Decimal types of different precisions and scales are comparable
       String decimalColumns[] = new String[]{"d1", "d2", "d3", "d4", "d5", "NULL"};
@@ -313,7 +317,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       // Binary operators do not operate on expression with incompatible types
       for (String numeric_type: new String[]{"BOOLEAN", "TINYINT", "SMALLINT", "INT",
           "BIGINT", "FLOAT", "DOUBLE", "DECIMAL(9,0)"}) {
-        for (String string_type: new String[]{"STRING", "TIMESTAMP", "DATE"}) {
+        for (String string_type: new String[]{"STRING", "BINARY", "TIMESTAMP", "DATE"}) {
           AnalysisError("select cast(NULL as " + numeric_type + ") "
               + operator + " cast(NULL as " + string_type + ")",
               "operands of type " + numeric_type + " and " + string_type +
@@ -368,11 +372,14 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Invalid type cast of CAST(1 AS TIMESTAMP) from TIMESTAMP to DECIMAL(9,0)");
     AnalysisError("select cast(date '1970-01-01' as decimal)",
         "Invalid type cast of DATE '1970-01-01' from DATE to DECIMAL(9,0)");
+    AnalysisError("select cast(cast(\"1.1\" as binary) as decimal)",
+        "Invalid type cast of CAST('1.1' AS BINARY) from BINARY to DECIMAL(9,0)");
 
     for (Type type: Type.getSupportedTypes()) {
       if (type.isNull() || type.isDecimal() || type.isBoolean() || type.isDateOrTimeType()
           || type.getPrimitiveType() == PrimitiveType.VARCHAR
-          || type.getPrimitiveType() == PrimitiveType.CHAR) {
+          || type.getPrimitiveType() == PrimitiveType.CHAR
+          || type.getPrimitiveType() == PrimitiveType.BINARY) {
         continue;
       }
       AnalyzesOk("select cast(1.1 as " + type + ")");
@@ -576,10 +583,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "right operand of LIKE must be of type STRING");
     AnalysisError("select * from functional.alltypes where 'test' ilike 5",
         "right operand of ILIKE must be of type STRING");
+    AnalysisError("select * from functional.alltypes where string_col like " +
+                  "cast('test%' as binary)",
+        "right operand of LIKE must be of type STRING");
     AnalysisError("select * from functional.alltypes where int_col like 'test%'",
         "left operand of LIKE must be of type STRING");
     AnalysisError("select * from functional.alltypes where int_col ilike 'test%'",
         "left operand of ILIKE must be of type STRING");
+    AnalysisError("select * from functional.binary_tbl where binary_col like 'test%'",
+        "left operand of LIKE must be of type STRING");
     AnalysisError("select * from functional.alltypes where string_col regexp 'test]['",
         "invalid regular expression in 'string_col REGEXP 'test][''");
     AnalysisError("select * from functional.alltypes where string_col iregexp 'test]['",
@@ -659,6 +671,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   public void TestIsNullPredicates() throws AnalysisException {
     AnalyzesOk("select * from functional.alltypes where int_col is null");
     AnalyzesOk("select * from functional.alltypes where string_col is not null");
+    AnalyzesOk("select * from functional.binary_tbl where binary_col is null");
     AnalyzesOk("select * from functional.alltypes where null is not null");
 
     AnalysisError("select 1 from functional.allcomplextypes where int_map_col is null",
@@ -721,6 +734,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "where 'abc' between string_col and date_string_col");
     AnalyzesOk("select * from functional.alltypes " +
         "where 'abc' not between string_col and date_string_col");
+    AnalyzesOk("select * from functional.binary_tbl " +
+        "where cast('abc' as binary) not between cast(string_col as binary) " +
+        "and binary_col");
     // Additional predicates before and/or after between predicate.
     AnalyzesOk("select * from functional.alltypes " +
         "where string_col = 'abc' and tinyint_col between 10 and 20");
@@ -774,6 +790,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "where tiny_struct between 10 and 20",
         "Incompatible return types 'STRUCT<b:BOOLEAN>' and 'TINYINT' " +
         "of exprs 'tiny_struct' and '10'.");
+    AnalysisError("select * from functional.binary_tbl " +
+        "where string_col between binary_col and 'a'",
+        "Incompatible return types 'STRING' and 'BINARY' " +
+        "of exprs 'string_col' and 'binary_col'.");
+
     // IMPALA-7211: Do not cast decimal types to other decimal types
     AnalyzesOk("select cast(1 as decimal(38,2)) between " +
         "0.9 * cast(1 as decimal(38,3)) and 3");
@@ -1926,6 +1947,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select nullif(1,2,3)", "default.nullif() unknown");
     AnalysisError("select nullif('x', 1)",
         "operands of type STRING and TINYINT are not comparable: 'x' IS DISTINCT FROM 1");
+
+    // Check limited function support for BINARY.
+    AnalyzesOk("select length(cast('a' as binary))");
+    AnalysisError("select lower(cast('a' as binary))",
+        "No matching function with signature: lower(BINARY).");
   }
 
   @Test

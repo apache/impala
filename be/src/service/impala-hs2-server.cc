@@ -897,8 +897,8 @@ void ImpalaServer::GetResultSetMetadata(TGetResultSetMetadataResp& return_val,
             result_set_md->columns[i].columnName);
         return_val.schema.columns[i].position = i;
         return_val.schema.columns[i].typeDesc.types.resize(1);
-        ColumnType t = ColumnType::FromThrift(result_set_md->columns[i].columnType);
-        return_val.schema.columns[i].typeDesc.types[0] = t.ToHs2Type();
+        return_val.schema.columns[i].typeDesc.types[0] =
+            ColumnToHs2Type(result_set_md->columns[i].columnType);
       }
     }
   }

@@ -114,6 +114,10 @@ class UtilityFunctions {
   /// string.
   static StringVal Md5(FunctionContext* ctx, const StringVal& input_str);
 
+  /// Implementation of the typeOf() for BINARY type, which is generally not
+  /// differentiated from STRING by the backend.
+  static StringVal TypeOfBinary(FunctionContext* ctx, const StringVal& input_val);
+
  private:
   static StringVal GenUuid(FunctionContext* ctx);
 };

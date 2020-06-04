@@ -1818,3 +1818,19 @@ class TestErasureCoding(ImpalaTestSuite):
   @SkipIf.not_ec
   def test_erasure_coding(self, vector):
     self.run_test_case('QueryTest/hdfs-erasure-coding', vector)
+
+
+class TestBinaryType(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestBinaryType, cls).add_test_dimensions()
+    # todo: IMPALA-5323: Support Kudu BINARY
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format != 'kudu')
+
+  def test_binary_type(self, vector):
+    self.run_test_case('QueryTest/binary-type', vector)

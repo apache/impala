@@ -57,6 +57,7 @@ void Base64Encode(const std::vector<uint8_t>& in, std::string* out);
 void Base64Encode(const std::vector<uint8_t>& in, std::stringstream* out);
 void Base64Encode(const std::string& in, std::string* out);
 void Base64Encode(const std::string& in, std::stringstream* out);
+void Base64Encode(const char* in, int64_t in_len, std::stringstream* out);
 
 /// Calculate the maximum output buffer size needed for Base64Decode. Returns false if
 /// in_len is invalid.

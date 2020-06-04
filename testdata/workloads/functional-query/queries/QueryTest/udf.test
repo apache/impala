@@ -57,6 +57,13 @@ string
 'why hello there'
 ====
 ---- QUERY
+select identity(cast("why hello there" as binary));
+---- TYPES
+binary
+---- RESULTS
+'why hello there'
+====
+---- QUERY
 select identity(now());
 ---- TYPES
 timestamp
@@ -123,11 +130,11 @@ timestamp
 ---- QUERY
 # Test UDFs with different arguments
 select all_types_fn("1", true, 2, 3, 4, 5, 6.0, 7.0, cast(8 as decimal(2,0)),
-    date '1970-01-10');
+    date '1970-01-10', cast("binary" as binary));
 ---- TYPES
 int
 ---- RESULTS
-46
+52
 ====
 ---- QUERY
 select no_args();
@@ -218,7 +225,7 @@ false,1,1,1,10,1.100000023841858,10.1,'1',2009-03-01 00:01:00,2009
 select sum(all_types_fn(
     string_col, bool_col, tinyint_col, smallint_col,
     int_col, bigint_col, float_col, double_col, cast(tinyint_col as decimal(2,0)),
-    cast(adddate('1970-01-01', tinyint_col) as date)))
+    cast(adddate('1970-01-01', tinyint_col) as date), cast(string_col as binary)))
 from functional.alltypes;
 ---- TYPES
 bigint
@@ -226,9 +233,9 @@ bigint
 # Verify with 'select sum(length(string_col)) + sum(cast(bool_col as int))
 #  + sum(tinyint_col) + sum(smallint_col) + sum(int_col) + sum(bigint_col)
 #  + sum(cast(float_col as bigint)) + sum(cast(double_col as bigint)) + sum(tinyint_col)
-#  + sum(tinyint_col)
+#  + sum(tinyint_col) + sum(bytes(string_col))
 #  from functional.alltypes;'
-865050
+872350
 ====
 ---- QUERY
 select no_args() from functional.alltypes limit 1;

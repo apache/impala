@@ -26,6 +26,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/descriptors.h"
 #include "runtime/tuple.h"
+#include "util/coding-util.h"
 #include "util/string-parser.h"
 #include "runtime/string-value.h"
 #include "runtime/date-value.h"
@@ -38,7 +39,8 @@ namespace impala {
 
 /// Note: this function has a codegen'd version.  Changing this function requires
 /// corresponding changes to CodegenWriteSlot().
-inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tuple,
+inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc,
+    const AuxColumnType* auxType, Tuple* tuple,
     const char* data, int len, bool copy_string, bool need_escape, MemPool* pool) {
   if ((len == 0 && !slot_desc->type().IsStringType()) || data == NULL) {
     tuple->SetNull(slot_desc->null_indicator_offset());
@@ -66,6 +68,15 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
           !(len != 0 && (copy_string || need_escape));
       if (type.type == TYPE_CHAR) reuse_data &= (buffer_len <= len);
 
+      bool base64_decode = false;
+      if (auxType->IsBinaryStringSubtype()) {
+        base64_decode = true;
+        reuse_data = false;
+        int64_t out_len;
+        if (!Base64DecodeBufLen(data, len, &out_len)) return false;
+        buffer_len = out_len;
+      }
+
       StringValue str;
       str.len = std::min(buffer_len, len);
       if (reuse_data) {
@@ -83,7 +94,12 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
             reinterpret_cast<char*>(pool->TryAllocateUnaligned(buffer_len)) :
             reinterpret_cast<char*>(slot);
         if (UNLIKELY(str.ptr == NULL)) return false;
-        if (need_escape) {
+        if (base64_decode) {
+          int64_t out_len;
+          if(!Base64Decode(data, len, buffer_len, str.ptr, &out_len)) return false;
+          DCHECK_LE(out_len, buffer_len);
+          str.len = out_len;
+        } else if (need_escape) {
           // Use a temporary variable on the stack to avoid accessing an unaligned
           // pointer.
           int str_len = str.len;

@@ -205,12 +205,11 @@ string ImpalaServer::ColumnTypeToBeeswaxTypeString(const TColumnType& type) {
   if (type.types.size() == 1) {
     DCHECK_EQ(TTypeNodeType::SCALAR, type.types[0].type);
     DCHECK(type.types[0].__isset.scalar_type);
-    TPrimitiveType::type col_type = type.types[0].scalar_type.type;
-    return TypeToOdbcString(ThriftToType(col_type));
+    return TypeToOdbcString(type);
   } else if (type.types[0].type == TTypeNodeType::ARRAY) {
     DCHECK_GT(type.types.size(), 1);
     // TODO (IMPALA-11041): consider returning the real type
-    return TypeToOdbcString(PrimitiveType::TYPE_STRING);
+    return "string";
   } else if (type.types[0].type == TTypeNodeType::STRUCT) {
     DCHECK_GT(type.types.size(), 1);
     RaiseBeeswaxException("Returning struct types is not supported through the "

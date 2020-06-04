@@ -325,10 +325,15 @@ public class ScalarType extends Type {
 
   @Override
   public boolean supportsTablePartitioning() {
-    if (!isSupported() || isComplexType() || type_ == PrimitiveType.TIMESTAMP) {
-      return false;
+    if (!isSupported() || isComplexType()) return false;
+    switch (type_) {
+      case TIMESTAMP:
+      // Hive allows BINARY partition columns, but it is buggy at the moment: HIVE-12680
+      case BINARY:
+        return false;
+      default:
+        return true;
     }
-    return true;
   }
 
   @Override

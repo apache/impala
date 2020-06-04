@@ -260,17 +260,23 @@ public class ComputeStatsStmt extends StatementBase {
       }
       if (ignoreColumn(c)) continue;
 
-      // NDV approximation function. Add explicit alias for later identification when
-      // updating the Metastore.
       String colRefSql = ToSqlUtils.getIdentSql(c.getName());
-      if (isIncremental_) {
-        columnStatsSelectList.add("NDV_NO_FINALIZE(" + colRefSql + ") AS " + colRefSql);
-      } else if (isSampling()) {
-        columnStatsSelectList.add(String.format("SAMPLED_NDV(%s, %.10f) AS %s",
-            colRefSql, effectiveSamplePerc_, colRefSql));
+
+      if (c.getType().isBinary()) {
+        // NDV is not calculated for BINARY columns (similarly to Hive).
+        columnStatsSelectList.add("NULL AS " + colRefSql);
       } else {
-        // Regular (non-incremental) compute stats without sampling.
-        columnStatsSelectList.add("NDV(" + colRefSql + ") AS " + colRefSql);
+        // NDV approximation function. Add explicit alias for later identification when
+        // updating the Metastore.
+        if (isIncremental_) {
+          columnStatsSelectList.add("NDV_NO_FINALIZE(" + colRefSql + ") AS " + colRefSql);
+        } else if (isSampling()) {
+          columnStatsSelectList.add(String.format("SAMPLED_NDV(%s, %.10f) AS %s",
+              colRefSql, effectiveSamplePerc_, colRefSql));
+        } else {
+          // Regular (non-incremental) compute stats without sampling.
+          columnStatsSelectList.add("NDV(" + colRefSql + ") AS " + colRefSql);
+        }
       }
 
       // Count the number of NULL values.

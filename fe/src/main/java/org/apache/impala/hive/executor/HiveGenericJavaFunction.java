@@ -184,6 +184,8 @@ public class HiveGenericJavaFunction implements HiveJavaFunction {
         return PrimitiveObjectInspectorFactory.writableDoubleObjectInspector;
       case STRING:
         return PrimitiveObjectInspectorFactory.writableStringObjectInspector;
+      case BINARY:
+        return PrimitiveObjectInspectorFactory.writableBinaryObjectInspector;
       default:
         throw new CatalogException("Unsupported type: " + t);
     }

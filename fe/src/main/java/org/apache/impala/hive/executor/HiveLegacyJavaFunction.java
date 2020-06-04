@@ -199,7 +199,7 @@ public class HiveLegacyJavaFunction implements HiveJavaFunction {
     // the function definition. This happens when both of them map to the same primitive
     // type.
     JavaUdfDataType javaRetType = JavaUdfDataType.getType(m.getReturnType());
-    if (retType.getPrimitiveType().toThrift() != javaRetType.getPrimitiveType()) {
+    if (!javaRetType.isCompatibleWith(retType.getPrimitiveType().toThrift())) {
       return false;
     }
 
@@ -211,8 +211,8 @@ public class HiveLegacyJavaFunction implements HiveJavaFunction {
     for (int i = 0; i < m.getParameterTypes().length; ++i) {
       JavaUdfDataType javaArgType =
           JavaUdfDataType.getType(m.getParameterTypes()[i]);
-      if (javaArgType.getPrimitiveType() !=
-          parameterTypes[i].getPrimitiveType().toThrift()) {
+      if (!javaArgType.isCompatibleWith(
+          parameterTypes[i].getPrimitiveType().toThrift())) {
         return false;
       }
     }

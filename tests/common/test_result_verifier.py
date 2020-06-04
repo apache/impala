@@ -503,7 +503,7 @@ def parse_result_rows(exec_result, escape_strings=True):
     assert len(cols) == len(col_types)
     new_cols = list()
     for i in xrange(len(cols)):
-      if col_types[i] in ['STRING', 'CHAR', 'VARCHAR']:
+      if col_types[i] in ['STRING', 'CHAR', 'VARCHAR', 'BINARY']:
         col = cols[i]
         if isinstance(col, str):
           try:

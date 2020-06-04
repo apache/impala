@@ -25,6 +25,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
+#include "util/coding-util.h"
 #include "util/hdfs-util.h"
 #include "util/runtime-profile-counters.h"
 
@@ -75,8 +76,8 @@ Status HdfsTextTableWriter::AppendRows(
   COUNTER_ADD(parent_->rows_inserted_counter(), limit);
 
   bool all_rows = row_group_indices.empty();
-  int num_non_partition_cols =
-      table_desc_->num_cols() - table_desc_->num_clustering_cols();
+  int num_partition_cols = table_desc_->num_clustering_cols();
+  int num_non_partition_cols = table_desc_->num_cols() - num_partition_cols;
   DCHECK_GE(output_expr_evals_.size(), num_non_partition_cols) << parent_->DebugString();
 
   {
@@ -99,7 +100,16 @@ Status HdfsTextTableWriter::AppendRows(
             StringValue sv(val_ptr, StringValue::UnpaddedCharLength(val_ptr, type.len));
             PrintEscaped(&sv);
           } else if (type.IsVarLenStringType()) {
-            PrintEscaped(reinterpret_cast<const StringValue*>(value));
+            const ColumnDescriptor& col_desc =
+                table_desc_->col_descs()[num_partition_cols + j];
+            const StringValue* string_value = reinterpret_cast<const StringValue*>(value);
+            if (col_desc.auxType().IsBinaryStringSubtype()) {
+              // TODO: try to find a more efficient imlementation
+              Base64Encode(
+                  string_value->ptr , string_value->len, &rowbatch_stringstream_);
+            } else {
+              PrintEscaped(string_value);
+            }
           } else {
             output_expr_evals_[j]->PrintValue(value, &rowbatch_stringstream_);
           }

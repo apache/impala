@@ -68,4 +68,7 @@ std::string PrintTColumnValue(const impala::TColumnValue& colval);
 
 /// Return true if one field in value is set. Return false otherwise.
 bool isOneFieldSet(const impala::TColumnValue& value);
+
+apache::hive::service::cli::thrift::TTypeEntry ColumnToHs2Type(
+    const TColumnType& columnType);
 }

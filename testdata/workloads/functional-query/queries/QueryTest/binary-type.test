@@ -1,0 +1,149 @@
+====
+---- QUERY
+select id, string_col, cast(binary_col as string) from binary_tbl
+where string_col != "invalid utf8"
+---- TYPES
+INT, STRING, STRING
+---- RESULTS: RAW_STRING
+1,'ascii','binary1'
+2,'ascii','binary2'
+3,'null','NULL'
+4,'empty',''
+5,'valid utf8','árvíztűrőtükörfúró'
+6,'valid utf8','你好hello'
+====
+---- QUERY
+select id, hex(cast(binary_col as string)) from binary_tbl
+where string_col = "invalid utf8"
+---- TYPES
+INT, STRING
+---- RESULTS
+7,'00FF00FF'
+8,'FF4433221100'
+====
+---- QUERY
+set utf8_mode=0;
+select string_col, length(binary_col) from binary_tbl
+---- TYPES
+STRING, INT
+---- RESULTS
+'ascii',7
+'ascii',7
+'null',NULL
+'empty',0
+'valid utf8',26
+'valid utf8',11
+'invalid utf8',4
+'invalid utf8',6
+====
+---- QUERY
+set utf8_mode=1;
+select string_col, length(binary_col) from binary_tbl
+---- TYPES
+STRING, INT
+---- RESULTS
+'ascii',7
+'ascii',7
+'null',NULL
+'empty',0
+'valid utf8',26
+'valid utf8',11
+'invalid utf8',4
+'invalid utf8',6
+====
+---- QUERY
+select binary_col_with_nulls from binary_tbl_big
+  where binary_col_with_nulls = cast("01/02/09" as binary)
+---- TYPES
+BINARY
+---- RESULTS
+'01/02/09'
+'01/02/09'
+'01/02/09'
+'01/02/09'
+'01/02/09'
+====
+---- QUERY
+select binary_col_with_nulls from binary_tbl_big
+  where binary_col_with_nulls > cast("12/31/09" as binary)
+---- TYPES
+BINARY
+---- RESULTS
+'12/31/10'
+'12/31/10'
+'12/31/10'
+'12/31/10'
+'12/31/10'
+====
+---- QUERY
+select distinct binary_col_with_nulls from binary_tbl_big
+  where binary_col_with_nulls < cast("01/02/09" as binary)
+---- TYPES
+BINARY
+---- RESULTS
+'01/01/09'
+'01/01/10'
+====
+---- QUERY
+set DISABLE_OUTERMOST_TOPN=0;
+select  binary_col_with_nulls from binary_tbl_big
+  where binary_col = cast("4" as binary)
+  order by binary_col_with_nulls limit 3
+---- TYPES
+BINARY
+---- RESULTS
+'01/01/09'
+'01/01/10'
+'01/02/09'
+====
+---- QUERY
+set DISABLE_OUTERMOST_TOPN=1;
+select  binary_col_with_nulls from binary_tbl_big
+  where binary_col = cast("4" as binary)
+  order by binary_col_with_nulls limit 3
+---- TYPES
+BINARY
+---- RESULTS
+'01/01/09'
+'01/01/10'
+'01/02/09'
+====
+---- QUERY
+select count(binary_col_with_nulls), max(binary_col), min(binary_col) from binary_tbl_big
+---- TYPES
+BIGINT, BINARY, BINARY
+---- RESULTS
+3650,'9','0'
+====
+---- QUERY
+# ndv is not yet added for BINARY, casting is needed (IMPALA-11351)
+select count(distinct binary_col_with_nulls), ndv(cast(binary_col_with_nulls as string))
+  from binary_tbl_big
+---- TYPES
+BIGINT, BIGINT
+---- RESULTS
+730,736
+====
+---- QUERY
+# Test multiple count distinct
+select count(distinct binary_col), count(distinct binary_col_with_nulls)
+  from binary_tbl_big
+  where id < 20
+---- TYPES
+BIGINT, BIGINT
+---- RESULTS
+10,2
+====
+---- QUERY
+select bb1.id, bb2.id, bb1.binary_col_with_nulls, bb2.binary_col_with_nulls
+  from binary_tbl_big bb1 left join functional_hbase.binary_tbl_big bb2
+  on bb1.binary_col_with_nulls = bb2.binary_col_with_nulls
+  where bb1.id < 3 and bb2.id < 3;
+---- TYPES
+INT,  INT, BINARY, BINARY
+---- RESULTS
+0,2,'01/01/09','01/01/09'
+0,0,'01/01/09','01/01/09'
+2,2,'01/01/09','01/01/09'
+2,0,'01/01/09','01/01/09'
+====

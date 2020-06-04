@@ -236,16 +236,16 @@ public class AuditingTest extends FrontendTestBase {
 
     // Dropping a table that fails loading should still result in an access event.
     accessEvents = AnalyzeAccessEvents(
-        "drop table functional.unsupported_partition_types");
+        "drop table functional.unsupported_binary_partition");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional.unsupported_partition_types", TCatalogObjectType.TABLE, "DROP")));
+        "functional.unsupported_binary_partition", TCatalogObjectType.TABLE, "DROP")));
 
     // Dropping a table without using a fully qualified path should generate the correct
     // access event (see IMPALA-5318).
     accessEvents = AnalyzeAccessEvents(
-        "drop table unsupported_partition_types", "functional");
+        "drop table unsupported_binary_partition", "functional");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional.unsupported_partition_types", TCatalogObjectType.TABLE, "DROP")));
+        "functional.unsupported_binary_partition", TCatalogObjectType.TABLE, "DROP")));
   }
 
   @Test

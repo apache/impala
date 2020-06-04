@@ -194,19 +194,25 @@ public class PartialCatalogInfoTest {
     assertEquals(resp.lookup_status, CatalogLookupStatus.PARTITION_NOT_FOUND);
   }
 
-  @Test
-  public void testTableStats() throws Exception {
+  private List<ColumnStatisticsObj> fetchColumStats(String dbName, String tblName,
+      ImmutableList<String> columns) throws Exception {
     TGetPartialCatalogObjectRequest req = new TGetPartialCatalogObjectRequest();
     req.object_desc = new TCatalogObject();
     req.object_desc.setType(TCatalogObjectType.TABLE);
-    req.object_desc.table = new TTable("functional", "alltypes");
+    req.object_desc.table = new TTable(dbName, tblName);
     req.table_info_selector = new TTableInfoSelector();
-    req.table_info_selector.want_stats_for_column_names = ImmutableList.of(
-        "year", "month", "id", "bool_col", "tinyint_col", "smallint_col",
-        "int_col", "bigint_col", "float_col", "double_col", "date_string_col",
-        "string_col", "timestamp_col");
+    req.table_info_selector.want_stats_for_column_names = columns;
     TGetPartialCatalogObjectResponse resp = sendRequest(req);
-    List<ColumnStatisticsObj> stats = resp.table_info.column_stats;
+    return resp.table_info.column_stats;
+  }
+
+  @Test
+  public void testTableStats() throws Exception {
+    List<ColumnStatisticsObj> stats = fetchColumStats(
+        "functional", "alltypes", ImmutableList.of(
+            "year", "month", "id", "bool_col", "tinyint_col", "smallint_col",
+            "int_col", "bigint_col", "float_col", "double_col", "date_string_col",
+            "string_col", "timestamp_col"));
     // We have 13 columns, but 2 are the clustering columns which don't have stats.
     assertEquals(11, stats.size());
     assertEquals("ColumnStatisticsObj(colName:id, colType:INT, " +
@@ -216,20 +222,25 @@ public class PartialCatalogInfoTest {
 
   @Test
   public void testDateTableStats() throws Exception {
-    TGetPartialCatalogObjectRequest req = new TGetPartialCatalogObjectRequest();
-    req.object_desc = new TCatalogObject();
-    req.object_desc.setType(TCatalogObjectType.TABLE);
-    req.object_desc.table = new TTable("functional", "date_tbl");
-    req.table_info_selector = new TTableInfoSelector();
-    req.table_info_selector.want_stats_for_column_names = ImmutableList.of(
-        "date_col", "date_part");
-    TGetPartialCatalogObjectResponse resp = sendRequest(req);
-    List<ColumnStatisticsObj> stats = resp.table_info.column_stats;
+    List<ColumnStatisticsObj> stats = fetchColumStats(
+        "functional", "date_tbl",
+        ImmutableList.of("date_col", "date_part"));
     // We have 2 columns, but 1 is the clustering column which doesn't have stats.
     assertEquals(1, stats.size());
     assertEquals("ColumnStatisticsObj(colName:date_col, colType:DATE, " +
         "statsData:<ColumnStatisticsData dateStats:DateColumnStatsData(" +
         "numNulls:2, numDVs:16)>)", stats.get(0).toString());
+  }
+
+  @Test
+  public void testBinaryTableStats() throws Exception {
+    List<ColumnStatisticsObj> stats = fetchColumStats(
+        "functional", "binary_tbl", ImmutableList.of("binary_col"));
+    assertEquals(1, stats.size());
+    assertEquals("ColumnStatisticsObj(colName:binary_col, colType:BINARY, " +
+        "statsData:<ColumnStatisticsData binaryStats:BinaryColumnStatsData(" +
+        "maxColLen:26, avgColLen:8.714285850524902, numNulls:1)>)",
+        stats.get(0).toString());
   }
 
   @Test

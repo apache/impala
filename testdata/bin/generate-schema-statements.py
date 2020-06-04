@@ -219,6 +219,7 @@ HIVE_TO_AVRO_TYPE_MAP = {
   # a timestamp column will fail. We probably want to convert back to timestamps
   # in our tests.
   'TIMESTAMP': 'string',
+  'BINARY': 'bytes',
   }
 
 PARQUET_ALTER_STATEMENT = "ALTER TABLE %(table_name)s SET\n\

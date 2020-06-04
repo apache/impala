@@ -81,6 +81,13 @@ int, int, int
 10,20,30
 ====
 ---- QUERY
+select generic_identity(cast("a" as binary)), generic_identity(cast(NULL as binary));
+---- TYPES
+binary, binary
+---- RESULTS
+'a','NULL'
+====
+---- QUERY
 # IMPALA-1392: Hive UDFs that throw exceptions should return NULL
 select generic_throws_exception();
 ---- TYPES

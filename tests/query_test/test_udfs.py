@@ -113,6 +113,11 @@ returns decimal(20,0) intermediate string location '{location}'
 init_fn='AggStringIntermediateInit' update_fn='AggStringIntermediateUpdate'
 merge_fn='AggStringIntermediateMerge' finalize_fn='AggStringIntermediateFinalize';
 
+create aggregate function {database}.agg_binary_intermediate(decimal(20,10), bigint, binary)
+returns decimal(20,0) intermediate binary location '{location}'
+init_fn='AggStringIntermediateInit' update_fn='AggStringIntermediateUpdate'
+merge_fn='AggStringIntermediateMerge' finalize_fn='AggStringIntermediateFinalize';
+
 create aggregate function {database}.char_intermediate_sum(int) returns int
 intermediate char(10) LOCATION '{location}' update_fn='AggCharIntermediateUpdate'
 init_fn='AggCharIntermediateInit' merge_fn='AggCharIntermediateMerge'
@@ -146,6 +151,10 @@ create function {database}.identity(string) returns string
 location '{location}'
 symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9StringValE';
 
+create function {database}.identity(binary) returns binary
+location '{location}'
+symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9StringValE';
+
 create function {database}.identity(timestamp) returns timestamp
 location '{location}'
 symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_12TimestampValE';
@@ -167,7 +176,8 @@ location '{location}'
 symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_10DecimalValE';
 
 create function {database}.all_types_fn(
-    string, boolean, tinyint, smallint, int, bigint, float, double, decimal(2,0), date)
+    string, boolean, tinyint, smallint, int, bigint, float, double, decimal(2,0), date,
+    binary)
 returns int
 location '{location}' symbol='AllTypes';
 

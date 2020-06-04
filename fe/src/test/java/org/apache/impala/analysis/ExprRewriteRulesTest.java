@@ -405,6 +405,8 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("repeat('A', 65536)", rule, repeat("A", 65_536));
     RewritesOk("repeat('A', 4294967296)", rule, null);
 
+    // Check that constant folding can handle binary results.
+    RewritesOk("cast(concat('a', 'b') as binary)", rule, "'ab'");
   }
 
   @Test

@@ -137,6 +137,7 @@ testdata/cluster/node_templates/cdh5/etc/hadoop/conf/*.xml.tmpl
 testdata/cluster/node_templates/common/etc/kudu/*.conf.tmpl
 testdata/cluster/node_templates/common/etc/hadoop/conf/*.xml.tmpl
 testdata/cluster/ranger/setup/*.json.template
+testdata/data/binary_tbl/000000_0.txt
 testdata/data/chars-formats.txt
 testdata/data/chars-tiny.txt
 testdata/data/parent_table.txt

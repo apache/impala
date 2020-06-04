@@ -80,6 +80,7 @@ public class TestGenericUdf extends GenericUDF {
           .add(PrimitiveCategory.FLOAT)
           .add(PrimitiveCategory.DOUBLE)
           .add(PrimitiveCategory.STRING)
+          .add(PrimitiveCategory.BINARY)
           .build();
 
   public TestGenericUdf() {
@@ -134,6 +135,8 @@ public class TestGenericUdf extends GenericUDF {
         return evaluateDouble(arguments);
       case STRING:
         return evaluateString(arguments);
+      case BINARY:
+        return evaluateBinary(arguments);
       case DATE:
       case TIMESTAMP:
       default:
@@ -295,7 +298,7 @@ public class TestGenericUdf extends GenericUDF {
         return null;
       }
       if (!(input.get() instanceof Text)) {
-        throw new HiveException("Expected String but got " + input.get().getClass());
+        throw new HiveException("Expected Text but got " + input.get().getClass());
       }
       String currentString = ((Text) input.get()).toString();
       finalString += currentString;
@@ -303,6 +306,25 @@ public class TestGenericUdf extends GenericUDF {
     Text resultString = new Text();
     resultString.set(finalString);
     return resultString;
+  }
+
+  public BytesWritable evaluateBinary(DeferredObject[] inputs) throws HiveException {
+    byte[] result = null;
+    for (DeferredObject input : inputs) {
+      if (input == null) {
+        return null;
+      }
+      if (!(input.get() instanceof BytesWritable)) {
+        throw new HiveException(
+            "Expected BytesWritable but got " + input.get().getClass());
+      }
+      byte[] currentArray = ((BytesWritable) input.get()).getBytes();
+      // Unlike other functions, simply return last argument.
+      result = currentArray;
+    }
+    BytesWritable resultBinary = new BytesWritable();
+    if (result != null) resultBinary.set(result, 0, result.length);
+    return resultBinary;
   }
 
   private String getSignatureString(PrimitiveCategory argAndRetType_,

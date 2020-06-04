@@ -275,7 +275,7 @@ public class AnalyzerTest extends FrontendTestBase {
    * 1. Complex types, e.g., map
    *    For tables with such types we prevent loading the table metadata.
    * 2. Primitive types
-   *    For tables with unsupported primitive types (e.g., binary)
+   *    For tables with unsupported primitive types (e.g. datetime)
    *    we can run queries as long as the unsupported columns are not referenced.
    *    We fail analysis if a query references an unsupported primitive column.
    * 3. Partition-column types
@@ -283,33 +283,35 @@ public class AnalyzerTest extends FrontendTestBase {
    */
   @Test
   public void TestUnsupportedTypes() {
-    // Select supported types from a table with mixed supported/unsupported types.
-    AnalyzesOk("select int_col, date_col, str_col, bigint_col " +
-        "from functional.unsupported_types");
+    // With DATE and BINARY support Impala can now handle the same scalar types as Hive.
+    // There is still some gap in supported types for partition columns.
 
-    // Unsupported type binary.
-    AnalysisError("select bin_col from functional.unsupported_types",
-        "Unsupported type 'BINARY' in 'bin_col'.");
-    // Unsupported type binary in a star expansion.
-    AnalysisError("select * from functional.unsupported_types",
-        "Unsupported type 'BINARY' in 'functional.unsupported_types.bin_col'.");
-    // Mixed supported/unsupported types.
-    AnalysisError("select int_col, str_col, bin_col " +
-        "from functional.unsupported_types",
-        "Unsupported type 'BINARY' in 'bin_col'.");
-    AnalysisError("create table tmp as select * from functional.unsupported_types",
-        "Unsupported type 'BINARY' in 'functional.unsupported_types.bin_col'.");
-    // Unsupported type in the target insert table.
-    AnalysisError("insert into functional.unsupported_types " +
-        "values(null, null, null, null, null, null)",
-        "Unable to INSERT into target table (functional.unsupported_types) because " +
-        "the column 'bin_col' has an unsupported type 'BINARY'");
     // Unsupported partition-column type.
-    AnalysisError("select * from functional.unsupported_partition_types",
-        "Failed to load metadata for table: 'functional.unsupported_partition_types'");
-
+    AnalysisError("select * from functional.unsupported_timestamp_partition",
+        "Failed to load metadata for table: " +
+        "'functional.unsupported_timestamp_partition'");
+    AnalysisError("select * from functional.unsupported_binary_partition",
+        "Failed to load metadata for table: 'functional.unsupported_binary_partition'");
     // Try with hbase
     AnalyzesOk("describe functional_hbase.allcomplextypes");
+    // Returning complex types with BINARY in select list is not yet implemented
+    // (IMPALA-11491). Note that this is also problematic in Hive (HIVE-26454).
+    AnalysisError(
+        "select binary_item_col from functional_parquet.binary_in_complex_types",
+        "Binary type inside collection types is not supported (IMPALA-11491).");
+    AnalysisError(
+        "select binary_member_col from functional_parquet.binary_in_complex_types",
+        "Struct containing a BINARY type is not allowed in the select list " +
+        "(IMPALA-11491).");
+    // TODO: change error message once IMPALA-10918 is finished.
+    AnalysisError(
+        "select binary_key_col from functional_parquet.binary_in_complex_types",
+        "Expr 'binary_key_col' in select list returns a map type 'MAP<BINARY,INT>'." +
+        "\nMap type is not allowed in the select list.");
+    AnalysisError(
+        "select binary_value_col from functional_parquet.binary_in_complex_types",
+        "Expr 'binary_value_col' in select list returns a map type 'MAP<INT,BINARY>'." +
+        "\nMap type is not allowed in the select list.");
 
     for (ScalarType t: Type.getUnsupportedTypes()) {
       // Create/Alter table.
@@ -683,7 +685,7 @@ public class AnalyzerTest extends FrontendTestBase {
   @Test
   // Test matching function signatures.
   public void TestFunctionMatching() {
-    Function[] fns = new Function[18];
+    Function[] fns = new Function[19];
     // test()
     fns[0] = createFunction(false);
 
@@ -736,6 +738,8 @@ public class AnalyzerTest extends FrontendTestBase {
     fns[16] = createFunction(true, Type.DATE);
     // test(string...)
     fns[17] = createFunction(true, Type.STRING);
+    // test(binary...)
+    fns[18] = createFunction(true, Type.BINARY);
 
     Assert.assertFalse(fns[1].compare(fns[0], Function.CompareMode.IS_SUPERTYPE_OF));
     Assert.assertTrue(fns[1].compare(fns[2], Function.CompareMode.IS_SUPERTYPE_OF));
@@ -793,6 +797,8 @@ public class AnalyzerTest extends FrontendTestBase {
     Assert.assertFalse(fns[17].compare(fns[15],
         Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
     Assert.assertFalse(fns[17].compare(fns[16],
+        Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+    Assert.assertFalse(fns[18].compare(fns[17],
         Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
 
     for (int i = 0; i < fns.length; ++i) {

@@ -48,6 +48,10 @@ create function generic_identity(string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestGenericUdf';
 
+create function generic_identity(binary) returns binary
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestGenericUdf';
+
 create function generic_add(string, string) returns string
 location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='org.apache.impala.TestGenericUdf';

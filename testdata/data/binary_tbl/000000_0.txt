@@ -1,0 +1,8 @@
+1,ascii,YmluYXJ5MQ==
+2,ascii,YmluYXJ5Mg==
+3,null,\N
+4,empty,
+5,valid utf8,w6FydsOtenTFsXLFkXTDvGvDtnJmw7pyw7M=
+6,valid utf8,5L2g5aW9aGVsbG8=
+7,invalid utf8,AP8A/w==
+8,invalid utf8,/0QzIhEA

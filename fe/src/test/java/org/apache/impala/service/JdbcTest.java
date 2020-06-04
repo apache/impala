@@ -301,6 +301,20 @@ public class JdbcTest extends JdbcTestBase {
     assertFalse(rs.next());
     rs.close();
 
+    // validate BINARY column
+    rs = con_.getMetaData().getColumns(null, "functional", "binary_tbl", null);
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.INTEGER, rs.getInt("DATA_TYPE"));
+    assertEquals(10, rs.getInt("COLUMN_SIZE"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.VARCHAR, rs.getInt("DATA_TYPE"));
+    assertEquals(Integer.MAX_VALUE, rs.getInt("COLUMN_SIZE"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.BINARY, rs.getInt("DATA_TYPE"));
+    assertEquals(Integer.MAX_VALUE, rs.getInt("COLUMN_SIZE"));
+    assertFalse(rs.next());
+    rs.close();
+
     // Validate complex types STRUCT/MAP/ARRAY.
     // To be consistent with Hive's behavior, the TYPE_NAME field is populated
     // with the primitive type name for scalar types, and with the full toSql()

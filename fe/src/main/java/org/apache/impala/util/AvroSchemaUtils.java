@@ -178,7 +178,8 @@ public abstract class AvroSchemaUtils {
       // are taken from the Avro schema.
       if ((colDef.getType().isStringType() && avroCol.getType().isStringType())) {
         Preconditions.checkState(
-            avroCol.getType().getPrimitiveType() == PrimitiveType.STRING);
+            avroCol.getType().getPrimitiveType() == PrimitiveType.STRING
+            || avroCol.getType().isBinary());
         Map<ColumnDef.Option, Object> option = Maps.newHashMap();
         String comment = avroCol.getComment();
         if (comment != null) option.put(ColumnDef.Option.COMMENT, comment);

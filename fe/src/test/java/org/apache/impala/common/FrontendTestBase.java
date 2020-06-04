@@ -156,6 +156,8 @@ public class FrontendTestBase extends AbstractFrontendTest {
       "d2 decimal(10, 0), d3 decimal(20, 10), d4 decimal(38, 38), d5 decimal(10, 5), " +
       "timestamp_col timestamp, string_col string, varchar_col varchar(50), " +
       "char_col char (30), date_col date)");
+    // TODO: no BINARY column added at the moment, as this table is used to test all
+    //       columns with sampled_ndv, which is currently not enabled for BINARY
   }
 
   /**

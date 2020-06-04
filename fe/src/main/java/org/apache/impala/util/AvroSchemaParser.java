@@ -131,11 +131,7 @@ public class AvroSchemaParser {
         return structType;
       case BYTES:
         String logicalType = schema.getProp("logicalType");
-        if (logicalType == null) {
-          throw new AnalysisException(String.format(
-            "logicalType for column '%s' specified at wrong level or was not specified",
-             colName));
-        }
+        if (logicalType == null) return Type.BINARY;
         // Decimal is stored in Avro as a BYTE.
         if (logicalType.equalsIgnoreCase("decimal")) {
           return getDecimalType(schema);

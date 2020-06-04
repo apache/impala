@@ -113,14 +113,18 @@ public class LikePredicate extends Predicate {
     msg.node_type = TExprNodeType.FUNCTION_CALL;
   }
 
+  private static boolean isLikeableType(Type type) {
+    return (type.isStringType() && !type.isBinary()) || type.isNull();
+  }
+
   @Override
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     super.analyzeImpl(analyzer);
-    if (!getChild(0).getType().isStringType() && !getChild(0).getType().isNull()) {
+    if (!isLikeableType(getChild(0).getType())) {
       throw new AnalysisException(
           "left operand of " + op_.toString() + " must be of type STRING: " + toSql());
     }
-    if (!getChild(1).getType().isStringType() && !getChild(1).getType().isNull()) {
+    if (!isLikeableType(getChild(1).getType())) {
       throw new AnalysisException(
           "right operand of " + op_.toString() + " must be of type STRING: " + toSql());
     }

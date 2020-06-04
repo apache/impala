@@ -105,6 +105,10 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
       // Timestamp in the subquery predicate
       AnalyzesOk(String.format("select * from functional.date_tbl where " +
             "date_col %s (select timestamp_col from functional.alltypes)", op));
+      // Binary in the subquery predicate
+      AnalyzesOk(String.format("select * from functional.binary_tbl where " +
+            "binary_col %s (select cast(string_col as binary) " +
+            "from functional.alltypes)", op));
 
       // Subqueries with multiple predicates in the WHERE clause
       AnalyzesOk(String.format("select * from functional.alltypes t where t.id %s " +

@@ -623,13 +623,17 @@ public class ColumnStats {
         }
         break;
       case BINARY:
-        isCompatible = statsData.isSetStringStats();
+        isCompatible = statsData.isSetBinaryStats();
         if (isCompatible) {
           BinaryColumnStatsData binaryStats = statsData.getBinaryStats();
           numNulls_ = binaryStats.getNumNulls();
           maxSize_ = binaryStats.getMaxColLen();
           avgSize_ = Double.valueOf(binaryStats.getAvgColLen()).floatValue();
-          avgSerializedSize_ = avgSize_ + PrimitiveType.BINARY.getSlotSize();
+          if (avgSize_ >= 0) {
+            avgSerializedSize_ = avgSize_ + PrimitiveType.BINARY.getSlotSize();
+          } else {
+            avgSerializedSize_ = -1;
+          }
         }
         break;
       case DECIMAL:
@@ -737,6 +741,8 @@ public class ColumnStats {
     long numFalses = colStats.getNum_falses();
     boolean isLowValueSet = colStats.isSetLow_value();
     boolean isHighValueSet = colStats.isSetHigh_value();
+    long maxStrLen = colStats.getMax_size();
+    double avgStrLen = colStats.getAvg_size();
     switch(colType.getPrimitiveType()) {
       case BOOLEAN:
         colStatsData.setBooleanStats(
@@ -854,10 +860,13 @@ public class ColumnStats {
       case CHAR:
       case VARCHAR:
       case STRING:
-        long maxStrLen = colStats.getMax_size();
-        double avgStrLen = colStats.getAvg_size();
         colStatsData.setStringStats(
             new StringColumnStatsData(maxStrLen, avgStrLen, numNulls, ndv));
+        break;
+      case BINARY:
+        // No NDV is stored for BINARY.
+        colStatsData.setBinaryStats(
+            new BinaryColumnStatsData(maxStrLen, avgStrLen, numNulls));
         break;
       case DECIMAL:
         {

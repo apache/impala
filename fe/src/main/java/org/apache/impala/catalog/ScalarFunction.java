@@ -142,6 +142,7 @@ public class ScalarFunction extends Function {
           break;
         case STRING:
         case VARCHAR:
+        case BINARY:
           beFn += "_StringVal";
           break;
         case CHAR:

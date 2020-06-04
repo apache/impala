@@ -85,6 +85,13 @@ string, string, string, string, string, string
 'why hello there','why hello there','why hello there','NULL','NULL','NULL'
 ====
 ---- QUERY
+select identity(cast("a" as binary)), identity(cast(NULL as binary));
+---- TYPES
+binary, binary
+---- RESULTS
+'a','NULL'
+====
+---- QUERY
 # IMPALA-1134. Each "identity" call below tests a different type (BytesWritable, Text,
 # and String). The different types are handled slightly differently.
 select length(identity("0123456789")),
@@ -235,6 +242,13 @@ select identity_anytype("a", "b", "c");
 string
 ---- RESULTS
 'abc'
+====
+---- QUERY
+# BINARY is only supported when the function is created
+# specifically with BINARY arguments / return type (IMPALA-11340).
+select identity_anytype(cast("a" as binary));
+---- CATCH
+AnalysisException: No matching function with signature
 ====
 ---- QUERY
 # IMPALA-3378: test many Java UDFs being opened and run concurrently

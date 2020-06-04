@@ -552,7 +552,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
     drop function if exists {database}.identity(decimal(38,10));
     drop function if exists {database}.all_types_fn(
         string, boolean, tinyint, smallint, int, bigint, float, double, decimal(2,0),
-        date);
+        date, binary);
     drop function if exists {database}.no_args();
     drop function if exists {database}.var_and(boolean...);
     drop function if exists {database}.var_sum(int...);
@@ -602,6 +602,10 @@ class TestUdfPersistence(CustomClusterTestSuite):
     location '{location}'
     symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9StringValE';
 
+    create function {database}.identity(binary) returns binary
+    location '{location}'
+    symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_9StringValE';
+
     create function {database}.identity(timestamp) returns timestamp
     location '{location}'
     symbol='_Z8IdentityPN10impala_udf15FunctionContextERKNS_12TimestampValE';
@@ -624,7 +628,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
 
     create function {database}.all_types_fn(
         string, boolean, tinyint, smallint, int, bigint, float, double, decimal(2,0),
-        date)
+        date, binary)
     returns int
     location '{location}' symbol='AllTypes';
 

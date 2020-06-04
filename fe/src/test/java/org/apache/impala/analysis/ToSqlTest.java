@@ -972,6 +972,10 @@ public class ToSqlTest extends FrontendTestBase {
         "VALUES(112, DATE '1970-01-01')");
     testToSql("upsert into table functional_kudu.testtbl values(1, 'a', 1)",
         "UPSERT INTO TABLE functional_kudu.testtbl VALUES(1, 'a', 1)");
+    testToSql("insert into table functional.binary_tbl " +
+        "values(1, 'a', cast('a' as binary))",
+        "INSERT INTO TABLE functional.binary_tbl " +
+        "VALUES(1, 'a', CAST('a' AS BINARY))");
   }
 
   /**

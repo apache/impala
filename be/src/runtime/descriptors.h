@@ -213,17 +213,23 @@ class ColumnDescriptor {
   ColumnDescriptor(const TColumnDescriptor& tdesc);
   const std::string& name() const { return name_; }
   const ColumnType& type() const { return type_; }
+
   int field_id() const { return field_id_; }
   int field_map_key_id() const { return field_map_key_id_; }
   int field_map_value_id() const { return field_map_value_id_; }
+
+  const AuxColumnType& auxType() const { return aux_type_; }
   std::string DebugString() const;
 
  private:
   std::string name_;
   ColumnType type_;
+
   int field_id_ = -1;
   int field_map_key_id_ = -1;
   int field_map_value_id_ = -1;
+
+  AuxColumnType aux_type_;
 };
 
 /// Base class for table descriptors.
@@ -241,6 +247,13 @@ class TableDescriptor {
     return slot_desc->col_path().size() == 1 &&
         slot_desc->col_path()[0] < num_clustering_cols_ &&
         !slot_desc->IsVirtual();
+  }
+
+  /// Get ColumnDesc based on SchemaPath.
+  const ColumnDescriptor& GetColumnDesc(const SlotDescriptor* slot_desc) const {
+    DCHECK_EQ(slot_desc->col_path().size(), 1); // Not supported for nested types.
+    DCHECK_LT(slot_desc->col_path()[0], col_descs_.size());
+    return col_descs_[slot_desc->col_path()[0]];
   }
 
   const std::string& name() const { return name_; }

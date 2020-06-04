@@ -1192,6 +1192,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   double_col double,
   date_string_col string,
   string_col string,
+  binary_col binary,
   timestamp_col timestamp,
   year int,
   month int,
@@ -1199,7 +1200,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
 STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
 WITH SERDEPROPERTIES (
   "hbase.columns.mapping" =
-  ":key#b,d:bool_col#b,d:tinyint_col#b,d:smallint_col#b,d:int_col#b,d:bigint_col#b,d:float_col#b,d:double_col#b,d:date_string_col,d:string_col,d:timestamp_col,d:year#b,d:month#b,d:day#b"
+  ":key#b,d:bool_col#b,d:tinyint_col#b,d:smallint_col#b,d:int_col#b,d:bigint_col#b,d:float_col#b,d:double_col#b,d:date_string_col,d:string_col,d:binary_col,d:timestamp_col,d:year#b,d:month#b,d:day#b"
 )
 TBLPROPERTIES("hbase.table.name" = "functional_hbase.insertalltypesaggbinary");
 ====
@@ -1222,6 +1223,7 @@ float_col float
 double_col double
 date_string_col string
 string_col string
+binary_col binary
 timestamp_col timestamp
 ====
 ---- DATASET
@@ -1737,39 +1739,22 @@ partition by range(id)
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-unsupported_types
----- CREATE_HIVE
--- Create a table that mixes supported and unsupported scalar types.
--- We should be able to read the column values of supported types and
--- fail queries that reference  columns of unsupported types.
-CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
-  int_col INT,
-  dec_col DECIMAL,
-  date_col DATE,
-  str_col STRING,
-  bin_col BINARY,
-  bigint_col BIGINT)
-ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
-STORED AS {file_format}
-LOCATION '{hdfs_location}';
----- TABLE_PROPERTIES
-transactional=false
----- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
----- LOAD
-LOAD DATA LOCAL INPATH '{impala_home}/testdata/UnsupportedTypes/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-unsupported_partition_types
+unsupported_timestamp_partition
 ---- CREATE_HIVE
 -- Create a table that is partitioned on an unsupported partition-column type
 CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
   int_col INT)
 PARTITIONED BY (t TIMESTAMP);
----- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+unsupported_binary_partition
+---- CREATE_HIVE
+-- Create a table that is partitioned on an unsupported partition-column type
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  int_col INT)
+PARTITIONED BY (t BINARY);
 ====
 ---- DATASET
 functional
@@ -3518,6 +3503,67 @@ INSERT INTO {db_name}{db_suffix}.{table_name} VALUES
   array("1", "2", NULL),
   array(array("1", "2", NULL), array("3")),
   array(array(array("1", "2", NULL), array("3")), array(array("4")))
- )
+ );
 ---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+binary_tbl
+---- COLUMNS
+id INT
+string_col STRING
+binary_col BINARY
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/binary_tbl/000000_0.txt' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- DEPENDENT_LOAD
+insert overwrite table {db_name}{db_suffix}.{table_name}
+select id, string_col, binary_col from functional.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+binary_tbl_big
+---- PARTITION_COLUMNS
+year INT
+month INT
+---- COLUMNS
+id INT
+int_col INT
+binary_col BINARY
+binary_col_with_nulls BINARY
+---- LOAD
+SET hive.exec.dynamic.partition.mode=nonstrict;
+SET hive.exec.dynamic.partition=true;
+insert overwrite table {db_name}{db_suffix}.{table_name} partition(year, month)
+select id, int_col, cast(string_col as binary),
+       cast(case when id % 2 = 0 then date_string_col else NULL end as binary),
+       year, month
+    from functional.alltypes;
+---- DEPENDENT_LOAD
+insert overwrite table {db_name}{db_suffix}.{table_name} partition(year, month)
+select id, int_col, cast(string_col as binary),
+       cast(case when id % 2 = 0 then date_string_col else NULL end as binary),
+       year, month
+    from functional.alltypes;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+binary_in_complex_types
+---- COLUMNS
+binary_item_col array<binary>
+binary_key_col map<binary, int>
+binary_value_col map<int, binary>
+binary_member_col struct<i:int, b:binary>
+---- DEPENDENT_LOAD_HIVE
+insert overwrite table {db_name}{db_suffix}.{table_name}
+values (
+  array(cast("item1" as binary), cast("item2" as binary)),
+  map(cast("key1" as binary), 1, cast("key2" as binary), 2),
+  map(1, cast("value1" as binary), 2, cast("value2" as binary)),
+  named_struct("i", 0, "b", cast("member" as binary))
+  )
 ====

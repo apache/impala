@@ -472,6 +472,8 @@ Status OrcSchemaResolver::ValidatePrimitiveType(const ColumnType& type,
     case orc::TypeKind::STRING:
     case orc::TypeKind::VARCHAR:
     case orc::TypeKind::CHAR:
+    case orc::TypeKind::BINARY:
+      // orc::TypeKind::BINARY is handled as TYPE_STRING, TYPE_BINARY is not used.
       if (type.type == TYPE_STRING || type.type == TYPE_VARCHAR
           || type.type == TYPE_CHAR) {
         return Status::OK();

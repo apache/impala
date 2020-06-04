@@ -184,6 +184,11 @@ public class CastExpr extends Expr {
         }
         // Disable no-op casts
         if (fromType.equals(toType) && !fromType.isDecimal()) continue;
+        // No built-in function needed for BINARY <-> STRING conversion, while there is
+        // no conversion from / to any other type.
+        if (fromType.isBinary() || toType.isBinary()) {
+          continue;
+        }
         String beClass = toType.isDecimal() || fromType.isDecimal() ?
             "DecimalOperators" : "CastFunctions";
         String beSymbol = "impala::" + beClass + "::CastTo" + Function.getUdfType(toType);
@@ -350,11 +355,19 @@ public class CastExpr extends Expr {
 
     Type childType = children_.get(0).type_;
     Preconditions.checkState(!childType.isNull());
+
     // IMPALA-4550: We always need to set noOp_ to the correct value, since we could
     // be performing a subsequent analysis run and its correct value might have changed.
     // This can happen if the child node gets substituted and its type changes.
     noOp_ = childType.equals(type_);
     if (noOp_) return;
+
+    // BINARY can be only converted from / to STRING and the conversion is NOOP.
+    if ((childType.isBinary() && type_.getPrimitiveType() == PrimitiveType.STRING)
+        || (type_.isBinary() && childType.getPrimitiveType() == PrimitiveType.STRING)) {
+      noOp_ = true;
+      return;
+    }
 
     FunctionName fnName = new FunctionName(BuiltinsDb.NAME, getFnName(type_));
     Type[] args = { childType };

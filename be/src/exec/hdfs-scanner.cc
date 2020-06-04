@@ -286,8 +286,10 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
       need_escape = true;
     }
 
-    SlotDescriptor* desc = scan_node_->materialized_slots()[i];
-    bool error = !text_converter_->WriteSlot(desc, tuple,
+    const SlotDescriptor* slot_desc = scan_node_->materialized_slots()[i];
+    const AuxColumnType& aux_type =
+        scan_node_->hdfs_table()->GetColumnDesc(slot_desc).auxType();
+    bool error = !text_converter_->WriteSlot(slot_desc, &aux_type, tuple,
         fields[i].start, len, false, need_escape, pool);
     error_fields[i] = error;
     *error_in_row |= error;
@@ -370,9 +372,12 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
     // If the type is CHAR, WriteSlot for this slot cannot be codegen'd. To keep codegen
     // for other things, we call the interpreted code for this slot from the codegen'd
     // code instead of failing codegen. See IMPALA-9747.
-    if (TextConverter::SupportsCodegenWriteSlot(slot_desc->type())) {
-      RETURN_IF_ERROR(TextConverter::CodegenWriteSlot(codegen, tuple_desc, slot_desc, &fn,
-          node->hdfs_table_->null_column_value().data(),
+    const AuxColumnType& aux_type =
+        node->hdfs_table_->GetColumnDesc(slot_desc).auxType();
+    if (TextConverter::SupportsCodegenWriteSlot(
+        slot_desc->type(), aux_type)) {
+      RETURN_IF_ERROR(TextConverter::CodegenWriteSlot(codegen, tuple_desc, slot_desc,
+          &aux_type, &fn, node->hdfs_table_->null_column_value().data(),
           node->hdfs_table_->null_column_value().size(), true,
           state->query_options().strict_mode));
       if (i >= LlvmCodeGen::CODEGEN_INLINE_EXPRS_THRESHOLD) codegen->SetNoInline(fn);

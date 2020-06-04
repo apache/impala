@@ -25,6 +25,7 @@
 #include "common/logging.h"
 #include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "gen-cpp/TCLIService_constants.h"
 #include "runtime/date-value.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/raw-value.inline.h"
@@ -119,10 +120,12 @@ void impala::TColumnValueToHS2TColumn(const TColumnValue& col_val,
     case TPrimitiveType::CHAR:
     case TPrimitiveType::VARCHAR:
     case TPrimitiveType::DECIMAL:
+    case TPrimitiveType::BINARY:
       is_null = !col_val.__isset.string_val;
       column->stringVal.values.push_back(col_val.string_val);
       nulls = &column->stringVal.nulls;
       break;
+
     default:
       DCHECK(false) << "Unhandled type: "
                     << TypeToString(ThriftToType(type.types[0].scalar_type.type));
@@ -275,22 +278,43 @@ static void DateExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
   }
 }
 
+// Common logic for BINARY, STRING and VARCHAR.
+static void StringExprValuesToHS2TColumnHelper(ScalarExprEvaluator* expr_eval,
+    RowBatch* batch, int start_idx, int num_rows, uint32_t output_row_idx,
+    vector<string>&  values, string& nulls) {
+  FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
+    StringVal val = expr_eval->GetStringVal(it.Get());
+    if (val.is_null) {
+      values.emplace_back();
+    } else {
+      values.emplace_back(reinterpret_cast<char*>(val.ptr), val.len);
+    }
+    SetNullBit(output_row_idx, val.is_null, &nulls);
+    ++output_row_idx;
+  }
+}
+
 // Implementation for STRING and VARCHAR.
 static void StringExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* batch,
     int start_idx, int num_rows, uint32_t output_row_idx,
     apache::hive::service::cli::thrift::TColumn* column) {
   ReserveSpace(num_rows, output_row_idx, &column->stringVal);
-  FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
-    StringVal val = expr_eval->GetStringVal(it.Get());
-    if (val.is_null) {
-      column->stringVal.values.emplace_back();
-    } else {
-      column->stringVal.values.emplace_back(reinterpret_cast<char*>(val.ptr), val.len);
-    }
-    SetNullBit(output_row_idx, val.is_null, &column->stringVal.nulls);
-    ++output_row_idx;
-  }
+  StringExprValuesToHS2TColumnHelper(
+      expr_eval, batch, start_idx, num_rows, output_row_idx,
+      column->stringVal.values, column->stringVal.nulls);
 }
+
+// Implementation for BINARY. Same as for STRING with the exception of using a different
+// Thrift field.
+static void BinaryExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval, RowBatch* batch,
+    int start_idx, int num_rows, uint32_t output_row_idx,
+    apache::hive::service::cli::thrift::TColumn* column) {
+  ReserveSpace(num_rows, output_row_idx, &column->binaryVal);
+  StringExprValuesToHS2TColumnHelper(
+      expr_eval, batch, start_idx, num_rows, output_row_idx,
+      column->binaryVal.values, column->binaryVal.nulls);
+}
+
 
 // Implementation for CHAR.
 static void CharExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
@@ -486,6 +510,10 @@ void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
       StringExprValuesToHS2TColumn(
           expr_eval, batch, start_idx, num_rows, output_row_idx, column);
       return;
+    case TPrimitiveType::BINARY:
+      BinaryExprValuesToHS2TColumn(
+          expr_eval, batch, start_idx, num_rows, output_row_idx, column);
+      return;
     case TPrimitiveType::CHAR:
       CharExprValuesToHS2TColumn(
           expr_eval, type, batch, start_idx, num_rows, output_row_idx, column);
@@ -546,6 +574,7 @@ void impala::TColumnValueToHS2TColumnValue(const TColumnValue& col_val,
     case TPrimitiveType::DATE:
     case TPrimitiveType::VARCHAR:
     case TPrimitiveType::CHAR:
+    case TPrimitiveType::BINARY:
       // HiveServer2 requires timestamp to be presented as string. Note that the .thrift
       // spec says it should be a BIGINT; AFAICT Hive ignores that and produces a string.
       hs2_col_val->__isset.stringVal = true;
@@ -614,6 +643,8 @@ void impala::ExprValueToHS2TColumnValue(const void* value, const TColumnType& ty
       break;
     case TPrimitiveType::STRING:
     case TPrimitiveType::VARCHAR:
+    // Unlike TColumn, TColumnValue does not differentiate between STRING and BINARY.
+    case TPrimitiveType::BINARY:
       hs2_col_val->__isset.stringVal = true;
       hs2_col_val->stringVal.__isset.value = not_null;
       if (not_null) {
@@ -833,4 +864,93 @@ bool impala::isOneFieldSet(const impala::TColumnValue& value) {
           value.__isset.timestamp_val ||
           value.__isset.decimal_val ||
           value.__isset.date_val);
+}
+
+thrift::TTypeEntry impala::ColumnToHs2Type(
+    const TColumnType& columnType) {
+  const ColumnType& type = ColumnType::FromThrift(columnType);
+  AuxColumnType aux_type(columnType);
+  thrift::TPrimitiveTypeEntry type_entry;
+  switch (type.type) {
+    // Map NULL_TYPE to BOOLEAN, otherwise Hive's JDBC driver won't
+    // work for queries like "SELECT NULL" (IMPALA-914).
+    case TYPE_NULL:
+      type_entry.__set_type(thrift::TTypeId::BOOLEAN_TYPE);
+      break;
+    case TYPE_BOOLEAN:
+      type_entry.__set_type(thrift::TTypeId::BOOLEAN_TYPE);
+      break;
+    case TYPE_TINYINT:
+      type_entry.__set_type(thrift::TTypeId::TINYINT_TYPE);
+      break;
+    case TYPE_SMALLINT:
+      type_entry.__set_type(thrift::TTypeId::SMALLINT_TYPE);
+      break;
+    case TYPE_INT:
+      type_entry.__set_type(thrift::TTypeId::INT_TYPE);
+      break;
+    case TYPE_BIGINT:
+      type_entry.__set_type(thrift::TTypeId::BIGINT_TYPE);
+      break;
+    case TYPE_FLOAT:
+      type_entry.__set_type(thrift::TTypeId::FLOAT_TYPE);
+      break;
+    case TYPE_DOUBLE:
+      type_entry.__set_type(thrift::TTypeId::DOUBLE_TYPE);
+      break;
+    case TYPE_DATE:
+      type_entry.__set_type(thrift::TTypeId::DATE_TYPE);
+      break;
+    case TYPE_TIMESTAMP:
+      type_entry.__set_type(thrift::TTypeId::TIMESTAMP_TYPE);
+      break;
+    case TYPE_STRING:
+      if (aux_type.string_subtype == AuxColumnType::StringSubtype::BINARY) {
+        type_entry.__set_type(thrift::TTypeId::BINARY_TYPE);
+      } else {
+        type_entry.__set_type(thrift::TTypeId::STRING_TYPE);
+      }
+      break;
+    case TYPE_DECIMAL: {
+      thrift::TTypeQualifierValue tprecision;
+      tprecision.__set_i32Value(type.precision);
+      thrift::TTypeQualifierValue tscale;
+      tscale.__set_i32Value(type.scale);
+
+      thrift::TTypeQualifiers type_quals;
+      type_quals.qualifiers[thrift::g_TCLIService_constants.PRECISION] = tprecision;
+      type_quals.qualifiers[thrift::g_TCLIService_constants.SCALE] = tscale;
+      type_entry.__set_typeQualifiers(type_quals);
+      type_entry.__set_type(thrift::TTypeId::DECIMAL_TYPE);
+      break;
+    }
+    case TYPE_CHAR:
+    case TYPE_VARCHAR: {
+      thrift::TTypeQualifierValue tmax_len;
+      tmax_len.__set_i32Value(type.len);
+
+      thrift::TTypeQualifiers type_quals;
+      type_quals.qualifiers[thrift::g_TCLIService_constants.CHARACTER_MAXIMUM_LENGTH]
+          = tmax_len;
+      type_entry.__set_typeQualifiers(type_quals);
+      type_entry.__set_type((type.type == TYPE_CHAR)
+          ? thrift::TTypeId::CHAR_TYPE : thrift::TTypeId::VARCHAR_TYPE);
+      break;
+    }
+    case TYPE_STRUCT:
+    case TYPE_ARRAY:
+      type_entry.__set_type(thrift::TTypeId::STRING_TYPE);
+      break;
+    case TYPE_BINARY:
+    default:
+      // HiveServer2 does not have a type for invalid, datetime or
+      // fixed_uda_intermediate. Binary should be stored as TYPE_STRING, not
+      // TYPE_BINARY in the backend.
+      DCHECK(false) << "bad TypeToTValueType() type: " << type.DebugString();
+      type_entry.__set_type(thrift::TTypeId::STRING_TYPE);
+  };
+
+  thrift::TTypeEntry result;
+  result.__set_primitiveEntry(type_entry);
+  return result;
 }

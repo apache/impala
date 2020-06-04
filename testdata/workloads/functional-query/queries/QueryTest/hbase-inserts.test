@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 insert into table insertalltypesagg
-select id, bigint_col, bool_col, date_string_col, day, double_col, float_col,
+select id, bigint_col, cast(string_col as binary), bool_col, date_string_col, day, double_col, float_col,
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
 ---- RESULTS
 : 11000
@@ -19,7 +19,7 @@ INT, BOOLEAN
 ====
 ---- QUERY
 insert into table insertalltypesagg
-select 9999999, bigint_col, false, date_string_col, day, double_col, float_col,
+select 9999999, bigint_col, cast(string_col as binary), false, date_string_col, day, double_col, float_col,
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
 ---- RESULTS
 : 11000
@@ -46,22 +46,22 @@ select * from insertalltypesagg limit 1
 # test inserting Hive's default text representation of NULL '\N'
 # and make sure a scan returns the string and not NULL
 insert into table insertalltypesagg
-select 9999999, bigint_col, false, "\\N", day, double_col, float_col,
+select 9999999, bigint_col, cast("\\N" as binary), false, "\\N", day, double_col, float_col,
 int_col, month, smallint_col, "\\N", timestamp_col, tinyint_col, year from functional.alltypesagg limit 1
 ---- RESULTS
 : 1
 ====
 ---- QUERY
-select id, date_string_col, string_col from insertalltypesagg
+select id, date_string_col, string_col, binary_col from insertalltypesagg
 where id = 9999999
 ---- RESULTS
-9999999,'\\N','\\N'
+9999999,'\\N','\\N','\\N'
 ---- TYPES
-INT, STRING, STRING
+INT, STRING, STRING, BINARY
 ====
 ---- QUERY
 insert into table insertalltypesaggbinary
-select id, bigint_col, bool_col, date_string_col, day, double_col, float_col,
+select id, bigint_col, cast(string_col as binary), bool_col, date_string_col, day, double_col, float_col,
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
 ---- RESULTS
 : 11000
@@ -109,7 +109,7 @@ INT, BOOLEAN
 ====
 ---- QUERY
 insert into table insertalltypesaggbinary
-select 9999999, bigint_col, false, date_string_col, day, double_col, float_col,
+select 9999999, bigint_col,  cast(string_col as binary), false, date_string_col, day, double_col, float_col,
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
 ---- RESULTS
 : 11000
@@ -136,18 +136,18 @@ select * from insertalltypesaggbinary limit 1
 # test inserting Hive's default text representation of NULL '\N'
 # and make sure a scan returns the string and not NULL
 insert into table insertalltypesaggbinary
-select 9999999, bigint_col, false, "\\N", day, double_col, float_col,
+select 9999999, bigint_col,  cast("\\N" as binary), false, "\\N", day, double_col, float_col,
 int_col, month, smallint_col, "\\N", timestamp_col, tinyint_col, year from functional.alltypesagg limit 1
 ---- RESULTS
 : 1
 ====
 ---- QUERY
-select id, date_string_col, string_col from insertalltypesaggbinary
+select id, date_string_col, string_col, binary_col from insertalltypesaggbinary
 where id = 9999999
 ---- RESULTS
-9999999,'\\N','\\N'
+9999999,'\\N','\\N','\\N'
 ---- TYPES
-INT, STRING, STRING
+INT, STRING, STRING, BINARY
 ====
 ---- QUERY
 #IMPALA-715 handle large string value
@@ -232,4 +232,17 @@ insert into table insert_date_tbl
 select * from insert_date_tbl limit 1
 ---- RESULTS
 : 1
+====
+---- QUERY
+# Insert special characters to binary_col.
+insert into table insertalltypesagg (id, binary_col) values (99999999, cast(unhex('00112233445566778899AABBCCDDEEFF') as binary))
+---- RESULTS
+: 1
+====
+---- QUERY
+select id, hex(cast(binary_col as string)) from insertalltypesagg where id = 99999999
+---- RESULTS
+99999999,'00112233445566778899AABBCCDDEEFF'
+---- TYPES
+INT, STRING
 ====

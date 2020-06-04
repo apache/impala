@@ -23,7 +23,6 @@
 
 #include "common/logging.h"
 #include "gen-cpp/Types_types.h"  // for TPrimitiveType
-#include "gen-cpp/TCLIService_types.h"  // for HiveServer2 Type
 
 namespace llvm {
   class ConstantStruct;
@@ -48,7 +47,7 @@ enum PrimitiveType {
   TYPE_STRING,
   TYPE_DATE,
   TYPE_DATETIME,    // Not implemented
-  TYPE_BINARY,      // Not implemented
+  TYPE_BINARY,      // Not used, see AuxColumnType::StringSubtype
   TYPE_DECIMAL,
   TYPE_CHAR,
   TYPE_VARCHAR,
@@ -62,7 +61,30 @@ enum PrimitiveType {
 PrimitiveType ThriftToType(TPrimitiveType::type ttype);
 TPrimitiveType::type ToThrift(PrimitiveType ptype);
 std::string TypeToString(PrimitiveType t);
-std::string TypeToOdbcString(PrimitiveType t);
+
+// Contains information about a type that generally doesn't affect how it should be
+// handled by backend, but can affect encoding / decoding.
+struct AuxColumnType {
+  // Differentiates between STRING and BINARY.
+  // As STRING is just a byte array in Impala (no UTF-8 encoding), the two types are
+  // practically the same in the backend - only some file format readers/writers
+  // differentiate between the two. Instead of using PrimitiveType::TYPE_BINARY BINARY
+  // uses TYPE_STRING to ensure that everything that works for STRING also works for
+  // BINARY.
+  enum class StringSubtype {
+    STRING,
+    BINARY
+  };
+  StringSubtype string_subtype = StringSubtype::STRING;
+
+  AuxColumnType(const TColumnType& thrift_type);
+
+  inline bool IsBinaryStringSubtype() const {
+    return string_subtype == StringSubtype::BINARY;
+  }
+};
+
+std::string TypeToOdbcString(const TColumnType& type);
 
 // Describes a type. Includes the enum, children types, and any type-specific metadata
 // (e.g. precision and scale for decimals).
@@ -101,6 +123,7 @@ struct ColumnType {
     : type(type), len(-1), precision(-1), scale(-1) {
     DCHECK_NE(type, TYPE_CHAR);
     DCHECK_NE(type, TYPE_VARCHAR);
+    DCHECK_NE(type, TYPE_BINARY);
     DCHECK_NE(type, TYPE_DECIMAL);
     DCHECK_NE(type, TYPE_STRUCT);
     DCHECK_NE(type, TYPE_ARRAY);
@@ -246,7 +269,6 @@ struct ColumnType {
   /// optimizer can pull out fields of the returned ConstantStruct for constant folding.
   llvm::ConstantStruct* ToIR(LlvmCodeGen* codegen) const;
 
-  apache::hive::service::cli::thrift::TTypeEntry ToHs2Type() const;
   std::string DebugString() const;
 
   /// Used to create a possibly nested type from the flattened Thrift representation.

@@ -154,6 +154,7 @@ public class CatalogTest {
     assertNotNull(catalog_.getOrLoadTable("functional", "uservisitssmall", "test", null));
     assertNotNull(catalog_.getOrLoadTable("functional", "view_view", "test", null));
     assertNotNull(catalog_.getOrLoadTable("functional", "date_tbl", "test", null));
+    assertNotNull(catalog_.getOrLoadTable("functional", "binary_tbl", "test", null));
     // IMP-163 - table with string partition column does not load if there are partitions
     assertNotNull(
         catalog_.getOrLoadTable("functional", "StringPartitionKey", "test", null));
@@ -330,6 +331,10 @@ public class CatalogTest {
     checkTableCols(functionalDb, "date_tbl", 1,
         new String[] {"date_part", "id_col", "date_col"},
         new Type[] {Type.DATE, Type.INT, Type.DATE});
+
+    checkTableCols(functionalDb, "binary_tbl", 0,
+        new String[] {"id", "string_col", "binary_col"},
+        new Type[] {Type.INT, Type.STRING, Type.BINARY});
 
     // case-insensitive lookup
     assertEquals(catalog_.getOrLoadTable("functional", "alltypes", "test", null),
@@ -605,6 +610,27 @@ public class CatalogTest {
     assertTrue(stringCol.getStats().getAvgSerializedSize() > 0);
     assertTrue(stringCol.getStats().getMaxSize() > 0);
     assertFalse(stringCol.getStats().hasNulls());
+
+    // DATE and BINARY types are missing from alltypesagg, so date_tbl and binary_tbl
+    // are also checked.
+    HdfsTable dateTable = (HdfsTable) catalog_.getOrLoadTable("functional", "date_tbl",
+        "test", null);
+
+    Column dateCol = dateTable.getColumn("date_col");
+    assertEquals(dateCol.getStats().getAvgSerializedSize(),
+        PrimitiveType.DATE.getSlotSize(), 0.0001);
+    assertEquals(dateCol.getStats().getMaxSize(), PrimitiveType.DATE.getSlotSize());
+    assertTrue(dateCol.getStats().hasNulls());
+
+    HdfsTable binaryTable = (HdfsTable) catalog_.getOrLoadTable("functional",
+         "binary_tbl", "test", null);
+
+    Column binaryCol = binaryTable.getColumn("binary_col");
+    assertTrue(binaryCol.getStats().getAvgSerializedSize() > 0);
+    assertTrue(binaryCol.getStats().getMaxSize() > 0);
+    assertTrue(binaryCol.getStats().hasNulls());
+    // NDV is not calculated for BINARY columns
+    assertFalse(binaryCol.getStats().hasNumDistinctValues());
   }
 
   /**

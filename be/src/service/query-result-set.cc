@@ -414,6 +414,12 @@ int HS2ColumnarResultSet::AddRows(
             from->stringVal.values.begin() + start_idx,
             from->stringVal.values.begin() + start_idx + rows_added);
         break;
+      case TPrimitiveType::BINARY:
+        StitchNulls(num_rows_, rows_added, start_idx, from->binaryVal.nulls,
+            &(to->binaryVal.nulls));
+        to->binaryVal.values.insert(to->binaryVal.values.end(),
+            from->binaryVal.values.begin() + start_idx,
+            from->binaryVal.values.begin() + start_idx + rows_added);
       default:
         DCHECK(false) << "Unsupported type: "
                       << TypeToString(ThriftToType(
@@ -476,6 +482,9 @@ void HS2ColumnarResultSet::InitColumns() {
         case TPrimitiveType::CHAR:
         case TPrimitiveType::STRING:
           col_output.__isset.stringVal = true;
+          break;
+        case TPrimitiveType::BINARY:
+          col_output.__isset.binaryVal = true;
           break;
         default:
           DCHECK(false) << "Unhandled column type: "

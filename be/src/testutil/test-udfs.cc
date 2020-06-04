@@ -64,10 +64,11 @@ IntVal AllTypes(
     FunctionContext* context, const StringVal& string, const BooleanVal& boolean,
     const TinyIntVal& tiny_int, const SmallIntVal& small_int, const IntVal& int_val,
     const BigIntVal& big_int, const FloatVal& float_val, const DoubleVal& double_val,
-    const DecimalVal& decimal, const DateVal& date_val) {
+    const DecimalVal& decimal, const DateVal& date_val, const StringVal& binary_val) {
   int result = string.len + boolean.val + tiny_int.val + small_int.val + int_val.val
                + big_int.val + static_cast<int64_t>(float_val.val)
-               + static_cast<int64_t>(double_val.val) + decimal.val4 + date_val.val;
+               + static_cast<int64_t>(double_val.val) + decimal.val4 + date_val.val
+               + binary_val.len;
   return IntVal(result);
 }
 

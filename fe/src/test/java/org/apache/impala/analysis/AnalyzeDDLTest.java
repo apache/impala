@@ -1931,7 +1931,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "DROP VIEW not allowed on a table: functional.alltypes");
 
     // No analysis error for tables that can't be loaded.
-    AnalyzesOk("drop table functional.unsupported_partition_types");
+    AnalyzesOk("drop table functional.unsupported_binary_partition");
   }
 
   @Test
@@ -2666,6 +2666,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Unsupported partition-column types.
     AnalysisError("create table new_table (i int) PARTITIONED BY (t timestamp)",
         "Type 'TIMESTAMP' is not supported as partition-column type in column: t");
+    AnalysisError("create table new_table (i int) PARTITIONED BY (t binary)",
+        "Type 'BINARY' is not supported as partition-column type in column: t");
 
     // Caching ops
     AnalyzesOk("create table cached_tbl(i int) partitioned by(j int) " +
@@ -3327,7 +3329,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("create function identity(string) RETURNS int " +
         "LOCATION '/test-warehouse/libTestUdfs.so' " + "SYMBOL='Identity'");
     AnalyzesOk("create function all_types_fn(string, boolean, tinyint, " +
-        "smallint, int, bigint, float, double, decimal, date) returns int " +
+        "smallint, int, bigint, float, double, decimal, date, binary) returns int " +
         "location '/test-warehouse/libTestUdfs.so' symbol='AllTypes'");
 
     // Try creating functions with illegal function names.
@@ -3642,6 +3644,7 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     TypeDefsAnalyzeOk("DECIMAL");
     TypeDefsAnalyzeOk("TIMESTAMP");
     TypeDefsAnalyzeOk("DATE");
+    TypeDefsAnalyzeOk("BINARY");
 
     // Test decimal.
     TypeDefsAnalyzeOk("DECIMAL");

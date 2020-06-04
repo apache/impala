@@ -45,11 +45,12 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const ScanPlanNode& pnode,
     : ScanNode(pool, pnode, descs),
       table_name_(pnode.tnode_->hbase_scan_node.table_name),
       tuple_id_(pnode.tnode_->hbase_scan_node.tuple_id),
-      tuple_desc_(NULL),
+      tuple_desc_(nullptr),
+      hbase_table_(nullptr),
       tuple_idx_(0),
       filters_(pnode.tnode_->hbase_scan_node.filters),
-      hbase_scanner_(NULL),
-      row_key_slot_(NULL),
+      hbase_scanner_(nullptr),
+      row_key_slot_(nullptr),
       row_key_binary_encoded_(false),
       text_converter_(new TextConverter('\\', "", false)),
       suggested_max_caching_(0) {
@@ -78,9 +79,8 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
   // Here, we re-order the slots from the query by family/qualifier, exploiting the
   // known sort order of the columns retrieved from HBase, to avoid family/qualifier
   // comparisons.
-  const HBaseTableDescriptor* hbase_table =
-      static_cast<const HBaseTableDescriptor*>(tuple_desc_->table_desc());
-  const vector<HBaseTableDescriptor::HBaseColumnDescriptor>& cols = hbase_table->cols();
+  hbase_table_ = static_cast<const HBaseTableDescriptor*>(tuple_desc_->table_desc());
+  const vector<HBaseTableDescriptor::HBaseColumnDescriptor>& cols = hbase_table_->cols();
   const vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   sorted_non_key_slots_.reserve(slots.size());
   for (int i = 0; i < slots.size(); ++i) {
@@ -126,7 +126,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
       sr.set_stop_key(key_range.stopkey());
     }
   }
-  runtime_profile_->AddInfoString("Table Name", hbase_table->fully_qualified_name());
+  runtime_profile_->AddInfoString("Table Name", hbase_table_->fully_qualified_name());
   return Status::OK();
 }
 
@@ -145,9 +145,10 @@ Status HBaseScanNode::Open(RuntimeState* state) {
 
 void HBaseScanNode::WriteTextSlot(
     const string& family, const string& qualifier,
-    void* value, int value_length, SlotDescriptor* slot,
+    void* value, int value_length, SlotDescriptor* slot_desc,
     RuntimeState* state, MemPool* pool, Tuple* tuple, bool* error_in_row) {
-  if (!text_converter_->WriteSlot(slot, tuple,
+  const AuxColumnType& aux_type = hbase_table_->GetColumnDesc(slot_desc).auxType();
+  if (!text_converter_->WriteSlot(slot_desc, &aux_type, tuple,
       reinterpret_cast<char*>(value), value_length, true, false, pool)) {
     *error_in_row = true;
     if (state->LogHasSpace()) {
@@ -155,7 +156,7 @@ void HBaseScanNode::WriteTextSlot(
       ss << "Error converting column " << family
           << ":" << qualifier << ": "
           << "'" << string(reinterpret_cast<char*>(value), value_length) << "' TO "
-          << slot->type();
+          << slot_desc->type();
       state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
     }
   }

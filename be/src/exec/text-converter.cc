@@ -107,10 +107,11 @@ void TextConverter::UnescapeString(const char* src, char* dest, int* len,
 // TODO: convert this function to use cross-compilation + constant substitution in whole
 // or part. It is currently too complex and doesn't implement the full functionality.
 Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
-    TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc, llvm::Function** fn,
-    const char* null_col_val, int len, bool check_null, bool strict_mode) {
+    TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc,
+    const AuxColumnType* aux_type, llvm::Function** fn, const char* null_col_val,
+    int len, bool check_null, bool strict_mode) {
   DCHECK(fn != nullptr);
-  DCHECK(SupportsCodegenWriteSlot(slot_desc->type()));
+  DCHECK(SupportsCodegenWriteSlot(slot_desc->type(), *aux_type));
 
   // Codegen is_null_string
   bool is_default_null = (len == 2 && null_col_val[0] == '\\' && null_col_val[1] == 'N');
@@ -349,6 +350,11 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   return Status::OK();
 }
 
-bool TextConverter::SupportsCodegenWriteSlot(const ColumnType& col_type) {
+bool TextConverter::SupportsCodegenWriteSlot(const ColumnType& col_type,
+    const AuxColumnType& auxType) {
+  if (col_type.type == TYPE_STRING) {
+    // TODO: implement codegen for binary (IMPALA-11475)
+    return auxType.string_subtype != AuxColumnType::StringSubtype::BINARY;
+  }
   return col_type.type != TYPE_CHAR;
 }

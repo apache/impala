@@ -1693,6 +1693,10 @@ public class Analyzer {
       throw new AnalysisException(
           "MAP type inside collection types is not supported.");
     }
+    if (resolvedPathToItem.destType().isBinary()) {
+      throw new AnalysisException(
+          "Binary type inside collection types is not supported (IMPALA-11491).");
+    }
     registerSlotRef(resolvedPathToItem, false);
     return desc;
   }

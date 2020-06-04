@@ -44,6 +44,7 @@ public class LiteralExprTest extends FrontendTestBase {
     testLiteralExprPositive("1.0", Type.FLOAT);
     testLiteralExprPositive("1.0", Type.DOUBLE);
     testLiteralExprPositive("ABC", Type.STRING);
+    testLiteralExprPositive("ABC", Type.BINARY);
     testLiteralExprPositive("1.1", ScalarType.createDecimalType(2, 1));
     testLiteralExprPositive("2001-02-28", Type.DATE);
 

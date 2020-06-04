@@ -41,9 +41,7 @@ public enum PrimitiveType {
   // 8-byte pointer and 4-byte length indicator (12 bytes total).
   STRING("STRING", 12, TPrimitiveType.STRING),
   VARCHAR("VARCHAR", 12, TPrimitiveType.VARCHAR),
-
-  // Unsupported scalar type.
-  BINARY("BINARY", -1, TPrimitiveType.BINARY),
+  BINARY("BINARY", 12, TPrimitiveType.BINARY),
 
   // For decimal at the highest precision, the BE uses 16 bytes.
   DECIMAL("DECIMAL", 16, TPrimitiveType.DECIMAL),

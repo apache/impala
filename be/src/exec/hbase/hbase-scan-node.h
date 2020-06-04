@@ -79,6 +79,9 @@ class HBaseScanNode : public ScanNode {
   /// Descriptor of tuples read from HBase table.
   const TupleDescriptor* tuple_desc_;
 
+  /// Descriptor of the HBase table. Set during Prepare().
+  const HBaseTableDescriptor* hbase_table_;
+
   /// Tuple index in tuple row.
   int tuple_idx_;
 

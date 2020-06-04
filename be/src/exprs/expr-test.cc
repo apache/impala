@@ -358,7 +358,11 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
       return "";
     }
     EXPECT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetDetail();
-    EXPECT_EQ(TypeToOdbcString(expr_type.type), result_types[0].type) << expr;
+    string odbcType = TypeToOdbcString(expr_type.ToThrift());
+    // ColumnType cannot be BINARY, so STRING is used instead.
+    string expectedType =
+        result_types[0].type == "binary" ? "string" : result_types[0].type;
+    EXPECT_EQ(odbcType, expectedType) << expr;
     return result_row;
   }
 
@@ -770,28 +774,32 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     TestValue("0/0 < 1/0", TYPE_BOOLEAN, false);
   }
 
-  void TestStringComparisons() {
-    TestValue<bool>("'abc' = 'abc'", TYPE_BOOLEAN, true);
-    TestValue<bool>("'abc' = 'abcd'", TYPE_BOOLEAN, false);
-    TestValue<bool>("'abc' != 'abcd'", TYPE_BOOLEAN, true);
-    TestValue<bool>("'abc' != 'abc'", TYPE_BOOLEAN, false);
-    TestValue<bool>("'abc' < 'abcd'", TYPE_BOOLEAN, true);
-    TestValue<bool>("'abcd' < 'abc'", TYPE_BOOLEAN, false);
-    TestValue<bool>("'abcd' < 'abcd'", TYPE_BOOLEAN, false);
-    TestValue<bool>("'abc' > 'abcd'", TYPE_BOOLEAN, false);
-    TestValue<bool>("'abcd' > 'abc'", TYPE_BOOLEAN, true);
-    TestValue<bool>("'abcd' > 'abcd'", TYPE_BOOLEAN, false);
-    TestValue<bool>("'abc' <= 'abcd'", TYPE_BOOLEAN, true);
-    TestValue<bool>("'abcd' <= 'abc'", TYPE_BOOLEAN, false);
-    TestValue<bool>("'abcd' <= 'abcd'", TYPE_BOOLEAN, true);
-    TestValue<bool>("'abc' >= 'abcd'", TYPE_BOOLEAN, false);
-    TestValue<bool>("'abcd' >= 'abc'", TYPE_BOOLEAN, true);
-    TestValue<bool>("'abcd' >= 'abcd'", TYPE_BOOLEAN, true);
+  void TestStringComparisons(string string_type) {
+    string abc = "cast('abc' as " + string_type + ")";
+    string abcd = "cast('abcd' as " + string_type + ")";
+    string empty = "cast('' as " + string_type + ")";
+
+    TestValue<bool>(abc + " = " + abc, TYPE_BOOLEAN, true);
+    TestValue<bool>(abc + " = " + abcd, TYPE_BOOLEAN, false);
+    TestValue<bool>(abc + " != " + abcd, TYPE_BOOLEAN, true);
+    TestValue<bool>(abc + " != " + abc, TYPE_BOOLEAN, false);
+    TestValue<bool>(abc + " < " + abcd, TYPE_BOOLEAN, true);
+    TestValue<bool>(abcd + " < " + abc, TYPE_BOOLEAN, false);
+    TestValue<bool>(abcd + " < " + abcd, TYPE_BOOLEAN, false);
+    TestValue<bool>(abc + " > " + abcd, TYPE_BOOLEAN, false);
+    TestValue<bool>(abcd + " > " + abc, TYPE_BOOLEAN, true);
+    TestValue<bool>(abcd + " > " + abcd, TYPE_BOOLEAN, false);
+    TestValue<bool>(abc + " <= " + abcd, TYPE_BOOLEAN, true);
+    TestValue<bool>(abcd + " <= " + abc, TYPE_BOOLEAN, false);
+    TestValue<bool>(abcd + " <= " + abcd, TYPE_BOOLEAN, true);
+    TestValue<bool>(abc + " >= " + abcd, TYPE_BOOLEAN, false);
+    TestValue<bool>(abcd + " >= " + abc, TYPE_BOOLEAN, true);
+    TestValue<bool>(abcd + " >= " + abcd, TYPE_BOOLEAN, true);
 
     // Test some empty strings
-    TestValue<bool>("'abcd' >= ''", TYPE_BOOLEAN, true);
-    TestValue<bool>("'' > ''", TYPE_BOOLEAN, false);
-    TestValue<bool>("'' = ''", TYPE_BOOLEAN, true);
+    TestValue<bool>(abcd + " >= " + empty, TYPE_BOOLEAN, true);
+    TestValue<bool>(empty + " > " + empty, TYPE_BOOLEAN, false);
+    TestValue<bool>(empty + " = " + empty, TYPE_BOOLEAN, true);
   }
 
   void TestDecimalComparisons() {
@@ -1205,6 +1213,8 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     return pool_.Add(
         UdfTestHarness::CreateTestContext(return_type, arg_types, state, pool));
   }
+
+  void TestBytes();
 };
 
 template<>
@@ -3164,7 +3174,10 @@ TEST_P(ExprTest, BinaryPredicates) {
   TestFixedPointComparisons<int64_t>(false);
   TestFloatingPointComparisons<float>(true);
   TestFloatingPointComparisons<double>(false);
-  TestStringComparisons();
+  TestStringComparisons("STRING");
+  TestStringComparisons("BINARY");
+  TestStringComparisons("VARCHAR(4)");
+  TestStringComparisons("CHAR(4)");
   TestDecimalComparisons();
   TestNullComparisons();
   TestDistinctFrom();
@@ -4725,6 +4738,26 @@ TEST_P(ExprTest, StringFunctions) {
   TestIsNull("concat('a', 'b', NULL)", TYPE_STRING);
   TestStringValue("concat('', '', '')", "");
 
+  // Concat should work with BINARY the same way as with STRING
+  TestStringValue("concat(cast('a' as binary))", "a");
+  TestStringValue("concat(cast('a' as binary), cast('b' as binary))", "ab");
+  TestStringValue(
+      "concat(cast('a' as binary), cast('b' as binary), cast('cde' as binary))",
+      "abcde");
+  TestStringValue(
+      "concat(cast('a' as binary) , cast('b' as binary), "
+      "cast('cde' as binary), cast('fg' as binary))",
+      "abcdefg");
+  TestStringValue(
+       "concat(cast('a' as binary), cast('b' as binary), cast('cde' as binary), "
+       "cast('' as binary), cast('fg' as binary), cast('' as binary))",
+       "abcdefg");
+  TestIsNull("concat(cast(NULL as binary))", TYPE_STRING);
+  TestIsNull("concat(cast('a' as binary), NULL, cast('b' as binary))", TYPE_STRING);
+  TestIsNull("concat(cast('a' as binary), cast('b' as binary), NULL)", TYPE_STRING);
+  TestStringValue(
+      "concat(cast('' as binary), cast('' as binary), cast('' as binary))", "");
+
   TestStringValue("concat_ws(',', 'a')", "a");
   TestStringValue("concat_ws(',', 'a', 'b')", "a,b");
   TestStringValue("concat_ws(',', 'a', 'b', 'cde')", "a,b,cde");
@@ -5498,6 +5531,8 @@ TEST_P(ExprTest, MurmurHashFunction) {
   // changes behavior.
   EXPECT_EQ(-3190198453633110066, expected);
   TestValue("murmur_hash('hello world')", TYPE_BIGINT, expected);
+  // BINARY should return the same hash as STRING
+  TestValue("murmur_hash(cast('hello world' as binary))", TYPE_BIGINT, expected);
   s = string("");
   expected = HashUtil::MurmurHash2_64(s.data(), s.size(), HashUtil::MURMUR_DEFAULT_SEED);
   TestValue("murmur_hash('')", TYPE_BIGINT, expected);
@@ -7247,9 +7282,9 @@ TEST_P(ExprTest, TimestampFunctions) {
     Status status = executor_->Exec(stmt, &result_types);
     EXPECT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetDetail();
     DCHECK(result_types.size() == 2);
-    EXPECT_EQ(TypeToOdbcString(TYPE_TIMESTAMP), result_types[0].type)
+    EXPECT_EQ(result_types[0].type, "timestamp")
         << "invalid type returned by now()";
-    EXPECT_EQ(TypeToOdbcString(TYPE_TIMESTAMP), result_types[1].type)
+    EXPECT_EQ(result_types[1].type, "timestamp")
         << "invalid type returned by utc_timestamp()";
     string result_row;
     status = executor_->FetchResult(&result_row);
@@ -8405,6 +8440,9 @@ TEST_P(ExprTest, ConditionalFunctions) {
   TestValue("if(FALSE, cast(5.5 as double), cast(8.8 as double))", TYPE_DOUBLE, 8.8);
   TestStringValue("if(TRUE, 'abc', 'defgh')", "abc");
   TestStringValue("if(FALSE, 'abc', 'defgh')", "defgh");
+  TestStringValue("if(TRUE, cast('a' as binary), cast('b' as binary))", "a");
+  TestStringValue("if(FALSE, cast('a' as binary), cast('b' as binary))", "b");
+
   TimestampValue then_val = TimestampValue::FromUnixTime(1293872461, UTCPTR);
   TimestampValue else_val = TimestampValue::FromUnixTime(929387245, UTCPTR);
   TestTimestampValue("if(TRUE, cast('2011-01-01 09:01:01' as timestamp), "
@@ -8427,6 +8465,9 @@ TEST_P(ExprTest, ConditionalFunctions) {
   TestValue("nvl2(NULL, cast(5.5 as double), cast(8.8 as double))", TYPE_DOUBLE, 8.8);
   TestStringValue("nvl2('some string', 'abc', 'defgh')", "abc");
   TestStringValue("nvl2(NULL, 'abc', 'defgh')", "defgh");
+  TestStringValue(
+      "nvl2(cast('' as binary), cast('a' as binary), cast('b' as binary))", "a");
+  TestStringValue("nvl2(NULL, cast('a' as binary), cast('b' as binary))", "b");
   TimestampValue first_val = TimestampValue::FromUnixTime(1293872461, UTCPTR);
   TimestampValue second_val = TimestampValue::FromUnixTime(929387245, UTCPTR);
   TestTimestampValue("nvl2(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
@@ -8456,6 +8497,10 @@ TEST_P(ExprTest, ConditionalFunctions) {
   TestStringValue("nullif('abc', 'def')", "abc");
   TestIsNull("nullif(NULL, 'abc')", TYPE_STRING);
   TestStringValue("nullif('abc', NULL)", "abc");
+  TestIsNull("nullif(cast('a' as binary), cast('a' as binary))", TYPE_STRING);
+  TestStringValue("nullif(cast('a' as binary), cast('b' as binary))", "a");
+  TestIsNull("nullif(NULL, cast('a' as binary))", TYPE_STRING);
+  TestStringValue("nullif(cast('a' as binary), NULL)", "a");
   TestIsNull("nullif(cast('2011-01-01 09:01:01' as timestamp), "
       "cast('2011-01-01 09:01:01' as timestamp))", TYPE_TIMESTAMP);
   TimestampValue testlhs = TimestampValue::FromUnixTime(1293872461, UTCPTR);
@@ -8492,6 +8537,7 @@ TEST_P(ExprTest, ConditionalFunctions) {
     TestValue(f + "(NULL, cast(10.0 as float))", TYPE_FLOAT, 10.0f);
     TestValue(f + "(NULL, cast(10.0 as double))", TYPE_DOUBLE, 10.0);
     TestStringValue(f + "(NULL, 'abc')", "abc");
+    TestStringValue(f + "(NULL, cast('abc' as binary))", "abc");
     TestTimestampValue(f + "(NULL, " + default_timestamp_str_ + ")",
         default_timestamp_val_);
     TestDateValue(f + "(NULL, " + default_date_str_ + ")", default_date_val_);
@@ -8525,6 +8571,10 @@ TEST_P(ExprTest, ConditionalFunctions) {
   TestStringValue("coalesce(NULL, 'abc', NULL)", "abc");
   TestStringValue("coalesce('defgh', NULL, 'abc', NULL)", "defgh");
   TestStringValue("coalesce(NULL, NULL, NULL, 'abc', NULL, NULL)", "abc");
+  TestStringValue("coalesce(cast('a' as binary))", "a");
+  TestStringValue("coalesce(NULL, cast('a' as binary), NULL)", "a");
+  TestStringValue("coalesce(cast('a' as binary), NULL, cast('b' as binary), NULL)", "a");
+  TestStringValue("coalesce(NULL, NULL, NULL, cast('a' as binary), NULL, NULL)", "a");
   TimestampValue ats = TimestampValue::FromUnixTime(1293872461, UTCPTR);
   TimestampValue bts = TimestampValue::FromUnixTime(929387245, UTCPTR);
   TestTimestampValue("coalesce(cast('2011-01-01 09:01:01' as timestamp))", ats);
@@ -10724,14 +10774,29 @@ TEST_P(ExprTest, Utf8MaskTest) {
   executor_->PopExecOption();
 }
 
-TEST_P(ExprTest, BytesTest) {
+void ExprTest::TestBytes() {
   // Verifies Bytes(exp) counts number of bytes.
   TestIsNull("Bytes(NULL)", TYPE_INT);
   TestValue("Bytes('你好')", TYPE_INT, 6);
   TestValue("Bytes('你好hello')", TYPE_INT, 11);
   TestValue("Bytes('你好 hello 你好')", TYPE_INT, 19);
   TestValue("Bytes('hello')", TYPE_INT, 5);
+  // BINARY uses "bytes" behind "length"
+  TestIsNull("Length(CAST(NULL AS BINARY))", TYPE_INT);
+  TestValue("Length(CAST('你好' AS BINARY))", TYPE_INT, 6);
+  TestValue("Length(CAST('你好hello' AS BINARY))", TYPE_INT, 11);
+  TestValue("Length(CAST('你好 hello 你好' AS BINARY))", TYPE_INT, 19);
+  TestValue("Length(CAST('hello' AS BINARY))", TYPE_INT, 5);
 }
+
+TEST_P(ExprTest, BytesTest) {
+  // Bytes should behave the same regardless of utf8_mode.
+  TestBytes();
+  executor_->PushExecOption("utf8_mode=true");
+  TestBytes();
+  executor_->PopExecOption();
+}
+
 TEST_P(ExprTest, Utf8Test) {
   // Verifies utf8_length() counts length by UTF-8 characters instead of bytes.
   // '你' and '好' are both encoded into 3 bytes.
