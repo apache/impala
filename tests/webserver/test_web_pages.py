@@ -621,12 +621,7 @@ class TestWebPage(ImpalaTestSuite):
     # check that metrics exist
     assert 'max_query_mem_limit' in pool_config
     assert 'min_query_mem_limit' in pool_config
-    assert 'max_running_queries_multiple' in pool_config
-    assert 'max_memory_multiple' in pool_config
     assert 'clamp_mem_limit_query_option' in pool_config
-    assert 'max_running_queries_derived' in pool_config
-    assert 'max_queued_queries_derived' in pool_config
-    assert 'max_memory_derived' in pool_config
 
   def __fetch_resource_pools_json(self, pool_name=None):
     """Helper method used to fetch the resource pool json from the admission debug page.

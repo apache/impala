@@ -484,13 +484,6 @@ class AdmissionController {
       IntGauge* max_query_mem_limit;
       IntGauge* min_query_mem_limit;
       BooleanProperty* clamp_mem_limit_query_option;
-      DoubleGauge* max_running_queries_multiple;
-      DoubleGauge* max_queued_queries_multiple;
-      IntGauge* max_memory_multiple;
-      /// Metrics exposing the pool's derived runtime configuration.
-      IntGauge* max_running_queries_derived;
-      IntGauge* max_queued_queries_derived;
-      IntGauge* max_memory_derived;
     };
 
     PoolStats(AdmissionController* parent, const std::string& name)
@@ -547,10 +540,7 @@ class AdmissionController {
     const TPoolStats& local_stats() { return local_stats_; }
 
     /// Updates the metrics exposing the pool configuration to those in pool_cfg.
-    void UpdateConfigMetrics(const TPoolConfig& pool_cfg, int64_t cluster_size);
-
-    /// Updates the metrics exposing the scalable pool configuration values.
-    void UpdateDerivedMetrics(const TPoolConfig& pool_cfg, int64_t cluster_size);
+    void UpdateConfigMetrics(const TPoolConfig& pool_cfg);
 
     PoolMetrics* metrics() { return &metrics_; }
     std::string DebugString() const;
@@ -794,8 +784,7 @@ class AdmissionController {
   /// true and keeps queue_node->admitted_schedule unset if the query cannot be admitted
   /// now, but also does not need to be rejected. If the query must be rejected, this
   /// method returns false and sets queue_node->not_admitted_reason.
-  bool FindGroupToAdmitOrReject(
-      int64_t cluster_size, ClusterMembershipMgr::SnapshotPtr membership_snapshot,
+  bool FindGroupToAdmitOrReject(ClusterMembershipMgr::SnapshotPtr membership_snapshot,
       const TPoolConfig& pool_config, bool admit_from_queue, PoolStats* pool_stats,
       QueueNode* queue_node);
 
@@ -808,7 +797,7 @@ class AdmissionController {
   /// false and not_admitted_reason specifies why the request can not be admitted
   /// immediately. Caller owns not_admitted_reason. Must hold admission_ctrl_lock_.
   bool CanAdmitRequest(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
-      int64_t cluster_size, bool admit_from_queue, std::string* not_admitted_reason);
+      bool admit_from_queue, std::string* not_admitted_reason);
 
   /// Returns true if all executors can accommodate the largest initial reservation of
   /// any executor and the backend running the coordinator fragment can accommodate its
@@ -832,8 +821,7 @@ class AdmissionController {
   /// 'mem_unavailable_reason'.
   /// Must hold admission_ctrl_lock_.
   bool HasAvailableMemResources(const QuerySchedule& schedule,
-      const TPoolConfig& pool_cfg, int64_t cluster_size,
-      std::string* mem_unavailable_reason);
+      const TPoolConfig& pool_cfg, std::string* mem_unavailable_reason);
 
   /// Returns true if there are enough available slots on all executors in the schedule to
   /// fit the query schedule. The number of slots per executors does not change with the
@@ -891,7 +879,7 @@ class AdmissionController {
   /// disabled, or the queue is already full.
   /// Must hold admission_ctrl_lock_.
   bool RejectForCluster(const std::string& pool_name, const TPoolConfig& pool_cfg,
-      bool admit_from_queue, int64_t cluster_size, std::string* rejection_reason);
+      bool admit_from_queue, std::string* rejection_reason);
 
   /// Returns true if a request must be rejected immediately based on the pool
   /// configuration and a particular schedule, e.g. because the memory requirements of the
@@ -900,7 +888,7 @@ class AdmissionController {
   /// other groups, either.
   /// Must hold admission_ctrl_lock_.
   bool RejectForSchedule(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
-      int64_t cluster_size, int64_t group_size, std::string* rejection_reason);
+      std::string* rejection_reason);
 
   /// Gets or creates the PoolStats for pool_name. Must hold admission_ctrl_lock_.
   PoolStats* GetPoolStats(const std::string& pool_name, bool dcheck_exists = false);
@@ -933,20 +921,10 @@ class AdmissionController {
       const std::string& pool_name, const std::string& backend_id);
 
   /// Returns the maximum memory for the pool.
-  static int64_t GetMaxMemForPool(const TPoolConfig& pool_config, int64_t cluster_size);
-
-  /// Returns a description of how the maximum memory for the pool is configured.
-  static std::string GetMaxMemForPoolDescription(
-      const TPoolConfig& pool_config, int64_t cluster_size);
+  static int64_t GetMaxMemForPool(const TPoolConfig& pool_config);
 
   /// Returns the maximum number of requests that can run in the pool.
-  static int64_t GetMaxRequestsForPool(
-      const TPoolConfig& pool_config, int64_t cluster_size);
-
-  /// Returns a description of how the maximum number of requests that can run in the pool
-  /// is configured.
-  static std::string GetMaxRequestsForPoolDescription(
-      const TPoolConfig& pool_config, int64_t cluster_size);
+  static int64_t GetMaxRequestsForPool(const TPoolConfig& pool_config);
 
   /// Returns the effective queue timeout for the pool in milliseconds.
   static int64_t GetQueueTimeoutForPoolMs(const TPoolConfig& pool_config);
@@ -957,8 +935,8 @@ class AdmissionController {
   /// is returned.
   /// Uses a heuristic to limit the number of requests we dequeue locally to avoid all
   /// impalads dequeuing too many requests at the same time.
-  int64_t GetMaxToDequeue(RequestQueue& queue, PoolStats* stats,
-      const TPoolConfig& pool_config, int64_t cluster_size);
+  int64_t GetMaxToDequeue(
+      RequestQueue& queue, PoolStats* stats, const TPoolConfig& pool_config);
 
   /// Returns true if the pool has been disabled through configuration.
   static bool PoolDisabled(const TPoolConfig& pool_config);
@@ -966,17 +944,8 @@ class AdmissionController {
   /// Returns true if the pool is configured to limit the number of running queries.
   static bool PoolLimitsRunningQueriesCount(const TPoolConfig& pool_config);
 
-  /// Returns true if the pool has a fixed (i.e. not scalable) maximum memory limit.
-  static bool PoolHasFixedMemoryLimit(const TPoolConfig& pool_config);
-
   /// Returns the maximum number of requests that can be queued in the pool.
-  static int64_t GetMaxQueuedForPool(
-      const TPoolConfig& pool_config, int64_t cluster_size);
-
-  /// Returns a description of how the maximum number of requests that can run be queued
-  /// in the pool is configured.
-  static std::string GetMaxQueuedForPoolDescription(
-      const TPoolConfig& pool_config, int64_t cluster_size);
+  static int64_t GetMaxQueuedForPool(const TPoolConfig& pool_config);
 
   /// Return all executor groups from 'all_groups' that can be used to run queries in
   /// 'pool_name'.
