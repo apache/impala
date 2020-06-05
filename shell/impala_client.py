@@ -114,7 +114,7 @@ class ImpalaClient(object):
   """Base class for shared functionality between HS2 and Beeswax. Includes stub methods
   for methods that are expected to be implemented in the subclasses.
   TODO: when beeswax support is removed, merge this with ImpalaHS2Client."""
-  def __init__(self, impalad, kerberos_host_fqdn, use_kerberos=False,
+  def __init__(self, impalad, fetch_size, kerberos_host_fqdn, use_kerberos=False,
                kerberos_service_name="impala", use_ssl=False, ca_cert=None, user=None,
                ldap_password=None, use_ldap=False, client_connect_timeout_ms=60000,
                verbose=True, use_http_base_transport=False, http_path=None):
@@ -133,7 +133,7 @@ class ImpalaClient(object):
     self.client_connect_timeout_ms = int(client_connect_timeout_ms)
     self.default_query_options = {}
     self.query_option_levels = {}
-    self.fetch_batch_size = 1024
+    self.fetch_size = fetch_size
     self.use_http_base_transport = use_http_base_transport
     self.http_path = http_path
     # This is set from ImpalaShell's signal handler when a query is cancelled
@@ -264,25 +264,10 @@ class ImpalaClient(object):
   def fetch(self, query_handle):
     """Returns an iterable of batches of result rows. Each batch is an iterable of rows.
     Each row is an iterable of strings in the format in which they should be displayed
-    Tries to ensure that the batches have a granularity of self.fetch_batch_size but
+    Tries to ensure that the batches have a granularity of self.fetch_size but
     does not guarantee it.
     """
-    result_rows = None
-    for rows in self._fetch_one_batch(query_handle):
-      if result_rows:
-        result_rows.extend(rows)
-      else:
-        result_rows = rows
-      if len(result_rows) > self.fetch_batch_size:
-        yield result_rows
-        result_rows = None
-
-    # Return the final batch of rows.
-    if result_rows:
-      yield result_rows
-
-  def _fetch_one_batch(self, query_handle):
-    """Returns an iterable of batches of result rows up to self.fetch_batch_size. Does
+    """Returns an iterable of batches of result rows up to self.fetch_size. Does
     not need to consolidate those batches into larger batches."""
     raise NotImplementedError()
 
@@ -761,7 +746,7 @@ class ImpalaHS2Client(ImpalaClient):
 
     return "{low}:{high}".format(low=low_hex, high=high_hex)
 
-  def _fetch_one_batch(self, query_handle):
+  def fetch(self, query_handle):
     assert query_handle.hasResultSet
     prim_types = [column.typeDesc.types[0].primitiveEntry.type
                   for column in query_handle.schema.columns]
@@ -769,7 +754,7 @@ class ImpalaHS2Client(ImpalaClient):
                         for prim_type in prim_types]
     while True:
       req = TFetchResultsReq(query_handle, TFetchOrientation.FETCH_NEXT,
-          self.fetch_batch_size)
+          self.fetch_size)
 
       def FetchResults():
         return self.imp_service.FetchResults(req)
@@ -1083,11 +1068,11 @@ class ImpalaBeeswaxClient(ImpalaClient):
       return self.ERROR_STATE
     return state
 
-  def _fetch_one_batch(self, query_handle):
+  def fetch(self, query_handle):
     while True:
       result, rpc_status = self._do_beeswax_rpc(
          lambda: self.imp_service.fetch(query_handle, False,
-                                        self.fetch_batch_size))
+                                        self.fetch_size))
       if rpc_status != RpcStatus.OK:
         raise RPCException()
       yield [row.split('\t') for row in result.data]
