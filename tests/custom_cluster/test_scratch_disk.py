@@ -24,6 +24,7 @@ import stat
 import tempfile
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.verifiers.metric_verifier import MetricVerifier
 
 class TestScratchDir(CustomClusterTestSuite):
   @classmethod
@@ -188,3 +189,69 @@ class TestScratchDir(CustomClusterTestSuite):
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     self.execute_query_expect_success(client, self.spill_query, exec_option)
+
+  @pytest.mark.execute_serially
+  def test_scratch_dirs_default_priority(self, vector):
+    """ 5 empty directories are created in the /tmp directory and we verify that all
+        of those directories are used as scratch disk. By default, all directories
+        should have the same priority and so all should be used in a round robin
+        manner."""
+    normal_dirs = self.generate_dirs(5)
+    self._start_impala_cluster([
+      '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
+      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true'], cluster_size=1,
+      expected_num_executors=1)
+    self.assert_impalad_log_contains("INFO", "Using scratch directory ",
+                                    expected_count=len(normal_dirs))
+    vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
+    impalad = self.cluster.impalads[0]
+    client = impalad.service.create_beeswax_client()
+    handle = self.execute_query_async_using_client(client, self.spill_query, vector)
+    verifier = MetricVerifier(impalad.service)
+    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
+    metrics0 = self.get_metric('tmp-file-mgr.scratch-space-bytes-used.dir-0')
+    metrics1 = self.get_metric('tmp-file-mgr.scratch-space-bytes-used.dir-1')
+    metrics2 = self.get_metric('tmp-file-mgr.scratch-space-bytes-used.dir-2')
+    metrics3 = self.get_metric('tmp-file-mgr.scratch-space-bytes-used.dir-3')
+    metrics4 = self.get_metric('tmp-file-mgr.scratch-space-bytes-used.dir-4')
+    assert (metrics0 > 0 and metrics1 > 0 and metrics2 > 0 and metrics3 > 0 and
+      metrics4 > 0)
+    results = client.fetch(self.spill_query, handle)
+    assert results.success
+    client.close_query(handle)
+    client.close()
+
+  @pytest.mark.execute_serially
+  def test_scratch_dirs_prioritized_spill(self, vector):
+    """ 5 empty directories are created in the /tmp directory and we verify that only
+        the directories with highest priority are used as scratch disk."""
+    normal_dirs = self.generate_dirs(5)
+    normal_dirs[0] = '{0}::{1}'.format(normal_dirs[0], 1)
+    normal_dirs[1] = '{0}::{1}'.format(normal_dirs[1], 0)
+    normal_dirs[2] = '{0}::{1}'.format(normal_dirs[2], 1)
+    normal_dirs[3] = '{0}::{1}'.format(normal_dirs[3], 0)
+    normal_dirs[4] = '{0}::{1}'.format(normal_dirs[4], 1)
+    self._start_impala_cluster([
+      '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
+      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true'], cluster_size=1,
+      expected_num_executors=1)
+    self.assert_impalad_log_contains("INFO", "Using scratch directory ",
+                                    expected_count=len(normal_dirs))
+    vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
+    impalad = self.cluster.impalads[0]
+    client = impalad.service.create_beeswax_client()
+    handle = self.execute_query_async_using_client(client, self.spill_query, vector)
+    verifier = MetricVerifier(impalad.service)
+    verifier.wait_for_metric("impala-server.num-fragments-in-flight", 2)
+    metrics0 = self.get_metric('tmp-file-mgr.scratch-space-bytes-used.dir-0')
+    metrics1 = self.get_metric('tmp-file-mgr.scratch-space-bytes-used.dir-1')
+    metrics2 = self.get_metric('tmp-file-mgr.scratch-space-bytes-used.dir-2')
+    metrics3 = self.get_metric('tmp-file-mgr.scratch-space-bytes-used.dir-3')
+    metrics4 = self.get_metric('tmp-file-mgr.scratch-space-bytes-used.dir-4')
+    # dir1 and dir3 have highest priority and will be used as scratch disk.
+    assert (metrics1 > 0 and metrics3 > 0 and metrics0 == 0 and metrics2 == 0 and
+      metrics4 == 0)
+    results = client.fetch(self.spill_query, handle)
+    assert results.success
+    client.close_query(handle)
+    client.close()

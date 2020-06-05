@@ -64,6 +64,7 @@ static const int64_t TERABYTE = 1024L * GIGABYTE;
 
 class TmpFileMgrTest : public ::testing::Test {
  public:
+  static const int DEFAULT_PRIORITY = numeric_limits<int>::max();
   virtual void SetUp() {
     // Reset query options that are modified by tests.
     FLAGS_disk_spill_encryption = false;
@@ -170,8 +171,8 @@ class TmpFileMgrTest : public ::testing::Test {
   }
 
   /// Helper to set FileGroup::next_allocation_index_.
-  static void SetNextAllocationIndex(TmpFileGroup* group, int value) {
-    group->next_allocation_index_ = value;
+  static void SetNextAllocationIndex(TmpFileGroup* group, int priority, int value) {
+    group->next_allocation_index_[priority] = value;
   }
 
   /// Helper to cancel the FileGroup RequestContext.
@@ -191,6 +192,16 @@ class TmpFileMgrTest : public ::testing::Test {
     }
     EXPECT_EQ(bytes_allocated, group->current_bytes_allocated_);
     return bytes_allocated;
+  }
+
+  /// Helper to validate the [start, end] index range for a given priority for a given
+  /// file group.
+  static void ValidatePriorityIndexRange(TmpFileGroup* group, int priority, int start,
+    int end) {
+    auto search = group->tmp_files_index_range_.find(priority);
+    EXPECT_TRUE(search != group->tmp_files_index_range_.end());
+    EXPECT_EQ(start, search->second.start);
+    EXPECT_EQ(end, search->second.end);
   }
 
   /// Helpers to call WriteHandle methods.
@@ -445,7 +456,7 @@ void TmpFileMgrTest::TestScratchLimit(bool punch_holes, int64_t alloc_size) {
   TmpFile* alloc_file;
 
   // Alloc from file 1 should succeed.
-  SetNextAllocationIndex(&file_group, 0);
+  SetNextAllocationIndex(&file_group, DEFAULT_PRIORITY, 0);
   ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &alloc_file, &offset));
   ASSERT_EQ(alloc_file, files[0]); // Should select files round-robin.
   ASSERT_EQ(0, offset);
@@ -697,12 +708,12 @@ TEST_F(TmpFileMgrTest, TestHWMMetric) {
   TmpFile* alloc_file;
 
   // Alloc from file_group_1 and file_group_2 interleaving allocations.
-  SetNextAllocationIndex(&file_group_1, 0);
+  SetNextAllocationIndex(&file_group_1, DEFAULT_PRIORITY, 0);
   ASSERT_OK(GroupAllocateSpace(&file_group_1, ALLOC_SIZE, &alloc_file, &offset));
   ASSERT_EQ(alloc_file, files[0]);
   ASSERT_EQ(0, offset);
 
-  SetNextAllocationIndex(&file_group_2, 0);
+  SetNextAllocationIndex(&file_group_2, DEFAULT_PRIORITY, 0);
   ASSERT_OK(GroupAllocateSpace(&file_group_2, ALLOC_SIZE, &alloc_file, &offset));
   ASSERT_EQ(alloc_file, files[2]);
   ASSERT_EQ(0, offset);
@@ -772,7 +783,7 @@ void TmpFileMgrTest::TestDirectoryLimits(bool punch_holes) {
 
   // Allocate three times - once per directory. We expect these allocations to go through
   // so we should have one allocation in each directory.
-  SetNextAllocationIndex(&file_group_1, 0);
+  SetNextAllocationIndex(&file_group_1, DEFAULT_PRIORITY, 0);
   for (int i = 0; i < tmp_dir_specs.size(); ++i) {
     ASSERT_OK(GroupAllocateSpace(&file_group_1, ALLOC_SIZE, &alloc_file, &offset));
   }
@@ -847,7 +858,7 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitsExhausted) {
   TmpFile* alloc_file;
 
   // Allocate exactly the maximum total capacity of the directories.
-  SetNextAllocationIndex(&file_group_1, 0);
+  SetNextAllocationIndex(&file_group_1, DEFAULT_PRIORITY, 0);
   for (int i = 0; i < MAX_ALLOCATIONS; ++i) {
     ASSERT_OK(GroupAllocateSpace(&file_group_1, ALLOC_SIZE, &alloc_file, &offset));
   }
@@ -883,9 +894,12 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsing) {
       "/tmp/tmp-file-mgr-test6", "/tmp/tmp-file-mgr-test7"});
   // Configure various directories with valid formats.
   auto& dirs = GetTmpDirs(
-      CreateTmpFileMgr("/tmp/tmp-file-mgr-test1:5g,/tmp/tmp-file-mgr-test2,"
-                       "/tmp/tmp-file-mgr-test3:1234,/tmp/tmp-file-mgr-test4:99999999,"
-                       "/tmp/tmp-file-mgr-test5:200tb,/tmp/tmp-file-mgr-test6:100MB"));
+      CreateTmpFileMgr("/tmp/tmp-file-mgr-test1:5g:1,"
+                       "/tmp/tmp-file-mgr-test2::2,"
+                       "/tmp/tmp-file-mgr-test3:1234:3,"
+                       "/tmp/tmp-file-mgr-test4:99999999:4,"
+                       "/tmp/tmp-file-mgr-test5:200tb:5,"
+                       "/tmp/tmp-file-mgr-test6:100MB:6"));
   EXPECT_EQ(6, dirs.size());
   EXPECT_EQ(5 * GIGABYTE, dirs[0].bytes_limit);
   EXPECT_EQ(numeric_limits<int64_t>::max(), dirs[1].bytes_limit);
@@ -918,7 +932,7 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsing) {
   // Extra colons
   auto& dirs4 = GetTmpDirs(
       CreateTmpFileMgr("/tmp/tmp-file-mgr-test1:1:,/tmp/tmp-file-mgr-test2:10mb::"));
-  EXPECT_EQ(0, dirs4.size());
+  EXPECT_EQ(1, dirs4.size());
 
   // Empty strings.
   auto& nodirs = GetTmpDirs(CreateTmpFileMgr(""));
@@ -1019,5 +1033,160 @@ void TmpFileMgrTest::TestCompressBufferManagement() {
 
   compressed_buffer_tracker->Release(DATA.size() * 2);
   file_group.Close();
+}
+
+// Test the directory parsing logic, including the various error cases.
+TEST_F(TmpFileMgrTest, TestDirectoryPriorityParsing) {
+  RemoveAndCreateDirs({"/tmp/tmp-file-mgr-test1", "/tmp/tmp-file-mgr-test2",
+      "/tmp/tmp-file-mgr-test3", "/tmp/tmp-file-mgr-test4", "/tmp/tmp-file-mgr-test5",
+      "/tmp/tmp-file-mgr-test6", "/tmp/tmp-file-mgr-test7"});
+  // Configure various directories with valid formats. The directories are passed in
+  // unsorted priority order. The expectation is that the resulting directory lists will
+  // be sorted by priority.
+  auto& dirs = GetTmpDirs(
+      CreateTmpFileMgr("/tmp/tmp-file-mgr-test3:1234:3,/tmp/tmp-file-mgr-test6:100MB:,"
+                       "/tmp/tmp-file-mgr-test2::2,/tmp/tmp-file-mgr-test4:99999999:4,"
+                       "/tmp/tmp-file-mgr-test5:200tb:5,/tmp/tmp-file-mgr-test1:5g:1"));
+  EXPECT_EQ(6, dirs.size());
+  EXPECT_EQ(5 * GIGABYTE, dirs[0].bytes_limit);
+  EXPECT_EQ(1, dirs[0].priority);
+  EXPECT_EQ(numeric_limits<int64_t>::max(), dirs[1].bytes_limit);
+  EXPECT_EQ(2, dirs[1].priority);
+  EXPECT_EQ(1234, dirs[2].bytes_limit);
+  EXPECT_EQ(3, dirs[2].priority);
+  EXPECT_EQ(99999999, dirs[3].bytes_limit);
+  EXPECT_EQ(4, dirs[3].priority);
+  EXPECT_EQ(200 * TERABYTE, dirs[4].bytes_limit);
+  EXPECT_EQ(5, dirs[4].priority);
+  EXPECT_EQ(100 * MEGABYTE, dirs[5].bytes_limit);
+  EXPECT_EQ(numeric_limits<int>::max(), dirs[5].priority);
+
+  // Various invalid limit formats result in the directory getting skipped.
+  // Include a valid dir on the end to ensure that we don't short-circuit all
+  // directories.
+  auto& dirs2 = GetTmpDirs(
+      CreateTmpFileMgr("/tmp/tmp-file-mgr-test1::foo,/tmp/tmp-file-mgr-test2::?,"
+                       "/tmp/tmp-file-mgr-test3::1.2.3.4,/tmp/tmp-file-mgr-test4:: ,"
+                       "/tmp/tmp-file-mgr-test5::p0,/tmp/tmp-file-mgr-test6::10%,"
+                       "/tmp/tmp-file-mgr-test1:100:-1"));
+  EXPECT_EQ(1, dirs2.size());
+  EXPECT_EQ("/tmp/tmp-file-mgr-test1/impala-scratch", dirs2[0].path);
+  EXPECT_EQ(100, dirs2[0].bytes_limit);
+  EXPECT_EQ(-1, dirs2[0].priority);
+}
+
+// Tests that when TmpFileGroup is constructed, the priority based index ranges are
+// populated properly.
+TEST_F(TmpFileMgrTest, TestPriorityBasedIndexRanges) {
+  // Tmp dirs with priority 0, 1 and 2.
+  vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test5::1", "/tmp/tmp-file-mgr-test2::0",
+      "/tmp/tmp-file-mgr-test7::2", "/tmp/tmp-file-mgr-test1::0",
+      "/tmp/tmp-file-mgr-test6::1", "/tmp/tmp-file-mgr-test3::0",
+      "/tmp/tmp-file-mgr-test4::1"});
+  // Tmp dirs with priority 0 and 1.
+  vector<string> tmp_dirs1({"/tmp/tmp-file-mgr-test5::0", "/tmp/tmp-file-mgr-test2::1",
+      "/tmp/tmp-file-mgr-test7::0", "/tmp/tmp-file-mgr-test1::1",
+      "/tmp/tmp-file-mgr-test6::0", "/tmp/tmp-file-mgr-test3::1",
+      "/tmp/tmp-file-mgr-test4::0"});
+  // Tmp dirs with priority 0.
+  vector<string> tmp_dirs2({"/tmp/tmp-file-mgr-test1::0", "/tmp/tmp-file-mgr-test2::0",
+      "/tmp/tmp-file-mgr-test3::0", "/tmp/tmp-file-mgr-test4::0"});
+  TmpFileMgr tmp_file_mgr;
+  TmpFileMgr tmp_file_mgr1;
+  TmpFileMgr tmp_file_mgr2;
+  scoped_ptr<MetricGroup> metrics1(new MetricGroup("tmp-file-mgr-test"));
+  scoped_ptr<MetricGroup> metrics2(new MetricGroup("tmp-file-mgr-test"));
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, "", false, metrics_.get()));
+  ASSERT_OK(tmp_file_mgr1.InitCustom(tmp_dirs1, false, "", false, metrics1.get()));
+  ASSERT_OK(tmp_file_mgr2.InitCustom(tmp_dirs2, false, "", false, metrics2.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  ValidatePriorityIndexRange(&file_group, 0, 0, 2);
+  ValidatePriorityIndexRange(&file_group, 1, 3, 5);
+  ValidatePriorityIndexRange(&file_group, 2, 6, 6);
+  TmpFileGroup file_group1(&tmp_file_mgr1, io_mgr(), profile_, id);
+  ValidatePriorityIndexRange(&file_group1, 0, 0, 3);
+  ValidatePriorityIndexRange(&file_group1, 1, 4, 6);
+  TmpFileGroup file_group2(&tmp_file_mgr2, io_mgr(), profile_, id);
+  ValidatePriorityIndexRange(&file_group2, 0, 0, 3);
+  file_group.Close();
+  file_group1.Close();
+  file_group2.Close();
+}
+
+// Tests various scenarios with priority based spilling.
+TEST_F(TmpFileMgrTest, TestPriorityBasedSpilling) {
+  vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test1:1K:0", "/tmp/tmp-file-mgr-test2:1K:3",
+      "/tmp/tmp-file-mgr-test3:1K:2", "/tmp/tmp-file-mgr-test4:1K:2",
+      "/tmp/tmp-file-mgr-test5:1K:2", "/tmp/tmp-file-mgr-test6:1K:1"});
+  RemoveAndCreateDirs(tmp_dirs);
+  TmpFileMgr tmp_file_mgr;
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, "", false, metrics_.get()));
+
+  // The allocation size is same as the limit per directory.
+  // So each scratch directory can fit exactly one allocation.
+  const int alloc_size = 1024;
+  const int64_t limit = alloc_size * 6;
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id, limit);
+  TUniqueId id1;
+  TmpFileGroup file_group1(&tmp_file_mgr, io_mgr(), profile_, id1, limit);
+  TUniqueId id2;
+  TmpFileGroup file_group2(&tmp_file_mgr, io_mgr(), profile_, id2, limit);
+
+  vector<TmpFile*> files;
+  ASSERT_OK(CreateFiles(&file_group, &files));
+  vector<TmpFile*> files1;
+  ASSERT_OK(CreateFiles(&file_group1, &files1));
+  vector<TmpFile*> files2;
+  ASSERT_OK(CreateFiles(&file_group2, &files2));
+
+  int64_t offset;
+  TmpFile* alloc_file;
+
+  // filegroup should allocate from file at index 0
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &alloc_file, &offset));
+  ASSERT_EQ(alloc_file, files[0]);
+
+  // filegroup1 should allocate from file at index 1
+  ASSERT_OK(GroupAllocateSpace(&file_group1, alloc_size, &alloc_file, &offset));
+  ASSERT_EQ(alloc_file, files1[1]);
+
+  SetNextAllocationIndex(&file_group1, 2, 4);
+  // filegroup1 should allocate from file at index 4
+  ASSERT_OK(GroupAllocateSpace(&file_group1, alloc_size, &alloc_file, &offset));
+  ASSERT_EQ(alloc_file, files1[4]);
+
+  // filegroup1 should allocate from file at index 2
+  ASSERT_OK(GroupAllocateSpace(&file_group1, alloc_size, &alloc_file, &offset));
+  ASSERT_EQ(alloc_file, files1[2]);
+
+  // filegroup2 should allocate from file at index 3
+  ASSERT_OK(GroupAllocateSpace(&file_group2, alloc_size, &alloc_file, &offset));
+  ASSERT_EQ(alloc_file, files2[3]);
+
+  // filegroup should allocate from file at index 5
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &alloc_file, &offset));
+  ASSERT_EQ(alloc_file, files[5]);
+
+  // Closing filegroup should result in freeing allocation at index 0 and 5
+  file_group.Close();
+
+  // filegroup1 should allocate from file at index 0
+  ASSERT_OK(GroupAllocateSpace(&file_group1, alloc_size, &alloc_file, &offset));
+  ASSERT_EQ(alloc_file, files1[0]);
+
+  // Closing filegroup2 should result in freeing allocation at index 3
+  file_group2.Close();
+
+  // filegroup should allocate from file at index 3
+  ASSERT_OK(GroupAllocateSpace(&file_group1, alloc_size, &alloc_file, &offset));
+  ASSERT_EQ(alloc_file, files1[3]);
+
+  // filegroup should allocate from file at index 5
+  ASSERT_OK(GroupAllocateSpace(&file_group1, alloc_size, &alloc_file, &offset));
+  ASSERT_EQ(alloc_file, files1[5]);
+
+  file_group1.Close();
 }
 } // namespace impala
