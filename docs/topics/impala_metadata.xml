@@ -124,6 +124,29 @@ under the License.
             </dd>
 
           </dlentry>
+          <dlentry>
+            <dt>Flags related to <codeph>use_local_catalog</codeph></dt>
+            <dd>When <codeph>use_local_catalog</codeph> is enabled or set to <codeph>True</codeph> on the impalad
+              coordinators the following list of flags configure various parameters as described below. It is not
+              recommended to change the default values on these flags.
+            </dd>
+            <dd>
+              <ul>
+                <li>The flag <codeph>local_catalog_cache_mb</codeph> (defaults to -1) configures the
+                  size of the catalog cache within each coordinator. With the default set to -1, the
+                  cache is auto-configured to 60% of the configured Java heap size. Note that the
+                  Java heap size is distinct from and typically smaller than the overall Impala
+                  memory limit.</li>
+                <li>The flag <codeph>local_catalog_cache_expiration_s</codeph> (defaults to 3600) configures the
+                  expiration time of the catalog cache within each impalad. Even if the configured
+                  cache capacity has not been reached, items are removed from the cache if they have not
+                  been accessed in the defined amount of time.</li>
+                <li>The flag <codeph>local_catalog_max_fetch_retries</codeph> (defaults to 40) configures
+                  the maximum number of retries needed for queries to fetch a metadata object from the impalad
+                  coordinator's local catalog cache.</li>
+              </ul>
+            </dd>
+          </dlentry>
         </dl>
       </p>
 
