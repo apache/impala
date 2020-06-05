@@ -125,21 +125,6 @@ public class RequestPoolService {
   private final static String CLAMP_MEM_LIMIT_QUERY_OPTION =
       "impala.admission-control.clamp-mem-limit-query-option";
 
-  // Key for specifying the "Max Running Queries Multiple" configuration
-  // of the pool.
-  private final static String MAX_RUNNING_QUERIES_MULTIPLE =
-      "impala.admission-control.max-running-queries-multiple";
-
-  // Key for specifying the "Max Queued Queries Multiple" configuration
-  // of the pool.
-  private final static String MAX_QUEUED_QUERIES_MULTIPLE =
-      "impala.admission-control.max-queued-queries-multiple";
-
-  // Key for specifying the "Max Memory Multiple" configuration
-  // of the pool.
-  private final static String MAX_MEMORY_MULTIPLE =
-      "impala.admission-control.max-memory-multiple";
-
   // Key for specifying the "Max mt_dop" configuration of the pool
   private final static String MAX_MT_DOP = "impala.admission-control.max-mt-dop";
 
@@ -402,12 +387,6 @@ public class RequestPoolService {
           getPoolConfigValue(currentConf, pool, MIN_QUERY_MEM_LIMIT_BYTES, 0L));
       result.setClamp_mem_limit_query_option(
           getPoolConfigValue(currentConf, pool, CLAMP_MEM_LIMIT_QUERY_OPTION, true));
-      result.setMax_running_queries_multiple(
-          getPoolConfigDoubleValue(currentConf, pool, MAX_RUNNING_QUERIES_MULTIPLE, 0.0));
-      result.setMax_queued_queries_multiple(
-          getPoolConfigDoubleValue(currentConf, pool, MAX_QUEUED_QUERIES_MULTIPLE, 0.0));
-      result.setMax_memory_multiple(
-          getPoolConfigValue(currentConf, pool, MAX_MEMORY_MULTIPLE, 0));
       result.setMax_mt_dop(
           getPoolConfigValue(currentConf, pool, MAX_MT_DOP, -1));
     }
@@ -415,13 +394,11 @@ public class RequestPoolService {
       LOG.debug("getPoolConfig(pool={}): max_mem_resources={}, max_requests={},"
               + " max_queued={},  queue_timeout_ms={}, default_query_options={},"
               + " max_query_mem_limit={}, min_query_mem_limit={},"
-              + " clamp_mem_limit_query_option={}, max_running_queries_multiple={},"
-              + " max_queued_queries_multiple={}, max_memory_multiple={}",
+              + " clamp_mem_limit_query_option={}",
           pool, result.max_mem_resources, result.max_requests, result.max_queued,
           result.queue_timeout_ms, result.default_query_options,
           result.max_query_mem_limit, result.min_query_mem_limit,
-          result.clamp_mem_limit_query_option, result.max_running_queries_multiple,
-          result.max_queued_queries_multiple, result.max_memory_multiple);
+          result.clamp_mem_limit_query_option);
     }
     return result;
   }
@@ -456,15 +433,6 @@ public class RequestPoolService {
       Configuration conf, String pool, String key, boolean defaultValue) {
     return conf.getBoolean(String.format(PER_POOL_CONFIG_KEY_FORMAT, key, pool),
         conf.getBoolean(key, defaultValue));
-  }
-
-  /**
-   * Looks up the per-pool Double config from the Configuration. See above.
-   */
-  private double getPoolConfigDoubleValue(
-      Configuration conf, String pool, String key, double defaultValue) {
-    return conf.getDouble(String.format(PER_POOL_CONFIG_KEY_FORMAT, key, pool),
-        conf.getDouble(key, defaultValue));
   }
 
   /**
