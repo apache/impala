@@ -284,6 +284,19 @@ def get_option_parser(defaults):
                     "enforce any http path for the incoming requests, deployments could "
                     "still put it behind a loadbalancer that can expect the traffic at a "
                     "certain path.")
+  parser.add_option("--fetch_size", type="int", dest="fetch_size", default=10240,
+                    help="The fetch size when fetching rows from the Impala coordinator. "
+                    "The fetch size controls how many rows a single fetch RPC request "
+                    "(RPC from the Impala shell to the Impala coordinator) reads at a "
+                    "time. This option is most effective when result spooling is enabled "
+                    "('spool_query_results'=true). When result spooling is enabled "
+                    "values over the batch_size are honored. When result spooling is "
+                    "disabled, values over the batch_size have no affect. By default, "
+                    "the fetch_size is set to 10240 which is equivalent to 10 row "
+                    "batches (assuming the default batch size). Note that if result "
+                    "spooling is disabled only a single row batch can be fetched at a "
+                    "time regardless of the specified fetch_size.")
+
 
   # add default values to the help text
   for option in parser.option_list:

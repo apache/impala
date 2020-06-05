@@ -217,6 +217,7 @@ class ImpalaShell(cmd.Cmd, object):
     self.ignore_query_failure = options.ignore_query_failure
 
     self.http_path = options.http_path
+    self.fetch_size = options.fetch_size
 
     # Due to a readline bug in centos/rhel7, importing it causes control characters to be
     # printed. This breaks any scripting against the shell in non-interactive mode. Since
@@ -543,22 +544,22 @@ class ImpalaShell(cmd.Cmd, object):
   def _new_impala_client(self):
     protocol = options.protocol.lower()
     if protocol == 'hs2':
-      return ImpalaHS2Client(self.impalad, self.kerberos_host_fqdn, self.use_kerberos,
-                          self.kerberos_service_name, self.use_ssl,
-                          self.ca_cert, self.user, self.ldap_password,
-                          self.use_ldap, self.client_connect_timeout_ms, self.verbose,
+      return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
+                          self.use_kerberos, self.kerberos_service_name, self.use_ssl,
+                          self.ca_cert, self.user, self.ldap_password, self.use_ldap,
+                          self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=False, http_path=self.http_path)
     elif protocol == 'hs2-http':
-      return ImpalaHS2Client(self.impalad, self.kerberos_host_fqdn, self.use_kerberos,
-                          self.kerberos_service_name, self.use_ssl,
-                          self.ca_cert, self.user, self.ldap_password,
-                          self.use_ldap, self.client_connect_timeout_ms, self.verbose,
+      return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
+                          self.use_kerberos, self.kerberos_service_name, self.use_ssl,
+                          self.ca_cert, self.user, self.ldap_password, self.use_ldap,
+                          self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=True, http_path=self.http_path)
     elif protocol == 'beeswax':
-      return ImpalaBeeswaxClient(self.impalad, self.kerberos_host_fqdn, self.use_kerberos,
-                          self.kerberos_service_name, self.use_ssl,
-                          self.ca_cert, self.user, self.ldap_password,
-                          self.use_ldap, self.client_connect_timeout_ms, self.verbose)
+      return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
+                          self.use_kerberos, self.kerberos_service_name, self.use_ssl,
+                          self.ca_cert, self.user, self.ldap_password, self.use_ldap,
+                          self.client_connect_timeout_ms, self.verbose)
     else:
       err_msg = "Invalid --protocol value {0}, must be beeswax, hs2 or hs2-http."
       print(err_msg.format(protocol), file=sys.stderr)

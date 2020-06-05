@@ -1017,3 +1017,12 @@ class TestImpalaShell(ImpalaTestSuite):
       assert "3\t3\t30.3" in result.stdout, result.stdout
 
     assert "4\t4\t40.4" in result.stdout, result.stdout
+
+  def test_fetch_size(self, vector):
+    """Test the --fetch_size option with and without result spooling enabled."""
+    query = "select * from functional.alltypes limit 1024"
+    query_with_result_spooling = "set spool_query_results=true; " + query
+    for query in [query, query_with_result_spooling]:
+      result = run_impala_shell_cmd(vector, ['-q', query, '-B', '--fetch_size', '512'])
+      result_rows = result.stdout.strip().split('\n')
+      assert len(result_rows) == 1024

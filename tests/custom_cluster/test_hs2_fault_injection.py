@@ -106,7 +106,7 @@ class TestHS2FaultInjection(CustomClusterTestSuite):
   impala-shell client"""
   def setup(self):
     impalad = IMPALAD_HS2_HTTP_HOST_PORT.split(":")
-    self.custom_hs2_http_client = FaultInjectingImpalaHS2Client(impalad,
+    self.custom_hs2_http_client = FaultInjectingImpalaHS2Client(impalad, 1024,
         kerberos_host_fqdn=None, use_http_base_transport=True, http_path='cliservice')
     self.transport = self.custom_hs2_http_client.transport
 
@@ -317,7 +317,7 @@ class TestHS2FaultInjection(CustomClusterTestSuite):
     self.transport.close()
     rows_fetched = self.custom_hs2_http_client.fetch(query_handle)
     for rows in rows_fetched:
-      num_rows += 1
+      num_rows += len(rows)
     assert num_rows == 1
     self.transport.close()
     self.close_query(query_handle)
