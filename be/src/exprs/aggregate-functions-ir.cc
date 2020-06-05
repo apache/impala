@@ -29,6 +29,7 @@
 #include "codegen/impala-ir.h"
 #include "common/logging.h"
 #include "exprs/anyval-util.h"
+#include "exprs/datasketches-common.h"
 #include "exprs/hll-bias.h"
 #include "gutil/strings/substitute.h"
 #include "runtime/date-value.h"
@@ -1611,23 +1612,18 @@ BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
   return estimate;
 }
 
-/// Config for DataSketches HLL algorithm to set the size of each entry within the
-/// sketch.
+/// Auxiliary function that receives an input type that has a serialize_compact()
+/// function (e.g. hll_sketch or hll_union) and returns the serialized version of it
+/// wrapped into a StringVal.
 /// Introducing this variable in the .cc to avoid including the whole DataSketches HLL
 /// functionality into the header.
-const datasketches::target_hll_type DS_HLL_TYPE = datasketches::target_hll_type::HLL_4;
-
-/// Auxiliary function that receives a hll_sketch and returns the serialized version of
-/// it wrapped into a StringVal.
-/// Introducing this function in the .cc to avoid including the whole DataSketches HLL
-/// functionality into the header.
-StringVal SerializeDsHllSketch(FunctionContext* ctx,
-    const datasketches::hll_sketch& sketch) {
-  std::stringstream serialized_sketch;
-  sketch.serialize_compact(serialized_sketch);
-  std::string serialized_sketch_str = serialized_sketch.str();
-  StringVal dst(ctx, serialized_sketch_str.size());
-  memcpy(dst.ptr, serialized_sketch_str.c_str(), serialized_sketch_str.size());
+template <typename T>
+StringVal SerializeCompactDsHll(FunctionContext* ctx, const T& input) {
+  std::stringstream serialized_input;
+  input.serialize_compact(serialized_input);
+  std::string serialized_input_str = serialized_input.str();
+  StringVal dst(ctx, serialized_input_str.size());
+  memcpy(dst.ptr, serialized_input_str.c_str(), serialized_input_str.size());
   return dst;
 }
 
@@ -1674,7 +1670,7 @@ StringVal AggregateFunctions::DsHllSerialize(FunctionContext* ctx,
   DCHECK_EQ(src.len, sizeof(datasketches::hll_sketch));
   datasketches::hll_sketch* sketch_ptr =
       reinterpret_cast<datasketches::hll_sketch*>(src.ptr);
-  StringVal dst = SerializeDsHllSketch(ctx, *sketch_ptr);
+  StringVal dst = SerializeCompactDsHll(ctx, *sketch_ptr);
   ctx->Free(src.ptr);
   return dst;
 }
@@ -1715,10 +1711,80 @@ StringVal AggregateFunctions::DsHllFinalizeSketch(FunctionContext* ctx,
       reinterpret_cast<datasketches::hll_sketch*>(src.ptr);
   StringVal result_str = StringVal::null();
   if (sketch_ptr->get_estimate() > 0.0) {
-    result_str = SerializeDsHllSketch(ctx, *sketch_ptr);
+    result_str = SerializeCompactDsHll(ctx, *sketch_ptr);
   }
   ctx->Free(src.ptr);
   return result_str;
+}
+
+void AggregateFunctions::DsHllUnionInit(FunctionContext* ctx, StringVal* slot) {
+  AllocBuffer(ctx, slot, sizeof(datasketches::hll_union));
+  if (UNLIKELY(slot->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
+  datasketches::hll_union* union_ptr =
+      reinterpret_cast<datasketches::hll_union*>(slot->ptr);
+  *union_ptr = datasketches::hll_union(DS_SKETCH_CONFIG);
+}
+
+void AggregateFunctions::DsHllUnionUpdate(FunctionContext* ctx, const StringVal& src,
+    StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::hll_union));
+  // These parameters might be overwritten by DeserializeHllSketch() to use the settings
+  // from the deserialized sketch from 'src'.
+  datasketches::hll_sketch src_sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
+  if (!DeserializeHllSketch(src, &src_sketch)) {
+    LogSketchDeserializationError(ctx);
+    return;
+  }
+  datasketches::hll_union* union_ptr =
+      reinterpret_cast<datasketches::hll_union*>(dst->ptr);
+  union_ptr->update(src_sketch);
+}
+
+StringVal AggregateFunctions::DsHllUnionSerialize(FunctionContext* ctx,
+    const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::hll_union));
+  datasketches::hll_union* union_ptr =
+      reinterpret_cast<datasketches::hll_union*>(src.ptr);
+  StringVal dst = SerializeCompactDsHll(ctx, *union_ptr);
+  ctx->Free(src.ptr);
+  return dst;
+}
+
+void AggregateFunctions::DsHllUnionMerge(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  DCHECK(!src.is_null);
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::hll_union));
+
+  datasketches::hll_union src_union =
+      datasketches::hll_union::deserialize(reinterpret_cast<char*>(src.ptr), src.len);
+
+  datasketches::hll_union* dst_union_ptr =
+      reinterpret_cast<datasketches::hll_union*>(dst->ptr);
+
+  dst_union_ptr->update(src_union.get_result(DS_HLL_TYPE));
+}
+
+StringVal AggregateFunctions::DsHllUnionFinalize(FunctionContext* ctx,
+    const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::hll_union));
+  datasketches::hll_union* union_ptr =
+      reinterpret_cast<datasketches::hll_union*>(src.ptr);
+  datasketches::hll_sketch sketch = union_ptr->get_result(DS_HLL_TYPE);
+  if (sketch.get_estimate() == 0.0) {
+    ctx->Free(src.ptr);
+    return StringVal::null();
+  }
+  StringVal result = SerializeCompactDsHll(ctx, sketch);
+  ctx->Free(src.ptr);
+  return result;
 }
 
 /// Intermediate aggregation state for the SampledNdv() function.

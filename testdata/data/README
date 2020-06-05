@@ -505,6 +505,10 @@ DataSketches HLL sketches created by Hive. Each column contains a sketch for a
 specific data type. Covers the following types: TINYINT, INT, BIGINT, FLOAT, DOUBLE,
 STRING, CHAR and VARCHAR. Has an additional column for NULL values.
 
+hll_sketches_from_impala.parquet:
+This holds the same sketches as hll_sketches_from_hive.parquet but these sketches were
+created by Impala instead of Hive.
+
 hudi_parquet:
 IMPALA-8778: Support read Apache Hudi tables
 Hudi parquet is a special format of parquet files managed by Apache Hudi

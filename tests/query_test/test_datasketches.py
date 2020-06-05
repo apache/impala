@@ -34,4 +34,5 @@ class TestDatasketches(ImpalaTestSuite):
 
   def test_hll(self, vector, unique_database):
     create_table_from_parquet(self.client, unique_database, 'hll_sketches_from_hive')
+    create_table_from_parquet(self.client, unique_database, 'hll_sketches_from_impala')
     self.run_test_case('QueryTest/datasketches-hll', vector, unique_database)
