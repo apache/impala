@@ -18,7 +18,9 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <memory>
+#include <unordered_map>
 #include <utility>
 
 #include <mutex>
@@ -98,15 +100,20 @@ class TmpFileMgr {
 
   /// A configured temporary directory that TmpFileMgr allocates files in.
   struct TmpDir {
-    TmpDir(const std::string& path, int64_t bytes_limit, IntGauge* bytes_used_metric)
-      : path(path), bytes_limit(bytes_limit), bytes_used_metric(bytes_used_metric) {}
+    TmpDir(const std::string& path, int64_t bytes_limit, int priority,
+      IntGauge* bytes_used_metric)
+      : path(path), bytes_limit(bytes_limit), priority(priority),
+        bytes_used_metric(bytes_used_metric) {}
 
     /// Path to the temporary directory.
     const std::string path;
 
     /// Limit on bytes that should be written to this path. Set to maximum value
     /// of int64_t if there is no limit.
-    int64_t const bytes_limit;
+    const int64_t bytes_limit;
+
+    /// Scratch directory priority.
+    const int priority;
 
     /// The current bytes of scratch used for this temporary directory.
     IntGauge* const bytes_used_metric;
@@ -377,16 +384,31 @@ class TmpFileGroup {
   /// Protects below members.
   SpinLock lock_;
 
-  /// List of files representing the TmpFileGroup.
+  /// List of files representing the TmpFileGroup. Files are ordered by the priority of
+  /// the related TmpDir.
   std::vector<std::unique_ptr<TmpFile>> tmp_files_;
+
+  /// Index Range in the 'tmp_files'. Used to keep track of index range
+  /// corresponding to a given priority.
+  struct TmpFileIndexRange {
+    TmpFileIndexRange(int start, int end)
+      : start(start), end(end) {}
+    // Start index of the range.
+    const int start;
+    // End index of the range.
+    const int end;
+  };
+  /// Map storing the index range in the 'tmp_files', corresponding to scratch dirs's
+  /// priority.
+  std::map<int, TmpFileIndexRange> tmp_files_index_range_;
 
   /// Total space allocated in this group's files.
   int64_t current_bytes_allocated_;
 
   /// Index into 'tmp_files' denoting the file to which the next temporary file range
-  /// should be allocated from. Used to implement round-robin allocation from temporary
-  /// files.
-  int next_allocation_index_;
+  /// should be allocated from, for a given priority. Used to implement round-robin
+  /// allocation from temporary files.
+  std::unordered_map<int, int> next_allocation_index_;
 
   /// Each vector in free_ranges_[i] is a vector of File/offset pairs for free scratch
   /// ranges of length 2^i bytes. Has 64 entries so that every int64_t length has a

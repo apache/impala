@@ -49,6 +49,7 @@
 #include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 #include "util/scope-exit-trigger.h"
+#include "util/string-parser.h"
 
 #include "common/names.h"
 
@@ -74,11 +75,18 @@ DEFINE_bool(disk_spill_punch_holes, false,
 DEFINE_string(scratch_dirs, "/tmp",
     "Writable scratch directories. "
     "This is a comma-separated list of directories. Each directory is "
-    "specified as the directory path and an optional limit on the bytes that will "
-    "be allocated in that directory. If the optional limit is provided, the path and "
+    "specified as the directory path, an optional limit on the bytes that will "
+    "be allocated in that directory, and an optional priority for the directory. "
+    "If the optional limit is provided, the path and "
     "the limit are separated by a colon. E.g. '/dir1:10G,/dir2:5GB,/dir3' will allow "
     "allocating up to 10GB of scratch in /dir1, 5GB of scratch in /dir2 and an "
-    "unlimited amount in /dir3.");
+    "unlimited amount in /dir3. "
+    "If the optional priority is provided, the path and the limit and priority are "
+    "separated by colon. Priority based spilling will result in directories getting "
+    "selected as a spill target based on their priority. The lower the numerical value "
+    "the higher the priority. E.g. '/dir1:10G:0,/dir2:5GB:1,/dir3::1', will cause "
+    "spilling to first fill up '/dir1' followed by using '/dir2' and '/dir3' in a "
+    "round robin manner.");
 DEFINE_bool(allow_multiple_scratch_dirs_per_device, true,
     "If false and --scratch_dirs contains multiple directories on the same device, "
     "then only the first writable directory is used");
@@ -86,6 +94,7 @@ DEFINE_bool(allow_multiple_scratch_dirs_per_device, true,
 using boost::algorithm::is_any_of;
 using boost::algorithm::join;
 using boost::algorithm::split;
+using boost::algorithm::token_compress_off;
 using boost::algorithm::token_compress_on;
 using boost::filesystem::absolute;
 using boost::filesystem::path;
@@ -165,41 +174,57 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
               ExecEnv::GetInstance()->process_mem_tracker()));
     }
   }
-  vector<TmpDir> tmp_dirs;
+  vector<std::unique_ptr<TmpDir>> tmp_dirs;
   // Parse the directory specifiers. Don't return an error on parse errors, just log a
   // warning - we don't want to abort process startup because of misconfigured scratch,
   // since queries will generally still be runnable.
   for (const string& tmp_dir_spec : tmp_dir_specifiers) {
     vector<string> toks;
-    split(toks, tmp_dir_spec, is_any_of(":"), token_compress_on);
-    if (toks.size() > 2) {
+    split(toks, tmp_dir_spec, is_any_of(":"), token_compress_off);
+    if (toks.size() > 3) {
       LOG(ERROR) << "Could not parse temporary dir specifier, too many colons: '"
                  << tmp_dir_spec << "'";
       continue;
     }
     int64_t bytes_limit = numeric_limits<int64_t>::max();
-    if (toks.size() == 2) {
+    if (toks.size() >= 2) {
       bool is_percent;
       bytes_limit = ParseUtil::ParseMemSpec(toks[1], &is_percent, 0);
       if (bytes_limit < 0 || is_percent) {
-        LOG(ERROR) << "Malformed data cache capacity configuration '" << tmp_dir_spec
-                   << "'";
+        LOG(ERROR) << "Malformed scratch directory capacity configuration '"
+                   << tmp_dir_spec << "'";
         continue;
       } else if (bytes_limit == 0) {
         // Interpret -1, 0 or empty string as no limit.
         bytes_limit = numeric_limits<int64_t>::max();
       }
     }
+    int priority = numeric_limits<int>::max();
+    if (toks.size() == 3 && !toks[2].empty()) {
+      StringParser::ParseResult result;
+      priority = StringParser::StringToInt<int>(toks[2].data(), toks[2].size(), &result);
+      if (result != StringParser::PARSE_SUCCESS) {
+        LOG(ERROR) << "Malformed scratch directory priority configuration '"
+                   << tmp_dir_spec << "'";
+        continue;
+      }
+    }
     IntGauge* bytes_used_metric = metrics->AddGauge(
         SCRATCH_DIR_BYTES_USED_FORMAT, 0, Substitute("$0", tmp_dirs.size()));
-    tmp_dirs.emplace_back(toks[0], bytes_limit, bytes_used_metric);
+    tmp_dirs.emplace_back(new TmpDir(toks[0], bytes_limit, priority, bytes_used_metric));
   }
+
+  // Sort the tmp directories by priority.
+  std::sort(tmp_dirs.begin(), tmp_dirs.end(),
+      [](const std::unique_ptr<TmpDir>& a, const std::unique_ptr<TmpDir>& b) {
+        return a->priority < b->priority;
+      });
 
   vector<bool> is_tmp_dir_on_disk(DiskInfo::num_disks(), false);
   // For each tmp directory, find the disk it is on,
   // so additional tmp directories on the same disk can be skipped.
   for (int i = 0; i < tmp_dirs.size(); ++i) {
-    path tmp_path(trim_right_copy_if(tmp_dirs[i].path, is_any_of("/")));
+    path tmp_path(trim_right_copy_if(tmp_dirs[i]->path, is_any_of("/")));
     tmp_path = absolute(tmp_path);
     path scratch_subdir_path(tmp_path / TMP_SUB_DIR_NAME);
     // tmp_path must be a writable directory.
@@ -228,9 +253,9 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
         if (disk_id >= 0) is_tmp_dir_on_disk[disk_id] = true;
         LOG(INFO) << "Using scratch directory " << scratch_subdir_path.string() << " on "
                   << "disk " << disk_id
-                  << " limit: " << PrettyPrinter::PrintBytes(tmp_dirs[i].bytes_limit);
-        tmp_dirs_.emplace_back(scratch_subdir_path.string(), tmp_dirs[i].bytes_limit,
-            tmp_dirs[i].bytes_used_metric);
+                  << " limit: " << PrettyPrinter::PrintBytes(tmp_dirs[i]->bytes_limit);
+        tmp_dirs_.emplace_back(scratch_subdir_path.string(), tmp_dirs[i]->bytes_limit,
+            tmp_dirs[i]->priority, tmp_dirs[i]->bytes_used_metric);
       } else {
         LOG(WARNING) << "Could not remove and recreate directory "
                      << scratch_subdir_path.string() << ": cannot use it for scratch. "
@@ -396,6 +421,23 @@ TmpFileGroup::TmpFileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
     free_ranges_(64) {
   DCHECK(tmp_file_mgr != nullptr);
   io_ctx_ = io_mgr_->RegisterContext();
+  // Populate the priority based index ranges.
+  const std::vector<TmpDir>& tmp_dirs = tmp_file_mgr_->tmp_dirs_;
+  if (tmp_dirs.size() > 0) {
+    int start_index = 0;
+    int priority = tmp_dirs[0].priority;
+    for (int i = 0; i < tmp_dirs.size() - 1; ++i) {
+      priority = tmp_dirs[i].priority;
+      const int next_priority = tmp_dirs[i+1].priority;
+      if (next_priority != priority) {
+        tmp_files_index_range_.emplace(priority, TmpFileIndexRange(start_index, i));
+        start_index = i + 1;
+        priority = next_priority;
+      }
+    }
+    tmp_files_index_range_.emplace(priority,
+      TmpFileIndexRange(start_index, tmp_dirs.size() - 1));
+  }
 }
 
 TmpFileGroup::~TmpFileGroup() {
@@ -416,9 +458,16 @@ Status TmpFileGroup::CreateFiles() {
     ++files_allocated;
   }
   DCHECK_EQ(tmp_files_.size(), files_allocated);
+  DCHECK_EQ(tmp_file_mgr_->tmp_dirs_.size(), tmp_files_.size());
   if (tmp_files_.size() == 0) return ScratchAllocationFailedStatus({});
-  // Start allocating on a random device to avoid overloading the first device.
-  next_allocation_index_ = rand() % tmp_files_.size();
+  // Initialize the next allocation index for each priority.
+  for (const auto& entry: tmp_files_index_range_) {
+    const int priority = entry.first;
+    const int start = entry.second.start;
+    const int end = entry.second.end;
+    // Start allocating on a random device to avoid overloading the first device.
+    next_allocation_index_.emplace(priority, start + rand() % (end - start + 1));
+  }
   return Status::OK();
 }
 
@@ -479,22 +528,31 @@ Status TmpFileGroup::AllocateSpace(
   // that some disks were at capacity.
   vector<int> at_capacity_dirs;
 
-  // Find the next physical file in round-robin order and allocate a range from it.
-  for (int attempt = 0; attempt < tmp_files_.size(); ++attempt) {
-    int idx = next_allocation_index_;
-    next_allocation_index_ = (next_allocation_index_ + 1) % tmp_files_.size();
-    *tmp_file = tmp_files_[idx].get();
-    if ((*tmp_file)->is_blacklisted()) continue;
+  // Find the next physical file in priority based round-robin order and allocate a range
+  // from it.
+  for (const auto& entry: tmp_files_index_range_) {
+    const int priority = entry.first;
+    const int start = entry.second.start;
+    const int end = entry.second.end;
+    DCHECK (0 <= start && start <= end && end < tmp_files_.size())
+      << "Invalid index range: [" << start << ", " << end << "] "
+      << "tmp_files_.size(): " << tmp_files_.size();
+    for (int index = start; index <= end; ++index) {
+      const int idx = next_allocation_index_[priority];
+      next_allocation_index_[priority] = start + (idx - start + 1) % (end - start + 1);
+      *tmp_file = tmp_files_[idx].get();
+      if ((*tmp_file)->is_blacklisted()) continue;
 
-    // Check the per-directory limit.
-    if (!(*tmp_file)->AllocateSpace(scratch_range_bytes, file_offset)) {
-      at_capacity_dirs.push_back(idx);
-      continue;
+      // Check the per-directory limit.
+      if (!(*tmp_file)->AllocateSpace(scratch_range_bytes, file_offset)) {
+        at_capacity_dirs.push_back(idx);
+        continue;
+      }
+      scratch_space_bytes_used_counter_->Add(scratch_range_bytes);
+      tmp_file_mgr_->scratch_bytes_used_metric_->Increment(scratch_range_bytes);
+      current_bytes_allocated_ += scratch_range_bytes;
+      return Status::OK();
     }
-    scratch_space_bytes_used_counter_->Add(scratch_range_bytes);
-    tmp_file_mgr_->scratch_bytes_used_metric_->Increment(scratch_range_bytes);
-    current_bytes_allocated_ += scratch_range_bytes;
-    return Status::OK();
   }
   return ScratchAllocationFailedStatus(at_capacity_dirs);
 }
@@ -737,7 +795,12 @@ string TmpFileGroup::DebugString() {
   stringstream ss;
   ss << "TmpFileGroup " << this << " bytes limit " << bytes_limit_
      << " current bytes allocated " << current_bytes_allocated_
-     << " next allocation index " << next_allocation_index_ << " writes "
+     << " next allocation index [ ";
+  // Get priority based allocation index.
+  for (const auto& entry: next_allocation_index_) {
+    ss << " (priority: " << entry.first << ", index: " << entry.second << "), ";
+  }
+  ss << "] writes "
      << write_counter_->value() << " bytes written " << bytes_written_counter_->value()
      << " uncompressed bytes written " << uncompressed_bytes_written_counter_->value()
      << " reads " << read_counter_->value() << " bytes read "
