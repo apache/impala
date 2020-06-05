@@ -72,5 +72,5 @@ message ScanRangePB {
   // One of these must be set for every ScanRangePB.
   optional HdfsFileSplitPB hdfs_file_split = 1;
   optional HBaseKeyRangePB hbase_key_range = 2;
-  optional string kudu_scan_token = 3;
+  optional bytes kudu_scan_token = 3;
 }
