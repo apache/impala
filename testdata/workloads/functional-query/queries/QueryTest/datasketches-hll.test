@@ -166,3 +166,63 @@ BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 ---- RESULTS
 5,7,6,5,6,4,3,3,NULL
 ====
+---- QUERY
+# Unions the sketches from sketch_store and checks if the union produces the same result
+# as if the whole data was sketched together into a single sketch.
+select
+    ds_hll_estimate(ds_hll_union(date_sketch)),
+    ds_hll_estimate(ds_hll_union(float_sketch))
+from sketch_store;
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+12,10
+====
+---- QUERY
+# Checks that ds_hll_union() produces NULL for an empty dataset.
+select ds_hll_union(field) from functional_parquet.emptytable;
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Checks that ds_hll_union() produces NULL for NULL inputs.
+select ds_hll_union(null_str) from functional_parquet.nullrows;
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# ds_hll_union() returns an error if it receives an invalid serialized sketch.
+select ds_hll_union(date_string_col) from functional_parquet.alltypestiny where id=1;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# Get the same sketches from Impala and Hive and put them into the same table. When we
+# get the estimates from the unions of these sketches the expectation is to get the same
+# results as if these sketches were used separately to get the estimates. However, for
+# string types (STRING, CHAR, VARCHAR) we see the numbers doubling up because of the
+# difference between how Impala and Hive uses these types. See IMPALA-9939 for further
+# details.
+create table hll_sketches_impala_hive like hll_sketches_from_impala stored as parquet;
+insert into hll_sketches_impala_hive select * from hll_sketches_from_hive;
+insert into hll_sketches_impala_hive select * from hll_sketches_from_impala;
+select
+    ds_hll_estimate(ds_hll_union(ti)) as ti,
+    ds_hll_estimate(ds_hll_union(i)) as i,
+    ds_hll_estimate(ds_hll_union(bi)) as bi,
+    ds_hll_estimate(ds_hll_union(f)) as f,
+    ds_hll_estimate(ds_hll_union(d)) as d,
+    ds_hll_estimate(ds_hll_union(s)) as s,
+    ds_hll_estimate(ds_hll_union(c)) as c,
+    ds_hll_estimate(ds_hll_union(v)) as v,
+    ds_hll_estimate(ds_hll_union(nc)) as nc
+from hll_sketches_impala_hive;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+5,7,6,5,6,8,6,6,NULL
+====

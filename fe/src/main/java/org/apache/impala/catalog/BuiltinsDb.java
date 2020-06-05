@@ -1331,6 +1331,20 @@ public class BuiltinsDb extends Db {
     db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
         db, "ntile", Lists.<Type>newArrayList(Type.BIGINT), Type.BIGINT, Type.STRING));
 
+    // DataSketches HLL union
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_hll_union",
+        Lists.<Type>newArrayList(Type.STRING), Type.STRING, Type.STRING,
+        prefix + "14DsHllUnionInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix +
+            "16DsHllUnionUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "15DsHllUnionMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "19DsHllUnionSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        prefix +
+            "18DsHllUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        true, false, true));
+
     for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue; // NULL is handled through type promotion.
       if (t.isScalarType(PrimitiveType.CHAR)) continue; // promoted to STRING

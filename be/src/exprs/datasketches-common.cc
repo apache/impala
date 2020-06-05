@@ -15,22 +15,31 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "exprs/datasketches-functions.h"
+#include "datasketches-common.h"
 
-#include "exprs/datasketches-common.h"
-#include "thirdparty/datasketches/hll.hpp"
+#include "common/logging.h"
+#include "udf/udf-internal.h"
 
 namespace impala {
 
-BigIntVal DataSketchesFunctions::DsHllEstimate(FunctionContext* ctx,
-    const StringVal& serialized_sketch) {
-  if (serialized_sketch.is_null || serialized_sketch.len == 0) return BigIntVal::null();
-  datasketches::hll_sketch sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
-  if (!DeserializeHllSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
-    return BigIntVal::null();
+using datasketches::hll_sketch;
+using impala_udf::StringVal;
+
+void LogSketchDeserializationError(FunctionContext* ctx) {
+  ctx->SetError("Unable to deserialize sketch.");
+}
+
+bool DeserializeHllSketch(const StringVal& serialized_sketch, hll_sketch* sketch) {
+  DCHECK(sketch != nullptr);
+  if (serialized_sketch.is_null || serialized_sketch.len == 0) return false;
+  try {
+    *sketch = hll_sketch::deserialize((void*)serialized_sketch.ptr,
+        serialized_sketch.len);
+    return true;
+  } catch (const std::invalid_argument&) {
+    // Deserialization throws if the input string is not a serialized sketch.
+    return false;
   }
-  return sketch.get_estimate();
 }
 
 }
