@@ -156,9 +156,13 @@ class TestRanger(CustomClusterTestSuite):
                                         .format(unique_database, user1), user=ADMIN)
       result = self.execute_query("show grant user {0} on database {1}"
                                   .format(user1, unique_database))
+      # Revoking the select privilege also deprives the grantee of the permission to
+      # transfer other privilege(s) on the same resource to other principals. This is a
+      # current limitation of Ranger since privileges on the same resource share the same
+      # delegateAdmin field in the corresponding RangerPolicyItem.
       TestRanger._check_privileges(result, [
-          ["USER", user1, unique_database, "", "", "", "*", "insert", "true"],
-          ["USER", user1, unique_database, "*", "*", "", "", "insert", "true"]])
+          ["USER", user1, unique_database, "", "", "", "*", "insert", "false"],
+          ["USER", user1, unique_database, "*", "*", "", "", "insert", "false"]])
 
       # Revoke privilege granting from user 1
       self.execute_query_expect_success(admin_client, "revoke grant option for insert "
