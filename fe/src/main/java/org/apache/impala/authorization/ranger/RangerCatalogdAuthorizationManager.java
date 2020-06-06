@@ -285,7 +285,7 @@ public class RangerCatalogdAuthorizationManager implements AuthorizationManager 
     request.setGrantor(grantor);
     if (user != null) request.getUsers().add(user);
     if (!groups.isEmpty()) request.getGroups().addAll(groups);
-    request.setDelegateAdmin(isGrant == withGrantOpt);
+    request.setDelegateAdmin(isGrant && withGrantOpt);
     request.setEnableAudit(Boolean.TRUE);
     request.setReplaceExistingPermissions(Boolean.FALSE);
     request.setClusterName(clusterName);
