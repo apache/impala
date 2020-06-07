@@ -118,12 +118,13 @@ class TestMtDopScanNode(ImpalaTestSuite):
     fq_table_name = "%s.store_sales_subset" % unique_database
     self.execute_query("create table %s as select distinct(ss_sold_date_sk) as "
                        "sold_date from tpcds.store_sales limit 50" % fq_table_name)
-    vector.get_value('exec_option')['mt_dop'] = 10
+    vector.get_value('exec_option')['mt_dop'] = 8
     vector.get_value('exec_option')['runtime_filter_wait_time_ms'] = 100000
 
     # Since this depends on instances fetching scan ranges from a shared queue, running
-    # it multiple times ensures any flakiness is removed.
-    NUM_TRIES = 10
+    # it multiple times ensures any flakiness is removed. On a release build it has a
+    # 0.05% failure rate.
+    NUM_TRIES = 100
     failed_count = 0
     for i in xrange(NUM_TRIES):
       try:
