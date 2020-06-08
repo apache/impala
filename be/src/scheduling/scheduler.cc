@@ -163,6 +163,7 @@ Status Scheduler::ComputeScanRangeAssignment(
       const TPlanNodeId node_id = entry.first;
       const TPlanFragment& fragment = schedule->GetContainingFragment(node_id);
       bool exec_at_coord = (fragment.partition.type == TPartitionType::UNPARTITIONED);
+      DCHECK(executor_config.group.NumExecutors() > 0 || exec_at_coord);
 
       const TPlanNode& node = schedule->GetNode(node_id);
       DCHECK_EQ(node.node_id, node_id);
@@ -542,11 +543,19 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
   // random rank.
   bool random_replica = query_options.schedule_random_replica || node_random_replica;
 
-  // TODO: Build this one from executor_group
+  // This temp group is necessary because of the AssignmentCtx interface. This group is
+  // used to schedule scan ranges for the plan node passed where the caller of this method
+  // has determined that it needs to be scheduled on the coordinator only. Note that this
+  // also includes queries where the whole query should run on the coordinator, as is
+  // determined by Scheduler::IsCoordinatorOnlyQuery(). For those queries, the
+  // AdmissionController will pass an empty executor group and rely on this method being
+  // called with exec_at_coord = true.
+  // TODO: Either get this from the ExecutorConfig or modify the AssignmentCtx interface
+  // to handle this case.
   ExecutorGroup coord_only_executor_group("coordinator-only-group");
   const BackendDescriptorPB& local_be_desc = executor_config.local_be_desc;
   coord_only_executor_group.AddExecutor(local_be_desc);
-  VLOG_QUERY << "Exec at coord is " << (exec_at_coord ? "true" : "false");
+  VLOG_ROW << "Exec at coord is " << (exec_at_coord ? "true" : "false");
   AssignmentCtx assignment_ctx(
       exec_at_coord ? coord_only_executor_group : executor_group, total_assignments_,
       total_local_assignments_);
@@ -740,6 +749,15 @@ Status Scheduler::Schedule(
 #endif
   schedule->set_executor_group(executor_config.group.name());
   return Status::OK();
+}
+
+bool Scheduler::IsCoordinatorOnlyQuery(const TQueryExecRequest& exec_request) {
+  DCHECK_GT(exec_request.plan_exec_info.size(), 0);
+  const TPlanExecInfo& plan_exec_info = exec_request.plan_exec_info[0];
+  int64_t num_fragments = plan_exec_info.fragments.size();
+  DCHECK_GT(num_fragments, 0);
+  auto type = plan_exec_info.fragments[0].partition.type;
+  return num_fragments == 1 && type == TPartitionType::UNPARTITIONED;
 }
 
 void Scheduler::ComputeBackendExecParams(

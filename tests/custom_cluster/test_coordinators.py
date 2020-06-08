@@ -291,15 +291,21 @@ class TestCoordinators(CustomClusterTestSuite):
       self._stop_impala_cluster()
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(cluster_size=1, num_exclusive_coordinators=1)
+  @CustomClusterTestSuite.with_args(impalad_args="--queue_wait_timeout_ms=2000",
+                                    cluster_size=1, num_exclusive_coordinators=1)
   def test_dedicated_coordinator_without_executors(self):
     """This test verifies that a query gets queued and times out when no executors are
-    present."""
-    result = self.execute_query_expect_failure(self.client, "select 2")
-    expected_error = "Query aborted:Admission for query exceeded timeout 60000ms in " \
+    present but a coordinator only query gets executed."""
+    # Pick a non-trivial query that needs to be scheduled on executors.
+    query = "select count(*) from functional.alltypes where month + random() < 3"
+    result = self.execute_query_expect_failure(self.client, query)
+    expected_error = "Query aborted:Admission for query exceeded timeout 2000ms in " \
                      "pool default-pool. Queued reason: Waiting for executors to " \
-                     "start. Only DDL queries can currently run."
+                     "start."
     assert expected_error in str(result)
+    # Now pick a coordinator only query.
+    query = "select 1"
+    self.execute_query_expect_success(self.client, query)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1, num_exclusive_coordinators=1,

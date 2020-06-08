@@ -27,6 +27,8 @@ from time import sleep
 
 LOG = logging.getLogger("test_auto_scaling")
 
+# Non-trivial query that gets scheduled on all executors within a group.
+TEST_QUERY = "select count(*) from functional.alltypes where month + random() < 3"
 
 class TestExecutorGroups(CustomClusterTestSuite):
   """This class contains tests that exercise the logic related to scaling clusters up and
@@ -120,28 +122,35 @@ class TestExecutorGroups(CustomClusterTestSuite):
       60, 1, lambda: expected_str in self.client.get_runtime_profile(query_handle))
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args="-queue_wait_timeout_ms=2000")
-  def test_no_group_timeout(self):
-    """Tests that a query submitted to a coordinator with no executor group times out."""
-    result = self.execute_query_expect_failure(self.client, "select sleep(2)")
+  @CustomClusterTestSuite.with_args(impalad_args="-queue_wait_timeout_ms=1000")
+  def test_no_group(self):
+    """Tests that a regular query submitted to a coordinator with no executor group
+    times out but coordinator only queries can still run."""
+    result = self.execute_query_expect_failure(self.client, TEST_QUERY)
     assert "Admission for query exceeded timeout" in str(result)
     assert self._get_num_executor_groups(only_healthy=True) == 0
+    expected_group = "Executor Group: empty group (using coordinator only)"
+    # Force the query to run on coordinator only.
+    result = self.execute_query_expect_success(self.client, TEST_QUERY,
+                                               query_options={'NUM_NODES': '1'})
+    assert expected_group in str(result.runtime_profile)
+    # Small query runs on coordinator only.
+    result = self.execute_query_expect_success(self.client, "select 1")
+    assert expected_group in str(result.runtime_profile)
 
   @pytest.mark.execute_serially
   def test_single_group(self):
     """Tests that we can start a single executor group and run a simple query."""
-    QUERY = "select count(*) from functional.alltypestiny"
     self._add_executor_group("group1", 2)
-    self.execute_query_expect_success(self.client, QUERY)
+    self.execute_query_expect_success(self.client, TEST_QUERY)
     assert self._get_num_executor_groups(only_healthy=True) == 1
 
   @pytest.mark.execute_serially
   def test_executor_group_starts_while_qeueud(self):
     """Tests that a query can stay in the queue of an empty cluster until an executor
     group comes online."""
-    QUERY = "select count(*) from functional.alltypestiny"
     client = self.client
-    handle = client.execute_async(QUERY)
+    handle = client.execute_async(TEST_QUERY)
     self._assert_eventually_in_profile(handle, "Waiting for executors to start")
     assert self._get_num_executor_groups(only_healthy=True) == 0
     self._add_executor_group("group1", 2)
@@ -151,13 +160,12 @@ class TestExecutorGroups(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   def test_executor_group_health(self):
     """Tests that an unhealthy executor group will not run queries."""
-    QUERY = "select count(*) from functional.alltypestiny"
     # Start cluster and group
     self._add_executor_group("group1", 2)
     self._wait_for_num_executor_groups(1, only_healthy=True)
     client = self.client
     # Run query to validate
-    self.execute_query_expect_success(client, QUERY)
+    self.execute_query_expect_success(client, TEST_QUERY)
     # Kill an executor
     executor = self.cluster.impalads[1]
     executor.kill()
@@ -165,14 +173,14 @@ class TestExecutorGroups(CustomClusterTestSuite):
                                                    timeout=20)
     assert self._get_num_executor_groups(only_healthy=True) == 0
     # Run query and observe timeout
-    handle = client.execute_async(QUERY)
+    handle = client.execute_async(TEST_QUERY)
     self._assert_eventually_in_profile(handle, "Waiting for executors to start")
     # Restart executor
     executor.start()
     # Query should now finish
     client.wait_for_finished_timeout(handle, 20)
     # Run query and observe success
-    self.execute_query_expect_success(client, QUERY)
+    self.execute_query_expect_success(client, TEST_QUERY)
     self._wait_for_num_executor_groups(1, only_healthy=True)
 
   @pytest.mark.execute_serially
@@ -310,7 +318,6 @@ class TestExecutorGroups(CustomClusterTestSuite):
   def test_sequential_startup_wait(self):
     """Tests that starting an executor group sequentially works as expected, i.e. queries
     don't fail and no queries are admitted until the group is in a healthy state."""
-    QUERY = "select sleep(4)"
     # Start first executor
     self._add_executor_group("group1", 3, num_executors=1)
     self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 2)
@@ -318,7 +325,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     assert self._get_num_executor_groups(only_healthy=True) == 0
     # Run query and observe that it gets queued
     client = self.client
-    handle = client.execute_async(QUERY)
+    handle = client.execute_async(TEST_QUERY)
     self._assert_eventually_in_profile(handle, "Initial admission queue reason:"
                                                " Waiting for executors to start")
     initial_state = client.get_state(handle)
@@ -342,8 +349,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self._add_executor_group("", min_size=2, num_executors=2,
                              admission_control_slots=3)
     # Run query to make sure things work
-    QUERY = "select count(*) from functional.alltypestiny"
-    self.execute_query_expect_success(self.client, QUERY)
+    self.execute_query_expect_success(self.client, TEST_QUERY)
     assert self._get_num_executor_groups(only_healthy=True) == 1
     # Kill executors to make group empty
     impalads = self.cluster.impalads
@@ -351,10 +357,12 @@ class TestExecutorGroups(CustomClusterTestSuite):
     impalads[2].kill()
     self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 1)
     # Run query to make sure it times out
-    result = self.execute_query_expect_failure(self.client, QUERY)
+    result = self.execute_query_expect_failure(self.client, TEST_QUERY)
     expected_error = "Query aborted:Admission for query exceeded timeout 2000ms in " \
                      "pool default-pool. Queued reason: Waiting for executors to " \
-                     "start. Only DDL queries can currently run."
+                     "start. Only DDL queries and queries scheduled only on the " \
+                     "coordinator (either NUM_NODES set to 1 or when small query " \
+                     "optimization is triggered) can currently run."
     assert expected_error in str(result)
     assert self._get_num_executor_groups(only_healthy=True) == 0
 

@@ -164,6 +164,10 @@ class ClusterMembershipMgr {
   /// 'cause' is an error status representing the reason the node was blacklisted.
   void BlacklistExecutor(const BackendDescriptorPB& be_desc, const Status& cause);
 
+  /// Returns a pointer to the static empty group reserved for scheduling coord only
+  /// queries.
+  const ExecutorGroup* GetEmptyExecutorGroup() { return &empty_exec_group_; }
+
  private:
   /// Serializes and adds the local backend descriptor to 'subscriber_topic_updates'.
   void AddLocalBackendToStatestore(const BackendDescriptorPB& local_be_desc,
@@ -203,6 +207,9 @@ class ClusterMembershipMgr {
   /// used in DCHECKs.
   bool IsBackendInExecutorGroups(
       const BackendDescriptorPB& be_desc, const ExecutorGroups& executor_groups);
+
+  /// An empty group used for scheduling coordinator only queries.
+  const ExecutorGroup empty_exec_group_;
 
   /// Ensures that only one thread is processing a membership update at a time, either
   /// from a statestore update or a blacklisting decision. Must be taken before any other

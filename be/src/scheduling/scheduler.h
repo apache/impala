@@ -68,8 +68,13 @@ class Scheduler {
   };
 
   /// Populates given query schedule and assigns fragments to hosts based on scan
-  /// ranges in the query exec request.
+  /// ranges in the query exec request. 'executor_config' must contain a non-empty group
+  /// unless IsCoordinatorOnlyQuery() is true.
   Status Schedule(const ExecutorConfig& executor_config, QuerySchedule* schedule);
+
+  /// Returns true if the query is only supposed to run on the coordinator (single
+  /// unpartitioned fragment).
+  bool IsCoordinatorOnlyQuery(const TQueryExecRequest& exec_request);
 
  private:
   /// Map from a host's IP address to the next executor to be round-robin scheduled for

@@ -210,8 +210,10 @@ const string REASON_THREAD_RESERVATION_AGG_LIMIT_EXCEEDED =
 // $0 is the error message returned by the scheduler.
 const string REASON_SCHEDULER_ERROR = "Error during scheduling: $0";
 const string REASON_LOCAL_BACKEND_NOT_STARTED = "Local backend has not started up yet.";
-const string REASON_NO_EXECUTOR_GROUPS = "Waiting for executors to start. Only DDL "
-    "queries can currently run.";
+const string REASON_NO_EXECUTOR_GROUPS =
+    "Waiting for executors to start. Only DDL queries and queries scheduled only on the "
+    "coordinator (either NUM_NODES set to 1 or when small query optimization is "
+    "triggered) can currently run.";
 
 // Queue decision details
 // $0 = num running queries, $1 = num queries limit, $2 = staleness detail
@@ -1161,8 +1163,6 @@ Status AdmissionController::ComputeGroupSchedules(
   std::vector<GroupSchedule>* output_schedules = &queue_node->group_schedules;
   output_schedules->clear();
 
-  const string& pool_name = request.request.query_ctx.request_pool;
-
   // If the first statestore update arrives before the local backend has finished starting
   // up, we might not have a local backend descriptor yet. We return no schedules, which
   // will result in the query being queued.
@@ -1173,9 +1173,8 @@ Status AdmissionController::ComputeGroupSchedules(
   }
   const BackendDescriptorPB& local_be_desc = *membership_snapshot->local_be_desc;
 
-  vector<const ExecutorGroup*> executor_groups;
-  GetExecutorGroupsForPool(
-      membership_snapshot->executor_groups, pool_name, &executor_groups);
+  vector<const ExecutorGroup*> executor_groups =
+      GetExecutorGroupsForQuery(membership_snapshot->executor_groups, request);
 
   if (executor_groups.empty()) {
     queue_node->not_admitted_reason = REASON_NO_EXECUTOR_GROUPS;
@@ -1188,8 +1187,9 @@ Status AdmissionController::ComputeGroupSchedules(
   // to balance queries across executor groups equally.
   // TODO(IMPALA-8731): balance queries across executor groups more evenly
   for (const ExecutorGroup* executor_group : executor_groups) {
-    DCHECK(executor_group->IsHealthy());
-    DCHECK_GT(executor_group->NumExecutors(), 0);
+    DCHECK(executor_group->IsHealthy()
+        || cluster_membership_mgr_->GetEmptyExecutorGroup() == executor_group)
+        << executor_group->name();
     unique_ptr<QuerySchedule> group_schedule =
         make_unique<QuerySchedule>(request.query_id, request.request,
             request.query_options, request.summary_profile, request.query_events);
@@ -1232,7 +1232,6 @@ bool AdmissionController::FindGroupToAdmitOrReject(
 
   for (GroupSchedule& group_schedule : queue_node->group_schedules) {
     const ExecutorGroup& executor_group = group_schedule.executor_group;
-    DCHECK_GT(executor_group.NumExecutors(), 0);
     QuerySchedule* schedule = group_schedule.schedule.get();
     schedule->UpdateMemoryRequirements(pool_config);
 
@@ -1493,7 +1492,7 @@ void AdmissionController::AdmitQuery(QuerySchedule* schedule, bool was_queued) {
            << " coord_backend_mem_limit set to: "
            << PrintBytes(schedule->coord_backend_mem_limit())
            << " coord_backend_mem_to_admit set to: "
-           << PrintBytes(schedule->coord_backend_mem_to_admit());;
+           << PrintBytes(schedule->coord_backend_mem_to_admit());
   // Update memory and number of queries.
   UpdateStatsOnAdmission(*schedule);
   UpdateExecGroupMetric(schedule->executor_group(), 1);
@@ -1759,31 +1758,40 @@ string AdmissionController::MakePoolTopicKey(
   return Substitute("$0$1$2", pool_name, TOPIC_KEY_DELIMITER, backend_id);
 }
 
-void AdmissionController::GetExecutorGroupsForPool(
-    const ClusterMembershipMgr::ExecutorGroups& all_groups, const string& pool_name,
-    vector<const ExecutorGroup*>* matching_groups) {
+vector<const ExecutorGroup*> AdmissionController::GetExecutorGroupsForQuery(
+    const ClusterMembershipMgr::ExecutorGroups& all_groups,
+    const AdmissionRequest& request) {
+  vector<const ExecutorGroup*> matching_groups;
+  if (ExecEnv::GetInstance()->scheduler()->IsCoordinatorOnlyQuery(request.request)) {
+    // Coordinator only queries can run regardless of the presence of exec groups. This
+    // empty group works as a proxy to schedule coordinator only queries.
+    matching_groups.push_back(cluster_membership_mgr_->GetEmptyExecutorGroup());
+    return matching_groups;
+  }
+  const string& pool_name = request.request.query_ctx.request_pool;
   string prefix(pool_name + POOL_GROUP_DELIMITER);
   // We search for matching groups before the health check so that we don't fall back to
   // the default group in case there are matching but unhealthy groups.
   for (const auto& it : all_groups) {
     StringPiece name(it.first);
-    if (name.starts_with(prefix)) matching_groups->push_back(&it.second);
+    if (name.starts_with(prefix)) matching_groups.push_back(&it.second);
   }
-  if (matching_groups->empty()) {
+  if (matching_groups.empty()) {
     auto default_it = all_groups.find(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
-    if (default_it == all_groups.end()) return;
+    if (default_it == all_groups.end()) return matching_groups;
     VLOG(3) << "Checking default executor group for pool " << pool_name;
-    matching_groups->push_back(&default_it->second);
+    matching_groups.push_back(&default_it->second);
   }
   // Filter out unhealthy groups.
-  auto erase_from = std::remove_if(matching_groups->begin(), matching_groups->end(),
+  auto erase_from = std::remove_if(matching_groups.begin(), matching_groups.end(),
       [](const ExecutorGroup* g) { return !g->IsHealthy(); });
-  matching_groups->erase(erase_from, matching_groups->end());
+  matching_groups.erase(erase_from, matching_groups.end());
   // Sort executor groups by name.
   auto cmp = [](const ExecutorGroup* a, const ExecutorGroup* b) {
     return a->name() < b->name();
   };
-  sort(matching_groups->begin(), matching_groups->end(), cmp);
+  sort(matching_groups.begin(), matching_groups.end(), cmp);
+  return matching_groups;
 }
 
 int64_t AdmissionController::GetClusterSize(
