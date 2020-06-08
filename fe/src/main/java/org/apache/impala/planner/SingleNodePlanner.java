@@ -47,6 +47,7 @@ import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SelectStmt;
+import org.apache.impala.analysis.SetOperationStmt.SetOperand;
 import org.apache.impala.analysis.SingularRowSrcTableRef;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
@@ -57,7 +58,6 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.analysis.UnionStmt;
-import org.apache.impala.analysis.UnionStmt.UnionOperand;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeDataSourceTable;
@@ -120,7 +120,7 @@ public class SingleNodePlanner {
    * performs the following actions.
    * In the top-down phase over query statements:
    * - Materialize the slots required for evaluating expressions of that statement.
-   * - Migrate conjuncts from parent blocks into inline views and union operands.
+   * - Migrate conjuncts from parent blocks into inline views and set operands.
    * In the bottom-up phase generate the plan tree for every query statement:
    * - Generate the plan for the FROM-clause of a select statement: The plan trees of
    *   absolute and uncorrelated table refs are connected via JoinNodes. The relative
@@ -237,7 +237,7 @@ public class SingleNodePlanner {
     EmptySetNode node = new EmptySetNode(ctx_.getNextNodeId(), tupleIds);
     node.init(analyzer);
     // Set the output smap to resolve exprs referencing inline views within stmt.
-    // Not needed for a UnionStmt because it materializes its input operands.
+    // Not needed for a SetOperationStmt because it materializes its input operands.
     if (stmt instanceof SelectStmt) {
       node.setOutputSmap(((SelectStmt) stmt).getBaseTblSmap());
     }
@@ -1988,13 +1988,11 @@ public class SingleNodePlanner {
    * distinct portion of the given unionStmt. The unionDistinctPlan is then added
    * as a child of the returned UnionNode.
    */
-  private UnionNode createUnionPlan(
-      Analyzer analyzer, UnionStmt unionStmt, List<UnionOperand> unionOperands,
-      PlanNode unionDistinctPlan)
-      throws ImpalaException {
+  private UnionNode createUnionPlan(Analyzer analyzer, UnionStmt unionStmt,
+      List<SetOperand> unionOperands, PlanNode unionDistinctPlan) throws ImpalaException {
     UnionNode unionNode = new UnionNode(ctx_.getNextNodeId(), unionStmt.getTupleId(),
-        unionStmt.getUnionResultExprs(), ctx_.hasSubplan());
-    for (UnionOperand op: unionOperands) {
+        unionStmt.getSetOperationResultExprs(), ctx_.hasSubplan());
+    for (SetOperand op : unionOperands) {
       if (op.getAnalyzer().hasEmptyResultSet()) {
         unmarkCollectionSlots(op.getQueryStmt());
         continue;
@@ -2016,7 +2014,7 @@ public class SingleNodePlanner {
     }
 
     if (unionDistinctPlan != null) {
-      Preconditions.checkState(unionStmt.hasDistinctOps());
+      Preconditions.checkState(unionStmt.hasUnionDistinctOps());
       Preconditions.checkState(unionDistinctPlan instanceof AggregationNode);
       unionNode.addChild(unionDistinctPlan,
           unionStmt.getDistinctAggInfo().getGroupingExprs());
@@ -2050,7 +2048,7 @@ public class SingleNodePlanner {
       // the individual operands.
       // Do this prior to creating the operands' plan trees so they get a chance to
       // pick up propagated predicates.
-      for (UnionOperand op: unionStmt.getOperands()) {
+      for (SetOperand op : unionStmt.getOperands()) {
         List<Expr> opConjuncts =
             Expr.substituteList(conjuncts, op.getSmap(), analyzer, false);
         op.getAnalyzer().registerConjuncts(opConjuncts);
@@ -2065,16 +2063,17 @@ public class SingleNodePlanner {
 
     PlanNode result = null;
     // create DISTINCT tree
-    if (unionStmt.hasDistinctOps()) {
+    if (unionStmt.hasUnionDistinctOps()) {
       result = createUnionPlan(
-          analyzer, unionStmt, unionStmt.getDistinctOperands(), null);
+          analyzer, unionStmt, unionStmt.getUnionDistinctOperands(), null);
       result = new AggregationNode(
           ctx_.getNextNodeId(), result, unionStmt.getDistinctAggInfo(), AggPhase.FIRST);
       result.init(analyzer);
     }
     // create ALL tree
-    if (unionStmt.hasAllOps()) {
-      result = createUnionPlan(analyzer, unionStmt, unionStmt.getAllOperands(), result);
+    if (unionStmt.hasUnionAllOps()) {
+      result =
+          createUnionPlan(analyzer, unionStmt, unionStmt.getUnionAllOperands(), result);
     }
 
     if (unionStmt.hasAnalyticExprs()) {

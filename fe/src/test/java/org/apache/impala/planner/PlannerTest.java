@@ -57,6 +57,7 @@ public class PlannerTest extends PlannerTestBase {
     PlannerTestBase.setUp();
     // Rebalance the HBase tables. This is necessary because some tests rely on HBase
     // tables being arranged in a deterministic way. See IMPALA-7061 for details.
+
     HBaseTestDataRegionAssignment assignment = new HBaseTestDataRegionAssignment();
     assignment.performAssignment("functional_hbase.alltypessmall");
     assignment.performAssignment("functional_hbase.alltypesagg");
@@ -444,6 +445,11 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testUnion() {
     runPlannerTestFile("union");
+  }
+
+  @Test
+  public void testSetOperationRewrite() {
+    runPlannerTestFile("setoperation-rewrite");
   }
 
   @Test

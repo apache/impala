@@ -216,6 +216,7 @@ public class Analyzer {
   public boolean hasPlanHints() { return globalState_.hasPlanHints; }
   public void setHasWithClause() { hasWithClause_ = true; }
   public boolean hasWithClause() { return hasWithClause_; }
+  public void setSetOpNeedsRewrite() { globalState_.setOperationNeedsRewrite = true; }
 
   /**
    * @param table Table whose properties need to be checked.
@@ -341,6 +342,10 @@ public class Analyzer {
 
     // True if at least one of the analyzers belongs to a subquery.
     public boolean containsSubquery = false;
+
+    // True if one of the analyzers belongs to a set operand of type EXCEPT or INTERSECT
+    // which needs to be rewritten using joins.
+    public boolean setOperationNeedsRewrite = false;
 
     // all registered conjuncts (map from expr id to conjunct). We use a LinkedHashMap to
     // preserve the order in which conjuncts are added.
@@ -492,6 +497,7 @@ public class Analyzer {
   private final GlobalState globalState_;
 
   public boolean containsSubquery() { return globalState_.containsSubquery; }
+  public boolean containsSetOperation() { return globalState_.setOperationNeedsRewrite; }
 
   // An analyzer stores analysis state for a single select block. A select block can be
   // a top level select statement, or an inline view select block.
@@ -900,7 +906,7 @@ public class Analyzer {
 
   /**
    * Return true if this analyzer has no ancestors. (i.e. false for the analyzer created
-   * for inline views/ union operands, etc.)
+   * for inline views/ set operands (except/intersect/union), etc.)
    */
   public boolean isRootAnalyzer() { return ancestors_.isEmpty(); }
 
@@ -2695,7 +2701,7 @@ public class Analyzer {
    * Returns null if an empty expression list or null is passed to it.
    * Throw an AnalysisException if the types are incompatible.
    */
-  public List<Expr> castToUnionCompatibleTypes(List<List<Expr>> exprLists)
+  public List<Expr> castToSetOpCompatibleTypes(List<List<Expr>> exprLists)
       throws AnalysisException {
     if (exprLists == null || exprLists.size() == 0) return null;
     if (exprLists.size() == 1) return exprLists.get(0);

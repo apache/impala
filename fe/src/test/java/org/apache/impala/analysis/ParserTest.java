@@ -818,110 +818,162 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestUnion() {
-    // Single union test.
-    ParsesOk("select a from test union select a from test");
-    ParsesOk("select a from test union all select a from test");
-    ParsesOk("select a from test union distinct select a from test");
-    // Chained union test.
-    ParsesOk("select a from test union select a from test " +
-        "union select a from test union select a from test");
-    ParsesOk("select a from test union all select a from test " +
-        "union all select a from test union all select a from test");
-    ParsesOk("select a from test union distinct select a from test " +
-        "union distinct select a from test union distinct select a from test ");
-    // Mixed union with all and distinct.
-    ParsesOk("select a from test union select a from test " +
-        "union all select a from test union distinct select a from test");
-    // No from clause.
-    ParsesOk("select sin() union select cos()");
-    ParsesOk("select sin() union all select cos()");
-    ParsesOk("select sin() union distinct select cos()");
+  public void TestSetOperations() {
+    // the ALL modifier isn't currently support with except / intersect
+    String allOp = "union";
+    ParsesOk(String.format("select a from test %s all select a from test", allOp));
+    ParsesOk(String.format("select sin() %s all select cos()", allOp));
+    // Mixed %s with all and distinct.
+    ParsesOk(String.format("select a from test %s select a from test "
+            + "%s all select a from test %s distinct select a from test",
+        allOp, allOp, allOp));
+    ParsesOk(String.format("select a from test %s all select a from test "
+            + "%s all select a from test %s all select a from test",
+        allOp, allOp, allOp));
 
-    // All select blocks in parenthesis.
-    ParsesOk("(select a from test) union (select a from test) " +
-        "union (select a from test) union (select a from test)");
-    // Union with order by,
-    ParsesOk("(select a from test) union (select a from test) " +
-        "union (select a from test) union (select a from test) order by a");
-    ParsesOk("(select a from test) union (select a from test) " +
-        "union (select a from test) union (select a from test) order by a nulls first");
-    // Union with limit.
-    ParsesOk("(select a from test) union (select a from test) " +
-        "union (select a from test) union (select a from test) limit 10");
-    // Union with order by, offset and limit.
-    ParsesOk("(select a from test) union (select a from test) " +
-        "union (select a from test) union (select a from test) order by a limit 10");
-    ParsesOk("(select a from test) union (select a from test) " +
-        "union (select a from test) union (select a from test) order by a " +
-        "nulls first limit 10");
-    ParsesOk("(select a from test) union (select a from test) " +
-        "union (select a from test) union (select a from test) order by a " +
-        "nulls first offset 10");
-    ParserError("select a from test union (select a from test) " +
-        "union (select a from test) union (select a from test) offset 10");
-    // Union with some select blocks in parenthesis, and others not.
-    ParsesOk("(select a from test) union select a from test " +
-        "union (select a from test) union select a from test");
-    ParsesOk("select a from test union (select a from test) " +
-        "union select a from test union (select a from test)");
-    // Union with order by, offset and limit binding to last select.
-    ParsesOk("(select a from test) union (select a from test) " +
-        "union select a from test union select a from test order by a limit 10");
-    ParsesOk("(select a from test) union (select a from test) " +
-        "union select a from test union select a from test order by a offset 10");
-    ParsesOk("(select a from test) union (select a from test) " +
-        "union select a from test union select a from test order by a");
-    // Union with order by and limit.
-    // Last select with order by and limit is in parenthesis.
-    ParsesOk("select a from test union (select a from test) " +
-        "union select a from test union (select a from test order by a limit 10) " +
-        "order by a limit 1");
-    ParsesOk("select a from test union (select a from test) " +
-        "union select a from test union (select a from test order by a offset 10) " +
-        "order by a limit 1");
-    ParsesOk("select a from test union (select a from test) " +
-        "union select a from test union (select a from test order by a) " +
-        "order by a limit 1");
-    // Union with order by, offset in first operand.
-    ParsesOk("select a from test order by a union select a from test");
-    ParsesOk("select a from test order by a offset 5 union select a from test");
-    ParsesOk("select a from test offset 5 union select a from test");
-    // Union with order by and limit.
-    // Last select with order by and limit is not in parenthesis.
-    ParsesOk("select a from test union select a from test " +
-        "union select a from test union select a from test order by a limit 10 " +
-        "order by a limit 1");
+    final String[] noAllOps = new String[] {"except", "intersect", "minus"};
+    for (String noAllOp : noAllOps) {
+      ParserError(String.format("select a from test %s all select a from test", noAllOp));
+      ParserError(String.format("select sin() %s all select cos()", noAllOp));
+      // Mixed %s with all and distinct.
+      ParserError(String.format("select a from test %s select a from test "
+              + "%s all select a from test %s distinct select a from test",
+          noAllOp, noAllOp, noAllOp));
+      ParserError(String.format("select a from test %s all select a from test "
+              + "%s all select a from test %s all select a from test",
+          noAllOp, noAllOp, noAllOp));
+    }
 
-    // Nested unions with order by and limit.
-    ParsesOk("select a union " +
-        "((select b) union (select c) order by 1 limit 1)");
-    ParsesOk("select a union " +
-        "((select b) union " +
-        "  ((select c) union (select d) " +
-        "   order by 1 limit 1) " +
-        " order by 1 limit 1)");
+    final String[] setOperators = new String[] {"union", "except", "intersect", "minus"};
+    for (String op : setOperators) {
+      // Single union test.
+      ParsesOk(String.format("select a from test %s select a from test", op));
+      ParsesOk(String.format("select a from test %s distinct select a from test", op));
+      // Chained union test.
+      ParsesOk(String.format("select a from test %s select a from test "
+              + "%s select a from test %s select a from test",
+          op, op, op));
+      ParsesOk(String.format("select a from test %s distinct select a from test "
+              + "%s distinct select a from test %s distinct select a from test ",
+          op, op, op));
+      // No from clause.
+      ParsesOk(String.format("select sin() %s select cos()", op));
+      ParsesOk(String.format("select sin() %s distinct select cos()", op));
 
-    // Union in insert query.
-    ParsesOk("insert into table t select a from test union select a from test");
-    ParsesOk("insert into table t select a from test union select a from test " +
-        "union select a from test union select a from test");
-    ParsesOk("insert overwrite table t select a from test union select a from test");
-    ParsesOk("insert overwrite table t select a from test union select a from test " +
-        "union select a from test union select a from test");
+      // All select blocks in parenthesis.
+      ParsesOk(String.format("(select a from test) %s (select a from test) "
+              + "%s (select a from test) %s (select a from test)",
+          op, op, op));
+      // op, op, operator with order by,
+      ParsesOk(String.format("(select a from test) %s (select a from test) "
+              + "%s (select a from test) %s (select a from test) order by a",
+          op, op, op));
+      ParsesOk(String.format("(select a from test) %s (select a from test) "
+              + "%s (select a from test) %s (select a from test) order by a nulls first",
+          op, op, op));
+      // op, op, operator with limit.
+      ParsesOk(String.format("(select a from test) %s (select a from test) "
+              + "%s (select a from test) %s (select a from test) limit 10",
+          op, op, op));
+      // op, op, operator with order by, offset and limit.
+      ParsesOk(String.format("(select a from test) %s (select a from test) "
+              + "%s (select a from test) %s (select a from test) order by a limit 10",
+          op, op, op));
+      ParsesOk(String.format("(select a from test) %s (select a from test) "
+              + "%s (select a from test) %s (select a from test) order by a "
+              + "nulls first limit 10",
+          op, op, op));
+      ParsesOk(String.format("(select a from test) %s (select a from test) "
+              + "%s (select a from test) %s (select a from test) order by a "
+              + "nulls first offset 10",
+          op, op, op));
+      ParserError(String.format("select a from test %s (select a from test) "
+              + "%s (select a from test) %s (select a from test) offset 10",
+          op, op, op));
+      // op, op, operator with some select blocks in parenthesis, and others not.
+      ParsesOk(String.format("(select a from test) %s select a from test "
+              + "%s (select a from test) %s select a from test",
+          op, op, op));
+      ParsesOk(String.format("select a from test %s (select a from test) "
+              + "%s select a from test %s (select a from test)",
+          op, op, op));
+      // op, op, operator with order by, offset and limit binding to last select.
+      ParsesOk(String.format("(select a from test) %s (select a from test) "
+              + "%s select a from test %s select a from test order by a limit 10",
+          op, op, op));
+      ParsesOk(String.format("(select a from test) %s (select a from test) "
+              + "%s select a from test %s select a from test order by a offset 10",
+          op, op, op));
+      ParsesOk(String.format("(select a from test) %s (select a from test) "
+              + "%s select a from test %s select a from test order by a",
+          op, op, op));
+      // op, op, operator with order by and limit.
+      // Last select with order by and limit is in parenthesis.
+      ParsesOk(String.format("select a from test %s (select a from test) "
+              + "%s select a from test %s (select a from test order by a limit 10) "
+              + "order by a limit 1",
+          op, op, op));
+      ParsesOk(String.format("select a from test %s (select a from test) "
+              + "%s select a from test %s (select a from test order by a offset 10) "
+              + "order by a limit 1",
+          op, op, op));
+      ParsesOk(String.format("select a from test %s (select a from test) "
+              + "%s select a from test %s (select a from test order by a) "
+              + "order by a limit 1",
+          op, op, op));
+      // operator with order by, offset in first operand.
+      ParsesOk(String.format("select a from test order by a %s select a from test", op));
+      ParsesOk(String.format(
+          "select a from test order by a offset 5 %s select a from test", op, op));
+      ParsesOk(String.format("select a from test offset 5 %s select a from test", op));
+      // operator with order by and limit.
+      // Last select with order by and limit is not in parenthesis.
+      ParsesOk(String.format("select a from test %s select a from test "
+              + "%s select a from test %s select a from test order by a limit 10 "
+              + "order by a limit 1",
+          op, op, op));
 
-    // Union in upsert query.
-    ParsesOk("upsert into table t select a from test union select a from test");
-    ParsesOk("upsert into table t select a from test union select a from test " +
-        "union select a from test union select a from test");
+      // Nested %ss with order by and limit.
+      ParsesOk(String.format("select a %s "
+              + "((select b) %s (select c) order by 1 limit 1)",
+          op, op));
+      ParsesOk(String.format("select a %s "
+              + "((select b) %s "
+              + "  ((select c) %s (select d) "
+              + "   order by 1 limit 1) "
+              + " order by 1 limit 1)",
+          op, op, op));
 
-    // No complete select statement on lhs.
-    ParserError("a from test union select a from test");
-    // No complete select statement on rhs.
-    ParserError("select a from test union a from test");
-    // Union cannot be a column or table since it's a keyword.
-    ParserError("select union from test");
-    ParserError("select a from union");
+      // operator in insert query.
+      ParsesOk(String.format(
+          "insert into table t select a from test %s select a from test", op));
+      ParsesOk(
+          String.format("insert into table t select a from test %s select a from test "
+                  + "%s select a from test %s select a from test",
+              op, op, op));
+      ParsesOk(String.format(
+          "insert overwrite table t select a from test %s select a from test", op));
+      ParsesOk(String.format(
+          "insert overwrite table t select a from test %s select a from test "
+              + "%s select a from test %s select a from test",
+          op, op, op));
+
+      // operator in upsert query.
+      ParsesOk(String.format(
+          "upsert into table t select a from test %s select a from test", op));
+      ParsesOk(
+          String.format("upsert into table t select a from test %s select a from test "
+                  + "%s select a from test %s select a from test",
+              op, op, op));
+
+      // No complete select statement on lhs.
+      ParserError(String.format("a from test %s select a from test", op));
+      // No complete select statement on rhs.
+      ParserError(String.format("select a from test %s a from test", op));
+      // operator cannot be a column or table since it's a keyword.
+      ParserError(String.format("select %s from test", op));
+      ParserError(String.format("select a from %s", op));
+    }
   }
 
   @Test
@@ -3403,8 +3455,9 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c where a = 5\n" +
         "               ^\n" +
         "Encountered: WHERE\n" +
-        "Expected: AND, AS, BETWEEN, DEFAULT, DIV, FROM, ILIKE, IN, IREGEXP, IS, LIKE, " +
-        "LIMIT, ||, NOT, OR, ORDER, REGEXP, RLIKE, UNION, COMMA, IDENTIFIER\n");
+        "Expected: AND, AS, BETWEEN, DEFAULT, DIV, EXCEPT, FROM, ILIKE, IN, INTERSECT, " +
+        "IREGEXP, IS, LIKE, LIMIT, ||, MINUS, NOT, OR, ORDER, REGEXP, RLIKE, UNION, " +
+        "COMMA, IDENTIFIER\n");
 
     // missing table list
     ParserError("select c, b, c from where a = 5",
@@ -3472,8 +3525,9 @@ public class ParserTest extends FrontendTestBase {
         "... b, c,c,c,c,c,c,c,c,c,a a a,c,c,c,c,c,c,c,cd,c,d,d,,c,...\n" +
         "                             ^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, OFFSET, " +
-        "ON, ORDER, RIGHT, STRAIGHT_JOIN, TABLESAMPLE, UNION, USING, WHERE, COMMA\n");
+        "Expected: CROSS, EXCEPT, FROM, FULL, GROUP, HAVING, INNER, INTERSECT, JOIN, " +
+        "LEFT, LIMIT, MINUS, OFFSET, ON, ORDER, RIGHT, STRAIGHT_JOIN, TABLESAMPLE, " +
+        "UNION, USING, WHERE, COMMA\n");
 
     // Long line: error close to the start
     ParserError("select a a a, b, c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,cd,c,d,d,,c, from t",
@@ -3481,8 +3535,9 @@ public class ParserTest extends FrontendTestBase {
         "select a a a, b, c,c,c,c,c,c,c,c,c,c,c,...\n" +
         "           ^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: CROSS, FROM, FULL, GROUP, HAVING, INNER, JOIN, LEFT, LIMIT, OFFSET, " +
-        "ON, ORDER, RIGHT, STRAIGHT_JOIN, TABLESAMPLE, UNION, USING, WHERE, COMMA\n");
+        "Expected: CROSS, EXCEPT, FROM, FULL, GROUP, HAVING, INNER, INTERSECT, JOIN, " +
+        "LEFT, LIMIT, MINUS, OFFSET, ON, ORDER, RIGHT, STRAIGHT_JOIN, TABLESAMPLE, " +
+        "UNION, USING, WHERE, COMMA\n");
 
     // Long line: error close to the end
     ParserError("select a, b, c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t",

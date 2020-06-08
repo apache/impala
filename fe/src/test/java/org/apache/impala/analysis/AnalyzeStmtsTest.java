@@ -3009,6 +3009,195 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestSetOperations() {
+    // Tests for SetOperationStmt analysis which includes intersect, except and union
+    AnalyzesOk("select rank() over (order by int_col) from functional.alltypes " +
+        "intersect select int_col from functional.alltypessmall");
+    // Selects on same table without aliases.
+    AnalyzesOk("select int_col from functional.alltypes intersect " +
+        "select int_col from functional.alltypes");
+    // Longer union chain.
+    AnalyzesOk("select int_col from functional.alltypes union " +
+        "select int_col from functional.alltypes " +
+        "intersect select int_col from functional.alltypes except " +
+        "select int_col from functional.alltypes");
+
+    // Nesting
+    AnalyzesOk("(select int_col from functional.alltypes " +
+        "intersect (select tinyint_col from functional.alltypessmall union " +
+                  " select tinyint_col from functional.alltypessmall) except " +
+                  " select tinyint_col from functional.alltypestiny where id = 1) " +
+        "union (select tinyint_col from functional.alltypessmall) ");
+
+    // All columns, perfectly compatible.
+    AnalyzesOk("select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year," +
+        "month from functional.alltypes union " +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year," +
+        "month from functional.alltypes");
+    // Make sure table aliases aren't visible across union operands.
+    AnalyzesOk("select a.smallint_col from functional.alltypes a " +
+        "union select a.int_col from functional.alltypessmall a");
+    // All columns compatible with NULL.
+    AnalyzesOk("select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year," +
+        "month from functional.alltypes union " +
+        "select NULL, NULL, NULL, NULL, NULL, NULL, " +
+        "NULL, NULL, NULL, NULL, NULL, NULL," +
+        "NULL from functional.alltypes");
+
+    // No from clause. Has literals and NULLs. Requires implicit casts.
+    AnalyzesOk("select 1, 2, 3 " +
+        "union select NULL, NULL, NULL " +
+        "union select 1.0, NULL, 3 " +
+        "union select NULL, 10, NULL");
+    // Implicit casts on integer types.
+    AnalyzesOk("select tinyint_col from functional.alltypes " +
+        "union select smallint_col from functional.alltypes " +
+        "union select int_col from functional.alltypes " +
+        "union select bigint_col from functional.alltypes");
+    // Implicit casts on float types.
+    AnalyzesOk("select float_col from functional.alltypes union " +
+        "select double_col from functional.alltypes");
+    // Implicit casts on all numeric types with two columns from each select.
+    AnalyzesOk("select tinyint_col, double_col from functional.alltypes " +
+        "union select smallint_col, float_col from functional.alltypes " +
+        "union select int_col, bigint_col from functional.alltypes " +
+        "union select bigint_col, int_col from functional.alltypes " +
+        "union select float_col, smallint_col from functional.alltypes " +
+        "union select double_col, tinyint_col from functional.alltypes");
+
+    // With order by, offset and limit.
+    AnalyzesOk("(select int_col from functional.alltypes) " +
+        "union (select tinyint_col from functional.alltypessmall) " +
+        "order by int_col limit 1");
+    AnalyzesOk("(select int_col from functional.alltypes) " +
+        "union (select tinyint_col from functional.alltypessmall) " +
+        "order by int_col");
+    AnalyzesOk("(select int_col from functional.alltypes) " +
+        "union (select tinyint_col from functional.alltypessmall) " +
+        "order by int_col offset 5");
+    // Order by w/o limit is ignored in the union operand below.
+    AnalyzesOk("select int_col from functional.alltypes order by int_col " +
+        "union (select tinyint_col from functional.alltypessmall) ");
+    AnalysisError("select int_col from functional.alltypes order by int_col offset 5 " +
+        "union (select tinyint_col from functional.alltypessmall) ",
+        "Order-by with offset without limit not supported in nested queries");
+    AnalysisError("select int_col from functional.alltypes offset 5 " +
+        "union (select tinyint_col from functional.alltypessmall) ",
+        "OFFSET requires an ORDER BY clause: OFFSET 5");
+    // Order by w/o limit is ignored in the union operand below.
+    AnalyzesOk("select int_col from functional.alltypes " +
+        "union (select tinyint_col from functional.alltypessmall " +
+        "order by tinyint_col) ");
+    AnalysisError("select int_col from functional.alltypes " +
+        "union (select tinyint_col from functional.alltypessmall " +
+        "order by tinyint_col offset 5) ",
+        "Order-by with offset without limit not supported in nested queries");
+    AnalysisError("select int_col from functional.alltypes " +
+        "union (select tinyint_col from functional.alltypessmall offset 5) ",
+        "OFFSET requires an ORDER BY clause: OFFSET 5");
+    // Bigger order by.
+    AnalyzesOk("(select tinyint_col, double_col from functional.alltypes) " +
+        "union (select smallint_col, float_col from functional.alltypes) " +
+        "union (select int_col, bigint_col from functional.alltypes) " +
+        "union (select bigint_col, int_col from functional.alltypes) " +
+        "order by double_col, tinyint_col");
+    // Multiple union operands with valid order by clauses.
+    AnalyzesOk("select int_col from functional.alltypes order by int_col " +
+        "union select int_col from functional.alltypes order by int_col limit 10 " +
+        "union (select int_col from functional.alltypes " +
+        "order by int_col limit 10 offset 5) order by int_col offset 5");
+    // Bigger order by with ordinals.
+    AnalyzesOk("(select tinyint_col, double_col from functional.alltypes) " +
+        "union (select smallint_col, float_col from functional.alltypes) " +
+        "union (select int_col, bigint_col from functional.alltypes) " +
+        "union (select bigint_col, int_col from functional.alltypes) " +
+        "order by 2, 1");
+
+    // Unequal number of columns.
+    AnalysisError("select int_col from functional.alltypes " +
+        "union select int_col, float_col from functional.alltypes",
+        "Operands have unequal number of columns:\n" +
+        "'SELECT int_col FROM functional.alltypes' has 1 column(s)\n" +
+        "'SELECT int_col, float_col FROM functional.alltypes' has 2 column(s)");
+    // Unequal number of columns, longer union chain.
+    AnalysisError("select int_col from functional.alltypes " +
+        "union select tinyint_col from functional.alltypes " +
+        "union select smallint_col from functional.alltypes " +
+        "union select smallint_col, bigint_col from functional.alltypes",
+        "Operands have unequal number of columns:\n" +
+        "'SELECT int_col FROM functional.alltypes' has 1 column(s)\n" +
+        "'SELECT smallint_col, bigint_col FROM functional.alltypes' has 2 column(s)");
+    // Incompatible types.
+    AnalysisError("select bool_col from functional.alltypes " +
+        "union select lag(string_col) over(order by int_col) from functional.alltypes",
+        "Incompatible return types 'BOOLEAN' and 'STRING' of exprs " +
+        "'bool_col' and 'lag(string_col, 1, NULL)'.");
+    // Incompatible types, longer union chain.
+    AnalysisError("select int_col, string_col from functional.alltypes " +
+        "union select tinyint_col, bool_col from functional.alltypes " +
+        "union select smallint_col, int_col from functional.alltypes " +
+        "union select smallint_col, bool_col from functional.alltypes",
+        "Incompatible return types 'STRING' and 'BOOLEAN' of " +
+            "exprs 'string_col' and 'bool_col'.");
+    // Invalid ordinal in order by.
+    AnalysisError("(select int_col from functional.alltypes) " +
+        "union (select int_col from functional.alltypessmall) order by 2",
+        "ORDER BY: ordinal exceeds the number of items in the SELECT list: 2");
+    // Ambiguous order by.
+    AnalysisError("(select int_col a, string_col a from functional.alltypes) " +
+        "union (select int_col a, string_col a " +
+        "from functional.alltypessmall) order by a",
+        "ORDER BY: ambiguous alias: 'a'");
+    // Ambiguous alias in the second union operand should work.
+    AnalyzesOk("(select int_col a, string_col b from functional.alltypes) " +
+        "union (select int_col a, string_col a " +
+        "from functional.alltypessmall) order by a");
+    // Ambiguous alias even though the exprs of the first operand are identical
+    // (the corresponding in exprs in the other operand are different)
+    AnalysisError("select int_col a, int_col a from functional.alltypes " +
+        "union all (select 1, bigint_col from functional.alltypessmall) order by a",
+        "ORDER BY: ambiguous alias: 'a'");
+
+    // Column labels are inherited from first select block.
+    // Order by references an invalid column
+    AnalysisError("(select smallint_col from functional.alltypes) " +
+        "union (select int_col from functional.alltypessmall) order by int_col",
+        "Could not resolve column/field reference: 'int_col'");
+    // Make sure table aliases aren't visible across union operands.
+    AnalysisError("select a.smallint_col from functional.alltypes a " +
+        "union select a.int_col from functional.alltypessmall",
+        "Could not resolve column/field reference: 'a.int_col'");
+
+    // Regression test for IMPALA-1128, union of decimal and an int type that converts
+    // to the identical decimal.
+    AnalyzesOk("select cast(1 as bigint) union select cast(1 as decimal(19, 0))");
+
+    AnalysisContext decimalV1Ctx = createAnalysisCtx();
+    decimalV1Ctx.getQueryOptions().setDecimal_v2(false);
+    AnalysisContext decimalV2Ctx = createAnalysisCtx();
+    decimalV2Ctx.getQueryOptions().setDecimal_v2(true);
+
+    // IMPALA-6518: union of two incompatible decimal columns. There is no implicit cast
+    // if decimal_v2 is enabled.
+    String query = "select cast(123 as decimal(38, 0)) " +
+        "union all select cast(0.789 as decimal(38, 38))";
+    AnalyzesOk(query, decimalV1Ctx);
+    AnalysisError(query, decimalV2Ctx, "Incompatible return types 'DECIMAL(38,0)' and " +
+        "'DECIMAL(38,38)' of exprs 'CAST(123 AS DECIMAL(38,0))' and " +
+        "'CAST(0.789 AS DECIMAL(38,38))'.");
+
+    query = "select cast(123 as double) " +
+        "union all select cast(0.456 as float)" +
+        "union all select cast(0.789 as decimal(38, 38))";
+    AnalyzesOk(query, decimalV1Ctx);
+    AnalyzesOk(query, decimalV2Ctx);
+  }
+
+
+  @Test
   public void TestUnion() {
     // Selects on different tables.
     AnalyzesOk("select rank() over (order by int_col) from functional.alltypes union " +
@@ -3348,7 +3537,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select * from t1 union all select * from T2 union all select * from t3 " +
         "union all select * from T4 union all select * from t5");
 
-    // Multiple WITH clauses. One for the UnionStmt and one for each union operand.
+    // Multiple WITH clauses. One for the SetOperationStmt and one for each union operand.
     AnalyzesOk("with t1 as (values('a', 'b')) " +
         "(with t2 as (values('c', 'd')) select * from t2) union all" +
         "(with t3 as (values('e', 'f')) select * from t3) order by 1 limit 1");
@@ -4335,7 +4524,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   @Test
   public void TestClone() {
     testNumberOfMembers(QueryStmt.class, 11);
-    testNumberOfMembers(UnionStmt.class, 10);
+    testNumberOfMembers(SetOperationStmt.class, 13);
     testNumberOfMembers(ValuesStmt.class, 0);
 
     // Also check TableRefs.
