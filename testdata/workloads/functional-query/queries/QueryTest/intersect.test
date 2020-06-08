@@ -1,0 +1,536 @@
+====
+---- QUERY
+select 100 union select 101 intersect select 101
+---- RESULTS
+101
+====
+---- QUERY
+select 100 intersect select 101 union select 101
+---- RESULTS
+101
+====
+---- QUERY
+select 100 intersect (select 100 union select 102)
+---- RESULTS
+100
+====
+---- QUERY
+select 100 intersect (select 100 union all select 102) intersect select 102
+---- RESULTS
+====
+---- QUERY
+select 100 intersect (select 100 intersect select 100)
+---- RESULTS
+100
+====
+---- QUERY
+# intersect distinct before unions all with limit 2
+select 100 intersect distinct (select 100 intersect select 100 union all select 100)
+  union all select 100 limit 2
+---- RESULTS
+100
+100
+====
+---- QUERY
+# intersect distinct after unions with limit 2 but deduped by the intersect coming after
+# the unions as opposed to above
+select 100 union all (select 100 intersect select 100 union all select 100)
+  intersect distinct select 100 limit 2
+---- RESULTS
+100
+====
+---- QUERY
+# nulls are equal
+select group_str, null_str from nullrows where bool_nulls = true intersect
+select group_str, null_str from nullrows where bool_nulls = false
+---- TYPES
+STRING, STRING
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'a','NULL'
+'f','NULL'
+'k','NULL'
+'u','NULL'
+'p','NULL'
+====
+---- QUERY
+# nulls are equal
+select id, null_str from nullrows where bool_nulls = true intersect
+select id, some_nulls from nullrows where bool_nulls = false
+---- TYPES
+STRING, STRING
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'a','NULL'
+'f','NULL'
+'k','NULL'
+'u','NULL'
+'p','NULL'
+---- QUERY
+# Subquery rewrites
+select id from alltypestiny where int_col in (select int_col from alltypessmall) intersect
+select id from alltypessmall where int_col < (select max(int_col) from alltypestiny)
+---- TYPES
+INT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0
+====
+---- QUERY
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+intersect
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+====
+---- QUERY
+# intersect has set semantics so each row should be unique
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union all
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+intersect
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+====
+---- QUERY
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year from alltypestiny where year=2009 and month=1 order by id limit 3-2
+intersect
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year from alltypestiny where year=2009 and month=1 order by int_col limit 1*1*1
+intersect
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year from alltypestiny where year=2009 and month=1 order by id limit 1&1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009
+====
+---- QUERY
+# INTERSECT only, mixed selects with and without from clauses, no nesting
+select id as  i, bool_col as bet, tinyint_col as the, smallint_col as song, int_col as `is`, bigint_col as about, float_col as food, double_col as yummy, date_string_col as chocolate, string_col as cake, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+intersect
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+intersect
+select 1,false,1,1,1,10,1.1,10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp), 2009,1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- LABELS
+i, bet, the, song, is, about, food, yummy, chocolate, cake, timestamp_col, year, month
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+====
+---- QUERY
+# intersect with order by and limit
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2,3)
+intersect
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2)
+intersect
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1)
+order by 1 limit 1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+====
+---- QUERY
+# Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union distinct
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union all
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+union all
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+order by 1,2 limit 3
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+====
+---- QUERY
+# Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union all
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union distinct
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+union all
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+order by 1,2 limit 4
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+====
+---- QUERY
+# intersect not unnesting first operand
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2)
+intersect
+ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1)
+intersect
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+====
+---- QUERY
+# intersect unnesting second operand is nested
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+intersect
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2,3)
+   intersect
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2))
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+====
+---- QUERY
+# first operand intersect union all outside
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2)
+ intersect
+ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+union all
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+====
+---- QUERY
+# first operand intersect and union all, union all outside pulls up
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2)
+ intersect
+ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+ union all
+ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+union all
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+====
+---- QUERY
+# first operand intersect and union, union outside no pull up
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2)
+ intersect
+ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+ union distinct
+ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+union distinct
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+====
+---- QUERY
+# intersect unnest second operand is nested
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+intersect
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (2,1)
+   intersect
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+====
+---- QUERY
+# written without nesting should have the same results as above
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+intersect
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (2,1)
+   intersect
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+====
+---- QUERY
+# intersect unnest second operand is nested
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+intersect
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+intersect
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (2,1)
+   intersect
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2))
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+====
+---- QUERY
+# union all absorbing nested all with intersect
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+ intersect
+ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+ union all
+ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1)
+union all
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+====
+---- QUERY
+# union all absorbing nested all with intersect
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+union all
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (2,1)
+ intersect
+ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+ union all
+ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1)
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+====
+---- QUERY
+# INTERSECT rewrites to inner join for when we have select distincts
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+intersect
+  (select distinct id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2,3)
+   intersect
+   select distinct id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2)
+   intersect
+   select distinct id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+====
+---- QUERY
+# INTERSECT rewrites to inner join for when we have select distincts
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+intersect
+  (select distinct id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2,3)
+   intersect
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2)
+   intersect
+   select distinct id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+====
+---- QUERY
+# intersect doesn't absorb nested with order by and limit,
+# second operand is nested
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+intersect
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2,3)
+   intersect
+   (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+   order by 1 limit 1)
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+====
+---- QUERY
+# manually unnest intersect with order by and limit; results same as above
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+intersect
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2,3)
+   intersect
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+   order by 1 limit 1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+====
+---- QUERY
+# mixed with except nested
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+intersect
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month = 1
+   except
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+   intersect
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1)
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+====
+---- QUERY
+# mixed with except as above manually unnested
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+intersect
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month = 1
+   except
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2
+   intersect
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+====
+---- QUERY
+# Complex intersect unnesting
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2,3)
+intersect
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2)
+   intersect
+     (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2)
+      intersect
+        (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2,3)
+         intersect
+         select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)))
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+====
+---- QUERY
+# intersect in subquery
+select x.id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2,3)
+   intersect 
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month in (1,2)) x
+intersect
+(select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=2)
+order by 1 limit 1
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+====
+---- QUERY
+# INTERSET in subquery with a WHERE condition in the outer select.
+select x.id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from
+  (select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1
+   intersect
+   select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypestiny where year=2009 and month=1) x
+where x.int_col < 5 and x.bool_col = false
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
+---- RESULTS
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+====
+---- QUERY
+# INTERSECT with values statements
+values(1, 'a', NULL, 10.0)
+intersect
+values(1, 'a', NULL, 10.0)
+intersect
+values(1, 'a', NULL, 10.0)
+---- TYPES
+tinyint, string, null, decimal
+---- HS2_TYPES
+tinyint, string, boolean, decimal
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'a',NULL,10.0
+====
+---- QUERY
+# Test INTERSECT with group by
+select id, count(*) from alltypes where id = 1 group by id
+intersect 
+select 1, 1
+---- TYPES
+int, bigint
+---- RESULTS
+1,1
+====
+---- QUERY
+select * from
+  (select 1 a, 2 b
+   intersect
+   select 2-1, 2
+   intersect
+   select 10/10, 20/10) t
+where b > a
+---- TYPES
+double, double
+---- RESULTS
+1,2
+====
+---- QUERY
+# Verify that limit is obeyed
+select bigint_col from alltypestiny where bigint_col >= 0
+intersect
+(select bigint_col from alltypestiny where bigint_col >= 0)
+order by bigint_col limit 1
+---- RESULTS
+0
+---- TYPES
+bigint
+=====
+---- QUERY
+# Input tuples that have non-nullable slots
+select count(*) from alltypestiny
+intersect
+select count(*) from alltypestiny
+---- RESULTS
+8
+---- TYPES
+bigint
+=====
+---- QUERY
+select bigint_col + 1 from alltypestiny
+intersect
+select bigint_col + 1 from alltypestiny
+---- RESULTS
+11
+1
+---- TYPES
+bigint
+=====
+---- QUERY
+# Test implicit casts. The labels comes from the leftmost operands however the return
+# types should match the widest compatible types across operands, not just the leftmost
+select tinyint_col, float_col, string_col from alltypestiny where year=2009 and month=1
+intersect
+select int_col, double_col, string_col from alltypestiny where year=2009 and month=1
+---- LABELS
+tinyint_col, float_col, string_col
+---- TYPES
+int, double, string
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,0,'0'
+====

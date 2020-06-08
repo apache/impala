@@ -13624,6 +13624,552 @@ PLAN-ROOT SINK
    HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
    row-size=24B cardinality=2.88M
+=======
+---- QUERY: TPCDS-Q38
+SELECT count(*)
+FROM
+  (SELECT DISTINCT c_last_name,
+                   c_first_name,
+                   d_date
+   FROM store_sales,
+        date_dim,
+        customer
+   WHERE store_sales.ss_sold_date_sk = date_dim.d_date_sk
+     AND store_sales.ss_customer_sk = customer.c_customer_sk
+     AND d_month_seq BETWEEN 1200 AND 1200 + 11 INTERSECT
+     SELECT DISTINCT c_last_name,
+                     c_first_name,
+                     d_date
+     FROM catalog_sales,
+          date_dim,
+          customer WHERE catalog_sales.cs_sold_date_sk = date_dim.d_date_sk
+     AND catalog_sales.cs_bill_customer_sk = customer.c_customer_sk
+     AND d_month_seq BETWEEN 1200 AND 1200 + 11 INTERSECT
+     SELECT DISTINCT c_last_name,
+                     c_first_name,
+                     d_date
+     FROM web_sales,
+          date_dim,
+          customer WHERE web_sales.ws_sold_date_sk = date_dim.d_date_sk
+     AND web_sales.ws_bill_customer_sk = customer.c_customer_sk
+     AND d_month_seq BETWEEN 1200 AND 1200 + 11 ) hot_cust
+LIMIT 100
+---- PLAN
+Max Per-Host Resource Reservation: Memory=194.69MB Threads=10
+Per-Host Resource Estimates: Memory=861MB
+PLAN-ROOT SINK
+|
+20:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  limit: 100
+|  row-size=8B cardinality=1
+|
+19:HASH JOIN [INNER JOIN]
+|  hash predicates: c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name, d_date IS NOT DISTINCT FROM d_date
+|  runtime filters: RF000 <- c_first_name, RF001 <- c_last_name, RF002 <- d_date
+|  row-size=174B cardinality=2.88M
+|
+|--17:AGGREGATE [FINALIZE]
+|  |  group by: c_last_name, c_first_name, d_date
+|  |  row-size=58B cardinality=719.38K
+|  |
+|  16:HASH JOIN [INNER JOIN]
+|  |  hash predicates: web_sales.ws_bill_customer_sk = customer.c_customer_sk
+|  |  row-size=78B cardinality=719.38K
+|  |
+|  |--14:SCAN HDFS [tpcds.customer]
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |     row-size=40B cardinality=100.00K
+|  |
+|  15:HASH JOIN [INNER JOIN]
+|  |  hash predicates: web_sales.ws_sold_date_sk = date_dim.d_date_sk
+|  |  row-size=38B cardinality=719.38K
+|  |
+|  |--13:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_month_seq <= 1211, d_month_seq >= 1200
+|  |     row-size=30B cardinality=7.30K
+|  |
+|  12:SCAN HDFS [tpcds.web_sales]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     row-size=8B cardinality=719.38K
+|
+18:HASH JOIN [INNER JOIN]
+|  hash predicates: c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name, d_date IS NOT DISTINCT FROM d_date
+|  runtime filters: RF006 <- c_first_name, RF007 <- c_last_name, RF008 <- d_date
+|  row-size=116B cardinality=2.88M
+|
+|--11:AGGREGATE [FINALIZE]
+|  |  group by: c_last_name, c_first_name, d_date
+|  |  row-size=58B cardinality=1.44M
+|  |
+|  10:HASH JOIN [INNER JOIN]
+|  |  hash predicates: catalog_sales.cs_bill_customer_sk = customer.c_customer_sk
+|  |  runtime filters: RF016 <- customer.c_customer_sk
+|  |  row-size=78B cardinality=1.44M
+|  |
+|  |--08:SCAN HDFS [tpcds.customer]
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |     row-size=40B cardinality=100.00K
+|  |
+|  09:HASH JOIN [INNER JOIN]
+|  |  hash predicates: catalog_sales.cs_sold_date_sk = date_dim.d_date_sk
+|  |  runtime filters: RF018 <- date_dim.d_date_sk
+|  |  row-size=38B cardinality=1.44M
+|  |
+|  |--07:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_month_seq <= 1211, d_month_seq >= 1200
+|  |     row-size=30B cardinality=7.30K
+|  |
+|  06:SCAN HDFS [tpcds.catalog_sales]
+|     HDFS partitions=1/1 files=1 size=282.20MB
+|     runtime filters: RF016 -> catalog_sales.cs_bill_customer_sk, RF018 -> catalog_sales.cs_sold_date_sk
+|     row-size=8B cardinality=1.44M
+|
+05:AGGREGATE [FINALIZE]
+|  group by: c_last_name, c_first_name, d_date
+|  row-size=58B cardinality=2.88M
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_customer_sk = customer.c_customer_sk
+|  runtime filters: RF012 <- customer.c_customer_sk
+|  row-size=78B cardinality=2.88M
+|
+|--02:SCAN HDFS [tpcds.customer]
+|     HDFS partitions=1/1 files=1 size=12.60MB
+|     runtime filters: RF000 -> tpcds.customer.c_first_name, RF001 -> tpcds.customer.c_last_name, RF006 -> tpcds.customer.c_first_name, RF007 -> tpcds.customer.c_last_name
+|     row-size=40B cardinality=100.00K
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  runtime filters: RF014 <- date_dim.d_date_sk
+|  row-size=38B cardinality=2.88M
+|
+|--01:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_month_seq <= 1211, d_month_seq >= 1200
+|     runtime filters: RF002 -> tpcds.date_dim.d_date, RF008 -> tpcds.date_dim.d_date
+|     row-size=30B cardinality=7.30K
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF012 -> store_sales.ss_customer_sk, RF014 -> store_sales.ss_sold_date_sk
+   row-size=8B cardinality=2.88M
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=363.06MB Threads=22
+Per-Host Resource Estimates: Memory=1.21GB
+PLAN-ROOT SINK
+|
+36:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  limit: 100
+|  row-size=8B cardinality=1
+|
+35:EXCHANGE [UNPARTITIONED]
+|
+20:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+19:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name, d_date IS NOT DISTINCT FROM d_date
+|  runtime filters: RF000 <- c_first_name, RF001 <- c_last_name, RF002 <- d_date
+|  row-size=174B cardinality=2.88M
+|
+|--34:EXCHANGE [HASH(c_last_name,c_first_name,d_date)]
+|  |
+|  33:AGGREGATE [FINALIZE]
+|  |  group by: c_last_name, c_first_name, d_date
+|  |  row-size=58B cardinality=719.38K
+|  |
+|  32:EXCHANGE [HASH(c_last_name,c_first_name,d_date)]
+|  |
+|  17:AGGREGATE [STREAMING]
+|  |  group by: c_last_name, c_first_name, d_date
+|  |  row-size=58B cardinality=719.38K
+|  |
+|  16:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: web_sales.ws_bill_customer_sk = customer.c_customer_sk
+|  |  row-size=78B cardinality=719.38K
+|  |
+|  |--31:EXCHANGE [BROADCAST]
+|  |  |
+|  |  14:SCAN HDFS [tpcds.customer]
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |     row-size=40B cardinality=100.00K
+|  |
+|  15:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: web_sales.ws_sold_date_sk = date_dim.d_date_sk
+|  |  row-size=38B cardinality=719.38K
+|  |
+|  |--30:EXCHANGE [BROADCAST]
+|  |  |
+|  |  13:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_month_seq <= 1211, d_month_seq >= 1200
+|  |     row-size=30B cardinality=7.30K
+|  |
+|  12:SCAN HDFS [tpcds.web_sales]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     row-size=8B cardinality=719.38K
+|
+18:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name, d_date IS NOT DISTINCT FROM d_date
+|  runtime filters: RF006 <- c_first_name, RF007 <- c_last_name, RF008 <- d_date
+|  row-size=116B cardinality=2.88M
+|
+|--29:EXCHANGE [HASH(c_last_name,c_first_name,d_date)]
+|  |
+|  28:AGGREGATE [FINALIZE]
+|  |  group by: c_last_name, c_first_name, d_date
+|  |  row-size=58B cardinality=1.44M
+|  |
+|  27:EXCHANGE [HASH(c_last_name,c_first_name,d_date)]
+|  |
+|  11:AGGREGATE [STREAMING]
+|  |  group by: c_last_name, c_first_name, d_date
+|  |  row-size=58B cardinality=1.44M
+|  |
+|  10:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: catalog_sales.cs_bill_customer_sk = customer.c_customer_sk
+|  |  runtime filters: RF016 <- customer.c_customer_sk
+|  |  row-size=78B cardinality=1.44M
+|  |
+|  |--26:EXCHANGE [BROADCAST]
+|  |  |
+|  |  08:SCAN HDFS [tpcds.customer]
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |     row-size=40B cardinality=100.00K
+|  |
+|  09:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: catalog_sales.cs_sold_date_sk = date_dim.d_date_sk
+|  |  runtime filters: RF018 <- date_dim.d_date_sk
+|  |  row-size=38B cardinality=1.44M
+|  |
+|  |--25:EXCHANGE [BROADCAST]
+|  |  |
+|  |  07:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_month_seq <= 1211, d_month_seq >= 1200
+|  |     row-size=30B cardinality=7.30K
+|  |
+|  06:SCAN HDFS [tpcds.catalog_sales]
+|     HDFS partitions=1/1 files=1 size=282.20MB
+|     runtime filters: RF016 -> catalog_sales.cs_bill_customer_sk, RF018 -> catalog_sales.cs_sold_date_sk
+|     row-size=8B cardinality=1.44M
+|
+24:AGGREGATE [FINALIZE]
+|  group by: c_last_name, c_first_name, d_date
+|  row-size=58B cardinality=2.88M
+|
+23:EXCHANGE [HASH(c_last_name,c_first_name,d_date)]
+|
+05:AGGREGATE [STREAMING]
+|  group by: c_last_name, c_first_name, d_date
+|  row-size=58B cardinality=2.88M
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_customer_sk = customer.c_customer_sk
+|  runtime filters: RF012 <- customer.c_customer_sk
+|  row-size=78B cardinality=2.88M
+|
+|--22:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.customer]
+|     HDFS partitions=1/1 files=1 size=12.60MB
+|     runtime filters: RF000 -> tpcds.customer.c_first_name, RF001 -> tpcds.customer.c_last_name, RF006 -> tpcds.customer.c_first_name, RF007 -> tpcds.customer.c_last_name
+|     row-size=40B cardinality=100.00K
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  runtime filters: RF014 <- date_dim.d_date_sk
+|  row-size=38B cardinality=2.88M
+|
+|--21:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_month_seq <= 1211, d_month_seq >= 1200
+|     runtime filters: RF002 -> tpcds.date_dim.d_date, RF008 -> tpcds.date_dim.d_date
+|     row-size=30B cardinality=7.30K
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF012 -> store_sales.ss_customer_sk, RF014 -> store_sales.ss_sold_date_sk
+   row-size=8B cardinality=2.88M
+====
+---- QUERY: TPCDS-Q87
+SELECT count(*)
+FROM ((SELECT DISTINCT c_last_name,
+                         c_first_name,
+                         d_date
+         FROM store_sales,
+              date_dim,
+              customer
+         WHERE store_sales.ss_sold_date_sk = date_dim.d_date_sk
+           AND store_sales.ss_customer_sk = customer.c_customer_sk
+           AND d_month_seq BETWEEN 1200 AND 1200+11)
+      EXCEPT
+        (SELECT DISTINCT c_last_name,
+                         c_first_name,
+                         d_date
+         FROM catalog_sales,
+              date_dim,
+              customer
+         WHERE catalog_sales.cs_sold_date_sk = date_dim.d_date_sk
+           AND catalog_sales.cs_bill_customer_sk = customer.c_customer_sk
+           AND d_month_seq BETWEEN 1200 AND 1200+11)
+      EXCEPT
+        (SELECT DISTINCT c_last_name,
+                         c_first_name,
+                         d_date
+         FROM web_sales,
+              date_dim,
+              customer
+         WHERE web_sales.ws_sold_date_sk = date_dim.d_date_sk
+           AND web_sales.ws_bill_customer_sk = customer.c_customer_sk
+           AND d_month_seq BETWEEN 1200 AND 1200+11)) cool_cust;
+---- PLAN
+Max Per-Host Resource Reservation: Memory=190.69MB Threads=10
+Per-Host Resource Estimates: Memory=857MB
+PLAN-ROOT SINK
+|
+20:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+19:HASH JOIN [LEFT ANTI JOIN]
+|  hash predicates: c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name, d_date IS NOT DISTINCT FROM d_date
+|  row-size=58B cardinality=2.88M
+|
+|--17:AGGREGATE [FINALIZE]
+|  |  group by: c_last_name, c_first_name, d_date
+|  |  row-size=58B cardinality=719.38K
+|  |
+|  16:HASH JOIN [INNER JOIN]
+|  |  hash predicates: web_sales.ws_bill_customer_sk = customer.c_customer_sk
+|  |  runtime filters: RF008 <- customer.c_customer_sk
+|  |  row-size=78B cardinality=719.38K
+|  |
+|  |--14:SCAN HDFS [tpcds.customer]
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |     row-size=40B cardinality=100.00K
+|  |
+|  15:HASH JOIN [INNER JOIN]
+|  |  hash predicates: web_sales.ws_sold_date_sk = date_dim.d_date_sk
+|  |  runtime filters: RF010 <- date_dim.d_date_sk
+|  |  row-size=38B cardinality=719.38K
+|  |
+|  |--13:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_month_seq <= 1211, d_month_seq >= 1200
+|  |     row-size=30B cardinality=7.30K
+|  |
+|  12:SCAN HDFS [tpcds.web_sales]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     runtime filters: RF008 -> web_sales.ws_bill_customer_sk, RF010 -> web_sales.ws_sold_date_sk
+|     row-size=8B cardinality=719.38K
+|
+18:HASH JOIN [LEFT ANTI JOIN]
+|  hash predicates: c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name, d_date IS NOT DISTINCT FROM d_date
+|  row-size=58B cardinality=2.88M
+|
+|--11:AGGREGATE [FINALIZE]
+|  |  group by: c_last_name, c_first_name, d_date
+|  |  row-size=58B cardinality=1.44M
+|  |
+|  10:HASH JOIN [INNER JOIN]
+|  |  hash predicates: catalog_sales.cs_bill_customer_sk = customer.c_customer_sk
+|  |  runtime filters: RF004 <- customer.c_customer_sk
+|  |  row-size=78B cardinality=1.44M
+|  |
+|  |--08:SCAN HDFS [tpcds.customer]
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |     row-size=40B cardinality=100.00K
+|  |
+|  09:HASH JOIN [INNER JOIN]
+|  |  hash predicates: catalog_sales.cs_sold_date_sk = date_dim.d_date_sk
+|  |  runtime filters: RF006 <- date_dim.d_date_sk
+|  |  row-size=38B cardinality=1.44M
+|  |
+|  |--07:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_month_seq <= 1211, d_month_seq >= 1200
+|  |     row-size=30B cardinality=7.30K
+|  |
+|  06:SCAN HDFS [tpcds.catalog_sales]
+|     HDFS partitions=1/1 files=1 size=282.20MB
+|     runtime filters: RF004 -> catalog_sales.cs_bill_customer_sk, RF006 -> catalog_sales.cs_sold_date_sk
+|     row-size=8B cardinality=1.44M
+|
+05:AGGREGATE [FINALIZE]
+|  group by: c_last_name, c_first_name, d_date
+|  row-size=58B cardinality=2.88M
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_customer_sk = customer.c_customer_sk
+|  runtime filters: RF000 <- customer.c_customer_sk
+|  row-size=78B cardinality=2.88M
+|
+|--02:SCAN HDFS [tpcds.customer]
+|     HDFS partitions=1/1 files=1 size=12.60MB
+|     row-size=40B cardinality=100.00K
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  runtime filters: RF002 <- date_dim.d_date_sk
+|  row-size=38B cardinality=2.88M
+|
+|--01:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_month_seq <= 1211, d_month_seq >= 1200
+|     row-size=30B cardinality=7.30K
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> store_sales.ss_customer_sk, RF002 -> store_sales.ss_sold_date_sk
+   row-size=8B cardinality=2.88M
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=353.06MB Threads=22
+Per-Host Resource Estimates: Memory=1.20GB
+PLAN-ROOT SINK
+|
+36:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+35:EXCHANGE [UNPARTITIONED]
+|
+20:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+19:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
+|  hash predicates: c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name, d_date IS NOT DISTINCT FROM d_date
+|  row-size=58B cardinality=2.88M
+|
+|--34:EXCHANGE [HASH(c_last_name,c_first_name,d_date)]
+|  |
+|  33:AGGREGATE [FINALIZE]
+|  |  group by: c_last_name, c_first_name, d_date
+|  |  row-size=58B cardinality=719.38K
+|  |
+|  32:EXCHANGE [HASH(c_last_name,c_first_name,d_date)]
+|  |
+|  17:AGGREGATE [STREAMING]
+|  |  group by: c_last_name, c_first_name, d_date
+|  |  row-size=58B cardinality=719.38K
+|  |
+|  16:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: web_sales.ws_bill_customer_sk = customer.c_customer_sk
+|  |  runtime filters: RF008 <- customer.c_customer_sk
+|  |  row-size=78B cardinality=719.38K
+|  |
+|  |--31:EXCHANGE [BROADCAST]
+|  |  |
+|  |  14:SCAN HDFS [tpcds.customer]
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |     row-size=40B cardinality=100.00K
+|  |
+|  15:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: web_sales.ws_sold_date_sk = date_dim.d_date_sk
+|  |  runtime filters: RF010 <- date_dim.d_date_sk
+|  |  row-size=38B cardinality=719.38K
+|  |
+|  |--30:EXCHANGE [BROADCAST]
+|  |  |
+|  |  13:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_month_seq <= 1211, d_month_seq >= 1200
+|  |     row-size=30B cardinality=7.30K
+|  |
+|  12:SCAN HDFS [tpcds.web_sales]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     runtime filters: RF008 -> web_sales.ws_bill_customer_sk, RF010 -> web_sales.ws_sold_date_sk
+|     row-size=8B cardinality=719.38K
+|
+18:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
+|  hash predicates: c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name, d_date IS NOT DISTINCT FROM d_date
+|  row-size=58B cardinality=2.88M
+|
+|--29:EXCHANGE [HASH(c_last_name,c_first_name,d_date)]
+|  |
+|  28:AGGREGATE [FINALIZE]
+|  |  group by: c_last_name, c_first_name, d_date
+|  |  row-size=58B cardinality=1.44M
+|  |
+|  27:EXCHANGE [HASH(c_last_name,c_first_name,d_date)]
+|  |
+|  11:AGGREGATE [STREAMING]
+|  |  group by: c_last_name, c_first_name, d_date
+|  |  row-size=58B cardinality=1.44M
+|  |
+|  10:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: catalog_sales.cs_bill_customer_sk = customer.c_customer_sk
+|  |  runtime filters: RF004 <- customer.c_customer_sk
+|  |  row-size=78B cardinality=1.44M
+|  |
+|  |--26:EXCHANGE [BROADCAST]
+|  |  |
+|  |  08:SCAN HDFS [tpcds.customer]
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |     row-size=40B cardinality=100.00K
+|  |
+|  09:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: catalog_sales.cs_sold_date_sk = date_dim.d_date_sk
+|  |  runtime filters: RF006 <- date_dim.d_date_sk
+|  |  row-size=38B cardinality=1.44M
+|  |
+|  |--25:EXCHANGE [BROADCAST]
+|  |  |
+|  |  07:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_month_seq <= 1211, d_month_seq >= 1200
+|  |     row-size=30B cardinality=7.30K
+|  |
+|  06:SCAN HDFS [tpcds.catalog_sales]
+|     HDFS partitions=1/1 files=1 size=282.20MB
+|     runtime filters: RF004 -> catalog_sales.cs_bill_customer_sk, RF006 -> catalog_sales.cs_sold_date_sk
+|     row-size=8B cardinality=1.44M
+|
+24:AGGREGATE [FINALIZE]
+|  group by: c_last_name, c_first_name, d_date
+|  row-size=58B cardinality=2.88M
+|
+23:EXCHANGE [HASH(c_last_name,c_first_name,d_date)]
+|
+05:AGGREGATE [STREAMING]
+|  group by: c_last_name, c_first_name, d_date
+|  row-size=58B cardinality=2.88M
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_customer_sk = customer.c_customer_sk
+|  runtime filters: RF000 <- customer.c_customer_sk
+|  row-size=78B cardinality=2.88M
+|
+|--22:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.customer]
+|     HDFS partitions=1/1 files=1 size=12.60MB
+|     row-size=40B cardinality=100.00K
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  runtime filters: RF002 <- date_dim.d_date_sk
+|  row-size=38B cardinality=2.88M
+|
+|--21:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_month_seq <= 1211, d_month_seq >= 1200
+|     row-size=30B cardinality=7.30K
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> store_sales.ss_customer_sk, RF002 -> store_sales.ss_sold_date_sk
+   row-size=8B cardinality=2.88M
 ====
 # Q23-1
 with frequent_ss_items as

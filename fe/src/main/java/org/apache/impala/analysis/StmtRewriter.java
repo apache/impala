@@ -22,11 +22,12 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
-import org.apache.impala.analysis.UnionStmt.UnionOperand;
+import org.apache.impala.analysis.SetOperationStmt.SetOperand;
+import org.apache.impala.analysis.SetOperationStmt.SetOperator;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.TableAliasGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
@@ -75,7 +76,7 @@ public class StmtRewriter {
 
   /**
    * Calls the appropriate rewrite method based on the specific type of query stmt. See
-   * rewriteSelectStatement() and rewriteUnionStatement() documentation.
+   * rewriteSelectStatement() and rewriteSetOperationStatement() documentation.
    */
   protected void rewriteQueryStatement(QueryStmt stmt, Analyzer analyzer)
       throws AnalysisException {
@@ -83,8 +84,8 @@ public class StmtRewriter {
     Preconditions.checkState(stmt.isAnalyzed());
     if (stmt instanceof SelectStmt) {
       rewriteSelectStatement((SelectStmt) stmt, analyzer);
-    } else if (stmt instanceof UnionStmt) {
-      rewriteUnionStatement((UnionStmt) stmt);
+    } else if (stmt instanceof SetOperationStmt) {
+      rewriteSetOperationStatement((SetOperationStmt) stmt, analyzer);
     } else {
       throw new AnalysisException(
           "Subqueries not supported for " + stmt.getClass().getSimpleName() +
@@ -98,7 +99,15 @@ public class StmtRewriter {
       if (!(tblRef instanceof InlineViewRef)) continue;
       InlineViewRef inlineViewRef = (InlineViewRef) tblRef;
       rewriteQueryStatement(inlineViewRef.getViewStmt(), inlineViewRef.getAnalyzer());
+      // SetOperationStmt can be rewritten to SelectStmt.
+      if (inlineViewRef.getViewStmt() instanceof SetOperationStmt
+          && !(inlineViewRef.getViewStmt() instanceof UnionStmt)) {
+        inlineViewRef.queryStmt_ =
+            ((SetOperationStmt) inlineViewRef.getViewStmt()).getRewrittenStmt();
+        Preconditions.checkState(inlineViewRef.queryStmt_ != null);
+      }
     }
+
     // Currently only SubqueryRewriter touches the where clause. Recurse into the where
     // clause when the need arises.
     rewriteSelectStmtHook(stmt, analyzer);
@@ -106,14 +115,254 @@ public class StmtRewriter {
   }
 
   /**
-   * Rewrite all operands in a UNION. The conditions that apply to SelectStmt rewriting
-   * also apply here.
+   * Generate the join predicate for EXCEPT / INTERSECT rewrites. The set semantics
+   * require null = null to evaluate to true.
    */
-  private void rewriteUnionStatement(UnionStmt stmt) throws AnalysisException {
-    for (UnionOperand operand : stmt.getOperands()) {
-      Preconditions.checkState(operand.getQueryStmt() instanceof SelectStmt);
-      rewriteSelectStatement((SelectStmt) operand.getQueryStmt(), operand.getAnalyzer());
+  private static Expr getSetOpJoinPredicates(
+      InlineViewRef left, InlineViewRef right, SetOperator operator) {
+    Preconditions.checkState(left.getColLabels().size() == right.getColLabels().size());
+    Preconditions.checkState(
+        operator == SetOperator.EXCEPT || operator == SetOperator.INTERSECT);
+
+    BinaryPredicate.Operator eqOp = BinaryPredicate.Operator.NOT_DISTINCT;
+    final List<Expr> conjuncts =
+        Lists.newArrayListWithCapacity(left.getColLabels().size());
+    for (int i = 0; i < left.getColLabels().size(); ++i) {
+      conjuncts.add(new BinaryPredicate(eqOp,
+          new SlotRef(
+              Path.createRawPath(left.getUniqueAlias(), left.getColLabels().get(i))),
+          new SlotRef(
+              Path.createRawPath(right.getUniqueAlias(), right.getColLabels().get(i)))));
     }
+    return CompoundPredicate.createConjunctivePredicate(conjuncts);
+  }
+
+  /**
+   * Rewrite all operands in a SetOperation (EXCEPT/INTERSECT/UNION).
+   *
+   * IMPALA-9944: To support the [ALL] qualifier for EXCEPT & INTERSECT
+   *
+   * EXCEPT is rewritten using a Left Anti Join with an additional IS NOT DISTINCT
+   * predicate to ensure NULL equality returns true. INTERSECT is handled similarly
+   * however using LEFT SEMI or INNER Joins.
+   *
+   * We walk the list of set operands from left to right, combining consecutive EXCEPT and
+   * INTERSECT operands by combining their joins. When we encounter a UNION operand, we
+   * start a new SelectStmt to combine all subsequent UNIONS, with the leftmost operand
+   * being the joined statements from EXCEPT / INTERSECT
+   *
+   * Example: SELECT a FROM T1 INTERSECT SELECT a FROM T2 UNION SELECT b FROM T3
+   *
+   * We start by building a new SelectStmt to combine the operands as joined view.
+   *
+   * SELECT DISTINCT * FROM (SELECT a FROM T1) $a$1 LEFT SEMI JOIN (SELECT a FROM T2) $a$2
+   *   ON $a$1.a IS NOT DISTINCT FROM $a$2.a
+   *
+   * Subsequent UNION operands require a switch to a new SelectStmt. When creating a new
+   * SelectStmt if the current operand is a UNION then the first operand's from clause
+   * will contain the previous SelectStmt. When switching to EXCEPT/INTERSECT the first
+   * element in the from clause will contain the SelectStmt from the Union.
+   *
+   * Now we create a new SelectStmt for the UNION.
+   *
+   * SELECT * FROM ( op1 UNION op2 )
+   *
+   * Filling in op1 and op2
+   *
+   * SELECT * FROM(
+   *  SELECT DISTINCT * FROM (SELECT a FROM T1) $a$1 LEFT SEMI JOIN
+   *  (SELECT a FROM T2) $a$2 ON $a$1.a IS NOT DISTINCT FROM $a$2.a
+   * UNION
+   *   SELECT b FROM T3) $a$3
+   *
+   * We continue to create new SelectStmts whenever we switch from a
+   * series of EXCEPT/INTERSECT to UNION.
+   *
+   */
+  private void rewriteSetOperationStatement(SetOperationStmt stmt, Analyzer analyzer)
+      throws AnalysisException {
+    // Early out for UnionStmt as we don't rewrite the union operator
+    if (stmt instanceof UnionStmt) {
+      for (SetOperand operand : stmt.getOperands()) {
+        rewriteQueryStatement(operand.getQueryStmt(), operand.getAnalyzer());
+        if (operand.getQueryStmt() instanceof SetOperationStmt
+            && !(operand.getQueryStmt() instanceof UnionStmt)) {
+          SetOperationStmt setOpStmt = ((SetOperationStmt) operand.getQueryStmt());
+          if (setOpStmt.hasRewrittenStmt()) {
+            QueryStmt rewrittenStmt = setOpStmt.getRewrittenStmt();
+            operand.setQueryStmt(rewrittenStmt);
+          }
+        }
+      }
+      return;
+    }
+
+    // During each iteration of the loop below, exactly one of eiSelect or uSelect becomes
+    // non-null, they function as placeholders for the current sequence of rewrites for
+    // except/intersect or union operands respectively. If the last operand processed was
+    // a union, uSelect is the current select statement that has unionStmt nested inside,
+    // which in turn contains preceding union operands.  If the last operator processed
+    // was an except or intersect, eiSelect is the current select statement containing
+    // preceding except or intersect operands in the from clause.
+    TableAliasGenerator tableAliasGenerator = new TableAliasGenerator(analyzer, null);
+    SelectStmt uSelect = null, eiSelect = null;
+    SetOperationStmt unionStmt = null;
+
+    SetOperand firstOperand = stmt.getOperands().get(0);
+    rewriteQueryStatement(firstOperand.getQueryStmt(), firstOperand.getAnalyzer());
+    if (firstOperand.getQueryStmt() instanceof SetOperationStmt) {
+      SetOperationStmt setOpStmt = ((SetOperationStmt) firstOperand.getQueryStmt());
+      if (setOpStmt.hasRewrittenStmt()) {
+        firstOperand.setQueryStmt(setOpStmt.getRewrittenStmt());
+      }
+    }
+
+    for (int i = 1; i < stmt.getOperands().size(); ++i) {
+      SetOperand operand = stmt.getOperands().get(i);
+      rewriteQueryStatement(operand.getQueryStmt(), operand.getAnalyzer());
+      if (operand.getQueryStmt() instanceof SetOperationStmt) {
+        SetOperationStmt setOpStmt = ((SetOperationStmt) operand.getQueryStmt());
+        if (setOpStmt.hasRewrittenStmt()) {
+          operand.setQueryStmt(setOpStmt.getRewrittenStmt());
+        }
+      }
+
+      switch (operand.getSetOperator()) {
+        case EXCEPT:
+        case INTERSECT:
+          if (eiSelect == null) {
+            // For a new SelectStmt the left most tableref will either by the first
+            // operand or a the SelectStmt from the union operands.
+            InlineViewRef leftMostView = null;
+            SelectList sl =
+                new SelectList(Lists.newArrayList(SelectListItem.createStarItem(null)));
+            // Intersect/Except have set semantics in SQL they must not return duplicates
+            // As an optimization if the leftmost operand is already distinct we remove
+            // the distinct here.
+            // This would be best done in a cost based manner during planning.
+            sl.setIsDistinct(true);
+            eiSelect = new SelectStmt(sl, null, null, null, null, null, null);
+
+            if (i == 1) {
+              if (firstOperand.getQueryStmt() instanceof SelectStmt) {
+                // optimize out the distinct aggregation in the outer query
+                if (((SelectStmt) firstOperand.getQueryStmt()).getSelectList()
+                    .isDistinct()) {
+                  sl.setIsDistinct(false);
+                }
+              }
+              leftMostView = new InlineViewRef(tableAliasGenerator.getNextAlias(),
+                  firstOperand.getQueryStmt(), (TableSampleClause) null);
+              leftMostView.analyze(analyzer);
+              eiSelect.getTableRefs().add(leftMostView);
+            }
+
+            // There was a union operator before this one.
+            if (uSelect != null) {
+              Preconditions.checkState(i != 1);
+              if (uSelect.getSelectList().isDistinct()
+                  && eiSelect.getTableRefs().size() == 0) {
+                // optimize out the distinct aggregation in the outer query
+                sl.setIsDistinct(false);
+              }
+              leftMostView = new InlineViewRef(
+                  tableAliasGenerator.getNextAlias(), uSelect, (TableSampleClause) null);
+              leftMostView.analyze(analyzer);
+              eiSelect.getTableRefs().add(leftMostView);
+              uSelect = null;
+            }
+          }
+
+          // INTERSECT => Left Semi Join and EXCEPT => Left Anti Join
+          JoinOperator joinOp = operand.getSetOperator() == SetOperator.EXCEPT ?
+              JoinOperator.LEFT_ANTI_JOIN :
+              JoinOperator.LEFT_SEMI_JOIN;
+          TableRef rightMostTbl =
+              eiSelect.getTableRefs().get(eiSelect.getTableRefs().size() - 1);
+
+          // As an optimization we can rewrite INTERSECT with an inner join if both
+          // operands return distinct rows.
+          if (operand.getQueryStmt() instanceof SelectStmt) {
+            SelectStmt inner = ((SelectStmt) operand.getQueryStmt());
+            if (inner.getSelectList().isDistinct()) {
+              if (rightMostTbl instanceof InlineViewRef) {
+                QueryStmt outer = ((InlineViewRef) rightMostTbl).getViewStmt();
+                if (outer instanceof SelectStmt) {
+                  if (((SelectStmt) outer).getSelectList().isDistinct()
+                      && operand.getSetOperator() == SetOperator.INTERSECT) {
+                    joinOp = JoinOperator.INNER_JOIN;
+                    TableRef firstTbl = eiSelect.getTableRefs().get(0);
+                    // Make sure only the leftmost view's tuples are visible
+                    eiSelect.getSelectList().getItems().set(0, SelectListItem
+                        .createStarItem(Lists.newArrayList(firstTbl.getUniqueAlias())));
+                  }
+                }
+              }
+            }
+          }
+          List<String> colLabels = new ArrayList<>();
+          for (int j = 0; j < operand.getQueryStmt().getColLabels().size(); ++j) {
+            colLabels.add(eiSelect.getColumnAliasGenerator().getNextAlias());
+          }
+          // Wraps the query statement for the current operand.
+          InlineViewRef opWrapperView = new InlineViewRef(
+              tableAliasGenerator.getNextAlias(), operand.getQueryStmt(), colLabels);
+          opWrapperView.setLeftTblRef(rightMostTbl);
+          opWrapperView.setJoinOp(joinOp);
+          opWrapperView.setOnClause(
+              getSetOpJoinPredicates((InlineViewRef) eiSelect.getTableRefs().get(0),
+                  opWrapperView, operand.getSetOperator()));
+          opWrapperView.analyze(analyzer);
+          eiSelect.getTableRefs().add(opWrapperView);
+          break;
+
+        case UNION:
+          // Create a new SelectStmt for unions.
+          if (uSelect == null) {
+            unionStmt = null;
+            SelectList sl =
+                new SelectList(Lists.newArrayList(SelectListItem.createStarItem(null)));
+            uSelect = new SelectStmt(sl, null, null, null, null, null, null);
+            SetOperationStmt.SetOperand eiOperand = null;
+            if (eiSelect != null) {
+              eiOperand = new SetOperationStmt.SetOperand(eiSelect, null, null);
+              eiSelect = null;
+            }
+            List<SetOperationStmt.SetOperand> initialOps = new ArrayList<>();
+            if (i == 1) {
+              initialOps.add(firstOperand);
+              firstOperand = null;
+            }
+            if (eiOperand != null) {
+              initialOps.add(eiOperand);
+            }
+            unionStmt = new UnionStmt(initialOps, null, null);
+            uSelect.getTableRefs().add(new InlineViewRef(
+                tableAliasGenerator.getNextAlias(), unionStmt, (TableSampleClause) null));
+          }
+          operand.reset();
+          unionStmt.getOperands().add(operand);
+          break;
+
+        default:
+          throw new AnalysisException("Unknown Set Operation Statement Operator Type");
+      }
+    }
+
+    final SelectStmt newStmt = uSelect != null ? uSelect : eiSelect;
+    Preconditions.checkNotNull(newStmt);
+
+    newStmt.limitElement_ = stmt.limitElement_;
+    newStmt.limitElement_.reset();
+    if (stmt.hasOrderByClause()) {
+      newStmt.orderByElements_ = stmt.cloneOrderByElements();
+      if (newStmt.orderByElements_ != null) {
+        for (OrderByElement o : newStmt.orderByElements_) o.getExpr().reset();
+      }
+    }
+
+    newStmt.analyze(analyzer);
+    stmt.rewrittenStmt_ = newStmt;
   }
 
   protected void rewriteSelectStmtHook(SelectStmt stmt, Analyzer analyzer)

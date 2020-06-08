@@ -38,7 +38,7 @@ import com.google.common.collect.Lists;
 /**
  * Abstract base class for any statement that returns results
  * via a list of result expressions, for example a
- * SelectStmt or UnionStmt. Also maintains a map of expression substitutions
+ * SelectStmt or SetOperationStmt. Also maintains a map of expression substitutions
  * for replacing expressions from ORDER BY or GROUP BY clauses with
  * their corresponding result expressions.
  * Used for sharing members/methods and some of the analysis code, in particular the

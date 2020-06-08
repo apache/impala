@@ -31,9 +31,8 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
  * - No nesting of ValuesStmts
  */
 public class ValuesStmt extends UnionStmt {
-
-  public ValuesStmt(List<UnionOperand> operands,
-      List<OrderByElement> orderByElements, LimitElement limitElement) {
+  public ValuesStmt(List<SetOperand> operands, List<OrderByElement> orderByElements,
+      LimitElement limitElement) {
     super(operands, orderByElements, limitElement);
   }
 

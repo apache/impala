@@ -122,6 +122,12 @@ class TestQueries(ImpalaTestSuite):
     result = self.execute_query(query_string, vector.get_value('exec_option'))
     assert result.data[0] == '60'
 
+  def test_intersect(self, vector):
+    self.run_test_case('QueryTest/intersect', vector)
+
+  def test_except(self, vector):
+    self.run_test_case('QueryTest/except', vector)
+
   def test_sort(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
       pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")

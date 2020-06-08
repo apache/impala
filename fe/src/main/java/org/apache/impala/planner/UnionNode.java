@@ -51,7 +51,7 @@ import com.google.common.base.Preconditions;
 public class UnionNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(UnionNode.class);
 
-  // List of union result exprs of the originating UnionStmt. Used for
+  // List of union result exprs of the originating SetOperationStmt. Used for
   // determining passthrough-compatibility of children.
   protected List<Expr> unionResultExprs_;
 

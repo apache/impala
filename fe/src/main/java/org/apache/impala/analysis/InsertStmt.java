@@ -703,8 +703,8 @@ public class InsertStmt extends StatementBase {
       kuduPartitionColumnNames = getKuduPartitionColumnNames((FeKuduTable) table_);
     }
 
-    UnionStmt unionStmt =
-        (queryStmt_ instanceof UnionStmt) ? (UnionStmt) queryStmt_ : null;
+    SetOperationStmt unionStmt =
+        (queryStmt_ instanceof SetOperationStmt) ? (SetOperationStmt) queryStmt_ : null;
     List<Expr> widestTypeExprList = null;
     if (unionStmt != null && unionStmt.getWidestExprs() != null
         && unionStmt.getWidestExprs().size() > 0) {

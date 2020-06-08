@@ -93,6 +93,7 @@ public class AnalysisContext {
     public boolean isAlterViewStmt() { return stmt_ instanceof AlterViewStmt; }
     public boolean isComputeStatsStmt() { return stmt_ instanceof ComputeStatsStmt; }
     public boolean isQueryStmt() { return stmt_ instanceof QueryStmt; }
+    public boolean isSetOperationStmt() { return stmt_ instanceof SetOperationStmt; }
     public boolean isInsertStmt() { return stmt_ instanceof InsertStmt; }
     public boolean isDropDbStmt() { return stmt_ instanceof DropDbStmt; }
     public boolean isDropTableOrViewStmt() {
@@ -375,12 +376,16 @@ public class AnalysisContext {
     public Analyzer getAnalyzer() { return analyzer_; }
     public Set<TAccessEvent> getAccessEvents() { return analyzer_.getAccessEvents(); }
     public boolean requiresSubqueryRewrite() {
-      return analyzer_.containsSubquery() && !(stmt_ instanceof CreateViewStmt)
-          && !(stmt_ instanceof AlterViewStmt) && !(stmt_ instanceof ShowCreateTableStmt);
+      return analyzer_.containsSubquery() && !isCreateViewStmt() && !isAlterViewStmt()
+          && !isShowCreateTableStmt();
     }
     public boolean requiresExprRewrite() {
       return isQueryStmt() || isInsertStmt() || isCreateTableAsSelectStmt()
           || isUpdateStmt() || isDeleteStmt();
+    }
+    public boolean requiresSetOperationRewrite() {
+      return analyzer_.containsSetOperation() && !isCreateViewStmt() && !isAlterViewStmt()
+          && !isShowCreateTableStmt();
     }
     public TLineageGraph getThriftLineageGraph() {
       return analyzer_.getThriftSerializedLineageGraph();
@@ -470,7 +475,7 @@ public class AnalysisContext {
     analysisResult_.analyzer_.checkStmtExprLimit();
     boolean isExplain = analysisResult_.isExplainStmt();
 
-    // Apply expr and subquery rewrites.
+    // Apply expr, setop, and subquery rewrites.
     boolean reAnalyze = false;
     ExprRewriter rewriter = analysisResult_.analyzer_.getExprRewriter();
     if (analysisResult_.requiresExprRewrite()) {
@@ -481,7 +486,10 @@ public class AnalysisContext {
     if (analysisResult_.requiresSubqueryRewrite()) {
       new StmtRewriter.SubqueryRewriter().rewrite(analysisResult_);
       reAnalyze = true;
-      LOG.info("Re-analyze the rewritten query.");
+    }
+    if (analysisResult_.requiresSetOperationRewrite()) {
+      new StmtRewriter().rewrite(analysisResult_);
+      reAnalyze = true;
     }
     if (!reAnalyze) return;
 
@@ -503,11 +511,23 @@ public class AnalysisContext {
     ImmutableList<PrivilegeRequest> origPrivReqs =
         analysisResult_.analyzer_.getPrivilegeReqs();
 
+    // For SetOperationStmt we must replace the query statement with the rewritten version
+    // before re-analysis.
+    if (analysisResult_.requiresSetOperationRewrite()) {
+      if (analysisResult_.isSetOperationStmt()) {
+        if (((SetOperationStmt) analysisResult_.getStmt()).hasRewrittenStmt()) {
+          analysisResult_.stmt_ =
+            ((SetOperationStmt) analysisResult_.getStmt()).getRewrittenStmt();
+        }
+      }
+    }
+
     // Re-analyze the stmt with a new analyzer.
     analysisResult_.analyzer_ = createAnalyzer(stmtTableCache, authzCtx);
     // We restore the privileges collected in the first pass below. So, no point in
     // collecting them again.
     analysisResult_.analyzer_.setEnablePrivChecks(false);
+
     analysisResult_.stmt_.reset();
     try {
       analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
