@@ -947,10 +947,13 @@ class AdmissionController {
   /// Returns the maximum number of requests that can be queued in the pool.
   static int64_t GetMaxQueuedForPool(const TPoolConfig& pool_config);
 
-  /// Return all executor groups from 'all_groups' that can be used to run queries in
-  /// 'pool_name'.
-  void GetExecutorGroupsForPool(const ClusterMembershipMgr::ExecutorGroups& all_groups,
-      const std::string& pool_name, std::vector<const ExecutorGroup*>* matching_groups);
+  /// Return all executor groups from 'all_groups' that can be used to run the query. If
+  /// the query is a coordinator only query then a reserved empty group is returned
+  /// otherwise returns all healthy groups that can be used to run queries for the
+  /// resource pool associated with the query.
+  std::vector<const ExecutorGroup*> GetExecutorGroupsForQuery(
+      const ClusterMembershipMgr::ExecutorGroups& all_groups,
+      const AdmissionRequest& request);
 
   /// Returns the current size of the cluster.
   int64_t GetClusterSize(const ClusterMembershipMgr::Snapshot& membership_snapshot);

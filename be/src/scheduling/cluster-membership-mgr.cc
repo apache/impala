@@ -45,6 +45,8 @@ ExecutorGroup* FindOrInsertExecutorGroup(const ExecutorGroupDescPB& group,
 
 namespace impala {
 
+static const string EMPTY_GROUP_NAME("empty group (using coordinator only)");
+
 static const string LIVE_EXEC_GROUP_KEY("cluster-membership.executor-groups.total");
 static const string HEALTHY_EXEC_GROUP_KEY(
     "cluster-membership.executor-groups.total-healthy");
@@ -52,7 +54,8 @@ static const string TOTAL_BACKENDS_KEY("cluster-membership.backends.total");
 
 ClusterMembershipMgr::ClusterMembershipMgr(
     string local_backend_id, StatestoreSubscriber* subscriber, MetricGroup* metrics)
-  : current_membership_(std::make_shared<const Snapshot>()),
+  : empty_exec_group_(EMPTY_GROUP_NAME),
+    current_membership_(std::make_shared<const Snapshot>()),
     statestore_subscriber_(subscriber),
     local_backend_id_(move(local_backend_id)) {
   DCHECK(metrics != nullptr);
