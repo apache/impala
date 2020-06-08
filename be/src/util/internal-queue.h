@@ -81,7 +81,7 @@ class InternalQueueBase {
   /// if the queue is empty. This is O(1).
   T* head() const {
     std::lock_guard<LockType> lock(lock_);
-    if (empty()) return nullptr;
+    if (IsEmptyLocked()) return nullptr;
     return reinterpret_cast<T*>(head_);
   }
 
@@ -89,7 +89,7 @@ class InternalQueueBase {
   /// if the queue is empty. This is O(1).
   T* tail() {
     std::lock_guard<LockType> lock(lock_);
-    if (empty()) return nullptr;
+    if (IsEmptyLocked()) return nullptr;
     return reinterpret_cast<T*>(tail_);
   }
 
@@ -133,7 +133,7 @@ class InternalQueueBase {
     Node* result = nullptr;
     {
       std::lock_guard<LockType> lock(lock_);
-      if (empty()) return nullptr;
+      if (IsEmptyLocked()) return nullptr;
       --size_;
       result = head_;
       head_ = head_->next;
@@ -155,7 +155,7 @@ class InternalQueueBase {
     Node* result = nullptr;
     {
       std::lock_guard<LockType> lock(lock_);
-      if (empty()) return nullptr;
+      if (IsEmptyLocked()) return nullptr;
       --size_;
       result = tail_;
       tail_ = tail_->prev;
@@ -223,8 +223,14 @@ class InternalQueueBase {
     head_ = tail_ = nullptr;
   }
 
-  int size() const { return size_; }
-  bool empty() const { return head_ == nullptr; }
+  int size() const {
+    std::lock_guard<LockType> lock(lock_);
+    return SizeLocked();
+  }
+  bool empty() const {
+    std::lock_guard<LockType> lock(lock_);
+    return IsEmptyLocked();
+  }
 
   /// Returns if the target is on the queue. This is O(1) and does not acquire any locks.
   bool Contains(const T* target) const {
@@ -237,7 +243,7 @@ class InternalQueueBase {
     std::lock_guard<LockType> lock(lock_);
     if (head_ == nullptr) {
       if (tail_ != nullptr) return false;
-      if (size() != 0) return false;
+      if (SizeLocked() != 0) return false;
       return true;
     }
 
@@ -254,7 +260,7 @@ class InternalQueueBase {
       }
       current = next;
     }
-    if (num_elements_found != size()) return false;
+    if (num_elements_found != SizeLocked()) return false;
     return true;
   }
 
@@ -286,6 +292,10 @@ class InternalQueueBase {
 
  private:
   friend struct Node;
+
+  inline int SizeLocked() const { return size_; }
+  inline bool IsEmptyLocked() const { return head_ == nullptr; }
+
   mutable LockType lock_;
   Node *head_, *tail_;
   int size_;
