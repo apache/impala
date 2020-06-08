@@ -1129,7 +1129,7 @@ void Coordinator::ComputeQuerySummary() {
   stringstream mem_info, cpu_user_info, cpu_system_info, bytes_read_info;
   ResourceUtilization total_utilization;
   for (BackendState* backend_state: backend_states_) {
-    ResourceUtilization utilization = backend_state->ComputeResourceUtilization();
+    ResourceUtilization utilization = backend_state->GetResourceUtilization();
     total_utilization.Merge(utilization);
     string network_address = NetworkAddressPBToString(backend_state->impalad_address());
     mem_info << network_address << "("
@@ -1247,7 +1247,7 @@ Coordinator::ResourceUtilization Coordinator::ComputeQueryResourceUtilization() 
   DCHECK(exec_rpcs_complete_.Load()) << "Exec() must be called first";
   ResourceUtilization query_resource_utilization;
   for (BackendState* backend_state: backend_states_) {
-    query_resource_utilization.Merge(backend_state->ComputeResourceUtilization());
+    query_resource_utilization.Merge(backend_state->GetResourceUtilization());
   }
   return query_resource_utilization;
 }

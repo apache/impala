@@ -42,9 +42,9 @@
 using kudu::client::KuduClient;
 using kudu::client::KuduTable;
 
-PROFILE_DECLARE_COUNTER(ScanRangesComplete);
-
 namespace impala {
+
+PROFILE_DECLARE_COUNTER(ScanRangesComplete);
 
 const string KuduScanNodeBase::KUDU_ROUND_TRIPS = "TotalKuduScanRoundTrips";
 const string KuduScanNodeBase::KUDU_REMOTE_TOKENS = "KuduRemoteScanTokens";

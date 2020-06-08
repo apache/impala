@@ -129,6 +129,24 @@ message StatefulStatusPB {
   optional AuxErrorInfoPB aux_error_info = 3;
 }
 
+// Per-node stats required for the exec summary.
+message ExecSummaryDataPB {
+  // Plan node ID, set if this is for a PlanNode.
+  optional int32 plan_node_id = 1;
+
+  // Plan node ID, set if this is for a DataSink.
+  optional int32 data_sink_id = 2;
+
+  // Rows returned from this node, if this is a PlanNode.
+  optional int64 rows_returned = 3;
+
+  // Peak memory usage in bytes of this PlanNode or DataSink.
+  optional int64 peak_mem_usage = 4;
+
+  // Local time in nanoseconds spent in this plan node.
+  optional int64 local_time_ns = 5;
+}
+
 // RPC error metadata that can be associated with a AuxErrorInfoPB object. Created if a
 // RPC to another node failed.
 message RPCErrorInfoPB {
@@ -168,6 +186,9 @@ message FragmentInstanceExecStatusPB {
   // The non-idempotent parts of the report, and any prior reports that are not known to
   // have been received by the coordinator.
   repeated StatefulStatusPB stateful_report = 6;
+
+  // Per-node stats required for the exec summary.
+  repeated ExecSummaryDataPB exec_summary_data = 7;
 }
 
 message ReportExecStatusRequestPB {
@@ -191,6 +212,28 @@ message ReportExecStatusRequestPB {
   // the fragment which sets 'overall_status' above. Not set if 'overall_status' is a
   // general error (e.g. failure to start fragment instances).
   optional UniqueIdPB fragment_instance_id = 6;
+
+  // Peak memory usage for this query on this backend in bytes.
+  optional int64 peak_mem_consumption = 7;
+
+  // User CPU utilization for the query on this backend in ns.
+  optional int64 cpu_user_ns = 8;
+
+  // System CPU utilization for the query on this backend in ns.
+  optional int64 cpu_sys_ns = 9;
+
+  // Sum of BytesRead counters on this backend.
+  optional int64 bytes_read = 10;
+
+  // Total scan ranges completed on this backend.
+  optional int64 scan_ranges_complete = 11;
+
+  // Total bytes sent by instances that did not contain a scan node.
+  optional int64 exchange_bytes_sent = 12;
+
+  // Total bytes sent by instances that contained a scan node.
+  optional int64 scan_bytes_sent = 13;
+
 }
 
 message ReportExecStatusResponsePB {

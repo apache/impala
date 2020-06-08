@@ -143,6 +143,12 @@ class FragmentInstanceState {
   const TNetworkAddress& coord_address() const { return query_ctx().coord_address; }
   bool IsDone() const { return current_state_.Load() == FInstanceExecStatePB::FINISHED; }
   ObjectPool* obj_pool();
+  int64_t scan_ranges_complete() const { return scan_ranges_complete_; }
+  int64_t peak_mem_consumption() const { return peak_mem_consumption_; }
+  int64_t cpu_user_ns() const { return cpu_user_ns_; }
+  int64_t cpu_sys_ns() const { return cpu_sys_ns_; }
+  int64_t bytes_read() const { return bytes_read_; }
+  int64_t total_bytes_sent() const { return total_bytes_sent_; }
 
   /// Returns true if the current thread is a thread executing the whole or part of
   /// a fragment instance.
@@ -190,6 +196,22 @@ class FragmentInstanceState {
   /// True if a report has been generated where 'done' is true, after which the sequence
   /// number should not be bumped for future reports.
   bool final_report_generated_ = false;
+
+  /// Total scan ranges complete across all scan nodes. Set in GetStatusReport().
+  int64_t scan_ranges_complete_ = 0;
+
+  /// Last peak memory consumption value. Set in GetStatusReport().
+  int64_t peak_mem_consumption_ = 0;
+
+  /// Last CPU user and system totals in ns. Set in GetStatusReport().
+  int64_t cpu_user_ns_ = 0;
+  int64_t cpu_sys_ns_ = 0;
+
+  /// Sum of BytesRead counters on this backend. Set in GetStatusReport().
+  int64_t bytes_read_ = 0;
+
+  /// Total bytes sent on exchanges in this backend. Set in GetStatusReport().
+  int64_t total_bytes_sent_ = 0;
 
   /// Profile for timings for each stage of the plan fragment instance's lifecycle.
   /// Lives in obj_pool().

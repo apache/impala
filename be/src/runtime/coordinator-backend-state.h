@@ -136,12 +136,13 @@ class Coordinator::BackendState {
   /// Update overall execution status, including the instances' exec status/profiles
   /// and the error log, if this backend is not already done. Updates the fragment
   /// instances' TExecStats in exec_summary (exec_summary->nodes.exec_stats) and updates
-  /// progress_update. If any instance reports an error, the overall execution status
-  /// becomes the first reported error status. Returns true iff this update changed
-  /// IsDone() from false to true, either because it was the last fragment to complete or
-  /// because it was the first error received. Adds the AuxErrorInfoPB from each
-  /// FragmentInstanceExecStatusPB in backend_exec_status to the vector
-  /// aux_error_info.
+  /// scan_range_progress with any newly-completed scan ranges.
+  ///
+  /// If any instance reports an error, the overall execution status becomes the first
+  /// reported error status. Returns true iff this update changed IsDone() from false
+  /// to true, either because it was the last fragment to complete or because it was
+  /// the first error received. Adds the AuxErrorInfoPB from each
+  /// FragmentInstanceExecStatusPB in backend_exec_status to the vector aux_error_info.
   bool ApplyExecStatusReport(const ReportExecStatusRequestPB& backend_exec_status,
       const TRuntimeProfileForest& thrift_profiles, ExecSummary* exec_summary,
       ProgressUpdater* scan_range_progress, DmlExecState* dml_exec_state,
@@ -177,7 +178,7 @@ class Coordinator::BackendState {
 
   /// Return peak memory consumption and aggregated resource usage across all fragment
   /// instances for this backend.
-  ResourceUtilization ComputeResourceUtilization();
+  ResourceUtilization GetResourceUtilization();
 
   /// Merge the accumulated error log into 'merged'.
   void MergeErrorLog(ErrorLogMap* merged);
@@ -226,12 +227,10 @@ class Coordinator::BackendState {
         ObjectPool* obj_pool);
 
     /// Updates 'this' with exec_status and the fragment intance's thrift profile. Also
-    /// updates the fragment instance's TExecStats in exec_summary and 'progress_updater'
-    /// with the number of newly completed scan ranges. Also updates the instance's avg
-    /// profile. Caller must hold BackendState::lock_.
+    /// updates the fragment instance's TExecStats in exec_summary. Also updates the
+    /// instance's avg profile. Caller must hold BackendState::lock_.
     void Update(const FragmentInstanceExecStatusPB& exec_status,
-        const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary,
-        ProgressUpdater* scan_range_progress);
+        const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary);
 
     int per_fragment_instance_idx() const {
       return exec_params_.per_fragment_instance_idx;
@@ -270,26 +269,11 @@ class Coordinator::BackendState {
     /// in ApplyExecStatusReport()
     bool done_ = false;
 
-    /// true after the first call to profile->Update()
-    bool profile_created_ = false;
-
     /// cumulative size of all splits; set in c'tor
     int64_t total_split_size_ = 0;
 
     /// wall clock timer for this instance
     MonotonicStopWatch stopwatch_;
-
-    /// total scan ranges complete across all scan nodes
-    int64_t total_ranges_complete_ = 0;
-
-    /// SCAN_RANGES_COMPLETE_COUNTERs in profile_
-    std::vector<RuntimeProfile::Counter*> scan_ranges_complete_counters_;
-
-    /// Collection of BYTES_READ_COUNTERs of all scan nodes in this fragment instance.
-    std::vector<RuntimeProfile::Counter*> bytes_read_counters_;
-
-    /// Collection of TotalBytesSent of all data stream senders in this fragment instance.
-    std::vector<RuntimeProfile::Counter*> bytes_sent_counters_;
 
     /// Descriptor string for the last query status report time in the profile.
     static const char* LAST_REPORT_TIME_DESC;
@@ -297,9 +281,6 @@ class Coordinator::BackendState {
     /// The current state of this fragment instance's execution. This gets serialized in
     /// ToJson() and is displayed in the debug webpages.
     FInstanceExecStatePB current_state_ = FInstanceExecStatePB::WAITING_FOR_EXEC;
-
-    /// Extracts scan_ranges_complete_counters_ and  bytes_read_counters_ from profile_.
-    void InitCounters();
   };
 
   /// QuerySchedule associated with the Coordinator that owns this BackendState.
@@ -392,6 +373,12 @@ class Coordinator::BackendState {
   /// True if a CancelQueryFInstances RPC was already sent to this backend.
   bool sent_cancel_rpc_ = false;
 
+  /// Total scan ranges complete across all scan nodes. Set in ApplyExecStatusReport().
+  int64_t total_ranges_complete_ = 0;
+
+  /// Resource utilization values. Set in ApplyExecStatusReport().
+  ResourceUtilization backend_utilization_;
+
   /// END: Members that are protected by 'lock_'.
   /////////////////////////////////////////
 
@@ -417,8 +404,8 @@ class Coordinator::BackendState {
   /// Version of IsDone() where caller must hold lock_ via lock;
   bool IsDoneLocked(const std::unique_lock<std::mutex>& lock) const;
 
-  /// Same as ComputeResourceUtilization() but caller must hold lock.
-  ResourceUtilization ComputeResourceUtilizationLocked();
+  /// Same as GetResourceUtilization() but caller must hold lock.
+  ResourceUtilization GetResourceUtilizationLocked();
 
   /// Logs 'msg' at the VLOG_QUERY level, along with 'query_id_' and 'krpc_host_'.
   void VLogForBackend(const std::string& msg);

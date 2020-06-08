@@ -40,6 +40,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/fragment-state.h"
 #include "runtime/krpc-data-stream-mgr.h"
+#include "runtime/krpc-data-stream-sender.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
 #include "runtime/row-batch.h"
@@ -56,8 +57,9 @@
 
 using google::protobuf::RepeatedPtrField;
 using kudu::rpc::RpcContext;
-using namespace impala;
 using namespace apache::thrift;
+
+namespace impala {
 
 const string FragmentInstanceState::PER_HOST_PEAK_MEM_COUNTER = "PerHostPeakMemUsage";
 const string FragmentInstanceState::FINST_THREAD_GROUP_NAME = "fragment-execution";
@@ -66,6 +68,9 @@ const string FragmentInstanceState::FINST_THREAD_NAME_PREFIX = "exec-finstance";
 static const string OPEN_TIMER_NAME = "OpenTime";
 static const string PREPARE_TIMER_NAME = "PrepareTime";
 static const string EXEC_TIMER_NAME = "ExecTime";
+
+PROFILE_DECLARE_COUNTER(ScanRangesComplete);
+PROFILE_DECLARE_COUNTER(BytesRead);
 
 FragmentInstanceState::FragmentInstanceState(QueryState* query_state,
     FragmentState* fragment_state, const TPlanFragmentInstanceCtx& instance_ctx,
@@ -277,6 +282,50 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
   instance_status->set_current_state(current_state());
   DCHECK(profile() != nullptr);
   profile()->ToThrift(thrift_profile);
+
+  // Pull out and aggregate counters from the profile.
+  RuntimeProfile::Counter* user_time = profile()->GetCounter("TotalThreadsUserTime");
+  if (user_time != nullptr) cpu_user_ns_ = user_time->value();
+
+  RuntimeProfile::Counter* system_time = profile()->GetCounter("TotalThreadsSysTime");
+  if (system_time != nullptr) cpu_sys_ns_ = system_time->value();
+
+  // Compute local_time for use below.
+  profile()->ComputeTimeInProfile();
+  vector<RuntimeProfile*> nodes;
+  profile()->GetAllChildren(&nodes);
+  int64_t bytes_read = 0;
+  int64_t scan_ranges_complete = 0;
+  int64_t total_bytes_sent = 0;
+  for (RuntimeProfile* node : nodes) {
+    RuntimeProfile::Counter* c = node->GetCounter(PROFILE_BytesRead.name());
+    if (c != nullptr) bytes_read += c->value();
+    c = node->GetCounter(PROFILE_ScanRangesComplete.name());
+    if (c != nullptr) scan_ranges_complete += c->value();
+    c = node->GetCounter(KrpcDataStreamSender::TOTAL_BYTES_SENT_COUNTER);
+    if (c != nullptr) total_bytes_sent += c->value();
+
+    bool is_plan_node = node->metadata().__isset.plan_node_id;
+    bool is_data_sink = node->metadata().__isset.data_sink_id;
+    // Plan Nodes and data sinks get an entry in the exec summary.
+    if (is_plan_node || is_data_sink) {
+      ExecSummaryDataPB* summary_data = instance_status->add_exec_summary_data();
+      if (is_plan_node) {
+        summary_data->set_plan_node_id(node->metadata().plan_node_id);
+      } else {
+        summary_data->set_data_sink_id(node->metadata().data_sink_id);
+      }
+      RuntimeProfile::Counter* rows_counter = node->GetCounter("RowsReturned");
+      RuntimeProfile::Counter* mem_counter = node->GetCounter("PeakMemoryUsage");
+      if (rows_counter != nullptr) summary_data->set_rows_returned(rows_counter->value());
+      if (mem_counter != nullptr) summary_data->set_peak_mem_usage(mem_counter->value());
+      summary_data->set_local_time_ns(node->local_time());
+    }
+  }
+  bytes_read_ = bytes_read;
+  scan_ranges_complete_ = scan_ranges_complete;
+  total_bytes_sent_  = total_bytes_sent;
+
   // Send the DML stats if this is the final report.
   if (done) {
     runtime_state()->dml_exec_state()->ToProto(
@@ -579,4 +628,5 @@ void FragmentInstanceState::PrintVolumeIds() {
   VLOG_FILE
       << "Hdfs split stats (<volume id>:<# splits>/<split lengths>) for query="
       << PrintId(query_id()) << ":\n" << str.str();
+}
 }
