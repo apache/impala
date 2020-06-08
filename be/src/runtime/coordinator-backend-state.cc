@@ -58,10 +58,8 @@ namespace accumulators = boost::accumulators;
 
 DECLARE_int32(backend_client_rpc_timeout_ms);
 DECLARE_int64(rpc_max_message_size);
-PROFILE_DECLARE_COUNTER(ScanRangesComplete);
 
 namespace impala {
-PROFILE_DECLARE_COUNTER(BytesRead);
 
 const char* Coordinator::BackendState::InstanceStats::LAST_REPORT_TIME_DESC =
     "Last report received time";
@@ -338,48 +336,15 @@ Status Coordinator::BackendState::GetStatus(bool* is_fragment_failure,
   return status_;
 }
 
-Coordinator::ResourceUtilization Coordinator::BackendState::ComputeResourceUtilization() {
+Coordinator::ResourceUtilization Coordinator::BackendState::GetResourceUtilization() {
   lock_guard<mutex> l(lock_);
   DCHECK(exec_done_) << "May only be called after WaitOnExecRpc() completes.";
-  return ComputeResourceUtilizationLocked();
+  return GetResourceUtilizationLocked();
 }
 
 Coordinator::ResourceUtilization
-Coordinator::BackendState::ComputeResourceUtilizationLocked() {
-  ResourceUtilization result;
-  for (const auto& entry : instance_stats_map_) {
-    RuntimeProfile* profile = entry.second->profile_;
-    ResourceUtilization instance_utilization;
-    // Update resource utilization and apply delta.
-    RuntimeProfile::Counter* user_time = profile->GetCounter("TotalThreadsUserTime");
-    if (user_time != nullptr) instance_utilization.cpu_user_ns = user_time->value();
-
-    RuntimeProfile::Counter* system_time = profile->GetCounter("TotalThreadsSysTime");
-    if (system_time != nullptr) instance_utilization.cpu_sys_ns = system_time->value();
-
-    for (RuntimeProfile::Counter* c : entry.second->bytes_read_counters_) {
-      instance_utilization.bytes_read += c->value();
-    }
-
-    int64_t bytes_sent = 0;
-    for (RuntimeProfile::Counter* c : entry.second->bytes_sent_counters_) {
-      bytes_sent += c->value();
-    }
-
-    // Determine whether this instance had a scan node in its plan.
-    if (instance_utilization.bytes_read > 0) {
-      instance_utilization.scan_bytes_sent = bytes_sent;
-    } else {
-      instance_utilization.exchange_bytes_sent = bytes_sent;
-    }
-
-    RuntimeProfile::Counter* peak_mem =
-        profile->GetCounter(FragmentInstanceState::PER_HOST_PEAK_MEM_COUNTER);
-    if (peak_mem != nullptr)
-      instance_utilization.peak_per_host_mem_consumption = peak_mem->value();
-    result.Merge(instance_utilization);
-  }
-  return result;
+Coordinator::BackendState::GetResourceUtilizationLocked() {
+  return backend_utilization_;
 }
 
 void Coordinator::BackendState::MergeErrorLog(ErrorLogMap* merged) {
@@ -474,8 +439,7 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
     }
 
     DCHECK(!instance_stats->done_);
-    instance_stats->Update(instance_exec_status, *profile_iter, exec_summary,
-        scan_range_progress);
+    instance_stats->Update(instance_exec_status, *profile_iter, exec_summary);
 
     // Update DML stats
     if (instance_exec_status.has_dml_exec_status()) {
@@ -508,6 +472,20 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
       --num_remaining_instances_;
     }
   }
+  // Determine newly-completed scan ranges and update scan_range_progress.
+  int64_t scan_ranges_complete = backend_exec_status.scan_ranges_complete();
+  int64_t scan_range_delta = scan_ranges_complete - total_ranges_complete_;
+  DCHECK_GE(scan_range_delta, 0);
+  scan_range_progress->Update(scan_range_delta);
+  total_ranges_complete_ = scan_ranges_complete;
+
+  backend_utilization_.peak_per_host_mem_consumption =
+      backend_exec_status.peak_mem_consumption();
+  backend_utilization_.cpu_user_ns = backend_exec_status.cpu_user_ns();
+  backend_utilization_.cpu_sys_ns = backend_exec_status.cpu_sys_ns();
+  backend_utilization_.bytes_read = backend_exec_status.bytes_read();
+  backend_utilization_.exchange_bytes_sent = backend_exec_status.exchange_bytes_sent();
+  backend_utilization_.scan_bytes_sent = backend_exec_status.scan_bytes_sent();
 
   // status_ has incorporated the status from all fragment instances. If the overall
   // backend status is not OK, but no specific fragment instance reported an error, then
@@ -732,26 +710,9 @@ Coordinator::BackendState::InstanceStats::InstanceStats(
   (*fragment_stats->bytes_assigned())(total_split_size_);
 }
 
-void Coordinator::BackendState::InstanceStats::InitCounters() {
-  vector<RuntimeProfile*> children;
-  profile_->GetAllChildren(&children);
-  for (RuntimeProfile* p : children) {
-    RuntimeProfile::Counter* c = p->GetCounter(PROFILE_ScanRangesComplete.name());
-    if (c != nullptr) scan_ranges_complete_counters_.push_back(c);
-
-    RuntimeProfile::Counter* bytes_read = p->GetCounter(PROFILE_BytesRead.name());
-    if (bytes_read != nullptr) bytes_read_counters_.push_back(bytes_read);
-
-    RuntimeProfile::Counter* bytes_sent =
-        p->GetCounter(KrpcDataStreamSender::TOTAL_BYTES_SENT_COUNTER);
-    if (bytes_sent != nullptr) bytes_sent_counters_.push_back(bytes_sent);
-  }
-}
-
 void Coordinator::BackendState::InstanceStats::Update(
     const FragmentInstanceExecStatusPB& exec_status,
-    const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary,
-    ProgressUpdater* scan_range_progress) {
+    const TRuntimeProfileTree& thrift_profile, ExecSummary* exec_summary) {
   last_report_time_ms_ = UnixMillis();
   DCHECK_GT(exec_status.report_seq_no(), last_report_seq_no_);
   last_report_seq_no_ = exec_status.report_seq_no();
@@ -759,54 +720,40 @@ void Coordinator::BackendState::InstanceStats::Update(
   profile_->UpdateInfoString(LAST_REPORT_TIME_DESC,
       ToStringFromUnixMillis(last_report_time_ms_));
   profile_->Update(thrift_profile);
-  if (!profile_created_) {
-    profile_created_ = true;
-    InitCounters();
-  }
   profile_->ComputeTimeInProfile();
 
   // update exec_summary
-  // TODO: why do this every time we get an updated instance profile?
-  vector<RuntimeProfile*> children;
-  profile_->GetAllChildren(&children);
   TExecSummary& thrift_exec_summary = exec_summary->thrift_exec_summary;
-  for (RuntimeProfile* child : children) {
-    bool is_plan_node = child->metadata().__isset.plan_node_id;
-    bool is_data_sink = child->metadata().__isset.data_sink_id;
-    // Plan Nodes and data sinks get an entry in the summary.
-    if (!is_plan_node && !is_data_sink) continue;
-
+  for (const ExecSummaryDataPB& exec_summary_entry : exec_status.exec_summary_data()) {
+    bool is_plan_node = exec_summary_entry.has_plan_node_id();
+    bool is_data_sink = exec_summary_entry.has_data_sink_id();
+    DCHECK(is_plan_node || is_data_sink) << "Invalid exec summary entry sent by executor";
     int exec_summary_idx;
     if (is_plan_node) {
-      exec_summary_idx = exec_summary->node_id_to_idx_map[child->metadata().plan_node_id];
+      exec_summary_idx =
+          exec_summary->node_id_to_idx_map[exec_summary_entry.plan_node_id()];
     } else {
       exec_summary_idx =
-          exec_summary->data_sink_id_to_idx_map[child->metadata().data_sink_id];
+          exec_summary->data_sink_id_to_idx_map[exec_summary_entry.data_sink_id()];
     }
     TPlanNodeExecSummary& node_exec_summary = thrift_exec_summary.nodes[exec_summary_idx];
     DCHECK_EQ(node_exec_summary.fragment_idx, exec_params_.fragment().idx);
     int per_fragment_instance_idx = exec_params_.per_fragment_instance_idx;
     DCHECK_LT(per_fragment_instance_idx, node_exec_summary.exec_stats.size())
-        << " name=" << child->name()
         << " instance_id=" << PrintId(exec_params_.instance_id)
         << " fragment_idx=" << exec_params_.fragment().idx;
     TExecStats& instance_stats = node_exec_summary.exec_stats[per_fragment_instance_idx];
 
-    RuntimeProfile::Counter* rows_counter = child->GetCounter("RowsReturned");
-    RuntimeProfile::Counter* mem_counter = child->GetCounter("PeakMemoryUsage");
-    if (rows_counter != nullptr) instance_stats.__set_cardinality(rows_counter->value());
-    if (mem_counter != nullptr) instance_stats.__set_memory_used(mem_counter->value());
-    instance_stats.__set_latency_ns(child->local_time());
-    // TODO: track interesting per-node metrics
+    if (exec_summary_entry.has_rows_returned()) {
+      instance_stats.__set_cardinality(exec_summary_entry.rows_returned());
+    }
+    if (exec_summary_entry.has_peak_mem_usage()) {
+      instance_stats.__set_memory_used(exec_summary_entry.peak_mem_usage());
+    }
+    DCHECK(exec_summary_entry.has_local_time_ns());
+    instance_stats.__set_latency_ns(exec_summary_entry.local_time_ns());
     node_exec_summary.__isset.exec_stats = true;
   }
-
-  // determine newly-completed scan ranges and update scan_range_progress
-  int64_t total = 0;
-  for (RuntimeProfile::Counter* c: scan_ranges_complete_counters_) total += c->value();
-  int64_t delta = total - total_ranges_complete_;
-  total_ranges_complete_ = total;
-  scan_range_progress->Update(delta);
 
   // extract the current execution state of this instance
   current_state_ = exec_status.current_state();
@@ -891,7 +838,7 @@ void Coordinator::FragmentStats::AddExecStats() {
 void Coordinator::BackendState::ToJson(Value* value, Document* document) {
   unique_lock<mutex> l(lock_);
   DCHECK(exec_done_) << "May only be called after WaitOnExecRpc() completes.";
-  ResourceUtilization resource_utilization = ComputeResourceUtilizationLocked();
+  ResourceUtilization resource_utilization = GetResourceUtilizationLocked();
   value->AddMember("num_instances", fragments_.size(), document->GetAllocator());
   value->AddMember("done", IsDoneLocked(l), document->GetAllocator());
   value->AddMember("peak_per_host_mem_consumption",

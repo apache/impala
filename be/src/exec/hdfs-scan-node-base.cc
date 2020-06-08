@@ -68,10 +68,10 @@ DEFINE_bool(always_use_data_cache, false, "(Advanced) Always uses the IO data ca
     "IO data cache is only used if the data is expected to be remote. Used by tests.");
 
 namespace filesystem = boost::filesystem;
-using namespace impala;
 using namespace impala::io;
 using namespace strings;
 
+namespace impala {
 PROFILE_DEFINE_TIMER(TotalRawHdfsReadTime, STABLE_LOW, "Aggregate wall clock time"
     " across all Disk I/O threads in HDFS read operations.");
 PROFILE_DEFINE_TIMER(TotalRawHdfsOpenFileTime, STABLE_LOW, "Aggregate wall clock time"
@@ -1251,4 +1251,5 @@ Status ScanRangeSharedState::GetNextScanRange(
 void ScanRangeSharedState::AddCancellationHook(RuntimeState* state) {
   DCHECK(use_mt_scan_node_) << "Should only be called by MT scan nodes";
   state->AddCancellationCV(&scan_range_submission_lock_, &range_submission_cv_);
+}
 }

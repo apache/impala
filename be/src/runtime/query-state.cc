@@ -68,7 +68,7 @@ DECLARE_int64(rpc_max_message_size);
 DEFINE_int32_hidden(stress_status_report_delay_ms, 0, "Stress option to inject a delay "
     "before status reports. Has no effect on release builds.");
 
-using namespace impala;
+namespace impala {
 
 QueryState::ScopedRef::ScopedRef(const TUniqueId& query_id) {
   DCHECK(ExecEnv::GetInstance()->query_exec_mgr() != nullptr);
@@ -417,20 +417,48 @@ void QueryState::ConstructReport(bool instances_started,
   host_profile_->ClearChunkedTimeSeriesCounters();
 
   if (instances_started) {
+    // Stats that we aggregate across the instances.
+    int64_t cpu_user_ns = 0;
+    int64_t cpu_sys_ns = 0;
+    int64_t bytes_read = 0;
+    int64_t scan_ranges_complete = 0;
+    int64_t exchange_bytes_sent = 0;
+    int64_t scan_bytes_sent = 0;
+
     for (const auto& entry : fis_map_) {
       FragmentInstanceState* fis = entry.second;
 
       // If this fragment instance has already sent its last report, skip it.
       if (fis->final_report_sent()) {
         DCHECK(fis->IsDone());
-        continue;
+      } else {
+        // Update the status and profiles of this fragment instance.
+        FragmentInstanceExecStatusPB* instance_status =
+            report->add_instance_exec_status();
+        profiles_forest->profile_trees.emplace_back();
+        fis->GetStatusReport(instance_status, &profiles_forest->profile_trees.back());
       }
 
-      // Update the status and profiles of this fragment instance.
-      FragmentInstanceExecStatusPB* instance_status = report->add_instance_exec_status();
-      profiles_forest->profile_trees.emplace_back();
-      fis->GetStatusReport(instance_status, &profiles_forest->profile_trees.back());
+      // Include these values for running and completed finstances in the status report.
+      cpu_user_ns += fis->cpu_user_ns();
+      cpu_sys_ns += fis->cpu_sys_ns();
+      bytes_read += fis->bytes_read();
+      scan_ranges_complete += fis->scan_ranges_complete();
+      // Determine whether this instance had a scan node in its plan.
+      // Note: this is hacky. E.g. it doesn't work for Kudu scans.
+      if (fis->bytes_read() > 0) {
+        scan_bytes_sent += fis->total_bytes_sent();
+      } else {
+        exchange_bytes_sent += fis->total_bytes_sent();
+      }
     }
+    report->set_peak_mem_consumption(query_mem_tracker_->peak_consumption());
+    report->set_cpu_user_ns(cpu_user_ns);
+    report->set_cpu_sys_ns(cpu_sys_ns);
+    report->set_bytes_read(bytes_read);
+    report->set_scan_ranges_complete(scan_ranges_complete);
+    report->set_exchange_bytes_sent(exchange_bytes_sent);
+    report->set_scan_bytes_sent(scan_bytes_sent);
   }
 }
 
@@ -807,4 +835,5 @@ Status QueryState::StartSpilling(RuntimeState* runtime_state, MemTracker* mem_tr
     ImpaladMetrics::NUM_QUERIES_SPILLED->Increment(1);
   }
   return Status::OK();
+}
 }
