@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
 import org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem;
+import org.apache.hadoop.fs.ozone.OzoneFileSystem;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -149,9 +150,11 @@ public class LoadDataStmt extends StatementBase {
       if (!(fs instanceof DistributedFileSystem) && !(fs instanceof S3AFileSystem) &&
           !(fs instanceof AzureBlobFileSystem) &&
           !(fs instanceof SecureAzureBlobFileSystem) &&
-          !(fs instanceof AdlFileSystem)) {
-        throw new AnalysisException(String.format("INPATH location '%s' " +
-            "must point to an HDFS, S3A, ADL or ABFS filesystem.", sourceDataPath_));
+          !(fs instanceof AdlFileSystem) &&
+          !(fs instanceof OzoneFileSystem)) {
+        throw new AnalysisException(String.format("INPATH location '%s' "
+                + "must point to an HDFS, S3A, ADL, ABFS, or Ozone filesystem.",
+            sourceDataPath_));
       }
       if (!fs.exists(source)) {
         throw new AnalysisException(String.format(
