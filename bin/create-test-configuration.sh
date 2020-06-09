@@ -66,6 +66,7 @@ function generate_config {
 
 CREATE_METASTORE=0
 CREATE_RANGER_POLICY_DB=0
+UPGRADE_METASTORE_DB=0
 
 # parse command line options
 for ARG in $*
@@ -77,9 +78,13 @@ do
     -create_ranger_policy_db)
       CREATE_RANGER_POLICY_DB=1
       ;;
+    -upgrade_metastore_db)
+      UPGRADE_METASTORE_DB=1
+      ;;
     -help|*)
       echo "[-create_metastore] : If true, creates a new metastore."
       echo "[-create_ranger_policy_db] : If true, creates a new Ranger policy db."
+      echo "[-upgrade_metastore_db] : If true, upgrades the schema of HMS db."
       exit 1
       ;;
   esac
@@ -163,10 +168,18 @@ if [ $CREATE_METASTORE -eq 1 ]; then
   # version and invokes the appropriate scripts
   CLASSPATH={$CLASSPATH}:${CONFIG_DIR} ${HIVE_HOME}/bin/schematool -initSchema -dbType \
 postgres 1>${IMPALA_CLUSTER_LOGS_DIR}/schematool.log 2>&1
+  # TODO: We probably don't need to do this anymore
   # Increase the size limit of PARAM_VALUE from SERDE_PARAMS table to be able to create
   # HBase tables with large number of columns.
   echo "alter table \"SERDE_PARAMS\" alter column \"PARAM_VALUE\" type character varying" \
       | psql -q -U hiveuser -d ${METASTORE_DB}
+fi
+
+if [ $UPGRADE_METASTORE_DB -eq 1 ]; then
+  echo "Upgrading the schema of metastore db ${METASTORE_DB}. Check \
+${IMPALA_CLUSTER_LOGS_DIR}/schematool.log for details."
+  CLASSPATH={$CLASSPATH}:${CONFIG_DIR} ${HIVE_HOME}/bin/schematool -upgradeSchema \
+-dbType postgres 1>${IMPALA_CLUSTER_LOGS_DIR}/schematool.log 2>&1
 fi
 
 if [ $CREATE_RANGER_POLICY_DB -eq 1 ]; then

@@ -58,6 +58,7 @@ TESTDATA_ACTION=0
 TESTS_ACTION=1
 FORMAT_CLUSTER=0
 FORMAT_METASTORE=0
+UPGRADE_METASTORE_SCHEMA=0
 FORMAT_RANGER_POLICY_DB=0
 NEED_MINICLUSTER=0
 START_IMPALA_CLUSTER=0
@@ -113,6 +114,9 @@ do
       ;;
     -format_metastore)
       FORMAT_METASTORE=1
+      ;;
+    -upgrade_metastore_db)
+      UPGRADE_METASTORE_SCHEMA=1
       ;;
     -format_ranger_policy_db)
       FORMAT_RANGER_POLICY_DB=1
@@ -201,6 +205,8 @@ do
            "[Default: False]"
       echo "[-format_cluster] : Format the minicluster [Default: False]"
       echo "[-format_metastore] : Format the metastore db [Default: False]"
+      echo "[-upgrade_metastore_db] : Upgrades the schema of metastore db"\
+           "[Default: False]"
       echo "[-format_ranger_policy_db] : Format the Ranger policy db [Default: False]"
       echo "[-release_and_debug] : Build both release and debug binaries. Overrides "\
            "other build types [Default: false]"
@@ -269,7 +275,10 @@ Examples of common tasks:
   ./buildall.sh -testdata
 
   # Build, format mini-cluster and metastore, load all test data, run tests
-  ./buildall.sh -testdata -format"
+  ./buildall.sh -testdata -format
+
+  # Build and upgrade metastore schema to latest.
+  ./buildall.sh -upgrade_metastore_db"
       exit 1
       ;;
     esac
@@ -349,7 +358,7 @@ fi
 
 if [[ $TESTS_ACTION -eq 1 || $TESTDATA_ACTION -eq 1 || $FORMAT_CLUSTER -eq 1 ||
       $FORMAT_METASTORE -eq 1 || $FORMAT_RANGER_POLICY_DB -eq 1 || -n "$SNAPSHOT_FILE" ||
-      -n "$METASTORE_SNAPSHOT_FILE" ]]; then
+      -n "$METASTORE_SNAPSHOT_FILE" || $UPGRADE_METASTORE_SCHEMA -eq 1 ]]; then
   NEED_MINICLUSTER=1
 fi
 
@@ -486,7 +495,8 @@ reconfigure_test_cluster() {
   "${IMPALA_HOME}/bin/start-impala-cluster.py" --kill --force
 
   if [[ "$FORMAT_METASTORE" -eq 1 || "$FORMAT_CLUSTER" -eq 1 ||
-        "$FORMAT_RANGER_POLICY_DB" -eq 1 || -n "$METASTORE_SNAPSHOT_FILE" ]]
+        "$FORMAT_RANGER_POLICY_DB" -eq 1 || -n "$METASTORE_SNAPSHOT_FILE" ||
+        "$UPGRADE_METASTORE_SCHEMA" -eq 1 ]]
   then
     # Kill any processes that may be accessing postgres metastore. To be safe, this is
     # done before we make any changes to the config files.
@@ -500,6 +510,10 @@ reconfigure_test_cluster() {
 
   if [[ "$FORMAT_METASTORE" -eq 1 && -z "$METASTORE_SNAPSHOT_FILE" ]]; then
     CREATE_TEST_CONFIG_ARGS+=" -create_metastore"
+  fi
+
+  if [[ "$UPGRADE_METASTORE_SCHEMA" -eq 1 ]]; then
+    CREATE_TEST_CONFIG_ARGS+=" -upgrade_metastore_db"
   fi
 
   # Generate the Hadoop configs needed by Impala
