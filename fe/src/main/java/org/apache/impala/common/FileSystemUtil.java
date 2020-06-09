@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
 import org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem;
+import org.apache.hadoop.fs.ozone.OzoneFileSystem;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
@@ -394,10 +395,7 @@ public class FileSystemUtil {
    * Returns true iff the filesystem is a OzoneFileSystem.
    */
   public static boolean isOzoneFileSystem(FileSystem fs) {
-    // TODO once CDP becomes the default build version, this check can directly use
-    // org.apache.hadoop.fs.ozone.OzoneFileSystem, similar to the rest of the
-    // is*FileSystem() methods.
-    return fs.getUri().getScheme().equals("o3fs");
+    return fs instanceof OzoneFileSystem;
   }
 
   /**
