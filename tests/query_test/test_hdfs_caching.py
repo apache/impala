@@ -179,7 +179,6 @@ class TestHdfsCachingFallbackPath(ImpalaTestSuite):
 @SkipIfADLS.caching
 @SkipIfIsilon.caching
 @SkipIfLocal.caching
-@SkipIfCatalogV2.hdfs_caching_ddl_unsupported()
 class TestHdfsCachingDdl(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

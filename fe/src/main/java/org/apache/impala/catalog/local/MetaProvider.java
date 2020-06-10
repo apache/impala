@@ -30,6 +30,7 @@ import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.common.Pair;
@@ -128,6 +129,7 @@ public interface MetaProvider {
    * in order to perform concurrency control checks, etc.
    */
   interface TableMetaRef {
+    boolean isMarkedCached();
   }
 
   /**
@@ -147,7 +149,10 @@ public interface MetaProvider {
     ImmutableList<FileDescriptor> getFileDescriptors();
     byte[] getPartitionStats();
     boolean hasIncrementalStats();
+    boolean isMarkedCached();
   }
 
   public TValidWriteIdList getValidWriteIdList(TableMetaRef ref);
+
+  Iterable<HdfsCachePool> getHdfsCachePools();
 }

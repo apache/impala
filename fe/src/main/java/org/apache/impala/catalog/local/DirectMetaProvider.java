@@ -39,6 +39,7 @@ import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.FileMetadataLoader;
 import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
@@ -87,10 +88,16 @@ class DirectMetaProvider implements MetaProvider {
     }
   }
 
+  @Override
+  public Iterable<HdfsCachePool> getHdfsCachePools() {
+    throw new UnsupportedOperationException(
+        "HDFSCachePools are not supported in DirectMetaProvider");
+  }
 
   @Override
   public AuthorizationPolicy getAuthPolicy() {
-    throw new UnsupportedOperationException("not supported");
+    throw new UnsupportedOperationException(
+        "Authorization is not supported in DirectMetaProvider");
   }
 
   @Override
@@ -393,6 +400,12 @@ class DirectMetaProvider implements MetaProvider {
       throw new UnsupportedOperationException("Incremental stats not supported with " +
           "DirectMetaProvider implementation.");
     }
+
+    @Override
+    public boolean isMarkedCached() {
+      throw new UnsupportedOperationException("Hdfs caching not supported with " +
+          "DirectMetaProvider implementation");
+    }
   }
 
   private class TableMetaRefImpl implements TableMetaRef {
@@ -409,6 +422,12 @@ class DirectMetaProvider implements MetaProvider {
 
     private boolean isPartitioned() {
       return msTable_.getPartitionKeysSize() != 0;
+    }
+
+    @Override
+    public boolean isMarkedCached() {
+      throw new UnsupportedOperationException("Hdfs caching not supported with " +
+          "DirectMetaProvider implementation");
     }
   }
 

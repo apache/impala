@@ -1656,6 +1656,7 @@ public class HdfsTable extends Table implements FeFsTable {
           partInfo.setPartition_stats(part.getPartitionStatsCompressed());
         }
 
+        partInfo.setIs_marked_cached(part.isMarkedCached());
         resp.table_info.partitions.add(partInfo);
       }
     }
@@ -1678,6 +1679,9 @@ public class HdfsTable extends Table implements FeFsTable {
           sqlConstraints_.getForeignKeys());
       resp.table_info.setSql_constraints(sqlConstraints);
     }
+    // Publish the isMarkedCached_ marker so coordinators don't need to validate
+    // it again which requires additional HDFS RPCs.
+    resp.table_info.setIs_marked_cached(isMarkedCached_);
     return resp;
   }
 

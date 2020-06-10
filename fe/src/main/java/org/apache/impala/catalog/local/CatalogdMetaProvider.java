@@ -54,6 +54,7 @@ import org.apache.impala.catalog.CatalogDeltaLog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogObjectCache;
 import org.apache.impala.catalog.Function;
+import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.ImpaladCatalog.ObjectUpdateSequencer;
 import org.apache.impala.catalog.Principal;
@@ -328,6 +329,11 @@ public class CatalogdMetaProvider implements MetaProvider {
       new CatalogObjectCache<>();
   private AtomicReference<? extends AuthorizationChecker> authzChecker_;
 
+  // Cache of known HDFS cache pools. Allows for checking the existence
+  // of pools without hitting HDFS. This is _not_ "fetch-on-demand".
+  private final CatalogObjectCache<HdfsCachePool> hdfsCachePools_ =
+      new CatalogObjectCache<>(false);
+
   public CatalogdMetaProvider(TBackendGflags flags) {
     Preconditions.checkArgument(flags.isSetLocal_catalog_cache_expiration_s());
     Preconditions.checkArgument(flags.isSetLocal_catalog_cache_mb());
@@ -356,6 +362,11 @@ public class CatalogdMetaProvider implements MetaProvider {
 
   public CacheStats getCacheStats() {
     return cache_.stats();
+  }
+
+  @Override
+  public Iterable<HdfsCachePool> getHdfsCachePools() {
+    return hdfsCachePools_;
   }
 
   @Override
@@ -718,7 +729,7 @@ public class CatalogdMetaProvider implements MetaProvider {
             return new TableMetaRefImpl(
                 dbName, tableName, resp.table_info.hms_table, resp.object_version_number,
                 new SqlConstraints(primaryKeys, foreignKeys),
-                resp.table_info.valid_write_ids);
+                resp.table_info.valid_write_ids, resp.table_info.is_marked_cached);
            }
       });
     // The table list is populated based on tables in a given Db in catalogd. If a table
@@ -963,7 +974,7 @@ public class CatalogdMetaProvider implements MetaProvider {
       }
       PartitionMetadataImpl metaImpl = new PartitionMetadataImpl(msPart,
           ImmutableList.copyOf(fds), part.getPartition_stats(),
-          part.has_incremental_stats);
+          part.has_incremental_stats, part.is_marked_cached);
 
       checkResponse(partRef != null, req, "returned unexpected partition id %s", part.id);
 
@@ -1102,6 +1113,8 @@ public class CatalogdMetaProvider implements MetaProvider {
   public synchronized TUpdateCatalogCacheResponse updateCatalogCache(
       TUpdateCatalogCacheRequest req) {
     if (req.isSetCatalog_service_id()) {
+      // Requests from processing statestore updates won't have this. Only requests from
+      // DDLs will set this. See more details in ImpalaServer::ProcessCatalogUpdateResult.
       witnessCatalogServiceId(req.catalog_service_id);
     }
 
@@ -1111,6 +1124,7 @@ public class CatalogdMetaProvider implements MetaProvider {
     Long nextCatalogVersion = null;
 
     ObjectUpdateSequencer authObjectSequencer = new ObjectUpdateSequencer();
+    ObjectUpdateSequencer hdfsCachePoolSequencer = new ObjectUpdateSequencer();
 
     Pair<Boolean, ByteBuffer> update;
     while ((update = FeSupport.NativeGetNextCatalogObjectUpdate(req.native_iterator_ptr))
@@ -1137,6 +1151,16 @@ public class CatalogdMetaProvider implements MetaProvider {
 
       invalidateCacheForObject(obj);
 
+      if (obj.type == TCatalogObjectType.HDFS_CACHE_POOL) {
+        // HdfsCachePools have no dependency to each other. But we can't update
+        // hdfsCachePools_ directly since a new catalog service id (due to catalogd
+        // restart) will cause hdfsCachePools_ to be clear (see mode details in
+        // witnessCatalogServiceId()). So we have to deal with HDFS_CACHE_POOL objects
+        // after the CATALOG object.
+        hdfsCachePoolSequencer.add(obj, isDelete);
+        continue;
+      }
+
       // The sequencing of updates to authorization objects is important since they
       // may be cross-referential. So, just add them to the sequencer which ensures
       // we handle them in the right order later.
@@ -1144,6 +1168,7 @@ public class CatalogdMetaProvider implements MetaProvider {
           obj.type == TCatalogObjectType.PRIVILEGE ||
           obj.type == TCatalogObjectType.AUTHZ_CACHE_INVALIDATION) {
         authObjectSequencer.add(obj, isDelete);
+        continue;
       }
 
       // Handle CATALOG objects. These are sent only via the updates published via
@@ -1160,8 +1185,21 @@ public class CatalogdMetaProvider implements MetaProvider {
           // Detected a new reset() finishes in Catalogd, clear the cache in case some
           // tables are skipped in this topic update.
           cache_.invalidateAll();
+          // Don't need to clear hdfsCachePools_ if this comes from a catalogd restart,
+          // because we already clear it in witnessCatalogServiceId().
+          // Shouldn't clear hdfsCachePools_ if this comes from a global invalidation,
+          // because HdfsCachePool updates may already come in the previous statestore
+          // update (see how the version lock is held in CatalogServiceCatalog.reset()).
+          // Clear hdfsCachePools_ will also clear them.
         }
       }
+    }
+
+    for (TCatalogObject obj : hdfsCachePoolSequencer.getUpdatedObjects()) {
+      updateHdfsCachePools(obj, /*isDelete=*/false);
+    }
+    for (TCatalogObject obj : hdfsCachePoolSequencer.getDeletedObjects()) {
+      updateHdfsCachePools(obj, /*isDelete=*/true);
     }
 
     for (TCatalogObject obj : authObjectSequencer.getUpdatedObjects()) {
@@ -1191,6 +1229,29 @@ public class CatalogdMetaProvider implements MetaProvider {
       return new TUpdateCatalogCacheResponse(catalogServiceId_,
           lastResetCatalogVersion_.get() + 1, lastSeenCatalogVersion_.get());
     }
+  }
+
+  private void updateHdfsCachePools(TCatalogObject obj, boolean isDelete) {
+    Preconditions.checkState(obj.type == TCatalogObjectType.HDFS_CACHE_POOL);
+    String poolName = obj.getCache_pool().getPool_name();
+    if (isDelete) {
+      HdfsCachePool existingItem = hdfsCachePools_.get(poolName);
+      if (existingItem != null
+          && existingItem.getCatalogVersion() <= obj.getCatalog_version()) {
+        hdfsCachePools_.remove(poolName);
+        LOG.trace("Removed HdfsCachePool {}", poolName);
+      }
+      return;
+    }
+    HdfsCachePool cachePool = new HdfsCachePool(obj.getCache_pool());
+    cachePool.setCatalogVersion(obj.getCatalog_version());
+    if (hdfsCachePools_.add(cachePool)) {
+      LOG.trace("Added HdfsCachePool name={}, version={}", poolName,
+          obj.getCatalog_version());
+      return;
+    }
+    LOG.warn("Ignored stale HdfsCachePool update: name={}, version={}", poolName,
+        obj.getCatalog_version());
   }
 
   private void updateAuthPolicy(TCatalogObject obj, boolean isDelete) {
@@ -1260,6 +1321,10 @@ public class CatalogdMetaProvider implements MetaProvider {
         }
         catalogServiceId_ = serviceId;
         cache_.invalidateAll();
+        // Clear cached items from the previous catalogd instance. Otherwise, we'll
+        // ignore new updates from the new catalogd instance since they have lower
+        // versions.
+        hdfsCachePools_.clear();
         // TODO(todd): we probably need to invalidate the auth policy too.
         // we are probably better off detecting this at a higher level and
         // reinstantiating the metaprovider entirely, similar to how ImpaladCatalog
@@ -1402,13 +1467,15 @@ public class CatalogdMetaProvider implements MetaProvider {
     private final ImmutableList<FileDescriptor> fds_;
     private final byte[] partitionStats_;
     private final boolean hasIncrementalStats_;
+    private final boolean isMarkedCached_;
 
     public PartitionMetadataImpl(Partition msPartition, ImmutableList<FileDescriptor> fds,
-        byte[] partitionStats, boolean hasIncrementalStats) {
+        byte[] partitionStats, boolean hasIncrementalStats, boolean isMarkedCached) {
       this.msPartition_ = Preconditions.checkNotNull(msPartition);
       this.fds_ = fds;
       this.partitionStats_ = partitionStats;
       this.hasIncrementalStats_ = hasIncrementalStats;
+      this.isMarkedCached_ = isMarkedCached;
     }
 
     /**
@@ -1423,7 +1490,7 @@ public class CatalogdMetaProvider implements MetaProvider {
         fds.add(fd.cloneWithNewHostIndex(origIndex.getList(), dstIndex));
       }
       return new PartitionMetadataImpl(msPartition_, ImmutableList.copyOf(fds),
-          partitionStats_, hasIncrementalStats_);
+          partitionStats_, hasIncrementalStats_, isMarkedCached_);
     }
 
     @Override
@@ -1441,6 +1508,9 @@ public class CatalogdMetaProvider implements MetaProvider {
 
     @Override
     public boolean hasIncrementalStats() { return hasIncrementalStats_; }
+
+    @Override
+    public boolean isMarkedCached() { return isMarkedCached_; }
   }
 
   /**
@@ -1473,21 +1543,30 @@ public class CatalogdMetaProvider implements MetaProvider {
      */
     private final TValidWriteIdList validWriteIds_;
 
+    /**
+     * True if this table's is marked as cached by hdfs caching. See comments in
+     * LocalFsTable.
+     */
+    private final boolean isMarkedCached_;
+
     public TableMetaRefImpl(String dbName, String tableName,
         Table msTable, long catalogVersion, SqlConstraints sqlConstraints,
-        TValidWriteIdList validWriteIds) {
+        TValidWriteIdList validWriteIds, boolean isMarkedCached) {
       this.dbName_ = dbName;
       this.tableName_ = tableName;
       this.msTable_ = msTable;
       this.catalogVersion_ = catalogVersion;
       this.sqlConstraints_ = sqlConstraints;
       this.validWriteIds_ = validWriteIds;
+      this.isMarkedCached_ = isMarkedCached;
     }
 
     @Override
     public String toString() {
       return String.format("TableMetaRef %s.%s@%d", dbName_, tableName_, catalogVersion_);
     }
+
+    public boolean isMarkedCached() { return isMarkedCached_; }
   }
 
   /**

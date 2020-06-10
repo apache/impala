@@ -445,7 +445,6 @@ class TestDdlStatements(TestDdlBase):
 
   @SkipIf.not_hdfs
   @SkipIfLocal.hdfs_client
-  @SkipIfCatalogV2.hdfs_caching_ddl_unsupported()
   @UniqueDatabase.parametrize(sync_ddl=True, num_dbs=2)
   def test_alter_table_hdfs_caching(self, vector, unique_database):
     self.run_test_case('QueryTest/alter-table-hdfs-caching', vector,

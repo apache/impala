@@ -59,15 +59,21 @@ public class LocalFsPartition implements FeFsPartition {
   // True if partitionStats_ has intermediate_col_stats populated.
   private final boolean hasIncrementalStats_;
 
+  // True if this partition is marked as cached by hdfs caching. Does not necessarily
+  // mean the data is cached. Only used in analyzing DDLs or constructing results of
+  // SHOW TABLE STATS / SHOW PARTITIONS.
+  private final boolean isMarkedCached_;
+
   public LocalFsPartition(LocalFsTable table, LocalPartitionSpec spec,
       Partition msPartition, ImmutableList<FileDescriptor> fileDescriptors,
-      byte [] partitionStats, boolean hasIncrementalStats) {
+      byte [] partitionStats, boolean hasIncrementalStats, boolean isMarkedCached) {
     table_ = Preconditions.checkNotNull(table);
     spec_ = Preconditions.checkNotNull(spec);
     msPartition_ = Preconditions.checkNotNull(msPartition);
     fileDescriptors_ = fileDescriptors;
     partitionStats_ = partitionStats;
     hasIncrementalStats_ = hasIncrementalStats;
+    isMarkedCached_ = isMarkedCached;
   }
 
   @Override
@@ -137,14 +143,12 @@ public class LocalFsPartition implements FeFsPartition {
 
   @Override
   public boolean isCacheable() {
-    // TODO Auto-generated method stub
-    return false;
+    return FileSystemUtil.isPathCacheable(getLocationPath());
   }
 
   @Override
   public boolean isMarkedCached() {
-    // TODO Auto-generated method stub
-    return false;
+    return isMarkedCached_;
   }
 
   @Override

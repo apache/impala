@@ -70,6 +70,7 @@ import com.google.common.base.Preconditions;
 public class LocalCatalog implements FeCatalog {
   private final MetaProvider metaProvider_;
   private Map<String, FeDb> dbs_ = new HashMap<>();
+  private Map<String, HdfsCachePool> hdfsCachePools_ = null;
   private String nullPartitionKeyValue_;
   private final String defaultKuduMasterHosts_;
 
@@ -213,7 +214,16 @@ public class LocalCatalog implements FeCatalog {
 
   @Override
   public HdfsCachePool getHdfsCachePool(String poolName) {
-    throw new UnsupportedOperationException("TODO");
+    loadHdfsCachePools();
+    return hdfsCachePools_.get(poolName);
+  }
+
+  private void loadHdfsCachePools() {
+    if (hdfsCachePools_ != null) return;
+    hdfsCachePools_ = new HashMap<>();
+    for (HdfsCachePool pool : metaProvider_.getHdfsCachePools()) {
+      hdfsCachePools_.put(pool.getName(), pool);
+    }
   }
 
   @Override
