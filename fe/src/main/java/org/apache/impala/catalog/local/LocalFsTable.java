@@ -122,6 +122,13 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
    */
   private final String avroSchema_;
 
+  /**
+   * True if this table is marked as cached by hdfs caching. Does not necessarily mean
+   * the data is cached or that all/any partitions are cached. Only used in analyzing
+   * DDLs.
+   */
+  private final boolean isMarkedCached_;
+
   public static LocalFsTable load(LocalDb db, Table msTbl, TableMetaRef ref) {
     String fullName = msTbl.getDbName() + "." + msTbl.getTableName();
 
@@ -173,6 +180,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
         FeFsTable.DEFAULT_NULL_COLUMN_VALUE;
 
     avroSchema_ = explicitAvroSchema;
+    isMarkedCached_ = (ref != null && ref.isMarkedCached());
   }
 
   private static String loadAvroSchema(Table msTbl) throws AnalysisException {
@@ -196,23 +204,33 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
         /*explicitAvroSchema=*/null);
   }
 
-
-  @Override
+  @Override // FeFsTable
   public boolean isCacheable() {
-    // TODO Auto-generated method stub
-    return false;
+    if (!isLocationCacheable()) return false;
+    if (!isMarkedCached() && getNumClusteringCols() > 0) {
+      // Check if all partitions are cacheable.
+      // TODO: Currently we load all partitions including their file metadata in order to
+      //  detect whether they are cacheable. This is inefficient since only the partition
+      //  locations are needed. Consider decoupling msPartition and file descriptors in
+      //  LocalFsPartition so we can load the msPartition part individually.
+      loadPartitionSpecs();
+      for (FeFsPartition partition : loadPartitions(partitionSpecs_.keySet())) {
+        if (!partition.isCacheable()) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
-  @Override
+  @Override // FeFsTable
   public boolean isLocationCacheable() {
-    // TODO Auto-generated method stub
-    return false;
+    return FileSystemUtil.isPathCacheable(new Path(getLocation()));
   }
 
   @Override
   public boolean isMarkedCached() {
-    // TODO Auto-generated method stub
-    return false;
+    return isMarkedCached_;
   }
 
   @Override
@@ -365,7 +383,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
         this, CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);
     LocalFsPartition prototypePartition = new LocalFsPartition(
         this, spec, protoMsPartition, /*fileDescriptors=*/null, /*partitionStats=*/null,
-        /*hasIncrementalStats=*/false);
+        /*hasIncrementalStats=*/false, /*isMarkedCached=*/false);
     return prototypePartition;
   }
 
@@ -440,7 +458,8 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
       }
 
       LocalFsPartition part = new LocalFsPartition(this, spec, p.getHmsPartition(),
-          p.getFileDescriptors(), p.getPartitionStats(), p.hasIncrementalStats());
+          p.getFileDescriptors(), p.getPartitionStats(), p.hasIncrementalStats(),
+          p.isMarkedCached());
       ret.add(part);
     }
     return ret;

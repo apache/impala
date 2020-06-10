@@ -745,10 +745,12 @@ public class CatalogServiceCatalog extends Catalog {
         min.setFn(fnObject);
         break;
       case DATA_SOURCE:
-      case HDFS_CACHE_POOL:
         // These are currently not cached by v2 impalad.
         // TODO(todd): handle these items.
         return null;
+      case HDFS_CACHE_POOL:
+        // HdfsCachePools just contain the name strings. Publish them as minimal objects.
+        return obj;
       default:
         throw new AssertionError("Unexpected catalog object type: " + obj.type);
       }

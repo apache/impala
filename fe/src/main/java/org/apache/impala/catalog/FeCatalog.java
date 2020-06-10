@@ -74,7 +74,6 @@ public interface FeCatalog {
   // TODO(todd): introduce FeFunction
   public Function getFunction(Function desc, Function.CompareMode mode);
 
-  // TODO(todd): introduce FeFsCachePool
   /** @see Catalog#getHdfsCachePool(String) */
   public HdfsCachePool getHdfsCachePool(String poolName);
 

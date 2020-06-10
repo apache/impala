@@ -358,6 +358,11 @@ struct TPartialPartitionInfo {
   // TTableInfoSelector. Incremental stats data can be fetched by setting
   // 'want_partition_stats' in TTableInfoSelector.
   6: optional bool has_incremental_stats
+
+  // Set to true if the partition is marked as cached by hdfs caching. Does not
+  // necessarily mean the data is cached. Set when 'want_partition_metadata' is true in
+  // TTableInfoSelector.
+  7: optional bool is_marked_cached
 }
 
 // Returned information about a Table, as selected by TTableInfoSelector.
@@ -391,6 +396,10 @@ struct TPartialTableInfo {
 
   // Valid write id list of ACID table.
   9: optional CatalogObjects.TValidWriteIdList valid_write_ids;
+
+  // Set if this table is marked as cached by hdfs caching. Does not necessarily mean the
+  // data is cached or that all/any partitions are cached. Only used in analyzing DDLs.
+  10: optional bool is_marked_cached
 }
 
 struct TBriefTableMeta {

@@ -253,13 +253,6 @@ class SkipIfCatalogV2:
       IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
       reason="IMPALA-7131: data sources not supported.")
 
-  # TODO: IMPALA-7538: add support or update tests to reflect expected behaviour.
-  @classmethod
-  def hdfs_caching_ddl_unsupported(self):
-    return pytest.mark.skipif(
-      IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
-      reason="IMPALA-7538: HDFS caching DDL not supported.")
-
   # TODO: IMPALA-8489: fix this bug.
   @classmethod
   def impala_8489(self):
