@@ -805,7 +805,11 @@ void Webserver::RenderUrlWithTemplate(const struct sq_connection* connection,
     // Callbacks may optionally be rendered as a text-only, pretty-printed Json document
     // (mostly for debugging or integration with third-party tools).
     StringBuffer strbuf;
+    // Write the JSON out with human-readable formatting. The settings are tweaked to
+    // reduce extraneous whitespace characters, compared to the default formatting.
     PrettyWriter<StringBuffer> writer(strbuf);
+    writer.SetIndent('\t', 1);
+    writer.SetFormatOptions(kFormatSingleLineArray);
     document.Accept(writer);
     (*output) << strbuf.GetString();
     *content_type = JSON;
