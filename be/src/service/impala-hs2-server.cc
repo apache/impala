@@ -1042,8 +1042,9 @@ void ImpalaServer::GetRuntimeProfile(
   if (request.format == TRuntimeProfileFormat::THRIFT) {
     return_val.__set_thrift_profile(thrift_profile);
   } else if (request.format == TRuntimeProfileFormat::JSON) {
+    // Serialize to JSON without extra whitespace/formatting.
     rapidjson::StringBuffer sb;
-    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(sb);
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
     json_profile.Accept(writer);
     ss << sb.GetString();
     return_val.__set_profile(ss.str());
