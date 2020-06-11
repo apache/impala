@@ -301,6 +301,8 @@ class HdfsTableSink : public DataSink {
   RuntimeProfile::Counter* hdfs_write_timer_;
   /// Time spent compressing data
   RuntimeProfile::Counter* compress_timer_;
+  /// Will the output of this sink be used for query results
+  const bool is_result_sink_;
 };
 
 }

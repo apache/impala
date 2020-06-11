@@ -88,7 +88,8 @@ HdfsTableSink::HdfsTableSink(TDataSinkId sink_id, const HdfsTableSinkConfig& sin
     sort_columns_(hdfs_sink.sort_columns),
     sorting_order_((TSortingOrder::type)hdfs_sink.sorting_order),
     current_clustered_partition_(nullptr),
-    partition_key_exprs_(sink_config.partition_key_exprs_) {
+    partition_key_exprs_(sink_config.partition_key_exprs_),
+    is_result_sink_(hdfs_sink.is_result_sink) {
   if (hdfs_sink.__isset.write_id) {
     write_id_ = hdfs_sink.write_id;
     DCHECK_GT(write_id_, 0);
@@ -739,6 +740,8 @@ void HdfsTableSink::Close(RuntimeState* state) {
 
 bool HdfsTableSink::ShouldSkipStaging(RuntimeState* state, OutputPartition* partition) {
   if (IsTransactional()) return true;
+  // We skip staging if we are writing query results
+  if (is_result_sink_) return true;
   return (IsS3APath(partition->final_hdfs_file_name_prefix.c_str()) && !overwrite_ &&
       state->query_options().s3_skip_insert_staging);
 }

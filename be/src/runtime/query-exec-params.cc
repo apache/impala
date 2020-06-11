@@ -49,13 +49,30 @@ QueryExecParams::QueryExecParams(const UniqueIdPB& query_id,
     const TExecRequest& exec_request, const QuerySchedulePB& query_schedule)
   : query_id_(query_id), exec_request_(exec_request), query_schedule_(query_schedule) {}
 
-const TPlanFragment* QueryExecParams::GetCoordFragment() const {
+bool QueryExecParams::HasResultSink(const TPlanFragment* fragment) const {
+  return fragment != nullptr &&
+      fragment->output_sink.type == TDataSinkType::TABLE_SINK &&
+      fragment->output_sink.table_sink.type == TTableSinkType::HDFS &&
+      fragment->output_sink.table_sink.hdfs_table_sink.is_result_sink;
+}
+
+bool QueryExecParams::HasResultSink() const {
+  return HasResultSink(GetCoordFragmentImpl());
+}
+
+const TPlanFragment* QueryExecParams::GetCoordFragmentImpl() const {
   // Only have coordinator fragment for statements that return rows.
   if (query_exec_request().stmt_type != TStmtType::QUERY) return nullptr;
   DCHECK_GE(query_exec_request().plan_exec_info.size(), 1);
   DCHECK_GE(query_exec_request().plan_exec_info[0].fragments.size(), 1);
   const TPlanFragment* fragment = &query_exec_request().plan_exec_info[0].fragments[0];
   DCHECK_EQ(fragment->partition.type, TPartitionType::UNPARTITIONED);
+  return fragment;
+}
+
+const TPlanFragment* QueryExecParams::GetCoordFragment() const {
+  const TPlanFragment* fragment = GetCoordFragmentImpl();
+  if (HasResultSink(fragment)) return nullptr;
   return fragment;
 }
 

@@ -87,6 +87,9 @@ struct THdfsTableSink {
   // Sorting order. If not lexical, the backend should not populate the
   // RowGroup::sorting_columns list in parquet files.
   7: required Types.TSortingOrder sorting_order
+
+  // Indicates that this HdfsTableSink is writing query results
+  8: optional bool is_result_sink = false;
 }
 
 // Structure to encapsulate specific options that are passed down to the KuduTableSink

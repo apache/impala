@@ -62,6 +62,9 @@ public class HdfsTableSink extends TableSink {
   // be opened, written, and closed one by one.
   protected final boolean inputIsClustered_;
 
+  // Indicates that this sink is being used to write query results
+  protected final boolean isResultSink_;
+
   private static final Set<HdfsFileFormat> SUPPORTED_FILE_FORMATS = ImmutableSet.of(
       HdfsFileFormat.PARQUET, HdfsFileFormat.TEXT, HdfsFileFormat.RC_FILE,
       HdfsFileFormat.SEQUENCE_FILE, HdfsFileFormat.AVRO, HdfsFileFormat.ICEBERG);
@@ -83,7 +86,7 @@ public class HdfsTableSink extends TableSink {
   public HdfsTableSink(FeTable targetTable, List<Expr> partitionKeyExprs,
       List<Expr> outputExprs, boolean overwrite, boolean inputIsClustered,
       Pair<List<Integer>, TSortingOrder> sortProperties, long writeId,
-      int maxTableSinks) {
+      int maxTableSinks, boolean isResultSink) {
     super(targetTable, Op.INSERT, outputExprs);
     Preconditions.checkState(targetTable instanceof FeFsTable);
     partitionKeyExprs_ = partitionKeyExprs;
@@ -93,6 +96,7 @@ public class HdfsTableSink extends TableSink {
     sortingOrder_ = sortProperties.second;
     writeId_ = writeId;
     maxHdfsSinks_ = maxTableSinks;
+    isResultSink_ = isResultSink;
   }
 
   @Override
@@ -215,6 +219,7 @@ public class HdfsTableSink extends TableSink {
     }
     hdfsTableSink.setSort_columns(sortColumns_);
     hdfsTableSink.setSorting_order(sortingOrder_);
+    hdfsTableSink.setIs_result_sink(isResultSink_);
     if (writeId_ != -1) hdfsTableSink.setWrite_id(writeId_);
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
         TTableSinkType.HDFS, sinkOp_.toThrift());
@@ -230,9 +235,16 @@ public class HdfsTableSink extends TableSink {
 
   @Override
   public void collectExprs(List<Expr> exprs) {
-    // Avoid adding any partition exprs redundantly.
     if (!(targetTable_ instanceof FeIcebergTable)) exprs.addAll(partitionKeyExprs_);
-    exprs.addAll(outputExprs_.subList(0, targetTable_.getNonClusteringColumns().size()));
+    if (isResultSink_) {
+      // It is expected outputExprs_ is fully populated with the expected result schema
+      // when writing query results
+      exprs.addAll(outputExprs_);
+    } else {
+      // Avoid adding any partition exprs redundantly.
+      exprs.addAll(outputExprs_.subList(0,
+          targetTable_.getNonClusteringColumns().size()));
+    }
   }
 
   /**

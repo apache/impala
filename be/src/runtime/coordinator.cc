@@ -792,6 +792,28 @@ void Coordinator::HandleExecStateTransition(
   finalized_.Set(true);
 }
 
+Status Coordinator::FinalizeResultSink() {
+  // All instances must have reported their final statuses before finalization, which is a
+  // post-condition of Wait. Result sink file clean up is the responsibility of the
+  // external frontend implementation.
+  DCHECK(has_called_wait_.Load());
+  VLOG_QUERY << "Finalizing result sink: " << PrintId(query_id());
+  SCOPED_TIMER(finalization_timer_);
+  RETURN_IF_ERROR(UpdateExecState(Status::OK(), nullptr, FLAGS_hostname));
+
+  HdfsTableDescriptor* hdfs_table;
+  DCHECK(query_ctx().__isset.desc_tbl_serialized);
+  // When a query has a result sink, it is explicitly assumed that the table descriptor
+  // for id = 0 is a pseudo-table describing the location in which to write results.
+  const TableId result_sink_table_id = 0;
+  RETURN_IF_ERROR(DescriptorTbl::CreateHdfsTblDescriptor(query_ctx().desc_tbl_serialized,
+        result_sink_table_id, obj_pool(), &hdfs_table));
+  DCHECK(hdfs_table != nullptr)
+    << "Result Sink target table not known in descriptor table";
+  hdfs_table->ReleaseResources();
+  return Status::OK();
+}
+
 Status Coordinator::FinalizeHdfsDml() {
   // All instances must have reported their final statuses before finalization, which is a
   // post-condition of Wait. If the query was not successful, still try to clean up the
@@ -866,7 +888,7 @@ Status Coordinator::Wait() {
   if (has_called_wait_.Load()) return Status::OK();
   has_called_wait_.Store(true);
 
-  if (stmt_type_ == TStmtType::QUERY) {
+  if (stmt_type_ == TStmtType::QUERY && !exec_params_.HasResultSink()) {
     DCHECK(coord_instance_ != nullptr);
     RETURN_IF_ERROR(UpdateExecState(coord_instance_->WaitForOpen(),
         &coord_instance_->runtime_state()->fragment_instance_id(), FLAGS_hostname));
@@ -883,14 +905,19 @@ Status Coordinator::Wait() {
     }
     return Status::OK();
   }
-  DCHECK_EQ(stmt_type_, TStmtType::DML);
+  DCHECK(stmt_type_ == TStmtType::DML ||
+      (stmt_type_ == TStmtType::QUERY && exec_params_.HasResultSink()));
   // DML finalization can only happen when all backends have completed all side-effects
-  // and reported relevant state.
+  // and reported relevant state. We also wait for backends to complete if we are writing
+  // results to a filesystem.
   WaitForBackends();
+
   if (finalize_params() != nullptr) {
-    RETURN_IF_ERROR(UpdateExecState(
-            FinalizeHdfsDml(), nullptr, FLAGS_hostname));
+    RETURN_IF_ERROR(UpdateExecState(FinalizeHdfsDml(), nullptr, FLAGS_hostname));
+  } else if (exec_params_.HasResultSink()) {
+    RETURN_IF_ERROR(UpdateExecState(FinalizeResultSink(), nullptr, FLAGS_hostname));
   }
+
   // DML requests are finished at this point.
   RETURN_IF_ERROR(SetNonErrorTerminalState(ExecState::RETURNED_RESULTS));
   query_profile_->AddInfoString(
