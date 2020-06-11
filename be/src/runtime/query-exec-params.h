@@ -54,6 +54,9 @@ class QueryExecParams {
   /// Return the coordinator fragment, or nullptr if there isn't one.
   const TPlanFragment* GetCoordFragment() const;
 
+  /// Returns true if the the query has a result sink
+  bool HasResultSink() const;
+
   /// Return the total number of instances across all fragments.
   int GetNumFragmentInstances() const;
 
@@ -70,6 +73,10 @@ class QueryExecParams {
 
   /// Owned by the ClientRwquestState and has query lifetime.
   const QuerySchedulePB& query_schedule_;
+
+  const TPlanFragment* GetCoordFragmentImpl() const;
+
+  bool HasResultSink(const TPlanFragment* fragment) const;
 
   /// Constructor used for testing only. Does not initialize 'fragments_'.
   QueryExecParams(const UniqueIdPB& query_id, const TExecRequest& exec_request,

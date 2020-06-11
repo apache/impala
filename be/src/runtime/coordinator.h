@@ -544,6 +544,12 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// finishing the INSERT in flight.
   Status FinalizeHdfsDml() WARN_UNUSED_RESULT;
 
+  /// Perform any post-query cleanup required for Result Sink writing. Called by Wait()
+  /// only after all fragment instances have returned. It is the responsibility of an
+  /// external frontend to clean up the Result Sink location on success or error of the
+  /// running query.
+  Status FinalizeResultSink() WARN_UNUSED_RESULT;
+
   /// Helper for Exec(). Populates backend_states_, starts query execution at all
   /// backends in parallel, and blocks until startup completes.
   Status StartBackendExec();

@@ -102,7 +102,7 @@ public abstract class TableSink extends DataSink {
       List<Integer> referencedColumns, boolean overwrite,
       boolean inputIsClustered, Pair<List<Integer>, TSortingOrder> sortProperties) {
     return create(table, sinkAction, partitionKeyExprs, outputExprs, referencedColumns,
-        overwrite, inputIsClustered, sortProperties, -1, 0);
+        overwrite, inputIsClustered, sortProperties, -1, 0, false);
   }
 
   /**
@@ -113,6 +113,16 @@ public abstract class TableSink extends DataSink {
       List<Integer> referencedColumns, boolean overwrite, boolean inputIsClustered,
       Pair<List<Integer>, TSortingOrder> sortProperties, long writeId,
       int maxTableSinks) {
+    return create(table, sinkAction, partitionKeyExprs, outputExprs, referencedColumns,
+        overwrite, inputIsClustered, sortProperties, writeId, maxTableSinks, false);
+  }
+
+  public static TableSink create(FeTable table, Op sinkAction,
+      List<Expr> partitionKeyExprs, List<Expr> outputExprs,
+      List<Integer> referencedColumns,
+      boolean overwrite, boolean inputIsClustered,
+      Pair<List<Integer>, TSortingOrder> sortProperties, long writeId,
+      int maxTableSinks, boolean isResultSink) {
     Preconditions.checkNotNull(partitionKeyExprs);
     Preconditions.checkNotNull(referencedColumns);
     Preconditions.checkNotNull(sortProperties.first);
@@ -122,7 +132,7 @@ public abstract class TableSink extends DataSink {
       // Referenced columns don't make sense for an Hdfs table.
       Preconditions.checkState(referencedColumns.isEmpty());
       return new HdfsTableSink(table, partitionKeyExprs,outputExprs, overwrite,
-          inputIsClustered, sortProperties, writeId, maxTableSinks);
+          inputIsClustered, sortProperties, writeId, maxTableSinks, isResultSink);
     } else if (table instanceof FeHBaseTable) {
       // HBase only supports inserts.
       Preconditions.checkState(sinkAction == Op.INSERT);
