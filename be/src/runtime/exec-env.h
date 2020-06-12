@@ -118,9 +118,6 @@ class ExecEnv {
 
   KrpcDataStreamMgr* stream_mgr() { return stream_mgr_.get(); }
 
-  ImpalaBackendClientCache* impalad_client_cache() {
-    return impalad_client_cache_.get();
-  }
   CatalogServiceClientCache* catalogd_client_cache() {
     return catalogd_client_cache_.get();
   }
@@ -187,7 +184,6 @@ class ExecEnv {
   boost::scoped_ptr<Scheduler> scheduler_;
   boost::scoped_ptr<AdmissionController> admission_controller_;
   boost::scoped_ptr<StatestoreSubscriber> statestore_subscriber_;
-  boost::scoped_ptr<ImpalaBackendClientCache> impalad_client_cache_;
   boost::scoped_ptr<CatalogServiceClientCache> catalogd_client_cache_;
   boost::scoped_ptr<HBaseTableFactory> htable_factory_;
   boost::scoped_ptr<io::DiskIoMgr> disk_io_mgr_;

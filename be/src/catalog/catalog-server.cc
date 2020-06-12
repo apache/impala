@@ -73,6 +73,7 @@ DEFINE_int64_hidden(catalog_partial_fetch_rpc_queue_timeout_s, LLONG_MAX, "Maxim
     "(in seconds) a partial catalog object fetch RPC spends in the queue waiting "
     "to run. Must be set to a value greater than zero.");
 
+DECLARE_string(debug_actions);
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_int32(state_store_port);
@@ -126,6 +127,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
   void ResetMetadata(TResetMetadataResponse& resp, const TResetMetadataRequest& req)
       override {
     VLOG_RPC << "ResetMetadata(): request=" << ThriftDebugString(req);
+    DebugActionNoFail(FLAGS_debug_actions, "RESET_METADATA_DELAY");
     Status status = catalog_server_->catalog()->ResetMetadata(req, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     TStatus thrift_status;
