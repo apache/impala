@@ -277,7 +277,23 @@ public class CastExpr extends Expr {
 
   @Override
   protected float computeEvalCost() {
-    return getChild(0).hasCost() ? getChild(0).getCost() + CAST_COST : UNKNOWN_COST;
+    // By default, assume that casting requires some non-trivial logic - i.e. is similar
+    // to calling an arbitrary function.
+    float castCost = FUNCTION_CALL_COST;
+    Type inType = children_.get(0).getType();
+    if ((type_.isVarchar() || type_.getPrimitiveType() == PrimitiveType.STRING) &&
+        (inType.isVarchar() || inType.getPrimitiveType() == PrimitiveType.STRING)) {
+      // Casting between variable-length string types requires at most adjusting the
+      // length field.
+      castCost = ARITHMETIC_OP_COST;
+    } else if (
+        (type_.isFloatingPointType() || type_.isIntegerType() || type_.isBoolean()) &&
+        (inType.isFloatingPointType() || inType.isIntegerType() ||  inType.isBoolean())) {
+      // Casting between machine primitive types can be done cheaply, e.g. with a
+      // machine instruction or two.
+      castCost = ARITHMETIC_OP_COST;
+    }
+    return getChild(0).hasCost() ? getChild(0).getCost() + castCost : UNKNOWN_COST;
   }
 
   private void analyze() throws AnalysisException {

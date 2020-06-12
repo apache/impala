@@ -83,7 +83,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public static final float ARITHMETIC_OP_COST = 1;
   public static final float BINARY_PREDICATE_COST = 1;
   public static final float VAR_LEN_BINARY_PREDICATE_COST = 5;
-  public static final float CAST_COST = 1;
   public static final float COMPOUND_PREDICATE_COST = 1;
   public static final float FUNCTION_CALL_COST = 10;
   public static final float IS_NOT_EMPTY_COST = 1;

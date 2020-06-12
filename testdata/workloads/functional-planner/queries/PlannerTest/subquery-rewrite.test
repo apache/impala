@@ -2366,7 +2366,7 @@ PLAN-ROOT SINK
 |
 02:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: id = id
-|  other join predicates: a.tinyint_col >= t.tinyint_col, t.float_col >= a.float_col, a.smallint_col <= t.int_col, a.tinyint_col <= t.smallint_col, t.float_col <= a.double_col, a.double_col <= CAST(t.string_col AS INT), t.string_col >= a.string_col, a.double_col >= round(acos(t.float_col), 2)
+|  other join predicates: a.tinyint_col >= t.tinyint_col, t.float_col >= a.float_col, a.smallint_col <= t.int_col, a.tinyint_col <= t.smallint_col, t.float_col <= a.double_col, t.string_col >= a.string_col, a.double_col <= CAST(t.string_col AS INT), a.double_col >= round(acos(t.float_col), 2)
 |  runtime filters: RF000 <- id
 |  row-size=56B cardinality=730
 |

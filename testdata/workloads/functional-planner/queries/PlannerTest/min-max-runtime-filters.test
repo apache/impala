@@ -90,9 +90,9 @@ PLAN-ROOT SINK
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
 02:HASH JOIN [INNER JOIN]
-|  hash predicates: CAST(a.float_col AS DOUBLE) = b.double_col, CAST(a.int_col AS SMALLINT) = b.smallint_col, a.string_col = b.timestamp_col, a.tinyint_col = b.bigint_col
-|  fk/pk conjuncts: a.string_col = b.timestamp_col, a.tinyint_col = b.bigint_col
-|  runtime filters: RF007[min_max] <- b.bigint_col
+|  hash predicates: CAST(a.float_col AS DOUBLE) = b.double_col, CAST(a.int_col AS SMALLINT) = b.smallint_col, a.tinyint_col = b.bigint_col, a.string_col = b.timestamp_col
+|  fk/pk conjuncts: a.tinyint_col = b.bigint_col, a.string_col = b.timestamp_col
+|  runtime filters: RF006[min_max] <- b.bigint_col
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=60B cardinality=1.46K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -103,7 +103,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN KUDU [functional_kudu.alltypes a]
-   runtime filters: RF007[min_max] -> a.tinyint_col
+   runtime filters: RF006[min_max] -> a.tinyint_col
    mem-estimate=3.00MB mem-reservation=0B thread-reservation=1
    tuple-ids=0 row-size=26B cardinality=7.30K
    in pipelines: 00(GETNEXT)
@@ -147,7 +147,7 @@ PLAN-ROOT SINK
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [functional_parquet.alltypes b]
-|     HDFS partitions=24/24 files=24 size=200.33KB
+|     HDFS partitions=24/24 files=24 size=201.73KB
 |     runtime filters: RF000[bloom] -> b.int_col
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
