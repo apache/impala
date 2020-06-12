@@ -2805,7 +2805,10 @@ Status ImpalaServer::StartShutdown(
     }
   }
   LOG(INFO) << "Shutdown complete, going down.";
-  exit(0);
+  // Use _exit here instead since exit() does cleanup which interferes with the shutdown
+  // signal handler thread causing a data race.
+  ShutdownLogging();
+  _exit(0);
 }
 
 // This should never be inlined to prevent it potentially being optimized, e.g.
