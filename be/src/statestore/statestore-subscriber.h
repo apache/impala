@@ -151,6 +151,10 @@ class StatestoreSubscriber {
   std::unique_ptr<Thread> recovery_mode_thread_;
 
   /// statestore client cache - only one client is ever used. Initialized in constructor.
+  /// The StatestoreClientCache is created with num_retries = 1 and wait_ms = 0.
+  /// Connections are still retried, but the retry mechanism is driven by DoRpcWithRetry.
+  /// Clients should always use DoRpcWithRetry rather than DoRpc to ensure that both RPCs
+  /// and connections are retried.
   boost::scoped_ptr<StatestoreClientCache> client_cache_;
 
   /// MetricGroup instance that all metrics are registered in. Not owned by this class.

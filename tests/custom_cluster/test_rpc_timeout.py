@@ -191,3 +191,48 @@ class TestRPCTimeout(CustomClusterTestSuite):
     conclude that the backend is unresponsive."""
     self.execute_query_verify_metrics(self.SLOW_TEST_QUERY,
         expected_exception="cancelled due to unresponsive backend")
+
+
+class TestCatalogRPCTimeout(CustomClusterTestSuite):
+  """"Tests RPC timeout and retry handling for catalogd operations."""
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    super(TestCatalogRPCTimeout, cls).setup_class()
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--catalog_client_rpc_timeout_ms=10 "
+                 "--catalog_client_rpc_retry_interval_ms=1 "
+                 "--catalog_client_connection_num_retries=1",
+    catalogd_args="--debug_actions=RESET_METADATA_DELAY:SLEEP@1000")
+  def test_catalog_rpc_timeout(self):
+    """Tests that catalog_client_rpc_timeout_ms enforces a timeout on catalogd
+    operations. The debug action causes a delay of 1 second for refresh table
+    commands. The RPC timeout is 10 ms, so all refresh table commands should
+    fail with an RPC timeout exception."""
+    try:
+      self.execute_query("refresh functional.alltypes")
+    except ImpalaBeeswaxException as e:
+      assert "RPC recv timed out" in str(e)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--catalog_client_rpc_timeout_ms=5000 "
+                 "--catalog_client_rpc_retry_interval_ms=0 "
+                 "--catalog_client_connection_num_retries=10",
+    catalogd_args="--debug_actions=RESET_METADATA_DELAY:JITTER@10000@0.75")
+  def test_catalog_rpc_retries(self):
+    """Tests that catalogd operations are retried. The debug action should randomly
+    cause refresh table commands to fail. However, the catalogd client will retry
+    the command 10 times, so eventually the refresh attempt should succeed. The debug
+    action will add 10 seconds of delay to refresh table operations. The delay will only
+    be triggered 75% of the time.
+    """
+    self.execute_query("refresh functional.alltypes")

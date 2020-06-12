@@ -66,6 +66,8 @@ DEFINE_int64_hidden(statestore_subscriber_recovery_grace_period_ms, 30000L, "Per
     "after the last successful subscription attempt until the subscriber will be "
     "considered fully recovered. After a successful reconnect attempt, updates to the "
     "cluster membership will only become effective after this period has elapsed.");
+DEFINE_int32(statestore_client_rpc_timeout_ms, 300000, "(Advanced) The underlying "
+    "TSocket send/recv timeout in milliseconds for a catalog client RPC.");
 
 DECLARE_string(debug_actions);
 DECLARE_string(ssl_client_ca_certificate);
@@ -122,17 +124,18 @@ class StatestoreSubscriberThriftIf : public StatestoreSubscriberIf {
 StatestoreSubscriber::StatestoreSubscriber(const string& subscriber_id,
     const TNetworkAddress& heartbeat_address, const TNetworkAddress& statestore_address,
     MetricGroup* metrics)
-    : subscriber_id_(subscriber_id),
-      statestore_address_(statestore_address),
-      thrift_iface_(new StatestoreSubscriberThriftIf(this)),
-      failure_detector_(new TimeoutFailureDetector(
-          seconds(FLAGS_statestore_subscriber_timeout_seconds),
-          seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))),
-      client_cache_(new StatestoreClientCache(1, 0, 0, 0, "",
-                !FLAGS_ssl_client_ca_certificate.empty())),
-      metrics_(metrics->GetOrCreateChildGroup("statestore-subscriber")),
-      heartbeat_address_(heartbeat_address),
-      is_registered_(false) {
+  : subscriber_id_(subscriber_id),
+    statestore_address_(statestore_address),
+    thrift_iface_(new StatestoreSubscriberThriftIf(this)),
+    failure_detector_(
+        new TimeoutFailureDetector(seconds(FLAGS_statestore_subscriber_timeout_seconds),
+            seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))),
+    client_cache_(new StatestoreClientCache(1, 0, FLAGS_statestore_client_rpc_timeout_ms,
+        FLAGS_statestore_client_rpc_timeout_ms, "",
+        !FLAGS_ssl_client_ca_certificate.empty())),
+    metrics_(metrics->GetOrCreateChildGroup("statestore-subscriber")),
+    heartbeat_address_(heartbeat_address),
+    is_registered_(false) {
   connected_to_statestore_metric_ =
       metrics_->AddProperty("statestore-subscriber.connected", false);
   connection_failure_metric_ =
