@@ -366,6 +366,13 @@ public class AcidUtils {
   }
 
   /**
+   * Returns true if 'fd' refers to a delete delta file.
+   */
+  public static boolean isDeleteDeltaFd(FileDescriptor fd) {
+    return fd.getRelativePath().startsWith("delete_delta_");
+  }
+
+  /**
    * This method is similar to {@link AcidUtils#filterFilesForAcidState} with the
    * difference that it expects input to be valid file descriptors from a loaded table.
    * This means that file descriptors are already pre-vetted and are consistent with
@@ -503,6 +510,7 @@ public class AcidUtils {
     for (Iterator<String> it = deltaDirNames.iterator(); it.hasNext();) {
       String dirname = it.next();
       ParsedDelta parsedDelta = parseDelta(dirname);
+      if (parsedDelta == null) parsedDelta = parseDeleteDelta(dirname);
       if (parsedDelta != null) {
         if (parsedDelta.minWriteId <= baseWriteId) {
           Preconditions.checkState(parsedDelta.maxWriteId <= baseWriteId);
@@ -511,13 +519,6 @@ public class AcidUtils {
         }
         deltas.add(new Pair<String, ParsedDelta>(dirname, parsedDelta));
         continue;
-      }
-      ParsedDelta deleteDelta = parseDeleteDelta(dirname);
-      if (deleteDelta != null) {
-        if (deleteDelta.maxWriteId > baseWriteId) {
-          throw new CatalogException("Table has deleted rows. It's currently not "
-              + "supported by Impala. Run major compaction to resolve this.");
-        }
       }
     }
 

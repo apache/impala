@@ -98,6 +98,15 @@ class TestAcid(ImpalaTestSuite):
   def test_acid_partitioned(self, vector, unique_database):
     self.run_test_case('QueryTest/acid-partitioned', vector, use_db=unique_database)
 
+  @SkipIfHive2.acid
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  def test_full_acid_scans(self, vector, unique_database):
+    self.run_test_case('QueryTest/full-acid-scans', vector, use_db=unique_database)
+
   # When local CatalogV2 combines with hms_enent_polling enabled, it seems
   # that Catalog loads tables by itself, the query statement cannot trigger
   # loading tables. As the ValidWriteIdlists is part of table loading profile,

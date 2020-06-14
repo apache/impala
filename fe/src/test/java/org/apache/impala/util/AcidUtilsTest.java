@@ -494,8 +494,8 @@ public class AcidUtilsTest {
   }
 
   @Test
-  public void testDeleteDeltaFail() {
-    filteringError(new String[]{
+  public void testDeleteDelta() {
+    assertFiltering(new String[]{
             "base_0000005/",
             "base_0000005/abc.txt",
             "delete_delta_0000006_0000006/",
@@ -504,8 +504,9 @@ public class AcidUtilsTest {
         "",
         // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
         "default.test:10:1234:1,2,3",
-        "Table has deleted rows"
-        );
+        new String[]{
+          "base_0000005/abc.txt",
+          "delete_delta_0000006_0000006/00000"});
   }
 
   public void testHiveStreamingFail() {

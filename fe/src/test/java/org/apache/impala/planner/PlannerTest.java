@@ -1050,4 +1050,12 @@ public class PlannerTest extends PlannerTestBase {
   public void testConvertToCNF() {
     runPlannerTestFile("convert-to-cnf", "tpch_parquet");
   }
+
+  /**
+   * Check that ACID table scans work as expected.
+   */
+  @Test
+  public void testAcidTableScans() {
+    runPlannerTestFile("acid-scans", "functional_orc_def");
+  }
 }

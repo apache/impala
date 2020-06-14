@@ -80,6 +80,14 @@ public abstract class JoinNode extends PlanNode {
   // joinTableId_
   protected JoinTableId joinTableId_ = JoinTableId.INVALID;
 
+  // True if this join is used to do the join between insert and delete delta files.
+  protected boolean isAcidJoin_ = false;
+
+  public void setIsAcidJoin() {
+    isAcidJoin_ = true;
+    displayName_ = "DELETE EVENTS " + displayName_;
+  }
+
   // List of equi-join conjuncts believed to be involved in a FK/PK relationship.
   // The conjuncts are grouped by the tuple ids of the joined base table refs. A conjunct
   // is only included in this list if it is of the form <SlotRef> = <SlotRef> and the

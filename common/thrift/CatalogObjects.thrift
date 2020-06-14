@@ -306,6 +306,12 @@ struct THdfsPartition {
 
   9: optional list<THdfsFileDesc> file_desc
 
+  // List of ACID insert delta file descriptors.
+  21: optional list<THdfsFileDesc> insert_file_desc
+
+  // List of ACID delete delta file descriptors.
+  22: optional list<THdfsFileDesc> delete_file_desc
+
   // The access level Impala has on this partition (READ_WRITE, READ_ONLY, etc).
   11: optional TAccessLevel access_level
 

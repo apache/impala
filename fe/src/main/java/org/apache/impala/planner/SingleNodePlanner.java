@@ -43,6 +43,8 @@ import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.MultiAggregateInfo;
 import org.apache.impala.analysis.MultiAggregateInfo.AggPhase;
 import org.apache.impala.analysis.NullLiteral;
+import org.apache.impala.analysis.Path;
+import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.analysis.QueryStmt;
 import org.apache.impala.analysis.SelectStmt;
 import org.apache.impala.analysis.SingularRowSrcTableRef;
@@ -56,6 +58,7 @@ import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.analysis.UnionStmt;
 import org.apache.impala.analysis.UnionStmt.UnionOperand;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeFsPartition;
@@ -64,13 +67,19 @@ import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.thrift.TQueryOptions;
+import org.apache.impala.util.AcidUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1409,6 +1418,10 @@ public class SingleNodePlanner {
       }
       unionNode.init(analyzer);
       return unionNode;
+    } else if (addAcidSlotsIfNeeded(analyzer, hdfsTblRef, partitions)) {
+      // We are scanning a full ACID table that has delete delta files. Let's create
+      // a LEFT ANTI JOIN between the insert deltas and delete deltas.
+      return createAcidJoinNode(analyzer, hdfsTblRef, conjuncts, partitions, pair.second);
     } else {
       HdfsScanNode scanNode =
           new HdfsScanNode(ctx_.getNextNodeId(), tupleDesc, conjuncts, partitions,
@@ -1416,6 +1429,170 @@ public class SingleNodePlanner {
       scanNode.init(analyzer);
       return scanNode;
     }
+  }
+
+  /**
+   * Adds partitioning columns and ACID columns to the table. It's needed to do a hash
+   * join between insert deltas and delete deltas.
+   * Returns true when the slot refs are added successfully and they are needed.
+   * Return false means this was a no-op because the slot refs are not needed, e.g.
+   * it's a non-ACID table, or there are no delete delta files.
+   * Throws exception in case of errors.
+   */
+  private boolean addAcidSlotsIfNeeded(Analyzer analyzer, TableRef hdfsTblRef,
+      List<? extends FeFsPartition> partitions) throws AnalysisException {
+    FeTable feTable = hdfsTblRef.getTable();
+    if (!AcidUtils.isFullAcidTable(feTable.getMetaStoreTable().getParameters())) {
+      return false;
+    }
+    boolean areThereDeletedRows = false;
+    for (FeFsPartition partition: partitions) {
+      if (partition.genDeleteDeltaPartition() != null) {
+        areThereDeletedRows = true;
+        break;
+      }
+    }
+    if (!areThereDeletedRows) return false;
+    final String NOT_SUPPORTED_YET = "This query is not supported on full ACID tables " +
+        "that have deleted rows and complex types. As a workaround you can run a " +
+        "major compaction.";
+    if (hdfsTblRef instanceof CollectionTableRef) {
+      throw new AnalysisException(NOT_SUPPORTED_YET);
+    }
+    for (SlotDescriptor slotDesc : hdfsTblRef.getDesc().getSlots()) {
+      if (slotDesc.getItemTupleDesc() != null) {
+        throw new AnalysisException(NOT_SUPPORTED_YET);
+      }
+    }
+    addAcidSlots(analyzer, hdfsTblRef);
+    return true;
+  }
+
+  private void addAcidSlots(Analyzer analyzer, TableRef hdfsTblRef)
+      throws AnalysisException {
+    FeTable feTable = hdfsTblRef.getTable();
+    List<String> rawPath = new ArrayList<>();
+    rawPath.add(hdfsTblRef.getUniqueAlias());
+    // Add slot refs for the partitioning columns.
+    for (Column partCol : feTable.getClusteringColumns()) {
+      rawPath.add(partCol.getName());
+      addSlotRefToDesc(analyzer, rawPath);
+      rawPath.remove(rawPath.size() - 1);
+    }
+    // Add slot refs for the ACID fields that identify rows.
+    rawPath.add("row__id");
+    String[] acidFields = {"originaltransaction", "bucket", "rowid"};
+    for (String acidField : acidFields) {
+      rawPath.add(acidField);
+      addSlotRefToDesc(analyzer, rawPath);
+      rawPath.remove(rawPath.size() - 1);
+    }
+  }
+
+  /**
+   * Adds a new slot ref with path 'rawPath' to its tuple descriptor. This is a no-op if
+   * the tuple descriptor already has a slot ref with the given raw path.
+   */
+  private void addSlotRefToDesc(Analyzer analyzer, List<String> rawPath)
+      throws AnalysisException {
+    Path resolvedPath = null;
+    try {
+      resolvedPath = analyzer.resolvePath(rawPath, PathType.SLOT_REF);
+    } catch (TableLoadingException e) {
+      // Should never happen because we only check registered table aliases.
+      Preconditions.checkState(false);
+    }
+    Preconditions.checkNotNull(resolvedPath);
+    SlotDescriptor desc = analyzer.registerSlotRef(resolvedPath);
+    desc.setIsMaterialized(true);
+  }
+
+  /**
+   * Takes an 'hdfsTblRef' of an ACID table and creates two scan nodes for it. One for
+   * the insert delta files, and one for the delete files. On top of the two scans it
+   * adds a LEFT ANTI HASH JOIN with BROADCAST distribution mode. I.e. delete events will
+   * be broadcasted to the nodes that scan the insert files.
+   */
+  private PlanNode createAcidJoinNode(Analyzer analyzer, TableRef hdfsTblRef,
+      List<Expr> conjuncts, List<? extends FeFsPartition> partitions,
+      List<Expr> partConjuncts)
+      throws ImpalaException {
+    FeTable feTable = hdfsTblRef.getTable();
+    Preconditions.checkState(AcidUtils.isFullAcidTable(
+      feTable.getMetaStoreTable().getParameters()));
+
+    // Let's create separate partitions for inserts and deletes.
+    List<FeFsPartition> insertDeltaPartitions = new ArrayList<>();
+    List<FeFsPartition> deleteDeltaPartitions = new ArrayList<>();
+    for (FeFsPartition part : partitions) {
+      insertDeltaPartitions.add(part.genInsertDeltaPartition());
+      FeFsPartition deleteDeltaPartition = part.genDeleteDeltaPartition();
+      if (deleteDeltaPartition != null) deleteDeltaPartitions.add(deleteDeltaPartition);
+    }
+    // The followings just create separate scan nodes for insert deltas and delete deltas,
+    // plus adds a LEFT ANTI HASH JOIN above them.
+    TableRef deleteDeltaRef = new TableRef(hdfsTblRef.getPath(),
+        hdfsTblRef.getUniqueAlias() + "-delete-delta");
+    deleteDeltaRef = analyzer.resolveTableRef(deleteDeltaRef);
+    deleteDeltaRef.analyze(analyzer);
+    addAcidSlots(analyzer, deleteDeltaRef);
+    HdfsScanNode deltaScanNode = new HdfsScanNode(ctx_.getNextNodeId(),
+        hdfsTblRef.getDesc(), conjuncts, insertDeltaPartitions, hdfsTblRef,
+        /*aggInfo=*/null, partConjuncts, /*isPartitionKeyScan=*/false);
+    deltaScanNode.init(analyzer);
+    HdfsScanNode deleteDeltaScanNode = new HdfsScanNode(ctx_.getNextNodeId(),
+        deleteDeltaRef.getDesc(), Collections.emptyList(), deleteDeltaPartitions,
+        deleteDeltaRef, /*aggInfo=*/null, partConjuncts, /*isPartitionKeyScan=*/false);
+    deleteDeltaScanNode.init(analyzer);
+    //TODO: ACID join conjuncts currently contain predicates for all partitioning columns
+    // and the ACID fields. So all of those columns will be the inputs of the hash
+    // function in the HASH JOIN. Probably we could only include 'originalTransaction' and
+    // 'rowid' in the hash predicates, while passing the other conjuncts in
+    // 'otherJoinConjuncts'.
+    List<BinaryPredicate> acidJoinConjuncts = createAcidJoinConjuncts(analyzer,
+        hdfsTblRef.getDesc(), deleteDeltaRef.getDesc());
+    JoinNode acidJoin = new HashJoinNode(deltaScanNode, deleteDeltaScanNode,
+        /*straight_join=*/true, DistributionMode.BROADCAST, JoinOperator.LEFT_ANTI_JOIN,
+        acidJoinConjuncts, /*otherJoinConjuncts=*/Collections.emptyList());
+    acidJoin.setId(ctx_.getNextNodeId());
+    acidJoin.init(analyzer);
+    acidJoin.setIsAcidJoin();
+    return acidJoin;
+  }
+
+  /**
+   * Creates conjuncts used in the ANTI-JOIN between insert deltas and delete
+   * deltas. I.e. it adds equality predicates for the partitioning columns and
+   * ACID columns. E.g. [insertDelta.part = deleteDelta.part,
+   * insertDelta.row__id.rowid = deleteDelta.row__id.rowid, ...]
+   *
+   * @param insertTupleDesc Tuple descriptor of the insert delta scan node
+   * @param deleteTupleDesc Tuple descriptor of the delete delta scan node
+   */
+  List<BinaryPredicate> createAcidJoinConjuncts(Analyzer analyzer,
+      TupleDescriptor insertTupleDesc, TupleDescriptor deleteTupleDesc)
+      throws AnalysisException {
+    List<BinaryPredicate> ret = new ArrayList<>();
+    // 'deleteTupleDesc' only has slot descriptors for the slots needed in the JOIN, i.e.
+    // it only has slot refs for the partitioning columns and ACID columns. Therefore we
+    // can just iterate over it and find the corresponding slot refs in the insert tuple
+    // descriptor and create an equality predicate between the slot ref pairs.
+    for (SlotDescriptor deleteSlotDesc : deleteTupleDesc.getSlots()) {
+      boolean foundMatch = false;
+      for (SlotDescriptor insertSlotDesc : insertTupleDesc.getSlots()) {
+        if (deleteSlotDesc.getMaterializedPath().equals(
+            insertSlotDesc.getMaterializedPath())) {
+          foundMatch = true;
+          BinaryPredicate pred = new BinaryPredicate(
+              Operator.EQ, new SlotRef(insertSlotDesc), new SlotRef(deleteSlotDesc));
+          pred.analyze(analyzer);
+          ret.add(pred);
+          break;
+        }
+      }
+      Preconditions.checkState(foundMatch);
+    }
+    return ret;
   }
 
   /**

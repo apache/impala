@@ -1,0 +1,195 @@
+====
+---- QUERY
+create table acid (i int) stored as orc tblproperties('transactional'='true');
+====
+---- HIVE_QUERY
+use $DATABASE;
+insert into acid values (1), (2), (3);
+delete from acid where i = 2;
+====
+---- QUERY
+refresh acid;
+select * from acid;
+---- RESULTS
+1
+3
+---- TYPES
+INT
+====
+---- HIVE_QUERY
+use $DATABASE;
+insert into acid values (5), (5), (5);
+====
+---- QUERY
+refresh acid;
+select * from acid;
+---- RESULTS
+1
+3
+5
+5
+5
+---- TYPES
+INT
+====
+---- HIVE_QUERY
+use $DATABASE;
+update acid set i = i + 1;
+====
+---- QUERY
+refresh acid;
+select * from acid;
+---- RESULTS
+2
+4
+6
+6
+6
+---- TYPES
+INT
+====
+---- HIVE_QUERY
+use $DATABASE;
+insert overwrite table acid select 1000;
+====
+---- QUERY
+refresh acid;
+select * from acid;
+---- RESULTS
+1000
+---- TYPES
+INT
+====
+---- QUERY
+select count(*) from functional_orc_def.alltypes_deleted_rows;
+---- RESULTS
+7119
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*)
+from functional_orc_def.alltypes_deleted_rows
+where month % 2 = 0 and year % 2 = 0 and id % 10 = 0;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+select year, month, count(*)
+from functional_orc_def.alltypes_deleted_rows
+group by year, month
+order by year, month
+---- RESULTS
+2009,1,310
+2009,2,280
+2009,3,310
+2009,4,300
+2009,5,310
+2009,6,300
+2009,7,310
+2009,8,310
+2009,9,300
+2009,10,310
+2009,11,300
+2009,12,310
+2010,1,310
+2010,2,252
+2010,3,310
+2010,4,270
+2010,5,310
+2010,6,270
+2010,7,310
+2010,8,279
+2010,9,300
+2010,10,279
+2010,11,300
+2010,12,279
+---- TYPES
+INT,INT,BIGINT
+====
+---- QUERY
+select count(*) from (
+  select * from functional_orc_def.alltypes_deleted_rows where id % 2 = 0
+  union all
+  select * from functional_orc_def.alltypes_deleted_rows where id % 2 != 0
+) t;
+---- RESULTS
+7119
+---- TYPES
+BIGINT
+====
+---- QUERY
+select id from functional_orc_def.alltypes_deleted_rows
+where id % 2 = 0 order by id desc limit 10
+union all
+select max(id) from functional_orc_def.alltypes_deleted_rows;
+---- RESULTS
+7298
+7296
+7294
+7292
+7288
+7286
+7284
+7282
+7278
+7276
+7299
+---- TYPES
+INT
+====
+---- QUERY
+select id from functional_orc_def.alltypes_deleted_rows
+where year=2010 and month = 8 and id % 2 = 0 order by id desc limit 10
+union all
+select max(id) from functional_orc_def.alltypes_deleted_rows;
+---- RESULTS
+6078
+6076
+6074
+6072
+6068
+6066
+6064
+6062
+6058
+6056
+7299
+---- TYPES
+INT
+====
+---- QUERY
+create table acid_part_key_scan (id int)
+partitioned by (p int) stored as orc
+tblproperties('transactional'='true');
+====
+---- HIVE_QUERY
+use $DATABASE;
+insert into acid_part_key_scan partition(p=0) values (0), (1), (2);
+insert into acid_part_key_scan partition(p=1) values (0), (1), (2);
+delete from acid_part_key_scan where p = 1 and id = 0;
+====
+---- QUERY
+refresh acid_part_key_scan;
+select max(p) from acid_part_key_scan;
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- HIVE_QUERY
+use $DATABASE;
+delete from acid_part_key_scan where p = 1;
+====
+---- QUERY
+refresh acid_part_key_scan;
+show partitions acid_part_key_scan;
+---- RESULTS
+'0',-1,1,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*
+'1',-1,3,regex:.+,regex:.+,regex:.+,regex:.+,regex:.+,regex:.*
+'Total',-1,4,regex:.+,regex:.+,'','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====

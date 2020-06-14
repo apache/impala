@@ -175,13 +175,15 @@ public class HashJoinNode extends JoinNode {
       }
     }
     if (detailLevel.ordinal() > TExplainLevel.MINIMAL.ordinal()) {
-      output.append(detailPrefix + "hash predicates: ");
-      for (int i = 0; i < eqJoinConjuncts_.size(); ++i) {
-        Expr eqConjunct = eqJoinConjuncts_.get(i);
-        output.append(eqConjunct.toSql());
-        if (i + 1 != eqJoinConjuncts_.size()) output.append(", ");
+      if (!isAcidJoin_ || detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
+        output.append(detailPrefix + "hash predicates: ");
+        for (int i = 0; i < eqJoinConjuncts_.size(); ++i) {
+          Expr eqConjunct = eqJoinConjuncts_.get(i);
+          output.append(eqConjunct.toSql());
+          if (i + 1 != eqJoinConjuncts_.size()) output.append(", ");
+        }
+        output.append("\n");
       }
-      output.append("\n");
 
       // Optionally print FK/PK equi-join conjuncts.
       if (joinOp_.isInnerJoin() || joinOp_.isOuterJoin()) {

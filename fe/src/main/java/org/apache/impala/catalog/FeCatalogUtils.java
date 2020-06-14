@@ -363,9 +363,20 @@ public abstract class FeCatalogUtils {
       long numBlocks = 0;
       long totalFileBytes = 0;
       for (FileDescriptor fd: part.getFileDescriptors()) {
-        thriftHdfsPart.addToFile_desc(fd.toThrift());
         numBlocks += fd.getNumFileBlocks();
         totalFileBytes += fd.getFileLength();
+      }
+      if (!part.getInsertFileDescriptors().isEmpty()) {
+        for (FileDescriptor fd : part.getInsertFileDescriptors()) {
+          thriftHdfsPart.addToInsert_file_desc(fd.toThrift());
+        }
+        for (FileDescriptor fd : part.getDeleteFileDescriptors()) {
+          thriftHdfsPart.addToDelete_file_desc(fd.toThrift());
+        }
+      } else {
+        for (FileDescriptor fd: part.getFileDescriptors()) {
+          thriftHdfsPart.addToFile_desc(fd.toThrift());
+        }
       }
       thriftHdfsPart.setNum_blocks(numBlocks);
       thriftHdfsPart.setTotal_file_size_bytes(totalFileBytes);

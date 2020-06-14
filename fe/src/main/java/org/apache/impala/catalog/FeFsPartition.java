@@ -55,9 +55,19 @@ public interface FeFsPartition {
   FileSystemUtil.FsType getFsType();
 
   /**
-   * @return the files that this partition contains
+   * @return all the files that this partition contains, even delete delta files
    */
   List<FileDescriptor> getFileDescriptors();
+
+  /**
+   * @return the insert delta files that this partition contains
+   */
+  List<FileDescriptor> getInsertFileDescriptors();
+
+  /**
+   * @return the delete delta files that this partition contains
+   */
+  List<FileDescriptor> getDeleteFileDescriptors();
 
   /**
    * @return true if this partition contains any files
@@ -174,4 +184,13 @@ public interface FeFsPartition {
    */
   long getWriteId();
 
+  /**
+   * Returns new FeFsPartition that has the insert delta descriptors as file descriptors.
+   */
+  FeFsPartition genInsertDeltaPartition();
+
+  /**
+   * Returns new FeFsPartition that has the delete delta descriptors as file descriptors.
+   */
+  FeFsPartition genDeleteDeltaPartition();
 }

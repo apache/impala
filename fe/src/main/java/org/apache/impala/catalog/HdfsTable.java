@@ -71,6 +71,7 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
+import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -1177,8 +1178,8 @@ public class HdfsTable extends Table implements FeFsTable {
     // Copy over the FDs from the old partition to the new one, so that
     // 'refreshPartitionFileMetadata' below can compare modification times and
     // reload the locations only for those that changed.
-    partBuilder.setFileDescriptors(oldPartition.getFileDescriptors())
-        .setIsMarkedCached(isMarkedCached_);
+    partBuilder.setFileDescriptors(oldPartition);
+    partBuilder.setIsMarkedCached(isMarkedCached_);
     long fileMdLoadTime = loadFileMetadataForPartitions(client,
         ImmutableList.of(partBuilder), /*isRefresh=*/true);
     setUnpartitionedTableStats(partBuilder);
@@ -1631,14 +1632,21 @@ public class HdfsTable extends Table implements FeFsTable {
         }
 
         if (req.table_info_selector.want_partition_files) {
-          List<FileDescriptor> filteredFds = new ArrayList<>(part.getFileDescriptors());
           try {
-            numFilesFiltered += AcidUtils
-                .filterFdsForAcidState(filteredFds, reqWriteIdList);
-            partInfo.file_descriptors = Lists
-                .newArrayListWithCapacity(filteredFds.size());
-            for (FileDescriptor fd: filteredFds) {
-              partInfo.file_descriptors.add(fd.toThrift());
+            if (!part.getInsertFileDescriptors().isEmpty()) {
+              partInfo.file_descriptors = new ArrayList<>();
+              partInfo.insert_file_descriptors = new ArrayList<>();
+              numFilesFiltered += addFilteredFds(part.getInsertFileDescriptors(),
+                  partInfo.insert_file_descriptors, reqWriteIdList);
+              partInfo.delete_file_descriptors = new ArrayList<>();
+              numFilesFiltered += addFilteredFds(part.getDeleteFileDescriptors(),
+                  partInfo.delete_file_descriptors, reqWriteIdList);
+            } else {
+              partInfo.file_descriptors = new ArrayList<>();
+              numFilesFiltered += addFilteredFds(part.getFileDescriptors(),
+                  partInfo.file_descriptors, reqWriteIdList);
+              partInfo.insert_file_descriptors = new ArrayList<>();
+              partInfo.delete_file_descriptors = new ArrayList<>();
             }
             hits.inc();
           } catch (CatalogException ex) {
@@ -1683,6 +1691,16 @@ public class HdfsTable extends Table implements FeFsTable {
     // it again which requires additional HDFS RPCs.
     resp.table_info.setIs_marked_cached(isMarkedCached_);
     return resp;
+  }
+
+  private int addFilteredFds(List<FileDescriptor> fds, List<THdfsFileDesc> thriftFds,
+      ValidWriteIdList writeIdList) throws CatalogException {
+    List<FileDescriptor> filteredFds = new ArrayList<>(fds);
+    int numFilesFiltered = AcidUtils.filterFdsForAcidState(filteredFds, writeIdList);
+    for (FileDescriptor fd: filteredFds) {
+      thriftFds.add(fd.toThrift());
+    }
+    return numFilesFiltered;
   }
 
   private double getFileMetadataCacheHitRate() {
@@ -1732,6 +1750,10 @@ public class HdfsTable extends Table implements FeFsTable {
           stats.numBlocks += tHdfsPartition.getNum_blocks();
           stats.numFiles +=
               tHdfsPartition.isSetFile_desc() ? tHdfsPartition.getFile_desc().size() : 0;
+          stats.numFiles += tHdfsPartition.isSetInsert_file_desc() ?
+              tHdfsPartition.getInsert_file_desc().size() : 0;
+          stats.numFiles += tHdfsPartition.isSetDelete_file_desc() ?
+              tHdfsPartition.getDelete_file_desc().size() : 0;
           stats.totalFileBytes += tHdfsPartition.getTotal_file_size_bytes();
         }
         idToPartition.put(id, tHdfsPartition);
@@ -1985,7 +2007,7 @@ public class HdfsTable extends Table implements FeFsTable {
     long totalBytes = 0L;
     long totalNumFiles = 0L;
     for (FeFsPartition p: orderedPartitions) {
-      int numFiles = p.getFileDescriptors().size();
+      int numFiles = p.getNumFileDescriptors();
       long size = p.getSize();
       totalNumFiles += numFiles;
       totalBytes += size;
@@ -2096,7 +2118,7 @@ public class HdfsTable extends Table implements FeFsTable {
         || HdfsPartition.comparePartitionKeyValues(
             oldPartition.getPartitionValues(), partBuilder.getPartitionValues()) == 0);
     if (oldPartition != null) {
-      partBuilder.setFileDescriptors(oldPartition.getFileDescriptors());
+      partBuilder.setFileDescriptors(oldPartition);
     }
     loadFileMetadataForPartitions(client, ImmutableList.of(partBuilder),
         /*isRefresh=*/true);

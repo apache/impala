@@ -20,72 +20,6 @@ truncate table functional_orc_def.full_transactional_table;
 AnalysisException: TRUNCATE not supported on full transactional (ACID) table: functional_orc_def.full_transactional_table
 ====
 ---- QUERY
-create table acid (i int) stored as orc tblproperties('transactional'='true');
-====
----- HIVE_QUERY
-use $DATABASE;
-insert into acid values (1), (2), (3);
-delete from acid where i = 2;
-====
----- QUERY
-refresh acid;
-select * from acid;
----- CATCH
-TableLoadingException
-====
----- HIVE_QUERY
-alter table $DATABASE.acid compact 'major' and wait;
-====
----- QUERY
-invalidate metadata acid;
-select * from acid;
----- RESULTS
-1
-3
----- TYPES
-INT
-====
----- HIVE_QUERY
-use $DATABASE;
-insert into acid values (5);
-insert into acid values (5);
-insert into acid values (5);
-====
----- QUERY
-refresh acid;
-select * from acid;
----- RESULTS
-1
-3
-5
-5
-5
----- TYPES
-INT
-====
----- HIVE_QUERY
-alter table $DATABASE.acid compact 'major' and wait;
-====
----- QUERY
-refresh acid;
-show files in acid;
----- RESULTS
-row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/acid/base_0000005_v\d+/bucket_\d+','\d+K?B',''
----- TYPES
-STRING,STRING,STRING
-====
----- QUERY
-select * from acid;
----- RESULTS
-1
-3
-5
-5
-5
----- TYPES
-INT
-====
----- QUERY
 # Impala should reject tables that have multiple files in the same
 # bucket in the same directory.
 # Note: This table is clearly not bucketed, but for row ID
@@ -104,4 +38,30 @@ refresh test_promotion_fail;
 select * from  test_promotion_fail;
 ---- CATCH
 Found original file with unexpected name
+====
+---- QUERY
+create table complex_copy like functional_orc_def.complextypestbl;
+====
+---- HIVE_QUERY
+use $DATABASE;
+insert into complex_copy select * from functional_orc_def.complextypestbl;
+delete from complex_copy where id % 2 = 0;
+====
+---- QUERY
+select id from complex_copy;
+---- RESULTS
+1
+3
+5
+7
+====
+---- QUERY
+select id, item from complex_copy c, c.int_array;
+---- CATCH
+This query is not supported on full ACID tables
+====
+---- QUERY
+select item from complex_copy.int_array;
+---- CATCH
+This query is not supported on full ACID tables
 ====

@@ -616,6 +616,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
    */
   @Nonnull
   private final ImmutableList<byte[]> encodedFileDescriptors_;
+  private final ImmutableList<byte[]> encodedInsertFileDescriptors_;
+  private final ImmutableList<byte[]> encodedDeleteFileDescriptors_;
   private final HdfsPartitionLocationCompressor.Location location_;
   // True if this partition is marked as cached. Does not necessarily mean the data is
   // cached.
@@ -644,6 +646,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
   private HdfsPartition(HdfsTable table, long id, List<LiteralExpr> partitionKeyValues,
       HdfsStorageDescriptor fileFormatDescriptor,
       @Nonnull ImmutableList<byte[]> encodedFileDescriptors,
+      ImmutableList<byte[]> encodedInsertFileDescriptors,
+      ImmutableList<byte[]> encodedDeleteFileDescriptors,
       HdfsPartitionLocationCompressor.Location location,
       boolean isMarkedCached, TAccessLevel accessLevel, Map<String, String> hmsParameters,
       CachedHmsPartitionDescriptor cachedMsPartitionDescriptor,
@@ -654,6 +658,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     partitionKeyValues_ = ImmutableList.copyOf(partitionKeyValues);
     fileFormatDescriptor_ = fileFormatDescriptor;
     encodedFileDescriptors_ = encodedFileDescriptors;
+    encodedInsertFileDescriptors_ = encodedInsertFileDescriptors;
+    encodedDeleteFileDescriptors_ = encodedDeleteFileDescriptors;
     location_ = location;
     isMarkedCached_ = isMarkedCached;
     accessLevel_ = accessLevel;
@@ -825,7 +831,23 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
   @Override // FeFsPartition
   public List<HdfsPartition.FileDescriptor> getFileDescriptors() {
     // Return a lazily transformed list from our internal bytes storage.
-    return Lists.transform(encodedFileDescriptors_, FileDescriptor.FROM_BYTES);
+    List<HdfsPartition.FileDescriptor> ret = new ArrayList<>();
+    ret.addAll(Lists.transform(encodedFileDescriptors_, FileDescriptor.FROM_BYTES));
+    ret.addAll(Lists.transform(encodedInsertFileDescriptors_, FileDescriptor.FROM_BYTES));
+    ret.addAll(Lists.transform(encodedDeleteFileDescriptors_, FileDescriptor.FROM_BYTES));
+    return ret;
+  }
+
+  @Override // FeFsPartition
+  public List<HdfsPartition.FileDescriptor> getInsertFileDescriptors() {
+    // Return a lazily transformed list from our internal bytes storage.
+    return Lists.transform(encodedInsertFileDescriptors_, FileDescriptor.FROM_BYTES);
+  }
+
+  @Override // FeFsPartition
+  public List<HdfsPartition.FileDescriptor> getDeleteFileDescriptors() {
+    // Return a lazily transformed list from our internal bytes storage.
+    return Lists.transform(encodedDeleteFileDescriptors_, FileDescriptor.FROM_BYTES);
   }
 
   /**
@@ -844,11 +866,16 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
 
   @Override // FeFsPartition
   public int getNumFileDescriptors() {
-    return encodedFileDescriptors_.size();
+    return encodedFileDescriptors_.size() +
+           encodedInsertFileDescriptors_.size() +
+           encodedDeleteFileDescriptors_.size();
   }
 
   @Override
-  public boolean hasFileDescriptors() { return !encodedFileDescriptors_.isEmpty(); }
+  public boolean hasFileDescriptors() {
+    return !encodedFileDescriptors_.isEmpty() ||
+           !encodedInsertFileDescriptors_.isEmpty();
+  }
 
   public CachedHmsPartitionDescriptor getCachedMsPartitionDescriptor() {
     return cachedMsPartitionDescriptor_;
@@ -907,6 +934,30 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
   }
 
   @Override
+  public long getWriteId() {
+    return writeId_;
+  }
+
+  @Override
+  public HdfsPartition genInsertDeltaPartition() {
+    ImmutableList<byte[]> fileDescriptors = !encodedInsertFileDescriptors_.isEmpty() ?
+        encodedInsertFileDescriptors_ : encodedFileDescriptors_;
+    return new HdfsPartition.Builder(this)
+        .setId(id_)
+        .setFileDescriptors(fileDescriptors)
+        .build();
+  }
+
+  @Override
+  public HdfsPartition genDeleteDeltaPartition() {
+    if (encodedDeleteFileDescriptors_.isEmpty()) return null;
+    return new HdfsPartition.Builder(this)
+        .setId(id_)
+        .setFileDescriptors(encodedDeleteFileDescriptors_)
+        .build();
+  }
+
+  @Override
   public String toString() {
     return MoreObjects.toStringHelper(this)
       .add("fileDescriptors", getFileDescriptors())
@@ -920,6 +971,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     private List<LiteralExpr> partitionKeyValues_;
     private HdfsStorageDescriptor fileFormatDescriptor_ = null;
     private ImmutableList<byte[]> encodedFileDescriptors_;
+    private ImmutableList<byte[]> encodedInsertFileDescriptors_;
+    private ImmutableList<byte[]> encodedDeleteFileDescriptors_;
     private HdfsPartitionLocationCompressor.Location location_ = null;
     private boolean isMarkedCached_ = false;
     private TAccessLevel accessLevel_ = TAccessLevel.READ_WRITE;
@@ -969,15 +1022,27 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     public HdfsPartition build() {
       if (partitionKeyValues_ == null) partitionKeyValues_ = Collections.emptyList();
       if (encodedFileDescriptors_ == null) setFileDescriptors(Collections.emptyList());
+      if (encodedInsertFileDescriptors_ == null) {
+        setInsertFileDescriptors(Collections.emptyList());
+      }
+      if (encodedDeleteFileDescriptors_ == null) {
+        setDeleteFileDescriptors(Collections.emptyList());
+      }
       if (hmsParameters_ == null) hmsParameters_ = Collections.emptyMap();
       if (location_ == null) {
         // Only prototype partitions can have null locations.
         Preconditions.checkState(id_ == CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);
       }
       return new HdfsPartition(table_, id_, partitionKeyValues_, fileFormatDescriptor_,
-          encodedFileDescriptors_, location_, isMarkedCached_, accessLevel_,
+          encodedFileDescriptors_, encodedInsertFileDescriptors_,
+          encodedDeleteFileDescriptors_, location_, isMarkedCached_, accessLevel_,
           hmsParameters_, cachedMsPartitionDescriptor_, partitionStats_,
           hasIncrementalStats_, numRows_, writeId_, inFlightEvents_);
+    }
+
+    public Builder setId(long id) {
+      id_ = id;
+      return this;
     }
 
     public Builder setMsPartition(
@@ -1114,11 +1179,46 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       return Lists.transform(encodedFileDescriptors_, FileDescriptor.FROM_BYTES);
     }
 
+    public Builder clearFileDescriptors() {
+      encodedFileDescriptors_ = ImmutableList.of();
+      encodedInsertFileDescriptors_ = ImmutableList.of();
+      encodedDeleteFileDescriptors_ = ImmutableList.of();
+      return this;
+    }
+
     public Builder setFileDescriptors(List<FileDescriptor> descriptors) {
       // Store an eagerly transformed-and-copied list so that we drop the memory usage
       // of the flatbuffer wrapper.
       encodedFileDescriptors_ = ImmutableList.copyOf(Lists.transform(
           descriptors, FileDescriptor.TO_BYTES));
+      return this;
+    }
+
+    public Builder setFileDescriptors(HdfsPartition partition) {
+      encodedFileDescriptors_ = partition.encodedFileDescriptors_;
+      encodedInsertFileDescriptors_ = partition.encodedInsertFileDescriptors_;
+      encodedDeleteFileDescriptors_ = partition.encodedDeleteFileDescriptors_;
+      return this;
+    }
+
+    public Builder setInsertFileDescriptors(List<FileDescriptor> descriptors) {
+      // Store an eagerly transformed-and-copied list so that we drop the memory usage
+      // of the flatbuffer wrapper.
+      encodedInsertFileDescriptors_ = ImmutableList.copyOf(Lists.transform(
+          descriptors, FileDescriptor.TO_BYTES));
+      return this;
+    }
+
+    public Builder setDeleteFileDescriptors(List<FileDescriptor> descriptors) {
+      // Store an eagerly transformed-and-copied list so that we drop the memory usage
+      // of the flatbuffer wrapper.
+      encodedDeleteFileDescriptors_ = ImmutableList.copyOf(Lists.transform(
+          descriptors, FileDescriptor.TO_BYTES));
+      return this;
+    }
+
+    public Builder setFileDescriptors(ImmutableList<byte[]> encodedDescriptors) {
+      encodedFileDescriptors_ = encodedDescriptors;
       return this;
     }
 
@@ -1179,6 +1279,14 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
           hmsParameters_.get(MetastoreEventPropertyKey.CATALOG_VERSION.getKey())));
     }
 
+    private List<FileDescriptor> fdsFromThrift(List<THdfsFileDesc> tFileDescs) {
+      List<FileDescriptor> ret = new ArrayList<>();
+      for (THdfsFileDesc desc : tFileDescs) {
+        ret.add(HdfsPartition.FileDescriptor.fromThrift(desc));
+      }
+      return ret;
+    }
+
     public List<LiteralExpr> getPartitionValues() {
       return partitionKeyValues_;
     }
@@ -1213,13 +1321,15 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
         }
       }
 
-      List<FileDescriptor> fileDescriptors = new ArrayList<>();
       if (thriftPartition.isSetFile_desc()) {
-        for (THdfsFileDesc desc : thriftPartition.getFile_desc()) {
-          fileDescriptors.add(HdfsPartition.FileDescriptor.fromThrift(desc));
-        }
+        setFileDescriptors(fdsFromThrift(thriftPartition.getFile_desc()));
       }
-      setFileDescriptors(fileDescriptors);
+      if (thriftPartition.isSetInsert_file_desc()) {
+        setInsertFileDescriptors(fdsFromThrift(thriftPartition.getInsert_file_desc()));
+      }
+      if (thriftPartition.isSetDelete_file_desc()) {
+        setDeleteFileDescriptors(fdsFromThrift(thriftPartition.getDelete_file_desc()));
+      }
 
       accessLevel_ = thriftPartition.isSetAccess_level() ?
           thriftPartition.getAccess_level() : TAccessLevel.READ_WRITE;
@@ -1285,10 +1395,5 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       if (cmp != 0) return cmp;
     }
     return 0;
-  }
-
-  @Override
-  public long getWriteId() {
-    return writeId_;
   }
 }

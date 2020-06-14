@@ -247,18 +247,33 @@ class DirectMetaProvider implements MetaProvider {
             " which was not requested. Requested: " + namesSet);
       }
 
-      ImmutableList<FileDescriptor> fds = loadFileMetadata(
-          fullTableName, partName, p, hostIndex);
-
-      PartitionMetadata existing = ret.put(partName, new PartitionMetadataImpl(p, fds));
+      FileMetadataLoader loader = loadFileMetadata(fullTableName, partName, p, hostIndex);
+      PartitionMetadata existing = ret.put(partName, createPartMetadataImpl(p, loader));
       if (existing != null) {
         throw new MetaException("HMS returned multiple partitions with name " +
             partName);
       }
     }
 
-
     return ret;
+  }
+
+  private PartitionMetadataImpl createPartMetadataImpl(Partition p,
+      FileMetadataLoader loader) {
+    List<FileDescriptor> deleteDescriptors = loader.getLoadedDeleteDeltaFds();
+    ImmutableList<FileDescriptor> fds;
+    ImmutableList<FileDescriptor> insertFds;
+    ImmutableList<FileDescriptor> deleteFds;
+    if (deleteDescriptors != null && !deleteDescriptors.isEmpty()) {
+      fds = ImmutableList.copyOf(Collections.emptyList());
+      insertFds = ImmutableList.copyOf(loader.getLoadedInsertDeltaFds());
+      deleteFds = ImmutableList.copyOf(loader.getLoadedDeleteDeltaFds());
+    } else {
+      fds = ImmutableList.copyOf(loader.getLoadedFds());
+      insertFds = ImmutableList.copyOf(Collections.emptyList());
+      deleteFds = ImmutableList.copyOf(Collections.emptyList());
+    }
+    return new PartitionMetadataImpl(p, fds, insertFds, deleteFds);
   }
 
   /**
@@ -277,10 +292,10 @@ class DirectMetaProvider implements MetaProvider {
         "Expected empty partition name for unpartitioned table");
     Partition msPartition = msTableToPartition(table.msTable_);
     String fullName = table.dbName_ + "." + table.tableName_;
-    ImmutableList<FileDescriptor> fds = loadFileMetadata(fullName,
+    FileMetadataLoader loader = loadFileMetadata(fullName,
         "default",  msPartition, hostIndex);
-    return ImmutableMap.of("", (PartitionMetadata)new PartitionMetadataImpl(
-        msPartition, fds));
+    return ImmutableMap.of("",
+        (PartitionMetadata)createPartMetadataImpl(msPartition, loader));
   }
 
   static Partition msTableToPartition(Table msTable) {
@@ -324,7 +339,7 @@ class DirectMetaProvider implements MetaProvider {
     }
   }
 
-  private ImmutableList<FileDescriptor> loadFileMetadata(String fullTableName,
+  private FileMetadataLoader loadFileMetadata(String fullTableName,
       String partName, Partition msPartition, ListMap<TNetworkAddress> hostIndex)
         throws CatalogException {
     //TODO(IMPALA-9042): Remove "throws MetaException"
@@ -345,14 +360,14 @@ class DirectMetaProvider implements MetaProvider {
     } catch (FileNotFoundException fnf) {
       // If the partition directory isn't found, this is treated as having no
       // files.
-      return ImmutableList.of();
+      return fml;
     } catch (IOException ioe) {
       throw new LocalCatalogException(String.format(
           "Could not load files for partition %s of table %s",
           partName, fullTableName), ioe);
     }
 
-    return ImmutableList.copyOf(fml.getLoadedFds());
+    return fml;
   }
 
   @Immutable
@@ -373,11 +388,16 @@ class DirectMetaProvider implements MetaProvider {
   private static class PartitionMetadataImpl implements PartitionMetadata {
     private final Partition msPartition_;
     private final ImmutableList<FileDescriptor> fds_;
+    private final ImmutableList<FileDescriptor> insertFds_;
+    private final ImmutableList<FileDescriptor> deleteFds_;
 
     public PartitionMetadataImpl(Partition msPartition,
-        ImmutableList<FileDescriptor> fds) {
+        ImmutableList<FileDescriptor> fds, ImmutableList<FileDescriptor> insertFds,
+        ImmutableList<FileDescriptor> deleteFds) {
       this.msPartition_ = msPartition;
       this.fds_ = fds;
+      this.insertFds_ = insertFds;
+      this.deleteFds_ = deleteFds;
     }
 
     @Override
@@ -387,7 +407,22 @@ class DirectMetaProvider implements MetaProvider {
 
     @Override
     public ImmutableList<FileDescriptor> getFileDescriptors() {
-      return fds_;
+      if (insertFds_.isEmpty()) return fds_;
+      List<FileDescriptor> ret = Lists.newArrayListWithCapacity(
+          insertFds_.size() + deleteFds_.size());
+      ret.addAll(insertFds_);
+      ret.addAll(deleteFds_);
+      return ImmutableList.copyOf(ret);
+    }
+
+    @Override
+    public ImmutableList<FileDescriptor> getInsertFileDescriptors() {
+      return insertFds_;
+    }
+
+    @Override
+    public ImmutableList<FileDescriptor> getDeleteFileDescriptors() {
+      return deleteFds_;
     }
 
     @Override
