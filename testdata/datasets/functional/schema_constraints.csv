@@ -12,6 +12,7 @@ table_name:hbasealltypeserrornonulls, constraint:restrict_to, table_format:hbase
 
 table_name:alltypesinsert, constraint:restrict_to, table_format:text/none/none
 table_name:alltypes_promoted, constraint:restrict_to, table_format:orc/def/block
+table_name:alltypes_deleted_rows, constraint:restrict_to, table_format:orc/def/block
 table_name:stringpartitionkey, constraint:restrict_to, table_format:text/none/none
 table_name:alltypesnopart_insert, constraint:restrict_to, table_format:text/none/none
 table_name:insert_overwrite_nopart, constraint:restrict_to, table_format:text/none/none

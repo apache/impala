@@ -44,6 +44,7 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.SqlConstraints;
@@ -382,8 +383,9 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     LocalPartitionSpec spec = new LocalPartitionSpec(
         this, CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);
     LocalFsPartition prototypePartition = new LocalFsPartition(
-        this, spec, protoMsPartition, /*fileDescriptors=*/null, /*partitionStats=*/null,
-        /*hasIncrementalStats=*/false, /*isMarkedCached=*/false);
+        this, spec, protoMsPartition, /*fileDescriptors=*/null,
+        /*insertFileDescriptors=*/null, /*deleteFileDescriptors=*/null,
+        /*partitionStats=*/null, /*hasIncrementalStats=*/false, /*isMarkedCached=*/false);
     return prototypePartition;
   }
 
@@ -457,8 +459,11 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
             "' (perhaps it was concurrently dropped by another process)");
       }
 
+      ImmutableList<FileDescriptor> fds = p.getInsertFileDescriptors().isEmpty() ?
+          p.getFileDescriptors() : ImmutableList.of();
       LocalFsPartition part = new LocalFsPartition(this, spec, p.getHmsPartition(),
-          p.getFileDescriptors(), p.getPartitionStats(), p.hasIncrementalStats(),
+          fds, p.getInsertFileDescriptors(),
+          p.getDeleteFileDescriptors(), p.getPartitionStats(), p.hasIncrementalStats(),
           p.isMarkedCached());
       ret.add(part);
     }

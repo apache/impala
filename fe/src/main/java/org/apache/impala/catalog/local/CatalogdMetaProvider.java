@@ -961,19 +961,14 @@ public class CatalogdMetaProvider implements MetaProvider {
 
       // Transform the file descriptors to the caller's index.
       checkResponse(part.file_descriptors != null, req, "missing file descriptors");
-      List<FileDescriptor> fds = Lists.newArrayListWithCapacity(
-          part.file_descriptors.size());
-      for (THdfsFileDesc thriftFd: part.file_descriptors) {
-        FileDescriptor fd = FileDescriptor.fromThrift(thriftFd);
-        // The file descriptors returned via the RPC use host indexes that reference
-        // the 'network_addresses' list in the RPC. However, the caller may have already
-        // loaded some addresses into 'hostIndex'. So, the returned FDs need to be
-        // remapped to point to the caller's 'hostIndex' instead of the list in the
-        // RPC response.
-        fds.add(fd.cloneWithNewHostIndex(resp.table_info.network_addresses, hostIndex));
-      }
+      ImmutableList<FileDescriptor> fds = convertThriftFdList(part.file_descriptors,
+          resp.table_info.network_addresses, hostIndex);
+      ImmutableList<FileDescriptor> insertFds = convertThriftFdList(
+          part.insert_file_descriptors, resp.table_info.network_addresses, hostIndex);
+      ImmutableList<FileDescriptor> deleteFds = convertThriftFdList(
+          part.delete_file_descriptors, resp.table_info.network_addresses, hostIndex);
       PartitionMetadataImpl metaImpl = new PartitionMetadataImpl(msPart,
-          ImmutableList.copyOf(fds), part.getPartition_stats(),
+          fds, insertFds, deleteFds, part.getPartition_stats(),
           part.has_incremental_stats, part.is_marked_cached);
 
       checkResponse(partRef != null, req, "returned unexpected partition id %s", part.id);
@@ -985,6 +980,21 @@ public class CatalogdMetaProvider implements MetaProvider {
       }
     }
     return ret;
+  }
+
+  private ImmutableList<FileDescriptor> convertThriftFdList(List<THdfsFileDesc> thriftFds,
+      List<TNetworkAddress> networkAddresses, ListMap<TNetworkAddress> hostIndex) {
+    List<FileDescriptor> fds = Lists.newArrayListWithCapacity(thriftFds.size());
+    for (THdfsFileDesc thriftFd: thriftFds) {
+      FileDescriptor fd = FileDescriptor.fromThrift(thriftFd);
+      // The file descriptors returned via the RPC use host indexes that reference
+      // the 'network_addresses' list in the RPC. However, the caller may have already
+      // loaded some addresses into 'hostIndex'. So, the returned FDs need to be
+      // remapped to point to the caller's 'hostIndex' instead of the list in the
+      // RPC response.
+      fds.add(fd.cloneWithNewHostIndex(networkAddresses, hostIndex));
+    }
+    return ImmutableList.copyOf(fds);
   }
 
   /**
@@ -1465,14 +1475,19 @@ public class CatalogdMetaProvider implements MetaProvider {
   public static class PartitionMetadataImpl implements PartitionMetadata {
     private final Partition msPartition_;
     private final ImmutableList<FileDescriptor> fds_;
+    private final ImmutableList<FileDescriptor> insertFds_;
+    private final ImmutableList<FileDescriptor> deleteFds_;
     private final byte[] partitionStats_;
     private final boolean hasIncrementalStats_;
     private final boolean isMarkedCached_;
 
     public PartitionMetadataImpl(Partition msPartition, ImmutableList<FileDescriptor> fds,
+        ImmutableList<FileDescriptor> insertFds, ImmutableList<FileDescriptor> deleteFds,
         byte[] partitionStats, boolean hasIncrementalStats, boolean isMarkedCached) {
       this.msPartition_ = Preconditions.checkNotNull(msPartition);
       this.fds_ = fds;
+      this.insertFds_ = insertFds;
+      this.deleteFds_ = deleteFds;
       this.partitionStats_ = partitionStats;
       this.hasIncrementalStats_ = hasIncrementalStats;
       this.isMarkedCached_ = isMarkedCached;
@@ -1485,12 +1500,24 @@ public class CatalogdMetaProvider implements MetaProvider {
     public PartitionMetadataImpl cloneRelativeToHostIndex(
         ListMap<TNetworkAddress> origIndex,
         ListMap<TNetworkAddress> dstIndex) {
-      List<FileDescriptor> fds = Lists.newArrayListWithCapacity(fds_.size());
-      for (FileDescriptor fd: fds_) {
-        fds.add(fd.cloneWithNewHostIndex(origIndex.getList(), dstIndex));
-      }
-      return new PartitionMetadataImpl(msPartition_, ImmutableList.copyOf(fds),
+      ImmutableList<FileDescriptor> fds = cloneFdsRelativeToHostIndex(
+          fds_, origIndex, dstIndex);
+      ImmutableList<FileDescriptor> insertFds = cloneFdsRelativeToHostIndex(
+          insertFds_, origIndex, dstIndex);
+      ImmutableList<FileDescriptor> deleteFds = cloneFdsRelativeToHostIndex(
+          deleteFds_, origIndex, dstIndex);
+      return new PartitionMetadataImpl(msPartition_, fds, insertFds, deleteFds,
           partitionStats_, hasIncrementalStats_, isMarkedCached_);
+    }
+
+    private static ImmutableList<FileDescriptor> cloneFdsRelativeToHostIndex(
+        ImmutableList<FileDescriptor> fds, ListMap<TNetworkAddress> origIndex,
+        ListMap<TNetworkAddress> dstIndex) {
+      List<FileDescriptor> ret = Lists.newArrayListWithCapacity(fds.size());
+      for (FileDescriptor fd: fds) {
+        ret.add(fd.cloneWithNewHostIndex(origIndex.getList(), dstIndex));
+      }
+      return ImmutableList.copyOf(ret);
     }
 
     @Override
@@ -1500,7 +1527,22 @@ public class CatalogdMetaProvider implements MetaProvider {
 
     @Override
     public ImmutableList<FileDescriptor> getFileDescriptors() {
-      return fds_;
+      if (insertFds_.isEmpty()) return fds_;
+      List<FileDescriptor> ret = Lists.newArrayListWithCapacity(
+          insertFds_.size() + deleteFds_.size());
+      ret.addAll(insertFds_);
+      ret.addAll(deleteFds_);
+      return ImmutableList.copyOf(ret);
+    }
+
+    @Override
+    public ImmutableList<FileDescriptor> getInsertFileDescriptors() {
+      return insertFds_;
+    }
+
+    @Override
+    public ImmutableList<FileDescriptor> getDeleteFileDescriptors() {
+      return deleteFds_;
     }
 
     @Override

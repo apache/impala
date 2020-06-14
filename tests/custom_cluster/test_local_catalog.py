@@ -27,7 +27,8 @@ import time
 from multiprocessing.pool import ThreadPool
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfHive2
+from tests.common.skip import (SkipIfHive2, SkipIfS3, SkipIfABFS,
+                               SkipIfADLS, SkipIfIsilon, SkipIfLocal)
 from tests.util.filesystem_utils import WAREHOUSE
 
 RETRY_PROFILE_MSG = 'Retried query planning due to inconsistent metadata'
@@ -459,6 +460,10 @@ class TestObservability(CustomClusterTestSuite):
 
 
 class TestFullAcid(CustomClusterTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
   @SkipIfHive2.acid
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -471,6 +476,15 @@ class TestFullAcid(CustomClusterTestSuite):
     res.data.sort()
     assert res.data == ['0', '1', '2', '3', '4', '5', '6', '7']
 
+  @SkipIfHive2.acid
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  @pytest.mark.execute_serially
+  def test_full_acid_scans(self, vector, unique_database):
+    self.run_test_case('QueryTest/full-acid-scans', vector, use_db=unique_database)
 
 class TestReusePartitionMetadata(CustomClusterTestSuite):
   @pytest.mark.execute_serially

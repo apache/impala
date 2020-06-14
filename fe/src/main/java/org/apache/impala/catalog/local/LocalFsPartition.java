@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog.local;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -51,7 +52,13 @@ public class LocalFsPartition implements FeFsPartition {
    * Null in the case of a 'prototype partition'.
    */
   @Nullable
-  private final ImmutableList<FileDescriptor> fileDescriptors_;
+  private ImmutableList<FileDescriptor> fileDescriptors_;
+
+  @Nullable
+  private ImmutableList<FileDescriptor> insertFileDescriptors_;
+
+  @Nullable
+  private ImmutableList<FileDescriptor> deleteFileDescriptors_;
 
   @Nullable
   private final byte[] partitionStats_;
@@ -66,11 +73,15 @@ public class LocalFsPartition implements FeFsPartition {
 
   public LocalFsPartition(LocalFsTable table, LocalPartitionSpec spec,
       Partition msPartition, ImmutableList<FileDescriptor> fileDescriptors,
+      ImmutableList<FileDescriptor> insertFileDescriptors,
+      ImmutableList<FileDescriptor> deleteFileDescriptors,
       byte [] partitionStats, boolean hasIncrementalStats, boolean isMarkedCached) {
     table_ = Preconditions.checkNotNull(table);
     spec_ = Preconditions.checkNotNull(spec);
     msPartition_ = Preconditions.checkNotNull(msPartition);
     fileDescriptors_ = fileDescriptors;
+    insertFileDescriptors_ = insertFileDescriptors;
+    deleteFileDescriptors_ = deleteFileDescriptors;
     partitionStats_ = partitionStats;
     hasIncrementalStats_ = hasIncrementalStats;
     isMarkedCached_ = isMarkedCached;
@@ -100,17 +111,35 @@ public class LocalFsPartition implements FeFsPartition {
 
   @Override
   public List<FileDescriptor> getFileDescriptors() {
-    return fileDescriptors_;
+    if (!fileDescriptors_.isEmpty()) return fileDescriptors_;
+    List<FileDescriptor> ret = new ArrayList<>();
+    ret.addAll(insertFileDescriptors_);
+    ret.addAll(deleteFileDescriptors_);
+    return ret;
+  }
+
+  @Override
+  public List<FileDescriptor> getInsertFileDescriptors() {
+    return insertFileDescriptors_;
+  }
+
+  @Override
+  public List<FileDescriptor> getDeleteFileDescriptors() {
+    return deleteFileDescriptors_;
   }
 
   @Override
   public boolean hasFileDescriptors() {
-    return !fileDescriptors_.isEmpty();
+    return !fileDescriptors_.isEmpty() ||
+           !insertFileDescriptors_.isEmpty() ||
+           !deleteFileDescriptors_.isEmpty();
   }
 
   @Override
   public int getNumFileDescriptors() {
-    return fileDescriptors_.size();
+    return fileDescriptors_.size() +
+           insertFileDescriptors_.size() +
+           deleteFileDescriptors_.size();
   }
 
   @Override
@@ -188,7 +217,7 @@ public class LocalFsPartition implements FeFsPartition {
   @Override
   public long getSize() {
     long size = 0;
-    for (FileDescriptor fd : fileDescriptors_) {
+    for (FileDescriptor fd : getFileDescriptors()) {
       size += fd.getFileLength();
     }
     return size;
@@ -227,5 +256,22 @@ public class LocalFsPartition implements FeFsPartition {
   @Override
   public long getWriteId() {
     return MetastoreShim.getWriteIdFromMSPartition(msPartition_);
+  }
+
+  @Override
+  public LocalFsPartition genInsertDeltaPartition() {
+    ImmutableList<FileDescriptor> fds = insertFileDescriptors_.isEmpty() ?
+        fileDescriptors_ : insertFileDescriptors_;
+    return new LocalFsPartition(table_, spec_, msPartition_, fds,
+        ImmutableList.of(), ImmutableList.of(), partitionStats_,
+        hasIncrementalStats_, isMarkedCached_);
+  }
+
+  @Override
+  public LocalFsPartition genDeleteDeltaPartition() {
+    if (deleteFileDescriptors_.isEmpty()) return null;
+    return new LocalFsPartition(table_, spec_, msPartition_, deleteFileDescriptors_,
+        ImmutableList.of(), ImmutableList.of(), partitionStats_,
+        hasIncrementalStats_, isMarkedCached_);
   }
 }

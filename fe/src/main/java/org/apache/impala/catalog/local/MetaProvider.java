@@ -147,6 +147,8 @@ public interface MetaProvider {
   interface PartitionMetadata {
     Partition getHmsPartition();
     ImmutableList<FileDescriptor> getFileDescriptors();
+    ImmutableList<FileDescriptor> getInsertFileDescriptors();
+    ImmutableList<FileDescriptor> getDeleteFileDescriptors();
     byte[] getPartitionStats();
     boolean hasIncrementalStats();
     boolean isMarkedCached();

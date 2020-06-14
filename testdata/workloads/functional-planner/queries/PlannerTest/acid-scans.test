@@ -1,0 +1,829 @@
+# Select from a full ACID table that has deleted rows. The plan should
+# contain an DELETE EVENTS HASH JOIN between the insert deltas and delete deltas.
+select * from alltypes_deleted_rows;
+---- PLAN
+PLAN-ROOT SINK
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=100B cardinality=3.44K
+|
+|--01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows functional_orc_def.alltypes_deleted_rows-delete-delta]
+|     HDFS partitions=6/24 files=6 size=6.58KB
+|     row-size=28B cardinality=419
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows]
+   HDFS partitions=24/24 files=24 size=54.09KB
+      row-size=100B cardinality=3.44K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  row-size=100B cardinality=3.44K
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows functional_orc_def.alltypes_deleted_rows-delete-delta]
+|     HDFS partitions=6/24 files=6 size=6.58KB
+|     row-size=28B cardinality=419
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows]
+   HDFS partitions=24/24 files=24 size=54.09KB
+      row-size=100B cardinality=3.44K
+====
+# Select from a partition that has delete delta files.
+select * from alltypes_deleted_rows where month = 2 and year = 2010;
+---- PLAN
+PLAN-ROOT SINK
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=100B cardinality=143
+|
+|--01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows functional_orc_def.alltypes_deleted_rows-delete-delta]
+|     partition predicates: `month` = 2, `year` = 2010
+|     HDFS partitions=1/24 files=1 size=1.10KB
+|     row-size=28B cardinality=70
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows]
+   partition predicates: `month` = 2, `year` = 2010
+   HDFS partitions=1/24 files=1 size=2.24KB
+      row-size=100B cardinality=143
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  row-size=100B cardinality=143
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows functional_orc_def.alltypes_deleted_rows-delete-delta]
+|     partition predicates: `month` = 2, `year` = 2010
+|     HDFS partitions=1/24 files=1 size=1.10KB
+|     row-size=28B cardinality=70
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows]
+   partition predicates: `month` = 2, `year` = 2010
+   HDFS partitions=1/24 files=1 size=2.24KB
+      row-size=100B cardinality=143
+====
+# Select from a partition that don't have delete delta files. It should
+# just do a simple SCAN.
+select * from alltypes_deleted_rows where month = 2 and year = 2009;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows]
+   partition predicates: `month` = 2, `year` = 2009
+   HDFS partitions=1/24 files=1 size=2.25KB
+      row-size=80B cardinality=143
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows]
+   partition predicates: `month` = 2, `year` = 2009
+   HDFS partitions=1/24 files=1 size=2.25KB
+      row-size=80B cardinality=143
+====
+# Use IN predicate to join the table with itself.
+select *
+from alltypes_deleted_rows dd
+where id in (select max(id) from alltypes_deleted_rows group by month);
+---- PLAN
+PLAN-ROOT SINK
+|
+07:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: id = max(id)
+|  runtime filters: RF000 <- max(id)
+|  row-size=100B cardinality=3.44K
+|
+|--06:AGGREGATE [FINALIZE]
+|  |  output: max(id)
+|  |  group by: `month`
+|  |  row-size=8B cardinality=12
+|  |
+|  05:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  |  row-size=32B cardinality=3.44K
+|  |
+|  |--04:SCAN HDFS [functional_orc_def.alltypes_deleted_rows functional_orc_def.alltypes_deleted_rows-delete-delta]
+|  |     HDFS partitions=6/24 files=6 size=6.58KB
+|  |     row-size=28B cardinality=419
+|  |
+|  03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows]
+|     HDFS partitions=24/24 files=24 size=54.09KB
+|     row-size=32B cardinality=3.44K
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=100B cardinality=3.44K
+|
+|--01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows dd-delete-delta]
+|     HDFS partitions=6/24 files=6 size=6.58KB
+|     row-size=28B cardinality=419
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows dd]
+   HDFS partitions=24/24 files=24 size=54.09KB
+      runtime filters: RF000 -> id
+         row-size=100B cardinality=3.44K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+13:EXCHANGE [UNPARTITIONED]
+|
+07:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: id = max(id)
+|  runtime filters: RF000 <- max(id)
+|  row-size=100B cardinality=3.44K
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  11:AGGREGATE [FINALIZE]
+|  |  output: max:merge(id)
+|  |  group by: `month`
+|  |  row-size=8B cardinality=12
+|  |
+|  10:EXCHANGE [HASH(`month`)]
+|  |
+|  06:AGGREGATE [STREAMING]
+|  |  output: max(id)
+|  |  group by: `month`
+|  |  row-size=8B cardinality=12
+|  |
+|  05:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  |  row-size=32B cardinality=3.44K
+|  |
+|  |--09:EXCHANGE [BROADCAST]
+|  |  |
+|  |  04:SCAN HDFS [functional_orc_def.alltypes_deleted_rows functional_orc_def.alltypes_deleted_rows-delete-delta]
+|  |     HDFS partitions=6/24 files=6 size=6.58KB
+|  |     row-size=28B cardinality=419
+|  |
+|  03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows]
+|     HDFS partitions=24/24 files=24 size=54.09KB
+|     row-size=32B cardinality=3.44K
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  row-size=100B cardinality=3.44K
+|
+|--08:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows dd-delete-delta]
+|     HDFS partitions=6/24 files=6 size=6.58KB
+|     row-size=28B cardinality=419
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows dd]
+   HDFS partitions=24/24 files=24 size=54.09KB
+      runtime filters: RF000 -> id
+         row-size=100B cardinality=3.44K
+====
+# Do an explicit join with itself. This creates a bushy plan.
+select t1.id, t2.month
+from alltypes_deleted_rows t1, alltypes_deleted_rows t2
+where t1.id % 12 = t2.month;
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id % 12 = t2.`month`
+|  runtime filters: RF000 <- t2.`month`
+|  row-size=60B cardinality=3.44K
+|
+|--05:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  |  row-size=28B cardinality=3.44K
+|  |
+|  |--04:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t2-delete-delta]
+|  |     HDFS partitions=6/24 files=6 size=6.58KB
+|  |     row-size=28B cardinality=419
+|  |
+|  03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t2]
+|     HDFS partitions=24/24 files=24 size=54.09KB
+|     row-size=28B cardinality=3.44K
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=32B cardinality=3.44K
+|
+|--01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t1-delete-delta]
+|     HDFS partitions=6/24 files=6 size=6.58KB
+|     row-size=28B cardinality=419
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t1]
+   HDFS partitions=24/24 files=24 size=54.09KB
+      runtime filters: RF000 -> t1.id % 12
+         row-size=32B cardinality=3.44K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+11:EXCHANGE [UNPARTITIONED]
+|
+06:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: t1.id % 12 = t2.`month`
+|  runtime filters: RF000 <- t2.`month`
+|  row-size=60B cardinality=3.44K
+|
+|--10:EXCHANGE [HASH(t2.`month`)]
+|  |
+|  05:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  |  row-size=28B cardinality=3.44K
+|  |
+|  |--08:EXCHANGE [BROADCAST]
+|  |  |
+|  |  04:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t2-delete-delta]
+|  |     HDFS partitions=6/24 files=6 size=6.58KB
+|  |     row-size=28B cardinality=419
+|  |
+|  03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t2]
+|     HDFS partitions=24/24 files=24 size=54.09KB
+|     row-size=28B cardinality=3.44K
+|
+09:EXCHANGE [HASH(t1.id % 12)]
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  row-size=32B cardinality=3.44K
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t1-delete-delta]
+|     HDFS partitions=6/24 files=6 size=6.58KB
+|     row-size=28B cardinality=419
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t1]
+   HDFS partitions=24/24 files=24 size=54.09KB
+      runtime filters: RF000 -> t1.id % 12
+         row-size=32B cardinality=3.44K
+====
+# Use IN predicate to join the table with itself.
+# Use explain_level=2.
+select *
+from alltypes_deleted_rows dd
+where id in (select max(id) from alltypes_deleted_rows group by month);
+---- QUERYOPTIONS
+explain_level=2
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=228.88MB mem-reservation=6.98MB thread-reservation=5 runtime-filters-memory=1.00MB
+PLAN-ROOT SINK
+|  output exprs: dd.id, dd.bool_col, dd.tinyint_col, dd.smallint_col, dd.int_col, dd.bigint_col, dd.float_col, dd.double_col, dd.date_string_col, dd.string_col, dd.timestamp_col, dd.year, dd.month
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+07:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: id = max(id)
+|  runtime filters: RF000[bloom] <- max(id)
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0 row-size=100B cardinality=3.44K
+|  in pipelines: 00(GETNEXT), 06(OPEN)
+|
+|--06:AGGREGATE [FINALIZE]
+|  |  output: max(id)
+|  |  group by: `month`
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=2 row-size=8B cardinality=12
+|  |  in pipelines: 06(GETNEXT), 03(OPEN)
+|  |
+|  05:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  |  hash predicates: functional_orc_def.alltypes_deleted_rows.month = functional_orc_def.alltypes_deleted_rows-delete-delta.month, functional_orc_def.alltypes_deleted_rows.row__id.bucket = functional_orc_def.alltypes_deleted_rows-delete-delta.row__id.bucket, functional_orc_def.alltypes_deleted_rows.row__id.originaltransaction = functional_orc_def.alltypes_deleted_rows-delete-delta.row__id.originaltransaction, functional_orc_def.alltypes_deleted_rows.row__id.rowid = functional_orc_def.alltypes_deleted_rows-delete-delta.row__id.rowid, functional_orc_def.alltypes_deleted_rows.year = functional_orc_def.alltypes_deleted_rows-delete-delta.year
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=1 row-size=32B cardinality=3.44K
+|  |  in pipelines: 03(GETNEXT), 04(OPEN)
+|  |
+|  |--04:SCAN HDFS [functional_orc_def.alltypes_deleted_rows functional_orc_def.alltypes_deleted_rows-delete-delta]
+|  |     HDFS partitions=6/24 files=6 size=6.58KB
+|  |     stored statistics:
+|  |       table: rows=unavailable size=unavailable
+|  |       partitions: 0/6 rows=unavailable
+|  |       columns: all
+|  |     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
+|  |     tuple-ids=5 row-size=28B cardinality=419
+|  |     in pipelines: 04(GETNEXT)
+|  |
+|  03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows]
+|     HDFS partitions=24/24 files=24 size=54.09KB
+|     stored statistics:
+|       table: rows=unavailable size=unavailable
+|       partitions: 0/24 rows=unavailable
+|       columns missing stats: id
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
+|     tuple-ids=1 row-size=32B cardinality=3.44K
+|     in pipelines: 03(GETNEXT)
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  hash predicates: dd.month = dd-delete-delta.month, dd.row__id.bucket = dd-delete-delta.row__id.bucket, dd.row__id.originaltransaction = dd-delete-delta.row__id.originaltransaction, dd.row__id.rowid = dd-delete-delta.row__id.rowid, dd.year = dd-delete-delta.year
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0 row-size=100B cardinality=3.44K
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows dd-delete-delta]
+|     HDFS partitions=6/24 files=6 size=6.58KB
+|     stored statistics:
+|       table: rows=unavailable size=unavailable
+|       partitions: 0/6 rows=unavailable
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
+|     tuple-ids=4 row-size=28B cardinality=419
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows dd]
+   HDFS partitions=24/24 files=24 size=54.09KB
+   runtime filters: RF000[bloom] -> id
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=64.00MB mem-reservation=112.00KB thread-reservation=1
+   tuple-ids=0 row-size=100B cardinality=3.44K
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=424.01KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: dd.id, dd.bool_col, dd.tinyint_col, dd.smallint_col, dd.int_col, dd.bigint_col, dd.float_col, dd.double_col, dd.date_string_col, dd.string_col, dd.timestamp_col, dd.year, dd.month
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+13:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=424.01KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=100B cardinality=3.44K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=68.94MB mem-reservation=4.98MB thread-reservation=2 runtime-filters-memory=1.00MB
+07:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: id = max(id)
+|  runtime filters: RF000[bloom] <- max(id)
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0 row-size=100B cardinality=3.44K
+|  in pipelines: 00(GETNEXT), 11(OPEN)
+|
+|--12:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=8B cardinality=12
+|  |  in pipelines: 11(GETNEXT)
+|  |
+|  F04:PLAN FRAGMENT [HASH(`month`)] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+|  11:AGGREGATE [FINALIZE]
+|  |  output: max:merge(id)
+|  |  group by: `month`
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=2 row-size=8B cardinality=12
+|  |  in pipelines: 11(GETNEXT), 03(OPEN)
+|  |
+|  10:EXCHANGE [HASH(`month`)]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=8B cardinality=12
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=75.99MB mem-reservation=3.97MB thread-reservation=2
+|  06:AGGREGATE [STREAMING]
+|  |  output: max(id)
+|  |  group by: `month`
+|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=2 row-size=8B cardinality=12
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  05:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  |  hash predicates: functional_orc_def.alltypes_deleted_rows.month = functional_orc_def.alltypes_deleted_rows-delete-delta.month, functional_orc_def.alltypes_deleted_rows.row__id.bucket = functional_orc_def.alltypes_deleted_rows-delete-delta.row__id.bucket, functional_orc_def.alltypes_deleted_rows.row__id.originaltransaction = functional_orc_def.alltypes_deleted_rows-delete-delta.row__id.originaltransaction, functional_orc_def.alltypes_deleted_rows.row__id.rowid = functional_orc_def.alltypes_deleted_rows-delete-delta.row__id.rowid, functional_orc_def.alltypes_deleted_rows.year = functional_orc_def.alltypes_deleted_rows-delete-delta.year
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=1 row-size=32B cardinality=3.44K
+|  |  in pipelines: 03(GETNEXT), 04(OPEN)
+|  |
+|  |--09:EXCHANGE [BROADCAST]
+|  |  |  mem-estimate=50.74KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=5 row-size=28B cardinality=419
+|  |  |  in pipelines: 04(GETNEXT)
+|  |  |
+|  |  F03:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  |  Per-Host Resources: mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=2
+|  |  04:SCAN HDFS [functional_orc_def.alltypes_deleted_rows functional_orc_def.alltypes_deleted_rows-delete-delta, RANDOM]
+|  |     HDFS partitions=6/24 files=6 size=6.58KB
+|  |     stored statistics:
+|  |       table: rows=unavailable size=unavailable
+|  |       partitions: 0/6 rows=unavailable
+|  |       columns: all
+|  |     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
+|  |     tuple-ids=5 row-size=28B cardinality=419
+|  |     in pipelines: 04(GETNEXT)
+|  |
+|  03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows, RANDOM]
+|     HDFS partitions=24/24 files=24 size=54.09KB
+|     stored statistics:
+|       table: rows=unavailable size=unavailable
+|       partitions: 0/24 rows=unavailable
+|       columns missing stats: id
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
+|     tuple-ids=1 row-size=32B cardinality=3.44K
+|     in pipelines: 03(GETNEXT)
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  hash predicates: dd.month = dd-delete-delta.month, dd.row__id.bucket = dd-delete-delta.row__id.bucket, dd.row__id.originaltransaction = dd-delete-delta.row__id.originaltransaction, dd.row__id.rowid = dd-delete-delta.row__id.rowid, dd.year = dd-delete-delta.year
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0 row-size=100B cardinality=3.44K
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--08:EXCHANGE [BROADCAST]
+|  |  mem-estimate=50.74KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=4 row-size=28B cardinality=419
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=2
+|  01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows dd-delete-delta, RANDOM]
+|     HDFS partitions=6/24 files=6 size=6.58KB
+|     stored statistics:
+|       table: rows=unavailable size=unavailable
+|       partitions: 0/6 rows=unavailable
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
+|     tuple-ids=4 row-size=28B cardinality=419
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows dd, RANDOM]
+   HDFS partitions=24/24 files=24 size=54.09KB
+   runtime filters: RF000[bloom] -> id
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=64.00MB mem-reservation=112.00KB thread-reservation=1
+   tuple-ids=0 row-size=100B cardinality=3.44K
+   in pipelines: 00(GETNEXT)
+====
+# Do an explicit join with itself. This creates a bushy plan.
+# Use explain_level=3.
+select t1.id, t2.month
+from alltypes_deleted_rows t1, alltypes_deleted_rows t2
+where t1.id % 12 = t2.month;
+---- QUERYOPTIONS
+explain_level=3
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+Per-Host Resources: mem-estimate=212.88MB mem-reservation=6.89MB thread-reservation=5 runtime-filters-memory=1.00MB
+  PLAN-ROOT SINK
+  |  output exprs: t1.id, t2.`month`
+  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+  |
+  06:HASH JOIN [INNER JOIN]
+  |  hash predicates: t1.id % 12 = t2.`month`
+  |  fk/pk conjuncts: assumed fk/pk
+  |  runtime filters: RF000[bloom] <- t2.`month`
+  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+  |  tuple-ids=0,1 row-size=60B cardinality=3.44K
+  |  in pipelines: 00(GETNEXT), 03(OPEN)
+  |
+  |--05:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+  |  |  hash predicates: t2.month = t2-delete-delta.month, t2.row__id.bucket = t2-delete-delta.row__id.bucket, t2.row__id.originaltransaction = t2-delete-delta.row__id.originaltransaction, t2.row__id.rowid = t2-delete-delta.row__id.rowid, t2.year = t2-delete-delta.year
+  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+  |  |  tuple-ids=1 row-size=28B cardinality=3.44K
+  |  |  in pipelines: 03(GETNEXT), 04(OPEN)
+  |  |
+  |  |--04:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t2-delete-delta]
+  |  |     HDFS partitions=6/24 files=6 size=6.58KB
+  |  |     stored statistics:
+  |  |       table: rows=unavailable size=unavailable
+  |  |       partitions: 0/6 rows=unavailable
+  |  |       columns: all
+  |  |     extrapolated-rows=disabled max-scan-range-rows=unavailable
+  |  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
+  |  |     tuple-ids=3 row-size=28B cardinality=419
+  |  |     in pipelines: 04(GETNEXT)
+  |  |
+  |  03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t2]
+  |     HDFS partitions=24/24 files=24 size=54.09KB
+  |     stored statistics:
+  |       table: rows=unavailable size=unavailable
+  |       partitions: 0/24 rows=unavailable
+  |       columns: all
+  |     extrapolated-rows=disabled max-scan-range-rows=unavailable
+  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
+  |     tuple-ids=1 row-size=28B cardinality=3.44K
+  |     in pipelines: 03(GETNEXT)
+  |
+  02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+  |  hash predicates: t1.month = t1-delete-delta.month, t1.row__id.bucket = t1-delete-delta.row__id.bucket, t1.row__id.originaltransaction = t1-delete-delta.row__id.originaltransaction, t1.row__id.rowid = t1-delete-delta.row__id.rowid, t1.year = t1-delete-delta.year
+  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+  |  tuple-ids=0 row-size=32B cardinality=3.44K
+  |  in pipelines: 00(GETNEXT), 01(OPEN)
+  |
+  |--01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t1-delete-delta]
+  |     HDFS partitions=6/24 files=6 size=6.58KB
+  |     stored statistics:
+  |       table: rows=unavailable size=unavailable
+  |       partitions: 0/6 rows=unavailable
+  |       columns: all
+  |     extrapolated-rows=disabled max-scan-range-rows=unavailable
+  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
+  |     tuple-ids=2 row-size=28B cardinality=419
+  |     in pipelines: 01(GETNEXT)
+  |
+  00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t1]
+     HDFS partitions=24/24 files=24 size=54.09KB
+     runtime filters: RF000[bloom] -> t1.id % 12
+     stored statistics:
+       table: rows=unavailable size=unavailable
+       partitions: 0/24 rows=unavailable
+       columns missing stats: id
+     extrapolated-rows=disabled max-scan-range-rows=unavailable
+     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
+     tuple-ids=0 row-size=32B cardinality=3.44K
+     in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+Per-Host Resources: mem-estimate=271.21KB mem-reservation=0B thread-reservation=1
+  PLAN-ROOT SINK
+  |  output exprs: t1.id, t2.`month`
+  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+  |
+  11:EXCHANGE [UNPARTITIONED]
+     mem-estimate=271.21KB mem-reservation=0B thread-reservation=0
+     tuple-ids=0,1 row-size=60B cardinality=3.44K
+     in pipelines: 00(GETNEXT)
+
+F04:PLAN FRAGMENT [HASH(t1.id % 12)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=3.20MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
+  DATASTREAM SINK [FRAGMENT=F05, EXCHANGE=11, UNPARTITIONED]
+  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+  06:HASH JOIN [INNER JOIN, PARTITIONED]
+  |  hash predicates: t1.id % 12 = t2.`month`
+  |  fk/pk conjuncts: assumed fk/pk
+  |  runtime filters: RF000[bloom] <- t2.`month`
+  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+  |  tuple-ids=0,1 row-size=60B cardinality=3.44K
+  |  in pipelines: 00(GETNEXT), 03(OPEN)
+  |
+  |--10:EXCHANGE [HASH(t2.`month`)]
+  |     mem-estimate=127.36KB mem-reservation=0B thread-reservation=0
+  |     tuple-ids=1 row-size=28B cardinality=3.44K
+  |     in pipelines: 03(GETNEXT)
+  |
+  09:EXCHANGE [HASH(t1.id % 12)]
+     mem-estimate=143.84KB mem-reservation=0B thread-reservation=0
+     tuple-ids=0 row-size=32B cardinality=3.44K
+     in pipelines: 00(GETNEXT)
+
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=66.99MB mem-reservation=2.97MB thread-reservation=2 runtime-filters-memory=1.00MB
+  DATASTREAM SINK [FRAGMENT=F04, EXCHANGE=09, HASH(t1.id % 12)]
+  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+  02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+  |  hash predicates: t1.month = t1-delete-delta.month, t1.row__id.bucket = t1-delete-delta.row__id.bucket, t1.row__id.originaltransaction = t1-delete-delta.row__id.originaltransaction, t1.row__id.rowid = t1-delete-delta.row__id.rowid, t1.year = t1-delete-delta.year
+  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+  |  tuple-ids=0 row-size=32B cardinality=3.44K
+  |  in pipelines: 00(GETNEXT), 01(OPEN)
+  |
+  |--07:EXCHANGE [BROADCAST]
+  |     mem-estimate=50.74KB mem-reservation=0B thread-reservation=0
+  |     tuple-ids=2 row-size=28B cardinality=419
+  |     in pipelines: 01(GETNEXT)
+  |
+  00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t1, RANDOM]
+     HDFS partitions=24/24 files=24 size=54.09KB
+     runtime filters: RF000[bloom] -> t1.id % 12
+     stored statistics:
+       table: rows=unavailable size=unavailable
+       partitions: 0/24 rows=unavailable
+       columns missing stats: id
+     extrapolated-rows=disabled max-scan-range-rows=unavailable
+     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
+     tuple-ids=0 row-size=32B cardinality=3.44K
+     in pipelines: 00(GETNEXT)
+
+F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=2
+  DATASTREAM SINK [FRAGMENT=F00, EXCHANGE=07, BROADCAST]
+  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+  01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t1-delete-delta, RANDOM]
+     HDFS partitions=6/24 files=6 size=6.58KB
+     stored statistics:
+       table: rows=unavailable size=unavailable
+       partitions: 0/6 rows=unavailable
+       columns: all
+     extrapolated-rows=disabled max-scan-range-rows=unavailable
+     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
+     tuple-ids=2 row-size=28B cardinality=419
+     in pipelines: 01(GETNEXT)
+
+F02:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=49.99MB mem-reservation=1.96MB thread-reservation=2
+  DATASTREAM SINK [FRAGMENT=F04, EXCHANGE=10, HASH(t2.`month`)]
+  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+  05:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+  |  hash predicates: t2.month = t2-delete-delta.month, t2.row__id.bucket = t2-delete-delta.row__id.bucket, t2.row__id.originaltransaction = t2-delete-delta.row__id.originaltransaction, t2.row__id.rowid = t2-delete-delta.row__id.rowid, t2.year = t2-delete-delta.year
+  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+  |  tuple-ids=1 row-size=28B cardinality=3.44K
+  |  in pipelines: 03(GETNEXT), 04(OPEN)
+  |
+  |--08:EXCHANGE [BROADCAST]
+  |     mem-estimate=50.74KB mem-reservation=0B thread-reservation=0
+  |     tuple-ids=3 row-size=28B cardinality=419
+  |     in pipelines: 04(GETNEXT)
+  |
+  03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t2, RANDOM]
+     HDFS partitions=24/24 files=24 size=54.09KB
+     stored statistics:
+       table: rows=unavailable size=unavailable
+       partitions: 0/24 rows=unavailable
+       columns: all
+     extrapolated-rows=disabled max-scan-range-rows=unavailable
+     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
+     tuple-ids=1 row-size=28B cardinality=3.44K
+     in pipelines: 03(GETNEXT)
+
+F03:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=2
+  DATASTREAM SINK [FRAGMENT=F02, EXCHANGE=08, BROADCAST]
+  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+  04:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t2-delete-delta, RANDOM]
+     HDFS partitions=6/24 files=6 size=6.58KB
+     stored statistics:
+       table: rows=unavailable size=unavailable
+       partitions: 0/6 rows=unavailable
+       columns: all
+     extrapolated-rows=disabled max-scan-range-rows=unavailable
+     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
+     tuple-ids=3 row-size=28B cardinality=419
+     in pipelines: 04(GETNEXT)
+====
+# Do a join with itself, but the scanned partitions of 't2' don't have delete delta files.
+select t1.id, t2.month
+from alltypes_deleted_rows t1, alltypes_deleted_rows t2
+where t1.id % 12 = t2.month and t2.year = 2009;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id % 12 = t2.`month`
+|  runtime filters: RF000 <- t2.`month`
+|  row-size=36B cardinality=3.44K
+|
+|--03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t2]
+|     partition predicates: t2.`year` = 2009
+|     HDFS partitions=12/24 files=12 size=27.02KB
+|     row-size=4B cardinality=1.72K
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=32B cardinality=3.44K
+|
+|--01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t1-delete-delta]
+|     HDFS partitions=6/24 files=6 size=6.58KB
+|     row-size=28B cardinality=419
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t1]
+   HDFS partitions=24/24 files=24 size=54.09KB
+      runtime filters: RF000 -> t1.id % 12
+         row-size=32B cardinality=3.44K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: t1.id % 12 = t2.`month`
+|  runtime filters: RF000 <- t2.`month`
+|  row-size=36B cardinality=3.44K
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t2]
+|     partition predicates: t2.`year` = 2009
+|     HDFS partitions=12/24 files=12 size=27.02KB
+|     row-size=4B cardinality=1.72K
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  row-size=32B cardinality=3.44K
+|
+|--05:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t1-delete-delta]
+|     HDFS partitions=6/24 files=6 size=6.58KB
+|     row-size=28B cardinality=419
+|
+00:SCAN HDFS [functional_orc_def.alltypes_deleted_rows t1]
+   HDFS partitions=24/24 files=24 size=54.09KB
+      runtime filters: RF000 -> t1.id % 12
+         row-size=32B cardinality=3.44K
+====
+# Query hints + using
+select straight_join a.id from functional.alltypes a
+  join /* +BROADCAST */ functional_orc_def.alltypes_deleted_rows b
+  using (id);
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
+|  row-size=36B cardinality=6.12K
+|
+|--03:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  |  row-size=32B cardinality=3.44K
+|  |
+|  |--02:SCAN HDFS [functional_orc_def.alltypes_deleted_rows b-delete-delta]
+|  |     HDFS partitions=6/24 files=6 size=6.58KB
+|  |     row-size=28B cardinality=419
+|  |
+|  01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows b]
+|     HDFS partitions=24/24 files=24 size=54.09KB
+|     row-size=32B cardinality=3.44K
+|
+00:SCAN HDFS [functional.alltypes a]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.id
+   row-size=4B cardinality=6.12K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
+|  row-size=36B cardinality=6.12K
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  03:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  |  row-size=32B cardinality=3.44K
+|  |
+|  |--05:EXCHANGE [BROADCAST]
+|  |  |
+|  |  02:SCAN HDFS [functional_orc_def.alltypes_deleted_rows b-delete-delta]
+|  |     HDFS partitions=6/24 files=6 size=6.58KB
+|  |     row-size=28B cardinality=419
+|  |
+|  01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows b]
+|     HDFS partitions=24/24 files=24 size=54.09KB
+|     row-size=32B cardinality=3.44K
+|
+00:SCAN HDFS [functional.alltypes a]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.id
+   row-size=4B cardinality=6.12K
+====
+select straight_join a.id from functional.alltypes a
+ join /* +SHUFFLE */ functional_orc_def.alltypes_deleted_rows b
+ using (id);
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
+|  row-size=36B cardinality=6.12K
+|
+|--03:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  |  row-size=32B cardinality=3.44K
+|  |
+|  |--02:SCAN HDFS [functional_orc_def.alltypes_deleted_rows b-delete-delta]
+|  |     HDFS partitions=6/24 files=6 size=6.58KB
+|  |     row-size=28B cardinality=419
+|  |
+|  01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows b]
+|     HDFS partitions=24/24 files=24 size=54.09KB
+|     row-size=32B cardinality=3.44K
+|
+00:SCAN HDFS [functional.alltypes a]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.id
+   row-size=4B cardinality=6.12K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: a.id = b.id
+|  runtime filters: RF000 <- b.id
+|  row-size=36B cardinality=6.12K
+|
+|--07:EXCHANGE [HASH(b.id)]
+|  |
+|  03:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  |  row-size=32B cardinality=3.44K
+|  |
+|  |--05:EXCHANGE [BROADCAST]
+|  |  |
+|  |  02:SCAN HDFS [functional_orc_def.alltypes_deleted_rows b-delete-delta]
+|  |     HDFS partitions=6/24 files=6 size=6.58KB
+|  |     row-size=28B cardinality=419
+|  |
+|  01:SCAN HDFS [functional_orc_def.alltypes_deleted_rows b]
+|     HDFS partitions=24/24 files=24 size=54.09KB
+|     row-size=32B cardinality=3.44K
+|
+06:EXCHANGE [HASH(a.id)]
+|
+00:SCAN HDFS [functional.alltypes a]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> a.id
+   row-size=4B cardinality=6.12K
+====

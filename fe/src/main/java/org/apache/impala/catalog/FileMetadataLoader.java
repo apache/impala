@@ -70,6 +70,8 @@ public class FileMetadataLoader {
   private boolean forceRefreshLocations = false;
 
   private List<FileDescriptor> loadedFds_;
+  private List<FileDescriptor> loadedInsertDeltaFds_;
+  private List<FileDescriptor> loadedDeleteDeltaFds_;
   private LoadStats loadStats_;
 
   /**
@@ -126,6 +128,14 @@ public class FileMetadataLoader {
     Preconditions.checkState(loadedFds_ != null,
         "Must have successfully loaded first");
     return loadedFds_;
+  }
+
+  public List<FileDescriptor> getLoadedInsertDeltaFds() {
+    return loadedInsertDeltaFds_;
+  }
+
+  public List<FileDescriptor> getLoadedDeleteDeltaFds() {
+    return loadedDeleteDeltaFds_;
   }
 
   /**
@@ -220,6 +230,17 @@ public class FileMetadataLoader {
           ++loadStats_.skippedFiles;
         }
         loadedFds_.add(Preconditions.checkNotNull(fd));;
+      }
+      if (writeIds_ != null) {
+        loadedInsertDeltaFds_ = new ArrayList<>();
+        loadedDeleteDeltaFds_ = new ArrayList<>();
+        for (FileDescriptor fd : loadedFds_) {
+          if (AcidUtils.isDeleteDeltaFd(fd)) {
+            loadedDeleteDeltaFds_.add(fd);
+          } else {
+            loadedInsertDeltaFds_.add(fd);
+          }
+        }
       }
       loadStats_.unknownDiskIds += numUnknownDiskIds.getRef();
       if (LOG.isTraceEnabled()) {

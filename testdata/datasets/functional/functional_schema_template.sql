@@ -527,6 +527,31 @@ TBLPROPERTIES("hbase.table.name" = "functional_hbase.hbasealltypeserrornonulls")
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+alltypes_deleted_rows
+---- PARTITION_COLUMNS
+year int
+month int
+---- COLUMNS
+id int COMMENT 'Add a comment'
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+---- DEPENDENT_LOAD_ACID
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}{db_suffix}.alltypes;
+DELETE FROM {db_name}{db_suffix}.{table_name} WHERE month % 2 = 0 and year % 2 = 0 and id % 10 = 0;
+---- TABLE_PROPERTIES
+transactional=true
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 alltypesagg
 ---- PARTITION_COLUMNS
 year int

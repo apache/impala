@@ -124,7 +124,14 @@ public class ParallelFileMetadataLoader {
       FileMetadataLoader loader = loaders_.get(p);
 
       for (HdfsPartition.Builder partBuilder : e.getValue()) {
-        partBuilder.setFileDescriptors(loader.getLoadedFds());
+        partBuilder.clearFileDescriptors();
+        List<FileDescriptor> deleteDescriptors = loader.getLoadedDeleteDeltaFds();
+        if (deleteDescriptors != null && !deleteDescriptors.isEmpty()) {
+          partBuilder.setInsertFileDescriptors(loader.getLoadedInsertDeltaFds());
+          partBuilder.setDeleteFileDescriptors(loader.getLoadedDeleteDeltaFds());
+        } else {
+          partBuilder.setFileDescriptors(loader.getLoadedFds());
+        }
       }
     }
   }

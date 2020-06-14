@@ -371,6 +371,8 @@ public interface FeFsTable extends FeTable {
      * Its implementation tries to minimize the constant factor and object generation.
      * The given 'randomSeed' is used for random number generation.
      * The 'percentBytes' parameter must be between 0 and 100.
+     *
+     * TODO(IMPALA-9883): Fix this for full ACID tables.
      */
     public static Map<HdfsScanNode.SampledPartitionMetadata, List<FileDescriptor>>
         getFilesSample(FeFsTable table, Collection<? extends FeFsPartition> inputParts,
