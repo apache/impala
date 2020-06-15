@@ -895,8 +895,8 @@ public class CatalogdMetaProvider implements MetaProvider {
       storePartitionsInCache(refImpl, hostIndex, fromCatalogd);
     }
     sw.stop();
-    addStatsToProfile(PARTITIONS_STATS_CATEGORY, refToMeta.size(), numMisses, sw);
-    LOG.trace("Request for partitions of {}: hit {}/{}", table, refToMeta.size(),
+    addStatsToProfile(PARTITIONS_STATS_CATEGORY, numHits, numMisses, sw);
+    LOG.trace("Request for partitions of {}: hit {}/{}", table, numHits,
         partitionRefs.size());
 
     // Convert the returned map to be by-name instead of by-ref.
