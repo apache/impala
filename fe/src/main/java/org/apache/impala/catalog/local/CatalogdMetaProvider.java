@@ -892,7 +892,7 @@ public class CatalogdMetaProvider implements MetaProvider {
           refImpl, hostIndex, missingRefs);
       refToMeta.putAll(fromCatalogd);
       // Write back to the cache.
-      storePartitionsInCache(refImpl, hostIndex, fromCatalogd);
+      storePartitionsInCache(hostIndex, fromCatalogd);
     }
     sw.stop();
     addStatsToProfile(PARTITIONS_STATS_CATEGORY, numHits, numMisses, sw);
@@ -991,7 +991,7 @@ public class CatalogdMetaProvider implements MetaProvider {
         partitionRefs.size());
     for (PartitionRef ref: partitionRefs) {
       PartitionRefImpl prefImpl = (PartitionRefImpl)ref;
-      PartitionCacheKey cacheKey = new PartitionCacheKey(table, prefImpl.getId());
+      PartitionCacheKey cacheKey = new PartitionCacheKey(prefImpl.getId());
       PartitionMetadataImpl val = (PartitionMetadataImpl)getIfPresent(cacheKey);
       if (val == null) continue;
 
@@ -1007,12 +1007,12 @@ public class CatalogdMetaProvider implements MetaProvider {
    * Write back the partitions in 'metas' into the cache. The file descriptors in these
    * partitions must be relative to the 'hostIndex'.
    */
-  private void storePartitionsInCache(TableMetaRefImpl table,
-      ListMap<TNetworkAddress> hostIndex, Map<PartitionRef, PartitionMetadata> metas) {
+  private void storePartitionsInCache(ListMap<TNetworkAddress> hostIndex,
+      Map<PartitionRef, PartitionMetadata> metas) {
     for (Map.Entry<PartitionRef, PartitionMetadata> e: metas.entrySet()) {
       PartitionRefImpl prefImpl = (PartitionRefImpl)e.getKey();
       PartitionMetadataImpl metaImpl = (PartitionMetadataImpl)e.getValue();
-      PartitionCacheKey cacheKey = new PartitionCacheKey(table, prefImpl.getId());
+      PartitionCacheKey cacheKey = new PartitionCacheKey(prefImpl.getId());
       PartitionMetadataImpl cacheVal = metaImpl.cloneRelativeToHostIndex(hostIndex,
           cacheHostIndex_);
       cache_.put(cacheKey, cacheVal);
@@ -1593,9 +1593,7 @@ public class CatalogdMetaProvider implements MetaProvider {
 
     @Override
     public boolean equals(Object obj) {
-      if (obj == null || !(obj instanceof ColStatsCacheKey)) {
-        return false;
-      }
+      if (!(obj instanceof ColStatsCacheKey)) return false;
       ColStatsCacheKey other = (ColStatsCacheKey)obj;
       return super.equals(obj) && colName_.equals(other.colName_);
     }
@@ -1615,34 +1613,26 @@ public class CatalogdMetaProvider implements MetaProvider {
   /**
    * Key for caching information about a single partition.
    *
-   * TODO(todd): currently this inherits from VersionedTableCacheKey. This means that, if
-   * a table's version number changes, all of its partitions must be reloaded. However,
-   * since partition IDs are globally unique within a catalogd instance, we could
-   * optimize this to just key based on the partition ID. However, currently, there are
-   * some cases where partitions are mutated in place rather than replaced with a new ID.
-   * We need to eliminate those or add a partition sequence number before we can make
-   * this optimization.
+   * Values for these keys are 'PartitionMetadataImpl' objects.
    */
-  private static class PartitionCacheKey extends VersionedTableCacheKey {
+  @Immutable
+  private static class PartitionCacheKey {
     private final long partId_;
 
-    PartitionCacheKey(TableMetaRefImpl table, long partId) {
-      super(table);
+    PartitionCacheKey(long partId) {
       partId_ = partId;
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(super.hashCode(), partId_);
+      return Objects.hashCode(partId_, getClass());
     }
 
     @Override
     public boolean equals(Object obj) {
-      if (obj == null || !(obj instanceof PartitionCacheKey)) {
-        return false;
-      }
+      if (!(obj instanceof PartitionCacheKey)) return false;
       PartitionCacheKey other = (PartitionCacheKey)obj;
-      return super.equals(obj) && partId_ == other.partId_;
+      return partId_ == other.partId_;
     }
   }
 

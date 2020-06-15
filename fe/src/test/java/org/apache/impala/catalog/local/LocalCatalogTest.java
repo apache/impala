@@ -159,9 +159,7 @@ public class LocalCatalogTest {
   @Test
   public void testPartitioning() throws Exception {
     FeFsTable t = (FeFsTable) catalog_.getTable("functional",  "alltypes");
-    // TODO(todd): once we support file descriptors in LocalCatalog,
-    // run the full test.
-    CatalogTest.checkAllTypesPartitioning(t, /*checkFileDescriptors=*/false);
+    CatalogTest.checkAllTypesPartitioning(t);
   }
 
   /**
@@ -250,7 +248,6 @@ public class LocalCatalogTest {
     assertEquals(24, totalFds);
     assertTrue(t.getHostIndex().size() > 0);
   }
-
 
   @Test
   public void testLoadFileDescriptorsUnpartitioned() throws Exception {
