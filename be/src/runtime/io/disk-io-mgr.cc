@@ -162,6 +162,12 @@ static const char* READ_LATENCY_METRIC_KEY_TEMPLATE =
     "impala-server.io-mgr.queue-$0.read-latency";
 static const char* READ_SIZE_METRIC_KEY_TEMPLATE =
     "impala-server.io-mgr.queue-$0.read-size";
+static const char* WRITE_LATENCY_METRIC_KEY_TEMPLATE =
+    "impala-server.io-mgr.queue-$0.write-latency";
+static const char* WRITE_SIZE_METRIC_KEY_TEMPLATE =
+    "impala-server.io-mgr.queue-$0.write-size";
+static const char* WRITE_IO_ERR_METRIC_KEY_TEMPLATE =
+    "impala-server.io-mgr.queue-$0.write-io-error";
 
 AtomicInt32 DiskIoMgr::next_disk_id_;
 
@@ -302,9 +308,13 @@ Status DiskIoMgr::Init() {
       ImpaladMetrics::IO_MGR_METRICS->AddProperty<string>(
           DEVICE_NAME_METRIC_KEY_TEMPLATE, device_name, i_string);
     }
-    int64_t ONE_HOUR_IN_NS = 60L * 60L * NANOS_PER_SEC;
+
     HistogramMetric* read_latency = nullptr;
     HistogramMetric* read_size = nullptr;
+    HistogramMetric* write_latency = nullptr;
+    HistogramMetric* write_size = nullptr;
+    IntCounter* write_io_err = nullptr;
+
     if (TestInfo::is_test()) {
       read_latency =
         ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
@@ -312,15 +322,47 @@ Status DiskIoMgr::Init() {
       read_size =
         ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
             Substitute(READ_SIZE_METRIC_KEY_TEMPLATE, i_string));
+      write_latency =
+          ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
+              Substitute(WRITE_LATENCY_METRIC_KEY_TEMPLATE, i_string));
+      write_size = ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
+          Substitute(WRITE_SIZE_METRIC_KEY_TEMPLATE, i_string));
+      write_io_err = ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<IntCounter>(
+          Substitute(WRITE_IO_ERR_METRIC_KEY_TEMPLATE, i_string));
     }
-    disk_queues_[i]->set_read_latency(read_latency != nullptr ? read_latency :
-            ImpaladMetrics::IO_MGR_METRICS->RegisterMetric(new HistogramMetric(
-                MetricDefs::Get(READ_LATENCY_METRIC_KEY_TEMPLATE, i_string),
-                ONE_HOUR_IN_NS, 3)));
+
+    int64_t ONE_HOUR_IN_NS = 60L * 60L * NANOS_PER_SEC;
     int64_t ONE_GB = 1024L * 1024L * 1024L;
-    disk_queues_[i]->set_read_size(read_size != nullptr ? read_size :
-            ImpaladMetrics::IO_MGR_METRICS->RegisterMetric(new HistogramMetric(
-                MetricDefs::Get(READ_SIZE_METRIC_KEY_TEMPLATE, i_string), ONE_GB, 3)));
+
+    if (read_latency == nullptr) {
+      read_latency = ImpaladMetrics::IO_MGR_METRICS->RegisterMetric(
+          new HistogramMetric(MetricDefs::Get(READ_LATENCY_METRIC_KEY_TEMPLATE, i_string),
+              ONE_HOUR_IN_NS, 3));
+    }
+    if (read_size == nullptr) {
+      read_size = ImpaladMetrics::IO_MGR_METRICS->RegisterMetric(new HistogramMetric(
+          MetricDefs::Get(READ_SIZE_METRIC_KEY_TEMPLATE, i_string), ONE_GB, 3));
+    }
+    if (write_latency == nullptr) {
+      write_latency = ImpaladMetrics::IO_MGR_METRICS->RegisterMetric(new HistogramMetric(
+          MetricDefs::Get(WRITE_LATENCY_METRIC_KEY_TEMPLATE, i_string), ONE_HOUR_IN_NS,
+          3));
+    }
+    if (write_size == nullptr) {
+      write_size = ImpaladMetrics::IO_MGR_METRICS->RegisterMetric(new HistogramMetric(
+          MetricDefs::Get(WRITE_SIZE_METRIC_KEY_TEMPLATE, i_string), ONE_GB, 3));
+    }
+    if (write_io_err == nullptr) {
+      write_io_err = ImpaladMetrics::IO_MGR_METRICS->RegisterMetric(
+          new IntCounter(MetricDefs::Get(WRITE_IO_ERR_METRIC_KEY_TEMPLATE, i_string), 0));
+    }
+
+    disk_queues_[i]->set_read_latency(read_latency);
+    disk_queues_[i]->set_read_size(read_size);
+    disk_queues_[i]->set_write_latency(write_latency);
+    disk_queues_[i]->set_write_size(write_size);
+    disk_queues_[i]->set_write_io_err(write_io_err);
+
     for (int j = 0; j < num_threads_per_disk; ++j) {
       stringstream ss;
       ss << "work-loop(Disk: " << device_name << ", Thread: " << j << ")";
@@ -514,16 +556,26 @@ void DiskIoMgr::Write(RequestContext* writer_context, WriteRange* write_range) {
   Status ret_status = Status::OK();
   FILE* file_handle = nullptr;
   Status close_status = Status::OK();
-  ret_status = local_file_system_->OpenForWrite(write_range->file(), O_RDWR | O_CREAT,
-      S_IRUSR | S_IWUSR, &file_handle);
-  if (!ret_status.ok()) goto end;
+  DiskQueue* queue = disk_queues_[write_range->disk_id()];
 
-  ret_status = WriteRangeHelper(file_handle, write_range);
+  {
+    ScopedHistogramTimer write_timer(queue->write_latency());
+    ret_status = local_file_system_->OpenForWrite(
+        write_range->file(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR, &file_handle);
+    if (!ret_status.ok()) goto end;
 
-  close_status = local_file_system_->Fclose(file_handle, write_range);
-  if (ret_status.ok() && !close_status.ok()) ret_status = close_status;
+    ret_status = WriteRangeHelper(file_handle, write_range);
+
+    close_status = local_file_system_->Fclose(file_handle, write_range);
+    if (ret_status.ok() && !close_status.ok()) ret_status = close_status;
+  }
 
 end:
+  if (ret_status.ok()) {
+    queue->write_size()->Update(write_range->len());
+  } else {
+    queue->write_io_err()->Increment(1);
+  }
   writer_context->WriteDone(write_range, ret_status);
 }
 

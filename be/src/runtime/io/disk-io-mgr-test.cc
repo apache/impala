@@ -23,9 +23,10 @@
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/io/cache-reader-test-stub.h"
-#include "runtime/io/local-file-system-with-fault-injection.h"
+#include "runtime/io/disk-io-mgr-internal.h"
 #include "runtime/io/disk-io-mgr-stress.h"
 #include "runtime/io/disk-io-mgr.h"
+#include "runtime/io/local-file-system-with-fault-injection.h"
 #include "runtime/io/request-context.h"
 #include "runtime/test-env.h"
 #include "testutil/gtest-util.h"
@@ -33,6 +34,8 @@
 #include "testutil/scoped-flag-setter.h"
 #include "util/condition-variable.h"
 #include "util/debug-util.h"
+#include "util/filesystem-util.h"
+#include "util/histogram-metric.h"
 #include "util/thread.h"
 #include "util/time.h"
 
@@ -1639,6 +1642,133 @@ TEST_F(DiskIoMgrTest, BufferSizeSelection) {
   // Non power-of-two size < min buffer size.
   EXPECT_EQ(vector<int64_t>({MIN_BUFFER_SIZE}),
       io_mgr.ChooseBufferSizes(MIN_BUFFER_SIZE - 7, 3 * MAX_BUFFER_SIZE));
+}
+
+// Issue a number of writes then read if the metrics record
+// the write operations.
+TEST_F(DiskIoMgrTest, MetricsOfWriteSizeAndLatency) {
+  InitRootReservation(LARGE_RESERVATION_LIMIT);
+  num_ranges_written_ = 0;
+  string tmp_file = "/tmp/disk_io_mgr_test.txt";
+  int num_ranges = 100;
+  int64_t file_size = 1024 * 1024;
+  int64_t cur_offset = 0;
+  int num_disks = 5;
+  int success = CreateTempFile(tmp_file.c_str(), file_size);
+  if (success != 0) {
+    LOG(ERROR) << "Error creating temp file " << tmp_file.c_str() << " of size "
+               << file_size;
+    EXPECT_TRUE(false);
+  }
+
+  // Reset the Metric if it exists.
+  for (int i = 0; i < num_disks; i++) {
+    string key_prefix = "impala-server.io-mgr.queue-";
+    string write_size_postfix = ".write-size";
+    string write_latency_postfix = ".write-latency";
+    string i_str = std::to_string(i);
+    auto write_size_org =
+        ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
+            key_prefix + i_str + write_size_postfix);
+    auto write_latency_org =
+        ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<HistogramMetric>(
+            key_prefix + i_str + write_latency_postfix);
+    if (write_size_org != nullptr) write_size_org->Reset();
+    if (write_latency_org != nullptr) write_latency_org->Reset();
+  }
+
+  WriteRange::WriteDoneCallback callback = [=](const Status& status) {
+    lock_guard<mutex> l(written_mutex_);
+    ++num_ranges_written_;
+    if (num_ranges_written_ == num_ranges) writes_done_.NotifyOne();
+  };
+
+  // Issue a number of writes to the disks.
+  ObjectPool tmp_pool;
+  DiskIoMgr io_mgr(num_disks, 1, 1, 1, 10);
+  ASSERT_OK(io_mgr.Init());
+  unique_ptr<RequestContext> writer = io_mgr.RegisterContext();
+  for (int i = 0; i < num_ranges; ++i) {
+    int32_t* data = tmp_pool.Add(new int32_t);
+    *data = rand();
+    WriteRange** new_range = tmp_pool.Add(new WriteRange*);
+    *new_range =
+        tmp_pool.Add(new WriteRange(tmp_file, cur_offset, i % num_disks, callback));
+    (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
+    cur_offset += sizeof(int32_t);
+    ASSERT_OK(writer->AddWriteRange(*new_range));
+  }
+  {
+    unique_lock<mutex> lock(written_mutex_);
+    while (num_ranges_written_ < num_ranges) writes_done_.Wait(lock);
+  }
+
+  // Check the count and max/min of the histogram metric.
+  size_t write_size_len = sizeof(int32_t);
+  auto exam_fuc = [&](HistogramMetric* metric, const string& keyname) {
+    uint64_t total_cnt = metric->TotalCount();
+    uint64_t min_value = metric->MinValue();
+    uint64_t max_value = metric->MaxValue();
+    // The count should be added by num_ranges/num_disks per disk.
+    EXPECT_EQ(total_cnt, num_ranges / num_disks);
+    // Check if the min and max of write size are the same as the written len.
+    if (keyname == "write_size") {
+      EXPECT_EQ(min_value, write_size_len);
+      EXPECT_EQ(max_value, write_size_len);
+    }
+  };
+
+  for (int i = 0; i < num_disks; i++) {
+    auto write_size = io_mgr.disk_queues_[i]->write_size();
+    auto write_latency = io_mgr.disk_queues_[i]->write_latency();
+    exam_fuc(write_size, "write_size");
+    exam_fuc(write_latency, "write_latency");
+  }
+
+  num_ranges_written_ = 0;
+  io_mgr.UnregisterContext(writer.get());
+}
+
+// Issue a writing operation to a non-existent tmp file path.
+// Test if the write IO errors can be recorded.
+TEST_F(DiskIoMgrTest, MetricsOfWriteIoError) {
+  InitRootReservation(LARGE_RESERVATION_LIMIT);
+  num_ranges_written_ = 0;
+  string tmp_file = "/non-existent/file.txt";
+
+  // Reset the Metric if it exists.
+  auto write_io_err = ImpaladMetrics::IO_MGR_METRICS->FindMetricForTesting<IntCounter>(
+      "impala-server.io-mgr.queue-0.write-io-error");
+  if (write_io_err != nullptr) write_io_err->SetValue(0);
+
+  vector<string> tmp_path;
+  tmp_path.push_back(tmp_file);
+  // Remove the path in case it exists.
+  Status rm_status = FileSystemUtil::RemovePaths(tmp_path);
+  ObjectPool tmp_pool;
+  DiskIoMgr io_mgr(1, 1, 1, 1, 10);
+  ASSERT_OK(io_mgr.Init());
+  unique_ptr<RequestContext> writer = io_mgr.RegisterContext();
+  int32_t* data = tmp_pool.Add(new int32_t);
+  *data = rand();
+  WriteRange** new_range = tmp_pool.Add(new WriteRange*);
+  WriteRange::WriteDoneCallback callback = [=](const Status& status) {
+    ASSERT_EQ(TErrorCode::DISK_IO_ERROR, status.code());
+    num_ranges_written_ = 1;
+    writes_done_.NotifyOne();
+  };
+  *new_range = tmp_pool.Add(new WriteRange(tmp_file, 0, 0, callback));
+  (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
+  EXPECT_OK(writer->AddWriteRange(*new_range));
+  {
+    unique_lock<mutex> lock(written_mutex_);
+    while (num_ranges_written_ < 1) writes_done_.Wait(lock);
+  }
+  // One IO Error should be added to the metrics counter.
+  EXPECT_EQ(write_io_err->GetValue(), 1);
+
+  num_ranges_written_ = 0;
+  io_mgr.UnregisterContext(writer.get());
 }
 }
 }
