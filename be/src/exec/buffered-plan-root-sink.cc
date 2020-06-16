@@ -105,8 +105,9 @@ Status BufferedPlanRootSink::FlushFinal(RuntimeState* state) {
   // If no batches are ever added, wake up the consumer thread so it can check the
   // SenderState and return appropriately.
   rows_available_.NotifyAll();
-  // Wait until the consumer has read all rows from the batch_queue_.
-  {
+  // Wait until the consumer has read all rows from the batch_queue_ or this has
+  // been cancelled.
+  while (!IsCancelledOrClosed(state) && !IsQueueEmpty(state)) {
     SCOPED_TIMER(profile()->inactive_timer());
     consumer_eos_.Wait(l);
   }
@@ -136,6 +137,14 @@ void BufferedPlanRootSink::Close(RuntimeState* state) {
 
 void BufferedPlanRootSink::Cancel(RuntimeState* state) {
   DCHECK(state->is_cancelled());
+  // Get the lock_ to synchronize with FlushFinal(). Either FlushFinal() will be waiting
+  // on the consumer_eos_ condition variable and get signalled below, or it will see
+  // that is_cancelled() is true after it gets the lock. Drop the the lock before
+  // signalling the CV so that a blocked thread can immediately acquire the mutex when
+  // it wakes up.
+  {
+    unique_lock<mutex> l(lock_);
+  }
   // Wake up all sleeping threads so they can check the cancellation state.
   // While it should be safe to call NotifyOne() here, prefer to use NotifyAll() to
   // ensure that all sleeping threads are awoken. The calls to NotifyAll() are not on the
