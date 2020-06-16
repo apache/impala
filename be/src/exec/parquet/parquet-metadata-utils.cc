@@ -338,10 +338,10 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
       }
 
       int expected_len = ParquetPlainEncoder::DecimalSize(slot_desc->type());
-      if (schema_element.type_length != expected_len) {
+      if (schema_element.type_length < expected_len) {
         return Status(Substitute("File '$0' column '$1' has an invalid type length. "
-            "Expecting: $2 len in file: $3", filename, schema_element.name, expected_len,
-            schema_element.type_length));
+            "Expecting: len >= $2 in file: $3", filename, schema_element.name,
+            expected_len, schema_element.type_length));
       }
     }
     if (!schema_element.__isset.scale) {
