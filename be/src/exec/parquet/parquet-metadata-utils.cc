@@ -245,7 +245,7 @@ Status ParquetMetadataUtils::ValidateColumnOffsets(const string& filename,
     }
     int64_t col_len = col_chunk.meta_data.total_compressed_size;
     int64_t col_end = col_start + col_len;
-    if (col_end <= 0 || col_end > file_length) {
+    if (col_end <= 0 || col_end >= file_length) {
       return Status(Substitute("Parquet file '$0': metadata is corrupt. Column $1 has "
           "invalid column offsets (offset=$2, size=$3, file_size=$4).", filename, i,
           col_start, col_len, file_length));
