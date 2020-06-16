@@ -123,25 +123,32 @@ class DecimalUtil {
 #endif
   }
 
-  template<typename T>
+  template <typename T>
   static inline void DecodeFromFixedLenByteArray(
-      const uint8_t* buffer, int fixed_len_size, T* v) {
+      const uint8_t* RESTRICT buffer, int fixed_len_size, T* RESTRICT v) {
     DCHECK_GT(fixed_len_size, 0);
-    DCHECK_LE(fixed_len_size, sizeof(T));
-    *v = 0;
-    // We need to sign extend val. For example, if the original value was
-    // -1, the original bytes were -1,-1,-1,-1. If we only wrote out 1 byte, after
-    // the encode step above, val would contain (-1, 0, 0, 0). We need to sign
-    // extend the remaining 3 bytes to get the original value.
-    // We do this by filling in the most significant bytes and (arithmetic) bit
-    // shifting down.
-    int bytes_to_fill = sizeof(T) - fixed_len_size;
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-    BitUtil::ByteSwap(reinterpret_cast<int8_t*>(v) + bytes_to_fill, buffer, fixed_len_size);
-#else
-    memcpy(v, buffer, fixed_len_size);
+#if __BYTE_ORDER != __LITTLE_ENDIAN
+    static_assert(false, "Byte order must be little-endian");
 #endif
-    v->value() >>= (bytes_to_fill * 8);
+    if (LIKELY(sizeof(T) >= fixed_len_size)) {
+      // We need to sign extend val. For example, if the original value was
+      // -1, the original bytes were -1,-1,-1,-1. If we only wrote out 1 byte, ByteSwap()
+      // only fills in the first byte of 'v' - the least significant byte. We initialize
+      // the value to either 0 or -1 to ensure that the result is correctly sign-extended.
+
+      // GCC can optimize this code to an instruction pair of movsbq and sarq with no
+      // branches.
+      int8_t most_significant_byte = reinterpret_cast<const int8_t*>(buffer)[0];
+      v->value() = most_significant_byte >= 0 ? 0 : -1;
+      BitUtil::ByteSwap(reinterpret_cast<int8_t*>(v), buffer, fixed_len_size);
+    } else {
+      // If the destination 'v' is smaller than the input, discard the upper bytes.
+      // These bytes should only contain the sign-extended value if they were encoded
+      // correctly, so are not required.
+      int bytes_to_discard = fixed_len_size - sizeof(T);
+      BitUtil::ByteSwap(reinterpret_cast<int8_t*>(v),
+          buffer + bytes_to_discard, sizeof(T));
+    }
   }
 
   // Used to skip checking overflow in multiply of decimal values.

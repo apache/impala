@@ -806,6 +806,8 @@ class TestParquet(ImpalaTestSuite):
 
     create_table_from_parquet(self.client, unique_database, 'decimal_stored_as_int32')
     create_table_from_parquet(self.client, unique_database, 'decimal_stored_as_int64')
+    create_table_from_parquet(self.client, unique_database, 'decimal_padded_fixed_len_byte_array')
+    create_table_from_parquet(self.client, unique_database, 'decimal_padded_fixed_len_byte_array2')
 
     self.run_test_case('QueryTest/parquet-decimal-formats', vector, unique_database)
 
