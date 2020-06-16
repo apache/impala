@@ -25,23 +25,20 @@ import logging
 import os
 import re
 import requests
+import subprocess
+from datetime import datetime
 from time import sleep, time
 
 from tests.common.impala_connection import create_connection, create_ldap_connection
-from TCLIService import TCLIService
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
-from thrift.protocol import TBinaryProtocol, TCompactProtocol, TProtocol
-from thrift.TSerialization import deserialize
-from RuntimeProfile.ttypes import TRuntimeProfileTree
-import base64
-import zlib
 
 LOG = logging.getLogger('impala_service')
 LOG.setLevel(level=logging.DEBUG)
 
 WEBSERVER_USERNAME = os.environ.get('IMPALA_WEBSERVER_USERNAME', None)
 WEBSERVER_PASSWORD = os.environ.get('IMPALA_WEBSERVER_PASSWORD', None)
+
 
 # Base class for all Impala services
 # TODO: Refactor the retry/timeout logic into a common place.
@@ -82,6 +79,13 @@ class BaseImpalaService(object):
   def get_debug_webpage_json(self, page_name):
     """Returns the json for the given Impala debug webpage, eg. '/queries'"""
     return json.loads(self.read_debug_webpage(page_name + "?json"))
+
+  def dump_debug_webpage_json(self, page_name, filename):
+    """Dumps the json for a given Impalad debug webpage to the specified file.
+       Prints the JSON with indenting to be somewhat human readable."""
+    debug_json = self.get_debug_webpage_json(page_name)
+    with open(filename, "w") as json_out:
+      json.dump(debug_json, json_out, indent=2)
 
   def get_metric_value(self, metric_name, default_value=None):
     """Returns the value of the the given metric name from the Impala debug webpage"""
@@ -126,20 +130,81 @@ class BaseImpalaService(object):
             (metric_name, expected_value, value))
       LOG.info("Sleeping %ds before next retry." % interval)
       sleep(interval)
-    assert 0, 'Metric value %s did not reach value %s in %ss\nDumping impalad debug ' \
-              'pages:\nmemz: %s\nmetrics: %s\nqueries: %s\nsessions: %s\nthreadz: %s\n '\
-              'rpcz: %s' % \
-              (metric_name, expected_value, timeout,
-               json.dumps(self.read_debug_webpage('memz?json')),
-               json.dumps(self.read_debug_webpage('metrics?json')),
-               json.dumps(self.read_debug_webpage('queries?json')),
-               json.dumps(self.read_debug_webpage('sessions?json')),
-               json.dumps(self.read_debug_webpage('threadz?json')),
-               json.dumps(self.read_debug_webpage('rpcz?json')))
+
+    LOG.info("Metric {0} did not reach value {1} in {2}s. Failing...".format(metric_name,
+        expected_value, timeout))
+    self.__metric_timeout_assert(metric_name, expected_value, timeout)
+
+  def __request_minidump(self, pid):
+    """
+    Impala processes (impalad, catalogd, statestored) have a signal handler for
+    SIGUSR1 that dumps a minidump. This sends a SIGUSR1 to the specified pid
+    to trigger a minidump. Note that this will not work for processes that don't
+    implement a handler for SIGUSR1. This does not wait for the minidump to be
+    generated, so callers will need to consider this.
+    """
+    cmd = ["kill", "-SIGUSR1", pid]
+    subprocess.check_output(cmd)
+
+  def __metric_timeout_assert(self, metric_name, expected_value, timeout):
+    """
+    Helper function to dump diagnostic information for debugging a metric timeout and
+    then assert.
+    """
+    impala_home = os.environ["IMPALA_HOME"]
+    log_dir = os.environ["IMPALA_LOGS_DIR"]
+
+    # Create a diagnostic directory to contain all the relevent information
+    datetime_string = datetime.now().strftime("%Y%m%d_%H:%M:%S")
+    diag_dir = os.path.join(log_dir, "metric_timeout_diags_{0}".format(datetime_string))
+    if not os.path.exists(diag_dir):
+      os.makedirs(diag_dir)
+
+    # Read debug pages from the Web UI and dump them to files in the diagnostic
+    # directory
+    json_dir = os.path.join(diag_dir, "json")
+    if not os.path.exists(json_dir):
+      os.makedirs(json_dir)
+    json_diag_string = "Dumping debug webpages in JSON format...\n"
+    debug_pages = ["memz", "metrics", "queries", "sessions", "threadz", "rpcz"]
+    for debug_page in debug_pages:
+      json_filename = os.path.join(json_dir, "{0}.json".format(debug_page))
+      self.dump_debug_webpage_json(debug_page, json_filename)
+      json_filename_rewritten = json_filename.replace(impala_home, "$IMPALA_HOME")
+      json_diag_string += \
+          "Dumped {0} JSON to {1}\n".format(debug_page, json_filename_rewritten)
+
+    # Requests a minidump for each running impalad/catalogd. The minidump will be
+    # written to the processes's minidump_path. For simplicity, we leave it there,
+    # as it will be preserved along with everything else in the log directory.
+    impalad_pids = subprocess.check_output(["pgrep", "impalad"]).split("\n")[:-1]
+    catalogd_pids = subprocess.check_output(["pgrep", "-f", "catalogd"]).split("\n")[:-1]
+    minidump_diag_string = "Dumping minidumps for impalads/catalogds...\n"
+    for pid in impalad_pids:
+      self.__request_minidump(pid)
+      minidump_diag_string += "Dumped minidump for Impalad PID {0}\n".format(pid)
+    for pid in catalogd_pids:
+      self.__request_minidump(pid)
+      minidump_diag_string += "Dumped minidump for Catalogd PID {0}\n".format(pid)
+
+    # This is not a critical path, so sleep 30 seconds to be sure that the minidumps
+    # have been written.
+    sleep(30)
+
+    # Now, fire the assert with the information about the dumps. This provides
+    # information about where to find the json files and other diagnostics.
+    # This is in the logs directory, so it should be packed up along with everything
+    # else for automated jobs.
+    assert_string = \
+        "Metric {0} did not reach value {1} in {2}s.\n".format(metric_name,
+            expected_value, timeout)
+    assert_string += json_diag_string
+    assert_string += minidump_diag_string
+    assert 0, assert_string
 
   def get_catalog_object_dump(self, object_type, object_name):
     """ Gets the web-page for the given 'object_type' and 'object_name'."""
-    return self.read_debug_webpage('catalog_object?object_type=%s&object_name=%s' %\
+    return self.read_debug_webpage('catalog_object?object_type=%s&object_name=%s' %
         (object_type, object_name))
 
   def get_catalog_objects(self, excludes=['_impala_builtins']):
@@ -161,10 +226,12 @@ class BaseImpalaService(object):
     return objects
 
   def extract_catalog_object_version(self, thrift_txt):
-    """ Extracts and returns the version of the catalog object's 'thrift_txt' representation."""
+    """ Extracts and returns the version of the catalog object's 'thrift_txt'
+        representation."""
     result = re.search(r'catalog_version \(i64\) = (\d+)', thrift_txt)
     assert result, 'Unable to find catalog version in object: ' + thrift_txt
     return int(result.group(1))
+
 
 # Allows for interacting with an Impalad instance to perform operations such as creating
 # new connections or accessing the debug webpage.
@@ -291,7 +358,7 @@ class ImpaladService(BaseImpalaService):
         LOG.info("num_known_live_backends has reached value: %s" % value)
         return value
       else:
-        LOG.info("Waiting for num_known_live_backends=%s. Current value: %s" %\
+        LOG.info("Waiting for num_known_live_backends=%s. Current value: %s" %
             (expected_value, value))
       sleep(1)
     assert 0, 'num_known_live_backends did not reach expected value in time'
@@ -340,8 +407,8 @@ class ImpaladService(BaseImpalaService):
         query_status = self.get_query_status(query_id)
         if query_status is None:
           assert False, "Could not find 'Query Status' section in profile of "\
-                    "query with id %s:\n%s" % (query_id)
-      except Exception as e:
+              "query with id %s:\n%s" % (query_id)
+      except Exception:
         pass
       if expected_content in query_status:
         return True
@@ -390,6 +457,7 @@ class ImpaladService(BaseImpalaService):
     except Exception, e:
       LOG.info(e)
       return False
+
 
 # Allows for interacting with the StateStore service to perform operations such as
 # accessing the debug webpage.
