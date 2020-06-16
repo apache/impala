@@ -308,7 +308,6 @@ class TestDdlStatements(TestDdlBase):
     self.run_test_case('QueryTest/create-table-as-select', vector,
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
 
-  @SkipIf.kudu_not_supported
   @UniqueDatabase.parametrize(sync_ddl=True)
   @SkipIfKudu.no_hybrid_clock
   def test_create_kudu(self, vector, unique_database):

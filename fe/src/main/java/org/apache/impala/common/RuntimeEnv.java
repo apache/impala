@@ -51,9 +51,6 @@ public class RuntimeEnv {
   public void setNumCores(int numCores) { this.numCores_ = numCores; }
   public void setTestEnv(boolean v) { isTestEnv_ = v; }
   public boolean isTestEnv() { return isTestEnv_; }
-  public boolean isKuduSupported() {
-    return "true".equals(System.getenv("KUDU_IS_SUPPORTED"));
-  }
   public boolean isMtDopValidationEnabled() { return enableMtDopValidation_; }
   public void setEnableMtDopValidation(boolean v) { enableMtDopValidation_ = v; }
 

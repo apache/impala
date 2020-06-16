@@ -75,9 +75,6 @@ class KuduTestSuite(ImpalaTestSuite):
 
   @classmethod
   def setup_class(cls):
-    if os.environ["KUDU_IS_SUPPORTED"] == "false":
-      pytest.skip("Kudu is not supported")
-
     super(KuduTestSuite, cls).setup_class()
 
   @classmethod

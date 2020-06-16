@@ -1044,10 +1044,8 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "int_col ('numNulls'='2')");
     AnalyzesOk("alter table functional.alltypes_datasource set column stats " +
         "int_col ('numDVs'='2')");
-    if (RuntimeEnv.INSTANCE.isKuduSupported()) {
-      AnalyzesOk("alter table functional_kudu.testtbl set column stats " +
-          "name ('numNulls'='2')");
-    }
+    AnalyzesOk("alter table functional_kudu.testtbl set column stats " +
+        "name ('numNulls'='2')");
 
     // Table does not exist.
     AnalysisError("alter table bad_tbl set column stats int_col ('numNulls'='2')",

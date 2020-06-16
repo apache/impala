@@ -41,9 +41,6 @@
 # DOWNLOAD_CDH_COMPONENTS - When set to true, this script will also download and extract
 #   the CDP Hadoop components (i.e. Hadoop, Hive, HBase, Ranger, etc) into
 #   CDP_COMPONENTS_HOME as appropriate.
-# KUDU_IS_SUPPORTED - If KUDU_IS_SUPPORTED is false, Kudu is disabled and we download
-#   the toolchain Kudu and use the symbols to compile a non-functional stub library so
-#   that Impala has something to link against.
 # IMPALA_<PACKAGE>_VERSION - The version expected for <PACKAGE>. This is typically
 #   configured in bin/impala-config.sh and must exist for every package. This is used
 #   to construct an appropriate URL and expected archive name.
@@ -405,115 +402,6 @@ def check_custom_toolchain(toolchain_packages_home, packages):
     raise Exception("Toolchain bootstrap failed: required packages were missing")
 
 
-def build_kudu_stub(kudu_dir, gcc_dir):
-  """When Kudu isn't supported, the CentOS 7 Kudu package is downloaded from the
-     toolchain. This replaces the client lib with a stubbed client. The
-     'kudu_dir' specifies the location of the unpacked CentOS 7 Kudu package.
-     The 'gcc_dir' specifies the location of the unpacked GCC/G++."""
-
-  print "Building kudu stub"
-  # Find the client lib files in the Kudu dir. There may be several files with
-  # various extensions. Also there will be a debug version.
-  client_lib_paths = []
-  for path, _, files in os.walk(kudu_dir):
-    for file in files:
-      if not file.startswith("libkudu_client.so"):
-        continue
-      file_path = os.path.join(path, file)
-      if os.path.islink(file_path):
-        continue
-      client_lib_paths.append(file_path)
-  if not client_lib_paths:
-    raise Exception("Unable to find Kudu client lib under '%s'" % kudu_dir)
-
-  # The client stub will be create by inspecting a real client and extracting the
-  # symbols. The choice of which client file to use shouldn't matter.
-  client_lib_path = client_lib_paths[0]
-
-  # Use a newer version of binutils because on older systems the default binutils may
-  # not be able to read the newer binary.
-  binutils_dir = ToolchainPackage("binutils").pkg_directory()
-  nm_path = os.path.join(binutils_dir, "bin", "nm")
-  objdump_path = os.path.join(binutils_dir, "bin", "objdump")
-
-  # Extract the symbols and write the stubbed client source. There is a special method
-  # kudu::client::GetShortVersionString() that is overridden so that the stub can be
-  # identified by the caller.
-  get_short_version_sig = "kudu::client::GetShortVersionString()"
-  nm_out = check_output([nm_path, "--defined-only", "-D", client_lib_path])
-  stub_build_dir = tempfile.mkdtemp()
-  stub_client_src_file = open(os.path.join(stub_build_dir, "kudu_client.cc"), "w")
-  try:
-    stub_client_src_file.write("""
-#include <string>
-
-static const std::string kFakeKuduVersion = "__IMPALA_KUDU_STUB__";
-
-static void KuduNotSupported() {
-    *((char*)0) = 0;
-}
-
-namespace kudu { namespace client {
-std::string GetShortVersionString() { return kFakeKuduVersion; }
-}}
-""")
-    found_start_version_symbol = False
-    cpp_filt_path = os.path.join(binutils_dir, "bin", "c++filt")
-    for line in nm_out.splitlines():
-      addr, sym_type, mangled_name = line.split(" ")
-      # Skip special functions an anything that isn't a strong symbol. Any symbols that
-      # get passed this check must be related to Kudu. If a symbol unrelated to Kudu
-      # (ex: a boost symbol) gets defined in the stub, there's a chance the symbol could
-      # get used and crash Impala.
-      if mangled_name in ["_init", "_fini"] or sym_type not in "Tt":
-        continue
-      demangled_name = check_output([cpp_filt_path, mangled_name]).strip()
-      assert "kudu" in demangled_name, \
-          "Symbol doesn't appear to be related to Kudu: " + demangled_name
-      if demangled_name == get_short_version_sig:
-        found_start_version_symbol = True
-        continue
-      stub_client_src_file.write("""
-extern "C" void %s() {
-  KuduNotSupported();
-}
-""" % mangled_name)
-
-    if not found_start_version_symbol:
-      raise Exception("Expected to find symbol a corresponding to"
-          " %s but it was not found." % get_short_version_sig)
-    stub_client_src_file.flush()
-
-    # The soname is needed to avoid problem in packaging builds. Without the soname,
-    # the library dependency as listed in the impalad binary will be a full path instead
-    # of a short name. Debian in particular has problems with packaging when that happens.
-    objdump_out = check_output([objdump_path, "-p", client_lib_path])
-    for line in objdump_out.splitlines():
-      if "SONAME" not in line:
-        continue
-      # The line that needs to be parsed should be something like:
-      # "  SONAME               libkudu_client.so.0"
-      so_name = line.split()[1]
-      break
-    else:
-      raise Exception("Unable to extract soname from %s" % client_lib_path)
-
-    # Compile the library.
-    stub_client_lib_path = os.path.join(stub_build_dir, "libkudu_client.so")
-    toolchain_packages_home = os.environ.get("IMPALA_TOOLCHAIN_PACKAGES_HOME")
-    gpp = os.path.join(
-        toolchain_packages_home, "gcc-%s" % os.environ.get("IMPALA_GCC_VERSION"),
-        "bin", "g++")
-    subprocess.check_call([gpp, stub_client_src_file.name, "-shared", "-fPIC",
-        "-Wl,-soname,%s" % so_name, "-o", stub_client_lib_path])
-
-    # Replace the real libs with the stub.
-    for client_lib_path in client_lib_paths:
-      shutil.copyfile(stub_client_lib_path, client_lib_path)
-  finally:
-    shutil.rmtree(stub_build_dir)
-
-
 def execute_many(f, args):
   """
   Executes f(a) for a in args using a threadpool to execute in parallel.
@@ -581,16 +469,9 @@ def get_hadoop_downloads():
   return cluster_components
 
 
-def get_kudu_downloads(use_kudu_stub):
-  # If Kudu is not supported, we download centos7 kudu to build the kudu stub.
-  kudu_downloads = []
-  if use_kudu_stub:
-    kudu_downloads += [ToolchainKudu("centos7")]
-  else:
-    # Toolchain Kudu includes Java artifacts.
-    kudu_downloads += [ToolchainKudu()]
-
-  return kudu_downloads
+def get_kudu_downloads():
+  # Toolchain Kudu includes Java artifacts.
+  return [ToolchainKudu()]
 
 
 def main():
@@ -608,8 +489,6 @@ def main():
   Hadoop component packages are only downloaded if $DOWNLOAD_CDH_COMPONENTS is true. The
   versions used for Hadoop components come from the CDP versions based on the
   $CDP_BUILD_NUMBER. CDP Hadoop packages are downloaded into $CDP_COMPONENTS_HOME.
-  If Kudu is not supported on this platform (or KUDU_IS_SUPPORTED=false), then this
-  builds a Kudu stub to allow for compilation without Kudu support.
   """
   logging.basicConfig(level=logging.INFO,
       format='%(asctime)s %(threadName)s %(levelname)s: %(message)s')
@@ -624,14 +503,12 @@ def main():
   # Create the toolchain directory if necessary
   create_directory_from_env_var("IMPALA_TOOLCHAIN_PACKAGES_HOME")
 
-  use_kudu_stub = os.environ["KUDU_IS_SUPPORTED"] != "true"
-
   downloads = []
   downloads += get_toolchain_downloads()
   kudu_download = None
   if os.getenv("DOWNLOAD_CDH_COMPONENTS", "false") == "true":
     create_directory_from_env_var("CDP_COMPONENTS_HOME")
-    downloads += get_kudu_downloads(use_kudu_stub)
+    downloads += get_kudu_downloads()
     downloads += get_hadoop_downloads()
 
   components_needing_download = [d for d in downloads if d.needs_download()]
@@ -640,12 +517,6 @@ def main():
     component.download()
 
   execute_many(download, components_needing_download)
-
-  if use_kudu_stub:
-    # Find the kudu package directory and the gcc package directory
-    kudu_download = [d for d in downloads if d.name == 'kudu'][0]
-    gcc_download = [d for d in downloads if d.name == 'gcc'][0]
-    build_kudu_stub(kudu_download.pkg_directory(), gcc_download.pkg_directory())
 
 
 if __name__ == "__main__": main()

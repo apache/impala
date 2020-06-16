@@ -1872,7 +1872,6 @@ public class ParserTest extends FrontendTestBase {
 
   @Test
   public void TestKuduUpdate() {
-    //TestUtils.assumeKuduIsSupported();
     ParserError("update (select * from functional_kudu.testtbl) a set name = '10'");
   }
 

@@ -29,9 +29,7 @@ WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 # of what specific table format to target along with the exec options (num_nodes, etc)
 # to use when running the query.
 class TableFormatInfo(object):
-  KNOWN_FILE_FORMATS = ['text', 'seq', 'rc', 'parquet', 'orc', 'avro', 'hbase']
-  if os.environ['KUDU_IS_SUPPORTED'] == 'true':
-    KNOWN_FILE_FORMATS.append('kudu')
+  KNOWN_FILE_FORMATS = ['text', 'seq', 'rc', 'parquet', 'orc', 'avro', 'hbase', 'kudu']
   KNOWN_COMPRESSION_CODECS = ['none', 'snap', 'gzip', 'bzip', 'def', 'zstd', 'lz4']
   KNOWN_COMPRESSION_TYPES = ['none', 'block', 'record']
 
@@ -254,10 +252,6 @@ def load_table_info_dimension(workload_name, exploration_strategy, file_formats=
       # Extract each test vector and add them to a dictionary
       vals = dict((key.strip(), value.strip()) for key, value in\
           (item.split(':') for item in line.split(',')))
-
-      # Skip Kudu if Kudu is not supported (IMPALA-4287).
-      if os.environ['KUDU_IS_SUPPORTED'] != 'true' and vals['file_format'] == 'kudu':
-        continue
 
       # If only loading specific file formats skip anything that doesn't match
       if file_formats is not None and vals['file_format'] not in file_formats:

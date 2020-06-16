@@ -160,18 +160,16 @@ public class ExprRewriterTest extends AnalyzerTest {
     RewritesOk("insert into functional.alltypes (id, int_col, float_col, bigint_col) " +
       "partition(year=2009,month=10) " + stmt_, 23, 11);
 
-    if (RuntimeEnv.INSTANCE.isKuduSupported()) {
-      // Update.
-      RewritesOk("update t2 set name = 'test' from " +
-          "functional.alltypes t1 join functional_kudu.dimtbl t2 on (t1.id = t2.id) " +
-          "where t2.id < 10", 10, 5);
-      RewritesOk("update functional_kudu.dimtbl set name = 'test', zip = 4711 " +
-          "where exists (" + stmt_ + ")", 28, 16);
-      // Delete.
-      RewritesOk("delete a from " +
-          "functional_kudu.testtbl a join functional.testtbl b on a.zip = b.zip", 4, 2);
-      RewritesOk("delete functional_kudu.testtbl where exists (" + stmt_ + ")", 24, 12);
-    }
+    // Update.
+    RewritesOk("update t2 set name = 'test' from " +
+        "functional.alltypes t1 join functional_kudu.dimtbl t2 on (t1.id = t2.id) " +
+        "where t2.id < 10", 10, 5);
+    RewritesOk("update functional_kudu.dimtbl set name = 'test', zip = 4711 " +
+        "where exists (" + stmt_ + ")", 28, 16);
+    // Delete.
+    RewritesOk("delete a from " +
+        "functional_kudu.testtbl a join functional.testtbl b on a.zip = b.zip", 4, 2);
+    RewritesOk("delete functional_kudu.testtbl where exists (" + stmt_ + ")", 24, 12);
   }
 
   /**
@@ -327,27 +325,25 @@ public class ExprRewriterTest extends AnalyzerTest {
         "INSERT INTO TABLE functional.alltypes(id) " +
         "PARTITION (`year`=2009, `month`=10) SELECT 2");
 
-    if (RuntimeEnv.INSTANCE.isKuduSupported()) {
-      // Update.
-      assertToSql(ctx,
-          "update functional_kudu.alltypes "
-              + "set string_col = 'test' where id = (select 1 + 1)",
-          "UPDATE functional_kudu.alltypes SET string_col = 'test' "
-              + "FROM functional_kudu.alltypes WHERE id = (SELECT 1 + 1)",
-          "UPDATE functional_kudu.alltypes SET string_col = 'test' "
-              + "FROM functional_kudu.alltypes LEFT SEMI JOIN (SELECT 2) `$a$1` (`$c$1`) "
-              + "ON id = `$a$1`.`$c$1` WHERE id = (SELECT 2)");
+    // Update.
+    assertToSql(ctx,
+        "update functional_kudu.alltypes "
+            + "set string_col = 'test' where id = (select 1 + 1)",
+        "UPDATE functional_kudu.alltypes SET string_col = 'test' "
+            + "FROM functional_kudu.alltypes WHERE id = (SELECT 1 + 1)",
+        "UPDATE functional_kudu.alltypes SET string_col = 'test' "
+            + "FROM functional_kudu.alltypes LEFT SEMI JOIN (SELECT 2) `$a$1` (`$c$1`) "
+            + "ON id = `$a$1`.`$c$1` WHERE id = (SELECT 2)");
 
-      // Delete
-      assertToSql(ctx,
-          "delete functional_kudu.alltypes "
-              + "where id = (select 1 + 1)",
-          "DELETE FROM functional_kudu.alltypes "
-              + "WHERE id = (SELECT 1 + 1)",
-          "DELETE functional_kudu.alltypes "
-              + "FROM functional_kudu.alltypes LEFT SEMI JOIN (SELECT 2) `$a$1` (`$c$1`) "
-              + "ON id = `$a$1`.`$c$1` WHERE id = (SELECT 2)");
-    }
+    // Delete
+    assertToSql(ctx,
+        "delete functional_kudu.alltypes "
+            + "where id = (select 1 + 1)",
+        "DELETE FROM functional_kudu.alltypes "
+            + "WHERE id = (SELECT 1 + 1)",
+        "DELETE functional_kudu.alltypes "
+            + "FROM functional_kudu.alltypes LEFT SEMI JOIN (SELECT 2) `$a$1` (`$c$1`) "
+            + "ON id = `$a$1`.`$c$1` WHERE id = (SELECT 2)");
 
     // We don't do any rewrite for WITH clause.
     StatementBase stmt = (StatementBase) AnalyzesOk("with t as (select 1 + 1) " +

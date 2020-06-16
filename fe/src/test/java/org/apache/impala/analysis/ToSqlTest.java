@@ -1063,7 +1063,6 @@ public class ToSqlTest extends FrontendTestBase {
 
   @Test
   public void TestUpdate() {
-    TestUtils.assumeKuduIsSupported();
     testToSql("update functional_kudu.dimtbl set name = '10' where name < '11'",
         "UPDATE functional_kudu.dimtbl SET name = '10' FROM functional_kudu.dimtbl " +
             "WHERE name < '11'");
@@ -1086,7 +1085,6 @@ public class ToSqlTest extends FrontendTestBase {
 
   @Test
   public void TestDelete() {
-    TestUtils.assumeKuduIsSupported();
     testToSql("delete functional_kudu.testtbl where zip = 10",
         "DELETE FROM functional_kudu.testtbl WHERE zip = 10");
     testToSql("delete from functional_kudu.testtbl where zip = 10",

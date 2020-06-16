@@ -62,9 +62,7 @@ else
   # the other services could work after the proper configuration changes.
   SUPPORTED_SERVICES=()
 fi
-if $KUDU_IS_SUPPORTED; then
-  SUPPORTED_SERVICES+=(kudu)
-fi
+SUPPORTED_SERVICES+=(kudu)
 
 # All DataNodes and NodeManagers need a unique but fixed address. The IP is fixed at
 # 127.0.0.1, so the only difference is the port. The address must be fixed because it is

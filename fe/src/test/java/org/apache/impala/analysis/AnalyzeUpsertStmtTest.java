@@ -23,7 +23,6 @@ import org.junit.Test;
 public class AnalyzeUpsertStmtTest extends AnalyzerTest {
   @Test
   public void TestUpsert() {
-    TestUtils.assumeKuduIsSupported();
     // VALUES clause
     AnalyzesOk("upsert into table functional_kudu.testtbl values(1, 'a', 1)");
     AnalyzesOk("upsert into table functional_kudu.testtbl(id) values(1)");

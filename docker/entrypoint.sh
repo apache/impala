@@ -198,18 +198,16 @@ function start_minicluster {
   # presumably because there's only one layer involved. See
   # https://issues.apache.org/jira/browse/KUDU-1419.
   set -x
-  if [ "true" = $KUDU_IS_SUPPORTED ]; then
-    pushd /home/impdev/Impala/testdata
-    for x in cluster/cdh*/node-*/var/lib/kudu/*/wal; do
-      echo $x
-      # This mv takes time, as it's actually copying into the latest layer.
-      mv $x $x-orig
-      mkdir $x
-      mv $x-orig/* $x
-      rmdir $x-orig
-    done
-    popd
-  fi
+  pushd /home/impdev/Impala/testdata
+  for x in cluster/cdh*/node-*/var/lib/kudu/*/wal; do
+    echo $x
+    # This mv takes time, as it's actually copying into the latest layer.
+    mv $x $x-orig
+    mkdir $x
+    mv $x-orig/* $x
+    rmdir $x-orig
+  done
+  popd
 
   # Wait for postgresql to really start; if it doesn't, Hive Metastore will fail to start.
   for i in {1..120}; do
