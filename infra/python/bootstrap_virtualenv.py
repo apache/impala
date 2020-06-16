@@ -277,13 +277,9 @@ def install_adls_deps():
 def install_kudu_client_if_possible():
   '''Installs the Kudu python module if possible, which depends on the toolchain and
   the compiled requirements in compiled-requirements.txt. If the toolchain isn't
-  available, nothing will be done. Also nothing will be done if the Kudu client lib
-  required by the module isn't available (as determined by KUDU_IS_SUPPORTED)'''
+  available, nothing will be done.'''
   if reqs_are_installed(KUDU_REQS_PATH):
     LOG.debug("Skipping Kudu: matching kudu-installed-requirements.txt found")
-    return
-  if os.environ["KUDU_IS_SUPPORTED"] != "true":
-    LOG.debug("Skipping Kudu: Kudu is not supported")
     return
   kudu_base_dir = os.environ["IMPALA_KUDU_HOME"]
   if not os.path.exists(kudu_base_dir):

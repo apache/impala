@@ -754,7 +754,6 @@ class TestImpalaShell(ImpalaTestSuite):
         (expected_rows_modified, expected_row_errors)
     assert expected_output in results.stderr, results.stderr
 
-  @SkipIf.kudu_not_supported
   def test_kudu_dml_reporting(self, vector, unique_database):
     db = unique_database
     run_impala_shell_cmd(vector, [

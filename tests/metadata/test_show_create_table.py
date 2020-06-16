@@ -277,7 +277,6 @@ class TestInfraCompat(ImpalaTestSuite):
                              'l_receiptdate', 'l_shipinstruct', 'l_shipmode',
                              'l_comment')}]
 
-  @SkipIf.kudu_not_supported
   @pytest.mark.parametrize('table_primary_keys_map', TABLE_PRIMARY_KEYS_MAPS)
   def test_primary_key_parse(self, impala_testinfra_cursor, table_primary_keys_map):
     """
@@ -288,7 +287,6 @@ class TestInfraCompat(ImpalaTestSuite):
     assert impala_testinfra_cursor._fetch_primary_key_names(
         table_primary_keys_map['table']) == table_primary_keys_map['primary_keys']
 
-  @SkipIf.kudu_not_supported
   @pytest.mark.parametrize('table_primary_keys_map', TABLE_PRIMARY_KEYS_MAPS)
   def test_load_table_with_primary_key_attr(self, impala_testinfra_cursor,
                                             table_primary_keys_map):

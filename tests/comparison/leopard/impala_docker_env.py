@@ -300,28 +300,27 @@ class ImpalaDockerEnv(object):
     # incompatibility with Kudu. First we have to get test data off the container, store
     # it somewhere, and then start another container using docker -v and mount the test
     # data as a volume to bypass AUFS. See also the README for Leopard.
-    if os.environ.get('KUDU_IS_SUPPORTED') == 'true':
-      LOG.info('Warming testdata cluster external volume')
-      self.start_new_container()
-      with settings(
-          warn_only=True,
-          host_string=self.host,
-          user=self.host_username,
-      ):
-        sudo(
-            'mkdir -p {host_testdata_path} && '
-            'rsync -e "ssh -i {priv_key} -o StrictHostKeyChecking=no '
-            ''         '-o UserKnownHostsFile=/dev/null -p {ssh_port}" '
-            '--delete --archive --verbose --progress '
-            '{user}@127.0.0.1:{container_testdata_path} {host_testdata_path} && '
-            'chown -R {uid}:{gid} {host_testdata_path}'.format(
-                host_testdata_path=HOST_TESTDATA_EXTERNAL_VOLUME_PATH,
-                priv_key=HOST_TO_DOCKER_SSH_KEY,
-                ssh_port=self.ssh_port,
-                uid=DOCKER_IMPALA_USER_UID,
-                gid=DOCKER_IMPALA_USER_GID,
-                user=DOCKER_USER_NAME,
-                container_testdata_path=DOCKER_TESTDATA_VOLUME_PATH))
+    LOG.info('Warming testdata cluster external volume')
+    self.start_new_container()
+    with settings(
+        warn_only=True,
+        host_string=self.host,
+        user=self.host_username,
+    ):
+      sudo(
+          'mkdir -p {host_testdata_path} && '
+          'rsync -e "ssh -i {priv_key} -o StrictHostKeyChecking=no '
+          ''         '-o UserKnownHostsFile=/dev/null -p {ssh_port}" '
+          '--delete --archive --verbose --progress '
+          '{user}@127.0.0.1:{container_testdata_path} {host_testdata_path} && '
+          'chown -R {uid}:{gid} {host_testdata_path}'.format(
+              host_testdata_path=HOST_TESTDATA_EXTERNAL_VOLUME_PATH,
+              priv_key=HOST_TO_DOCKER_SSH_KEY,
+              ssh_port=self.ssh_port,
+              uid=DOCKER_IMPALA_USER_UID,
+              gid=DOCKER_IMPALA_USER_GID,
+              user=DOCKER_USER_NAME,
+              container_testdata_path=DOCKER_TESTDATA_VOLUME_PATH))
       self.stop_docker()
       volume_map = {
           HOST_TESTDATA_EXTERNAL_VOLUME_PATH: DOCKER_TESTDATA_VOLUME_PATH,

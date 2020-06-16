@@ -3441,14 +3441,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "uncorrelated one 'functional.alltypestiny':\n" +
         "SELECT item FROM b.int_array_col, functional.alltypestiny");
 
-    if (RuntimeEnv.INSTANCE.isKuduSupported()) {
-      // Key columns missing from permutation
-      AnalysisError("insert into functional_kudu.testtbl(zip) values(1)",
-          "All primary key columns must be specified for INSERTing into Kudu tables. " +
-          "Missing columns are: id");
-      // Mixed column name case, on both primary key and non-primary key cols.
-      AnalyzesOk("insert into functional_kudu.alltypes (ID, BOOL_COL) values (0, true)");
-    }
+    // Key columns missing from permutation
+    AnalysisError("insert into functional_kudu.testtbl(zip) values(1)",
+        "All primary key columns must be specified for INSERTing into Kudu tables. " +
+        "Missing columns are: id");
+    // Mixed column name case, on both primary key and non-primary key cols.
+    AnalyzesOk("insert into functional_kudu.alltypes (ID, BOOL_COL) values (0, true)");
 
     addTestDb("d", null);
     addTestTable("create table d.dec1 (c decimal(38,37)) location '/'");

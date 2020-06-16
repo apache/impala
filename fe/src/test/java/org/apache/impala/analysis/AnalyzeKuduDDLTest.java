@@ -72,7 +72,6 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
   }
 
   private void testDDlsOnKuduTable(boolean isExternalPurgeTbl) {
-    TestUtils.assumeKuduIsSupported();
     // Test primary keys and partition by clauses
     AnalyzesOk("create table tab (x int primary key) partition by hash(x) " +
         "partitions 8 stored as kudu", isExternalPurgeTbl);
@@ -524,7 +523,6 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
 
   @Test
   public void TestCreateExternalKuduTable() {
-    TestUtils.assumeKuduIsSupported();
     final String kuduMasters = catalog_.getDefaultKuduMasterHosts();
     AnalyzesOk("create external table t stored as kudu " +
         "tblproperties('kudu.table_name'='t')");
@@ -592,7 +590,6 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
 
   @Test
   public void TestAlterKuduTable() {
-    TestUtils.assumeKuduIsSupported();
     // ALTER TABLE ADD/DROP range partitions
     String[] addDrop = {"add if not exists", "add", "drop if exists", "drop"};
     for (String kw: addDrop) {

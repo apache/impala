@@ -37,7 +37,6 @@ import org.junit.Test;
 public class AuditingKuduTest extends FrontendTestBase {
   @Test
   public void TestKuduStatements() throws AuthorizationException, AnalysisException {
-    TestUtils.assumeKuduIsSupported();
     // Select
     Set<TAccessEvent> accessEvents =
         AnalyzeAccessEvents("select * from functional_kudu.testtbl");

@@ -233,7 +233,7 @@ error_codes = (
 
   ("IMPALA_KUDU_TYPE_MISSING", 73, "Impala type $0 is not available in Kudu."),
 
-  ("KUDU_NOT_SUPPORTED_ON_OS", 74, "Kudu is not supported on this operating system."),
+  ("KUDU_NOT_SUPPORTED_ON_OS", 74, "Not in use."),
 
   ("KUDU_NOT_ENABLED", 75, "Kudu features are disabled by the startup flag "
    "--disable_kudu."),

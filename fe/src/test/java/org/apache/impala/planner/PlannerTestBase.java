@@ -108,9 +108,7 @@ public class PlannerTestBase extends FrontendTestBase {
     updateReq.setNum_executors(3);
     ExecutorMembershipSnapshot.update(updateReq);
 
-    if (RuntimeEnv.INSTANCE.isKuduSupported()) {
-      kuduClient_ = new KuduClient.KuduClientBuilder("127.0.0.1:7051").build();
-    }
+    kuduClient_ = new KuduClient.KuduClientBuilder("127.0.0.1:7051").build();
     String logDir = System.getenv("IMPALA_FE_TEST_LOGS_DIR");
     if (logDir == null) logDir = "/tmp";
     outDir_ = Paths.get(logDir, "PlannerTest");

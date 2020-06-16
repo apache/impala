@@ -106,8 +106,6 @@ class SkipIfADLS:
       reason="The client is slow to realize changes to file metadata")
 
 class SkipIfKudu:
-  unsupported_env = pytest.mark.skipif(os.environ["KUDU_IS_SUPPORTED"] == "false",
-      reason="Kudu is not supported in this environment")
   no_hybrid_clock = pytest.mark.skipif(
       get_kudu_master_flag("--use_hybrid_clock") == "false",
       reason="Test relies on --use_hybrid_clock=true in Kudu.")
@@ -118,8 +116,6 @@ class SkipIfKudu:
 class SkipIf:
   skip_hbase = pytest.mark.skipif(pytest.config.option.skip_hbase,
       reason="--skip_hbase argument specified")
-  kudu_not_supported = pytest.mark.skipif(os.environ["KUDU_IS_SUPPORTED"] == "false",
-      reason="Kudu is not supported")
   not_s3 = pytest.mark.skipif(not IS_S3, reason="S3 Filesystem needed")
   not_hdfs = pytest.mark.skipif(not IS_HDFS, reason="HDFS Filesystem needed")
   not_ec = pytest.mark.skipif(not IS_EC, reason="Erasure Coding needed")

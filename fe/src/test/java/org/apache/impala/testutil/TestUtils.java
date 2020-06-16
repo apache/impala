@@ -394,10 +394,6 @@ public class TestUtils {
     return sw.toString();
   }
 
-  public static void assumeKuduIsSupported() {
-    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
-  }
-
   /**
    * Returns the hive major version from environment
    */

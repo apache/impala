@@ -643,19 +643,6 @@ fi
 # overall build type) and does not apply when using a local Kudu build.
 export USE_KUDU_DEBUG_BUILD=${USE_KUDU_DEBUG_BUILD-false}
 
-# Kudu doesn't compile on some old Linux distros. KUDU_IS_SUPPORTED enables building Kudu
-# into the backend.
-if [[ -z "${KUDU_IS_SUPPORTED-}" ]]; then
-  if [[ -n "$KUDU_BUILD_DIR" ]]; then
-    KUDU_IS_SUPPORTED=true
-  elif $IS_OSX; then
-    KUDU_IS_SUPPORTED=false
-  else
-    KUDU_IS_SUPPORTED=true
-  fi
-fi
-export KUDU_IS_SUPPORTED
-
 export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"d652cab17"}
 export IMPALA_KUDU_JAVA_VERSION=${IMPALA_KUDU_JAVA_VERSION-"1.13.0-SNAPSHOT"}
 export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-$IMPALA_KUDU_VERSION

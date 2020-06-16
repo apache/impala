@@ -611,7 +611,6 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testKudu() {
-    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
     TQueryOptions options = defaultQueryOptions();
     options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.ALL);
     addTestDb("kudu_planner_test", "Test DB for Kudu Planner.");
@@ -622,13 +621,11 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testKuduUpsert() {
-    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
     runPlannerTestFile("kudu-upsert");
   }
 
   @Test
   public void testKuduUpdate() {
-    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
     TQueryOptions options = defaultQueryOptions();
     options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.ALL);
     runPlannerTestFile("kudu-update", options);
@@ -636,13 +633,11 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testKuduDelete() {
-    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
     runPlannerTestFile("kudu-delete");
   }
 
   @Test
   public void testKuduSelectivity() {
-    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.VERBOSE);
     runPlannerTestFile("kudu-selectivity", options);
@@ -650,7 +645,6 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testKuduTpch() {
-    Assume.assumeTrue(RuntimeEnv.INSTANCE.isKuduSupported());
     TQueryOptions options = defaultQueryOptions();
     options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.ALL);
     runPlannerTestFile("tpch-kudu", options,
