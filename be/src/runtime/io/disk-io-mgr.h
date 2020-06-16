@@ -380,6 +380,8 @@ class DiskIoMgr : public CacheLineAligned {
   friend class DiskIoMgrTest_Buffers_Test;
   friend class DiskIoMgrTest_BufferSizeSelection_Test;
   friend class DiskIoMgrTest_VerifyNumThreadsParameter_Test;
+  friend class DiskIoMgrTest_MetricsOfWriteSizeAndLatency_Test;
+  friend class DiskIoMgrTest_MetricsOfWriteIoError_Test;
 
   /////////////////////////////////////////
   /// BEGIN: private members that are accessed by other io:: classes
