@@ -78,7 +78,7 @@ class StatusPB;
 ///
 ///   return Status::OK();
 /// }
-class NODISCARD Status {
+class [[nodiscard]] Status {
  public:
   typedef strings::internal::SubstituteArg ArgType;
 
