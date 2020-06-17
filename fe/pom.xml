@@ -212,10 +212,6 @@ under the License.
           <groupId>org.apache.kafka</groupId>
           <artifactId>kafka_2.11</artifactId>
         </exclusion>
-        <exclusion>
-          <groupId>org.apache.solr</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
       </exclusions>
     </dependency>
     <!-- this is needed by ranger-plugins-audit -->
@@ -692,8 +688,6 @@ under the License.
                     <exclude>io.netty:*</exclude>
                     <!-- Avoid runtime dependency on rocksdb. -->
                     <exclude>org.rocksdb:*</exclude>
-                    <!-- Avoid runtime dependency on solr. -->
-                    <exclude>org.apache.solr:*</exclude>
                     <!-- Avoid runtime dependency on Jersey server components. -->
                     <exclude>com.sun.jersey:jersey-server</exclude>
                     <exclude>com.sun.jersey:jersey-server</exclude>
