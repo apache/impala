@@ -2726,6 +2726,19 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/data/date_tbl/0003.txt' OVERWRITE
 ---- DEPENDENT_LOAD
 insert overwrite table {db_name}{db_suffix}.{table_name} partition(date_part)
 select id_col, date_col, date_part from functional.{table_name};
+---- CREATE_KUDU
+-- Can't create partitions with date_part since Kudu don't support "partition by"
+-- with non key column.
+DROP TABLE IF EXISTS {db_name}{db_suffix}.{table_name};
+CREATE TABLE {db_name}{db_suffix}.{table_name} (
+  id_col INT PRIMARY KEY,
+  date_col DATE NULL,
+  date_part DATE NOT NULL
+)
+PARTITION BY HASH (id_col) PARTITIONS 3 STORED AS KUDU;
+---- DEPENDENT_LOAD_KUDU
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name}
+SELECT id_col, date_col, date_part FROM {db_name}.{table_name};
 ====
 ---- DATASET
 functional

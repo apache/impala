@@ -1266,7 +1266,7 @@ PLAN-ROOT SINK
 |     row-size=32B cardinality=1
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.05MB
    row-size=32B cardinality=150.00K
 ====
 # Two-way join query where the build side is optimized into an empty set
@@ -1603,7 +1603,7 @@ PLAN-ROOT SINK
 |
 |--11:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.bigint_col = b.bigint_col, a.bool_col = b.bool_col, a.double_col = b.double_col, a.float_col = b.float_col, a.id = b.id, a.int_col = b.int_col, a.smallint_col = b.smallint_col, a.tinyint_col = b.tinyint_col
-|  |  runtime filters: RF032 <- b.bigint_col, RF033 <- b.bool_col, RF034 <- b.double_col, RF035 <- b.float_col, RF036 <- b.id, RF037 <- b.int_col, RF038 <- b.smallint_col, RF039 <- b.tinyint_col
+|  |  runtime filters: RF033 <- b.bigint_col, RF034 <- b.bool_col, RF035 <- b.double_col, RF036 <- b.float_col, RF037 <- b.id, RF038 <- b.int_col, RF039 <- b.smallint_col, RF040 <- b.tinyint_col
 |  |  row-size=64B cardinality=8
 |  |
 |  |--10:SCAN HDFS [functional.alltypestiny b]
@@ -1612,7 +1612,7 @@ PLAN-ROOT SINK
 |  |
 |  09:SCAN HDFS [functional.alltypes a]
 |     HDFS partitions=24/24 files=24 size=478.45KB
-|     runtime filters: RF032 -> a.bigint_col, RF033 -> a.bool_col, RF034 -> a.double_col, RF035 -> a.float_col, RF036 -> a.id, RF037 -> a.int_col, RF038 -> a.smallint_col, RF039 -> a.tinyint_col
+|     runtime filters: RF033 -> a.bigint_col, RF034 -> a.bool_col, RF035 -> a.double_col, RF036 -> a.float_col, RF037 -> a.id, RF038 -> a.int_col, RF039 -> a.smallint_col, RF040 -> a.tinyint_col
 |     row-size=32B cardinality=7.30K
 |
 30:NESTED LOOP JOIN [CROSS JOIN]
