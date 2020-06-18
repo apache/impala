@@ -141,6 +141,9 @@ class ImpalaClient(object):
     # query cancellation.
     self.is_query_cancelled = False
     self.verbose = verbose
+    # This is set in connect(). It's used in constructing the retried query link after
+    # we parse the retried query id.
+    self.webserver_address = None
 
   def connect(self):
     """Creates a connection to an Impalad instance. Returns a tuple with the impala
@@ -226,6 +229,10 @@ class ImpalaClient(object):
     """Return the standard string representation of an Impala query ID, e.g.
     'd74d8ce632c9d4d0:75c5a51100000000'"""
     raise NotImplementedError()
+
+  def get_query_link(self, query_id):
+    """Return the URL link to the debug page of the query"""
+    return "%s/query_plan?query_id=%s" % (self.webserver_address, query_id)
 
   def wait_to_finish(self, last_query_handle, periodic_callback=None):
     """Wait until the results can be fetched for 'last_query_handle' or until the
@@ -320,6 +327,16 @@ class ImpalaClient(object):
     last_query_handle. Note that the error log may contain messages that are not errors
     (e.g. warnings)."""
     return self._get_warn_or_error_log(last_query_handle, False)
+
+  def _append_retried_query_link(self, get_log_result):
+    """Append the retried query link if the original query has been retried"""
+    query_id_search = re.search("Query has been retried using query id: (.*)\n",
+                                get_log_result)
+    if query_id_search and len(query_id_search.groups()) >= 1:
+      retried_query_id = query_id_search.group(1)
+      get_log_result += "Retried query link: %s" % \
+                        self.get_query_link(retried_query_id)
+    return get_log_result
 
   def _get_http_transport(self, connect_timeout_ms):
     """Creates a transport with HTTP as the base."""
@@ -690,6 +707,7 @@ class ImpalaHS2Client(ImpalaClient):
     # PingImpalaHS2Service rpc is idempotent and so safe to retry.
     resp = self._do_hs2_rpc(PingImpalaHS2Service, retry_on_error=True)
     self._check_hs2_rpc_status(resp.status)
+    self.webserver_address = resp.webserver_address
     return (resp.version, resp.webserver_address)
 
   def _create_query_req(self, query_str, set_query_options):
@@ -891,6 +909,7 @@ class ImpalaHS2Client(ImpalaClient):
     # Strip progress message out of HS2 log.
     log = HS2_LOG_PROGRESS_REGEX.sub("", log)
     if log and log.strip():
+      log = self._append_retried_query_link(log)
       type_str = "WARNINGS" if warn is True else "ERROR"
       return "%s: %s" % (type_str, log)
     return ""
@@ -1037,6 +1056,7 @@ class ImpalaBeeswaxClient(ImpalaClient):
       raise
     except TTransportException as e:
       raise DisconnectedException("Error communicating with impalad: %s" % e)
+    self.webserver_address = resp.webserver_address
     return (resp.version, resp.webserver_address)
 
   def _create_query_req(self, query_str, set_query_options):
@@ -1144,6 +1164,7 @@ class ImpalaBeeswaxClient(ImpalaClient):
       type_str = "warn" if warn is True else "error"
       return "Failed to get %s log: %s" % (type_str, rpc_status)
     if log and log.strip():
+      log = self._append_retried_query_link(log)
       type_str = "WARNINGS" if warn is True else "ERROR"
       return "%s: %s" % (type_str, log)
     return ""

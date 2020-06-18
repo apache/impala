@@ -320,6 +320,15 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
       SQLSTATE_GENERAL_ERROR);
   stringstream error_log_ss;
 
+  if (query_handle->IsRetriedQuery()) {
+    QueryHandle original_query_handle;
+    RAISE_IF_ERROR(GetQueryHandle(query_id, &original_query_handle),
+        SQLSTATE_GENERAL_ERROR);
+    DCHECK(!original_query_handle->query_status().ok());
+    error_log_ss << Substitute(GET_LOG_QUERY_RETRY_INFO_FORMAT,
+        original_query_handle->query_status().GetDetail(),
+        PrintId(query_handle->query_id()));
+  }
   {
     // Take the lock to ensure that if the client sees a exec_state == ERROR, it is
     // guaranteed to see the error query_status.
@@ -343,6 +352,7 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
     if (!coord_errors.empty()) error_log_ss << coord_errors << "\n";
   }
   log = error_log_ss.str();
+  VLOG_RPC << "get_log(): query_id=" << PrintId(query_id) << ", log=" << log;
 }
 
 void ImpalaServer::get_default_configuration(vector<ConfigVariable>& configurations,

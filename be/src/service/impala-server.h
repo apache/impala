@@ -645,6 +645,8 @@ class ImpalaServer : public ImpalaServiceIf,
   static const char* SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION;
   static const char* SQLSTATE_GENERAL_ERROR;
   static const char* SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED;
+  /// String format of retry information returned in GetLog() RPCs.
+  static const char* GET_LOG_QUERY_RETRY_INFO_FORMAT;
 
   /// Used in situations where the client provides a session ID and a query ID and the
   /// caller needs to validate that the query can be accessed from the session. The two
