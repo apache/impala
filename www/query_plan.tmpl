@@ -57,7 +57,7 @@ under the License.
 <h3>Plan</h3>
 <div>
   <label>
-  <input type="checkbox" checked="true" id="colour_scheme"/>
+  <input type="checkbox" checked="true" id="colour_scheme" onClick="refresh()"/>
   Shade nodes according to time spent (if unchecked, shade according to plan fragment)
   </label>
 </div>
@@ -137,6 +137,10 @@ function renderGraph(ignored_arg) {
   if (req.status != 200) return;
   var json = JSON.parse(req.responseText);
   var plan = json["plan_json"];
+  var inflight = json["inflight"];
+  if (!inflight) {
+    clearInterval(intervalId);
+  }
 
   var states = []
   var edges = []
@@ -222,6 +226,6 @@ function refresh() {
 // Force one refresh before starting the timer.
 refresh();
 
-setInterval(refresh, 1000);
+var intervalId = setInterval(refresh, 2000);
 
 </script>
