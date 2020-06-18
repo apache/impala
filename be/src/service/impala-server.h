@@ -938,6 +938,14 @@ class ImpalaServer : public ImpalaServiceIf,
   Status GetQueryHandle(const TUniqueId& query_id, QueryHandle* query_handle,
       bool return_unregistered = false);
 
+  /// Returns both the active QueryHandle and the original QueryHandle for this query id.
+  /// In scenarios that require both QueryHandles, calling 'GetActiveQueryHandle' and
+  /// 'GetQueryHandle' one by one may have race conditions with QueryDriver deletion
+  /// causing QueryDriver not found in the second call. Use this method in such cases.
+  /// See 'GetQueryDriver' for a description of the 'return_unregistered' parameter.
+  Status GetAllQueryHandles(const TUniqueId& query_id, QueryHandle* active_query_handle,
+      QueryHandle* original_query_handle, bool return_unregistered = false);
+
   /// Returns the QueryDriver for the given query_id, or nullptr if not found. If
   /// 'return_unregistered' is true, queries that have started unregistration
   /// may be returned. Otherwise queries that have started unregistration will

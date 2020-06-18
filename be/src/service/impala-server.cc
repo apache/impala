@@ -713,8 +713,11 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
     TExecSummary* result) {
   // Search for the query id in the active query map.
   {
+    // QueryHandle of the current query.
     QueryHandle query_handle;
-    Status status = GetQueryHandle(query_id, &query_handle,
+    // QueryHandle or the original query if the query is retried.
+    QueryHandle original_query_handle;
+    Status status = GetAllQueryHandles(query_id, &query_handle, &original_query_handle,
         /*return_unregistered=*/ true);
     if (status.ok()) {
       lock_guard<mutex> l(*query_handle->lock());
@@ -733,7 +736,6 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
             }
           }
         }
-        return Status::OK();
       } else if (query_handle->GetCoordinator() != nullptr) {
         query_handle->GetCoordinator()->GetTExecSummary(result);
         TExecProgress progress;
@@ -743,11 +745,18 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
             query_handle->GetCoordinator()->progress().total());
         // TODO: does this not need to be synchronized?
         result->__set_progress(progress);
-        return Status::OK();
       } else {
         *result = TExecSummary();
-        return Status::OK();
       }
+      if (query_handle->IsRetriedQuery()) {
+        // Don't need to acquire lock on original_query_handle since the query is
+        // finished. There are no concurrent updates on its status.
+        result->error_logs.push_back(original_query_handle->query_status().GetDetail());
+        result->error_logs.push_back(Substitute("Retrying query using query id: $0",
+            PrintId(query_handle->query_id())));
+        result->__isset.error_logs = true;
+      }
+      return Status::OK();
     }
   }
 
@@ -1335,6 +1344,24 @@ Status ImpalaServer::GetQueryHandle(
     return err;
   }
   query_handle->SetHandle(query_driver, query_driver->GetClientRequestState(query_id));
+  return Status::OK();
+}
+
+Status ImpalaServer::GetAllQueryHandles(const TUniqueId& query_id,
+    QueryHandle* active_query_handle, QueryHandle* original_query_handle,
+    bool return_unregistered) {
+  DCHECK(active_query_handle != nullptr);
+  DCHECK(original_query_handle != nullptr);
+  shared_ptr<QueryDriver> query_driver = GetQueryDriver(query_id, return_unregistered);
+  if (UNLIKELY(query_driver == nullptr)) {
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    VLOG(1) << err.GetDetail();
+    return err;
+  }
+  active_query_handle->SetHandle(query_driver,
+      query_driver->GetActiveClientRequestState());
+  original_query_handle->SetHandle(query_driver,
+      query_driver->GetClientRequestState(query_id));
   return Status::OK();
 }
 

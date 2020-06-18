@@ -1088,6 +1088,17 @@ class ImpalaShell(cmd.Cmd, object):
         self.last_summary = time.time()
         return
 
+      data = ""
+      if summary.error_logs:
+        for error_line in summary.error_logs:
+          data += error_line + "\n"
+          query_id_search = re.search("Retrying query using query id: (.*)",
+                                      error_line)
+          if query_id_search and len(query_id_search.groups()) == 1:
+            retried_query_id = query_id_search.group(1)
+            data += "Retried query link: %s\n"\
+                    % self.imp_client.get_query_link(retried_query_id)
+
       if summary.progress:
         progress = summary.progress
 
@@ -1096,7 +1107,6 @@ class ImpalaShell(cmd.Cmd, object):
           self.last_summary = time.time()
           return
 
-        data = ""
         if self.live_progress and progress.total_scan_ranges > 0:
           val = ((summary.progress.num_completed_scan_ranges * 100) /
                  summary.progress.total_scan_ranges)
@@ -1110,7 +1120,7 @@ class ImpalaShell(cmd.Cmd, object):
           formatter = PrettyOutputFormatter(table)
           data += formatter.format(output) + "\n"
 
-        self.progress_stream.write(data)
+      self.progress_stream.write(data)
       self.last_summary = time.time()
 
   def _default_summary_table(self):

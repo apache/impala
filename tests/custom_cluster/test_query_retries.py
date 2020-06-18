@@ -77,10 +77,14 @@ class TestQueryRetries(CustomClusterTestSuite):
     assert len(results.data) == 1
     assert int(results.data[0]) == 3650
 
+    # Validate the live exec summary.
+    retried_query_id = self.__get_retried_query_id_from_summary(handle)
+    assert retried_query_id is not None
+
     # Validate the state of the runtime profiles.
     retried_runtime_profile = self.client.get_runtime_profile(handle)
-    retried_query_id =\
-        self.__validate_runtime_profiles(retried_runtime_profile, handle.get_handle().id)
+    self.__validate_runtime_profiles(
+        retried_runtime_profile, handle.get_handle().id, retried_query_id)
 
     # Validate the state of the client log.
     self.__validate_client_log(handle, retried_query_id)
@@ -115,6 +119,10 @@ class TestQueryRetries(CustomClusterTestSuite):
     assert len(results.data) == 1
     assert self._shuffle_heavy_query_results in results.data[0]
 
+    # Validate the live exec summary.
+    retried_query_id = self.__get_retried_query_id_from_summary(handle)
+    assert retried_query_id is not None
+
     # The runtime profile of the retried query.
     retried_runtime_profile = self.client.get_runtime_profile(handle)
 
@@ -123,8 +131,8 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.__assert_executors_blacklisted(killed_impalad, retried_runtime_profile)
 
     # Validate the state of the runtime profiles.
-    retried_query_id = self.__validate_runtime_profiles(
-        retried_runtime_profile, handle.get_handle().id)
+    self.__validate_runtime_profiles(
+        retried_runtime_profile, handle.get_handle().id, retried_query_id)
 
     # Validate the state of the client log.
     self.__validate_client_log(handle, retried_query_id)
@@ -183,8 +191,11 @@ class TestQueryRetries(CustomClusterTestSuite):
       retried_runtime_profile = self.client.get_runtime_profile(handle)
       self.__assert_executors_blacklisted(killed_impalad, retried_runtime_profile)
 
-      retried_query_id = self.__validate_runtime_profiles(
-          retried_runtime_profile, handle.get_handle().id)
+      retried_query_id = self.__get_retried_query_id_from_summary(handle)
+      assert retried_query_id is not None
+
+      self.__validate_runtime_profiles(
+          retried_runtime_profile, handle.get_handle().id, retried_query_id)
 
       self.__validate_client_log(handle, retried_query_id)
 
@@ -227,9 +238,13 @@ class TestQueryRetries(CustomClusterTestSuite):
     # the runtime profile.
     self.__assert_executors_blacklisted(killed_impalad, retried_runtime_profile)
 
+    # Validate the live exec summary.
+    retried_query_id = self.__get_retried_query_id_from_summary(handle)
+    assert retried_query_id is not None
+
     # Validate the state of the runtime profiles.
-    retried_query_id = self.__validate_runtime_profiles(
-      retried_runtime_profile, handle.get_handle().id)
+    self.__validate_runtime_profiles(
+        retried_runtime_profile, handle.get_handle().id, retried_query_id)
 
     # Validate the state of the client log.
     self.__validate_client_log(handle, retried_query_id)
@@ -267,11 +282,14 @@ class TestQueryRetries(CustomClusterTestSuite):
     # Wait until the query fails.
     self.wait_for_state(handle, self.client.QUERY_STATES['EXCEPTION'], 60)
 
+    # Validate the live exec summary.
+    retried_query_id = self.__get_retried_query_id_from_summary(handle)
+    assert retried_query_id is not None
+
     # The runtime profile and client log of the retried query, need to be retrieved
     # before fetching results, since the failed fetch attempt will close the
     # query handle.
     retried_runtime_profile = self.client.get_runtime_profile(handle)
-    retried_query_id = self.__get_query_id_from_profile(retried_runtime_profile)
     self.__validate_client_log(handle, retried_query_id)
 
     # Assert that the query failed, since a query can only be retried once.
@@ -334,9 +352,14 @@ class TestQueryRetries(CustomClusterTestSuite):
         query_options={'retry_failed_queries': 'true'})
     self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
 
+    # Validate the live exec summary.
+    retried_query_id = self.__get_retried_query_id_from_summary(handle)
+    assert retried_query_id is not None
+
     # Validate that the query was retried.
-    retried_query_id = self.__validate_runtime_profiles_from_service(
-        impalad_service, handle)
+    profile_retried_query_id = \
+        self.__validate_runtime_profiles_from_service(impalad_service, handle)
+    assert profile_retried_query_id == retried_query_id
     self.__validate_client_log(handle, retried_query_id)
 
     # Cancel the query.
@@ -369,12 +392,17 @@ class TestQueryRetries(CustomClusterTestSuite):
         query_options={'retry_failed_queries': 'true', 'query_timeout_s': '1'})
     self.wait_for_state(handle, self.client.QUERY_STATES['EXCEPTION'], 60)
 
+    # Validate the live exec summary.
+    retried_query_id = self.__get_retried_query_id_from_summary(handle)
+    assert retried_query_id is not None
+
     # Wait for the query timeout to expire the query handle.
     time.sleep(5)
 
     # Validate that the query was retried.
-    retried_query_id = self.__validate_runtime_profiles_from_service(
-        impalad_service, handle)
+    profile_retried_query_id = \
+        self.__validate_runtime_profiles_from_service(impalad_service, handle)
+    assert profile_retried_query_id == retried_query_id
     self.__validate_client_log(handle, retried_query_id)
 
     # Assert than attempt to fetch from the query handle fails with a query expired
@@ -439,11 +467,16 @@ class TestQueryRetries(CustomClusterTestSuite):
     assert len(results.data) == 1
     assert int(results.data[0]) == 6001215
 
+    # Validate the live exec summary.
+    retried_query_id = \
+        self.__get_retried_query_id_from_summary(handle, use_hs2_client=True)
+    assert retried_query_id is not None
+
     # Validate the state of the runtime profiles.
     retried_runtime_profile = self.hs2_client.get_runtime_profile(handle,
         TRuntimeProfileFormat.STRING)
-    retried_query_id = self.__validate_runtime_profiles(
-        retried_runtime_profile, self.hs2_client.get_query_id(handle))
+    self.__validate_runtime_profiles(
+        retried_runtime_profile, self.hs2_client.get_query_id(handle), retried_query_id)
     self.__validate_client_log(handle, retried_query_id, use_hs2_client=True)
     self.impalad_test_service.wait_for_metric_value(
         'impala-server.resultset-cache.total-num-rows', 1, timeout=60)
@@ -455,7 +488,8 @@ class TestQueryRetries(CustomClusterTestSuite):
     original_profile = impalad_service.read_query_profile_page(handle.get_handle().id)
     retried_query_id = self.__get_retried_query_id_from_profile(original_profile)
     retried_profile = impalad_service.read_query_profile_page(retried_query_id)
-    self.__validate_runtime_profiles(retried_profile, handle.get_handle().id)
+    self.__validate_runtime_profiles(
+        retried_profile, handle.get_handle().id, retried_query_id)
     return retried_query_id
 
   def __get_retried_query_id_from_profile(self, profile):
@@ -515,7 +549,8 @@ class TestQueryRetries(CustomClusterTestSuite):
             original_id_pattern, retried_runtime_profile)
     assert original_id_search.group(1) == original_query_id
 
-  def __validate_runtime_profiles(self, retried_runtime_profile, original_query_id):
+  def __validate_runtime_profiles(self, retried_runtime_profile, original_query_id,
+                                  retried_query_id):
     """"Validate the runtime profiles of both the original and retried queries. The
     'retried_runtime_profile' refers to the runtime profile of the retried query (the
     most recent attempt of the query, which should have succeeded). The
@@ -523,8 +558,8 @@ class TestQueryRetries(CustomClusterTestSuite):
     original attempt of the query submitted by the user, which failed and had to be
     retried)."""
 
-    # Extract the retried query id from the retried runtime profile.
-    retried_query_id = self.__get_query_id_from_profile(retried_runtime_profile)
+    # Check the retried query id in the retried runtime profile.
+    assert retried_query_id == self.__get_query_id_from_profile(retried_runtime_profile)
 
     # Assert that the query id of the original query is in the runtime profile of the
     # retried query.
@@ -540,7 +575,6 @@ class TestQueryRetries(CustomClusterTestSuite):
     # Assert that the query options from the original and retried queries are the same.
     assert self.__get_query_options(original_runtime_profile) == \
         self.__get_query_options(retried_runtime_profile)
-    return retried_query_id
 
   def __get_query_options(self, profile):
     """Returns the query options from the given profile."""
@@ -599,3 +633,15 @@ class TestQueryRetries(CustomClusterTestSuite):
     assert query_id_search,\
       "Invalid client log, has no retried query id. Log=%s" % client_log
     assert query_id_search.group(1) == retried_query_id
+
+  def __get_retried_query_id_from_summary(self, handle, use_hs2_client=False):
+    if use_hs2_client:
+      summary = self.hs2_client.get_exec_summary(handle)
+    else:
+      summary = self.client.get_exec_summary(handle)
+    if summary.error_logs:
+      for log in summary.error_logs:
+        query_id_search = re.search("Retrying query using query id: (.*)", log)
+        if query_id_search:
+          return query_id_search.group(1)
+    return None
