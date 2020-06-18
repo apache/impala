@@ -385,8 +385,9 @@ class ImpylaHS2Connection(ImpalaConnection):
 
   def get_exec_summary(self, operation_handle):
     LOG.info("-- getting exec summary operation: {0}".format(operation_handle))
-    raise NotImplementedError(
-        "Not yet implemented for HS2 - summary returned is thrift, not string.")
+    cursor = operation_handle.get_handle()
+    # summary returned is thrift, not string.
+    return cursor.get_summary()
 
   def get_runtime_profile(self, operation_handle, profile_format):
     LOG.info("-- getting runtime profile operation: {0}".format(operation_handle))
