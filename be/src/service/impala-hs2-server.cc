@@ -931,7 +931,16 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
     // Report progress
     ss << coord->progress().ToString() << "\n";
   }
-  // Report the query status, if the query failed.
+  // Report the query status, if the query failed or has been retried.
+  if (query_handle->IsRetriedQuery()) {
+    QueryHandle original_query_handle;
+    HS2_RETURN_IF_ERROR(return_val, GetQueryHandle(query_id, &original_query_handle),
+        SQLSTATE_GENERAL_ERROR);
+    DCHECK(!original_query_handle->query_status().ok());
+    ss << Substitute(GET_LOG_QUERY_RETRY_INFO_FORMAT,
+        original_query_handle->query_status().GetDetail(),
+        PrintId(query_handle->query_id()));
+  }
   {
     // Take the lock to ensure that if the client sees a query_state == EXCEPTION, it is
     // guaranteed to see the error query_status.
@@ -966,6 +975,7 @@ void ImpalaServer::GetLog(TGetLogResp& return_val, const TGetLogReq& request) {
   }
   return_val.log = ss.str();
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
+  VLOG_RPC << "GetLog(): query_id=" << PrintId(query_id) << ", log=" << return_val.log;
 }
 
 void ImpalaServer::GetExecSummary(TGetExecSummaryResp& return_val,

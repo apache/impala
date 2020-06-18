@@ -1146,8 +1146,7 @@ class ImpalaShell(cmd.Cmd, object):
       self.last_summary = time.time()
       if print_web_link:
         self._print_if_verbose(
-            "Query progress can be monitored at: %s/query_plan?query_id=%s" %
-            (self.webserver_address,
+            "Query progress can be monitored at: %s" % self.imp_client.get_query_link(
              self.imp_client.get_query_id_str(self.last_query_handle)))
 
       wait_to_finish = self.imp_client.wait_to_finish(self.last_query_handle,
