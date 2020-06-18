@@ -83,16 +83,15 @@ aggregation(SUM, ProbeRows): 1460
 row_regex: .*2 of 2 Runtime Filters Published.*
 ====
 ---- QUERY
-# TODO update the runtime profile for this test case when IMPALA-9691
-#   (Support Kudu Timestamp and Date Bloom Filter) is fixed.
+# IMPALA-9691: Support Kudu Timestamp and Date Bloom Filter
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN count(*) from alltypes a join [BROADCAST] alltypestiny b
 where a.timestamp_col = b.timestamp_col
 ---- RESULTS
 8
 ---- RUNTIME_PROFILE
-aggregation(SUM, ProbeRows): 902
-row_regex: .*1 of 1 Runtime Filter Published.*
+aggregation(SUM, ProbeRows): 8
+row_regex: .*2 of 2 Runtime Filters Published.*
 ====
 ---- QUERY
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
@@ -369,6 +368,19 @@ where a.d38_38 = b.d38_38 and b.d38_38 = 0
 aggregation(SUM, ProbeRows): 732
 row_regex: .*2 of 2 Runtime Filters Published.*
 ====
+---- QUERY
+# TODO update the runtime profile for this test case when IMPALA-9294
+#   (Support Kudu Date Min/Max Filters) is fixed.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from date_tbl a
+join [BROADCAST] date_tbl b
+where a.date_col = b.date_col and b.date_col = DATE '2017-11-28'
+---- RESULTS
+9
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 3
+row_regex: .*1 of 1 Runtime Filter Published.*
+====
 
 
 ---- QUERY
@@ -458,4 +470,62 @@ where a.id in (select b.id from alltypes b where b.int_col < 10);
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 7300
 row_regex: .*2 of 2 Runtime Filters Published.*
+====
+
+
+---- QUERY
+####################################################
+# Test case 5: Join with different formats of tables
+###################################################
+# Join on the integer type of columns with HDFS as target
+# of the bloom filter.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from functional_parquet.alltypes a
+join [BROADCAST] functional_kudu.alltypes b
+where a.int_col = b.int_col
+---- RESULTS
+5329000
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 7300
+row_regex: .*1 of 1 Runtime Filter Published.*
+====
+---- QUERY
+# Join on the integer type of columns with Kudu as target
+# of the bloom filter and min=max filter.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from functional_kudu.alltypes a
+join [BROADCAST] functional_parquet.alltypes b
+where a.int_col = b.int_col
+---- RESULTS
+5329000
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 7300
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+# Join on the timestamp type of columns with kudu as target
+# of the runtime filters. Bloom filter and min-max filter
+# are generated.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from functional_kudu.alltypes a
+join [BROADCAST] functional_parquet.alltypes b
+where a.timestamp_col = b.timestamp_col
+---- RESULTS
+7300
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 7300
+row_regex: .*2 of 2 Runtime Filters Published.*
+====
+---- QUERY
+# Join on the timestamp type of columns with HDFS as target
+# of runtime filters. Bloom filter is generated.
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from functional_parquet.alltypes a
+join [BROADCAST] functional_kudu.alltypes b
+where a.timestamp_col = b.timestamp_col
+---- RESULTS
+7300
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 7300
+row_regex: .*1 of 1 Runtime Filter Published.*
 ====

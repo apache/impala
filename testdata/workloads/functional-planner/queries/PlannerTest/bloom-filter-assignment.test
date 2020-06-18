@@ -406,3 +406,137 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=4B cardinality=12.79K
    in pipelines: 00(GETNEXT)
 ====
+# Source: HDFS timestamp slot, Targets: HDFS and Kudu timestamp slots
+#   Join three tables, bloom filters are assigned to HDFS and Kudu scanner.
+select straight_join count(*)
+  from functional_parquet.alltypes a join [BROADCAST] functional_kudu.alltypes b
+    join [BROADCAST] functional_parquet.alltypes c
+  where a.timestamp_col = b.timestamp_col and a.timestamp_col = c.timestamp_col and
+    c.id < 100
+---- QUERYOPTIONS
+ENABLED_RUNTIME_FILTER_TYPES=BLOOM
+EXPLAIN_LEVEL=2
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=55.62MB mem-reservation=6.91MB thread-reservation=4 runtime-filters-memory=3.00MB
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=8B cardinality=1
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.timestamp_col = c.timestamp_col
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF000[bloom] <- c.timestamp_col, RF001[bloom] <- utc_to_unix_micros(c.timestamp_col)
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1,2 row-size=52B cardinality=12.88K
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [functional_parquet.alltypes c]
+|     HDFS partitions=24/24 files=24 size=202.50KB
+|     predicates: c.id < CAST(100 AS INT)
+|     stored statistics:
+|       table: rows=unavailable size=unavailable
+|       partitions: 0/24 rows=unavailable
+|       columns: unavailable
+|     extrapolated-rows=disabled max-scan-range-rows=unavailable
+|     parquet statistics predicates: c.id < CAST(100 AS INT)
+|     parquet dictionary predicates: c.id < CAST(100 AS INT)
+|     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
+|     tuple-ids=2 row-size=20B cardinality=1.29K
+|     in pipelines: 02(GETNEXT)
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.timestamp_col = b.timestamp_col
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF003[bloom] <- b.timestamp_col
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=32B cardinality=12.88K
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN KUDU [functional_kudu.alltypes b]
+|     runtime filters: RF001[bloom] -> b.timestamp_col
+|     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+|     tuple-ids=1 row-size=16B cardinality=7.30K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [functional_parquet.alltypes a]
+   HDFS partitions=24/24 files=24 size=202.50KB
+   runtime filters: RF000[bloom] -> a.timestamp_col, RF003[bloom] -> a.timestamp_col
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=16B cardinality=12.88K
+   in pipelines: 00(GETNEXT)
+====
+# Source: Kudu timestamp slot, Target HDFS and Kudu timestamp slots
+#   Join three tables, bloom filters are assigned to Kudu scanner and HDFS scanner.
+select straight_join count(*)
+  from functional_parquet.alltypes a join [BROADCAST] functional_kudu.alltypes b
+    join [BROADCAST] functional_kudu.alltypes c
+  where a.timestamp_col = b.timestamp_col and a.timestamp_col = c.timestamp_col and
+    c.id < 100
+---- QUERYOPTIONS
+ENABLED_RUNTIME_FILTER_TYPES=BLOOM
+EXPLAIN_LEVEL=2
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.88MB mem-reservation=6.89MB thread-reservation=4 runtime-filters-memory=3.00MB
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=8B cardinality=1
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.timestamp_col = c.timestamp_col
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF000[bloom] <- c.timestamp_col, RF001[bloom] <- utc_to_unix_micros(c.timestamp_col)
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1,2 row-size=48B cardinality=12.88K
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN KUDU [functional_kudu.alltypes c]
+|     kudu predicates: c.id < CAST(100 AS INT)
+|     mem-estimate=1.50MB mem-reservation=0B thread-reservation=1
+|     tuple-ids=2 row-size=16B cardinality=730
+|     in pipelines: 02(GETNEXT)
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.timestamp_col = b.timestamp_col
+|  fk/pk conjuncts: assumed fk/pk
+|  runtime filters: RF003[bloom] <- b.timestamp_col
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=32B cardinality=12.88K
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN KUDU [functional_kudu.alltypes b]
+|     runtime filters: RF001[bloom] -> b.timestamp_col
+|     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+|     tuple-ids=1 row-size=16B cardinality=7.30K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [functional_parquet.alltypes a]
+   HDFS partitions=24/24 files=24 size=202.50KB
+   runtime filters: RF000[bloom] -> a.timestamp_col, RF003[bloom] -> a.timestamp_col
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=16B cardinality=12.88K
+   in pipelines: 00(GETNEXT)
+====

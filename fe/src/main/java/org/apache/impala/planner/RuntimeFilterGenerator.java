@@ -33,6 +33,7 @@ import org.apache.impala.analysis.BinaryPredicate.Operator;
 import org.apache.impala.analysis.CastExpr;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.Predicate;
 import org.apache.impala.analysis.SlotDescriptor;
@@ -44,6 +45,7 @@ import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
@@ -194,6 +196,9 @@ public final class RuntimeFilterGenerator {
     private boolean finalized_ = false;
     // The type of filter to build.
     private final TRuntimeFilterType type_;
+    // If set, indicates that the filter is targeted for Kudu scan node with source
+    // timestamp truncation.
+    private boolean isTimestampTruncation_ = false;
 
     /**
      * Internal representation of a runtime filter target.
@@ -252,7 +257,8 @@ public final class RuntimeFilterGenerator {
 
     private RuntimeFilter(RuntimeFilterId filterId, JoinNode filterSrcNode, Expr srcExpr,
         Expr origTargetExpr, Operator exprCmpOp, Map<TupleId, List<SlotId>> targetSlots,
-        TRuntimeFilterType type, FilterSizeLimits filterSizeLimits) {
+        TRuntimeFilterType type, FilterSizeLimits filterSizeLimits,
+        boolean isTimestampTruncation) {
       id_ = filterId;
       src_ = filterSrcNode;
       srcExpr_ = srcExpr;
@@ -260,6 +266,7 @@ public final class RuntimeFilterGenerator {
       exprCmpOp_ = exprCmpOp;
       targetSlotsByTid_ = targetSlots;
       type_ = type;
+      isTimestampTruncation_ = isTimestampTruncation;
       computeNdvEstimate();
       calculateFilterSize(filterSizeLimits);
     }
@@ -309,7 +316,8 @@ public final class RuntimeFilterGenerator {
      */
     public static RuntimeFilter create(IdGenerator<RuntimeFilterId> idGen,
         Analyzer analyzer, Expr joinPredicate, JoinNode filterSrcNode,
-        TRuntimeFilterType type, FilterSizeLimits filterSizeLimits) {
+        TRuntimeFilterType type, FilterSizeLimits filterSizeLimits,
+        boolean isTimestampTruncation) {
       Preconditions.checkNotNull(idGen);
       Preconditions.checkNotNull(joinPredicate);
       Preconditions.checkNotNull(filterSrcNode);
@@ -328,6 +336,24 @@ public final class RuntimeFilterGenerator {
           TupleIsNullPredicate.unwrapExpr(normalizedJoinConjunct.getChild(0).clone());
       Expr srcExpr = normalizedJoinConjunct.getChild(1);
 
+      if (isTimestampTruncation) {
+        Preconditions.checkArgument(srcExpr.isAnalyzed());
+        Preconditions.checkArgument(srcExpr.getType() == Type.TIMESTAMP);
+        Expr toUnixTimeExpr =
+            new FunctionCallExpr("utc_to_unix_micros", Lists.newArrayList(srcExpr));
+        try {
+          toUnixTimeExpr.analyze(analyzer);
+        } catch (AnalysisException e) {
+          // Expr analysis failed. Skip this runtime filter since we cannot serialize
+          // it to thrift.
+          LOG.warn("Skipping runtime filter because analysis failed: "
+                  + toUnixTimeExpr.toSql(),
+              e);
+          return null;
+        }
+        srcExpr = toUnixTimeExpr;
+      }
+
       Map<TupleId, List<SlotId>> targetSlots = getTargetSlots(analyzer, targetExpr);
       Preconditions.checkNotNull(targetSlots);
       if (targetSlots.isEmpty()) return null;
@@ -336,7 +362,8 @@ public final class RuntimeFilterGenerator {
         LOG.trace("Generating runtime filter from predicate " + joinPredicate);
       }
       return new RuntimeFilter(idGen.getNextId(), filterSrcNode, srcExpr, targetExpr,
-          normalizedJoinConjunct.getOp(), targetSlots, type, filterSizeLimits);
+          normalizedJoinConjunct.getOp(), targetSlots, type, filterSizeLimits,
+          isTimestampTruncation);
     }
 
     /**
@@ -443,6 +470,20 @@ public final class RuntimeFilterGenerator {
     public TRuntimeFilterType getType() { return type_; }
     public Operator getExprCompOp() { return exprCmpOp_; }
     public long getFilterSize() { return filterSizeBytes_; }
+    public boolean isTimestampTruncation() { return isTimestampTruncation_; }
+
+    /**
+     * Return TIMESTAMP if the isTimestampTruncation_ is set as true so that
+     * the source expr type could be matching with target expr type when
+     * assigning bloom filter to target scan node.
+     */
+    public Type getSrcExprType() {
+      if (!isTimestampTruncation_) {
+        return srcExpr_.getType();
+      } else {
+        return Type.TIMESTAMP;
+      }
+    }
 
     /**
      * Estimates the selectivity of a runtime filter as the cardinality of the
@@ -596,13 +637,30 @@ public final class RuntimeFilterGenerator {
       }
       joinConjuncts.addAll(joinNode.getConjuncts());
       List<RuntimeFilter> filters = new ArrayList<>();
-      for (TRuntimeFilterType type : TRuntimeFilterType.values()) {
+      for (TRuntimeFilterType filterType : TRuntimeFilterType.values()) {
         for (Expr conjunct : joinConjuncts) {
-          RuntimeFilter filter = RuntimeFilter.create(filterIdGenerator,
-              ctx.getRootAnalyzer(), conjunct, joinNode, type, bloomFilterSizeLimits_);
-          if (filter == null) continue;
-          registerRuntimeFilter(filter);
-          filters.add(filter);
+          RuntimeFilter filter =
+              RuntimeFilter.create(filterIdGenerator, ctx.getRootAnalyzer(), conjunct,
+                  joinNode, filterType, bloomFilterSizeLimits_,
+                  /* isTimestampTruncation */ false);
+          if (filter != null) {
+            registerRuntimeFilter(filter);
+            filters.add(filter);
+          }
+          // For timestamp bloom filters, we also generate a RuntimeFilter with the
+          // src timestamp truncated for Kudu scan node targets.
+          if (filterType == TRuntimeFilterType.BLOOM
+              && Predicate.isEquivalencePredicate(conjunct)
+              && conjunct.getChild(0).getType().isTimestamp()
+              && conjunct.getChild(1).getType().isTimestamp()) {
+            RuntimeFilter filter2 =
+                RuntimeFilter.create(filterIdGenerator, ctx.getRootAnalyzer(), conjunct,
+                    joinNode, filterType, bloomFilterSizeLimits_,
+                    /* isTimestampTruncation */ true);
+            if (filter2 == null) continue;
+            registerRuntimeFilter(filter2);
+            filters.add(filter2);
+          }
         }
       }
       generateFilters(ctx, root.getChild(0));
@@ -702,25 +760,28 @@ public final class RuntimeFilterGenerator {
       if (runtimeFilterMode == TRuntimeFilterMode.LOCAL && !isLocalTarget) continue;
 
       // Check that the scan node supports applying filters of this type and targetExpr.
-      if (scanNode instanceof HdfsScanNode
-          && filter.getType() != TRuntimeFilterType.BLOOM) {
-        continue;
-      } else if (scanNode instanceof KuduScanNode) {
+      if (scanNode instanceof HdfsScanNode) {
+        if (filter.getType() != TRuntimeFilterType.BLOOM
+            || filter.isTimestampTruncation()) {
+          continue;
+        }
+      } else {
+        Preconditions.checkState(scanNode instanceof KuduScanNode);
         if (filter.getType() == TRuntimeFilterType.BLOOM) {
           if (enabledRuntimeFilterTypes != TEnabledRuntimeFilterTypes.BLOOM
               && enabledRuntimeFilterTypes != TEnabledRuntimeFilterTypes.ALL) {
             continue;
           }
-          // TODO: IMPALA-9691 Support Kudu Timestamp and Date Bloom Filters
-          if (targetExpr.getType().isTimestamp() || targetExpr.getType().isDate()) {
-            continue;
-          }
           // TODO: Support Kudu VARCHAR Bloom Filter
           if (targetExpr.getType().isVarchar()) continue;
           // Kudu only supports targeting a single column, not general exprs, so the
-          // target must be a SlotRef pointing to a column without casting
+          // target must be a SlotRef pointing to a column without casting.
+          // For timestamp bloom filter, assign it to Kudu if it has src timestamp
+          // truncation.
           if (!(targetExpr instanceof SlotRef)
-              || filter.getExprCompOp() == Operator.NOT_DISTINCT) {
+              || filter.getExprCompOp() == Operator.NOT_DISTINCT
+              || (targetExpr.getType().isTimestamp()
+                     && !filter.isTimestampTruncation())) {
             continue;
           }
           SlotRef slotRef = (SlotRef) targetExpr;
@@ -815,7 +876,7 @@ public final class RuntimeFilterGenerator {
         return null;
       }
     }
-    Type srcType = filter.getSrcExpr().getType();
+    Type srcType = filter.getSrcExprType();
     // Types of targetExpr and srcExpr must be exactly the same since runtime filters are
     // based on hashing.
     if (!targetExpr.getType().equals(srcType)) {
