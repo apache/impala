@@ -928,6 +928,8 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
   document->AddMember("stmt", json_stmt, document->GetAllocator());
   Value json_plan_text(RedactCopy(plan).c_str(), document->GetAllocator());
   document->AddMember("plan", json_plan_text, document->GetAllocator());
+  Value json_inflight(found);
+  document->AddMember("inflight", json_inflight, document->GetAllocator());
 
   // Redact the error in case the query is contained in the error message.
   Value json_status(query_status.ok() ? "OK" :
