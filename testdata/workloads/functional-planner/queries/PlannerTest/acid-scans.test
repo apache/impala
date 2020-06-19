@@ -292,7 +292,7 @@ PLAN-ROOT SINK
 |  |     HDFS partitions=6/24 files=6 size=6.58KB
 |  |     stored statistics:
 |  |       table: rows=unavailable size=unavailable
-|  |       partitions: 0/6 rows=unavailable
+|  |       partitions: 0/6 rows=413
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
@@ -303,7 +303,7 @@ PLAN-ROOT SINK
 |     HDFS partitions=24/24 files=24 size=54.09KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
-|       partitions: 0/24 rows=unavailable
+|       partitions: 0/24 rows=3.42K
 |       columns missing stats: id
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
@@ -320,7 +320,7 @@ PLAN-ROOT SINK
 |     HDFS partitions=6/24 files=6 size=6.58KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
-|       partitions: 0/6 rows=unavailable
+|       partitions: 0/6 rows=413
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
@@ -332,7 +332,7 @@ PLAN-ROOT SINK
    runtime filters: RF000[bloom] -> id
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/24 rows=unavailable
+     partitions: 0/24 rows=3.42K
      columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=64.00MB mem-reservation=112.00KB thread-reservation=1
@@ -404,7 +404,7 @@ Per-Host Resources: mem-estimate=68.94MB mem-reservation=4.98MB thread-reservati
 |  |     HDFS partitions=6/24 files=6 size=6.58KB
 |  |     stored statistics:
 |  |       table: rows=unavailable size=unavailable
-|  |       partitions: 0/6 rows=unavailable
+|  |       partitions: 0/6 rows=413
 |  |       columns: all
 |  |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
@@ -415,7 +415,7 @@ Per-Host Resources: mem-estimate=68.94MB mem-reservation=4.98MB thread-reservati
 |     HDFS partitions=24/24 files=24 size=54.09KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
-|       partitions: 0/24 rows=unavailable
+|       partitions: 0/24 rows=3.42K
 |       columns missing stats: id
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
@@ -439,7 +439,7 @@ Per-Host Resources: mem-estimate=68.94MB mem-reservation=4.98MB thread-reservati
 |     HDFS partitions=6/24 files=6 size=6.58KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
-|       partitions: 0/6 rows=unavailable
+|       partitions: 0/6 rows=413
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
@@ -451,7 +451,7 @@ Per-Host Resources: mem-estimate=68.94MB mem-reservation=4.98MB thread-reservati
    runtime filters: RF000[bloom] -> id
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/24 rows=unavailable
+     partitions: 0/24 rows=3.42K
      columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=64.00MB mem-reservation=112.00KB thread-reservation=1
@@ -490,7 +490,7 @@ Per-Host Resources: mem-estimate=212.88MB mem-reservation=6.89MB thread-reservat
   |  |     HDFS partitions=6/24 files=6 size=6.58KB
   |  |     stored statistics:
   |  |       table: rows=unavailable size=unavailable
-  |  |       partitions: 0/6 rows=unavailable
+  |  |       partitions: 0/6 rows=413
   |  |       columns: all
   |  |     extrapolated-rows=disabled max-scan-range-rows=unavailable
   |  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
@@ -501,7 +501,7 @@ Per-Host Resources: mem-estimate=212.88MB mem-reservation=6.89MB thread-reservat
   |     HDFS partitions=24/24 files=24 size=54.09KB
   |     stored statistics:
   |       table: rows=unavailable size=unavailable
-  |       partitions: 0/24 rows=unavailable
+  |       partitions: 0/24 rows=3.42K
   |       columns: all
   |     extrapolated-rows=disabled max-scan-range-rows=unavailable
   |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
@@ -518,7 +518,7 @@ Per-Host Resources: mem-estimate=212.88MB mem-reservation=6.89MB thread-reservat
   |     HDFS partitions=6/24 files=6 size=6.58KB
   |     stored statistics:
   |       table: rows=unavailable size=unavailable
-  |       partitions: 0/6 rows=unavailable
+  |       partitions: 0/6 rows=413
   |       columns: all
   |     extrapolated-rows=disabled max-scan-range-rows=unavailable
   |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
@@ -530,7 +530,7 @@ Per-Host Resources: mem-estimate=212.88MB mem-reservation=6.89MB thread-reservat
      runtime filters: RF000[bloom] -> t1.id % 12
      stored statistics:
        table: rows=unavailable size=unavailable
-       partitions: 0/24 rows=unavailable
+       partitions: 0/24 rows=3.42K
        columns missing stats: id
      extrapolated-rows=disabled max-scan-range-rows=unavailable
      mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
@@ -590,7 +590,7 @@ Per-Host Resources: mem-estimate=66.99MB mem-reservation=2.97MB thread-reservati
      runtime filters: RF000[bloom] -> t1.id % 12
      stored statistics:
        table: rows=unavailable size=unavailable
-       partitions: 0/24 rows=unavailable
+       partitions: 0/24 rows=3.42K
        columns missing stats: id
      extrapolated-rows=disabled max-scan-range-rows=unavailable
      mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
@@ -605,7 +605,7 @@ Per-Host Resources: mem-estimate=48.00MB mem-reservation=24.00KB thread-reservat
      HDFS partitions=6/24 files=6 size=6.58KB
      stored statistics:
        table: rows=unavailable size=unavailable
-       partitions: 0/6 rows=unavailable
+       partitions: 0/6 rows=413
        columns: all
      extrapolated-rows=disabled max-scan-range-rows=unavailable
      mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
@@ -631,7 +631,7 @@ Per-Host Resources: mem-estimate=49.99MB mem-reservation=1.96MB thread-reservati
      HDFS partitions=24/24 files=24 size=54.09KB
      stored statistics:
        table: rows=unavailable size=unavailable
-       partitions: 0/24 rows=unavailable
+       partitions: 0/24 rows=3.42K
        columns: all
      extrapolated-rows=disabled max-scan-range-rows=unavailable
      mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
@@ -646,7 +646,7 @@ Per-Host Resources: mem-estimate=48.00MB mem-reservation=24.00KB thread-reservat
      HDFS partitions=6/24 files=6 size=6.58KB
      stored statistics:
        table: rows=unavailable size=unavailable
-       partitions: 0/6 rows=unavailable
+       partitions: 0/6 rows=413
        columns: all
      extrapolated-rows=disabled max-scan-range-rows=unavailable
      mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1

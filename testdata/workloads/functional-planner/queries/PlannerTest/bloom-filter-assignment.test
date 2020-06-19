@@ -30,7 +30,7 @@ PLAN-ROOT SINK
 |     HDFS partitions=24/24 files=24 size=201.11KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
-|       partitions: 0/24 rows=unavailable
+|       partitions: 0/24 rows=12.84K
 |       columns: unavailable
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
@@ -42,7 +42,7 @@ PLAN-ROOT SINK
    runtime filters: RF000[bloom] -> a.id
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/24 rows=unavailable
+     partitions: 0/24 rows=12.84K
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
@@ -126,7 +126,7 @@ PLAN-ROOT SINK
    runtime filters: RF000[bloom] -> a.id
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/24 rows=unavailable
+     partitions: 0/24 rows=12.84K
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
@@ -165,7 +165,7 @@ PLAN-ROOT SINK
 |     HDFS partitions=24/24 files=24 size=201.11KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
-|       partitions: 0/24 rows=unavailable
+|       partitions: 0/24 rows=12.84K
 |       columns: unavailable
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
@@ -216,7 +216,7 @@ PLAN-ROOT SINK
    runtime filters: RF000[bloom] -> a.id + 1
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/24 rows=unavailable
+     partitions: 0/24 rows=12.84K
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
@@ -254,7 +254,7 @@ PLAN-ROOT SINK
 |     HDFS partitions=24/24 files=24 size=201.11KB
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
-|       partitions: 0/24 rows=unavailable
+|       partitions: 0/24 rows=12.84K
 |       columns: unavailable
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
@@ -301,7 +301,7 @@ PLAN-ROOT SINK
 |     predicates: c.id < CAST(100 AS INT)
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
-|       partitions: 0/24 rows=unavailable
+|       partitions: 0/24 rows=12.84K
 |       columns: unavailable
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     parquet statistics predicates: c.id < CAST(100 AS INT)
@@ -329,7 +329,7 @@ PLAN-ROOT SINK
    runtime filters: RF000[bloom] -> a.int_col, RF002[bloom] -> a.int_col
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/24 rows=unavailable
+     partitions: 0/24 rows=12.84K
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
@@ -372,7 +372,7 @@ PLAN-ROOT SINK
 |     predicates: c.id < CAST(100 AS INT)
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
-|       partitions: 0/24 rows=unavailable
+|       partitions: 0/24 rows=12.84K
 |       columns: unavailable
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     parquet statistics predicates: c.id < CAST(100 AS INT)
@@ -399,7 +399,7 @@ PLAN-ROOT SINK
    runtime filters: RF000[bloom] -> a.int_col + 1, RF002[bloom] -> a.int_col
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/24 rows=unavailable
+     partitions: 0/24 rows=12.84K
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
@@ -442,7 +442,7 @@ PLAN-ROOT SINK
 |     predicates: c.id < CAST(100 AS INT)
 |     stored statistics:
 |       table: rows=unavailable size=unavailable
-|       partitions: 0/24 rows=unavailable
+|       partitions: 0/24 rows=12.84K
 |       columns: unavailable
 |     extrapolated-rows=disabled max-scan-range-rows=unavailable
 |     parquet statistics predicates: c.id < CAST(100 AS INT)
@@ -470,7 +470,7 @@ PLAN-ROOT SINK
    runtime filters: RF000[bloom] -> a.timestamp_col, RF003[bloom] -> a.timestamp_col
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/24 rows=unavailable
+     partitions: 0/24 rows=12.84K
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
@@ -533,7 +533,7 @@ PLAN-ROOT SINK
    runtime filters: RF000[bloom] -> a.timestamp_col, RF003[bloom] -> a.timestamp_col
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/24 rows=unavailable
+     partitions: 0/24 rows=12.84K
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1

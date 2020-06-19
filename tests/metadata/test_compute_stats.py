@@ -29,6 +29,8 @@ from tests.common.test_dimensions import (
     create_uncompressed_text_dimension)
 from CatalogObjects.ttypes import THdfsCompression
 
+import os
+
 
 IMPALA_TEST_CLUSTER_PROPERTIES = ImpalaTestClusterProperties.get_instance()
 
@@ -169,6 +171,126 @@ class TestComputeStats(ImpalaTestSuite):
       self.execute_query("show table stats %s.%s" % (unique_database, table_name))
     assert(len(show_result.data) == 2)
     assert("1\tpval\t8" in show_result.data[0])
+
+  @staticmethod
+  def create_load_test_corrupt_stats(self, unique_database, create_load_stmts,
+          table_name, partitions, files):
+    """A helper method for tests against the fix to IMPALA-9744."""
+    # Create and load the Hive table.
+    self.run_stmt_in_hive(create_load_stmts)
+
+    # Make the table visible in Impala.
+    self.execute_query("invalidate metadata %s.%s" % (unique_database, table_name))
+
+    # Formulate a simple query that scans the Hive table.
+    explain_stmt = """
+    explain select * from {0}.{1} where
+    int_col > (select 3*stddev(int_col) from {0}.{1})
+    """.format(unique_database, table_name)
+    explain_result = self.execute_query(explain_stmt)
+
+    # Formulate a template which verifies the number of partitions and the number
+    # of files are per spec.
+    hdfs_physical_properties_template \
+      = """HDFS partitions={0}/{0} files={1}""".format(partitions, files)
+
+    # Check that the template formulated above exists and row count of the table is
+    # not zero, for all scans.
+    for i in xrange(len(explain_result.data)):
+      if ("SCAN HDFS" in explain_result.data[i]):
+         assert(hdfs_physical_properties_template in explain_result.data[i + 1])
+         assert("cardinality=0" not in explain_result.data[i + 2])
+
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  def test_corrupted_stats_in_partitioned_hive_tables(self, vector, unique_database):
+    """IMPALA-9744: Tests that the partition stats corruption in Hive tables
+    (row count=0, partition size>0, persisted when the data was loaded with
+    hive.stats.autogather=true) is handled at the table scan level.
+    """
+    # Unless something drastic changes in Hive and/or Impala, this test should
+    # always succeed.
+    if self.exploration_strategy() != 'exhaustive': pytest.skip()
+
+    # Load from a local data file
+    local_file = os.path.join(os.environ['IMPALA_HOME'],
+                 "testdata/data/alltypes_tiny_pages.parquet")
+    table_name = "partitioned_table_with_corrupted_and_missing_stats"
+
+    # Setting hive.stats.autogather=true after CRTB DDL but before LOAD DML
+    # minimally reproduces the corrupt stats issue.
+    create_load_stmts = """
+      CREATE TABLE {0}.{1} (
+        id int COMMENT 'Add a comment',
+        bool_col boolean,
+        tinyint_col tinyint,
+        smallint_col smallint,
+        int_col int,
+        bigint_col bigint,
+        float_col float,
+        double_col double,
+        date_string_col string,
+        string_col string,
+        timestamp_col timestamp,
+        year int,
+        month int )
+        PARTITIONED BY (decade string)
+        STORED AS PARQUET;
+      set hive.stats.autogather=true;
+      load data local inpath '{2}' into table {0}.{1} partition (decade="corrupt-stats");
+      set hive.stats.autogather=false;
+      load data local inpath '{2}' into table {0}.{1} partition (decade="missing-stats");
+    """.format(unique_database, table_name, local_file)
+
+    self.create_load_test_corrupt_stats(self, unique_database, create_load_stmts,
+            table_name, 2, 2)
+
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
+  def test_corrupted_stats_in_unpartitioned_hive_tables(self, vector, unique_database):
+    """IMPALA-9744: Tests that the stats corruption in unpartitioned Hive
+    tables (row count=0, partition size>0, persisted when the data was loaded
+    with hive.stats.autogather=true) is handled at the table scan level.
+    """
+    # Unless something drastic changes in Hive and/or Impala, this test should
+    # always succeed.
+    if self.exploration_strategy() != 'exhaustive': pytest.skip()
+
+    # Load from a local data file
+    local_file = os.path.join(os.environ['IMPALA_HOME'],
+                 "testdata/data/alltypes_tiny_pages.parquet")
+    table_name = "nonpartitioned_table_with_corrupted_stats"
+
+    # Setting hive.stats.autogather=true prior to CRTB DDL minimally reproduces the
+    # corrupt stats issue.
+    create_load_stmts = """
+      set hive.stats.autogather=true;
+      CREATE TABLE {0}.{1} (
+        id int COMMENT 'Add a comment',
+        bool_col boolean,
+        tinyint_col tinyint,
+        smallint_col smallint,
+        int_col int,
+        bigint_col bigint,
+        float_col float,
+        double_col double,
+        date_string_col string,
+        string_col string,
+        timestamp_col timestamp,
+        year int,
+        month int)
+        STORED AS PARQUET;
+      load data local inpath '{2}' into table {0}.{1};
+    """.format(unique_database, table_name, local_file)
+
+    self.create_load_test_corrupt_stats(self, unique_database, create_load_stmts,
+            table_name, 1, 1)
 
   @SkipIfS3.eventually_consistent
   @SkipIfCatalogV2.stats_pulling_disabled()

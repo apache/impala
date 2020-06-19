@@ -51,7 +51,7 @@ PLAN-ROOT SINK
    runtime filters: RF000[bloom] -> b.int_col, RF002[bloom] -> b.int_col
    stored statistics:
      table: rows=unavailable size=unavailable
-     partitions: 0/24 rows=unavailable
+     partitions: 0/24 rows=12.84K
      columns: unavailable
    extrapolated-rows=disabled max-scan-range-rows=unavailable
    mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
