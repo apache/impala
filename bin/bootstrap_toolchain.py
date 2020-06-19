@@ -85,8 +85,7 @@ OS_MAPPING = [
   OsMapping("debian8", "ec2-package-debian-8", "debian8"),
   OsMapping("suselinux11", "ec2-package-sles-11", None),
   OsMapping("suselinux12", "ec2-package-sles-12", "sles12"),
-  OsMapping("suse12.2", "ec2-package-sles-12", "sles12"),
-  OsMapping("suse12.3", "ec2-package-sles-12", "sles12"),
+  OsMapping("suse12", "ec2-package-sles-12", "sles12"),
   OsMapping("ubuntu12.04", "ec2-package-ubuntu-12-04", None),
   OsMapping("ubuntu14.04", "ec2-package-ubuntu-14-04", None),
   OsMapping("ubuntu15.04", "ec2-package-ubuntu-14-04", None),
@@ -361,7 +360,7 @@ def get_platform_release_label(release=None):
       lsb_release = check_output(["lsb_release", "-irs"])
       release = "".join(map(lambda x: x.lower(), lsb_release.split()))
       # Only need to check against the major release if RHEL or CentOS
-      for platform in ['centos', 'redhatenterpriseserver']:
+      for platform in ['centos', 'redhatenterpriseserver', 'suse']:
         if platform in release:
           release = release.split('.')[0]
           break
