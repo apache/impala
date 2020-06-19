@@ -129,13 +129,20 @@ class TestExplain(ImpalaTestSuite):
     result = self.execute_query("explain select * from %s where p = 1" % mixed_tbl,
         query_options={'explain_level':3})
     check_cardinality(result.data, '100')
+    # Set the number of rows at the table level to -1.
+    self.execute_query(
+      "alter table %s set tblproperties('numRows'='-1')" % mixed_tbl)
     # Set the number of rows for a single partition.
     self.execute_query(
       "alter table %s partition(p=1) set tblproperties('numRows'='50')" % mixed_tbl)
-    # Use partition stats when availabe. Partitions without stats are ignored.
+    # Use partition stats when availabe. Row counts for partitions without
+    # stats are estimated.
     result = self.execute_query("explain select * from %s" % mixed_tbl,
         query_options={'explain_level':3})
-    check_cardinality(result.data, '50')
+    check_cardinality(result.data, '51')
+    # Set the number of rows at the table level back to 100.
+    self.execute_query(
+      "alter table %s set tblproperties('numRows'='100')" % mixed_tbl)
     # Fall back to table-level stats when no selected partitions have stats.
     result = self.execute_query("explain select * from %s where p = 2" % mixed_tbl,
         query_options={'explain_level':3})

@@ -1150,9 +1150,11 @@ public class HdfsScanNode extends ScanNode {
   /**
    * Computes and returns the number of rows scanned based on the per-partition row count
    * stats and/or the table-level row count stats, depending on which of those are
-   * available, and whether the table is partitioned. Partitions without stats are
-   * ignored as long as there is at least one partition with stats. Otherwise,
-   * we fall back to table-level stats even for partitioned tables.
+   * available. Partition stats are used as long as they are neither missing nor
+   * corrupted. Otherwise, we fall back to table-level stats even for partitioned tables.
+   * We further estimate the row count if the table-level stats is missing or corrupted,
+   * or some partitions are with corrupt stats. The estimation is done only for those
+   * partitions with corrupt stats.
    *
    * Sets these members:
    * numPartitionsWithNumRows_, partitionNumRows_, hasCorruptTableStats_.
@@ -1161,34 +1163,43 @@ public class HdfsScanNode extends ScanNode {
     numPartitionsWithNumRows_ = 0;
     partitionNumRows_ = -1;
     hasCorruptTableStats_ = false;
-    if (tbl_.getNumClusteringCols() > 0) {
-      for (FeFsPartition p: partitions_) {
-        // Check for corrupt partition stats
-        long partNumRows = p.getNumRows();
-        if (partNumRows < -1  || (partNumRows == 0 && p.getSize() > 0))  {
-          hasCorruptTableStats_ = true;
-        }
-        // Ignore partitions with missing stats in the hope they don't matter
-        // enough to change the planning outcome.
-        if (partNumRows > -1) {
-          if (partitionNumRows_ == -1) partitionNumRows_ = 0;
-          partitionNumRows_ = checkedAdd(partitionNumRows_, partNumRows);
-          ++numPartitionsWithNumRows_;
-        }
+
+    List<FeFsPartition> partitionsWithCorruptOrMissingStats = new ArrayList<>();
+    for (FeFsPartition p : partitions_) {
+      long partNumRows = p.getNumRows();
+      // Check for corrupt stats
+      if (partNumRows < -1 || (partNumRows == 0 && p.getSize() > 0)) {
+        hasCorruptTableStats_ = true;
+        partitionsWithCorruptOrMissingStats.add(p);
+      } else if (partNumRows == -1) { // Check for missing stats
+        partitionsWithCorruptOrMissingStats.add(p);
+      } else if (partNumRows > -1) {
+        // Consider partition with good stats.
+        if (partitionNumRows_ == -1) partitionNumRows_ = 0;
+        partitionNumRows_ = checkedAdd(partitionNumRows_, partNumRows);
+        ++numPartitionsWithNumRows_;
       }
-      if (numPartitionsWithNumRows_ > 0) return partitionNumRows_;
     }
-    // Table is unpartitioned or the table is partitioned but no partitions have stats.
+    // If all partitions have good stats, return the total row count contributed
+    // by each of the partitions, as the row count for the table.
+    if (partitionsWithCorruptOrMissingStats.size() == 0
+        && numPartitionsWithNumRows_ > 0) {
+      return partitionNumRows_;
+    }
+
     // Set cardinality based on table-level stats.
     long numRows = tbl_.getNumRows();
     // Depending on the query option of disable_hdfs_num_rows_est, if numRows
-    // is still not available, we provide a crude estimation by computing
-    // sumAvgRowSizes, the sum of the slot size of each column of scalar type,
-    // and then generate the estimate using sumValues(totalBytesPerFs_), the size of
-    // the hdfs table.
-    if (!queryOptions.disable_hdfs_num_rows_estimate && numRows == -1L) {
-      // Compute the estimated table size when taking compression into consideration
-      long estimatedTableSize = computeEstimatedTableSize();
+    // is still not available (-1), or partition stats is corrupted, we provide
+    // a crude estimation by computing sumAvgRowSizes, the sum of the slot
+    // size of each column of scalar type, and then generate the estimate using
+    // sumValues(totalBytesPerFs_), the size of the hdfs table.
+    if (!queryOptions.disable_hdfs_num_rows_estimate
+        && (numRows == -1L || hasCorruptTableStats_)) {
+      // Compute the estimated table size from those partitions with missing or corrupt
+      // row count, when taking compression into consideration
+      long estimatedTableSize =
+          computeEstimatedTableSize(partitionsWithCorruptOrMissingStats);
 
       double sumAvgRowSizes = 0.0;
       for (Column col : tbl_.getColumns()) {
@@ -1202,25 +1213,35 @@ public class HdfsScanNode extends ScanNode {
         }
       }
 
+      long estNumRows = 0;
       if (sumAvgRowSizes == 0.0) {
         // When the type of each Column is of ArrayType or MapType,
         // sumAvgRowSizes would be equal to 0. In this case, we use a ultimate
         // fallback row width if sumAvgRowSizes == 0.0.
-        numRows = Math.round(estimatedTableSize / DEFAULT_ROW_WIDTH_ESTIMATE);
+        estNumRows = Math.round(estimatedTableSize / DEFAULT_ROW_WIDTH_ESTIMATE);
       } else {
-        numRows = Math.round(estimatedTableSize / sumAvgRowSizes);
+        estNumRows = Math.round(estimatedTableSize / sumAvgRowSizes);
       }
+
+      // Include the row count contributed by partitions with good stats (if any).
+      numRows = partitionNumRows_ =
+          (partitionNumRows_ > 0) ? partitionNumRows_ + estNumRows : estNumRows;
     }
+
     if (numRows < -1 || (numRows == 0 && tbl_.getTotalHdfsBytes() > 0)) {
       hasCorruptTableStats_ = true;
     }
+
     return numRows;
   }
 
-  /** Compute the estimated table size when taking compression into consideration */
-  private long computeEstimatedTableSize() {
+  /**
+   * Compute the estimated table size for the partitions contained in
+   * the partitions argument when taking compression into consideration
+   */
+  private long computeEstimatedTableSize(List<FeFsPartition> partitions) {
     long estimatedTableSize = 0;
-    for (FeFsPartition p: partitions_) {
+    for (FeFsPartition p : partitions) {
       HdfsFileFormat format = p.getFileFormat();
       long estimatedPartitionSize = 0;
       if (format == HdfsFileFormat.TEXT) {

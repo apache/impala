@@ -59,15 +59,18 @@ explain select count(*) from corrupted where org = 1;
 ''
 '03:AGGREGATE [FINALIZE]'
 '|  output: count:merge(*)'
+'|  row-size=8B cardinality=1'
 '|'
 '02:EXCHANGE [UNPARTITIONED]'
 '|'
 '01:AGGREGATE'
 '|  output: count(*)'
+'|  row-size=8B cardinality=1'
 '|'
 '00:SCAN $FILESYSTEM_NAME [$DATABASE.corrupted]'
+'   partition predicates: org = 1'
 '   $FILESYSTEM_NAME partitions=1/2 files=1 size=24B'
-'   row-size=0B cardinality=0'
+'   row-size=0B cardinality=1'
 ---- TYPES
 STRING
 ====
@@ -143,7 +146,7 @@ explain select count(*) from corrupted where org = 2;
 '|'
 '00:SCAN $FILESYSTEM_NAME [$DATABASE.corrupted]'
 '   $FILESYSTEM_NAME partitions=1/2 files=1 size=24B'
-'   row-size=0B cardinality=6'
+'   row-size=0B cardinality=1'
 ---- TYPES
 STRING
 ====
@@ -203,7 +206,7 @@ explain select count(*) from corrupted_no_part;
 '|'
 '00:SCAN $FILESYSTEM_NAME [$DATABASE.corrupted_no_part]'
 '   $FILESYSTEM_NAME partitions=1/1 files=1 size=6B'
-'   row-size=0B cardinality=0'
+'   row-size=0B cardinality=2'
 ---- TYPES
 STRING
 ====
@@ -226,7 +229,7 @@ explain select count(*) from corrupted_no_part;
 '|'
 '00:SCAN $FILESYSTEM_NAME [$DATABASE.corrupted_no_part]'
 '   $FILESYSTEM_NAME partitions=1/1 files=1 size=6B'
-'   row-size=0B cardinality=unavailable'
+'   row-size=0B cardinality=2'
 ---- TYPES
 STRING
 ====

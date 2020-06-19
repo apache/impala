@@ -113,18 +113,29 @@ public class TestUtils {
    */
   public static class IgnoreValueFilter implements ResultFilter {
     // Literal string containing the key name.
-    private final String keyPrefix;
-    private final String valueRegex;
+    protected final String keyPrefix;
+    protected final String valueRegex;
 
     /**
      * Create a filter that ignores the value from key value pairs where the key is
-     * the literal 'key' value and the value matches 'valueRegex'.
+     * the literal 'key' value and the value matches 'valueRegex'. The key and the
+     * value are separated by the 'separator' character.
      */
-    public IgnoreValueFilter(String key, String valueRegex) {
+    public IgnoreValueFilter(
+        String key, String valueRegex, char separator) {
       // Include leading space to avoid matching partial keys, e.g. if key is "bar" we
       // don't want to match "foobar=".
-      this.keyPrefix = " " + key + "=";
+      this.keyPrefix = " " + key + Character.toString(separator);
       this.valueRegex = valueRegex;
+    }
+
+    /**
+     *  Create a filter that ignores the value from key value pairs where the key is
+     *  the literal 'key' value and the value matches 'valueRegex'. The key and the
+     *  value are separated by '='.
+     */
+    public IgnoreValueFilter(String key, String valueRegex) {
+      this(key, valueRegex, '=');
     }
 
     @Override
@@ -133,6 +144,30 @@ public class TestUtils {
     @Override
     public String transform(String input) {
       return input.replaceAll(keyPrefix + valueRegex, keyPrefix);
+    }
+  }
+
+  /**
+   * Filter to replace the value from elements in the format key=value.
+   */
+  public static class ReplaceValueFilter extends IgnoreValueFilter {
+    // Literal string containing the replacement regex.
+    private final String replaceRegex;
+
+    /**
+     * Create a filter that replaces the value from key value pairs where the key is
+     * the literal 'key' value and the value matches 'valueRegex'. The key and the
+     * value are separated by the 'separator' character.
+     */
+    public ReplaceValueFilter(
+        String key, String valueRegex, String replaceRegex, char separator) {
+      super(key, valueRegex, separator);
+      this.replaceRegex = replaceRegex;
+    }
+
+    @Override
+    public String transform(String input) {
+      return input.replaceAll(keyPrefix + valueRegex, keyPrefix + replaceRegex);
     }
   }
 
@@ -175,6 +210,11 @@ public class TestUtils {
   // entries
   public static final IgnoreValueFilter CARDINALITY_FILTER =
       new IgnoreValueFilter("cardinality", "\\S+");
+
+  // Ignore any values after 'rows=' in partitions: 0/24 rows=12.83K or
+  // partitions: 0/24 rows=unavailable entries
+  public static final ReplaceValueFilter PARTITIONS_FILTER =
+      new ReplaceValueFilter("partitions", "( \\d+/\\d+ rows=)\\S+", "$1", ':');
 
   // Ignore the exact estimated row count, which depends on the file sizes.
   static IgnoreValueFilter SCAN_RANGE_ROW_COUNT_FILTER =

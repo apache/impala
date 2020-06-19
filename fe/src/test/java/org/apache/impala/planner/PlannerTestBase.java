@@ -540,6 +540,10 @@ public class PlannerTestBase extends FrontendTestBase {
       if (!testOptions.contains(PlannerTestOption.VALIDATE_SCAN_FS)) {
         resultFilters.add(TestUtils.SCAN_NODE_SCHEME_FILTER);
       }
+      if (testOptions.contains(
+              PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS)) {
+        resultFilters.add(TestUtils.PARTITIONS_FILTER);
+      }
 
       String planDiff = TestUtils.compareOutput(
           Lists.newArrayList(explainStr.split("\n")), expectedPlan, true, resultFilters);
@@ -830,7 +834,10 @@ public class PlannerTestBase extends FrontendTestBase {
     VALIDATE_SCAN_FS,
     // If set, disables the attempt to compute an estimated number of rows in an
     // hdfs table.
-    DISABLE_HDFS_NUM_ROWS_ESTIMATE
+    DISABLE_HDFS_NUM_ROWS_ESTIMATE,
+    // If set, make no attempt to validate the estimated number of rows for any
+    // partitions in an hdfs table.
+    DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS
   }
 
   protected void runPlannerTestFile(String testFile, TQueryOptions options) {
