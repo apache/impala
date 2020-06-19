@@ -87,6 +87,12 @@ enum THdfsCompression {
   LZ4_BLOCKED = 12
 }
 
+// Iceberg table file format identitied by table property 'iceberg_file_format'
+enum TIcebergFileFormat {
+  PARQUET = 0
+  ORC = 1
+}
+
 enum TColumnEncoding {
   AUTO = 0
   PLAIN = 1
@@ -526,6 +532,8 @@ struct TIcebergTable {
   // Iceberg file system table location
   1: required string table_location
   2: required list<TIcebergPartitionSpec> partition_spec
+  // Data file path md5 and it's file descriptor
+  3: optional map<string,THdfsFileDesc> path_md5_to_file_descriptor
 }
 
 // Represents a table or view.

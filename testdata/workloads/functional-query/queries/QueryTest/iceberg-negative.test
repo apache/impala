@@ -1,0 +1,45 @@
+====
+---- QUERY
+CREATE TABLE iceberg_test1
+STORED AS ICEBERG;
+---- CATCH
+AnalysisException: Table requires at least 1 column for managed iceberg table.
+====
+---- QUERY
+CREATE TABLE iceberg_test2(
+  level STRING
+)
+PARTITION BY SPEC
+(
+  level IDENTITY,
+  event_time HOUR
+)
+STORED AS ICEBERG;
+---- CATCH
+AnalysisException: Cannot find source column: event_time
+====
+---- QUERY
+CREATE TABLE iceberg_test3(
+  level STRING
+)
+STORED AS ICEBERG;
+INSERT INTO iceberg_test3 values('1');
+---- CATCH
+AnalysisException: Impala does not support INSERTing into iceberg table: $DATABASE.iceberg_test3
+====
+---- QUERY
+TRUNCATE iceberg_test3
+---- CATCH
+AnalysisException: TRUNCATE TABLE not supported on iceberg table: $DATABASE.iceberg_test3
+====
+---- QUERY
+ALTER TABLE iceberg_test3 ADD COLUMN event_time TIMESTAMP
+---- CATCH
+AnalysisException: ALTER TABLE not allowed on iceberg table: iceberg_test3
+====
+---- QUERY
+# iceberg_non_partitioned is not partitioned
+SHOW PARTITIONS functional_parquet.iceberg_non_partitioned
+---- CATCH
+AnalysisException: Table is not partitioned: functional_parquet.iceberg_non_partitioned
+====

@@ -35,6 +35,7 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -915,6 +916,10 @@ public class ComputeStatsStmt extends StatementBase {
           && partition.getFileFormat() != HdfsFileFormat.HUDI_PARQUET
           && partition.getFileFormat() != HdfsFileFormat.ORC)
         return false;
+    }
+
+    if (table_ instanceof FeIcebergTable) {
+      return FeIcebergTable.Utils.isColumnar((FeIcebergTable) table_);
     }
     return true;
   }

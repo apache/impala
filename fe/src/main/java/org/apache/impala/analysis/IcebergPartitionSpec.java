@@ -23,8 +23,6 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 
-import com.google.common.base.Preconditions;
-
 /**
  * Represents the partitioning of a Iceberg table as defined in the PARTITION BY SPEC
  * clause of a CREATE TABLE statement. Iceberg supported kinds of partition.
@@ -52,12 +50,17 @@ public class IcebergPartitionSpec extends StmtNode {
     this(0, fields);
   }
 
-  public List<IcebergPartitionField> getIcebergPartitionFields_() {
+  public List<IcebergPartitionField> getIcebergPartitionFields() {
     return icebergPartitionFields_;
+  }
+
+  public boolean hasPartitionFields() {
+    return icebergPartitionFields_ != null && (!icebergPartitionFields_.isEmpty());
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (!hasPartitionFields()) return;
     for (IcebergPartitionField field : icebergPartitionFields_) {
       field.analyze(analyzer);
     }
@@ -72,7 +75,7 @@ public class IcebergPartitionSpec extends StmtNode {
   public String toSql(ToSqlOptions options) {
     StringBuilder builder = new StringBuilder();
     builder.append("(");
-    if (!icebergPartitionFields_.isEmpty()) {
+    if (hasPartitionFields()) {
       builder.append("\n");
       for (IcebergPartitionField field : icebergPartitionFields_) {
         builder.append(String.format("  %s,\n", field.toSql()));
@@ -85,6 +88,7 @@ public class IcebergPartitionSpec extends StmtNode {
   public TIcebergPartitionSpec toThrift() {
     TIcebergPartitionSpec result = new TIcebergPartitionSpec();
     result.setPartition_id(partitionId_);
+    if (!hasPartitionFields()) return result;
     for (IcebergPartitionField field : icebergPartitionFields_) {
       result.addToPartition_fields(field.toThrift());
     }

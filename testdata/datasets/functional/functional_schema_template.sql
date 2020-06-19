@@ -2933,3 +2933,29 @@ case when id % 2 = 0 then cast(timestamp_col as date)
 else cast(cast(timestamp_col as date) + interval 5 days as date) end date_col
 FROM {db_name}{db_suffix}.alltypes where id < 500;
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+iceberg_partitioned
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+STORED AS ICEBERG
+LOCATION '/test-warehouse/iceberg_test/iceberg_partitioned'
+TBLPROPERTIES('iceberg_file_format'='parquet');
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/iceberg_test && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_partitioned /test-warehouse/iceberg_test/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+iceberg_non_partitioned
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+STORED AS ICEBERG
+LOCATION '/test-warehouse/iceberg_test/iceberg_non_partitioned'
+TBLPROPERTIES('iceberg_file_format'='parquet');
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/iceberg_test && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_non_partitioned /test-warehouse/iceberg_test/
+====

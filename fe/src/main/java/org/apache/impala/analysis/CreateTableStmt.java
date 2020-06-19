@@ -580,6 +580,12 @@ public class CreateTableStmt extends StatementBase {
           "managed iceberg table.");
     }
 
+    if ((!isExternal() || Boolean.parseBoolean(getTblProperties().get(
+        Table.TBL_PROP_EXTERNAL_TABLE_PURGE)))) {
+      // Check partition columns for managed iceberg table
+      checkPartitionColumns();
+    }
+
     String handler = getTblProperties().get(IcebergTable.KEY_STORAGE_HANDLER);
     if (handler != null && !IcebergTable.isIcebergStorageHandler(handler)) {
       throw new AnalysisException("Invalid storage handler " +
@@ -587,5 +593,36 @@ public class CreateTableStmt extends StatementBase {
     }
     putGeneratedKuduProperty(IcebergTable.KEY_STORAGE_HANDLER,
         IcebergTable.ICEBERG_STORAGE_HANDLER);
+
+    String fileformat = getTblProperties().get(IcebergTable.ICEBERG_FILE_FORMAT);
+    if (fileformat == null || fileformat.isEmpty()) {
+      putGeneratedKuduProperty(IcebergTable.ICEBERG_FILE_FORMAT, "parquet");
+    }
+  }
+
+  /**
+   * For iceberg table, partition column must be from source column
+   */
+  private void checkPartitionColumns() throws AnalysisException {
+    // This check is unnecessary for iceberg table without partition spec
+    List<IcebergPartitionSpec> specs = tableDef_.getIcebergPartitionSpecs();
+    if (specs == null || specs.isEmpty()) return;
+
+    // Iceberg table only has one partition spec now
+    List<IcebergPartitionField> fields = specs.get(0).getIcebergPartitionFields();
+    Preconditions.checkState(fields != null && !fields.isEmpty());
+    for (IcebergPartitionField field : fields) {
+      String fieldName = field.getFieldName();
+      boolean containFlag = false;
+      for (ColumnDef columnDef : tableDef_.getColumnDefs()) {
+        if (columnDef.getColName().equalsIgnoreCase(fieldName)) {
+          containFlag = true;
+          break;
+        }
+      }
+      if (!containFlag) {
+        throw new AnalysisException("Cannot find source column: " + fieldName);
+      }
+    }
   }
 }

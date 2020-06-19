@@ -561,17 +561,19 @@ CREATE TABLE iceberg_test1 (
   level STRING
 )
 STORED AS ICEBERG
+TBLPROPERTIES('iceberg_file_format'='parquet')
 ---- RESULTS-HIVE
 CREATE TABLE show_create_table_test_db.iceberg_test1 (
   level STRING
 )
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
+TBLPROPERTIES('iceberg_file_format'='parquet')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test1 (
   level STRING
 )
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg_file_format'='parquet')
 ====

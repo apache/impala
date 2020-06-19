@@ -35,7 +35,6 @@ import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
-import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNotEmptyPredicate;
 import org.apache.impala.analysis.LiteralExpr;
@@ -196,7 +195,7 @@ public class HdfsScanNode extends ScanNode {
   private final FeFsTable tbl_;
 
   // List of partitions to be scanned. Partitions have been pruned.
-  private final List<? extends FeFsPartition> partitions_;
+  protected final List<? extends FeFsPartition> partitions_;
 
   // Parameters for table sampling. Null if not sampling.
   private final TableSampleClause sampleParams_;
@@ -838,7 +837,13 @@ public class HdfsScanNode extends ScanNode {
     maxScanRangeNumRows_ = -1;
     fileFormats_ = new HashSet<>();
     for (FeFsPartition partition: partitions_) {
-      List<FileDescriptor> fileDescs = partition.getFileDescriptors();
+      List<FileDescriptor> fileDescs;
+      if (this instanceof IcebergScanNode) {
+        fileDescs = ((IcebergScanNode) this).getFileDescriptorByIcebergPredicates();
+      } else {
+        fileDescs = partition.getFileDescriptors();
+      }
+
       if (sampledFiles != null) {
         // If we are sampling, check whether this partition is included in the sample.
         fileDescs = sampledFiles.get(

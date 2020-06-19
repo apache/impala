@@ -112,6 +112,40 @@ public class FileMetadataLoaderTest {
   }
 
   @Test
+  public void testIcebergLoading() throws IOException, CatalogException {
+    ListMap<TNetworkAddress> hostIndex = new ListMap<>();
+    Path table1Path = new Path(
+        "hdfs://localhost:20500/test-warehouse/iceberg_test/iceberg_partitioned");
+    FileMetadataLoader fml1 = new FileMetadataLoader(table1Path, /* recursive=*/true,
+        /* oldFds = */ Collections.emptyList(), hostIndex, null, null,
+        HdfsFileFormat.ICEBERG);
+    fml1.load();
+    assertEquals(25, fml1.getStats().loadedFiles);
+    assertEquals(25, fml1.getLoadedFds().size());
+
+    ArrayList<String> relPaths = new ArrayList<>(
+        Collections2.transform(fml1.getLoadedFds(), FileDescriptor::getRelativePath));
+    Collections.sort(relPaths);
+    assertEquals("data/event_time_hour=2020-01-01-08/action=view/" +
+        "00001-1-b975a171-0911-47c2-90c8-300f23c28772-00000.parquet", relPaths.get(0));
+
+    Path table2Path = new Path(
+        "hdfs://localhost:20500/test-warehouse/iceberg_test/iceberg_non_partitioned");
+    FileMetadataLoader fml2 = new FileMetadataLoader(table2Path, /* recursive=*/true,
+        /* oldFds = */ Collections.emptyList(), hostIndex, null, null,
+        HdfsFileFormat.ICEBERG);
+    fml2.load();
+    assertEquals(25, fml2.getStats().loadedFiles);
+    assertEquals(25, fml2.getLoadedFds().size());
+
+    relPaths = new ArrayList<>(
+        Collections2.transform(fml2.getLoadedFds(), FileDescriptor::getRelativePath));
+    Collections.sort(relPaths);
+    assertEquals("data/00001-1-5dbd44ad-18bc-40f2-9dd6-aeb2cc23457c-00000.parquet",
+        relPaths.get(0));
+  }
+
+  @Test
   public void testAcidMinorCompactionLoading() throws IOException, CatalogException {
     //TODO(IMPALA-9042): Remove "throws CatalogException"
     ListMap<TNetworkAddress> hostIndex = new ListMap<>();

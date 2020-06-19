@@ -65,11 +65,11 @@ import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeKuduTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
-import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
@@ -1736,6 +1736,15 @@ public class SingleNodePlanner {
     // TODO(todd) introduce FE interfaces for DataSourceTable, HBaseTable, KuduTable
     FeTable table = tblRef.getTable();
     if (table instanceof FeFsTable) {
+      if (table instanceof FeIcebergTable) {
+        FeFsTable feFsTable = ((FeIcebergTable) tblRef.getDesc().getTable()).
+            getFeFsTable();
+        analyzer.materializeSlots(conjuncts);
+        scanNode = new IcebergScanNode(ctx_.getNextNodeId(), tblRef.getDesc(), conjuncts,
+            tblRef, feFsTable, aggInfo);
+        scanNode.init(analyzer);
+        return scanNode;
+      }
       return createHdfsScanPlan(tblRef, aggInfo, conjuncts, analyzer);
     } else if (table instanceof FeDataSourceTable) {
       scanNode = new DataSourceScanNode(ctx_.getNextNodeId(), tblRef.getDesc(),
@@ -1753,9 +1762,6 @@ public class SingleNodePlanner {
           aggInfo);
       scanNode.init(analyzer);
       return scanNode;
-    } else if (tblRef.getTable() instanceof IcebergTable) {
-      // This function will be supported in the future
-      throw new NotImplementedException("Query is not supported for iceberg table now");
     } else {
       throw new NotImplementedException(
           "Planning not implemented for table ref class: " + tblRef.getClass());

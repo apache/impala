@@ -33,6 +33,7 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.PartitionStatsUtil;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.compat.MetastoreShim;
@@ -42,6 +43,7 @@ import org.apache.impala.thrift.TPartitionStats;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import org.apache.impala.util.IcebergUtil;
 
 public class LocalFsPartition implements FeFsPartition {
   private final LocalFsTable table_;
@@ -197,7 +199,13 @@ public class LocalFsPartition implements FeFsPartition {
 
   @Override
   public HdfsFileFormat getFileFormat() {
-    return getInputFormatDescriptor().getFileFormat();
+    HdfsFileFormat format = getInputFormatDescriptor().getFileFormat();
+    if (format == HdfsFileFormat.ICEBERG) {
+      String format_str = table_.getMetaStoreTable().getParameters().get(
+          IcebergTable.ICEBERG_FILE_FORMAT);
+      return IcebergUtil.toHdfsFileFormat(format_str);
+    }
+    return format;
   }
 
   @Override

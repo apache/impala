@@ -369,7 +369,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
     return false;
   }
 
-  private LocalFsPartition createPrototypePartition() {
+  protected LocalFsPartition createPrototypePartition() {
     Partition protoMsPartition = new Partition();
 
     // The prototype partition should not have a location set in its storage

@@ -1,0 +1,20 @@
+====
+---- QUERY
+# This query will filter files by partition column predicate
+select * from functional_parquet.iceberg_partitioned
+where event_time > to_timestamp('2020-01-01 09:00:00','yyyy-MM-dd HH:mm:ss')
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# This query will scan a file which id = 1, filter by predicate for parquet file
+select * from functional_parquet.iceberg_partitioned where id = 1
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+====
+---- QUERY
+# This query will do a full scan
+select * from functional_parquet.iceberg_partitioned
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 20
+====

@@ -1,0 +1,185 @@
+====
+---- QUERY
+# IMPALA-9741: Support querying Iceberg table by impala
+SELECT count(*) from iceberg_partitioned;
+---- TYPES
+bigint
+---- RESULTS
+20
+====
+---- QUERY
+SELECT count(*) from iceberg_non_partitioned
+---- TYPES
+bigint
+---- RESULTS
+20
+====
+---- QUERY
+# Test non partition column filter count
+SELECT count(*) from iceberg_partitioned
+where id > 10
+---- TYPES
+bigint
+---- RESULTS
+10
+====
+---- QUERY
+SELECT count(*) from iceberg_non_partitioned
+where id > 10
+---- TYPES
+bigint
+---- RESULTS
+10
+====
+---- QUERY
+# Test partition column filter count
+SELECT count(*) from iceberg_partitioned
+where action <> 'click'
+---- TYPES
+bigint
+---- RESULTS
+14
+====
+---- QUERY
+SELECT count(*) from iceberg_non_partitioned
+where action = 'click'
+---- TYPES
+bigint
+---- RESULTS
+6
+====
+---- QUERY
+# Test distinct count
+SELECT count(distinct id),count(distinct action) from iceberg_partitioned
+---- TYPES
+bigint,bigint
+---- RESULTS
+20,3
+====
+---- QUERY
+SELECT count(distinct id),count(distinct action) from iceberg_non_partitioned
+---- TYPES
+bigint,bigint
+---- RESULTS
+20,3
+====
+---- QUERY
+# Test timestamp filter for iceberg derived partition 'HOUR'
+SELECT count(*) from iceberg_partitioned
+where event_time > to_timestamp('2020-01-01 09:00:00','yyyy-MM-dd HH:mm:ss')
+---- TYPES
+bigint
+---- RESULTS
+6
+====
+---- QUERY
+SELECT count(*) from iceberg_non_partitioned
+where event_time > to_timestamp('2020-01-01 09:00:00','yyyy-MM-dd HH:mm:ss')
+---- TYPES
+bigint
+---- RESULTS
+6
+====
+---- QUERY
+# Test non-count query for partition filter
+SELECT * from iceberg_partitioned
+where event_time > to_timestamp('2020-01-01 09:00:00','yyyy-MM-dd HH:mm:ss')
+ORDER BY id
+---- TYPES
+int,string,string,timestamp
+---- RESULTS
+2,'Lisa','download',2020-01-01 10:00:00
+5,'Lisa','download',2020-01-01 10:00:00
+7,'Lisa','download',2020-01-01 10:00:00
+8,'Lisa','download',2020-01-01 10:00:00
+14,'Lisa','download',2020-01-01 10:00:00
+16,'Lisa','download',2020-01-01 10:00:00
+====
+---- QUERY
+# Test non-count query for non-partition filter
+SELECT * from iceberg_non_partitioned
+where id < 5
+ORDER BY id
+---- TYPES
+int,string,string,timestamp
+---- RESULTS
+1,'Alex','view',2020-01-01 08:00:00
+2,'Lisa','download',2020-01-01 10:00:00
+3,'Alan','click',2020-01-01 09:00:00
+4,'Alex','view',2020-01-01 08:00:00
+====
+---- QUERY
+# Test show partitions query for iceberg table
+SHOW PARTITIONS iceberg_partitioned
+---- TYPES
+bigint,bigint,bigint,string,string
+---- RESULTS
+0,4,1000,'event_time_hour','HOUR'
+0,3,1001,'action','IDENTITY'
+====
+---- QUERY
+SHOW FILES in iceberg_partitioned
+---- LABELS
+Path,Size,Partition
+---- RESULTS
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-08/action=view/00001-1-b975a171-0911-47c2-90c8-300f23c28772-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-08/action=view/00006-6-9bc6f547-de52-4aad-8c07-5d0f1aaa0558-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-08/action=view/00009-9-bf3024d6-8b55-42d3-b25e-5f2a31303026-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-08/action=view/00017-17-a0d23269-c8d7-40cf-94c8-8b624969b9c0-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-08/action=view/00023-23-138a376e-696e-4da3-95f3-7e0aacb11ca3-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-08/action=view/00027-27-04494175-75de-41ef-b824-3923ebfba0cb-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-08/action=view/00030-30-eba34050-b263-41e8-bc7d-773a47b33c32-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-08/action=view/00031-31-0ec1c3ff-7154-4fd1-a090-8fa0b9c2d3c8-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-09/action=click/00004-4-8b99da05-6be1-42e1-90e0-bff8ca08b5af-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-09/action=click/00014-14-5b39012d-85e3-4144-ac83-574ed5046718-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-09/action=click/00015-15-e37e3f98-5f3b-4245-9c01-76cf0f1dd21a-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-09/action=click/00019-19-e36a1955-f01c-4e08-9f19-dcec0cbceadd-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-09/action=click/00020-20-c9632a29-fd5b-4ba5-a0db-2992c73075c2-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-09/action=click/00028-28-31220e43-f85a-4609-9ebb-4c76269cddb6-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-10/action=download/00003-3-7e47d440-44f5-4a11-bbfa-c72c520ca997-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-10/action=download/00007-7-c902540c-b002-413c-b422-7ec3c06d404e-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-10/action=download/00011-11-5558f0e5-7a46-417e-8c0a-50bb00e54a30-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-10/action=download/00012-12-ea94b7c7-164d-4d06-8b4d-24d296906f73-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-10/action=download/00022-22-0565b9eb-060d-4180-aa1e-2bb69187d8db-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/data/event_time_hour=2020-01-01-10/action=download/00025-25-1f2b05c6-5407-41fc-a881-60626253ca77-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/metadata/af797bab-2f2c-44df-a77b-d91c7198fe53-m0.avro',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/metadata/snap-8270633197658268308-1-af797bab-2f2c-44df-a77b-d91c7198fe53.avro',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/metadata/v1.metadata.json',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/metadata/v2.metadata.json',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned/metadata/version-hint.text',regex:.*,''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+SHOW FILES in iceberg_non_partitioned
+---- LABELS
+Path,Size,Partition
+---- RESULTS
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00001-1-5dbd44ad-18bc-40f2-9dd6-aeb2cc23457c-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00003-3-27db2521-1e8b-40c1-b846-552cd620abce-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00004-4-f1b55628-0544-4833-8b11-1b4add53dfd6-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00006-6-f75530ef-93b6-4994-b3c8-db957d44848c-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00007-7-8d9b22da-5f10-4cbf-8e4d-160f829b5e48-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00009-9-f029a1f7-9024-4bc3-a030-e20861586146-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00011-11-f07814ae-56cd-486b-af81-18541437da7d-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00012-12-967c70a4-bf4d-4a82-8c97-c90e2b4d9dcf-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00014-14-d0cdca7f-c050-407e-b70c-2bd076f83e4e-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00015-15-0e931a1f-309e-43b3-a5cf-3ef82fa4a87c-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00017-17-43138078-244c-4b38-8127-04a5bfbc4695-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00019-19-52569895-df25-4ad8-b64d-49c4540d36c9-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00020-20-f160c1ea-a2f5-4109-81ec-3ff9c155430f-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00022-22-c1f61b8c-9d9a-4823-b64e-109770c16696-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00023-23-8cfc9d65-bfc3-47c4-8da7-6610b49b3305-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00025-25-d519b09d-c730-40a6-ad03-8b36096cb234-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00027-27-802b2129-0d18-418a-bcdd-b1b5332ea2a5-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00028-28-70f51a0c-3d30-4cdb-afcb-e8c1cfa3caa4-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00030-30-e887707d-58db-469c-ab96-b77188f25189-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/data/00031-31-facf6a62-c326-44f7-bdc3-b1471bd594d7-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/metadata/9b8c72ab-43b9-42fb-a5e9-1dcfa1801a21-m0.avro',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/metadata/snap-93996984692289973-1-9b8c72ab-43b9-42fb-a5e9-1dcfa1801a21.avro',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/metadata/v1.metadata.json',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/metadata/v2.metadata.json',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned/metadata/version-hint.text',regex:.*,''
+---- TYPES
+STRING,STRING,STRING
+====

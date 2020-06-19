@@ -2527,7 +2527,7 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Creates a new Icebrg table.
+   * Creates a new Iceberg table.
    */
   private boolean createIcebergTable(org.apache.hadoop.hive.metastore.api.Table newTable,
                                   TCreateTableParams params, TDdlExecResponse response)

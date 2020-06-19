@@ -15,18 +15,21 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import pytest
-
-from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.impala_test_suite import ImpalaTestSuite
 
 
-class TestCreatingIcebergTable(CustomClusterTestSuite):
+class TestCreatingIcebergTable(ImpalaTestSuite):
   """Test creating iceberg managed and external table"""
 
   @classmethod
   def get_workload(cls):
     return 'functional-query'
 
-  @pytest.mark.execute_serially
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestCreatingIcebergTable, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
   def test_create_iceberg_tables(self, vector, unique_database):
-    self.run_test_case('QueryTest/iceberg_create', vector, use_db=unique_database)
+    self.run_test_case('QueryTest/iceberg-create', vector, use_db=unique_database)

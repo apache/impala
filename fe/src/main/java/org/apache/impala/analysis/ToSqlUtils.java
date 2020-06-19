@@ -392,6 +392,11 @@ public class ToSqlUtils {
         colsSql = null;
       }
     } else if (table instanceof FeFsTable) {
+      if (table instanceof FeIcebergTable) {
+        storageHandlerClassName = null;
+        properties.remove(IcebergTable.KEY_STORAGE_HANDLER);
+      }
+
       String inputFormat = msTable.getSd().getInputFormat();
       format = HdfsFileFormat.fromHdfsInputFormatClass(inputFormat);
       compression = HdfsCompression.fromHdfsInputFormatClass(inputFormat);
@@ -401,10 +406,6 @@ public class ToSqlUtils {
       } catch (Exception e) {
         throw new CatalogException("Could not get primary key/foreign keys sql.", e);
       }
-    } else if (table instanceof FeIcebergTable) {
-      storageHandlerClassName = null;
-      format = HdfsFileFormat.ICEBERG;
-      properties.remove(IcebergTable.KEY_STORAGE_HANDLER);
     }
 
     HdfsUri tableLocation = location == null ? null : new HdfsUri(location);
