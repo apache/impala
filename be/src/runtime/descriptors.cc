@@ -554,6 +554,7 @@ Status DescriptorTbl::CreateTblDescriptorInternal(const TTableDescriptor& tdesc,
     ObjectPool* pool, TableDescriptor** desc) {
   *desc = nullptr;
   switch (tdesc.tableType) {
+    case TTableType::ICEBERG_TABLE:
     case TTableType::HDFS_TABLE: {
       HdfsTableDescriptor* hdfs_tbl = pool->Add(new HdfsTableDescriptor(tdesc, pool));
       *desc = hdfs_tbl;

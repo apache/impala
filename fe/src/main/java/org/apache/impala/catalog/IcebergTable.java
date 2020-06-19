@@ -18,7 +18,9 @@
 package org.apache.impala.catalog;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
@@ -26,13 +28,15 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
-import org.apache.iceberg.PartitionField;
-import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.THdfsFileDesc;
+import org.apache.impala.thrift.THdfsTable;
+import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TIcebergTable;
@@ -60,6 +64,12 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public static final String ICEBERG_STORAGE_HANDLER =
       "com.expediagroup.hiveberg.IcebergStorageHandler";
 
+  // Iceberg file format key in tblproperties
+  public static final String ICEBERG_FILE_FORMAT = "iceberg_file_format";
+
+  // Iceberg file format dependend on table properties
+  private TIcebergFileFormat icebergFileFormat_;
+
   // The iceberg file system table location
   private String icebergTableLocation_;
 
@@ -69,13 +79,18 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // Schema of the iceberg table.
   private org.apache.iceberg.Schema icebergSchema_;
 
-  // PartitionSpec of the iceberg table.
-  private List<PartitionSpec> icebergPartitionSpecs_;
+  // Key is the DataFile md5, value is FileDescriptor transformed from DataFile
+  private Map<String, FileDescriptor> pathMD5ToFileDescMap_;
+
+  // Treat iceberg table as a non-partitioned hdfs table in backend
+  private HdfsTable hdfsTable_;
 
   protected IcebergTable(org.apache.hadoop.hive.metastore.api.Table msTable,
-                         Db db, String name, String owner) {
+      Db db, String name, String owner) {
     super(msTable, db, name, owner);
     icebergTableLocation_ = msTable.getSd().getLocation();
+    icebergFileFormat_ = Utils.getIcebergFileFormat(msTable);
+    hdfsTable_ = new HdfsTable(msTable, db, name, owner);
   }
 
   /**
@@ -96,6 +111,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
     return msTbl.getTableType().equalsIgnoreCase(TableType.MANAGED_TABLE.toString());
   }
 
+  public HdfsTable getHdfsTable() {
+    return hdfsTable_;
+  }
+
   @Override
   public TCatalogObjectType getCatalogObjectType() {
     return TCatalogObjectType.TABLE;
@@ -114,17 +133,19 @@ public class IcebergTable extends Table implements FeIcebergTable {
     return isIcebergStorageHandler(msTbl.getParameters().get(KEY_STORAGE_HANDLER));
   }
 
-  public org.apache.iceberg.Schema getIcebergSchema() {
-    return icebergSchema_;
-  }
-
-  public List<PartitionSpec> getIcebergPartitionSpec() {
-    return icebergPartitionSpecs_;
+  @Override
+  public TIcebergFileFormat getIcebergFileFormat() {
+    return icebergFileFormat_;
   }
 
   @Override
   public String getIcebergTableLocation() {
     return icebergTableLocation_;
+  }
+
+  @Override
+  public FeFsTable getFeFsTable() {
+    return hdfsTable_;
   }
 
   @Override
@@ -134,10 +155,16 @@ public class IcebergTable extends Table implements FeIcebergTable {
   }
 
   @Override
+  public Map<String, FileDescriptor> getPathMD5ToFileDescMap() {
+    return pathMD5ToFileDescMap_;
+  }
+
+  @Override
   public TTable toThrift() {
     TTable table = super.toThrift();
     table.setTable_type(TTableType.ICEBERG_TABLE);
-    table.setIceberg_table(getTIcebergTable());
+    table.setIceberg_table(Utils.getTIcebergTable(this));
+    table.setHdfs_table(transfromToTHdfsTable(true));
     return table;
   }
 
@@ -150,7 +177,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
    */
   @Override
   public void load(boolean dummy /* not used */, IMetaStoreClient msClient,
-                   org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
+      org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
       throws TableLoadingException {
     final Timer.Context context =
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
@@ -162,6 +189,12 @@ public class IcebergTable extends Table implements FeIcebergTable {
           getMetrics().getTimer(Table.LOAD_DURATION_STORAGE_METADATA).time();
       try {
         loadSchemaFromIceberg();
+        // Loading hdfs table after loaded schema from Iceberg,
+        // in case we create external Iceberg table skipping column info in sql.
+        hdfsTable_.load(false, msClient, msTable_, true, true, false, null, reason);
+        pathMD5ToFileDescMap_ = Utils.loadAllPartition(msTable_.getSd().getLocation(),
+            this);
+        loadAllColumnStats(msClient);
       } catch (Exception e) {
         throw new TableLoadingException("Error loading metadata for Iceberg table " +
             icebergTableLocation_, e);
@@ -194,9 +227,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public void loadSchemaFromIceberg() throws TableLoadingException {
     TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(icebergTableLocation_);
     icebergSchema_ = metadata.schema();
-    icebergPartitionSpecs_ = metadata.specs();
     loadSchema();
-    partitionSpecs_ = buildIcebergPartitionSpec(icebergPartitionSpecs_);
+    partitionSpecs_ = Utils.loadPartitionSpecByIceberg(metadata);
   }
 
   /**
@@ -220,29 +252,15 @@ public class IcebergTable extends Table implements FeIcebergTable {
     }
   }
 
-  /**
-   * Build IcebergPartitionSpec list by iceberg PartitionSpec
-   */
-  private List<IcebergPartitionSpec> buildIcebergPartitionSpec(
-      List<PartitionSpec> specs) throws TableLoadingException {
-    List<IcebergPartitionSpec> ret = new ArrayList<>();
-    for (PartitionSpec spec : specs) {
-      List<IcebergPartitionField> fields = new ArrayList<>();
-      for (PartitionField field : spec.fields()) {
-        fields.add(new IcebergPartitionField(field.sourceId(), field.fieldId(),
-            field.name(), IcebergUtil.getPartitionTransform(field)));
-      }
-      ret.add(new IcebergPartitionSpec(spec.specId(), fields));
-    }
-    return ret;
-  }
-
   @Override
   protected void loadFromThrift(TTable thriftTable) throws TableLoadingException {
     super.loadFromThrift(thriftTable);
     TIcebergTable ticeberg = thriftTable.getIceberg_table();
     icebergTableLocation_ = ticeberg.getTable_location();
     partitionSpecs_ = loadPartitionBySpecsFromThrift(ticeberg.getPartition_spec());
+    pathMD5ToFileDescMap_ = loadFileDescFromThrift(
+        ticeberg.getPath_md5_to_file_descriptor());
+    hdfsTable_.loadFromThrift(thriftTable);
   }
 
   private List<IcebergPartitionSpec> loadPartitionBySpecsFromThrift(
@@ -266,21 +284,33 @@ public class IcebergTable extends Table implements FeIcebergTable {
     return ret;
   }
 
+  private Map<String, FileDescriptor> loadFileDescFromThrift(
+      Map<String, THdfsFileDesc> tFileDescMap) {
+    Map<String, FileDescriptor> fileDescMap = new HashMap<>();
+    if (tFileDescMap == null) return fileDescMap;
+    for (Map.Entry<String, THdfsFileDesc> entry : tFileDescMap.entrySet()) {
+      fileDescMap.put(entry.getKey(), FileDescriptor.fromThrift(entry.getValue()));
+    }
+    return fileDescMap;
+  }
+
   @Override
   public TTableDescriptor toThriftDescriptor(int tableId,
-                                             Set<Long> referencedPartitions) {
+      Set<Long> referencedPartitions) {
     TTableDescriptor desc = new TTableDescriptor(tableId, TTableType.ICEBERG_TABLE,
         getTColumnDescriptors(), numClusteringCols_, name_, db_.getName());
-    desc.setIcebergTable(getTIcebergTable());
+    desc.setIcebergTable(Utils.getTIcebergTable(this));
+    desc.setHdfsTable(transfromToTHdfsTable(false));
     return desc;
   }
 
-  private TIcebergTable getTIcebergTable() {
-    TIcebergTable tbl = new TIcebergTable();
-    tbl.setTable_location(icebergTableLocation_);
-    for (IcebergPartitionSpec partition : partitionSpecs_) {
-      tbl.addToPartition_spec(partition.toThrift());
+  private THdfsTable transfromToTHdfsTable(boolean updatePartitionFlag) {
+    THdfsTable hdfsTable = hdfsTable_.getTHdfsTable(ThriftObjectType.FULL, null);
+    if (updatePartitionFlag) {
+      // Iceberg table only has one THdfsPartition, we set this partition
+      // file format by iceberg file format which depend on table properties
+      Utils.updateIcebergPartitionFileFormat(this, hdfsTable);
     }
-    return tbl;
+    return hdfsTable;
   }
 }

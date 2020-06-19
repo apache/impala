@@ -523,6 +523,14 @@ kll_sketches_from_impala.parquet:
 This holds the same sketches as kll_sketches_from_hive.parquet but these sketches were
 created by Impala instead of Hive.
 
+iceberg:
+IMPALA-9741: Support querying Iceberg table by impala
+Since impala cannot insert iceberg table now, we generated data by
+spark-shell, version is 2.4.x, and there are two tables' data in
+testdata/data/iceberg_test. Iceberg table location contains
+two directories: metadata, which contains table metadata managed
+by iceberg; data, which contains the data files.
+
 hudi_parquet:
 IMPALA-8778: Support read Apache Hudi tables
 Hudi parquet is a special format of parquet files managed by Apache Hudi

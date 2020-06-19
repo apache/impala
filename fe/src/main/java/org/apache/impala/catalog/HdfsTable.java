@@ -2112,7 +2112,7 @@ public class HdfsTable extends Table implements FeFsTable {
    *  (e.g. number of blocks, files, etc) in order to compute an estimate of the metadata
    *  size of this table.
    */
-  private THdfsTable getTHdfsTable(ThriftObjectType type, Set<Long> refPartitions) {
+  protected THdfsTable getTHdfsTable(ThriftObjectType type, Set<Long> refPartitions) {
     if (type == ThriftObjectType.FULL) {
       // "full" implies all partitions should be included.
       Preconditions.checkArgument(refPartitions == null);

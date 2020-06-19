@@ -25,8 +25,8 @@ import org.apache.impala.thrift.TIcebergPartitionTransform;
  * Represents a PartitionField of iceberg
  */
 public class IcebergPartitionField extends StmtNode {
-  // The id of the source field in iceberg table Schema, you can get these source
-  // fields by Schema.columns(), the return type is List<NestedField>.
+  // The id of the source column in the Iceberg table schema. The source column is
+  // used as the input for this partition field.
   private int sourceId_;
 
   // The field id from Iceberg PartitionField, which across all the table
@@ -49,6 +49,14 @@ public class IcebergPartitionField extends StmtNode {
 
   public IcebergPartitionField(String fieldName, TIcebergPartitionTransform fieldType) {
     this(0, 0, fieldName, fieldType);
+  }
+
+  public String getFieldName() {
+    return fieldName_;
+  }
+
+  public int getSourceId() {
+    return sourceId_;
   }
 
   @Override

@@ -20,7 +20,13 @@ package org.apache.impala.util;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
 import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.TableScan;
+import org.apache.iceberg.expressions.UnboundPredicate;
 import org.apache.iceberg.hadoop.HadoopTableOperations;
 import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.PartitionField;
@@ -28,8 +34,8 @@ import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.types.Types;
-import org.apache.iceberg.types.Type.TypeID;
 import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
@@ -39,6 +45,8 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCreateTableParams;
+import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionTransform;
 
@@ -73,8 +81,7 @@ public class IcebergUtil {
    * partition columns are all from source columns, this is different from hdfs table.
    */
   public static PartitionSpec createIcebergPartition(Schema schema,
-                                                     TCreateTableParams params)
-      throws ImpalaRuntimeException {
+      TCreateTableParams params) throws ImpalaRuntimeException {
     if (params.getPartition_spec() == null) {
       return null;
     }
@@ -98,6 +105,14 @@ public class IcebergUtil {
       }
     }
     return builder.build();
+  }
+
+  /**
+   * Get TIcebergFileFormat from a string, usually from table properties
+   */
+  public static TIcebergFileFormat getIcebergFileFormat(String format){
+    if ("PARQUET".equalsIgnoreCase(format)) return TIcebergFileFormat.PARQUET;
+    return null;
   }
 
   /**
@@ -130,6 +145,33 @@ public class IcebergUtil {
       throw new TableLoadingException("Unsupported iceberg partition type: " +
           type);
     }
+  }
+
+  /**
+   * Transform TIcebergFileFormat to THdfsFileFormat
+   */
+  public static THdfsFileFormat toTHdfsFileFormat(TIcebergFileFormat format) {
+    switch (format) {
+      case ORC:
+        return THdfsFileFormat.ORC;
+      case PARQUET:
+      default:
+        return THdfsFileFormat.PARQUET;
+    }
+  }
+
+  /**
+   * Transform TIcebergFileFormat to HdfsFileFormat
+   */
+  public static HdfsFileFormat toHdfsFileFormat(TIcebergFileFormat format) {
+    return HdfsFileFormat.fromThrift(toTHdfsFileFormat(format));
+  }
+
+  /**
+   * Transform TIcebergFileFormat to HdfsFileFormat
+   */
+  public static HdfsFileFormat toHdfsFileFormat(String format) {
+    return HdfsFileFormat.fromThrift(toTHdfsFileFormat(getIcebergFileFormat(format)));
   }
 
   /**
@@ -182,5 +224,32 @@ public class IcebergUtil {
         throw new TableLoadingException(String.format(
             "Iceberg type '%s' is not supported in Impala", t.typeId()));
     }
+  }
+
+  /**
+   * Get iceberg data file by file system table location and iceberg predicates
+   */
+  public static List<DataFile> getIcebergDataFiles(String location,
+      List<UnboundPredicate> predicates) {
+    BaseTable table = IcebergUtil.getBaseTable(location);
+    TableScan scan = table.newScan();
+    for (UnboundPredicate predicate : predicates) {
+      scan = scan.filter(predicate);
+    }
+
+    List<DataFile> dataFileList = new ArrayList<>();
+    for (FileScanTask task : scan.planFiles()) {
+      dataFileList.add(task.file());
+    }
+    return dataFileList;
+  }
+
+  /**
+   * Use DataFile path to construct md5 as map key, cached in memory
+   */
+  public static String getDataFileMD5(DataFile dataFile) {
+    Hasher hasher = Hashing.md5().newHasher();
+    hasher.putUnencodedChars(dataFile.path().toString());
+    return hasher.hash().toString();
   }
 }

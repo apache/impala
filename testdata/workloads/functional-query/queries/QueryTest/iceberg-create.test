@@ -60,31 +60,6 @@ DESCRIBE iceberg_test2;
 STRING,STRING,STRING
 ====
 ---- QUERY
-SHOW PARTITIONS iceberg_test2;
----- CATCH
-AnalysisException: Iceberg table does not have PartitionSpec: $DATABASE.iceberg_test2
-====
----- QUERY
-CREATE TABLE iceberg_test3(
-  level STRING
-)
-PARTITION BY SPEC
-(
-  level IDENTITY,
-  event_time HOUR
-)
-STORED AS ICEBERG;
----- CATCH
-ImpalaRuntimeException: Error making 'createTable' RPC to Hive Metastore: 
-CAUSED BY: IllegalArgumentException: Cannot find source column: event_time
-====
----- QUERY
-CREATE TABLE iceberg_test3
-STORED AS ICEBERG;
----- CATCH
-AnalysisException: Table requires at least 1 column for managed iceberg table.
-====
----- QUERY
 CREATE EXTERNAL TABLE iceberg_test_external(
   level STRING
 )
@@ -101,12 +76,12 @@ PARTITION BY SPEC
   level IDENTITY
 )
 STORED AS ICEBERG
-LOCATION '/iceberg_test_with_location';
+LOCATION '/$DATABASE.iceberg_test_with_location';
 CREATE EXTERNAL TABLE iceberg_test_external(
   level STRING
 )
 STORED AS ICEBERG
-LOCATION '/iceberg_test_with_location';
+LOCATION '/$DATABASE.iceberg_test_with_location';
 ---- RESULTS
 'Table has been created.'
 ====
@@ -127,7 +102,7 @@ BIGINT,BIGINT,BIGINT,STRING,STRING
 ---- QUERY
 CREATE EXTERNAL TABLE iceberg_test_external_empty_column
 STORED AS ICEBERG
-LOCATION '/iceberg_test_with_location';
+LOCATION '/$DATABASE.iceberg_test_with_location';
 ---- RESULTS
 'Table has been created.'
 ====

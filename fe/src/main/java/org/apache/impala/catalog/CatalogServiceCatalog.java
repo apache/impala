@@ -3194,8 +3194,9 @@ public class CatalogServiceCatalog extends Catalog {
       // TODO(todd): consider a read-write lock here.
       table.getLock().lock();
       try {
-        if (table instanceof HdfsTable) {
-          HdfsTable hdfsTable = (HdfsTable) table;
+        if (table instanceof HdfsTable || table instanceof IcebergTable) {
+          HdfsTable hdfsTable = table instanceof HdfsTable ? (HdfsTable) table :
+              ((IcebergTable) table).getHdfsTable();
           missingPartialInfos = Maps.newHashMap();
           resp = hdfsTable.getPartialInfo(req, missingPartialInfos);
           if (missingPartialInfos.isEmpty()) return resp;

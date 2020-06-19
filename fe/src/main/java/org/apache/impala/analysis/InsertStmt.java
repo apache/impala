@@ -27,6 +27,7 @@ import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
@@ -439,11 +440,15 @@ public class InsertStmt extends StatementBase {
           builder.onTable(table_).allOf(privilegeRequired).build());
     }
 
-    // We do not support (in|up)serting into views.
+    // We do not support (in|up)serting into views and iceberg table
     if (table_ instanceof FeView) {
       throw new AnalysisException(
           String.format("Impala does not support %sing into views: %s", getOpName(),
               table_.getFullName()));
+    } else if (table_ instanceof FeIcebergTable) {
+      throw new AnalysisException(
+          String.format("Impala does not support %sing into iceberg table: %s",
+              getOpName(), table_.getFullName()));
     }
 
     Analyzer.ensureTableNotFullAcid(table_, "INSERT");

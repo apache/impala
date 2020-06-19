@@ -340,6 +340,29 @@ class TestHudiParquet(ImpalaTestSuite):
     self.run_test_case('QueryTest/hudi-parquet', vector)
 
 
+class TestIceberg(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestIceberg, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension(debug_action_options=DEBUG_ACTION_DIMS))
+    cls.ImpalaTestMatrix.add_constraint(
+      lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_iceberg_query(self, vector):
+    self.run_test_case('QueryTest/iceberg-query', vector)
+
+  def test_iceberg_negative(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-negative', vector, use_db=unique_database)
+
+  def test_iceberg_profile(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-profile', vector, use_db=unique_database)
+
+
 class TestParquet(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):

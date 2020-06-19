@@ -76,8 +76,7 @@ public class ShowFilesStmt extends StatementBase {
     table_ = tableRef.getTable();
     Preconditions.checkNotNull(table_);
     if (!(table_ instanceof FeFsTable)) {
-      throw new AnalysisException(String.format(
-          "SHOW FILES not applicable to a non hdfs table: %s", tableName_));
+      throw new AnalysisException("SHOW FILES is applicable only to a HDFS table");
     }
     tableRef.analyze(analyzer);
 

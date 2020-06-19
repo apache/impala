@@ -1188,6 +1188,9 @@ public class Frontend {
       throws ImpalaException {
     FeTable table = getCatalog().getTable(dbName, tableName);
     if (table instanceof FeFsTable) {
+      if (table instanceof FeIcebergTable && op == TShowStatsOp.PARTITIONS) {
+        return FeIcebergTable.Utils.getPartitionSpecs((FeIcebergTable) table);
+      }
       return ((FeFsTable) table).getTableStats();
     } else if (table instanceof FeHBaseTable) {
       return ((FeHBaseTable) table).getTableStats();
@@ -1201,12 +1204,6 @@ public class Frontend {
       } else {
         Preconditions.checkState(op == TShowStatsOp.TABLE_STATS);
         return FeKuduTable.Utils.getTableStats((FeKuduTable) table);
-      }
-    } else if (table instanceof FeIcebergTable) {
-      if (op == TShowStatsOp.PARTITIONS) {
-        return FeIcebergTable.Utils.getPartitionSpecs((FeIcebergTable) table);
-      } else {
-        throw new AnalysisException("Iceberg table not supported table stats now.");
       }
     } else {
       throw new InternalException("Invalid table class: " + table.getClass());

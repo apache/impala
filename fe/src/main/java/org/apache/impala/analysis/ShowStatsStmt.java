@@ -81,7 +81,26 @@ public class ShowStatsStmt extends StatementBase {
           "%s not applicable to a view: %s", getSqlPrefix(), table_.getFullName()));
     }
     if (table_ instanceof FeFsTable) {
-      if (table_.getNumClusteringCols() == 0 && op_ == TShowStatsOp.PARTITIONS) {
+      // There two cases here: Non-partitioned hdfs table and non-partitioned
+      // iceberg table
+      boolean partitioned = true;
+      if (op_ == TShowStatsOp.PARTITIONS) {
+        if (table_ instanceof FeIcebergTable) {
+          // We only get latest partition spec from Iceberg now, so this list only
+          // contains one partition spec member.
+          // Iceberg snapshots chosen maybe supported in the future.
+          Preconditions.checkNotNull(((FeIcebergTable) table_).getPartitionSpec());
+          // Partition spec without partition fields is non-partitioned.
+          if (!((FeIcebergTable) table_).getPartitionSpec().get(0).hasPartitionFields()) {
+            partitioned = false;
+          }
+        } else {
+          if (table_.getNumClusteringCols() == 0) {
+            partitioned = false;
+          }
+        }
+      }
+      if (!partitioned) {
         throw new AnalysisException("Table is not partitioned: " + table_.getFullName());
       }
       if (op_ == TShowStatsOp.RANGE_PARTITIONS) {
@@ -94,21 +113,6 @@ public class ShowStatsStmt extends StatementBase {
           FeKuduTable.Utils.getRangePartitioningColNames(kuduTable).isEmpty()) {
         throw new AnalysisException(getSqlPrefix() + " requested but table does not " +
             "have range partitions: " + table_.getFullName());
-      }
-    } else if (table_ instanceof FeIcebergTable) {
-      FeIcebergTable icebergTable = (FeIcebergTable) table_;
-      if (op_ == TShowStatsOp.PARTITIONS) {
-        //Non-partition iceberg table only has an empty PartitionField set
-        Preconditions.checkArgument(!icebergTable.getPartitionSpec().isEmpty());
-        IcebergPartitionSpec spec = icebergTable.getPartitionSpec().get(0);
-        boolean emptySpec = (spec.getIcebergPartitionFields_() == null ||
-            spec.getIcebergPartitionFields_().size() == 0);
-        if (icebergTable.getPartitionSpec().size() == 1 && emptySpec) {
-          throw new AnalysisException("Iceberg table does not have PartitionSpec: "
-              + table_.getFullName());
-        }
-      } else {
-        throw new AnalysisException(getSqlPrefix() + " not supported for Iceberg table.");
       }
     } else {
       if (op_ == TShowStatsOp.RANGE_PARTITIONS) {
