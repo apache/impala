@@ -72,4 +72,5 @@ message ColumnValuePB {
   optional string binary_val = 8;
   optional string timestamp_val = 9;
   optional bytes decimal_val = 10;
+  optional int32 date_val = 11;
 }

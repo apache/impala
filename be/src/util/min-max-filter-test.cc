@@ -19,6 +19,7 @@
 #include "util/min-max-filter.h"
 
 #include "gen-cpp/data_stream_service.pb.h"
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/string-value.inline.h"
@@ -359,73 +360,92 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   always_false->Close();
 }
 
-void CheckTimestampVals(
-    MinMaxFilter* filter, const TimestampValue& min, const TimestampValue& max) {
-  EXPECT_EQ(*reinterpret_cast<const TimestampValue*>(filter->GetMin()), min);
-  EXPECT_EQ(*reinterpret_cast<const TimestampValue*>(filter->GetMax()), max);
-  EXPECT_FALSE(filter->AlwaysFalse());
-  EXPECT_FALSE(filter->AlwaysTrue());
+static TimestampValue ParseSimpleTimestamp(const char* s) {
+  return TimestampValue::ParseSimpleDateFormat(s);
 }
+
+static DateValue ParseSimpleDate(const char* s) {
+  return DateValue::ParseSimpleDateFormat(s, strlen(s), /* accept_time_toks */ true);
+}
+
+#define DATE_TIME_CHECK_VALS(NAME, TYPE)                                           \
+  void Check##NAME##Vals(MinMaxFilter* filter, const TYPE& min, const TYPE& max) { \
+    EXPECT_EQ(*reinterpret_cast<const TYPE*>(filter->GetMin()), min);              \
+    EXPECT_EQ(*reinterpret_cast<const TYPE*>(filter->GetMax()), max);              \
+    EXPECT_FALSE(filter->AlwaysFalse());                                           \
+    EXPECT_FALSE(filter->AlwaysTrue());                                            \
+  }
+
+DATE_TIME_CHECK_VALS(Timestamp, TimestampValue);
+DATE_TIME_CHECK_VALS(Date, DateValue);
+
+#define DATE_TIME_CHECK_FUNCS(NAME, TYPE, PROTOBUF_TYPE, PRIMITIVE_TYPE)            \
+  do {                                                                              \
+    ObjectPool obj_pool;                                                            \
+    MemTracker mem_tracker;                                                         \
+    ColumnType col_type(PrimitiveType::TYPE_##PRIMITIVE_TYPE);                      \
+    MinMaxFilter* filter = MinMaxFilter::Create(col_type, &obj_pool, &mem_tracker); \
+    /* Test the behavior of an empty filter. */                                     \
+    EXPECT_TRUE(filter->AlwaysFalse());                                             \
+    EXPECT_FALSE(filter->AlwaysTrue());                                             \
+    MinMaxFilterPB pFilter;                                                         \
+    filter->ToProtobuf(&pFilter);                                                   \
+    EXPECT_TRUE(pFilter.always_false());                                            \
+    EXPECT_FALSE(pFilter.always_true());                                            \
+    EXPECT_FALSE(pFilter.min().has_##PROTOBUF_TYPE##_val());                        \
+    EXPECT_FALSE(pFilter.max().has_##PROTOBUF_TYPE##_val());                        \
+    MinMaxFilter* empty_filter =                                                    \
+        MinMaxFilter::Create(pFilter, col_type, &obj_pool, &mem_tracker);           \
+    EXPECT_TRUE(empty_filter->AlwaysFalse());                                       \
+    EXPECT_FALSE(empty_filter->AlwaysTrue());                                       \
+    empty_filter->Close();                                                          \
+    /* Now insert some stuff. */                                                    \
+    TYPE t1 = ParseSimple##NAME("2000-01-01 00:00:00");                             \
+    filter->Insert(&t1);                                                            \
+    Check##NAME##Vals(filter, t1, t1);                                              \
+    TYPE t2 = ParseSimple##NAME("1990-01-01 12:30:00");                             \
+    filter->Insert(&t2);                                                            \
+    Check##NAME##Vals(filter, t2, t1);                                              \
+    TYPE t3 = ParseSimple##NAME("2001-04-30 05:00:00");                             \
+    filter->Insert(&t3);                                                            \
+    Check##NAME##Vals(filter, t2, t3);                                              \
+    TYPE t4 = ParseSimple##NAME("2001-04-30 01:00:00");                             \
+    filter->Insert(&t4);                                                            \
+    Check##NAME##Vals(filter, t2, t3);                                              \
+    /* Check Protobuf. */                                                           \
+    filter->ToProtobuf(&pFilter);                                                   \
+    EXPECT_FALSE(pFilter.always_false());                                           \
+    EXPECT_FALSE(pFilter.always_true());                                            \
+    EXPECT_EQ(TYPE::FromColumnValuePB(pFilter.min()), t2);                          \
+    EXPECT_EQ(TYPE::FromColumnValuePB(pFilter.max()), t3);                          \
+    MinMaxFilter* filter2 =                                                         \
+        MinMaxFilter::Create(pFilter, col_type, &obj_pool, &mem_tracker);           \
+    Check##NAME##Vals(filter2, t2, t3);                                             \
+    filter2->Close();                                                               \
+    /* Check the behavior of Or. */                                                 \
+    filter->ToProtobuf(&pFilter);                                                   \
+    MinMaxFilterPB pFilter1;                                                        \
+    t2.ToColumnValuePB(pFilter1.mutable_min());                                     \
+    t4.ToColumnValuePB(pFilter1.mutable_max());                                     \
+    MinMaxFilterPB pFilter2;                                                        \
+    t1.ToColumnValuePB(pFilter2.mutable_min());                                     \
+    t3.ToColumnValuePB(pFilter2.mutable_max());                                     \
+    MinMaxFilter::Or(pFilter1, &pFilter2, col_type);                                \
+    EXPECT_EQ(TYPE::FromColumnValuePB(pFilter2.min()), t2);                         \
+    EXPECT_EQ(TYPE::FromColumnValuePB(pFilter2.max()), t3);                         \
+    filter->Close();                                                                \
+  } while (false)
 
 // Tests that a TimestampMinMaxFilter returns the expected min/max after having values
 // inserted into it, and that MinMaxFilter::Or works for timestamps.
 TEST(MinMaxFilterTest, TestTimestampMinMaxFilter) {
-  ObjectPool obj_pool;
-  MemTracker mem_tracker;
-  ColumnType timestamp_type(PrimitiveType::TYPE_TIMESTAMP);
-  MinMaxFilter* filter = MinMaxFilter::Create(timestamp_type, &obj_pool, &mem_tracker);
+  DATE_TIME_CHECK_FUNCS(Timestamp, TimestampValue, timestamp, TIMESTAMP);
+}
 
-  // Test the behavior of an empty filter.
-  EXPECT_TRUE(filter->AlwaysFalse());
-  EXPECT_FALSE(filter->AlwaysTrue());
-  MinMaxFilterPB pFilter;
-  filter->ToProtobuf(&pFilter);
-  EXPECT_TRUE(pFilter.always_false());
-  EXPECT_FALSE(pFilter.always_true());
-  EXPECT_FALSE(pFilter.min().has_timestamp_val());
-  EXPECT_FALSE(pFilter.max().has_timestamp_val());
-  MinMaxFilter* empty_filter =
-      MinMaxFilter::Create(pFilter, timestamp_type, &obj_pool, &mem_tracker);
-  EXPECT_TRUE(empty_filter->AlwaysFalse());
-  EXPECT_FALSE(empty_filter->AlwaysTrue());
-
-  // Now insert some stuff.
-  TimestampValue t1 = TimestampValue::ParseSimpleDateFormat("2000-01-01 00:00:00");
-  filter->Insert(&t1);
-  CheckTimestampVals(filter, t1, t1);
-  TimestampValue t2 = TimestampValue::ParseSimpleDateFormat("1990-01-01 12:30:00");
-  filter->Insert(&t2);
-  CheckTimestampVals(filter, t2, t1);
-  TimestampValue t3 = TimestampValue::ParseSimpleDateFormat("2001-04-30 05:00:00");
-  filter->Insert(&t3);
-  CheckTimestampVals(filter, t2, t3);
-  TimestampValue t4 = TimestampValue::ParseSimpleDateFormat("2001-04-30 01:00:00");
-  filter->Insert(&t4);
-  CheckTimestampVals(filter, t2, t3);
-
-  filter->ToProtobuf(&pFilter);
-  EXPECT_FALSE(pFilter.always_false());
-  EXPECT_FALSE(pFilter.always_true());
-  EXPECT_EQ(TimestampValue::FromColumnValuePB(pFilter.min()), t2);
-  EXPECT_EQ(TimestampValue::FromColumnValuePB(pFilter.max()), t3);
-  MinMaxFilter* filter2 =
-      MinMaxFilter::Create(pFilter, timestamp_type, &obj_pool, &mem_tracker);
-  CheckTimestampVals(filter2, t2, t3);
-
-  // Check the behavior of Or.
-  MinMaxFilterPB pFilter1;
-  t2.ToColumnValuePB(pFilter1.mutable_min());
-  t4.ToColumnValuePB(pFilter1.mutable_max());
-  MinMaxFilterPB pFilter2;
-  t1.ToColumnValuePB(pFilter2.mutable_min());
-  t3.ToColumnValuePB(pFilter2.mutable_max());
-  MinMaxFilter::Or(pFilter1, &pFilter2, timestamp_type);
-  EXPECT_EQ(TimestampValue::FromColumnValuePB(pFilter2.min()), t2);
-  EXPECT_EQ(TimestampValue::FromColumnValuePB(pFilter2.max()), t3);
-
-  filter->Close();
-  empty_filter->Close();
-  filter2->Close();
+// Tests that a DateMinMaxFilter returns the expected min/max after having values
+// inserted into it, and that MinMaxFilter::Or works for dates.
+TEST(MinMaxFilterTest, TestDateMinMaxFilter) {
+  DATE_TIME_CHECK_FUNCS(Date, DateValue, date, DATE);
 }
 
 #define DECIMAL_CHECK(SIZE)                                                           \

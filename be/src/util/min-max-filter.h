@@ -20,6 +20,7 @@
 
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "impala-ir/impala-ir-functions.h"
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.h"
 #include "runtime/string-buffer.h"
 #include "runtime/string-value.h"
@@ -213,38 +214,36 @@ class StringMinMaxFilter : public MinMaxFilter {
   bool always_true_;
 };
 
-class TimestampMinMaxFilter : public MinMaxFilter {
- public:
-  TimestampMinMaxFilter() { always_false_ = true; }
-  TimestampMinMaxFilter(const MinMaxFilterPB& protobuf);
-  virtual ~TimestampMinMaxFilter() {}
+#define DATE_TIME_MIN_MAX_FILTER(NAME, TYPE)                            \
+  class NAME##MinMaxFilter : public MinMaxFilter {                      \
+   public:                                                              \
+    NAME##MinMaxFilter() { always_false_ = true; }                      \
+    NAME##MinMaxFilter(const MinMaxFilterPB& protobuf);                 \
+    virtual ~NAME##MinMaxFilter() {}                                    \
+    virtual const void* GetMin() const override { return &min_; }       \
+    virtual const void* GetMax() const override { return &max_; }       \
+    virtual PrimitiveType type() override;                              \
+    virtual void Insert(const void* val) override;                      \
+    virtual bool AlwaysTrue() const override { return false; }          \
+    virtual bool AlwaysFalse() const override { return always_false_; } \
+    virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;   \
+    virtual void SetAlwaysTrue() override {                             \
+      DCHECK(false) << #NAME << " filters cannot be always true.";      \
+    }                                                                   \
+    virtual std::string DebugString() const override;                   \
+    static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out);      \
+    static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);    \
+    static const char* LLVM_CLASS_NAME;                                 \
+                                                                        \
+   private:                                                             \
+    TYPE min_;                                                          \
+    TYPE max_;                                                          \
+    /* True if no rows have been inserted. */                           \
+    bool always_false_;                                                 \
+  };
 
-  virtual const void* GetMin() const override { return &min_; }
-  virtual const void* GetMax() const override { return &max_; }
-  virtual PrimitiveType type() override;
-
-  virtual void Insert(const void* val) override;
-  virtual bool AlwaysTrue() const override { return false; }
-  virtual bool AlwaysFalse() const override { return always_false_; }
-  virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;
-  virtual void SetAlwaysTrue() override {
-    DCHECK(false) << "Timestamp filters cannot be always true.";
-  }
-  virtual std::string DebugString() const override;
-
-  static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out);
-  static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);
-
-  /// Struct name in LLVM IR.
-  static const char* LLVM_CLASS_NAME;
-
- private:
-  TimestampValue min_;
-  TimestampValue max_;
-
-  /// True if no rows have been inserted.
-  bool always_false_;
-};
+DATE_TIME_MIN_MAX_FILTER(Timestamp, TimestampValue);
+DATE_TIME_MIN_MAX_FILTER(Date, DateValue);
 
 #define DECIMAL_SIZE_4BYTE 4
 #define DECIMAL_SIZE_8BYTE 8

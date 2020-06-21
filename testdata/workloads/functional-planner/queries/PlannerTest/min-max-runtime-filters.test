@@ -164,3 +164,54 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=4B cardinality=7.30K
    in pipelines: 00(GETNEXT)
 ====
+# Query with 3-way shuffer joins on Kudu tables with different types of columns.
+select STRAIGHT_JOIN count(*) from functional_kudu.date_tbl a,
+    functional_kudu.date_tbl b,
+    functional_kudu.date_tbl c
+where a.date_col = b.date_col and b.id_col = c.id_col
+---- PLAN
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=14.62MB mem-reservation=3.88MB thread-reservation=4
+PLAN-ROOT SINK
+|  output exprs: count(*)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=3 row-size=8B cardinality=1
+|  in pipelines: 05(GETNEXT), 00(OPEN)
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: b.id_col = c.id_col
+|  fk/pk conjuncts: b.id_col = c.id_col
+|  runtime filters: RF001[min_max] <- c.id_col
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1,2 row-size=16B cardinality=30
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN KUDU [functional_kudu.date_tbl c]
+|     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+|     tuple-ids=2 row-size=4B cardinality=22
+|     in pipelines: 02(GETNEXT)
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.date_col = b.date_col
+|  fk/pk conjuncts: none
+|  runtime filters: RF003[min_max] <- b.date_col
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=12B cardinality=30
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN KUDU [functional_kudu.date_tbl b]
+|     runtime filters: RF001[min_max] -> b.id_col
+|     mem-estimate=1.50MB mem-reservation=0B thread-reservation=1
+|     tuple-ids=1 row-size=8B cardinality=22
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN KUDU [functional_kudu.date_tbl a]
+   runtime filters: RF003[min_max] -> a.date_col
+   mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=22
+   in pipelines: 00(GETNEXT)
+====

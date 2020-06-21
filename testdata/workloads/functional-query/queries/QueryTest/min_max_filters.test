@@ -315,6 +315,18 @@ where a.d38_38 = b.d38_38 and b.d38_38 = 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 732
 ====
+---- QUERY
+# IMPALA-9294 Support Kudu Date Min/Max Filters
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select STRAIGHT_JOIN count(*) from date_tbl a join [BROADCAST] date_tbl b
+where a.date_col = b.date_col and b.date_col between DATE '2010-01-01' and
+  DATE '2021-01-01';
+---- RESULTS
+10
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 4
+row_regex: .*1 of 1 Runtime Filter Published.*
+====
 
 ---- QUERY
 ####################################################
@@ -394,4 +406,22 @@ BIGINT
 1
 1
 1
+====
+
+
+---- QUERY
+####################################################
+# Test case 5: three-way parallel shuffle joins.
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select count(*) from
+    functional_kudu.date_tbl a INNER JOIN /* +shuffle */
+    functional_kudu.date_tbl b INNER JOIN /* +shuffle */
+    functional_kudu.date_tbl c
+on a.date_col = b.date_col and b.date_col = c.date_col;
+---- RESULTS
+50
+---- RUNTIME_PROFILE
+aggregation(SUM, ProbeRows): 48
+row_regex: .*1 of 1 Runtime Filter Published.*
 ====
