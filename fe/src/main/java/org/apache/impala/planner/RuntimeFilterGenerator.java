@@ -792,8 +792,6 @@ public final class RuntimeFilterGenerator {
               && enabledRuntimeFilterTypes != TEnabledRuntimeFilterTypes.ALL) {
             continue;
           }
-          // TODO: IMPALA-9294: Support Kudu Date Min/Max Filters
-          if (targetExpr.getType().isDate()) continue;
           // TODO: IMPALA-9580: Support Kudu VARCHAR Min/Max Filters
           if (targetExpr.getType().isVarchar()) continue;
           SlotRef slotRef = targetExpr.unwrapSlotRef(true);

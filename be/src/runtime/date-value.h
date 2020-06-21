@@ -23,6 +23,7 @@
 
 #include "common/logging.h"
 #include "common/status.h"
+#include "gen-cpp/common.pb.h"
 #include "udf/udf.h"
 
 namespace impala {
@@ -171,6 +172,17 @@ class DateValue {
   static DateValue FromDateVal(const impala_udf::DateVal& udf_value) {
     DCHECK(!udf_value.is_null);
     return DateValue(udf_value.val);
+  }
+
+  // Store the days_since_epoch_ of this DateValue in 'pvalue'.
+  void ToColumnValuePB(ColumnValuePB* pvalue) const {
+    DCHECK(pvalue != nullptr);
+    pvalue->set_date_val(days_since_epoch_);
+  }
+
+  // Returns a new DateValue created from the value in 'value_pb'.
+  static DateValue FromColumnValuePB(const ColumnValuePB& value_pb) {
+    return DateValue(value_pb.date_val());
   }
 
   /// Constructors that parse from a date string. See DateParser for details about the

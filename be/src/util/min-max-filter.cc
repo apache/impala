@@ -21,6 +21,7 @@
 #include <unordered_map>
 
 #include "common/object-pool.h"
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/raw-value.h"
 #include "runtime/string-value.inline.h"
@@ -41,6 +42,7 @@ static std::unordered_map<int, string> MIN_MAX_FILTER_LLVM_CLASS_NAMES = {
     {PrimitiveType::TYPE_DOUBLE, DoubleMinMaxFilter::LLVM_CLASS_NAME},
     {PrimitiveType::TYPE_STRING, StringMinMaxFilter::LLVM_CLASS_NAME},
     {PrimitiveType::TYPE_TIMESTAMP, TimestampMinMaxFilter::LLVM_CLASS_NAME},
+    {PrimitiveType::TYPE_DATE, DateMinMaxFilter::LLVM_CLASS_NAME},
     {PrimitiveType::TYPE_DECIMAL, DecimalMinMaxFilter::LLVM_CLASS_NAME}};
 
 static std::unordered_map<int, IRFunction::Type> MIN_MAX_FILTER_IR_FUNCTION_TYPES = {
@@ -52,7 +54,8 @@ static std::unordered_map<int, IRFunction::Type> MIN_MAX_FILTER_IR_FUNCTION_TYPE
     {PrimitiveType::TYPE_FLOAT, IRFunction::FLOAT_MIN_MAX_FILTER_INSERT},
     {PrimitiveType::TYPE_DOUBLE, IRFunction::DOUBLE_MIN_MAX_FILTER_INSERT},
     {PrimitiveType::TYPE_STRING, IRFunction::STRING_MIN_MAX_FILTER_INSERT},
-    {PrimitiveType::TYPE_TIMESTAMP, IRFunction::TIMESTAMP_MIN_MAX_FILTER_INSERT}};
+    {PrimitiveType::TYPE_TIMESTAMP, IRFunction::TIMESTAMP_MIN_MAX_FILTER_INSERT},
+    {PrimitiveType::TYPE_DATE, IRFunction::DATE_MIN_MAX_FILTER_INSERT}};
 
 static std::unordered_map<int, IRFunction::Type>
     DECIMAL_MIN_MAX_FILTER_IR_FUNCTION_TYPES = {
@@ -332,63 +335,61 @@ void StringMinMaxFilter::SetAlwaysTrue() {
   max_.len = 0;
 }
 
-// TIMESTAMP
-const char* TimestampMinMaxFilter::LLVM_CLASS_NAME =
-    "class.impala::TimestampMinMaxFilter";
-
-TimestampMinMaxFilter::TimestampMinMaxFilter(const MinMaxFilterPB& protobuf) {
-  always_false_ = protobuf.always_false();
-  if (!always_false_) {
-    DCHECK(protobuf.min().has_timestamp_val());
-    DCHECK(protobuf.max().has_timestamp_val());
-    min_ = TimestampValue::FromColumnValuePB(protobuf.min());
-    max_ = TimestampValue::FromColumnValuePB(protobuf.max());
+// TIMESTAMP and DATE
+#define DATE_TIME_MIN_MAX_FILTER_FUNCS(NAME, TYPE, PROTOBUF_TYPE, PRIMITIVE_TYPE)      \
+  const char* NAME##MinMaxFilter::LLVM_CLASS_NAME =                                    \
+      "class.impala::" #NAME "MinMaxFilter";                                           \
+  NAME##MinMaxFilter::NAME##MinMaxFilter(const MinMaxFilterPB& protobuf) {             \
+    always_false_ = protobuf.always_false();                                           \
+    if (!always_false_) {                                                              \
+      DCHECK(protobuf.min().has_##PROTOBUF_TYPE##_val());                              \
+      DCHECK(protobuf.max().has_##PROTOBUF_TYPE##_val());                              \
+      min_ = TYPE::FromColumnValuePB(protobuf.min());                                  \
+      max_ = TYPE::FromColumnValuePB(protobuf.max());                                  \
+    }                                                                                  \
+  }                                                                                    \
+  PrimitiveType NAME##MinMaxFilter::type() {                                           \
+    return PrimitiveType::TYPE_##PRIMITIVE_TYPE;                                       \
+  }                                                                                    \
+  void NAME##MinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {                \
+    if (!always_false_) {                                                              \
+      min_.ToColumnValuePB(protobuf->mutable_min());                                   \
+      max_.ToColumnValuePB(protobuf->mutable_max());                                   \
+    }                                                                                  \
+    protobuf->set_always_false(always_false_);                                         \
+    protobuf->set_always_true(false);                                                  \
+  }                                                                                    \
+  string NAME##MinMaxFilter::DebugString() const {                                     \
+    stringstream out;                                                                  \
+    out << #NAME << "MinMaxFilter(min=" << min_ << ", max=" << max_                    \
+        << ", always_false=" << (always_false_ ? "true" : "false") << ")";             \
+    return out.str();                                                                  \
+  }                                                                                    \
+  void NAME##MinMaxFilter::Or(const MinMaxFilterPB& in, MinMaxFilterPB* out) {         \
+    if (out->always_false()) {                                                         \
+      out->mutable_min()->set_##PROTOBUF_TYPE##_val(in.min().PROTOBUF_TYPE##_val());   \
+      out->mutable_max()->set_##PROTOBUF_TYPE##_val(in.max().PROTOBUF_TYPE##_val());   \
+      out->set_always_false(false);                                                    \
+    } else {                                                                           \
+      TYPE in_min_val = TYPE::FromColumnValuePB(in.min());                             \
+      TYPE out_min_val = TYPE::FromColumnValuePB(out->min());                          \
+      if (in_min_val < out_min_val) {                                                  \
+        out->mutable_min()->set_##PROTOBUF_TYPE##_val(in.min().PROTOBUF_TYPE##_val()); \
+      }                                                                                \
+      TYPE in_max_val = TYPE::FromColumnValuePB(in.max());                             \
+      TYPE out_max_val = TYPE::FromColumnValuePB(out->max());                          \
+      if (in_max_val > out_max_val) {                                                  \
+        out->mutable_max()->set_##PROTOBUF_TYPE##_val(in.max().PROTOBUF_TYPE##_val()); \
+      }                                                                                \
+    }                                                                                  \
+  }                                                                                    \
+  void NAME##MinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {       \
+    out->mutable_min()->set_##PROTOBUF_TYPE##_val(in.min().PROTOBUF_TYPE##_val());     \
+    out->mutable_max()->set_##PROTOBUF_TYPE##_val(in.max().PROTOBUF_TYPE##_val());     \
   }
-}
 
-PrimitiveType TimestampMinMaxFilter::type() {
-  return PrimitiveType::TYPE_TIMESTAMP;
-}
-
-void TimestampMinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {
-  if (!always_false_) {
-    min_.ToColumnValuePB(protobuf->mutable_min());
-    max_.ToColumnValuePB(protobuf->mutable_max());
-  }
-  protobuf->set_always_false(always_false_);
-  protobuf->set_always_true(false);
-}
-
-string TimestampMinMaxFilter::DebugString() const {
-  stringstream out;
-  out << "TimestampMinMaxFilter(min=" << min_ << ", max=" << max_
-      << " always_false=" << (always_false_ ? "true" : "false") << ")";
-  return out.str();
-}
-
-void TimestampMinMaxFilter::Or(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
-  if (out->always_false()) {
-    out->mutable_min()->set_timestamp_val(in.min().timestamp_val());
-    out->mutable_max()->set_timestamp_val(in.max().timestamp_val());
-    out->set_always_false(false);
-  } else {
-    TimestampValue in_min_val = TimestampValue::FromColumnValuePB(in.min());
-    TimestampValue out_min_val = TimestampValue::FromColumnValuePB(out->min());
-    if (in_min_val < out_min_val) {
-      out->mutable_min()->set_timestamp_val(in.min().timestamp_val());
-    }
-    TimestampValue in_max_val = TimestampValue::FromColumnValuePB(in.max());
-    TimestampValue out_max_val = TimestampValue::FromColumnValuePB(out->max());
-    if (in_max_val > out_max_val) {
-      out->mutable_max()->set_timestamp_val(in.max().timestamp_val());
-    }
-  }
-}
-
-void TimestampMinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
-  out->mutable_min()->set_timestamp_val(in.min().timestamp_val());
-  out->mutable_max()->set_timestamp_val(in.max().timestamp_val());
-}
+DATE_TIME_MIN_MAX_FILTER_FUNCS(Timestamp, TimestampValue, timestamp, TIMESTAMP);
+DATE_TIME_MIN_MAX_FILTER_FUNCS(Date, DateValue, date, DATE);
 
 // DECIMAL
 const char* DecimalMinMaxFilter::LLVM_CLASS_NAME = "class.impala::DecimalMinMaxFilter";
@@ -568,6 +569,8 @@ MinMaxFilter* MinMaxFilter::Create(
       return pool->Add(new StringMinMaxFilter(mem_tracker));
     case PrimitiveType::TYPE_TIMESTAMP:
       return pool->Add(new TimestampMinMaxFilter());
+    case PrimitiveType::TYPE_DATE:
+      return pool->Add(new DateMinMaxFilter());
     case PrimitiveType::TYPE_DECIMAL:
       return pool->Add(new DecimalMinMaxFilter(type.precision));
     default:
@@ -597,6 +600,8 @@ MinMaxFilter* MinMaxFilter::Create(const MinMaxFilterPB& protobuf, ColumnType ty
       return pool->Add(new StringMinMaxFilter(protobuf, mem_tracker));
     case PrimitiveType::TYPE_TIMESTAMP:
       return pool->Add(new TimestampMinMaxFilter(protobuf));
+    case PrimitiveType::TYPE_DATE:
+      return pool->Add(new DateMinMaxFilter(protobuf));
     case PrimitiveType::TYPE_DECIMAL:
       return pool->Add(new DecimalMinMaxFilter(protobuf, type.precision));
     default:
@@ -657,6 +662,10 @@ void MinMaxFilter::Or(
     DCHECK(out->min().has_timestamp_val());
     TimestampMinMaxFilter::Or(in, out);
     return;
+  } else if (in.min().has_date_val()) {
+    DCHECK(out->min().has_date_val());
+    DateMinMaxFilter::Or(in, out);
+    return;
   } else if (in.min().has_decimal_val()) {
     DCHECK(out->min().has_decimal_val());
     DecimalMinMaxFilter::Or(in, out, columnType.precision);
@@ -702,6 +711,10 @@ void MinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
   } else if (in.min().has_timestamp_val()) {
     DCHECK(!out->min().has_timestamp_val());
     TimestampMinMaxFilter::Copy(in, out);
+    return;
+  } else if (in.min().has_date_val()) {
+    DCHECK(!out->min().has_date_val());
+    DateMinMaxFilter::Copy(in, out);
     return;
   } else if (in.min().has_decimal_val()) {
     DCHECK(!out->min().has_decimal_val());

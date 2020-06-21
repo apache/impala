@@ -57,21 +57,25 @@ void StringMinMaxFilter::Insert(const void* val) {
   }
 }
 
-void TimestampMinMaxFilter::Insert(const void* val) {
-  if (val == nullptr) return;
-  const TimestampValue* value = reinterpret_cast<const TimestampValue*>(val);
-  if (always_false_) {
-    min_ = *value;
-    max_ = *value;
-    always_false_ = false;
-  } else {
-    if (*value < min_) {
-      min_ = *value;
-    } else if (*value > max_) {
-      max_ = *value;
-    }
+#define DATE_TIME_MIN_MAX_FILTER_INSERT(NAME, TYPE)         \
+  void NAME##MinMaxFilter::Insert(const void* val) {        \
+    if (val == nullptr) return;                             \
+    const TYPE* value = reinterpret_cast<const TYPE*>(val); \
+    if (always_false_) {                                    \
+      min_ = *value;                                        \
+      max_ = *value;                                        \
+      always_false_ = false;                                \
+    } else {                                                \
+      if (*value < min_) {                                  \
+        min_ = *value;                                      \
+      } else if (*value > max_) {                           \
+        max_ = *value;                                      \
+      }                                                     \
+    }                                                       \
   }
-}
+
+DATE_TIME_MIN_MAX_FILTER_INSERT(Timestamp, TimestampValue);
+DATE_TIME_MIN_MAX_FILTER_INSERT(Date, DateValue);
 
 #define INSERT_DECIMAL_MINMAX(SIZE)                         \
   do {                                                      \

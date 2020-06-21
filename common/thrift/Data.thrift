@@ -30,6 +30,7 @@ struct TColumnValue {
   8: optional binary binary_val
   9: optional binary timestamp_val
  10: optional binary decimal_val
+ 11: optional i32 date_val
 }
 
 struct TResultRow {

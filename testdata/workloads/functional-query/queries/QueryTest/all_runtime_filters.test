@@ -369,8 +369,6 @@ aggregation(SUM, ProbeRows): 732
 row_regex: .*2 of 2 Runtime Filters Published.*
 ====
 ---- QUERY
-# TODO update the runtime profile for this test case when IMPALA-9294
-#   (Support Kudu Date Min/Max Filters) is fixed.
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 select STRAIGHT_JOIN count(*) from date_tbl a
 join [BROADCAST] date_tbl b
@@ -379,7 +377,7 @@ where a.date_col = b.date_col and b.date_col = DATE '2017-11-28'
 9
 ---- RUNTIME_PROFILE
 aggregation(SUM, ProbeRows): 3
-row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*2 of 2 Runtime Filters Published.*
 ====
 
 
