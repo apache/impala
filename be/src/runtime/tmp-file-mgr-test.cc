@@ -278,7 +278,7 @@ TEST_F(TmpFileMgrTest, TestFileAllocation) {
   // tmp file is only allocated on writes.
   EXPECT_OK(FileSystemUtil::CreateFile(file->path()));
   file_group.Close();
-  EXPECT_FALSE(boost::filesystem::exists(file->path()));
+  EXPECT_FALSE(boost::filesystem::exists(file_path));
   CheckMetrics(&tmp_file_mgr);
 }
 
