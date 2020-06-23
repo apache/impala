@@ -1159,6 +1159,14 @@ public class CatalogdMetaProvider implements MetaProvider {
         continue;
       }
 
+      if (!isDelete && obj.type == TCatalogObjectType.HDFS_PARTITION) {
+        // Skip if this is the update for a new partition.
+        if (!obj.hdfs_partition.isSetPrev_id()) continue;
+        // This is an update from an existing partiton. Invalidate the previous partition
+        // instance by resetting the id to the previous one.
+        obj.hdfs_partition.setId(obj.hdfs_partition.prev_id);
+        obj.hdfs_partition.unsetPrev_id();
+      }
       invalidateCacheForObject(obj);
 
       if (obj.type == TCatalogObjectType.HDFS_CACHE_POOL) {
@@ -1373,6 +1381,10 @@ public class CatalogdMetaProvider implements MetaProvider {
           ImmutableList.of(DbCacheKey.DbInfoType.TABLE_LIST),
           invalidated);
       break;
+    case HDFS_PARTITION:
+      invalidateCacheForPartition(obj.hdfs_partition.db_name, obj.hdfs_partition.tbl_name,
+          obj.hdfs_partition.partition_name, obj.hdfs_partition.id, invalidated);
+      break;
     case FUNCTION:
       // Same as above: if we see a function, it might be new or deleted and we should
       // refresh the list of functions in the DB to be safe.
@@ -1398,7 +1410,6 @@ public class CatalogdMetaProvider implements MetaProvider {
           DbCacheKey.DbInfoType.HMS_METADATA,
           DbCacheKey.DbInfoType.FUNCTION_NAMES), invalidated);
       break;
-
     default:
       break;
     }
@@ -1431,6 +1442,19 @@ public class CatalogdMetaProvider implements MetaProvider {
     TableCacheKey key = new TableCacheKey(dbName.toLowerCase(), tblName.toLowerCase());
     if (cache_.asMap().remove(key) != null) {
       invalidated.add("table " + dbName + "." + tblName);
+    }
+  }
+
+  /**
+   * Invalidate cached metadata for the given partition. If anything was invalidated, adds
+   * a human-readable string to 'invalidated' indicating the invalidated metadata.
+   */
+  private void invalidateCacheForPartition(String dbName, String tblName, String partName,
+      long partitionId, List<String> invalidated) {
+    PartitionCacheKey key = new PartitionCacheKey(partitionId);
+    if (cache_.asMap().remove(key) != null) {
+      invalidated.add(String.format("partition %s.%s:%s (id=%d)",
+          dbName, tblName, partName, partitionId));
     }
   }
 

@@ -25,10 +25,12 @@ import org.apache.impala.thrift.TCatalogObjectType;
 public interface CatalogObject extends HasName {
 
   /**
-   * Catalog objects are often serialized to Thrift. When doing so, many of the
-   * objects have a minimal "descriptor" form used in query execution as well as
-   * a more complete "full" form with all information, used when transferring the
-   * catalog object from catalogd to the impalads.
+   * Catalog objects are often serialized to Thrift. When doing so, many of the objects
+   * have a minimal "descriptor" form used in query execution as well as a more complete
+   * "full" form with all information, used in catalog topic updates and DDL responses to
+   * coordinators. When sending incremental update for a hdfs table, its "descriptor" form
+   * is used with no partitions. Its incremental partition updates will follow it in the
+   * same topic update.
    */
   static enum ThriftObjectType {
     FULL,

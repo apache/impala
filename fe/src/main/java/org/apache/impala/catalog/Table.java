@@ -508,6 +508,14 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   }
 
   public TCatalogObject toMinimalTCatalogObject() {
+    return toMinimalTCatalogObjectHelper();
+  }
+
+  /**
+   * Helper method for generating the minimal catalog object. toMinimalTCatalogObject()
+   * may be overrided by subclasses so we put the general implementation here.
+   */
+  private TCatalogObject toMinimalTCatalogObjectHelper() {
     TCatalogObject catalogObject =
         new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
     catalogObject.setTable(new TTable());
@@ -519,12 +527,12 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   /**
    * Override parent implementation that will finally call toThrift() which requires
    * holding the table lock. However, it's not guaranteed that caller holds the table
-   * lock (IMPALA-9136). Here we use toMinimalTCatalogObject() directly since only db
-   * name and table name are needed.
+   * lock (IMPALA-9136). Here we use toMinimalTCatalogObjectHelper() directly since only
+   * db name and table name are needed.
    */
   @Override
   public final String getUniqueName() {
-    return Catalog.toCatalogObjectKey(toMinimalTCatalogObject());
+    return Catalog.toCatalogObjectKey(toMinimalTCatalogObjectHelper());
   }
 
   @Override

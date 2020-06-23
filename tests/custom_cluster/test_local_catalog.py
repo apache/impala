@@ -161,6 +161,60 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=true",
     catalogd_args="--catalog_topic_mode=minimal")
+  def test_invalidate_stale_partitions(self, unique_database):
+    """
+    Test that partition level invalidations are sent from catalogd and processed
+    correctly in coordinators.
+    TODO: Currently, there are no ways to get the cached partition ids in a LocalCatalog
+     coordinator. So this test infers them based on the query pattern. However, this
+     depends on the implementation details of catalogd which will evolve and may have to
+     change the partition ids in this test. A more robust ways is a) get the cached
+     partition id of a partition, b) run a DML on this partition, c) verify the old
+     partition id is invalidate.
+    """
+    # Creates a partitioned table and inits 3 partitions on it. They are the first 3
+    # partitions loaded in catalogd. So their partition ids are 0,1,2.
+    self.execute_query("use " + unique_database)
+    self.execute_query("create table my_part (id int) partitioned by (p int)")
+    self.execute_query("alter table my_part add partition (p=0)")
+    self.execute_query("alter table my_part add partition (p=1)")
+    self.execute_query("alter table my_part add partition (p=2)")
+    # Trigger a query on all partitions so they are loaded in local catalog cache.
+    self.execute_query("select count(*) from my_part")
+    # Update all partitions. We should receive invalidations for partition id=0,1,2.
+    self.execute_query("insert into my_part partition(p) values (0,0),(1,1),(2,2)")
+
+    log_regex = "Invalidated objects in cache: \[partition %s.my_part:p=\d \(id=%%d\)\]"\
+                % unique_database
+    self.assert_impalad_log_contains('INFO', log_regex % 0)
+    self.assert_impalad_log_contains('INFO', log_regex % 1)
+    self.assert_impalad_log_contains('INFO', log_regex % 2)
+
+    # Trigger a query on all partitions so partitions with id=3,4,5 are loaded in local
+    # catalog cache.
+    self.execute_query("select count(*) from my_part")
+    # Update all partitions. We should receive invalidations for partition id=3,4,5.
+    # The new partitions are using id=6,7,8.
+    self.execute_query(
+        "insert overwrite my_part partition(p) values (0,0),(1,1),(2,2)")
+    self.assert_impalad_log_contains('INFO', log_regex % 3)
+    self.assert_impalad_log_contains('INFO', log_regex % 4)
+    self.assert_impalad_log_contains('INFO', log_regex % 5)
+
+    # Repeat the same test on non-partitioned tables
+    self.execute_query("create table my_tbl (id int)")
+    # Trigger a query to load the only partition which has partition id = 9.
+    self.execute_query("select count(*) from my_tbl")
+    # Update the table. So we should receive an invalidation on partition id = 9.
+    self.execute_query("insert into my_tbl select 0")
+    self.assert_impalad_log_contains(
+        'INFO', "Invalidated objects in cache: \[partition %s.my_tbl: \(id=9\)\]"
+                % unique_database)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args="--use_local_catalog=true",
+    catalogd_args="--catalog_topic_mode=minimal")
   def test_global_invalidate_metadata_with_sync_ddl(self, unique_database):
     try:
       impalad1 = self.cluster.impalads[0]

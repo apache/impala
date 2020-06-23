@@ -57,7 +57,6 @@ import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.PartitionKeyValue;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
-import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -67,6 +66,7 @@ import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
+import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
@@ -126,6 +126,22 @@ import com.google.common.collect.Sets;
  * Owned by Catalog instance.
  * The partition keys constitute the clustering columns.
  *
+ * Partition metadata are propagated to coordinators in different ways depending on the
+ * topic update mode.
+ * 1. In v1 mode (topicMode = full), we only send the partitionIds in the thrift table
+ * which represents the current list of the partitions. Additionally, for each newly
+ * added/removed partition we send a THdfsPartition in the same topic update. However,
+ * coordinators detect the removal of any partitions by absence of an id inside
+ * partitionIds in the table object.
+ * 2. In v2 mode (topicMode = minimal), LocalCatalog coordinators only load what they need
+ * and hence we only send deleted partitionIds. Updated partitions are also treated as a
+ * special case of deleted partitions by sending the previous partitionId for such
+ * partitions so that LocalCatalog coordinators invalidate them proactively.
+ *
+ * In DDL/REFRESH responses, we are still sending the full thrift tables instead of
+ * sending incremental updates as in the topic updates. Because catalogd is not aware of
+ * the table states (partitionIds) of each coordinators. Generating incremental table
+ * updates requires a base status. This will be improved in IMPALA-9936 and IMPALA-9937.
  */
 public class HdfsTable extends Table implements FeFsTable {
   // Name of default partition for unpartitioned tables
@@ -268,6 +284,14 @@ public class HdfsTable extends Table implements FeFsTable {
   // finalized in the coming incremental metadata refresh (see updatePartitionsFromHms()
   // for more details). This map is only maintained in the catalogd.
   private final Map<Long, HdfsPartition.Builder> dirtyPartitions_ = new HashMap<>();
+
+  // The max id of all partitions of this table sent to coordinators. Partitions with ids
+  // larger than this are not known in coordinators.
+  private long maxSentPartitionId_ = HdfsPartition.INITIAL_PARTITION_ID - 1;
+
+  // Dropped partitions since last catalog update. These partitions need to be removed
+  // in coordinator's cache if there are no updates on them.
+  private final Set<HdfsPartition> droppedPartitions = new HashSet<>();
 
   // Represents a set of storage-related statistics aggregated at the table or partition
   // level.
@@ -849,11 +873,21 @@ public class HdfsTable extends Table implements FeFsTable {
       throw new CatalogException(String.format("Partition %s already exists in table %s",
           partition.getPartitionName(), getFullName()));
     }
+    addPartitionNoThrow(partition);
+  }
+
+  /**
+   * Adds the partition to the HdfsTable. Skips if a partition with the same partition id
+   * already exists.
+   */
+  public boolean addPartitionNoThrow(HdfsPartition partition) {
+    if (partitionMap_.containsKey(partition.getId())) return false;
     if (partition.getFileFormat() == HdfsFileFormat.AVRO) hasAvroData_ = true;
     partitionMap_.put(partition.getId(), partition);
     fileMetadataStats_.totalFileBytes += partition.getSize();
     fileMetadataStats_.numFiles += partition.getNumFileDescriptors();
     updatePartitionMdAndColStats(partition);
+    return true;
   }
 
   /**
@@ -915,6 +949,13 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
+   * The same as the above method but specifies the partition using the partition id.
+   */
+  public HdfsPartition dropPartition(long partitionId) {
+    return dropPartition(partitionMap_.get(partitionId));
+  }
+
+  /**
    * Drops a partition and updates partition column statistics. Returns the
    * HdfsPartition that was dropped or null if the partition does not exist.
    * If removeCacheDirective = true, any cache directive on the partition is removed.
@@ -939,10 +980,11 @@ public class HdfsTable extends Table implements FeFsTable {
             ", partition " + partition.getPartitionName() + ": ", e);
       }
     }
-    // dirtyPartitions_ is only maintained in the catalogd. nullPartitionIds_ and
-    // partitionValuesMap_ are only maintained in coordinators.
+    // dirtyPartitions_ and droppedPartitionIds are only maintained in the catalogd.
+    // nullPartitionIds_ and partitionValuesMap_ are only maintained in coordinators.
     if (!isStoredInImpaladCatalogCache()) {
       dirtyPartitions_.remove(partitionId);
+      droppedPartitions.add(partition.genMinimalPartition());
       return partition;
     }
     for (int i = 0; i < partition.getPartitionValues().size(); ++i) {
@@ -1180,6 +1222,9 @@ public class HdfsTable extends Table implements FeFsTable {
     // reload the locations only for those that changed.
     partBuilder.setFileDescriptors(oldPartition);
     partBuilder.setIsMarkedCached(isMarkedCached_);
+    // Keep track of the previous partition id, so we can send invalidation on the old
+    // partition instance to local catalog coordinators.
+    partBuilder.setPrevId(oldPartition.getId());
     long fileMdLoadTime = loadFileMetadataForPartitions(client,
         ImmutableList.of(partBuilder), /*isRefresh=*/true);
     setUnpartitionedTableStats(partBuilder);
@@ -1544,10 +1589,12 @@ public class HdfsTable extends Table implements FeFsTable {
     sqlConstraints_ =  SqlConstraints.fromThrift(hdfsTable.getSql_constraints());
     resetPartitions();
     try {
-      for (Map.Entry<Long, THdfsPartition> part: hdfsTable.getPartitions().entrySet()) {
-        addPartition(new HdfsPartition.Builder(this, part.getKey())
-            .fromThrift(part.getValue())
-            .build());
+      if (hdfsTable.has_full_partitions) {
+        for (THdfsPartition tPart : hdfsTable.getPartitions().values()) {
+          addPartition(new HdfsPartition.Builder(this, tPart.id)
+              .fromThrift(tPart)
+              .build());
+        }
       }
       prototypePartition_ =
           new HdfsPartition.Builder(this, CatalogObjectsConstants.PROTOTYPE_PARTITION_ID)
@@ -1562,6 +1609,19 @@ public class HdfsTable extends Table implements FeFsTable {
     if (hdfsTable.isSetValid_write_ids()) {
       validWriteIds_ = MetastoreShim.getValidWriteIdListFromThrift(
           getFullName(), hdfsTable.getValid_write_ids());
+    }
+  }
+
+  /**
+   * Validate that all expected partitions are set and not have any stale partitions.
+   */
+  public void validatePartitions(Set<Long> expectedPartitionIds)
+      throws TableLoadingException {
+    if (!partitionMap_.keySet().equals(expectedPartitionIds)) {
+      throw new TableLoadingException(String.format("Error applying incremental updates" +
+              " on table %s: missing partition ids %s, stale partition ids %s",
+          getFullName(), expectedPartitionIds.removeAll(partitionMap_.keySet()),
+          partitionMap_.keySet().removeAll(expectedPartitionIds)));
     }
   }
 
@@ -1584,6 +1644,108 @@ public class HdfsTable extends Table implements FeFsTable {
     table.setTable_type(TTableType.HDFS_TABLE);
     table.setHdfs_table(getTHdfsTable(ThriftObjectType.FULL, null));
     return table;
+  }
+
+  /**
+   * Just like toThrift but unset the full partition metadata in the partition map.
+   * So only the partition ids are contained. Used in catalogd to send partition updates
+   * individually in catalog topic updates.
+   */
+  public TTable toThriftWithMinimalPartitions() {
+    TTable table = super.toThrift();
+    table.setTable_type(TTableType.HDFS_TABLE);
+    // Specify an empty set to exclude all partitions.
+    THdfsTable hdfsTable = getTHdfsTable(ThriftObjectType.DESCRIPTOR_ONLY,
+        Collections.emptySet());
+    // Host indexes are still required by resolving incremental partition updates.
+    hdfsTable.setNetwork_addresses(hostIndex_.getList());
+    // Coordinators use the partition ids to detect stale and new partitions. Thrift
+    // doesn't allow null values in maps. So we still set non-null values here.
+    for (long partId : partitionMap_.keySet()) {
+      THdfsPartition part = new THdfsPartition();
+      part.setId(partId);
+      hdfsTable.putToPartitions(partId, part);
+    }
+    hdfsTable.setHas_full_partitions(false);
+    hdfsTable.setHas_partition_names(false);
+    table.setHdfs_table(hdfsTable);
+    return table;
+  }
+
+  /**
+   * Just likes super.toMinimalTCatalogObject() but also contains the minimal catalog
+   * objects of partitions in the returned result.
+   */
+  @Override
+  public TCatalogObject toMinimalTCatalogObject() {
+    TCatalogObject catalogObject = super.toMinimalTCatalogObject();
+    catalogObject.getTable().setTable_type(TTableType.HDFS_TABLE);
+    THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
+        nullPartitionKeyValue_, nullColumnValue_,
+        /*idToPartition=*/ new HashMap<>(),
+        /*prototypePartition=*/ new THdfsPartition());
+    for (HdfsPartition part : partitionMap_.values()) {
+      hdfsTable.partitions.put(part.getId(), part.toMinimalTHdfsPartition());
+    }
+    hdfsTable.setHas_full_partitions(false);
+    // The minimal catalog object of partitions contain the partition names.
+    hdfsTable.setHas_partition_names(true);
+    catalogObject.getTable().setHdfs_table(hdfsTable);
+    return catalogObject;
+  }
+
+  /**
+   * Gets the max sent partition id in previous catalog topic updates.
+   */
+  public long getMaxSentPartitionId() { return maxSentPartitionId_; }
+
+  /**
+   * Updates the max sent partition id in catalog topic updates.
+   */
+  public void setMaxSentPartitionId(long maxSentPartitionId) {
+    this.maxSentPartitionId_ = maxSentPartitionId;
+  }
+
+  /**
+   * Resets the max sent partition id in catalog topic updates. Used when statestore
+   * resarts and requires a full update from the catalogd.
+   */
+  public void resetMaxSentPartitionId() {
+    maxSentPartitionId_ = Catalog.INITIAL_CATALOG_VERSION - 1;
+  }
+
+  /**
+   * Gets the deleted/replaced partition instances since last catalog topic update.
+   */
+  public List<HdfsPartition> getDroppedPartitions() {
+    return ImmutableList.copyOf(droppedPartitions);
+  }
+
+  /**
+   * Clears the deleted/replaced partition instance set.
+   */
+  public void resetDroppedPartitions() { droppedPartitions.clear(); }
+
+  /**
+   * Gets catalog objects of new partitions since last catalog update. They are partitions
+   * that coordinators are not aware of.
+   */
+  public List<TCatalogObject> getNewPartitionsSinceLastUpdate() {
+    List<TCatalogObject> result = new ArrayList<>();
+    int numSkippedParts = 0;
+    for (HdfsPartition partition: partitionMap_.values()) {
+      if (partition.getId() <= maxSentPartitionId_) {
+        numSkippedParts++;
+        continue;
+      }
+      TCatalogObject catalogPart =
+          new TCatalogObject(TCatalogObjectType.HDFS_PARTITION, getCatalogVersion());
+      partition.setTCatalogObject(catalogPart);
+      result.add(catalogPart);
+    }
+    LOG.info("Skipped {} partitions of table {} in the incremental update",
+        numSkippedParts, getFullName());
+    return result;
   }
 
   public TGetPartialCatalogObjectResponse getPartialInfo(
@@ -1766,13 +1928,17 @@ public class HdfsTable extends Table implements FeFsTable {
 
     memUsageEstimate += fileMetadataStats_.numFiles * PER_FD_MEM_USAGE_BYTES +
         fileMetadataStats_.numBlocks * PER_BLOCK_MEM_USAGE_BYTES;
-    setEstimatedMetadataSize(memUsageEstimate);
-    setNumFiles(fileMetadataStats_.numFiles);
+    if (type == ThriftObjectType.FULL) {
+      // These metrics only make sense when we are collecting a FULL object.
+      setEstimatedMetadataSize(memUsageEstimate);
+      setNumFiles(fileMetadataStats_.numFiles);
+    }
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
         nullPartitionKeyValue_, nullColumnValue_, idToPartition, prototypePartition);
     hdfsTable.setAvroSchema(avroSchema_);
     hdfsTable.setSql_constraints(sqlConstraints_.toThrift());
     if (type == ThriftObjectType.FULL) {
+      hdfsTable.setHas_full_partitions(true);
       // Network addresses are used only by THdfsFileBlocks which are inside
       // THdfsFileDesc, so include network addreses only when including THdfsFileDesc.
       hdfsTable.setNetwork_addresses(hostIndex_.getList());

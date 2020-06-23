@@ -336,20 +336,21 @@ public abstract class FeCatalogUtils {
   public static THdfsPartition fsPartitionToThrift(FeFsPartition part,
       ThriftObjectType type) {
     HdfsStorageDescriptor sd = part.getInputFormatDescriptor();
-    THdfsPartition thriftHdfsPart = new THdfsPartition(
-        sd.getLineDelim(),
-        sd.getFieldDelim(),
-        sd.getCollectionDelim(),
-        sd.getMapKeyDelim(),
-        sd.getEscapeChar(),
-        sd.getFileFormat().toThrift(),
-        Expr.treesToThrift(part.getPartitionValues()),
-        sd.getBlockSize());
+    THdfsPartition thriftHdfsPart = new THdfsPartition();
+    thriftHdfsPart.setLineDelim(sd.getLineDelim());
+    thriftHdfsPart.setFieldDelim(sd.getFieldDelim());
+    thriftHdfsPart.setCollectionDelim(sd.getCollectionDelim());
+    thriftHdfsPart.setMapKeyDelim(sd.getMapKeyDelim());
+    thriftHdfsPart.setEscapeChar(sd.getEscapeChar());
+    thriftHdfsPart.setFileFormat(sd.getFileFormat().toThrift());
+    thriftHdfsPart.setPartitionKeyExprs(Expr.treesToThrift(part.getPartitionValues()));
+    thriftHdfsPart.setBlockSize(sd.getBlockSize());
     thriftHdfsPart.setId(part.getId());
     thriftHdfsPart.setLocation(part.getLocationAsThrift());
     if (part.getWriteId() >= 0)
       thriftHdfsPart.setWrite_id(part.getWriteId());
     if (type == ThriftObjectType.FULL) {
+      thriftHdfsPart.setPartition_name(part.getPartitionName());
       thriftHdfsPart.setStats(new TTableStats(part.getNumRows()));
       thriftHdfsPart.setAccess_level(part.getAccessLevel());
       thriftHdfsPart.setIs_marked_cached(part.isMarkedCached());
