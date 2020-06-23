@@ -41,6 +41,7 @@ import org.apache.impala.common.TransactionKeepalive.HeartbeatContext;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TFunction;
+import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TTable;
@@ -514,6 +515,7 @@ public abstract class Catalog implements AutoCloseable {
         }
         break;
       }
+      // TODO(IMPALA-9935): support HDFS_PARTITION
       case FUNCTION: {
         TFunction tfn = objectDesc.getFn();
         Function desc = Function.fromThrift(tfn);
@@ -624,6 +626,11 @@ public abstract class Catalog implements AutoCloseable {
         TTable tbl = catalogObject.getTable();
         return "TABLE:" + tbl.getDb_name().toLowerCase() + "." +
             tbl.getTbl_name().toLowerCase();
+      case HDFS_PARTITION:
+        THdfsPartition part = catalogObject.getHdfs_partition();
+        return "HDFS_PARTITION:" + part.getDb_name().toLowerCase() + "." +
+            part.getTbl_name().toLowerCase() + ":" +
+            Preconditions.checkNotNull(part.getPartition_name());
       case FUNCTION:
         return "FUNCTION:" + catalogObject.getFn().getName() + "(" +
             catalogObject.getFn().getSignature() + ")";

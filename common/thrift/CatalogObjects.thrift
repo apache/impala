@@ -42,6 +42,7 @@ enum TCatalogObjectType {
   HDFS_CACHE_POOL = 9
   // A catalog object type as a marker for authorization cache invalidation.
   AUTHZ_CACHE_INVALIDATION = 10
+  HDFS_PARTITION = 11
 }
 
 enum TTableType {
@@ -280,24 +281,26 @@ struct THdfsPartition {
   // as part of query plans and fragments.
   // ============================================================
 
-  1: required byte lineDelim
-  2: required byte fieldDelim
-  3: required byte collectionDelim
-  4: required byte mapKeyDelim
-  5: required byte escapeChar
-  6: required THdfsFileFormat fileFormat
+  1: optional byte lineDelim
+  2: optional byte fieldDelim
+  3: optional byte collectionDelim
+  4: optional byte mapKeyDelim
+  5: optional byte escapeChar
+  6: optional THdfsFileFormat fileFormat
 
   // These are Literal expressions
   7: list<Exprs.TExpr> partitionKeyExprs
-  8: required i32 blockSize
+  8: optional i32 blockSize
 
   10: optional THdfsPartitionLocation location
 
-  // Unique (in this table) id of this partition. May be set to
+  // Unique (in the catalog) id of this partition. May be set to
   // PROTOTYPE_PARTITION_ID when this object is used to describe
   // a partition which will be created as part of a query.
   14: optional i64 id
-
+  // The partition id of the previous instance that is replaced by this. Catalogd uses
+  // this to send invalidations of stale partition instances for catalog-v2 coordinators.
+  26: optional i64 prev_id = -1
 
   // ============================================================
   // Fields only included when the catalogd serializes a table to be
@@ -343,6 +346,12 @@ struct THdfsPartition {
 
   // For acid table, store last committed write id.
   20: optional i64 write_id
+
+  // These fields are required in catalog updates. Coordinators use them to locate the
+  // related partition.
+  23: optional string db_name
+  24: optional string tbl_name
+  25: optional string partition_name
 }
 
 // Constant partition ID used for THdfsPartition.prototype_partition below.
@@ -388,7 +397,16 @@ struct THdfsTable {
   // Map from partition id to partition metadata.
   // Does not include the special prototype partition with id=PROTOTYPE_PARTITION_ID --
   // that partition is separately included below.
+  // Partition metadata in the values can be empty (in cases only partition ids are used)
+  // or only contain the partition name. Reflected by the following flags.
   4: required map<i64, THdfsPartition> partitions
+  // True if the partition map contains full metadata of all partitions.
+  14: optional bool has_full_partitions
+  // True if the partition map contains partition names in all partition values.
+  // False if the partition map contains empty partition values. In this case, only the
+  // partition ids are usable.
+  // Only valid when has_full_partitions is false.
+  15: optional bool has_partition_names
 
   // Prototype partition, used when creating new partitions during insert.
   10: required THdfsPartition prototype_partition
@@ -728,4 +746,7 @@ struct TCatalogObject {
 
   // Set iff object type is AUTHZ_CACHE_INVALIDATION
   11: optional TAuthzCacheInvalidation authz_cache_invalidation
+
+  // Set iff object type is HDFS_PARTITION
+  12: optional THdfsPartition hdfs_partition
 }

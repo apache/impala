@@ -51,6 +51,8 @@ import org.apache.impala.fb.FbFileBlock;
 import org.apache.impala.fb.FbFileDesc;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
+import org.apache.impala.thrift.TCatalogObject;
+import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TExpr;
 import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.THdfsFileDesc;
@@ -84,8 +86,15 @@ import com.google.flatbuffers.FlatBufferBuilder;
  * in SHOW statements.
  * This class is supposed to be immutable. We should use HdfsPartition.Builder to create
  * new instances instead of updating the fields in-place.
+ * This class extends CatalogObjectImpl so catalogd can send partition metadata
+ * individually instead of carrying them inside the HdfsTable thrift objects. However, we
+ * don't explicitly have a different catalog version for Partitions - all the partitions
+ * of a HdfsTable will have the same catalogVersion as its parent table, because we use
+ * the partition id to identify a partition instance (snapshot). The catalog versions are
+ * not used actually.
  */
-public class HdfsPartition implements FeFsPartition, PrunablePartition {
+public class HdfsPartition extends CatalogObjectImpl
+    implements FeFsPartition, PrunablePartition {
   /**
    * Metadata for a single file in this partition.
    */
@@ -584,15 +593,22 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
         }
       };
 
+  public final static long INITIAL_PARTITION_ID = 0;
   private final static AtomicLong partitionIdCounter_ = new AtomicLong();
   private final HdfsTable table_;
   private final ImmutableList<LiteralExpr> partitionKeyValues_;
+  // Partition name generated from the partition keys and 'partitionKeyValues_'.
+  // An example is 'p1=v1/p2=v2/p3=v3'. Use this to avoid generating the name repeatedly.
+  private final String partName_;
   // estimated number of rows in partition; -1: unknown
   private final long numRows_;
 
   // A unique ID across the whole catalog for each partition, used to identify a partition
   // in the thrift representation of a table.
   private final long id_;
+  // The partition id of the previous instance that is replaced by this. Used to send
+  // partition level invalidation for catalog-v2 coordinators.
+  private final long prevId_;
 
   /*
    * Note: Although you can write multiple formats to a single partition (by changing
@@ -643,8 +659,8 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
   // it's not used in coordinators.
   private final InFlightEvents inFlightEvents_;
 
-  private HdfsPartition(HdfsTable table, long id, List<LiteralExpr> partitionKeyValues,
-      HdfsStorageDescriptor fileFormatDescriptor,
+  private HdfsPartition(HdfsTable table, long id, long prevId, String partName,
+      List<LiteralExpr> partitionKeyValues, HdfsStorageDescriptor fileFormatDescriptor,
       @Nonnull ImmutableList<byte[]> encodedFileDescriptors,
       ImmutableList<byte[]> encodedInsertFileDescriptors,
       ImmutableList<byte[]> encodedDeleteFileDescriptors,
@@ -655,6 +671,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       InFlightEvents inFlightEvents) {
     table_ = table;
     id_ = id;
+    prevId_ = prevId;
     partitionKeyValues_ = ImmutableList.copyOf(partitionKeyValues);
     fileFormatDescriptor_ = fileFormatDescriptor;
     encodedFileDescriptors_ = encodedFileDescriptors;
@@ -670,6 +687,11 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     numRows_ = numRows;
     writeId_ = writeId;
     inFlightEvents_ = inFlightEvents;
+    if (partName == null && id_ != CatalogObjectsConstants.PROTOTYPE_PARTITION_ID) {
+      partName_ = FeCatalogUtils.getPartitionName(this);
+    } else {
+      partName_ = partName;
+    }
   }
 
   @Override // FeFsPartition
@@ -684,9 +706,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
 
   @Override // FeFsPartition
   public String getPartitionName() {
-    // TODO: Consider storing the PartitionKeyValue in HdfsPartition. It would simplify
-    // this code would be useful in other places, such as fromThrift().
-    return FeCatalogUtils.getPartitionName(this);
+    return partName_;
   }
 
   @Override
@@ -966,10 +986,73 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       .toString();
   }
 
+  @Override // CatalogObjectImpl
+  final public long getCatalogVersion() {
+    throw new UnsupportedOperationException(
+        "Catalog version of the partition should not be used");
+  }
+
+  @Override // CatalogObjectImpl
+  final public void setCatalogVersion(long version) {
+    throw new UnsupportedOperationException(
+        "Catalog version of the partition should not be set");
+  }
+
+  @Override // CatalogObjectImpl
+  protected void setTCatalogObject(TCatalogObject catalogObject) {
+    catalogObject.setHdfs_partition(
+        FeCatalogUtils.fsPartitionToThrift(this, ThriftObjectType.FULL));
+    // Set the db and table names here instead of in FeCatalogUtils.fsPartitionToThrift(),
+    // because FeCatalogUtils.fsPartitionToThrift() is also used in generating DDL
+    // responses which don't require storing the names in each partition update.
+    // Note that DDL responses have full (not incremental) table metadata.
+    catalogObject.getHdfs_partition().setDb_name(table_.getDb().getName());
+    catalogObject.getHdfs_partition().setTbl_name(table_.getName());
+    catalogObject.getHdfs_partition().setPartition_name(partName_);
+    catalogObject.getHdfs_partition().setId(id_);
+    if (prevId_ != INITIAL_PARTITION_ID - 1) {
+      catalogObject.getHdfs_partition().setPrev_id(prevId_);
+    }
+  }
+
+  @Override // CatalogObject
+  public TCatalogObjectType getCatalogObjectType() {
+    return TCatalogObjectType.HDFS_PARTITION;
+  }
+
+  public TCatalogObject toMinimalTCatalogObject() {
+    // The catalog version is not used.
+    TCatalogObject catalogPart = new TCatalogObject(TCatalogObjectType.HDFS_PARTITION,
+        table_.getCatalogVersion());
+    catalogPart.setHdfs_partition(toMinimalTHdfsPartition());
+    return catalogPart;
+  }
+
+  public THdfsPartition toMinimalTHdfsPartition() {
+    THdfsPartition part = new THdfsPartition();
+    part.setDb_name(table_.getDb().getName());
+    part.setTbl_name(table_.getName());
+    part.setPartition_name(partName_);
+    part.setId(id_);
+    return part;
+  }
+
+  /**
+   * Generate a new instance with the minimal metadata for toMinimalTHdfsPartition().
+   */
+  public HdfsPartition genMinimalPartition() {
+    return new HdfsPartition.Builder(table_, id_)
+        .setPartitionName(partName_)
+        .setIsMinimalMode(true)
+        .build();
+  }
+
   public static class Builder {
     // For the meaning of these fields, see field comments of HdfsPartition.
     private HdfsTable table_;
     private long id_;
+    private long prevId_ = INITIAL_PARTITION_ID - 1;
+    private String partName_ = null;
     private List<LiteralExpr> partitionKeyValues_;
     private HdfsStorageDescriptor fileFormatDescriptor_ = null;
     private ImmutableList<byte[]> encodedFileDescriptors_;
@@ -988,6 +1071,9 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
 
     @Nullable
     private HdfsPartition oldInstance_ = null;
+    // True if we are generating a minimal partition instance for
+    // HdfsPartition.toMinimalTHdfsPartition()
+    private boolean isMinimalMode_ = false;
 
     public Builder(HdfsTable table, long id) {
       Preconditions.checkNotNull(table);
@@ -1002,6 +1088,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     public Builder(HdfsPartition partition) {
       this(partition.table_);
       oldInstance_ = partition;
+      prevId_ = oldInstance_.id_;
       partitionKeyValues_ = partition.partitionKeyValues_;
       fileFormatDescriptor_ = partition.fileFormatDescriptor_;
       setFileDescriptors(partition);
@@ -1032,11 +1119,12 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       }
       if (hmsParameters_ == null) hmsParameters_ = Collections.emptyMap();
       if (location_ == null) {
-        // Only prototype partitions can have null locations.
-        Preconditions.checkState(id_ == CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);
+        // Only prototype or minimal mode partitions can have null locations.
+        Preconditions.checkState(id_ == CatalogObjectsConstants.PROTOTYPE_PARTITION_ID
+            || isMinimalMode_);
       }
-      return new HdfsPartition(table_, id_, partitionKeyValues_, fileFormatDescriptor_,
-          encodedFileDescriptors_, encodedInsertFileDescriptors_,
+      return new HdfsPartition(table_, id_, prevId_, partName_, partitionKeyValues_,
+          fileFormatDescriptor_, encodedFileDescriptors_, encodedInsertFileDescriptors_,
           encodedDeleteFileDescriptors_, location_, isMarkedCached_, accessLevel_,
           hmsParameters_, cachedMsPartitionDescriptor_, partitionStats_,
           hasIncrementalStats_, numRows_, writeId_, inFlightEvents_);
@@ -1044,6 +1132,21 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
 
     public Builder setId(long id) {
       id_ = id;
+      return this;
+    }
+
+    public Builder setPrevId(long prevId) {
+      prevId_ = prevId;
+      return this;
+    }
+
+    public Builder setPartitionName(String partName) {
+      partName_ = partName;
+      return this;
+    }
+
+    public Builder setIsMinimalMode(boolean isMinimalMode) {
+      isMinimalMode_ = isMinimalMode;
       return this;
     }
 

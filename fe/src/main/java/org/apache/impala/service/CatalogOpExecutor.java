@@ -954,7 +954,8 @@ public class CatalogOpExecutor {
   private static void addTableToCatalogUpdate(Table tbl, TCatalogUpdateResult result) {
     Preconditions.checkNotNull(tbl);
     TCatalogObject updatedCatalogObject = tbl.toTCatalogObject();
-    // TODO(todd): if client is a 'v2' impalad, only send back invalidation
+    // TODO(IMPALA-9936): if client is a 'v2' impalad, only send back invalidation
+    // TODO(IMPALA-9937): if client is a 'v1' impalad, only send back incremental updates
     result.addToUpdated_catalog_objects(updatedCatalogObject);
     result.setVersion(updatedCatalogObject.getCatalog_version());
   }
@@ -1291,7 +1292,7 @@ public class CatalogOpExecutor {
             + "and IF NOT EXISTS was specified.");
       }
       Preconditions.checkNotNull(existingDb);
-      // TODO(todd): if client is a 'v2' impalad, only send back invalidation
+      // TODO(IMPALA-9936): if client is a 'v2' impalad, only send back invalidation
       resp.getResult().addToUpdated_catalog_objects(existingDb.toTCatalogObject());
       resp.getResult().setVersion(existingDb.getCatalogVersion());
       addSummary(resp, "Database already exists.");
@@ -1349,7 +1350,7 @@ public class CatalogOpExecutor {
       }
 
       Preconditions.checkNotNull(newDb);
-      // TODO(todd): if client is a 'v2' impalad, only send back invalidation
+      // TODO(IMPALA-9936): if client is a 'v2' impalad, only send back invalidation
       resp.result.addToUpdated_catalog_objects(newDb.toTCatalogObject());
       if (authzConfig_.isEnabled()) {
         authzManager_.updateDatabaseOwnerPrivilege(params.server_name, newDb.getName(),
@@ -3178,7 +3179,7 @@ public class CatalogOpExecutor {
           newTableName.toString()));
     }
     catalog_.addVersionsForInflightEvents(false, result.second, newCatalogVersion);
-    // TODO(todd): if client is a 'v2' impalad, only send back invalidation
+    // TODO(IMPALA-9936): if client is a 'v2' impalad, only send back invalidation
     response.result.addToRemoved_catalog_objects(result.first.toMinimalTCatalogObject());
     response.result.addToUpdated_catalog_objects(result.second.toTCatalogObject());
     response.result.setVersion(result.second.getCatalogVersion());
@@ -4236,6 +4237,9 @@ public class CatalogOpExecutor {
       if (tblWasRemoved.getRef()) {
         resp.getResult().addToRemoved_catalog_objects(updatedThriftTable);
       } else {
+        // TODO(IMPALA-9936): if client is a 'v2' impalad, only send back invalidation
+        // TODO(IMPALA-9937): if client is a 'v1' impalad, only send back incremental
+        //  updates
         resp.getResult().addToUpdated_catalog_objects(updatedThriftTable);
       }
 
@@ -4796,7 +4800,7 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(db);
     TCatalogObject updatedCatalogObject = db.toTCatalogObject();
     updatedCatalogObject.setCatalog_version(updatedCatalogObject.getCatalog_version());
-    // TODO(todd): if client is a 'v2' impalad, only send back invalidation
+    // TODO(IMPALA-9936): if client is a 'v2' impalad, only send back invalidation
     result.addToUpdated_catalog_objects(updatedCatalogObject);
     result.setVersion(updatedCatalogObject.getCatalog_version());
   }

@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import static org.apache.impala.thrift.TCatalogObjectType.HDFS_PARTITION;
 import static org.apache.impala.thrift.TCatalogObjectType.TABLE;
 
 import java.io.IOException;
@@ -86,6 +87,8 @@ import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.TGetPartitionStatsRequest;
 import org.apache.impala.thrift.THdfsFileDesc;
+import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TPartialCatalogInfo;
 import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TPartitionKeyValue;
@@ -94,11 +97,11 @@ import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TTableType;
 import org.apache.impala.thrift.TTableUsage;
 import org.apache.impala.thrift.TTableUsageMetrics;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateTableUsageRequest;
-import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.CatalogBlacklistUtils;
 import org.apache.impala.util.FunctionUtils;
@@ -727,6 +730,24 @@ public class CatalogServiceCatalog extends Catalog {
       case VIEW:
         min.setTable(new TTable(obj.table.db_name, obj.table.tbl_name));
         break;
+      case HDFS_PARTITION:
+        // LocalCatalog caches the partition meta only using the partition id as the key.
+        // But we still need to pass the db and table name for generating the topic entry
+        // key.
+        THdfsPartition partObject = new THdfsPartition();
+        partObject.setDb_name(obj.hdfs_partition.db_name);
+        partObject.setTbl_name(obj.hdfs_partition.tbl_name);
+        partObject.setPartition_name(obj.hdfs_partition.partition_name);
+        partObject.setId(obj.hdfs_partition.id);
+        if (obj.hdfs_partition.isSetPrev_id()) {
+          Preconditions.checkState(
+              obj.hdfs_partition.prev_id != HdfsPartition.INITIAL_PARTITION_ID - 1,
+              "Invalid partition id");
+          // For updates, coordinators can invalidate the old partition instance.
+          partObject.setPrev_id(obj.hdfs_partition.prev_id);
+        }
+        min.setHdfs_partition(partObject);
+        break;
       case CATALOG:
         // Sending the top-level catalog version is important for implementing SYNC_DDL.
         // This also allows impalads to detect a catalogd restart and invalidate the
@@ -760,9 +781,11 @@ public class CatalogServiceCatalog extends Catalog {
       return min;
     }
 
-    public boolean versionNotInRange(long version) {
+    boolean versionNotInRange(long version) {
       return version <= fromVersion || version > toVersion;
     }
+
+    boolean isFullUpdate() { return fromVersion == 0; }
   }
 
   /**
@@ -813,6 +836,28 @@ public class CatalogServiceCatalog extends Catalog {
       if (!ctx.updatedCatalogObjects.contains(
           Catalog.toCatalogObjectKey(removedObject))) {
         ctx.addCatalogObject(removedObject, true);
+      }
+      // If this is a HdfsTable, make sure we send deletes for removed partitions.
+      // So we won't leak partition topic entries in the statestored catalog topic.
+      if (removedObject.type == TCatalogObjectType.TABLE
+          && removedObject.getTable().getTable_type() == TTableType.HDFS_TABLE) {
+        THdfsTable hdfsTable = removedObject.getTable().getHdfs_table();
+        Preconditions.checkState(
+            !hdfsTable.has_full_partitions && hdfsTable.has_partition_names,
+            /*errorMessage*/hdfsTable);
+        for (THdfsPartition part : hdfsTable.partitions.values()) {
+          Preconditions.checkState(part.id >= HdfsPartition.INITIAL_PARTITION_ID
+              && part.db_name != null
+              && part.tbl_name != null
+              && part.partition_name != null, /*errorMessage*/part);
+          TCatalogObject removedPart = new TCatalogObject(HDFS_PARTITION,
+              removedObject.getCatalog_version());
+          removedPart.setHdfs_partition(part);
+          if (!ctx.updatedCatalogObjects.contains(
+              Catalog.toCatalogObjectKey(removedPart))) {
+            ctx.addCatalogObject(removedPart, true);
+          }
+        }
       }
     }
     // Each topic update should contain a single "TCatalog" object which is used to
@@ -1247,7 +1292,12 @@ public class CatalogServiceCatalog extends Catalog {
         return;
       }
       try {
-        catalogTbl.setTable(tbl.toThrift());
+        if (tbl instanceof HdfsTable) {
+          catalogTbl.setTable(((HdfsTable) tbl).toThriftWithMinimalPartitions());
+          addHdfsPartitionsToCatalogDelta((HdfsTable) tbl, ctx);
+        } else {
+          catalogTbl.setTable(tbl.toThrift());
+        }
       } catch (Exception e) {
         LOG.error(String.format("Error calling toThrift() on table %s: %s",
             tbl.getFullName(), e.getMessage()), e);
@@ -1258,6 +1308,30 @@ public class CatalogServiceCatalog extends Catalog {
     } finally {
       tbl.getLock().unlock();
     }
+  }
+
+  private void addHdfsPartitionsToCatalogDelta(HdfsTable hdfsTable,
+      GetCatalogDeltaContext ctx) throws TException {
+    // Reset the max sent partition id if we are collecting a full update (e.g. due to
+    // statestored restarts).
+    if (ctx.isFullUpdate()) hdfsTable.resetMaxSentPartitionId();
+
+    // Add updates for new partitions.
+    long maxSentId = hdfsTable.getMaxSentPartitionId();
+    for (TCatalogObject catalogPart : hdfsTable.getNewPartitionsSinceLastUpdate()) {
+      maxSentId = Math.max(maxSentId, catalogPart.getHdfs_partition().getId());
+      ctx.addCatalogObject(catalogPart, false);
+    }
+    hdfsTable.setMaxSentPartitionId(maxSentId);
+
+    for (HdfsPartition part : hdfsTable.getDroppedPartitions()) {
+      TCatalogObject removedPart = part.toMinimalTCatalogObject();
+      if (!ctx.updatedCatalogObjects.contains(
+          Catalog.toCatalogObjectKey(removedPart))) {
+        ctx.addCatalogObject(removedPart, true);
+      }
+    }
+    hdfsTable.resetDroppedPartitions();
   }
 
   /**
@@ -1830,6 +1904,13 @@ public class CatalogServiceCatalog extends Catalog {
       // db object due to concurrent INVALIDATE METADATA
       Db db = getDb(dbName);
       if (db == null) return null;
+      Table existingTbl = db.getTable(tblName);
+      if (existingTbl instanceof HdfsTable) {
+        // Add the old instance to the deleteLog_ so we can send isDeleted updates for
+        // its partitions.
+        existingTbl.setCatalogVersion(incrementAndGetCatalogVersion());
+        deleteLog_.addRemovedObject(existingTbl.toMinimalTCatalogObject());
+      }
       Table incompleteTable = IncompleteTable.createUninitializedTable(db, tblName);
       incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
       db.addTable(incompleteTable);
@@ -1927,6 +2008,12 @@ public class CatalogServiceCatalog extends Catalog {
       if (existingTbl == null ||
           existingTbl.getCatalogVersion() != expectedCatalogVersion) return existingTbl;
 
+      if (existingTbl instanceof HdfsTable) {
+        // Add the old instance to the deleteLog_ so we can send isDeleted updates for
+        // its stale partitions.
+        existingTbl.setCatalogVersion(incrementAndGetCatalogVersion());
+        deleteLog_.addRemovedObject(existingTbl.toMinimalTCatalogObject());
+      }
       updatedTbl.setCatalogVersion(incrementAndGetCatalogVersion());
       db.addTable(updatedTbl);
       return updatedTbl;
@@ -2116,6 +2203,12 @@ public class CatalogServiceCatalog extends Catalog {
         Table existingTable = removeTable(oldTableName.db_name, oldTableName.table_name);
         // Add the newTable only if oldTable existed.
         if (existingTable != null) {
+          if (existingTable instanceof HdfsTable) {
+            // Add the old instance to the deleteLog_ so we can send isDeleted updates for
+            // its partitions.
+            existingTable.setCatalogVersion(incrementAndGetCatalogVersion());
+            deleteLog_.addRemovedObject(existingTable.toMinimalTCatalogObject());
+          }
           Table incompleteTable = IncompleteTable.createUninitializedTable(newDb,
               newTableName.getTable_name());
           incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
