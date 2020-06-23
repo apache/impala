@@ -54,6 +54,8 @@ Status QueryDriver::RunFrontendPlanner(const TQueryCtx& query_ctx) {
   // this query.
   DCHECK(client_request_state_ != nullptr);
   DCHECK(exec_request_ != nullptr);
+  RETURN_IF_ERROR(
+      DebugAction(query_ctx.client_request.query_options, "FRONTEND_PLANNER"));
   RETURN_IF_ERROR(client_request_state_->UpdateQueryStatus(
       ExecEnv::GetInstance()->frontend()->GetExecRequest(
           query_ctx, exec_request_.get())));
