@@ -26,4 +26,5 @@ ENTRYPOINT ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/catalogd",\
      "-log_dir=/opt/impala/logs",\
      "-abort_on_config_error=false", "-state_store_host=statestored",\
      "-catalog_topic_mode=minimal", "-hms_event_polling_interval_s=0",\
-     "-invalidate_tables_on_memory_pressure=true"]
+     "-invalidate_tables_on_memory_pressure=true",\
+     "-use_resolved_hostname=true"]

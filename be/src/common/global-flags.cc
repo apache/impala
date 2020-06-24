@@ -35,6 +35,9 @@ DEFINE_string(hostname, "", "Hostname to use for this daemon, also used as part 
               "the Kerberos principal, if enabled. If not set, the system default will be"
               " used");
 
+DEFINE_bool(use_resolved_hostname, false, "If true, --hostname is resolved before use, "
+              "so that the IP address will be used everywhere instead of the hostname.");
+
 DEFINE_int32(be_port, 22000,
     "port on which thrift based ImpalaInternalService is exported");
 DEFINE_int32(krpc_port, 27000,
