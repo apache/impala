@@ -248,6 +248,10 @@ class QueryDriver {
   /// 'RunFrontendPlanner'.
   std::unique_ptr<TExecRequest> exec_request_;
 
+  /// The TExecRequest for the retried query. Created in
+  /// 'CreateRetriedClientRequestState'.
+  std::unique_ptr<TExecRequest> retry_exec_request_;
+
   /// Thread to process query retry requests. Done in a separate thread to avoid blocking
   /// control service RPC threads.
   std::unique_ptr<Thread> retry_query_thread_;
