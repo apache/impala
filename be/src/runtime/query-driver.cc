@@ -26,6 +26,7 @@
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
+#include "common/thread-debug-info.h"
 
 namespace impala {
 
@@ -275,7 +276,6 @@ void QueryDriver::RetryQueryFromThread(
   // 'client_request_state_' points to the original query and
   // 'retried_client_request_state_' points to the retried query.
   {
-    lock_guard<SpinLock> l(client_request_state_lock_);
     // Before exposing the new query, check if the original query was unregistered while
     // the new query was being created. If it was, then abort the new query.
     if (parent_server_->GetQueryDriver(query_id) == nullptr) {
@@ -283,6 +283,7 @@ void QueryDriver::RetryQueryFromThread(
       HandleRetryFailure(&status, &error_msg, request_state, retry_query_id);
       return;
     }
+    lock_guard<SpinLock> l(client_request_state_lock_);
     retried_client_request_state_ = move(retry_request_state);
   }
 
@@ -301,13 +302,23 @@ void QueryDriver::RetryQueryFromThread(
 void QueryDriver::CreateRetriedClientRequestState(ClientRequestState* request_state,
     unique_ptr<ClientRequestState>* retry_request_state,
     shared_ptr<ImpalaServer::SessionState>* session) {
-  parent_server_->PrepareQueryContext(&exec_request_->query_exec_request.query_ctx);
+  // Make a copy of the exec_request_ rather than re-using it. The copy is necessary
+  // because the exec_request_ might still be used by the Coordinator even after the
+  // query has been retried. Making a copy avoids any race conditions on the
+  // exec_request_ since the retry_exec_request_ needs to set a new query id on the
+  // TExecRequest object.
+  retry_exec_request_ = make_unique<TExecRequest>(*exec_request_);
+  TQueryCtx query_ctx = retry_exec_request_->query_exec_request.query_ctx;
+  parent_server_->PrepareQueryContext(&query_ctx);
+  retry_exec_request_->query_exec_request.__set_query_ctx(query_ctx);
+
+  ScopedThreadContext tdi_context(GetThreadDebugInfo(), query_ctx.query_id);
 
   // Create the ClientRequestState for the new query.
-  const TQueryCtx& query_ctx = exec_request_->query_exec_request.query_ctx;
   ExecEnv* exec_env = ExecEnv::GetInstance();
-  *retry_request_state = make_unique<ClientRequestState>(query_ctx, exec_env->frontend(),
-      parent_server_, *session, exec_request_.get(), request_state->parent_driver());
+  *retry_request_state =
+      make_unique<ClientRequestState>(query_ctx, exec_env->frontend(), parent_server_,
+          *session, retry_exec_request_.get(), request_state->parent_driver());
   (*retry_request_state)->SetOriginalId(request_state->query_id());
   (*retry_request_state)
       ->set_user_profile_access(
