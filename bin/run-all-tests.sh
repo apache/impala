@@ -46,6 +46,7 @@ fi
 # Run End-to-end Tests
 : ${EE_TEST:=true}
 : ${EE_TEST_FILES:=}
+: ${EE_TEST_SHARDS:=1}
 # Run JDBC Test
 : ${JDBC_TEST:=true}
 # Run Cluster Tests
@@ -158,6 +159,8 @@ LOG_DIR="${IMPALA_EE_TEST_LOGS_DIR}"
 # Enable core dumps
 ulimit -c unlimited || true
 
+TEST_RET_CODE=0
+
 # Helper function to start Impala cluster.
 start_impala_cluster() {
   # TODO: IMPALA-9812: remove --unlock_mt_dop when it is no longer needed.
@@ -165,6 +168,21 @@ start_impala_cluster() {
       "${IMPALA_HOME}/bin/start-impala-cluster.py" \
       --log_dir="${IMPALA_EE_TEST_LOGS_DIR}" \
       ${TEST_START_CLUSTER_ARGS} --impalad_args=--unlock_mt_dop=true
+}
+
+run_ee_tests() {
+  if [[ $# -gt 0 ]]; then
+    EXTRA_ARGS=${1}
+  else
+    EXTRA_ARGS=""
+  fi
+  # Run end-to-end tests.
+  # KERBEROS TODO - this will need to deal with ${KERB_ARGS}
+  if ! "${IMPALA_HOME}/tests/run-tests.py" ${COMMON_PYTEST_ARGS} \
+      ${RUN_TESTS_ARGS} ${EXTRA_ARGS} ${EE_TEST_FILES}; then
+    #${KERB_ARGS};
+    TEST_RET_CODE=1
+  fi
 }
 
 for i in $(seq 1 $NUM_TEST_ITERATIONS)
@@ -231,12 +249,25 @@ do
   fi
 
   if [[ "$EE_TEST" == true ]]; then
-    # Run end-to-end tests.
-    # KERBEROS TODO - this will need to deal with ${KERB_ARGS}
-    if ! "${IMPALA_HOME}/tests/run-tests.py" ${COMMON_PYTEST_ARGS} \
-        ${RUN_TESTS_ARGS} ${EE_TEST_FILES}; then
-      #${KERB_ARGS};
-      TEST_RET_CODE=1
+    if [[ ${EE_TEST_SHARDS} -lt 2 ]]; then
+      # For runs without sharding, avoid adding the "--shard_tests" parameter.
+      # Some test frameworks (e.g. the docker-based tests) use this.
+      run_ee_tests
+    else
+      # When the EE tests are sharded, it runs 1/Nth of the tests at a time, restarting
+      # Impala between the shards. There are two benefits:
+      # 1. It isolates errors so that if Impala crashes, the next shards will still run
+      #    with a fresh Impala.
+      # 2. For ASAN runs, resources accumulate over test execution, so tests get slower
+      #    over time (see IMPALA-9887). Running shards with regular restarts
+      #    substantially speeds up execution time.
+      #
+      # Shards are 1 indexed (i.e. 1/N through N/N). This shards both serial and
+      # parallel tests.
+      for (( shard_idx=1 ; shard_idx <= ${EE_TEST_SHARDS} ; shard_idx++ )); do
+        run_ee_tests "--shard_tests=$shard_idx/${EE_TEST_SHARDS}"
+        start_impala_cluster
+      done
     fi
   fi
 
