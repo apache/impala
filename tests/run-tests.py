@@ -282,22 +282,44 @@ if __name__ == "__main__":
     run(sys.argv[1:])
   else:
     print_metrics('connections')
+
+    # If using sharding, it is useful to include it in the output filenames so that
+    # different shards don't overwrite each other. If not using sharding, use the
+    # normal filenames. This does not validate the shard_tests argument.
+    shard_identifier = ""
+    shard_arg = None
+    for idx, arg in enumerate(sys.argv):
+      # This deliberately does not stop at the first occurrence. It continues through
+      # all the arguments to find the last occurrence of shard_tests.
+      if arg == "--shard_tests":
+        # Form 1: --shard_tests N/M (space separation => grab next argument)
+        assert idx + 1 < len(sys.argv), "shard_args expects an argument"
+        shard_arg = sys.argv[idx + 1]
+      elif "--shard_tests=" in arg:
+        # Form 2: --shard_tests=N/M
+        shard_arg = arg.replace("--shard_tests=", "")
+
+    if shard_arg:
+      # The shard argument is "N/M" where N <= M. Convert to a string that can be used
+      # in a filename.
+      shard_identifier = "_shard_{0}".format(shard_arg.replace("/", "_"))
+
     # First run query tests that need to be executed serially
     if not skip_serial:
       base_args = ['-m', 'execute_serially']
-      run(base_args + build_test_args('serial'))
+      run(base_args + build_test_args("serial{0}".format(shard_identifier)))
       print_metrics('connections')
 
     # Run the stress tests tests
     if not skip_stress:
       base_args = ['-m', 'stress', '-n', NUM_STRESS_CLIENTS]
-      run(base_args + build_test_args('stress'))
+      run(base_args + build_test_args("stress{0}".format(shard_identifier)))
       print_metrics('connections')
 
     # Run the remaining query tests in parallel
     if not skip_parallel:
       base_args = ['-m', 'not execute_serially and not stress', '-n', NUM_CONCURRENT_TESTS]
-      run(base_args + build_test_args('parallel'))
+      run(base_args + build_test_args("parallel{0}".format(shard_identifier)))
 
     # The total number of tests executed at this point is expected to be >0
     # If it is < 0 then the script needs to exit with a non-zero
@@ -306,7 +328,8 @@ if __name__ == "__main__":
       sys.exit(1)
 
     # Finally, validate impalad/statestored metrics.
-    args = build_test_args(base_name='verify-metrics', valid_dirs=['verifiers'])
+    args = build_test_args(base_name="verify-metrics{0}".format(shard_identifier),
+                           valid_dirs=['verifiers'])
     args.append('verifiers/test_verify_metrics.py')
     run(args)
 
