@@ -20,6 +20,7 @@
 #ifndef _HLL_HPP_
 #define _HLL_HPP_
 
+#include "common_defs.hpp"
 #include "HllUtil.hpp"
 
 #include <memory>
@@ -194,31 +195,16 @@ class hll_sketch_alloc final {
 
     /**
      * Human readable summary with optional detail
-     * @param os std::ostram to which the summary is written
      * @param summary if true, output the sketch summary
      * @param detail if true, output the internal data array
      * @param auxDetail if true, output the internal Aux array, if it exists.
      * @param all if true, outputs all entries including empty ones
      * @return human readable string with optional detail.
      */
-    std::ostream& to_string(std::ostream& os,
-                            bool summary = true,
-                            bool detail = false,
-                            bool aux_detail = false,
-                            bool all = false) const;
-
-    /**
-     * Human readable summary with optional detail
-     * @param summary if true, output the sketch summary
-     * @param detail if true, output the internal data array
-     * @param auxDetail if true, output the internal Aux array, if it exists.
-     * @param all if true, outputs all entries including empty ones
-     * @return human readable string with optional detail.
-     */
-    std::string to_string(bool summary = true,
-                          bool detail = false,
-                          bool aux_detail = false,
-                          bool all = false) const;
+    string<A> to_string(bool summary = true,
+                        bool detail = false,
+                        bool aux_detail = false,
+                        bool all = false) const;
 
     /**
      * Present the given std::string as a potential unique item.
@@ -547,63 +533,6 @@ class hll_union_alloc {
      */
     hll_sketch_alloc<A> get_result(target_hll_type tgt_type = HLL_4) const;
 
-    typedef vector_u8<A> vector_bytes; // alias for users
-
-    /**
-     * Serializes the sketch to a byte array, compacting data structures
-     * where feasible to eliminate unused storage in the serialized image.
-     * @param header_size_bytes Allows for PostgreSQL integration
-     */
-    vector_bytes serialize_compact() const;
-  
-    /**
-     * Serializes the sketch to a byte array, retaining all internal 
-     * data structures in their current form.
-     */
-    vector_bytes serialize_updatable() const;
-
-    /**
-     * Serializes the sketch to an ostream, compacting data structures
-     * where feasible to eliminate unused storage in the serialized image.
-     * @param os std::ostream to use for output.
-     */
-    void serialize_compact(std::ostream& os) const;
-
-    /**
-     * Serializes the sketch to an ostream, retaining all internal data
-     * structures in their current form.
-     * @param os std::ostream to use for output.
-     */
-    void serialize_updatable(std::ostream& os) const;
-
-    /**
-     * Human readable summary with optional detail
-     * @param os std::ostram to which the summary is written
-     * @param summary if true, output the sketch summary
-     * @param detail if true, output the internal data array
-     * @param auxDetail if true, output the internal Aux array, if it exists.
-     * @param all if true, outputs all entries including empty ones
-     * @return human readable string with optional detail.
-     */
-    std::ostream& to_string(std::ostream& os,
-                            bool summary = true,
-                            bool detail = false,
-                            bool aux_Detail = false,
-                            bool all = false) const;
-  
-    /**
-     * Human readable summary with optional detail
-     * @param summary if true, output the sketch summary
-     * @param detail if true, output the internal data array
-     * @param auxDetail if true, output the internal Aux array, if it exists.
-     * @param all if true, outputs all entries including empty ones
-     * @return human readable string with optional detail.
-     */
-    std::string to_string(bool summary = true,
-                          bool detail = false,
-                          bool aux_detail = false,
-                          bool all = false) const;
-
     /**
      * Update this union operator with the given sketch.
      * @param The given sketch.
@@ -741,12 +670,6 @@ class hll_union_alloc {
     int lg_max_k;
     hll_sketch_alloc<A> gadget;
 };
-
-template<typename A>
-static std::ostream& operator<<(std::ostream& os, const hll_sketch_alloc<A>& sketch);
-
-template<typename A>
-static std::ostream& operator<<(std::ostream& os, const hll_union_alloc<A>& union_in);
 
 /// convenience alias for hll_sketch with default allocator
 typedef hll_sketch_alloc<> hll_sketch;

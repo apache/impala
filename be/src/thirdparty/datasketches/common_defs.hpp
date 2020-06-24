@@ -17,24 +17,20 @@
  * under the License.
  */
 
-#ifndef _COMPOSITEINTERPOLATIONXTABLE_HPP_
-#define _COMPOSITEINTERPOLATIONXTABLE_HPP_
+#ifndef _COMMON_DEFS_HPP_
+#define _COMMON_DEFS_HPP_
 
+#include <cstdint>
+#include <string>
 #include <memory>
 
 namespace datasketches {
 
-template<typename A = std::allocator<char>>
-class CompositeInterpolationXTable {
-  public:
-    static int get_y_stride(int logK);
+static const uint64_t DEFAULT_SEED = 9001;
 
-    static const double* get_x_arr(int logK);
-    static int get_x_arr_length();
-};
+template<typename A> using AllocChar = typename std::allocator_traits<A>::template rebind_alloc<char>;
+template<typename A> using string = std::basic_string<char, std::char_traits<char>, AllocChar<A>>;
 
-}
+} // namespace
 
-#include "CompositeInterpolationXTable-internal.hpp"
-
-#endif /* _COMPOSITEINTERPOLATIONXTABLE_HPP_ */
+#endif // _COMMON_DEFS_HPP_

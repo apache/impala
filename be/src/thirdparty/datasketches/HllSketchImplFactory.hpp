@@ -56,7 +56,6 @@ CouponHashSet<A>* HllSketchImplFactory<A>::promoteListToSet(const CouponList<A>&
   for (auto coupon: list) {
     chSet->couponUpdate(coupon);
   }
-  chSet->putOutOfOrderFlag(true);
   return chSet;
 }
 

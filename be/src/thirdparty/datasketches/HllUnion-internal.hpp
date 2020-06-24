@@ -66,11 +66,6 @@ hll_union_alloc<A> hll_union_alloc<A>::deserialize(std::istream& is) {
 }
 
 template<typename A>
-static std::ostream& operator<<(std::ostream& os, const hll_union_alloc<A>& hllUnion) {
-  return hllUnion.to_string(os, true, true, false, false);
-}
-
-template<typename A>
 hll_sketch_alloc<A> hll_union_alloc<A>::get_result(target_hll_type target_type) const {
   return hll_sketch_alloc<A>(gadget, target_type);
 }
@@ -160,38 +155,6 @@ void hll_union_alloc<A>::coupon_update(const int coupon) {
     if (gadget.sketch_impl != nullptr) { gadget.sketch_impl->get_deleter()(gadget.sketch_impl); }
     gadget.sketch_impl = result;
   }
-}
-
-template<typename A>
-vector_u8<A> hll_union_alloc<A>::serialize_compact() const {
-  return gadget.serialize_compact();
-}
-
-template<typename A>
-vector_u8<A> hll_union_alloc<A>::serialize_updatable() const {
-  return gadget.serialize_updatable();
-}
-
-template<typename A>
-void hll_union_alloc<A>::serialize_compact(std::ostream& os) const {
-  return gadget.serialize_compact(os);
-}
-
-template<typename A>
-void hll_union_alloc<A>::serialize_updatable(std::ostream& os) const {
-  return gadget.serialize_updatable(os);
-}
-
-template<typename A>
-std::ostream& hll_union_alloc<A>::to_string(std::ostream& os, const bool summary,
-                                  const bool detail, const bool aux_detail, const bool all) const {
-  return gadget.to_string(os, summary, detail, aux_detail, all);
-}
-
-template<typename A>
-std::string hll_union_alloc<A>::to_string(const bool summary, const bool detail,
-                                   const bool aux_detail, const bool all) const {
-  return gadget.to_string(summary, detail, aux_detail, all);
 }
 
 template<typename A>
@@ -315,7 +278,7 @@ void hll_union_alloc<A>::union_impl(const hll_sketch_alloc<A>& sketch, const int
   if (src_impl->getCurMode() == LIST || src_impl->getCurMode() == SET) {
     if (dst_impl->isEmpty() && src_impl->getLgConfigK() == dst_impl->getLgConfigK()) {
       dst_impl = src_impl->copyAs(HLL_8);
-      gadget.sketch_impl->get_deleter()(gadget.sketch_impl); // gadget replaced
+      gadget.sketch_impl->get_deleter()(gadget.sketch_impl); // gadget to be replaced
     } else {
       const CouponList<A>* src = static_cast<const CouponList<A>*>(src_impl);
       for (auto coupon: *src) {
@@ -329,21 +292,22 @@ void hll_union_alloc<A>::union_impl(const hll_sketch_alloc<A>& sketch, const int
       const CouponList<A>* src = static_cast<const CouponList<A>*>(dst_impl);
       dst_impl = copy_or_downsample(src_impl, lg_max_k);
       static_cast<Hll8Array<A>*>(dst_impl)->mergeList(*src);
-      gadget.sketch_impl->get_deleter()(gadget.sketch_impl); // gadget replaced
+      gadget.sketch_impl->get_deleter()(gadget.sketch_impl); // gadget to be replaced
     } else { // gadget is HLL
       if (src_impl->getLgConfigK() < dst_impl->getLgConfigK()) {
         dst_impl = copy_or_downsample(dst_impl, sketch.get_lg_config_k());
-        gadget.sketch_impl->get_deleter()(gadget.sketch_impl); // gadget replaced
+        gadget.sketch_impl->get_deleter()(gadget.sketch_impl); // gadget to be replaced
       }
       const HllArray<A>* src = static_cast<const HllArray<A>*>(src_impl);
       static_cast<Hll8Array<A>*>(dst_impl)->mergeHll(*src);
       dst_impl->putOutOfOrderFlag(true);
+      static_cast<Hll8Array<A>*>(dst_impl)->putHipAccum(0);
     }
   } else { // src is HLL, gadget is empty
     dst_impl = copy_or_downsample(src_impl, lg_max_k);
-    gadget.sketch_impl->get_deleter()(gadget.sketch_impl); // gadget replaced
+    gadget.sketch_impl->get_deleter()(gadget.sketch_impl); // gadget to be replaced
   }
-  gadget.sketch_impl = dst_impl;
+  gadget.sketch_impl = dst_impl; // gadget replaced
 }
 
 }

@@ -1612,19 +1612,29 @@ BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
   return estimate;
 }
 
-/// Auxiliary function that receives an input type that has a serialize_compact()
-/// function (e.g. hll_sketch or hll_union) and returns the serialized version of it
-/// wrapped into a StringVal.
-/// Introducing this variable in the .cc to avoid including the whole DataSketches HLL
+/// Auxiliary function that receives a hll_sketch and returns the serialized version of
+/// it wrapped into a StringVal.
+/// Introducing this function in the .cc to avoid including the whole DataSketches HLL
 /// functionality into the header.
-template <typename T>
-StringVal SerializeCompactDsHll(FunctionContext* ctx, const T& input) {
+StringVal SerializeCompactDsHllSketch(FunctionContext* ctx,
+    const datasketches::hll_sketch& sketch) {
   std::stringstream serialized_input;
-  input.serialize_compact(serialized_input);
+  sketch.serialize_compact(serialized_input);
   std::string serialized_input_str = serialized_input.str();
   StringVal dst(ctx, serialized_input_str.size());
   memcpy(dst.ptr, serialized_input_str.c_str(), serialized_input_str.size());
   return dst;
+}
+
+/// Auxiliary function that receives a hll_union, gets the underlying HLL sketch from the
+/// union object and returns the serialized, compacted HLL sketch wrapped into StringVal.
+/// Introducing this function in the .cc to avoid including the whole DataSketches HLL
+/// functionality into the header.
+StringVal SerializeDsHllUnion(FunctionContext* ctx,
+    const datasketches::hll_union& ds_union) {
+  std::stringstream serialized_input;
+  datasketches::hll_sketch sketch = ds_union.get_result(DS_HLL_TYPE);
+  return SerializeCompactDsHllSketch(ctx, sketch);
 }
 
 void AggregateFunctions::DsHllInit(FunctionContext* ctx, StringVal* dst) {
@@ -1670,7 +1680,7 @@ StringVal AggregateFunctions::DsHllSerialize(FunctionContext* ctx,
   DCHECK_EQ(src.len, sizeof(datasketches::hll_sketch));
   datasketches::hll_sketch* sketch_ptr =
       reinterpret_cast<datasketches::hll_sketch*>(src.ptr);
-  StringVal dst = SerializeCompactDsHll(ctx, *sketch_ptr);
+  StringVal dst = SerializeCompactDsHllSketch(ctx, *sketch_ptr);
   ctx->Free(src.ptr);
   return dst;
 }
@@ -1711,7 +1721,7 @@ StringVal AggregateFunctions::DsHllFinalizeSketch(FunctionContext* ctx,
       reinterpret_cast<datasketches::hll_sketch*>(src.ptr);
   StringVal result_str = StringVal::null();
   if (sketch_ptr->get_estimate() > 0.0) {
-    result_str = SerializeCompactDsHll(ctx, *sketch_ptr);
+    result_str = SerializeCompactDsHllSketch(ctx, *sketch_ptr);
   }
   ctx->Free(src.ptr);
   return result_str;
@@ -1751,7 +1761,7 @@ StringVal AggregateFunctions::DsHllUnionSerialize(FunctionContext* ctx,
   DCHECK_EQ(src.len, sizeof(datasketches::hll_union));
   datasketches::hll_union* union_ptr =
       reinterpret_cast<datasketches::hll_union*>(src.ptr);
-  StringVal dst = SerializeCompactDsHll(ctx, *union_ptr);
+  StringVal dst = SerializeDsHllUnion(ctx, *union_ptr);
   ctx->Free(src.ptr);
   return dst;
 }
@@ -1762,13 +1772,14 @@ void AggregateFunctions::DsHllUnionMerge(
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::hll_union));
 
-  datasketches::hll_union src_union =
-      datasketches::hll_union::deserialize(reinterpret_cast<char*>(src.ptr), src.len);
+  // Note, 'src' is a serialized hll_sketch and not a serialized hll_union.
+  datasketches::hll_sketch src_sketch =
+      datasketches::hll_sketch::deserialize(reinterpret_cast<char*>(src.ptr), src.len);
 
   datasketches::hll_union* dst_union_ptr =
       reinterpret_cast<datasketches::hll_union*>(dst->ptr);
 
-  dst_union_ptr->update(src_union.get_result(DS_HLL_TYPE));
+  dst_union_ptr->update(src_sketch);
 }
 
 StringVal AggregateFunctions::DsHllUnionFinalize(FunctionContext* ctx,
@@ -1782,7 +1793,7 @@ StringVal AggregateFunctions::DsHllUnionFinalize(FunctionContext* ctx,
     ctx->Free(src.ptr);
     return StringVal::null();
   }
-  StringVal result = SerializeCompactDsHll(ctx, sketch);
+  StringVal result = SerializeCompactDsHllSketch(ctx, sketch);
   ctx->Free(src.ptr);
   return result;
 }
