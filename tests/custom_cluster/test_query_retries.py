@@ -32,8 +32,16 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.errors import Timeout
+from tests.common.skip import SkipIfEC
 
 
+# All tests in this class have SkipIfEC because all tests run a query and expect
+# the query to be retried when killing a random impalad. On EC this does not always work
+# because many queries that might run on three impalads for HDFS / S3 builds, might only
+# run on two instances on EC builds. The difference is that EC creates smaller tables
+# compared to data stored on HDFS / S3. If the query is only run on two instances, then
+# randomly killing one impalad won't necessarily trigger a retry of the query.
+@SkipIfEC.fix_later
 class TestQueryRetries(CustomClusterTestSuite):
 
   # A query that shuffles a lot of data. Useful when testing query retries since it
@@ -499,7 +507,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     if not retried_query_id_search: return None
     return retried_query_id_search.group(1)
 
-  def __wait_until_retried(self, handle, timeout=60):
+  def __wait_until_retried(self, handle, timeout=300):
     """Wait until the given query handle has been retried. This is achieved by polling the
     runtime profile of the query and checking the 'Retry Status' field."""
     retried_state = "RETRIED"
@@ -529,7 +537,8 @@ class TestQueryRetries(CustomClusterTestSuite):
   def __get_query_id_from_profile(self, profile):
     """Extracts and returns the query id of the given profile."""
     query_id_search = re.search("Query \(id=(.*)\)", profile)
-    assert query_id_search, "Invalid query profile, has no query id"
+    assert query_id_search, "Invalid query profile, has no query id:\n{0}".format(
+        profile)
     return query_id_search.group(1)
 
   def __get_original_query_profile(self, original_query_id):
@@ -602,6 +611,11 @@ class TestQueryRetries(CustomClusterTestSuite):
     # original query.
     assert "Retried Query Id: {0}".format(retried_query_id) \
         in original_runtime_profile, original_runtime_profile
+
+    # Assert that the original query ran on all three nodes. All queries scan tables
+    # large enough such that scan fragments are scheduled on all impalads.
+    assert re.search("PLAN FRAGMENT.*instances=3", original_runtime_profile), \
+        original_runtime_profile
 
   def __validate_web_ui_state(self):
     """Validate the state of the web ui after a query (or queries) have been retried.
