@@ -436,7 +436,7 @@ class BaseImpalaProcess(Process):
   def _get_arg_value(self, arg_name, default=None):
     """Gets the argument value for given argument name"""
     for arg in self.cmd:
-      if ('%s=' % arg_name) in arg.strip().lstrip('-'):
+      if arg.strip().lstrip('-').startswith('%s=' % arg_name):
         return arg.split('=')[1]
     if default is None:
       assert 0, "Argument '{0}' not found in cmd '{1}'.".format(arg_name, self.cmd)

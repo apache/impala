@@ -66,6 +66,7 @@ using namespace impala;
 DECLARE_bool(enable_process_lifetime_heap_profiling);
 DECLARE_string(heap_profile_dir);
 DECLARE_string(hostname);
+DECLARE_bool(use_resolved_hostname);
 // TODO: rename this to be more generic when we have a good CM release to do so.
 DECLARE_int32(logbufsecs);
 DECLARE_int32(max_log_files);
@@ -349,6 +350,14 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   LOG(INFO) << "Process ID: " << getpid();
   LOG(INFO) << "Default AES cipher mode for spill-to-disk: "
             << EncryptionKey::ModeToString(EncryptionKey::GetSupportedDefaultMode());
+
+  if (FLAGS_use_resolved_hostname) {
+    IpAddr ip_address;
+    Status status = HostnameToIpAddr(FLAGS_hostname, &ip_address);
+    if (!status.ok()) CLEAN_EXIT_WITH_ERROR(status.GetDetail());
+    LOG(INFO) << Substitute("Resolved hostname $0 to $1", FLAGS_hostname, ip_address);
+    FLAGS_hostname = ip_address;
+  }
 
   // Required for the FE's Catalog
   ABORT_IF_ERROR(impala::LibCache::Init());

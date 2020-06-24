@@ -23,4 +23,5 @@ FROM ${BASE_IMAGE}
 EXPOSE 25010
 
 ENTRYPOINT ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/statestored",\
-     "-log_dir=/opt/impala/logs"]
+     "-log_dir=/opt/impala/logs",\
+     "-use_resolved_hostname=true"]
