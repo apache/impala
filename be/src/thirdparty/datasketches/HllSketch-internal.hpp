@@ -25,6 +25,7 @@
 #include "HllSketchImplFactory.hpp"
 #include "CouponList.hpp"
 #include "HllArray.hpp"
+#include "common_defs.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -73,11 +74,6 @@ hll_sketch_alloc<A>::~hll_sketch_alloc() {
 }
 
 template<typename A>
-std::ostream& operator<<(std::ostream& os, const hll_sketch_alloc<A>& sketch) {
-  return sketch.to_string(os, true, true, false, false);
-}
-
-template<typename A>
 hll_sketch_alloc<A>::hll_sketch_alloc(const hll_sketch_alloc<A>& that) :
   sketch_impl(that.sketch_impl->copy())
 {}
@@ -123,7 +119,7 @@ template<typename A>
 void hll_sketch_alloc<A>::update(const std::string& datum) {
   if (datum.empty()) { return; }
   HashState hashResult;
-  HllUtil<A>::hash(datum.c_str(), datum.length(), HllUtil<A>::DEFAULT_UPDATE_SEED, hashResult);
+  HllUtil<A>::hash(datum.c_str(), datum.length(), DEFAULT_SEED, hashResult);
   coupon_update(HllUtil<A>::coupon(hashResult));
 }
 
@@ -131,7 +127,7 @@ template<typename A>
 void hll_sketch_alloc<A>::update(const uint64_t datum) {
   // no sign extension with 64 bits so no need to cast to signed value
   HashState hashResult;
-  HllUtil<A>::hash(&datum, sizeof(uint64_t), HllUtil<A>::DEFAULT_UPDATE_SEED, hashResult);
+  HllUtil<A>::hash(&datum, sizeof(uint64_t), DEFAULT_SEED, hashResult);
   coupon_update(HllUtil<A>::coupon(hashResult));
 }
 
@@ -153,7 +149,7 @@ void hll_sketch_alloc<A>::update(const uint8_t datum) {
 template<typename A>
 void hll_sketch_alloc<A>::update(const int64_t datum) {
   HashState hashResult;
-  HllUtil<A>::hash(&datum, sizeof(int64_t), HllUtil<A>::DEFAULT_UPDATE_SEED, hashResult);
+  HllUtil<A>::hash(&datum, sizeof(int64_t), DEFAULT_SEED, hashResult);
   coupon_update(HllUtil<A>::coupon(hashResult));
 }
 
@@ -161,7 +157,7 @@ template<typename A>
 void hll_sketch_alloc<A>::update(const int32_t datum) {
   int64_t val = static_cast<int64_t>(datum);
   HashState hashResult;
-  HllUtil<A>::hash(&val, sizeof(int64_t), HllUtil<A>::DEFAULT_UPDATE_SEED, hashResult);
+  HllUtil<A>::hash(&val, sizeof(int64_t), DEFAULT_SEED, hashResult);
   coupon_update(HllUtil<A>::coupon(hashResult));
 }
 
@@ -169,7 +165,7 @@ template<typename A>
 void hll_sketch_alloc<A>::update(const int16_t datum) {
   int64_t val = static_cast<int64_t>(datum);
   HashState hashResult;
-  HllUtil<A>::hash(&val, sizeof(int64_t), HllUtil<A>::DEFAULT_UPDATE_SEED, hashResult);
+  HllUtil<A>::hash(&val, sizeof(int64_t), DEFAULT_SEED, hashResult);
   coupon_update(HllUtil<A>::coupon(hashResult));
 }
 
@@ -177,7 +173,7 @@ template<typename A>
 void hll_sketch_alloc<A>::update(const int8_t datum) {
   int64_t val = static_cast<int64_t>(datum);
   HashState hashResult;
-  HllUtil<A>::hash(&val, sizeof(int64_t), HllUtil<A>::DEFAULT_UPDATE_SEED, hashResult);
+  HllUtil<A>::hash(&val, sizeof(int64_t), DEFAULT_SEED, hashResult);
   coupon_update(HllUtil<A>::coupon(hashResult));
 }
 
@@ -191,7 +187,7 @@ void hll_sketch_alloc<A>::update(const double datum) {
     d.longBytes = 0x7ff8000000000000L; // canonicalize NaN using value from Java's Double.doubleToLongBits()
   }
   HashState hashResult;
-  HllUtil<A>::hash(&d, sizeof(double), HllUtil<A>::DEFAULT_UPDATE_SEED, hashResult);
+  HllUtil<A>::hash(&d, sizeof(double), DEFAULT_SEED, hashResult);
   coupon_update(HllUtil<A>::coupon(hashResult));
 }
 
@@ -205,7 +201,7 @@ void hll_sketch_alloc<A>::update(const float datum) {
     d.longBytes = 0x7ff8000000000000L; // canonicalize NaN using value from Java's Double.doubleToLongBits()
   }
   HashState hashResult;
-  HllUtil<A>::hash(&d, sizeof(double), HllUtil<A>::DEFAULT_UPDATE_SEED, hashResult);
+  HllUtil<A>::hash(&d, sizeof(double), DEFAULT_SEED, hashResult);
   coupon_update(HllUtil<A>::coupon(hashResult));
 }
 
@@ -213,7 +209,7 @@ template<typename A>
 void hll_sketch_alloc<A>::update(const void* data, const size_t lengthBytes) {
   if (data == nullptr) { return; }
   HashState hashResult;
-  HllUtil<A>::hash(data, lengthBytes, HllUtil<A>::DEFAULT_UPDATE_SEED, hashResult);
+  HllUtil<A>::hash(data, lengthBytes, DEFAULT_SEED, hashResult);
   coupon_update(HllUtil<A>::coupon(hashResult));
 }
 
@@ -248,21 +244,11 @@ vector_u8<A> hll_sketch_alloc<A>::serialize_updatable() const {
 }
 
 template<typename A>
-std::string hll_sketch_alloc<A>::to_string(const bool summary,
-                                    const bool detail,
-                                    const bool aux_detail,
-                                    const bool all) const {
-  std::ostringstream oss;
-  to_string(oss, summary, detail, aux_detail, all);
-  return oss.str();
-}
-
-template<typename A>
-std::ostream& hll_sketch_alloc<A>::to_string(std::ostream& os,
-                                      const bool summary,
-                                      const bool detail,
-                                      const bool aux_detail,
-                                      const bool all) const {
+string<A> hll_sketch_alloc<A>::to_string(const bool summary,
+                                         const bool detail,
+                                         const bool aux_detail,
+                                         const bool all) const {
+  std::basic_ostringstream<char, std::char_traits<char>, AllocChar<A>> os;
   if (summary) {
     os << "### HLL sketch summary:" << std::endl
        << "  Log Config K   : " << get_lg_config_k() << std::endl
@@ -279,6 +265,10 @@ std::ostream& hll_sketch_alloc<A>::to_string(std::ostream& os,
          << "  HipAccum       : " << hllArray->getHipAccum() << std::endl
          << "  KxQ0           : " << hllArray->getKxQ0() << std::endl
          << "  KxQ1           : " << hllArray->getKxQ1() << std::endl;
+      if (get_target_type() == HLL_4) {
+        const Hll4Array<A>* hll4_ptr = static_cast<const Hll4Array<A>*>(sketch_impl);
+        os << "  Aux table?     : " << (hll4_ptr->getAuxHashMap() != nullptr ? "true" : "false") << std::endl;
+      }
     } else {
       os << "  Coupon count   : "
          << std::to_string(((CouponList<A>*) sketch_impl)->getCouponCount()) << std::endl;
@@ -350,7 +340,7 @@ std::ostream& hll_sketch_alloc<A>::to_string(std::ostream& os,
     }
   }
 
-  return os;
+  return os.str();
 }
 
 template<typename A>

@@ -175,7 +175,7 @@ void Hll4Array<A>::internalHll4Update(const int slotNo, const int newVal) {
       //assert(shiftedNewValue >= 0);
 
       if (rawStoredOldValue == HllUtil<A>::AUX_TOKEN) { // 879
-        // Given that we have an AUX_TOKEN, tehre are 4 cases for how to
+        // Given that we have an AUX_TOKEN, there are 4 cases for how to
         // actually modify the data structure
 
         if (shiftedNewValue >= HllUtil<A>::AUX_TOKEN) { // case 1: 881

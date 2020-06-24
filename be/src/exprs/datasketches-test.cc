@@ -16,8 +16,10 @@
 // under the License.
 
 #include "thirdparty/datasketches/hll.hpp"
+#include "thirdparty/datasketches/kll_sketch.hpp"
 
 #include <sstream>
+#include <stdlib.h>
 
 #include "testutil/gtest-util.h"
 
@@ -29,8 +31,7 @@ namespace impala {
 // The below code is mostly a copy-paste from the example code found on the official
 // DataSketches web page: https://datasketches.apache.org/docs/HLL/HllCppExample.html
 // The purpose is to create 2 HLL sketches that have overlap in their data, serialize
-// these sketches into files, deserialize them and give a cardinality estimate combining
-// the 2 sketches.
+// them, deserialize them and give a cardinality estimate combining the 2 sketches.
 TEST(TestDataSketchesHll, UseDataSketchesInterface) {
   const int lg_k = 11;
   const auto type = datasketches::HLL_4;
@@ -66,6 +67,44 @@ TEST(TestDataSketchesHll, UseDataSketchesInterface) {
     // the order of the inputs fed to the sketches is fix here so we get the same
     // estimate every time we run this test.
     EXPECT_EQ(152040, (int)sketch.get_estimate());
+  }
+}
+
+
+// This test is meant to cover that the KLL algorithm from the DataSketches library can
+// be imported into Impala, builds without errors and the basic functionality is
+// available to use.
+// The below code is mostly a copy-paste from the example code found on the official
+// DataSketches web page:
+// https://datasketches.apache.org/docs/Quantiles/QuantilesCppExample.html
+// The purpose is to create 2 KLL sketches that have overlap in their data, serialize
+// them, deserialize them and get an estimate for quantiles after combining the 2
+// sketches.
+TEST(TestDataSketchesKll, UseDataSketchesInterface) {
+  std::stringstream sketch_stream1;
+  std::stringstream sketch_stream2;
+  {
+    datasketches::kll_sketch<float> sketch1;
+    for (int i = 0; i < 100000; ++i) sketch1.update(i);
+    sketch1.serialize(sketch_stream1);
+
+    datasketches::kll_sketch<float> sketch2;
+    for (int i = 30000; i < 130000; ++i) sketch2.update(i);
+    sketch2.serialize(sketch_stream2);
+  }
+
+  {
+    auto sketch1 = datasketches::kll_sketch<float>::deserialize(sketch_stream1);
+    auto sketch2 = datasketches::kll_sketch<float>::deserialize(sketch_stream2);
+    sketch1.merge(sketch2);
+
+    const double fractions[3] {0, 0.5, 1};
+    auto quantiles = sketch1.get_quantiles(fractions, 3);
+    EXPECT_EQ(0, quantiles[0]);
+    // The median is an approximate. Here we check that it is in 2% error range.
+    int exact_median = 65000;
+    EXPECT_LE(abs(quantiles[1] - exact_median), exact_median * 0.02);
+    EXPECT_EQ(129999, quantiles[2]);
   }
 }
 

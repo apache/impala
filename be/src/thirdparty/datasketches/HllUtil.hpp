@@ -22,7 +22,8 @@
 
 #include "MurmurHash3.h"
 #include "RelativeErrorTables.hpp"
-#include "CommonUtil.hpp"
+#include "count_zeros.hpp"
+#include "common_defs.hpp"
 
 #include <cmath>
 #include <stdexcept>
@@ -83,8 +84,6 @@ public:
   static const int MIN_LOG_K = 4;
   static const int MAX_LOG_K = 21;
 
-  static const uint64_t DEFAULT_UPDATE_SEED = 9001L;
-
   static const double HLL_HIP_RSE_FACTOR; // sqrt(log(2.0)) = 0.8325546
   static const double HLL_NON_HIP_RSE_FACTOR; // sqrt((3.0 * log(2.0)) - 1.0) = 1.03896
   static const double COUPON_RSE_FACTOR; // 0.409 at transition point not the asymptote
@@ -108,7 +107,6 @@ public:
   static int coupon(const uint64_t hash[]);
   static int coupon(const HashState& hashState);
   static void hash(const void* key, int keyLen, uint64_t seed, HashState& result);
-
   static int checkLgK(int lgK);
   static void checkMemSize(uint64_t minBytes, uint64_t capBytes);
   static inline void checkNumStdDev(int numStdDev);
@@ -118,8 +116,6 @@ public:
   static double invPow2(int e);
   static unsigned int ceilingPowerOf2(unsigned int n);
   static unsigned int simpleIntLog2(unsigned int n); // n must be power of 2
-  static unsigned int getNumberOfLeadingZeros(uint64_t x);
-  static unsigned int numberOfTrailingZeros(uint32_t n);
   static int computeLgArrInts(hll_mode mode, int count, int lgConfigK);
   static double getRelErr(bool upperBound, bool unioned,
                           int lgConfigK, int numStdDev);
@@ -144,7 +140,7 @@ const int HllUtil<A>::LG_AUX_ARR_INTS[] = {
 template<typename A>
 inline int HllUtil<A>::coupon(const uint64_t hash[]) {
   int addr26 = (int) (hash[0] & KEY_MASK_26);
-  int lz = CommonUtil::getNumberOfLeadingZeros(hash[1]);
+  int lz = count_leading_zeros_in_u64(hash[1]);
   int value = ((lz > 62 ? 62 : lz) + 1); 
   return (value << KEY_BITS_26) | addr26;
 }
@@ -152,14 +148,14 @@ inline int HllUtil<A>::coupon(const uint64_t hash[]) {
 template<typename A>
 inline int HllUtil<A>::coupon(const HashState& hashState) {
   int addr26 = (int) (hashState.h1 & KEY_MASK_26);
-  int lz = CommonUtil::getNumberOfLeadingZeros(hashState.h2);  
+  int lz = count_leading_zeros_in_u64(hashState.h2);  
   int value = ((lz > 62 ? 62 : lz) + 1); 
   return (value << KEY_BITS_26) | addr26;
 }
 
 template<typename A>
 inline void HllUtil<A>::hash(const void* key, const int keyLen, const uint64_t seed, HashState& result) {
-  MurmurHash3_x64_128(key, keyLen, DEFAULT_UPDATE_SEED, result);
+  MurmurHash3_x64_128(key, keyLen, seed, result);
 }
 
 template<typename A>
@@ -219,7 +215,7 @@ inline double HllUtil<A>::invPow2(const int e) {
 // compute the next highest power of 2 of 32-bit n
 // taken from https://graphics.stanford.edu/~seander/bithacks.html
 template<typename A>
-inline unsigned int HllUtil<A>::ceilingPowerOf2(unsigned int n) {
+inline uint32_t HllUtil<A>::ceilingPowerOf2(uint32_t n) {
   --n;
   n |= n >> 1;
   n |= n >> 2;
@@ -230,45 +226,11 @@ inline unsigned int HllUtil<A>::ceilingPowerOf2(unsigned int n) {
 }
 
 template<typename A>
-inline unsigned int HllUtil<A>::simpleIntLog2(unsigned int n) {
+inline uint32_t HllUtil<A>::simpleIntLog2(uint32_t n) {
   if (n == 0) {
     throw std::logic_error("cannot take log of 0");
   }
-  const unsigned int e = numberOfTrailingZeros(n);
-  return e;
-}
-
-// taken from https://graphics.stanford.edu/~seander/bithacks.html
-// input is 32-bit word to count zero bits on right
-template<typename A>
-inline unsigned int HllUtil<A>::numberOfTrailingZeros(uint32_t v) {
-  unsigned int c;     // c will be the number of zero bits on the right,
-                      // so if v is 1101000 (base 2), then c will be 3
-  // NOTE: if 0 == v, then c = 31.
-  if (v & 0x1) {
-    // special case for odd v (assumed to happen half of the time)
-    c = 0;
-  } else {
-    c = 1;
-    if ((v & 0xffff) == 0) {  
-      v >>= 16;  
-      c += 16;
-    }
-    if ((v & 0xff) == 0) {  
-      v >>= 8;  
-      c += 8;
-    }
-    if ((v & 0xf) == 0) {  
-      v >>= 4;
-      c += 4;
-    }
-    if ((v & 0x3) == 0) {  
-      v >>= 2;
-      c += 2;
-    }
-    c -= v & 0x1;
-  }
-  return c;	
+  return count_trailing_zeros_in_u32(n);
 }
 
 template<typename A>

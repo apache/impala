@@ -1,14 +1,15 @@
-The content of this folder imports the functionality needed for HLL approximate
-algorithm from Apache DataSketches by copying the necessary files from that
-project into this folder. Note, that the original structure of files was
-changed during this process as originally hll/ and common/ libraries were
-both affected but I copied these into the same directory so that Impala can
-compile them without rewriting the include paths in the files themselves. Also
-note, that not the whole common/ directory was copied just the files needed for
-HLL.
+The content of this folder imports the functionality needed for HLL and KLL
+approximate algorithms from Apache DataSketches by copying the necessary files
+from that project into this folder. Note, that the original structure of files was
+changed during this process as originally the following folders were affected:
+  hll/include/
+  kll/include/
+  common/include/
+I copied the content of these folders into the same directory so that Impala
+can compile them without rewriting the include paths in the files themselves.
 
 The git hash of the snapshot I used as a source for the files:
-a6265b307a03085abe26c20413fdbf7d7a5eaf29
+c67d92faad3827932ca3b5d864222e64977f2c20
 
 Browse the source files here:
 https://github.com/apache/incubator-datasketches-cpp

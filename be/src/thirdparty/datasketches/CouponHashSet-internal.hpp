@@ -63,7 +63,7 @@ std::function<void(HllSketchImpl<A>*)> CouponHashSet<A>::get_deleter() const {
 template<typename A>
 CouponHashSet<A>* CouponHashSet<A>::newSet(const void* bytes, size_t len) {
   if (len < HllUtil<A>::HASH_SET_INT_ARR_START) { // hard-coded 
-    throw std::invalid_argument("Input data length insufficient to hold CouponHashSet");
+    throw std::out_of_range("Input data length insufficient to hold CouponHashSet");
   }
 
   const uint8_t* data = static_cast<const uint8_t*>(bytes);
@@ -102,12 +102,11 @@ CouponHashSet<A>* CouponHashSet<A>::newSet(const void* bytes, size_t len) {
   const int couponsInArray = (compactFlag ? couponCount : (1 << lgArrInts));
   const size_t expectedLength = HllUtil<A>::HASH_SET_INT_ARR_START + (couponsInArray * sizeof(int));
   if (len < expectedLength) {
-    throw std::invalid_argument("Byte array too short for sketch. Expected " + std::to_string(expectedLength)
+    throw std::out_of_range("Byte array too short for sketch. Expected " + std::to_string(expectedLength)
                                 + ", found: " + std::to_string(len));
   }
 
   CouponHashSet<A>* sketch = new (chsAlloc().allocate(1)) CouponHashSet<A>(lgK, tgtHllType);
-  sketch->putOutOfOrderFlag(true);
 
   if (compactFlag) {
     const uint8_t* curPos = data + HllUtil<A>::HASH_SET_INT_ARR_START;
@@ -170,7 +169,8 @@ CouponHashSet<A>* CouponHashSet<A>::newSet(std::istream& is) {
   }
 
   CouponHashSet<A>* sketch = new (chsAlloc().allocate(1)) CouponHashSet<A>(lgK, tgtHllType);
-  sketch->putOutOfOrderFlag(true);
+  typedef std::unique_ptr<CouponHashSet<A>, std::function<void(HllSketchImpl<A>*)>> coupon_hash_set_ptr;
+  coupon_hash_set_ptr ptr(sketch, sketch->get_deleter());
 
   // Don't set couponCount here;
   // we'll set later if updatable, and increment with updates if compact
@@ -181,18 +181,19 @@ CouponHashSet<A>* CouponHashSet<A>::newSet(std::istream& is) {
       sketch->couponUpdate(coupon);
     }
   } else {
-    int* oldArr = sketch->couponIntArr;
-    const size_t oldArrLen = 1 << sketch->lgCouponArrInts;
-    sketch->lgCouponArrInts = lgArrInts;
     typedef typename std::allocator_traits<A>::template rebind_alloc<int> intAlloc;
+    intAlloc().deallocate(sketch->couponIntArr, 1 << sketch->lgCouponArrInts);
+    sketch->lgCouponArrInts = lgArrInts;
     sketch->couponIntArr = intAlloc().allocate(1 << lgArrInts);
     sketch->couponCount = couponCount;
     // for stream processing, read entire list so read pointer ends up set correctly
     is.read((char*)sketch->couponIntArr, (1 << sketch->lgCouponArrInts) * sizeof(int));
-    intAlloc().deallocate(oldArr, oldArrLen);
   } 
 
-  return sketch;
+  if (!is.good())
+    throw std::runtime_error("error reading from std::istream"); 
+
+  return ptr.release();
 }
 
 template<typename A>
