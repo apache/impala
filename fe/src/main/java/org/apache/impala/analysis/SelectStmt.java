@@ -32,6 +32,7 @@ import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ColumnAliasGenerator;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.common.TableAliasGenerator;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -90,7 +91,17 @@ public class SelectStmt extends QueryStmt {
   protected final List<String> colLabels_; // lower case column labels
   protected final FromClause fromClause_;
   protected Expr whereClause_;
+
+  // Grouping expressions for this select block, including expressions from the original
+  // query statement and additional expressions that may be added during rewriting.
   protected List<Expr> groupingExprs_;
+
+  // The original GROUP BY clause with information about grouping sets, etc.
+  // If there was no original GROUP BY clause, but grouping exprs are added during
+  // rewriting, this is initialized as a placeholder empty group by list.
+  // Non-null iff groupingExprs_ is non-null.
+  private GroupByClause groupByClause_;
+
   protected Expr havingClause_;  // original having clause
 
   // havingClause with aliases and agg output resolved
@@ -115,7 +126,7 @@ public class SelectStmt extends QueryStmt {
 
   SelectStmt(SelectList selectList,
              FromClause fromClause,
-             Expr wherePredicate, List<Expr> groupingExprs,
+             Expr wherePredicate, GroupByClause groupByClause,
              Expr havingPredicate, List<OrderByElement> orderByElements,
              LimitElement limitElement) {
     super(orderByElements, limitElement);
@@ -126,7 +137,12 @@ public class SelectStmt extends QueryStmt {
       fromClause_ = fromClause;
     }
     whereClause_ = wherePredicate;
-    groupingExprs_ = groupingExprs;
+    groupByClause_ = groupByClause;
+    if (groupByClause != null) {
+      groupingExprs_ = Expr.cloneList(groupByClause.getOrigGroupingExprs());
+    } else {
+      groupingExprs_ = null;
+    }
     havingClause_ = havingPredicate;
     colLabels_ = new ArrayList<>();
     havingPred_ = null;
@@ -158,6 +174,18 @@ public class SelectStmt extends QueryStmt {
   public boolean hasAnalyticInfo() { return analyticInfo_ != null; }
   public boolean hasHavingClause() { return havingClause_ != null; }
   public ExprSubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
+
+  /**
+   * Append additional grouping expressions to the select list. Used by StmtRewriter.
+   */
+  protected void addGroupingExprs(List<Expr> addtlGroupingExprs) {
+    if (groupingExprs_ == null) {
+      groupByClause_ = new GroupByClause(
+          Collections.emptyList(), GroupByClause.GroupingSetsType.NONE);
+      groupingExprs_ = new ArrayList<>();
+    }
+    groupingExprs_.addAll(addtlGroupingExprs);
+  }
 
   // Column alias generator used during query rewriting.
   private ColumnAliasGenerator columnAliasGenerator_ = null;
@@ -724,6 +752,14 @@ public class SelectStmt extends QueryStmt {
       }
       // initialize groupingExprs_ with the analyzed version
       groupingExprs_ = groupingExprsCopy_;
+
+      if (groupByClause_ != null && groupByClause_.hasGroupingSets()) {
+        if (RuntimeEnv.INSTANCE.isGroupingSetsValidationEnabled()) {
+          throw new AnalysisException(groupByClause_.getTypeString() +
+              " not supported in GROUP BY");
+        }
+        groupByClause_.analyzeGroupingSets(groupingExprsCopy_);
+      }
     }
 
     private void collectAggExprs() {
@@ -799,6 +835,7 @@ public class SelectStmt extends QueryStmt {
       }
       Expr.removeDuplicates(aggExprs_);
       Expr.removeDuplicates(groupingExprs);
+      // TODO: IMPALA-9898: need to pass in grouping set info for MultiAggregateInfo.
       multiAggInfo_ = new MultiAggregateInfo(groupingExprs, aggExprs_);
       multiAggInfo_.analyze(analyzer_);
     }
@@ -1124,17 +1161,13 @@ public class SelectStmt extends QueryStmt {
       strBuilder.append(whereClause_.toSql(options));
     }
     // Group By clause
-    if (groupingExprs_ != null) {
-      strBuilder.append(" GROUP BY ");
+    if (groupByClause_ != null) {
       // Handle both analyzed (multiAggInfo_ != null) and unanalyzed cases.
       // Unanalyzed case us used to generate SQL such as for views.
       // See ToSqlUtils.getCreateViewSql().
       List<Expr> groupingExprs = multiAggInfo_ == null
           ? groupingExprs_ : multiAggInfo_.getGroupingExprs();
-      for (int i = 0; i < groupingExprs.size(); ++i) {
-        strBuilder.append(groupingExprs.get(i).toSql(options));
-        strBuilder.append((i+1 != groupingExprs.size()) ? ", " : "");
-      }
+      strBuilder.append(groupByClause_.toSql(groupingExprs, options));
     }
     // Having clause
     if (havingClause_ != null) {
@@ -1195,6 +1228,8 @@ public class SelectStmt extends QueryStmt {
     whereClause_ = (other.whereClause_ != null) ? other.whereClause_.clone() : null;
     groupingExprs_ =
         (other.groupingExprs_ != null) ? Expr.cloneList(other.groupingExprs_) : null;
+    groupByClause_ =
+        (other.groupByClause_ != null) ? other.groupByClause_.clone() : null;
     havingClause_ = (other.havingClause_ != null) ? other.havingClause_.clone() : null;
     colLabels_ = Lists.newArrayList(other.colLabels_);
     multiAggInfo_ = (other.multiAggInfo_ != null) ? other.multiAggInfo_.clone() : null;
@@ -1274,6 +1309,7 @@ public class SelectStmt extends QueryStmt {
     colLabels_.clear();
     fromClause_.reset();
     if (whereClause_ != null) whereClause_.reset();
+    if (groupByClause_ != null) groupByClause_.reset();
     if (groupingExprs_ != null) Expr.resetList(groupingExprs_);
     if (havingClause_ != null) havingClause_.reset();
     havingPred_ = null;

@@ -815,11 +815,7 @@ public class StmtRewriter {
           new SelectList(items, isDistinct, stmt.selectList_.getPlanHints());
       // Update subquery's GROUP BY clause
       if (groupByExprs != null && !groupByExprs.isEmpty()) {
-        if (stmt.hasGroupByClause()) {
-          stmt.groupingExprs_.addAll(groupByExprs);
-        } else {
-          stmt.groupingExprs_ = groupByExprs;
-        }
+        stmt.addGroupingExprs(groupByExprs);
       }
     }
 

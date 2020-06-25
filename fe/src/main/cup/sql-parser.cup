@@ -284,13 +284,14 @@ terminal
   KW_ARRAY, KW_AS, KW_ASC, KW_AUTHORIZATION, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY,
   KW_BLOCKSIZE, KW_BOOLEAN, KW_BY, KW_CACHED, KW_CASCADE, KW_CASE, KW_CAST, KW_CHANGE,
   KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS, KW_COMMENT, KW_COMPRESSION,
-  KW_COMPUTE, KW_CONSTRAINT, KW_COPY, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA,
+  KW_COMPUTE, KW_CONSTRAINT, KW_COPY, KW_CREATE, KW_CROSS, KW_CUBE, KW_CURRENT, KW_DATA,
   KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DEFAULT, KW_DELETE,
   KW_DELIMITED, KW_DESC, KW_DESCRIBE, KW_DISABLE, KW_DISTINCT, KW_DIV, KW_DOUBLE,
   KW_DROP, KW_ELSE, KW_ENABLE, KW_ENCODING, KW_END, KW_ESCAPED, KW_EXISTS, KW_EXPLAIN,
   KW_EXTENDED, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FILES, KW_FINALIZE_FN,
   KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR, KW_FOREIGN, KW_FORMAT, KW_FORMATTED,
-  KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HASH, KW_HUDIPARQUET,
+  KW_FROM, KW_FULL, KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_GROUPING, KW_HASH,
+  KW_HUDIPARQUET,
   KW_IGNORE, KW_HAVING, KW_ICEBERG, KW_IF, KW_ILIKE, KW_IN, KW_INCREMENTAL, KW_INIT_FN, KW_INNER,
   KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE, KW_IREGEXP,
   KW_IS, KW_JOIN,  KW_KUDU, KW_LAST, KW_LEFT, KW_LEXICAL, KW_LIKE, KW_LIMIT, KW_LINES,
@@ -300,9 +301,10 @@ terminal
   KW_PARTITIONS, KW_PRECEDING, KW_PREPARE_FN, KW_PRIMARY, KW_PRODUCED, KW_PURGE,
   KW_RANGE, KW_RCFILE, KW_RECOVER, KW_REFERENCES, KW_REFRESH, KW_REGEXP, KW_RELY,
   KW_RENAME, KW_REPEATABLE, KW_REPLACE, KW_REPLICATION, KW_RESTRICT, KW_RETURNS,
-  KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROW, KW_ROWS, KW_SCHEMA,
+  KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROLLUP, KW_ROW, KW_ROWS, KW_SCHEMA,
   KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN,
-  KW_SET, KW_SHOW, KW_SMALLINT, KW_SORT, KW_SPEC, KW_STORED, KW_STRAIGHT_JOIN, KW_STRING,
+  KW_SET, KW_SHOW, KW_SMALLINT, KW_SETS, KW_SORT, KW_SPEC, KW_STORED, KW_STRAIGHT_JOIN,
+  KW_STRING,
   KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES,
   KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS,
   KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNKNOWN, KW_UPDATE,
@@ -386,7 +388,10 @@ nonterminal Expr where_clause;
 nonterminal Expr predicate, bool_test_expr;
 nonterminal Predicate between_predicate, comparison_predicate, compound_predicate,
   in_predicate, like_predicate, exists_predicate;
-nonterminal List<Expr> group_by_clause, opt_partition_by_clause;
+nonterminal List<Expr> grouping_set;
+nonterminal List<List<Expr>> grouping_sets;
+nonterminal GroupByClause group_by_clause;
+nonterminal List<Expr> opt_partition_by_clause;
 nonterminal Expr having_clause;
 nonterminal List<OrderByElement> order_by_elements, opt_order_by_clause;
 nonterminal OrderByElement order_by_element;
@@ -3063,11 +3068,62 @@ where_clause ::=
   {: RESULT = null; :}
   ;
 
+// Support the following variants:
+// * GROUP BY a, b, c
+// * GROUP BY ROLLUP(a, b, c) - standard ROLLUP syntax
+// * GROUP BY a, b, c WITH ROLLUP - non-standard ROLLUP syntax supported by some systems
+// * GROUP BY CUBE(a, b, c) - standard CUBE syntax
+// * GROUP BY a, b, c WITH CUBE - non-standard CUBE syntax supported by some systems
+// * GROUP BY GROUPING SETS((a, b, c), (a, b), ()) - standard GROUPING SETs syntax
+//
+// Not yet supported: multiple ROLLUP/CUBE/GROUPING SET clauses, e.g.:
+// * GROUP BY a, ROLLUP(b, c)
 group_by_clause ::=
   KW_GROUP KW_BY expr_list:l
-  {: RESULT = l; :}
+  {: RESULT = new GroupByClause(l, GroupByClause.GroupingSetsType.NONE); :}
+  | KW_GROUP KW_BY expr_list:l KW_WITH KW_ROLLUP
+  {: RESULT = new GroupByClause(l, GroupByClause.GroupingSetsType.ROLLUP); :}
+  | KW_GROUP KW_BY KW_ROLLUP LPAREN expr_list:l RPAREN
+  {: RESULT = new GroupByClause(l, GroupByClause.GroupingSetsType.ROLLUP); :}
+  | KW_GROUP KW_BY KW_CUBE LPAREN expr_list:l RPAREN
+  {: RESULT = new GroupByClause(l, GroupByClause.GroupingSetsType.CUBE); :}
+  | KW_GROUP KW_BY expr_list:l KW_WITH KW_CUBE
+  {: RESULT = new GroupByClause(l, GroupByClause.GroupingSetsType.CUBE); :}
+  | KW_GROUP KW_BY KW_GROUPING KW_SETS LPAREN grouping_sets:sets RPAREN
+  {: RESULT = new GroupByClause(sets); :}
   | /* empty */
   {: RESULT = null; :}
+  ;
+
+grouping_set ::=
+  expr:e
+  {:
+    List<Expr> list = new ArrayList<Expr>();
+    list.add(e);
+    RESULT = list;
+  :}
+  | LPAREN expr_list:l RPAREN
+  {:
+    RESULT = l;
+  :}
+  | LPAREN RPAREN
+  {:
+    RESULT = new ArrayList<Expr>();
+  :}
+  ;
+
+grouping_sets ::=
+  grouping_set:s
+  {:
+    List<List<Expr>> sets = new ArrayList<List<Expr>>();
+    sets.add(s);
+    RESULT = sets;
+  :}
+  | grouping_sets:sets COMMA grouping_set:s
+  {:
+    sets.add(s);
+    RESULT = sets;
+  :}
   ;
 
 having_clause ::=
@@ -3771,6 +3827,8 @@ word ::=
   {: RESULT = r.toString(); :}
   | KW_CROSS:r
   {: RESULT = r.toString(); :}
+  | KW_CUBE:r
+  {: RESULT = r.toString(); :}
   | KW_CURRENT:r
   {: RESULT = r.toString(); :}
   | KW_DATA:r
@@ -3858,6 +3916,8 @@ word ::=
   | KW_GRANT:r
   {: RESULT = r.toString(); :}
   | KW_GROUP:r
+  {: RESULT = r.toString(); :}
+  | KW_GROUPING:r
   {: RESULT = r.toString(); :}
   | KW_HAVING:r
   {: RESULT = r.toString(); :}
@@ -4009,6 +4069,8 @@ word ::=
   {: RESULT = r.toString(); :}
   | KW_ROLES:r
   {: RESULT = r.toString(); :}
+  | KW_ROLLUP:r
+  {: RESULT = r.toString(); :}
   | KW_ROW:r
   {: RESULT = r.toString(); :}
   | KW_ROWS:r
@@ -4028,6 +4090,8 @@ word ::=
   | KW_SERIALIZE_FN:r
   {: RESULT = r.toString(); :}
   | KW_SET:r
+  {: RESULT = r.toString(); :}
+  | KW_SETS:r
   {: RESULT = r.toString(); :}
   | KW_SHOW:r
   {: RESULT = r.toString(); :}

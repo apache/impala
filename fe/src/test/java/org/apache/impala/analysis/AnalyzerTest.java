@@ -28,10 +28,13 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.util.FunctionUtils;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Assume;
+import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -62,6 +65,19 @@ public class AnalyzerTest extends FrontendTestBase {
     typeToLiteralValue_.put(Type.DATE, "cast('2012-12-21' as date)");
     typeToLiteralValue_.put(Type.STRING, "'Hello, World!'");
     typeToLiteralValue_.put(Type.NULL, "NULL");
+  }
+
+  @Before
+  public void setUpTest() throws Exception {
+    // Reset the RuntimeEnv - individual tests may change it.
+    RuntimeEnv.INSTANCE.reset();
+    RuntimeEnv.INSTANCE.setTestEnv(true);
+  }
+
+  @AfterClass
+  public static void cleanUpClass() throws Exception {
+    // Reset the RuntimeEnv - individual tests may have changed it.
+    RuntimeEnv.INSTANCE.reset();
   }
 
   /**

@@ -23,6 +23,7 @@ import static org.junit.Assert.fail;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
+import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestUtils;
 import org.junit.Test;
 
@@ -814,6 +815,33 @@ public class ToSqlTest extends FrontendTestBase {
         "having avg(tinyint_col) > 10 AND count(tinyint_col) > 5",
         "SELECT sum(id) FROM functional.alltypes GROUP BY tinyint_col " +
         "HAVING avg(tinyint_col) > 10 AND count(tinyint_col) > 5");
+
+    // CUBE, ROLLUP.
+    // Temporarily disable validation of support for CUBE/ROLLUP/GROUPING SETS
+    // so we can run toSql() on these statements.
+    RuntimeEnv.INSTANCE.setEnableGroupingSetsValidation(false);
+    testToSql("select int_col, string_col, sum(id) from functional.alltypes " +
+        "group by rollup(int_col, string_col)",
+        "SELECT int_col, string_col, sum(id) FROM functional.alltypes " +
+        "GROUP BY ROLLUP(int_col, string_col)");
+    testToSql("select int_col, string_col, sum(id) from functional.alltypes " +
+        "group by int_col, string_col with rollup",
+        "SELECT int_col, string_col, sum(id) FROM functional.alltypes " +
+        "GROUP BY ROLLUP(int_col, string_col)");
+    testToSql("select int_col, string_col, sum(id) from functional.alltypes " +
+        "group by cube(int_col, string_col)",
+        "SELECT int_col, string_col, sum(id) FROM functional.alltypes " +
+        "GROUP BY CUBE(int_col, string_col)");
+    testToSql("select int_col, string_col, sum(id) from functional.alltypes " +
+        "group by int_col, string_col with cube",
+        "SELECT int_col, string_col, sum(id) FROM functional.alltypes " +
+        "GROUP BY CUBE(int_col, string_col)");
+
+    // GROUPING SETS.
+    testToSql("select int_col, string_col, sum(id) from functional.alltypes " +
+        "group by grouping sets((int_col, string_col), (int_col), ())",
+        "SELECT int_col, string_col, sum(id) FROM functional.alltypes " +
+        "GROUP BY GROUPING SETS((int_col, string_col), (int_col), ())");
   }
 
   // Test the toSql() output of the order by clause.

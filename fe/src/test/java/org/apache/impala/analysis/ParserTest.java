@@ -3658,6 +3658,61 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestRollup() {
+    ParsesOk("SELECT a FROM foo GROUP BY ROLLUP(a)");
+    ParsesOk("SELECT a, b FROM foo GROUP BY ROLLUP(a, b)");
+
+    // Non-standard WITH ROLLUP
+    ParsesOk("SELECT a FROM foo GROUP BY a WITH ROLLUP");
+    ParsesOk("SELECT a, b FROM foo GROUP BY a, b WITH ROLLUP");
+
+    // Nested grouping clauses not supported.
+    ParserError("SELECT a, b FROM foo GROUP BY ROLLUP(a, ROLLUP(b, c))");
+    ParserError("SELECT a, b FROM foo GROUP BY ROLLUP(a, CUBE(b, c))");
+
+    // Multiple clauses not supported with ROLLUP - parser does not handle yet.
+    ParserError("SELECT a, b FROM foo GROUP BY c, ROLLUP(a, b)");
+    ParserError("SELECT a, b FROM foo GROUP BY ROLLUP(a, b), c");
+    ParserError("SELECT a, b FROM foo GROUP BY ROLLUP(a, b), ROLLUP(c)");
+    ParserError("SELECT a, b FROM foo GROUP BY ROLLUP(a, b), CUBE(c, d)");
+  }
+
+  @Test
+  public void TestCube() {
+    ParsesOk("SELECT a FROM foo GROUP BY CUBE(a)");
+    ParsesOk("SELECT a, b FROM foo GROUP BY CUBE(a, b)");
+
+    // Non-standard WITH CUBE is supported
+    ParsesOk("SELECT a FROM foo GROUP BY a WITH CUBE");
+    ParsesOk("SELECT a, b FROM foo GROUP BY a, b WITH CUBE");
+
+    // Nested grouping clauses not supported.
+    ParserError("SELECT a, b FROM foo GROUP BY CUBE(a, ROLLUP(b, c))");
+    ParserError("SELECT a, b FROM foo GROUP BY CUBE(a, CUBE(b, c))");
+
+    // Multiple clauses not supported with CUBE - parser does not handle yet.
+    ParserError("SELECT a, b FROM foo GROUP BY c, CUBE(a, b)");
+    ParserError("SELECT a, b FROM foo GROUP BY CUBE(a, b), c");
+    ParserError("SELECT a, b FROM foo GROUP BY CUBE(a, b), CUBE(c)");
+  }
+
+  @Test
+  public void TestGroupingSets() {
+    ParsesOk("SELECT a FROM foo GROUP BY GROUPING SETS((a, b))");
+    ParsesOk("SELECT a FROM foo GROUP BY GROUPING SETS((a, b), (a), ())");
+
+    // Nested grouping sets not supported.
+    ParserError("SELECT a FROM foo GROUP BY GROUPING SETS(ROLLUP(a, b), (a), ())");
+    ParserError("SELECT a FROM foo GROUP BY GROUPING SETS((a, b), CUBE(a), ())");
+    ParserError("SELECT a FROM foo " +
+        "GROUP BY GROUPING SETS((a, b), GROUPING SETS ((a, b, c), (b, c)))");
+
+    // Multiple clauses not supported with GROUPING SETS - parser does not handle yet.
+    ParserError("SELECT a FROM foo GROUP BY a, b, GROUPING SETS(a, b)");
+    ParserError("SELECT a FROM foo GROUP BY CUBE(a, b), GROUPING SETS(a, b)");
+  }
+
+  @Test
   public void TestSet() {
     ParsesOk("SET foo='bar'");
     ParsesOk("SET foo=\"bar\"");
