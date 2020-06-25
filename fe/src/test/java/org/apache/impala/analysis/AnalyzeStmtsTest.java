@@ -2281,6 +2281,219 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         ScalarType.STRING);
   }
 
+  /**
+   * Test ROLLUP, CUBE and GROUPING SETS functionality.
+   */
+  @Test
+  public void TestGroupingSets() throws AnalysisException {
+    RuntimeEnv.INSTANCE.setEnableGroupingSetsValidation(false);
+    // Basic examples of each clause.
+    AnalyzesOk("select count(*) from functional.alltypes " +
+        "group by rollup(int_col, string_col)");
+    AnalyzesOk("select count(*) from functional.alltypes " +
+        "group by int_col, string_col with rollup");
+    AnalyzesOk("select count(*) from functional.alltypes " +
+        "group by int_col, string_col with cube");
+    AnalyzesOk("select count(*) from functional.alltypes " +
+        "group by GROUPING SETS((int_col), (string_col))");
+
+    // Test limits for number of distinct expressions
+    StringBuilder sb = new StringBuilder();
+    for (int i = 1; i <= 25; ++i) {
+      sb.append("bool_col" + i + ", tinyint_col" + i + ", smallint_col" + i +
+                ", int_col" + i + ", bigint_col" + i + ", float_col" + i +
+                ", double_col" + i + ", string_col" + i);
+      if (i != 25) {
+        sb.append(",");
+      }
+    }
+    String longColList = sb.toString();
+    AnalysisError("select count(*) from functional.widetable_250_cols " +
+        "group by rollup(" + longColList + ")",
+        "Number of grouping columns (200) exceeds GROUP BY with ROLLUP limit of 63");
+    AnalysisError("select count(*) from functional.widetable_250_cols " +
+        "group by cube(" + longColList + ")",
+        "Number of grouping columns (200) exceeds GROUP BY with CUBE limit of 63");
+    AnalysisError("select count(*) from functional.widetable_250_cols " +
+        "group by grouping sets((" + longColList + "))",
+        "Number of grouping columns (200) exceeds GROUP BY with SETS limit of 63");
+
+    // Duplicating the same column shouldn't increase distinct column count.
+    AnalysisError("select count(*) from functional.widetable_250_cols " +
+        "group by grouping sets((" + longColList + ", string_col1), " +
+        "(bool_col1, int_col1))",
+        "Number of grouping columns (200) exceeds GROUP BY with SETS limit of 63");
+
+    // Grouping sets with overlapping expression lists doesn't hit limit, since exprs are
+    // deduplicated.
+    AnalyzesOk("select count(*) from functional.widetable_250_cols " +
+      "group by grouping sets(( " +
+      "  bool_col1, tinyint_col1, smallint_col1, int_col1, bigint_col1, " +
+      "  float_col1, double_col1, string_col1, " +
+      "  bool_col2, tinyint_col2, smallint_col2, int_col2, bigint_col2, " +
+      "  float_col2, double_col2, string_col2, " +
+      "  bool_col3, tinyint_col3, smallint_col3, int_col3, bigint_col3, " +
+      "  float_col3, double_col3, string_col3, " +
+      "  bool_col4, tinyint_col4, smallint_col4, int_col4, bigint_col4, " +
+      "  float_col4, double_col4, string_col4, " +
+      "  bool_col5, tinyint_col5, smallint_col5, int_col5, bigint_col5, " +
+      "  float_col5, double_col5, string_col5, " +
+      "  bool_col6, tinyint_col6, smallint_col6, int_col6, bigint_col6, " +
+      "  float_col6, double_col6, string_col6, " +
+      "  bool_col7, tinyint_col7, smallint_col7, int_col7, bigint_col7, " +
+      "  float_col7, double_col7, string_col7), " +
+      "  (bool_col1, tinyint_col1, smallint_col1, int_col1, bigint_col1, " +
+      "  float_col1, double_col1, string_col1, " +
+      "  bool_col2, tinyint_col2, smallint_col2, int_col2, bigint_col2, " +
+      "  float_col2, double_col2, string_col2)); ");
+
+    // Test limit of number of distinct grouping sets - 63. CUBE with 6 grouping exprs
+    // results in 2^6 = 64 distinct grouping sets. CUBE with 5 grouping exprs and ROLLUP
+    // with 6 grouping exprs are both under the limit.
+    AnalyzesOk("select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, count(*) " +
+        "from functional.alltypes " +
+        "group by rollup(id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col)");
+    AnalyzesOk("select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "count(*) " +
+        "from functional.alltypes " +
+        "group by cube(id, bool_col, tinyint_col, smallint_col, int_col, bigint_col)");
+    AnalysisError("select id, bool_col, tinyint_col, smallint_col, int_col, " +
+        "bigint_col, float_col, count(*) " +
+        "from functional.alltypes " +
+        "group by cube(id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col)",
+        "Limit of 64 grouping sets exceeded");
+
+
+    // Basic test cases where grouping exprs are subset and superset of select list.
+    AnalyzesOk("select int_col, count(*) from functional.alltypes " +
+        "group by rollup(int_col, string_col)");
+    AnalyzesOk("select int_col, string_col, count(*) from functional.alltypes " +
+        "group by rollup(int_col, string_col)");
+    AnalysisError("select int_col, bool_col, string_col, count(*) " +
+        "from functional.alltypes " +
+        "group by rollup(int_col, string_col)",
+        "select list expression not produced by aggregation output " +
+        "(missing from GROUP BY clause?): bool_col");
+    AnalyzesOk("select int_col, count(*) from functional.alltypes " +
+        "group by cube(int_col, string_col)");
+    AnalyzesOk("select int_col, string_col, count(*) from functional.alltypes " +
+        "group by cube(int_col, string_col)");
+    AnalysisError("select int_col, bool_col, string_col, count(*) " +
+        "from functional.alltypes " +
+        "group by cube(int_col, string_col)",
+        "select list expression not produced by aggregation output " +
+        "(missing from GROUP BY clause?): bool_col");
+    AnalyzesOk("select int_col, count(*) from functional.alltypes " +
+        "group by grouping sets((int_col, string_col), (int_col))");
+    AnalyzesOk("select int_col, string_col, count(*) from functional.alltypes " +
+        "group by grouping sets((int_col, string_col), (int_col))");
+    AnalysisError("select int_col, bool_col, string_col, count(*) " +
+        "from functional.alltypes " +
+        "group by grouping sets((int_col, string_col), (int_col))",
+        "select list expression not produced by aggregation output " +
+        "(missing from GROUP BY clause?): bool_col");
+
+    // Support for ordinals.
+    AnalyzesOk("select int_col, string_col, count(*) from functional.alltypes " +
+        "group by rollup(1, 2)");
+    AnalyzesOk("select int_col, string_col, count(*) from functional.alltypes " +
+        "group by cube(1, 2)");
+    AnalyzesOk("select int_col, string_col, count(*) from functional.alltypes " +
+        "group by grouping sets((1, 2), (1))");
+    AnalysisError("select int_col, string_col, count(*) from functional.alltypes " +
+        "group by rollup(1, 3)",
+        "GROUP BY expression must not contain aggregate functions: 3");
+    AnalysisError("select int_col, string_col, count(*) from functional.alltypes " +
+        "group by cube(1, 3)",
+        "GROUP BY expression must not contain aggregate functions: 3");
+    AnalysisError("select int_col, string_col, count(*) from functional.alltypes " +
+        "group by grouping sets((1, 3), (1))",
+        "GROUP BY expression must not contain aggregate functions: 3");
+
+    // Refer to same column by name and ordinal in grouping sets.
+    AnalyzesOk("select int_col, string_col, count(*) from functional.alltypes " +
+        "group by grouping sets((1, 2), (int_col))");
+
+    // Group by non-trivial expressions not in select list
+    AnalyzesOk("select count(*) from functional.alltypes " +
+        "group by rollup(int_col, substring(string_col, 1, 2))");
+    AnalyzesOk("select int_col, count(*) from functional.alltypes " +
+        "group by cube(int_col, substring(string_col, 1, 2))");
+    AnalyzesOk("select int_col, count(*) from functional.alltypes " +
+        "group by grouping sets((int_col), (int_col, substring(string_col, 1, 2)))");
+
+    // Group by non-trivial expressions in select list
+    AnalyzesOk("select int_col, substring(string_col, 1, 2) str, count(*) " +
+        "from functional.alltypes " +
+        "group by rollup(int_col, substring(string_col, 1, 2))");
+    AnalyzesOk("select int_col, substring(string_col, 1, 2) str, count(*) " +
+        "from functional.alltypes " +
+        "group by cube(int_col, str)");
+    AnalyzesOk("select int_col, substring(string_col, 1, 2) str, count(*) " +
+        "from functional.alltypes " +
+        "group by grouping sets((int_col, str), (substring(string_col, 1, 2)))");
+
+    // Expressions in select list must appear in group by.
+    AnalysisError("select int_col, substring(string_col, 1, 3) str, count(*) " +
+        "from functional.alltypes " +
+        "group by rollup(int_col, substring(string_col, 1, 2))",
+        "select list expression not produced by aggregation output (missing from " +
+        "GROUP BY clause?): substring(string_col, 1, 3)");
+
+    // Use the expression and an alias.
+    AnalyzesOk("select int_col, substring(string_col, 1, 2) str, count(*) " +
+        "from functional.alltypes " +
+        "group by rollup(int_col, str, substring(string_col, 1, 2))");
+
+    // Group by constant expression.
+    AnalyzesOk("select int_col, count(*) " +
+        "from functional.alltypes " +
+        "group by rollup(int_col, 'constant')");
+    AnalyzesOk("select int_col, count(*) " +
+        "from functional.alltypes " +
+        "group by cube(int_col, 'constant')");
+    AnalyzesOk("select int_col, count(*) " +
+        "from functional.alltypes " +
+        "group by grouping sets((false), (int_col, 'constant'))");
+
+    // Subqueries with grouping sets inside and outside subquery.
+    AnalyzesOk("select g.int_col, count(*) " +
+        "from functional.alltypesagg g " +
+        "left outer join functional.alltypes a on g.id = a.id " +
+        "where g.int_col < 100 and g.tinyint_col < ( " +
+        "  select count(*) from functional.alltypes t " +
+        "  where t.id = g.id and g.string_col = t.string_col and t.bool_col = true) " +
+        "group by rollup(g.int_col, g.string_col) " +
+        "having count(*) < 100");
+    AnalysisError("select g.int_col, count(*) " +
+        "from functional.alltypesagg g " +
+        "where g.int_col < 100 and g.tinyint_col < ( " +
+        "  select count(*) from functional.alltypes t " +
+        "  where t.id = g.id and g.string_col = t.string_col and t.bool_col = true " +
+        "  group by rollup(t.string_col, t.bool_col)) " +
+        "  group by g.int_col",
+        "Unsupported correlated subquery with grouping and/or aggregation");
+  }
+
+  /**
+   * Test that ROLLUP, CUBE and GROUPING SETS result in AnalysException for now.
+   */
+  @Test
+  public void TestGroupingSetsValidation() throws AnalysisException {
+    AnalysisError("select count(*) from functional.alltypes " +
+        "group by rollup(int_col, string_col)",
+        "ROLLUP not supported in GROUP BY");
+    AnalysisError("select count(*) from functional.alltypes " +
+        "group by cube(int_col, string_col)",
+        "CUBE not supported in GROUP BY");
+    AnalysisError("select count(*) from functional.alltypes " +
+        "group by GROUPING SETS((int_col), (string_col))",
+        "SETS not supported in GROUP BY");
+  }
+
   @Test
   public void TestDistinct() throws AnalysisException {
     AnalyzesOk("select count(distinct id) as sum_id from functional.testtbl");
