@@ -1,0 +1,76 @@
+====
+---- QUERY: TPCDS-Q63
+select  *
+from (select i_manager_id
+             ,sum(ss_sales_price) sum_sales
+             ,avg(sum(ss_sales_price)) over (partition by i_manager_id) avg_monthly_sales
+      from item
+          ,store_sales
+          ,date_dim
+          ,store
+      where ss_item_sk = i_item_sk
+        and ss_sold_date_sk = d_date_sk
+        and ss_store_sk = s_store_sk
+        and d_month_seq in (1212,1212+1,1212+2,1212+3,1212+4,1212+5,1212+6,1212+7,1212+8,1212+9,1212+10,1212+11)
+        and ((    i_category in ('Books','Children','Electronics')
+              and i_class in ('personal','portable','refernece','self-help')
+              and i_brand in ('scholaramalgamalg #14','scholaramalgamalg #7',
+                                  'exportiunivamalg #9','scholaramalgamalg #9'))
+           or(    i_category in ('Women','Music','Men')
+              and i_class in ('accessories','classical','fragrances','pants')
+              and i_brand in ('amalgimporto #1','edu packscholar #1','exportiimporto #1',
+                                 'importoamalg #1')))
+group by i_manager_id, d_moy) tmp1
+where case when avg_monthly_sales > 0 then abs (sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
+order by i_manager_id
+        ,avg_monthly_sales
+        ,sum_sales
+limit 100;
+---- RESULTS
+10,58.29,219.285833
+10,86.13,219.285833
+10,99.79,219.285833
+10,103.41,219.285833
+10,123.23,219.285833
+10,145.67,219.285833
+10,180.92,219.285833
+10,246.39,219.285833
+10,439.43,219.285833
+10,457.26,219.285833
+10,480.87,219.285833
+13,11.61,170.405000
+13,11.82,170.405000
+13,71.49,170.405000
+13,75.64,170.405000
+13,84.31,170.405000
+13,113.69,170.405000
+13,253.69,170.405000
+13,291.33,170.405000
+13,304.78,170.405000
+13,461.69,170.405000
+29,4.08,171.758182
+29,18.16,171.758182
+29,44.87,171.758182
+29,71.17,171.758182
+29,102.90,171.758182
+29,138.61,171.758182
+29,208.57,171.758182
+29,247.06,171.758182
+29,248.03,171.758182
+29,372.54,171.758182
+29,433.35,171.758182
+34,5.95,175.055000
+34,13.06,175.055000
+34,32.31,175.055000
+34,76.42,175.055000
+34,82.49,175.055000
+34,112.40,175.055000
+34,126.59,175.055000
+34,210.32,175.055000
+34,219.27,175.055000
+34,258.47,175.055000
+34,409.37,175.055000
+34,554.01,175.055000
+---- TYPES
+INT, DECIMAL, DECIMAL
+====

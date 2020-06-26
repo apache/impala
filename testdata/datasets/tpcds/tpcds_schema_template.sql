@@ -1133,3 +1133,22 @@ SELECT * FROM {db_name}.{table_name};
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/web_site/'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
+---- DATASET
+tpcds
+---- BASE_TABLE_NAME
+reason
+---- COLUMNS
+r_reason_sk           bigint
+r_reason_id           string
+r_reason_desc         string
+---- ROW_FORMAT
+delimited fields terminated by '|'
+---- TABLE_PROPERTIES
+text:serialization.null.format=
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT * FROM {db_name}.{table_name};
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/reason/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
