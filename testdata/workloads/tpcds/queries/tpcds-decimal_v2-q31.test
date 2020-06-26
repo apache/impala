@@ -1,0 +1,109 @@
+====
+---- QUERY: TPCDS-Q31
+-- THE RESULT ROWS ARE SORTED ACCORDING TO THE COLUMN OF SS1.D_YEAR. BUT SINCE THE COLUMN
+-- OF SS1.D_YEAR IS 2000 FOR EACH RETURNED ROW, THE RESULT SET SHOULD BE CONSIDERED
+-- CORRECT REGARDLESS OF THE RELATIVE ORDERING OF RETURNED ROWS.
+with ss as
+ (select ca_county,d_qoy, d_year,sum(ss_ext_sales_price) as store_sales
+ from store_sales,date_dim,customer_address
+ where ss_sold_date_sk = d_date_sk
+  and ss_addr_sk=ca_address_sk
+ group by ca_county,d_qoy, d_year),
+ ws as
+ (select ca_county,d_qoy, d_year,sum(ws_ext_sales_price) as web_sales
+ from web_sales,date_dim,customer_address
+ where ws_sold_date_sk = d_date_sk
+  and ws_bill_addr_sk=ca_address_sk
+ group by ca_county,d_qoy, d_year)
+ select /* tt */
+        ss1.ca_county
+       ,ss1.d_year
+       ,ws2.web_sales/ws1.web_sales web_q1_q2_increase
+       ,ss2.store_sales/ss1.store_sales store_q1_q2_increase
+       ,ws3.web_sales/ws2.web_sales web_q2_q3_increase
+       ,ss3.store_sales/ss2.store_sales store_q2_q3_increase
+ from
+        ss ss1
+       ,ss ss2
+       ,ss ss3
+       ,ws ws1
+       ,ws ws2
+       ,ws ws3
+ where
+    ss1.d_qoy = 1
+    and ss1.d_year = 2000
+    and ss1.ca_county = ss2.ca_county
+    and ss2.d_qoy = 2
+    and ss2.d_year = 2000
+ and ss2.ca_county = ss3.ca_county
+    and ss3.d_qoy = 3
+    and ss3.d_year = 2000
+    and ss1.ca_county = ws1.ca_county
+    and ws1.d_qoy = 1
+    and ws1.d_year = 2000
+    and ws1.ca_county = ws2.ca_county
+    and ws2.d_qoy = 2
+    and ws2.d_year = 2000
+    and ws1.ca_county = ws3.ca_county
+    and ws3.d_qoy = 3
+    and ws3.d_year =2000
+    and case when ws1.web_sales > 0 then ws2.web_sales/ws1.web_sales else null end
+       > case when ss1.store_sales > 0 then ss2.store_sales/ss1.store_sales else null end
+    and case when ws2.web_sales > 0 then ws3.web_sales/ws2.web_sales else null end
+       > case when ss2.store_sales > 0 then ss3.store_sales/ss2.store_sales else null end
+ order by ss1.d_year;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'Oxford County',2000,0.973143,0.757240,4.012687,1.640751
+'Atchison County',2000,0.800221,0.242964,11.944560,3.162954
+'Bradley County',2000,1.489632,0.575785,1.344390,0.998919
+'Mitchell County',2000,4.439233,1.161335,1.394036,1.256074
+'Sheridan County',2000,1.386030,1.250657,1.575936,0.537886
+'Smith County',2000,0.636936,0.427882,5.744845,4.477958
+'Refugio County',2000,1.812976,0.586732,1.301984,1.269604
+'Williamson County',2000,2.985102,0.391418,5.805965,4.396699
+'Nicholas County',2000,2.165116,2.056274,6.021300,1.262577
+'Ingham County',2000,0.574390,0.384114,1.306517,0.992061
+'Marion County',2000,1.158999,0.916511,2.445040,1.851073
+'Bacon County',2000,1.168826,0.394038,0.968800,0.510743
+'Edmonson County',2000,0.732442,0.299753,1.602897,1.491246
+'Vernon County',2000,0.974454,0.915946,1.368804,1.041712
+'Lamar County',2000,0.749358,0.745617,4.269036,2.029584
+'Harlan County',2000,1.670355,1.590115,2.471959,2.107294
+'Forest County',2000,0.644745,0.342367,5.771027,1.881074
+'Stark County',2000,7.338220,1.417589,1.863840,1.227366
+'Gaston County',2000,0.763774,0.455496,3.955611,2.141572
+'Boyd County',2000,1.086324,0.811507,1.168972,0.742057
+'Heard County',2000,4.102554,1.266947,3.500228,1.127804
+'Miller County',2000,2.575745,1.318273,2.191968,0.982218
+'Richmond County',2000,1.571665,1.294015,2.309592,1.778016
+'Mora County',2000,1.183261,0.635654,2.513120,0.918567
+'Nantucket County',2000,1.437897,0.722692,1.175488,0.962304
+'Lincoln County',2000,1.019137,0.944845,2.335960,1.776928
+'Stone County',2000,1.900042,0.811920,3.699361,1.521662
+'Meriwether County',2000,0.365748,0.300417,2.772270,0.787769
+'Ferry County',2000,0.701373,0.341010,4.002919,2.603464
+'Perry County',2000,1.580780,0.764453,2.153370,1.802410
+'Wright County',2000,5.029335,1.970810,4.076529,1.966472
+'Prince William County',2000,3.376373,0.630787,1.706967,0.934324
+'Cass County',2000,2.398720,1.190582,2.257169,0.847801
+'Fillmore County',2000,0.507769,0.349921,2.443162,1.301136
+'Green County',2000,0.763667,0.321499,4.694152,4.207034
+'Houston County',2000,2.045326,1.038983,1.965051,1.421193
+'Grant County',2000,0.693336,0.622870,1.788644,1.722197
+'Steele County',2000,1.377413,0.766513,1.247973,0.931195
+'Mercer County',2000,0.738342,0.601678,3.012450,2.724470
+'Culpeper County',2000,0.661751,0.619014,1.659248,1.224169
+'Harris County',2000,2.337569,0.333126,2.417058,1.025794
+'Corson County',2000,0.560309,0.175081,4.807409,3.227141
+'Otero County',2000,2.754655,1.246299,2.976111,2.245835
+'Rice County',2000,1.134698,0.733018,2.378149,1.986402
+'Crockett County',2000,1.637106,0.360468,2.134042,1.832451
+'Lake County',2000,1.255077,0.745928,1.515147,1.265662
+'New Kent County',2000,0.602616,0.399062,2.869386,2.625895
+'Bourbon County',2000,1.913115,0.981928,3.364802,1.380123
+'Tooele County',2000,6.590303,0.768910,1.788637,0.340067
+'Carter County',2000,3.953739,1.151033,2.119285,1.844491
+'Buchanan County',2000,1.195667,0.746049,3.332904,2.239788
+---- TYPES
+STRING, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL
+====
