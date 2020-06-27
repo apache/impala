@@ -1,5 +1,7 @@
 ====
 ---- QUERY: TPCDS-Q8
+-- This is an unofficial variant that is rewritten to use SEMI JOIN instead of
+-- INTERSECT.
 select
   s_store_name,
   sum(ss_net_profit)

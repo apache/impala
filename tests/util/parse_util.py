@@ -22,7 +22,7 @@ from datetime import datetime
 # changed, and the stress test loses the ability to run the full set of queries. Set
 # these constants and assert that when a workload is used, all the queries we expect to
 # use are there.
-EXPECTED_TPCDS_QUERIES_COUNT = 85
+EXPECTED_TPCDS_QUERIES_COUNT = 86
 EXPECTED_TPCH_NESTED_QUERIES_COUNT = 22
 EXPECTED_TPCH_QUERIES_COUNT = 22
 # Add the number of stress test specific queries, i.e. in files like '*-stress-*.test'
