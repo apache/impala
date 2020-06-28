@@ -274,6 +274,7 @@ TEST(SslTest, ClientBeforeServer) {
 
 TEST(SslTest, BadCiphers) {
   int port = GetServerPort();
+#ifndef __aarch64__
   {
     ThriftServer* server;
     EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
@@ -282,14 +283,14 @@ TEST(SslTest, BadCiphers) {
                   .Build(&server));
     EXPECT_FALSE(server->Start().ok());
   }
-
+#endif
   {
     ThriftServer* server;
     EXPECT_OK(ThriftServerBuilder("DummyStatestore", MakeProcessor(), port)
                   .ssl(SERVER_CERT, PRIVATE_KEY)
                   .Build(&server));
     EXPECT_OK(server->Start());
-
+#ifndef __aarch64__
     auto s1 =
         ScopedFlagSetter<string>::Make(&FLAGS_ssl_cipher_list, "this_is_not_a_cipher");
     auto s2 =
@@ -298,6 +299,7 @@ TEST(SslTest, BadCiphers) {
     ThriftClient<StatestoreServiceClientWrapper> ssl_client(
         "localhost", port, "", nullptr, true);
     EXPECT_FALSE(ssl_client.Open().ok());
+#endif
   }
 }
 
@@ -320,12 +322,13 @@ TEST(SslTest, MismatchedCiphers) {
   // Failure to negotiate a cipher will show up when data is sent, not when socket is
   // opened.
   EXPECT_OK(ssl_client.Open());
-
+#ifndef __aarch64__
   bool send_done = false;
   TRegisterSubscriberResponse resp;
   EXPECT_THROW(ssl_client.iface()->RegisterSubscriber(
                    resp, TRegisterSubscriberRequest(), &send_done),
       TTransportException);
+#endif
 }
 
 // Test that StringToProtocol() correctly maps strings to their symbolic protocol
