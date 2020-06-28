@@ -277,7 +277,7 @@ TEST(Webserver, SslCipherSuite) {
       Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
   auto cmd = ScopedFlagSetter<string>::Make(
       &FLAGS_webserver_private_key_password_cmd, "echo password");
-
+#ifndef __aarch64__
   {
     auto ciphers = ScopedFlagSetter<string>::Make(
         &FLAGS_ssl_cipher_list, "not_a_cipher");
@@ -285,7 +285,7 @@ TEST(Webserver, SslCipherSuite) {
     Webserver webserver("", FLAGS_webserver_port, &metrics);
     ASSERT_FALSE(webserver.Start().ok());
   }
-
+#endif
   {
     auto ciphers = ScopedFlagSetter<string>::Make(
         &FLAGS_ssl_cipher_list, "AES128-SHA");

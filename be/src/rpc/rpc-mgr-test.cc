@@ -113,6 +113,7 @@ TEST_F(RpcMgrTest, CorrectPasswordTls) {
   tls_rpc_mgr.Shutdown();
 }
 
+#ifndef __aarch64__
 // Test with a bad TLS cipher and verify that an error is thrown.
 TEST_F(RpcMgrTest, BadCiphersTls) {
   ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT, "", "not_a_cipher");
@@ -128,6 +129,7 @@ TEST_F(RpcMgrTest, BadCiphersTls) {
   ASSERT_FALSE(tls_rpc_mgr.Init(tls_krpc_address).ok());
   tls_rpc_mgr.Shutdown();
 }
+#endif
 
 // Test with a valid TLS cipher.
 TEST_F(RpcMgrTest, ValidCiphersTls) {
