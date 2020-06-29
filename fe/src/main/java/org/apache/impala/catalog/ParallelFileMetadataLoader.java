@@ -35,6 +35,7 @@ import org.apache.impala.catalog.FeFsTable.Utils;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TValidWriteIdList;
@@ -158,19 +159,21 @@ public class ParallelFileMetadataLoader {
     int failedLoadTasks = 0;
     ExecutorService pool = createPool();
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(logPrefix_)) {
-      List<Future<Void>> futures = new ArrayList<>(loaders_.size());
+      List<Pair<FileMetadataLoader, Future<Void>>> futures =
+          new ArrayList<>(loaders_.size());
       for (FileMetadataLoader loader : loaders_.values()) {
-        futures.add(pool.submit(() -> { loader.load(); return null; }));
+        futures.add(new Pair<FileMetadataLoader, Future<Void>>(
+            loader, pool.submit(() -> { loader.load(); return null; })));
       }
 
       // Wait for the loaders to finish.
       for (int i = 0; i < futures.size(); i++) {
         try {
-          futures.get(i).get();
+          futures.get(i).second.get();
         } catch (ExecutionException | InterruptedException e) {
           if (++failedLoadTasks <= MAX_PATH_METADATA_LOADING_ERRORS_TO_LOG) {
             LOG.error(logPrefix_ + " encountered an error loading data for path " +
-                loaders_.get(i).getPartDir(), e);
+                futures.get(i).first.getPartDir(), e);
           }
         }
       }
