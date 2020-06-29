@@ -127,11 +127,17 @@ TEST(ThreadPoolTest, SynchronousThreadPoolTimeouts) {
   SynchronousThreadPool pool("sync-thread-pool", "worker", 1, 1);
   ASSERT_OK(pool.Init());
 
-  // Timeout case #1: Submit one task that takes 100 milliseconds. Offer it with a timeout
-  // of 1 millisecond so that the caller immediately times out.
+  // Timeout case #1: Submit one task that takes 100 milliseconds(500 milliseconds on
+  // aarch64). Offer it with a timeout of 1 millisecond so that the caller immediately
+  // times out.
   unique_ptr<bool> long_sleep_destroyed(new bool);
+#ifndef __aarch64__
+  int sleepMilliseconds = 100;
+#else
+  int sleepMilliseconds = 500;
+#endif
   std::shared_ptr<SleepWorkItem> long_sleep(
-      new SleepWorkItem(100, long_sleep_destroyed.get()));
+      new SleepWorkItem(sleepMilliseconds, long_sleep_destroyed.get()));
   Status timeout_status = pool.SynchronousOffer(long_sleep, 1);
   ASSERT_EQ(timeout_status.code(), TErrorCode::THREAD_POOL_TASK_TIMED_OUT);
   // The work item is still running, and even if the caller releases its shared_ptr,
