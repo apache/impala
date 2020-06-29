@@ -28,7 +28,6 @@
 #include "gen-cpp/ImpalaInternalService.h" // for TQueryOptions
 #include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/scheduler.h"
-#include "scheduling/query-schedule.h"
 #include "util/metrics.h"
 
 namespace impala {

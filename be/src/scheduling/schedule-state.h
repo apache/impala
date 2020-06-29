@@ -32,8 +32,8 @@
 
 namespace impala {
 
-struct FragmentExecParams;
-struct FInstanceExecParams;
+struct FragmentScheduleState;
+struct FInstanceScheduleState;
 
 /// map from scan node id to a list of scan ranges
 typedef std::map<TPlanNodeId, std::vector<ScanRangeParamsPB>> PerNodeScanRanges;
@@ -47,31 +47,33 @@ typedef std::unordered_map<NetworkAddressPB, PerNodeScanRanges>
 /// participates in query execution, which includes every backend that has fragments
 /// scheduled on it and the coordinator backend.
 ///
-/// Created by QuerySchedule::GetOrCreateBackendExecParams() and initialized in
+/// Created by ScheduleState::GetOrCreateBackendScheduleState() and initialized in
 /// Scheduler::ComputeBackendExecParams(). Used as an input to the
 /// AdmissionController and Coordinator::BackendState.
-struct BackendExecParams {
+struct BackendScheduleState {
   BackendDescriptorPB be_desc;
 
   /// Pointer to the corresponding protobuf struct containing any parameters for this
   /// backend that will need to be sent back to the coordinator. Owned by
-  /// QuerySchedule::query_schedule_pb_.
-  BackendExecParamsPB* pb;
+  /// ScheduleState::query_schedule_pb_.
+  BackendExecParamsPB* exec_params;
 
-  explicit BackendExecParams(BackendExecParamsPB* pb) : pb(pb) {}
+  explicit BackendScheduleState(BackendExecParamsPB* exec_params)
+    : exec_params(exec_params) {}
 };
 
-/// Map from an impalad backend address to the exec params for that backend.
-typedef std::unordered_map<NetworkAddressPB, BackendExecParams> PerBackendExecParams;
+/// Map from an impalad backend address to the state for that backend.
+typedef std::unordered_map<NetworkAddressPB, BackendScheduleState>
+    PerBackendScheduleStates;
 
 /// Execution parameters for a single fragment instance. Contains both intermediate
 /// info needed by the scheduler and info that will be sent back to the coordinator.
 ///
-/// FInstanceExecParams are created as children of FragmentExecParams (in
-/// 'instance_exec_params') and then the calculated execution parameters, 'pb', are
-/// transferred to the corresponding BackendExecParams in
+/// FInstanceScheduleStates are created as children of FragmentScheduleStates (in
+/// 'instance_states') and then the calculated execution parameters, 'exec_params', are
+/// transferred to the corresponding BackendExecParamsPB in
 /// Scheduler::ComputeBackendExecParams().
-struct FInstanceExecParams {
+struct FInstanceScheduleState {
   /// Thrift address of execution backend.
   NetworkAddressPB host;
 
@@ -80,15 +82,15 @@ struct FInstanceExecParams {
 
   /// Contains any info that needs to be sent back to the coordinator. Computed during
   /// Scheduler::ComputeFragmentExecParams() then transferred to the corresponding
-  /// BackendExecParamsPB in Scheduler::ComputeBackendExecParams(), after which it is no
-  /// longer valid to access.
-  FInstanceExecParamsPB pb;
+  /// BackendExecParamsPB in Scheduler::ComputeBackendExecParams(), after which it
+  /// is no longer valid to access.
+  FInstanceExecParamsPB exec_params;
 
-  FInstanceExecParams(const UniqueIdPB& instance_id, const NetworkAddressPB& host,
+  FInstanceScheduleState(const UniqueIdPB& instance_id, const NetworkAddressPB& host,
       const NetworkAddressPB& krpc_host, int per_fragment_instance_idx,
-      const FragmentExecParams& fragment_exec_params);
+      const FragmentScheduleState& fragment_state);
 
-  /// Adds the ranges in 'scan_ranges' to the scan at 'scan_idx' in 'pb'.
+  /// Adds the ranges in 'scan_ranges' to the scan at 'scan_idx' in 'exec_params'.
   void AddScanRanges(int scan_idx, const std::vector<ScanRangeParamsPB>& scan_ranges);
 };
 
@@ -96,9 +98,9 @@ struct FInstanceExecParams {
 /// any intermediate data needed for scheduling that will not be sent back to the
 /// coordinator as part of the QuerySchedulePB along with a pointer to the corresponding
 /// FragmentExecParamsPB in the QuerySchedulePB.
-struct FragmentExecParams {
+struct FragmentScheduleState {
   /// Only needed as intermediate state during exec parameter computation.
-  /// For scheduling, refer to FInstanceExecParams.per_node_scan_ranges
+  /// For scheduling, refer to FInstanceExecParamsPB.per_node_scan_ranges
   FragmentScanRangeAssignment scan_range_assignment;
 
   bool is_coord_fragment;
@@ -111,52 +113,52 @@ struct FragmentExecParams {
   /// instances for a given backend will be consecutive entries in the vector. These have
   /// their protobuf params Swap()-ed to the BackendExecParamsPB during
   /// Scheduler::ComputeBackendExecParams() and are no longer valid after that.
-  std::vector<FInstanceExecParams> instance_exec_params;
+  std::vector<FInstanceScheduleState> instance_states;
 
-  /// Pointer to the corresponding FragmentExecParamsPB in the parent QuerySchedule's
+  /// Pointer to the corresponding FragmentExecParamsPB in the parent ScheduleState's
   /// 'query_schedule_pb_'
-  FragmentExecParamsPB* pb;
+  FragmentExecParamsPB* exec_params;
 
-  FragmentExecParams(const TPlanFragment& fragment, FragmentExecParamsPB* pb);
+  FragmentScheduleState(const TPlanFragment& fragment, FragmentExecParamsPB* exec_params);
 };
 
-/// QuerySchedule is a container class for scheduling data used by Scheduler and
+/// ScheduleState is a container class for scheduling data used by Scheduler and
 /// AdmissionController, which perform the scheduling logic itself, and it is only
-/// intednded to be accessed by them. The information needed for the coordinator to begin
+/// intended to be accessed by them. The information needed for the coordinator to begin
 /// execution is stored in 'query_schedule_pb_', which is returned from the
 /// AdmissionController on successful admission. Everything else is intermediate data
 /// needed to calculate the schedule but is discarded after a scheduling decision is made.
 ///
 /// The general usage pattern is:
-/// - FragmentExecParams are created for each fragment in the plan. They are given
+/// - FragmentScheduleStates are created for each fragment in the plan. They are given
 ///   pointers to corresponding FragmentExecParamsPBs created in the QuerySchedulePB.
-/// - FInstanceExecParams are created as children of the FragmentExecParams for each
-///   finstance and assigned to hosts. The FInstanceExecParams each have a corresponding
-///   FInstanceExecParamsPB that they initially own.
-/// - The scheduler computes the BackendExecParams for each backend that was assigned a
+/// - FInstanceScheduleStates are created as children of the FragmentScheduleStates for
+///   each finstance and assigned to hosts. The FInstanceScheduleStates each have a
+///   corresponding FInstanceExecParamsPB that they initially own.
+/// - The scheduler computes the BackendScheduleState for each backend that was assigned a
 ///   fragment instance (and the coordinator backend). They are given pointers to
 ///   corresponding BackendExecParamsPBs created in the QuerySchedulePB and the
 ///   FInstanceExecParamsPB are Swap()-ed into them.
-/// - The QuerySchedule is passed to the admission controller, which keeps updating the
+/// - The ScheduleState is passed to the admission controller, which keeps updating the
 ///   memory requirements by calling UpdateMemoryRequirements() every time it tries to
 ///   admit the query and sets the final values once the query gets admitted successfully.
 /// - On successful admission, the QuerySchedulePB is returned to the coordinator and
 ///   everything else is discarded.
-class QuerySchedule {
+class ScheduleState {
  public:
-  QuerySchedule(const UniqueIdPB& query_id, const TQueryExecRequest& request,
+  ScheduleState(const UniqueIdPB& query_id, const TQueryExecRequest& request,
       const TQueryOptions& query_options, RuntimeProfile* summary_profile,
       RuntimeProfile::EventSequence* query_events);
 
-  /// For testing only: build a QuerySchedule object but do not run Init().
-  QuerySchedule(const UniqueIdPB& query_id, const TQueryExecRequest& request,
+  /// For testing only: build a ScheduleState object but do not run Init().
+  ScheduleState(const UniqueIdPB& query_id, const TQueryExecRequest& request,
       const TQueryOptions& query_options, RuntimeProfile* summary_profile);
 
   /// Verifies that the schedule is well-formed (and DCHECKs if it isn't):
-  /// - all fragments have a FragmentExecParams
+  /// - all fragments have a FragmentScheduleState
   /// - all scan ranges are assigned
-  /// - all BackendExecParams have instances assigned except for coordinator.
-  /// Expected to be called after the BackendExecParams have been computed, i.e. the
+  /// - all BackendScheduleStates have instances assigned except for coordinator.
+  /// Expected to be called after the BackendScheduleStates have been computed, i.e. the
   /// FInstanceExecParamsPB will have already been swapped.
   void Validate() const;
 
@@ -177,7 +179,7 @@ class QuerySchedule {
   /// dedicated coordinator.
   int64_t GetDedicatedCoordMemoryEstimate() const;
 
-  /// Helper methods used by scheduler to populate this QuerySchedule.
+  /// Helper methods used by scheduler to populate this ScheduleState.
   void IncNumScanRanges(int64_t delta);
 
   /// Map node ids to the id of their containing fragment.
@@ -195,8 +197,8 @@ class QuerySchedule {
 
   const TPlanFragment& GetContainingFragment(PlanNodeId node_id) const {
     FragmentIdx fragment_idx = GetFragmentIdx(node_id);
-    DCHECK_LT(fragment_idx, fragment_exec_params_.size());
-    return fragment_exec_params_[fragment_idx].fragment;
+    DCHECK_LT(fragment_idx, fragment_schedule_states_.size());
+    return fragment_schedule_states_[fragment_idx].fragment;
   }
 
   const TPlanNode& GetNode(PlanNodeId id) const {
@@ -204,29 +206,31 @@ class QuerySchedule {
     return fragment.plan.nodes[plan_node_to_plan_node_idx_[id]];
   }
 
-  const PerBackendExecParams& per_backend_exec_params() const {
-    return per_backend_exec_params_;
+  const PerBackendScheduleStates& per_backend_schedule_states() const {
+    return per_backend_schedule_states_;
   }
-  PerBackendExecParams& per_backend_exec_params() { return per_backend_exec_params_; }
+  PerBackendScheduleStates& per_backend_schedule_states() {
+    return per_backend_schedule_states_;
+  }
 
-  /// Returns a reference to the BackendExecParams corresponding to 'address', creating
+  /// Returns a reference to the BackendScheduleState corresponding to 'address', creating
   /// it if it doesn't already exist.
-  BackendExecParams& GetOrCreateBackendExecParams(const NetworkAddressPB& address);
+  BackendScheduleState& GetOrCreateBackendScheduleState(const NetworkAddressPB& address);
 
-  /// Removes any BackendExecParams that have been created. Only used in testing.
-  void ClearBackendExecParams() {
-    per_backend_exec_params_.clear();
+  /// Removes any BackendScheduleStates that have been created. Only used in testing.
+  void ClearBackendScheduleStates() {
+    per_backend_schedule_states_.clear();
     query_schedule_pb_->clear_backend_exec_params();
   }
 
-  std::vector<FragmentExecParams>& fragment_exec_params() {
-    return fragment_exec_params_;
+  std::vector<FragmentScheduleState>& fragment_schedule_states() {
+    return fragment_schedule_states_;
   }
-  const FragmentExecParams& GetFragmentExecParams(FragmentIdx idx) const {
-    return fragment_exec_params_[idx];
+  const FragmentScheduleState& GetFragmentScheduleState(FragmentIdx idx) const {
+    return fragment_schedule_states_[idx];
   }
-  FragmentExecParams* GetFragmentExecParams(FragmentIdx idx) {
-    return &fragment_exec_params_[idx];
+  FragmentScheduleState* GetFragmentScheduleState(FragmentIdx idx) {
+    return &fragment_schedule_states_[idx];
   }
 
 
@@ -315,11 +319,11 @@ class QuerySchedule {
 
   /// Populated in Init(), then calculated in Scheduler::ComputeFragmentExecParams().
   /// Indexed by fragment idx (TPlanFragment.idx).
-  std::vector<FragmentExecParams> fragment_exec_params_;
+  std::vector<FragmentScheduleState> fragment_schedule_states_;
 
-  /// Map from backend address to pointers to the corresponding BackendExecParamsPB in
-  /// 'query_schedule_pb_'. Created in GetOrCreateBackendExecParams().
-  PerBackendExecParams per_backend_exec_params_;
+  /// Map from backend address to corresponding BackendScheduleState. Created in
+  /// GetOrCreateBackendScheduleState().
+  PerBackendScheduleStates per_backend_schedule_states_;
 
   /// Used to generate consecutive fragment instance ids.
   UniqueIdPB next_instance_id_;
@@ -338,7 +342,7 @@ class QuerySchedule {
   /// Map from fragment idx to references into the 'request_'.
   std::unordered_map<int32_t, const TPlanFragment&> fragments_;
 
-  /// Populate fragments_ and fragment_exec_params_ from request_.plan_exec_info.
+  /// Populate fragments_ and fragment_schedule_states_ from request_.plan_exec_info.
   /// Sets is_coord_fragment and exchange_input_fragments.
   /// Also populates plan_node_to_fragment_idx_ and plan_node_to_plan_node_idx_.
   void Init();

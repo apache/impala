@@ -28,7 +28,7 @@
 #include "runtime/mem-tracker.h"
 #include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/executor-group.h"
-#include "scheduling/query-schedule.h"
+#include "scheduling/schedule-state.h"
 #include "scheduling/scheduler.h"
 #include "service/impala-server.h"
 #include "util/bit-util.h"
@@ -332,8 +332,8 @@ Status AdmissionController::Init() {
   return status;
 }
 
-void AdmissionController::PoolStats::AdmitQueryAndMemory(const QuerySchedule& schedule) {
-  int64_t cluster_mem_admitted = schedule.GetClusterMemoryToAdmit();
+void AdmissionController::PoolStats::AdmitQueryAndMemory(const ScheduleState& state) {
+  int64_t cluster_mem_admitted = state.GetClusterMemoryToAdmit();
   DCHECK_GT(cluster_mem_admitted, 0);
   local_mem_admitted_ += cluster_mem_admitted;
   metrics_.local_mem_admitted->Increment(cluster_mem_admitted);
@@ -423,15 +423,15 @@ void AdmissionController::UpdateStatsOnReleaseForBackends(const UniqueIdPB& quer
   pools_for_updates_.insert(running_query.request_pool);
 }
 
-void AdmissionController::UpdateStatsOnAdmission(const QuerySchedule& schedule) {
-  for (const auto& entry : schedule.per_backend_exec_params()) {
+void AdmissionController::UpdateStatsOnAdmission(const ScheduleState& state) {
+  for (const auto& entry : state.per_backend_schedule_states()) {
     const NetworkAddressPB& host_addr = entry.first;
-    int64_t mem_to_admit = GetMemToAdmit(schedule, entry.second);
-    UpdateHostStats(host_addr, mem_to_admit, 1, entry.second.pb->slots_to_use());
+    int64_t mem_to_admit = GetMemToAdmit(state, entry.second);
+    UpdateHostStats(host_addr, mem_to_admit, 1, entry.second.exec_params->slots_to_use());
   }
-  PoolStats* pool_stats = GetPoolStats(schedule);
-  pool_stats->AdmitQueryAndMemory(schedule);
-  pools_for_updates_.insert(schedule.request_pool());
+  PoolStats* pool_stats = GetPoolStats(state);
+  pool_stats->AdmitQueryAndMemory(state);
+  pools_for_updates_.insert(state.request_pool());
 }
 
 void AdmissionController::UpdateHostStats(const NetworkAddressPB& host_addr,
@@ -470,22 +470,21 @@ static bool CanMemLimitAccommodateReservation(
   return false;
 }
 
-bool AdmissionController::CanAccommodateMaxInitialReservation(
-    const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
-    string* mem_unavailable_reason) {
-  const int64_t executor_mem_limit = schedule.per_backend_mem_limit();
-  const int64_t executor_min_reservation = schedule.largest_min_reservation();
-  const int64_t coord_mem_limit = schedule.coord_backend_mem_limit();
-  const int64_t coord_min_reservation = schedule.coord_min_reservation();
+bool AdmissionController::CanAccommodateMaxInitialReservation(const ScheduleState& state,
+    const TPoolConfig& pool_cfg, string* mem_unavailable_reason) {
+  const int64_t executor_mem_limit = state.per_backend_mem_limit();
+  const int64_t executor_min_reservation = state.largest_min_reservation();
+  const int64_t coord_mem_limit = state.coord_backend_mem_limit();
+  const int64_t coord_min_reservation = state.coord_min_reservation();
   return CanMemLimitAccommodateReservation(
              executor_mem_limit, executor_min_reservation, mem_unavailable_reason)
       && CanMemLimitAccommodateReservation(
              coord_mem_limit, coord_min_reservation, mem_unavailable_reason);
 }
 
-bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule,
+bool AdmissionController::HasAvailableMemResources(const ScheduleState& state,
     const TPoolConfig& pool_cfg, string* mem_unavailable_reason) {
-  const string& pool_name = schedule.request_pool();
+  const string& pool_name = state.request_pool();
   const int64_t pool_max_mem = GetMaxMemForPool(pool_cfg);
   // If the pool doesn't have memory resources configured, always true.
   if (pool_max_mem < 0) return true;
@@ -498,10 +497,10 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
   //    to execute the query.
 
   // Case 1:
-  PoolStats* stats = GetPoolStats(schedule);
-  int64_t cluster_mem_to_admit = schedule.GetClusterMemoryToAdmit();
+  PoolStats* stats = GetPoolStats(state);
+  int64_t cluster_mem_to_admit = state.GetClusterMemoryToAdmit();
   VLOG_RPC << "Checking agg mem in pool=" << pool_name << " : " << stats->DebugString()
-           << " executor_group=" << schedule.executor_group()
+           << " executor_group=" << state.executor_group()
            << " cluster_mem_needed=" << PrintBytes(cluster_mem_to_admit)
            << " pool_max_mem=" << PrintBytes(pool_max_mem);
   if (stats->EffectiveMemReserved() + cluster_mem_to_admit > pool_max_mem) {
@@ -513,14 +512,14 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
   }
 
   // Case 2:
-  for (const auto& entry : schedule.per_backend_exec_params()) {
+  for (const auto& entry : state.per_backend_schedule_states()) {
     const NetworkAddressPB& host = entry.first;
     const string host_id = NetworkAddressPBToString(host);
     int64_t admit_mem_limit = entry.second.be_desc.admit_mem_limit();
     const HostStats& host_stats = host_stats_[host_id];
     int64_t mem_reserved = host_stats.mem_reserved;
     int64_t mem_admitted = host_stats.mem_admitted;
-    int64_t mem_to_admit = GetMemToAdmit(schedule, entry.second);
+    int64_t mem_to_admit = GetMemToAdmit(state, entry.second);
     VLOG_ROW << "Checking memory on host=" << host_id
              << " mem_reserved=" << PrintBytes(mem_reserved)
              << " mem_admitted=" << PrintBytes(mem_admitted)
@@ -535,38 +534,37 @@ bool AdmissionController::HasAvailableMemResources(const QuerySchedule& schedule
       return false;
     }
   }
-  const TQueryOptions& query_opts = schedule.query_options();
+  const TQueryOptions& query_opts = state.query_options();
   if (!query_opts.__isset.buffer_pool_limit || query_opts.buffer_pool_limit <= 0) {
     // Check if a change in pool_cfg.max_query_mem_limit (while the query was queued)
     // resulted in a decrease in the computed per_host_mem_limit such that it can no
     // longer accommodate the largest min_reservation.
-    return CanAccommodateMaxInitialReservation(
-        schedule, pool_cfg, mem_unavailable_reason);
+    return CanAccommodateMaxInitialReservation(state, pool_cfg, mem_unavailable_reason);
   }
   return true;
 }
 
-bool AdmissionController::HasAvailableSlots(const QuerySchedule& schedule,
-    const TPoolConfig& pool_cfg, string* unavailable_reason) {
-  for (const auto& entry : schedule.per_backend_exec_params()) {
+bool AdmissionController::HasAvailableSlots(
+    const ScheduleState& state, const TPoolConfig& pool_cfg, string* unavailable_reason) {
+  for (const auto& entry : state.per_backend_schedule_states()) {
     const NetworkAddressPB& host = entry.first;
     const string host_id = NetworkAddressPBToString(host);
     int64_t admission_slots = entry.second.be_desc.admission_slots();
     int64_t slots_in_use = host_stats_[host_id].slots_in_use;
     VLOG_ROW << "Checking available slot on host=" << host_id
              << " slots_in_use=" << slots_in_use
-             << " needs=" << slots_in_use + entry.second.pb->slots_to_use()
+             << " needs=" << slots_in_use + entry.second.exec_params->slots_to_use()
              << " executor admission_slots=" << admission_slots;
-    if (slots_in_use + entry.second.pb->slots_to_use() > admission_slots) {
+    if (slots_in_use + entry.second.exec_params->slots_to_use() > admission_slots) {
       *unavailable_reason = Substitute(HOST_SLOT_NOT_AVAILABLE, host_id,
-          entry.second.pb->slots_to_use(), slots_in_use, admission_slots);
+          entry.second.exec_params->slots_to_use(), slots_in_use, admission_slots);
       return false;
     }
   }
   return true;
 }
 
-bool AdmissionController::CanAdmitRequest(const QuerySchedule& schedule,
+bool AdmissionController::CanAdmitRequest(const ScheduleState& state,
     const TPoolConfig& pool_cfg, bool admit_from_queue, string* not_admitted_reason) {
   // Can't admit if:
   //  (a) There are already queued requests (and this is not admitting from the queue).
@@ -576,9 +574,9 @@ bool AdmissionController::CanAdmitRequest(const QuerySchedule& schedule,
   //  (d) There are not enough memory resources available for the query.
 
   const int64_t max_requests = GetMaxRequestsForPool(pool_cfg);
-  PoolStats* pool_stats = GetPoolStats(schedule);
+  PoolStats* pool_stats = GetPoolStats(state);
   bool default_group =
-      schedule.executor_group() == ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME;
+      state.executor_group() == ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME;
   if (!admit_from_queue && pool_stats->local_stats().num_queued > 0) {
     *not_admitted_reason = Substitute(QUEUED_QUEUE_NOT_EMPTY,
         pool_stats->local_stats().num_queued, GetStalenessDetailLocked(" "));
@@ -591,13 +589,13 @@ bool AdmissionController::CanAdmitRequest(const QuerySchedule& schedule,
         max_requests, GetStalenessDetailLocked(" "));
     return false;
   }
-  if (!default_group && !HasAvailableSlots(schedule, pool_cfg, not_admitted_reason)) {
+  if (!default_group && !HasAvailableSlots(state, pool_cfg, not_admitted_reason)) {
     // All non-default executor groups are also limited by the number of running queries
     // per executor.
     // TODO(IMPALA-8757): Extend slot based admission to default executor group
     return false;
   }
-  if (!HasAvailableMemResources(schedule, pool_cfg, not_admitted_reason)) {
+  if (!HasAvailableMemResources(state, pool_cfg, not_admitted_reason)) {
     return false;
   }
   return true;
@@ -644,11 +642,11 @@ bool AdmissionController::RejectForCluster(const string& pool_name,
   return false;
 }
 
-bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
-    const TPoolConfig& pool_cfg, string* rejection_reason) {
+bool AdmissionController::RejectForSchedule(
+    const ScheduleState& state, const TPoolConfig& pool_cfg, string* rejection_reason) {
   DCHECK(rejection_reason != nullptr && rejection_reason->empty());
   bool default_group =
-      schedule.executor_group() == ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME;
+      state.executor_group() == ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME;
 
   // Compute the max (over all backends), the cluster totals (across all backends) for
   // min_mem_reservation_bytes, thread_reservation, the min admit_mem_limit
@@ -661,36 +659,41 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
   pair<const NetworkAddressPB*, int64_t> coord_admit_mem_limit(
       nullptr, std::numeric_limits<int64_t>::max());
   int64_t cluster_thread_reservation = 0;
-  for (const auto& e : schedule.per_backend_exec_params()) {
-    const BackendExecParams& bp = e.second;
+  for (const auto& e : state.per_backend_schedule_states()) {
+    const BackendScheduleState& be_state = e.second;
     // TODO(IMPALA-8757): Extend slot based admission to default executor group
-    if (!default_group && bp.pb->slots_to_use() > bp.be_desc.admission_slots()) {
+    if (!default_group
+        && be_state.exec_params->slots_to_use() > be_state.be_desc.admission_slots()) {
       *rejection_reason = Substitute(REASON_NOT_ENOUGH_SLOTS_ON_BACKEND,
-          bp.pb->slots_to_use(), NetworkAddressPBToString(bp.be_desc.address()),
-          bp.be_desc.admission_slots());
+          be_state.exec_params->slots_to_use(),
+          NetworkAddressPBToString(be_state.be_desc.address()),
+          be_state.be_desc.admission_slots());
       return true;
     }
 
-    cluster_min_mem_reservation_bytes += bp.pb->min_mem_reservation_bytes();
-    if (bp.pb->min_mem_reservation_bytes() > largest_min_mem_reservation.second) {
+    cluster_min_mem_reservation_bytes +=
+        be_state.exec_params->min_mem_reservation_bytes();
+    if (be_state.exec_params->min_mem_reservation_bytes()
+        > largest_min_mem_reservation.second) {
       largest_min_mem_reservation =
-          make_pair(&e.first, bp.pb->min_mem_reservation_bytes());
+          make_pair(&e.first, be_state.exec_params->min_mem_reservation_bytes());
     }
-    cluster_thread_reservation += bp.pb->thread_reservation();
-    if (bp.pb->thread_reservation() > max_thread_reservation.second) {
-      max_thread_reservation = make_pair(&e.first, bp.pb->thread_reservation());
+    cluster_thread_reservation += be_state.exec_params->thread_reservation();
+    if (be_state.exec_params->thread_reservation() > max_thread_reservation.second) {
+      max_thread_reservation =
+          make_pair(&e.first, be_state.exec_params->thread_reservation());
     }
-    if (bp.pb->is_coord_backend()) {
+    if (be_state.exec_params->is_coord_backend()) {
       coord_admit_mem_limit.first = &e.first;
-      coord_admit_mem_limit.second = bp.be_desc.admit_mem_limit();
-    } else if (bp.be_desc.admit_mem_limit() < min_executor_admit_mem_limit.second) {
+      coord_admit_mem_limit.second = be_state.be_desc.admit_mem_limit();
+    } else if (be_state.be_desc.admit_mem_limit() < min_executor_admit_mem_limit.second) {
       min_executor_admit_mem_limit.first = &e.first;
-      min_executor_admit_mem_limit.second = bp.be_desc.admit_mem_limit();
+      min_executor_admit_mem_limit.second = be_state.be_desc.admit_mem_limit();
     }
   }
 
   // Checks related to the min buffer reservation against configured query memory limits:
-  const TQueryOptions& query_opts = schedule.query_options();
+  const TQueryOptions& query_opts = state.query_options();
   if (query_opts.__isset.buffer_pool_limit && query_opts.buffer_pool_limit > 0) {
     if (largest_min_mem_reservation.second > query_opts.buffer_pool_limit) {
       *rejection_reason = Substitute(REASON_BUFFER_LIMIT_TOO_LOW_FOR_RESERVATION,
@@ -698,7 +701,7 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
           PrintBytes(largest_min_mem_reservation.second));
       return true;
     }
-  } else if (!CanAccommodateMaxInitialReservation(schedule, pool_cfg, rejection_reason)) {
+  } else if (!CanAccommodateMaxInitialReservation(state, pool_cfg, rejection_reason)) {
     // If buffer_pool_limit is not explicitly set, it's calculated from mem_limit.
     return true;
   }
@@ -716,7 +719,7 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
       && query_opts.thread_reservation_aggregate_limit > 0
       && cluster_thread_reservation > query_opts.thread_reservation_aggregate_limit) {
     *rejection_reason = Substitute(REASON_THREAD_RESERVATION_AGG_LIMIT_EXCEEDED,
-        schedule.per_backend_exec_params().size(), cluster_thread_reservation,
+        state.per_backend_schedule_states().size(), cluster_thread_reservation,
         query_opts.thread_reservation_aggregate_limit);
     return true;
   }
@@ -735,13 +738,13 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
           PrintBytes(max_mem), PrintBytes(cluster_min_mem_reservation_bytes));
       return true;
     }
-    int64_t cluster_mem_to_admit = schedule.GetClusterMemoryToAdmit();
+    int64_t cluster_mem_to_admit = state.GetClusterMemoryToAdmit();
     if (cluster_mem_to_admit > max_mem) {
       *rejection_reason = Substitute(REASON_REQ_OVER_POOL_MEM,
           PrintBytes(cluster_mem_to_admit), PrintBytes(max_mem));
       return true;
     }
-    int64_t executor_mem_to_admit = schedule.per_backend_mem_to_admit();
+    int64_t executor_mem_to_admit = state.per_backend_mem_to_admit();
     VLOG_ROW << "Checking executor mem with executor_mem_to_admit = "
              << executor_mem_to_admit
              << " and min_admit_mem_limit.second = "
@@ -753,7 +756,7 @@ bool AdmissionController::RejectForSchedule(const QuerySchedule& schedule,
               NetworkAddressPBToString(*min_executor_admit_mem_limit.first));
       return true;
     }
-    int64_t coord_mem_to_admit = schedule.coord_backend_mem_to_admit();
+    int64_t coord_mem_to_admit = state.coord_backend_mem_to_admit();
     VLOG_ROW << "Checking coordinator mem with coord_mem_to_admit = "
              << coord_mem_to_admit
              << " and coord_admit_mem_limit.second = " << coord_admit_mem_limit.second;
@@ -1156,7 +1159,7 @@ void AdmissionController::UpdateClusterAggregates() {
   if (i > 0) VLOG_ROW << ss.str();
 }
 
-Status AdmissionController::ComputeGroupSchedules(
+Status AdmissionController::ComputeGroupScheduleStates(
     ClusterMembershipMgr::SnapshotPtr membership_snapshot, QueueNode* queue_node) {
   int64_t previous_membership_version = 0;
   if (queue_node->membership_snapshot.get() != nullptr) {
@@ -1177,7 +1180,7 @@ Status AdmissionController::ComputeGroupSchedules(
           << " with membership version " << current_membership_version;
 
   queue_node->membership_snapshot = membership_snapshot;
-  std::vector<GroupSchedule>* output_schedules = &queue_node->group_schedules;
+  std::vector<GroupScheduleState>* output_schedules = &queue_node->group_states;
   output_schedules->clear();
 
   // If the first statestore update arrives before the local backend has finished starting
@@ -1207,17 +1210,17 @@ Status AdmissionController::ComputeGroupSchedules(
     DCHECK(executor_group->IsHealthy()
         || cluster_membership_mgr_->GetEmptyExecutorGroup() == executor_group)
         << executor_group->name();
-    unique_ptr<QuerySchedule> group_schedule =
-        make_unique<QuerySchedule>(request.query_id, request.request,
+    unique_ptr<ScheduleState> group_state =
+        make_unique<ScheduleState>(request.query_id, request.request,
             request.query_options, request.summary_profile, request.query_events);
     const string& group_name = executor_group->name();
     VLOG(3) << "Scheduling for executor group: " << group_name << " with "
             << executor_group->NumExecutors() << " executors";
     const Scheduler::ExecutorConfig group_config = {*executor_group, local_be_desc};
-    RETURN_IF_ERROR(ExecEnv::GetInstance()->scheduler()->Schedule(
-        group_config, group_schedule.get()));
-    DCHECK(!group_schedule->executor_group().empty());
-    output_schedules->emplace_back(std::move(group_schedule), *executor_group);
+    RETURN_IF_ERROR(
+        ExecEnv::GetInstance()->scheduler()->Schedule(group_config, group_state.get()));
+    DCHECK(!group_state->executor_group().empty());
+    output_schedules->emplace_back(std::move(group_state), *executor_group);
   }
   DCHECK(!output_schedules->empty());
   return Status::OK();
@@ -1236,21 +1239,21 @@ bool AdmissionController::FindGroupToAdmitOrReject(
   }
 
   // Compute schedules
-  Status ret = ComputeGroupSchedules(membership_snapshot, queue_node);
+  Status ret = ComputeGroupScheduleStates(membership_snapshot, queue_node);
   if (!ret.ok()) {
     DCHECK(queue_node->not_admitted_reason.empty());
     queue_node->not_admitted_reason = Substitute(REASON_SCHEDULER_ERROR, ret.GetDetail());
     return false;
   }
-  if (queue_node->group_schedules.empty()) {
+  if (queue_node->group_states.empty()) {
     DCHECK(!queue_node->not_admitted_reason.empty());
     return true;
   }
 
-  for (GroupSchedule& group_schedule : queue_node->group_schedules) {
-    const ExecutorGroup& executor_group = group_schedule.executor_group;
-    QuerySchedule* schedule = group_schedule.schedule.get();
-    schedule->UpdateMemoryRequirements(pool_config);
+  for (GroupScheduleState& group_state : queue_node->group_states) {
+    const ExecutorGroup& executor_group = group_state.executor_group;
+    ScheduleState* state = group_state.state.get();
+    state->UpdateMemoryRequirements(pool_config);
 
     const string& group_name = executor_group.name();
     int64_t group_size = executor_group.NumExecutors();
@@ -1260,27 +1263,26 @@ bool AdmissionController::FindGroupToAdmitOrReject(
     const int64_t max_queued = GetMaxQueuedForPool(pool_config);
     const int64_t max_mem = GetMaxMemForPool(pool_config);
     const int64_t max_requests = GetMaxRequestsForPool(pool_config);
-    VLOG_QUERY << "Trying to admit id=" << PrintId(schedule->query_id())
+    VLOG_QUERY << "Trying to admit id=" << PrintId(state->query_id())
                << " in pool_name=" << pool_name << " executor_group_name=" << group_name
                << " per_host_mem_estimate="
-               << PrintBytes(schedule->GetPerExecutorMemoryEstimate())
+               << PrintBytes(state->GetPerExecutorMemoryEstimate())
                << " dedicated_coord_mem_estimate="
-               << PrintBytes(schedule->GetDedicatedCoordMemoryEstimate())
-               << " max_requests=" << max_requests
-               << " max_queued=" << max_queued
+               << PrintBytes(state->GetDedicatedCoordMemoryEstimate())
+               << " max_requests=" << max_requests << " max_queued=" << max_queued
                << " max_mem=" << PrintBytes(max_mem);
     VLOG_QUERY << "Stats: " << pool_stats->DebugString();
 
     // Query is rejected if the rejection check fails on *any* group.
-    if (RejectForSchedule(*schedule, pool_config, &rejection_reason)) {
+    if (RejectForSchedule(*state, pool_config, &rejection_reason)) {
       DCHECK(!rejection_reason.empty());
       queue_node->not_admitted_reason = rejection_reason;
       return false;
     }
 
     if (CanAdmitRequest(
-            *schedule, pool_config, admit_from_queue, &queue_node->not_admitted_reason)) {
-      queue_node->admitted_schedule = std::move(group_schedule.schedule);
+            *state, pool_config, admit_from_queue, &queue_node->not_admitted_reason)) {
+      queue_node->admitted_schedule = std::move(group_state.state);
       return true;
     } else {
       VLOG_RPC << "Cannot admit query " << queue_node->admission_request.query_id
@@ -1481,9 +1483,9 @@ void AdmissionController::LogDequeueFailed(QueueNode* node,
 }
 
 AdmissionController::PoolStats* AdmissionController::GetPoolStats(
-    const QuerySchedule& schedule) {
-  DCHECK(!schedule.request_pool().empty());
-  return GetPoolStats(schedule.request_pool());
+    const ScheduleState& state) {
+  DCHECK(!state.request_pool().empty());
+  return GetPoolStats(state.request_pool());
 }
 
 AdmissionController::PoolStats* AdmissionController::GetPoolStats(
@@ -1500,54 +1502,52 @@ AdmissionController::PoolStats* AdmissionController::GetPoolStats(
   return &it->second;
 }
 
-void AdmissionController::AdmitQuery(QuerySchedule* schedule, bool was_queued) {
-  VLOG_RPC << "For Query " << PrintId(schedule->query_id())
+void AdmissionController::AdmitQuery(ScheduleState* state, bool was_queued) {
+  VLOG_RPC << "For Query " << PrintId(state->query_id())
            << " per_backend_mem_limit set to: "
-           << PrintBytes(schedule->per_backend_mem_limit())
+           << PrintBytes(state->per_backend_mem_limit())
            << " per_backend_mem_to_admit set to: "
-           << PrintBytes(schedule->per_backend_mem_to_admit())
+           << PrintBytes(state->per_backend_mem_to_admit())
            << " coord_backend_mem_limit set to: "
-           << PrintBytes(schedule->coord_backend_mem_limit())
+           << PrintBytes(state->coord_backend_mem_limit())
            << " coord_backend_mem_to_admit set to: "
-           << PrintBytes(schedule->coord_backend_mem_to_admit());
+           << PrintBytes(state->coord_backend_mem_to_admit());
   // Update memory and number of queries.
-  UpdateStatsOnAdmission(*schedule);
-  UpdateExecGroupMetric(schedule->executor_group(), 1);
+  UpdateStatsOnAdmission(*state);
+  UpdateExecGroupMetric(state->executor_group(), 1);
   // Update summary profile.
   const string& admission_result =
       was_queued ? PROFILE_INFO_VAL_ADMIT_QUEUED : PROFILE_INFO_VAL_ADMIT_IMMEDIATELY;
-  schedule->summary_profile()->AddInfoString(
+  state->summary_profile()->AddInfoString(
       PROFILE_INFO_KEY_ADMISSION_RESULT, admission_result);
-  schedule->summary_profile()->AddInfoString(
-      PROFILE_INFO_KEY_ADMITTED_MEM, PrintBytes(schedule->GetClusterMemoryToAdmit()));
-  schedule->summary_profile()->AddInfoString(
-      PROFILE_INFO_KEY_EXECUTOR_GROUP, schedule->executor_group());
+  state->summary_profile()->AddInfoString(
+      PROFILE_INFO_KEY_ADMITTED_MEM, PrintBytes(state->GetClusterMemoryToAdmit()));
+  state->summary_profile()->AddInfoString(
+      PROFILE_INFO_KEY_EXECUTOR_GROUP, state->executor_group());
   // We may have admitted based on stale information. Include a warning in the profile
   // if this this may be the case.
   int64_t time_since_update_ms;
   string staleness_detail = GetStalenessDetailLocked("", &time_since_update_ms);
   // IMPALA-8235: convert to TIME_NS because of issues with tools consuming TIME_MS.
-  COUNTER_SET(ADD_COUNTER(schedule->summary_profile(),
-      PROFILE_TIME_SINCE_LAST_UPDATE_COUNTER_NAME, TUnit::TIME_NS),
+  COUNTER_SET(ADD_COUNTER(state->summary_profile(),
+                  PROFILE_TIME_SINCE_LAST_UPDATE_COUNTER_NAME, TUnit::TIME_NS),
       static_cast<int64_t>(time_since_update_ms * NANOS_PER_MICRO * MICROS_PER_MILLI));
   if (!staleness_detail.empty()) {
-    schedule->summary_profile()->AddInfoString(
+    state->summary_profile()->AddInfoString(
         PROFILE_INFO_KEY_STALENESS_WARNING, staleness_detail);
   }
-  DCHECK(
-      num_released_backends_.find(schedule->query_id()) == num_released_backends_.end());
-  num_released_backends_[schedule->query_id()] =
-      schedule->per_backend_exec_params().size();
+  DCHECK(num_released_backends_.find(state->query_id()) == num_released_backends_.end());
+  num_released_backends_[state->query_id()] = state->per_backend_schedule_states().size();
 
   // Store info about the admitted resources so that we can release them.
-  DCHECK(running_queries_.find(schedule->query_id()) == running_queries_.end());
-  RunningQuery& running_query = running_queries_[schedule->query_id()];
-  running_query.request_pool = schedule->request_pool();
-  running_query.executor_group = schedule->executor_group();
-  for (const auto& entry : schedule->per_backend_exec_params()) {
+  DCHECK(running_queries_.find(state->query_id()) == running_queries_.end());
+  RunningQuery& running_query = running_queries_[state->query_id()];
+  running_query.request_pool = state->request_pool();
+  running_query.executor_group = state->executor_group();
+  for (const auto& entry : state->per_backend_schedule_states()) {
     BackendAllocation& allocation = running_query.per_backend_resources[entry.first];
-    allocation.slots_to_use = entry.second.pb->slots_to_use();
-    allocation.mem_to_admit = GetMemToAdmit(*schedule, entry.second);
+    allocation.slots_to_use = entry.second.exec_params->slots_to_use();
+    allocation.mem_to_admit = GetMemToAdmit(*state, entry.second);
   }
 }
 
@@ -1586,7 +1586,7 @@ void AdmissionController::PoolToJsonLocked(const string& pool_name,
   // Get the queued queries
   Value queued_queries(kArrayType);
   queue.Iterate([&queued_queries, document](QueueNode* node) {
-    if (node->group_schedules.empty()) {
+    if (node->group_states.empty()) {
       Value query_info(kObjectType);
       query_info.AddMember("query_id", "N/A", document->GetAllocator());
       query_info.AddMember("mem_limit", 0, document->GetAllocator());
@@ -1595,19 +1595,19 @@ void AdmissionController::PoolToJsonLocked(const string& pool_name,
       queued_queries.PushBack(query_info, document->GetAllocator());
       return true;
     }
-    QuerySchedule* schedule = node->group_schedules.begin()->schedule.get();
+    ScheduleState* state = node->group_states.begin()->state.get();
     Value query_info(kObjectType);
-    Value query_id(PrintId(schedule->query_id()).c_str(), document->GetAllocator());
+    Value query_id(PrintId(state->query_id()).c_str(), document->GetAllocator());
     query_info.AddMember("query_id", query_id, document->GetAllocator());
     query_info.AddMember(
-        "mem_limit", schedule->per_backend_mem_limit(), document->GetAllocator());
-    query_info.AddMember("mem_limit_to_admit", schedule->per_backend_mem_to_admit(),
+        "mem_limit", state->per_backend_mem_limit(), document->GetAllocator());
+    query_info.AddMember("mem_limit_to_admit", state->per_backend_mem_to_admit(),
         document->GetAllocator());
-    query_info.AddMember("coord_mem_limit", schedule->coord_backend_mem_limit(),
+    query_info.AddMember(
+        "coord_mem_limit", state->coord_backend_mem_limit(), document->GetAllocator());
+    query_info.AddMember("coord_mem_to_admit", state->coord_backend_mem_to_admit(),
         document->GetAllocator());
-    query_info.AddMember("coord_mem_to_admit",
-        schedule->coord_backend_mem_to_admit(), document->GetAllocator());
-    query_info.AddMember("num_backends", schedule->per_backend_exec_params().size(),
+    query_info.AddMember("num_backends", state->per_backend_schedule_states().size(),
         document->GetAllocator());
     queued_queries.PushBack(query_info, document->GetAllocator());
     return true;
@@ -1862,10 +1862,10 @@ bool AdmissionController::PoolLimitsRunningQueriesCount(const TPoolConfig& pool_
 }
 
 int64_t AdmissionController::GetMemToAdmit(
-    const QuerySchedule& schedule, const BackendExecParams& backend_exec_params) {
-  return backend_exec_params.pb->is_coord_backend() ?
-      schedule.coord_backend_mem_to_admit() :
-      schedule.per_backend_mem_to_admit();
+    const ScheduleState& state, const BackendScheduleState& backend_schedule_state) {
+  return backend_schedule_state.exec_params->is_coord_backend() ?
+      state.coord_backend_mem_to_admit() :
+      state.per_backend_mem_to_admit();
 }
 
 void AdmissionController::UpdateExecGroupMetricMap(

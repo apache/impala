@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "scheduling/query-schedule.h"
+#include "scheduling/schedule-state.h"
 
 #include "runtime/bufferpool/reservation-util.h"
 #include "scheduling/scheduler.h"
@@ -32,28 +32,28 @@ DEFINE_bool_hidden(use_dedicated_coordinator_estimates, true,
 
 namespace impala {
 
-FInstanceExecParams::FInstanceExecParams(const UniqueIdPB& instance_id,
+FInstanceScheduleState::FInstanceScheduleState(const UniqueIdPB& instance_id,
     const NetworkAddressPB& host, const NetworkAddressPB& krpc_host,
-    int per_fragment_instance_idx, const FragmentExecParams& fragment_exec_params)
+    int per_fragment_instance_idx, const FragmentScheduleState& fragment_schedule_states)
   : host(host), krpc_host(krpc_host) {
-  *pb.mutable_instance_id() = instance_id;
-  pb.set_per_fragment_instance_idx(per_fragment_instance_idx);
-  pb.set_fragment_idx(fragment_exec_params.fragment.idx);
+  *exec_params.mutable_instance_id() = instance_id;
+  exec_params.set_per_fragment_instance_idx(per_fragment_instance_idx);
+  exec_params.set_fragment_idx(fragment_schedule_states.fragment.idx);
 }
 
-void FInstanceExecParams::AddScanRanges(
+void FInstanceScheduleState::AddScanRanges(
     int scan_idx, const vector<ScanRangeParamsPB>& scan_ranges) {
-  ScanRangesPB& scan_ranges_pb = (*pb.mutable_per_node_scan_ranges())[scan_idx];
+  ScanRangesPB& scan_ranges_pb = (*exec_params.mutable_per_node_scan_ranges())[scan_idx];
   *scan_ranges_pb.mutable_scan_ranges() = {scan_ranges.begin(), scan_ranges.end()};
 }
 
-FragmentExecParams::FragmentExecParams(
-    const TPlanFragment& fragment, FragmentExecParamsPB* pb)
-  : is_coord_fragment(false), fragment(fragment), pb(pb) {
-  pb->set_fragment_idx(fragment.idx);
+FragmentScheduleState::FragmentScheduleState(
+    const TPlanFragment& fragment, FragmentExecParamsPB* exec_params)
+  : is_coord_fragment(false), fragment(fragment), exec_params(exec_params) {
+  exec_params->set_fragment_idx(fragment.idx);
 }
 
-QuerySchedule::QuerySchedule(const UniqueIdPB& query_id, const TQueryExecRequest& request,
+ScheduleState::ScheduleState(const UniqueIdPB& query_id, const TQueryExecRequest& request,
     const TQueryOptions& query_options, RuntimeProfile* summary_profile,
     RuntimeProfile::EventSequence* query_events)
   : query_id_(query_id),
@@ -66,7 +66,7 @@ QuerySchedule::QuerySchedule(const UniqueIdPB& query_id, const TQueryExecRequest
   Init();
 }
 
-QuerySchedule::QuerySchedule(const UniqueIdPB& query_id, const TQueryExecRequest& request,
+ScheduleState::ScheduleState(const UniqueIdPB& query_id, const TQueryExecRequest& request,
     const TQueryOptions& query_options, RuntimeProfile* summary_profile)
   : query_id_(query_id),
     request_(request),
@@ -78,7 +78,7 @@ QuerySchedule::QuerySchedule(const UniqueIdPB& query_id, const TQueryExecRequest
   DCHECK(TestInfo::is_test());
 }
 
-void QuerySchedule::Init() {
+void ScheduleState::Init() {
   *query_schedule_pb_->mutable_query_id() = query_id_;
   // extract TPlanFragments and order by fragment idx
   for (const TPlanExecInfo& plan_exec_info: request_.plan_exec_info) {
@@ -88,18 +88,18 @@ void QuerySchedule::Init() {
   }
 
   // this must only be called once
-  DCHECK_EQ(fragment_exec_params_.size(), 0);
+  DCHECK_EQ(fragment_schedule_states_.size(), 0);
   for (int i = 0; i < fragments_.size(); ++i) {
     auto it = fragments_.find(i);
     DCHECK(it != fragments_.end());
-    fragment_exec_params_.emplace_back(
+    fragment_schedule_states_.emplace_back(
         it->second, query_schedule_pb_->add_fragment_exec_params());
   }
 
   // mark coordinator fragment
   const TPlanFragment& root_fragment = request_.plan_exec_info[0].fragments[0];
   if (RequiresCoordinatorFragment()) {
-    fragment_exec_params_[root_fragment.idx].is_coord_fragment = true;
+    fragment_schedule_states_[root_fragment.idx].is_coord_fragment = true;
     // the coordinator instance gets index 0, generated instance ids start at 1
     next_instance_id_ = CreateInstanceId(next_instance_id_, 1);
   }
@@ -135,33 +135,34 @@ void QuerySchedule::Init() {
       if (!fragment.output_sink.__isset.stream_sink) continue;
       PlanNodeId dest_node_id = fragment.output_sink.stream_sink.dest_node_id;
       FragmentIdx dest_idx = plan_node_to_fragment_idx_[dest_node_id];
-      FragmentExecParams& dest_params = fragment_exec_params_[dest_idx];
-      dest_params.exchange_input_fragments.push_back(fragment.idx);
+      FragmentScheduleState& dest_state = fragment_schedule_states_[dest_idx];
+      dest_state.exchange_input_fragments.push_back(fragment.idx);
     }
   }
 }
 
-void QuerySchedule::Validate() const {
-  // all fragments have a FragmentExecParams
+void ScheduleState::Validate() const {
+  // all fragments have a FragmentScheduleState
   int num_fragments = 0;
   for (const TPlanExecInfo& plan_exec_info: request_.plan_exec_info) {
     for (const TPlanFragment& fragment: plan_exec_info.fragments) {
-      DCHECK_LT(fragment.idx, fragment_exec_params_.size());
-      DCHECK_EQ(fragment.idx, fragment_exec_params_[fragment.idx].fragment.idx);
+      DCHECK_LT(fragment.idx, fragment_schedule_states_.size());
+      DCHECK_EQ(fragment.idx, fragment_schedule_states_[fragment.idx].fragment.idx);
       ++num_fragments;
     }
   }
-  DCHECK_EQ(num_fragments, fragment_exec_params_.size());
+  DCHECK_EQ(num_fragments, fragment_schedule_states_.size());
 
   // we assigned the correct number of scan ranges per (host, node id):
   // assemble a map from host -> (map from node id -> #scan ranges)
   unordered_map<NetworkAddressPB, map<TPlanNodeId, int>> count_map;
-  for (const auto& entry : per_backend_exec_params_) {
-    for (const FInstanceExecParamsPB& ip : entry.second.pb->instance_params()) {
-      auto host_it = count_map.find(entry.second.pb->address());
+  for (const auto& entry : per_backend_schedule_states_) {
+    for (const FInstanceExecParamsPB& ip : entry.second.exec_params->instance_params()) {
+      auto host_it = count_map.find(entry.second.exec_params->address());
       if (host_it == count_map.end()) {
-        count_map.insert(make_pair(entry.second.pb->address(), map<TPlanNodeId, int>()));
-        host_it = count_map.find(entry.second.pb->address());
+        count_map.insert(
+            make_pair(entry.second.exec_params->address(), map<TPlanNodeId, int>()));
+        host_it = count_map.find(entry.second.exec_params->address());
       }
       map<TPlanNodeId, int>& node_map = host_it->second;
 
@@ -177,9 +178,9 @@ void QuerySchedule::Validate() const {
     }
   }
 
-  for (const FragmentExecParams& fp: fragment_exec_params_) {
-    for (const FragmentScanRangeAssignment::value_type& assignment_entry:
-        fp.scan_range_assignment) {
+  for (const FragmentScheduleState& fragment_state : fragment_schedule_states_) {
+    for (const FragmentScanRangeAssignment::value_type& assignment_entry :
+        fragment_state.scan_range_assignment) {
       const NetworkAddressPB& host = assignment_entry.first;
       DCHECK_GT(count_map.count(host), 0);
       map<TPlanNodeId, int>& node_map = count_map.find(host)->second;
@@ -194,70 +195,71 @@ void QuerySchedule::Validate() const {
   }
 
   // Check that all fragments have instances.
-  for (const FragmentExecParams& fp: fragment_exec_params_) {
-    DCHECK_GT(fp.instance_exec_params.size(), 0) << fp.fragment;
+  for (const FragmentScheduleState& fragment_state : fragment_schedule_states_) {
+    DCHECK_GT(fragment_state.instance_states.size(), 0) << fragment_state.fragment;
   }
 
   // Check that all backends have instances, except possibly the coordaintor backend.
-  for (const auto& elem: per_backend_exec_params_) {
-    const BackendExecParams& bp = elem.second;
-    DCHECK(!bp.pb->instance_params().empty() || bp.pb->is_coord_backend());
+  for (const auto& elem : per_backend_schedule_states_) {
+    const BackendExecParamsPB* be_params = elem.second.exec_params;
+    DCHECK(!be_params->instance_params().empty() || be_params->is_coord_backend());
   }
 }
-BackendExecParams& QuerySchedule::GetOrCreateBackendExecParams(
+BackendScheduleState& ScheduleState::GetOrCreateBackendScheduleState(
     const NetworkAddressPB& address) {
-  auto it = per_backend_exec_params_.find(address);
-  if (it == per_backend_exec_params_.end()) {
-    BackendExecParamsPB* pb = query_schedule_pb_->add_backend_exec_params();
-    it = per_backend_exec_params_.emplace(address, BackendExecParams(pb)).first;
+  auto it = per_backend_schedule_states_.find(address);
+  if (it == per_backend_schedule_states_.end()) {
+    BackendExecParamsPB* be_params = query_schedule_pb_->add_backend_exec_params();
+    it = per_backend_schedule_states_.emplace(address, BackendScheduleState(be_params))
+             .first;
   }
   return it->second;
 }
 
-int64_t QuerySchedule::GetPerExecutorMemoryEstimate() const {
+int64_t ScheduleState::GetPerExecutorMemoryEstimate() const {
   DCHECK(request_.__isset.per_host_mem_estimate);
   return request_.per_host_mem_estimate;
 }
 
-int64_t QuerySchedule::GetDedicatedCoordMemoryEstimate() const {
+int64_t ScheduleState::GetDedicatedCoordMemoryEstimate() const {
   DCHECK(request_.__isset.dedicated_coord_mem_estimate);
   return request_.dedicated_coord_mem_estimate;
 }
 
-void QuerySchedule::IncNumScanRanges(int64_t delta) {
+void ScheduleState::IncNumScanRanges(int64_t delta) {
   query_schedule_pb_->set_num_scan_ranges(query_schedule_pb_->num_scan_ranges() + delta);
 }
 
-UniqueIdPB QuerySchedule::GetNextInstanceId() {
+UniqueIdPB ScheduleState::GetNextInstanceId() {
   UniqueIdPB result = next_instance_id_;
   next_instance_id_.set_lo(next_instance_id_.lo() + 1);
   return result;
 }
 
-int64_t QuerySchedule::GetClusterMemoryToAdmit() const {
-  // There will always be an entry for the coordinator in per_backend_exec_params_.
+int64_t ScheduleState::GetClusterMemoryToAdmit() const {
+  // There will always be an entry for the coordinator in per_backend_schedule_states_.
   return query_schedule_pb_->per_backend_mem_to_admit()
-      * (per_backend_exec_params_.size() - 1)
+      * (per_backend_schedule_states_.size() - 1)
       + coord_backend_mem_to_admit();
 }
 
-bool QuerySchedule::UseDedicatedCoordEstimates() const {
-  for (const auto& itr : per_backend_exec_params_) {
-    if (!itr.second.pb->is_coord_backend()) continue;
+bool ScheduleState::UseDedicatedCoordEstimates() const {
+  for (const auto& itr : per_backend_schedule_states_) {
+    if (!itr.second.exec_params->is_coord_backend()) continue;
     auto& coord = itr.second;
     bool is_dedicated_coord = !coord.be_desc.is_executor();
     bool only_coord_fragment_scheduled =
-        RequiresCoordinatorFragment() && coord.pb->instance_params().size() == 1;
-    bool no_fragment_scheduled = coord.pb->instance_params().size() == 0;
+        RequiresCoordinatorFragment() && coord.exec_params->instance_params().size() == 1;
+    bool no_fragment_scheduled = coord.exec_params->instance_params().size() == 0;
     return FLAGS_use_dedicated_coordinator_estimates && is_dedicated_coord
         && (only_coord_fragment_scheduled || no_fragment_scheduled);
   }
   DCHECK(false)
-      << "Coordinator backend should always have a entry in per_backend_exec_params_";
+      << "Coordinator backend should always have a entry in per_backend_schedule_states_";
   return false;
 }
 
-void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
+void ScheduleState::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
   // If the min_query_mem_limit and max_query_mem_limit are not set in the pool config
   // then it falls back to traditional(old) behavior, which means that, it sets the
   // mem_limit if it is set in the query options, else sets it to -1 (no limit).
@@ -316,7 +318,7 @@ void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
   coord_backend_mem_to_admit = min(coord_backend_mem_to_admit, MemInfo::physical_mem());
 
   // If the query is only scheduled to run on the coordinator.
-  if (per_backend_exec_params_.size() == 1 && RequiresCoordinatorFragment()) {
+  if (per_backend_schedule_states_.size() == 1 && RequiresCoordinatorFragment()) {
     per_backend_mem_to_admit = 0;
   }
 
@@ -341,7 +343,7 @@ void QuerySchedule::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
   query_schedule_pb_->set_per_backend_mem_to_admit(per_backend_mem_to_admit);
 }
 
-void QuerySchedule::set_executor_group(string executor_group) {
+void ScheduleState::set_executor_group(string executor_group) {
   DCHECK(executor_group_.empty());
   executor_group_ = std::move(executor_group);
 }

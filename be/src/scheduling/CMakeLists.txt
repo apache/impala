@@ -34,9 +34,9 @@ add_library(Scheduling STATIC
   cluster-membership-test-util.cc
   executor-group.cc
   hash-ring.cc
-  query-schedule.cc
   request-pool-service.cc
   scheduler-test-util.cc
+  schedule-state.cc
   scheduler.cc
 )
 add_dependencies(Scheduling gen-deps)

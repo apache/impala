@@ -28,7 +28,7 @@
 #include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/Types_types.h"
 #include "scheduling/executor-group.h"
-#include "scheduling/query-schedule.h"
+#include "scheduling/schedule-state.h"
 #include "util/metrics-fwd.h"
 #include "util/network-util.h"
 #include "util/runtime-profile.h"
@@ -70,7 +70,7 @@ class Scheduler {
   /// Populates given query schedule and assigns fragments to hosts based on scan
   /// ranges in the query exec request. 'executor_config' must contain a non-empty group
   /// unless IsCoordinatorOnlyQuery() is true.
-  Status Schedule(const ExecutorConfig& executor_config, QuerySchedule* schedule);
+  Status Schedule(const ExecutorConfig& executor_config, ScheduleState* state);
 
   /// Returns true if the query is only supposed to run on the coordinator (single
   /// unpartitioned fragment).
@@ -287,8 +287,8 @@ class Scheduler {
   /// fragment_exec_params_ with the resulting scan range assignment.
   /// We have a benchmark for this method in be/src/benchmarks/scheduler-benchmark.cc.
   /// 'executor_config' is the executor configuration to use for scheduling.
-  Status ComputeScanRangeAssignment(const ExecutorConfig& executor_config,
-      QuerySchedule* schedule);
+  Status ComputeScanRangeAssignment(
+      const ExecutorConfig& executor_config, ScheduleState* state);
 
   /// Process the list of scan ranges of a single plan node and compute scan range
   /// assignments (returned in 'assignment'). The result is a mapping from hosts to their
@@ -352,28 +352,28 @@ class Scheduler {
       const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
       FragmentScanRangeAssignment* assignment);
 
-  /// Computes BackendExecParams for all backends assigned in the query and always one for
-  /// the coordinator backend since it participates in execution regardless. Must be
+  /// Computes execution parameters for all backends assigned in the query and always one
+  /// for the coordinator backend since it participates in execution regardless. Must be
   /// called after ComputeFragmentExecParams().
   void ComputeBackendExecParams(
-      const ExecutorConfig& executor_config, QuerySchedule* schedule);
+      const ExecutorConfig& executor_config, ScheduleState* state);
 
-  /// Compute the FragmentExecParams for all plans in the schedule's
+  /// Compute the per-fragment execution parameters for all plans in the schedule's
   /// TQueryExecRequest.plan_exec_info.
   /// This includes the routing information (destinations, per_exch_num_senders,
   /// sender_id)
   /// 'executor_config' is the executor configuration to use for scheduling.
-  void ComputeFragmentExecParams(const ExecutorConfig& executor_config,
-      QuerySchedule* schedule);
+  void ComputeFragmentExecParams(
+      const ExecutorConfig& executor_config, ScheduleState* state);
 
-  /// Recursively create FInstanceExecParams and set per_node_scan_ranges for
-  /// fragment_params and its input fragments via a depth-first traversal.
+  /// Recursively create FInstanceScheduleState and set per_node_scan_ranges for
+  /// fragment_state and its input fragments via a depth-first traversal.
   /// All fragments are part of plan_exec_info.
   void ComputeFragmentExecParams(const ExecutorConfig& executor_config,
-      const TPlanExecInfo& plan_exec_info, FragmentExecParams* fragment_params,
-      QuerySchedule* schedule);
+      const TPlanExecInfo& plan_exec_info, FragmentScheduleState* fragment_state,
+      ScheduleState* state);
 
-  /// Create instances of the fragment corresponding to fragment_params, which contains
+  /// Create instances of the fragment corresponding to fragment_state, which contains
   /// either a Union node, one or more scan nodes, or both.
   ///
   /// This fragment is scheduled on the union of hosts of all scans in the fragment
@@ -385,7 +385,7 @@ class Scheduler {
   /// For HDFS, this load balances among instances within a host using
   /// AssignRangesToInstances().
   void CreateCollocatedAndScanInstances(const ExecutorConfig& executor_config,
-      FragmentExecParams* fragment_params, QuerySchedule* schedule);
+      FragmentScheduleState* fragment_state, ScheduleState* state);
 
   /// Does a round robin assignment of scan ranges 'ranges' that were assigned to a host
   /// to at most 'max_num_instances' fragment instances running on the same host.
@@ -394,23 +394,24 @@ class Scheduler {
   static std::vector<std::vector<ScanRangeParamsPB>> AssignRangesToInstances(
       int max_num_instances, std::vector<ScanRangeParamsPB>& ranges);
 
-  /// For each instance of fragment_params's input fragment, create a collocated
-  /// instance for fragment_params's fragment.
-  /// Expects that fragment_params only has a single input fragment.
+  /// For each instance of fragment_state's input fragment, create a collocated
+  /// instance for fragment_state's fragment.
+  /// Expects that fragment_state only has a single input fragment.
   void CreateInputCollocatedInstances(
-      FragmentExecParams* fragment_params, QuerySchedule* schedule);
+      FragmentScheduleState* fragment_state, ScheduleState* state);
 
   /// Create instances for a fragment that has a join build sink as its root.
   /// These instances will be collocated with the fragment instances that consume
   /// the join build. Therefore, those instances must have already been created
   /// by the scheduler.
   void CreateCollocatedJoinBuildInstances(
-      FragmentExecParams* fragment_params, QuerySchedule* schedule);
+      FragmentScheduleState* fragment_state, ScheduleState* state);
 
   /// Add all hosts that the scans identified by 'scan_ids' are executed on to
   /// 'scan_hosts'.
   void GetScanHosts(const BackendDescriptorPB& local_be_desc,
-      const std::vector<TPlanNodeId>& scan_ids, const FragmentExecParams& params,
+      const std::vector<TPlanNodeId>& scan_ids,
+      const FragmentScheduleState& fragment_state,
       std::vector<NetworkAddressPB>* scan_hosts);
 
   /// Return true if 'plan' contains a node of the given type.
