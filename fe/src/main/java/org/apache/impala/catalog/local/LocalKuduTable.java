@@ -18,6 +18,7 @@
 package org.apache.impala.catalog.local;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,6 +43,8 @@ import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
 import org.apache.kudu.client.KuduException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -52,6 +55,8 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
   private final TableParams tableParams_;
   private final List<KuduPartitionParam> partitionBy_;
   private final ImmutableList<String> primaryKeyColumnNames_;
+
+  private final org.apache.kudu.client.KuduTable kuduTable_;
 
   /**
    * Create a new instance based on the table metadata 'msTable' stored
@@ -86,7 +91,7 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
 
     ColumnMap cmap = new ColumnMap(cols, /*numClusteringCols=*/0, fullTableName,
         /*isFullAcidSchema=*/false);
-    return new LocalKuduTable(db, msTable, ref, cmap, pkNames, partitionBy);
+    return new LocalKuduTable(db, msTable, ref, cmap, kuduTable, pkNames, partitionBy);
   }
 
 
@@ -110,8 +115,8 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
     ColumnMap cmap = new ColumnMap(columns, /*numClusteringCols=*/0, fullTableName,
         /*isFullAcidSchema=*/false);
 
-    return new LocalKuduTable(db, msTable, /*ref=*/null, cmap, pkNames,
-        kuduPartitionParams);
+    return new LocalKuduTable(db, msTable, /*ref=*/null, cmap, /*kuduTable*/null,
+        pkNames, kuduPartitionParams);
   }
 
   private static void convertColsFromKudu(Schema schema, List<Column> cols,
@@ -136,9 +141,11 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
   }
 
   private LocalKuduTable(LocalDb db, Table msTable, TableMetaRef ref, ColumnMap cmap,
+      org.apache.kudu.client.KuduTable kuduTable,
       List<String> primaryKeyColumnNames,
       List<KuduPartitionParam> partitionBy)  {
     super(db, msTable, ref, cmap);
+    kuduTable_ = kuduTable;
     tableParams_ = new TableParams(msTable);
     partitionBy_ = ImmutableList.copyOf(partitionBy);
     primaryKeyColumnNames_ = ImmutableList.copyOf(primaryKeyColumnNames);
@@ -149,10 +156,16 @@ public class LocalKuduTable extends LocalTable implements FeKuduTable {
     return tableParams_.masters_;
   }
 
-
   @Override
   public String getKuduTableName() {
     return tableParams_.kuduTableName_;
+  }
+
+  /**
+   * Return the Kudu table backing this table.
+   */
+  public org.apache.kudu.client.KuduTable getKuduTable() {
+    return kuduTable_;
   }
 
   @Override

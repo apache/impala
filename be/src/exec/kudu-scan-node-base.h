@@ -62,6 +62,8 @@ class KuduScanNodeBase : public ScanNode {
 
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
 
+  const KuduTableDescriptor* table_desc() const { return table_desc_; }
+
  private:
   friend class KuduScanner;
 
@@ -71,12 +73,12 @@ class KuduScanNodeBase : public ScanNode {
   /// Descriptor of tuples read from Kudu table.
   const TupleDescriptor* tuple_desc_ = nullptr;
 
+  /// Descriptor of the Kudu table.
+  const KuduTableDescriptor* table_desc_ = nullptr;
+
   /// Pointer to the KuduClient, which is stored on the QueryState and shared between
   /// scanners and fragment instances.
   kudu::client::KuduClient* client_ = nullptr;
-
-  /// Kudu table reference. Shared between scanner threads for KuduScanNode.
-  kudu::client::sp::shared_ptr<kudu::client::KuduTable> table_;
 
   /// Set of scan tokens to be deserialized into Kudu scanners.
   std::vector<std::string> scan_tokens_;

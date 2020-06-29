@@ -132,8 +132,10 @@ public class KuduScanNode extends ScanNode {
 
     KuduClient client = KuduUtil.getKuduClient(kuduTable_.getKuduMasterHosts());
     try {
+      // Get the KuduTable from the analyzer to retrieve the cached KuduTable
+      // for this query and prevent multiple openTable calls for a single query.
       org.apache.kudu.client.KuduTable rpcTable =
-          client.openTable(kuduTable_.getKuduTableName());
+          analyzer.getKuduTable(kuduTable_);
       validateSchema(rpcTable);
 
       if (canApplyCountStarOptimization(analyzer)) {
