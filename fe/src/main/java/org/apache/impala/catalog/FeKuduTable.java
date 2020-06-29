@@ -141,6 +141,7 @@ public interface FeKuduTable extends FeTable {
 
       KuduClient client = KuduUtil.getKuduClient(table.getKuduMasterHosts());
       try {
+        // Call openTable to ensure we get the latest metadata for the Kudu table.
         org.apache.kudu.client.KuduTable kuduTable =
             client.openTable(table.getKuduTableName());
         List<LocatedTablet> tablets = kuduTable.getTabletsLocations(
@@ -171,8 +172,9 @@ public interface FeKuduTable extends FeTable {
 
       KuduClient client = KuduUtil.getKuduClient(table.getKuduMasterHosts());
       try {
-        org.apache.kudu.client.KuduTable kuduTable = client.openTable(
-            table.getKuduTableName());
+        // Call openTable to ensure we get the latest metadata for the Kudu table.
+        org.apache.kudu.client.KuduTable kuduTable =
+            client.openTable(table.getKuduTableName());
         List<LocatedTablet> tablets =
             kuduTable.getTabletsLocations(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
         if (tablets.isEmpty()) {
@@ -216,8 +218,9 @@ public interface FeKuduTable extends FeTable {
       resultSchema.addToColumns(new TColumn(header, Type.STRING.toThrift()));
       KuduClient client = KuduUtil.getKuduClient(table.getKuduMasterHosts());
       try {
-        org.apache.kudu.client.KuduTable kuduTable = client.openTable(
-            table.getKuduTableName());
+        // Call openTable to ensure we get the latest metadata for the Kudu table.
+        org.apache.kudu.client.KuduTable kuduTable =
+            client.openTable(table.getKuduTableName());
         // The Kudu table API will return the partitions in sorted order by value.
         List<String> partitions = kuduTable.getFormattedRangePartitions(
             BackendConfig.INSTANCE.getKuduClientTimeoutMs());

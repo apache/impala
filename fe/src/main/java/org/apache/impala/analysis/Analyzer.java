@@ -58,6 +58,7 @@ import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.local.LocalKuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.ImpalaException;
@@ -94,9 +95,11 @@ import org.apache.impala.util.Graph.RandomAccessibleGraph;
 import org.apache.impala.util.Graph.SccCondensedGraph;
 import org.apache.impala.util.Graph.WritableGraph;
 import org.apache.impala.util.IntIterator;
+import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.TSessionStateUtil;
+import org.apache.kudu.client.KuduClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -458,6 +461,11 @@ public class Analyzer {
     // incrementNumStmtExprs(). Note that this does not include expressions that do not
     // require analysis (e.g. some literal expressions).
     private int numStmtExprs_ = 0;
+
+    // Cache of KuduTables opened for this query. (map from table name to kudu table)
+    // This cache prevent multiple openTable calls for a given table in the same query.
+    public final Map<String, org.apache.kudu.client.KuduTable> kuduTables =
+        new HashMap<>();
 
     public GlobalState(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
         AuthorizationFactory authzFactory, AuthorizationContext authzCtx) {
@@ -2811,6 +2819,37 @@ public class Analyzer {
       throw new TableLoadingException("Missing metadata for table: " + tableName, cause);
     }
     return table;
+  }
+
+  public org.apache.kudu.client.KuduTable getKuduTable(FeKuduTable feKuduTable)
+      throws AnalysisException {
+    String tableName = feKuduTable.getFullName();
+
+    // Use the kuduTable from the global state cache if it exists.
+    org.apache.kudu.client.KuduTable kuduTable = globalState_.kuduTables.get(tableName);
+
+    // Otherwise try use the KuduTable from the FeKuduTable if it exists and
+    // add it to the global state state cache future use.
+    if (kuduTable == null &&
+        feKuduTable instanceof LocalKuduTable &&
+        ((LocalKuduTable) feKuduTable).getKuduTable() != null) {
+      kuduTable = ((LocalKuduTable) feKuduTable).getKuduTable();
+      globalState_.kuduTables.put(tableName, kuduTable);
+    }
+
+    // Last, get the KuduTable via a request to the Kudu server using openTable and
+    // add it to the global state state cache for future use.
+    if (kuduTable == null) {
+      try {
+        KuduClient client = KuduUtil.getKuduClient(feKuduTable.getKuduMasterHosts());
+        kuduTable = client.openTable(feKuduTable.getKuduTableName());
+        globalState_.kuduTables.put(tableName, kuduTable);
+      } catch (Exception ex) {
+        throw new AnalysisException("Unable to open the Kudu table: " + tableName, ex);
+      }
+    }
+
+    return kuduTable;
   }
 
   /**

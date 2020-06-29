@@ -214,7 +214,7 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
   VLOG_ROW << "Starting KuduScanner with ReadMode=" << mode
            << " timeout=" << FLAGS_kudu_operation_timeout_ms
            << " node with id=" << scan_node_->id()
-           << " Kudu table=" << scan_node_->table_->name();
+           << " Kudu table=" << scan_node_->table_desc()->table_name();
 
   if (!timestamp_slots_.empty()) {
     uint64_t row_format_flags =
@@ -251,7 +251,7 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
 
         KUDU_RETURN_IF_ERROR(
             scanner_->AddConjunctPredicate(
-                scan_node_->table_->NewInBloomFilterPredicate(col_name, bbf_vec)),
+                scanner_->GetKuduTable()->NewInBloomFilterPredicate(col_name, bbf_vec)),
             BuildErrorString("Failed to add bloom filter predicate"));
       } else {
         DCHECK(ctx.filter->is_min_max_filter());
@@ -282,15 +282,15 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
 
         KuduValue* min_value;
         RETURN_IF_ERROR(CreateKuduValue(col_type, min, &min_value));
-        KUDU_RETURN_IF_ERROR(
-            scanner_->AddConjunctPredicate(scan_node_->table_->NewComparisonPredicate(
-                col_name, KuduPredicate::ComparisonOp::GREATER_EQUAL, min_value)),
+        KUDU_RETURN_IF_ERROR(scanner_->AddConjunctPredicate(
+          scanner_->GetKuduTable()->NewComparisonPredicate(
+              col_name, KuduPredicate::ComparisonOp::GREATER_EQUAL, min_value)),
             BuildErrorString("Failed to add min predicate"));
 
         KuduValue* max_value;
         RETURN_IF_ERROR(CreateKuduValue(col_type, max, &max_value));
-        KUDU_RETURN_IF_ERROR(
-            scanner_->AddConjunctPredicate(scan_node_->table_->NewComparisonPredicate(
+        KUDU_RETURN_IF_ERROR(scanner_->AddConjunctPredicate(
+            scanner_->GetKuduTable()->NewComparisonPredicate(
                 col_name, KuduPredicate::ComparisonOp::LESS_EQUAL, max_value)),
             BuildErrorString("Failed to add max predicate"));
       }
@@ -379,8 +379,8 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch, Tuple** tuple_me
         kudu_tuple->SetNull(slot->null_indicator_offset());
         RETURN_IF_ERROR(state_->LogOrReturnError(
             ErrorMsg::Init(TErrorCode::KUDU_TIMESTAMP_OUT_OF_RANGE,
-              scan_node_->table_->name(),
-              scan_node_->table_->schema().Column(slot->col_pos()).name())));
+              scan_node_->table_desc()->table_name(),
+              scanner_->GetKuduTable()->schema().Column(slot->col_pos()).name())));
       }
     }
 
@@ -441,7 +441,7 @@ Status KuduScanner::GetNextScannerBatch() {
 
 string KuduScanner::BuildErrorString(const char* msg) {
   return Substitute("$0 for node with id '$1' for Kudu table '$2'", msg, scan_node_->id(),
-      scan_node_->table_->name());
+      scan_node_->table_desc()->table_name());
 }
 
 }  // namespace impala

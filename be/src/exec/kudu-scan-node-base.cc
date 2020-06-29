@@ -77,6 +77,7 @@ Status KuduScanNodeBase::Prepare(RuntimeState* state) {
 
   DCHECK(state->desc_tbl().GetTupleDescriptor(tuple_id_) != NULL);
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
+  table_desc_ = static_cast<const KuduTableDescriptor*>(tuple_desc_->table_desc());
 
   // Initialize the list of scan tokens to process from the ScanRangeParamsPB.
   DCHECK(scan_range_params_ != NULL);
@@ -97,21 +98,15 @@ Status KuduScanNodeBase::Open(RuntimeState* state) {
   RETURN_IF_ERROR(QueryMaintenance(state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
-  const KuduTableDescriptor* table_desc =
-      static_cast<const KuduTableDescriptor*>(tuple_desc_->table_desc());
-
   RETURN_IF_ERROR(ExecEnv::GetInstance()->GetKuduClient(
-      table_desc->kudu_master_addresses(), &client_));
+      table_desc_->kudu_master_addresses(), &client_));
 
   uint64_t latest_ts = static_cast<uint64_t>(
       max<int64_t>(0, state->query_ctx().session.kudu_latest_observed_ts));
   VLOG_RPC << "Latest observed Kudu timestamp: " << latest_ts;
   if (latest_ts > 0) client_->SetLatestObservedTimestamp(latest_ts);
 
-  KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc->table_name(), &table_),
-      "Unable to open Kudu table");
-
-  runtime_profile_->AddInfoString("Table Name", table_desc->fully_qualified_name());
+  runtime_profile_->AddInfoString("Table Name", table_desc_->fully_qualified_name());
   if (filter_ctxs_.size() > 0) WaitForRuntimeFilters();
   return Status::OK();
 }
