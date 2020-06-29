@@ -24,7 +24,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/runtime-state.h"
 #include "runtime/test-env.h"
-#include "scheduling/query-schedule.h"
+#include "scheduling/schedule-state.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
 #include "testutil/gtest-util.h"
@@ -80,9 +80,9 @@ class AdmissionControllerTest : public testing::Test {
     pool_.Clear();
   }
 
-  /// Make a QuerySchedule with dummy parameters that can be used to test admission and
+  /// Make a ScheduleState with dummy parameters that can be used to test admission and
   /// rejection in AdmissionController.
-  QuerySchedule* MakeQuerySchedule(string request_pool_name, int64_t mem_limit,
+  ScheduleState* MakeScheduleState(string request_pool_name, int64_t mem_limit,
       TPoolConfig& config, const int num_hosts, const int per_host_mem_estimate,
       const int coord_mem_estimate, bool is_dedicated_coord,
       const string& executor_group = ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME) {
@@ -97,55 +97,56 @@ class AdmissionControllerTest : public testing::Test {
     UniqueIdPB* query_id = pool_.Add(new UniqueIdPB()); // always 0,0
     TQueryOptions* query_options = pool_.Add(new TQueryOptions());
     query_options->__set_mem_limit(mem_limit);
-    QuerySchedule* query_schedule = pool_.Add(new QuerySchedule(
-        *query_id, *request, *query_options, profile));
-    query_schedule->set_executor_group(executor_group);
-    SetHostsInQuerySchedule(*query_schedule, num_hosts, is_dedicated_coord);
-    query_schedule->UpdateMemoryRequirements(config);
-    return query_schedule;
+    ScheduleState* schedule_state =
+        pool_.Add(new ScheduleState(*query_id, *request, *query_options, profile));
+    schedule_state->set_executor_group(executor_group);
+    SetHostsInScheduleState(*schedule_state, num_hosts, is_dedicated_coord);
+    schedule_state->UpdateMemoryRequirements(config);
+    return schedule_state;
   }
 
-  /// Same as previous MakeQuerySchedule with fewer input (more default params).
-  QuerySchedule* MakeQuerySchedule(string request_pool_name, TPoolConfig& config,
+  /// Same as previous MakeScheduleState with fewer input (more default params).
+  ScheduleState* MakeScheduleState(string request_pool_name, TPoolConfig& config,
       const int num_hosts, const int per_host_mem_estimate,
       const string& executor_group = ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME) {
-    return MakeQuerySchedule(request_pool_name, 0, config, num_hosts,
+    return MakeScheduleState(request_pool_name, 0, config, num_hosts,
         per_host_mem_estimate, per_host_mem_estimate, false, executor_group);
   }
 
   /// Replace the per-backend hosts in the schedule with one having 'count' hosts.
   /// Note: no FInstanceExecParams are added so
-  /// QuerySchedule::UseDedicatedCoordEstimates() would consider this schedule as not
+  /// ScheduleState::UseDedicatedCoordEstimates() would consider this schedule as not
   /// having anything scheduled on the backend which would result in always returning true
   /// if a dedicated coordinator backend exists.
-  void SetHostsInQuerySchedule(QuerySchedule& query_schedule, const int count,
+  void SetHostsInScheduleState(ScheduleState& schedule_state, const int count,
       bool is_dedicated_coord, int64_t min_mem_reservation_bytes = 0,
       int64_t admit_mem_limit = 200L * MEGABYTE, int slots_to_use = 1,
       int slots_available = 8) {
-    query_schedule.ClearBackendExecParams();
+    schedule_state.ClearBackendScheduleStates();
     for (int i = 0; i < count; ++i) {
       const string host_name = Substitute("host$0", i);
       NetworkAddressPB host_addr = MakeNetworkAddressPB(host_name, 25000);
-      BackendExecParams& backend_exec_params =
-          query_schedule.GetOrCreateBackendExecParams(host_addr);
-      backend_exec_params.pb->set_min_mem_reservation_bytes(min_mem_reservation_bytes);
-      backend_exec_params.pb->set_slots_to_use(slots_to_use);
-      backend_exec_params.be_desc.set_admit_mem_limit(admit_mem_limit);
-      backend_exec_params.be_desc.set_admission_slots(slots_available);
-      backend_exec_params.be_desc.set_is_executor(true);
-      *backend_exec_params.be_desc.mutable_address() = host_addr;
+      BackendScheduleState& backend_schedule_state =
+          schedule_state.GetOrCreateBackendScheduleState(host_addr);
+      backend_schedule_state.exec_params->set_min_mem_reservation_bytes(
+          min_mem_reservation_bytes);
+      backend_schedule_state.exec_params->set_slots_to_use(slots_to_use);
+      backend_schedule_state.be_desc.set_admit_mem_limit(admit_mem_limit);
+      backend_schedule_state.be_desc.set_admission_slots(slots_available);
+      backend_schedule_state.be_desc.set_is_executor(true);
+      *backend_schedule_state.be_desc.mutable_address() = host_addr;
       if (i == 0) {
         // Add first element as the coordinator.
-        backend_exec_params.pb->set_is_coord_backend(true);
-        backend_exec_params.be_desc.set_is_executor(!is_dedicated_coord);
+        backend_schedule_state.exec_params->set_is_coord_backend(true);
+        backend_schedule_state.be_desc.set_is_executor(!is_dedicated_coord);
       }
     }
   }
 
   /// Extract the host network addresses from 'schedule'.
-  vector<NetworkAddressPB> GetHostAddrs(const QuerySchedule& schedule) {
+  vector<NetworkAddressPB> GetHostAddrs(const ScheduleState& schedule_state) {
     vector<NetworkAddressPB> host_addrs;
-    for (auto& backend_state : schedule.per_backend_exec_params()) {
+    for (auto& backend_state : schedule_state.per_backend_schedule_states()) {
       host_addrs.push_back(backend_state.first);
     }
     return host_addrs;
@@ -268,9 +269,9 @@ TEST_F(AdmissionControllerTest, Simple) {
   TPoolConfig config_c;
   ASSERT_OK(request_pool_service->GetPoolConfig(QUEUE_C, &config_c));
 
-  // Create a QuerySchedule to run on QUEUE_C.
-  QuerySchedule* query_schedule = MakeQuerySchedule(QUEUE_C, config_c, 1, 64L * MEGABYTE);
-  query_schedule->UpdateMemoryRequirements(config_c);
+  // Create a ScheduleState to run on QUEUE_C.
+  ScheduleState* schedule_state = MakeScheduleState(QUEUE_C, config_c, 1, 64L * MEGABYTE);
+  schedule_state->UpdateMemoryRequirements(config_c);
 
   // Check that the AdmissionController initially has no data about other hosts.
   ASSERT_EQ(0, admission_controller->host_stats_.size());
@@ -278,14 +279,14 @@ TEST_F(AdmissionControllerTest, Simple) {
   // Check that the query can be admitted.
   string not_admitted_reason;
   ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *query_schedule, config_c, true, &not_admitted_reason));
+      *schedule_state, config_c, true, &not_admitted_reason));
 
-  // Create a QuerySchedule just like 'query_schedule' to run on 3 hosts which can't be
+  // Create a ScheduleState just like 'schedule_state' to run on 3 hosts which can't be
   // admitted.
-  QuerySchedule* query_schedule_3_hosts =
-      MakeQuerySchedule(QUEUE_C, config_c, 3, 64L * MEGABYTE);
+  ScheduleState* schedule_state_3_hosts =
+      MakeScheduleState(QUEUE_C, config_c, 3, 64L * MEGABYTE);
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *query_schedule_3_hosts, config_c, true, &not_admitted_reason));
+      *schedule_state_3_hosts, config_c, true, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough aggregate memory available in pool root.queueC with max mem "
       "resources 128.00 MB. Needed 192.00 MB but only 128.00 MB was available.");
@@ -316,7 +317,7 @@ TEST_F(AdmissionControllerTest, Simple) {
 
   // Test that the query cannot be admitted now.
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *query_schedule, config_c, true, &not_admitted_reason));
+      *schedule_state, config_c, true, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "number of running queries 11 is at or over limit 10.");
 }
@@ -339,36 +340,36 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestMemory) {
       admission_controller->GetPoolStats(QUEUE_D);
   CheckPoolStatsEmpty(pool_stats);
 
-  // Create a QuerySchedule to run on QUEUE_D with per_host_mem_estimate of 30MB.
+  // Create a ScheduleState to run on QUEUE_D with per_host_mem_estimate of 30MB.
   int64_t host_count = 2;
-  QuerySchedule* query_schedule =
-      MakeQuerySchedule(QUEUE_D, config_d, host_count, 30L * MEGABYTE);
+  ScheduleState* schedule_state =
+      MakeScheduleState(QUEUE_D, config_d, host_count, 30L * MEGABYTE);
 
   // Check that the query can be admitted.
   string not_admitted_reason;
   ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *query_schedule, config_d, true, &not_admitted_reason));
+      *schedule_state, config_d, true, &not_admitted_reason));
 
   // Tests that this query cannot be admitted.
   // Increasing the number of hosts pushes the aggregate memory required to admit this
   // query over the allowed limit.
   host_count = 15;
-  QuerySchedule* query_schedule15 =
-      MakeQuerySchedule(QUEUE_D, config_d, host_count, 30L * MEGABYTE);
+  ScheduleState* schedule_state15 =
+      MakeScheduleState(QUEUE_D, config_d, host_count, 30L * MEGABYTE);
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *query_schedule15, config_d, true, &not_admitted_reason));
+      *schedule_state15, config_d, true, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough aggregate memory available in pool root.queueD with max mem resources "
       "400.00 MB. Needed 480.00 MB but only 400.00 MB was available.");
 
-  // Create a QuerySchedule to run on QUEUE_D with per_host_mem_estimate of 50MB.
+  // Create a ScheduleState to run on QUEUE_D with per_host_mem_estimate of 50MB.
   // which is going to be too much memory.
   host_count = 10;
-  QuerySchedule* query_schedule_10_fail =
-      MakeQuerySchedule(QUEUE_D, config_d, host_count, 50L * MEGABYTE);
+  ScheduleState* schedule_state_10_fail =
+      MakeScheduleState(QUEUE_D, config_d, host_count, 50L * MEGABYTE);
 
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *query_schedule_10_fail, config_d, true, &not_admitted_reason));
+      *schedule_state_10_fail, config_d, true, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough aggregate memory available in pool root.queueD with max mem resources "
       "400.00 MB. Needed 500.00 MB but only 400.00 MB was available.");
@@ -392,10 +393,10 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestCount) {
       admission_controller->GetPoolStats(QUEUE_D);
   CheckPoolStatsEmpty(pool_stats);
 
-  // Create a QuerySchedule to run on QUEUE_D on 12 hosts.
+  // Create a ScheduleState to run on QUEUE_D on 12 hosts.
   int64_t host_count = 12;
-  QuerySchedule* query_schedule =
-      MakeQuerySchedule(QUEUE_D, config_d, host_count, 30L * MEGABYTE);
+  ScheduleState* schedule_state =
+      MakeScheduleState(QUEUE_D, config_d, host_count, 30L * MEGABYTE);
   string not_admitted_reason;
 
   // Simulate that there are 2 queries queued.
@@ -403,17 +404,17 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestCount) {
 
   // Query can be admitted from queue...
   ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *query_schedule, config_d, true, &not_admitted_reason));
+      *schedule_state, config_d, true, &not_admitted_reason));
   // ... but same Query cannot be admitted directly.
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *query_schedule, config_d, false, &not_admitted_reason));
+      *schedule_state, config_d, false, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "queue is not empty (size 2); queued queries are executed first");
 
   // Simulate that there are 7 queries already running.
   pool_stats->agg_num_running_ = 7;
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *query_schedule, config_d, true, &not_admitted_reason));
+      *schedule_state, config_d, true, &not_admitted_reason));
   EXPECT_STR_CONTAINS(
       not_admitted_reason, "number of running queries 7 is at or over limit 6");
 }
@@ -432,17 +433,17 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestSlots) {
   TPoolConfig config_d;
   ASSERT_OK(request_pool_service->GetPoolConfig(QUEUE_D, &config_d));
 
-  // Create QuerySchedules to run on QUEUE_D on 12 hosts.
+  // Create ScheduleStates to run on QUEUE_D on 12 hosts.
   // Running in both default and non-default executor groups is simulated.
   int64_t host_count = 12;
   int64_t slots_per_host = 16;
   int64_t slots_per_query = 4;
-  QuerySchedule* default_group_schedule =
-      MakeQuerySchedule(QUEUE_D, config_d, host_count, 30L * MEGABYTE);
-  QuerySchedule* other_group_schedule =
-      MakeQuerySchedule(QUEUE_D, config_d, host_count, 30L * MEGABYTE, "other_group");
-  for (QuerySchedule* schedule : {default_group_schedule, other_group_schedule}) {
-    SetHostsInQuerySchedule(
+  ScheduleState* default_group_schedule =
+      MakeScheduleState(QUEUE_D, config_d, host_count, 30L * MEGABYTE);
+  ScheduleState* other_group_schedule =
+      MakeScheduleState(QUEUE_D, config_d, host_count, 30L * MEGABYTE, "other_group");
+  for (ScheduleState* schedule : {default_group_schedule, other_group_schedule}) {
+    SetHostsInScheduleState(
         *schedule, 2, false, MEGABYTE, 200L * MEGABYTE, slots_per_query, slots_per_host);
   }
   vector<NetworkAddressPB> host_addrs = GetHostAddrs(*default_group_schedule);
@@ -492,44 +493,44 @@ TEST_F(AdmissionControllerTest, QueryRejection) {
       admission_controller->GetPoolStats(QUEUE_D);
   CheckPoolStatsEmpty(pool_stats);
 
-  // Create a QuerySchedule to run on QUEUE_D with per_host_mem_estimate of 50MB
+  // Create a ScheduleState to run on QUEUE_D with per_host_mem_estimate of 50MB
   // which is going to be too much memory.
   int host_count = 10;
-  QuerySchedule* query_schedule =
-      MakeQuerySchedule(QUEUE_D, config_d, host_count, 50L * MEGABYTE);
+  ScheduleState* schedule_state =
+      MakeScheduleState(QUEUE_D, config_d, host_count, 50L * MEGABYTE);
 
   // Check messages from RejectForSchedule().
   string rejected_reason;
   ASSERT_TRUE(admission_controller->RejectForSchedule(
-      *query_schedule, config_d, &rejected_reason));
+      *schedule_state, config_d, &rejected_reason));
   EXPECT_STR_CONTAINS(rejected_reason,
       "request memory needed 500.00 MB is greater than pool max mem resources 400.00 MB");
 
-  // Adjust the QuerySchedule to have minimum memory reservation of 45MB.
+  // Adjust the ScheduleState to have minimum memory reservation of 45MB.
   // This will be rejected immediately as minimum memory reservation is too high.
-  SetHostsInQuerySchedule(*query_schedule, host_count, false, 45L * MEGABYTE);
+  SetHostsInScheduleState(*schedule_state, host_count, false, 45L * MEGABYTE);
   string rejected_reserved_reason;
   ASSERT_TRUE(admission_controller->RejectForSchedule(
-      *query_schedule, config_d, &rejected_reserved_reason));
+      *schedule_state, config_d, &rejected_reserved_reason));
   EXPECT_STR_CONTAINS(rejected_reserved_reason,
       "minimum memory reservation needed is greater than pool max mem resources. Pool "
       "max mem resources: 400.00 MB. Cluster-wide memory reservation needed: 450.00 MB. "
       "Increase the pool max mem resources.");
 
-  // Adjust the QuerySchedule to require many slots per node.
+  // Adjust the ScheduleState to require many slots per node.
   // This will be rejected immediately in non-default executor groups
   // as the nodes do not have that many slots. Because of IMPALA-8757, this check
   // does not yet occur for the default executor group.
-  SetHostsInQuerySchedule(*query_schedule, 2, false, MEGABYTE, 200L * MEGABYTE, 16, 4);
+  SetHostsInScheduleState(*schedule_state, 2, false, MEGABYTE, 200L * MEGABYTE, 16, 4);
   string rejected_slots_reason;
   // Don't reject for default executor group.
   EXPECT_FALSE(admission_controller->RejectForSchedule(
-      *query_schedule, config_d, &rejected_slots_reason))
+      *schedule_state, config_d, &rejected_slots_reason))
       << rejected_slots_reason;
   // Reject for non-default executor group.
-  QuerySchedule* other_group_schedule = MakeQuerySchedule(
+  ScheduleState* other_group_schedule = MakeScheduleState(
       QUEUE_D, config_d, host_count, 50L * MEGABYTE, "a_different_executor_group");
-  SetHostsInQuerySchedule(
+  SetHostsInScheduleState(
       *other_group_schedule, 2, false, MEGABYTE, 200L * MEGABYTE, 16, 4);
   EXPECT_TRUE(admission_controller->RejectForSchedule(
       *other_group_schedule, config_d, &rejected_slots_reason));
@@ -539,7 +540,7 @@ TEST_F(AdmissionControllerTest, QueryRejection) {
       "mt_dop to less than 4 to ensure that the query can execute.");
   rejected_slots_reason = "";
   // Reduce mt_dop to ensure it can execute.
-  SetHostsInQuerySchedule(
+  SetHostsInScheduleState(
       *other_group_schedule, 2, false, MEGABYTE, 200L * MEGABYTE, 4, 4);
   EXPECT_FALSE(admission_controller->RejectForSchedule(
       *other_group_schedule, config_d, &rejected_slots_reason))
@@ -660,8 +661,8 @@ TEST_F(AdmissionControllerTest, PoolStats) {
   TPoolConfig config_c;
   ASSERT_OK(request_pool_service->GetPoolConfig(QUEUE_C, &config_c));
 
-  // Create a QuerySchedule to run on QUEUE_C.
-  QuerySchedule* query_schedule = MakeQuerySchedule(QUEUE_C, config_c, 1, 1000);
+  // Create a ScheduleState to run on QUEUE_C.
+  ScheduleState* schedule_state = MakeScheduleState(QUEUE_C, config_c, 1, 1000);
 
   // Get the PoolStats for QUEUE_C.
   AdmissionController::PoolStats* pool_stats =
@@ -676,13 +677,13 @@ TEST_F(AdmissionControllerTest, PoolStats) {
   CheckPoolStatsEmpty(pool_stats);
 
   // Show that Admit and Release leave stats at zero.
-  pool_stats->AdmitQueryAndMemory(*query_schedule);
+  pool_stats->AdmitQueryAndMemory(*schedule_state);
   ASSERT_EQ(1, pool_stats->agg_num_running());
   ASSERT_EQ(1, pool_stats->metrics()->agg_num_running->GetValue());
   int64_t mem_to_release = 0;
-  for (auto& backend_state : query_schedule->per_backend_exec_params()) {
+  for (auto& backend_state : schedule_state->per_backend_schedule_states()) {
     mem_to_release +=
-        admission_controller->GetMemToAdmit(*query_schedule, backend_state.second);
+        admission_controller->GetMemToAdmit(*schedule_state, backend_state.second);
   }
   pool_stats->ReleaseMem(mem_to_release);
   pool_stats->ReleaseQuery(0);
@@ -697,10 +698,10 @@ TEST_F(AdmissionControllerTest, PoolDisabled) {
   checkPoolDisabled(true, /* max_requests */ 1, /* max_mem_resources */ 0);
 }
 
-// Basic tests of the QuerySchedule object to confirm that a query with different
+// Basic tests of the ScheduleState object to confirm that a query with different
 // coordinator and executor memory estimates calculates memory to admit correctly
 // for various combinations of memory limit configurations.
-TEST_F(AdmissionControllerTest, DedicatedCoordQuerySchedule) {
+TEST_F(AdmissionControllerTest, DedicatedCoordScheduleState) {
   AdmissionController* admission_controller = MakeAdmissionController();
   RequestPoolService* request_pool_service = admission_controller->request_pool_service_;
 
@@ -710,74 +711,74 @@ TEST_F(AdmissionControllerTest, DedicatedCoordQuerySchedule) {
   ASSERT_OK(request_pool_service->GetPoolConfig("default", &pool_config));
 
   // For query only running on the coordinator, the per_backend_mem_to_admit should be 0.
-  QuerySchedule* query_schedule = MakeQuerySchedule(
+  ScheduleState* schedule_state = MakeScheduleState(
       "default", 0, pool_config, 1, PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
-  query_schedule->UpdateMemoryRequirements(pool_config);
-  ASSERT_EQ(0, query_schedule->per_backend_mem_to_admit());
-  ASSERT_EQ(COORD_MEM_ESTIMATE, query_schedule->coord_backend_mem_to_admit());
+  schedule_state->UpdateMemoryRequirements(pool_config);
+  ASSERT_EQ(0, schedule_state->per_backend_mem_to_admit());
+  ASSERT_EQ(COORD_MEM_ESTIMATE, schedule_state->coord_backend_mem_to_admit());
 
   // Make sure executors and coordinators are assigned memory to admit appropriately and
   // that the cluster memory to admitted is calculated correctly.
-  query_schedule = MakeQuerySchedule(
+  schedule_state = MakeScheduleState(
       "default", 0, pool_config, 2, PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
-  ASSERT_EQ(COORD_MEM_ESTIMATE, query_schedule->GetDedicatedCoordMemoryEstimate());
-  ASSERT_EQ(PER_EXEC_MEM_ESTIMATE, query_schedule->GetPerExecutorMemoryEstimate());
-  query_schedule->UpdateMemoryRequirements(pool_config);
-  ASSERT_EQ(PER_EXEC_MEM_ESTIMATE, query_schedule->per_backend_mem_to_admit());
-  ASSERT_EQ(COORD_MEM_ESTIMATE, query_schedule->coord_backend_mem_to_admit());
-  ASSERT_EQ(-1, query_schedule->per_backend_mem_limit());
-  ASSERT_EQ(-1, query_schedule->coord_backend_mem_limit());
+  ASSERT_EQ(COORD_MEM_ESTIMATE, schedule_state->GetDedicatedCoordMemoryEstimate());
+  ASSERT_EQ(PER_EXEC_MEM_ESTIMATE, schedule_state->GetPerExecutorMemoryEstimate());
+  schedule_state->UpdateMemoryRequirements(pool_config);
+  ASSERT_EQ(PER_EXEC_MEM_ESTIMATE, schedule_state->per_backend_mem_to_admit());
+  ASSERT_EQ(COORD_MEM_ESTIMATE, schedule_state->coord_backend_mem_to_admit());
+  ASSERT_EQ(-1, schedule_state->per_backend_mem_limit());
+  ASSERT_EQ(-1, schedule_state->coord_backend_mem_limit());
   ASSERT_EQ(COORD_MEM_ESTIMATE + PER_EXEC_MEM_ESTIMATE,
-      query_schedule->GetClusterMemoryToAdmit());
+      schedule_state->GetClusterMemoryToAdmit());
 
   // Set the min_query_mem_limit in pool_config. min_query_mem_limit should
   // not be enforced on the coordinator. Also ensure mem limits are set for both.
-  query_schedule = MakeQuerySchedule(
+  schedule_state = MakeScheduleState(
       "default", 0, pool_config, 2, PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
   ASSERT_OK(request_pool_service->GetPoolConfig("default", &pool_config));
   pool_config.__set_min_query_mem_limit(700 * MEGABYTE);
-  query_schedule->UpdateMemoryRequirements(pool_config);
-  ASSERT_EQ(700 * MEGABYTE, query_schedule->per_backend_mem_to_admit());
-  ASSERT_EQ(COORD_MEM_ESTIMATE, query_schedule->coord_backend_mem_to_admit());
-  ASSERT_EQ(700 * MEGABYTE, query_schedule->per_backend_mem_limit());
-  ASSERT_EQ(COORD_MEM_ESTIMATE, query_schedule->coord_backend_mem_limit());
+  schedule_state->UpdateMemoryRequirements(pool_config);
+  ASSERT_EQ(700 * MEGABYTE, schedule_state->per_backend_mem_to_admit());
+  ASSERT_EQ(COORD_MEM_ESTIMATE, schedule_state->coord_backend_mem_to_admit());
+  ASSERT_EQ(700 * MEGABYTE, schedule_state->per_backend_mem_limit());
+  ASSERT_EQ(COORD_MEM_ESTIMATE, schedule_state->coord_backend_mem_limit());
 
   // Make sure coordinator's mem to admit is adjusted based on its own minimum mem
   // reservation.
-  query_schedule = MakeQuerySchedule(
+  schedule_state = MakeScheduleState(
       "default", 0, pool_config, 2, PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
   int64_t coord_min_reservation = 200 * MEGABYTE;
   int64_t min_coord_mem_limit_required =
       ReservationUtil::GetMinMemLimitFromReservation(coord_min_reservation);
   pool_config.__set_min_query_mem_limit(700 * MEGABYTE);
-  query_schedule->set_coord_min_reservation(200 * MEGABYTE);
-  query_schedule->UpdateMemoryRequirements(pool_config);
-  ASSERT_EQ(700 * MEGABYTE, query_schedule->per_backend_mem_to_admit());
-  ASSERT_EQ(min_coord_mem_limit_required, query_schedule->coord_backend_mem_to_admit());
-  ASSERT_EQ(700 * MEGABYTE, query_schedule->per_backend_mem_limit());
-  ASSERT_EQ(min_coord_mem_limit_required, query_schedule->coord_backend_mem_limit());
+  schedule_state->set_coord_min_reservation(200 * MEGABYTE);
+  schedule_state->UpdateMemoryRequirements(pool_config);
+  ASSERT_EQ(700 * MEGABYTE, schedule_state->per_backend_mem_to_admit());
+  ASSERT_EQ(min_coord_mem_limit_required, schedule_state->coord_backend_mem_to_admit());
+  ASSERT_EQ(700 * MEGABYTE, schedule_state->per_backend_mem_limit());
+  ASSERT_EQ(min_coord_mem_limit_required, schedule_state->coord_backend_mem_limit());
 
   // Set mem_limit query option.
   ASSERT_OK(request_pool_service->GetPoolConfig("default", &pool_config));
-  query_schedule = MakeQuerySchedule("default", GIGABYTE, pool_config, 2,
+  schedule_state = MakeScheduleState("default", GIGABYTE, pool_config, 2,
       PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
-  query_schedule->UpdateMemoryRequirements(pool_config);
-  ASSERT_EQ(GIGABYTE, query_schedule->per_backend_mem_to_admit());
-  ASSERT_EQ(GIGABYTE, query_schedule->coord_backend_mem_to_admit());
-  ASSERT_EQ(GIGABYTE, query_schedule->per_backend_mem_limit());
-  ASSERT_EQ(GIGABYTE, query_schedule->coord_backend_mem_limit());
+  schedule_state->UpdateMemoryRequirements(pool_config);
+  ASSERT_EQ(GIGABYTE, schedule_state->per_backend_mem_to_admit());
+  ASSERT_EQ(GIGABYTE, schedule_state->coord_backend_mem_to_admit());
+  ASSERT_EQ(GIGABYTE, schedule_state->per_backend_mem_limit());
+  ASSERT_EQ(GIGABYTE, schedule_state->coord_backend_mem_limit());
 
   // Set mem_limit query option and max_query_mem_limit. In this case, max_query_mem_limit
   // will be enforced on both coordinator and executor.
-  query_schedule = MakeQuerySchedule("default", GIGABYTE, pool_config, 2,
+  schedule_state = MakeScheduleState("default", GIGABYTE, pool_config, 2,
       PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
   ASSERT_OK(request_pool_service->GetPoolConfig("default", &pool_config));
   pool_config.__set_max_query_mem_limit(700 * MEGABYTE);
-  query_schedule->UpdateMemoryRequirements(pool_config);
-  ASSERT_EQ(700 * MEGABYTE, query_schedule->per_backend_mem_to_admit());
-  ASSERT_EQ(700 * MEGABYTE, query_schedule->coord_backend_mem_to_admit());
-  ASSERT_EQ(700 * MEGABYTE, query_schedule->per_backend_mem_limit());
-  ASSERT_EQ(700 * MEGABYTE, query_schedule->coord_backend_mem_limit());
+  schedule_state->UpdateMemoryRequirements(pool_config);
+  ASSERT_EQ(700 * MEGABYTE, schedule_state->per_backend_mem_to_admit());
+  ASSERT_EQ(700 * MEGABYTE, schedule_state->coord_backend_mem_to_admit());
+  ASSERT_EQ(700 * MEGABYTE, schedule_state->per_backend_mem_limit());
+  ASSERT_EQ(700 * MEGABYTE, schedule_state->coord_backend_mem_limit());
 }
 
 // Test admission decisions for clusters with dedicated coordinators, where different
@@ -793,41 +794,41 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   // Set up a query schedule to test.
   const int64_t PER_EXEC_MEM_ESTIMATE = GIGABYTE;
   const int64_t COORD_MEM_ESTIMATE = 150 * MEGABYTE;
-  QuerySchedule* query_schedule = MakeQuerySchedule(
+  ScheduleState* schedule_state = MakeScheduleState(
       "default", 0, pool_config, 2, PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
-  query_schedule->ClearBackendExecParams();
+  schedule_state->ClearBackendScheduleStates();
   // Add coordinator backend.
   const string coord_host_name = Substitute("host$0", 1);
   NetworkAddressPB coord_addr = MakeNetworkAddressPB(coord_host_name, 25000);
   const string coord_host = NetworkAddressPBToString(coord_addr);
-  BackendExecParams& coord_exec_params =
-      query_schedule->GetOrCreateBackendExecParams(coord_addr);
-  coord_exec_params.pb->set_is_coord_backend(true);
-  coord_exec_params.pb->set_thread_reservation(1);
+  BackendScheduleState& coord_exec_params =
+      schedule_state->GetOrCreateBackendScheduleState(coord_addr);
+  coord_exec_params.exec_params->set_is_coord_backend(true);
+  coord_exec_params.exec_params->set_thread_reservation(1);
   coord_exec_params.be_desc.set_admit_mem_limit(512 * MEGABYTE);
   coord_exec_params.be_desc.set_is_executor(false);
   // Add executor backend.
   const string exec_host_name = Substitute("host$0", 2);
   NetworkAddressPB exec_addr = MakeNetworkAddressPB(exec_host_name, 25000);
   const string exec_host = NetworkAddressPBToString(exec_addr);
-  BackendExecParams& backend_exec_params =
-      query_schedule->GetOrCreateBackendExecParams(exec_addr);
-  backend_exec_params.pb->set_thread_reservation(1);
-  backend_exec_params.be_desc.set_admit_mem_limit(GIGABYTE);
-  backend_exec_params.be_desc.set_is_executor(true);
+  BackendScheduleState& backend_schedule_state =
+      schedule_state->GetOrCreateBackendScheduleState(exec_addr);
+  backend_schedule_state.exec_params->set_thread_reservation(1);
+  backend_schedule_state.be_desc.set_admit_mem_limit(GIGABYTE);
+  backend_schedule_state.be_desc.set_is_executor(true);
   string not_admitted_reason;
   // Test 1: coord's admit_mem_limit < executor's admit_mem_limit. Query should not
   // be rejected because query fits on both executor and coordinator. It should be
   // queued if there is not enough capacity.
-  query_schedule->UpdateMemoryRequirements(pool_config);
+  schedule_state->UpdateMemoryRequirements(pool_config);
   ASSERT_FALSE(admission_controller->RejectForSchedule(
-      *query_schedule, pool_config, &not_admitted_reason));
+      *schedule_state, pool_config, &not_admitted_reason));
   ASSERT_TRUE(admission_controller->HasAvailableMemResources(
-      *query_schedule, pool_config, &not_admitted_reason));
+      *schedule_state, pool_config, &not_admitted_reason));
   // Coord does not have enough available memory.
   admission_controller->host_stats_[coord_host].mem_reserved = 500 * MEGABYTE;
   ASSERT_FALSE(admission_controller->HasAvailableMemResources(
-      *query_schedule, pool_config, &not_admitted_reason));
+      *schedule_state, pool_config, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough memory available on host host1:25000. Needed 150.00 MB but only "
       "12.00 MB out of 512.00 MB was available.");
@@ -835,7 +836,7 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   // Neither coordinator or executor has enough available memory.
   admission_controller->host_stats_[exec_host].mem_reserved = 500 * MEGABYTE;
   ASSERT_FALSE(admission_controller->HasAvailableMemResources(
-      *query_schedule, pool_config, &not_admitted_reason));
+      *schedule_state, pool_config, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough memory available on host host2:25000. Needed 1.00 GB but only "
       "524.00 MB out of 1.00 GB was available.");
@@ -843,7 +844,7 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   // Executor does not have enough available memory.
   admission_controller->host_stats_[coord_host].mem_reserved = 0;
   ASSERT_FALSE(admission_controller->HasAvailableMemResources(
-      *query_schedule, pool_config, &not_admitted_reason));
+      *schedule_state, pool_config, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough memory available on host host2:25000. Needed 1.00 GB but only "
       "524.00 MB out of 1.00 GB was available.");
@@ -852,15 +853,15 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
 
   // Test 2: coord's admit_mem_limit < executor's admit_mem_limit. Query rejected because
   // coord's admit_mem_limit is less than mem_to_admit on the coord.
-  // Re-using previous QuerySchedule object.
+  // Re-using previous ScheduleState object.
   coord_exec_params.be_desc.set_admit_mem_limit(100 * MEGABYTE);
   ASSERT_TRUE(admission_controller->RejectForSchedule(
-      *query_schedule, pool_config, &not_admitted_reason));
+      *schedule_state, pool_config, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "request memory needed 150.00 MB is greater than memory available for "
       "admission 100.00 MB of host1:25000");
   ASSERT_FALSE(admission_controller->HasAvailableMemResources(
-      *query_schedule, pool_config, &not_admitted_reason));
+      *schedule_state, pool_config, &not_admitted_reason));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough memory available on host host1:25000. Needed 150.00 MB but only "
       "100.00 MB out of 100.00 MB was available.");
@@ -868,36 +869,39 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
 
   // Test 3: Make sure that coord and executors have separate checks on for whether their
   // mem limits can accommodate their respective initial reservations.
-    query_schedule = MakeQuerySchedule(
+  schedule_state = MakeScheduleState(
       "default", 0, pool_config, 2, PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
-    pool_config.__set_min_query_mem_limit(MEGABYTE); // to auto set mem_limit(s).
-    query_schedule->UpdateMemoryRequirements(pool_config);
-    query_schedule->set_largest_min_reservation(600 * MEGABYTE);
-    query_schedule->set_coord_min_reservation(50 * MEGABYTE);
-    ASSERT_TRUE(AdmissionController::CanAccommodateMaxInitialReservation(
-        *query_schedule, pool_config, &not_admitted_reason));
-    // Coordinator reservation doesn't fit.
-    query_schedule->set_coord_min_reservation(200 * MEGABYTE);
-    ASSERT_FALSE(AdmissionController::CanAccommodateMaxInitialReservation(
-        *query_schedule, pool_config, &not_admitted_reason));
-    EXPECT_STR_CONTAINS(not_admitted_reason, "minimum memory reservation is greater "
-        "than memory available to the query for buffer reservations. Memory reservation "
-        "needed given the current plan: 200.00 MB");
-    // Neither coordinator or executor reservation fits.
-    query_schedule->set_largest_min_reservation(GIGABYTE);
-    ASSERT_FALSE(AdmissionController::CanAccommodateMaxInitialReservation(
-        *query_schedule, pool_config, &not_admitted_reason));
-    EXPECT_STR_CONTAINS(not_admitted_reason, "minimum memory reservation is greater "
-        "than memory available to the query for buffer reservations. Memory reservation "
-        "needed given the current plan: 1.00 GB");
-    // Coordinator reservation doesn't fit.
-    query_schedule->set_coord_min_reservation(50 * MEGABYTE);
-    query_schedule->set_largest_min_reservation(GIGABYTE);
-    ASSERT_FALSE(AdmissionController::CanAccommodateMaxInitialReservation(
-        *query_schedule, pool_config, &not_admitted_reason));
-    EXPECT_STR_CONTAINS(not_admitted_reason, "minimum memory reservation is greater "
-        "than memory available to the query for buffer reservations. Memory reservation "
-        "needed given the current plan: 1.00 GB");
+  pool_config.__set_min_query_mem_limit(MEGABYTE); // to auto set mem_limit(s).
+  schedule_state->UpdateMemoryRequirements(pool_config);
+  schedule_state->set_largest_min_reservation(600 * MEGABYTE);
+  schedule_state->set_coord_min_reservation(50 * MEGABYTE);
+  ASSERT_TRUE(AdmissionController::CanAccommodateMaxInitialReservation(
+      *schedule_state, pool_config, &not_admitted_reason));
+  // Coordinator reservation doesn't fit.
+  schedule_state->set_coord_min_reservation(200 * MEGABYTE);
+  ASSERT_FALSE(AdmissionController::CanAccommodateMaxInitialReservation(
+      *schedule_state, pool_config, &not_admitted_reason));
+  EXPECT_STR_CONTAINS(not_admitted_reason,
+      "minimum memory reservation is greater "
+      "than memory available to the query for buffer reservations. Memory reservation "
+      "needed given the current plan: 200.00 MB");
+  // Neither coordinator or executor reservation fits.
+  schedule_state->set_largest_min_reservation(GIGABYTE);
+  ASSERT_FALSE(AdmissionController::CanAccommodateMaxInitialReservation(
+      *schedule_state, pool_config, &not_admitted_reason));
+  EXPECT_STR_CONTAINS(not_admitted_reason,
+      "minimum memory reservation is greater "
+      "than memory available to the query for buffer reservations. Memory reservation "
+      "needed given the current plan: 1.00 GB");
+  // Coordinator reservation doesn't fit.
+  schedule_state->set_coord_min_reservation(50 * MEGABYTE);
+  schedule_state->set_largest_min_reservation(GIGABYTE);
+  ASSERT_FALSE(AdmissionController::CanAccommodateMaxInitialReservation(
+      *schedule_state, pool_config, &not_admitted_reason));
+  EXPECT_STR_CONTAINS(not_admitted_reason,
+      "minimum memory reservation is greater "
+      "than memory available to the query for buffer reservations. Memory reservation "
+      "needed given the current plan: 1.00 GB");
 }
 
 } // end namespace impala

@@ -30,7 +30,7 @@
 #include "common/status.h"
 #include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/request-pool-service.h"
-#include "scheduling/query-schedule.h"
+#include "scheduling/schedule-state.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/condition-variable.h"
 #include "util/internal-queue.h"
@@ -169,9 +169,6 @@ enum class AdmissionOutcome {
 /// Each executor group belongs to a single resource pool and will only serve requests
 /// from that pool. I.e. the relationships are 1 resource pool : many executor groups and
 /// 1 executor group : many executors.
-
-
-
 ///
 /// Executors that don't specify an executor group name during startup are automatically
 /// added to a default group called DEFAULT_EXECUTOR_GROUP_NAME. The default executor
@@ -243,8 +240,8 @@ enum class AdmissionOutcome {
 /// from the default resource pool. Consider that each executor has only one admission
 /// slot i.e. --admission_control_slots=1 is specified for all executors. An incoming
 /// query with mt_dop=1 is submitted through SubmitForAdmission(), which calls
-/// FindGroupToAdmitOrReject(). From there we call ComputeGroupSchedules() which calls
-/// compute schedules for both executor groups. Then we perform rejection tests and
+/// FindGroupToAdmitOrReject(). From there we call ComputeGroupScheduleStates() which
+/// calls compute schedules for both executor groups. Then we perform rejection tests and
 /// afterwards call CanAdmitRequest() for each of the schedules. Executor groups are
 /// processed in alphanumerically sorted order, so we attempt admission to group
 /// "default-pool-group-1" first. CanAdmitRequest() calls HasAvailableSlots() to check
@@ -315,7 +312,7 @@ class AdmissionController {
       MetricGroup* metrics, const TNetworkAddress& host_addr);
   ~AdmissionController();
 
-  /// This struct contains all information needed to create a QuerySchedule and try to
+  /// This struct contains all information needed to create a schedule and try to
   /// admit it. None of the members are owned by the instances of this class (usually they
   /// are owned by the ClientRequestState).
   struct AdmissionRequest {
@@ -500,15 +497,15 @@ class AdmissionController {
     }
 
     // ADMISSION LIFECYCLE METHODS
-    /// Updates the pool stats when the request represented by 'schedule' is admitted.
-    void AdmitQueryAndMemory(const QuerySchedule& schedule);
+    /// Updates the pool stats when the request represented by 'state' is admitted.
+    void AdmitQueryAndMemory(const ScheduleState& state);
     /// Updates the pool stats except the memory admitted stat.
     void ReleaseQuery(int64_t peak_mem_consumption);
     /// Releases the specified memory from the pool stats.
     void ReleaseMem(int64_t mem_to_release);
-    /// Updates the pool stats when the request represented by 'schedule' is queued.
+    /// Updates the pool stats when the request represented by 'state' is queued.
     void Queue();
-    /// Updates the pool stats when the request represented by 'schedule' is dequeued.
+    /// Updates the pool stats when the request represented by 'state is dequeued.
     void Dequeue(bool timed_out);
 
     // STATESTORE CALLBACK METHODS
@@ -632,11 +629,11 @@ class AdmissionController {
   /// on. It is used to attempt admission without rescheduling the query in case the
   /// cluster membership has not changed. Users of the struct must make sure that
   /// executor_group stays valid.
-  struct GroupSchedule {
-    GroupSchedule(
-        std::unique_ptr<QuerySchedule> schedule, const ExecutorGroup& executor_group)
-      : schedule(std::move(schedule)), executor_group(executor_group) {}
-    std::unique_ptr<QuerySchedule> schedule;
+  struct GroupScheduleState {
+    GroupScheduleState(
+        std::unique_ptr<ScheduleState> state, const ExecutorGroup& executor_group)
+      : state(std::move(state)), executor_group(executor_group) {}
+    std::unique_ptr<ScheduleState> state;
     const ExecutorGroup& executor_group;
   };
 
@@ -680,12 +677,12 @@ class AdmissionController {
 
     /// The membership snapshot used during the last admission attempt. It can be nullptr
     /// before the first admission attempt and if any schedules have been created,
-    /// 'group_schedule' will contain the corresponding schedules and executor groups.
+    /// 'group_state' will contain the corresponding schedules and executor groups.
     ClusterMembershipMgr::SnapshotPtr membership_snapshot;
 
     /// List of schedules and executor groups that can be attempted to be admitted for
     /// this queue node.
-    std::vector<GroupSchedule> group_schedules;
+    std::vector<GroupScheduleState> group_states;
 
     /// END: Members that are only valid while queued, but invalid once dequeued.
     /////////////////////////////////////////
@@ -699,9 +696,9 @@ class AdmissionController {
     /// The Admission outcome of the queued request.
     Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* const admit_outcome;
 
-    /// The schedule of the query if it was admitted successfully. Nullptr if it has not
-    /// been admitted or was cancelled or rejected.
-    std::unique_ptr<QuerySchedule> admitted_schedule = nullptr;
+    /// The schedule of the query if it was admitted successfully. Nullptr if it has
+    /// not been admitted or was cancelled or rejected.
+    std::unique_ptr<ScheduleState> admitted_schedule = nullptr;
 
     /// END: Members that are valid after admission / cancellation / rejection
     /////////////////////////////////////////
@@ -722,8 +719,8 @@ class AdmissionController {
     int32_t slots_to_use;
 
     /// Amount of memory allocated to this query. This will be equal to
-    /// QuerySchedule::coord_backend_mem_to_admit() if this is the coordinator backend, or
-    /// QuerySchedule::per_backend_mem_to_admit() otherwise.
+    /// ScheduleState::coord_backend_mem_to_admit() if this is the coordinator backend, or
+    /// ScheduleState::per_backend_mem_to_admit() otherwise.
     int64_t mem_to_admit;
   };
 
@@ -801,9 +798,9 @@ class AdmissionController {
   /// 'membership_snapshot' has changed. Will return any errors that occur during
   /// scheduling, e.g. if the scan range generation fails. Note that this will not return
   /// an error if no executor groups are available for scheduling, but will set
-  /// 'queue_node->not_admitted_reason' and leave 'queue_node->group_schedules' empty in
+  /// 'queue_node->not_admitted_reason' and leave 'queue_node->group_states' empty in
   /// that case.
-  Status ComputeGroupSchedules(
+  Status ComputeGroupScheduleStates(
       ClusterMembershipMgr::SnapshotPtr membership_snapshot, QueueNode* queue_node);
 
   /// Reschedules the query if necessary using 'membership_snapshot' and tries to find an
@@ -825,7 +822,7 @@ class AdmissionController {
   /// admit_from_queue is true if attempting to admit from the queue. Otherwise, returns
   /// false and not_admitted_reason specifies why the request can not be admitted
   /// immediately. Caller owns not_admitted_reason. Must hold admission_ctrl_lock_.
-  bool CanAdmitRequest(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
+  bool CanAdmitRequest(const ScheduleState& state, const TPoolConfig& pool_cfg,
       bool admit_from_queue, std::string* not_admitted_reason);
 
   /// Returns true if all executors can accommodate the largest initial reservation of
@@ -841,7 +838,7 @@ class AdmissionController {
   /// 5. If a dedicated coordinator is used and the mem_limit in query options is set
   ///    lower than what is required to support the sum of initial memory reservations of
   ///    the fragments scheduled on the coordinator.
-  static bool CanAccommodateMaxInitialReservation(const QuerySchedule& schedule,
+  static bool CanAccommodateMaxInitialReservation(const ScheduleState& state,
       const TPoolConfig& pool_cfg, std::string* mem_unavailable_reason);
 
   /// Returns true if there is enough memory available to admit the query based on the
@@ -849,24 +846,24 @@ class AdmissionController {
   /// false and returns the reason in 'mem_unavailable_reason'. Caller owns
   /// 'mem_unavailable_reason'.
   /// Must hold admission_ctrl_lock_.
-  bool HasAvailableMemResources(const QuerySchedule& schedule,
-      const TPoolConfig& pool_cfg, std::string* mem_unavailable_reason);
+  bool HasAvailableMemResources(const ScheduleState& state, const TPoolConfig& pool_cfg,
+      std::string* mem_unavailable_reason);
 
   /// Returns true if there are enough available slots on all executors in the schedule to
   /// fit the query schedule. The number of slots per executors does not change with the
   /// group or cluster size and instead always uses pool_cfg.max_requests. If a host does
   /// not have a free slot, this returns false and sets 'unavailable_reason'.
   /// Must hold admission_ctrl_lock_.
-  bool HasAvailableSlots(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
+  bool HasAvailableSlots(const ScheduleState& state, const TPoolConfig& pool_cfg,
       string* unavailable_reason);
 
   /// Updates the memory admitted and the num of queries running for each backend in
-  /// 'schedule'. Also updates the stats of its associated resource pool. Used only when
-  /// the 'schedule' is admitted.
-  void UpdateStatsOnAdmission(const QuerySchedule& schedule);
+  /// 'state'. Also updates the stats of its associated resource pool. Used only when
+  /// the 'state' is admitted.
+  void UpdateStatsOnAdmission(const ScheduleState& state);
 
   /// Updates the memory admitted and the num of queries running for each backend in
-  /// 'schedule' which have been release/completed. The list of completed backends is
+  /// 'state' which have been release/completed. The list of completed backends is
   /// specified in 'host_addrs'. Also updates the stats related to the admitted memory of
   /// its associated resource pool.
   void UpdateStatsOnReleaseForBackends(const UniqueIdPB& query_id,
@@ -915,15 +912,15 @@ class AdmissionController {
   /// pool are uniform and that a query rejected for one group will not be able to run on
   /// other groups, either.
   /// Must hold admission_ctrl_lock_.
-  bool RejectForSchedule(const QuerySchedule& schedule, const TPoolConfig& pool_cfg,
+  bool RejectForSchedule(const ScheduleState& state, const TPoolConfig& pool_cfg,
       std::string* rejection_reason);
 
   /// Gets or creates the PoolStats for pool_name. Must hold admission_ctrl_lock_.
   PoolStats* GetPoolStats(const std::string& pool_name, bool dcheck_exists = false);
 
-  /// Gets or creates the PoolStats for query schedule 'schedule'. Scheduling must be done
+  /// Gets or creates the PoolStats for query schedule 'state'. Scheduling must be done
   /// already and the schedule must have an associated executor_group.
-  PoolStats* GetPoolStats(const QuerySchedule& schedule);
+  PoolStats* GetPoolStats(const ScheduleState& state);
 
   /// Log the reason for dequeuing of 'node' failing and add the reason to the query's
   /// profile. Must hold admission_ctrl_lock_.
@@ -932,7 +929,7 @@ class AdmissionController {
   /// Sets the per host mem limit and mem admitted in the schedule and does the necessary
   /// accounting and logging on successful submission.
   /// Caller must hold 'admission_ctrl_lock_'.
-  void AdmitQuery(QuerySchedule* schedule, bool was_queued);
+  void AdmitQuery(ScheduleState* state, bool was_queued);
 
   /// Same as PoolToJson() but requires 'admission_ctrl_lock_' to be held by the caller.
   /// Is a helper method used by both PoolToJson() and AllPoolsToJson()
@@ -990,11 +987,11 @@ class AdmissionController {
   int64_t GetExecutorGroupSize(const ClusterMembershipMgr::Snapshot& membership_snapshot,
       const std::string& group_name);
 
-  /// Get the amount of memory to admit for the Backend with the given BackendExecParams.
-  /// This method may return different values depending on if the Backend is an Executor
-  /// or a Coordinator.
+  /// Get the amount of memory to admit for the Backend with the given
+  /// BackendScheduleState. This method may return different values depending on if the
+  /// Backend is an Executor or a Coordinator.
   static int64_t GetMemToAdmit(
-      const QuerySchedule& schedule, const BackendExecParams& backend_exec_params);
+      const ScheduleState& state, const BackendScheduleState& backend_schedule_state);
 
   /// Updates the list of executor groups for which we maintain the query load metrics.
   /// Removes the metrics of the groups that no longer exist from the metric group and
@@ -1014,7 +1011,7 @@ class AdmissionController {
   FRIEND_TEST(AdmissionControllerTest, CanAdmitRequestSlots);
   FRIEND_TEST(AdmissionControllerTest, GetMaxToDequeue);
   FRIEND_TEST(AdmissionControllerTest, QueryRejection);
-  FRIEND_TEST(AdmissionControllerTest, DedicatedCoordQuerySchedule);
+  FRIEND_TEST(AdmissionControllerTest, DedicatedCoordScheduleState);
   FRIEND_TEST(AdmissionControllerTest, DedicatedCoordAdmissionChecks);
   friend class AdmissionControllerTest;
 };
