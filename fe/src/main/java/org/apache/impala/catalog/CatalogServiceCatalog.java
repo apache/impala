@@ -1924,12 +1924,12 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Remove a catalog table based on the given metastore table if it exists and its
-   * createTime matches with the metastore table
+   * id matches with the id of the table in Catalog.
    *
    * @param msTable Metastore table to be used to remove Table
    * @param tblWasfound is set to true if the table was found in the catalog
    * @param tblMatched is set to true if the table is found and it matched with the
-   * createTime of the cached metastore table in catalog or if the existing table is a
+   * id of the cached metastore table in catalog or if the existing table is a
    * incomplete table
    * @return Removed table object. Return null if the table was not removed
    */
@@ -1938,7 +1938,7 @@ public class CatalogServiceCatalog extends Catalog {
     tblWasfound.setRef(false);
     tblMatched.setRef(false);
     // make sure that the createTime of the input table is valid
-    Preconditions.checkState(msTable.getCreateTime() > 0);
+    Preconditions.checkState(msTable.getId() > 0);
     versionLock_.writeLock().lock();
     try {
       Db db = getDb(msTable.getDbName());
@@ -1952,8 +1952,8 @@ public class CatalogServiceCatalog extends Catalog {
       // is given by comparing the metastore createTime. In case the found table is a
       // Incomplete table remove it
       if (tblToBeRemoved instanceof IncompleteTable
-          || (msTable.getCreateTime()
-                 == tblToBeRemoved.getMetaStoreTable().getCreateTime())) {
+          || (msTable.getId()
+                 == tblToBeRemoved.getMetaStoreTable().getId())) {
         tblMatched.setRef(true);
         Table removedTbl = db.removeTable(tblToBeRemoved.getName());
         removedTbl.setCatalogVersion(incrementAndGetCatalogVersion());

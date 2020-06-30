@@ -1206,12 +1206,12 @@ public class MetastoreEventsProcessorTest {
     // created table
     assertEquals(3, events.size());
     Table existingTable = catalog_.getTable(TEST_DB_NAME, testTblName);
-    int creationTime = existingTable.getMetaStoreTable().getCreateTime();
+    long id = existingTable.getMetaStoreTable().getId();
     assertEquals("CREATE_TABLE", events.get(0).getEventType());
     eventsProcessor_.processEvents(Lists.newArrayList(events.get(0)));
     // after processing the create_table the original table should still remain the same
-    assertEquals(creationTime, catalog_.getTable(TEST_DB_NAME,
-        testTblName).getMetaStoreTable().getCreateTime());
+    assertEquals(id, catalog_.getTable(TEST_DB_NAME,
+        testTblName).getMetaStoreTable().getId());
     //second event should be drop_table. This event should also be skipped since
     // catalog state is more recent than the event
     assertEquals("DROP_TABLE", events.get(1).getEventType());
@@ -1233,8 +1233,8 @@ public class MetastoreEventsProcessorTest {
         catalog_.getTable(TEST_DB_NAME,
             testTblName) instanceof IncompleteTable);
     //finally make sure the table is still the same
-    assertEquals(creationTime, catalog_.getTable(TEST_DB_NAME,
-        testTblName).getMetaStoreTable().getCreateTime());
+    assertEquals(id, catalog_.getTable(TEST_DB_NAME,
+        testTblName).getMetaStoreTable().getId());
   }
 
   /**
