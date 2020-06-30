@@ -36,7 +36,6 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.junit.Assert;
 import org.junit.Test;
@@ -2286,7 +2285,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    */
   @Test
   public void TestGroupingSets() throws AnalysisException {
-    RuntimeEnv.INSTANCE.setEnableGroupingSetsValidation(false);
     // Basic examples of each clause.
     AnalyzesOk("select count(*) from functional.alltypes " +
         "group by rollup(int_col, string_col)");
@@ -2476,22 +2474,25 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "  group by rollup(t.string_col, t.bool_col)) " +
         "  group by g.int_col",
         "Unsupported correlated subquery with grouping and/or aggregation");
-  }
 
-  /**
-   * Test that ROLLUP, CUBE and GROUPING SETS result in AnalysException for now.
-   */
-  @Test
-  public void TestGroupingSetsValidation() throws AnalysisException {
-    AnalysisError("select count(*) from functional.alltypes " +
-        "group by rollup(int_col, string_col)",
-        "ROLLUP not supported in GROUP BY");
-    AnalysisError("select count(*) from functional.alltypes " +
-        "group by cube(int_col, string_col)",
-        "CUBE not supported in GROUP BY");
-    AnalysisError("select count(*) from functional.alltypes " +
-        "group by GROUPING SETS((int_col), (string_col))",
-        "SETS not supported in GROUP BY");
+    // Combining grouping sets and distinct aggregations is not supported at this point.
+    // See IMPALA-9914.
+    AnalysisError("select count(distinct id) from functional.alltypes " +
+        "group by rollup(int_col, bool_col)",
+        "Distinct aggregate functions and grouping sets are not supported in the same " +
+        "query block.");
+    AnalysisError("select count(distinct id), count(distinct string_col) " +
+        "from functional.alltypes " +
+        "group by rollup(int_col, bool_col)",
+        "Distinct aggregate functions and grouping sets are not supported in the same " +
+        "query block.");
+
+    // Combining DISTINCT and GROUP BY is not supported in general, not just for grouping
+    // sets.
+    AnalysisError("select distinct int_col, bool_col, count(*) " +
+        "from functional.alltypes " +
+        "group by rollup(int_col, bool_col)",
+        "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
   }
 
   @Test

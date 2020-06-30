@@ -758,10 +758,6 @@ public class SelectStmt extends QueryStmt {
       groupingExprs_ = groupingExprsCopy_;
 
       if (groupByClause_ != null && groupByClause_.hasGroupingSets()) {
-        if (RuntimeEnv.INSTANCE.isGroupingSetsValidationEnabled()) {
-          throw new AnalysisException(groupByClause_.getTypeString() +
-              " not supported in GROUP BY");
-        }
         groupByClause_.analyzeGroupingSets(groupingExprsCopy_);
       }
     }
@@ -837,10 +833,14 @@ public class SelectStmt extends QueryStmt {
         Preconditions.checkState(aggExprs_.isEmpty());
         groupingExprs = Expr.cloneList(resultExprs_);
       }
+      // All expressions passed into the MultiAggregateInfo must be deduplicated.
+      // The analyzed grouping sets were already deduplicated.
       Expr.removeDuplicates(aggExprs_);
       Expr.removeDuplicates(groupingExprs);
-      // TODO: IMPALA-9898: need to pass in grouping set info for MultiAggregateInfo.
-      multiAggInfo_ = new MultiAggregateInfo(groupingExprs, aggExprs_);
+      List<List<Expr>> groupingSets =
+          (groupByClause_ != null && groupByClause_.hasGroupingSets()) ?
+          groupByClause_.getAnalyzedGroupingSets() : null;
+      multiAggInfo_ = new MultiAggregateInfo(groupingExprs, aggExprs_, groupingSets);
       multiAggInfo_.analyze(analyzer_);
     }
 

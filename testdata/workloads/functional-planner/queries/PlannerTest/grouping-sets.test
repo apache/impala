@@ -1,0 +1,1197 @@
+# Basic ROLLUP
+select int_col, bool_col, string_col, count(*) from functional.alltypes
+group by rollup(int_col, bool_col, string_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=29B cardinality=231
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=29B cardinality=231
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count:merge(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count:merge(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count:merge(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(int_col) WHEN 3 THEN murmur_hash(int_col) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(bool_col) WHEN 2 THEN murmur_hash(bool_col) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(string_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+====
+# WITH ROLLUP results in same plan
+select int_col, bool_col, string_col, count(*) from functional.alltypes
+group by int_col, bool_col, string_col with rollup
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=29B cardinality=231
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+====
+# Basic CUBE
+select int_col, bool_col, string_col, count(*) from functional.alltypes
+group by cube(int_col, bool_col, string_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4,5,6,7,8) IN (1, 2, 3, 4, 5, 6, 7, 8), CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) WHEN 5 THEN count(*) WHEN 6 THEN count(*) WHEN 7 THEN count(*) WHEN 8 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN int_col WHEN 2 THEN NULL WHEN 3 THEN int_col WHEN 4 THEN NULL WHEN 5 THEN int_col WHEN 6 THEN NULL WHEN 7 THEN int_col WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL WHEN 5 THEN bool_col WHEN 6 THEN bool_col WHEN 7 THEN NULL WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN string_col WHEN 2 THEN string_col WHEN 3 THEN string_col WHEN 4 THEN string_col WHEN 5 THEN NULL WHEN 6 THEN NULL WHEN 7 THEN NULL WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 WHEN 6 THEN 6 WHEN 7 THEN 7 WHEN 8 THEN 8 END
+|  row-size=29B cardinality=363
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: NULL, bool_col, string_col
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, string_col
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, string_col
+|  Class 4
+|    output: count(*)
+|    group by: int_col, bool_col, NULL
+|  Class 5
+|    output: count(*)
+|    group by: NULL, bool_col, NULL
+|  Class 6
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 7
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=204B cardinality=363
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4,5,6,7,8) IN (1, 2, 3, 4, 5, 6, 7, 8), CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) WHEN 5 THEN count(*) WHEN 6 THEN count(*) WHEN 7 THEN count(*) WHEN 8 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN int_col WHEN 2 THEN NULL WHEN 3 THEN int_col WHEN 4 THEN NULL WHEN 5 THEN int_col WHEN 6 THEN NULL WHEN 7 THEN int_col WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL WHEN 5 THEN bool_col WHEN 6 THEN bool_col WHEN 7 THEN NULL WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN string_col WHEN 2 THEN string_col WHEN 3 THEN string_col WHEN 4 THEN string_col WHEN 5 THEN NULL WHEN 6 THEN NULL WHEN 7 THEN NULL WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 WHEN 6 THEN 6 WHEN 7 THEN 7 WHEN 8 THEN 8 END
+|  row-size=29B cardinality=363
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count:merge(*)
+|    group by: NULL, bool_col, string_col
+|  Class 2
+|    output: count:merge(*)
+|    group by: int_col, NULL, string_col
+|  Class 3
+|    output: count:merge(*)
+|    group by: NULL, NULL, string_col
+|  Class 4
+|    output: count:merge(*)
+|    group by: int_col, bool_col, NULL
+|  Class 5
+|    output: count:merge(*)
+|    group by: NULL, bool_col, NULL
+|  Class 6
+|    output: count:merge(*)
+|    group by: int_col, NULL, NULL
+|  Class 7
+|    output: count:merge(*)
+|    group by: NULL, NULL, NULL
+|  row-size=204B cardinality=363
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(int_col) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(int_col) WHEN 6 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(int_col) WHEN 8 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN murmur_hash(bool_col) WHEN 2 THEN murmur_hash(bool_col) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(bool_col) WHEN 6 THEN murmur_hash(bool_col) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN murmur_hash(string_col) WHEN 2 THEN murmur_hash(string_col) WHEN 3 THEN murmur_hash(string_col) WHEN 4 THEN murmur_hash(string_col) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: NULL, bool_col, string_col
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, string_col
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, string_col
+|  Class 4
+|    output: count(*)
+|    group by: int_col, bool_col, NULL
+|  Class 5
+|    output: count(*)
+|    group by: NULL, bool_col, NULL
+|  Class 6
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 7
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=204B cardinality=363
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+====
+# WITH CUBE results in same plan.
+select int_col, bool_col, string_col, count(*) from functional.alltypes
+group by int_col, bool_col, string_col with cube
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4,5,6,7,8) IN (1, 2, 3, 4, 5, 6, 7, 8), CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) WHEN 5 THEN count(*) WHEN 6 THEN count(*) WHEN 7 THEN count(*) WHEN 8 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN int_col WHEN 2 THEN NULL WHEN 3 THEN int_col WHEN 4 THEN NULL WHEN 5 THEN int_col WHEN 6 THEN NULL WHEN 7 THEN int_col WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL WHEN 5 THEN bool_col WHEN 6 THEN bool_col WHEN 7 THEN NULL WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN string_col WHEN 2 THEN string_col WHEN 3 THEN string_col WHEN 4 THEN string_col WHEN 5 THEN NULL WHEN 6 THEN NULL WHEN 7 THEN NULL WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 WHEN 6 THEN 6 WHEN 7 THEN 7 WHEN 8 THEN 8 END
+|  row-size=29B cardinality=363
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: NULL, bool_col, string_col
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, string_col
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, string_col
+|  Class 4
+|    output: count(*)
+|    group by: int_col, bool_col, NULL
+|  Class 5
+|    output: count(*)
+|    group by: NULL, bool_col, NULL
+|  Class 6
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 7
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=204B cardinality=363
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+====
+# Basic GROUPING SETS
+select int_col, bool_col, string_col, count(*) from functional.alltypes
+group by grouping sets((int_col, bool_col, string_col), (), (bool_col, string_col))
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3) WHEN 1 THEN int_col WHEN 2 THEN NULL WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN bool_col WHEN 2 THEN NULL WHEN 3 THEN bool_col END, CASE valid_tid(1,2,3) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN string_col END, CASE valid_tid(1,2,3) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 END
+|  row-size=29B cardinality=221
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  Class 2
+|    output: count(*)
+|    group by: NULL, bool_col, string_col
+|  row-size=77B cardinality=221
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3) WHEN 1 THEN int_col WHEN 2 THEN NULL WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN bool_col WHEN 2 THEN NULL WHEN 3 THEN bool_col END, CASE valid_tid(1,2,3) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN string_col END, CASE valid_tid(1,2,3) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 END
+|  row-size=29B cardinality=221
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count:merge(*)
+|    group by: NULL, NULL, NULL
+|  Class 2
+|    output: count:merge(*)
+|    group by: NULL, bool_col, string_col
+|  row-size=77B cardinality=221
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(bool_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(bool_col) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(string_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(string_col) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  Class 2
+|    output: count(*)
+|    group by: NULL, bool_col, string_col
+|  row-size=77B cardinality=221
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+====
+# Test that ordinals are replaced correctly.
+select int_col, bool_col, string_col, count(*) from functional.alltypes
+group by rollup(int_col, 2, 3)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=29B cardinality=231
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=29B cardinality=231
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count:merge(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count:merge(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count:merge(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(int_col) WHEN 3 THEN murmur_hash(int_col) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(bool_col) WHEN 2 THEN murmur_hash(bool_col) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(string_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+====
+# Test that duplicate column references are deduplicated. and that
+# the order of elements is respected for rollup.
+select int_col, bool_col, string_col, count(*) from functional.alltypes
+group by rollup(int_col, 3, 2, 3, string_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN string_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=29B cardinality=311
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, string_col, bool_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, string_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=102B cardinality=311
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN string_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=29B cardinality=311
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: int_col, string_col, bool_col
+|  Class 1
+|    output: count:merge(*)
+|    group by: int_col, string_col, NULL
+|  Class 2
+|    output: count:merge(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count:merge(*)
+|    group by: NULL, NULL, NULL
+|  row-size=102B cardinality=311
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(int_col) WHEN 3 THEN murmur_hash(int_col) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(string_col) WHEN 2 THEN murmur_hash(string_col) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(bool_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, string_col, bool_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, string_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=102B cardinality=311
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+====
+# Test that duplicate column references are deduplicated, even if the same expression
+# appears in the select list multiple times.
+select int_col, bool_col, string_col, bool_col, string_col, count(*)
+from functional.alltypes
+group by cube(int_col, 3, 2, 4, string_col, 5)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4,5,6,7,8) IN (1, 2, 3, 4, 5, 6, 7, 8), CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) WHEN 5 THEN count(*) WHEN 6 THEN count(*) WHEN 7 THEN count(*) WHEN 8 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN int_col WHEN 2 THEN NULL WHEN 3 THEN int_col WHEN 4 THEN NULL WHEN 5 THEN int_col WHEN 6 THEN NULL WHEN 7 THEN int_col WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN string_col WHEN 2 THEN string_col WHEN 3 THEN NULL WHEN 4 THEN NULL WHEN 5 THEN string_col WHEN 6 THEN string_col WHEN 7 THEN NULL WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN bool_col WHEN 4 THEN bool_col WHEN 5 THEN NULL WHEN 6 THEN NULL WHEN 7 THEN NULL WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 WHEN 6 THEN 6 WHEN 7 THEN 7 WHEN 8 THEN 8 END
+|  row-size=29B cardinality=363
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, string_col, bool_col
+|  Class 1
+|    output: count(*)
+|    group by: NULL, string_col, bool_col
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, bool_col
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, bool_col
+|  Class 4
+|    output: count(*)
+|    group by: int_col, string_col, NULL
+|  Class 5
+|    output: count(*)
+|    group by: NULL, string_col, NULL
+|  Class 6
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 7
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=204B cardinality=363
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4,5,6,7,8) IN (1, 2, 3, 4, 5, 6, 7, 8), CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) WHEN 5 THEN count(*) WHEN 6 THEN count(*) WHEN 7 THEN count(*) WHEN 8 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN int_col WHEN 2 THEN NULL WHEN 3 THEN int_col WHEN 4 THEN NULL WHEN 5 THEN int_col WHEN 6 THEN NULL WHEN 7 THEN int_col WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN string_col WHEN 2 THEN string_col WHEN 3 THEN NULL WHEN 4 THEN NULL WHEN 5 THEN string_col WHEN 6 THEN string_col WHEN 7 THEN NULL WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN bool_col WHEN 4 THEN bool_col WHEN 5 THEN NULL WHEN 6 THEN NULL WHEN 7 THEN NULL WHEN 8 THEN NULL END, CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 WHEN 6 THEN 6 WHEN 7 THEN 7 WHEN 8 THEN 8 END
+|  row-size=29B cardinality=363
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: int_col, string_col, bool_col
+|  Class 1
+|    output: count:merge(*)
+|    group by: NULL, string_col, bool_col
+|  Class 2
+|    output: count:merge(*)
+|    group by: int_col, NULL, bool_col
+|  Class 3
+|    output: count:merge(*)
+|    group by: NULL, NULL, bool_col
+|  Class 4
+|    output: count:merge(*)
+|    group by: int_col, string_col, NULL
+|  Class 5
+|    output: count:merge(*)
+|    group by: NULL, string_col, NULL
+|  Class 6
+|    output: count:merge(*)
+|    group by: int_col, NULL, NULL
+|  Class 7
+|    output: count:merge(*)
+|    group by: NULL, NULL, NULL
+|  row-size=204B cardinality=363
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(int_col) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(int_col) WHEN 6 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(int_col) WHEN 8 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN murmur_hash(string_col) WHEN 2 THEN murmur_hash(string_col) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(string_col) WHEN 6 THEN murmur_hash(string_col) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4,5,6,7,8) WHEN 1 THEN murmur_hash(bool_col) WHEN 2 THEN murmur_hash(bool_col) WHEN 3 THEN murmur_hash(bool_col) WHEN 4 THEN murmur_hash(bool_col) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) WHEN 7 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, string_col, bool_col
+|  Class 1
+|    output: count(*)
+|    group by: NULL, string_col, bool_col
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, bool_col
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, bool_col
+|  Class 4
+|    output: count(*)
+|    group by: int_col, string_col, NULL
+|  Class 5
+|    output: count(*)
+|    group by: NULL, string_col, NULL
+|  Class 6
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 7
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=204B cardinality=363
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+====
+# Test that non-trivial expressions can be used
+select int_col * bigint_col, bool_col, string_col || 'foo', count(*)
+from functional.alltypes
+group by rollup(int_col * bigint_col, bool_col, string_col || 'foo')
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col * bigint_col WHEN 2 THEN int_col * bigint_col WHEN 3 THEN int_col * bigint_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN concat(string_col, 'foo') WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=33B cardinality=231
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col * bigint_col, bool_col, concat(string_col, 'foo')
+|  Class 1
+|    output: count(*)
+|    group by: int_col * bigint_col, bool_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col * bigint_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=116B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=26B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col * bigint_col WHEN 2 THEN int_col * bigint_col WHEN 3 THEN int_col * bigint_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN concat(string_col, 'foo') WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=33B cardinality=231
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: int_col * bigint_col, bool_col, concat(string_col, 'foo')
+|  Class 1
+|    output: count:merge(*)
+|    group by: int_col * bigint_col, bool_col, NULL
+|  Class 2
+|    output: count:merge(*)
+|    group by: int_col * bigint_col, NULL, NULL
+|  Class 3
+|    output: count:merge(*)
+|    group by: NULL, NULL, NULL
+|  row-size=116B cardinality=231
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(int_col * bigint_col) WHEN 2 THEN murmur_hash(int_col * bigint_col) WHEN 3 THEN murmur_hash(int_col * bigint_col) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(bool_col) WHEN 2 THEN murmur_hash(bool_col) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(concat(string_col, 'foo')) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: int_col * bigint_col, bool_col, concat(string_col, 'foo')
+|  Class 1
+|    output: count(*)
+|    group by: int_col * bigint_col, bool_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col * bigint_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=116B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=26B cardinality=7.30K
+====
+# Test that mixed aggregate functions can be used.
+select int_col * bigint_col, bool_col, string_col || 'foo',
+       count(*), sum(tinyint_col), min(date_string_col)
+from functional.alltypes
+group by rollup(int_col * bigint_col, bool_col, string_col || 'foo')
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END), aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN sum(tinyint_col) WHEN 2 THEN sum(tinyint_col) WHEN 3 THEN sum(tinyint_col) WHEN 4 THEN sum(tinyint_col) END), aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN min(date_string_col) WHEN 2 THEN min(date_string_col) WHEN 3 THEN min(date_string_col) WHEN 4 THEN min(date_string_col) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col * bigint_col WHEN 2 THEN int_col * bigint_col WHEN 3 THEN int_col * bigint_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN concat(string_col, 'foo') WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=53B cardinality=231
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*), sum(tinyint_col), min(date_string_col)
+|    group by: int_col * bigint_col, bool_col, concat(string_col, 'foo')
+|  Class 1
+|    output: count(*), sum(tinyint_col), min(date_string_col)
+|    group by: int_col * bigint_col, bool_col, NULL
+|  Class 2
+|    output: count(*), sum(tinyint_col), min(date_string_col)
+|    group by: int_col * bigint_col, NULL, NULL
+|  Class 3
+|    output: count(*), sum(tinyint_col), min(date_string_col)
+|    group by: NULL, NULL, NULL
+|  row-size=196B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=47B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END), aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN sum(tinyint_col) WHEN 2 THEN sum(tinyint_col) WHEN 3 THEN sum(tinyint_col) WHEN 4 THEN sum(tinyint_col) END), aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN min(date_string_col) WHEN 2 THEN min(date_string_col) WHEN 3 THEN min(date_string_col) WHEN 4 THEN min(date_string_col) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col * bigint_col WHEN 2 THEN int_col * bigint_col WHEN 3 THEN int_col * bigint_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN concat(string_col, 'foo') WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=53B cardinality=231
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*), sum:merge(tinyint_col), min:merge(date_string_col)
+|    group by: int_col * bigint_col, bool_col, concat(string_col, 'foo')
+|  Class 1
+|    output: count:merge(*), sum:merge(tinyint_col), min:merge(date_string_col)
+|    group by: int_col * bigint_col, bool_col, NULL
+|  Class 2
+|    output: count:merge(*), sum:merge(tinyint_col), min:merge(date_string_col)
+|    group by: int_col * bigint_col, NULL, NULL
+|  Class 3
+|    output: count:merge(*), sum:merge(tinyint_col), min:merge(date_string_col)
+|    group by: NULL, NULL, NULL
+|  row-size=196B cardinality=231
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(int_col * bigint_col) WHEN 2 THEN murmur_hash(int_col * bigint_col) WHEN 3 THEN murmur_hash(int_col * bigint_col) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(bool_col) WHEN 2 THEN murmur_hash(bool_col) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(concat(string_col, 'foo')) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*), sum(tinyint_col), min(date_string_col)
+|    group by: int_col * bigint_col, bool_col, concat(string_col, 'foo')
+|  Class 1
+|    output: count(*), sum(tinyint_col), min(date_string_col)
+|    group by: int_col * bigint_col, bool_col, NULL
+|  Class 2
+|    output: count(*), sum(tinyint_col), min(date_string_col)
+|    group by: int_col * bigint_col, NULL, NULL
+|  Class 3
+|    output: count(*), sum(tinyint_col), min(date_string_col)
+|    group by: NULL, NULL, NULL
+|  row-size=196B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=47B cardinality=7.30K
+====
+# Test that limit is placed in final aggregate node.
+select int_col, bool_col, string_col, count(*) from functional.alltypes
+group by rollup(int_col, 2, 3)
+limit 5
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  limit: 5
+|  row-size=29B cardinality=5
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|  limit: 5
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  limit: 5
+|  row-size=29B cardinality=5
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count:merge(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count:merge(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count:merge(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(int_col) WHEN 3 THEN murmur_hash(int_col) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(bool_col) WHEN 2 THEN murmur_hash(bool_col) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(string_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+====
+# Test that HAVING predicates are placed at final aggregate node.
+select int_col, bool_col, string_col, count(*) from functional.alltypes
+group by rollup(int_col, 2, 3)
+having count(*) > 1 and min(int_col) > 0
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END), aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN min(int_col) WHEN 2 THEN min(int_col) WHEN 3 THEN min(int_col) WHEN 4 THEN min(int_col) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  having: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END) > 1, aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN min(int_col) WHEN 2 THEN min(int_col) WHEN 3 THEN min(int_col) WHEN 4 THEN min(int_col) END) > 0
+|  row-size=33B cardinality=23
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*), min(int_col)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*), min(int_col)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count(*), min(int_col)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*), min(int_col)
+|    group by: NULL, NULL, NULL
+|  row-size=117B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END), aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN min(int_col) WHEN 2 THEN min(int_col) WHEN 3 THEN min(int_col) WHEN 4 THEN min(int_col) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  having: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END) > 1, aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN min(int_col) WHEN 2 THEN min(int_col) WHEN 3 THEN min(int_col) WHEN 4 THEN min(int_col) END) > 0
+|  row-size=33B cardinality=23
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*), min:merge(int_col)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count:merge(*), min:merge(int_col)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count:merge(*), min:merge(int_col)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count:merge(*), min:merge(int_col)
+|    group by: NULL, NULL, NULL
+|  row-size=117B cardinality=231
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(int_col) WHEN 3 THEN murmur_hash(int_col) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(bool_col) WHEN 2 THEN murmur_hash(bool_col) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(string_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*), min(int_col)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*), min(int_col)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count(*), min(int_col)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*), min(int_col)
+|    group by: NULL, NULL, NULL
+|  row-size=117B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+====
+# Test that ORDER BY is handled correctly.
+select int_col, bool_col, string_col, count(*) from functional.alltypes
+group by rollup(int_col, bool_col, string_col)
+order by string_col, int_col desc, bool_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SORT
+|  order by: CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END ASC, CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END DESC, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END ASC
+|  row-size=25B cardinality=231
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=29B cardinality=231
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END ASC, CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END DESC, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END ASC
+|
+03:SORT
+|  order by: CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END ASC, CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END DESC, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END ASC
+|  row-size=25B cardinality=231
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN bool_col WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=29B cardinality=231
+|
+05:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count:merge(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count:merge(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count:merge(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+04:EXCHANGE [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(int_col) WHEN 3 THEN murmur_hash(int_col) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(bool_col) WHEN 2 THEN murmur_hash(bool_col) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(string_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, bool_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, bool_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=101B cardinality=231
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=18B cardinality=7.30K
+====
+# Grouping sets with constants in group by. We still produce the same grouping sets
+# as if they were variable expressions.
+select int_col, 1234 i, 'test', count(*) from functional.alltypes
+group by rollup(int_col, i, 'test')
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1234 WHEN 2 THEN 1234 WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 'test' WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=30B cardinality=31
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, 1234, 'test'
+|  Class 1
+|    output: count(*)
+|    group by: int_col, 1234, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=104B cardinality=31
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3,4) IN (1, 2, 3, 4), CASE valid_tid(1,2,3,4) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) WHEN 4 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3,4) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1234 WHEN 2 THEN 1234 WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 'test' WHEN 2 THEN NULL WHEN 3 THEN NULL WHEN 4 THEN NULL END, CASE valid_tid(1,2,3,4) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 END
+|  row-size=30B cardinality=31
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: int_col, 1234, 'test'
+|  Class 1
+|    output: count:merge(*)
+|    group by: int_col, 1234, NULL
+|  Class 2
+|    output: count:merge(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count:merge(*)
+|    group by: NULL, NULL, NULL
+|  row-size=104B cardinality=31
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(int_col) WHEN 3 THEN murmur_hash(int_col) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash(1234) WHEN 2 THEN murmur_hash(1234) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3,4) WHEN 1 THEN murmur_hash('test') WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) WHEN 4 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, 1234, 'test'
+|  Class 1
+|    output: count(*)
+|    group by: int_col, 1234, NULL
+|  Class 2
+|    output: count(*)
+|    group by: int_col, NULL, NULL
+|  Class 3
+|    output: count(*)
+|    group by: NULL, NULL, NULL
+|  row-size=104B cardinality=31
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
+====
+# Empty grouping sets results in non-grouping aggregation.
+select count(*) from functional.alltypes
+group by grouping sets(())
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=0B cardinality=7.30K
+====
+# Rollup of single column results in multiple aggregation classes.
+select int_col, count(*) from functional.alltypes
+group by rollup(int_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2) IN (1, 2), CASE valid_tid(1,2) WHEN 1 THEN count(*) WHEN 2 THEN count(*) END)
+|  group by: CASE valid_tid(1,2) WHEN 1 THEN int_col WHEN 2 THEN NULL END, CASE valid_tid(1,2) WHEN 1 THEN 1 WHEN 2 THEN 2 END
+|  row-size=16B cardinality=11
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col
+|  Class 1
+|    output: count(*)
+|    group by: NULL
+|  row-size=24B cardinality=11
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
+====
+# Cube of single column results in multiple aggregation classes.
+select int_col, count(*) from functional.alltypes
+group by rollup(int_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2) IN (1, 2), CASE valid_tid(1,2) WHEN 1 THEN count(*) WHEN 2 THEN count(*) END)
+|  group by: CASE valid_tid(1,2) WHEN 1 THEN int_col WHEN 2 THEN NULL END, CASE valid_tid(1,2) WHEN 1 THEN 1 WHEN 2 THEN 2 END
+|  row-size=16B cardinality=11
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col
+|  Class 1
+|    output: count(*)
+|    group by: NULL
+|  row-size=24B cardinality=11
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
+====
+# Grouping sets referencing single column results in simple grouping aggregation.
+select int_col, count(*) from functional.alltypes
+group by grouping sets((int_col), (1))
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: int_col
+|  row-size=12B cardinality=10
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
+====
+# Having predicates must be evaluated after aggregation because the aggregation can
+# introduce NULLs.
+select int_col, string_col, count(*)
+from functional.alltypesagg
+group by rollup(int_col, string_col)
+having int_col is NULL and string_col > 'abc'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 END
+|  having: CASE valid_tid(1,2,3) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN NULL END IS NULL, CASE valid_tid(1,2,3) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL END > 'abc'
+|  row-size=28B cardinality=7
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: NULL, NULL
+|  row-size=75B cardinality=11.96K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=19B cardinality=11.00K
+====
+# Missing optimization: the HAVING predicate could eliminate 2/3 of the agg classes.
+select int_col, string_col, count(*)
+from functional.alltypesagg
+group by rollup(int_col, string_col)
+having string_col is not NULL
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 END
+|  having: CASE valid_tid(1,2,3) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL END IS NOT NULL
+|  row-size=28B cardinality=11.96K
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: NULL, NULL
+|  row-size=75B cardinality=11.96K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=19B cardinality=11.00K
+====

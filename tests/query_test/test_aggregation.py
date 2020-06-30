@@ -384,6 +384,12 @@ class TestAggregationQueries(ImpalaTestSuite):
       for i in xrange(14, 16):
         self.appx_equals(int(sampled_ndv_vals[i]) * sample_perc, int(ndv_vals[i]), 2.0)
 
+  def test_grouping_sets(self, vector):
+    """Tests for ROLLUP, CUBE and GROUPING SETS."""
+    if vector.get_value('table_format').file_format == 'hbase':
+      pytest.xfail(reason="IMPALA-283 - HBase null handling is inconsistent")
+    self.run_test_case('QueryTest/grouping-sets', vector)
+
 
 class TestDistinctAggregation(ImpalaTestSuite):
   """Run the distinct aggregation test suite, with codegen and shuffle_distinct_exprs

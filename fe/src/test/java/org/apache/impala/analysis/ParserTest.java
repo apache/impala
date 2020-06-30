@@ -3666,6 +3666,9 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("SELECT a FROM foo GROUP BY a WITH ROLLUP");
     ParsesOk("SELECT a, b FROM foo GROUP BY a, b WITH ROLLUP");
 
+    // Can't combine syntaxes
+    ParserError("SELECT a, b FROM foo GROUP BY ROLLUP(a, b) WITH ROLLUP");
+
     // Nested grouping clauses not supported.
     ParserError("SELECT a, b FROM foo GROUP BY ROLLUP(a, ROLLUP(b, c))");
     ParserError("SELECT a, b FROM foo GROUP BY ROLLUP(a, CUBE(b, c))");
@@ -3675,6 +3678,12 @@ public class ParserTest extends FrontendTestBase {
     ParserError("SELECT a, b FROM foo GROUP BY ROLLUP(a, b), c");
     ParserError("SELECT a, b FROM foo GROUP BY ROLLUP(a, b), ROLLUP(c)");
     ParserError("SELECT a, b FROM foo GROUP BY ROLLUP(a, b), CUBE(c, d)");
+
+    // Empty clause not supported
+    ParserError("SELECT count(*) FROM foo GROUP BY ROLLUP()");
+
+    // Extra parentheses in list elements are supported.
+    ParsesOk("SELECT a, b FROM foo GROUP BY ROLLUP((a), (b))");
   }
 
   @Test
@@ -3686,6 +3695,9 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("SELECT a FROM foo GROUP BY a WITH CUBE");
     ParsesOk("SELECT a, b FROM foo GROUP BY a, b WITH CUBE");
 
+    // Can't combine syntaxes
+    ParserError("SELECT a, b FROM foo GROUP BY CUBE(a, b) WITH CUBE");
+
     // Nested grouping clauses not supported.
     ParserError("SELECT a, b FROM foo GROUP BY CUBE(a, ROLLUP(b, c))");
     ParserError("SELECT a, b FROM foo GROUP BY CUBE(a, CUBE(b, c))");
@@ -3694,6 +3706,12 @@ public class ParserTest extends FrontendTestBase {
     ParserError("SELECT a, b FROM foo GROUP BY c, CUBE(a, b)");
     ParserError("SELECT a, b FROM foo GROUP BY CUBE(a, b), c");
     ParserError("SELECT a, b FROM foo GROUP BY CUBE(a, b), CUBE(c)");
+
+    // Empty clause not supported
+    ParserError("SELECT count(*) FROM foo GROUP BY CUBE()");
+
+    // Extra parentheses in list elements are supported.
+    ParsesOk("SELECT a, b FROM foo GROUP BY CUBE((a), (b))");
   }
 
   @Test
@@ -3710,6 +3728,13 @@ public class ParserTest extends FrontendTestBase {
     // Multiple clauses not supported with GROUPING SETS - parser does not handle yet.
     ParserError("SELECT a FROM foo GROUP BY a, b, GROUPING SETS(a, b)");
     ParserError("SELECT a FROM foo GROUP BY CUBE(a, b), GROUPING SETS(a, b)");
+
+    // Empty clause not supported, but empty grouping sets are supported.
+    ParsesOk("SELECT a FROM foo GROUP BY GROUPING SETS(())");
+    ParserError("SELECT a FROM foo GROUP BY GROUPING SETS()");
+
+    // Extra parentheses around expressions in list elements are supported.
+    ParserError("SELECT a FROM foo GROUP BY GROUPING SETS((), ((a), (b))");
   }
 
   @Test

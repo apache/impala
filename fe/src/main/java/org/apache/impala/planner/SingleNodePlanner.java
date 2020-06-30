@@ -962,23 +962,27 @@ public class SingleNodePlanner {
   private AggregationNode createAggregationPlan(PlanNode root,
       MultiAggregateInfo multiAggInfo, Analyzer analyzer) throws InternalException {
     Preconditions.checkNotNull(multiAggInfo);
-    AggregationNode firstPhaseAgg =
+    AggregationNode agg =
         new AggregationNode(ctx_.getNextNodeId(), root, multiAggInfo, AggPhase.FIRST);
-    firstPhaseAgg.init(analyzer);
-    if (!multiAggInfo.hasSecondPhase()) return firstPhaseAgg;
+    agg.init(analyzer);
+    if (!multiAggInfo.hasSecondPhase() && !multiAggInfo.hasTransposePhase()) {
+      return agg;
+    }
 
-    firstPhaseAgg.unsetNeedsFinalize();
-    firstPhaseAgg.setIntermediateTuple();
+    agg.setIntermediateTuple();
 
-    AggregationNode secondPhaseAgg = new AggregationNode(
-        ctx_.getNextNodeId(), firstPhaseAgg, multiAggInfo, AggPhase.SECOND);
-    secondPhaseAgg.init(analyzer);
-    if (!multiAggInfo.hasTransposePhase()) return secondPhaseAgg;
-
-    AggregationNode transposePhaseAgg = new AggregationNode(
-        ctx_.getNextNodeId(), secondPhaseAgg, multiAggInfo, AggPhase.TRANSPOSE);
-    transposePhaseAgg.init(analyzer);
-    return transposePhaseAgg;
+    if (multiAggInfo.hasSecondPhase()) {
+      agg.unsetNeedsFinalize();
+      agg = new AggregationNode(
+          ctx_.getNextNodeId(), agg, multiAggInfo, AggPhase.SECOND);
+      agg.init(analyzer);
+    }
+    if (multiAggInfo.hasTransposePhase()) {
+      agg = new AggregationNode(
+          ctx_.getNextNodeId(), agg, multiAggInfo, AggPhase.TRANSPOSE);
+      agg.init(analyzer);
+    }
+    return agg;
   }
 
  /**

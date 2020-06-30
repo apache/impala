@@ -180,6 +180,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testGroupingSets() {
+    runPlannerTestFile("grouping-sets");
+  }
+
+  @Test
   public void testAnalyticFns() {
     runPlannerTestFile("analytic-fns",
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));

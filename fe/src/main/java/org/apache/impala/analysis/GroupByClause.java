@@ -51,6 +51,10 @@ public class GroupByClause {
   // clause. Non-null iff groupingSetsType is SETS.
   private final List<List<Integer>> groupingSetsList_;
 
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+  boolean isAnalyzed_ = false;
+
   // ID of each of the distinct grouping sets. Each ID is a bitfield with a bit set if
   // that distinct grouping expr is part of that grouping set. Populated during analysis.
   private final List<Long> groupingIDs_;
@@ -58,6 +62,9 @@ public class GroupByClause {
   // The list of analyzed expressions in each distinct grouping set. Populated during
   // analysis.
   private final List<List<Expr>> analyzedGroupingSets_;
+
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
 
   /**
    * Constructor for regular GROUP BY, ROLLUP and CUBE.
@@ -110,15 +117,25 @@ public class GroupByClause {
   }
 
   public List<Expr> getOrigGroupingExprs() { return origGroupingExprs_; }
-  public List<Long> getGroupingIDs() { return groupingIDs_; }
+  public List<Long> getGroupingIDs() {
+    Preconditions.checkState(isAnalyzed_);
+    return groupingIDs_;
+  }
+  public List<List<Expr>> getAnalyzedGroupingSets() {
+    Preconditions.checkState(isAnalyzed_);
+    return analyzedGroupingSets_;
+  }
 
   /**
    * Add a new grouping ID if it is not already present in 'groupingIDs_'. If it is a new
    * grouping ID, expand the list of expressions it references and append them to
    * 'analyzedGroupingSets_'.
    * @param groupingExprs duplicated list of analyzed grouping exprs
+   * @param addtlGroupingExprs additional grouping exprs that will be added to each
+   *    grouping set, e.g. correlated columns from a subquery rewrite.
    */
-  private void addGroupingID(long id, List<Expr> groupingExprs) throws AnalysisException {
+  private void addGroupingID(long id, List<Expr> groupingExprs,
+      List<Expr> addtlGroupingExprs) throws AnalysisException {
     Preconditions.checkState(id >= 0 && id < (1L << groupingExprs.size()),
         "bad id: " + id);
     if (groupingIDs_.contains(id)) return;
@@ -140,6 +157,8 @@ public class GroupByClause {
         groupingSet.add(NullLiteral.create(groupingExpr.getType()));
       }
     }
+    // The additional grouping expressions are a part of each grouping set.
+    groupingSet.addAll(addtlGroupingExprs);
     analyzedGroupingSets_.add(groupingSet);
   }
 
@@ -195,6 +214,10 @@ public class GroupByClause {
       }
     }
 
+    List<Expr> addtlGroupingExprs =
+        groupingExprs.subList(numOrigGroupingExprs, groupingExprs.size());
+    Expr.removeDuplicates(addtlGroupingExprs);
+
     int numGroupingSetExprs = dedupedGroupingSetExprs.size();
     if (numGroupingSetExprs >= (Long.SIZE - 1)) {
       throw new AnalysisException(
@@ -209,7 +232,7 @@ public class GroupByClause {
       // E.g. for CUBE(a, b, c), we enumerate 111, 110, 101, 100, 010, 001, 000,
       // meaning the sets (a, b, c), (b, c), (a, c), (c), (b), (a), ().
       for (long id = (1L << numGroupingSetExprs) - 1; id >= 0; id--) {
-        addGroupingID(id, dedupedGroupingSetExprs);
+        addGroupingID(id, dedupedGroupingSetExprs, addtlGroupingExprs);
       }
     } else if (groupingSetsType_ == GroupingSetsType.ROLLUP) {
       Preconditions.checkState(numGroupingSetExprs > 0);
@@ -220,7 +243,7 @@ public class GroupByClause {
       long bit = (1L << numGroupingSetExprs);
       long id = bit - 1;
       while (bit != 0) {
-        addGroupingID(id, dedupedGroupingSetExprs);
+        addGroupingID(id, dedupedGroupingSetExprs, addtlGroupingExprs);
         bit >>= 1;
         id &= ~bit;
       }
@@ -240,9 +263,10 @@ public class GroupByClause {
               "bad pos" + dedupedPos);
           mask |= (1L << dedupedPos);
         }
-        addGroupingID(mask, dedupedGroupingSetExprs);
+        addGroupingID(mask, dedupedGroupingSetExprs, addtlGroupingExprs);
       }
     }
+    isAnalyzed_ = true;
   }
 
   /**
@@ -253,6 +277,7 @@ public class GroupByClause {
     // groupingIDs_ were generated during analysis, so clear them out.
     groupingIDs_.clear();
     analyzedGroupingSets_.clear();
+    isAnalyzed_ = false;
   }
 
   /**

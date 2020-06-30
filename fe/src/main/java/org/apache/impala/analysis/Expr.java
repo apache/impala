@@ -1121,6 +1121,27 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
+   * Create a deep copy of 'ls'. The elements of the returned list are of the same
+   * type as the input list.
+   */
+  public static <C extends Expr> List<List<C>> deepCopy(List<List<C>> ls) {
+    Preconditions.checkNotNull(ls);
+    List<List<C>> result = new ArrayList<>(ls.size());
+    for (List<C> l : ls) {
+      if (l == null) {
+        result.add(null);
+        continue;
+      }
+      List<C> l2 = new ArrayList<>(l.size());
+      for (Expr element : l) {
+        l2.add((C) element.clone());
+      }
+      result.add(l2);
+    }
+    return result;
+  }
+
+  /**
    * Removes duplicate exprs (according to equals()).
    */
   public static <C extends Expr> void removeDuplicates(List<C> l) {
