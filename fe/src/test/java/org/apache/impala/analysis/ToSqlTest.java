@@ -23,7 +23,6 @@ import static org.junit.Assert.fail;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FrontendTestBase;
-import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.testutil.TestUtils;
 import org.junit.Test;
 
@@ -817,9 +816,6 @@ public class ToSqlTest extends FrontendTestBase {
         "HAVING avg(tinyint_col) > 10 AND count(tinyint_col) > 5");
 
     // CUBE, ROLLUP.
-    // Temporarily disable validation of support for CUBE/ROLLUP/GROUPING SETS
-    // so we can run toSql() on these statements.
-    RuntimeEnv.INSTANCE.setEnableGroupingSetsValidation(false);
     testToSql("select int_col, string_col, sum(id) from functional.alltypes " +
         "group by rollup(int_col, string_col)",
         "SELECT int_col, string_col, sum(id) FROM functional.alltypes " +

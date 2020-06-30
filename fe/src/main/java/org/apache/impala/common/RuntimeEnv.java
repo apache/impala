@@ -34,9 +34,6 @@ public class RuntimeEnv {
   // service.
   private boolean enableMtDopValidation_;
 
-  // Whether we should allow ROLLUP/CUBE/GROUPING SETS queries to pass analysis
-  private boolean enableGroupingSetsValidation_;
-
   public RuntimeEnv() {
     reset();
   }
@@ -48,7 +45,6 @@ public class RuntimeEnv {
     numCores_ = Runtime.getRuntime().availableProcessors();
     isTestEnv_ = false;
     enableMtDopValidation_ = false;
-    enableGroupingSetsValidation_ = true;
   }
 
   public int getNumCores() { return numCores_; }
@@ -57,11 +53,4 @@ public class RuntimeEnv {
   public boolean isTestEnv() { return isTestEnv_; }
   public boolean isMtDopValidationEnabled() { return enableMtDopValidation_; }
   public void setEnableMtDopValidation(boolean v) { enableMtDopValidation_ = v; }
-  public boolean isGroupingSetsValidationEnabled() {
-    return enableGroupingSetsValidation_;
-  }
-  public void setEnableGroupingSetsValidation(boolean v) {
-    enableGroupingSetsValidation_ = v;
-  }
-
 }

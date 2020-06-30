@@ -1,0 +1,125 @@
+====
+---- QUERY: TPCDS-Q22
+select  i_product_name
+             ,i_brand
+             ,i_class
+             ,i_category
+             ,avg(inv_quantity_on_hand) qoh
+       from inventory
+           ,date_dim
+           ,item
+           ,warehouse
+       where inv_date_sk=d_date_sk
+              and inv_item_sk=i_item_sk
+              and inv_warehouse_sk = w_warehouse_sk
+              and d_month_seq between 1212 and 1212 + 11
+       group by rollup(i_product_name
+                       ,i_brand
+                       ,i_class
+                       ,i_category)
+order by qoh, i_product_name, i_brand, i_class, i_category
+limit 100;
+---- RESULTS
+'n stbarcallyationought','amalgscholar #2','rock','Music',432.056680162
+'n stbarcallyationought','amalgscholar #2','rock','NULL',432.056680162
+'n stbarcallyationought','amalgscholar #2','NULL','NULL',432.056680162
+'n stbarcallyationought','NULL','NULL','NULL',432.056680162
+'antiablen stcally','univbrand #6','jewelry boxes','Jewelry',436.257028112
+'antiablen stcally','univbrand #6','jewelry boxes','NULL',436.257028112
+'antiablen stcally','univbrand #6','NULL','NULL',436.257028112
+'antiablen stcally','NULL','NULL','NULL',436.257028112
+'antiantiableeseought','exportiexporti #2','toddlers','Children',436.558704453
+'antiantiableeseought','exportiexporti #2','toddlers','NULL',436.558704453
+'antiantiableeseought','exportiexporti #2','NULL','NULL',436.558704453
+'antiantiableeseought','NULL','NULL','NULL',436.558704453
+'n stcallyn stationought','exportischolar #2','pop','Music',436.852589641
+'n stcallyn stationought','exportischolar #2','pop','NULL',436.852589641
+'n stcallyn stationought','exportischolar #2','NULL','NULL',436.852589641
+'n stcallyn stationought','NULL','NULL','NULL',436.852589641
+'ationantiableationought','amalgscholar #2','rock','Music',438.133064516
+'ationantiableationought','amalgscholar #2','rock','NULL',438.133064516
+'ationantiableationought','amalgscholar #2','NULL','NULL',438.133064516
+'ationantiableationought','NULL','NULL','NULL',438.133064516
+'n stcallyesepriought','edu packscholar #2','classical','Music',438.56097561
+'n stcallyesepriought','edu packscholar #2','classical','NULL',438.56097561
+'n stcallyesepriought','edu packscholar #2','NULL','NULL',438.56097561
+'n stcallyesepriought','NULL','NULL','NULL',438.56097561
+'oughteingoughtn st','importobrand #6','costume','Jewelry',441.268595041
+'oughteingoughtn st','importobrand #6','costume','NULL',441.268595041
+'oughteingoughtn st','importobrand #6','NULL','NULL',441.268595041
+'oughteingoughtn st','NULL','NULL','NULL',441.268595041
+'prieingeseantiought','amalgunivamalg #4','cooking','Books',441.76446281
+'prieingeseantiought','amalgunivamalg #4','cooking','NULL',441.76446281
+'prieingeseantiought','amalgunivamalg #4','NULL','NULL',441.76446281
+'prieingeseantiought','NULL','NULL','NULL',441.76446281
+'ationationpribarought','scholarmaxi #10','history','Books',442.041322314
+'ationationpribarought','scholarmaxi #10','history','NULL',442.041322314
+'ationationpribarought','scholarmaxi #10','NULL','NULL',442.041322314
+'ationationpribarought','NULL','NULL','NULL',442.041322314
+'n stpribarought','edu packexporti #2','school-uniforms','Children',442.215447154
+'n stpribarought','edu packexporti #2','school-uniforms','NULL',442.215447154
+'n stpribarought','edu packexporti #2','NULL','NULL',442.215447154
+'n stpribarought','NULL','NULL','NULL',442.215447154
+'pricallyantiese','amalgunivamalg #8','cameras','Electronics',442.740890688
+'pricallyantiese','amalgunivamalg #8','cameras','NULL',442.740890688
+'pricallyantiese','amalgunivamalg #8','NULL','NULL',442.740890688
+'pricallyantiese','NULL','NULL','NULL',442.740890688
+'n stoughtoughtbarought','amalgscholar #2','rock','Music',443.9625
+'n stoughtoughtbarought','amalgscholar #2','rock','NULL',443.9625
+'n stoughtoughtbarought','amalgscholar #2','NULL','NULL',443.9625
+'n stoughtoughtbarought','NULL','NULL','NULL',443.9625
+'antiableableought','importoamalgamalg #2','monitors','Electronics',444.646090535
+'antiableableought','importoamalgamalg #2','monitors','NULL',444.646090535
+'antiableableought','importoamalgamalg #2','NULL','NULL',444.646090535
+'antiableableought','NULL','NULL','NULL',444.646090535
+'prieseoughtable','exportischolar #2','pop','Music',445.270491803
+'prieseoughtable','exportischolar #2','pop','NULL',445.270491803
+'prieseoughtable','exportischolar #2','NULL','NULL',445.270491803
+'prieseoughtable','NULL','NULL','NULL',445.270491803
+'ationpribarought','amalgunivamalg #1','cameras','Electronics',445.530120482
+'ationpribarought','amalgunivamalg #1','cameras','NULL',445.530120482
+'ationpribarought','amalgunivamalg #1','NULL','NULL',445.530120482
+'ationpribarought','NULL','NULL','NULL',445.530120482
+'n stn stesebarought','importoexporti #2','infants','Children',445.907630522
+'n stn stesebarought','importoexporti #2','infants','NULL',445.907630522
+'n stn stesebarought','importoexporti #2','NULL','NULL',445.907630522
+'n stn stesebarought','NULL','NULL','NULL',445.907630522
+'prioughtanticallyought','importoexporti #2','infants','Children',445.959677419
+'prioughtanticallyought','importoexporti #2','infants','NULL',445.959677419
+'prioughtanticallyought','importoexporti #2','NULL','NULL',445.959677419
+'prioughtanticallyought','NULL','NULL','NULL',445.959677419
+'oughtationpriantiought','exportiedu pack #2','kids','Shoes',445.963855422
+'oughtationpriantiought','exportiedu pack #2','kids','NULL',445.963855422
+'oughtationpriantiought','exportiedu pack #2','NULL','NULL',445.963855422
+'oughtationpriantiought','NULL','NULL','NULL',445.963855422
+'priantioughtantiought','importomaxi #10','business','Books',446.179591837
+'priantioughtantiought','importomaxi #10','business','NULL',446.179591837
+'priantioughtantiought','importomaxi #10','NULL','NULL',446.179591837
+'priantioughtantiought','NULL','NULL','NULL',446.179591837
+'n stpribarbarought','edu packbrand #8','estate','Jewelry',446.316
+'n stpribarbarought','edu packbrand #8','estate','NULL',446.316
+'n stpribarbarought','edu packbrand #8','NULL','NULL',446.316
+'n stpribarbarought','NULL','NULL','NULL',446.316
+'ationn steingantiought','edu packcorp #2','bracelets','Jewelry',446.586065574
+'ationn steingantiought','edu packcorp #2','bracelets','NULL',446.586065574
+'ationn steingantiought','edu packcorp #2','NULL','NULL',446.586065574
+'ationn steingantiought','NULL','NULL','NULL',446.586065574
+'antioughtcallyantiought','edu packamalgamalg #10','automotive','Electronics',446.714859438
+'antioughtcallyantiought','edu packamalgamalg #10','automotive','NULL',446.714859438
+'antioughtcallyantiought','edu packamalgamalg #10','NULL','NULL',446.714859438
+'antioughtcallyantiought','NULL','NULL','NULL',446.714859438
+'antiableprin st','edu packimporto #2','sports-apparel','Men',446.796680498
+'antiableprin st','edu packimporto #2','sports-apparel','NULL',446.796680498
+'antiableprin st','edu packimporto #2','NULL','NULL',446.796680498
+'antiableprin st','NULL','NULL','NULL',446.796680498
+'antioughtantically','corpnameless #6','football','Sports',446.963562753
+'antioughtantically','corpnameless #6','football','NULL',446.963562753
+'antioughtantically','corpnameless #6','NULL','NULL',446.963562753
+'antioughtantically','NULL','NULL','NULL',446.963562753
+'antin stn stanti','amalgamalg #2','dresses','Women',447.380165289
+'antin stn stanti','amalgamalg #2','dresses','NULL',447.380165289
+'antin stn stanti','amalgamalg #2','NULL','NULL',447.380165289
+'antin stn stanti','NULL','NULL','NULL',447.380165289
+---- TYPES
+STRING, STRING, STRING, STRING, DOUBLE
+====

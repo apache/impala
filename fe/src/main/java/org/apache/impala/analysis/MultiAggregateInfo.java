@@ -157,12 +157,22 @@ public class MultiAggregateInfo {
 
   // Indicates if this MultiAggregateInfo is associated with grouping sets.
   private boolean isGroupingSet_;
+
+  // Grouping sets provided in the constructor. Null if 'isGroupingSet_' is false or if
+  // the list of grouping sets will be provided later in analyzeCustomClasses(). Each
+  // list must have the same number of expressions, and the expression types must match.
+  // TODO: could generalise this to allow omitting NULL expressions.
+  private List<List<Expr>> groupingSets_;
+
   // Indicates whether to generate the grouping_id column for grouping sets
   private boolean generateGroupingId_;
 
-  public MultiAggregateInfo(List<Expr> groupingExprs, List<FunctionCallExpr> aggExprs) {
+  public MultiAggregateInfo(List<Expr> groupingExprs, List<FunctionCallExpr> aggExprs,
+      List<List<Expr>> groupingSets) {
     groupingExprs_ = Expr.cloneList(Preconditions.checkNotNull(groupingExprs));
     aggExprs_ = Expr.cloneList(Preconditions.checkNotNull(aggExprs));
+    groupingSets_ = groupingSets == null ? null : Expr.deepCopy(groupingSets);
+    isGroupingSet_ = groupingSets != null;
   }
 
   /**
@@ -211,6 +221,12 @@ public class MultiAggregateInfo {
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
+
+    if (groupingSets_ != null) {
+      analyzeGroupingSets(analyzer);
+      return;
+    }
+
     isAnalyzed_ = true;
 
     // Group the agg exprs by their DISTINCT exprs and move the non-distinct agg exprs
@@ -270,6 +286,7 @@ public class MultiAggregateInfo {
     for (List<FunctionCallExpr> aggClass : aggClasses_) {
       aggInfos_.add(AggregateInfo.create(groupingExprs_, aggClass, analyzer));
     }
+
     if (aggInfos_.size() == 1) {
       // Only a single aggregation class, no transposition step is needed.
       outputSmap_ = aggInfos_.get(0).getResultSmap();
@@ -306,10 +323,36 @@ public class MultiAggregateInfo {
   }
 
   /**
+   * Implementation of analyze() for aggregation with grouping sets.
+   * Does not handle distinct aggregate functions yet.
+   *
+   * @throws AnalysisException if a distinct aggregation function is present or any other
+   *    analysis error occurs.
+   */
+  private void analyzeGroupingSets(Analyzer analyzer) throws AnalysisException {
+    for (FunctionCallExpr aggExpr : aggExprs_) {
+      if (aggExpr.isDistinct()) {
+        // We can't handle this now - it would require enumerating more aggregation
+        // classes.
+        throw new AnalysisException("Distinct aggregate functions and grouping sets " +
+            "are not supported in the same query block.");
+      }
+    }
+
+    List<List<FunctionCallExpr>> aggClasses = new ArrayList<>(groupingSets_.size());
+    List<AggregateInfo> aggInfos = new ArrayList<>(groupingSets_.size());
+    for (List<Expr> groupingSet : groupingSets_) {
+      aggClasses.add(aggExprs_);
+      aggInfos.add(AggregateInfo.create(groupingSet, aggExprs_, analyzer));
+    }
+    // analyzeCustomClasses() will do the rest of the analysis and set 'isAnalyzed_'
+    analyzeCustomClasses(analyzer, aggClasses, aggInfos);
+  }
+
+  /**
    * Version of analyze method that accepts list of aggregation class and aggregation
-   * info that may be created by an external planner. This is needed for supporting
-   * grouping sets/rollup functionality. This is unlike the default analyze method which
-   * internally generates these lists.
+   * info. This is needed for supporting grouping sets/rollup functionality. Does not
+   * handle distinct aggregate functions.
    */
   public void analyzeCustomClasses(Analyzer analyzer,
       List<List<FunctionCallExpr>> aggClasses,
@@ -432,8 +475,8 @@ public class MultiAggregateInfo {
    * Example:
    *  SELECT a1, b1, SUM(c1), MIN(d1) FROM t1 GROUP BY ROLLUP(a1, b1)
    *
-   * Currently, Impala does not support ROLLUP directly but suppose an external planner
-   * converts the above to the following 3 Grouping Sets: {(a1, b1), (a1), ()}
+   * For example, the above statement results in the following 3 Grouping Sets:
+   * {(a1, b1), (a1), ()}
    * We will map these to the following aggregation classes:
    * Class 1:
    *  Aggregate output exprs: SUM(c1), MIN(d1)
@@ -534,7 +577,8 @@ public class MultiAggregateInfo {
         // for a particular aggInfo, we only need to consider the group-by
         // exprs relevant to that aggInfo
         TupleDescriptor aggTuple = aggInfo.getResultTupleDesc();
-        Preconditions.checkState(gbIndex < aggTuple.getSlots().size());
+        Preconditions.checkState(gbIndex < aggTuple.getSlots().size(),
+            groupingExprs.toString() + " " + aggTuple.debugString());
         Expr whenExpr = NumericLiteral.create(aggTuple.getId().asInt());
         if (aggInfo.getGroupingExprs().size() == 0) {
           Type nullType = groupingExprs.get(gbIndex).getType();

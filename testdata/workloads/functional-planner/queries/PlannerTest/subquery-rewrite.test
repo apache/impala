@@ -4541,3 +4541,178 @@ PLAN-ROOT SINK
    HDFS partitions=4/4 files=4 size=460B
    row-size=4B cardinality=8
 ====
+# Uncorrelated EXISTS with a group by clause with rollup.
+select 1
+from functional.alltypesagg a
+where exists
+  (select id
+   from functional.alltypestiny b
+   group by rollup(id, int_col, bool_col))
+and tinyint_col < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  row-size=1B cardinality=1.10K
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  group by: CASE valid_tid(2,3,4,5) WHEN 2 THEN id WHEN 3 THEN id WHEN 4 THEN id WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 END
+|  |  limit: 1
+|  |  row-size=13B cardinality=1
+|  |
+|  02:AGGREGATE [FINALIZE]
+|  |  Class 0
+|  |    group by: id, int_col, bool_col
+|  |  Class 1
+|  |    group by: id, int_col, NULL
+|  |  Class 2
+|  |    group by: id, NULL, NULL
+|  |  Class 3
+|  |    group by: NULL, NULL, NULL
+|  |  row-size=36B cardinality=25
+|  |
+|  01:SCAN HDFS [functional.alltypestiny b]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=9B cardinality=8
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: tinyint_col < 10
+   row-size=1B cardinality=1.10K
+====
+# Correlated EXISTS with a group by clause with rollup.
+# The correlated columns are pushed into the GROUP BY.
+# TODO: This plan could be improved by removing the ROLLUP in the subquery or by
+# reordering the JOIN and AGGREGATE.
+select 1
+from functional.alltypesagg a
+where exists
+  (select id
+   from functional.alltypestiny b
+   where a.tinyint_col = b.tinyint_col and a.string_col = b.string_col
+   group by rollup(id, int_col, bool_col))
+and tinyint_col < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: a.tinyint_col = CASE valid_tid(2,3,4,5) WHEN 2 THEN b.tinyint_col WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col END, a.string_col = CASE valid_tid(2,3,4,5) WHEN 2 THEN b.string_col WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col END
+|  runtime filters: RF000 <- CASE valid_tid(2,3,4,5) WHEN 2 THEN b.tinyint_col WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col END, RF001 <- CASE valid_tid(2,3,4,5) WHEN 2 THEN b.string_col WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col END
+|  row-size=16B cardinality=3
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  group by: CASE valid_tid(2,3,4,5) WHEN 2 THEN id WHEN 3 THEN id WHEN 4 THEN id WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN b.tinyint_col WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col END, CASE valid_tid(2,3,4,5) WHEN 2 THEN b.string_col WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col END, CASE valid_tid(2,3,4,5) WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 END
+|  |  row-size=26B cardinality=28
+|  |
+|  02:AGGREGATE [FINALIZE]
+|  |  Class 0
+|  |    group by: id, int_col, bool_col, b.tinyint_col, b.string_col
+|  |  Class 1
+|  |    group by: id, int_col, NULL, b.tinyint_col, b.string_col
+|  |  Class 2
+|  |    group by: id, NULL, NULL, b.tinyint_col, b.string_col
+|  |  Class 3
+|  |    group by: NULL, NULL, NULL, b.tinyint_col, b.string_col
+|  |  row-size=92B cardinality=28
+|  |
+|  01:SCAN HDFS [functional.alltypestiny b]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=23B cardinality=8
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: tinyint_col < 10
+   runtime filters: RF000 -> a.tinyint_col, RF001 -> a.string_col
+   row-size=16B cardinality=1.10K
+====
+# Correlated EXISTS with a group by clause with rollup and having.
+# The correlated columns are pushed into the GROUP BY.
+# This plan could be improved by reordering the JOIN and AGGREGATE
+# or by transforming the ROLLUP (the HAVING predicate interacts with
+# the ROLLUP since it is always true for some aggregation classes).
+select 1
+from functional.alltypesagg a
+where exists
+  (select id
+   from functional.alltypestiny b
+   where a.tinyint_col = b.tinyint_col and a.string_col = b.string_col
+   group by rollup(id, int_col, bool_col)
+   having int_col is null)
+and tinyint_col < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: a.tinyint_col = CASE valid_tid(2,3,4,5) WHEN 2 THEN b.tinyint_col WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col END, a.string_col = CASE valid_tid(2,3,4,5) WHEN 2 THEN b.string_col WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col END
+|  runtime filters: RF000 <- CASE valid_tid(2,3,4,5) WHEN 2 THEN b.tinyint_col WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col END, RF001 <- CASE valid_tid(2,3,4,5) WHEN 2 THEN b.string_col WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col END
+|  row-size=16B cardinality=1
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  group by: CASE valid_tid(2,3,4,5) WHEN 2 THEN id WHEN 3 THEN id WHEN 4 THEN id WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN b.tinyint_col WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col END, CASE valid_tid(2,3,4,5) WHEN 2 THEN b.string_col WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col END, CASE valid_tid(2,3,4,5) WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 END
+|  |  having: CASE valid_tid(2,3,4,5) WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL WHEN 5 THEN NULL END IS NULL
+|  |  row-size=26B cardinality=1
+|  |
+|  02:AGGREGATE [FINALIZE]
+|  |  Class 0
+|  |    group by: id, int_col, bool_col, b.tinyint_col, b.string_col
+|  |  Class 1
+|  |    group by: id, int_col, NULL, b.tinyint_col, b.string_col
+|  |  Class 2
+|  |    group by: id, NULL, NULL, b.tinyint_col, b.string_col
+|  |  Class 3
+|  |    group by: NULL, NULL, NULL, b.tinyint_col, b.string_col
+|  |  row-size=92B cardinality=28
+|  |
+|  01:SCAN HDFS [functional.alltypestiny b]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=23B cardinality=8
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: tinyint_col < 10
+   runtime filters: RF000 -> a.tinyint_col, RF001 -> a.string_col
+   row-size=16B cardinality=1.10K
+====
+# Correlated EXISTS with a group by clause with rollup.
+# Same query as above but with tables flipped so that the join is transformed into a
+# RIGHT OUTER JOIN and the aggregation ends up on the left side of of the join. Runtime
+# filters cannot be pushed to the scan because the rollup aggregation introduces NULLs.
+select 1
+from functional.alltypestiny a
+where exists
+  (select id
+   from functional.alltypesagg b
+   where a.tinyint_col = b.tinyint_col and a.string_col = b.string_col
+   group by rollup(id, int_col, bool_col))
+and tinyint_col < 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: CASE valid_tid(2,3,4,5) WHEN 2 THEN b.tinyint_col WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col END = a.tinyint_col, CASE valid_tid(2,3,4,5) WHEN 2 THEN b.string_col WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col END = a.string_col
+|  row-size=14B cardinality=1
+|
+|--00:SCAN HDFS [functional.alltypestiny a]
+|     HDFS partitions=4/4 files=4 size=460B
+|     predicates: tinyint_col < 10
+|     row-size=14B cardinality=1
+|
+03:AGGREGATE [FINALIZE]
+|  group by: CASE valid_tid(2,3,4,5) WHEN 2 THEN id WHEN 3 THEN id WHEN 4 THEN id WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN b.tinyint_col WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col END, CASE valid_tid(2,3,4,5) WHEN 2 THEN b.string_col WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col END, CASE valid_tid(2,3,4,5) WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 END
+|  row-size=26B cardinality=41.67K
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    group by: id, int_col, bool_col, b.tinyint_col, b.string_col
+|  Class 1
+|    group by: id, int_col, NULL, b.tinyint_col, b.string_col
+|  Class 2
+|    group by: id, NULL, NULL, b.tinyint_col, b.string_col
+|  Class 3
+|    group by: NULL, NULL, NULL, b.tinyint_col, b.string_col
+|  row-size=100B cardinality=41.67K
+|
+01:SCAN HDFS [functional.alltypesagg b]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=25B cardinality=11.00K
+====
