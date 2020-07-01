@@ -207,6 +207,8 @@ public class CatalogServiceCatalog extends Catalog {
   private static final long LOCK_RETRY_TIMEOUT_MS = 7200000;
   // Time to sleep before retrying to acquire a table lock
   private static final int LOCK_RETRY_DELAY_MS = 10;
+  // default value of table id in the GetPartialCatalogObjectRequest
+  public static final long TABLE_ID_UNAVAILABLE = -1;
 
   private final TUniqueId catalogServiceId_;
 
@@ -603,8 +605,9 @@ public class CatalogServiceCatalog extends Catalog {
         new TableName(request.table_name.db_name, request.table_name.table_name)
           .toString(), request.valid_write_ids);
     }
+    long tableId = request.getTable_id();
     Table table = getOrLoadTable(tableName.db_name, tableName.table_name,
-        "needed to fetch partition stats", writeIdList);
+        "needed to fetch partition stats", writeIdList, tableId);
 
     // Table could be null if it does not exist anymore.
     if (table == null) {
@@ -1849,6 +1852,13 @@ public class CatalogServiceCatalog extends Catalog {
     return table;
   }
 
+
+  public Table getOrLoadTable(String dbName, String tblName, String reason,
+      ValidWriteIdList validWriteIdList) throws CatalogException {
+    return getOrLoadTable(dbName, tblName, reason, validWriteIdList,
+        TABLE_ID_UNAVAILABLE);
+  }
+
   /**
    * Gets the table with the given name, loading it if needed (if the existing catalog
    * object is not yet loaded). Returns the matching Table or null if no table with this
@@ -1859,7 +1869,7 @@ public class CatalogServiceCatalog extends Catalog {
    * (not yet loaded table) will be returned.
    */
   public Table getOrLoadTable(String dbName, String tblName, String reason,
-      ValidWriteIdList validWriteIdList) throws CatalogException {
+      ValidWriteIdList validWriteIdList, long tableId) throws CatalogException {
     TTableName tableName = new TTableName(dbName.toLowerCase(), tblName.toLowerCase());
     TableLoadingMgr.LoadRequest loadReq;
 
@@ -1874,9 +1884,12 @@ public class CatalogServiceCatalog extends Catalog {
       if (tbl.isLoaded() && validWriteIdList == null) return tbl;
       // if a validWriteIdList is provided, we see if the cached table can provided a
       // consistent view of the given validWriteIdList. If yes, we can return the table
-      // otherwise we reload the table.
+      // otherwise we reload the table. It is possible that the cached table is stale
+      // even if the ValidWriteIdList matches (eg. out-of-band drop and recreate of
+      // table) Hence we should make sure that we are comparing
+      // the ValidWriteIdList only when the table id matches.
       if (tbl instanceof HdfsTable
-          && AcidUtils.compare((HdfsTable) tbl, validWriteIdList) >= 0) {
+          && AcidUtils.compare((HdfsTable) tbl, validWriteIdList, tableId) >= 0) {
         return tbl;
       }
       previousCatalogVersion = tbl.getCatalogVersion();
@@ -3034,6 +3047,7 @@ public class CatalogServiceCatalog extends Catalog {
       Table table;
       ValidWriteIdList writeIdList = null;
       try {
+        long tableId = TABLE_ID_UNAVAILABLE;
         if (req.table_info_selector.valid_write_ids != null) {
           Preconditions.checkState(objectDesc.type.equals(TABLE));
           String dbName = objectDesc.getTable().db_name == null ? Catalog.DEFAULT_DB
@@ -3041,10 +3055,11 @@ public class CatalogServiceCatalog extends Catalog {
           String tblName = objectDesc.getTable().tbl_name;
           writeIdList = MetastoreShim.getValidWriteIdListFromThrift(
               dbName + "." + tblName, req.table_info_selector.valid_write_ids);
+          tableId = req.table_info_selector.getTable_id();
         }
         table = getOrLoadTable(
             objectDesc.getTable().getDb_name(), objectDesc.getTable().getTbl_name(),
-            "needed by coordinator", writeIdList);
+            "needed by coordinator", writeIdList, tableId);
       } catch (DatabaseNotFoundException e) {
         return createGetPartialCatalogObjectError(CatalogLookupStatus.DB_NOT_FOUND);
       }

@@ -29,6 +29,7 @@ import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.common.ValidWriteIdList.RangeResponse;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FileMetadataLoader.LoadStats;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -642,13 +643,21 @@ public class AcidUtils {
    * it returns 0 and if the table ValidWriteIdList is behind the provided
    * validWriteIdList this return -1. This information useful to determine if the
    * cached table can be used to construct a consistent snapshot corresponding to the
-   * given validWriteIdList.
+   * given validWriteIdList. The ValidWriteIdList is compared only if the table id
+   * matches with the given tableId.
    */
-  public static int compare(HdfsTable tbl, ValidWriteIdList validWriteIdList) {
+  public static int compare(HdfsTable tbl, ValidWriteIdList validWriteIdList,
+      long tableId) {
     Preconditions.checkState(tbl != null && tbl.getMetaStoreTable() != null);
     // if tbl is not a transactional, there is nothing to compare against and we return 0
     if (!isTransactionalTable(tbl.getMetaStoreTable().getParameters())) return 0;
     Preconditions.checkNotNull(tbl.getValidWriteIds());
+    // if the provided table id does not match with what CatalogService has we return
+    // -1 indicating that cached table is stale.
+    if (tableId != CatalogServiceCatalog.TABLE_ID_UNAVAILABLE
+        && tbl.getMetaStoreTable().getId() != tableId) {
+      return -1;
+    }
     return compare(tbl.getValidWriteIds(), validWriteIdList);
   }
 
@@ -664,7 +673,8 @@ public class AcidUtils {
    * 1, if a is more recent
    * -1, if b is more recent
    ***/
-  private static int compare(ValidWriteIdList a, ValidWriteIdList b) {
+  @VisibleForTesting
+  public static int compare(ValidWriteIdList a, ValidWriteIdList b) {
     Preconditions.checkState(a.getTableName().equalsIgnoreCase(b.getTableName()));
     // The algorithm assumes invalidWriteIds are sorted and values are less or equal than
     // hwm, here is how the algorithm works:
