@@ -352,7 +352,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch.customer c]
    HDFS partitions=1/1 files=1 size=23.08MB
    predicates: c.c_mktsegment IS NULL
-   row-size=218B cardinality=15.00K
+   row-size=218B cardinality=1
 ====
 # IS NOT NULL
 # Similar to above.
@@ -366,7 +366,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [tpch.customer c]
    HDFS partitions=1/1 files=1 size=23.08MB
    predicates: c.c_mktsegment IS NOT NULL
-   row-size=218B cardinality=15.00K
+   row-size=218B cardinality=150.00K
 ====
 # |alltypesagg| = 11K. Null count of tinyint_col = 2000.
 select *
