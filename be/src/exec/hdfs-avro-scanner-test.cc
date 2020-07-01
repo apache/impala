@@ -461,7 +461,8 @@ TEST_F(HdfsAvroScannerTest, DecimalTest) {
   // Unscaled value can be stored in 4 bytes
   data[0] = 8; // decodes to 4
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-  BitUtil::ByteSwap(&data[1], &d4v.value(), 4);
+  const Decimal4Value::StorageType d4v_value = d4v.value();
+  BitUtil::ByteSwap(&data[1], &d4v_value, 4);
 #else
   memcpy(&data[1], &d4v.value(), 4);
 #endif
@@ -482,7 +483,8 @@ TEST_F(HdfsAvroScannerTest, DecimalTest) {
   d8v = Decimal8Value(123456789012345678);
   data[0] = 16; // decodes to 8
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-  BitUtil::ByteSwap(&data[1], &d8v.value(), 8);
+  const Decimal8Value::StorageType d8v_value = d8v.value();
+  BitUtil::ByteSwap(&data[1], &d8v_value, 8);
 #else
   memcpy(&data[1], &d8v.value(), 8);
 #endif
@@ -495,7 +497,8 @@ TEST_F(HdfsAvroScannerTest, DecimalTest) {
   Decimal16Value d16v(1234567890);
   data[0] = 10; // decodes to 5
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-  BitUtil::ByteSwap(&data[1], &d16v.value(), 5);
+  const Decimal16Value::StorageType d16v_value = d16v.value();
+  BitUtil::ByteSwap(&data[1], &d16v_value, 5);
 #else
   memcpy(&data[1], &d16v.value(), 5);
 #endif
@@ -506,12 +509,14 @@ TEST_F(HdfsAvroScannerTest, DecimalTest) {
   TestReadAvroDecimal(data, 4, d16v, -1, TErrorCode::AVRO_TRUNCATED_BLOCK);
 
   /// Produce a very large decimal value.
-  memset(&d16v.value(), 0xFF, sizeof(d16v.value()));
+  Decimal16Value::StorageType d16v_value2;
+  memset(&d16v_value2, 0xFF, sizeof(d16v_value2));
+  d16v.set_value(d16v_value2);
   data[0] = 32; // decodes to 16
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-  BitUtil::ByteSwap(&data[1], &d16v.value(), 16);
+  BitUtil::ByteSwap(&data[1], &d16v_value2, 16);
 #else
-  memcpy(&data[1], &d16v.value(), 16);
+  memcpy(&data[1], &d16v_value2, 16);
 #endif
   TestReadAvroDecimal(data, 17, d16v, 17);
   TestReadAvroDecimal(data, 20, d16v, 17);

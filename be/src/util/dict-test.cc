@@ -148,9 +148,10 @@ TEST(DictTest, TestTimestamps) {
 template<typename InternalType>
 void IncrementValue(InternalType* t) { ++(*t); }
 
-template <> void IncrementValue(Decimal4Value* t) { ++(t->value()); }
-template <> void IncrementValue(Decimal8Value* t) { ++(t->value()); }
-template <> void IncrementValue(Decimal16Value* t) { ++(t->value()); }
+template <class T> void IncrementValue(DecimalValue<T>* t) {
+  const T value = t->value();
+  t->set_value(value + 1);
+}
 
 template<typename InternalType, parquet::Type::type PARQUET_TYPE>
 void TestNumbers(int max_value, int repeat, int value_byte_size) {

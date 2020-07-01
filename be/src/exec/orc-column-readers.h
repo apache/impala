@@ -420,7 +420,7 @@ class OrcDecimalColumnReader
       return Status::OK();
     }
     int64_t val = batch_->values.data()[row_idx];
-    reinterpret_cast<DECIMAL_TYPE*>(OrcColumnReader::GetSlot(tuple))->value() = val;
+    reinterpret_cast<DECIMAL_TYPE*>(OrcColumnReader::GetSlot(tuple))->set_value(val);
     return Status::OK();
   }
 
