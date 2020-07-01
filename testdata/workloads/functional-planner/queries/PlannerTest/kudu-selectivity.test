@@ -208,10 +208,10 @@ Per-Host Resources: mem-estimate=9.75MB mem-reservation=0B thread-reservation=2
   |  mem-estimate=0B mem-reservation=0B thread-reservation=0
   |
   00:SCAN KUDU [functional_kudu.alltypes]
-     predicates: timestamp_col < NULL, CAST(date_string_col AS TINYINT) IS NULL
-     kudu predicates: smallint_col IS NULL, tinyint_col IS NOT NULL, timestamp_col > TIMESTAMP '1987-05-19 00:00:00.000000010'
+     predicates: CAST(date_string_col AS TINYINT) IS NULL, timestamp_col < NULL
+     kudu predicates: smallint_col IS NULL, timestamp_col > TIMESTAMP '1987-05-19 00:00:00.000000010', tinyint_col IS NOT NULL
      mem-estimate=9.75MB mem-reservation=0B thread-reservation=1
-     tuple-ids=0 row-size=97B cardinality=730
+     tuple-ids=0 row-size=97B cardinality=1
      in pipelines: 00(GETNEXT)
 ====
 select * from functional_kudu.alltypes where

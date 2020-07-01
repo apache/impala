@@ -141,7 +141,7 @@ public class IsNullPredicate extends Predicate {
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
     if (isSingleColumnPredicate(slotRefRef, null)) {
       SlotDescriptor slotDesc = slotRefRef.getRef().getDesc();
-      if (!slotDesc.getStats().hasNulls()) return;
+      if (!slotDesc.getStats().hasNullsStats()) return;
       FeTable table = slotDesc.getParent().getTable();
       if (table != null && table.getNumRows() > 0) {
         long numRows = table.getNumRows();

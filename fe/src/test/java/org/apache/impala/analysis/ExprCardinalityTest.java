@@ -410,24 +410,14 @@ public class ExprCardinalityTest {
    */
   @Test
   public void testIsNullSelectivity() throws ImpalaException {
-    // Bug: No estimated selectivity for IS NULL (IMPALA-8050)
-    // Should be null count / |table|
-    // Bug: NDV of IS NULL is 3, should be 2 since IS NULL will
-    // never itself return NULL
-    //verifySelectExpr("alltypes", "id is null", 2, 0);
-    verifySelectExpr("alltypes", "id is null", 3, -1);
-    //verifySelectExpr("alltypes", "bool_col is null", 2, 0);
-    verifySelectExpr("alltypes", "bool_col is null", 3, -1);
-    //verifySelectExpr("alltypes", "int_col is null", 2, 0);
-    verifySelectExpr("alltypes", "int_col is null", 3, -1);
+    // TODO: IMPALA-9915: NDV of IS NULL should be 2
+    verifySelectExpr("alltypes", "id is null", 3, 0);
+    verifySelectExpr("alltypes", "bool_col is null", 3, 0);
+    verifySelectExpr("alltypes", "int_col is null", 3, 0);
 
-    //verifySelectExpr("nullrows", "id is null", 2, 0);
-    verifySelectExpr("nullrows", "id is null", 3, -1);
-     //verifySelectExpr("nullrows", "null_str is null", 2, 1);
+    verifySelectExpr("nullrows", "id is null", 3, 0);
     verifySelectExpr("nullrows", "null_str is null", 3, 1);
-    //verifySelectExpr("nullrows", "group_str is null", 2, 0);
-    verifySelectExpr("nullrows", "group_str is null", 3, -1);
-    //verifySelectExpr("nullrows", "some_nulls is null", 2, 20.0/26);
+    verifySelectExpr("nullrows", "group_str is null", 3, 0);
     verifySelectExpr("nullrows", "some_nulls is null", 3, 20.0/26);
     verifySelectExpr("nullrows", "bool_nulls is not null", 3, 1 - 15.0/26);
 
@@ -441,24 +431,14 @@ public class ExprCardinalityTest {
    */
   @Test
   public void testNotNullSelectivity() throws ImpalaException {
-    // Bug: No estimated selectivity for IS NOT NULL (IMPALA-8050)
-    // Should be 1 - null count / |table|
-    // Bug: NDV of IS NULL is 3, should be 2 since IS NOT NULL will
-    // never itself return NULL
-    //verifySelectExpr("alltypes", "id is not null", 2, 1);
-    verifySelectExpr("alltypes", "id is null", 3, -1);
-    //verifySelectExpr("alltypes", "bool_col is not null", 2, 1);
-    verifySelectExpr("alltypes", "bool_col is null", 3, -1);
-    //verifySelectExpr("alltypes", "int_col is not null", 2, 1);
-    verifySelectExpr("alltypes", "int_col is not null", 3, -1);
+    // TODO: IMPALA-9915: NDV of IS NOT NULL should be 2
+    verifySelectExpr("alltypes", "id is not null", 3, 1);
+    verifySelectExpr("alltypes", "bool_col is not null", 3, 1);
+    verifySelectExpr("alltypes", "int_col is not null", 3, 1);
 
-    //verifySelectExpr("nullrows", "id is not null", 2, 1);
-    verifySelectExpr("nullrows", "id is not null", 3, -1);
-     //verifySelectExpr("nullrows", "null_str is not null", 2, 0);
+    verifySelectExpr("nullrows", "id is not null", 3, 1);
     verifySelectExpr("nullrows", "null_str is not null", 3, 0);
-    //verifySelectExpr("nullrows", "group_str is not null", 2, 1);
-    verifySelectExpr("nullrows", "group_str is not null", 3, -1);
-    //verifySelectExpr("nullrows", "some_nulls is not null", 2, 1 - 20.0/26);
+    verifySelectExpr("nullrows", "group_str is not null", 3, 1);
     verifySelectExpr("nullrows", "some_nulls is not null", 3, 1 - 20.0/26);
     verifySelectExpr("nullrows", "bool_nulls is not null", 3, 1 - 15.0/26);
 

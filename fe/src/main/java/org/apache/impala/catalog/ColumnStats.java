@@ -194,6 +194,7 @@ public class ColumnStats {
   public double getAvgSize() { return avgSize_; }
   public long getMaxSize() { return maxSize_; }
   public boolean hasNulls() { return numNulls_ > 0; }
+  public boolean hasNullsStats() { return numNulls_ != -1; }
   public long getNumNulls() { return numNulls_; }
   // True iff getAvgSize() and getAvgSerializedSize() will return valid values.
   public boolean hasAvgSize() { return avgSize_ >= 0; }

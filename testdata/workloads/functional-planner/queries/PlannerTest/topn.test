@@ -10,7 +10,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    row-size=16B cardinality=0
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -24,7 +24,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    row-size=16B cardinality=0
 ====
 select zip, count(*)
@@ -46,7 +46,7 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    predicates: name LIKE 'm%'
    row-size=16B cardinality=0
 ---- DISTRIBUTEDPLAN
@@ -73,7 +73,7 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=0
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    predicates: name LIKE 'm%'
    row-size=16B cardinality=0
 ====
@@ -157,21 +157,21 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
-|  row-size=16B cardinality=10
+|  row-size=16B cardinality=100
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
-|     row-size=8B cardinality=10
+|     row-size=8B cardinality=100
 |
 00:SCAN HDFS [functional.alltypessmall t1]
-   partitions=4/4 files=4 size=6.32KB
+   HDFS partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> t1.id
    row-size=8B cardinality=100
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-05:MERGING-EXCHANGE [UNPARTITIONED]
+06:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC
 |  limit: 2
 |
@@ -179,20 +179,22 @@ PLAN-ROOT SINK
 |  order by: int_col ASC
 |  row-size=4B cardinality=2
 |
-02:HASH JOIN [INNER JOIN, BROADCAST]
+02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
-|  row-size=16B cardinality=10
+|  row-size=16B cardinality=100
 |
-|--04:EXCHANGE [BROADCAST]
+|--05:EXCHANGE [HASH(t2.id)]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
-|     row-size=8B cardinality=10
+|     row-size=8B cardinality=100
+|
+04:EXCHANGE [HASH(t1.id)]
 |
 00:SCAN HDFS [functional.alltypessmall t1]
-   partitions=4/4 files=4 size=6.32KB
+   HDFS partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> t1.id
    row-size=8B cardinality=100
 ====
@@ -206,7 +208,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=2
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 files=4 size=6.32KB
+   HDFS partitions=4/4 files=4 size=6.32KB
    row-size=4B cardinality=100
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -220,7 +222,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=2
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 files=4 size=6.32KB
+   HDFS partitions=4/4 files=4 size=6.32KB
    row-size=4B cardinality=100
 ====
 # Test that the top-n is on id and not on int_col
@@ -233,7 +235,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=2
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 files=4 size=6.32KB
+   HDFS partitions=4/4 files=4 size=6.32KB
    row-size=8B cardinality=100
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -247,7 +249,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=2
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 files=4 size=6.32KB
+   HDFS partitions=4/4 files=4 size=6.32KB
    row-size=8B cardinality=100
 ====
 # Test that the limit/offset is propagated correctly to child nodes. The TOP-N node
@@ -267,15 +269,15 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
-|  row-size=16B cardinality=10
+|  row-size=16B cardinality=100
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
-|     row-size=8B cardinality=10
+|     row-size=8B cardinality=100
 |
 00:SCAN HDFS [functional.alltypessmall t1]
-   partitions=4/4 files=4 size=6.32KB
+   HDFS partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> t1.id
    row-size=8B cardinality=100
 ---- SCANRANGELOCATIONS
@@ -292,29 +294,31 @@ NODE 1:
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-05:MERGING-EXCHANGE [UNPARTITIONED]
+06:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: int_col ASC
 |  limit: 10
 |
 03:TOP-N [LIMIT=15]
 |  order by: int_col ASC
-|  row-size=4B cardinality=10
+|  row-size=4B cardinality=15
 |
-02:HASH JOIN [INNER JOIN, BROADCAST]
+02:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: t1.id = t2.id
 |  runtime filters: RF000 <- t2.id
-|  row-size=16B cardinality=10
+|  row-size=16B cardinality=100
 |
-|--04:EXCHANGE [BROADCAST]
+|--05:EXCHANGE [HASH(t2.id)]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
-|     row-size=8B cardinality=10
+|     row-size=8B cardinality=100
+|
+04:EXCHANGE [HASH(t1.id)]
 |
 00:SCAN HDFS [functional.alltypessmall t1]
-   partitions=4/4 files=4 size=6.32KB
+   HDFS partitions=4/4 files=4 size=6.32KB
    runtime filters: RF000 -> t1.id
    row-size=8B cardinality=100
 ====
@@ -336,11 +340,11 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=12B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=12B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -359,11 +363,11 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=12B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=12B cardinality=7.30K
 ====
 # test distributed top-n over a union distinct (IMPALA-831)
@@ -388,11 +392,11 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=89B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -421,11 +425,11 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=7.40K
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=89B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ====
 # test that top-n is not placed below an unpartitioned exchange with a limit
@@ -439,7 +443,7 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    limit: 10
    row-size=89B cardinality=10
 ---- DISTRIBUTEDPLAN
@@ -453,7 +457,7 @@ PLAN-ROOT SINK
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    limit: 10
    row-size=89B cardinality=10
 ====
@@ -476,11 +480,11 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=10
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=89B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -498,10 +502,10 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=10
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=89B cardinality=100
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ====
