@@ -17,7 +17,11 @@
 
 package org.apache.impala.catalog;
 
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
+
 import java.sql.SQLException;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
@@ -32,11 +36,14 @@ import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
+import org.apache.impala.thrift.THdfsFileDesc;
+import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableInfoSelector;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.util.AcidUtils;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -475,9 +482,79 @@ public class PartialCatalogInfoWriteIdTest {
     Assert.assertEquals(numHitsAfter, numHits1 );
   }
 
+  /**
+   * This test make sure that the table returned is consistent with given writeId list
+   * even if the table was dropped and recreated from outside.
+   * @throws Exception
+   */
+  @Test
+  public void testFetchAfterDropAndRecreate() throws Exception {
+    Assume.assumeTrue(MetastoreShim.getMajorVersion() >= 3);
+    // row 2, first row is in the setup method
+    executeImpalaSql("insert into " + getTestTblName() + " values (2)");
+    Table tbl = catalog_.getOrLoadTable(testDbName, testTblName, "test", null);
+    Assert.assertFalse("Table must be loaded",
+        tbl instanceof IncompleteTable);
+    ValidWriteIdList olderWriteIdList = getValidWriteIdList(testDbName,
+        testTblName);
+    Assert.assertEquals(olderWriteIdList.toString(), tbl.getValidWriteIds().toString());
+    TGetPartialCatalogObjectRequest request = new RequestBuilder()
+        .db(testDbName)
+        .tbl(testTblName)
+        .writeId(olderWriteIdList)
+        .wantFiles()
+        .build();
+    TGetPartialCatalogObjectResponse response = sendRequest(request);
+    Assert.assertEquals(1, response.getTable_info().getPartitionsSize());
+    List<THdfsFileDesc> oldFds = response.getTable_info().getPartitions()
+        .get(0).file_descriptors;
+    Assert.assertEquals(2, oldFds.size());
+    // now recreate the table from hive so that Impala is not aware of it
+    executeHiveSql("drop table " + getTestTblName());
+    executeHiveSql("create table " + getTestTblName() + " like "
+        + "functional.insert_only_transactional_table stored as parquet");
+    // we do 2 more inserts into the table so that the high-watermark is same
+    // as olderWriteIdList.
+    executeHiveSql("insert into " + getTestTblName() + " values (1)");
+    executeHiveSql("insert into " + getTestTblName() + " values (2)");
+    ValidWriteIdList newerWriteIdList = getValidWriteIdList(testDbName, testTblName);
+    // the validWriteIdList itself is compatible
+    Assert.assertTrue(AcidUtils.compare(newerWriteIdList, olderWriteIdList) == 0);
+    // now a client with the newerValidWriteIdList must re-trigger a load
+    request = new RequestBuilder()
+        .db(testDbName)
+        .tbl(testTblName)
+        .writeId(newerWriteIdList)
+        .tableId(getTableId(testDbName, testTblName))
+        .wantFiles()
+        .build();
+    response = sendRequest(request);
+    Assert.assertEquals(1, response.getTable_info().getPartitionsSize());
+    List<THdfsFileDesc> newFds = response.getTable_info().getPartitions()
+        .get(0).file_descriptors;
+    Assert.assertEquals(2, newFds.size());
+    for (int i=0; i<newFds.size(); i++) {
+      // we expect that table was reloaded and hence the file descriptors should be
+      // different
+      Assert.assertNotEquals("Found the new file descriptor same as old one",
+          newFds.get(i), oldFds.get(i));
+    }
+  }
+
   private void executeHiveSql(String query) throws Exception {
     try (HiveJdbcClient hiveClient = hiveClientPool_.getClient()) {
       hiveClient.executeSql(query);
+    }
+  }
+
+  private void executeImpalaSql(String query) throws Exception {
+    ImpalaJdbcClient client = ImpalaJdbcClient
+        .createClientUsingHiveJdbcDriver();
+    client.connect();
+    try {
+      client.execStatement(query);
+    } finally {
+      client.close();
     }
   }
 
@@ -493,6 +570,7 @@ public class PartialCatalogInfoWriteIdTest {
     boolean wantPartitionNames;
     String tblName, dbName;
     ValidWriteIdList writeIdList;
+    long tableId = -1;
 
     RequestBuilder db(String db) {
       this.dbName = db;
@@ -506,6 +584,11 @@ public class PartialCatalogInfoWriteIdTest {
 
     RequestBuilder writeId(ValidWriteIdList validWriteIdList) {
       this.writeIdList = validWriteIdList;
+      return this;
+    }
+
+    RequestBuilder tableId(long id) {
+      this.tableId = id;
       return this;
     }
 
@@ -536,6 +619,7 @@ public class PartialCatalogInfoWriteIdTest {
       req.table_info_selector = new TTableInfoSelector();
       req.table_info_selector.valid_write_ids =
         MetastoreShim.convertToTValidWriteIdList(writeIdList);
+      req.table_info_selector.table_id = tableId;
       req.table_info_selector.want_hms_table = true;
       if (wantPartitionNames) {
         req.table_info_selector.want_partition_names = true;
@@ -550,6 +634,14 @@ public class PartialCatalogInfoWriteIdTest {
     }
   }
 
+  /**
+   * Gets the table id from the HMS.
+   */
+  private long getTableId(String db, String tbl) throws TException {
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      return client.getHiveClient().getTable(db, tbl).getId();
+    }
+  }
 
   private ValidWriteIdList getValidWriteIdList(String db, String tbl) throws TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {

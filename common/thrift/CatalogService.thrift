@@ -333,6 +333,11 @@ struct TTableInfoSelector {
   // If this is for a ACID table and this is set, this table info returned
   // will be consistent the provided valid_write_ids
   9: optional CatalogObjects.TValidWriteIdList valid_write_ids
+
+  // If the table id is provided the catalog service compares this table id
+  // with the HMS table which it has and triggers a reload in case it doesn't match.
+  // this field is only used when valid_write_ids is set, otherwise it is ignored
+  10: optional i64 table_id = -1
 }
 
 // Returned information about a particular partition.
@@ -510,6 +515,10 @@ struct TGetPartitionStatsRequest {
   // if the table is transactional then this field represents the client's view
   // of the table snapshot view in terms of ValidWriteIdList.
   3: optional CatalogObjects.TValidWriteIdList valid_write_ids
+  // If the table id is provided the catalog service compares this table id
+  // with the HMS table which it has and triggers a reload in case it doesn't match.
+  // this field is only used when valid_write_ids is set, otherwise it is ignored
+  4: optional i64 table_id = -1
 }
 
 // Response for requesting partition statistics. All partition statistics
