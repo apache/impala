@@ -40,8 +40,13 @@ namespace impala {
 /// Overflow is handled by an output return parameter. Functions should set this
 /// to true if overflow occured and leave it *unchanged* otherwise (e.g. |= rather than =).
 /// This allows the caller to not have to check overflow after every call.
+///
+/// Values of this class may be unaligned so we mark it as "packed" so that the compiler
+/// does not assume proper alignment. If the compiler assumes that the value is aligned it
+/// may generate aligned load instructions (for example 'vmovdqa') which fail in case the
+/// value is actually misaligned.
 template<typename T>
-class DecimalValue {
+class __attribute__ ((packed)) DecimalValue {
  public:
   typedef T StorageType;
 
@@ -49,8 +54,7 @@ class DecimalValue {
   DecimalValue(const T& s) : value_(s) { }
 
   DecimalValue& operator=(const T& s) {
-    // 'value_' may be unaligned. Use memcpy to avoid an unaligned store.
-    memcpy(&value_, &s, sizeof(T));
+    value_ = s;
     return *this;
   }
 
@@ -170,10 +174,17 @@ class DecimalValue {
     return Compare(this_scale, other, other_scale) < 0;
   }
 
-  /// Returns the underlying storage. For a particular storage size, there is
+  /// Returns a copy of the underlying storage. We cannot return a reference or pointer
+  /// because it may be unaligned (this class is packed) and unaligned pointers may lead
+  /// to undefined behaviour.
+  /// For a particular storage size, there is
   /// only one representation for any decimal and the storage is directly comparable.
-  inline const T& value() const { return value_; }
-  inline T& value() { return value_; }
+  inline T value() const { return value_; }
+
+  /// Sets the underlying storage to the given value.
+  inline void set_value(T value) {
+    value_ = value;
+  }
 
   /// Returns the value of the decimal before the decimal point.
   inline const T whole_part(int scale) const;

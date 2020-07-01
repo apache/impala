@@ -139,7 +139,7 @@ class DecimalUtil {
       // GCC can optimize this code to an instruction pair of movsbq and sarq with no
       // branches.
       int8_t most_significant_byte = reinterpret_cast<const int8_t*>(buffer)[0];
-      v->value() = most_significant_byte >= 0 ? 0 : -1;
+      v->set_value(most_significant_byte >= 0 ? 0 : -1);
       BitUtil::ByteSwap(reinterpret_cast<int8_t*>(v), buffer, fixed_len_size);
     } else {
       // If the destination 'v' is smaller than the input, discard the upper bytes.

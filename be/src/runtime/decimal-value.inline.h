@@ -680,10 +680,7 @@ inline std::string DecimalValue<T>::ToString(const ColumnType& type) const {
 
 template<typename T>
 inline std::string DecimalValue<T>::ToString(int precision, int scale) const {
-  T value;
-  // 'value_' may be unaligned. Use memcpy to avoid emitting instructions that assume
-  // alignment - see IMPALA-7473.
-  memcpy(&value, &value_, sizeof(T));
+  T value = value_;
   // Decimal values are sent to clients as strings so in the interest of
   // speed the string will be created without the using stringstream with the
   // whole/fractional_part().
