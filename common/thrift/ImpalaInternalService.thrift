@@ -425,7 +425,7 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   104: optional PlanNodes.TEnabledRuntimeFilterTypes enabled_runtime_filter_types =
-      PlanNodes.TEnabledRuntimeFilterTypes.MIN_MAX;
+      PlanNodes.TEnabledRuntimeFilterTypes.ALL;
 
   // See comment in ImpalaService.thrift
   105: optional bool async_codegen = false;

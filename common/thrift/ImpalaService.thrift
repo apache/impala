@@ -532,8 +532,8 @@ enum TImpalaQueryOptions {
   // This option only apply to Kudu now, will apply to HDFS once we support
   // min-max filter for HDFS.
   //     BLOOM   - apply bloom filter only,
-  //     MIN_MAX - apply min-max filter only (default).
-  //     ALL     - apply both bloom filter and min-max filter.
+  //     MIN_MAX - apply min-max filter only.
+  //     ALL     - apply both bloom filter and min-max filter (default).
   ENABLED_RUNTIME_FILTER_TYPES = 103
 
   // Enable asynchronous codegen.
