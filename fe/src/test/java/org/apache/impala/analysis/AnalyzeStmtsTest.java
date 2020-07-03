@@ -2493,6 +2493,90 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "from functional.alltypes " +
         "group by rollup(int_col, bool_col)",
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+
+    // grouping_id() and grouping() are aggregate functions that can be used in any
+    // GROUP BY, even though they are only meaningful in conjunction with
+    // CUBE/ROLLUP/GROUPING SETS. grouping() must reference exactly one of the grouping
+    // columns.
+    AnalyzesOk("select int_col, string_col, grouping_id(), grouping(int_col), " +
+        "grouping(string_col) " +
+        "from functional.alltypes " +
+        "group by rollup(int_col, string_col)");
+    AnalyzesOk("select int_col, string_col, grouping_id(), grouping(int_col), " +
+        "grouping(string_col) " +
+        "from functional.alltypes " +
+        "group by cube(int_col, string_col)");
+    AnalyzesOk("select int_col, string_col, grouping_id(), grouping(int_col), " +
+        "grouping(string_col) " +
+        "from functional.alltypes " +
+        "group by grouping sets((), (int_col, string_col))");
+
+    // grouping_id() can reference a variable number of grouping columns.
+    AnalyzesOk("select int_col, string_col, grouping_id(int_col, string_col), " +
+        "grouping(string_col) " +
+        "from functional.alltypes " +
+        "group by rollup(int_col, string_col)");
+
+    // Non-trivial expressions involving grouping_id().
+    AnalyzesOk("select bitand(grouping_id(), 1), cast(grouping(int_col) as string) " +
+        "from functional.alltypes " +
+        "group by rollup(int_col, string_col)");
+
+    // grouping() can reference non-trivial grouping expressions
+    AnalyzesOk("select int_col * 2, string_col, grouping(int_col * 2),  count(*) " +
+        "from functional.alltypes " +
+        "group by rollup(1, 2)");
+
+    // grouping_id() and grouping() can be used in conjunction with a plain GROUP BY.
+    AnalyzesOk("select int_col, string_col, grouping_id() " +
+        "from functional.alltypes " +
+        "group by int_col, string_col");
+    AnalyzesOk("select int_col, string_col, grouping(int_col) " +
+        "from functional.alltypes " +
+        "group by int_col, string_col");
+
+    // grouping() and grouping_id() can be used in the degenerate case of a single
+    // grouping set.
+    AnalyzesOk("select int_col, string_col, grouping_id(), grouping(int_col) " +
+        "from functional.alltypes " +
+        "group by grouping sets((int_col, string_col))");
+
+    // grouping() raises analysis error if given wrong number of args.
+    AnalysisError("select int_col, string_col, grouping(int_col, string_col) " +
+        "from functional.alltypes " +
+        "group by grouping sets((), (int_col, string_col))",
+        "No matching function with signature: grouping(INT, STRING).");
+    AnalysisError("select int_col, string_col, grouping() " +
+        "from functional.alltypes " +
+        "group by grouping sets((), (int_col, string_col))",
+        "No matching function with signature: grouping().");
+
+    // grouping() and grouping_id() must reference grouping expressions.
+    AnalysisError("select int_col, grouping('test') from functional.alltypes " +
+        "group by rollup(int_col, string_col)",
+        "'test' is not a grouping expression");
+    AnalysisError("select int_col, grouping(1) from functional.alltypes " +
+        "group by rollup(int_col, string_col)",
+        "1 is not a grouping expression");
+    AnalysisError("select grouping(tinyint_col) from functional.alltypes " +
+        "group by rollup(int_col, string_col)",
+        "tinyint_col is not a grouping expression");
+    AnalysisError("select count(*), grouping(count(*)) from functional.alltypes " +
+        "group by rollup(int_col, string_col)",
+        "aggregate function must not contain aggregate parameters: grouping(count(*))");
+    AnalysisError("select int_col, grouping_id(int_col, 'test') " +
+        "from functional.alltypes " +
+        "group by rollup(int_col, string_col)",
+        "'test' is not a grouping expression");
+    AnalysisError("select int_col, grouping_id(1) from functional.alltypes " +
+        "group by rollup(int_col, string_col)",
+        "1 is not a grouping expression");
+    AnalysisError("select grouping_id(int_col, tinyint_col) from functional.alltypes " +
+        "group by rollup(int_col, string_col)",
+        "tinyint_col is not a grouping expression");
+    AnalysisError("select count(*), grouping_id(count(*)) from functional.alltypes " +
+        "group by rollup(int_col, string_col)",
+        "count(*) is not a grouping expression");
   }
 
   @Test

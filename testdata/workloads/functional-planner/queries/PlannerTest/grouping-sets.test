@@ -1195,3 +1195,137 @@ PLAN-ROOT SINK
    HDFS partitions=11/11 files=11 size=814.73KB
    row-size=19B cardinality=11.00K
 ====
+# grouping() and grouping_id() are implemented in transpose aggregate.
+select int_col, string_col, grouping_id(), grouping(string_col), count(*)
+from functional.alltypesagg
+group by rollup(int_col, string_col)
+having grouping_id() > 0
+---- PLAN
+PLAN-ROOT SINK
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN 0 WHEN 2 THEN 1 WHEN 3 THEN 3 END), aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN 0 WHEN 2 THEN 1 WHEN 3 THEN 1 END), aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 END
+|  having: aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN 0 WHEN 2 THEN 1 WHEN 3 THEN 3 END) > 0
+|  row-size=37B cardinality=1.20K
+|
+01:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: NULL, NULL
+|  row-size=75B cardinality=11.96K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=19B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN 0 WHEN 2 THEN 1 WHEN 3 THEN 3 END), aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN 0 WHEN 2 THEN 1 WHEN 3 THEN 1 END), aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN count(*) WHEN 2 THEN count(*) WHEN 3 THEN count(*) END)
+|  group by: CASE valid_tid(1,2,3) WHEN 1 THEN int_col WHEN 2 THEN int_col WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN string_col WHEN 2 THEN NULL WHEN 3 THEN NULL END, CASE valid_tid(1,2,3) WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 END
+|  having: aggif(valid_tid(1,2,3) IN (1, 2, 3), CASE valid_tid(1,2,3) WHEN 1 THEN 0 WHEN 2 THEN 1 WHEN 3 THEN 3 END) > 0
+|  row-size=37B cardinality=1.20K
+|
+04:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count:merge(*)
+|    group by: int_col, string_col
+|  Class 1
+|    output: count:merge(*)
+|    group by: int_col, NULL
+|  Class 2
+|    output: count:merge(*)
+|    group by: NULL, NULL
+|  row-size=75B cardinality=11.96K
+|
+03:EXCHANGE [HASH(CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(int_col) WHEN 2 THEN murmur_hash(int_col) WHEN 3 THEN murmur_hash(NULL) END,CASE valid_tid(1,2,3) WHEN 1 THEN murmur_hash(string_col) WHEN 2 THEN murmur_hash(NULL) WHEN 3 THEN murmur_hash(NULL) END)]
+|
+01:AGGREGATE [STREAMING]
+|  Class 0
+|    output: count(*)
+|    group by: int_col, string_col
+|  Class 1
+|    output: count(*)
+|    group by: int_col, NULL
+|  Class 2
+|    output: count(*)
+|    group by: NULL, NULL
+|  row-size=75B cardinality=11.96K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=19B cardinality=11.00K
+====
+# grouping() and grouping_id() with plain GROUP BY. They are constants in this
+# case so do not show up in plan.
+select
+  grouping_id(int_col, string_col),
+  grouping_id(),
+  grouping(int_col),
+  grouping(string_col),
+  int_col,
+  string_col,
+  count(*)
+from functional.alltypestiny
+group by int_col, string_col
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: int_col, string_col
+|  row-size=25B cardinality=4
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=17B cardinality=8
+====
+# grouping() and grouping_id() with plain GROUP BY and multiple agg classes. The
+# function calls are replaced with constants so do not show up in plan.
+select
+  grouping_id(int_col, string_col),
+  grouping(int_col),
+  grouping(string_col),
+  int_col,
+  string_col,
+  count(distinct tinyint_col),
+  count(distinct timestamp_col)
+from functional.alltypestiny
+group by int_col, string_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(2,4) = 2, count(tinyint_col)), aggif(valid_tid(2,4) = 4, count(timestamp_col))
+|  group by: CASE valid_tid(2,4) WHEN 2 THEN int_col WHEN 4 THEN int_col END, CASE valid_tid(2,4) WHEN 2 THEN string_col WHEN 4 THEN string_col END
+|  row-size=32B cardinality=8
+|
+02:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: count(tinyint_col)
+|    group by: int_col, string_col
+|  Class 1
+|    output: count(timestamp_col)
+|    group by: int_col, string_col
+|  row-size=50B cardinality=8
+|
+01:AGGREGATE
+|  Class 0
+|    group by: int_col, string_col, tinyint_col
+|  Class 1
+|    group by: int_col, string_col, timestamp_col
+|  row-size=51B cardinality=16
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=34B cardinality=8
+====

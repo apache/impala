@@ -2880,6 +2880,11 @@ function_name ::=
   // Use 'dotted_path' to avoid a reduce/reduce with slot_ref.
   dotted_path:path
   {: RESULT = new FunctionName(path); :}
+  // Grouping is both a keyword and a builtin aggregate function.
+  | KW_GROUPING:r
+  {: List<String> path = new ArrayList<>();
+     path.add(r.toString());
+     RESULT = new FunctionName(path); :}
   ;
 
 from_clause ::=

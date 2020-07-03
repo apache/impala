@@ -414,6 +414,9 @@ class TestTpcdsDecimalV2Query(ImpalaTestSuite):
   def test_tpcds_q26(self, vector):
     self.run_test_case(self.get_workload() + '-decimal_v2-q26', vector)
 
+  def test_tpcds_q27(self, vector):
+    self.run_test_case(self.get_workload() + '-decimal_v2-q27', vector)
+
   def test_tpcds_q29(self, vector):
     self.run_test_case(self.get_workload() + '-decimal_v2-q29', vector)
 
@@ -431,6 +434,9 @@ class TestTpcdsDecimalV2Query(ImpalaTestSuite):
 
   def test_tpcds_q34(self, vector):
     self.run_test_case(self.get_workload() + '-decimal_v2-q34', vector)
+
+  def test_tpcds_q36(self, vector):
+    self.run_test_case(self.get_workload() + '-decimal_v2-q36', vector)
 
   def test_tpcds_q37(self, vector):
     self.run_test_case(self.get_workload() + '-decimal_v2-q37', vector)
@@ -531,6 +537,9 @@ class TestTpcdsDecimalV2Query(ImpalaTestSuite):
   def test_tpcds_q69(self, vector):
     self.run_test_case(self.get_workload() + '-decimal_v2-q69', vector)
 
+  def test_tpcds_q70(self, vector):
+    self.run_test_case(self.get_workload() + '-decimal_v2-q70', vector)
+
   def test_tpcds_q70a(self, vector):
     self.run_test_case(self.get_workload() + '-decimal_v2-q70a', vector)
 
@@ -564,6 +573,9 @@ class TestTpcdsDecimalV2Query(ImpalaTestSuite):
   def test_tpcds_q79(self, vector):
     self.run_test_case(self.get_workload() + '-decimal_v2-q79', vector)
 
+  def test_tpcds_q80(self, vector):
+    self.run_test_case(self.get_workload() + '-decimal_v2-q80', vector)
+
   def test_tpcds_q80a(self, vector):
     self.run_test_case(self.get_workload() + '-decimal_v2-q80a', vector)
 
@@ -581,6 +593,9 @@ class TestTpcdsDecimalV2Query(ImpalaTestSuite):
 
   def test_tpcds_q85(self, vector):
     self.run_test_case(self.get_workload() + '-decimal_v2-q85', vector)
+
+  def test_tpcds_q86(self, vector):
+    self.run_test_case(self.get_workload() + '-decimal_v2-q86', vector)
 
   def test_tpcds_q86a(self, vector):
     self.run_test_case(self.get_workload() + '-decimal_v2-q86a', vector)

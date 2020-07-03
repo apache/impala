@@ -30,6 +30,8 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.kudu.shaded.com.google.common.collect.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -109,6 +111,8 @@ import com.google.common.base.Preconditions;
  * the transposition to the output of the new simplified aggregation.
  */
 public class MultiAggregateInfo {
+  private final static Logger LOG = LoggerFactory.getLogger(MultiAggregateInfo.class);
+
   public static enum AggPhase {
     FIRST,
     FIRST_MERGE,
@@ -163,9 +167,6 @@ public class MultiAggregateInfo {
   // list must have the same number of expressions, and the expression types must match.
   // TODO: could generalise this to allow omitting NULL expressions.
   private List<List<Expr>> groupingSets_;
-
-  // Indicates whether to generate the grouping_id column for grouping sets
-  private boolean generateGroupingId_;
 
   public MultiAggregateInfo(List<Expr> groupingExprs, List<FunctionCallExpr> aggExprs,
       List<List<Expr>> groupingSets) {
@@ -233,11 +234,16 @@ public class MultiAggregateInfo {
     // into a separate list.
     // List of all DISTINCT expr lists and the grouped agg exprs.
     // distinctExprs[i] corresponds to groupedDistinctAggExprs[i]
+    // grouping() and grouping_id() expressions will be replaced by constants so are
+    // not included in either list.
     List<List<Expr>> distinctExprs = new ArrayList<>();
     List<List<FunctionCallExpr>> groupedDistinctAggExprs = new ArrayList<>();
     List<FunctionCallExpr> nonDistinctAggExprs = new ArrayList<>();
+    List<FunctionCallExpr> groupingBuiltinExprs = new ArrayList<>();
     for (FunctionCallExpr aggExpr : aggExprs_) {
-      if (aggExpr.isDistinct()) {
+      if (aggExpr.isGroupingBuiltin() || aggExpr.isGroupingIdBuiltin()) {
+        groupingBuiltinExprs.add(aggExpr);
+      } else if (aggExpr.isDistinct()) {
         List<Expr> children = AggregateFunction.getCanonicalDistinctAggChildren(aggExpr);
         int groupIdx = distinctExprs.indexOf(children);
         List<FunctionCallExpr> groupAggFns;
@@ -287,9 +293,20 @@ public class MultiAggregateInfo {
       aggInfos_.add(AggregateInfo.create(groupingExprs_, aggClass, analyzer));
     }
 
+    // Set up outputSmap_, which maps from the original grouping and aggregate exprs in
+    // all aggregation classes to the output of the final aggregation.
+    outputSmap_ = aggInfos_.size() == 1 ?
+        aggInfos_.get(0).getResultSmap().clone() : new ExprSubstitutionMap();
+    if (groupingBuiltinExprs.size() > 0) {
+      // grouping() and grouping_id() must be replaced with constants.
+      for (FunctionCallExpr aggExpr : groupingBuiltinExprs) {
+        outputSmap_.put(aggExpr.clone(),
+            getGroupingId(aggExpr, aggInfos_.get(0), groupingExprs_));
+      }
+    }
+
     if (aggInfos_.size() == 1) {
       // Only a single aggregation class, no transposition step is needed.
-      outputSmap_ = aggInfos_.get(0).getResultSmap();
       return;
     }
 
@@ -303,10 +320,9 @@ public class MultiAggregateInfo {
           new SlotRef(outputSlots.get(i)), groupingExprs_.get(i));
     }
 
-    // Maps from the original grouping and aggregate exprs in all aggregation classes to
-    // the final output produced by the transposing aggregation.
-    outputSmap_ = new ExprSubstitutionMap();
-    // Add mappings for grouping exprs.
+    // Set up outputSmap_ to map from the original grouping and aggregate exprs in
+    // all aggregation classes to the final output produced by the transposing
+    // aggregation.
     for (int i = 0; i < groupingExprs_.size(); ++i) {
       outputSmap_.put(groupingExprs_.get(i).clone(), new SlotRef(outputSlots.get(i)));
     }
@@ -330,6 +346,9 @@ public class MultiAggregateInfo {
    *    analysis error occurs.
    */
   private void analyzeGroupingSets(Analyzer analyzer) throws AnalysisException {
+    // Regular aggregate expressions that are evaluated over input rows.
+    List<FunctionCallExpr> inputAggExprs = new ArrayList<>();
+    // grouping() and grouping_id() expressions that are evaluated during transpose.
     for (FunctionCallExpr aggExpr : aggExprs_) {
       if (aggExpr.isDistinct()) {
         // We can't handle this now - it would require enumerating more aggregation
@@ -337,13 +356,18 @@ public class MultiAggregateInfo {
         throw new AnalysisException("Distinct aggregate functions and grouping sets " +
             "are not supported in the same query block.");
       }
+      if (!aggExpr.isGroupingBuiltin() && !aggExpr.isGroupingIdBuiltin()) {
+        inputAggExprs.add(aggExpr);
+      }
     }
 
+    // Enumerate the aggregate classes that need to be evaluated before the final
+    // transposition.
     List<List<FunctionCallExpr>> aggClasses = new ArrayList<>(groupingSets_.size());
     List<AggregateInfo> aggInfos = new ArrayList<>(groupingSets_.size());
     for (List<Expr> groupingSet : groupingSets_) {
-      aggClasses.add(aggExprs_);
-      aggInfos.add(AggregateInfo.create(groupingSet, aggExprs_, analyzer));
+      aggClasses.add(inputAggExprs);
+      aggInfos.add(AggregateInfo.create(groupingSet, inputAggExprs, analyzer));
     }
     // analyzeCustomClasses() will do the rest of the analysis and set 'isAnalyzed_'
     analyzeCustomClasses(analyzer, aggClasses, aggInfos);
@@ -372,7 +396,16 @@ public class MultiAggregateInfo {
 
     if (aggInfos_.size() == 1) {
       // Only a single aggregation class, no transposition step is needed.
-      outputSmap_ = aggInfos_.get(0).getResultSmap();
+      // Grouping builtins like grouping_id() would otherwise be handled in transpose agg.
+      // With only one agg class, we can replace them with constants.
+      for (FunctionCallExpr aggExpr : aggExprs_) {
+        if (aggExpr.isGroupingBuiltin() || aggExpr.isGroupingIdBuiltin()) {
+          if (outputSmap_ == null) outputSmap_ = aggInfos_.get(0).getResultSmap().clone();
+          outputSmap_.put(aggExpr.clone(),
+              getGroupingId(aggExpr, aggInfos_.get(0), groupingExprs_));
+        }
+      }
+      if (outputSmap_ == null) outputSmap_ = aggInfos_.get(0).getResultSmap();
       return;
     }
 
@@ -520,7 +553,9 @@ public class MultiAggregateInfo {
    *    END
    *
    *    Notes:
-   *      - This method optionally projects a grouping_id field for the grouping sets
+   *      - This method handles grouping() and grouping_id() aggregate functions
+   *        by generating CASE expressions with the same structure as above that
+   *        return the appropriate grouping()/grouping_id() value for the agg class.
    *      - The max number of grouping exprs allowed per grouping set is 64
    *      - For the transpose phase grouping exprs we add the TupleId also - this
    *        ensures that NULL values in the data are differentiated from NULLs in the
@@ -551,22 +586,42 @@ public class MultiAggregateInfo {
     List<CaseWhenClause> caseWhenClauses = new ArrayList<>();
 
     // Create aggregate exprs for the transposing agg.
-    for (int aggIndex = numGroupingExprs; aggIndex < numSlots; aggIndex++) {
+    int inputAggSlotIdx = numGroupingExprs;
+    for (int i = 0; i < aggExprs.size(); ++i) {
       caseWhenClauses.clear();
-      for (AggregateInfo aggInfo : aggInfos) {
+      FunctionCallExpr aggExpr = aggExprs.get(i);
+      boolean isGroupingFn = aggExpr.isGroupingBuiltin() || aggExpr.isGroupingIdBuiltin();
+      if (isGroupingFn) {
+        for (Expr childExpr : aggExpr.getChildren()) {
+          if (!groupingExprs.contains(childExpr)) {
+            throw new AnalysisException(childExpr.toSql() + " is not a grouping " +
+                "expression in " + aggExpr.toSql());
+          }
+        }
+      }
+      for (int j = 0; j < aggInfos.size(); ++j) {
+        AggregateInfo aggInfo = aggInfos.get(j);
         TupleDescriptor aggTuple = aggInfo.getResultTupleDesc();
-        Preconditions.checkState(aggIndex < aggTuple.getSlots().size());
         Expr whenExpr = NumericLiteral.create(aggTuple.getId().asInt());
-        Expr thenExpr = new SlotRef(aggTuple.getSlots().get(aggIndex));
+        Expr thenExpr;
+        if (isGroupingFn) {
+          thenExpr = getGroupingId(aggExpr, aggInfo, groupingExprs);
+        } else {
+          Preconditions.checkState(inputAggSlotIdx < aggTuple.getSlots().size(),
+              inputAggSlotIdx + " >= " + aggTuple.getSlots().size() + ": " +
+              aggTuple.debugString());
+          thenExpr = new SlotRef(aggTuple.getSlots().get(inputAggSlotIdx));
+        }
         caseWhenClauses.add(new CaseWhenClause(whenExpr, thenExpr));
       }
       CaseExpr caseExpr =
         new CaseExpr(new ValidTupleIdExpr(aggTids), caseWhenClauses, null);
       caseExpr.analyzeNoThrow(analyzer);
       List<Expr> aggFnParams = Lists.<Expr>newArrayList(tidInPred, caseExpr);
-      FunctionCallExpr aggExpr = new FunctionCallExpr("aggif", aggFnParams);
-      aggExpr.analyzeNoThrow(analyzer);
-      transAggExprs.add(aggExpr);
+      FunctionCallExpr transAggExpr = new FunctionCallExpr("aggif", aggFnParams);
+      transAggExpr.analyzeNoThrow(analyzer);
+      transAggExprs.add(transAggExpr);
+      if (!isGroupingFn) ++inputAggSlotIdx;
     }
 
     // Create grouping exprs for the transposing agg.
@@ -609,47 +664,42 @@ public class MultiAggregateInfo {
     caseExprForTids.analyzeNoThrow(analyzer);
     transGroupingExprs.add(caseExprForTids);
 
-    // Create the grouping_id column if requested.
-    // consider grouping sets: ((a1, b1), (a1, NULL), (NULL,NULL))
-    // By SQL standards, in the above NULL implies '1', non-null implies '0'.
-    // We multiply this by the place value of that column which is power-of-2
-    // This gives a grouping_id for each grouping set which is encapsulated
-    // within an aggif() function as below:
-    // AGGIF(valid_tid(1, 2, 3) IN (1, 2, 3),
-    //        CASE valid_tid(1, 2, 3) WHEN 1 then <groupingId_for_gs1>
-    //                                WHEN 2 then <groupingId_for_gs2>
-    //                                WHEN 3 then <groupingId_for_gs3>
-    //                               END)
-    if (generateGroupingId_) {
-      caseWhenClauses.clear();
-      for (AggregateInfo aggInfo : aggInfos) {
-        long groupingId = 0;
-        TupleDescriptor aggTuple = aggInfo.getResultTupleDesc();
-        Expr whenExpr = NumericLiteral.create(aggTuple.getId().asInt());
-        int numGbExprs = aggInfo.getGroupingExprs().size();
-        for (int i = numGbExprs - 1, j = 0; i >= 0; i--, j++) {
-          Expr aggInfoGbExpr = aggInfo.getGroupingExprs().get(i);
-          long placeValue = 1L << j;
-          int factor = aggInfoGbExpr instanceof NullLiteral ? 1 : 0;
-          groupingId += factor * placeValue;
-        }
-        Expr thenExpr = NumericLiteral.create(groupingId, Type.BIGINT);
-        caseWhenClauses.add(new CaseWhenClause(whenExpr, thenExpr));
-      }
-      CaseExpr caseExpr =
-        new CaseExpr(new ValidTupleIdExpr(aggTids), caseWhenClauses, null);
-
-      // wrap this in an aggif expr because an AggregateInfo only allows either
-      // aggregate exprs or grouping exprs
-      List<Expr> aggFnParams = Lists.<Expr>newArrayList(tidInPred, caseExpr);
-      FunctionCallExpr aggExpr = new FunctionCallExpr("aggif", aggFnParams);
-      aggExpr.analyze(analyzer);
-      transAggExprs.add(aggExpr);
-    }
-
     AggregateInfo result =
         AggregateInfo.create(transGroupingExprs, transAggExprs, analyzer);
     return result;
+  }
+
+  /**
+   * Return the value for grouping() or grouping_id() for a particular aggregation class.
+   * @param aggExpr the grouping() or grouping_id() function
+   * @param aggInfo the aggregate info for the aggregation class.
+   * @param groupingExprs all grouping expressions
+   */
+  private static NumericLiteral getGroupingId(FunctionCallExpr aggExpr,
+      AggregateInfo aggInfo, List<Expr> groupingExprs) {
+    if (aggExpr.isGroupingBuiltin()) {
+      boolean inSet = aggInfo.getGroupingExprs().contains(aggExpr.getChild(0));
+      // grouping(col) returns 1 if this is the aggregate across all values of
+      // the grouping expression, i.e. if the expression is *not* one of the
+      // grouping expressions for this aggregate class.
+      return NumericLiteral.create(inSet ? 0 : 1, Type.TINYINT);
+    } else {
+      Preconditions.checkState(aggExpr.isGroupingIdBuiltin());
+      // grouping_id() returns a bit vector of the groups exprs included in this
+      // agg class. The last grouping expression is the least significant bit in
+      // the returned value. The bit vector has 1 if this is the aggregate across
+      // all values of the grouping expression, the same as for grouping().
+      // The zero-argument version of grouping_id() generates the bit vector for all
+      // the grouping expressions.
+      List<Expr> inputExprs = aggExpr.getChildren().size() > 0 ?
+          aggExpr.getChildren() : groupingExprs;
+      long val = 0;
+      for (Expr child : inputExprs) {
+        val <<= 1;
+        val |= aggInfo.getGroupingExprs().contains(child) ? 0 : 1;
+      }
+      return NumericLiteral.create(val, Type.BIGINT);
+    }
   }
 
   /**
@@ -679,10 +729,6 @@ public class MultiAggregateInfo {
   public void setIsGroupingSet(boolean isGroupingSet) { isGroupingSet_ = isGroupingSet; }
 
   public boolean getIsGroupingSet() { return isGroupingSet_; }
-
-  public void setGenerateGroupingId(boolean generateGroupingId) {
-    generateGroupingId_ = generateGroupingId;
-  }
 
   /**
    * Determines which aggregate exprs are required to produce the final query result.

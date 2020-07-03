@@ -12212,3 +12212,1416 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk
    row-size=16B cardinality=2.88M
 ====
+# TPCDS-Q70
+select
+    sum(ss_net_profit) as total_sum
+   ,s_state
+   ,s_county
+   ,grouping(s_state)+grouping(s_county) as lochierarchy
+   ,rank() over (
+        partition by grouping(s_state)+grouping(s_county),
+        case when grouping(s_county) = 0 then s_state end
+        order by sum(ss_net_profit) desc) as rank_within_parent
+ from
+    store_sales
+   ,date_dim       d1
+   ,store
+ where
+    d1.d_month_seq between 1212 and 1212+11
+ and d1.d_date_sk = ss_sold_date_sk
+ and s_store_sk  = ss_store_sk
+ and s_state in
+             ( select s_state
+               from  (select s_state as s_state,
+                            rank() over ( partition by s_state order by sum(ss_net_profit) desc) as ranking
+                      from   store_sales, store, date_dim
+                      where  d_month_seq between 1212 and 1212+11
+                            and d_date_sk = ss_sold_date_sk
+                            and s_store_sk  = ss_store_sk
+                      group by s_state
+                     ) tmp1
+               where ranking <= 5
+             )
+ group by rollup(s_state,s_county)
+ order by
+   lochierarchy desc
+  -- Modified from original because Impala does not allow aliases within order by
+  -- expressions, except at the top level.
+  ,case when grouping(s_state)+grouping(s_county) = 0 then s_state end
+  ,rank_within_parent
+ limit 100
+---- PLAN
+Max Per-Host Resource Reservation: Memory=52.77MB Threads=7
+Per-Host Resource Estimates: Memory=437MB
+PLAN-ROOT SINK
+|
+19:TOP-N [LIMIT=100]
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) DESC, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC, rank() ASC
+|  row-size=50B cardinality=3
+|
+18:ANALYTIC
+|  functions: rank()
+|  partition by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END), CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END) DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=54B cardinality=3
+|
+17:SORT
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) ASC NULLS FIRST, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC NULLS FIRST, aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END) DESC
+|  row-size=46B cardinality=3
+|
+16:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END), aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END), aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END)
+|  group by: CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END, CASE valid_tid(11,12,13) WHEN 11 THEN s_county WHEN 12 THEN NULL WHEN 13 THEN NULL END, CASE valid_tid(11,12,13) WHEN 11 THEN 11 WHEN 12 THEN 12 WHEN 13 THEN 13 END
+|  row-size=46B cardinality=3
+|
+15:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: sum(ss_net_profit)
+|    group by: s_state, s_county
+|  Class 1
+|    output: sum(ss_net_profit)
+|    group by: s_state, NULL
+|  Class 2
+|    output: sum(ss_net_profit)
+|    group by: NULL, NULL
+|  row-size=141B cardinality=3
+|
+14:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: s_state = s_state
+|  runtime filters: RF000 <- s_state
+|  row-size=67B cardinality=2.88M
+|
+|--11:SELECT
+|  |  predicates: rank() <= 5
+|  |  row-size=38B cardinality=1
+|  |
+|  10:ANALYTIC
+|  |  functions: rank()
+|  |  partition by: s_state
+|  |  order by: sum(ss_net_profit) DESC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=38B cardinality=1
+|  |
+|  09:SORT
+|  |  order by: s_state ASC NULLS FIRST, sum(ss_net_profit) DESC
+|  |  row-size=30B cardinality=1
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  output: sum(ss_net_profit)
+|  |  group by: s_state
+|  |  row-size=30B cardinality=1
+|  |
+|  07:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  runtime filters: RF006 <- d_date_sk
+|  |  row-size=38B cardinality=2.88M
+|  |
+|  |--05:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
+|  |     row-size=8B cardinality=7.30K
+|  |
+|  06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |  runtime filters: RF008 <- s_store_sk
+|  |  row-size=30B cardinality=2.88M
+|  |
+|  |--04:SCAN HDFS [tpcds.store]
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
+|  |     row-size=18B cardinality=12
+|  |
+|  03:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     runtime filters: RF006 -> ss_sold_date_sk, RF008 -> ss_store_sk
+|     row-size=12B cardinality=2.88M
+|
+13:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = s_store_sk
+|  runtime filters: RF002 <- s_store_sk
+|  row-size=67B cardinality=2.88M
+|
+|--02:SCAN HDFS [tpcds.store]
+|     HDFS partitions=1/1 files=1 size=3.08KB
+|     runtime filters: RF000 -> s_state
+|     row-size=47B cardinality=12
+|
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d1.d_date_sk
+|  runtime filters: RF004 <- d1.d_date_sk
+|  row-size=20B cardinality=2.88M
+|
+|--01:SCAN HDFS [tpcds.date_dim d1]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d1.d_month_seq <= 1223, d1.d_month_seq >= 1212
+|     row-size=8B cardinality=7.30K
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF002 -> ss_store_sk, RF004 -> ss_sold_date_sk
+   row-size=12B cardinality=2.88M
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=97.39MB Threads=16
+Per-Host Resource Estimates: Memory=554MB
+PLAN-ROOT SINK
+|
+30:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) DESC, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC, rank() ASC
+|  limit: 100
+|
+19:TOP-N [LIMIT=100]
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) DESC, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC, rank() ASC
+|  row-size=50B cardinality=3
+|
+18:ANALYTIC
+|  functions: rank()
+|  partition by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END), CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END) DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=54B cardinality=3
+|
+17:SORT
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) ASC NULLS FIRST, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC NULLS FIRST, aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END) DESC
+|  row-size=46B cardinality=3
+|
+29:EXCHANGE [HASH(aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END),CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END)]
+|
+16:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END), aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END), aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END)
+|  group by: CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END, CASE valid_tid(11,12,13) WHEN 11 THEN s_county WHEN 12 THEN NULL WHEN 13 THEN NULL END, CASE valid_tid(11,12,13) WHEN 11 THEN 11 WHEN 12 THEN 12 WHEN 13 THEN 13 END
+|  row-size=46B cardinality=3
+|
+28:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: sum:merge(ss_net_profit)
+|    group by: s_state, s_county
+|  Class 1
+|    output: sum:merge(ss_net_profit)
+|    group by: s_state, NULL
+|  Class 2
+|    output: sum:merge(ss_net_profit)
+|    group by: NULL, NULL
+|  row-size=141B cardinality=3
+|
+27:EXCHANGE [HASH(CASE valid_tid(11,12,13) WHEN 11 THEN murmur_hash(s_state) WHEN 12 THEN murmur_hash(s_state) WHEN 13 THEN murmur_hash(NULL) END,CASE valid_tid(11,12,13) WHEN 11 THEN murmur_hash(s_county) WHEN 12 THEN murmur_hash(NULL) WHEN 13 THEN murmur_hash(NULL) END)]
+|
+15:AGGREGATE [STREAMING]
+|  Class 0
+|    output: sum(ss_net_profit)
+|    group by: s_state, s_county
+|  Class 1
+|    output: sum(ss_net_profit)
+|    group by: s_state, NULL
+|  Class 2
+|    output: sum(ss_net_profit)
+|    group by: NULL, NULL
+|  row-size=141B cardinality=3
+|
+14:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: s_state = s_state
+|  runtime filters: RF000 <- s_state
+|  row-size=67B cardinality=2.88M
+|
+|--26:EXCHANGE [BROADCAST]
+|  |
+|  11:SELECT
+|  |  predicates: rank() <= 5
+|  |  row-size=38B cardinality=1
+|  |
+|  10:ANALYTIC
+|  |  functions: rank()
+|  |  partition by: s_state
+|  |  order by: sum(ss_net_profit) DESC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=38B cardinality=1
+|  |
+|  09:SORT
+|  |  order by: s_state ASC NULLS FIRST, sum(ss_net_profit) DESC
+|  |  row-size=30B cardinality=1
+|  |
+|  25:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(ss_net_profit)
+|  |  group by: s_state
+|  |  row-size=30B cardinality=1
+|  |
+|  24:EXCHANGE [HASH(s_state)]
+|  |
+|  08:AGGREGATE [STREAMING]
+|  |  output: sum(ss_net_profit)
+|  |  group by: s_state
+|  |  row-size=30B cardinality=1
+|  |
+|  07:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  runtime filters: RF006 <- d_date_sk
+|  |  row-size=38B cardinality=2.88M
+|  |
+|  |--23:EXCHANGE [BROADCAST]
+|  |  |
+|  |  05:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_month_seq <= 1223, d_month_seq >= 1212
+|  |     row-size=8B cardinality=7.30K
+|  |
+|  06:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |  runtime filters: RF008 <- s_store_sk
+|  |  row-size=30B cardinality=2.88M
+|  |
+|  |--22:EXCHANGE [BROADCAST]
+|  |  |
+|  |  04:SCAN HDFS [tpcds.store]
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
+|  |     row-size=18B cardinality=12
+|  |
+|  03:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     runtime filters: RF006 -> ss_sold_date_sk, RF008 -> ss_store_sk
+|     row-size=12B cardinality=2.88M
+|
+13:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_store_sk = s_store_sk
+|  runtime filters: RF002 <- s_store_sk
+|  row-size=67B cardinality=2.88M
+|
+|--21:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.store]
+|     HDFS partitions=1/1 files=1 size=3.08KB
+|     runtime filters: RF000 -> s_state
+|     row-size=47B cardinality=12
+|
+12:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_sold_date_sk = d1.d_date_sk
+|  runtime filters: RF004 <- d1.d_date_sk
+|  row-size=20B cardinality=2.88M
+|
+|--20:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim d1]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d1.d_month_seq <= 1223, d1.d_month_seq >= 1212
+|     row-size=8B cardinality=7.30K
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF002 -> ss_store_sk, RF004 -> ss_sold_date_sk
+   row-size=12B cardinality=2.88M
+====
+# TPCDS-Q80
+with ssr as
+ (select  s_store_id as store_id,
+          sum(ss_ext_sales_price) as sales,
+          sum(coalesce(sr_return_amt, 0)) as `returns`,
+          sum(ss_net_profit - coalesce(sr_net_loss, 0)) as profit
+  from store_sales left outer join store_returns on
+         (ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number),
+     date_dim,
+     store,
+     item,
+     promotion
+ where ss_sold_date_sk = d_date_sk
+       and d_date between cast('1998-08-04' as date)
+                  and (cast('1998-08-04' as date) +  interval 30 days)
+       and ss_store_sk = s_store_sk
+       and ss_item_sk = i_item_sk
+       and i_current_price > 50
+       and ss_promo_sk = p_promo_sk
+       and p_channel_tv = 'N'
+ group by s_store_id)
+ ,
+ csr as
+ (select  cp_catalog_page_id as catalog_page_id,
+          sum(cs_ext_sales_price) as sales,
+          sum(coalesce(cr_return_amount, 0)) as `returns`,
+          sum(cs_net_profit - coalesce(cr_net_loss, 0)) as profit
+  from catalog_sales left outer join catalog_returns on
+         (cs_item_sk = cr_item_sk and cs_order_number = cr_order_number),
+     date_dim,
+     catalog_page,
+     item,
+     promotion
+ where cs_sold_date_sk = d_date_sk
+       and d_date between cast('1998-08-04' as date)
+                  and (cast('1998-08-04' as date) +  interval 30 days)
+        and cs_catalog_page_sk = cp_catalog_page_sk
+       and cs_item_sk = i_item_sk
+       and i_current_price > 50
+       and cs_promo_sk = p_promo_sk
+       and p_channel_tv = 'N'
+group by cp_catalog_page_id)
+ ,
+ wsr as
+ (select  web_site_id,
+          sum(ws_ext_sales_price) as sales,
+          sum(coalesce(wr_return_amt, 0)) as `returns`,
+          sum(ws_net_profit - coalesce(wr_net_loss, 0)) as profit
+  from web_sales left outer join web_returns on
+         (ws_item_sk = wr_item_sk and ws_order_number = wr_order_number),
+     date_dim,
+     web_site,
+     item,
+     promotion
+ where ws_sold_date_sk = d_date_sk
+       and d_date between cast('1998-08-04' as date)
+                  and (cast('1998-08-04' as date) +  interval 30 days)
+        and ws_web_site_sk = web_site_sk
+       and ws_item_sk = i_item_sk
+       and i_current_price > 50
+       and ws_promo_sk = p_promo_sk
+       and p_channel_tv = 'N'
+group by web_site_id)
+  select  channel
+        , id
+        , sum(sales) as sales
+        , sum(`returns`) as `returns`
+        , sum(profit) as profit
+ from
+ (select 'store channel' as channel
+        , 'store' || store_id as id
+        , sales
+        , `returns`
+        , profit
+ from   ssr
+ union all
+ select 'catalog channel' as channel
+        , 'catalog_page' || catalog_page_id as id
+        , sales
+        , `returns`
+        , profit
+ from  csr
+ union all
+ select 'web channel' as channel
+        , 'web_site' || web_site_id as id
+        , sales
+        , `returns`
+        , profit
+ from   wsr
+ ) x
+ group by rollup (channel, id)
+ order by channel
+         ,id
+ limit 100
+---- PLAN
+Max Per-Host Resource Reservation: Memory=66.95MB Threads=7
+Per-Host Resource Estimates: Memory=436MB
+PLAN-ROOT SINK
+|
+39:TOP-N [LIMIT=100]
+|  order by: CASE valid_tid(26,27,28) WHEN 26 THEN channel WHEN 27 THEN channel WHEN 28 THEN NULL END ASC, CASE valid_tid(26,27,28) WHEN 26 THEN id WHEN 27 THEN NULL WHEN 28 THEN NULL END ASC
+|  row-size=72B cardinality=100
+|
+38:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(26,27,28) IN (26, 27, 28), CASE valid_tid(26,27,28) WHEN 26 THEN sum(sales) WHEN 27 THEN sum(sales) WHEN 28 THEN sum(sales) END), aggif(valid_tid(26,27,28) IN (26, 27, 28), CASE valid_tid(26,27,28) WHEN 26 THEN sum(`returns`) WHEN 27 THEN sum(`returns`) WHEN 28 THEN sum(`returns`) END), aggif(valid_tid(26,27,28) IN (26, 27, 28), CASE valid_tid(26,27,28) WHEN 26 THEN sum(profit) WHEN 27 THEN sum(profit) WHEN 28 THEN sum(profit) END)
+|  group by: CASE valid_tid(26,27,28) WHEN 26 THEN channel WHEN 27 THEN channel WHEN 28 THEN NULL END, CASE valid_tid(26,27,28) WHEN 26 THEN id WHEN 27 THEN NULL WHEN 28 THEN NULL END, CASE valid_tid(26,27,28) WHEN 26 THEN 26 WHEN 27 THEN 27 WHEN 28 THEN 28 END
+|  row-size=76B cardinality=11.56K
+|
+37:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: sum(sales), sum(returns), sum(profit)
+|    group by: channel, id
+|  Class 1
+|    output: sum(sales), sum(returns), sum(profit)
+|    group by: channel, NULL
+|  Class 2
+|    output: sum(sales), sum(returns), sum(profit)
+|    group by: NULL, NULL
+|  row-size=216B cardinality=11.56K
+|
+00:UNION
+|  row-size=72B cardinality=11.56K
+|
+|--36:AGGREGATE [FINALIZE]
+|  |  output: sum(ws_ext_sales_price), sum(coalesce(wr_return_amt, 0)), sum(ws_net_profit - coalesce(wr_net_loss, 0))
+|  |  group by: web_site_id
+|  |  row-size=76B cardinality=15
+|  |
+|  35:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ws_web_site_sk = web_site_sk
+|  |  row-size=147B cardinality=71.46K
+|  |
+|  |--28:SCAN HDFS [tpcds.web_site]
+|  |     HDFS partitions=1/1 files=1 size=8.57KB
+|  |     row-size=32B cardinality=30
+|  |
+|  34:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ws_sold_date_sk = d_date_sk
+|  |  row-size=115B cardinality=71.46K
+|  |
+|  |--27:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_date <= DATE '1998-09-03', d_date >= DATE '1998-08-04'
+|  |     row-size=26B cardinality=7.30K
+|  |
+|  33:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ws_promo_sk = p_promo_sk
+|  |  runtime filters: RF020 <- p_promo_sk
+|  |  row-size=89B cardinality=71.46K
+|  |
+|  |--30:SCAN HDFS [tpcds.promotion]
+|  |     HDFS partitions=1/1 files=1 size=36.36KB
+|  |     predicates: p_channel_tv = 'N'
+|  |     row-size=17B cardinality=300
+|  |
+|  32:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ws_item_sk = i_item_sk
+|  |  runtime filters: RF022 <- i_item_sk
+|  |  row-size=72B cardinality=71.94K
+|  |
+|  |--29:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_current_price > 50
+|  |     row-size=12B cardinality=1.80K
+|  |
+|  31:HASH JOIN [LEFT OUTER JOIN]
+|  |  hash predicates: ws_item_sk = wr_item_sk, ws_order_number = wr_order_number
+|  |  row-size=60B cardinality=719.38K
+|  |
+|  |--26:SCAN HDFS [tpcds.web_returns]
+|  |     HDFS partitions=1/1 files=1 size=9.35MB
+|  |     runtime filters: RF022 -> tpcds.web_returns.wr_item_sk
+|  |     row-size=24B cardinality=71.76K
+|  |
+|  25:SCAN HDFS [tpcds.web_sales]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     runtime filters: RF022 -> ws_item_sk, RF020 -> ws_promo_sk
+|     row-size=36B cardinality=719.38K
+|
+|--24:AGGREGATE [FINALIZE]
+|  |  output: sum(cs_ext_sales_price), sum(coalesce(cr_return_amount, 0)), sum(cs_net_profit - coalesce(cr_net_loss, 0))
+|  |  group by: cp_catalog_page_id
+|  |  row-size=76B cardinality=11.54K
+|  |
+|  23:HASH JOIN [INNER JOIN]
+|  |  hash predicates: cs_catalog_page_sk = cp_catalog_page_sk
+|  |  runtime filters: RF008 <- cp_catalog_page_sk
+|  |  row-size=147B cardinality=143.20K
+|  |
+|  |--16:SCAN HDFS [tpcds.catalog_page]
+|  |     HDFS partitions=1/1 files=1 size=1.56MB
+|  |     row-size=32B cardinality=11.72K
+|  |
+|  22:HASH JOIN [INNER JOIN]
+|  |  hash predicates: cs_sold_date_sk = d_date_sk
+|  |  runtime filters: RF010 <- d_date_sk
+|  |  row-size=115B cardinality=143.20K
+|  |
+|  |--15:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_date <= DATE '1998-09-03', d_date >= DATE '1998-08-04'
+|  |     row-size=26B cardinality=7.30K
+|  |
+|  21:HASH JOIN [INNER JOIN]
+|  |  hash predicates: cs_promo_sk = p_promo_sk
+|  |  runtime filters: RF012 <- p_promo_sk
+|  |  row-size=89B cardinality=143.20K
+|  |
+|  |--18:SCAN HDFS [tpcds.promotion]
+|  |     HDFS partitions=1/1 files=1 size=36.36KB
+|  |     predicates: p_channel_tv = 'N'
+|  |     row-size=17B cardinality=300
+|  |
+|  20:HASH JOIN [INNER JOIN]
+|  |  hash predicates: cs_item_sk = i_item_sk
+|  |  runtime filters: RF014 <- i_item_sk
+|  |  row-size=72B cardinality=144.16K
+|  |
+|  |--17:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_current_price > 50
+|  |     row-size=12B cardinality=1.80K
+|  |
+|  19:HASH JOIN [LEFT OUTER JOIN]
+|  |  hash predicates: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
+|  |  row-size=60B cardinality=1.44M
+|  |
+|  |--14:SCAN HDFS [tpcds.catalog_returns]
+|  |     HDFS partitions=1/1 files=1 size=20.39MB
+|  |     runtime filters: RF014 -> tpcds.catalog_returns.cr_item_sk
+|  |     row-size=24B cardinality=144.07K
+|  |
+|  13:SCAN HDFS [tpcds.catalog_sales]
+|     HDFS partitions=1/1 files=1 size=282.20MB
+|     runtime filters: RF014 -> cs_item_sk, RF012 -> cs_promo_sk, RF008 -> cs_catalog_page_sk, RF010 -> cs_sold_date_sk
+|     row-size=36B cardinality=1.44M
+|
+12:AGGREGATE [FINALIZE]
+|  output: sum(ss_ext_sales_price), sum(coalesce(sr_return_amt, 0)), sum(ss_net_profit - coalesce(sr_net_loss, 0))
+|  group by: s_store_id
+|  row-size=76B cardinality=6
+|
+11:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = s_store_sk
+|  runtime filters: RF000 <- s_store_sk
+|  row-size=147B cardinality=286.13K
+|
+|--04:SCAN HDFS [tpcds.store]
+|     HDFS partitions=1/1 files=1 size=3.08KB
+|     row-size=32B cardinality=12
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF002 <- d_date_sk
+|  row-size=115B cardinality=286.13K
+|
+|--03:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_date <= DATE '1998-09-03', d_date >= DATE '1998-08-04'
+|     row-size=26B cardinality=7.30K
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_promo_sk = p_promo_sk
+|  runtime filters: RF004 <- p_promo_sk
+|  row-size=89B cardinality=286.13K
+|
+|--06:SCAN HDFS [tpcds.promotion]
+|     HDFS partitions=1/1 files=1 size=36.36KB
+|     predicates: p_channel_tv = 'N'
+|     row-size=17B cardinality=300
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF006 <- i_item_sk
+|  row-size=72B cardinality=288.04K
+|
+|--05:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     predicates: i_current_price > 50
+|     row-size=12B cardinality=1.80K
+|
+07:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  row-size=60B cardinality=2.88M
+|
+|--02:SCAN HDFS [tpcds.store_returns]
+|     HDFS partitions=1/1 files=1 size=31.19MB
+|     runtime filters: RF006 -> tpcds.store_returns.sr_item_sk
+|     row-size=24B cardinality=287.51K
+|
+01:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF006 -> ss_item_sk, RF004 -> ss_promo_sk, RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk
+   row-size=36B cardinality=2.88M
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=174.21MB Threads=39
+Per-Host Resource Estimates: Memory=1.23GB
+PLAN-ROOT SINK
+|
+63:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: CASE valid_tid(26,27,28) WHEN 26 THEN channel WHEN 27 THEN channel WHEN 28 THEN NULL END ASC, CASE valid_tid(26,27,28) WHEN 26 THEN id WHEN 27 THEN NULL WHEN 28 THEN NULL END ASC
+|  limit: 100
+|
+39:TOP-N [LIMIT=100]
+|  order by: CASE valid_tid(26,27,28) WHEN 26 THEN channel WHEN 27 THEN channel WHEN 28 THEN NULL END ASC, CASE valid_tid(26,27,28) WHEN 26 THEN id WHEN 27 THEN NULL WHEN 28 THEN NULL END ASC
+|  row-size=72B cardinality=100
+|
+38:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(26,27,28) IN (26, 27, 28), CASE valid_tid(26,27,28) WHEN 26 THEN sum(sales) WHEN 27 THEN sum(sales) WHEN 28 THEN sum(sales) END), aggif(valid_tid(26,27,28) IN (26, 27, 28), CASE valid_tid(26,27,28) WHEN 26 THEN sum(`returns`) WHEN 27 THEN sum(`returns`) WHEN 28 THEN sum(`returns`) END), aggif(valid_tid(26,27,28) IN (26, 27, 28), CASE valid_tid(26,27,28) WHEN 26 THEN sum(profit) WHEN 27 THEN sum(profit) WHEN 28 THEN sum(profit) END)
+|  group by: CASE valid_tid(26,27,28) WHEN 26 THEN channel WHEN 27 THEN channel WHEN 28 THEN NULL END, CASE valid_tid(26,27,28) WHEN 26 THEN id WHEN 27 THEN NULL WHEN 28 THEN NULL END, CASE valid_tid(26,27,28) WHEN 26 THEN 26 WHEN 27 THEN 27 WHEN 28 THEN 28 END
+|  row-size=76B cardinality=11.56K
+|
+62:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: sum:merge(sales), sum:merge(`returns`), sum:merge(profit)
+|    group by: channel, id
+|  Class 1
+|    output: sum:merge(sales), sum:merge(`returns`), sum:merge(profit)
+|    group by: channel, NULL
+|  Class 2
+|    output: sum:merge(sales), sum:merge(`returns`), sum:merge(profit)
+|    group by: NULL, NULL
+|  row-size=216B cardinality=11.56K
+|
+61:EXCHANGE [HASH(CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(channel) WHEN 27 THEN murmur_hash(channel) WHEN 28 THEN murmur_hash(NULL) END,CASE valid_tid(26,27,28) WHEN 26 THEN murmur_hash(id) WHEN 27 THEN murmur_hash(NULL) WHEN 28 THEN murmur_hash(NULL) END)]
+|
+37:AGGREGATE [STREAMING]
+|  Class 0
+|    output: sum(sales), sum(returns), sum(profit)
+|    group by: channel, id
+|  Class 1
+|    output: sum(sales), sum(returns), sum(profit)
+|    group by: channel, NULL
+|  Class 2
+|    output: sum(sales), sum(returns), sum(profit)
+|    group by: NULL, NULL
+|  row-size=216B cardinality=11.56K
+|
+00:UNION
+|  row-size=72B cardinality=11.56K
+|
+|--60:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(ws_ext_sales_price), sum:merge(coalesce(wr_return_amt, 0)), sum:merge(ws_net_profit - coalesce(wr_net_loss, 0))
+|  |  group by: web_site_id
+|  |  row-size=76B cardinality=15
+|  |
+|  59:EXCHANGE [HASH(web_site_id)]
+|  |
+|  36:AGGREGATE [STREAMING]
+|  |  output: sum(ws_ext_sales_price), sum(coalesce(wr_return_amt, 0)), sum(ws_net_profit - coalesce(wr_net_loss, 0))
+|  |  group by: web_site_id
+|  |  row-size=76B cardinality=15
+|  |
+|  35:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ws_web_site_sk = web_site_sk
+|  |  row-size=147B cardinality=71.46K
+|  |
+|  |--58:EXCHANGE [BROADCAST]
+|  |  |
+|  |  28:SCAN HDFS [tpcds.web_site]
+|  |     HDFS partitions=1/1 files=1 size=8.57KB
+|  |     row-size=32B cardinality=30
+|  |
+|  34:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ws_sold_date_sk = d_date_sk
+|  |  row-size=115B cardinality=71.46K
+|  |
+|  |--57:EXCHANGE [BROADCAST]
+|  |  |
+|  |  27:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_date <= DATE '1998-09-03', d_date >= DATE '1998-08-04'
+|  |     row-size=26B cardinality=7.30K
+|  |
+|  33:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ws_promo_sk = p_promo_sk
+|  |  runtime filters: RF020 <- p_promo_sk
+|  |  row-size=89B cardinality=71.46K
+|  |
+|  |--56:EXCHANGE [BROADCAST]
+|  |  |
+|  |  30:SCAN HDFS [tpcds.promotion]
+|  |     HDFS partitions=1/1 files=1 size=36.36KB
+|  |     predicates: p_channel_tv = 'N'
+|  |     row-size=17B cardinality=300
+|  |
+|  32:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ws_item_sk = i_item_sk
+|  |  runtime filters: RF022 <- i_item_sk
+|  |  row-size=72B cardinality=71.94K
+|  |
+|  |--55:EXCHANGE [BROADCAST]
+|  |  |
+|  |  29:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_current_price > 50
+|  |     row-size=12B cardinality=1.80K
+|  |
+|  31:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  |  hash predicates: ws_item_sk = wr_item_sk, ws_order_number = wr_order_number
+|  |  row-size=60B cardinality=719.38K
+|  |
+|  |--54:EXCHANGE [BROADCAST]
+|  |  |
+|  |  26:SCAN HDFS [tpcds.web_returns]
+|  |     HDFS partitions=1/1 files=1 size=9.35MB
+|  |     runtime filters: RF022 -> tpcds.web_returns.wr_item_sk
+|  |     row-size=24B cardinality=71.76K
+|  |
+|  25:SCAN HDFS [tpcds.web_sales]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     runtime filters: RF022 -> ws_item_sk, RF020 -> ws_promo_sk
+|     row-size=36B cardinality=719.38K
+|
+|--53:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(cs_ext_sales_price), sum:merge(coalesce(cr_return_amount, 0)), sum:merge(cs_net_profit - coalesce(cr_net_loss, 0))
+|  |  group by: cp_catalog_page_id
+|  |  row-size=76B cardinality=11.54K
+|  |
+|  52:EXCHANGE [HASH(cp_catalog_page_id)]
+|  |
+|  24:AGGREGATE [STREAMING]
+|  |  output: sum(cs_ext_sales_price), sum(coalesce(cr_return_amount, 0)), sum(cs_net_profit - coalesce(cr_net_loss, 0))
+|  |  group by: cp_catalog_page_id
+|  |  row-size=76B cardinality=11.54K
+|  |
+|  23:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: cs_catalog_page_sk = cp_catalog_page_sk
+|  |  runtime filters: RF008 <- cp_catalog_page_sk
+|  |  row-size=147B cardinality=143.20K
+|  |
+|  |--51:EXCHANGE [BROADCAST]
+|  |  |
+|  |  16:SCAN HDFS [tpcds.catalog_page]
+|  |     HDFS partitions=1/1 files=1 size=1.56MB
+|  |     row-size=32B cardinality=11.72K
+|  |
+|  22:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: cs_sold_date_sk = d_date_sk
+|  |  runtime filters: RF010 <- d_date_sk
+|  |  row-size=115B cardinality=143.20K
+|  |
+|  |--50:EXCHANGE [BROADCAST]
+|  |  |
+|  |  15:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_date <= DATE '1998-09-03', d_date >= DATE '1998-08-04'
+|  |     row-size=26B cardinality=7.30K
+|  |
+|  21:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: cs_promo_sk = p_promo_sk
+|  |  runtime filters: RF012 <- p_promo_sk
+|  |  row-size=89B cardinality=143.20K
+|  |
+|  |--49:EXCHANGE [BROADCAST]
+|  |  |
+|  |  18:SCAN HDFS [tpcds.promotion]
+|  |     HDFS partitions=1/1 files=1 size=36.36KB
+|  |     predicates: p_channel_tv = 'N'
+|  |     row-size=17B cardinality=300
+|  |
+|  20:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: cs_item_sk = i_item_sk
+|  |  runtime filters: RF014 <- i_item_sk
+|  |  row-size=72B cardinality=144.16K
+|  |
+|  |--48:EXCHANGE [BROADCAST]
+|  |  |
+|  |  17:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_current_price > 50
+|  |     row-size=12B cardinality=1.80K
+|  |
+|  19:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  |  hash predicates: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
+|  |  row-size=60B cardinality=1.44M
+|  |
+|  |--47:EXCHANGE [BROADCAST]
+|  |  |
+|  |  14:SCAN HDFS [tpcds.catalog_returns]
+|  |     HDFS partitions=1/1 files=1 size=20.39MB
+|  |     runtime filters: RF014 -> tpcds.catalog_returns.cr_item_sk
+|  |     row-size=24B cardinality=144.07K
+|  |
+|  13:SCAN HDFS [tpcds.catalog_sales]
+|     HDFS partitions=1/1 files=1 size=282.20MB
+|     runtime filters: RF014 -> cs_item_sk, RF012 -> cs_promo_sk, RF008 -> cs_catalog_page_sk, RF010 -> cs_sold_date_sk
+|     row-size=36B cardinality=1.44M
+|
+46:AGGREGATE [FINALIZE]
+|  output: sum:merge(ss_ext_sales_price), sum:merge(coalesce(sr_return_amt, 0)), sum:merge(ss_net_profit - coalesce(sr_net_loss, 0))
+|  group by: s_store_id
+|  row-size=76B cardinality=6
+|
+45:EXCHANGE [HASH(s_store_id)]
+|
+12:AGGREGATE [STREAMING]
+|  output: sum(ss_ext_sales_price), sum(coalesce(sr_return_amt, 0)), sum(ss_net_profit - coalesce(sr_net_loss, 0))
+|  group by: s_store_id
+|  row-size=76B cardinality=6
+|
+11:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_store_sk = s_store_sk
+|  runtime filters: RF000 <- s_store_sk
+|  row-size=147B cardinality=286.13K
+|
+|--44:EXCHANGE [BROADCAST]
+|  |
+|  04:SCAN HDFS [tpcds.store]
+|     HDFS partitions=1/1 files=1 size=3.08KB
+|     row-size=32B cardinality=12
+|
+10:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF002 <- d_date_sk
+|  row-size=115B cardinality=286.13K
+|
+|--43:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_date <= DATE '1998-09-03', d_date >= DATE '1998-08-04'
+|     row-size=26B cardinality=7.30K
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_promo_sk = p_promo_sk
+|  runtime filters: RF004 <- p_promo_sk
+|  row-size=89B cardinality=286.13K
+|
+|--42:EXCHANGE [BROADCAST]
+|  |
+|  06:SCAN HDFS [tpcds.promotion]
+|     HDFS partitions=1/1 files=1 size=36.36KB
+|     predicates: p_channel_tv = 'N'
+|     row-size=17B cardinality=300
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF006 <- i_item_sk
+|  row-size=72B cardinality=288.04K
+|
+|--41:EXCHANGE [BROADCAST]
+|  |
+|  05:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     predicates: i_current_price > 50
+|     row-size=12B cardinality=1.80K
+|
+07:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
+|  row-size=60B cardinality=2.88M
+|
+|--40:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.store_returns]
+|     HDFS partitions=1/1 files=1 size=31.19MB
+|     runtime filters: RF006 -> tpcds.store_returns.sr_item_sk
+|     row-size=24B cardinality=287.51K
+|
+01:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF006 -> ss_item_sk, RF004 -> ss_promo_sk, RF000 -> ss_store_sk, RF002 -> ss_sold_date_sk
+   row-size=36B cardinality=2.88M
+====
+# TPCDS-Q86
+select
+    sum(ws_net_paid) as total_sum
+   ,i_category
+   ,i_class
+   ,grouping(i_category)+grouping(i_class) as lochierarchy
+   ,rank() over (
+        partition by grouping(i_category)+grouping(i_class),
+        case when grouping(i_class) = 0 then i_category end
+        order by sum(ws_net_paid) desc) as rank_within_parent
+ from
+    web_sales
+   ,date_dim       d1
+   ,item
+ where
+    d1.d_month_seq between 1212 and 1212+11
+ and d1.d_date_sk = ws_sold_date_sk
+ and i_item_sk  = ws_item_sk
+ group by rollup(i_category,i_class)
+ order by
+   lochierarchy desc,
+  -- Modified from original because Impala does not allow aliases within order by
+  -- expressions, except at the top level.
+   case when grouping(i_category)+grouping(i_class) = 0 then i_category end,
+   rank_within_parent
+ limit 100
+---- PLAN
+Max Per-Host Resource Reservation: Memory=33.88MB Threads=4
+Per-Host Resource Estimates: Memory=250MB
+PLAN-ROOT SINK
+|
+09:TOP-N [LIMIT=100]
+|  order by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) DESC, CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END ASC, rank() ASC
+|  row-size=50B cardinality=100
+|
+08:ANALYTIC
+|  functions: rank()
+|  partition by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END), CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END
+|  order by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN sum(ws_net_paid) WHEN 4 THEN sum(ws_net_paid) WHEN 5 THEN sum(ws_net_paid) END) DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=54B cardinality=1.00K
+|
+07:SORT
+|  order by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) ASC NULLS FIRST, CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END ASC NULLS FIRST, aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN sum(ws_net_paid) WHEN 4 THEN sum(ws_net_paid) WHEN 5 THEN sum(ws_net_paid) END) DESC
+|  row-size=46B cardinality=1.00K
+|
+06:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN sum(ws_net_paid) WHEN 4 THEN sum(ws_net_paid) WHEN 5 THEN sum(ws_net_paid) END), aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END), aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END)
+|  group by: CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END, CASE valid_tid(3,4,5) WHEN 3 THEN i_class WHEN 4 THEN NULL WHEN 5 THEN NULL END, CASE valid_tid(3,4,5) WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 END
+|  row-size=46B cardinality=1.00K
+|
+05:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: sum(ws_net_paid)
+|    group by: i_category, i_class
+|  Class 1
+|    output: sum(ws_net_paid)
+|    group by: i_category, NULL
+|  Class 2
+|    output: sum(ws_net_paid)
+|    group by: NULL, NULL
+|  row-size=140B cardinality=1.00K
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ws_item_sk = i_item_sk
+|  runtime filters: RF000 <- i_item_sk
+|  row-size=70B cardinality=719.38K
+|
+|--02:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     row-size=46B cardinality=18.00K
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: ws_sold_date_sk = d1.d_date_sk
+|  runtime filters: RF002 <- d1.d_date_sk
+|  row-size=24B cardinality=719.38K
+|
+|--01:SCAN HDFS [tpcds.date_dim d1]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d1.d_month_seq <= 1223, d1.d_month_seq >= 1212
+|     row-size=8B cardinality=7.30K
+|
+00:SCAN HDFS [tpcds.web_sales]
+   HDFS partitions=1/1 files=1 size=140.07MB
+   runtime filters: RF000 -> ws_item_sk, RF002 -> ws_sold_date_sk
+   row-size=16B cardinality=719.38K
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=59.62MB Threads=9
+Per-Host Resource Estimates: Memory=333MB
+PLAN-ROOT SINK
+|
+15:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) DESC, CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END ASC, rank() ASC
+|  limit: 100
+|
+09:TOP-N [LIMIT=100]
+|  order by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) DESC, CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END ASC, rank() ASC
+|  row-size=50B cardinality=100
+|
+08:ANALYTIC
+|  functions: rank()
+|  partition by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END), CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END
+|  order by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN sum(ws_net_paid) WHEN 4 THEN sum(ws_net_paid) WHEN 5 THEN sum(ws_net_paid) END) DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=54B cardinality=1.00K
+|
+07:SORT
+|  order by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) ASC NULLS FIRST, CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END ASC NULLS FIRST, aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN sum(ws_net_paid) WHEN 4 THEN sum(ws_net_paid) WHEN 5 THEN sum(ws_net_paid) END) DESC
+|  row-size=46B cardinality=1.00K
+|
+14:EXCHANGE [HASH(aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END),CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END)]
+|
+06:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN sum(ws_net_paid) WHEN 4 THEN sum(ws_net_paid) WHEN 5 THEN sum(ws_net_paid) END), aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END), aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END)
+|  group by: CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END, CASE valid_tid(3,4,5) WHEN 3 THEN i_class WHEN 4 THEN NULL WHEN 5 THEN NULL END, CASE valid_tid(3,4,5) WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 END
+|  row-size=46B cardinality=1.00K
+|
+13:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: sum:merge(ws_net_paid)
+|    group by: i_category, i_class
+|  Class 1
+|    output: sum:merge(ws_net_paid)
+|    group by: i_category, NULL
+|  Class 2
+|    output: sum:merge(ws_net_paid)
+|    group by: NULL, NULL
+|  row-size=140B cardinality=1.00K
+|
+12:EXCHANGE [HASH(CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_category) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(NULL) END,CASE valid_tid(3,4,5) WHEN 3 THEN murmur_hash(i_class) WHEN 4 THEN murmur_hash(NULL) WHEN 5 THEN murmur_hash(NULL) END)]
+|
+05:AGGREGATE [STREAMING]
+|  Class 0
+|    output: sum(ws_net_paid)
+|    group by: i_category, i_class
+|  Class 1
+|    output: sum(ws_net_paid)
+|    group by: i_category, NULL
+|  Class 2
+|    output: sum(ws_net_paid)
+|    group by: NULL, NULL
+|  row-size=140B cardinality=1.00K
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ws_item_sk = i_item_sk
+|  runtime filters: RF000 <- i_item_sk
+|  row-size=70B cardinality=719.38K
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     row-size=46B cardinality=18.00K
+|
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ws_sold_date_sk = d1.d_date_sk
+|  runtime filters: RF002 <- d1.d_date_sk
+|  row-size=24B cardinality=719.38K
+|
+|--10:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim d1]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d1.d_month_seq <= 1223, d1.d_month_seq >= 1212
+|     row-size=8B cardinality=7.30K
+|
+00:SCAN HDFS [tpcds.web_sales]
+   HDFS partitions=1/1 files=1 size=140.07MB
+   runtime filters: RF000 -> ws_item_sk, RF002 -> ws_sold_date_sk
+   row-size=16B cardinality=719.38K
+====
+# TPCDS-Q27
+select i_item_id,
+       s_state, grouping(s_state) g_state,
+       avg(ss_quantity) agg1,
+       avg(ss_list_price) agg2,
+       avg(ss_coupon_amt) agg3,
+       avg(ss_sales_price) agg4
+from store_sales, customer_demographics, date_dim, store, item
+where ss_sold_date_sk = d_date_sk and
+      ss_item_sk = i_item_sk and
+      ss_store_sk = s_store_sk and
+      ss_cdemo_sk = cd_demo_sk and
+      cd_gender = 'M' and
+      cd_marital_status = 'S' and
+      cd_education_status = 'College' and
+      d_year = 2002 and
+      s_state in ('TN')
+group by rollup (i_item_id, s_state)
+order by i_item_id
+        ,s_state
+limit 100
+---- PLAN
+Max Per-Host Resource Reservation: Memory=50.32MB Threads=6
+Per-Host Resource Estimates: Memory=434MB
+PLAN-ROOT SINK
+|
+11:TOP-N [LIMIT=100]
+|  order by: CASE valid_tid(6,8,10) WHEN 6 THEN i_item_id WHEN 8 THEN i_item_id WHEN 10 THEN NULL END ASC, CASE valid_tid(6,8,10) WHEN 6 THEN s_state WHEN 8 THEN NULL WHEN 10 THEN NULL END ASC
+|  row-size=57B cardinality=100
+|
+10:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN 0 WHEN 8 THEN 1 WHEN 10 THEN 1 END), aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN avg(ss_quantity) WHEN 8 THEN avg(ss_quantity) WHEN 10 THEN avg(ss_quantity) END), aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN avg(ss_list_price) WHEN 8 THEN avg(ss_list_price) WHEN 10 THEN avg(ss_list_price) END), aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN avg(ss_coupon_amt) WHEN 8 THEN avg(ss_coupon_amt) WHEN 10 THEN avg(ss_coupon_amt) END), aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN avg(ss_sales_price) WHEN 8 THEN avg(ss_sales_price) WHEN 10 THEN avg(ss_sales_price) END)
+|  group by: CASE valid_tid(6,8,10) WHEN 6 THEN i_item_id WHEN 8 THEN i_item_id WHEN 10 THEN NULL END, CASE valid_tid(6,8,10) WHEN 6 THEN s_state WHEN 8 THEN NULL WHEN 10 THEN NULL END, CASE valid_tid(6,8,10) WHEN 6 THEN 6 WHEN 8 THEN 8 WHEN 10 THEN 10 END
+|  row-size=61B cardinality=17.71K
+|
+09:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg(ss_quantity), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
+|    group by: i_item_id, s_state
+|  Class 1
+|    output: avg(ss_quantity), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
+|    group by: i_item_id, NULL
+|  Class 2
+|    output: avg(ss_quantity), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
+|    group by: NULL, NULL
+|  row-size=202B cardinality=17.71K
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF000 <- i_item_sk
+|  row-size=150B cardinality=263.34K
+|
+|--04:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     row-size=36B cardinality=18.00K
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = s_store_sk
+|  runtime filters: RF002 <- s_store_sk
+|  row-size=114B cardinality=263.34K
+|
+|--03:SCAN HDFS [tpcds.store]
+|     HDFS partitions=1/1 files=1 size=3.08KB
+|     predicates: s_state IN ('TN')
+|     row-size=18B cardinality=12
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_cdemo_sk = cd_demo_sk
+|  runtime filters: RF004 <- cd_demo_sk
+|  row-size=96B cardinality=263.34K
+|
+|--01:SCAN HDFS [tpcds.customer_demographics]
+|     HDFS partitions=1/1 files=1 size=76.92MB
+|     predicates: cd_marital_status = 'S', cd_gender = 'M', cd_education_status = 'College'
+|     row-size=52B cardinality=97.40K
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF006 <- d_date_sk
+|  row-size=44B cardinality=589.03K
+|
+|--02:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_year = 2002
+|     row-size=8B cardinality=373
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> ss_item_sk, RF002 -> ss_store_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
+   row-size=36B cardinality=2.88M
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=67.95MB Threads=12
+Per-Host Resource Estimates: Memory=510MB
+PLAN-ROOT SINK
+|
+18:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: CASE valid_tid(6,8,10) WHEN 6 THEN i_item_id WHEN 8 THEN i_item_id WHEN 10 THEN NULL END ASC, CASE valid_tid(6,8,10) WHEN 6 THEN s_state WHEN 8 THEN NULL WHEN 10 THEN NULL END ASC
+|  limit: 100
+|
+11:TOP-N [LIMIT=100]
+|  order by: CASE valid_tid(6,8,10) WHEN 6 THEN i_item_id WHEN 8 THEN i_item_id WHEN 10 THEN NULL END ASC, CASE valid_tid(6,8,10) WHEN 6 THEN s_state WHEN 8 THEN NULL WHEN 10 THEN NULL END ASC
+|  row-size=57B cardinality=100
+|
+10:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN 0 WHEN 8 THEN 1 WHEN 10 THEN 1 END), aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN avg(ss_quantity) WHEN 8 THEN avg(ss_quantity) WHEN 10 THEN avg(ss_quantity) END), aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN avg(ss_list_price) WHEN 8 THEN avg(ss_list_price) WHEN 10 THEN avg(ss_list_price) END), aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN avg(ss_coupon_amt) WHEN 8 THEN avg(ss_coupon_amt) WHEN 10 THEN avg(ss_coupon_amt) END), aggif(valid_tid(6,8,10) IN (6, 8, 10), CASE valid_tid(6,8,10) WHEN 6 THEN avg(ss_sales_price) WHEN 8 THEN avg(ss_sales_price) WHEN 10 THEN avg(ss_sales_price) END)
+|  group by: CASE valid_tid(6,8,10) WHEN 6 THEN i_item_id WHEN 8 THEN i_item_id WHEN 10 THEN NULL END, CASE valid_tid(6,8,10) WHEN 6 THEN s_state WHEN 8 THEN NULL WHEN 10 THEN NULL END, CASE valid_tid(6,8,10) WHEN 6 THEN 6 WHEN 8 THEN 8 WHEN 10 THEN 10 END
+|  row-size=61B cardinality=17.71K
+|
+17:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: avg:merge(ss_quantity), avg:merge(ss_list_price), avg:merge(ss_coupon_amt), avg:merge(ss_sales_price)
+|    group by: i_item_id, s_state
+|  Class 1
+|    output: avg:merge(ss_quantity), avg:merge(ss_list_price), avg:merge(ss_coupon_amt), avg:merge(ss_sales_price)
+|    group by: i_item_id, NULL
+|  Class 2
+|    output: avg:merge(ss_quantity), avg:merge(ss_list_price), avg:merge(ss_coupon_amt), avg:merge(ss_sales_price)
+|    group by: NULL, NULL
+|  row-size=202B cardinality=17.71K
+|
+16:EXCHANGE [HASH(CASE valid_tid(5,7,9) WHEN 5 THEN murmur_hash(i_item_id) WHEN 7 THEN murmur_hash(i_item_id) WHEN 9 THEN murmur_hash(NULL) END,CASE valid_tid(5,7,9) WHEN 5 THEN murmur_hash(s_state) WHEN 7 THEN murmur_hash(NULL) WHEN 9 THEN murmur_hash(NULL) END)]
+|
+09:AGGREGATE [STREAMING]
+|  Class 0
+|    output: avg(ss_quantity), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
+|    group by: i_item_id, s_state
+|  Class 1
+|    output: avg(ss_quantity), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
+|    group by: i_item_id, NULL
+|  Class 2
+|    output: avg(ss_quantity), avg(ss_list_price), avg(ss_coupon_amt), avg(ss_sales_price)
+|    group by: NULL, NULL
+|  row-size=202B cardinality=17.71K
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF000 <- i_item_sk
+|  row-size=150B cardinality=263.34K
+|
+|--15:EXCHANGE [BROADCAST]
+|  |
+|  04:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     row-size=36B cardinality=18.00K
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_store_sk = s_store_sk
+|  runtime filters: RF002 <- s_store_sk
+|  row-size=114B cardinality=263.34K
+|
+|--14:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.store]
+|     HDFS partitions=1/1 files=1 size=3.08KB
+|     predicates: s_state IN ('TN')
+|     row-size=18B cardinality=12
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_cdemo_sk = cd_demo_sk
+|  runtime filters: RF004 <- cd_demo_sk
+|  row-size=96B cardinality=263.34K
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.customer_demographics]
+|     HDFS partitions=1/1 files=1 size=76.92MB
+|     predicates: cd_marital_status = 'S', cd_gender = 'M', cd_education_status = 'College'
+|     row-size=52B cardinality=97.40K
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF006 <- d_date_sk
+|  row-size=44B cardinality=589.03K
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_year = 2002
+|     row-size=8B cardinality=373
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> ss_item_sk, RF002 -> ss_store_sk, RF004 -> ss_cdemo_sk, RF006 -> ss_sold_date_sk
+   row-size=36B cardinality=2.88M
+====
+# TPCDS-Q36
+select
+    sum(ss_net_profit)/sum(ss_ext_sales_price) as gross_margin
+   ,i_category
+   ,i_class
+   ,grouping(i_category)+grouping(i_class) as lochierarchy
+   ,rank() over (
+        partition by grouping(i_category)+grouping(i_class),
+        case when grouping(i_class) = 0 then i_category end
+        order by sum(ss_net_profit)/sum(ss_ext_sales_price) asc) as rank_within_parent
+ from
+    store_sales
+   ,date_dim       d1
+   ,item
+   ,store
+ where
+    d1.d_year = 2001
+ and d1.d_date_sk = ss_sold_date_sk
+ and i_item_sk  = ss_item_sk
+ and s_store_sk  = ss_store_sk
+ and s_state in ('TN')
+ group by rollup(i_category,i_class)
+ order by
+   lochierarchy desc
+  -- Modified from original because Impala does not allow aliases within order by
+  -- expressions, except at the top level.
+  ,case when grouping(i_category)+grouping(i_class) = 0 then i_category end
+  ,rank_within_parent
+  limit 100
+---- PLAN
+Max Per-Host Resource Reservation: Memory=36.82MB Threads=5
+Per-Host Resource Estimates: Memory=253MB
+PLAN-ROOT SINK
+|
+11:TOP-N [LIMIT=100]
+|  order by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) DESC, CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END ASC, rank() ASC
+|  row-size=66B cardinality=100
+|
+10:ANALYTIC
+|  functions: rank()
+|  partition by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END), CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END
+|  order by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_net_profit) WHEN 5 THEN sum(ss_net_profit) WHEN 6 THEN sum(ss_net_profit) END) / aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_ext_sales_price) WHEN 5 THEN sum(ss_ext_sales_price) WHEN 6 THEN sum(ss_ext_sales_price) END) ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=70B cardinality=1.00K
+|
+09:SORT
+|  order by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) ASC NULLS FIRST, CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END ASC NULLS FIRST, aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_net_profit) WHEN 5 THEN sum(ss_net_profit) WHEN 6 THEN sum(ss_net_profit) END) / aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_ext_sales_price) WHEN 5 THEN sum(ss_ext_sales_price) WHEN 6 THEN sum(ss_ext_sales_price) END) ASC
+|  row-size=62B cardinality=1.00K
+|
+08:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_net_profit) WHEN 5 THEN sum(ss_net_profit) WHEN 6 THEN sum(ss_net_profit) END), aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_ext_sales_price) WHEN 5 THEN sum(ss_ext_sales_price) WHEN 6 THEN sum(ss_ext_sales_price) END), aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END), aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END)
+|  group by: CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END, CASE valid_tid(4,5,6) WHEN 4 THEN i_class WHEN 5 THEN NULL WHEN 6 THEN NULL END, CASE valid_tid(4,5,6) WHEN 4 THEN 4 WHEN 5 THEN 5 WHEN 6 THEN 6 END
+|  row-size=62B cardinality=1.00K
+|
+07:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    group by: i_category, i_class
+|  Class 1
+|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    group by: i_category, NULL
+|  Class 2
+|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    group by: NULL, NULL
+|  row-size=188B cardinality=1.00K
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = s_store_sk
+|  runtime filters: RF000 <- s_store_sk
+|  row-size=96B cardinality=589.03K
+|
+|--03:SCAN HDFS [tpcds.store]
+|     HDFS partitions=1/1 files=1 size=3.08KB
+|     predicates: s_state IN ('TN')
+|     row-size=18B cardinality=12
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF002 <- i_item_sk
+|  row-size=78B cardinality=589.03K
+|
+|--02:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     row-size=46B cardinality=18.00K
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d1.d_date_sk
+|  runtime filters: RF004 <- d1.d_date_sk
+|  row-size=32B cardinality=589.03K
+|
+|--01:SCAN HDFS [tpcds.date_dim d1]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d1.d_year = 2001
+|     row-size=8B cardinality=373
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
+   row-size=24B cardinality=2.88M
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=62.57MB Threads=11
+Per-Host Resource Estimates: Memory=336MB
+PLAN-ROOT SINK
+|
+18:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) DESC, CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END ASC, rank() ASC
+|  limit: 100
+|
+11:TOP-N [LIMIT=100]
+|  order by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) DESC, CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END ASC, rank() ASC
+|  row-size=66B cardinality=100
+|
+10:ANALYTIC
+|  functions: rank()
+|  partition by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END), CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END
+|  order by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_net_profit) WHEN 5 THEN sum(ss_net_profit) WHEN 6 THEN sum(ss_net_profit) END) / aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_ext_sales_price) WHEN 5 THEN sum(ss_ext_sales_price) WHEN 6 THEN sum(ss_ext_sales_price) END) ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=70B cardinality=1.00K
+|
+09:SORT
+|  order by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) ASC NULLS FIRST, CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END ASC NULLS FIRST, aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_net_profit) WHEN 5 THEN sum(ss_net_profit) WHEN 6 THEN sum(ss_net_profit) END) / aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_ext_sales_price) WHEN 5 THEN sum(ss_ext_sales_price) WHEN 6 THEN sum(ss_ext_sales_price) END) ASC
+|  row-size=62B cardinality=1.00K
+|
+17:EXCHANGE [HASH(aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END),CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END)]
+|
+08:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_net_profit) WHEN 5 THEN sum(ss_net_profit) WHEN 6 THEN sum(ss_net_profit) END), aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_ext_sales_price) WHEN 5 THEN sum(ss_ext_sales_price) WHEN 6 THEN sum(ss_ext_sales_price) END), aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END), aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END)
+|  group by: CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END, CASE valid_tid(4,5,6) WHEN 4 THEN i_class WHEN 5 THEN NULL WHEN 6 THEN NULL END, CASE valid_tid(4,5,6) WHEN 4 THEN 4 WHEN 5 THEN 5 WHEN 6 THEN 6 END
+|  row-size=62B cardinality=1.00K
+|
+16:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: sum:merge(ss_net_profit), sum:merge(ss_ext_sales_price)
+|    group by: i_category, i_class
+|  Class 1
+|    output: sum:merge(ss_net_profit), sum:merge(ss_ext_sales_price)
+|    group by: i_category, NULL
+|  Class 2
+|    output: sum:merge(ss_net_profit), sum:merge(ss_ext_sales_price)
+|    group by: NULL, NULL
+|  row-size=188B cardinality=1.00K
+|
+15:EXCHANGE [HASH(CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_category) WHEN 5 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) END,CASE valid_tid(4,5,6) WHEN 4 THEN murmur_hash(i_class) WHEN 5 THEN murmur_hash(NULL) WHEN 6 THEN murmur_hash(NULL) END)]
+|
+07:AGGREGATE [STREAMING]
+|  Class 0
+|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    group by: i_category, i_class
+|  Class 1
+|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    group by: i_category, NULL
+|  Class 2
+|    output: sum(ss_net_profit), sum(ss_ext_sales_price)
+|    group by: NULL, NULL
+|  row-size=188B cardinality=1.00K
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_store_sk = s_store_sk
+|  runtime filters: RF000 <- s_store_sk
+|  row-size=96B cardinality=589.03K
+|
+|--14:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.store]
+|     HDFS partitions=1/1 files=1 size=3.08KB
+|     predicates: s_state IN ('TN')
+|     row-size=18B cardinality=12
+|
+05:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF002 <- i_item_sk
+|  row-size=78B cardinality=589.03K
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     row-size=46B cardinality=18.00K
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_sold_date_sk = d1.d_date_sk
+|  runtime filters: RF004 <- d1.d_date_sk
+|  row-size=32B cardinality=589.03K
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpcds.date_dim d1]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d1.d_year = 2001
+|     row-size=8B cardinality=373
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
+   row-size=24B cardinality=2.88M
+====

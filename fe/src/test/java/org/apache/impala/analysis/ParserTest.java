@@ -3393,8 +3393,8 @@ public class ParserTest extends FrontendTestBase {
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
-        "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, IF, " +
-        "INTERVAL, LEFT, NOT, NULL, REPLACE, RIGHT, STRAIGHT_JOIN, TRUNCATE, TRUE, " +
+        "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, GROUPING, " +
+        "IF, INTERVAL, LEFT, NOT, NULL, REPLACE, RIGHT, STRAIGHT_JOIN, TRUNCATE, TRUE, " +
         "IDENTIFIER");
 
     // missing from
@@ -3420,8 +3420,8 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c from t where\n" +
         "                           ^\n" +
         "Encountered: EOF\n" +
-        "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, IF, INTERVAL, LEFT, NOT, " +
-        "NULL, REPLACE, RIGHT, TRUNCATE, TRUE, IDENTIFIER");
+        "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, GROUPING, IF, INTERVAL, " +
+        "LEFT, NOT, NULL, REPLACE, RIGHT, TRUNCATE, TRUE, IDENTIFIER");
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
@@ -3429,8 +3429,8 @@ public class ParserTest extends FrontendTestBase {
         "select c, b, c from t where group by a, b\n" +
         "                            ^\n" +
         "Encountered: GROUP\n" +
-        "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, IF, INTERVAL, LEFT, NOT, " +
-        "NULL, REPLACE, RIGHT, TRUNCATE, TRUE, IDENTIFIER");
+        "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, GROUPING, IF, INTERVAL, " +
+        "LEFT, NOT, NULL, REPLACE, RIGHT, TRUNCATE, TRUE, IDENTIFIER");
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",
@@ -3490,8 +3490,8 @@ public class ParserTest extends FrontendTestBase {
         "...c,c,c,c,c,c,c,c,cd,c,d,d, ,c, from t\n" +
         "                             ^\n" +
         "Encountered: COMMA\n" +
-        "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, IF, INTERVAL, LEFT, NOT, " +
-        "NULL, REPLACE, RIGHT, TRUNCATE, TRUE, IDENTIFIER");
+        "Expected: CASE, CAST, DATE, DEFAULT, EXISTS, FALSE, GROUPING, IF, INTERVAL, " +
+        "LEFT, NOT, NULL, REPLACE, RIGHT, TRUNCATE, TRUE, IDENTIFIER");
 
     // Parsing identifiers that have different names printed as EXPECTED
     ParserError("DROP DATA SRC foo",
@@ -3527,7 +3527,7 @@ public class ParserTest extends FrontendTestBase {
          "\n" +
          "^\n" +
          "Encountered: EOF\n" +
-         "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, " +
+         "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, GROUPING, " +
          "IF, INTERVAL, LEFT, NOT, NULL, REPLACE, RIGHT, " +
          "STRAIGHT_JOIN, TRUNCATE, TRUE, IDENTIFIER\n");
     ParserError("SELECT\n\n",
@@ -3535,7 +3535,7 @@ public class ParserTest extends FrontendTestBase {
          "\n" +
          "^\n" +
          "Encountered: EOF\n" +
-         "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, " +
+         "Expected: ALL, CASE, CAST, DATE, DEFAULT, DISTINCT, EXISTS, FALSE, GROUPING, " +
          "IF, INTERVAL, LEFT, NOT, NULL, REPLACE, RIGHT, " +
          "STRAIGHT_JOIN, TRUNCATE, TRUE, IDENTIFIER\n");
   }
@@ -3735,6 +3735,22 @@ public class ParserTest extends FrontendTestBase {
 
     // Extra parentheses around expressions in list elements are supported.
     ParserError("SELECT a FROM foo GROUP BY GROUPING SETS((), ((a), (b))");
+  }
+
+  /**
+   * Test that grouping() can be parsed as a function name, but not as a general
+   * identifier.
+   */
+  @Test
+  public void TestGroupingKeyword() {
+    ParsesOk("SELECT a, grouping(a) FROM foo GROUP BY GROUPING SETS((a, b))");
+    ParsesOk("SELECT a, gRoUpInG(a) FROM foo GROUP BY GROUPING SETS((a, b))");
+    ParsesOk("SELECT a, `grouping`(a) FROM foo GROUP BY GROUPING SETS((a, b))");
+
+    ParsesOk("SELECT a, grouping(a) as `grouping` FROM foo " +
+        "GROUP BY GROUPING SETS((a, b))");
+    ParserError("SELECT a, grouping(a) as grouping FROM foo " +
+        "GROUP BY GROUPING SETS((a, b))");
   }
 
   @Test
