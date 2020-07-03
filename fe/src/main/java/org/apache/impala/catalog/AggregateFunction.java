@@ -156,6 +156,24 @@ public class AggregateFunction extends Function {
     return fn;
   }
 
+  /**
+   * Create a builtin with no concrete implementation that will be rewritten during
+   * analysis, e.g. grouping() and grouping_id().
+   */
+  public static AggregateFunction createRewrittenBuiltin(Db db, String name,
+      List<Type> argTypes, Type retType, boolean ignoresDistinct,
+      boolean isAnalyticFn, boolean returnsNonNullOnEmpty) {
+    AggregateFunction fn = new AggregateFunction(new FunctionName(db.getName(), name),
+        argTypes, retType, false);
+    fn.setBinaryType(TFunctionBinaryType.BUILTIN);
+    fn.ignoresDistinct_ = ignoresDistinct;
+    fn.isAnalyticFn_ = isAnalyticFn;
+    fn.isAggregateFn_ = true;
+    fn.returnsNonNullOnEmpty_ = returnsNonNullOnEmpty;
+    fn.setIsPersistent(true);
+    return fn;
+  }
+
   public static AggregateFunction createAnalyticBuiltin(Db db, String name,
       List<Type> argTypes, Type retType, Type intermediateType) {
     return createAnalyticBuiltin(db, name, argTypes, retType, intermediateType, null,

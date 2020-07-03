@@ -153,3 +153,175 @@ where exists
 ---- TYPES
 INT
 ====
+---- QUERY
+# Test grouping() and grouping_id() on a table with null values.
+select
+  grouping_id(),
+  grouping(int_col % 2),
+  grouping(substring(string_col, 1, 1)),
+  grouping(bool_col),
+  int_col % 2 i,
+  substring(string_col, 1, 1) str,
+  bool_col,
+  count(*)
+from alltypesagg
+group by cube(i, str, bool_col)
+order by grouping_id() desc, i, str, bool_col
+---- RESULTS
+7,1,1,1,NULL,'NULL',NULL,11000
+6,1,1,0,NULL,'NULL',false,5000
+6,1,1,0,NULL,'NULL',true,6000
+5,1,0,1,NULL,'0',NULL,20
+5,1,0,1,NULL,'1',NULL,1220
+5,1,0,1,NULL,'2',NULL,1220
+5,1,0,1,NULL,'3',NULL,1220
+5,1,0,1,NULL,'4',NULL,1220
+5,1,0,1,NULL,'5',NULL,1220
+5,1,0,1,NULL,'6',NULL,1220
+5,1,0,1,NULL,'7',NULL,1220
+5,1,0,1,NULL,'8',NULL,1220
+5,1,0,1,NULL,'9',NULL,1220
+4,1,0,0,NULL,'0',true,20
+4,1,0,0,NULL,'1',false,560
+4,1,0,0,NULL,'1',true,660
+4,1,0,0,NULL,'2',false,550
+4,1,0,0,NULL,'2',true,670
+4,1,0,0,NULL,'3',false,560
+4,1,0,0,NULL,'3',true,660
+4,1,0,0,NULL,'4',false,550
+4,1,0,0,NULL,'4',true,670
+4,1,0,0,NULL,'5',false,560
+4,1,0,0,NULL,'5',true,660
+4,1,0,0,NULL,'6',false,550
+4,1,0,0,NULL,'6',true,670
+4,1,0,0,NULL,'7',false,560
+4,1,0,0,NULL,'7',true,660
+4,1,0,0,NULL,'8',false,550
+4,1,0,0,NULL,'8',true,670
+4,1,0,0,NULL,'9',false,560
+4,1,0,0,NULL,'9',true,660
+3,0,1,1,0,'NULL',NULL,5980
+3,0,1,1,1,'NULL',NULL,5000
+3,0,1,1,NULL,'NULL',NULL,20
+2,0,1,0,0,'NULL',true,5980
+2,0,1,0,1,'NULL',false,5000
+2,0,1,0,NULL,'NULL',true,20
+1,0,0,1,0,'1',NULL,660
+1,0,0,1,0,'2',NULL,670
+1,0,0,1,0,'3',NULL,660
+1,0,0,1,0,'4',NULL,670
+1,0,0,1,0,'5',NULL,660
+1,0,0,1,0,'6',NULL,670
+1,0,0,1,0,'7',NULL,660
+1,0,0,1,0,'8',NULL,670
+1,0,0,1,0,'9',NULL,660
+1,0,0,1,1,'1',NULL,560
+1,0,0,1,1,'2',NULL,550
+1,0,0,1,1,'3',NULL,560
+1,0,0,1,1,'4',NULL,550
+1,0,0,1,1,'5',NULL,560
+1,0,0,1,1,'6',NULL,550
+1,0,0,1,1,'7',NULL,560
+1,0,0,1,1,'8',NULL,550
+1,0,0,1,1,'9',NULL,560
+1,0,0,1,NULL,'0',NULL,20
+0,0,0,0,0,'1',true,660
+0,0,0,0,0,'2',true,670
+0,0,0,0,0,'3',true,660
+0,0,0,0,0,'4',true,670
+0,0,0,0,0,'5',true,660
+0,0,0,0,0,'6',true,670
+0,0,0,0,0,'7',true,660
+0,0,0,0,0,'8',true,670
+0,0,0,0,0,'9',true,660
+0,0,0,0,1,'1',false,560
+0,0,0,0,1,'2',false,550
+0,0,0,0,1,'3',false,560
+0,0,0,0,1,'4',false,550
+0,0,0,0,1,'5',false,560
+0,0,0,0,1,'6',false,550
+0,0,0,0,1,'7',false,560
+0,0,0,0,1,'8',false,550
+0,0,0,0,1,'9',false,560
+0,0,0,0,NULL,'0',true,20
+---- TYPES
+BIGINT, TINYINT, TINYINT, TINYINT, INT, STRING, BOOLEAN, BIGINT
+====
+---- QUERY
+# Test grouping_id() with different argument list order and length
+select
+  grouping_id(bool_col, string_col, int_col),
+  grouping_id(bool_col),
+  int_col,
+  string_col,
+  bool_col,
+  count(*)
+from alltypestiny
+group by rollup(int_col, string_col, bool_col)
+---- RESULTS
+6,1,0,'NULL',NULL,4
+0,0,1,'1',false,4
+7,1,NULL,'NULL',NULL,8
+4,1,0,'0',NULL,4
+4,1,1,'1',NULL,4
+0,0,0,'0',true,4
+6,1,1,'NULL',NULL,4
+---- TYPES
+BIGINT, BIGINT, INT, STRING, BOOLEAN, BIGINT
+====
+---- QUERY
+# Test grouping() and grouping_id() with a single grouping set.
+select
+  grouping_id(int_col, string_col),
+  grouping(int_col),
+  grouping(string_col),
+  int_col,
+  string_col,
+  count(*)
+from alltypestiny
+group by grouping sets((int_col, string_col))
+---- RESULTS
+0,0,0,1,'1',4
+0,0,0,0,'0',4
+---- TYPES
+BIGINT, TINYINT, TINYINT, INT, STRING, BIGINT
+====
+---- QUERY
+# Test grouping() and grouping_id() with plain GROUP BY, where they always
+# return 0.
+select
+  grouping_id(int_col, string_col),
+  grouping_id(),
+  grouping(int_col),
+  grouping(string_col),
+  int_col,
+  string_col,
+  count(*)
+from alltypestiny
+group by int_col, string_col
+---- RESULTS
+0,0,0,0,1,'1',4
+0,0,0,0,0,'0',4
+---- TYPES
+BIGINT, BIGINT, TINYINT, TINYINT, INT, STRING, BIGINT
+====
+---- QUERY
+# Test grouping() and grouping_id() with plain GROUP BY and multiple aggregation
+# classes from the distinct aggregate functions. They always return 0 in this
+# case.
+select
+  grouping_id(int_col, string_col),
+  grouping(int_col),
+  grouping(string_col),
+  int_col,
+  string_col,
+  count(distinct tinyint_col),
+  count(distinct timestamp_col)
+from alltypestiny
+group by int_col, string_col
+---- RESULTS
+0,0,0,1,'1',1,4
+0,0,0,0,'0',1,4
+---- TYPES
+BIGINT, TINYINT, TINYINT, INT, STRING, BIGINT, BIGINT
+====

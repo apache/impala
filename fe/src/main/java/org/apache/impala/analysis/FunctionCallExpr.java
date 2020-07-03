@@ -35,6 +35,8 @@ import org.apache.impala.thrift.TExprNode;
 import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TFunctionBinaryType;
 import org.apache.impala.thrift.TQueryOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
@@ -42,6 +44,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class FunctionCallExpr extends Expr {
+  private final static Logger LOG = LoggerFactory.getLogger(FunctionCallExpr.class);
+
   private final FunctionName fnName_;
   private final FunctionParams params_;
   private boolean isAnalyticFnCall_ = false;
@@ -118,11 +122,17 @@ public class FunctionCallExpr extends Expr {
 
   /** Returns true if fnName is a built-in with given name. */
   private static boolean functionNameEqualsBuiltin(FunctionName fnName, String name) {
-    return fnName.getFnNamePath().size() == 1
-           && fnName.getFnNamePath().get(0).equalsIgnoreCase(name)
-        || fnName.getFnNamePath().size() == 2
-           && fnName.getFnNamePath().get(0).equals(BuiltinsDb.NAME)
-           && fnName.getFnNamePath().get(1).equalsIgnoreCase(name);
+    // We could either have a function path, or the function name and optional database.
+    if (fnName.getFnNamePath() != null) {
+      return fnName.getFnNamePath().size() == 1
+             && fnName.getFnNamePath().get(0).equalsIgnoreCase(name)
+          || fnName.getFnNamePath().size() == 2
+             && fnName.getFnNamePath().get(0).equals(BuiltinsDb.NAME)
+             && fnName.getFnNamePath().get(1).equalsIgnoreCase(name);
+    } else {
+      return (fnName.getDb() == null || fnName.getDb().equals(BuiltinsDb.NAME)) &&
+          fnName.getFunction().equalsIgnoreCase(name);
+    }
   }
 
   /**
@@ -248,6 +258,16 @@ public class FunctionCallExpr extends Expr {
   public boolean isAggregateFunction() {
     Preconditions.checkNotNull(fn_);
     return fn_ instanceof AggregateFunction && !isAnalyticFnCall_;
+  }
+
+  /** Returns true if this function is a call to the built-in grouping() function. */
+  public boolean isGroupingBuiltin() {
+    return functionNameEqualsBuiltin(fnName_, "grouping");
+  }
+
+  /** Returns true if this function is a call to the built-in grouping_id() function. */
+  public boolean isGroupingIdBuiltin() {
+    return functionNameEqualsBuiltin(fnName_, "grouping_id");
   }
 
   /**
@@ -519,6 +539,15 @@ public class FunctionCallExpr extends Expr {
           uncheckedCastChild(ScalarType.BOOLEAN, i);
         }
       }
+      return;
+    }
+
+    // grouping_id() can take any set of input slot arguments. Just resolve it to the
+    // zero-argument version so it can be rewritten in MultiAggregateInfo.
+    if (isGroupingIdBuiltin()) {
+      Function searchDesc = new Function(fnName_, new Type[0], Type.INVALID, false);
+      fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+      type_ = fn_.getReturnType();
       return;
     }
 

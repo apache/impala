@@ -232,3 +232,32 @@ IMPALA=SUCCESS
 ---- QUERY_IMPALA_VIEW_RESULTS
 HIVE=SUCCESS
 ====
+---- CREATE_VIEW
+# View with ROLLUP and grouping(), which are supported by Impala and Hive
+create view test (i, b, c, g1, g2) as
+select int_col, bigint_col, count(string_col), grouping(int_col),
+    grouping(bigint_col)
+from functional.alltypessmall
+group by rollup(int_col, bigint_col)
+---- CREATE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+---- QUERY_HIVE_VIEW_RESULTS
+IMPALA=SUCCESS
+---- QUERY_IMPALA_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=SUCCESS
+====
+---- CREATE_VIEW
+# View with ROLLUP and grouping_id(), which is not supported by Hive
+create view test (i, b, c, g) as
+select int_col, bigint_col, count(string_col), grouping_id(int_col, bigint_col)
+from functional.alltypessmall
+group by rollup(int_col, bigint_col)
+---- CREATE_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=FAILURE
+---- QUERY_IMPALA_VIEW_RESULTS
+IMPALA=SUCCESS
+HIVE=FAILURE
+====

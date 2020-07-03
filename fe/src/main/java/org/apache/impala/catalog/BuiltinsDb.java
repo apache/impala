@@ -1403,6 +1403,17 @@ public class BuiltinsDb extends Db {
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
             db, "lead", Lists.newArrayList(t, Type.BIGINT), t, t));
     }
+
+    // Grouping ID functions for grouping sets. These are rewritten during analysis.
+    db.addBuiltin(AggregateFunction.createRewrittenBuiltin(db, "grouping_id",
+        Collections.<Type>emptyList(), Type.BIGINT, /*ignoresDistinct=*/ true,
+        /*isAnalyticFn=*/ false, /*returnsNonNullOnEmpty=*/ true));
+    // grouping() can take any grouping expression as input.
+    for (Type t: Type.getSupportedTypes()) {
+      db.addBuiltin(AggregateFunction.createRewrittenBuiltin(db, "grouping",
+          Lists.newArrayList(t), Type.TINYINT, /*ignoresDistinct=*/ true,
+          /*isAnalyticFn=*/ false, /*returnsNonNullOnEmpty=*/ true));
+    }
   }
 
   // Resolve the intermediate data type by searching for one in the

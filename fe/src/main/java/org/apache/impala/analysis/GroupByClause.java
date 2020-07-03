@@ -117,10 +117,6 @@ public class GroupByClause {
   }
 
   public List<Expr> getOrigGroupingExprs() { return origGroupingExprs_; }
-  public List<Long> getGroupingIDs() {
-    Preconditions.checkState(isAnalyzed_);
-    return groupingIDs_;
-  }
   public List<List<Expr>> getAnalyzedGroupingSets() {
     Preconditions.checkState(isAnalyzed_);
     return analyzedGroupingSets_;
