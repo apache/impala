@@ -1754,6 +1754,7 @@ TEST_F(DiskIoMgrTest, MetricsOfWriteIoError) {
   WriteRange** new_range = tmp_pool.Add(new WriteRange*);
   WriteRange::WriteDoneCallback callback = [=](const Status& status) {
     ASSERT_EQ(TErrorCode::DISK_IO_ERROR, status.code());
+    lock_guard<mutex> l(written_mutex_);
     num_ranges_written_ = 1;
     writes_done_.NotifyOne();
   };
