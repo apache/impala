@@ -39,8 +39,8 @@ import static org.apache.impala.analysis.ToSqlOptions.REWRITTEN;
  * Class representing a statement rewriter. The base class traverses the stmt tree and
  * the specific rewrite rules are implemented in the subclasses and are called by the
  * hooks in the base class.
- * TODO: Now that we have a nested-loop join supporting all join modes we could
- * allow more rewrites, although it is not clear we would always want to.
+ * TODO: IMPALA-9948: Now that we have a nested-loop join supporting all join modes we
+ * could allow more rewrites, although it is not clear we would always want to.
  */
 public class StmtRewriter {
   private final static Logger LOG = LoggerFactory.getLogger(StmtRewriter.class);
@@ -309,6 +309,7 @@ public class StmtRewriter {
       boolean isScalarSubquery = expr.getSubquery().isScalarSubquery();
       boolean isScalarColumn = expr.getSubquery().returnsScalarColumn();
       boolean isRuntimeScalar = subqueryStmt.isRuntimeScalar();
+      boolean isDisjunctive = hasSubqueryInDisjunction(expr);
       // Create a new inline view from the subquery stmt. The inline view will be added
       // to the stmt's table refs later. Explicitly set the inline view's column labels
       // to eliminate any chance that column aliases from the parent query could reference
@@ -320,6 +321,20 @@ public class StmtRewriter {
       InlineViewRef inlineView =
           new InlineViewRef(stmt.getTableAliasGenerator().getNextAlias(), subqueryStmt,
               colLabels);
+
+      // To handle a subquery in a disjunct, we need to pull out the subexpression that
+      // is the immediate parent of the subquery and prepare to add additional predicates
+      // to the WHERE clause of 'stmt'.
+      List<Expr> whereClauseConjuncts = null;
+      List<Expr> whereClauseSmapLhs = null;
+      List<Expr> whereClauseSmapRhs = null;
+      if (isDisjunctive) {
+        whereClauseConjuncts = new ArrayList<Expr>();
+        whereClauseSmapLhs = new ArrayList<Expr>();
+        whereClauseSmapRhs = new ArrayList<Expr>();
+        expr = replaceSubqueryInDisjunct(expr, inlineView, subqueryStmt,
+            whereClauseConjuncts, whereClauseSmapLhs, whereClauseSmapRhs);
+      }
 
       // Extract all correlated predicates from the subquery.
       List<Expr> onClauseConjuncts = extractCorrelatedPredicates(subqueryStmt);
@@ -350,15 +365,46 @@ public class StmtRewriter {
       // However the statement is already analyzed and since statement analysis is not
       // idempotent, the analysis needs to be reset.
       inlineView.reset();
-      inlineView.analyze(analyzer);
+      try {
+        inlineView.analyze(analyzer);
+      } catch (AnalysisException e) {
+        // We can't identify all the aggregate functions until the subquery is fully
+        // analyzed, so we need to catch the exception here and produce a more helpful
+        // error message.
+        if (isDisjunctive && subqueryStmt.hasAggregate(/*includeDistinct=*/ false)) {
+          // TODO: IMPALA-5098: we could easily support this if DISTINCT and aggregates
+          // were supported in the same query block.
+          throw new AnalysisException("Aggregate functions in subquery in disjunction " +
+              "not supported: " + subqueryStmt.toSql());
+        }
+        throw e;
+      }
       inlineView.setLeftTblRef(stmt.fromClause_.get(stmt.fromClause_.size() - 1));
       stmt.fromClause_.add(inlineView);
-      JoinOperator joinOp = JoinOperator.LEFT_SEMI_JOIN;
 
       // Create a join conjunct from the expr that contains a subquery.
       Expr joinConjunct =
-          createJoinConjunct(expr, inlineView, analyzer, !onClauseConjuncts.isEmpty());
-      if (joinConjunct != null) {
+            createJoinConjunct(expr, inlineView, analyzer, !onClauseConjuncts.isEmpty());
+      JoinOperator joinOp = JoinOperator.LEFT_SEMI_JOIN;
+
+      if (isDisjunctive) {
+        // Special case handling of disjunctive subqueries - add the WHERE conjuncts
+        // generated above and convert to a LEFT OUTER JOIN so we can reference slots
+        // from subquery.
+        for (Expr rhsExpr : whereClauseSmapRhs) {
+          rhsExpr.analyze(analyzer);
+        }
+        ExprSubstitutionMap smap =
+            new ExprSubstitutionMap(whereClauseSmapLhs, whereClauseSmapRhs);
+        for (Expr pred : whereClauseConjuncts) {
+          pred = pred.substitute(smap, analyzer, false);
+          stmt.whereClause_ =
+              CompoundPredicate.createConjunction(pred, stmt.whereClause_);
+        }
+        joinOp = JoinOperator.LEFT_OUTER_JOIN;
+        updateSelectList = true;
+        if (joinConjunct != null) onClauseConjuncts.add(joinConjunct);
+      } else if (joinConjunct != null) {
         SelectListItem firstItem =
             ((SelectStmt) inlineView.getViewStmt()).getSelectList().getItems().get(0);
         if (!onClauseConjuncts.isEmpty() && firstItem.getExpr() != null &&
@@ -461,7 +507,7 @@ public class StmtRewriter {
       }
 
       if (!hasEqJoinPred && !inlineView.isCorrelated()) {
-        // TODO: Requires support for non-equi joins.
+        // TODO: IMPALA-9948: we could support non-equi joins here
         // TODO: Remove this when independent subquery evaluation is implemented.
         // TODO: IMPALA-5100 to cover all cases, we do let through runtime scalars with
         // group by clauses to allow for subqueries where we haven't implemented plan time
@@ -525,6 +571,78 @@ public class StmtRewriter {
       inlineView.setJoinOp(joinOp);
       inlineView.setOnClause(onClausePredicate);
       return updateSelectList;
+    }
+
+    /**
+     * Handle a single subquery in 'expr', which is a predicate containing a disjunction,
+     * which in turn contains a subquery. The inline view and subqueryStmt are modified
+     * as needed and where clause predicates are generated and added to
+     * 'whereClauseConjuncts'. A smap constructed from 'smapLhs' and 'smapRhs' will be
+     * later applied to 'whereClauseConjuncts'. Exprs in 'smapRhs' will be analyzed by
+     * the caller before construction of the smap.
+     *
+     * 'subqueryStmt' must have a single item in its select list.
+     *
+     * @returns the parent expr of the subquery to be converted into a join conjunct
+     *    in the containing statement of the subquery.
+     * @throws AnalysisException if this predicate cannot be converted into a join
+     *    conjunct.
+     */
+    static private Expr replaceSubqueryInDisjunct(Expr expr, InlineViewRef inlineView,
+        SelectStmt subqueryStmt, List<Expr> whereClauseConjuncts,
+        List<Expr> smapLhs, List<Expr> smapRhs) throws AnalysisException {
+      Preconditions.checkState(subqueryStmt.getSelectList().getItems().size() == 1);
+      List<Expr> parents = new ArrayList<>();
+      expr.collect(Expr.HAS_SUBQUERY_CHILD, parents);
+      Preconditions.checkState(parents.size() == 1, "Must contain exactly 1 subquery");
+      Expr parent = parents.get(0);
+
+      // The caller will convert the IN predicate, a binary predicate against a
+      // scalar subquery and and any correlated predicates into join predicates.
+      // We can then replace the expression referencing the subquery with a NULL or
+      // IS NOT NULL referencing the select list item from the inline view, e.g.:
+      //
+      //    WHERE <condition 1> OR inlineview.col IS NOT NULL.
+      //
+      // Other expressions are not supported and rejected earlier in analysis.
+      // TODO: add support for [NOT] EXISTS. We could implement [NOT] EXISTS
+      // support by manipulating the select list of the subquery so that it
+      // includes a constant value, then referencing that in the generated WHERE conjunct.
+      if (parent instanceof ExistsPredicate) {
+        throw new AnalysisException("EXISTS/NOT EXISTS subqueries in OR predicates are " +
+            "not supported: " + expr.toSql());
+      } else if (parent instanceof InPredicate && ((InPredicate)parent).isNotIn()) {
+        throw new AnalysisException("NOT IN subqueries in OR predicates are not "
+            + "supported: " + expr.toSql());
+      } else if (!(parent instanceof Predicate)) {
+        // If the predicate is not the parent of the subquery, it requires more work to
+        // convert into a join conjunct.
+        // TODO: IMPALA-5226: handle a broader spectrum of expressions in where clause
+        // conjuncts.
+        throw new AnalysisException("Subqueries that are arguments to non-predicate " +
+            "exprs are not supported inside OR: " + expr.toSql());
+      }
+      Preconditions.checkState(parent instanceof InPredicate ||
+          parent instanceof BinaryPredicate || parent instanceof LikePredicate, parent);
+      // Get a reference to the first select list item from the IN.
+      SlotRef slotRef = new SlotRef(Lists.newArrayList(inlineView.getUniqueAlias(),
+            inlineView.getColLabels().get(0)));
+      // Add the original predicate to the where clause, and set up the subquery to be
+      // replaced.
+      whereClauseConjuncts.add(expr);
+      // We are going to do a LEFT OUTER equi-join against the single select list item
+      // from the subquery. We need each left input row to match at most one row from
+      // the right input, which we can ensure by adding a distinct to the subquery.
+      // The distinct supersedes any pre-existing grouping.
+      if (!subqueryStmt.returnsSingleRow()) {
+        subqueryStmt.getSelectList().setIsDistinct(true);
+        subqueryStmt.removeGroupBy();
+      }
+      smapLhs.add(parent);
+      // The new IsNullPredicate is not analyzed, but will be analyzed during
+      // construction of the smap.
+      smapRhs.add(new IsNullPredicate(slotRef, true));
+      return parent;
     }
 
     /**
@@ -946,10 +1064,6 @@ public class StmtRewriter {
         throws AnalysisException {
       // Rewrite all the subqueries in the HAVING clause.
       if (stmt.hasHavingClause() && stmt.havingClause_.getSubquery() != null) {
-        if (hasSubqueryInDisjunction(stmt.havingClause_)) {
-          throw new AnalysisException("Subqueries in OR predicates are not supported: "
-              + stmt.havingClause_.toSql());
-        }
         rewriteHavingClauseSubqueries(stmt, analyzer);
       }
 
@@ -957,12 +1071,6 @@ public class StmtRewriter {
       if (stmt.hasWhereClause()) {
         // Push negation to leaf operands.
         stmt.whereClause_ = Expr.pushNegationToOperands(stmt.whereClause_);
-        // Check if we can rewrite the subqueries in the WHERE clause. OR predicates with
-        // subqueries are not supported.
-        if (hasSubqueryInDisjunction(stmt.whereClause_)) {
-          throw new AnalysisException("Subqueries in OR predicates are not supported: " +
-              stmt.whereClause_.toSql());
-        }
         rewriteWhereClauseSubqueries(stmt, analyzer);
       }
       rewriteSelectListSubqueries(stmt, analyzer);

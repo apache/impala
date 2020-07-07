@@ -139,6 +139,18 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         }
       };
 
+  // Returns true if an Expr has a subquery as a direct child.
+  public static final com.google.common.base.Predicate<Expr> HAS_SUBQUERY_CHILD =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          for (Expr child : arg.getChildren()) {
+            if (child instanceof Subquery) return true;
+          }
+          return false;
+        }
+      };
+
   // Returns true if an Expr is an aggregate function that returns non-null on
   // an empty set (e.g. count).
   public static final com.google.common.base.Predicate<Expr>

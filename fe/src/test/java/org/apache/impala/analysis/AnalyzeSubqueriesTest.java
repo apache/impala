@@ -324,18 +324,13 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
       AnalyzesOk(String.format("select id from functional.alltypestiny t where " +
           "int_col %s (select int_col from functional.alltypestiny t)", op));
 
-      // OR with subquery predicates
+      // OR with subquery predicates. Only a single subquery is supported.
       AnalysisError(String.format("select * from functional.alltypes t where t.id %s " +
-          "(select id from functional.alltypesagg) or t.bool_col = false", op),
-          String.format("Subqueries in OR predicates are not supported: t.id %s " +
-          "(SELECT id FROM functional.alltypesagg) OR t.bool_col = FALSE", op));
-      AnalysisError(String.format("select id from functional.allcomplextypes t where " +
-          "id %s " +
-          "(select f1 from t.struct_array_col a where t.int_struct_col.f1 < a.f1) " +
-          "or id < 10", op),
-          String.format("Subqueries in OR predicates are not supported: id %s " +
-          "(SELECT f1 FROM t.struct_array_col a WHERE t.int_struct_col.f1 < a.f1) " +
-          "OR id < 10", op));
+          "(select id from functional.alltypesagg) or t.int_col %s " +
+          "(select int_col from functional.alltypesagg)", op, op),
+          String.format("Multiple subqueries are not supported in expression: t.id %s " +
+          "(SELECT id FROM functional.alltypesagg) OR t.int_col %s " +
+          "(SELECT int_col FROM functional.alltypesagg)", op, op));
 
       // Binary predicate with non-comparable operands
       AnalysisError(String.format("select * from functional.alltypes t where " +
@@ -438,29 +433,6 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
           "t.id < 10 or not (t.int_col %s (select int_col from " +
           "functional.alltypesagg) and t.bool_col = false))", op));
     }
-
-    // Negated [NOT] IN subquery with disjunction.
-    AnalysisError("select * from functional.alltypes t where not (t.id in " +
-        "(select id from functional.alltypesagg) and t.int_col = 10)",
-        "Subqueries in OR predicates are not supported: t.id NOT IN " +
-        "(SELECT id FROM functional.alltypesagg) OR t.int_col != 10");
-    AnalysisError("select * from functional.alltypes t where not (t.id not in " +
-        "(select id from functional.alltypesagg) and t.int_col = 10)",
-        "Subqueries in OR predicates are not supported: t.id IN " +
-        "(SELECT id FROM functional.alltypesagg) OR t.int_col != 10");
-
-    // Exists subquery with disjunction.
-    AnalysisError("select * from functional.alltypes t where exists " +
-        "(select * from functional.alltypesagg g where g.bool_col = false) " +
-        "or t.bool_col = true", "Subqueries in OR predicates are not " +
-        "supported: EXISTS (SELECT * FROM functional.alltypesagg g WHERE " +
-        "g.bool_col = FALSE) OR t.bool_col = TRUE");
-
-    // Comparator-based subquery with disjunction.
-    AnalysisError("select * from functional.alltypes t where t.id = " +
-        "(select min(id) from functional.alltypesagg g) or t.id = 10",
-        "Subqueries in OR predicates are not supported: t.id = " +
-        "(SELECT min(id) FROM functional.alltypesagg g) OR t.id = 10");
   }
 
   @Test
@@ -592,7 +564,7 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
       AnalysisError(String.format("select * from functional.alltypestiny t where " +
           "%s (select * from functional.alltypesagg a where a.id = t.id) or %s " +
           "(select * from functional.alltypessmall s where s.int_col = t.int_col)", op,
-          op), String.format("Subqueries in OR predicates are not supported: %s " +
+          op), String.format("Multiple subqueries are not supported in expression: %s " +
           "(SELECT * FROM functional.alltypesagg a WHERE a.id = t.id) OR %s (SELECT " +
           "* FROM functional.alltypessmall s WHERE s.int_col = t.int_col)",
           op.toUpperCase(), op.toUpperCase()));
@@ -778,6 +750,200 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     AnalyzesOk("select int_col from functional.alltypestiny a where " +
         "not exists (select 1 as int_col from functional.alltypesagg b " +
         "where a.int_col = b.int_col)");
+
+    // TODO: IMPALA-9945: EXISTS subquery inside FunctionCallExpr results in
+    // IllegalStateException.
+    AnalysisError("select * from functional.alltypes t " +
+        "where nvl(exists(select id from functional.alltypesagg), false)",
+        "Failed analysis after expr substitution.");
+    // TODO: IMPALA-9945: EXISTS subquery inside CaseExpr results in
+    // IllegalStateException.
+    AnalysisError("select * from functional.alltypes t " +
+        "where case when id % 2 = 0 then exists(select id from functional.alltypesagg) " +
+        "end",
+        "Failed analysis after expr substitution.");
+  }
+
+  /**
+   * Test subqueries in an OR predicate. Most cases cannot be handled by the
+   * StmtRewriter and should fail in analysis - see IMPALA-5226.
+   */
+  @Test
+  public void TestDisjunctiveSubqueries() throws AnalysisException {
+    // Only a single IN subquery is supported. Multiple subquery error cases are tested
+    // in TestInSubqueries. We test the remaining cases here.
+
+    // Basic IN subquery.
+    AnalyzesOk("select * from functional.alltypes t where t.id IN " +
+        "(select id from functional.alltypesagg) or t.bool_col = false");
+
+    // IN subquery with unnesting of array.
+    AnalyzesOk("select id from functional.allcomplextypes t where id IN " +
+        "(select f1 from t.struct_array_col a where t.int_struct_col.f1 < a.f1) " +
+        "or id < 10");
+
+    // IN scalar subquery.
+    AnalyzesOk("select * from functional.alltypes where int_col > 10 or " +
+        "string_col in (select min(string_col) from functional.alltypestiny)");
+    AnalyzesOk("select * from functional.alltypes where int_col > 10 or " +
+        "string_col in (select min(string_col) from functional.alltypestiny " +
+        "having min(string_col) > 'abc')");
+
+    // Aggregate functions with GROUP BY not supported in disjunctive subquery.
+    AnalysisError("select * from functional.alltypes where int_col > 10 or " +
+        "string_col in (select min(string_col) from functional.alltypestiny " +
+        "group by int_col)",
+        "Aggregate functions in subquery in disjunction not supported: " +
+        "SELECT min(string_col) FROM functional.alltypestiny GROUP BY int_col");
+
+    // Aggregate functions in HAVING not supported in disjunctive subquery.
+    AnalysisError("select * from functional.alltypes where int_col > 10 or " +
+        "string_col in (select string_col from functional.alltypestiny " +
+        "group by string_col having min(int_col) > 1)",
+        "Aggregate functions in subquery in disjunction not supported: " +
+        "SELECT string_col FROM functional.alltypestiny GROUP BY string_col " +
+        "HAVING min(int_col) > 1");
+
+    // GROUP BY in subquery can be ignored if not aggregate function are present.
+    AnalyzesOk("select * from functional.alltypes t where t.id IN " +
+        "(select int_col from functional.alltypesagg group by int_col, string_col) " +
+        "or t.bool_col = false");
+    AnalyzesOk("select * from functional.alltypes t where t.id IN " +
+        "(select int_col from functional.alltypesagg group by int_col) " +
+        "or t.bool_col = false");
+
+    // DISTINCT in subquery should work.
+    AnalyzesOk("select * from functional.alltypes t where t.id IN " +
+        "(select distinct id from functional.alltypesagg) or t.bool_col = false");
+
+    // NOT IN, EXISTS and NOT EXISTS subqueries are not supported.
+    AnalysisError("select * from functional.alltypes t where t.id not in " +
+        "(select id from functional.alltypesagg) OR t.int_col = 10",
+        "NOT IN subqueries in OR predicates are not supported: t.id NOT IN " +
+        "(SELECT id FROM functional.alltypesagg) OR t.int_col = 10");
+    AnalysisError("select * from functional.alltypes t where exists (select 1 " +
+        "from functional.alltypesagg t2 where t.id = t2.id) OR t.int_col = 10",
+        "EXISTS/NOT EXISTS subqueries in OR predicates are not supported: EXISTS " +
+        "(SELECT 1 FROM functional.alltypesagg t2 WHERE t.id = t2.id) OR " +
+        "t.int_col = 10");
+
+    // Negated [NOT] IN subquery with disjunction. Only IN can be rewritten by the
+    // analyzer.
+    AnalysisError("select * from functional.alltypes t where not (t.id in " +
+        "(select id from functional.alltypesagg) and t.int_col = 10)",
+        "NOT IN subqueries in OR predicates are not supported: t.id NOT IN " +
+        "(SELECT id FROM functional.alltypesagg) OR t.int_col != 10");
+    AnalyzesOk("select * from functional.alltypes t where not (t.id not in " +
+        "(select id from functional.alltypesagg) and t.int_col = 10)");
+
+    // Comparator-based subqueries in disjunctions are supported for scalar subqueries
+    // but not runtime scalar subqueries.
+    AnalyzesOk("select * from functional.alltypes t where t.id = " +
+        "(select min(id) from functional.alltypesagg g) or t.id = 10");
+    AnalyzesOk("select * from functional.alltypes t where t.id = " +
+        "(select min(id) from functional.alltypesagg g where t.int_col = g.int_col) " +
+        "or t.id = 10");
+    AnalysisError("select * from functional.alltypes t where t.id = " +
+        "(select id from functional.alltypesagg g where t.int_col = g.int_col) " +
+        "or t.id = 10",
+        "Unsupported correlated subquery with runtime scalar check: SELECT id FROM " +
+        "functional.alltypesagg g WHERE t.int_col = g.int_col");
+
+    // OR predicates must be at top-level - can't be more deeply nested inside another
+    // predicate.
+    AnalysisError("select * from functional.alltypes " +
+        "where int_col > 10 = (string_col in ('a', 'b') or string_col in " +
+        "(select min(string_col) from functional.alltypestiny))",
+        "IN subquery predicates are not supported in binary predicates: int_col > 10 = " +
+        "(string_col IN ('a', 'b') OR string_col IN (SELECT min(string_col) " +
+        "FROM functional.alltypestiny))");
+
+    // IN subquery inside function call inside OR is supported.
+    AnalyzesOk("select * from functional.alltypes t " +
+        "where nvl(int_col in (select id from functional.alltypesagg), false) or id = 2");
+
+    // IN subquery inside case inside OR is supported.
+    AnalyzesOk("select * from functional.alltypes t " +
+        "where case when id % 2 = 0 then int_col in (" +
+        "   select id from functional.alltypesagg) end or id = 2");
+
+    // BETWEEN predicate is rewritten during analysis into inequality operators. The
+    // subquery rewriter cannot directly handle BETWEEN predicates, but should be able
+    // to handle the rewritten version of BETWEEN. Ensure this is handled correctly,
+    // with the same validations applied as other predicates.
+    AnalyzesOk("select int_col from functional.alltypes t " +
+        " where (t.int_col is null or (t.int_col between " +
+        "   (select min(int_col) from functional.alltypesagg t2 where t.year = t2.year)" +
+        "   and 2))");
+    AnalysisError("select int_col from functional.alltypes t " +
+        " where (t.int_col is null or (t.int_col between " +
+        "  (select min(int_col) from functional.alltypesagg t2 where t.year = t2.year) " +
+        "  and (select max(int_col) from functional.alltypesagg t3)))",
+        "Multiple subqueries are not supported in expression: (t.int_col IS NULL OR " +
+        "t.int_col >= (SELECT min(int_col) FROM functional.alltypesagg t2 WHERE " +
+        "t.`year` = t2.`year`) AND " +
+        "t.int_col <= (SELECT max(int_col) FROM functional.alltypesagg t3))");
+
+    // LIKE predicate can be converted into a join conjunct.
+    AnalyzesOk("select * from functional.alltypes t1 " +
+        "where string_col like (select min(string_col) from functional.alltypesagg t2 " +
+        " where t1.int_col = t2.int_col) or id = 2");
+
+    // OR predicates nested inside a different expr type should be rejected -
+    // the rewrite is only implemented for WHERE and HAVING conjuncts with OR
+    // at the top level. The different Expr subclasses should reject subqueries
+    // during analysis. We try to test all Expr subclasses that could contain
+    // a Subquery here. Note that many of these are also unsupported in general -
+    // i.e. even outside a disjunct.
+    // TODO: IMPALA-5226: support all of these that can be safely rewritten into
+    // joins.
+    // IsNullPredicate rejects nested subqueries.
+    AnalysisError("select * from functional.alltypes t " +
+        "where cast((t.id IN (select id from functional.alltypesagg) " +
+        "  or t.bool_col = false) as string) is not null ",
+        "Unsupported IS NULL predicate that contains a subquery: " +
+        "CAST((t.id IN (SELECT id FROM functional.alltypesagg) " +
+        "OR t.bool_col = FALSE) AS STRING) IS NOT NULL");
+    AnalysisError("select * from functional.alltypes t " +
+        "where cast((t.id IN (select id from functional.alltypesagg) " +
+        "  or t.bool_col = false) as string) is null ",
+        "Unsupported IS NULL predicate that contains a subquery: " +
+        "CAST((t.id IN (SELECT id FROM functional.alltypesagg) " +
+        "OR t.bool_col = FALSE) AS STRING) IS NULL");
+    // BinaryPredicate rejects nested subqueries.
+    AnalysisError("select * from functional.alltypes t " +
+        "where (t.id IN (select id from functional.alltypesagg) " +
+        "or t.bool_col = false) > 1",
+        "IN subquery predicates are not supported in binary predicates: " +
+        "(t.id IN (SELECT id FROM functional.alltypesagg) OR t.bool_col = FALSE) > 1");
+    // InPredicate rejects nested subqueries.
+    AnalysisError("select * from functional.alltypes t1 " +
+        "where id in (1, (select min(id) from functional.alltypesagg t2 " +
+        "where t1.int_col = t2.int_col)) or t1.bool_col = false",
+        "Unsupported IN predicate with a subquery: id IN 1, " +
+        "(SELECT min(id) FROM functional.alltypesagg t2 WHERE t1.int_col = t2.int_col)");
+
+    // Subquery that is argument of ArithmeticExpr inside OR is not supported.
+    AnalysisError("select * from functional.alltypes t1 " +
+        "where (select min(int_col) from functional.alltypesagg t2 " +
+        "       where t1.int_col = t2.int_col) % 2 = 0 or id = 1",
+        "Subqueries that are arguments to non-predicate exprs are not supported inside " +
+        "OR: (SELECT min(int_col) FROM functional.alltypesagg t2 " +
+        "WHERE t1.int_col = t2.int_col) % 2 = 0 OR id = 1");
+    // Subquery that is argument of TimestampArithmeticExpr inside OR is not supported.
+    AnalysisError("select * from functional.alltypes t1 " +
+        "where (select min(timestamp_col) from functional.alltypesagg t2 " +
+        "       where t1.int_col = t2.int_col) + interval 1 day > '2020-01-01' or id = 2",
+        "Subqueries that are arguments to non-predicate exprs are not supported inside " +
+        "OR: (SELECT min(timestamp_col) FROM functional.alltypesagg t2 " +
+        "WHERE t1.int_col = t2.int_col) + INTERVAL 1 day > '2020-01-01' OR id = 2");
+    // Subquery that is argument of CaseExpr inside OR is not supported.
+    AnalysisError("select * from functional.alltypes t " +
+        "where case when id % 2 = 0 then (" +
+        "   select bool_col from functional.alltypesagg) end or id = 2",
+        "Subqueries that are arguments to non-predicate exprs are not supported inside " +
+        "OR: CASE WHEN id % 2 = 0 THEN (" +
+        "SELECT bool_col FROM functional.alltypesagg) END OR id = 2");
   }
 
   @Test

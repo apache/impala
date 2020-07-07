@@ -3429,7 +3429,7 @@ PLAN-ROOT SINK
    HDFS partitions=11/11 files=11 size=814.73KB
    runtime filters: RF000 -> alltypesagg.id
    row-size=39B cardinality=11.00K
-=======
+====
 # IMPALA-9905 Cardinality Check for subqueries with grouping expressions and
 # scalar return types
 select bigint_col from functional.alltypes where int_col >=
@@ -3500,4 +3500,694 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
    row-size=12B cardinality=7.30K
+====
+# Basic IN subquery in disjunct.
+select * from functional.alltypes t
+where t.id IN (select id from functional.alltypesagg) or t.bool_col = false
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = id
+|  other predicates: id IS NOT NULL OR t.bool_col = FALSE
+|  row-size=93B cardinality=7.81K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: id
+|  |  row-size=4B cardinality=10.28K
+|  |
+|  01:SCAN HDFS [functional.alltypesagg]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=4B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: t.id = id
+|  other predicates: id IS NOT NULL OR t.bool_col = FALSE
+|  row-size=93B cardinality=7.81K
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  group by: id
+|  |  row-size=4B cardinality=10.28K
+|  |
+|  04:EXCHANGE [HASH(id)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  group by: id
+|  |  row-size=4B cardinality=10.28K
+|  |
+|  01:SCAN HDFS [functional.alltypesagg]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=4B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+====
+# IN subquery with unnesting of array in disjunct.
+select id from functional_parquet.complextypestbl t
+where id in (7, 9, 10) or
+  id + 1 IN (select item from t.int_array a where t.nested_struct.a < a.item)
+---- PLAN
+PLAN-ROOT SINK
+|
+01:SUBPLAN
+|  row-size=28B cardinality=unavailable
+|
+|--05:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  join predicates: t.nested_struct.a < item, item = id + 1
+|  |  predicates: id IN (7, 9, 10) OR item IS NOT NULL
+|  |  row-size=28B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=24B cardinality=1
+|  |
+|  04:AGGREGATE [FINALIZE]
+|  |  group by: item
+|  |  row-size=4B cardinality=10
+|  |
+|  03:UNNEST [t.int_array a]
+|     row-size=0B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypestbl t]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   row-size=24B cardinality=unavailable
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+01:SUBPLAN
+|  row-size=28B cardinality=unavailable
+|
+|--05:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  join predicates: t.nested_struct.a < item, item = id + 1
+|  |  predicates: id IN (7, 9, 10) OR item IS NOT NULL
+|  |  row-size=28B cardinality=10
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |     row-size=24B cardinality=1
+|  |
+|  04:AGGREGATE [FINALIZE]
+|  |  group by: item
+|  |  row-size=4B cardinality=10
+|  |
+|  03:UNNEST [t.int_array a]
+|     row-size=0B cardinality=10
+|
+00:SCAN HDFS [functional_parquet.complextypestbl t]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   row-size=24B cardinality=unavailable
+====
+# IN scalar subquery in disjunct.
+select * from functional.alltypes
+where int_col > 10 or
+    string_col in (
+    select min(string_col) from functional.alltypestiny
+    having min(string_col) > 'abc')
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: string_col = min(string_col)
+|  other predicates: int_col > 10 OR min(string_col) IS NOT NULL
+|  row-size=101B cardinality=7.30K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(string_col)
+|  |  having: min(string_col) > 'abc'
+|  |  row-size=12B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=13B cardinality=8
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: string_col = min(string_col)
+|  other predicates: int_col > 10 OR min(string_col) IS NOT NULL
+|  row-size=101B cardinality=7.30K
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: min:merge(string_col)
+|  |  having: min(string_col) > 'abc'
+|  |  row-size=12B cardinality=1
+|  |
+|  04:EXCHANGE [UNPARTITIONED]
+|  |
+|  02:AGGREGATE
+|  |  output: min(string_col)
+|  |  row-size=12B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=13B cardinality=8
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+====
+# Comparator-based subquery in disjunction.
+select * from functional.alltypes t
+where t.id = (select min(id) from functional.alltypesagg g) or t.id = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = min(id)
+|  other predicates: min(id) IS NOT NULL OR t.id = 10
+|  row-size=93B cardinality=7.30K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypesagg g]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=4B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: t.id = min(id)
+|  other predicates: min(id) IS NOT NULL OR t.id = 10
+|  row-size=93B cardinality=7.30K
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: min:merge(id)
+|  |  row-size=4B cardinality=1
+|  |
+|  04:EXCHANGE [UNPARTITIONED]
+|  |
+|  02:AGGREGATE
+|  |  output: min(id)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypesagg g]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=4B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+====
+# Comparator-based subquery with correlated predicate in disjunction.
+select * from functional.alltypes t
+where int_col % 2 = 0 or
+  t.id <= (select min(id) from functional.alltypesagg g where t.int_col = g.int_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.int_col = g.int_col
+|  other join predicates: t.id <= min(id)
+|  other predicates: int_col % 2 = 0 OR min(id) IS NOT NULL
+|  row-size=97B cardinality=83.91K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id)
+|  |  group by: g.int_col
+|  |  row-size=8B cardinality=957
+|  |
+|  01:SCAN HDFS [functional.alltypesagg g]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=8B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: t.int_col = g.int_col
+|  other join predicates: t.id <= min(id)
+|  other predicates: int_col % 2 = 0 OR min(id) IS NOT NULL
+|  row-size=97B cardinality=83.91K
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: min:merge(id)
+|  |  group by: g.int_col
+|  |  row-size=8B cardinality=957
+|  |
+|  04:EXCHANGE [HASH(g.int_col)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  output: min(id)
+|  |  group by: g.int_col
+|  |  row-size=8B cardinality=957
+|  |
+|  01:SCAN HDFS [functional.alltypesagg g]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=8B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+====
+# Subquery nested in a more complex expression that has an OR at the top level.
+# The subquery select lists includes an alias to test alias handling.
+select * from functional.alltypes
+where int_col > 10 or (
+    string_col in ('2', '4') and int_col > 0 and string_col in (
+        select min(string_col) the_min from functional.alltypestiny))
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: string_col = min(string_col)
+|  other predicates: int_col > 10 OR (string_col IN ('2', '4') AND int_col > 0 AND min(string_col) IS NOT NULL)
+|  row-size=101B cardinality=7.30K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(string_col)
+|  |  row-size=12B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=13B cardinality=8
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: string_col = min(string_col)
+|  other predicates: int_col > 10 OR (string_col IN ('2', '4') AND int_col > 0 AND min(string_col) IS NOT NULL)
+|  row-size=101B cardinality=7.30K
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: min:merge(string_col)
+|  |  row-size=12B cardinality=1
+|  |
+|  04:EXCHANGE [UNPARTITIONED]
+|  |
+|  02:AGGREGATE
+|  |  output: min(string_col)
+|  |  row-size=12B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=13B cardinality=8
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+====
+# Subquery in OR in having clause.
+select year, month, min(id)
+from functional.alltypes
+group by year, month
+having (year = 2010 and month > 11) or
+  min(id) in (select int_col from functional.alltypestiny)
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: min(id) = int_col
+|  other predicates: (`year` = 2010 AND `month` > 11) OR int_col IS NOT NULL
+|  row-size=16B cardinality=24
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  group by: int_col
+|  |  row-size=4B cardinality=2
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=4B cardinality=8
+|
+01:AGGREGATE [FINALIZE]
+|  output: min(id)
+|  group by: `year`, `month`
+|  row-size=12B cardinality=24
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+10:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: min(id) = int_col
+|  other predicates: (`year` = 2010 AND `month` > 11) OR int_col IS NOT NULL
+|  row-size=16B cardinality=24
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  group by: int_col
+|  |  row-size=4B cardinality=2
+|  |
+|  07:EXCHANGE [HASH(int_col)]
+|  |
+|  03:AGGREGATE [STREAMING]
+|  |  group by: int_col
+|  |  row-size=4B cardinality=2
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=4B cardinality=8
+|
+06:AGGREGATE [FINALIZE]
+|  output: min:merge(id)
+|  group by: `year`, `month`
+|  row-size=12B cardinality=24
+|
+05:EXCHANGE [HASH(`year`,`month`)]
+|
+01:AGGREGATE [STREAMING]
+|  output: min(id)
+|  group by: `year`, `month`
+|  row-size=12B cardinality=24
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=12B cardinality=7.30K
+====
+# Multiple conjuncts with subqueries with OR.
+select id from functional.alltypes t
+where (id % 1234 = 0 or
+  t.id <= (select min(id) from functional.alltypesagg g where t.int_col = g.int_col)) and
+  (id % 4321 = 0 or
+    t.id >= (select max(id) from functional.alltypesagg g where t.int_col = g.int_col))
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.int_col = g.int_col
+|  other join predicates: t.id >= max(id)
+|  other predicates: (id % 4321 = 0 OR max(id) IS NOT NULL)
+|  row-size=24B cardinality=964.46K
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  output: max(id)
+|  |  group by: g.int_col
+|  |  row-size=8B cardinality=957
+|  |
+|  03:SCAN HDFS [functional.alltypesagg g]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=8B cardinality=11.00K
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.int_col = g.int_col
+|  other join predicates: t.id <= min(id)
+|  other predicates: (id % 1234 = 0 OR min(id) IS NOT NULL)
+|  row-size=16B cardinality=83.91K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id)
+|  |  group by: g.int_col
+|  |  row-size=8B cardinality=957
+|  |
+|  01:SCAN HDFS [functional.alltypesagg g]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=8B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+13:EXCHANGE [UNPARTITIONED]
+|
+06:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: t.int_col = g.int_col
+|  other join predicates: t.id >= max(id)
+|  other predicates: (id % 4321 = 0 OR max(id) IS NOT NULL)
+|  row-size=24B cardinality=964.46K
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  11:AGGREGATE [FINALIZE]
+|  |  output: max:merge(id)
+|  |  group by: g.int_col
+|  |  row-size=8B cardinality=957
+|  |
+|  10:EXCHANGE [HASH(g.int_col)]
+|  |
+|  04:AGGREGATE [STREAMING]
+|  |  output: max(id)
+|  |  group by: g.int_col
+|  |  row-size=8B cardinality=957
+|  |
+|  03:SCAN HDFS [functional.alltypesagg g]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=8B cardinality=11.00K
+|
+05:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: t.int_col = g.int_col
+|  other join predicates: t.id <= min(id)
+|  other predicates: (id % 1234 = 0 OR min(id) IS NOT NULL)
+|  row-size=16B cardinality=83.91K
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  output: min:merge(id)
+|  |  group by: g.int_col
+|  |  row-size=8B cardinality=957
+|  |
+|  07:EXCHANGE [HASH(g.int_col)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  output: min(id)
+|  |  group by: g.int_col
+|  |  row-size=8B cardinality=957
+|  |
+|  01:SCAN HDFS [functional.alltypesagg g]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=8B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
+====
+# Correlated subquery in BETWEEN in OR rewritten to LOJ.
+select int_col from functional.alltypes t
+where (t.int_col is null or
+      (t.int_col between
+          (select min(int_col) from functional.alltypesagg t2 where t.year = t2.year)
+          and 2))
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.`year` = t2.`year`
+|  other join predicates: t.int_col >= min(int_col)
+|  other predicates: (t.int_col IS NULL OR min(int_col) IS NOT NULL AND t.int_col <= 2)
+|  row-size=16B cardinality=7.30K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(int_col)
+|  |  group by: t2.`year`
+|  |  row-size=8B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypesagg t2]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=8B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: t.`year` = t2.`year`
+|  other join predicates: t.int_col >= min(int_col)
+|  other predicates: (t.int_col IS NULL OR min(int_col) IS NOT NULL AND t.int_col <= 2)
+|  row-size=16B cardinality=7.30K
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: min:merge(int_col)
+|  |  group by: t2.`year`
+|  |  row-size=8B cardinality=1
+|  |
+|  04:EXCHANGE [HASH(t2.`year`)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  output: min(int_col)
+|  |  group by: t2.`year`
+|  |  row-size=8B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypesagg t2]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=8B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
+====
+# Uncorrelated subquery in BETWEEN in OR rewritten to INNER JOIN.
+select int_col from functional.alltypes t
+where (t.int_col is null or
+      (t.int_col between
+          (select min(int_col) from functional.alltypesagg t2)
+          and 2))
+---- PLAN
+PLAN-ROOT SINK
+|
+03:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: t.int_col >= min(int_col), (t.int_col IS NULL OR min(int_col) IS NOT NULL AND t.int_col <= 2)
+|  row-size=8B cardinality=7.30K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(int_col)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypesagg t2]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=4B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  predicates: t.int_col >= min(int_col), (t.int_col IS NULL OR min(int_col) IS NOT NULL AND t.int_col <= 2)
+|  row-size=8B cardinality=7.30K
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: min:merge(int_col)
+|  |  row-size=4B cardinality=1
+|  |
+|  04:EXCHANGE [UNPARTITIONED]
+|  |
+|  02:AGGREGATE
+|  |  output: min(int_col)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypesagg t2]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=4B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
+====
+# LIKE predicate with subquerycan be rewritten into LEFT OUTER JOIN
+select * from functional.alltypes t1
+where id = 2 or string_col like (
+    select min(string_col)
+    from functional.alltypesagg t2
+    where t1.int_col = t2.int_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.int_col = t2.int_col
+|  other join predicates: string_col LIKE min(string_col)
+|  other predicates: id = 2 OR min(string_col) IS NOT NULL
+|  row-size=105B cardinality=83.91K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(string_col)
+|  |  group by: t2.int_col
+|  |  row-size=16B cardinality=957
+|  |
+|  01:SCAN HDFS [functional.alltypesagg t2]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=19B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+====
+# IN Subquery inside function call (NVL) can be rewritten into LEFT OUTER JOIN
+select * from functional.alltypes t
+where nvl(int_col in (select id from functional.alltypesagg), false) or id = 2
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: int_col = id
+|  other predicates: nvl(id IS NOT NULL, FALSE) OR id = 2
+|  row-size=93B cardinality=7.81K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: id
+|  |  row-size=4B cardinality=10.28K
+|  |
+|  01:SCAN HDFS [functional.alltypesagg]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=4B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
+====
+# IN Subquery inside case expr can be rewritten into LEFT OUTER JOIN
+select * from functional.alltypes t
+where bigint_col = 2 or
+      case when bigint_col % 2 = 0
+        then int_col in (select id from functional.alltypesagg)
+      end
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: int_col = id
+|  other predicates: bigint_col = 2 OR CASE WHEN bigint_col % 2 = 0 THEN id IS NOT NULL END
+|  row-size=93B cardinality=7.81K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: id
+|  |  row-size=4B cardinality=10.28K
+|  |
+|  01:SCAN HDFS [functional.alltypesagg]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=4B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
