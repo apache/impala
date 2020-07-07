@@ -187,6 +187,16 @@ public class SelectStmt extends QueryStmt {
     groupingExprs_.addAll(addtlGroupingExprs);
   }
 
+  /**
+   * Remove the group by clause. Used by StmtRewriter. This changes the semantics
+   * of this statement and should only be called when the query is being rewritten
+   * in a way such that the GROUP BY is *not* required for correctness.
+   */
+  protected void removeGroupBy() {
+    groupByClause_ = null;
+    groupingExprs_ = null;
+  }
+
   // Column alias generator used during query rewriting.
   private ColumnAliasGenerator columnAliasGenerator_ = null;
   public ColumnAliasGenerator getColumnAliasGenerator() {
@@ -670,13 +680,7 @@ public class SelectStmt extends QueryStmt {
     }
 
     private boolean checkForAggregates() throws AnalysisException {
-      if (groupingExprs_ == null && !selectList_.isDistinct()
-          && !TreeNode.contains(resultExprs_, Expr.IS_AGGREGATE)
-          && (havingPred_ == null
-              || !havingPred_.contains(Expr.IS_AGGREGATE))
-          && (sortInfo_ == null
-              || !TreeNode.contains(sortInfo_.getSortExprs(),
-                                    Expr.IS_AGGREGATE))) {
+      if (!hasAggregate(/*includeDistinct=*/ true)) {
         // We're not computing aggregates but we still need to register the HAVING
         // clause which could, e.g., contain a constant expression evaluating to false.
         if (havingPred_ != null) analyzer_.registerConjuncts(havingPred_, true);
@@ -1357,5 +1361,18 @@ public class SelectStmt extends QueryStmt {
     }
     // In all other cases, return false.
     return false;
+  }
+
+  /**
+   * @param includeDistinct if true, a distinct in the select list is counted
+   *    as requiring an aggregation
+   * @returns true if query block has an aggregate function or grouping.
+   */
+  public boolean hasAggregate(boolean includeDistinct) throws AnalysisException {
+    return groupingExprs_ != null || (includeDistinct && selectList_.isDistinct()) ||
+          TreeNode.contains(resultExprs_, Expr.IS_AGGREGATE) ||
+          (havingPred_ != null && havingPred_.contains(Expr.IS_AGGREGATE)) ||
+          (sortInfo_ != null &&
+           TreeNode.contains(sortInfo_.getSortExprs(), Expr.IS_AGGREGATE));
   }
 }

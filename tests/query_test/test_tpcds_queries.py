@@ -447,6 +447,9 @@ class TestTpcdsDecimalV2Query(ImpalaTestSuite):
   def test_tpcds_q43(self, vector):
     self.run_test_case(self.get_workload() + '-decimal_v2-q43', vector)
 
+  def test_tpcds_q45(self, vector):
+    self.run_test_case(self.get_workload() + '-decimal_v2-q45', vector)
+
   def test_tpcds_q46(self, vector):
     self.run_test_case(self.get_workload() + '-decimal_v2-q46', vector)
 

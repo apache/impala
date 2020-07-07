@@ -1317,3 +1317,104 @@ select id, sum(int_col) from alltypestiny where
 ---- CATCH
 Subquery must not return more than one row:
 ====
+---- QUERY
+# Basic IN subquery in OR predicate.
+# Crafted so that each branch of the OR matches a handful of rows.
+select id, timestamp_col from alltypes
+where (timestamp_col between '2009-04-13' and '2009-04-14') or
+    id in (select int_col from alltypestiny)
+---- TYPES
+INT, TIMESTAMP
+---- RESULTS
+0,2009-01-01 00:00:00
+1,2009-01-01 00:01:00
+1020,2009-04-13 02:00:05.400000000
+1021,2009-04-13 02:01:05.400000000
+1022,2009-04-13 02:02:05.410000000
+1023,2009-04-13 02:03:05.430000000
+1024,2009-04-13 02:04:05.460000000
+1025,2009-04-13 02:05:05.500000000
+1026,2009-04-13 02:06:05.550000000
+1027,2009-04-13 02:07:05.610000000
+1028,2009-04-13 02:08:05.680000000
+1029,2009-04-13 02:09:05.760000000
+---- DBAPI_RESULTS
+0,2009-01-01 00:00:00
+1,2009-01-01 00:01:00
+1020,2009-04-13 02:00:05.400000
+1021,2009-04-13 02:01:05.400000
+1022,2009-04-13 02:02:05.410000
+1023,2009-04-13 02:03:05.430000
+1024,2009-04-13 02:04:05.460000
+1025,2009-04-13 02:05:05.500000
+1026,2009-04-13 02:06:05.550000
+1027,2009-04-13 02:07:05.610000
+1028,2009-04-13 02:08:05.680000
+1029,2009-04-13 02:09:05.760000
+====
+---- QUERY
+# Subquery in OR predicate inside non-trivial expression.
+# Crafted so that each branch of the OR matches a few rows.
+select year, id, int_col, string_col, date_string_col
+from alltypes
+where (int_col = 9 and date_string_col > '12/31/00') or
+  (year = 2010 and date_string_col > '12/28/10' and
+    string_col in (select min(string_col) from alltypestiny))
+---- TYPES
+INT, INT, INT, STRING, STRING
+---- RESULTS
+2009,3649,9,'9','12/31/09'
+2010,7270,0,'0','12/29/10'
+2010,7280,0,'0','12/30/10'
+2010,7290,0,'0','12/31/10'
+2010,7299,9,'9','12/31/10'
+====
+---- QUERY
+# Subquery in HAVING clause.
+# Crafted so that each branch of the OR matches one row.
+select year, month, min(id)
+from alltypes
+group by year, month
+having (year = 2010 and month > 11) or
+  min(id) in (select int_col from alltypestiny)
+---- TYPES
+INT, INT, INT
+---- RESULTS
+2010,12,6990
+2009,1,0
+====
+---- QUERY
+# Comparator-based subquery with correlated predicate in disjunction.
+select id from alltypes t
+where id % 1234 = 0 or
+   t.id <= (select min(id) from alltypesagg g where t.int_col = g.int_col)
+---- TYPES
+INT
+---- RESULTS
+6170
+2468
+4936
+1234
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+3702
+====
+---- QUERY
+# Subquery that only returns NULL values. The IN predicate should always
+# evaluate to false in this case, because the hand-picked values have a null 'int_col'.
+select id, int_col from functional.alltypes t
+where t.id = 42 or t.int_col IN (
+  select int_col from functional.alltypesagg where id in (1000,2000,3000,4000))
+---- TYPES
+INT, INT
+---- RESULTS
+42,2
+====
