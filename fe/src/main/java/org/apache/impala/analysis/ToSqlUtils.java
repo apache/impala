@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.antlr.runtime.ANTLRStringStream;
+import org.antlr.runtime.RecognitionException;
 import org.antlr.runtime.Token;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.ObjectUtils;
@@ -51,6 +52,8 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.KuduUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
@@ -66,6 +69,8 @@ import com.google.common.collect.Maps;
  * for creating identifier strings that are compatible with Hive or Impala.
  */
 public class ToSqlUtils {
+  private final static Logger LOG = LoggerFactory.getLogger(ToSqlUtils.class);
+
   // Table properties to hide when generating the toSql() statement
   // EXTERNAL, SORT BY [order], and comment are hidden because they are part of the
   // toSql result, e.g.,
@@ -142,7 +147,16 @@ public class ToSqlUtils {
     // So, do the check on an upper-case version of the identifier.
     // Hive uses ANTLRNoCaseStringStream to upper-case text, but that
     // class is a non-static inner class so we can't use it here.
-    HiveLexer hiveLexer = new HiveLexer(new ANTLRStringStream(ident.toUpperCase()));
+    // Overrides HiveLexer to print error messages to TRACE level logs (see IMPALA-9921).
+    HiveLexer hiveLexer = new HiveLexer(new ANTLRStringStream(ident.toUpperCase())) {
+      @Override
+      public void displayRecognitionError(String[] tokenNames, RecognitionException e) {
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Error in checking needsQuotes using HiveLexer {}: {}",
+              getErrorHeader(e), getErrorMessage(e, tokenNames));
+        }
+      }
+    };
     try {
       Token t = hiveLexer.nextToken();
       // Check that the lexer recognizes an identifier and then EOF.
