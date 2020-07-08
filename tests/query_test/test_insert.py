@@ -19,6 +19,7 @@
 
 import os
 import pytest
+import re
 
 from testdata.common import widetable
 from tests.common.impala_cluster import ImpalaCluster
@@ -349,3 +350,79 @@ class TestInsertFileExtension(ImpalaTestSuite):
     for path in self.filesystem_client.ls("test-warehouse/{0}.db/{1}".format(
         unique_database, table_name)):
       if not path.startswith('_'): assert path.endswith(file_extension)
+
+
+class TestInsertHdfsWriterLimit(ImpalaTestSuite):
+  """Test to make sure writer fragment instances are distributed evenly when using max
+      hdfs_writers query option."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestInsertHdfsWriterLimit, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        (v.get_value('table_format').file_format == 'parquet'))
+
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  def test_insert_writer_limit(self, unique_database):
+    # Root internal (non-leaf) fragment.
+    query = "create table {0}.test1 as select int_col from " \
+            "functional_parquet.alltypes".format(unique_database)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=2, mt_dop=0,
+                                           expected_num_instances_per_host=[1, 2, 2])
+    # Root coordinator fragment.
+    query = "create table {0}.test2 as select int_col from " \
+            "functional_parquet.alltypes limit 100000".format(unique_database)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=2, mt_dop=0,
+                                           expected_num_instances_per_host=[1, 1, 2])
+    # Root scan fragment. Instance count within limit.
+    query = "create table {0}.test3 as select int_col from " \
+            "functional_parquet.alltypes".format(unique_database)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=4, mt_dop=0,
+                                           expected_num_instances_per_host=[1, 1, 1])
+
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  def test_mt_dop_writer_limit(self, unique_database):
+    # Root internal (non-leaf) fragment.
+    query = "create table {0}.test1 as select int_col from " \
+            "functional_parquet.alltypes".format(unique_database)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=11, mt_dop=10,
+                                           expected_num_instances_per_host=[11, 12, 12])
+    # Root coordinator fragment.
+    query = "create table {0}.test2 as select int_col from " \
+            "functional_parquet.alltypes limit 100000".format(unique_database)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=2, mt_dop=10,
+                                           expected_num_instances_per_host=[8, 8, 9])
+    # Root scan fragment. Instance count within limit.
+    query = "create table {0}.test3 as select int_col from " \
+            "functional_parquet.alltypes".format(unique_database)
+    self.__run_insert_and_verify_instances(query, max_fs_writers=30, mt_dop=10,
+                                           expected_num_instances_per_host=[8, 8, 8])
+
+  def __run_insert_and_verify_instances(self, query, max_fs_writers, mt_dop,
+                                        expected_num_instances_per_host):
+    self.client.set_configuration_option("max_fs_writers", max_fs_writers)
+    self.client.set_configuration_option("mt_dop", mt_dop)
+    # Test depends on both planner and scheduler to see the same state of the cluster
+    # having 3 executors, so to reduce flakiness we make sure all 3 executors are up
+    # and running.
+    self.impalad_test_service.wait_for_metric_value("cluster-membership.backends.total",
+                                                    3)
+    result = self.client.execute(query)
+    assert 'HDFS WRITER' in result.exec_summary[0]['operator'], result.runtime_profile
+    assert int(result.exec_summary[0]['num_instances']) <= int(
+      max_fs_writers), result.runtime_profile
+    regex = r'Per Host Number of Fragment Instances' \
+            r':.*?\((.*?)\).*?\((.*?)\).*?\((.*?)\).*?\n'
+    matches = re.findall(regex, result.runtime_profile)
+    assert len(matches) == 1 and len(matches[0]) == 3, result.runtime_profile
+    num_instances_per_host = [int(i) for i in matches[0]]
+    num_instances_per_host.sort()
+    expected_num_instances_per_host.sort()
+    assert num_instances_per_host == expected_num_instances_per_host, \
+      result.runtime_profile
+    self.client.clear_configuration()

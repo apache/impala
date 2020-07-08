@@ -398,6 +398,10 @@ class Scheduler {
 
   /// For each instance of fragment_state's input fragment, create a collocated
   /// instance for fragment_state's fragment.
+  /// Also enforces an upper limit on the number of instances in case this fragment_state
+  /// has an HDFS table writer and the MAX_FS_WRITERS query option is non zero. This
+  /// upper limit is enforced by doing a round robin assignment of instances among all the
+  /// hosts that would run the input fragment.
   /// Expects that fragment_state only has a single input fragment.
   void CreateInputCollocatedInstances(
       FragmentScheduleState* fragment_state, ScheduleState* state);

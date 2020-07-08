@@ -372,6 +372,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       // the destination join node. ParallelPlanner sets the destination fragment when
       // adding the JoinBuildSink.
       return ((JoinBuildSink)sink_).getNumNodes();
+    } else if (sink_ instanceof HdfsTableSink) {
+      return ((HdfsTableSink)sink_).getNumNodes();
     } else {
       return planRoot_.getNumNodes();
     }
@@ -402,6 +404,8 @@ public class PlanFragment extends TreeNode<PlanFragment> {
       // join. ParallelPlanner sets the destination fragment when adding the
       // JoinBuildSink.
       return ((JoinBuildSink)sink_).getNumInstances();
+    } else if (sink_ instanceof HdfsTableSink) {
+      return ((HdfsTableSink)sink_).getNumInstances();
     } else {
       return planRoot_.getNumInstances();
     }
