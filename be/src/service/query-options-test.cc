@@ -254,6 +254,7 @@ TEST(QueryOptions, SetIntOptions) {
       {MAKE_OPTIONDEF(statement_expression_limit),
           {MIN_STATEMENT_EXPRESSION_LIMIT, I32_MAX}},
       {MAKE_OPTIONDEF(max_cnf_exprs),                  {-1, I32_MAX}},
+      {MAKE_OPTIONDEF(max_fs_writers),                 {0, I32_MAX}},
   };
   for (const auto& test_case : case_set) {
     const OptionDef<int32_t>& option_def = test_case.first;

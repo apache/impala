@@ -75,10 +75,14 @@ public class HdfsTableSink extends TableSink {
   // Stores the allocated write id if the target table is transactional, otherwise -1.
   private long writeId_;
 
+  // Set the limit on the maximum number of hdfs table sink instances.
+  // A value of 0 means no limit.
+  private int maxHdfsSinks_;
+
   public HdfsTableSink(FeTable targetTable, List<Expr> partitionKeyExprs,
-      List<Expr> outputExprs,
-      boolean overwrite, boolean inputIsClustered,
-      Pair<List<Integer>, TSortingOrder> sortProperties, long writeId) {
+      List<Expr> outputExprs, boolean overwrite, boolean inputIsClustered,
+      Pair<List<Integer>, TSortingOrder> sortProperties, long writeId,
+      int maxTableSinks) {
     super(targetTable, Op.INSERT, outputExprs);
     Preconditions.checkState(targetTable instanceof FeFsTable);
     partitionKeyExprs_ = partitionKeyExprs;
@@ -87,6 +91,7 @@ public class HdfsTableSink extends TableSink {
     sortColumns_ = sortProperties.first;
     sortingOrder_ = sortProperties.second;
     writeId_ = writeId;
+    maxHdfsSinks_ = maxTableSinks;
   }
 
   @Override
@@ -227,5 +232,33 @@ public class HdfsTableSink extends TableSink {
     exprs.addAll(partitionKeyExprs_);
     // Avoid adding any partition exprs redundantly.
     exprs.addAll(outputExprs_.subList(0, targetTable_.getNonClusteringColumns().size()));
+  }
+
+  /**
+   * Return an estimate of the number of nodes the fragment with this sink will
+   * run on. This is based on the number of nodes set for the plan root and has an
+   * upper limit set by the MAX_HDFS_WRITER query option.
+   */
+  public int getNumNodes() {
+    int num_nodes = getFragment().getPlanRoot().getNumNodes();
+    if (maxHdfsSinks_ > 0) {
+      // If there are more nodes than instances where the fragment was initially
+      // planned to run then, then the instances will be distributed evenly across them.
+      num_nodes = Math.min(num_nodes, getNumInstances());
+    }
+    return num_nodes;
+  }
+
+  /**
+   * Return an estimate of the number of instances the fragment with this sink
+   * will run on. This is based on the number of instances set for the plan root
+   * and has an upper limit set by the MAX_HDFS_WRITER query option.
+   */
+  public int getNumInstances() {
+    int num_instances = getFragment().getPlanRoot().getNumInstances();
+    if (maxHdfsSinks_ > 0) {
+      num_instances =  Math.min(num_instances, maxHdfsSinks_);
+    }
+    return num_instances;
   }
 }

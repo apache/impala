@@ -480,6 +480,15 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
       }
     }
   }
+  if (fragment.output_sink.__isset.table_sink
+      && fragment.output_sink.table_sink.__isset.hdfs_table_sink
+      && state->query_options().max_fs_writers > 0
+      && fragment_state->instance_states.size() > state->query_options().max_fs_writers) {
+    LOG(WARNING) << "Extra table sink instances scheduled, probably due to mismatch of "
+                    "cluster state during planning vs scheduling. Expected: "
+                 << state->query_options().max_fs_writers
+                 << " Found: " << fragment_state->instance_states.size();
+  }
 }
 
 vector<vector<ScanRangeParamsPB>> Scheduler::AssignRangesToInstances(
@@ -503,15 +512,46 @@ vector<vector<ScanRangeParamsPB>> Scheduler::AssignRangesToInstances(
 void Scheduler::CreateInputCollocatedInstances(
     FragmentScheduleState* fragment_state, ScheduleState* state) {
   DCHECK_GE(fragment_state->exchange_input_fragments.size(), 1);
+  const TPlanFragment& fragment = fragment_state->fragment;
   const FragmentScheduleState& input_fragment_state =
       *state->GetFragmentScheduleState(fragment_state->exchange_input_fragments[0]);
   int per_fragment_instance_idx = 0;
-  for (const FInstanceScheduleState& input_instance_state :
-      input_fragment_state.instance_states) {
-    UniqueIdPB instance_id = state->GetNextInstanceId();
-    fragment_state->instance_states.emplace_back(instance_id, input_instance_state.host,
-        input_instance_state.krpc_host, per_fragment_instance_idx++, *fragment_state);
-    *fragment_state->exec_params->add_instances() = instance_id;
+
+  if (fragment.output_sink.__isset.table_sink
+      && fragment.output_sink.table_sink.__isset.hdfs_table_sink
+      && state->query_options().max_fs_writers > 0
+      && input_fragment_state.instance_states.size()
+          > state->query_options().max_fs_writers) {
+    std::unordered_set<std::pair<NetworkAddressPB, NetworkAddressPB>> all_hosts;
+    for (const FInstanceScheduleState& input_instance_state :
+        input_fragment_state.instance_states) {
+      all_hosts.insert({input_instance_state.host, input_instance_state.krpc_host});
+    }
+    // This implementation creates the desired number of instances while balancing them
+    // across hosts and ensuring that instances on the same host get consecutive instance
+    // indexes.
+    int num_hosts = all_hosts.size();
+    int max_instances = state->query_options().max_fs_writers;
+    int instances_per_host = max_instances / num_hosts;
+    int remainder = max_instances % num_hosts;
+    auto host_itr = all_hosts.begin();
+    for (int i = 0; i < num_hosts; i++) {
+      for (int j = 0; j < instances_per_host + (i < remainder); ++j) {
+        UniqueIdPB instance_id = state->GetNextInstanceId();
+        fragment_state->instance_states.emplace_back(instance_id, host_itr->first,
+            host_itr->second, per_fragment_instance_idx++, *fragment_state);
+        *fragment_state->exec_params->add_instances() = instance_id;
+      }
+      if (host_itr != all_hosts.end()) host_itr++;
+    }
+  } else {
+    for (const FInstanceScheduleState& input_instance_state :
+        input_fragment_state.instance_states) {
+      UniqueIdPB instance_id = state->GetNextInstanceId();
+      fragment_state->instance_states.emplace_back(instance_id, input_instance_state.host,
+          input_instance_state.krpc_host, per_fragment_instance_idx++, *fragment_state);
+      *fragment_state->exec_params->add_instances() = instance_id;
+    }
   }
 }
 

@@ -27,15 +27,18 @@ import org.apache.impala.analysis.InsertStmt;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.MultiAggregateInfo.AggPhase;
 import org.apache.impala.analysis.QueryStmt;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
+import org.apache.impala.thrift.TPartitionType;
 import org.apache.impala.util.KuduUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 
 /**
@@ -174,22 +177,24 @@ public class DistributedPlanner {
   }
 
   /**
-   * Decides whether to repartition the output of 'inputFragment' before feeding its
-   * data into the table sink of the given 'insertStmt'. The decision obeys the
-   * shuffle/noshuffle plan hints if present. Otherwise, returns a plan fragment that
-   * partitions the output of 'inputFragment' on the partition exprs of 'insertStmt',
-   * unless the expected number of partitions is less than the number of nodes on which
-   * inputFragment runs, or the target table is unpartitioned.
-   * For inserts into unpartitioned tables or inserts with only constant partition exprs,
-   * the shuffle hint leads to a plan that merges all rows at the coordinator where
-   * the table sink is executed.
-   * If this functions ends up creating a new fragment, appends that to 'fragments'.
+   * Decides whether to repartition the output of 'inputFragment' before feeding
+   * its data into the table sink of the given 'insertStmt'. The decision obeys
+   * the shuffle/noshuffle plan hints if present unless MAX_FS_WRITERS query
+   * option is used where the noshuffle hint is ignored. The decision is based on
+   * a number of factors including, whether the target table is partitioned or
+   * unpartitioned, the input fragment and the target table's partition
+   * expressions, expected number of output partitions, num of nodes on which the
+   * input partition will run, whether MAX_FS_WRITERS query option is used. If
+   * this functions ends up creating a new fragment, appends that to 'fragments'.
    */
   public PlanFragment createInsertFragment(
       PlanFragment inputFragment, InsertStmt insertStmt, Analyzer analyzer,
       List<PlanFragment> fragments)
       throws ImpalaException {
-    if (insertStmt.hasNoShuffleHint()) return inputFragment;
+    boolean enforce_hdfs_writer_limit = insertStmt.getTargetTable() instanceof FeFsTable
+        && analyzer.getQueryOptions().getMax_fs_writers() > 0;
+
+    if (insertStmt.hasNoShuffleHint() && !enforce_hdfs_writer_limit) return inputFragment;
 
     List<Expr> partitionExprs = Lists.newArrayList(insertStmt.getPartitionKeyExprs());
     // Ignore constants for the sake of partitioning.
@@ -200,10 +205,21 @@ public class DistributedPlanner {
     DataPartition inputPartition = inputFragment.getDataPartition();
     if (!partitionExprs.isEmpty()
         && analyzer.setsHaveValueTransfer(inputPartition.getPartitionExprs(),
-        partitionExprs, true)
-        && !(insertStmt.getTargetTable() instanceof FeKuduTable)) {
+            partitionExprs, true)
+        && !(insertStmt.getTargetTable() instanceof FeKuduTable)
+        && !enforce_hdfs_writer_limit) {
       return inputFragment;
     }
+
+    int maxHdfsWriters = analyzer.getQueryOptions().getMax_fs_writers();
+    // We also consider fragments containing union nodes along with scan fragments
+    // (leaf fragments) since they are either a part of those scan fragments or are
+    // co-located with them to maintain parallelism.
+    List<ScanNode> hdfsScanORUnionNodes = Lists.newArrayList();
+    inputFragment.collectPlanNodes(Predicates.instanceOf(HdfsScanNode.class),
+        hdfsScanORUnionNodes);
+    inputFragment.collectPlanNodes(Predicates.instanceOf(UnionNode.class),
+        hdfsScanORUnionNodes);
 
     // Make a cost-based decision only if no user hint was supplied.
     if (!insertStmt.hasShuffleHint()) {
@@ -213,12 +229,27 @@ public class DistributedPlanner {
         // TODO: make a more sophisticated decision here for partitioned tables and when
         // we have info about tablet locations.
         if (partitionExprs.isEmpty()) return inputFragment;
-      } else {
+      } else if (!enforce_hdfs_writer_limit || hdfsScanORUnionNodes.size() == 0
+          || inputFragment.getNumInstances() <= maxHdfsWriters) {
+        // Only consider skipping the addition of an exchange node if
+        // 1. The hdfs writer limit does not apply
+        // 2. Writer limit applies and there are no hdfs scan or union nodes. In this
+        //    case we will restrict the number of instances of this internal fragment.
+        // 3. Writer limit applies and there is a scan node or union node, but its num
+        //    of instances are already under the writer limit.
+        // Basically covering all cases where we don't mind restricting the parallelism
+        // of their instances.
+        int input_instances = inputFragment.getNumInstances();
+        if (enforce_hdfs_writer_limit && hdfsScanORUnionNodes.size() == 0) {
+          // For an internal fragment we enforce an upper limit based on the
+          // MAX_FS_WRITER query option.
+          input_instances = Math.min(input_instances, maxHdfsWriters);
+        }
         // If the existing partition exprs are a subset of the table partition exprs,
         // check if it is distributed across all nodes. If so, don't repartition.
         if (Expr.isSubset(inputPartition.getPartitionExprs(), partitionExprs)) {
           long numPartitions = getNumDistinctValues(inputPartition.getPartitionExprs());
-          if (numPartitions >= inputFragment.getNumNodes()) {
+          if (numPartitions >= input_instances) {
             return inputFragment;
           }
         }
@@ -231,8 +262,8 @@ public class DistributedPlanner {
         // size in the particular file format of the output table/partition.
         // We should always know on how many nodes our input is running.
         long numPartitions = getNumDistinctValues(partitionExprs);
-        Preconditions.checkState(inputFragment.getNumNodes() != -1);
-        if (numPartitions > 0 && numPartitions <= inputFragment.getNumNodes()) {
+        Preconditions.checkState(inputFragment.getNumInstances() != -1);
+        if (numPartitions > 0 && numPartitions <= input_instances) {
           return inputFragment;
         }
       }
@@ -244,7 +275,14 @@ public class DistributedPlanner {
     Preconditions.checkState(exchNode.hasValidStats());
     DataPartition partition;
     if (partitionExprs.isEmpty()) {
-      partition = DataPartition.UNPARTITIONED;
+      if (enforce_hdfs_writer_limit
+          && inputFragment.getDataPartition().getType() == TPartitionType.RANDOM) {
+        // This ensures the parallelism of the writers is maintained while maintaining
+        // legacy behavior(when not using MAX_FS_WRITER query option).
+        partition = DataPartition.RANDOM;
+      } else {
+        partition = DataPartition.UNPARTITIONED;
+      }
     } else if (insertStmt.getTargetTable() instanceof FeKuduTable) {
       partition = DataPartition.kuduPartitioned(
           KuduUtil.createPartitionExpr(insertStmt, ctx_.getRootAnalyzer()));

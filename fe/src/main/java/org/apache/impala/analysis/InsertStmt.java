@@ -117,6 +117,10 @@ public class InsertStmt extends StatementBase {
   // Set in analyze(). Contains metadata of target table to determine type of sink.
   private FeTable table_;
 
+  // Set in analyze(). Set the limit on the maximum number of table sink instances.
+  // A value of 0 means no limit.
+  private int maxTableSinks_ = 0;
+
   // Set in analyze(). Exprs correspond to the partitionKeyValues, if specified, or to
   // the partition columns for Kudu tables.
   private List<Expr> partitionKeyExprs_ = new ArrayList<>();
@@ -496,6 +500,7 @@ public class InsertStmt extends StatementBase {
     }
 
     if (table_ instanceof FeFsTable) {
+      setMaxTableSinks(analyzer_.getQueryOptions().getMax_fs_writers());
       FeFsTable fsTable = (FeFsTable) table_;
       StringBuilder error = new StringBuilder();
       fsTable.parseSkipHeaderLineCount(error);
@@ -922,6 +927,7 @@ public class InsertStmt extends StatementBase {
   public TableName getTargetTableName() { return targetTableName_; }
   public FeTable getTargetTable() { return table_; }
   public void setTargetTable(FeTable table) { this.table_ = table; }
+  public void setMaxTableSinks(int maxTableSinks) { this.maxTableSinks_ = maxTableSinks; }
   public void setWriteId(long writeId) { this.writeId_ = writeId; }
   public boolean isOverwrite() { return overwrite_; }
   public TSortingOrder getSortingOrder() { return sortingOrder_; }
@@ -959,7 +965,8 @@ public class InsertStmt extends StatementBase {
     Preconditions.checkState(table_ != null);
     return TableSink.create(table_, isUpsert_ ? TableSink.Op.UPSERT : TableSink.Op.INSERT,
         partitionKeyExprs_, resultExprs_, mentionedColumns_, overwrite_,
-        requiresClustering(), new Pair<>(sortColumns_, sortingOrder_), writeId_);
+        requiresClustering(), new Pair<>(sortColumns_, sortingOrder_), writeId_,
+        maxTableSinks_);
   }
 
   /**

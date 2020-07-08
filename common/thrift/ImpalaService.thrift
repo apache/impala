@@ -547,6 +547,10 @@ enum TImpalaQueryOptions {
   // The max reservation that sorter will use for intermediate sort runs.
   // 0 or -1 means this has no effect.
   SORT_RUN_BYTES_LIMIT = 106
+
+  // Sets an upper limit on the number of fs writer instances to be scheduled during
+  // insert. Currently this limit only applies to HDFS inserts.
+  MAX_FS_WRITERS = 107
 }
 
 // The summary of a DML statement.

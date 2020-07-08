@@ -230,6 +230,9 @@ public class CreateTableAsSelectStmt extends StatementBase {
           (tmpTable instanceof FeFsTable || tmpTable instanceof FeKuduTable));
 
       insertStmt_.setTargetTable(tmpTable);
+      if (tmpTable instanceof FeFsTable) {
+        insertStmt_.setMaxTableSinks(analyzer_.getQueryOptions().getMax_fs_writers());
+      }
     } catch (Exception e) {
       throw new AnalysisException(e.getMessage(), e);
     }

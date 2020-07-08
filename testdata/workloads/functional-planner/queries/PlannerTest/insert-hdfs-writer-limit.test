@@ -1,0 +1,630 @@
+# insert into an unpartitioned table. Single writer in the coordinator instance.
+insert into unpartitioned_table select int_col from
+functional_parquet.alltypes limit 10000000;
+---- QUERYOPTIONS
+max_fs_writers=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=90.69KB mem-reservation=0B thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.unpartitioned_table, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=50.02KB mem-reservation=0B thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 10000000
+|  mem-estimate=40.67KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=4B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=2
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   limit: 10000000
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into a partitioned table. Single writer in the coordinator instance.
+insert into partitioned_table partition(year, month) select int_col, year, month from
+functional_parquet.alltypes limit 10000000;
+---- QUERYOPTIONS
+max_fs_writers=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=6.10MB mem-reservation=6.00MB thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.partitioned_table, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|  output exprs: int_col, year, month
+|  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0
+|
+02:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=12.80K
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 10000000
+|  mem-estimate=98.02KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=12B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=2
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: int_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   limit: 10000000
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=12B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into a partitioned table. Multiple writers, part of the scan instance. Writers under the max limit.
+insert into partitioned_table partition(year, month) select int_col, year, month from
+functional_parquet.alltypes;
+---- QUERYOPTIONS
+max_fs_writers=30
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+|  Per-Instance Resources: mem-estimate=22.00MB mem-reservation=6.02MB thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.partitioned_table, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|  output exprs: int_col, year, month
+|  mem-estimate=6.25KB mem-reservation=0B thread-reservation=0
+|
+01:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=12.80K
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: int_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=12B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into a partitioned table. Multiple writers, part of the scan instance. Writers above the max limit.
+# A random exchange is added to maintain parallelism of writers.
+insert into partitioned_table partition(year, month) select int_col, year, month from
+functional_parquet.alltypes;
+---- QUERYOPTIONS
+max_fs_writers=11
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [HASH(`year`,`month`)] hosts=3 instances=11
+|  Per-Instance Resources: mem-estimate=6.42MB mem-reservation=6.00MB thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.partitioned_table, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|  output exprs: int_col, year, month
+|  mem-estimate=13.64KB mem-reservation=0B thread-reservation=0
+|
+02:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=12.80K
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [HASH(`year`,`month`)]
+|  mem-estimate=434.02KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=12B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: int_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=12B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into an unpartitioned table. Multiple writers, part of the scan instance. Writers under the max limit.
+insert into unpartitioned_table select int_col from functional_parquet.alltypes;
+---- QUERYOPTIONS
+max_fs_writers=4
+---- DISTRIBUTEDPLAN
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=16.02MB mem-reservation=16.00KB thread-reservation=2
+WRITE TO HDFS [test_hdfs_insert_writer_limit.unpartitioned_table, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=16.67KB mem-reservation=0B thread-reservation=0
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into an unpartitioned table. Multiple writers, part of the scan instance. Writers above the max limit.
+# A random exchange is added to maintain parallelism of writers.
+insert into unpartitioned_table select int_col from functional_parquet.alltypes;
+---- QUERYOPTIONS
+max_fs_writers=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=65.68KB mem-reservation=0B thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.unpartitioned_table, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=25.01KB mem-reservation=0B thread-reservation=0
+|
+01:EXCHANGE [RANDOM]
+|  mem-estimate=40.67KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=4B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=2
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into an unpartitioned table. Multiple writers, part of the scan instance. Writers under the max limit.
+# Same behaviour when using mt_dop.
+insert into unpartitioned_table select int_col from functional_parquet.alltypes;
+---- QUERYOPTIONS
+max_fs_writers=28
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.unpartitioned_table, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=2.08KB mem-reservation=0B thread-reservation=0
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=4B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into an unpartitioned table. Multiple writers, part of the scan instance. Writers above the max limit.
+# A random exchange is added to maintain parallelism of writers. Also enforced when using mt_dop
+insert into unpartitioned_table select int_col from functional_parquet.alltypes
+---- QUERYOPTIONS
+max_fs_writers=11
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=11
+|  Per-Instance Resources: mem-estimate=213.22KB mem-reservation=0B thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.unpartitioned_table, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=4.55KB mem-reservation=0B thread-reservation=0
+|
+01:EXCHANGE [RANDOM]
+|  mem-estimate=208.67KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=4B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=4B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into an unpartitioned table. Multiple writers in an internal fragment (w/o scan node).
+# Writers within the max limit.
+insert into unpartitioned_table select int_col from functional_parquet.alltypes group by int_col;
+---- QUERYOPTIONS
+max_fs_writers=4
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [HASH(int_col)] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=128.04MB mem-reservation=34.00MB thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.unpartitioned_table, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=16.67KB mem-reservation=0B thread-reservation=0
+|
+03:AGGREGATE [FINALIZE]
+|  group by: int_col
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=4B cardinality=12.80K
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:EXCHANGE [HASH(int_col)]
+|  mem-estimate=40.67KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=4B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=144.00MB mem-reservation=34.02MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  group by: int_col
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=4B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into an unpartitioned table. Multiple writers in an internal fragment (w/o scan node).
+# Writers over the max limit.
+insert into unpartitioned_table select int_col from functional_parquet.alltypes group by int_col;
+---- QUERYOPTIONS
+max_fs_writers=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [HASH(int_col)] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=128.04MB mem-reservation=34.00MB thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.unpartitioned_table, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=25.01KB mem-reservation=0B thread-reservation=0
+|
+03:AGGREGATE [FINALIZE]
+|  group by: int_col
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=4B cardinality=12.80K
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:EXCHANGE [HASH(int_col)]
+|  mem-estimate=40.67KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=4B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=144.00MB mem-reservation=34.02MB thread-reservation=2
+01:AGGREGATE [STREAMING]
+|  group by: int_col
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=4B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into an unpartitioned table. Multiple writers in an internal fragment (w/o scan node).
+# Writers over the max limit.
+insert into unpartitioned_table select int_col from functional_parquet.alltypes group by int_col;
+---- QUERYOPTIONS
+max_fs_writers=4
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [HASH(int_col)] hosts=3 instances=4
+|  Per-Instance Resources: mem-estimate=128.20MB mem-reservation=34.00MB thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.unpartitioned_table, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=12.50KB mem-reservation=0B thread-reservation=0
+|
+03:AGGREGATE [FINALIZE]
+|  group by: int_col
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=4B cardinality=12.80K
+|  in pipelines: 03(GETNEXT), 00(OPEN)
+|
+02:EXCHANGE [HASH(int_col)]
+|  mem-estimate=208.67KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=1 row-size=4B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=144.00MB mem-reservation=34.02MB thread-reservation=1
+01:AGGREGATE [STREAMING]
+|  group by: int_col
+|  mem-estimate=128.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=1 row-size=4B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=4B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into a partitioned table. Multiple writers in an internal fragment (w/o scan node).
+# Writers within the max limit.
+insert into partitioned_table partition(year, month) select int_col, year, month from functional_parquet.alltypes;
+---- QUERYOPTIONS
+max_fs_writers=4
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [HASH(`year`,`month`)] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=6.10MB mem-reservation=6.00MB thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.partitioned_table, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|  output exprs: int_col, year, month
+|  mem-estimate=50.02KB mem-reservation=0B thread-reservation=0
+|
+02:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=12.80K
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [HASH(`year`,`month`)]
+|  mem-estimate=98.02KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=12B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=2
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: int_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=12B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into a partitioned table. Multiple writers in an internal fragment (w/o scan node).
+# Writers over the max limit.
+insert into partitioned_table partition(year, month) select int_col, year, month from functional_parquet.alltypes;
+---- QUERYOPTIONS
+max_fs_writers=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [HASH(`year`,`month`)] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=6.10MB mem-reservation=6.00MB thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.partitioned_table, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|  output exprs: int_col, year, month
+|  mem-estimate=75.02KB mem-reservation=0B thread-reservation=0
+|
+02:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=12.80K
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [HASH(`year`,`month`)]
+|  mem-estimate=98.02KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=12B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=2
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: int_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=12B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into an partitioned table. Multiple writers in an internal fragment (w/o scan node).
+# Writers over the max limit.
+insert into partitioned_table partition(year, month) select int_col, year, month from functional_parquet.alltypes;
+---- QUERYOPTIONS
+max_fs_writers=4
+mt_dop=10
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [HASH(`year`,`month`)] hosts=3 instances=4
+|  Per-Instance Resources: mem-estimate=6.42MB mem-reservation=6.00MB thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.partitioned_table, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|  output exprs: int_col, year, month
+|  mem-estimate=37.51KB mem-reservation=0B thread-reservation=0
+|
+02:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=12.80K
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [HASH(`year`,`month`)]
+|  mem-estimate=434.02KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=12B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=24
+Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: int_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=0
+   tuple-ids=0 row-size=12B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# insert into an partitioned table. "no shuffle" hint disabled when using the query option.
+# Writers over the max limit.
+insert /* +NOSHUFFLE */ into partitioned_table partition(year, month)
+select int_col, year, month from functional_parquet.alltypes;
+---- QUERYOPTIONS
+max_fs_writers=4
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [HASH(`year`,`month`)] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=6.10MB mem-reservation=6.00MB thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.partitioned_table, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=24
+|  output exprs: int_col, year, month
+|  mem-estimate=50.02KB mem-reservation=0B thread-reservation=0
+|
+02:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=12B cardinality=12.80K
+|  in pipelines: 02(GETNEXT), 00(OPEN)
+|
+01:EXCHANGE [HASH(`year`,`month`)]
+|  mem-estimate=98.02KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=12B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=2
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: int_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=12B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# "shuffle" hint behaves differently when used with max_fs_writers query option.
+# If the root fragment has a random data partition then a random shuffle exchange
+# instead of an unpartitioned exchange. Instance counter within limit.
+insert /* +SHUFFLE */ into unpartitioned_table select int_col from functional_parquet.alltypes
+---- QUERYOPTIONS
+max_fs_writers=4
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=57.34KB mem-reservation=0B thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.unpartitioned_table, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=16.67KB mem-reservation=0B thread-reservation=0
+|
+01:EXCHANGE [RANDOM]
+|  mem-estimate=40.67KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=4B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=2
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# "shuffle" hint behaves differently when used with max_fs_writers query option.
+# If the root fragment has a random data partition then a random shuffle exchange
+# instead of an unpartitioned exchange. Instance counter over limit.
+insert /* +SHUFFLE */ into unpartitioned_table select int_col from functional_parquet.alltypes
+---- QUERYOPTIONS
+max_fs_writers=2
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+|  Per-Host Resources: mem-estimate=65.68KB mem-reservation=0B thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.unpartitioned_table, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=25.01KB mem-reservation=0B thread-reservation=0
+|
+01:EXCHANGE [RANDOM]
+|  mem-estimate=40.67KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=4B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=2
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====
+# "shuffle" hint behaves differently when used with max_fs_writers query option.
+# If the root fragment has a random data partition then a random shuffle exchange
+# is added to maintain parallelism instead of an unpartitioned exchange.
+# Test to show behaviour without using the query option
+insert /* +SHUFFLE */ into unpartitioned_table select int_col from functional_parquet.alltypes
+---- QUERYOPTIONS
+max_fs_writers=0
+---- DISTRIBUTEDPLAN
+F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=90.69KB mem-reservation=0B thread-reservation=1
+WRITE TO HDFS [test_hdfs_insert_writer_limit.unpartitioned_table, OVERWRITE=false]
+|  partitions=1
+|  output exprs: int_col
+|  mem-estimate=50.02KB mem-reservation=0B thread-reservation=0
+|
+01:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=40.67KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0 row-size=4B cardinality=12.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=2
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=201.26KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns: unavailable
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
+   tuple-ids=0 row-size=4B cardinality=12.80K
+   in pipelines: 00(GETNEXT)
+====

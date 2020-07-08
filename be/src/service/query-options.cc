@@ -922,6 +922,18 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_sort_run_bytes_limit(sort_run_bytes_limit);
         break;
       }
+      case TImpalaQueryOptions::MAX_FS_WRITERS: {
+        StringParser::ParseResult result;
+        const int32_t max_fs_writers =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || max_fs_writers < 0) {
+          return Status(Substitute("$0 is not valid for MAX_FS_WRITERS. Only "
+                                   "non-negative numbers are allowed.",
+              value));
+        }
+        query_options->__set_max_fs_writers(max_fs_writers);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

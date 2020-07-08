@@ -317,6 +317,18 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testHdfsInsertWriterLimit() {
+    addTestDb("test_hdfs_insert_writer_limit",
+        "Test DB for MAX_FS_WRITERS query option.");
+    addTestTable( "create table test_hdfs_insert_writer_limit.partitioned_table "
+        + "(id int) partitioned by (year int, month int) location '/'");
+    addTestTable("create table test_hdfs_insert_writer_limit.unpartitioned_table"
+        + " (id int) location '/'");
+    runPlannerTestFile("insert-hdfs-writer-limit", "test_hdfs_insert_writer_limit",
+        ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN));
+  }
+
+  @Test
   public void testHdfs() {
     runPlannerTestFile("hdfs");
   }
