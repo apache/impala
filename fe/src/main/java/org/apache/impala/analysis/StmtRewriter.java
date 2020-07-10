@@ -26,6 +26,7 @@ import org.apache.impala.analysis.SetOperationStmt.SetOperand;
 import org.apache.impala.analysis.SetOperationStmt.SetOperator;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.TableAliasGenerator;
+import org.apache.impala.util.AcidUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
@@ -1742,6 +1743,86 @@ public class StmtRewriter {
       stmt.analyze(analyzer);
       if (LOG.isTraceEnabled())
         LOG.trace("Rewritten HAVING Clause SQL: " + stmt.toSql(REWRITTEN));
+    }
+  }
+
+  /**
+   * Statement rewriter that rewrites queries against ACID tables. We need to do such
+   * rewrites when querying complex types in ACID tables, because ACID scanning needs
+   * to inject slot references to the hidden ACID columns, e.g. rowid.
+   * We can only inject those slot references if the scanner's base tuple is a table level
+   * tuple. This is not true for some complex type queries, e.g.:
+   *   SELECT item FROM complextypestbl.int_array;
+   * So the above query needs to be rewritten to:
+   *   SELECT item FROM complextypestbl $a$1, $a$1.int_array;
+   * With this rewrite the scanner's root tuple will be the table level tuple that can
+   * contain slot refs to the hidden columns.
+   */
+  static class AcidRewriter extends StmtRewriter {
+    @Override
+    protected void rewriteSelectStmtHook(SelectStmt stmt, Analyzer analyzer)
+        throws AnalysisException {
+      for (int i = 0; i < stmt.fromClause_.size(); ++i) {
+        TableRef tblRef = stmt.fromClause_.get(i);
+        if (tblRef instanceof CollectionTableRef &&
+            AcidUtils.isFullAcidTable(
+                tblRef.getTable().getMetaStoreTable().getParameters())) {
+          CollectionTableRef collRef = (CollectionTableRef)tblRef;
+          if (collRef.getCollectionExpr() == null) {
+            splitCollectionRef(analyzer, stmt, i);
+            if (LOG.isTraceEnabled()) {
+              LOG.trace("Rewritten ACID FROM Clause SQL: " + stmt.toSql(REWRITTEN));
+            }
+          }
+        }
+      }
+    }
+
+    /**
+     * We have a collection ref in the FROM clause like complextypestbl.int_array. But,
+     * for ACID scans we need to replace it with two table refs, like:
+     *  complextypestbl $a$1, $a$1.int_array
+     * This method modifies the FROM clause of the SELECT statement 'stmt' in-place.
+     * @param stmt is the SELECT statement
+     * @param tblRefIdx is the index of the collection ref in the FROM clause that needs
+     * to be split.
+     */
+    private void splitCollectionRef(Analyzer analyzer, SelectStmt stmt, int tableRefIdx)
+        throws AnalysisException {
+      TableRef collTblRef = stmt.fromClause_.get(tableRefIdx);
+      Preconditions.checkState(collTblRef instanceof CollectionTableRef);
+      // Let's create a base table ref with a unique alias.
+      TableName tblName = collTblRef.getTable().getTableName();
+      List<String> rawTblPath = generatePathFrom(tblName);
+      String alias = stmt.getTableAliasGenerator().getNextAlias();
+      TableRef baseTblRef = TableRef.newTableRef(analyzer, rawTblPath, alias);
+      // Let's root the collection table ref from the base table ref.
+      List<String> newCollPath = new ArrayList<>(collTblRef.getPath());
+      if (newCollPath.get(0).equals(tblName.getDb())) {
+        // Let's remove db name from the path.
+        newCollPath.remove(0);
+      }
+      Preconditions.checkState(newCollPath.get(0).equals(tblName.getTbl()));
+      // Let's remove the table name from the path.
+      newCollPath.remove(0);
+      // So instead of <db name>.<table name>, let's start the new path with <alias>.
+      newCollPath.add(0, alias);
+      // Remove the alias of the old collection ref from the analyzer. We need to add
+      // the new collection ref with the same old alias.
+      analyzer.removeAlias(collTblRef.getUniqueAlias());
+      TableRef newCollTblRef =
+          TableRef.newTableRef(analyzer, newCollPath, collTblRef.getUniqueAlias());
+      // Substitute the old collection ref to 'newCollTblRef'.
+      stmt.fromClause_.set(tableRefIdx, newCollTblRef);
+      // Insert the base table ref in front of the collection ref.
+      stmt.fromClause_.add(tableRefIdx, baseTblRef);
+    }
+
+    private List<String> generatePathFrom(TableName tblName) {
+      List<String> rawTblPath = new ArrayList<>();
+      if (tblName.getDb() != null) rawTblPath.add(tblName.getDb());
+      rawTblPath.add(tblName.getTbl());
+      return rawTblPath;
     }
   }
 }

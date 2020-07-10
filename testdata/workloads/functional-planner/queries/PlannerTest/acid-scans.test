@@ -827,3 +827,505 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> a.id
    row-size=4B cardinality=6.12K
 ====
+# SELECT primitive type from table that has complex types and deleted rows.
+select id from functional_orc_def.complextypestbl_deleted_rows;
+---- PLAN
+PLAN-ROOT SINK
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=28B cardinality=2.57K
+|
+|--01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows functional_orc_def.complextypestbl_deleted_rows-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   row-size=28B cardinality=2.57K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  row-size=28B cardinality=2.57K
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows functional_orc_def.complextypestbl_deleted_rows-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   row-size=28B cardinality=2.57K
+====
+# SELECT nested item with join syntax.
+select item from complextypestbl_deleted_rows t, t.int_array;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SUBPLAN
+|  row-size=36B cardinality=25.68K
+|
+|--06:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=36B cardinality=10
+|  |
+|  |--04:SINGULAR ROW SRC
+|  |     row-size=32B cardinality=1
+|  |
+|  05:UNNEST [t.int_array]
+|     row-size=0B cardinality=10
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=32B cardinality=2.57K
+|
+|--01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows t-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows t]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   predicates: !empty(t.int_array)
+   row-size=32B cardinality=2.57K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:SUBPLAN
+|  row-size=36B cardinality=25.68K
+|
+|--06:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=36B cardinality=10
+|  |
+|  |--04:SINGULAR ROW SRC
+|  |     row-size=32B cardinality=1
+|  |
+|  05:UNNEST [t.int_array]
+|     row-size=0B cardinality=10
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  row-size=32B cardinality=2.57K
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows t-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows t]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   predicates: !empty(t.int_array)
+   row-size=32B cardinality=2.57K
+====
+# SELECT nested item directly. This gets rewritten to a plan that is similar to the
+# join syntax plan.
+select item from complextypestbl_deleted_rows.int_array;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SUBPLAN
+|  row-size=36B cardinality=25.68K
+|
+|--06:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=36B cardinality=10
+|  |
+|  |--04:SINGULAR ROW SRC
+|  |     row-size=32B cardinality=1
+|  |
+|  05:UNNEST [$a$1.int_array int_array]
+|     row-size=0B cardinality=10
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=32B cardinality=2.57K
+|
+|--01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   predicates: !empty($a$1.int_array)
+   row-size=32B cardinality=2.57K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:SUBPLAN
+|  row-size=36B cardinality=25.68K
+|
+|--06:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=36B cardinality=10
+|  |
+|  |--04:SINGULAR ROW SRC
+|  |     row-size=32B cardinality=1
+|  |
+|  05:UNNEST [$a$1.int_array int_array]
+|     row-size=0B cardinality=10
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  row-size=32B cardinality=2.57K
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   predicates: !empty($a$1.int_array)
+   row-size=32B cardinality=2.57K
+====
+# SELECT nested items with a CROSS JOIN.
+select a1.item, a2.item
+from complextypestbl_deleted_rows.int_array a1, complextypestbl_deleted_rows.int_array a2;
+---- PLAN
+PLAN-ROOT SINK
+|
+14:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=72B cardinality=659.46M
+|
+|--10:SUBPLAN
+|  |  row-size=36B cardinality=25.68K
+|  |
+|  |--13:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  row-size=36B cardinality=10
+|  |  |
+|  |  |--11:SINGULAR ROW SRC
+|  |  |     row-size=32B cardinality=1
+|  |  |
+|  |  12:UNNEST [$a$2.int_array a2]
+|  |     row-size=0B cardinality=10
+|  |
+|  09:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  |  row-size=32B cardinality=2.57K
+|  |
+|  |--08:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$2-delete-delta]
+|  |     HDFS partitions=1/1 files=2 size=2.87KB
+|  |     row-size=20B cardinality=1.82K
+|  |
+|  07:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$2]
+|     HDFS partitions=1/1 files=2 size=4.04KB
+|     predicates: !empty($a$2.int_array)
+|     row-size=32B cardinality=2.57K
+|
+03:SUBPLAN
+|  row-size=36B cardinality=25.68K
+|
+|--06:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=36B cardinality=10
+|  |
+|  |--04:SINGULAR ROW SRC
+|  |     row-size=32B cardinality=1
+|  |
+|  05:UNNEST [$a$1.int_array a1]
+|     row-size=0B cardinality=10
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=32B cardinality=2.57K
+|
+|--01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   predicates: !empty($a$1.int_array)
+   row-size=32B cardinality=2.57K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+18:EXCHANGE [UNPARTITIONED]
+|
+14:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=72B cardinality=659.46M
+|
+|--17:EXCHANGE [BROADCAST]
+|  |
+|  10:SUBPLAN
+|  |  row-size=36B cardinality=25.68K
+|  |
+|  |--13:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  row-size=36B cardinality=10
+|  |  |
+|  |  |--11:SINGULAR ROW SRC
+|  |  |     row-size=32B cardinality=1
+|  |  |
+|  |  12:UNNEST [$a$2.int_array a2]
+|  |     row-size=0B cardinality=10
+|  |
+|  09:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  |  row-size=32B cardinality=2.57K
+|  |
+|  |--16:EXCHANGE [BROADCAST]
+|  |  |
+|  |  08:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$2-delete-delta]
+|  |     HDFS partitions=1/1 files=2 size=2.87KB
+|  |     row-size=20B cardinality=1.82K
+|  |
+|  07:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$2]
+|     HDFS partitions=1/1 files=2 size=4.04KB
+|     predicates: !empty($a$2.int_array)
+|     row-size=32B cardinality=2.57K
+|
+03:SUBPLAN
+|  row-size=36B cardinality=25.68K
+|
+|--06:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=36B cardinality=10
+|  |
+|  |--04:SINGULAR ROW SRC
+|  |     row-size=32B cardinality=1
+|  |
+|  05:UNNEST [$a$1.int_array a1]
+|     row-size=0B cardinality=10
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  row-size=32B cardinality=2.57K
+|
+|--15:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   predicates: !empty($a$1.int_array)
+   row-size=32B cardinality=2.57K
+====
+# SELECT a more deeply nested item with a LIMIT.
+select e from complextypestbl_deleted_rows.nested_struct.c.d.item;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SUBPLAN
+|  row-size=36B cardinality=25.68K
+|
+|--06:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=36B cardinality=10
+|  |
+|  |--04:SINGULAR ROW SRC
+|  |     row-size=32B cardinality=1
+|  |
+|  05:UNNEST [$a$1.nested_struct.c.d.item item]
+|     row-size=0B cardinality=10
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=32B cardinality=2.57K
+|
+|--01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   predicates: !empty($a$1.nested_struct.c.d.item)
+   row-size=32B cardinality=2.57K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+03:SUBPLAN
+|  row-size=36B cardinality=25.68K
+|
+|--06:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=36B cardinality=10
+|  |
+|  |--04:SINGULAR ROW SRC
+|  |     row-size=32B cardinality=1
+|  |
+|  05:UNNEST [$a$1.nested_struct.c.d.item item]
+|     row-size=0B cardinality=10
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  row-size=32B cardinality=2.57K
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   predicates: !empty($a$1.nested_struct.c.d.item)
+   row-size=32B cardinality=2.57K
+====
+# SELECT with nested SUBPLANs.
+select e from complextypestbl_deleted_rows.nested_struct.c.d a, a.item;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SUBPLAN
+|  row-size=48B cardinality=256.80K
+|
+|--10:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=48B cardinality=100
+|  |
+|  |--04:SINGULAR ROW SRC
+|  |     row-size=32B cardinality=1
+|  |
+|  06:SUBPLAN
+|  |  row-size=16B cardinality=100
+|  |
+|  |--09:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  row-size=16B cardinality=10
+|  |  |
+|  |  |--07:SINGULAR ROW SRC
+|  |  |     row-size=12B cardinality=1
+|  |  |
+|  |  08:UNNEST [a.item]
+|  |     row-size=0B cardinality=10
+|  |
+|  05:UNNEST [$a$1.nested_struct.c.d a]
+|     row-size=0B cardinality=10
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=32B cardinality=2.57K
+|
+|--01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   predicates: !empty($a$1.nested_struct.c.d)
+   predicates on a: !empty(a.item)
+   row-size=32B cardinality=2.57K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+12:EXCHANGE [UNPARTITIONED]
+|
+03:SUBPLAN
+|  row-size=48B cardinality=256.80K
+|
+|--10:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=48B cardinality=100
+|  |
+|  |--04:SINGULAR ROW SRC
+|  |     row-size=32B cardinality=1
+|  |
+|  06:SUBPLAN
+|  |  row-size=16B cardinality=100
+|  |
+|  |--09:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  row-size=16B cardinality=10
+|  |  |
+|  |  |--07:SINGULAR ROW SRC
+|  |  |     row-size=12B cardinality=1
+|  |  |
+|  |  08:UNNEST [a.item]
+|  |     row-size=0B cardinality=10
+|  |
+|  05:UNNEST [$a$1.nested_struct.c.d a]
+|     row-size=0B cardinality=10
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  row-size=32B cardinality=2.57K
+|
+|--11:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows $a$1]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   predicates: !empty($a$1.nested_struct.c.d)
+   predicates on a: !empty(a.item)
+   row-size=32B cardinality=2.57K
+====
+# Parent plan and analytic subplan.
+select a.id, v.key, v.rnum
+from functional_orc_def.complextypestbl_deleted_rows a,
+  (select key, row_number() over (order by key) rnum from a.int_map) v
+   where v.key != 'bad';
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SUBPLAN
+|  row-size=60B cardinality=2.57K
+|
+|--09:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=60B cardinality=1
+|  |
+|  |--04:SINGULAR ROW SRC
+|  |     row-size=40B cardinality=1
+|  |
+|  08:SELECT
+|  |  predicates: key != 'bad'
+|  |  row-size=20B cardinality=1
+|  |
+|  07:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: key ASC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=20B cardinality=10
+|  |
+|  06:SORT
+|  |  order by: key ASC
+|  |  row-size=12B cardinality=10
+|  |
+|  05:UNNEST [a.int_map]
+|     row-size=0B cardinality=10
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN]
+|  row-size=40B cardinality=2.57K
+|
+|--01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows a-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows a]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   row-size=40B cardinality=2.57K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+11:EXCHANGE [UNPARTITIONED]
+|
+03:SUBPLAN
+|  row-size=60B cardinality=2.57K
+|
+|--09:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=60B cardinality=1
+|  |
+|  |--04:SINGULAR ROW SRC
+|  |     row-size=40B cardinality=1
+|  |
+|  08:SELECT
+|  |  predicates: key != 'bad'
+|  |  row-size=20B cardinality=1
+|  |
+|  07:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: key ASC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=20B cardinality=10
+|  |
+|  06:SORT
+|  |  order by: key ASC
+|  |  row-size=12B cardinality=10
+|  |
+|  05:UNNEST [a.int_map]
+|     row-size=0B cardinality=10
+|
+02:DELETE EVENTS HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  row-size=40B cardinality=2.57K
+|
+|--10:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows a-delete-delta]
+|     HDFS partitions=1/1 files=2 size=2.87KB
+|     row-size=20B cardinality=1.82K
+|
+00:SCAN HDFS [functional_orc_def.complextypestbl_deleted_rows a]
+   HDFS partitions=1/1 files=2 size=4.04KB
+   row-size=40B cardinality=2.57K
+====
