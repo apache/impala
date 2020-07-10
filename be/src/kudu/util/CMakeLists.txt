@@ -15,6 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# Target including all protobuf-generated code.
+add_custom_target(kudu-util-proto-deps)
+
 #######################################
 # block_bloom_filter_proto
 #######################################
@@ -29,6 +32,8 @@ ADD_EXPORTABLE_LIBRARY(block_bloom_filter_proto
   DEPS hash_proto pb_util_proto protobuf
   NONLINK_DEPS ${BLOCK_BLOOM_FILTER_PROTO_TGTS})
 
+add_dependencies(kudu-util-proto-deps ${BLOCK_BLOOM_FILTER_PROTO_TGTS})
+
 #######################################
 # util_compression_proto
 #######################################
@@ -42,6 +47,8 @@ ADD_EXPORTABLE_LIBRARY(util_compression_proto
   SRCS ${UTIL_COMPRESSION_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${UTIL_COMPRESSION_PROTO_TGTS})
+
+add_dependencies(kudu-util-proto-deps ${UTIL_COMPRESSION_PROTO_TGTS})
 
 add_definitions(-DKUDU_HEADERS_USE_SHORT_STATUS_MACROS)
 
@@ -59,6 +66,8 @@ ADD_EXPORTABLE_LIBRARY(hash_proto
   DEPS protobuf
   NONLINK_DEPS ${HASH_PROTO_TGTS})
 
+add_dependencies(kudu-util-proto-deps ${HASH_PROTO_TGTS})
+
 #######################################
 # histogram_proto
 #######################################
@@ -72,6 +81,8 @@ ADD_EXPORTABLE_LIBRARY(histogram_proto
   SRCS ${HISTOGRAM_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${HISTOGRAM_PROTO_TGTS})
+
+add_dependencies(kudu-util-proto-deps ${HISTOGRAM_PROTO_TGTS})
 
 #######################################
 # maintenance_manager_proto
@@ -87,6 +98,8 @@ ADD_EXPORTABLE_LIBRARY(maintenance_manager_proto
   DEPS protobuf
   NONLINK_DEPS ${MAINTENANCE_MANAGER_PROTO_TGTS})
 
+add_dependencies(kudu-util-proto-deps ${MAINTENANCE_MANAGER_PROTO_TGTS})
+
 #######################################
 # mem_tracker_proto
 #######################################
@@ -100,6 +113,8 @@ ADD_EXPORTABLE_LIBRARY(mem_tracker_proto
   SRCS ${MEM_TRACKER_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${MEM_TRACKER_PROTO_TGTS})
+
+add_dependencies(kudu-util-proto-deps ${MEM_TRACKER_PROTO_TGTS})
 
 #######################################
 # pb_util_proto
@@ -115,6 +130,8 @@ ADD_EXPORTABLE_LIBRARY(pb_util_proto
   DEPS protobuf
   NONLINK_DEPS ${PB_UTIL_PROTO_TGTS})
 
+add_dependencies(kudu-util-proto-deps ${PB_UTIL_PROTO_TGTS})
+
 #######################################
 # version_info_proto
 #######################################
@@ -128,6 +145,8 @@ ADD_EXPORTABLE_LIBRARY(version_info_proto
   SRCS ${VERSION_INFO_PROTO_SRCS}
   DEPS protobuf
   NONLINK_DEPS ${VERSION_INFO_PROTO_TGTS})
+
+add_dependencies(kudu-util-proto-deps ${VERSION_INFO_PROTO_TGTS})
 
 ############################################################
 # Version stamp

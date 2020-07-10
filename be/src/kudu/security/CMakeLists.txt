@@ -19,6 +19,9 @@
 # The top-level CMakeLists sets a ${KRB5_REALM_OVERRIDE} variable which should
 # be linked first into all Kudu binaries.
 
+# Target including all protobuf-generated code.
+add_custom_target(kudu-security-proto-deps)
+
 ##############################
 # krb5_realm_override
 ##############################
@@ -46,6 +49,7 @@ ADD_EXPORTABLE_LIBRARY(token_proto
   DEPS ${TOKEN_PROTO_LIBS}
   NONLINK_DEPS ${TOKEN_PROTO_TGTS})
 
+add_dependencies(kudu-security-proto-deps ${TOKEN_PROTO_TGTS})
 
 ##############################
 # security
