@@ -155,3 +155,83 @@ ROW__ID.ROWID, ROW__ID.CURRENTTRANSACTION, ROW__ID.OPERATION, ROW__ID.BUCKET, RO
 ---- TYPES
 BIGINT, BIGINT, INT, INT, BIGINT, INT
 ====
+---- QUERY
+select row__id.originaltransaction, row__id.bucket, row__id.rowid, id
+from functional_orc_def.complextypestbl_deleted_rows;
+---- LABELS
+ROW__ID.ORIGINALTRANSACTION, ROW__ID.BUCKET, ROW__ID.ROWID, ID
+---- RESULTS
+1,536870912,0,1
+1,536870912,2,3
+1,536870912,4,5
+1,536870912,6,7
+---- TYPES
+BIGINT, INT, BIGINT, BIGINT
+====
+---- QUERY
+select row__id.originaltransaction, row__id.bucket, row__id.rowid, id, item
+from functional_orc_def.complextypestbl_deleted_rows t, t.int_array;
+---- LABELS
+ROW__ID.ORIGINALTRANSACTION, ROW__ID.BUCKET, ROW__ID.ROWID, ID, ITEM
+---- RESULTS
+1,536870912,0,1,1
+1,536870912,0,1,2
+1,536870912,0,1,3
+---- TYPES
+BIGINT, INT, BIGINT, BIGINT, INT
+====
+---- QUERY
+select row__id.originaltransaction, row__id.bucket, row__id.rowid, id, item
+from functional_orc_def.complextypestbl_deleted_rows t, t.int_array_array.item;
+---- LABELS
+ROW__ID.ORIGINALTRANSACTION, ROW__ID.BUCKET, ROW__ID.ROWID, ID, ITEM
+---- RESULTS
+1,536870912,0,1,1
+1,536870912,0,1,2
+1,536870912,0,1,3
+1,536870912,0,1,4
+1,536870912,6,7,5
+1,536870912,6,7,6
+---- TYPES
+BIGINT, INT, BIGINT, BIGINT, INT
+====
+---- QUERY
+select row__id.originaltransaction, row__id.bucket, row__id.rowid, id, e
+from functional_orc_def.complextypestbl_deleted_rows t, t.nested_struct.c.d.item;
+---- LABELS
+ROW__ID.ORIGINALTRANSACTION, ROW__ID.BUCKET, ROW__ID.ROWID, ID, E
+---- RESULTS
+1,536870912,0,1,10
+1,536870912,0,1,-10
+1,536870912,0,1,11
+1,536870912,6,7,NULL
+---- TYPES
+BIGINT, INT, BIGINT, BIGINT, INT
+====
+---- QUERY
+select row__id.originaltransaction, row__id.bucket, row__id.rowid, id, item
+from functional_orc_def.complextypestbl t, t.nested_struct.g.value.h.i;
+---- LABELS
+ROW__ID.ORIGINALTRANSACTION, ROW__ID.BUCKET, ROW__ID.ROWID, ID, ITEM
+---- RESULTS
+1,536870912,0,1,1.1
+1,536870912,1,2,2.2
+1,536870912,1,2,NULL
+1,536870912,4,5,2.2
+1,536870912,4,5,3.3
+---- TYPES
+BIGINT, INT, BIGINT, BIGINT, DOUBLE
+====
+====
+---- QUERY
+select row__id.originaltransaction, row__id.bucket, row__id.rowid, id, item
+from functional_orc_def.complextypestbl_deleted_rows t, t.nested_struct.g.value.h.i;
+---- LABELS
+ROW__ID.ORIGINALTRANSACTION, ROW__ID.BUCKET, ROW__ID.ROWID, ID, ITEM
+---- RESULTS
+1,536870912,0,1,1.1
+1,536870912,4,5,2.2
+1,536870912,4,5,3.3
+---- TYPES
+BIGINT, INT, BIGINT, BIGINT, DOUBLE
+====

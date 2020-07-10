@@ -1,0 +1,185 @@
+====
+---- QUERY
+select count(*) from complextypestbl_deleted_rows;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from complextypestbl_deleted_rows.int_array;
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*) from complextypestbl_deleted_rows.int_array_array.item;
+---- RESULTS
+6
+---- TYPES
+BIGINT
+====
+---- QUERY
+select id from complextypestbl_deleted_rows;
+---- RESULTS
+1
+3
+5
+7
+---- TYPES
+BIGINT
+====
+---- QUERY
+select id, item
+from complextypestbl_deleted_rows t, t.int_array;
+---- RESULTS
+1,1
+1,2
+1,3
+---- TYPES
+BIGINT, INT
+====
+---- QUERY
+select item from complextypestbl_deleted_rows.int_array;
+---- RESULTS
+1
+2
+3
+---- TYPES
+INT
+====
+---- QUERY
+select a1.item, a2.item
+from complextypestbl_deleted_rows.int_array a1, complextypestbl_deleted_rows.int_array a2
+order by 1, 2;
+---- RESULTS
+1,1
+1,2
+1,3
+2,1
+2,2
+2,3
+3,1
+3,2
+3,3
+---- TYPES
+INT, INT
+====
+---- QUERY
+select id, e from complextypestbl_deleted_rows t, t.nested_struct.c.d a, a.item;
+---- RESULTS
+1,10
+1,-10
+1,11
+7,NULL
+---- TYPES
+BIGINT, INT
+====
+---- QUERY
+select e from complextypestbl_deleted_rows.nested_struct.c.d a, a.item;
+---- RESULTS
+10
+-10
+11
+NULL
+---- TYPES
+INT
+====
+---- QUERY
+select id, cnt from complextypestbl_deleted_rows t,
+(select count(item) cnt from t.int_array_array.item) v;
+---- RESULTS
+1,4
+3,0
+5,0
+7,2
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+-- Materialize scalars, array with no slots, and array of arrays with no slots, with
+-- structs in schema
+select id, t.nested_struct.a, cnt1, cnt2 from complextypestbl t,
+ (select count(*) cnt1 from t.nested_struct.b) v1,
+  t.nested_struct.c.d, (select count(*) cnt2 from d.item arr) v2;
+---- RESULTS
+8,-1,1,1
+1,1,1,2
+1,1,1,1
+2,NULL,1,5
+2,NULL,1,2
+2,NULL,1,0
+2,NULL,1,0
+7,7,3,0
+7,7,3,1
+7,7,3,0
+---- TYPES
+BIGINT, INT, BIGINT, BIGINT
+====
+---- QUERY
+-- Materialize scalars, array with no slots, and array of arrays with no slots, with
+-- structs in schema, with deleted rows
+select id, t.nested_struct.a, cnt1, cnt2 from complextypestbl_deleted_rows t,
+ (select count(*) cnt1 from t.nested_struct.b) v1,
+  t.nested_struct.c.d, (select count(*) cnt2 from d.item arr) v2;
+---- RESULTS
+1,1,1,2
+1,1,1,1
+7,7,3,0
+7,7,3,1
+7,7,3,0
+---- TYPES
+BIGINT, INT, BIGINT, BIGINT
+====
+---- QUERY
+-- Query position slots.
+select id, a1.pos, a2.pos, a2.item
+ from complextypestbl t, t.int_array_array a1, a1.item a2;
+---- RESULTS
+8,0,0,-1
+8,0,1,-2
+1,0,0,1
+1,0,1,2
+1,1,0,3
+1,1,1,4
+2,0,0,NULL
+2,0,1,1
+2,0,2,2
+2,0,3,NULL
+2,1,0,3
+2,1,1,NULL
+2,1,2,4
+7,1,0,5
+7,1,1,6
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT
+====
+---- QUERY
+-- Query position slots against table with deleted rows.
+select id, a1.pos, a2.pos, a2.item
+ from complextypestbl_deleted_rows t, t.int_array_array a1, a1.item a2;
+---- RESULTS
+1,0,0,1
+1,0,1,2
+1,1,0,3
+1,1,1,4
+7,1,0,5
+7,1,1,6
+---- TYPES
+BIGINT, BIGINT, BIGINT, INT
+====
+---- QUERY
+-- Parent plan and analytic subplan.
+select a.id, v.key, v.rnum
+from complextypestbl_deleted_rows a,
+  (select key, row_number() over (order by key) rnum from a.int_map) v
+   where v.key != 'bad';
+---- RESULTS
+1,'k1',1
+1,'k2',2
+7,'k1',1
+7,'k3',2
+---- TYPES
+BIGINT, STRING, BIGINT
+====

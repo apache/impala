@@ -785,6 +785,21 @@ transactional=true
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+complextypestbl_deleted_rows
+---- COLUMNS
+id bigint
+int_array array<int>
+int_array_array array<array<int>>
+int_map map<string, int>
+int_map_array array<map<string, int>>
+nested_struct struct<a: int, b: array<int>, c: struct<d: array<array<struct<e: int, f: string>>>>, g: map<string, struct<h: struct<i: array<double>>>>>
+---- DEPENDENT_LOAD_ACID
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}{db_suffix}.complextypestbl;
+DELETE FROM {db_name}{db_suffix}.{table_name} WHERE id % 2 = 0;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 complextypestbl_non_transactional
 ---- COLUMNS
 id bigint

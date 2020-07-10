@@ -39,29 +39,3 @@ select * from  test_promotion_fail;
 ---- CATCH
 Found original file with unexpected name
 ====
----- QUERY
-create table complex_copy like functional_orc_def.complextypestbl;
-====
----- HIVE_QUERY
-use $DATABASE;
-insert into complex_copy select * from functional_orc_def.complextypestbl;
-delete from complex_copy where id % 2 = 0;
-====
----- QUERY
-select id from complex_copy;
----- RESULTS
-1
-3
-5
-7
-====
----- QUERY
-select id, item from complex_copy c, c.int_array;
----- CATCH
-This query is not supported on full ACID tables
-====
----- QUERY
-select item from complex_copy.int_array;
----- CATCH
-This query is not supported on full ACID tables
-====

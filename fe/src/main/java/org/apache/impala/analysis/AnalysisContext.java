@@ -375,9 +375,14 @@ public class AnalysisContext {
     public StatementBase getStmt() { return stmt_; }
     public Analyzer getAnalyzer() { return analyzer_; }
     public Set<TAccessEvent> getAccessEvents() { return analyzer_.getAccessEvents(); }
+    public boolean canRewriteStatement() {
+      return !isCreateViewStmt() && !isAlterViewStmt() && !isShowCreateTableStmt();
+    }
     public boolean requiresSubqueryRewrite() {
-      return analyzer_.containsSubquery() && !isCreateViewStmt() && !isAlterViewStmt()
-          && !isShowCreateTableStmt();
+      return canRewriteStatement() && analyzer_.containsSubquery();
+    }
+    public boolean requiresAcidComplexScanRewrite() {
+      return canRewriteStatement() && analyzer_.hasTopLevelAcidCollectionTableRef();
     }
     public boolean requiresExprRewrite() {
       return isQueryStmt() || isInsertStmt() || isCreateTableAsSelectStmt()
@@ -489,6 +494,10 @@ public class AnalysisContext {
     }
     if (analysisResult_.requiresSetOperationRewrite()) {
       new StmtRewriter().rewrite(analysisResult_);
+      reAnalyze = true;
+    }
+    if (analysisResult_.requiresAcidComplexScanRewrite()) {
+      new StmtRewriter.AcidRewriter().rewrite(analysisResult_);
       reAnalyze = true;
     }
     if (!reAnalyze) return;

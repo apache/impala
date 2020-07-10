@@ -215,6 +215,15 @@ public class Analyzer {
     isSubquery_ = true;
     globalState_.containsSubquery = true;
   }
+
+  public void setHasTopLevelAcidCollectionTableRef() {
+    globalState_.hasTopLevelAcidCollectionTableRef = true;
+  }
+
+  public boolean hasTopLevelAcidCollectionTableRef() {
+    return globalState_.hasTopLevelAcidCollectionTableRef;
+  }
+
   public boolean setHasPlanHints() { return globalState_.hasPlanHints = true; }
   public boolean hasPlanHints() { return globalState_.hasPlanHints; }
   public void setHasWithClause() { hasWithClause_ = true; }
@@ -349,6 +358,10 @@ public class Analyzer {
     // True if one of the analyzers belongs to a set operand of type EXCEPT or INTERSECT
     // which needs to be rewritten using joins.
     public boolean setOperationNeedsRewrite = false;
+
+    // True when the query directly scans collection items, e.g.:
+    // select item from complextypestbl.int_array;
+    public boolean hasTopLevelAcidCollectionTableRef = false;
 
     // all registered conjuncts (map from expr id to conjunct). We use a LinkedHashMap to
     // preserve the order in which conjuncts are added.
@@ -1619,6 +1632,7 @@ public class Analyzer {
   public FeCatalog getCatalog() { return globalState_.stmtTableCache.catalog; }
   public StmtTableCache getStmtTableCache() { return globalState_.stmtTableCache; }
   public Set<String> getAliases() { return aliasMap_.keySet(); }
+  public void removeAlias(String alias) { aliasMap_.remove(alias); }
 
   /**
    * Returns list of candidate equi-join conjuncts to be evaluated by the join node

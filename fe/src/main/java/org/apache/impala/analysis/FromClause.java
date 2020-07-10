@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.util.AcidUtils;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -34,7 +35,6 @@ import com.google.common.collect.Lists;
  * the class it implements the Iterable interface.
  */
 public class FromClause extends StmtNode implements Iterable<TableRef> {
-
   private final List<TableRef> tableRefs_;
 
   private boolean analyzed_ = false;
@@ -77,6 +77,9 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
       tblRef.setLeftTblRef(leftTblRef);
       tblRef.analyze(analyzer);
       leftTblRef = tblRef;
+      if (tblRef instanceof CollectionTableRef) {
+        checkTopLevelComplexAcidScan(analyzer, (CollectionTableRef)tblRef);
+      }
     }
     analyzed_ = true;
   }
@@ -97,6 +100,17 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
       } else {
         tblRefs.add(tblRef);
       }
+    }
+  }
+
+  private void checkTopLevelComplexAcidScan(Analyzer analyzer,
+      CollectionTableRef collRef) {
+    if (!AcidUtils.isFullAcidTable(
+        collRef.getTable().getMetaStoreTable().getParameters())) {
+      return;
+    }
+    if (collRef.getCollectionExpr() == null) {
+      analyzer.setHasTopLevelAcidCollectionTableRef();
     }
   }
 
@@ -188,4 +202,5 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
   public TableRef get(int i) { return tableRefs_.get(i); }
   public void set(int i, TableRef tableRef) { tableRefs_.set(i, tableRef); }
   public void add(TableRef t) { tableRefs_.add(t); }
+  public void add(int i, TableRef t) { tableRefs_.add(i, t); }
 }

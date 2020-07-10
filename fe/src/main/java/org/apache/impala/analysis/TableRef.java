@@ -142,6 +142,17 @@ public class TableRef extends StmtNode {
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
+  /**
+   * Returns a new, resolved, and analyzed table ref.
+   */
+  public static TableRef newTableRef(Analyzer analyzer, List<String> rawPath,
+      String alias) throws AnalysisException {
+    TableRef ret = new TableRef(rawPath, alias);
+    ret = analyzer.resolveTableRef(ret);
+    ret.analyze(analyzer);
+    return ret;
+  }
+
   public TableRef(List<String> path, String alias) {
     this(path, alias, Privilege.SELECT);
   }

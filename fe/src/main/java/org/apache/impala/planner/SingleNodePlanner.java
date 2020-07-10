@@ -1552,17 +1552,6 @@ public class SingleNodePlanner {
       }
     }
     if (!areThereDeletedRows) return false;
-    final String NOT_SUPPORTED_YET = "This query is not supported on full ACID tables " +
-        "that have deleted rows and complex types. As a workaround you can run a " +
-        "major compaction.";
-    if (hdfsTblRef instanceof CollectionTableRef) {
-      throw new AnalysisException(NOT_SUPPORTED_YET);
-    }
-    for (SlotDescriptor slotDesc : hdfsTblRef.getDesc().getSlots()) {
-      if (slotDesc.getItemTupleDesc() != null) {
-        throw new AnalysisException(NOT_SUPPORTED_YET);
-      }
-    }
     addAcidSlots(analyzer, hdfsTblRef);
     return true;
   }
@@ -1630,10 +1619,8 @@ public class SingleNodePlanner {
     }
     // The followings just create separate scan nodes for insert deltas and delete deltas,
     // plus adds a LEFT ANTI HASH JOIN above them.
-    TableRef deleteDeltaRef = new TableRef(hdfsTblRef.getPath(),
+    TableRef deleteDeltaRef = TableRef.newTableRef(analyzer, hdfsTblRef.getPath(),
         hdfsTblRef.getUniqueAlias() + "-delete-delta");
-    deleteDeltaRef = analyzer.resolveTableRef(deleteDeltaRef);
-    deleteDeltaRef.analyze(analyzer);
     addAcidSlots(analyzer, deleteDeltaRef);
     HdfsScanNode deltaScanNode = new HdfsScanNode(ctx_.getNextNodeId(),
         hdfsTblRef.getDesc(), conjuncts, insertDeltaPartitions, hdfsTblRef,
