@@ -3238,16 +3238,15 @@ TEST_P(ExprTest, CastExprs) {
       TimestampValue::ParseSimpleDateFormat("2001-01-21 01:05:31.123450000"));
   TestTimestampValue("cast('2001-1-21 1:5:31.12345678910111213' as timestamp)",
       TimestampValue::ParseSimpleDateFormat("2001-01-21 01:05:31.123456789"));
-  TestTimestampValue("cast('1:05:1.12' as timestamp)",
-      TimestampValue::ParseSimpleDateFormat("01:05:01.120000000"));
-  TestTimestampValue("cast('1:05:1' as timestamp)",
-      TimestampValue::ParseSimpleDateFormat("01:05:01"));
   TestTimestampValue("cast('        2001-01-9 1:05:1        ' as timestamp)",
       TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01"));
   TestIsNull("cast('2001-6' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('01-1-21' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('2001-1-21 12:5:3 AM' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('1:05:31.123456foo' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('1:05:1.12' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('1:05:1' as timestamp)", TYPE_TIMESTAMP);
+
   TestIsNull("cast('10/feb/10' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('1909-foo1-2bar' as timestamp)", TYPE_TIMESTAMP);
   TestIsNull("cast('1909/1-/2' as timestamp)", TYPE_TIMESTAMP);
@@ -3309,20 +3308,20 @@ TEST_P(ExprTest, CastExprs) {
       TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01"));
   TestTimestampValue("cast('  \t\r\n      2001-01-09   \t\r\n     ' as timestamp)",
       TimestampValue::ParseSimpleDateFormat("2001-01-09"));
-  TestTimestampValue("cast('  \t\r\n      01:05:01   \t\r\n     ' as timestamp)",
-      TimestampValue::ParseSimpleDateFormat("01:05:01"));
-  TestTimestampValue("cast(' \t\r\n 01:05:01.123456789   \t\r\n     ' as timestamp)",
-      TimestampValue::ParseSimpleDateFormat("01:05:01.123456789"));
   TestTimestampValue("cast('  \t\r\n      2001-1-9 1:5:1    \t\r\n    ' as timestamp)",
       TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01"));
   TestTimestampValue("cast('  \t\r\n  2001-1-9 1:5:1.12345678  \t\r\n ' as timestamp)",
       TimestampValue::ParseSimpleDateFormat("2001-01-09 01:05:01.123456780"));
-  TestTimestampValue("cast('  \t\r\n      1:5:1    \t\r\n    ' as timestamp)",
-      TimestampValue::ParseSimpleDateFormat("01:05:01"));
-  TestTimestampValue("cast('  \t\r\n      1:5:1.12345678    \t\r\n    ' as timestamp)",
-      TimestampValue::ParseSimpleDateFormat("01:05:01.123456780"));
   TestTimestampValue("cast('  \t\r\n      2001-1-9    \t\r\n    ' as timestamp)",
       TimestampValue::ParseSimpleDateFormat("2001-01-09"));
+
+  // IMPALA-9531: Dateless timestamps without format should return NULL
+  TestIsNull(
+      "cast('  \t\r\n      1:5:1.12345678    \t\r\n    ' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('  \t\r\n      1:5:1    \t\r\n    ' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull(
+      "cast(' \t\r\n 01:05:01.123456789   \t\r\n     ' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('  \t\r\n      01:05:01   \t\r\n     ' as timestamp)", TYPE_TIMESTAMP);
 
   // IMPALA-6995: whitespace-only strings should return NULL.
   TestIsNull("cast(' ' as timestamp)", TYPE_TIMESTAMP);

@@ -35,11 +35,10 @@ namespace impala {
 class TimestampParser {
  public:
   /// Parse a default date/time string. The default timestamp format is:
-  /// yyyy-MM-dd HH:mm:ss.SSSSSSSSS or yyyy-MM-ddTHH:mm:ss.SSSSSSSSS. Either just the
-  /// date or just the time may be specified. All components are required in either the
+  /// yyyy-MM-dd HH:mm:ss.SSSSSSSSS or yyyy-MM-ddTHH:mm:ss.SSSSSSSSS. Just the
+  /// date may be specified. All components are required in either the
   /// date or time except for the fractional seconds following the period. In the case
-  /// of just a date, the time will be set to 00:00:00. In the case of just a time, the
-  /// date will be set to invalid.
+  /// of just a date, the time will be set to 00:00:00.
   /// str -- valid pointer to the string to parse
   /// len -- length of the string to parse (must be > 0)
   /// d -- the date value where the results of the parsing will be placed
@@ -50,7 +49,7 @@ class TimestampParser {
 
   /// Parse a date/time string. The data must adhere to SimpleDateFormat, otherwise it
   /// will be rejected i.e. no missing tokens. In the case of just a date, the time will
-  /// be set to 00:00:00. In the case of just a time, the date will be set to invalid.
+  /// be set to 00:00:00.
   /// str -- valid pointer to the string to parse
   /// len -- length of the string to parse (must be > 0)
   /// dt_ctx -- date/time format context (must contain valid tokens)

@@ -336,65 +336,66 @@ bool SimpleDateFormatTokenizer::TokenizeByStr( DateTimeFormatContext* dt_ctx,
 }
 
 const DateTimeFormatContext* SimpleDateFormatTokenizer::GetDefaultFormatContext(
-    const char* str, int len, bool accept_time_toks, bool accept_time_toks_only) {
+    const char* str, int len, bool accept_time_toks) {
   DCHECK(initialized);
   DCHECK(str != nullptr);
   DCHECK(len > 0);
 
-  // Check if this string starts with a date component
-  if (str[4] == '-' && str[7] == '-') {
-    // Do we have a date component only?
-    if (len == DEFAULT_DATE_FMT_LEN) {
-      return &DEFAULT_DATE_CTX;
-    }
-
-    // We have a time component as well. Do we accept it?
-    if (!accept_time_toks) return nullptr;
-
-    switch (len) {
-      case DEFAULT_SHORT_DATE_TIME_FMT_LEN: {
-        if (LIKELY(str[13] == ':')) {
-          switch (str[10]) {
-            case ' ':
-              return &DEFAULT_SHORT_DATE_TIME_CTX;
-            case 'T':
-              return &DEFAULT_SHORT_ISO_DATE_TIME_CTX;
-          }
-        }
-        break;
+  if (LIKELY(len >= DEFAULT_DATE_FMT_LEN)) {
+    // Check if this string starts with a date component
+    if (str[4] == '-' && str[7] == '-') {
+      // Do we have a date component only?
+      if (len == DEFAULT_DATE_FMT_LEN) {
+        return &DEFAULT_DATE_CTX;
       }
-      case DEFAULT_DATE_TIME_FMT_LEN: {
-        if (LIKELY(str[13] == ':')) {
-          switch (str[10]) {
-            case ' ':
-              return &DEFAULT_DATE_TIME_CTX[9];
-            case 'T':
-              return &DEFAULT_ISO_DATE_TIME_CTX[9];
-          }
-        }
-        break;
-      }
-      default: {
-        // There is likely a fractional component that's below the expected 9 chars.
-        // We will need to work out which default context to use that corresponds to
-        // the fractional length in the string.
-        if (LIKELY(len > DEFAULT_SHORT_DATE_TIME_FMT_LEN)
-            && LIKELY(str[19] == '.') && LIKELY(str[13] == ':')) {
-          switch (str[10]) {
-            case ' ': {
-              return &DEFAULT_DATE_TIME_CTX[len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
-            }
-            case 'T': {
-              return &DEFAULT_ISO_DATE_TIME_CTX
-                  [len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
+
+      // We have a time component as well. Do we accept it?
+      if (!accept_time_toks) return nullptr;
+
+      switch (len) {
+        case DEFAULT_SHORT_DATE_TIME_FMT_LEN: {
+          if (LIKELY(str[13] == ':')) {
+            switch (str[10]) {
+              case ' ':
+                return &DEFAULT_SHORT_DATE_TIME_CTX;
+              case 'T':
+                return &DEFAULT_SHORT_ISO_DATE_TIME_CTX;
             }
           }
+          break;
         }
-        break;
+        case DEFAULT_DATE_TIME_FMT_LEN: {
+          if (LIKELY(str[13] == ':')) {
+            switch (str[10]) {
+              case ' ':
+                return &DEFAULT_DATE_TIME_CTX[9];
+              case 'T':
+                return &DEFAULT_ISO_DATE_TIME_CTX[9];
+            }
+          }
+          break;
+        }
+        default: {
+          // There is likely a fractional component that's below the expected 9 chars.
+          // We will need to work out which default context to use that corresponds to
+          // the fractional length in the string.
+          if (LIKELY(len > DEFAULT_SHORT_DATE_TIME_FMT_LEN)
+              && LIKELY(str[19] == '.') && LIKELY(str[13] == ':')) {
+            switch (str[10]) {
+              case ' ': {
+                return &DEFAULT_DATE_TIME_CTX[len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
+              }
+              case 'T': {
+                return &DEFAULT_ISO_DATE_TIME_CTX
+                    [len - DEFAULT_SHORT_DATE_TIME_FMT_LEN - 1];
+              }
+            }
+          }
+          break;
+        }
       }
     }
   }
-
   return nullptr;
 }
 

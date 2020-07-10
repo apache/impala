@@ -105,12 +105,10 @@ public:
   /// len -- length of the string to parse (must be > 0)
   /// accept_time_toks -- if true, time tokens are accepted. Otherwise time tokens are
   /// rejected.
-  /// accept_time_toks_only -- if true, time tokens without date tokens are accepted.
-  /// Otherwise, they are rejected.
   /// Return the corresponding default format context if parsing succeeded, or nullptr
   /// otherwise.
   static const DateTimeFormatContext* GetDefaultFormatContext(const char* str, int len,
-      bool accept_time_toks, bool accept_time_toks_only);
+      bool accept_time_toks);
 
   /// Initialize the default format contexts. This *must* be called before using
   /// GetDefaultFormatContext().
