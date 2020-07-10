@@ -420,7 +420,8 @@ add_subdirectory(ext-data-source)
 add_subdirectory(query-event-hook-api)
 
 # Build target for all generated files which most backend code depends on
-add_custom_target(gen-deps ALL DEPENDS thrift-deps proto-deps fb-deps)
+add_custom_target(gen-deps ALL DEPENDS thrift-deps proto-deps fb-deps
+  kudu-util-proto-deps kudu-rpc-proto-deps kudu-security-proto-deps)
 
 add_custom_target(tarballs ALL DEPENDS shell_tarball)
 
