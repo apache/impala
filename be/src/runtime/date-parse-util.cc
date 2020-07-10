@@ -102,7 +102,7 @@ bool DateParser::ParseSimpleDateFormat(const char* str, int len, bool accept_tim
 
   const DateTimeFormatContext* dt_ctx =
       SimpleDateFormatTokenizer::GetDefaultFormatContext(str, trimmed_len,
-          accept_time_toks, false);
+          accept_time_toks);
   if (dt_ctx != nullptr) return ParseSimpleDateFormat(str, trimmed_len, *dt_ctx, date);
 
   // Generating context lazily as a fall back if default formats fail.

@@ -106,9 +106,7 @@ bool TimestampParser::ParseSimpleDateFormat(const char* str, int len,
       SimpleDateFormatTokenizer::DEFAULT_DATE_TIME_FMT_LEN);
   // Determine the default formatting context that's required for parsing.
   const DateTimeFormatContext* dt_ctx =
-      SimpleDateFormatTokenizer::GetDefaultFormatContext(str, default_fmt_len, true,
-          true);
-
+      SimpleDateFormatTokenizer::GetDefaultFormatContext(str, default_fmt_len, true);
   if (dt_ctx != nullptr) {
     return ParseSimpleDateFormat(str, default_fmt_len, *dt_ctx, d, t);
   }
