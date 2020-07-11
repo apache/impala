@@ -5806,8 +5806,13 @@ TEST_P(ExprTest, MathFunctions) {
   TestValue("abs(-32768)", TYPE_INT, 32768);
   TestValue("abs(32767)", TYPE_INT, 32767);
   TestValue("abs(32768)", TYPE_BIGINT, 32768);
+#ifndef __aarch64__
   TestValue("abs(-1 * cast(pow(2, 31) as int))", TYPE_BIGINT, 2147483648);
   TestValue("abs(cast(pow(2, 31) as int))", TYPE_BIGINT, 2147483648);
+#else
+  TestValue("abs(-1 * cast(pow(2, 31) as int))", TYPE_BIGINT, 2147483647);
+  TestValue("abs(cast(pow(2, 31) as int))", TYPE_BIGINT, 2147483647);
+#endif
   TestValue("abs(2147483647)", TYPE_BIGINT, 2147483647);
   TestValue("abs(2147483647)", TYPE_BIGINT, 2147483647);
   TestValue("abs(-9223372036854775807)", TYPE_BIGINT,  9223372036854775807);
