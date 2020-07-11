@@ -4191,3 +4191,353 @@ PLAN-ROOT SINK
    HDFS partitions=24/24 files=24 size=478.45KB
    row-size=89B cardinality=7.30K
 ====
+# IMPALA-9949: uncorrelated subquery that can return 0 rows must be rewritten as a
+# LEFT OUTER JOIN. LIMIT 0 queries obviously return 0 rows.
+select id, (select min(int_col) from functional.alltypes limit 0)
+from functional.alltypestiny
+---- PLAN
+PLAN-ROOT SINK
+|
+02:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  row-size=8B cardinality=8
+|
+|--01:EMPTYSET
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
+|  row-size=8B cardinality=8
+|
+|--03:EXCHANGE [BROADCAST]
+|  |
+|  01:EMPTYSET
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# An aggregation with LIMIT 1 returns exactly one row so can be rewritten as a CROSS JOIN.
+select id, (select min(int_col) from functional.alltypes limit 1)
+from functional.alltypestiny
+---- PLAN
+PLAN-ROOT SINK
+|
+03:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=8B cardinality=8
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(int_col)
+|  |  limit: 1
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=8B cardinality=8
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: min:merge(int_col)
+|  |  limit: 1
+|  |  row-size=4B cardinality=1
+|  |
+|  04:EXCHANGE [UNPARTITIONED]
+|  |
+|  02:AGGREGATE
+|  |  output: min(int_col)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# IMPALA-9949: uncorrelated subquery that can return 0 rows must be rewritten as a
+# LEFT OUTER JOIN. The HAVING clause can eliminate the single row returned from
+# the aggregation.
+select id, (select min(int_col) from functional.alltypes having min(int_col) > 10)
+from functional.alltypestiny
+---- PLAN
+PLAN-ROOT SINK
+|
+03:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  row-size=8B cardinality=8
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(int_col)
+|  |  having: min(int_col) > 10
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
+|  row-size=8B cardinality=8
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: min:merge(int_col)
+|  |  having: min(int_col) > 10
+|  |  row-size=4B cardinality=1
+|  |
+|  04:EXCHANGE [UNPARTITIONED]
+|  |
+|  02:AGGREGATE
+|  |  output: min(int_col)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# A non-grouping aggregation without a HAVING or LIMIT always returns a single row, so
+# this can be safely rewritten as a CROSS JOIN.
+select id, (select min(int_col) from functional.alltypes where int_col > 10)
+from functional.alltypestiny
+---- PLAN
+PLAN-ROOT SINK
+|
+03:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=8B cardinality=8
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(int_col)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: int_col > 10
+|     row-size=4B cardinality=730
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=8B cardinality=8
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: min:merge(int_col)
+|  |  row-size=4B cardinality=1
+|  |
+|  04:EXCHANGE [UNPARTITIONED]
+|  |
+|  02:AGGREGATE
+|  |  output: min(int_col)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: int_col > 10
+|     row-size=4B cardinality=730
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# IMPALA-9949: uncorrelated subquery that can return 0 rows must be rewritten as a
+# LEFT OUTER JOIN. The WHERE clause can eliminate the single row returned from
+# the inner select.
+select id, (
+    select int_col
+    from (select min(id) as id, min(int_col) as int_col
+          from functional.alltypes) v
+    where id > 99999)
+from functional.alltypestiny
+---- PLAN
+PLAN-ROOT SINK
+|
+03:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  row-size=12B cardinality=8
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id), min(int_col)
+|  |  having: min(id) > 99999
+|  |  row-size=8B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=8B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
+|  row-size=12B cardinality=8
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: min:merge(id), min:merge(int_col)
+|  |  having: min(id) > 99999
+|  |  row-size=8B cardinality=1
+|  |
+|  04:EXCHANGE [UNPARTITIONED]
+|  |
+|  02:AGGREGATE
+|  |  output: min(id), min(int_col)
+|  |  row-size=8B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=8B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# IMPALA-9949: uncorrelated subquery that can return 0 rows must be rewritten as a
+# LEFT OUTER JOIN. The subquery has a single subquery in its from list, but that
+# subquery can return 0 or 1 rows.
+select id, (
+    select int_col
+    from (select min(id) as id, min(int_col) as int_col
+          from functional.alltypes
+          having min(int_col) > 10) v)
+from functional.alltypestiny
+---- PLAN
+PLAN-ROOT SINK
+|
+03:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  row-size=8B cardinality=8
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(int_col)
+|  |  having: min(int_col) > 10
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:NESTED LOOP JOIN [LEFT OUTER JOIN, BROADCAST]
+|  row-size=8B cardinality=8
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: min:merge(int_col)
+|  |  having: min(int_col) > 10
+|  |  row-size=4B cardinality=1
+|  |
+|  04:EXCHANGE [UNPARTITIONED]
+|  |
+|  02:AGGREGATE
+|  |  output: min(int_col)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# Subquery with a single subquery in the FROM list that returns exactly one row and
+# a trivially true WHERE clause. This can be rewritten as a cross join because it
+# always returns exactly one row.
+select id, (
+    select int_col
+    from (select min(id) as id, min(int_col) as int_col
+          from functional.alltypes) v
+    where TRUE)
+from functional.alltypestiny
+---- PLAN
+PLAN-ROOT SINK
+|
+03:NESTED LOOP JOIN [CROSS JOIN]
+|  row-size=8B cardinality=8
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(int_col)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+|  row-size=8B cardinality=8
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  output: min:merge(int_col)
+|  |  row-size=4B cardinality=1
+|  |
+|  04:EXCHANGE [UNPARTITIONED]
+|  |
+|  02:AGGREGATE
+|  |  output: min(int_col)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====

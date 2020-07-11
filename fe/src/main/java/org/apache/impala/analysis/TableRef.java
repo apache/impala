@@ -91,6 +91,9 @@ public class TableRef extends StmtNode {
   protected JoinOperator joinOp_;
   protected List<PlanHint> joinHints_ = new ArrayList<>();
   protected List<String> usingColNames_;
+  // Whether we should allow an empty ON clause in cases where it would usually be
+  // rejected in analysis. Used for TableRefs generated during query rewriting.
+  protected boolean allowEmptyOn_ = false;
 
   protected List<PlanHint> tableHints_ = new ArrayList<>();
   protected TReplicaPreference replicaPreference_;
@@ -189,6 +192,7 @@ public class TableRef extends StmtNode {
     onClause_ = (other.onClause_ != null) ? other.onClause_.clone() : null;
     usingColNames_ =
         (other.usingColNames_ != null) ? Lists.newArrayList(other.usingColNames_) : null;
+    allowEmptyOn_ = other.allowEmptyOn_;
     tableHints_ = Lists.newArrayList(other.tableHints_);
     replicaPreference_ = other.replicaPreference_;
     randomReplica_ = other.randomReplica_;
@@ -233,12 +237,16 @@ public class TableRef extends StmtNode {
     this.tableHints_ = other.tableHints_;
     this.onClause_ = other.onClause_;
     this.usingColNames_ = other.usingColNames_;
+    this.allowEmptyOn_ = other.allowEmptyOn_;
   }
 
   public JoinOperator getJoinOp() {
     // if it's not explicitly set, we're doing an inner join
     return (joinOp_ == null ? JoinOperator.INNER_JOIN : joinOp_);
   }
+
+  public boolean allowEmptyOn() { return allowEmptyOn_ ; }
+  public void setAllowEmptyOn(boolean v) { allowEmptyOn_ = v; }
 
   public TReplicaPreference getReplicaPreference() { return replicaPreference_; }
   public boolean getRandomReplica() { return randomReplica_; }
@@ -571,7 +579,7 @@ public class TableRef extends StmtNode {
         e.getIds(tupleIds, null);
         onClauseTupleIds.addAll(tupleIds);
       }
-    } else if (!isRelative() && !isCorrelated()
+    } else if (!allowEmptyOn() && !isRelative() && !isCorrelated()
         && (getJoinOp().isOuterJoin() || getJoinOp().isSemiJoin())) {
       throw new AnalysisException(
           joinOp_.toString() + " requires an ON or USING clause.");

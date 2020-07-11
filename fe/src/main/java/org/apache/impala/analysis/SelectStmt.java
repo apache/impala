@@ -326,7 +326,7 @@ public class SelectStmt extends QueryStmt {
                   "A subquery which may return more than one row is not supported in "
                   + "the expression: " + item.getExpr().toSql());
             }
-            Preconditions.checkState(((SelectStmt) s.getStatement()).returnsSingleRow(),
+            Preconditions.checkState(((SelectStmt)s.getStatement()).returnsAtMostOneRow(),
                 "Invariant violated: Only subqueries that are guaranteed to return a "
                     + "single row are supported: " + item.getExpr().toSql());
           }
@@ -1339,24 +1339,76 @@ public class SelectStmt extends QueryStmt {
    * TODO: IMPALA-1285 to cover more cases that can be determinded at plan time such has a
    * group by clause where all grouping expressions are bound to constant expressions.
    */
-  public boolean returnsSingleRow() {
-    Preconditions.checkState(isAnalyzed());
-    // limit 1 clause
-    if (limitElement_ != null && hasLimit() && limitElement_.getLimit() == 1) return true;
-    // No from clause (base tables or inline views)
-    if (fromClause_.isEmpty()) return true;
-    // Aggregation with no group by and no DISTINCT
+  public boolean returnsAtMostOneRow() {
+    return returnsSingleRow(false);
+  }
+
+  /**
+   * Check if the stmt returns exactly one row. This can happen
+   * in the following cases:
+   * 1. select stmt with an aggregate function and no group by and no having clause.
+   * 2. select stmt with no from clause and no where or having clause.
+   * 3. select from an inline view that returns exactly one row and no where or
+   *    having clause.
+   *
+   * This function may produce false negatives because the cardinality of the
+   * result set also depends on the data a stmt is processing.
+   *
+   * TODO: IMPALA-1285 to cover more cases that can be determinded at plan time such has a
+   * group by clause where all grouping expressions are bound to constant expressions.
+   */
+  public boolean returnsExactlyOneRow() {
+    return returnsSingleRow(true);
+  }
+
+  /**
+   * Helper for returnsAtMostOneRow() and returnsExactlyOneRow(). If exactlyOne
+   * is true, returns true iff this SELECT always returns exactly one row. If
+   * exactlyOne is false, returns true iff this SELECT returns zero or one rows.
+   */
+  private boolean returnsSingleRow(boolean exactlyOne) {
+    // This function checks the clauses in reverse order in which they are applied.
+    // We must return false as soon as we determine there is no upper bound on the rows
+    // returned.
+    // If exactlyOne is true, we also must return false when we determine there is no
+    // lower bound on the rows returned.
+    // If exactlyOne is false, we can also return true as soon as we determine an upper
+    // bound on the rows returned.
+
+    if (limitElement_ != null && hasLimit()) {
+      // Limit 0 or 1 clause. This is an upper bound on rows returned.
+      if (!exactlyOne && limitElement_.getLimit() <= 1) return true;
+      // Limit 0 clause - the query will return 0 rows.
+      if (exactlyOne && limitElement_.getLimit() == 0) return false;
+    }
+
+    // HAVING cause can eliminate any rows produced by the statement, therefore we have
+    // no lower bound on rows returned.
+    if (exactlyOne && havingClause_ != null && !havingClause_.isTriviallyTrue()) {
+      return false;
+    }
+
+    // Aggregation with no GROUP BY and no DISTINCT. The aggregation produces exactly one
+    // row and the WHERE clause cannot eliminate that row.
     if (hasMultiAggInfo() && !hasGroupByClause() && !selectList_.isDistinct()) {
       return true;
     }
 
-    // Select from an inline view that returns at most one row.
+    // The WHERE clause can eliminate the singular row produced by the FROM clause
+    // (or lack of FROM clause).
+    if (exactlyOne && whereClause_ != null && !whereClause_.isTriviallyTrue()) {
+      return false;
+    }
+
+    // No FROM clause (base tables or inline views). Exactly one row is produced.
+    if (fromClause_.isEmpty()) return true;
+
     List<TableRef> tableRefs = fromClause_.getTableRefs();
     if (tableRefs.size() == 1 && tableRefs.get(0) instanceof InlineViewRef) {
       InlineViewRef inlineView = (InlineViewRef)tableRefs.get(0);
       if (inlineView.queryStmt_ instanceof SelectStmt) {
         SelectStmt selectStmt = (SelectStmt)inlineView.queryStmt_;
-        return selectStmt.returnsSingleRow();
+        return selectStmt.returnsSingleRow(exactlyOne);
       }
     }
     // In all other cases, return false.

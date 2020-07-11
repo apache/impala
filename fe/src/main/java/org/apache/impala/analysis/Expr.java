@@ -973,6 +973,17 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
+   * Returns true if this expression is trivially true. Currently we only check if
+   * it is comprised of conjuncts that are all TRUE literals.
+   */
+  public boolean isTriviallyTrue() {
+    for (Expr conjunct : getConjuncts()) {
+      if (!Expr.IS_TRUE_LITERAL.apply(conjunct)) return false;
+    }
+    return true;
+  }
+
+  /**
    * Returns an analyzed clone of 'this' with exprs substituted according to smap.
    * Removes implicit casts and analysis state while cloning/substituting exprs within
    * this tree, such that the returned result has minimal implicit casts and types.
@@ -1354,7 +1365,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     if (!(this instanceof Subquery)) return false;
     Subquery subq = (Subquery) this;
     SelectStmt stmt = (SelectStmt) subq.getStatement();
-    return stmt.returnsSingleRow() && getType().isScalarType();
+    return stmt.returnsAtMostOneRow() && getType().isScalarType();
   }
 
   /**
