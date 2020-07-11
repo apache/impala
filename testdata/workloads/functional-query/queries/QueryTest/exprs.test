@@ -2585,13 +2585,11 @@ UDF WARNING: Invalid base64 string; input length is 3, which is not a multiple o
 ====
 ---- QUERY
 # base64 decoding a string with invalid characters
-select base64decode('abc%')
+select base64decode('abc%') is null or base64decode('abc%') = concat('i', chr(183), chr(255))
 ---- RESULTS
-'NULL'
+true
 ---- TYPES
-STRING
----- ERRORS
-UDF WARNING: Could not base64 decode input in space 4; actual output length 0
+BOOLEAN
 ====
 ---- QUERY
 # IMPALA-1731: test parsing infinity values
