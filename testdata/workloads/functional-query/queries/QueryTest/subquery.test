@@ -1418,3 +1418,19 @@ INT, INT
 ---- RESULTS
 42,2
 ====
+---- QUERY
+# IMPALA-9949: subquery in select list that returns 0 rows results in NULLs.
+select id, (select min(int_col) from functional.alltypes having min(int_col) < 0)
+from functional.alltypestiny
+---- RESULTS
+0,NULL
+1,NULL
+2,NULL
+3,NULL
+4,NULL
+5,NULL
+6,NULL
+7,NULL
+---- TYPES
+INT, INT
+====

@@ -92,7 +92,7 @@ public class Subquery extends Expr {
     }
 
     // If the subquery can return many rows, do the cardinality check at runtime.
-    if (!((SelectStmt)stmt_).returnsSingleRow()) stmt_.setIsRuntimeScalar(true);
+    if (!((SelectStmt)stmt_).returnsAtMostOneRow()) stmt_.setIsRuntimeScalar(true);
 
     Preconditions.checkNotNull(type_);
   }

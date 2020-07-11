@@ -230,7 +230,7 @@ public class StmtRewriter {
       if (!inPred.isNotIn()) return null;
 
       // CASE 2, NOT IN and RHS returns a single row:
-      if (rhsQuery.returnsSingleRow()) {
+      if (rhsQuery.returnsAtMostOneRow()) {
         return new BinaryPredicate(BinaryPredicate.Operator.NE, lhs, rhs);
       }
 
@@ -634,7 +634,7 @@ public class StmtRewriter {
       // from the subquery. We need each left input row to match at most one row from
       // the right input, which we can ensure by adding a distinct to the subquery.
       // The distinct supersedes any pre-existing grouping.
-      if (!subqueryStmt.returnsSingleRow()) {
+      if (!subqueryStmt.returnsAtMostOneRow()) {
         subqueryStmt.getSelectList().setIsDistinct(true);
         subqueryStmt.removeGroupBy();
       }
@@ -680,13 +680,10 @@ public class StmtRewriter {
 
     /**
      * Return true if the Expr tree rooted at 'expr' can be safely
-     * eliminated, i.e. it only consists of conjunctions of true BoolLiterals.
+     * eliminated, e.g. if it only consists of conjunctions of true BoolLiterals.
      */
     private static boolean canEliminate(Expr expr) {
-      for (Expr conjunct : expr.getConjuncts()) {
-        if (!Expr.IS_TRUE_LITERAL.apply(conjunct)) return false;
-      }
-      return true;
+      return expr.isTriviallyTrue();
     }
 
     /**
@@ -1344,11 +1341,14 @@ public class StmtRewriter {
           inlineView.reset();
           inlineView.analyze(analyzer);
 
-          // For uncorrelated scalar subqueries we rewrite with a CROSS_JOIN. This makes
-          // it simpler to further optimize by merging subqueries without worrying about
-          // join ordering as in IMPALA-9796. For correlated subqueries we'd want to
-          // rewrite to a LOJ.
-          inlineView.setJoinOp(JoinOperator.CROSS_JOIN);
+          // For uncorrelated scalar subqueries we rewrite with a CROSS_JOIN or
+          // LEFT OUTER JOIN with no join predicates. We prefer CROSS JOIN where
+          // possible because it makes it simpler to further optimize by merging
+          // subqueries without worrying about join ordering as in IMPALA-9796.
+          // For correlated subqueries we would need to rewrite to a LOJ.
+          inlineView.setJoinOp(subqueryStmt.returnsExactlyOneRow() ?
+              JoinOperator.CROSS_JOIN : JoinOperator.LEFT_OUTER_JOIN);
+          inlineView.setAllowEmptyOn(true); // Needed to allow LOJ with no ON clause.
           stmt.fromClause_.add(inlineView);
           newViews.add(inlineView);
 
