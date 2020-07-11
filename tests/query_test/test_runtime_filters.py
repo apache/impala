@@ -23,15 +23,23 @@ import time
 
 from beeswaxd.BeeswaxService import QueryState
 from tests.common.environ import build_flavor_timeout
+from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal, SkipIfIsilon
+from tests.common.test_dimensions import add_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
 
 # slow_build_timeout is set to 200000 to avoid failures like IMPALA-8064 where the
 # runtime filters don't arrive in time.
 WAIT_TIME_MS = build_flavor_timeout(60000, slow_build_timeout=200000)
+
+# Check whether the Impala under test in slow build. Query option ASYNC_CODEGEN will
+# be enabled when test runs for slow build like ASAN, TSAN, UBSAN, etc. This avoid
+# failures like IMPALA-9889 where the runtime filters don't arrive in time due to
+# the slowness of codegen.
+build_runs_slowly = ImpalaTestClusterProperties.get_instance().runs_slowly()
 
 # Some of the queries in runtime_filters consume a lot of memory, leading to
 # significant memory reservations in parallel tests.
@@ -59,6 +67,9 @@ class TestRuntimeFilters(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format in ['parquet', 'text', 'kudu']
         or v.get_value('mt_dop') == 0)
+    # Enable query option ASYNC_CODEGEN for slow build
+    if build_runs_slowly:
+      add_exec_option_dimension(cls, "async_codegen", 1)
 
   def test_basic_filters(self, vector):
     new_vector = deepcopy(vector)
@@ -172,6 +183,9 @@ class TestBloomFilters(ImpalaTestSuite):
     # Bloom filters are disabled on HBase
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format not in ['hbase'])
+    # Enable query option ASYNC_CODEGEN for slow build
+    if build_runs_slowly:
+      add_exec_option_dimension(cls, "async_codegen", 1)
 
   def test_bloom_filters(self, vector):
     if 'kudu' in str(vector.get_value('table_format')):
@@ -201,6 +215,9 @@ class TestMinMaxFilters(ImpalaTestSuite):
     # Min-max filters are only implemented for Kudu.
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format in ['kudu'])
+    # Enable query option ASYNC_CODEGEN for slow build
+    if build_runs_slowly:
+      add_exec_option_dimension(cls, "async_codegen", 1)
 
   def test_min_max_filters(self, vector):
     self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=MIN_MAX")
@@ -270,6 +287,9 @@ class TestAllRuntimeFilters(ImpalaTestSuite):
     # All filters are only implemented for Kudu now.
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format in ['kudu'])
+    # Enable query option ASYNC_CODEGEN for slow build
+    if build_runs_slowly:
+      add_exec_option_dimension(cls, "async_codegen", 1)
 
   def test_all_runtime_filters(self, vector):
     self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=ALL")
@@ -296,6 +316,9 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
     # Exercise both mt and non-mt code paths. Some tests assume 3 finstances, so
     # tests are not expected to work unmodified with higher mt_dop values.
     cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('mt_dop', 0, 4))
+    # Enable query option ASYNC_CODEGEN for slow build
+    if build_runs_slowly:
+      add_exec_option_dimension(cls, "async_codegen", 1)
 
   def test_row_filters(self, vector):
     new_vector = deepcopy(vector)
