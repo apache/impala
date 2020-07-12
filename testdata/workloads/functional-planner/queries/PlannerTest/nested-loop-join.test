@@ -14,7 +14,7 @@ PLAN-ROOT SINK
 |  row-size=273B cardinality=7.30K
 |
 |--02:SCAN HDFS [functional.alltypesagg c]
-|     partitions=11/11 files=11 size=814.73KB
+|     HDFS partitions=11/11 files=11 size=814.73KB
 |     predicates: c.bigint_col = 10
 |     row-size=95B cardinality=11
 |
@@ -23,11 +23,11 @@ PLAN-ROOT SINK
 |  row-size=178B cardinality=7.30K
 |
 |--01:SCAN HDFS [functional.alltypes b]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=89B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypestiny a]
-   partitions=4/4 files=4 size=460B
+   HDFS partitions=4/4 files=4 size=460B
    predicates: a.id < 10
    row-size=89B cardinality=1
 ---- DISTRIBUTEDPLAN
@@ -48,7 +48,7 @@ PLAN-ROOT SINK
 |  row-size=95B cardinality=1.10K
 |
 |--02:SCAN HDFS [functional.alltypesagg d]
-|     partitions=11/11 files=11 size=814.73KB
+|     HDFS partitions=11/11 files=11 size=814.73KB
 |     predicates: d.bigint_col < 10
 |     row-size=95B cardinality=1.10K
 |
@@ -57,11 +57,11 @@ PLAN-ROOT SINK
 |  row-size=1B cardinality=100
 |
 |--01:SCAN HDFS [functional.alltypessmall c]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=1B cardinality=100
 |
 00:SCAN HDFS [functional.alltypestiny a]
-   partitions=4/4 files=4 size=460B
+   HDFS partitions=4/4 files=4 size=460B
    row-size=1B cardinality=8
 ---- DISTRIBUTEDPLAN
 NotImplementedException: Error generating a valid execution plan for this query. A RIGHT SEMI JOIN type with no equi-join predicates can only be executed with a single node plan.
@@ -84,7 +84,7 @@ PLAN-ROOT SINK
 |  row-size=362B cardinality=18.40K
 |
 |--03:SCAN HDFS [functional.alltypes d]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=89B cardinality=7.30K
 |
 05:NESTED LOOP JOIN [FULL OUTER JOIN]
@@ -92,7 +92,7 @@ PLAN-ROOT SINK
 |  row-size=273B cardinality=11.10K
 |
 |--02:SCAN HDFS [functional.alltypesagg c]
-|     partitions=11/11 files=11 size=814.73KB
+|     HDFS partitions=11/11 files=11 size=814.73KB
 |     row-size=95B cardinality=11.00K
 |
 04:NESTED LOOP JOIN [FULL OUTER JOIN]
@@ -100,11 +100,11 @@ PLAN-ROOT SINK
 |  row-size=178B cardinality=101
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=89B cardinality=100
 |
 00:SCAN HDFS [functional.alltypestiny a]
-   partitions=4/4 files=4 size=460B
+   HDFS partitions=4/4 files=4 size=460B
    predicates: a.id < 10
    row-size=89B cardinality=1
 ---- DISTRIBUTEDPLAN
@@ -127,12 +127,12 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=10
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     predicates: b.int_col = 5
 |     row-size=8B cardinality=10
 |
 00:SCAN HDFS [functional.alltypestiny a]
-   partitions=4/4 files=4 size=460B
+   HDFS partitions=4/4 files=4 size=460B
    row-size=4B cardinality=8
 ---- DISTRIBUTEDPLAN
 NotImplementedException: Error generating a valid execution plan for this query. A RIGHT ANTI JOIN type with no equi-join predicates can only be executed with a single node plan.
@@ -149,14 +149,14 @@ PLAN-ROOT SINK
 |
 09:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 08:NESTED LOOP JOIN [RIGHT ANTI JOIN]
 |  join predicates: d.tinyint_col > e.tinyint_col
 |  row-size=5B cardinality=0
 |
 |--04:SCAN HDFS [functional.alltypesnopart e]
-|     partitions=1/1 files=0 size=0B
+|     HDFS partitions=1/1 files=0 size=0B
 |     predicates: e.id < 10
 |     row-size=5B cardinality=0
 |
@@ -165,7 +165,7 @@ PLAN-ROOT SINK
 |  row-size=1B cardinality=7.30K
 |
 |--03:SCAN HDFS [functional.alltypes d]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=1B cardinality=7.30K
 |
 06:NESTED LOOP JOIN [RIGHT OUTER JOIN]
@@ -173,7 +173,7 @@ PLAN-ROOT SINK
 |  row-size=17B cardinality=11.00K
 |
 |--02:SCAN HDFS [functional.alltypesagg c]
-|     partitions=11/11 files=11 size=814.73KB
+|     HDFS partitions=11/11 files=11 size=814.73KB
 |     row-size=5B cardinality=11.00K
 |
 05:NESTED LOOP JOIN [INNER JOIN]
@@ -181,11 +181,11 @@ PLAN-ROOT SINK
 |  row-size=12B cardinality=8
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=4B cardinality=100
 |
 00:SCAN HDFS [functional.alltypestiny a]
-   partitions=4/4 files=4 size=460B
+   HDFS partitions=4/4 files=4 size=460B
    row-size=8B cardinality=8
 ---- DISTRIBUTEDPLAN
 NotImplementedException: Error generating a valid execution plan for this query. A RIGHT ANTI JOIN type with no equi-join predicates can only be executed with a single node plan.
@@ -203,13 +203,13 @@ PLAN-ROOT SINK
 |
 15:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 14:EXCHANGE [UNPARTITIONED]
 |
 09:AGGREGATE
 |  output: count(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 08:NESTED LOOP JOIN [LEFT ANTI JOIN, BROADCAST]
 |  join predicates: d.tinyint_col > e.tinyint_col
@@ -236,23 +236,23 @@ PLAN-ROOT SINK
 |  |  |  |--10:EXCHANGE [BROADCAST]
 |  |  |  |  |
 |  |  |  |  00:SCAN HDFS [functional.alltypestiny a]
-|  |  |  |     partitions=4/4 files=4 size=460B
+|  |  |  |     HDFS partitions=4/4 files=4 size=460B
 |  |  |  |     row-size=8B cardinality=8
 |  |  |  |
 |  |  |  01:SCAN HDFS [functional.alltypessmall b]
-|  |  |     partitions=4/4 files=4 size=6.32KB
+|  |  |     HDFS partitions=4/4 files=4 size=6.32KB
 |  |  |     row-size=4B cardinality=100
 |  |  |
 |  |  02:SCAN HDFS [functional.alltypesagg c]
-|  |     partitions=11/11 files=11 size=814.73KB
+|  |     HDFS partitions=11/11 files=11 size=814.73KB
 |  |     row-size=5B cardinality=11.00K
 |  |
 |  03:SCAN HDFS [functional.alltypes d]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=1B cardinality=7.30K
 |
 04:SCAN HDFS [functional.alltypesnopart e]
-   partitions=1/1 files=0 size=0B
+   HDFS partitions=1/1 files=0 size=0B
    predicates: e.id < 10
    row-size=5B cardinality=0
 ====
@@ -272,7 +272,7 @@ PLAN-ROOT SINK
 |--06:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [functional.alltypes t2]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     predicates: (t2.bigint_col = 5)
 |     row-size=89B cardinality=730
 |
@@ -287,7 +287,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
 ====
 # IMPALA-5689: Do not invert a left semi join with no equi-join predicates.
@@ -298,16 +298,20 @@ left semi join functional.alltypes t2 on (t2.bigint_col=5)
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-07:EXCHANGE [UNPARTITIONED]
+08:EXCHANGE [UNPARTITIONED]
 |
 03:NESTED LOOP JOIN [LEFT SEMI JOIN, BROADCAST]
 |  row-size=4B cardinality=10
 |
-|--06:EXCHANGE [BROADCAST]
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  06:EXCHANGE [UNPARTITIONED]
+|  |  limit: 1
 |  |
 |  02:SCAN HDFS [functional.alltypes t2]
-|     partitions=24/24 files=24 size=478.45KB
+|     HDFS partitions=24/24 files=24 size=478.45KB
 |     predicates: (t2.bigint_col = 5)
+|     limit: 1
 |     row-size=8B cardinality=730
 |
 05:AGGREGATE [FINALIZE]
@@ -321,6 +325,6 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
 ====

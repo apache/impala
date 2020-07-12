@@ -126,12 +126,16 @@ where t1.int_col in
 ---- PLAN
 PLAN-ROOT SINK
 |
-02:HASH JOIN [LEFT SEMI JOIN]
+03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t1.int_col = t2.int_col
 |  runtime filters: RF000 <- t2.int_col
 |  row-size=89B cardinality=7.30K
 |
-|--01:SCAN HDFS [functional.alltypes t2]
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: t2.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
 |     HDFS partitions=24/24 files=24 size=478.45KB
 |     predicates: (t2.int_col IS NOT NULL AND (t2.int_col < 0 OR t2.int_col > 10) OR t2.bigint_col IS NOT NULL AND (t2.bigint_col < 0 OR t2.bigint_col > 10))
 |     row-size=12B cardinality=730
@@ -173,11 +177,15 @@ and t.bigint_col < 1000
 ---- PLAN
 PLAN-ROOT SINK
 |
-04:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
-|  hash predicates: t.tinyint_col = tinyint_col
+05:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
+|  hash predicates: t.tinyint_col = functional.alltypestiny.tinyint_col
 |  row-size=89B cardinality=730
 |
-|--02:SCAN HDFS [functional.alltypestiny]
+|--04:AGGREGATE [FINALIZE]
+|  |  group by: functional.alltypestiny.tinyint_col
+|  |  row-size=1B cardinality=2
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
 |     HDFS partitions=4/4 files=4 size=460B
 |     row-size=1B cardinality=8
 |
@@ -360,20 +368,24 @@ where a.int_col in
 ---- PLAN
 PLAN-ROOT SINK
 |
-08:AGGREGATE [FINALIZE]
+09:AGGREGATE [FINALIZE]
 |  output: count(id)
 |  row-size=8B cardinality=1
 |
-07:AGGREGATE
+08:AGGREGATE
 |  group by: id
 |  row-size=4B cardinality=115
 |
-06:HASH JOIN [LEFT SEMI JOIN]
+07:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: a.int_col = t.int_col
 |  runtime filters: RF000 <- t.int_col
 |  row-size=8B cardinality=115
 |
-|--05:HASH JOIN [INNER JOIN]
+|--06:AGGREGATE [FINALIZE]
+|  |  group by: t.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  05:HASH JOIN [INNER JOIN]
 |  |  hash predicates: s.bigint_col = n.bigint_col
 |  |  runtime filters: RF002 <- n.bigint_col
 |  |  row-size=29B cardinality=40
@@ -476,12 +488,16 @@ and s.bool_col = false
 ---- PLAN
 PLAN-ROOT SINK
 |
-08:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: a.int_col = int_col
-|  runtime filters: RF000 <- int_col
+09:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: a.int_col = functional.alltypessmall.int_col
+|  runtime filters: RF000 <- functional.alltypessmall.int_col
 |  row-size=109B cardinality=91
 |
-|--06:SCAN HDFS [functional.alltypessmall]
+|--08:AGGREGATE [FINALIZE]
+|  |  group by: functional.alltypessmall.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  06:SCAN HDFS [functional.alltypessmall]
 |     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=4B cardinality=100
 |
@@ -554,17 +570,21 @@ and bigint_col < 1000
 ---- PLAN
 PLAN-ROOT SINK
 |
-04:HASH JOIN [LEFT SEMI JOIN]
+05:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = id
 |  runtime filters: RF000 <- id
 |  row-size=89B cardinality=11
 |
-|--03:HASH JOIN [LEFT SEMI JOIN]
-|  |  hash predicates: int_col = int_col
-|  |  runtime filters: RF002 <- int_col
+|--04:HASH JOIN [LEFT SEMI JOIN]
+|  |  hash predicates: int_col = functional.alltypestiny.int_col
+|  |  runtime filters: RF002 <- functional.alltypestiny.int_col
 |  |  row-size=9B cardinality=11
 |  |
-|  |--02:SCAN HDFS [functional.alltypestiny]
+|  |--03:AGGREGATE [FINALIZE]
+|  |  |  group by: functional.alltypestiny.int_col
+|  |  |  row-size=4B cardinality=2
+|  |  |
+|  |  02:SCAN HDFS [functional.alltypestiny]
 |  |     HDFS partitions=4/4 files=4 size=460B
 |  |     row-size=4B cardinality=8
 |  |
@@ -744,12 +764,16 @@ and tinyint_col < 10
 ---- PLAN
 PLAN-ROOT SINK
 |
-03:HASH JOIN [LEFT SEMI JOIN]
+04:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: a.tinyint_col = b.tinyint_col
 |  runtime filters: RF000 <- b.tinyint_col
 |  row-size=1B cardinality=244
 |
-|--02:AGGREGATE [FINALIZE]
+|--03:AGGREGATE [FINALIZE]
+|  |  group by: b.tinyint_col
+|  |  row-size=1B cardinality=2
+|  |
+|  02:AGGREGATE [FINALIZE]
 |  |  group by: id, int_col, bool_col, b.tinyint_col
 |  |  row-size=10B cardinality=8
 |  |
@@ -771,21 +795,25 @@ where not exists
 ---- PLAN
 PLAN-ROOT SINK
 |
-03:AGGREGATE [FINALIZE]
+04:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  row-size=8B cardinality=1
 |
-02:HASH JOIN [RIGHT ANTI JOIN]
-|  hash predicates: a.int_col = t.int_col
+03:HASH JOIN [LEFT ANTI JOIN]
+|  hash predicates: t.int_col = a.int_col
 |  row-size=4B cardinality=7.30K
 |
-|--00:SCAN HDFS [functional.alltypes t]
-|     HDFS partitions=24/24 files=24 size=478.45KB
-|     row-size=4B cardinality=7.30K
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: a.int_col
+|  |  row-size=4B cardinality=957
+|  |
+|  01:SCAN HDFS [functional.alltypesagg a]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=4B cardinality=11.00K
 |
-01:SCAN HDFS [functional.alltypesagg a]
-   HDFS partitions=11/11 files=11 size=814.73KB
-   row-size=4B cardinality=11.00K
+00:SCAN HDFS [functional.alltypes t]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
 ====
 # Correlated NOT EXISTS with an analytic function and a group by clause
 select count(*)
@@ -799,15 +827,19 @@ and bool_col = false
 ---- PLAN
 PLAN-ROOT SINK
 |
-06:AGGREGATE [FINALIZE]
+07:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  row-size=8B cardinality=1
 |
-05:HASH JOIN [LEFT ANTI JOIN]
+06:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: a.int_col = b.int_col
 |  row-size=5B cardinality=5.50K
 |
-|--04:AGGREGATE [FINALIZE]
+|--05:AGGREGATE [FINALIZE]
+|  |  group by: b.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  04:AGGREGATE [FINALIZE]
 |  |  group by: b.id, b.int_col, b.bigint_col
 |  |  row-size=16B cardinality=50
 |  |
@@ -978,16 +1010,16 @@ where exists
 ---- PLAN
 PLAN-ROOT SINK
 |
-05:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  row-size=8B cardinality=1
 |
-04:HASH JOIN [LEFT SEMI JOIN]
+05:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: a.id = t.id
 |  runtime filters: RF000 <- t.id
 |  row-size=4B cardinality=8
 |
-|--03:HASH JOIN [RIGHT SEMI JOIN]
+|--04:HASH JOIN [RIGHT SEMI JOIN]
 |  |  hash predicates: g.int_col = t.int_col
 |  |  runtime filters: RF002 <- t.int_col
 |  |  row-size=8B cardinality=8
@@ -995,6 +1027,10 @@ PLAN-ROOT SINK
 |  |--01:SCAN HDFS [functional.alltypestiny t]
 |  |     HDFS partitions=4/4 files=4 size=460B
 |  |     row-size=8B cardinality=8
+|  |
+|  03:AGGREGATE [FINALIZE]
+|  |  group by: g.int_col
+|  |  row-size=4B cardinality=957
 |  |
 |  02:SCAN HDFS [functional.alltypesagg g]
 |     HDFS partitions=11/11 files=11 size=814.73KB
@@ -2489,6 +2525,7 @@ PLAN-ROOT SINK
 |--01:SCAN HDFS [functional.alltypestiny]
 |     HDFS partitions=4/4 files=4 size=460B
 |     predicates: 1 = functional.alltypestiny.int_col
+|     limit: 1
 |     row-size=4B cardinality=4
 |
 00:SCAN HDFS [functional.alltypessmall]
@@ -2546,6 +2583,7 @@ PLAN-ROOT SINK
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  group by: int_col
+|  |  limit: 1
 |  |  row-size=4B cardinality=2
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
@@ -2592,6 +2630,7 @@ PLAN-ROOT SINK
 |--02:AGGREGATE [FINALIZE]
 |  |  output: max(int_col)
 |  |  having: 1 = max(int_col)
+|  |  limit: 1
 |  |  row-size=4B cardinality=1
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
@@ -2635,6 +2674,7 @@ PLAN-ROOT SINK
 |
 |--02:SELECT
 |  |  predicates: 1 = int_col
+|  |  limit: 1
 |  |  row-size=4B cardinality=1
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
@@ -2679,11 +2719,13 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=7.30K
 |
 |--03:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  |  limit: 1
 |  |  row-size=4B cardinality=unavailable
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
 |  |     HDFS partitions=4/4 files=4 size=460B
 |  |     predicates: 1 = functional.alltypestiny.int_col
+|  |     limit: 1
 |  |     row-size=4B cardinality=4
 |  |
 |  01:SCAN HDFS [functional.tinyinttable]
@@ -2708,6 +2750,7 @@ PLAN-ROOT SINK
 |--03:HASH JOIN [LEFT SEMI JOIN]
 |  |  hash predicates: bigint_col = bigint_col, t.id = id
 |  |  runtime filters: RF000 <- bigint_col, RF001 <- id
+|  |  limit: 1
 |  |  row-size=16B cardinality=2
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
@@ -4688,7 +4731,7 @@ and tinyint_col < 10
 ---- PLAN
 PLAN-ROOT SINK
 |
-04:HASH JOIN [RIGHT SEMI JOIN]
+05:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: CASE valid_tid(2,3,4,5) WHEN 2 THEN b.tinyint_col WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col END = a.tinyint_col, CASE valid_tid(2,3,4,5) WHEN 2 THEN b.string_col WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col END = a.string_col
 |  row-size=14B cardinality=1
 |
@@ -4696,6 +4739,10 @@ PLAN-ROOT SINK
 |     HDFS partitions=4/4 files=4 size=460B
 |     predicates: tinyint_col < 10
 |     row-size=14B cardinality=1
+|
+04:AGGREGATE [FINALIZE]
+|  group by: CASE valid_tid(2,3,4,5) WHEN 2 THEN b.tinyint_col WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col END, CASE valid_tid(2,3,4,5) WHEN 2 THEN b.string_col WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col END
+|  row-size=13B cardinality=9.64K
 |
 03:AGGREGATE [FINALIZE]
 |  group by: CASE valid_tid(2,3,4,5) WHEN 2 THEN id WHEN 3 THEN id WHEN 4 THEN id WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN int_col WHEN 3 THEN int_col WHEN 4 THEN NULL WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN bool_col WHEN 3 THEN NULL WHEN 4 THEN NULL WHEN 5 THEN NULL END, CASE valid_tid(2,3,4,5) WHEN 2 THEN b.tinyint_col WHEN 3 THEN b.tinyint_col WHEN 4 THEN b.tinyint_col WHEN 5 THEN b.tinyint_col END, CASE valid_tid(2,3,4,5) WHEN 2 THEN b.string_col WHEN 3 THEN b.string_col WHEN 4 THEN b.string_col WHEN 5 THEN b.string_col END, CASE valid_tid(2,3,4,5) WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 END

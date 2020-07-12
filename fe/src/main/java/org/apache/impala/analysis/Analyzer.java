@@ -58,13 +58,13 @@ import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.planner.JoinNode;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
@@ -73,6 +73,7 @@ import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.rewrite.ExtractCommonConjunctRule;
+import org.apache.impala.rewrite.ExtractCompoundVerticalBarExprRule;
 import org.apache.impala.rewrite.FoldConstantsRule;
 import org.apache.impala.rewrite.NormalizeBinaryPredicatesRule;
 import org.apache.impala.rewrite.NormalizeCountStarRule;
@@ -80,7 +81,6 @@ import org.apache.impala.rewrite.NormalizeExprsRule;
 import org.apache.impala.rewrite.SimplifyCastStringToTimestamp;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.SimplifyDistinctFromRule;
-import org.apache.impala.rewrite.ExtractCompoundVerticalBarExprRule;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -873,6 +873,17 @@ public class Analyzer {
 
   public SlotDescriptor getSlotDesc(SlotId id) {
     return globalState_.descTbl.getSlotDesc(id);
+  }
+
+  /**
+   * Helper to get all slot descriptors in list.
+   */
+  public List<SlotDescriptor> getSlotDescs(List<SlotId> ids) {
+    List<SlotDescriptor> result = new ArrayList<>(ids.size());
+    for (SlotId id : ids) {
+      result.add(getSlotDesc(id));
+    }
+    return result;
   }
 
   public int getNumTableRefs() { return tableRefMap_.size(); }

@@ -4005,43 +4005,43 @@ select t1.bigint_col from functional.alltypestiny t1 inner join
 ---- PLAN
 PLAN-ROOT SINK
 |
-11:AGGREGATE [FINALIZE]
+12:AGGREGATE [FINALIZE]
 |  group by: bigint_col
 |  row-size=8B cardinality=8
 |
 00:UNION
-|  pass-through-operands: 01,04
+|  pass-through-operands: 01,05
 |  row-size=8B cardinality=11.70K
 |
-|--10:HASH JOIN [INNER JOIN]
+|--11:HASH JOIN [INNER JOIN]
 |  |  hash predicates: t2.bigint_col = t1.bigint_col
 |  |  runtime filters: RF004 <- t1.bigint_col
 |  |  row-size=16B cardinality=5.84K
 |  |
-|  |--08:SCAN HDFS [functional.alltypestiny t1]
+|  |--09:SCAN HDFS [functional.alltypestiny t1]
 |  |     HDFS partitions=4/4 files=4 size=460B
 |  |     row-size=8B cardinality=8
 |  |
-|  09:SCAN HDFS [functional.alltypes t2]
+|  10:SCAN HDFS [functional.alltypes t2]
 |     HDFS partitions=24/24 files=24 size=478.45KB
 |     runtime filters: RF004 -> t2.bigint_col
 |     row-size=8B cardinality=7.30K
 |
-|--07:HASH JOIN [RIGHT OUTER JOIN]
+|--08:HASH JOIN [RIGHT OUTER JOIN]
 |  |  hash predicates: t2.bigint_col = t1.bigint_col
 |  |  runtime filters: RF002 <- t1.bigint_col
 |  |  row-size=16B cardinality=5.84K
 |  |
-|  |--05:SCAN HDFS [functional.alltypestiny t1]
+|  |--06:SCAN HDFS [functional.alltypestiny t1]
 |  |     HDFS partitions=4/4 files=4 size=460B
 |  |     row-size=8B cardinality=8
 |  |
-|  06:SCAN HDFS [functional.alltypes t2]
+|  07:SCAN HDFS [functional.alltypes t2]
 |     HDFS partitions=24/24 files=24 size=478.45KB
 |     runtime filters: RF002 -> t2.bigint_col
 |     row-size=8B cardinality=7.30K
 |
-|--04:HASH JOIN [RIGHT SEMI JOIN]
+|--05:HASH JOIN [RIGHT SEMI JOIN]
 |  |  hash predicates: t2.bigint_col = t1.bigint_col
 |  |  runtime filters: RF000 <- t1.bigint_col
 |  |  row-size=8B cardinality=8
@@ -4049,6 +4049,10 @@ PLAN-ROOT SINK
 |  |--02:SCAN HDFS [functional.alltypestiny t1]
 |  |     HDFS partitions=4/4 files=4 size=460B
 |  |     row-size=8B cardinality=8
+|  |
+|  04:AGGREGATE [FINALIZE]
+|  |  group by: t2.bigint_col
+|  |  row-size=8B cardinality=10
 |  |
 |  03:SCAN HDFS [functional.alltypes t2]
 |     HDFS partitions=24/24 files=24 size=478.45KB
@@ -4103,7 +4107,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    row-size=32B cardinality=150.00K
 ====
 # IMPALA-6388: Verify that the order of the union operands does not impact the

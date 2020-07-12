@@ -1148,6 +1148,7 @@ PLAN-ROOT SINK
 |
 |--03:SCAN HDFS [functional.alltypes d]
 |     HDFS partitions=24/24 files=24 size=478.45KB
+|     limit: 1
 |     row-size=0B cardinality=7.30K
 |
 05:HASH JOIN [RIGHT OUTER JOIN]

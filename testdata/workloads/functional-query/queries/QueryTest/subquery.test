@@ -1434,3 +1434,88 @@ from functional.alltypestiny
 ---- TYPES
 INT, INT
 ====
+---- QUERY
+# IMPALA-1270: test that distinct subquery is executable and returns correct results.
+select id from alltypestiny
+where int_col in (select int_col from alltypes where id % 2 = 0)
+---- RESULTS
+0
+2
+4
+6
+---- TYPES
+INT
+====
+---- QUERY
+# IMPALA-1270: test that distinct subquery with anti join is executable and
+# returns correct results.
+select id from alltypestiny
+where int_col not in (select int_col from alltypes where id % 2 = 0)
+---- RESULTS
+1
+3
+5
+7
+---- TYPES
+INT
+====
+---- QUERY
+# IMPALA-1270: test that subquery with no join predicates is executable and
+# returns correct results. A limit is added by the planner.
+select id from alltypestiny
+where exists (select int_col from alltypes where id % 2 = 0)
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+---- TYPES
+INT
+====
+---- QUERY
+# IMPALA-1270: test subquery with multiple join predicates with distinct
+# added returns correct results.
+select count(*) from alltypesagg t1
+where int_col in (
+  select int_col from alltypes t2
+  where t1.bool_col = t2.bool_col and id is not null);
+---- RESULTS
+90
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-1270: test subquery with aggregate function returns correct results.
+select id from alltypesagg t1
+where int_col in (
+    select count(*)
+    from alltypes t2
+    group by int_col, tinyint_col)
+---- RESULTS
+730
+730
+1730
+1730
+2730
+2730
+3730
+3730
+4730
+4730
+5730
+5730
+6730
+6730
+7730
+7730
+8730
+8730
+9730
+9730
+---- TYPES
+INT
+====

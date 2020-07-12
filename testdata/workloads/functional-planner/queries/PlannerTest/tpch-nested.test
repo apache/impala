@@ -36,7 +36,7 @@ PLAN-ROOT SINK
 |  row-size=120B cardinality=1.50M
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: l_shipdate <= '1998-09-02'
    row-size=68B cardinality=1.50M
 ---- DISTRIBUTEDPLAN
@@ -64,7 +64,7 @@ PLAN-ROOT SINK
 |  row-size=120B cardinality=1.50M
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: l_shipdate <= '1998-09-02'
    row-size=68B cardinality=1.50M
 ====
@@ -147,7 +147,7 @@ PLAN-ROOT SINK
 |  |  |     row-size=0B cardinality=10
 |  |  |
 |  |  16:SCAN HDFS [tpch_nested_parquet.region r]
-|  |     HDFS partitions=1/1 files=1 size=3.50KB
+|  |     HDFS partitions=1/1 files=1 size=3.59KB
 |  |     predicates: r_name = 'EUROPE', !empty(r.r_nations)
 |  |     row-size=31B cardinality=1
 |  |
@@ -187,7 +187,7 @@ PLAN-ROOT SINK
 |  |     row-size=0B cardinality=10
 |  |
 |  06:SCAN HDFS [tpch_nested_parquet.region r]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: r_name = 'EUROPE', !empty(r.r_nations)
 |     row-size=31B cardinality=1
 |
@@ -270,7 +270,7 @@ PLAN-ROOT SINK
 |  |  |     row-size=0B cardinality=10
 |  |  |
 |  |  16:SCAN HDFS [tpch_nested_parquet.region r]
-|  |     HDFS partitions=1/1 files=1 size=3.50KB
+|  |     HDFS partitions=1/1 files=1 size=3.59KB
 |  |     predicates: r_name = 'EUROPE', !empty(r.r_nations)
 |  |     row-size=31B cardinality=1
 |  |
@@ -312,7 +312,7 @@ PLAN-ROOT SINK
 |  |     row-size=0B cardinality=10
 |  |
 |  06:SCAN HDFS [tpch_nested_parquet.region r]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: r_name = 'EUROPE', !empty(r.r_nations)
 |     row-size=31B cardinality=1
 |
@@ -408,7 +408,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: c_mktsegment = 'BUILDING', !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate < '1995-03-15'
    predicates on l: l_shipdate > '1995-03-15'
@@ -463,7 +463,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: c_mktsegment = 'BUILDING', !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate < '1995-03-15'
    predicates on l: l_shipdate > '1995-03-15'
@@ -519,6 +519,7 @@ PLAN-ROOT SINK
 |  |  |     row-size=48B cardinality=1
 |  |  |
 |  |  05:UNNEST [o.o_lineitems]
+|  |     limit: 1
 |  |     row-size=24B cardinality=10
 |  |
 |  07:NESTED LOOP JOIN [CROSS JOIN]
@@ -531,7 +532,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    predicates on o: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
    predicates on o_lineitems: l_commitdate < l_receiptdate
@@ -573,6 +574,7 @@ PLAN-ROOT SINK
 |  |  |     row-size=48B cardinality=1
 |  |  |
 |  |  05:UNNEST [o.o_lineitems]
+|  |     limit: 1
 |  |     row-size=24B cardinality=10
 |  |
 |  07:NESTED LOOP JOIN [CROSS JOIN]
@@ -585,7 +587,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    predicates on o: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
    predicates on o_lineitems: l_commitdate < l_receiptdate
@@ -655,7 +657,7 @@ PLAN-ROOT SINK
 |  |     row-size=0B cardinality=10
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.region r]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: r_name = 'ASIA', !empty(r.r_nations)
 |     row-size=31B cardinality=1
 |
@@ -684,7 +686,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
    runtime filters: RF000 -> c_nationkey, RF004 -> c.c_nationkey
@@ -744,7 +746,7 @@ PLAN-ROOT SINK
 |  |     row-size=0B cardinality=10
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.region r]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: r_name = 'ASIA', !empty(r.r_nations)
 |     row-size=31B cardinality=1
 |
@@ -773,7 +775,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
    runtime filters: RF000 -> c_nationkey, RF004 -> c.c_nationkey
@@ -800,7 +802,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=1
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: l_discount <= 0.07, l_discount >= 0.05, l_quantity < 24, l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
    row-size=36B cardinality=1.50M
 ---- DISTRIBUTEDPLAN
@@ -819,7 +821,7 @@ PLAN-ROOT SINK
 |  row-size=16B cardinality=1
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: l_discount <= 0.07, l_discount >= 0.05, l_quantity < 24, l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
    row-size=36B cardinality=1.50M
 ====
@@ -882,7 +884,7 @@ PLAN-ROOT SINK
 |  row-size=100B cardinality=15.00M
 |
 |--11:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: n2.n_name IN ('GERMANY', 'FRANCE')
 |     row-size=14B cardinality=5
 |
@@ -892,7 +894,7 @@ PLAN-ROOT SINK
 |  row-size=86B cardinality=15.00M
 |
 |--10:SCAN HDFS [tpch_nested_parquet.region.r_nations n1]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: n1.n_name IN ('FRANCE', 'GERMANY')
 |     row-size=14B cardinality=5
 |
@@ -930,7 +932,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems)
    predicates on l: l_shipdate >= '1995-01-01', l_shipdate <= '1996-12-31'
@@ -969,7 +971,7 @@ PLAN-ROOT SINK
 |--19:EXCHANGE [BROADCAST]
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: n2.n_name IN ('GERMANY', 'FRANCE')
 |     row-size=14B cardinality=5
 |
@@ -981,7 +983,7 @@ PLAN-ROOT SINK
 |--18:EXCHANGE [BROADCAST]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.region.r_nations n1]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: n1.n_name IN ('FRANCE', 'GERMANY')
 |     row-size=14B cardinality=5
 |
@@ -1021,7 +1023,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems)
    predicates on l: l_shipdate >= '1995-01-01', l_shipdate <= '1996-12-31'
@@ -1084,7 +1086,7 @@ PLAN-ROOT SINK
 |  row-size=167B cardinality=15.00M
 |
 |--16:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     row-size=14B cardinality=50
 |
 19:HASH JOIN [INNER JOIN]
@@ -1105,7 +1107,7 @@ PLAN-ROOT SINK
 |  |     row-size=0B cardinality=10
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.region r]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: r_name = 'AMERICA', !empty(r.r_nations)
 |     row-size=31B cardinality=1
 |
@@ -1152,7 +1154,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
    runtime filters: RF002 -> c_nationkey
@@ -1189,7 +1191,7 @@ PLAN-ROOT SINK
 |--26:EXCHANGE [BROADCAST]
 |  |
 |  16:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     row-size=14B cardinality=50
 |
 19:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1212,7 +1214,7 @@ PLAN-ROOT SINK
 |  |     row-size=0B cardinality=10
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.region r]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: r_name = 'AMERICA', !empty(r.r_nations)
 |     row-size=31B cardinality=1
 |
@@ -1263,7 +1265,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
    runtime filters: RF002 -> c_nationkey
@@ -1320,7 +1322,7 @@ PLAN-ROOT SINK
 |  row-size=169B cardinality=15.00M
 |
 |--11:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     row-size=14B cardinality=50
 |
 13:HASH JOIN [INNER JOIN]
@@ -1367,7 +1369,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(o.o_lineitems)
    row-size=24B cardinality=1.50M
 ---- DISTRIBUTEDPLAN
@@ -1402,7 +1404,7 @@ PLAN-ROOT SINK
 |--19:EXCHANGE [BROADCAST]
 |  |
 |  11:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     row-size=14B cardinality=50
 |
 13:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1453,7 +1455,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(o.o_lineitems)
    row-size=24B cardinality=1.50M
 ====
@@ -1510,7 +1512,7 @@ PLAN-ROOT SINK
 |  row-size=275B cardinality=15.00M
 |
 |--09:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     row-size=14B cardinality=50
 |
 01:SUBPLAN
@@ -1538,7 +1540,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1993-10-01', o_orderdate < '1994-01-01'
    predicates on l: l_returnflag = 'R'
@@ -1577,7 +1579,7 @@ PLAN-ROOT SINK
 |--13:EXCHANGE [BROADCAST]
 |  |
 |  09:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     row-size=14B cardinality=50
 |
 01:SUBPLAN
@@ -1605,7 +1607,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderdate >= '1993-10-01', o_orderdate < '1994-01-01'
    predicates on l: l_returnflag = 'R'
@@ -1668,7 +1670,7 @@ PLAN-ROOT SINK
 |  |  row-size=40B cardinality=100.00K
 |  |
 |  |--13:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|  |     HDFS partitions=1/1 files=1 size=3.50KB
+|  |     HDFS partitions=1/1 files=1 size=3.59KB
 |  |     predicates: n_name = 'GERMANY'
 |  |     row-size=14B cardinality=5
 |  |
@@ -1701,7 +1703,7 @@ PLAN-ROOT SINK
 |  row-size=48B cardinality=100.00K
 |
 |--05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: n_name = 'GERMANY'
 |     row-size=14B cardinality=5
 |
@@ -1758,7 +1760,7 @@ PLAN-ROOT SINK
 |  |--21:EXCHANGE [BROADCAST]
 |  |  |
 |  |  13:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|  |     HDFS partitions=1/1 files=1 size=3.50KB
+|  |     HDFS partitions=1/1 files=1 size=3.59KB
 |  |     predicates: n_name = 'GERMANY'
 |  |     row-size=14B cardinality=5
 |  |
@@ -1800,7 +1802,7 @@ PLAN-ROOT SINK
 |--18:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: n_name = 'GERMANY'
 |     row-size=14B cardinality=5
 |
@@ -1878,7 +1880,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(o.o_lineitems)
    predicates on l: l_shipmode IN ('MAIL', 'SHIP'), l_commitdate < l_receiptdate, l_shipdate < l_commitdate, l_receiptdate >= '1994-01-01', l_receiptdate < '1995-01-01'
    row-size=24B cardinality=1.50M
@@ -1919,7 +1921,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(o.o_lineitems)
    predicates on l: l_shipmode IN ('MAIL', 'SHIP'), l_commitdate < l_receiptdate, l_shipdate < l_commitdate, l_receiptdate >= '1994-01-01', l_receiptdate < '1995-01-01'
    row-size=24B cardinality=1.50M
@@ -1977,7 +1979,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates on c_orders: (NOT o_comment LIKE '%special%requests%')
    row-size=20B cardinality=150.00K
 ---- DISTRIBUTEDPLAN
@@ -2029,7 +2031,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates on c_orders: (NOT o_comment LIKE '%special%requests%')
    row-size=20B cardinality=150.00K
 ====
@@ -2067,7 +2069,7 @@ PLAN-ROOT SINK
 |     row-size=41B cardinality=200.00K
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: l_shipdate < '1995-10-01', l_shipdate >= '1995-09-01'
    runtime filters: RF000 -> l_partkey
    row-size=36B cardinality=1.50M
@@ -2098,7 +2100,7 @@ PLAN-ROOT SINK
 |     row-size=41B cardinality=200.00K
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: l_shipdate < '1995-10-01', l_shipdate >= '1995-09-01'
    runtime filters: RF000 -> l_partkey
    row-size=36B cardinality=1.50M
@@ -2158,7 +2160,7 @@ PLAN-ROOT SINK
 |  |  row-size=24B cardinality=1.50M
 |  |
 |  03:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     HDFS partitions=1/1 files=4 size=289.14MB
+|     HDFS partitions=1/1 files=4 size=289.08MB
 |     predicates: l_shipdate < '1996-04-01', l_shipdate >= '1996-01-01'
 |     row-size=36B cardinality=1.50M
 |
@@ -2177,7 +2179,7 @@ PLAN-ROOT SINK
 |  row-size=24B cardinality=1.50M
 |
 01:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: l_shipdate < '1996-04-01', l_shipdate >= '1996-01-01'
    runtime filters: RF000 -> l.l_suppkey
    row-size=36B cardinality=1.50M
@@ -2222,7 +2224,7 @@ PLAN-ROOT SINK
 |  |  row-size=24B cardinality=1.50M
 |  |
 |  03:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     HDFS partitions=1/1 files=4 size=289.14MB
+|     HDFS partitions=1/1 files=4 size=289.08MB
 |     predicates: l_shipdate < '1996-04-01', l_shipdate >= '1996-01-01'
 |     row-size=36B cardinality=1.50M
 |
@@ -2250,7 +2252,7 @@ PLAN-ROOT SINK
 |  row-size=24B cardinality=1.50M
 |
 01:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: l_shipdate < '1996-04-01', l_shipdate >= '1996-01-01'
    runtime filters: RF000 -> l.l_suppkey
    row-size=36B cardinality=1.50M
@@ -2426,7 +2428,7 @@ PLAN-ROOT SINK
 |  |  row-size=16B cardinality=15.00M
 |  |
 |  02:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     HDFS partitions=1/1 files=4 size=289.14MB
+|     HDFS partitions=1/1 files=4 size=289.08MB
 |     row-size=16B cardinality=15.00M
 |
 04:HASH JOIN [INNER JOIN]
@@ -2441,7 +2443,7 @@ PLAN-ROOT SINK
 |     row-size=48B cardinality=1.00K
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    runtime filters: RF000 -> l.l_partkey, RF002 -> l_partkey
    row-size=24B cardinality=15.00M
 ---- DISTRIBUTEDPLAN
@@ -2478,7 +2480,7 @@ PLAN-ROOT SINK
 |  |  row-size=16B cardinality=15.00M
 |  |
 |  02:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-|     HDFS partitions=1/1 files=4 size=289.14MB
+|     HDFS partitions=1/1 files=4 size=289.08MB
 |     row-size=16B cardinality=15.00M
 |
 10:EXCHANGE [HASH(p_partkey)]
@@ -2497,7 +2499,7 @@ PLAN-ROOT SINK
 |     row-size=48B cardinality=1.00K
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    runtime filters: RF000 -> l.l_partkey, RF002 -> l_partkey
    row-size=24B cardinality=15.00M
 ====
@@ -2559,7 +2561,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    row-size=50B cardinality=150.00K
 ---- DISTRIBUTEDPLAN
@@ -2605,7 +2607,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    row-size=50B cardinality=150.00K
 ====
@@ -2667,7 +2669,7 @@ PLAN-ROOT SINK
 |     row-size=52B cardinality=1.43K
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: l_shipmode IN ('AIR', 'AIR REG'), l_quantity <= 11 OR l_quantity <= 20 OR l_quantity <= 30, l_quantity <= 11 OR l_quantity <= 20 OR l_quantity >= 20, l_quantity <= 11 OR l_quantity >= 10 OR l_quantity <= 30, l_quantity <= 11 OR l_quantity >= 10 OR l_quantity >= 20, l_quantity >= 1 OR l_quantity <= 20 OR l_quantity <= 30, l_quantity >= 1 OR l_quantity <= 20 OR l_quantity >= 20, l_quantity >= 1 OR l_quantity >= 10 OR l_quantity <= 30, l_quantity >= 1 OR l_quantity >= 10 OR l_quantity >= 20, l_shipinstruct = 'DELIVER IN PERSON'
    runtime filters: RF000 -> l_partkey
    row-size=56B cardinality=1.50M
@@ -2700,7 +2702,7 @@ PLAN-ROOT SINK
 |     row-size=52B cardinality=1.43K
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: l_shipmode IN ('AIR', 'AIR REG'), l_quantity <= 11 OR l_quantity <= 20 OR l_quantity <= 30, l_quantity <= 11 OR l_quantity <= 20 OR l_quantity >= 20, l_quantity <= 11 OR l_quantity >= 10 OR l_quantity <= 30, l_quantity <= 11 OR l_quantity >= 10 OR l_quantity >= 20, l_quantity >= 1 OR l_quantity <= 20 OR l_quantity <= 30, l_quantity >= 1 OR l_quantity <= 20 OR l_quantity >= 20, l_quantity >= 1 OR l_quantity >= 10 OR l_quantity <= 30, l_quantity >= 1 OR l_quantity >= 10 OR l_quantity >= 20, l_shipinstruct = 'DELIVER IN PERSON'
    runtime filters: RF000 -> l_partkey
    row-size=56B cardinality=1.50M
@@ -2773,7 +2775,7 @@ PLAN-ROOT SINK
 |  |  row-size=115B cardinality=100.00K
 |  |
 |  |--05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|  |     HDFS partitions=1/1 files=1 size=3.50KB
+|  |     HDFS partitions=1/1 files=1 size=3.59KB
 |  |     predicates: n_name = 'CANADA'
 |  |     row-size=14B cardinality=5
 |  |
@@ -2801,7 +2803,7 @@ PLAN-ROOT SINK
 |  row-size=32B cardinality=1.50M
 |
 07:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
    runtime filters: RF000 -> l.l_partkey, RF001 -> l.l_suppkey
    row-size=36B cardinality=1.50M
@@ -2854,7 +2856,7 @@ PLAN-ROOT SINK
 |  |--16:EXCHANGE [BROADCAST]
 |  |  |
 |  |  05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|  |     HDFS partitions=1/1 files=1 size=3.50KB
+|  |     HDFS partitions=1/1 files=1 size=3.59KB
 |  |     predicates: n_name = 'CANADA'
 |  |     row-size=14B cardinality=5
 |  |
@@ -2889,7 +2891,7 @@ PLAN-ROOT SINK
 |  row-size=32B cardinality=1.50M
 |
 07:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: l_shipdate < '1995-01-01', l_shipdate >= '1994-01-01'
    runtime filters: RF000 -> l.l_partkey, RF001 -> l.l_suppkey
    row-size=36B cardinality=1.50M
@@ -2974,7 +2976,7 @@ PLAN-ROOT SINK
 |  row-size=146B cardinality=15.00M
 |
 |--10:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: n_name = 'SAUDI ARABIA'
 |     row-size=14B cardinality=5
 |
@@ -3012,7 +3014,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 01:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderstatus = 'F'
    predicates on l1: l1.l_receiptdate > l1.l_commitdate
@@ -3071,7 +3073,7 @@ PLAN-ROOT SINK
 |--22:EXCHANGE [BROADCAST]
 |  |
 |  10:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
-|     HDFS partitions=1/1 files=1 size=3.50KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: n_name = 'SAUDI ARABIA'
 |     row-size=14B cardinality=5
 |
@@ -3111,7 +3113,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 01:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderstatus = 'F'
    predicates on l1: l1.l_receiptdate > l1.l_commitdate
@@ -3176,6 +3178,7 @@ PLAN-ROOT SINK
 |  |     row-size=55B cardinality=1
 |  |
 |  04:UNNEST [c.c_orders]
+|     limit: 1
 |     row-size=0B cardinality=10
 |
 06:NESTED LOOP JOIN [INNER JOIN]
@@ -3187,12 +3190,12 @@ PLAN-ROOT SINK
 |  |  row-size=8B cardinality=1
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.customer c]
-|     HDFS partitions=1/1 files=4 size=289.14MB
+|     HDFS partitions=1/1 files=4 size=289.08MB
 |     predicates: c_acctbal > 0, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |     row-size=35B cardinality=15.00K
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
    row-size=47B cardinality=15.00K
 ---- DISTRIBUTEDPLAN
@@ -3229,6 +3232,7 @@ PLAN-ROOT SINK
 |  |     row-size=55B cardinality=1
 |  |
 |  04:UNNEST [c.c_orders]
+|     limit: 1
 |     row-size=0B cardinality=10
 |
 06:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
@@ -3248,12 +3252,12 @@ PLAN-ROOT SINK
 |  |  row-size=8B cardinality=1
 |  |
 |  01:SCAN HDFS [tpch_nested_parquet.customer c]
-|     HDFS partitions=1/1 files=4 size=289.14MB
+|     HDFS partitions=1/1 files=4 size=289.08MB
 |     predicates: c_acctbal > 0, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |     row-size=35B cardinality=15.00K
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
    row-size=47B cardinality=15.00K
 ====

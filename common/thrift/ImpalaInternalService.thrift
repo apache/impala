@@ -429,6 +429,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   105: optional bool async_codegen = false;
+
+  // See comment in ImpalaService.thrift
+  106: optional bool enable_distinct_semi_join_optimization = true;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

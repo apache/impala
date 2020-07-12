@@ -1475,16 +1475,16 @@ where
 order by
   s_name
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=55.81MB Threads=6
+Max Per-Host Resource Reservation: Memory=48.62MB Threads=6
 Per-Host Resource Estimates: Memory=65MB
 PLAN-ROOT SINK
 |
-10:SORT
+11:SORT
 |  order by: s_name ASC
 |  row-size=67B cardinality=400
 |
-09:HASH JOIN [RIGHT SEMI JOIN]
-|  hash predicates: ps_suppkey = s_suppkey
+10:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: tpch_kudu.partsupp.ps_suppkey = s_suppkey
 |  runtime filters: RF000 <- s_suppkey, RF001 <- s_suppkey
 |  row-size=87B cardinality=400
 |
@@ -1500,6 +1500,10 @@ PLAN-ROOT SINK
 |  00:SCAN KUDU [tpch_kudu.supplier]
 |     runtime filters: RF008 -> s_nationkey, RF009 -> s_nationkey
 |     row-size=85B cardinality=10.00K
+|
+09:AGGREGATE [FINALIZE]
+|  group by: tpch_kudu.partsupp.ps_suppkey
+|  row-size=8B cardinality=9.71K
 |
 07:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
@@ -1517,7 +1521,7 @@ PLAN-ROOT SINK
 |  |     row-size=57B cardinality=20.00K
 |  |
 |  02:SCAN KUDU [tpch_kudu.partsupp]
-|     runtime filters: RF000 -> ps_suppkey, RF001 -> ps_suppkey, RF006 -> ps_partkey, RF007 -> ps_partkey
+|     runtime filters: RF000 -> tpch_kudu.partsupp.ps_suppkey, RF001 -> tpch_kudu.partsupp.ps_suppkey, RF006 -> ps_partkey, RF007 -> ps_partkey
 |     row-size=24B cardinality=800.00K
 |
 05:AGGREGATE [FINALIZE]
@@ -1673,39 +1677,43 @@ order by
   cntrycode
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=13.94MB Threads=4
-Per-Host Resource Estimates: Memory=31MB
+Per-Host Resource Estimates: Memory=41MB
 PLAN-ROOT SINK
 |
-07:SORT
+08:SORT
 |  order by: cntrycode ASC
 |  row-size=36B cardinality=15.00K
 |
-06:AGGREGATE [FINALIZE]
+07:AGGREGATE [FINALIZE]
 |  output: count(*), sum(c_acctbal)
 |  group by: substr(c_phone, 1, 2)
 |  row-size=36B cardinality=15.00K
 |
-05:HASH JOIN [RIGHT ANTI JOIN]
-|  hash predicates: o_custkey = c_custkey
+06:HASH JOIN [LEFT ANTI JOIN]
+|  hash predicates: c_custkey = tpch_kudu.orders.o_custkey
 |  row-size=55B cardinality=15.00K
 |
-|--04:NESTED LOOP JOIN [INNER JOIN]
-|  |  predicates: c_acctbal > round(avg(c_acctbal), 1)
-|  |  row-size=55B cardinality=15.00K
+|--05:AGGREGATE [FINALIZE]
+|  |  group by: tpch_kudu.orders.o_custkey
+|  |  row-size=8B cardinality=98.39K
 |  |
-|  |--02:AGGREGATE [FINALIZE]
-|  |  |  output: avg(c_acctbal)
-|  |  |  row-size=8B cardinality=1
-|  |  |
-|  |  01:SCAN KUDU [tpch_kudu.customer]
-|  |     predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
-|  |     kudu predicates: c_acctbal > 0
-|  |     row-size=39B cardinality=15.00K
-|  |
-|  00:SCAN KUDU [tpch_kudu.customer]
-|     predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
-|     row-size=47B cardinality=15.00K
+|  03:SCAN KUDU [tpch_kudu.orders]
+|     row-size=8B cardinality=1.50M
 |
-03:SCAN KUDU [tpch_kudu.orders]
-   row-size=8B cardinality=1.50M
+04:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: c_acctbal > round(avg(c_acctbal), 1)
+|  row-size=55B cardinality=15.00K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: avg(c_acctbal)
+|  |  row-size=8B cardinality=1
+|  |
+|  01:SCAN KUDU [tpch_kudu.customer]
+|     predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+|     kudu predicates: c_acctbal > 0
+|     row-size=39B cardinality=15.00K
+|
+00:SCAN KUDU [tpch_kudu.customer]
+   predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+   row-size=47B cardinality=15.00K
 ====
