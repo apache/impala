@@ -1316,6 +1316,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return null;
   }
 
+  /**
+   * Find all unique slot and/or tuple ids referenced by this expr tree.
+   * @param tupleIds unique tuple IDs from this expr tree are appended here.
+   * @param slotIds unique slot IDs from this expr tree are appended here.
+   */
   public void getIds(List<TupleId> tupleIds, List<SlotId> slotIds) {
     Set<TupleId> tupleIdSet = new HashSet<>();
     Set<SlotId> slotIdSet = new HashSet<>();

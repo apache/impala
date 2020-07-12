@@ -1,0 +1,973 @@
+# IMPALA-1270: distinct should be added to subquery automatically because
+# it would reduce cardinality significantly.
+select * from functional.alltypestiny
+where int_col in (select int_col from functional.alltypes where id % 2 = 0)
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = functional.alltypes.int_col
+|  runtime filters: RF000 <- functional.alltypes.int_col
+|  row-size=89B cardinality=8
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: functional.alltypes.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: id % 2 = 0
+|     row-size=8B cardinality=730
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> int_col
+   row-size=89B cardinality=8
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: int_col = functional.alltypes.int_col
+|  row-size=89B cardinality=8
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: functional.alltypes.int_col
+|  |  runtime filters: RF000 <- functional.alltypes.int_col
+|  |
+|  06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  group by: functional.alltypes.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  04:EXCHANGE [HASH(functional.alltypes.int_col)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  group by: functional.alltypes.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: id % 2 = 0
+|     row-size=8B cardinality=730
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> int_col
+   row-size=89B cardinality=8
+====
+# IMPALA-1270: distinct should not be added to subquery when column stats
+# are missing (as they are on functional_parquet.alltypes).
+select * from functional.alltypestiny
+where int_col in (select int_col from functional_parquet.alltypes)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
+|  row-size=89B cardinality=8
+|
+|--00:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
+|
+01:SCAN HDFS [functional_parquet.alltypes]
+   HDFS partitions=24/24 files=24 size=202.01KB
+   runtime filters: RF000 -> int_col
+   row-size=4B cardinality=12.85K
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
+|  hash predicates: int_col = int_col
+|  row-size=89B cardinality=8
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: int_col
+|  |  runtime filters: RF000 <- int_col
+|  |
+|  04:EXCHANGE [HASH(int_col)]
+|  |
+|  00:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=89B cardinality=8
+|
+03:EXCHANGE [HASH(int_col)]
+|
+01:SCAN HDFS [functional_parquet.alltypes]
+   HDFS partitions=24/24 files=24 size=202.01KB
+   runtime filters: RF000 -> int_col
+   row-size=4B cardinality=12.85K
+====
+# IMPALA-1270: distinct should be added to subquery automatically because
+# it would reduce cardinality significantly.
+select * from functional.alltypestiny
+where int_col in (select int_col from functional.alltypes)
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = functional.alltypes.int_col
+|  runtime filters: RF000 <- functional.alltypes.int_col
+|  row-size=89B cardinality=8
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: functional.alltypes.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> int_col
+   row-size=89B cardinality=8
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: int_col = functional.alltypes.int_col
+|  row-size=89B cardinality=8
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: functional.alltypes.int_col
+|  |  runtime filters: RF000 <- functional.alltypes.int_col
+|  |
+|  06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  group by: functional.alltypes.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  04:EXCHANGE [HASH(functional.alltypes.int_col)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  group by: functional.alltypes.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> int_col
+   row-size=89B cardinality=8
+====
+# IMPALA-1270: distinct should not be added to subquery when it does not
+# reduce cardinality significantly.
+select * from functional.alltypestiny
+where int_col in (select int_col from functional.alltypes where id in (1,2,3))
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
+|  row-size=89B cardinality=8
+|
+|--01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: id IN (1, 2, 3)
+|     row-size=8B cardinality=3
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> int_col
+   row-size=89B cardinality=8
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: int_col = int_col
+|  row-size=89B cardinality=8
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: int_col
+|  |  runtime filters: RF000 <- int_col
+|  |
+|  03:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: id IN (1, 2, 3)
+|     row-size=8B cardinality=3
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> int_col
+   row-size=89B cardinality=8
+====
+# IMPALA-1270: distinct should not be added to subquery that returns 0 rows
+# reduce cardinality significantly.
+select * from functional.alltypestiny
+where int_col in (select int_col from functional.alltypes limit 0)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
+|  row-size=89B cardinality=0
+|
+|--01:EMPTYSET
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> int_col
+   row-size=89B cardinality=8
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: int_col = int_col
+|  row-size=89B cardinality=0
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: int_col
+|  |  runtime filters: RF000 <- int_col
+|  |
+|  03:EXCHANGE [BROADCAST]
+|  |
+|  01:EMPTYSET
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> int_col
+   row-size=89B cardinality=8
+====
+# IMPALA-1270: limit should be added to subquery that results in a semi
+# join with no join predicates.
+select * from functional.alltypestiny
+where exists (select int_col from functional.alltypes)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  row-size=89B cardinality=8
+|
+|--01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     limit: 1
+|     row-size=0B cardinality=1
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:NESTED LOOP JOIN [LEFT SEMI JOIN, BROADCAST]
+|  join table id: 00
+|  row-size=89B cardinality=8
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |
+|  04:EXCHANGE [BROADCAST]
+|  |
+|  03:EXCHANGE [UNPARTITIONED]
+|  |  limit: 1
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     limit: 1
+|     row-size=0B cardinality=1
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
+====
+# IMPALA-1270: the added aggregation does not result in an extra exchange for
+# shuffle joins.
+select straight_join *
+from functional.alltypestiny t1
+    left semi join /*+shuffle*/ functional.alltypes t2 on t1.int_col = t2.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t1.int_col = t2.int_col
+|  runtime filters: RF000 <- t2.int_col
+|  row-size=89B cardinality=8
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: t2.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> t1.int_col
+   row-size=89B cardinality=8
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
+|  hash predicates: t1.int_col = t2.int_col
+|  row-size=89B cardinality=8
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: t2.int_col
+|  |  runtime filters: RF000 <- t2.int_col
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  group by: t2.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  04:EXCHANGE [HASH(t2.int_col)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  group by: t2.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+06:EXCHANGE [HASH(t1.int_col)]
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> t1.int_col
+   row-size=89B cardinality=8
+====
+# IMPALA-1270: the distinct optimisation also applies to NULL AWARE LEFT ANTI JOIN
+select * from functional.alltypestiny
+where int_col not in (select int_col from functional.alltypes where id % 2 = 0)
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
+|  hash predicates: int_col = functional.alltypes.int_col
+|  row-size=89B cardinality=8
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: functional.alltypes.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: id % 2 = 0
+|     row-size=8B cardinality=730
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [NULL AWARE LEFT ANTI JOIN, BROADCAST]
+|  hash predicates: int_col = functional.alltypes.int_col
+|  row-size=89B cardinality=8
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: functional.alltypes.int_col
+|  |
+|  06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  group by: functional.alltypes.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  04:EXCHANGE [HASH(functional.alltypes.int_col)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  group by: functional.alltypes.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: id % 2 = 0
+|     row-size=8B cardinality=730
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
+====
+# IMPALA-1270: the distinct optimisation also applies to LEFT ANTI JOIN
+select * from functional.alltypestiny t1
+where not exists (
+    select int_col from functional.alltypes t2
+    where id % 2 = 0 and t1.int_col = t2.int_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT ANTI JOIN]
+|  hash predicates: t1.int_col = t2.int_col
+|  row-size=89B cardinality=8
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: t2.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: id % 2 = 0
+|     row-size=8B cardinality=730
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT ANTI JOIN, BROADCAST]
+|  hash predicates: t1.int_col = t2.int_col
+|  row-size=89B cardinality=8
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: t2.int_col
+|  |
+|  06:EXCHANGE [BROADCAST]
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  group by: t2.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  04:EXCHANGE [HASH(t2.int_col)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  group by: t2.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: id % 2 = 0
+|     row-size=8B cardinality=730
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
+====
+# IMPALA-1270: multi-column join showing that unused slots are projected.
+select count(*) from functional.alltypesagg t1
+where int_col in (
+    select int_col from functional.alltypes t2
+    where t1.bool_col = t2.bool_col and id is not null)
+---- PLAN
+PLAN-ROOT SINK
+|
+04:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = t2.int_col, t1.bool_col = t2.bool_col
+|  runtime filters: RF000 <- t2.int_col, RF001 <- t2.bool_col
+|  row-size=5B cardinality=115
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: t2.bool_col, t2.int_col
+|  |  row-size=5B cardinality=20
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: id IS NOT NULL
+|     row-size=9B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> int_col, RF001 -> t1.bool_col
+   row-size=5B cardinality=11.00K
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+09:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+04:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+03:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: int_col = t2.int_col, t1.bool_col = t2.bool_col
+|  row-size=5B cardinality=115
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: t2.int_col, t2.bool_col
+|  |  runtime filters: RF000 <- t2.int_col, RF001 <- t2.bool_col
+|  |
+|  07:EXCHANGE [BROADCAST]
+|  |
+|  06:AGGREGATE [FINALIZE]
+|  |  group by: t2.bool_col, t2.int_col
+|  |  row-size=5B cardinality=20
+|  |
+|  05:EXCHANGE [HASH(t2.bool_col,t2.int_col)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  group by: t2.bool_col, t2.int_col
+|  |  row-size=5B cardinality=20
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     predicates: id IS NOT NULL
+|     row-size=9B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> int_col, RF001 -> t1.bool_col
+   row-size=5B cardinality=11.00K
+====
+# IMPALA-1270: aggregation can be added on top of existing aggregation if it would
+# reduce cardinality enough.
+select count(*) from functional.alltypesagg t1
+where int_col in (
+    select int_col from functional.alltypes t2
+    group by int_col, id
+    having sum(int_col) > 1)
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+04:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
+|  row-size=4B cardinality=115
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  group by: int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  02:AGGREGATE [FINALIZE]
+|  |  output: sum(int_col)
+|  |  group by: int_col, id
+|  |  having: sum(int_col) > 1
+|  |  row-size=16B cardinality=730
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=8B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> int_col
+   row-size=4B cardinality=11.00K
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+12:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+11:EXCHANGE [UNPARTITIONED]
+|
+05:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+04:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: int_col = int_col
+|  row-size=4B cardinality=115
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: int_col
+|  |  runtime filters: RF000 <- int_col
+|  |
+|  10:EXCHANGE [BROADCAST]
+|  |
+|  09:AGGREGATE [FINALIZE]
+|  |  group by: int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  08:EXCHANGE [HASH(int_col)]
+|  |
+|  03:AGGREGATE [STREAMING]
+|  |  group by: int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  07:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(int_col)
+|  |  group by: int_col, id
+|  |  having: sum(int_col) > 1
+|  |  row-size=16B cardinality=730
+|  |
+|  06:EXCHANGE [HASH(int_col,id)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  output: sum(int_col)
+|  |  group by: int_col, id
+|  |  row-size=16B cardinality=7.30K
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=8B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> int_col
+   row-size=4B cardinality=11.00K
+====
+# IMPALA-1270: aggregation will not be added on top of existing aggregation if it does
+# not reduce cardinality enough.
+select count(*) from functional.alltypesagg t1
+where int_col in (
+    select int_col from functional.alltypes t2
+    group by int_col, tinyint_col
+    having sum(int_col) > 1)
+---- PLAN
+PLAN-ROOT SINK
+|
+04:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
+|  row-size=4B cardinality=115
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: sum(int_col)
+|  |  group by: int_col, tinyint_col
+|  |  having: sum(int_col) > 1
+|  |  row-size=13B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=5B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> int_col
+   row-size=4B cardinality=11.00K
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+09:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+08:EXCHANGE [UNPARTITIONED]
+|
+04:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+03:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: int_col = int_col
+|  row-size=4B cardinality=115
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: int_col
+|  |  runtime filters: RF000 <- int_col
+|  |
+|  07:EXCHANGE [BROADCAST]
+|  |
+|  06:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(int_col)
+|  |  group by: int_col, tinyint_col
+|  |  having: sum(int_col) > 1
+|  |  row-size=13B cardinality=10
+|  |
+|  05:EXCHANGE [HASH(int_col,tinyint_col)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  output: sum(int_col)
+|  |  group by: int_col, tinyint_col
+|  |  row-size=13B cardinality=100
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=5B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> int_col
+   row-size=4B cardinality=11.00K
+====
+# IMPALA-1270: planner is not able to coalesce redundant aggregations yet.
+# The left input of the SEMI JOIN could be more efficiently executed with
+# a single aggregation by int_col, but the bottom-up plan generation process
+# first generates an aggregation by int_col, tinyint_col and the distinct
+# aggregation is placed on top of that.
+select count(*) from functional.alltypesagg t1
+where int_col in (
+    select int_col from functional.alltypes t2
+    group by int_col, tinyint_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+04:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = int_col
+|  runtime filters: RF000 <- int_col
+|  row-size=4B cardinality=115
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  group by: int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  02:AGGREGATE [FINALIZE]
+|  |  group by: int_col, tinyint_col
+|  |  row-size=5B cardinality=100
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=5B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> int_col
+   row-size=4B cardinality=11.00K
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+12:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  row-size=8B cardinality=1
+|
+11:EXCHANGE [UNPARTITIONED]
+|
+05:AGGREGATE
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+04:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: int_col = int_col
+|  row-size=4B cardinality=115
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: int_col
+|  |  runtime filters: RF000 <- int_col
+|  |
+|  10:EXCHANGE [BROADCAST]
+|  |
+|  09:AGGREGATE [FINALIZE]
+|  |  group by: int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  08:EXCHANGE [HASH(int_col)]
+|  |
+|  03:AGGREGATE [STREAMING]
+|  |  group by: int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  07:AGGREGATE [FINALIZE]
+|  |  group by: int_col, tinyint_col
+|  |  row-size=5B cardinality=100
+|  |
+|  06:EXCHANGE [HASH(int_col,tinyint_col)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  group by: int_col, tinyint_col
+|  |  row-size=5B cardinality=100
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=5B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> int_col
+   row-size=4B cardinality=11.00K
+====
+# IMPALA-1270: aggregate function in select list of subquery is eligible for
+# distinct subquery optimization.
+select id from functional.alltypesagg t1
+where int_col in (
+    select count(*)
+    from functional.alltypes t2
+    group by int_col, tinyint_col)
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = count(*)
+|  runtime filters: RF000 <- count(*)
+|  row-size=8B cardinality=11
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  group by: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  02:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  group by: int_col, tinyint_col
+|  |  row-size=13B cardinality=100
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=5B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> int_col
+   row-size=8B cardinality=11.00K
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+10:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: int_col = count(*)
+|  row-size=8B cardinality=11
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: count(*)
+|  |  runtime filters: RF000 <- count(*)
+|  |
+|  09:EXCHANGE [BROADCAST]
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  group by: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  07:EXCHANGE [HASH(count(*))]
+|  |
+|  03:AGGREGATE [STREAMING]
+|  |  group by: count(*)
+|  |  row-size=8B cardinality=1
+|  |
+|  06:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  group by: int_col, tinyint_col
+|  |  row-size=13B cardinality=100
+|  |
+|  05:EXCHANGE [HASH(int_col,tinyint_col)]
+|  |
+|  02:AGGREGATE [STREAMING]
+|  |  output: count(*)
+|  |  group by: int_col, tinyint_col
+|  |  row-size=13B cardinality=100
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=5B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> int_col
+   row-size=8B cardinality=11.00K
+====
+# IMPALA-1270: analytic function in select list of subquery is eligible for
+# distinct subquery optimization.
+select id from functional.alltypesagg t1
+where int_col in (
+    select rank() over (partition by int_col order by id)
+    from functional.alltypes t2)
+---- PLAN
+PLAN-ROOT SINK
+|
+05:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = rank()
+|  runtime filters: RF000 <- rank()
+|  row-size=8B cardinality=11
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  group by: rank()
+|  |  row-size=8B cardinality=1
+|  |
+|  03:ANALYTIC
+|  |  functions: rank()
+|  |  partition by: int_col
+|  |  order by: id ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=16B cardinality=7.30K
+|  |
+|  02:SORT
+|  |  order by: int_col ASC NULLS FIRST, id ASC
+|  |  row-size=8B cardinality=7.30K
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=8B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> int_col
+   row-size=8B cardinality=11.00K
+---- PARALLELPLANS
+PLAN-ROOT SINK
+|
+10:EXCHANGE [UNPARTITIONED]
+|
+05:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: int_col = rank()
+|  row-size=8B cardinality=11
+|
+|--JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: rank()
+|  |  runtime filters: RF000 <- rank()
+|  |
+|  09:EXCHANGE [BROADCAST]
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  group by: rank()
+|  |  row-size=8B cardinality=1
+|  |
+|  07:EXCHANGE [HASH(rank())]
+|  |
+|  04:AGGREGATE [STREAMING]
+|  |  group by: rank()
+|  |  row-size=8B cardinality=1
+|  |
+|  03:ANALYTIC
+|  |  functions: rank()
+|  |  partition by: int_col
+|  |  order by: id ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=16B cardinality=7.30K
+|  |
+|  02:SORT
+|  |  order by: int_col ASC NULLS FIRST, id ASC
+|  |  row-size=8B cardinality=7.30K
+|  |
+|  06:EXCHANGE [HASH(int_col)]
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=8B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> int_col
+   row-size=8B cardinality=11.00K
+====

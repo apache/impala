@@ -494,3 +494,23 @@ on leftSide.id = rightSide.id;
 ---- TYPES
 BIGINT,BIGINT
 ====
+---- QUERY
+# IMPALA-1270: ensure semi join in subplan with distinct added is
+# executable.
+# NOTE: reference functional.alltypessmall because functional_parquet.alltypessmall
+# does not have stats computed.
+select a.id, e.key from complextypestbl a
+left semi join functional.alltypessmall c on (a.id = c.int_col)
+inner join a.nested_struct.g e
+where length(e.key) > 0
+---- RESULTS
+1,'foo'
+2,'g1'
+2,'g2'
+2,'g3'
+2,'g4'
+2,'g5'
+5,'foo'
+---- TYPES
+BIGINT,STRING
+====

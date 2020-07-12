@@ -910,6 +910,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_async_codegen(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::ENABLE_DISTINCT_SEMI_JOIN_OPTIMIZATION: {
+        query_options->__set_enable_distinct_semi_join_optimization(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

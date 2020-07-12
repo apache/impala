@@ -28,7 +28,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(f21)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.allcomplextypes.complex_nested_struct_col.f2.f12]
    partitions=0/0 files=0 size=0B
@@ -46,7 +46,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.f1 = b.f1
@@ -94,7 +94,7 @@ PLAN-ROOT SINK
 |  |     row-size=0B cardinality=10
 |  |
 |  00:SCAN HDFS [tpch_nested_parquet.region r]
-|     partitions=1/1 files=1 size=3.44KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     predicates: !empty(r.r_nations)
 |     row-size=12B cardinality=5
 |
@@ -104,12 +104,12 @@ PLAN-ROOT SINK
 |  row-size=163B cardinality=10.16K
 |
 |--06:SCAN HDFS [tpch_nested_parquet.supplier s]
-|     partitions=1/1 files=1 size=41.79MB
+|     HDFS partitions=1/1 files=1 size=41.80MB
 |     runtime filters: RF000 -> s.s_nationkey, RF001 -> s_comment
 |     row-size=77B cardinality=10.00K
 |
 05:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    runtime filters: RF000 -> c_nationkey, RF001 -> c.c_comment, RF004 -> c.c_nationkey, RF005 -> c_comment
    row-size=87B cardinality=150.00K
 ====
@@ -153,6 +153,7 @@ PLAN-ROOT SINK
 |  |     row-size=16B cardinality=1
 |  |
 |  03:UNNEST [a.int_array_col b]
+|     limit: 1
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [functional.allcomplextypes a]
@@ -200,6 +201,7 @@ PLAN-ROOT SINK
 |  |     row-size=16B cardinality=1
 |  |
 |  03:UNNEST [a.int_array_col b]
+|     limit: 1
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [functional.allcomplextypes a]
@@ -224,6 +226,7 @@ PLAN-ROOT SINK
 |  |     row-size=16B cardinality=1
 |  |
 |  03:UNNEST [a.int_array_col]
+|     limit: 1
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [functional.allcomplextypes a]
@@ -836,24 +839,24 @@ where e.f1 < 10
 ---- PLAN
 PLAN-ROOT SINK
 |
-11:HASH JOIN [INNER JOIN]
+12:HASH JOIN [INNER JOIN]
 |  hash predicates: d.id = b.id
 |  runtime filters: RF000 <- b.id
 |  row-size=36B cardinality=0
 |
-|--10:SUBPLAN
+|--11:SUBPLAN
 |  |  row-size=32B cardinality=0
 |  |
-|  |--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |--09:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |  row-size=32B cardinality=10
 |  |  |
-|  |  |--06:SINGULAR ROW SRC
+|  |  |--07:SINGULAR ROW SRC
 |  |  |     row-size=24B cardinality=1
 |  |  |
-|  |  07:UNNEST [a.struct_array_col e]
+|  |  08:UNNEST [a.struct_array_col e]
 |  |     row-size=0B cardinality=10
 |  |
-|  09:HASH JOIN [RIGHT ANTI JOIN]
+|  10:HASH JOIN [RIGHT ANTI JOIN]
 |  |  hash predicates: c.int_col = b.int_col
 |  |  row-size=24B cardinality=0
 |  |
@@ -869,16 +872,20 @@ PLAN-ROOT SINK
 |  |  |     row-size=16B cardinality=0
 |  |  |
 |  |  01:SCAN HDFS [functional.alltypestiny b]
-|  |     partitions=4/4 files=4 size=460B
+|  |     HDFS partitions=4/4 files=4 size=460B
 |  |     runtime filters: RF002 -> b.id
 |  |     row-size=8B cardinality=8
 |  |
+|  06:AGGREGATE [FINALIZE]
+|  |  group by: c.int_col
+|  |  row-size=4B cardinality=10
+|  |
 |  02:SCAN HDFS [functional.alltypessmall c]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     row-size=4B cardinality=100
 |
 03:SCAN HDFS [functional.alltypes d]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> d.id
    row-size=4B cardinality=7.30K
 ====
@@ -902,7 +909,7 @@ PLAN-ROOT SINK
 |  |  row-size=4B cardinality=100
 |  |
 |  |--02:SCAN HDFS [functional.alltypessmall c]
-|  |     partitions=4/4 files=4 size=6.32KB
+|  |     HDFS partitions=4/4 files=4 size=6.32KB
 |  |     row-size=4B cardinality=100
 |  |
 |  09:SUBPLAN
@@ -927,11 +934,11 @@ PLAN-ROOT SINK
 |  |     row-size=16B cardinality=0
 |  |
 |  01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 files=4 size=460B
+|     HDFS partitions=4/4 files=4 size=460B
 |     row-size=8B cardinality=8
 |
 03:SCAN HDFS [functional.alltypes d]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
 ====
 # Test subplans: Test joining relative refs with independent table refs.
@@ -989,13 +996,13 @@ PLAN-ROOT SINK
 |  |     row-size=36B cardinality=0
 |  |
 |  05:SCAN HDFS [functional.alltypessmall c]
-|     partitions=4/4 files=4 size=6.32KB
+|     HDFS partitions=4/4 files=4 size=6.32KB
 |     predicates: c.id < 10, c.int_col > 30
 |     runtime filters: RF002 -> c.id
 |     row-size=89B cardinality=10
 |
 06:SCAN HDFS [functional.alltypes e]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> e.id
    row-size=4B cardinality=7.30K
 ====
@@ -1015,7 +1022,7 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=8
 |
 |--06:SCAN HDFS [functional.alltypestiny e]
-|     partitions=4/4 files=4 size=460B
+|     HDFS partitions=4/4 files=4 size=460B
 |     row-size=89B cardinality=8
 |
 11:SUBPLAN
@@ -1053,7 +1060,7 @@ PLAN-ROOT SINK
 |     row-size=36B cardinality=0
 |
 05:SCAN HDFS [functional.alltypessmall c]
-   partitions=4/4 files=4 size=6.32KB
+   HDFS partitions=4/4 files=4 size=6.32KB
    predicates: c.int_col > 30
    row-size=89B cardinality=10
 ====
@@ -1069,7 +1076,7 @@ PLAN-ROOT SINK
 |  row-size=24B cardinality=0
 |
 |--05:NESTED LOOP JOIN [CROSS JOIN]
-|  |  row-size=24B cardinality=0
+|  |  row-size=24B cardinality=1
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |     row-size=16B cardinality=1
@@ -1077,7 +1084,7 @@ PLAN-ROOT SINK
 |  04:AGGREGATE [FINALIZE]
 |  |  output: count(*)
 |  |  having: count(*) < 10
-|  |  row-size=8B cardinality=0
+|  |  row-size=8B cardinality=1
 |  |
 |  03:UNNEST [a.int_array_col]
 |     row-size=0B cardinality=10
@@ -1098,7 +1105,7 @@ PLAN-ROOT SINK
 |  row-size=32B cardinality=0
 |
 |--05:NESTED LOOP JOIN [CROSS JOIN]
-|  |  row-size=32B cardinality=10
+|  |  row-size=32B cardinality=1
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |     row-size=16B cardinality=1
@@ -1107,7 +1114,7 @@ PLAN-ROOT SINK
 |  |  output: count(*)
 |  |  group by: f1
 |  |  having: count(*) < 10
-|  |  row-size=16B cardinality=10
+|  |  row-size=16B cardinality=1
 |  |
 |  03:UNNEST [a.struct_array_col]
 |     row-size=0B cardinality=10
@@ -1229,6 +1236,7 @@ PLAN-ROOT SINK
 |  |     row-size=16B cardinality=1
 |  |
 |  03:UNNEST [a.int_array_col]
+|     limit: 1
 |     row-size=4B cardinality=10
 |
 00:SCAN HDFS [functional.allcomplextypes a]
@@ -1252,6 +1260,7 @@ PLAN-ROOT SINK
 |  |     row-size=16B cardinality=1
 |  |
 |  03:UNNEST [a.int_array_col]
+|     limit: 1
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [functional.allcomplextypes a]
@@ -1648,7 +1657,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: c_custkey < 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < 5
    predicates on o_lineitems: l_linenumber < 3
@@ -1780,7 +1789,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: c.c_custkey = c.c_nationkey, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o.o_orderkey = o.o_shippriority
    predicates on l: l.l_partkey = l.l_linenumber, l.l_partkey = l.l_suppkey
@@ -1895,7 +1904,7 @@ PLAN-ROOT SINK
 |     row-size=44B cardinality=1
 |
 00:SCAN HDFS [tpch_nested_parquet.supplier s]
-   partitions=1/1 files=1 size=41.79MB
+   HDFS partitions=1/1 files=1 size=41.80MB
    row-size=44B cardinality=10.00K
 ====
 # IMPALA-2383: Test join ordering of relative collection ref after an outer join.
@@ -2068,7 +2077,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    row-size=44B cardinality=150.00K
 ====
 # IMPALA-2412: Test join ordering in nested subplans. Same as above
@@ -2127,7 +2136,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: !empty(c.c_orders)
    row-size=44B cardinality=150.00K
 ====
@@ -2184,7 +2193,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    row-size=44B cardinality=150.00K
 ====
 # IMPALA-2446: Test predicate assignment when outer join has no conjuncts in
@@ -2331,7 +2340,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    row-size=12B cardinality=150.00K
 ====
 # IMPALA-3065/IMPALA-3062: Test correct assignment of !empty() predicates.
@@ -2349,7 +2358,7 @@ PLAN-ROOT SINK
 |  row-size=28B cardinality=1.50M
 |
 |--05:SCAN HDFS [tpch_nested_parquet.customer c2]
-|     partitions=1/1 files=4 size=288.99MB
+|     HDFS partitions=1/1 files=4 size=289.08MB
 |     row-size=8B cardinality=150.00K
 |
 01:SUBPLAN
@@ -2365,7 +2374,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c1]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    runtime filters: RF000 -> c1.c_custkey
    row-size=20B cardinality=150.00K
 ====
@@ -2386,6 +2395,7 @@ PLAN-ROOT SINK
 |  |  row-size=40B cardinality=10
 |  |
 |  |--04:UNNEST [c2.c_orders o2]
+|  |     limit: 1
 |  |     row-size=0B cardinality=10
 |  |
 |  05:NESTED LOOP JOIN [CROSS JOIN]
@@ -2402,11 +2412,11 @@ PLAN-ROOT SINK
 |  row-size=40B cardinality=300.00K
 |
 |--01:SCAN HDFS [tpch_nested_parquet.customer c2]
-|     partitions=1/1 files=4 size=288.99MB
+|     HDFS partitions=1/1 files=4 size=289.08MB
 |     row-size=20B cardinality=150.00K
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c1]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    row-size=20B cardinality=150.00K
 ====
 # IMPALA-3084: Test correct assignment of NULL checking predicates
@@ -2431,7 +2441,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    row-size=230B cardinality=150.00K
 ====
 # IMPALA-2540: Complex query mixing joins on base tables and nested collections.
@@ -2486,21 +2496,21 @@ PLAN-ROOT SINK
 |  |  |  row-size=61B cardinality=5
 |  |  |
 |  |  |--03:SCAN HDFS [tpch_nested_parquet.region t5]
-|  |  |     partitions=1/1 files=1 size=3.44KB
+|  |  |     HDFS partitions=1/1 files=1 size=3.59KB
 |  |  |     row-size=2B cardinality=5
 |  |  |
 |  |  01:SCAN HDFS [tpch_nested_parquet.customer t2]
-|  |     partitions=1/1 files=4 size=288.99MB
+|  |     HDFS partitions=1/1 files=4 size=289.08MB
 |  |     runtime filters: RF004 -> t2.c_custkey
 |  |     row-size=59B cardinality=150.00K
 |  |
 |  02:SCAN HDFS [tpch_nested_parquet.region t3]
-|     partitions=1/1 files=1 size=3.44KB
+|     HDFS partitions=1/1 files=1 size=3.59KB
 |     runtime filters: RF002 -> t3.r_comment
 |     row-size=78B cardinality=5
 |
 00:SCAN HDFS [tpch_nested_parquet.region.r_nations t1]
-   partitions=1/1 files=1 size=3.44KB
+   HDFS partitions=1/1 files=1 size=3.59KB
    runtime filters: RF000 -> t1.pos
    row-size=8B cardinality=50
 ====
@@ -2533,7 +2543,7 @@ PLAN-ROOT SINK
 |     row-size=8B cardinality=2
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates on c_orders: o_orderkey = 6000000
    row-size=20B cardinality=150.00K
 ====
@@ -2584,6 +2594,48 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    row-size=20B cardinality=150.00K
+====
+# IMPALA-1270: SEMI JOIN in subplan with distinct added by planner.
+# The single node planner needs to correctly set the table ref ids for
+# the left branch of the semi join for subplan generation to work.
+select a.id, e.key from functional_parquet.complextypestbl a
+left semi join functional.alltypessmall c on (a.id = c.int_col)
+inner join a.nested_struct.g e
+where length(e.key) > 0
+---- PLAN
+PLAN-ROOT SINK
+|
+07:SUBPLAN
+|  row-size=32B cardinality=44.00K
+|
+|--05:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=32B cardinality=10
+|  |
+|  |--03:SINGULAR ROW SRC
+|  |     row-size=20B cardinality=1
+|  |
+|  04:UNNEST [a.nested_struct.g e]
+|     row-size=0B cardinality=10
+|
+06:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: a.id = c.int_col
+|  runtime filters: RF000 <- c.int_col
+|  row-size=20B cardinality=4.40K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: c.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypessmall c]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=4B cardinality=100
+|
+00:SCAN HDFS [functional_parquet.complextypestbl a]
+   HDFS partitions=1/1 files=2 size=6.92KB
+   predicates: !empty(a.nested_struct.g)
+   predicates on e: length(e.`key`) > 0
+   runtime filters: RF000 -> a.id
+   row-size=20B cardinality=4.40K
 ====

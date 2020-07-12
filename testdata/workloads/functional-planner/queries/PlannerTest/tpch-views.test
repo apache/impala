@@ -1477,11 +1477,11 @@ order by
 ---- PLAN
 PLAN-ROOT SINK
 |
-10:SORT
+11:SORT
 |  order by: s_name ASC
 |  row-size=67B cardinality=400
 |
-09:HASH JOIN [RIGHT SEMI JOIN]
+10:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: tpch.partsupp.ps_suppkey = tpch.supplier.s_suppkey
 |  runtime filters: RF000 <- tpch.supplier.s_suppkey
 |  row-size=98B cardinality=400
@@ -1500,6 +1500,10 @@ PLAN-ROOT SINK
 |     HDFS partitions=1/1 files=1 size=1.33MB
 |     runtime filters: RF008 -> tpch.supplier.s_nationkey
 |     row-size=77B cardinality=10.00K
+|
+09:AGGREGATE [FINALIZE]
+|  group by: tpch.partsupp.ps_suppkey
+|  row-size=8B cardinality=9.71K
 |
 07:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: l_partkey = tpch.partsupp.ps_partkey, l_suppkey = tpch.partsupp.ps_suppkey
@@ -1683,16 +1687,16 @@ order by
 ---- PLAN
 PLAN-ROOT SINK
 |
-07:SORT
+08:SORT
 |  order by: cntrycode ASC
 |  row-size=36B cardinality=15.00K
 |
-06:AGGREGATE [FINALIZE]
+07:AGGREGATE [FINALIZE]
 |  output: count(*), sum(tpch.customer.c_acctbal)
 |  group by: substr(tpch.customer.c_phone, 1, 2)
 |  row-size=36B cardinality=15.00K
 |
-05:HASH JOIN [RIGHT ANTI JOIN]
+06:HASH JOIN [RIGHT ANTI JOIN]
 |  hash predicates: tpch.orders.o_custkey = tpch.customer.c_custkey
 |  row-size=51B cardinality=15.00K
 |
@@ -1713,6 +1717,10 @@ PLAN-ROOT SINK
 |     HDFS partitions=1/1 files=1 size=23.08MB
 |     predicates: substr(tpch.customer.c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |     row-size=43B cardinality=15.00K
+|
+05:AGGREGATE [FINALIZE]
+|  group by: tpch.orders.o_custkey
+|  row-size=8B cardinality=98.39K
 |
 03:SCAN HDFS [tpch.orders]
    HDFS partitions=1/1 files=1 size=162.56MB

@@ -432,6 +432,15 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("subquery-rewrite", options);
   }
 
+  /**
+   * Tests for the IMPALA-1270 optimization of automatically adding a distinct
+   * agg to semi joins.
+   */
+  @Test
+  public void testSemiJoinDistinct() {
+    runPlannerTestFile("semi-join-distinct");
+  }
+
   @Test
   public void testUnion() {
     runPlannerTestFile("union");

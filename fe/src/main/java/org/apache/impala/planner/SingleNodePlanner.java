@@ -96,9 +96,19 @@ import com.google.common.collect.Sets;
  * The single-node plan needs to be wrapped in a plan fragment for it to be executable.
  */
 public class SingleNodePlanner {
+  // Controls whether a distinct aggregation should be inserted before a join input.
+  // If the size of the distinct values after aggregation is less than or equal to
+  // the original input size multiplied by this threshold, the distinct agg should be
+  // inserted.
+  private static final double JOIN_DISTINCT_THRESHOLD = 0.25;
+
   private final static Logger LOG = LoggerFactory.getLogger(SingleNodePlanner.class);
 
   private final PlannerContext ctx_;
+
+  // Set to true if single node planning added new value transfers to the
+  // value transfer graph in 'analyzer'.
+  private boolean valueTransferGraphNeedsUpdate_ = false;
 
   public SingleNodePlanner(PlannerContext ctx) {
     ctx_ = ctx;
@@ -161,6 +171,14 @@ public class SingleNodePlanner {
     PlanNode singleNodePlan = createQueryPlan(queryStmt, analyzer,
         ctx_.getQueryOptions().isDisable_outermost_topn());
     Preconditions.checkNotNull(singleNodePlan);
+    // Recompute the graph since we may have added new equivalences.
+    if (valueTransferGraphNeedsUpdate_) {
+      ctx_.getTimeline().markEvent("Recomputing value transfer graph");
+      analyzer.computeValueTransferGraph();
+      ctx_.getTimeline().markEvent("Value transfer graph computed");
+      valueTransferGraphNeedsUpdate_ = false;
+    }
+
     return singleNodePlan;
   }
 
@@ -1808,6 +1826,12 @@ public class SingleNodePlanner {
     }
     analyzer.markConjunctsAssigned(otherJoinConjuncts);
 
+    if (analyzer.getQueryOptions().isEnable_distinct_semi_join_optimization() &&
+            innerRef.getJoinOp().isLeftSemiJoin()) {
+      inner =
+          addDistinctToJoinInput(inner, analyzer, eqJoinConjuncts, otherJoinConjuncts);
+    }
+
     // Use a nested-loop join if there are no equi-join conjuncts, or if the inner
     // (build side) is a singular row src. A singular row src has a cardinality of 1, so
     // a nested-loop join is certainly cheaper than a hash join.
@@ -1825,6 +1849,99 @@ public class SingleNodePlanner {
     }
     result.init(analyzer);
     return result;
+  }
+
+  /**
+   * Optionally add a aggregation node on top of 'joinInput' if it is cheaper to project
+   * and aggregate the slots needed to evaluate the provided join conjuncts. This
+   * is only safe to do if the join's results do not depend on the number of duplicate
+   * values and if the join does not need to return any slots from 'joinInput'.  E.g.
+   * the inner of a left semi join satisfies both of those conditions.
+   * @return the original 'joinInput' or its new AggregationNode parent.
+   */
+  private PlanNode addDistinctToJoinInput(PlanNode joinInput, Analyzer analyzer,
+          List<BinaryPredicate> eqJoinConjuncts, List<Expr> otherJoinConjuncts)
+                  throws InternalException, AnalysisException {
+    List<Expr> allJoinConjuncts = new ArrayList<>();
+    allJoinConjuncts.addAll(eqJoinConjuncts);
+    allJoinConjuncts.addAll(otherJoinConjuncts);
+    allJoinConjuncts = Expr.substituteList(
+            allJoinConjuncts, joinInput.getOutputSmap(), analyzer, true);
+
+    // Identify the unique slots from the inner required by the join conjuncts. Since this
+    // is a semi-join, the inner tuple is not returned from the join and we do not need
+    // any other slots from the inner.
+    List<SlotId> allSlotIds = new ArrayList<>();
+    Expr.getIds(allJoinConjuncts, null, allSlotIds);
+    List<TupleId> joinInputTupleIds = joinInput.getTupleIds();
+    List<Expr> distinctExprs = new ArrayList<>();
+    double estDistinctTupleSize = 0;
+    for (SlotDescriptor slot : analyzer.getSlotDescs(allSlotIds)) {
+      if (joinInputTupleIds.contains(slot.getParent().getId())) {
+        distinctExprs.add(new SlotRef(slot));
+      }
+    }
+
+    // If there are no join predicates, this can be more efficiently handled by
+    // inserting a limit in the plan (since the first row returned from 'joinInput'
+    // will satisfy the join predicates).
+    if (distinctExprs.isEmpty()) {
+      joinInput.setLimit(1);
+      return joinInput;
+    }
+    long numDistinct = AggregationNode.estimateNumGroups(distinctExprs,
+            joinInput.getCardinality());
+    if (numDistinct < 0 || joinInput.getCardinality() < 0) {
+      // Default to not adding the aggregation if stats are missing.
+      LOG.trace("addDistinctToJoinInput():: missing stats, will not add agg");
+      return joinInput;
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("addDistinctToJoinInput(): " + "numDistinct=" + numDistinct +
+              " inputCardinality=" + joinInput.getCardinality());
+    }
+
+    // Check to see if an aggregation would reduce input by enough to justify inserting
+    // it. We factor in the average row size to account for the aggregate projecting
+    // out slots. The agg would be ineffective if the input already have 0 or 1 rows.
+    if (joinInput.getCardinality() <= 1 ||
+        numDistinct > JOIN_DISTINCT_THRESHOLD * joinInput.getCardinality()) {
+      return joinInput;
+    }
+
+    // Set up an aggregation node to return only distinct slots.
+    MultiAggregateInfo distinctAggInfo =
+         new MultiAggregateInfo(distinctExprs, Collections.emptyList(), null);
+    distinctAggInfo.analyze(analyzer);
+    distinctAggInfo.materializeRequiredSlots(analyzer, new ExprSubstitutionMap());
+    AggregationNode agg = new AggregationNode(
+            ctx_.getNextNodeId(), joinInput, distinctAggInfo, AggPhase.FIRST);
+    agg.init(analyzer);
+    // Mark the agg as materializing the same table ref. This is required so that other
+    // parts of planning, e.g. subplan generation, know that this plan tree materialized
+    // the table ref.
+    agg.setTblRefIds(joinInput.getTblRefIds());
+    // All references to the input slots in join conjuncts must be replaced with
+    // references to aggregate slots. The output smap from the aggregate info contains
+    // these mappings, so we can add it to the output smap of the agg to ensure that
+    // join conjuncts get replaced correctly.
+    agg.setOutputSmap(ExprSubstitutionMap.compose(
+            agg.getOutputSmap(), distinctAggInfo.getOutputSmap(), analyzer));
+
+    // Add value transfers between original slots and aggregate tuple so that runtime
+    // filters can be pushed through the aggregation. We can defer updating the
+    // value transfer graph until after the single node plan is constructed because
+    // a precondition of calling this function is that the join does not return any
+    // of the slots from this plan tree.
+    for (int i = 0; i < distinctExprs.size(); ++i) {
+      Expr distinctExpr = distinctExprs.get(i);
+      SlotDescriptor outputSlot =
+              distinctAggInfo.getAggClass(0).getResultTupleDesc().getSlots().get(i);
+      analyzer.registerValueTransfer(
+              ((SlotRef)distinctExpr).getSlotId(), outputSlot.getId());
+      valueTransferGraphNeedsUpdate_ = true;
+    }
+    return agg;
   }
 
   /**

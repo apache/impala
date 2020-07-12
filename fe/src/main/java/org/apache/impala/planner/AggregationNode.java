@@ -247,18 +247,28 @@ public class AggregationNode extends PlanNode {
     // limit the potential overestimation. We could, in future, improve this further
     // by recognizing functional dependencies.
     List<Expr> groupingExprs = aggInfo.getGroupingExprs();
+    long aggInputCardinality = getAggInputCardinality();
+    long numGroups = estimateNumGroups(groupingExprs, aggInputCardinality);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Node " + id_ + " numGroups= " + numGroups + " aggInputCardinality=" +
+          aggInputCardinality + " for agg class " + aggInfo.debugString());
+    }
+    return numGroups;
+  }
+
+  /**
+   * Estimate the number of groups that will be present for the provided grouping
+   * expressions and input cardinality.
+   * Returns -1 if a reasonable cardinality estimate cannot be produced.
+   */
+  public static long estimateNumGroups(
+          List<Expr> groupingExprs, long aggInputCardinality) {
     if (groupingExprs.isEmpty()) {
       // Non-grouping aggregation class - always results in one group even if there are
       // zero input rows.
       return 1;
     }
     long numGroups = Expr.getNumDistinctValues(groupingExprs);
-    // Sanity check the cardinality_ based on the input cardinality_.
-    long aggInputCardinality = getAggInputCardinality();
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Node " + id_ + " numGroups= " + numGroups + " aggInputCardinality=" +
-          aggInputCardinality + " for agg class " + aggInfo.debugString());
-    }
     if (numGroups == -1) {
       // A worst-case cardinality_ is better than an unknown cardinality_.
       // Note that this will still be -1 if the child's cardinality is unknown.

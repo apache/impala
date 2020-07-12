@@ -2181,24 +2181,34 @@ on (a.string_col = b.string_col and a.int_col = b.int_col)
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-07:EXCHANGE [UNPARTITIONED]
+10:EXCHANGE [UNPARTITIONED]
 |
-03:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
+04:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
 |  hash predicates: int_col = b.int_col, string_col = b.string_col
 |  runtime filters: RF000 <- b.int_col, RF001 <- b.string_col
 |  row-size=17B cardinality=4
 |
-|--06:EXCHANGE [HASH(b.int_col,b.string_col)]
+|--09:EXCHANGE [HASH(b.int_col,b.string_col)]
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  group by: b.string_col, b.int_col
+|  |  row-size=17B cardinality=100
+|  |
+|  07:EXCHANGE [HASH(b.string_col,b.int_col)]
+|  |
+|  03:AGGREGATE [STREAMING]
+|  |  group by: b.string_col, b.int_col
+|  |  row-size=17B cardinality=100
 |  |
 |  02:SCAN HDFS [functional.alltypes b]
 |     HDFS partitions=24/24 files=24 size=478.45KB
 |     row-size=17B cardinality=7.30K
 |
-05:AGGREGATE [FINALIZE]
+06:AGGREGATE [FINALIZE]
 |  group by: int_col, string_col
 |  row-size=17B cardinality=4
 |
-04:EXCHANGE [HASH(int_col,string_col)]
+05:EXCHANGE [HASH(int_col,string_col)]
 |
 01:AGGREGATE [STREAMING]
 |  group by: int_col, string_col
@@ -2566,42 +2576,50 @@ where a.id < 10
 ---- PLAN
 PLAN-ROOT SINK
 |
-08:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+10:NESTED LOOP JOIN [LEFT ANTI JOIN]
 |  join predicates: c.string_col != e.string_col
 |  row-size=267B cardinality=100
 |
-|--07:NESTED LOOP JOIN [RIGHT SEMI JOIN]
-|  |  join predicates: b.bigint_col > d.bigint_col
-|  |  row-size=267B cardinality=100
+|--09:AGGREGATE [FINALIZE]
+|  |  group by: e.string_col
+|  |  row-size=15B cardinality=963
 |  |
-|  |--06:NESTED LOOP JOIN [RIGHT OUTER JOIN]
-|  |  |  join predicates: a.int_col != c.int_col OR a.tinyint_col > c.tinyint_col
-|  |  |  row-size=267B cardinality=100
-|  |  |
-|  |  |--05:NESTED LOOP JOIN [INNER JOIN]
-|  |  |  |  predicates: a.id < b.id
-|  |  |  |  row-size=178B cardinality=100
-|  |  |  |
-|  |  |  |--00:SCAN HDFS [functional.alltypestiny a]
-|  |  |  |     HDFS partitions=4/4 files=4 size=460B
-|  |  |  |     predicates: a.id < 10
-|  |  |  |     row-size=89B cardinality=1
-|  |  |  |
-|  |  |  01:SCAN HDFS [functional.alltypessmall b]
-|  |  |     HDFS partitions=4/4 files=4 size=6.32KB
-|  |  |     row-size=89B cardinality=100
-|  |  |
-|  |  02:SCAN HDFS [functional.alltypes c]
-|  |     HDFS partitions=24/24 files=24 size=478.45KB
-|  |     row-size=89B cardinality=7.30K
+|  04:SCAN HDFS [functional.alltypesagg e]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=15B cardinality=11.00K
+|
+08:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  join predicates: b.bigint_col > d.bigint_col
+|  row-size=267B cardinality=100
+|
+|--07:AGGREGATE [FINALIZE]
+|  |  group by: d.bigint_col
+|  |  row-size=8B cardinality=1.01K
 |  |
 |  03:SCAN HDFS [functional.alltypesagg d]
 |     HDFS partitions=11/11 files=11 size=814.73KB
 |     row-size=8B cardinality=11.00K
 |
-04:SCAN HDFS [functional.alltypesagg e]
-   HDFS partitions=11/11 files=11 size=814.73KB
-   row-size=15B cardinality=11.00K
+06:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  join predicates: a.int_col != c.int_col OR a.tinyint_col > c.tinyint_col
+|  row-size=267B cardinality=100
+|
+|--05:NESTED LOOP JOIN [INNER JOIN]
+|  |  predicates: a.id < b.id
+|  |  row-size=178B cardinality=100
+|  |
+|  |--00:SCAN HDFS [functional.alltypestiny a]
+|  |     HDFS partitions=4/4 files=4 size=460B
+|  |     predicates: a.id < 10
+|  |     row-size=89B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=89B cardinality=100
+|
+02:SCAN HDFS [functional.alltypes c]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=89B cardinality=7.30K
 ====
 # Regression test for IMPALA-2495: Crash: impala::InPredicate::SetLookupPrepare
 select count(id) from functional.alltypestiny t1
@@ -3067,7 +3085,7 @@ PLAN-ROOT SINK
 |  row-size=96B cardinality=0
 |
 |--01:SCAN HDFS [functional_text_gzip.alltypes b]
-|     HDFS partitions=24/24 files=24 size=123.32KB
+|     HDFS partitions=24/24 files=24 size=77.88KB
 |     row-size=80B cardinality=unavailable
 |
 00:SCAN HDFS [functional_text_gzip.emptytable a]

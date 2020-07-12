@@ -13625,3 +13625,1846 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
    row-size=24B cardinality=2.88M
 ====
+# Q23-1
+with frequent_ss_items as
+ (select substr(i_item_desc,1,30) itemdesc,i_item_sk item_sk,d_date solddate,count(*) cnt
+  from store_sales
+      ,date_dim
+      ,item
+  where ss_sold_date_sk = d_date_sk
+    and ss_item_sk = i_item_sk
+    and d_year in (2000,2000+1,2000+2,2000+3)
+  group by substr(i_item_desc,1,30),i_item_sk,d_date
+  having count(*) >4),
+ max_store_sales as
+ (select max(csales) tpcds_cmax
+  from (select c_customer_sk,sum(ss_quantity*ss_sales_price) csales
+        from store_sales
+            ,customer
+            ,date_dim
+        where ss_customer_sk = c_customer_sk
+         and ss_sold_date_sk = d_date_sk
+         and d_year in (2000,2000+1,2000+2,2000+3)
+        group by c_customer_sk) x),
+ best_ss_customer as
+ (select c_customer_sk,sum(ss_quantity*ss_sales_price) ssales
+  from store_sales
+      ,customer
+  where ss_customer_sk = c_customer_sk
+  group by c_customer_sk
+  having sum(ss_quantity*ss_sales_price) > (50/100.0) * (select
+  *
+from
+ max_store_sales))
+  select  sum(sales)
+ from (select cs_quantity*cs_list_price sales
+       from catalog_sales
+           ,date_dim
+       where d_year = 2000
+         and d_moy = 2
+         and cs_sold_date_sk = d_date_sk
+         and cs_item_sk in (select item_sk from frequent_ss_items)
+         and cs_bill_customer_sk in (select c_customer_sk from best_ss_customer)
+      union all
+      select ws_quantity*ws_list_price sales
+       from web_sales
+           ,date_dim
+       where d_year = 2000
+         and d_moy = 2
+         and ws_sold_date_sk = d_date_sk
+         and ws_item_sk in (select item_sk from frequent_ss_items)
+         and ws_bill_customer_sk in (select c_customer_sk from best_ss_customer)) y
+ limit 100;
+---- PLAN
+Max Per-Host Resource Reservation: Memory=122.44MB Threads=11
+Per-Host Resource Estimates: Memory=910MB
+PLAN-ROOT SINK
+|
+49:AGGREGATE [FINALIZE]
+|  output: sum(sales)
+|  limit: 100
+|  row-size=16B cardinality=1
+|
+00:UNION
+|  row-size=8B cardinality=128.16K
+|
+|--48:HASH JOIN [RIGHT SEMI JOIN]
+|  |  hash predicates: c_customer_sk = ws_bill_customer_sk
+|  |  runtime filters: RF016 <- ws_bill_customer_sk
+|  |  row-size=36B cardinality=42.85K
+|  |
+|  |--47:HASH JOIN [LEFT SEMI JOIN]
+|  |  |  hash predicates: ws_item_sk = i_item_sk
+|  |  |  row-size=36B cardinality=42.85K
+|  |  |
+|  |  |--46:AGGREGATE [FINALIZE]
+|  |  |  |  group by: i_item_sk
+|  |  |  |  row-size=8B cardinality=17.98K
+|  |  |  |
+|  |  |  32:AGGREGATE [FINALIZE]
+|  |  |  |  output: count(*)
+|  |  |  |  group by: substr(i_item_desc, 1, 30), i_item_sk, d_date
+|  |  |  |  having: count(*) > 4
+|  |  |  |  row-size=50B cardinality=235.45K
+|  |  |  |
+|  |  |  31:HASH JOIN [INNER JOIN]
+|  |  |  |  hash predicates: ss_item_sk = i_item_sk
+|  |  |  |  row-size=162B cardinality=2.35M
+|  |  |  |
+|  |  |  |--29:SCAN HDFS [tpcds.item]
+|  |  |  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |  |  |     row-size=120B cardinality=18.00K
+|  |  |  |
+|  |  |  30:HASH JOIN [INNER JOIN]
+|  |  |  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  |  |  runtime filters: RF030 <- d_date_sk
+|  |  |  |  row-size=42B cardinality=2.35M
+|  |  |  |
+|  |  |  |--28:SCAN HDFS [tpcds.date_dim]
+|  |  |  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |  |  |     predicates: d_year IN (2000, 2001, 2002, 2003)
+|  |  |  |     row-size=30B cardinality=1.49K
+|  |  |  |
+|  |  |  27:SCAN HDFS [tpcds.store_sales]
+|  |  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |  |     runtime filters: RF030 -> ss_sold_date_sk
+|  |  |     row-size=12B cardinality=2.88M
+|  |  |
+|  |  45:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ws_sold_date_sk = d_date_sk
+|  |  |  runtime filters: RF026 <- d_date_sk
+|  |  |  row-size=36B cardinality=42.85K
+|  |  |
+|  |  |--26:SCAN HDFS [tpcds.date_dim]
+|  |  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |  |     predicates: d_year = 2000, d_moy = 2
+|  |  |     row-size=12B cardinality=108
+|  |  |
+|  |  25:SCAN HDFS [tpcds.web_sales]
+|  |     HDFS partitions=1/1 files=1 size=140.07MB
+|  |     runtime filters: RF026 -> ws_sold_date_sk
+|  |     row-size=24B cardinality=719.38K
+|  |
+|  44:NESTED LOOP JOIN [INNER JOIN]
+|  |  predicates: sum(ss_quantity * ss_sales_price) > 0.500000 * max(csales)
+|  |  row-size=36B cardinality=100.00K
+|  |
+|  |--43:AGGREGATE [FINALIZE]
+|  |  |  output: max(sum(ss_quantity * ss_sales_price))
+|  |  |  row-size=16B cardinality=1
+|  |  |
+|  |  42:AGGREGATE [FINALIZE]
+|  |  |  output: sum(ss_quantity * ss_sales_price)
+|  |  |  group by: c_customer_sk
+|  |  |  row-size=20B cardinality=100.00K
+|  |  |
+|  |  41:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ss_customer_sk = c_customer_sk
+|  |  |  row-size=28B cardinality=2.35M
+|  |  |
+|  |  |--38:SCAN HDFS [tpcds.customer]
+|  |  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |  |     row-size=4B cardinality=100.00K
+|  |  |
+|  |  40:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  |  runtime filters: RF022 <- d_date_sk
+|  |  |  row-size=24B cardinality=2.35M
+|  |  |
+|  |  |--39:SCAN HDFS [tpcds.date_dim]
+|  |  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |  |     predicates: d_year IN (2000, 2001, 2002, 2003)
+|  |  |     row-size=8B cardinality=1.49K
+|  |  |
+|  |  37:SCAN HDFS [tpcds.store_sales]
+|  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |     runtime filters: RF022 -> ss_sold_date_sk
+|  |     row-size=16B cardinality=2.88M
+|  |
+|  36:AGGREGATE [FINALIZE]
+|  |  output: sum(ss_quantity * ss_sales_price)
+|  |  group by: c_customer_sk
+|  |  row-size=20B cardinality=100.00K
+|  |
+|  35:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_customer_sk = c_customer_sk
+|  |  row-size=16B cardinality=2.88M
+|  |
+|  |--34:SCAN HDFS [tpcds.customer]
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |     runtime filters: RF016 -> tpcds.customer.c_customer_sk
+|  |     row-size=4B cardinality=100.00K
+|  |
+|  33:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     runtime filters: RF016 -> tpcds.store_sales.ss_customer_sk
+|     row-size=12B cardinality=2.88M
+|
+24:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: c_customer_sk = cs_bill_customer_sk
+|  runtime filters: RF000 <- cs_bill_customer_sk
+|  row-size=36B cardinality=85.31K
+|
+|--23:HASH JOIN [LEFT SEMI JOIN]
+|  |  hash predicates: cs_item_sk = i_item_sk
+|  |  row-size=36B cardinality=85.31K
+|  |
+|  |--22:AGGREGATE [FINALIZE]
+|  |  |  group by: i_item_sk
+|  |  |  row-size=8B cardinality=17.98K
+|  |  |
+|  |  08:AGGREGATE [FINALIZE]
+|  |  |  output: count(*)
+|  |  |  group by: substr(i_item_desc, 1, 30), i_item_sk, d_date
+|  |  |  having: count(*) > 4
+|  |  |  row-size=50B cardinality=235.45K
+|  |  |
+|  |  07:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ss_item_sk = i_item_sk
+|  |  |  row-size=162B cardinality=2.35M
+|  |  |
+|  |  |--05:SCAN HDFS [tpcds.item]
+|  |  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |  |     row-size=120B cardinality=18.00K
+|  |  |
+|  |  06:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  |  runtime filters: RF014 <- d_date_sk
+|  |  |  row-size=42B cardinality=2.35M
+|  |  |
+|  |  |--04:SCAN HDFS [tpcds.date_dim]
+|  |  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |  |     predicates: d_year IN (2000, 2001, 2002, 2003)
+|  |  |     row-size=30B cardinality=1.49K
+|  |  |
+|  |  03:SCAN HDFS [tpcds.store_sales]
+|  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |     runtime filters: RF014 -> ss_sold_date_sk
+|  |     row-size=12B cardinality=2.88M
+|  |
+|  21:HASH JOIN [INNER JOIN]
+|  |  hash predicates: cs_sold_date_sk = d_date_sk
+|  |  runtime filters: RF010 <- d_date_sk
+|  |  row-size=36B cardinality=85.31K
+|  |
+|  |--02:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year = 2000, d_moy = 2
+|  |     row-size=12B cardinality=108
+|  |
+|  01:SCAN HDFS [tpcds.catalog_sales]
+|     HDFS partitions=1/1 files=1 size=282.20MB
+|     runtime filters: RF010 -> cs_sold_date_sk
+|     row-size=24B cardinality=1.44M
+|
+20:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: sum(ss_quantity * ss_sales_price) > 0.500000 * max(csales)
+|  row-size=36B cardinality=100.00K
+|
+|--19:AGGREGATE [FINALIZE]
+|  |  output: max(sum(ss_quantity * ss_sales_price))
+|  |  row-size=16B cardinality=1
+|  |
+|  18:AGGREGATE [FINALIZE]
+|  |  output: sum(ss_quantity * ss_sales_price)
+|  |  group by: c_customer_sk
+|  |  row-size=20B cardinality=100.00K
+|  |
+|  17:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_customer_sk = c_customer_sk
+|  |  runtime filters: RF004 <- c_customer_sk
+|  |  row-size=28B cardinality=2.35M
+|  |
+|  |--14:SCAN HDFS [tpcds.customer]
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |     row-size=4B cardinality=100.00K
+|  |
+|  16:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  runtime filters: RF006 <- d_date_sk
+|  |  row-size=24B cardinality=2.35M
+|  |
+|  |--15:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year IN (2000, 2001, 2002, 2003)
+|  |     row-size=8B cardinality=1.49K
+|  |
+|  13:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     runtime filters: RF006 -> ss_sold_date_sk, RF004 -> ss_customer_sk
+|     row-size=16B cardinality=2.88M
+|
+12:AGGREGATE [FINALIZE]
+|  output: sum(ss_quantity * ss_sales_price)
+|  group by: c_customer_sk
+|  row-size=20B cardinality=100.00K
+|
+11:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  runtime filters: RF002 <- c_customer_sk
+|  row-size=16B cardinality=2.88M
+|
+|--10:SCAN HDFS [tpcds.customer]
+|     HDFS partitions=1/1 files=1 size=12.60MB
+|     runtime filters: RF000 -> tpcds.customer.c_customer_sk
+|     row-size=4B cardinality=100.00K
+|
+09:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> ss_customer_sk
+   row-size=12B cardinality=2.88M
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=370.38MB Threads=50
+Per-Host Resource Estimates: Memory=2.09GB
+PLAN-ROOT SINK
+|
+89:AGGREGATE [FINALIZE]
+|  output: sum:merge(sales)
+|  limit: 100
+|  row-size=16B cardinality=1
+|
+88:EXCHANGE [UNPARTITIONED]
+|
+49:AGGREGATE
+|  output: sum(sales)
+|  row-size=16B cardinality=1
+|
+00:UNION
+|  row-size=8B cardinality=128.16K
+|
+|--48:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
+|  |  hash predicates: c_customer_sk = ws_bill_customer_sk
+|  |  runtime filters: RF016 <- ws_bill_customer_sk
+|  |  row-size=36B cardinality=42.85K
+|  |
+|  |--87:EXCHANGE [HASH(ws_bill_customer_sk)]
+|  |  |
+|  |  47:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  |  |  hash predicates: ws_item_sk = i_item_sk
+|  |  |  row-size=36B cardinality=42.85K
+|  |  |
+|  |  |--86:EXCHANGE [BROADCAST]
+|  |  |  |
+|  |  |  85:AGGREGATE [FINALIZE]
+|  |  |  |  group by: i_item_sk
+|  |  |  |  row-size=8B cardinality=17.98K
+|  |  |  |
+|  |  |  84:EXCHANGE [HASH(i_item_sk)]
+|  |  |  |
+|  |  |  46:AGGREGATE [STREAMING]
+|  |  |  |  group by: i_item_sk
+|  |  |  |  row-size=8B cardinality=17.98K
+|  |  |  |
+|  |  |  83:AGGREGATE [FINALIZE]
+|  |  |  |  output: count:merge(*)
+|  |  |  |  group by: substr(i_item_desc, 1, 30), i_item_sk, d_date
+|  |  |  |  having: count(*) > 4
+|  |  |  |  row-size=50B cardinality=235.45K
+|  |  |  |
+|  |  |  82:EXCHANGE [HASH(substr(i_item_desc, 1, 30),i_item_sk,d_date)]
+|  |  |  |
+|  |  |  32:AGGREGATE [STREAMING]
+|  |  |  |  output: count(*)
+|  |  |  |  group by: substr(i_item_desc, 1, 30), i_item_sk, d_date
+|  |  |  |  row-size=50B cardinality=2.35M
+|  |  |  |
+|  |  |  31:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  |  |  hash predicates: ss_item_sk = i_item_sk
+|  |  |  |  row-size=162B cardinality=2.35M
+|  |  |  |
+|  |  |  |--81:EXCHANGE [BROADCAST]
+|  |  |  |  |
+|  |  |  |  29:SCAN HDFS [tpcds.item]
+|  |  |  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |  |  |     row-size=120B cardinality=18.00K
+|  |  |  |
+|  |  |  30:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  |  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  |  |  runtime filters: RF030 <- d_date_sk
+|  |  |  |  row-size=42B cardinality=2.35M
+|  |  |  |
+|  |  |  |--80:EXCHANGE [BROADCAST]
+|  |  |  |  |
+|  |  |  |  28:SCAN HDFS [tpcds.date_dim]
+|  |  |  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |  |  |     predicates: d_year IN (2000, 2001, 2002, 2003)
+|  |  |  |     row-size=30B cardinality=1.49K
+|  |  |  |
+|  |  |  27:SCAN HDFS [tpcds.store_sales]
+|  |  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |  |     runtime filters: RF030 -> ss_sold_date_sk
+|  |  |     row-size=12B cardinality=2.88M
+|  |  |
+|  |  45:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  |  hash predicates: ws_sold_date_sk = d_date_sk
+|  |  |  runtime filters: RF026 <- d_date_sk
+|  |  |  row-size=36B cardinality=42.85K
+|  |  |
+|  |  |--79:EXCHANGE [BROADCAST]
+|  |  |  |
+|  |  |  26:SCAN HDFS [tpcds.date_dim]
+|  |  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |  |     predicates: d_year = 2000, d_moy = 2
+|  |  |     row-size=12B cardinality=108
+|  |  |
+|  |  25:SCAN HDFS [tpcds.web_sales]
+|  |     HDFS partitions=1/1 files=1 size=140.07MB
+|  |     runtime filters: RF026 -> ws_sold_date_sk
+|  |     row-size=24B cardinality=719.38K
+|  |
+|  44:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  |  predicates: sum(ss_quantity * ss_sales_price) > 0.500000 * max(csales)
+|  |  row-size=36B cardinality=100.00K
+|  |
+|  |--78:EXCHANGE [BROADCAST]
+|  |  |
+|  |  77:AGGREGATE [FINALIZE]
+|  |  |  output: max:merge(csales)
+|  |  |  row-size=16B cardinality=1
+|  |  |
+|  |  76:EXCHANGE [UNPARTITIONED]
+|  |  |
+|  |  43:AGGREGATE
+|  |  |  output: max(sum(ss_quantity * ss_sales_price))
+|  |  |  row-size=16B cardinality=1
+|  |  |
+|  |  75:AGGREGATE [FINALIZE]
+|  |  |  output: sum:merge(ss_quantity * ss_sales_price)
+|  |  |  group by: c_customer_sk
+|  |  |  row-size=20B cardinality=100.00K
+|  |  |
+|  |  74:EXCHANGE [HASH(c_customer_sk)]
+|  |  |
+|  |  42:AGGREGATE [STREAMING]
+|  |  |  output: sum(ss_quantity * ss_sales_price)
+|  |  |  group by: c_customer_sk
+|  |  |  row-size=20B cardinality=100.00K
+|  |  |
+|  |  41:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  |  hash predicates: ss_customer_sk = c_customer_sk
+|  |  |  row-size=28B cardinality=2.35M
+|  |  |
+|  |  |--73:EXCHANGE [BROADCAST]
+|  |  |  |
+|  |  |  38:SCAN HDFS [tpcds.customer]
+|  |  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |  |     row-size=4B cardinality=100.00K
+|  |  |
+|  |  40:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  |  runtime filters: RF022 <- d_date_sk
+|  |  |  row-size=24B cardinality=2.35M
+|  |  |
+|  |  |--72:EXCHANGE [BROADCAST]
+|  |  |  |
+|  |  |  39:SCAN HDFS [tpcds.date_dim]
+|  |  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |  |     predicates: d_year IN (2000, 2001, 2002, 2003)
+|  |  |     row-size=8B cardinality=1.49K
+|  |  |
+|  |  37:SCAN HDFS [tpcds.store_sales]
+|  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |     runtime filters: RF022 -> ss_sold_date_sk
+|  |     row-size=16B cardinality=2.88M
+|  |
+|  71:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(ss_quantity * ss_sales_price)
+|  |  group by: c_customer_sk
+|  |  row-size=20B cardinality=100.00K
+|  |
+|  70:EXCHANGE [HASH(c_customer_sk)]
+|  |
+|  36:AGGREGATE [STREAMING]
+|  |  output: sum(ss_quantity * ss_sales_price)
+|  |  group by: c_customer_sk
+|  |  row-size=20B cardinality=100.00K
+|  |
+|  35:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_customer_sk = c_customer_sk
+|  |  row-size=16B cardinality=2.88M
+|  |
+|  |--69:EXCHANGE [BROADCAST]
+|  |  |
+|  |  34:SCAN HDFS [tpcds.customer]
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |     runtime filters: RF016 -> tpcds.customer.c_customer_sk
+|  |     row-size=4B cardinality=100.00K
+|  |
+|  33:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     runtime filters: RF016 -> tpcds.store_sales.ss_customer_sk
+|     row-size=12B cardinality=2.88M
+|
+24:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
+|  hash predicates: c_customer_sk = cs_bill_customer_sk
+|  runtime filters: RF000 <- cs_bill_customer_sk
+|  row-size=36B cardinality=85.31K
+|
+|--68:EXCHANGE [HASH(cs_bill_customer_sk)]
+|  |
+|  23:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  |  hash predicates: cs_item_sk = i_item_sk
+|  |  row-size=36B cardinality=85.31K
+|  |
+|  |--67:EXCHANGE [BROADCAST]
+|  |  |
+|  |  66:AGGREGATE [FINALIZE]
+|  |  |  group by: i_item_sk
+|  |  |  row-size=8B cardinality=17.98K
+|  |  |
+|  |  65:EXCHANGE [HASH(i_item_sk)]
+|  |  |
+|  |  22:AGGREGATE [STREAMING]
+|  |  |  group by: i_item_sk
+|  |  |  row-size=8B cardinality=17.98K
+|  |  |
+|  |  64:AGGREGATE [FINALIZE]
+|  |  |  output: count:merge(*)
+|  |  |  group by: substr(i_item_desc, 1, 30), i_item_sk, d_date
+|  |  |  having: count(*) > 4
+|  |  |  row-size=50B cardinality=235.45K
+|  |  |
+|  |  63:EXCHANGE [HASH(substr(i_item_desc, 1, 30),i_item_sk,d_date)]
+|  |  |
+|  |  08:AGGREGATE [STREAMING]
+|  |  |  output: count(*)
+|  |  |  group by: substr(i_item_desc, 1, 30), i_item_sk, d_date
+|  |  |  row-size=50B cardinality=2.35M
+|  |  |
+|  |  07:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  |  hash predicates: ss_item_sk = i_item_sk
+|  |  |  row-size=162B cardinality=2.35M
+|  |  |
+|  |  |--62:EXCHANGE [BROADCAST]
+|  |  |  |
+|  |  |  05:SCAN HDFS [tpcds.item]
+|  |  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |  |     row-size=120B cardinality=18.00K
+|  |  |
+|  |  06:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  |  runtime filters: RF014 <- d_date_sk
+|  |  |  row-size=42B cardinality=2.35M
+|  |  |
+|  |  |--61:EXCHANGE [BROADCAST]
+|  |  |  |
+|  |  |  04:SCAN HDFS [tpcds.date_dim]
+|  |  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |  |     predicates: d_year IN (2000, 2001, 2002, 2003)
+|  |  |     row-size=30B cardinality=1.49K
+|  |  |
+|  |  03:SCAN HDFS [tpcds.store_sales]
+|  |     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|  |     runtime filters: RF014 -> ss_sold_date_sk
+|  |     row-size=12B cardinality=2.88M
+|  |
+|  21:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: cs_sold_date_sk = d_date_sk
+|  |  runtime filters: RF010 <- d_date_sk
+|  |  row-size=36B cardinality=85.31K
+|  |
+|  |--60:EXCHANGE [BROADCAST]
+|  |  |
+|  |  02:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year = 2000, d_moy = 2
+|  |     row-size=12B cardinality=108
+|  |
+|  01:SCAN HDFS [tpcds.catalog_sales]
+|     HDFS partitions=1/1 files=1 size=282.20MB
+|     runtime filters: RF010 -> cs_sold_date_sk
+|     row-size=24B cardinality=1.44M
+|
+20:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  predicates: sum(ss_quantity * ss_sales_price) > 0.500000 * max(csales)
+|  row-size=36B cardinality=100.00K
+|
+|--59:EXCHANGE [BROADCAST]
+|  |
+|  58:AGGREGATE [FINALIZE]
+|  |  output: max:merge(csales)
+|  |  row-size=16B cardinality=1
+|  |
+|  57:EXCHANGE [UNPARTITIONED]
+|  |
+|  19:AGGREGATE
+|  |  output: max(sum(ss_quantity * ss_sales_price))
+|  |  row-size=16B cardinality=1
+|  |
+|  56:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(ss_quantity * ss_sales_price)
+|  |  group by: c_customer_sk
+|  |  row-size=20B cardinality=100.00K
+|  |
+|  55:EXCHANGE [HASH(c_customer_sk)]
+|  |
+|  18:AGGREGATE [STREAMING]
+|  |  output: sum(ss_quantity * ss_sales_price)
+|  |  group by: c_customer_sk
+|  |  row-size=20B cardinality=100.00K
+|  |
+|  17:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_customer_sk = c_customer_sk
+|  |  runtime filters: RF004 <- c_customer_sk
+|  |  row-size=28B cardinality=2.35M
+|  |
+|  |--54:EXCHANGE [BROADCAST]
+|  |  |
+|  |  14:SCAN HDFS [tpcds.customer]
+|  |     HDFS partitions=1/1 files=1 size=12.60MB
+|  |     row-size=4B cardinality=100.00K
+|  |
+|  16:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  runtime filters: RF006 <- d_date_sk
+|  |  row-size=24B cardinality=2.35M
+|  |
+|  |--53:EXCHANGE [BROADCAST]
+|  |  |
+|  |  15:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year IN (2000, 2001, 2002, 2003)
+|  |     row-size=8B cardinality=1.49K
+|  |
+|  13:SCAN HDFS [tpcds.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     runtime filters: RF006 -> ss_sold_date_sk, RF004 -> ss_customer_sk
+|     row-size=16B cardinality=2.88M
+|
+52:AGGREGATE [FINALIZE]
+|  output: sum:merge(ss_quantity * ss_sales_price)
+|  group by: c_customer_sk
+|  row-size=20B cardinality=100.00K
+|
+51:EXCHANGE [HASH(c_customer_sk)]
+|
+12:AGGREGATE [STREAMING]
+|  output: sum(ss_quantity * ss_sales_price)
+|  group by: c_customer_sk
+|  row-size=20B cardinality=100.00K
+|
+11:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|  runtime filters: RF002 <- c_customer_sk
+|  row-size=16B cardinality=2.88M
+|
+|--50:EXCHANGE [BROADCAST]
+|  |
+|  10:SCAN HDFS [tpcds.customer]
+|     HDFS partitions=1/1 files=1 size=12.60MB
+|     runtime filters: RF000 -> tpcds.customer.c_customer_sk
+|     row-size=4B cardinality=100.00K
+|
+09:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> tpcds.store_sales.ss_customer_sk, RF002 -> ss_customer_sk
+   row-size=12B cardinality=2.88M
+====
+# TPCDS-Q33
+with ss as (
+ select
+          i_manufact_id,sum(ss_ext_sales_price) total_sales
+ from
+  store_sales,
+  date_dim,
+         customer_address,
+         item
+ where
+         i_manufact_id in (select
+  i_manufact_id
+from
+ item
+where i_category in ('Electronics'))
+ and     ss_item_sk              = i_item_sk
+ and     ss_sold_date_sk         = d_date_sk
+ and     d_year                  = 1998
+ and     d_moy                   = 5
+ and     ss_addr_sk              = ca_address_sk
+ and     ca_gmt_offset           = -5
+ group by i_manufact_id),
+ cs as (
+ select
+          i_manufact_id,sum(cs_ext_sales_price) total_sales
+ from
+  catalog_sales,
+  date_dim,
+         customer_address,
+         item
+ where
+         i_manufact_id               in (select
+  i_manufact_id
+from
+ item
+where i_category in ('Electronics'))
+ and     cs_item_sk              = i_item_sk
+ and     cs_sold_date_sk         = d_date_sk
+ and     d_year                  = 1998
+ and     d_moy                   = 5
+ and     cs_bill_addr_sk         = ca_address_sk
+ and     ca_gmt_offset           = -5
+ group by i_manufact_id),
+ ws as (
+ select
+          i_manufact_id,sum(ws_ext_sales_price) total_sales
+ from
+  web_sales,
+  date_dim,
+         customer_address,
+         item
+ where
+         i_manufact_id               in (select
+  i_manufact_id
+from
+ item
+where i_category in ('Electronics'))
+ and     ws_item_sk              = i_item_sk
+ and     ws_sold_date_sk         = d_date_sk
+ and     d_year                  = 1998
+ and     d_moy                   = 5
+ and     ws_bill_addr_sk         = ca_address_sk
+ and     ca_gmt_offset           = -5
+ group by i_manufact_id)
+  select  i_manufact_id ,sum(total_sales) total_sales
+ from  (select * from ss
+        union all
+        select * from cs
+        union all
+        select * from ws) tmp1
+ group by i_manufact_id
+ order by total_sales
+limit 100;
+---- PLAN
+Max Per-Host Resource Reservation: Memory=59.69MB Threads=6
+Per-Host Resource Estimates: Memory=348MB
+PLAN-ROOT SINK
+|
+32:TOP-N [LIMIT=100]
+|  order by: sum(total_sales) ASC
+|  row-size=20B cardinality=100
+|
+31:AGGREGATE [FINALIZE]
+|  output: sum(total_sales)
+|  group by: i_manufact_id
+|  row-size=20B cardinality=2.83K
+|
+00:UNION
+|  row-size=20B cardinality=2.83K
+|
+|--30:AGGREGATE [FINALIZE]
+|  |  output: sum(ws_ext_sales_price)
+|  |  group by: i_manufact_id
+|  |  row-size=20B cardinality=944
+|  |
+|  29:HASH JOIN [LEFT SEMI JOIN]
+|  |  hash predicates: i_manufact_id = i_manufact_id
+|  |  row-size=52B cardinality=9.81K
+|  |
+|  |--25:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_category IN ('Electronics')
+|  |     row-size=22B cardinality=1.80K
+|  |
+|  28:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ws_item_sk = i_item_sk
+|  |  row-size=52B cardinality=9.81K
+|  |
+|  |--24:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     row-size=12B cardinality=18.00K
+|  |
+|  27:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ws_bill_addr_sk = ca_address_sk
+|  |  runtime filters: RF020 <- ca_address_sk
+|  |  row-size=40B cardinality=9.81K
+|  |
+|  |--23:SCAN HDFS [tpcds.customer_address]
+|  |     HDFS partitions=1/1 files=1 size=5.25MB
+|  |     predicates: ca_gmt_offset = -5
+|  |     row-size=8B cardinality=8.33K
+|  |
+|  26:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ws_sold_date_sk = d_date_sk
+|  |  runtime filters: RF022 <- d_date_sk
+|  |  row-size=32B cardinality=42.85K
+|  |
+|  |--22:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year = 1998, d_moy = 5
+|  |     row-size=12B cardinality=108
+|  |
+|  21:SCAN HDFS [tpcds.web_sales]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     runtime filters: RF022 -> ws_sold_date_sk, RF020 -> ws_bill_addr_sk
+|     row-size=20B cardinality=719.38K
+|
+|--20:AGGREGATE [FINALIZE]
+|  |  output: sum(cs_ext_sales_price)
+|  |  group by: i_manufact_id
+|  |  row-size=20B cardinality=944
+|  |
+|  19:HASH JOIN [LEFT SEMI JOIN]
+|  |  hash predicates: i_manufact_id = i_manufact_id
+|  |  runtime filters: RF008 <- i_manufact_id
+|  |  row-size=52B cardinality=14.81K
+|  |
+|  |--15:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_category IN ('Electronics')
+|  |     row-size=22B cardinality=1.80K
+|  |
+|  18:HASH JOIN [INNER JOIN]
+|  |  hash predicates: cs_item_sk = i_item_sk
+|  |  runtime filters: RF010 <- i_item_sk
+|  |  row-size=52B cardinality=14.81K
+|  |
+|  |--14:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     runtime filters: RF008 -> i_manufact_id
+|  |     row-size=12B cardinality=18.00K
+|  |
+|  17:HASH JOIN [INNER JOIN]
+|  |  hash predicates: cs_bill_addr_sk = ca_address_sk
+|  |  runtime filters: RF012 <- ca_address_sk
+|  |  row-size=40B cardinality=14.81K
+|  |
+|  |--13:SCAN HDFS [tpcds.customer_address]
+|  |     HDFS partitions=1/1 files=1 size=5.25MB
+|  |     predicates: ca_gmt_offset = -5
+|  |     row-size=8B cardinality=8.33K
+|  |
+|  16:HASH JOIN [INNER JOIN]
+|  |  hash predicates: cs_sold_date_sk = d_date_sk
+|  |  runtime filters: RF014 <- d_date_sk
+|  |  row-size=32B cardinality=85.31K
+|  |
+|  |--12:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year = 1998, d_moy = 5
+|  |     row-size=12B cardinality=108
+|  |
+|  11:SCAN HDFS [tpcds.catalog_sales]
+|     HDFS partitions=1/1 files=1 size=282.20MB
+|     runtime filters: RF014 -> cs_sold_date_sk, RF012 -> cs_bill_addr_sk, RF010 -> cs_item_sk
+|     row-size=20B cardinality=1.44M
+|
+10:AGGREGATE [FINALIZE]
+|  output: sum(ss_ext_sales_price)
+|  group by: i_manufact_id
+|  row-size=20B cardinality=944
+|
+09:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: i_manufact_id = i_manufact_id
+|  runtime filters: RF000 <- i_manufact_id
+|  row-size=52B cardinality=28.50K
+|
+|--05:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     predicates: i_category IN ('Electronics')
+|     row-size=22B cardinality=1.80K
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF002 <- i_item_sk
+|  row-size=52B cardinality=28.50K
+|
+|--04:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     runtime filters: RF000 -> i_manufact_id
+|     row-size=12B cardinality=18.00K
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_addr_sk = ca_address_sk
+|  runtime filters: RF004 <- ca_address_sk
+|  row-size=40B cardinality=28.50K
+|
+|--03:SCAN HDFS [tpcds.customer_address]
+|     HDFS partitions=1/1 files=1 size=5.25MB
+|     predicates: ca_gmt_offset = -5
+|     row-size=8B cardinality=8.33K
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF006 <- d_date_sk
+|  row-size=32B cardinality=170.55K
+|
+|--02:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_year = 1998, d_moy = 5
+|     row-size=12B cardinality=108
+|
+01:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF006 -> ss_sold_date_sk, RF004 -> ss_addr_sk, RF002 -> ss_item_sk
+   row-size=20B cardinality=2.88M
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=168.12MB Threads=35
+Per-Host Resource Estimates: Memory=994MB
+PLAN-ROOT SINK
+|
+55:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: sum(total_sales) ASC
+|  limit: 100
+|
+32:TOP-N [LIMIT=100]
+|  order by: sum(total_sales) ASC
+|  row-size=20B cardinality=100
+|
+54:AGGREGATE [FINALIZE]
+|  output: sum:merge(total_sales)
+|  group by: i_manufact_id
+|  row-size=20B cardinality=2.83K
+|
+53:EXCHANGE [HASH(i_manufact_id)]
+|
+31:AGGREGATE [STREAMING]
+|  output: sum(total_sales)
+|  group by: i_manufact_id
+|  row-size=20B cardinality=2.83K
+|
+00:UNION
+|  row-size=20B cardinality=2.83K
+|
+|--52:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(ws_ext_sales_price)
+|  |  group by: i_manufact_id
+|  |  row-size=20B cardinality=944
+|  |
+|  51:EXCHANGE [HASH(i_manufact_id)]
+|  |
+|  30:AGGREGATE [STREAMING]
+|  |  output: sum(ws_ext_sales_price)
+|  |  group by: i_manufact_id
+|  |  row-size=20B cardinality=944
+|  |
+|  29:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  |  hash predicates: i_manufact_id = i_manufact_id
+|  |  row-size=52B cardinality=9.81K
+|  |
+|  |--50:EXCHANGE [BROADCAST]
+|  |  |
+|  |  25:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_category IN ('Electronics')
+|  |     row-size=22B cardinality=1.80K
+|  |
+|  28:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  hash predicates: ws_item_sk = i_item_sk
+|  |  row-size=52B cardinality=9.81K
+|  |
+|  |--49:EXCHANGE [HASH(i_item_sk)]
+|  |  |
+|  |  24:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     row-size=12B cardinality=18.00K
+|  |
+|  48:EXCHANGE [HASH(ws_item_sk)]
+|  |
+|  27:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ws_bill_addr_sk = ca_address_sk
+|  |  runtime filters: RF020 <- ca_address_sk
+|  |  row-size=40B cardinality=9.81K
+|  |
+|  |--47:EXCHANGE [BROADCAST]
+|  |  |
+|  |  23:SCAN HDFS [tpcds.customer_address]
+|  |     HDFS partitions=1/1 files=1 size=5.25MB
+|  |     predicates: ca_gmt_offset = -5
+|  |     row-size=8B cardinality=8.33K
+|  |
+|  26:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ws_sold_date_sk = d_date_sk
+|  |  runtime filters: RF022 <- d_date_sk
+|  |  row-size=32B cardinality=42.85K
+|  |
+|  |--46:EXCHANGE [BROADCAST]
+|  |  |
+|  |  22:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year = 1998, d_moy = 5
+|  |     row-size=12B cardinality=108
+|  |
+|  21:SCAN HDFS [tpcds.web_sales]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     runtime filters: RF022 -> ws_sold_date_sk, RF020 -> ws_bill_addr_sk
+|     row-size=20B cardinality=719.38K
+|
+|--45:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(cs_ext_sales_price)
+|  |  group by: i_manufact_id
+|  |  row-size=20B cardinality=944
+|  |
+|  44:EXCHANGE [HASH(i_manufact_id)]
+|  |
+|  20:AGGREGATE [STREAMING]
+|  |  output: sum(cs_ext_sales_price)
+|  |  group by: i_manufact_id
+|  |  row-size=20B cardinality=944
+|  |
+|  19:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  |  hash predicates: i_manufact_id = i_manufact_id
+|  |  runtime filters: RF008 <- i_manufact_id
+|  |  row-size=52B cardinality=14.81K
+|  |
+|  |--43:EXCHANGE [BROADCAST]
+|  |  |
+|  |  15:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_category IN ('Electronics')
+|  |     row-size=22B cardinality=1.80K
+|  |
+|  18:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  hash predicates: cs_item_sk = i_item_sk
+|  |  runtime filters: RF010 <- i_item_sk
+|  |  row-size=52B cardinality=14.81K
+|  |
+|  |--42:EXCHANGE [HASH(i_item_sk)]
+|  |  |
+|  |  14:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     runtime filters: RF008 -> i_manufact_id
+|  |     row-size=12B cardinality=18.00K
+|  |
+|  41:EXCHANGE [HASH(cs_item_sk)]
+|  |
+|  17:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: cs_bill_addr_sk = ca_address_sk
+|  |  runtime filters: RF012 <- ca_address_sk
+|  |  row-size=40B cardinality=14.81K
+|  |
+|  |--40:EXCHANGE [BROADCAST]
+|  |  |
+|  |  13:SCAN HDFS [tpcds.customer_address]
+|  |     HDFS partitions=1/1 files=1 size=5.25MB
+|  |     predicates: ca_gmt_offset = -5
+|  |     row-size=8B cardinality=8.33K
+|  |
+|  16:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: cs_sold_date_sk = d_date_sk
+|  |  runtime filters: RF014 <- d_date_sk
+|  |  row-size=32B cardinality=85.31K
+|  |
+|  |--39:EXCHANGE [BROADCAST]
+|  |  |
+|  |  12:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year = 1998, d_moy = 5
+|  |     row-size=12B cardinality=108
+|  |
+|  11:SCAN HDFS [tpcds.catalog_sales]
+|     HDFS partitions=1/1 files=1 size=282.20MB
+|     runtime filters: RF014 -> cs_sold_date_sk, RF012 -> cs_bill_addr_sk, RF010 -> cs_item_sk
+|     row-size=20B cardinality=1.44M
+|
+38:AGGREGATE [FINALIZE]
+|  output: sum:merge(ss_ext_sales_price)
+|  group by: i_manufact_id
+|  row-size=20B cardinality=944
+|
+37:EXCHANGE [HASH(i_manufact_id)]
+|
+10:AGGREGATE [STREAMING]
+|  output: sum(ss_ext_sales_price)
+|  group by: i_manufact_id
+|  row-size=20B cardinality=944
+|
+09:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: i_manufact_id = i_manufact_id
+|  runtime filters: RF000 <- i_manufact_id
+|  row-size=52B cardinality=28.50K
+|
+|--36:EXCHANGE [BROADCAST]
+|  |
+|  05:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     predicates: i_category IN ('Electronics')
+|     row-size=22B cardinality=1.80K
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF002 <- i_item_sk
+|  row-size=52B cardinality=28.50K
+|
+|--35:EXCHANGE [BROADCAST]
+|  |
+|  04:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     runtime filters: RF000 -> i_manufact_id
+|     row-size=12B cardinality=18.00K
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_addr_sk = ca_address_sk
+|  runtime filters: RF004 <- ca_address_sk
+|  row-size=40B cardinality=28.50K
+|
+|--34:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.customer_address]
+|     HDFS partitions=1/1 files=1 size=5.25MB
+|     predicates: ca_gmt_offset = -5
+|     row-size=8B cardinality=8.33K
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF006 <- d_date_sk
+|  row-size=32B cardinality=170.55K
+|
+|--33:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_year = 1998, d_moy = 5
+|     row-size=12B cardinality=108
+|
+01:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF006 -> ss_sold_date_sk, RF004 -> ss_addr_sk, RF002 -> ss_item_sk
+   row-size=20B cardinality=2.88M
+====
+# TPCDS-Q60
+with ss as (
+ select
+          i_item_id,sum(ss_ext_sales_price) total_sales
+ from
+  store_sales,
+  date_dim,
+         customer_address,
+         item
+ where
+         i_item_id in (select
+  i_item_id
+from
+ item
+where i_category in ('Music'))
+ and     ss_item_sk              = i_item_sk
+ and     ss_sold_date_sk         = d_date_sk
+ and     d_year                  = 1998
+ and     d_moy                   = 9
+ and     ss_addr_sk              = ca_address_sk
+ and     ca_gmt_offset           = -5
+ group by i_item_id),
+ cs as (
+ select
+          i_item_id,sum(cs_ext_sales_price) total_sales
+ from
+  catalog_sales,
+  date_dim,
+         customer_address,
+         item
+ where
+         i_item_id               in (select
+  i_item_id
+from
+ item
+where i_category in ('Music'))
+ and     cs_item_sk              = i_item_sk
+ and     cs_sold_date_sk         = d_date_sk
+ and     d_year                  = 1998
+ and     d_moy                   = 9
+ and     cs_bill_addr_sk         = ca_address_sk
+ and     ca_gmt_offset           = -5
+ group by i_item_id),
+ ws as (
+ select
+          i_item_id,sum(ws_ext_sales_price) total_sales
+ from
+  web_sales,
+  date_dim,
+         customer_address,
+         item
+ where
+         i_item_id               in (select
+  i_item_id
+from
+ item
+where i_category in ('Music'))
+ and     ws_item_sk              = i_item_sk
+ and     ws_sold_date_sk         = d_date_sk
+ and     d_year                  = 1998
+ and     d_moy                   = 9
+ and     ws_bill_addr_sk         = ca_address_sk
+ and     ca_gmt_offset           = -5
+ group by i_item_id)
+  select
+  i_item_id
+,sum(total_sales) total_sales
+ from  (select * from ss
+        union all
+        select * from cs
+        union all
+        select * from ws) tmp1
+ group by i_item_id
+ order by i_item_id
+      ,total_sales
+ limit 100;
+---- PLAN
+Max Per-Host Resource Reservation: Memory=59.69MB Threads=6
+Per-Host Resource Estimates: Memory=346MB
+PLAN-ROOT SINK
+|
+32:TOP-N [LIMIT=100]
+|  order by: i_item_id ASC, sum(total_sales) ASC
+|  row-size=44B cardinality=100
+|
+31:AGGREGATE [FINALIZE]
+|  output: sum(total_sales)
+|  group by: i_item_id
+|  row-size=44B cardinality=10.80K
+|
+00:UNION
+|  row-size=44B cardinality=10.80K
+|
+|--30:AGGREGATE [FINALIZE]
+|  |  output: sum(ws_ext_sales_price)
+|  |  group by: i_item_id
+|  |  row-size=44B cardinality=2.00K
+|  |
+|  29:HASH JOIN [LEFT SEMI JOIN]
+|  |  hash predicates: i_item_id = i_item_id
+|  |  runtime filters: RF016 <- i_item_id
+|  |  row-size=76B cardinality=2.00K
+|  |
+|  |--25:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_category IN ('Music')
+|  |     row-size=46B cardinality=1.80K
+|  |
+|  28:HASH JOIN [INNER JOIN]
+|  |  hash predicates: i_item_sk = ws_item_sk
+|  |  runtime filters: RF018 <- ws_item_sk
+|  |  row-size=76B cardinality=9.81K
+|  |
+|  |--27:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ws_bill_addr_sk = ca_address_sk
+|  |  |  runtime filters: RF020 <- ca_address_sk
+|  |  |  row-size=40B cardinality=9.81K
+|  |  |
+|  |  |--23:SCAN HDFS [tpcds.customer_address]
+|  |  |     HDFS partitions=1/1 files=1 size=5.25MB
+|  |  |     predicates: ca_gmt_offset = -5
+|  |  |     row-size=8B cardinality=8.33K
+|  |  |
+|  |  26:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ws_sold_date_sk = d_date_sk
+|  |  |  runtime filters: RF022 <- d_date_sk
+|  |  |  row-size=32B cardinality=42.85K
+|  |  |
+|  |  |--22:SCAN HDFS [tpcds.date_dim]
+|  |  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |  |     predicates: d_year = 1998, d_moy = 9
+|  |  |     row-size=12B cardinality=108
+|  |  |
+|  |  21:SCAN HDFS [tpcds.web_sales]
+|  |     HDFS partitions=1/1 files=1 size=140.07MB
+|  |     runtime filters: RF022 -> ws_sold_date_sk, RF020 -> ws_bill_addr_sk
+|  |     row-size=20B cardinality=719.38K
+|  |
+|  24:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     runtime filters: RF016 -> i_item_id, RF018 -> i_item_sk
+|     row-size=36B cardinality=18.00K
+|
+|--20:AGGREGATE [FINALIZE]
+|  |  output: sum(cs_ext_sales_price)
+|  |  group by: i_item_id
+|  |  row-size=44B cardinality=3.01K
+|  |
+|  19:HASH JOIN [LEFT SEMI JOIN]
+|  |  hash predicates: i_item_id = i_item_id
+|  |  runtime filters: RF008 <- i_item_id
+|  |  row-size=76B cardinality=3.01K
+|  |
+|  |--15:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_category IN ('Music')
+|  |     row-size=46B cardinality=1.80K
+|  |
+|  18:HASH JOIN [INNER JOIN]
+|  |  hash predicates: i_item_sk = cs_item_sk
+|  |  row-size=76B cardinality=14.81K
+|  |
+|  |--17:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: cs_bill_addr_sk = ca_address_sk
+|  |  |  runtime filters: RF012 <- ca_address_sk
+|  |  |  row-size=40B cardinality=14.81K
+|  |  |
+|  |  |--13:SCAN HDFS [tpcds.customer_address]
+|  |  |     HDFS partitions=1/1 files=1 size=5.25MB
+|  |  |     predicates: ca_gmt_offset = -5
+|  |  |     row-size=8B cardinality=8.33K
+|  |  |
+|  |  16:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: cs_sold_date_sk = d_date_sk
+|  |  |  runtime filters: RF014 <- d_date_sk
+|  |  |  row-size=32B cardinality=85.31K
+|  |  |
+|  |  |--12:SCAN HDFS [tpcds.date_dim]
+|  |  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |  |     predicates: d_year = 1998, d_moy = 9
+|  |  |     row-size=12B cardinality=108
+|  |  |
+|  |  11:SCAN HDFS [tpcds.catalog_sales]
+|  |     HDFS partitions=1/1 files=1 size=282.20MB
+|  |     runtime filters: RF014 -> cs_sold_date_sk, RF012 -> cs_bill_addr_sk
+|  |     row-size=20B cardinality=1.44M
+|  |
+|  14:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     runtime filters: RF008 -> i_item_id
+|     row-size=36B cardinality=18.00K
+|
+10:AGGREGATE [FINALIZE]
+|  output: sum(ss_ext_sales_price)
+|  group by: i_item_id
+|  row-size=44B cardinality=5.79K
+|
+09:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: i_item_id = i_item_id
+|  runtime filters: RF000 <- i_item_id
+|  row-size=76B cardinality=5.79K
+|
+|--05:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     predicates: i_category IN ('Music')
+|     row-size=46B cardinality=1.80K
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|  row-size=76B cardinality=28.50K
+|
+|--04:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     runtime filters: RF000 -> i_item_id
+|     row-size=36B cardinality=18.00K
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_addr_sk = ca_address_sk
+|  runtime filters: RF004 <- ca_address_sk
+|  row-size=40B cardinality=28.50K
+|
+|--03:SCAN HDFS [tpcds.customer_address]
+|     HDFS partitions=1/1 files=1 size=5.25MB
+|     predicates: ca_gmt_offset = -5
+|     row-size=8B cardinality=8.33K
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF006 <- d_date_sk
+|  row-size=32B cardinality=170.55K
+|
+|--02:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_year = 1998, d_moy = 9
+|     row-size=12B cardinality=108
+|
+01:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF006 -> ss_sold_date_sk, RF004 -> ss_addr_sk
+   row-size=20B cardinality=2.88M
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=169.12MB Threads=36
+Per-Host Resource Estimates: Memory=998MB
+PLAN-ROOT SINK
+|
+56:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: i_item_id ASC, sum(total_sales) ASC
+|  limit: 100
+|
+32:TOP-N [LIMIT=100]
+|  order by: i_item_id ASC, sum(total_sales) ASC
+|  row-size=44B cardinality=100
+|
+55:AGGREGATE [FINALIZE]
+|  output: sum:merge(total_sales)
+|  group by: i_item_id
+|  row-size=44B cardinality=10.80K
+|
+54:EXCHANGE [HASH(i_item_id)]
+|
+31:AGGREGATE [STREAMING]
+|  output: sum(total_sales)
+|  group by: i_item_id
+|  row-size=44B cardinality=10.80K
+|
+00:UNION
+|  row-size=44B cardinality=10.80K
+|
+|--53:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(ws_ext_sales_price)
+|  |  group by: i_item_id
+|  |  row-size=44B cardinality=2.00K
+|  |
+|  52:EXCHANGE [HASH(i_item_id)]
+|  |
+|  30:AGGREGATE [STREAMING]
+|  |  output: sum(ws_ext_sales_price)
+|  |  group by: i_item_id
+|  |  row-size=44B cardinality=2.00K
+|  |
+|  29:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  |  hash predicates: i_item_id = i_item_id
+|  |  runtime filters: RF016 <- i_item_id
+|  |  row-size=76B cardinality=2.00K
+|  |
+|  |--51:EXCHANGE [BROADCAST]
+|  |  |
+|  |  25:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_category IN ('Music')
+|  |     row-size=46B cardinality=1.80K
+|  |
+|  28:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  hash predicates: ws_item_sk = i_item_sk
+|  |  row-size=76B cardinality=9.81K
+|  |
+|  |--50:EXCHANGE [HASH(i_item_sk)]
+|  |  |
+|  |  24:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     runtime filters: RF016 -> i_item_id
+|  |     row-size=36B cardinality=18.00K
+|  |
+|  49:EXCHANGE [HASH(ws_item_sk)]
+|  |
+|  27:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ws_bill_addr_sk = ca_address_sk
+|  |  runtime filters: RF020 <- ca_address_sk
+|  |  row-size=40B cardinality=9.81K
+|  |
+|  |--48:EXCHANGE [BROADCAST]
+|  |  |
+|  |  23:SCAN HDFS [tpcds.customer_address]
+|  |     HDFS partitions=1/1 files=1 size=5.25MB
+|  |     predicates: ca_gmt_offset = -5
+|  |     row-size=8B cardinality=8.33K
+|  |
+|  26:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ws_sold_date_sk = d_date_sk
+|  |  runtime filters: RF022 <- d_date_sk
+|  |  row-size=32B cardinality=42.85K
+|  |
+|  |--47:EXCHANGE [BROADCAST]
+|  |  |
+|  |  22:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year = 1998, d_moy = 9
+|  |     row-size=12B cardinality=108
+|  |
+|  21:SCAN HDFS [tpcds.web_sales]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     runtime filters: RF022 -> ws_sold_date_sk, RF020 -> ws_bill_addr_sk
+|     row-size=20B cardinality=719.38K
+|
+|--46:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(cs_ext_sales_price)
+|  |  group by: i_item_id
+|  |  row-size=44B cardinality=3.01K
+|  |
+|  45:EXCHANGE [HASH(i_item_id)]
+|  |
+|  20:AGGREGATE [STREAMING]
+|  |  output: sum(cs_ext_sales_price)
+|  |  group by: i_item_id
+|  |  row-size=44B cardinality=3.01K
+|  |
+|  19:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  |  hash predicates: i_item_id = i_item_id
+|  |  runtime filters: RF008 <- i_item_id
+|  |  row-size=76B cardinality=3.01K
+|  |
+|  |--44:EXCHANGE [BROADCAST]
+|  |  |
+|  |  15:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_category IN ('Music')
+|  |     row-size=46B cardinality=1.80K
+|  |
+|  18:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  hash predicates: cs_item_sk = i_item_sk
+|  |  row-size=76B cardinality=14.81K
+|  |
+|  |--43:EXCHANGE [HASH(i_item_sk)]
+|  |  |
+|  |  14:SCAN HDFS [tpcds.item]
+|  |     HDFS partitions=1/1 files=1 size=4.82MB
+|  |     runtime filters: RF008 -> i_item_id
+|  |     row-size=36B cardinality=18.00K
+|  |
+|  42:EXCHANGE [HASH(cs_item_sk)]
+|  |
+|  17:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: cs_bill_addr_sk = ca_address_sk
+|  |  runtime filters: RF012 <- ca_address_sk
+|  |  row-size=40B cardinality=14.81K
+|  |
+|  |--41:EXCHANGE [BROADCAST]
+|  |  |
+|  |  13:SCAN HDFS [tpcds.customer_address]
+|  |     HDFS partitions=1/1 files=1 size=5.25MB
+|  |     predicates: ca_gmt_offset = -5
+|  |     row-size=8B cardinality=8.33K
+|  |
+|  16:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: cs_sold_date_sk = d_date_sk
+|  |  runtime filters: RF014 <- d_date_sk
+|  |  row-size=32B cardinality=85.31K
+|  |
+|  |--40:EXCHANGE [BROADCAST]
+|  |  |
+|  |  12:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year = 1998, d_moy = 9
+|  |     row-size=12B cardinality=108
+|  |
+|  11:SCAN HDFS [tpcds.catalog_sales]
+|     HDFS partitions=1/1 files=1 size=282.20MB
+|     runtime filters: RF014 -> cs_sold_date_sk, RF012 -> cs_bill_addr_sk
+|     row-size=20B cardinality=1.44M
+|
+39:AGGREGATE [FINALIZE]
+|  output: sum:merge(ss_ext_sales_price)
+|  group by: i_item_id
+|  row-size=44B cardinality=5.79K
+|
+38:EXCHANGE [HASH(i_item_id)]
+|
+10:AGGREGATE [STREAMING]
+|  output: sum(ss_ext_sales_price)
+|  group by: i_item_id
+|  row-size=44B cardinality=5.79K
+|
+09:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: i_item_id = i_item_id
+|  runtime filters: RF000 <- i_item_id
+|  row-size=76B cardinality=5.79K
+|
+|--37:EXCHANGE [BROADCAST]
+|  |
+|  05:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     predicates: i_category IN ('Music')
+|     row-size=46B cardinality=1.80K
+|
+08:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ss_item_sk = i_item_sk
+|  runtime filters: RF002 <- i_item_sk
+|  row-size=76B cardinality=28.50K
+|
+|--36:EXCHANGE [HASH(i_item_sk)]
+|  |
+|  04:SCAN HDFS [tpcds.item]
+|     HDFS partitions=1/1 files=1 size=4.82MB
+|     runtime filters: RF000 -> i_item_id
+|     row-size=36B cardinality=18.00K
+|
+35:EXCHANGE [HASH(ss_item_sk)]
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_addr_sk = ca_address_sk
+|  runtime filters: RF004 <- ca_address_sk
+|  row-size=40B cardinality=28.50K
+|
+|--34:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.customer_address]
+|     HDFS partitions=1/1 files=1 size=5.25MB
+|     predicates: ca_gmt_offset = -5
+|     row-size=8B cardinality=8.33K
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|  runtime filters: RF006 <- d_date_sk
+|  row-size=32B cardinality=170.55K
+|
+|--33:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_year = 1998, d_moy = 9
+|     row-size=12B cardinality=108
+|
+01:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF006 -> ss_sold_date_sk, RF004 -> ss_addr_sk, RF002 -> ss_item_sk
+   row-size=20B cardinality=2.88M
+====
+# TPCDS-Q95
+with ws_wh as
+(select ws1.ws_order_number,ws1.ws_warehouse_sk wh1,ws2.ws_warehouse_sk wh2
+ from web_sales ws1,web_sales ws2
+ where ws1.ws_order_number = ws2.ws_order_number
+   and ws1.ws_warehouse_sk <> ws2.ws_warehouse_sk)
+ select
+   count(distinct ws_order_number) as "order count"
+  ,sum(ws_ext_ship_cost) as "total shipping cost"
+  ,sum(ws_net_profit) as "total net profit"
+from
+   web_sales ws1
+  ,date_dim
+  ,customer_address
+  ,web_site
+where
+    cast(d_date as timestamp) between cast('1999-02-01' as timestamp) and
+           (cast('1999-02-01' as timestamp) + interval 60 days)
+and ws1.ws_ship_date_sk = d_date_sk
+and ws1.ws_ship_addr_sk = ca_address_sk
+and ca_state = 'IL'
+and ws1.ws_web_site_sk = web_site_sk
+and web_company_name = 'pri'
+and ws1.ws_order_number in (select ws_order_number
+                            from ws_wh)
+and ws1.ws_order_number in (select wr_order_number
+                            from web_returns,ws_wh
+                            where wr_order_number = ws_wh.ws_order_number)
+order by count(distinct ws_order_number)
+limit 100;
+---- PLAN
+Max Per-Host Resource Reservation: Memory=113.77MB Threads=10
+Per-Host Resource Estimates: Memory=1010MB
+PLAN-ROOT SINK
+|
+21:TOP-N [LIMIT=100]
+|  order by: count(ws_order_number) ASC
+|  row-size=40B cardinality=1
+|
+20:AGGREGATE [FINALIZE]
+|  output: count(ws_order_number), sum:merge(ws_ext_ship_cost), sum:merge(ws_net_profit)
+|  row-size=40B cardinality=1
+|
+19:AGGREGATE
+|  output: sum(ws_ext_ship_cost), sum(ws_net_profit)
+|  group by: ws_order_number
+|  row-size=40B cardinality=3.25K
+|
+18:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: tpcds.web_returns.wr_order_number = ws1.ws_order_number
+|  runtime filters: RF000 <- ws1.ws_order_number
+|  row-size=92B cardinality=3.25K
+|
+|--16:HASH JOIN [RIGHT SEMI JOIN]
+|  |  hash predicates: ws1.ws_order_number = ws1.ws_order_number
+|  |  runtime filters: RF006 <- ws1.ws_order_number
+|  |  row-size=92B cardinality=3.25K
+|  |
+|  |--14:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ws1.ws_ship_date_sk = d_date_sk
+|  |  |  runtime filters: RF010 <- d_date_sk
+|  |  |  row-size=92B cardinality=3.25K
+|  |  |
+|  |  |--01:SCAN HDFS [tpcds.date_dim]
+|  |  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |  |     predicates: CAST(d_date AS TIMESTAMP) <= TIMESTAMP '1999-04-02 00:00:00', CAST(d_date AS TIMESTAMP) >= TIMESTAMP '1999-02-01 00:00:00'
+|  |  |     row-size=26B cardinality=7.30K
+|  |  |
+|  |  13:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ws1.ws_web_site_sk = web_site_sk
+|  |  |  runtime filters: RF012 <- web_site_sk
+|  |  |  row-size=66B cardinality=3.25K
+|  |  |
+|  |  |--03:SCAN HDFS [tpcds.web_site]
+|  |  |     HDFS partitions=1/1 files=1 size=8.57KB
+|  |  |     predicates: web_company_name = 'pri'
+|  |  |     row-size=20B cardinality=5
+|  |  |
+|  |  12:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: ws1.ws_ship_addr_sk = ca_address_sk
+|  |  |  runtime filters: RF014 <- ca_address_sk
+|  |  |  row-size=46B cardinality=19.52K
+|  |  |
+|  |  |--02:SCAN HDFS [tpcds.customer_address]
+|  |  |     HDFS partitions=1/1 files=1 size=5.25MB
+|  |  |     predicates: ca_state = 'IL'
+|  |  |     row-size=18B cardinality=980
+|  |  |
+|  |  00:SCAN HDFS [tpcds.web_sales ws1]
+|  |     HDFS partitions=1/1 files=1 size=140.07MB
+|  |     runtime filters: RF010 -> ws1.ws_ship_date_sk, RF012 -> ws1.ws_web_site_sk, RF014 -> ws1.ws_ship_addr_sk
+|  |     row-size=28B cardinality=719.38K
+|  |
+|  15:AGGREGATE [FINALIZE]
+|  |  group by: ws1.ws_order_number
+|  |  row-size=8B cardinality=59.77K
+|  |
+|  06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ws1.ws_order_number = ws2.ws_order_number
+|  |  other predicates: ws1.ws_warehouse_sk != ws2.ws_warehouse_sk
+|  |  runtime filters: RF008 <- ws2.ws_order_number
+|  |  row-size=24B cardinality=8.66M
+|  |
+|  |--05:SCAN HDFS [tpcds.web_sales ws2]
+|  |     HDFS partitions=1/1 files=1 size=140.07MB
+|  |     runtime filters: RF006 -> ws2.ws_order_number
+|  |     row-size=12B cardinality=719.38K
+|  |
+|  04:SCAN HDFS [tpcds.web_sales ws1]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     runtime filters: RF006 -> ws1.ws_order_number, RF008 -> ws1.ws_order_number
+|     row-size=12B cardinality=719.38K
+|
+17:AGGREGATE [FINALIZE]
+|  group by: tpcds.web_returns.wr_order_number
+|  row-size=8B cardinality=43.44K
+|
+11:HASH JOIN [INNER JOIN]
+|  hash predicates: ws1.ws_order_number = wr_order_number
+|  runtime filters: RF002 <- wr_order_number
+|  row-size=32B cardinality=10.39M
+|
+|--07:SCAN HDFS [tpcds.web_returns]
+|     HDFS partitions=1/1 files=1 size=9.35MB
+|     runtime filters: RF000 -> tpcds.web_returns.wr_order_number
+|     row-size=8B cardinality=71.76K
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: ws1.ws_order_number = ws2.ws_order_number
+|  other predicates: ws1.ws_warehouse_sk != ws2.ws_warehouse_sk
+|  runtime filters: RF004 <- ws2.ws_order_number
+|  row-size=24B cardinality=8.66M
+|
+|--09:SCAN HDFS [tpcds.web_sales ws2]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     runtime filters: RF000 -> ws2.ws_order_number, RF002 -> ws2.ws_order_number
+|     row-size=12B cardinality=719.38K
+|
+08:SCAN HDFS [tpcds.web_sales ws1]
+   HDFS partitions=1/1 files=1 size=140.07MB
+   runtime filters: RF000 -> ws1.ws_order_number, RF002 -> ws1.ws_order_number, RF004 -> ws1.ws_order_number
+   row-size=12B cardinality=719.38K
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=112.58MB Threads=21
+Per-Host Resource Estimates: Memory=1.02GB
+PLAN-ROOT SINK
+|
+21:TOP-N [LIMIT=100]
+|  order by: count(ws_order_number) ASC
+|  row-size=40B cardinality=1
+|
+33:AGGREGATE [FINALIZE]
+|  output: count:merge(ws_order_number), sum:merge(ws_ext_ship_cost), sum:merge(ws_net_profit)
+|  row-size=40B cardinality=1
+|
+32:EXCHANGE [UNPARTITIONED]
+|
+20:AGGREGATE
+|  output: count(ws_order_number), sum:merge(ws_ext_ship_cost), sum:merge(ws_net_profit)
+|  row-size=40B cardinality=1
+|
+19:AGGREGATE
+|  output: sum(ws_ext_ship_cost), sum(ws_net_profit)
+|  group by: ws_order_number
+|  row-size=40B cardinality=3.25K
+|
+18:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
+|  hash predicates: tpcds.web_returns.wr_order_number = ws1.ws_order_number
+|  runtime filters: RF000 <- ws1.ws_order_number
+|  row-size=92B cardinality=3.25K
+|
+|--16:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
+|  |  hash predicates: ws1.ws_order_number = ws1.ws_order_number
+|  |  runtime filters: RF006 <- ws1.ws_order_number
+|  |  row-size=92B cardinality=3.25K
+|  |
+|  |--31:EXCHANGE [HASH(ws1.ws_order_number)]
+|  |  |
+|  |  14:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  |  hash predicates: ws1.ws_ship_date_sk = d_date_sk
+|  |  |  runtime filters: RF010 <- d_date_sk
+|  |  |  row-size=92B cardinality=3.25K
+|  |  |
+|  |  |--30:EXCHANGE [HASH(d_date_sk)]
+|  |  |  |
+|  |  |  01:SCAN HDFS [tpcds.date_dim]
+|  |  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |  |     predicates: CAST(d_date AS TIMESTAMP) <= TIMESTAMP '1999-04-02 00:00:00', CAST(d_date AS TIMESTAMP) >= TIMESTAMP '1999-02-01 00:00:00'
+|  |  |     row-size=26B cardinality=7.30K
+|  |  |
+|  |  29:EXCHANGE [HASH(ws1.ws_ship_date_sk)]
+|  |  |
+|  |  13:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  |  hash predicates: ws1.ws_web_site_sk = web_site_sk
+|  |  |  runtime filters: RF012 <- web_site_sk
+|  |  |  row-size=66B cardinality=3.25K
+|  |  |
+|  |  |--28:EXCHANGE [BROADCAST]
+|  |  |  |
+|  |  |  03:SCAN HDFS [tpcds.web_site]
+|  |  |     HDFS partitions=1/1 files=1 size=8.57KB
+|  |  |     predicates: web_company_name = 'pri'
+|  |  |     row-size=20B cardinality=5
+|  |  |
+|  |  12:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  |  hash predicates: ws1.ws_ship_addr_sk = ca_address_sk
+|  |  |  runtime filters: RF014 <- ca_address_sk
+|  |  |  row-size=46B cardinality=19.52K
+|  |  |
+|  |  |--27:EXCHANGE [BROADCAST]
+|  |  |  |
+|  |  |  02:SCAN HDFS [tpcds.customer_address]
+|  |  |     HDFS partitions=1/1 files=1 size=5.25MB
+|  |  |     predicates: ca_state = 'IL'
+|  |  |     row-size=18B cardinality=980
+|  |  |
+|  |  00:SCAN HDFS [tpcds.web_sales ws1]
+|  |     HDFS partitions=1/1 files=1 size=140.07MB
+|  |     runtime filters: RF010 -> ws1.ws_ship_date_sk, RF012 -> ws1.ws_web_site_sk, RF014 -> ws1.ws_ship_addr_sk
+|  |     row-size=28B cardinality=719.38K
+|  |
+|  15:AGGREGATE [FINALIZE]
+|  |  group by: ws1.ws_order_number
+|  |  row-size=8B cardinality=59.77K
+|  |
+|  06:HASH JOIN [INNER JOIN, PARTITIONED]
+|  |  hash predicates: ws1.ws_order_number = ws2.ws_order_number
+|  |  other predicates: ws1.ws_warehouse_sk != ws2.ws_warehouse_sk
+|  |  runtime filters: RF008 <- ws2.ws_order_number
+|  |  row-size=24B cardinality=8.66M
+|  |
+|  |--26:EXCHANGE [HASH(ws2.ws_order_number)]
+|  |  |
+|  |  05:SCAN HDFS [tpcds.web_sales ws2]
+|  |     HDFS partitions=1/1 files=1 size=140.07MB
+|  |     runtime filters: RF006 -> ws2.ws_order_number
+|  |     row-size=12B cardinality=719.38K
+|  |
+|  25:EXCHANGE [HASH(ws1.ws_order_number)]
+|  |
+|  04:SCAN HDFS [tpcds.web_sales ws1]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     runtime filters: RF006 -> ws1.ws_order_number, RF008 -> ws1.ws_order_number
+|     row-size=12B cardinality=719.38K
+|
+17:AGGREGATE [FINALIZE]
+|  group by: tpcds.web_returns.wr_order_number
+|  row-size=8B cardinality=43.44K
+|
+11:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ws1.ws_order_number = wr_order_number
+|  runtime filters: RF002 <- wr_order_number
+|  row-size=32B cardinality=10.39M
+|
+|--24:EXCHANGE [HASH(wr_order_number)]
+|  |
+|  07:SCAN HDFS [tpcds.web_returns]
+|     HDFS partitions=1/1 files=1 size=9.35MB
+|     runtime filters: RF000 -> tpcds.web_returns.wr_order_number
+|     row-size=8B cardinality=71.76K
+|
+10:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: ws1.ws_order_number = ws2.ws_order_number
+|  other predicates: ws1.ws_warehouse_sk != ws2.ws_warehouse_sk
+|  runtime filters: RF004 <- ws2.ws_order_number
+|  row-size=24B cardinality=8.66M
+|
+|--23:EXCHANGE [HASH(ws2.ws_order_number)]
+|  |
+|  09:SCAN HDFS [tpcds.web_sales ws2]
+|     HDFS partitions=1/1 files=1 size=140.07MB
+|     runtime filters: RF000 -> ws2.ws_order_number, RF002 -> ws2.ws_order_number
+|     row-size=12B cardinality=719.38K
+|
+22:EXCHANGE [HASH(ws1.ws_order_number)]
+|
+08:SCAN HDFS [tpcds.web_sales ws1]
+   HDFS partitions=1/1 files=1 size=140.07MB
+   runtime filters: RF000 -> ws1.ws_order_number, RF002 -> ws1.ws_order_number, RF004 -> ws1.ws_order_number
+   row-size=12B cardinality=719.38K
+====

@@ -538,6 +538,11 @@ enum TImpalaQueryOptions {
 
   // Enable asynchronous codegen.
   ASYNC_CODEGEN = 104
+
+  // If true, the planner will consider adding a distinct aggregation to SEMI JOIN
+  // operations. If false, disables the optimization (i.e. falls back to pre-Impala-4.0
+  // behaviour).
+  ENABLE_DISTINCT_SEMI_JOIN_OPTIMIZATION = 105
 }
 
 // The summary of a DML statement.

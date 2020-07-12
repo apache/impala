@@ -4227,12 +4227,12 @@ Max Per-Host Resource Reservation: Memory=71.75MB Threads=6
 Per-Host Resource Estimates: Memory=612MB
 PLAN-ROOT SINK
 |
-10:SORT
+11:SORT
 |  order by: s_name ASC
 |  row-size=67B cardinality=400
 |
-09:HASH JOIN [RIGHT SEMI JOIN]
-|  hash predicates: ps_suppkey = s_suppkey
+10:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: tpch.partsupp.ps_suppkey = s_suppkey
 |  runtime filters: RF000 <- s_suppkey
 |  row-size=98B cardinality=400
 |
@@ -4250,6 +4250,10 @@ PLAN-ROOT SINK
 |     HDFS partitions=1/1 files=1 size=1.33MB
 |     runtime filters: RF008 -> s_nationkey
 |     row-size=77B cardinality=10.00K
+|
+09:AGGREGATE [FINALIZE]
+|  group by: tpch.partsupp.ps_suppkey
+|  row-size=8B cardinality=9.71K
 |
 07:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
@@ -4269,7 +4273,7 @@ PLAN-ROOT SINK
 |  |
 |  02:SCAN HDFS [tpch.partsupp]
 |     HDFS partitions=1/1 files=1 size=112.71MB
-|     runtime filters: RF000 -> ps_suppkey, RF006 -> ps_partkey
+|     runtime filters: RF000 -> tpch.partsupp.ps_suppkey, RF006 -> ps_partkey
 |     row-size=20B cardinality=800.00K
 |
 05:AGGREGATE [FINALIZE]
@@ -4283,30 +4287,30 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_suppkey, RF002 -> tpch.lineitem.l_partkey, RF003 -> tpch.lineitem.l_suppkey
    row-size=46B cardinality=600.12K
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=107.63MB Threads=13
-Per-Host Resource Estimates: Memory=660MB
+Max Per-Host Resource Reservation: Memory=111.57MB Threads=13
+Per-Host Resource Estimates: Memory=679MB
 PLAN-ROOT SINK
 |
-18:MERGING-EXCHANGE [UNPARTITIONED]
+20:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_name ASC
 |
-10:SORT
+11:SORT
 |  order by: s_name ASC
 |  row-size=67B cardinality=400
 |
-09:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
-|  hash predicates: ps_suppkey = s_suppkey
+10:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
+|  hash predicates: tpch.partsupp.ps_suppkey = s_suppkey
 |  runtime filters: RF000 <- s_suppkey
 |  row-size=98B cardinality=400
 |
-|--17:EXCHANGE [HASH(s_suppkey)]
+|--19:EXCHANGE [HASH(s_suppkey)]
 |  |
 |  08:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: s_nationkey = n_nationkey
 |  |  runtime filters: RF008 <- n_nationkey
 |  |  row-size=98B cardinality=400
 |  |
-|  |--15:EXCHANGE [BROADCAST]
+|  |--18:EXCHANGE [BROADCAST]
 |  |  |
 |  |  01:SCAN HDFS [tpch.nation]
 |  |     HDFS partitions=1/1 files=1 size=2.15KB
@@ -4318,7 +4322,15 @@ PLAN-ROOT SINK
 |     runtime filters: RF008 -> s_nationkey
 |     row-size=77B cardinality=10.00K
 |
-16:EXCHANGE [HASH(ps_suppkey)]
+17:AGGREGATE [FINALIZE]
+|  group by: tpch.partsupp.ps_suppkey
+|  row-size=8B cardinality=9.71K
+|
+16:EXCHANGE [HASH(tpch.partsupp.ps_suppkey)]
+|
+09:AGGREGATE [STREAMING]
+|  group by: tpch.partsupp.ps_suppkey
+|  row-size=8B cardinality=9.71K
 |
 07:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
@@ -4326,14 +4338,14 @@ PLAN-ROOT SINK
 |  runtime filters: RF002 <- ps_partkey, RF003 <- ps_suppkey
 |  row-size=20B cardinality=79.79K
 |
-|--14:EXCHANGE [HASH(ps_partkey,ps_suppkey)]
+|--15:EXCHANGE [HASH(ps_partkey,ps_suppkey)]
 |  |
 |  06:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  |  hash predicates: ps_partkey = p_partkey
 |  |  runtime filters: RF006 <- p_partkey
 |  |  row-size=20B cardinality=79.79K
 |  |
-|  |--13:EXCHANGE [BROADCAST]
+|  |--14:EXCHANGE [BROADCAST]
 |  |  |
 |  |  03:SCAN HDFS [tpch.part]
 |  |     HDFS partitions=1/1 files=1 size=22.83MB
@@ -4342,15 +4354,15 @@ PLAN-ROOT SINK
 |  |
 |  02:SCAN HDFS [tpch.partsupp]
 |     HDFS partitions=1/1 files=1 size=112.71MB
-|     runtime filters: RF000 -> ps_suppkey, RF006 -> ps_partkey
+|     runtime filters: RF000 -> tpch.partsupp.ps_suppkey, RF006 -> ps_partkey
 |     row-size=20B cardinality=800.00K
 |
-12:AGGREGATE [FINALIZE]
+13:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_quantity)
 |  group by: l_partkey, l_suppkey
 |  row-size=32B cardinality=600.12K
 |
-11:EXCHANGE [HASH(l_partkey,l_suppkey)]
+12:EXCHANGE [HASH(l_partkey,l_suppkey)]
 |
 05:AGGREGATE [STREAMING]
 |  output: sum(l_quantity)
@@ -4363,19 +4375,19 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_suppkey, RF002 -> tpch.lineitem.l_partkey, RF003 -> tpch.lineitem.l_suppkey
    row-size=46B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=123.45MB Threads=13
-Per-Host Resource Estimates: Memory=430MB
+Max Per-Host Resource Reservation: Memory=127.38MB Threads=13
+Per-Host Resource Estimates: Memory=449MB
 PLAN-ROOT SINK
 |
-18:MERGING-EXCHANGE [UNPARTITIONED]
+20:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: s_name ASC
 |
-10:SORT
+11:SORT
 |  order by: s_name ASC
 |  row-size=67B cardinality=400
 |
-09:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
-|  hash predicates: ps_suppkey = s_suppkey
+10:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
+|  hash predicates: tpch.partsupp.ps_suppkey = s_suppkey
 |  row-size=98B cardinality=400
 |
 |--JOIN BUILD
@@ -4383,7 +4395,7 @@ PLAN-ROOT SINK
 |  |  build expressions: s_suppkey
 |  |  runtime filters: RF000 <- s_suppkey
 |  |
-|  17:EXCHANGE [HASH(s_suppkey)]
+|  19:EXCHANGE [HASH(s_suppkey)]
 |  |
 |  08:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: s_nationkey = n_nationkey
@@ -4394,7 +4406,7 @@ PLAN-ROOT SINK
 |  |  |  build expressions: n_nationkey
 |  |  |  runtime filters: RF008 <- n_nationkey
 |  |  |
-|  |  15:EXCHANGE [BROADCAST]
+|  |  18:EXCHANGE [BROADCAST]
 |  |  |
 |  |  01:SCAN HDFS [tpch.nation]
 |  |     HDFS partitions=1/1 files=1 size=2.15KB
@@ -4406,7 +4418,15 @@ PLAN-ROOT SINK
 |     runtime filters: RF008 -> s_nationkey
 |     row-size=77B cardinality=10.00K
 |
-16:EXCHANGE [HASH(ps_suppkey)]
+17:AGGREGATE [FINALIZE]
+|  group by: tpch.partsupp.ps_suppkey
+|  row-size=8B cardinality=9.71K
+|
+16:EXCHANGE [HASH(tpch.partsupp.ps_suppkey)]
+|
+09:AGGREGATE [STREAMING]
+|  group by: tpch.partsupp.ps_suppkey
+|  row-size=8B cardinality=9.71K
 |
 07:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
 |  hash predicates: l_partkey = ps_partkey, l_suppkey = ps_suppkey
@@ -4418,7 +4438,7 @@ PLAN-ROOT SINK
 |  |  build expressions: ps_partkey, ps_suppkey
 |  |  runtime filters: RF002 <- ps_partkey, RF003 <- ps_suppkey
 |  |
-|  14:EXCHANGE [HASH(ps_partkey,ps_suppkey)]
+|  15:EXCHANGE [HASH(ps_partkey,ps_suppkey)]
 |  |
 |  06:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  |  hash predicates: ps_partkey = p_partkey
@@ -4429,7 +4449,7 @@ PLAN-ROOT SINK
 |  |  |  build expressions: p_partkey
 |  |  |  runtime filters: RF006 <- p_partkey
 |  |  |
-|  |  13:EXCHANGE [BROADCAST]
+|  |  14:EXCHANGE [BROADCAST]
 |  |  |
 |  |  03:SCAN HDFS [tpch.part]
 |  |     HDFS partitions=1/1 files=1 size=22.83MB
@@ -4438,15 +4458,15 @@ PLAN-ROOT SINK
 |  |
 |  02:SCAN HDFS [tpch.partsupp]
 |     HDFS partitions=1/1 files=1 size=112.71MB
-|     runtime filters: RF000 -> ps_suppkey, RF006 -> ps_partkey
+|     runtime filters: RF000 -> tpch.partsupp.ps_suppkey, RF006 -> ps_partkey
 |     row-size=20B cardinality=800.00K
 |
-12:AGGREGATE [FINALIZE]
+13:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_quantity)
 |  group by: l_partkey, l_suppkey
 |  row-size=32B cardinality=600.12K
 |
-11:EXCHANGE [HASH(l_partkey,l_suppkey)]
+12:EXCHANGE [HASH(l_partkey,l_suppkey)]
 |
 05:AGGREGATE [STREAMING]
 |  output: sum(l_quantity)
@@ -4815,21 +4835,21 @@ group by
 order by
   cntrycode
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=24.00MB Threads=4
-Per-Host Resource Estimates: Memory=314MB
+Max Per-Host Resource Reservation: Memory=25.94MB Threads=4
+Per-Host Resource Estimates: Memory=324MB
 PLAN-ROOT SINK
 |
-07:SORT
+08:SORT
 |  order by: cntrycode ASC
 |  row-size=36B cardinality=15.00K
 |
-06:AGGREGATE [FINALIZE]
+07:AGGREGATE [FINALIZE]
 |  output: count(*), sum(c_acctbal)
 |  group by: substr(c_phone, 1, 2)
 |  row-size=36B cardinality=15.00K
 |
-05:HASH JOIN [RIGHT ANTI JOIN]
-|  hash predicates: o_custkey = c_custkey
+06:HASH JOIN [RIGHT ANTI JOIN]
+|  hash predicates: tpch.orders.o_custkey = c_custkey
 |  row-size=51B cardinality=15.00K
 |
 |--04:NESTED LOOP JOIN [INNER JOIN]
@@ -4850,50 +4870,54 @@ PLAN-ROOT SINK
 |     predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |     row-size=43B cardinality=15.00K
 |
+05:AGGREGATE [FINALIZE]
+|  group by: tpch.orders.o_custkey
+|  row-size=8B cardinality=98.39K
+|
 03:SCAN HDFS [tpch.orders]
    HDFS partitions=1/1 files=1 size=162.56MB
    row-size=8B cardinality=1.50M
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=41.88MB Threads=10
-Per-Host Resource Estimates: Memory=365MB
+Max Per-Host Resource Reservation: Memory=45.81MB Threads=10
+Per-Host Resource Estimates: Memory=380MB
 PLAN-ROOT SINK
 |
-15:MERGING-EXCHANGE [UNPARTITIONED]
+17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: cntrycode ASC
 |
-07:SORT
+08:SORT
 |  order by: cntrycode ASC
 |  row-size=36B cardinality=15.00K
 |
-14:AGGREGATE [FINALIZE]
+16:AGGREGATE [FINALIZE]
 |  output: count:merge(*), sum:merge(c_acctbal)
 |  group by: cntrycode
 |  row-size=36B cardinality=15.00K
 |
-13:EXCHANGE [HASH(cntrycode)]
+15:EXCHANGE [HASH(cntrycode)]
 |
-06:AGGREGATE [STREAMING]
+07:AGGREGATE [STREAMING]
 |  output: count(*), sum(c_acctbal)
 |  group by: substr(c_phone, 1, 2)
 |  row-size=36B cardinality=15.00K
 |
-05:HASH JOIN [RIGHT ANTI JOIN, PARTITIONED]
-|  hash predicates: o_custkey = c_custkey
+06:HASH JOIN [RIGHT ANTI JOIN, PARTITIONED]
+|  hash predicates: tpch.orders.o_custkey = c_custkey
 |  row-size=51B cardinality=15.00K
 |
-|--12:EXCHANGE [HASH(c_custkey)]
+|--14:EXCHANGE [HASH(c_custkey)]
 |  |
 |  04:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  predicates: c_acctbal > avg(c_acctbal)
 |  |  row-size=51B cardinality=15.00K
 |  |
-|  |--10:EXCHANGE [BROADCAST]
+|  |--13:EXCHANGE [BROADCAST]
 |  |  |
-|  |  09:AGGREGATE [FINALIZE]
+|  |  12:AGGREGATE [FINALIZE]
 |  |  |  output: avg:merge(c_acctbal)
 |  |  |  row-size=8B cardinality=1
 |  |  |
-|  |  08:EXCHANGE [UNPARTITIONED]
+|  |  11:EXCHANGE [UNPARTITIONED]
 |  |  |
 |  |  02:AGGREGATE
 |  |  |  output: avg(c_acctbal)
@@ -4909,44 +4933,52 @@ PLAN-ROOT SINK
 |     predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |     row-size=43B cardinality=15.00K
 |
-11:EXCHANGE [HASH(o_custkey)]
+10:AGGREGATE [FINALIZE]
+|  group by: tpch.orders.o_custkey
+|  row-size=8B cardinality=98.39K
+|
+09:EXCHANGE [HASH(tpch.orders.o_custkey)]
+|
+05:AGGREGATE [STREAMING]
+|  group by: tpch.orders.o_custkey
+|  row-size=8B cardinality=98.39K
 |
 03:SCAN HDFS [tpch.orders]
    HDFS partitions=1/1 files=1 size=162.56MB
    row-size=8B cardinality=1.50M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=41.88MB Threads=9
-Per-Host Resource Estimates: Memory=213MB
+Max Per-Host Resource Reservation: Memory=45.81MB Threads=9
+Per-Host Resource Estimates: Memory=228MB
 PLAN-ROOT SINK
 |
-15:MERGING-EXCHANGE [UNPARTITIONED]
+17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: cntrycode ASC
 |
-07:SORT
+08:SORT
 |  order by: cntrycode ASC
 |  row-size=36B cardinality=15.00K
 |
-14:AGGREGATE [FINALIZE]
+16:AGGREGATE [FINALIZE]
 |  output: count:merge(*), sum:merge(c_acctbal)
 |  group by: cntrycode
 |  row-size=36B cardinality=15.00K
 |
-13:EXCHANGE [HASH(cntrycode)]
+15:EXCHANGE [HASH(cntrycode)]
 |
-06:AGGREGATE [STREAMING]
+07:AGGREGATE [STREAMING]
 |  output: count(*), sum(c_acctbal)
 |  group by: substr(c_phone, 1, 2)
 |  row-size=36B cardinality=15.00K
 |
-05:HASH JOIN [RIGHT ANTI JOIN, PARTITIONED]
-|  hash predicates: o_custkey = c_custkey
+06:HASH JOIN [RIGHT ANTI JOIN, PARTITIONED]
+|  hash predicates: tpch.orders.o_custkey = c_custkey
 |  row-size=51B cardinality=15.00K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: c_custkey
 |  |
-|  12:EXCHANGE [HASH(c_custkey)]
+|  14:EXCHANGE [HASH(c_custkey)]
 |  |
 |  04:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  |  join table id: 01
@@ -4956,13 +4988,13 @@ PLAN-ROOT SINK
 |  |--JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |
-|  |  10:EXCHANGE [BROADCAST]
+|  |  13:EXCHANGE [BROADCAST]
 |  |  |
-|  |  09:AGGREGATE [FINALIZE]
+|  |  12:AGGREGATE [FINALIZE]
 |  |  |  output: avg:merge(c_acctbal)
 |  |  |  row-size=8B cardinality=1
 |  |  |
-|  |  08:EXCHANGE [UNPARTITIONED]
+|  |  11:EXCHANGE [UNPARTITIONED]
 |  |  |
 |  |  02:AGGREGATE
 |  |  |  output: avg(c_acctbal)
@@ -4978,7 +5010,15 @@ PLAN-ROOT SINK
 |     predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
 |     row-size=43B cardinality=15.00K
 |
-11:EXCHANGE [HASH(o_custkey)]
+10:AGGREGATE [FINALIZE]
+|  group by: tpch.orders.o_custkey
+|  row-size=8B cardinality=98.39K
+|
+09:EXCHANGE [HASH(tpch.orders.o_custkey)]
+|
+05:AGGREGATE [STREAMING]
+|  group by: tpch.orders.o_custkey
+|  row-size=8B cardinality=98.39K
 |
 03:SCAN HDFS [tpch.orders]
    HDFS partitions=1/1 files=1 size=162.56MB
