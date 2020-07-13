@@ -1295,7 +1295,7 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     AnalysisError("select * from functional.alltypesagg g where " +
         "(select aggfn(int_col) from functional.alltypes s where " +
         "s.id = g.id) = 10", "UDAs are not supported in the select list of " +
-        "correlated subqueries: (SELECT default.aggfn(int_col) FROM " +
+        "correlated subqueries: (SELECT default.aggfn(int_col) /* NATIVE UDF */ FROM " +
         "functional.alltypes s WHERE s.id = g.id)");
     AnalyzesOk("select * from functional.alltypesagg g where " +
         "(select aggfn(int_col) from functional.alltypes s where " +

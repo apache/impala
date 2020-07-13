@@ -2170,7 +2170,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "aggregation without a FROM clause is not allowed");
     AnalysisError(
         "select aggfn(int_col) over (partition by int_col) from functional.alltypesagg",
-        "Aggregate function 'default.aggfn(int_col)' not supported with OVER clause.");
+        "Aggregate function 'default.aggfn(int_col) /* NATIVE UDF */' not supported " +
+        "with OVER clause.");
     AnalysisError("select aggfn(distinct int_col) from functional.alltypesagg",
         "User defined aggregates do not support DISTINCT.");
     AnalyzesOk("select default.aggfn(int_col) from functional.alltypes");
@@ -2228,7 +2229,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "aggregate function must not contain analytic parameters");
     AnalysisError("select min(aggfn(int_col)) from functional.alltypes",
         "aggregate function must not contain aggregate parameters: " +
-        "min(default.aggfn(int_col))");
+        "min(default.aggfn(int_col) /* NATIVE UDF */)");
 
     // wrong type
     AnalysisError("select sum(timestamp_col) from functional.alltypes",

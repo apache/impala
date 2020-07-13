@@ -55,6 +55,7 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.service.FeCatalogManager;
 import org.apache.impala.service.Frontend;
+import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TQueryOptions;
@@ -241,20 +242,24 @@ public class FrontendTestBase extends AbstractFrontendTest {
    * If 'expectedWarning' is not null, asserts that a warning is produced.
    */
   public ParseNode AnalyzesOk(String stmt, AnalysisContext ctx, String expectedWarning) {
-    return feFixture_.analyzeStmt(stmt, ctx, expectedWarning);
+    try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
+      return feFixture_.analyzeStmt(stmt, ctx, expectedWarning);
+    }
   }
 
   /**
    * Analyzes the given statement without performing rewrites or authorization.
    */
   public StatementBase AnalyzesOkNoRewrite(StatementBase stmt) throws ImpalaException {
-    AnalysisContext ctx = createAnalysisCtx();
-    StmtMetadataLoader mdLoader =
-        new StmtMetadataLoader(frontend_, ctx.getQueryCtx().session.database, null);
-    StmtTableCache loadedTables = mdLoader.loadTables(stmt);
-    Analyzer analyzer = ctx.createAnalyzer(loadedTables);
-    stmt.analyze(analyzer);
-    return stmt;
+    try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
+      AnalysisContext ctx = createAnalysisCtx();
+      StmtMetadataLoader mdLoader =
+          new StmtMetadataLoader(frontend_, ctx.getQueryCtx().session.database, null);
+      StmtTableCache loadedTables = mdLoader.loadTables(stmt);
+      Analyzer analyzer = ctx.createAnalyzer(loadedTables);
+      stmt.analyze(analyzer);
+      return stmt;
+    }
   }
 
   /**
@@ -307,12 +312,14 @@ public class FrontendTestBase extends AbstractFrontendTest {
 
   protected AnalysisResult parseAndAnalyze(String stmt, AnalysisContext ctx, Frontend fe)
       throws ImpalaException {
-    ctx.getQueryCtx().getClient_request().setStmt(stmt);
-    StatementBase parsedStmt = Parser.parse(stmt, ctx.getQueryOptions());
-    StmtMetadataLoader mdLoader =
-        new StmtMetadataLoader(fe, ctx.getQueryCtx().session.database, null);
-    StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
-    return ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache, fe.getAuthzChecker());
+    try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
+      ctx.getQueryCtx().getClient_request().setStmt(stmt);
+      StatementBase parsedStmt = Parser.parse(stmt, ctx.getQueryOptions());
+      StmtMetadataLoader mdLoader =
+          new StmtMetadataLoader(fe, ctx.getQueryCtx().session.database, null);
+      StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
+      return ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache, fe.getAuthzChecker());
+    }
   }
 
   /**
