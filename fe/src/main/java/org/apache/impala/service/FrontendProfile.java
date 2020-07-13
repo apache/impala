@@ -127,6 +127,33 @@ public class FrontendProfile {
   }
 
   /**
+   * Appends an informational key/value string pair to the profile. These are written out
+   * as is to the user. Values are appended to a comma separated list of values.
+   */
+  public synchronized void appendInfoString(String key, String val) {
+    Preconditions.checkState(profile_ != null, "already emitted profile");
+    Preconditions.checkNotNull(key);
+    Preconditions.checkNotNull(val);
+    Map<String, String> info_strings = profile_.getInfo_strings();
+    if (info_strings.containsKey(key)) {
+      info_strings.put(key, info_strings.get(key) + ", " + val);
+    } else {
+      info_strings.put(key, val);
+      profile_.getInfo_strings_display_order().add(key);
+    }
+  }
+
+  /**
+   * Returns the info string associated with the given key. Returns an empty String if
+   * the key does not exist.
+   */
+  public synchronized String getInfoString(String key) {
+    Preconditions.checkState(profile_ != null, "already emitted profile");
+    Preconditions.checkNotNull(key);
+    return profile_.getInfo_strings().getOrDefault(key, "");
+  }
+
+  /**
    * Add 'delta' to the counter with the given name and unit. Counters are created
    * on-demand.
    */

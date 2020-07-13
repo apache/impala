@@ -29,6 +29,7 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.TreeNode;
+import org.apache.impala.service.FrontendProfile;
 import org.apache.impala.thrift.TAggregateExpr;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TExprNode;
@@ -228,6 +229,11 @@ public class FunctionCallExpr extends Expr {
     sb.append(Joiner.on(", ").join(childrenToSql(options)));
     if (params_.isIgnoreNulls()) sb.append(" IGNORE NULLS");
     sb.append(")");
+    if (fn_ != null && !fnName_.isBuiltin()) {
+      sb.append(" /* ");
+      sb.append(fn_.getBinaryType());
+      sb.append(" UDF */");
+    }
     return sb.toString();
   }
 
@@ -500,6 +506,14 @@ public class FunctionCallExpr extends Expr {
   @Override
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     fnName_.analyze(analyzer);
+    if (!fnName_.isBuiltin()) {
+      FrontendProfile profile = FrontendProfile.getCurrent();
+      String udfInfoStringKey = "User Defined Functions (UDFs)";
+      String functionName = fnName_.toString();
+      if (!profile.getInfoString(udfInfoStringKey).contains(functionName)) {
+        profile.appendInfoString(udfInfoStringKey, functionName);
+      }
+    }
 
     if (isMergeAggFn()) {
       // This is the function call expr after splitting up to a merge aggregation.

@@ -17,6 +17,7 @@
 
 from copy import copy
 import os
+import re
 import pytest
 import tempfile
 from subprocess import call, check_call
@@ -614,3 +615,20 @@ class TestUdfTargeted(TestUdfBase):
     results = self.client.fetch(query, handle, -1)
     assert results.success
     assert len(results.data) == 9999
+
+  def test_udf_profile(self, vector, unique_database):
+    """Test to validate that explain plans and runtime profiles contain information about
+    any custom UDFs used in an Impala query."""
+    self.client.execute(
+        "create function {0}.hive_substring(string, int) returns string location '{1}' "
+        "symbol='org.apache.hadoop.hive.ql.udf.UDFSubstr'".format(
+            unique_database, get_fs_path('/test-warehouse/hive-exec.jar')))
+    profile = self.execute_query_expect_success(self.client,
+        "select {0}.hive_substring(string_col, 1), {0}.hive_substring(string_col, 2) "
+        "from functional.alltypes limit 10".format(unique_database)).runtime_profile
+
+    assert re.search("output exprs.*hive_substring.*/\* JAVA UDF \*/", profile)
+    # Ensure that hive_substring only shows up once in the list of UDFs.
+    assert re.search(
+        "User Defined Functions \(UDFs\): {0}\.hive_substring\s*[\r\n]".format(
+            unique_database), profile)
