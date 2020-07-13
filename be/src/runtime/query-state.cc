@@ -427,6 +427,11 @@ void QueryState::ConstructReport(bool instances_started,
   report->set_coord_state_idx(exec_rpc_params_.coord_state_idx());
   {
     unique_lock<SpinLock> l(status_lock_);
+
+    Status debug_action_status =
+        DebugAction(query_options(), "CONSTRUCT_QUERY_STATE_REPORT");
+    if (UNLIKELY(!debug_action_status.ok())) overall_status_ = debug_action_status;
+
     overall_status_.ToProto(report->mutable_overall_status());
     if (IsValidFInstanceId(failed_finstance_id_)) {
       TUniqueIdToUniqueIdPB(failed_finstance_id_, report->mutable_fragment_instance_id());
