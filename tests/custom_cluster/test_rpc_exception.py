@@ -157,3 +157,32 @@ class TestRPCException(CustomClusterTestSuite):
     elapsed_s = time.time() - start_s
     assert elapsed_s < 100, "Query took longer than expected to fail: %ss" % elapsed_s
     self.client.set_configuration_option("DEBUG_ACTION", "")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--debug_actions=" +
+      _get_rpc_debug_action(rpc=EXEC_RPC, action="SLEEP@1000000"))
+  def test_state_report_error(self):
+    """Test that verifies that when one backend reports failure, the other Exec() rpcs
+    are immediately cancelled and the query returns an error quickly."""
+    # Debug action to cause executer to construct a state report with failure. When
+    # the state report is processed by the coordinator, it sends a signal to stop
+    # issuing ExecQueryFInstance rpcs and cancel any inflight.
+    # The Exec() rpc to one of the impalads will sleep for a long time before hitting
+    # this (due to the impalad debug_actions startup flag specified above), so one
+    # Exec() will fail quickly while other one will fail only after a long wait.
+    self.client.set_configuration_option("DEBUG_ACTION",
+        "CONSTRUCT_QUERY_STATE_REPORT:FAIL")
+
+    start_s = time.time()
+    try:
+      self.client.execute(self.TEST_QUERY)
+      assert False, "query was expected to fail"
+    except ImpalaBeeswaxException as e:
+      assert "Debug Action: CONSTRUCT_QUERY_STATE_REPORT:FAIL" in str(e)
+
+    # If we successfully cancelled all Exec() rpcs and returned to the client as soon as
+    # the fast Exec() report failure, the time to run the query should be much less than
+    # the sleep time for the slow Exec() of 1000s.
+    elapsed_s = time.time() - start_s
+    assert elapsed_s < 100, "Query took longer than expected to fail: %ss" % elapsed_s
+    self.client.set_configuration_option("DEBUG_ACTION", "")

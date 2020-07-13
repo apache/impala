@@ -946,9 +946,12 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
     if (!status.ok()) {
       // We may start receiving status reports before all exec rpcs are complete.
       // Can't apply state transition until no more exec rpcs will be sent.
-      // TODO(IMPALA-6788): we should stop issuing ExecQueryFInstance rpcs and cancel any
-      // inflight when this happens.
-      WaitOnExecRpcs();
+      // We should stop issuing ExecQueryFInstance rpcs and cancel any inflight
+      // when this happens.
+      if (!exec_rpcs_complete_.Load()) {
+        if (!status.IsCancelled()) exec_rpcs_status_barrier_.NotifyRemaining(status);
+        WaitOnExecRpcs();
+      }
 
       // Transition the status if we're not already in a terminal state. This won't block
       // because either this transitions to an ERROR state or the query is already in
