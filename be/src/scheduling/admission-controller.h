@@ -314,22 +314,19 @@ class AdmissionController {
 
   /// This struct contains all information needed to create a schedule and try to
   /// admit it. None of the members are owned by the instances of this class (usually they
-  /// are owned by the ClientRequestState).
+  /// are owned by the ClientRequestState or AdmissionControlService).
   struct AdmissionRequest {
     const UniqueIdPB& query_id;
     const UniqueIdPB& coord_id;
     const TQueryExecRequest& request;
     const TQueryOptions& query_options;
     RuntimeProfile* summary_profile;
-    RuntimeProfile::EventSequence* query_events;
     std::unordered_set<NetworkAddressPB>& blacklisted_executor_addresses;
   };
 
-  /// Submits the request for admission. May returns immediately if rejected, but
-  /// otherwise blocks until the request is either admitted, times out, gets rejected
-  /// later, or cancelled by the client (by setting 'admit_outcome' to CANCELLED). When
-  /// this method returns, the following <admit_outcome, Return Status> pairs are
-  /// possible:
+  /// Submits the request for admission. If the query is queued, 'queued' will be true
+  /// and WaitOnQueued() must be called to block until a decision is made. Otherwise, when
+  /// this method returns, the following <admit_outcome, Status> pairs are possible:
   /// - Admitted: <ADMITTED, Status::OK>
   /// - Rejected or timed out: <REJECTED or TIMED_OUT, Status(msg: reason for the same)>
   /// - Cancelled: <CANCELLED, Status::CANCELLED>
@@ -337,7 +334,15 @@ class AdmissionController {
   /// cancelled to ensure that the pool statistics are updated.
   Status SubmitForAdmission(const AdmissionRequest& request,
       Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admit_outcome,
-      std::unique_ptr<QuerySchedulePB>* schedule_result);
+      std::unique_ptr<QuerySchedulePB>* schedule_result, bool* queued,
+      std::string* request_pool = nullptr);
+
+  /// After SubmitForAdmission(), if the query was queued this must be called. If
+  /// 'timeout_ms' is 0, it will block until a decision is made. Otherwise, if the
+  /// function returns due to the timeout 'wait_timed_out' will be true.
+  Status WaitOnQueued(const UniqueIdPB& query_id,
+      std::unique_ptr<QuerySchedulePB>* schedule_result, int64_t timeout_ms = 0,
+      bool* wait_timed_out = nullptr);
 
   /// Updates the pool statistics when a query completes (either successfully,
   /// is cancelled or failed). This should be called for all requests that have
@@ -711,6 +716,10 @@ class AdmissionController {
     /// Profile to be updated with information about admission.
     RuntimeProfile* profile;
 
+    /// Config of the pool this query will be scheduled on.
+    string pool_name;
+    TPoolConfig pool_cfg;
+
     /// END: Members that are valid for new objects after initialization
     /////////////////////////////////////////
 
@@ -725,6 +734,12 @@ class AdmissionController {
     /// List of schedules and executor groups that can be attempted to be admitted for
     /// this queue node.
     std::vector<GroupScheduleState> group_states;
+
+    /// Info about why this query was queued.
+    string initial_queue_reason;
+
+    /// The MonotonicMillis() time when the query was queued.
+    int64_t wait_start_ms;
 
     /// END: Members that are only valid while queued, but invalid once dequeued.
     /////////////////////////////////////////
@@ -752,6 +767,12 @@ class AdmissionController {
     /// END: Members that are valid after admission / cancellation / rejection
     /////////////////////////////////////////
   };
+
+  /// Protects 'queue_nodes_'. Should not be held with 'admission_ctrl_lock_'.
+  std::mutex queue_nodes_lock_;
+
+  /// Map from query id to the info needed to make admission decisions for queued queries.
+  std::unordered_map<UniqueIdPB, QueueNode> queue_nodes_;
 
   /// Queue for the queries waiting to be admitted for execution. Once the
   /// maximum number of concurrently executing queries has been reached,

@@ -43,6 +43,7 @@
 #include "runtime/query-exec-mgr.h"
 #include "runtime/thread-resource-mgr.h"
 #include "runtime/tmp-file-mgr.h"
+#include "scheduling/admission-control-service.h"
 #include "scheduling/admission-controller.h"
 #include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/request-pool-service.h"
@@ -161,6 +162,12 @@ DEFINE_int32(metrics_webserver_port, 0,
 
 DEFINE_string(metrics_webserver_interface, "",
     "Interface to start metrics webserver on. If blank, webserver binds to 0.0.0.0");
+
+DEFINE_bool(is_admission_controller, false,
+    "(Experimental) If true, this impalad will export the AdmissionControlService "
+    "interface, allowing it to perform admission control for coordinators that have "
+    "--admission_control_service_addr set to point to this impalad. This flag will be "
+    "removed in a future version, see IMPALA-9155.");
 
 const static string DEFAULT_FS = "fs.defaultFS";
 
@@ -281,6 +288,8 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
   if (FLAGS_is_coordinator) {
     hdfs_op_thread_pool_.reset(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024));
+  }
+  if (FLAGS_is_coordinator || FLAGS_is_admission_controller) {
     scheduler_.reset(new Scheduler(metrics_.get(), request_pool_service_.get()));
   }
 
@@ -410,6 +419,12 @@ Status ExecEnv::Init() {
   data_svc_.reset(new DataStreamService(rpc_metrics_));
   RETURN_IF_ERROR(data_svc_->Init());
   RETURN_IF_ERROR(stream_mgr_->Init(data_svc_->mem_tracker()));
+  // Initialize the AdmissionControlService, if enabled.
+  if (FLAGS_is_admission_controller) {
+    admission_svc_.reset(new AdmissionControlService(rpc_metrics_));
+    RETURN_IF_ERROR(admission_svc_->Init());
+  }
+
   // Bump thread cache to 1GB to reduce contention for TCMalloc central
   // list's spinlock.
   if (FLAGS_tcmalloc_max_total_thread_cache_bytes == 0) {

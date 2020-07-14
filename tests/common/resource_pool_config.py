@@ -31,8 +31,12 @@ class ResourcePoolConfig(object):
   # metrics debug page. Add to this dictionary if other configs are need for tests.
   CONFIG_TO_METRIC_STR_MAPPING = {'max-query-mem-limit': 'pool-max-query-mem-limit'}
 
-  def __init__(self, impala_service, llama_site_path):
+  """'impala_service' should point to an impalad to be used for running queries.
+  'ac_service' should point to the service running the admission controller and is used
+  for checking metrics values on the debug webui."""
+  def __init__(self, impala_service, ac_service, llama_site_path):
     self.impala_service = impala_service
+    self.ac_service = ac_service
     self.llama_site_path = llama_site_path
     tree = ET.parse(llama_site_path)
     self.root = tree.getroot()
@@ -63,7 +67,7 @@ class ResourcePoolConfig(object):
     while (time() - start_time < timeout):
       handle = client.execute_async("select 'wait_for_config_change'")
       client.close_query(handle)
-      current_val = str(self.impala_service.get_metric_value(metric_key))
+      current_val = str(self.ac_service.get_metric_value(metric_key))
       if current_val == target_val:
         return
       sleep(0.1)
