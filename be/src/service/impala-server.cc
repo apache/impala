@@ -640,72 +640,170 @@ Status ImpalaServer::AppendLineageEntry(const string& entry ) {
   return lineage_logger_->AppendEntry(entry);
 }
 
+Status ImpalaServer::GetRuntimeProfileOutput(const string& user,
+    const QueryHandle& query_handle, TRuntimeProfileFormat::type format,
+    RuntimeProfileOutput* profile) {
+  // For queries in INITIALIZED state, the profile information isn't populated yet.
+  if (query_handle->exec_state() == ClientRequestState::ExecState::INITIALIZED) {
+    return Status::Expected("Query plan is not ready.");
+  }
+  lock_guard<mutex> l(*query_handle->lock());
+  RETURN_IF_ERROR(CheckProfileAccess(
+      user, query_handle->effective_user(), query_handle->user_has_profile_access()));
+  if (query_handle->GetCoordinator() != nullptr) {
+    UpdateExecSummary(query_handle);
+  }
+  if (format == TRuntimeProfileFormat::BASE64) {
+    RETURN_IF_ERROR(
+        query_handle->profile()->SerializeToArchiveString(profile->string_output));
+  } else if (format == TRuntimeProfileFormat::THRIFT) {
+    query_handle->profile()->ToThrift(profile->thrift_output);
+  } else if (format == TRuntimeProfileFormat::JSON) {
+    query_handle->profile()->ToJson(profile->json_output);
+  } else {
+    DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
+    query_handle->profile()->PrettyPrint(profile->string_output);
+  }
+  return Status::OK();
+}
+
+Status ImpalaServer::GetQueryRecord(
+    const TUniqueId& query_id, QueryLogIndex::const_iterator* query_record) {
+  lock_guard<mutex> l(query_log_lock_);
+  *query_record = query_log_index_.find(query_id);
+  if (*query_record == query_log_index_.end()) {
+    // Common error, so logging explicitly and eliding Status's stack trace.
+    string err =
+        strings::Substitute(LEGACY_INVALID_QUERY_HANDLE_TEMPLATE, PrintId(query_id));
+    VLOG(1) << err;
+    return Status::Expected(err);
+  }
+  return Status::OK();
+}
+
 Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
-    const string& user, TRuntimeProfileFormat::type format, stringstream* output,
-    TRuntimeProfileTree* thrift_output, Document* json_output) {
-  DCHECK(output != nullptr);
+    const string& user, TRuntimeProfileFormat::type format,
+    RuntimeProfileOutput* original_profile, RuntimeProfileOutput* retried_profile,
+    bool* was_retried) {
+  DCHECK(original_profile != nullptr);
+  DCHECK(original_profile->string_output != nullptr);
+  DCHECK(retried_profile != nullptr);
+  DCHECK(retried_profile->string_output != nullptr);
+
+  // Search for the query id in the active query map
+  {
+    // QueryHandle of the active query and original query. If the query was retried the
+    // active handle points to the most recent query attempt and the original handle
+    // points to the original query attempt (the one that failed). If the query was not
+    // retried the active handle == the original handle.
+    QueryHandle active_query_handle;
+    QueryHandle original_query_handle;
+    Status status =
+        GetAllQueryHandles(query_id, &active_query_handle, &original_query_handle,
+            /*return_unregistered=*/ true);
+
+    if (status.ok()) {
+      // If the query was retried, then set the retried profile using the active query
+      // handle. The active query handle corresponds to the most recent query attempt,
+      // so it should be used to set the retried profile.
+      if (original_query_handle->WasRetried()) {
+        *was_retried = true;
+        RETURN_IF_ERROR(
+          GetRuntimeProfileOutput(user, active_query_handle, format, retried_profile));
+      }
+
+      // Set the profile for the original query.
+      RETURN_IF_ERROR(
+          GetRuntimeProfileOutput(user, original_query_handle, format, original_profile));
+      return Status::OK();
+    }
+  }
+
+  // The query was not found in the active query map, search the query log.
+  {
+    // Set the profile for the original query.
+    QueryLogIndex::const_iterator query_record;
+    RETURN_IF_ERROR(GetQueryRecord(query_id, &query_record));
+    RETURN_IF_ERROR(CheckProfileAccess(user, query_record->second->effective_user,
+        query_record->second->user_has_profile_access));
+    RETURN_IF_ERROR(DecompressToProfile(format, query_record, original_profile));
+
+    // Set the profile for the retried query.
+    if (query_record->second->was_retried) {
+      *was_retried = true;
+      DCHECK(query_record->second->retried_query_id != nullptr);
+      QueryLogIndex::const_iterator retried_query_record;
+
+      // The profile of the retried profile should always be earlier in the query log
+      // compared to the original profile. Since the query log is a FIFO queue, this
+      // means that if the original profile is in the log, then the retried profile
+      // must be in the log as well.
+      Status status =
+          GetQueryRecord(*query_record->second->retried_query_id, &retried_query_record);
+      DCHECK(status.ok());
+      RETURN_IF_ERROR(status);
+
+      // If the original profile was accessible by the user, then the retried profile
+      // must be accessible by the user as well.
+      status = CheckProfileAccess(user, retried_query_record->second->effective_user,
+          retried_query_record->second->user_has_profile_access);
+      DCHECK(status.ok());
+      RETURN_IF_ERROR(status);
+
+      RETURN_IF_ERROR(DecompressToProfile(format, retried_query_record, retried_profile));
+    }
+  }
+  return Status::OK();
+}
+
+Status ImpalaServer::GetRuntimeProfileOutput(const TUniqueId& query_id,
+    const string& user, TRuntimeProfileFormat::type format,
+    RuntimeProfileOutput* profile) {
+  DCHECK(profile != nullptr);
+  DCHECK(profile->string_output != nullptr);
+
   // Search for the query id in the active query map
   {
     QueryHandle query_handle;
     Status status = GetQueryHandle(query_id, &query_handle,
         /*return_unregistered=*/ true);
     if (status.ok()) {
-      // For queries in INITIALIZED state, the profile information isn't populated yet.
-      if (query_handle->exec_state() == ClientRequestState::ExecState::INITIALIZED) {
-        return Status::Expected("Query plan is not ready.");
-      }
-      lock_guard<mutex> l(*query_handle->lock());
-      RETURN_IF_ERROR(CheckProfileAccess(user, query_handle->effective_user(),
-          query_handle->user_has_profile_access()));
-      if (query_handle->GetCoordinator() != nullptr) {
-        UpdateExecSummary(query_handle);
-      }
-      if (format == TRuntimeProfileFormat::BASE64) {
-        RETURN_IF_ERROR(query_handle->profile()->SerializeToArchiveString(output));
-      } else if (format == TRuntimeProfileFormat::THRIFT) {
-        query_handle->profile()->ToThrift(thrift_output);
-      } else if (format == TRuntimeProfileFormat::JSON) {
-        query_handle->profile()->ToJson(json_output);
-      } else {
-        DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
-        query_handle->profile()->PrettyPrint(output);
-      }
+      RETURN_IF_ERROR(GetRuntimeProfileOutput(user, query_handle, format, profile));
       return Status::OK();
     }
   }
 
   // The query was not found the active query map, search the query log.
   {
-    lock_guard<mutex> l(query_log_lock_);
     QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
-    if (query_record == query_log_index_.end()) {
-      // Common error, so logging explicitly and eliding Status's stack trace.
-      string err =
-          strings::Substitute(LEGACY_INVALID_QUERY_HANDLE_TEMPLATE, PrintId(query_id));
-      VLOG(1) << err;
-      return Status::Expected(err);
-    }
+    RETURN_IF_ERROR(GetQueryRecord(query_id, &query_record));
     RETURN_IF_ERROR(CheckProfileAccess(user, query_record->second->effective_user,
         query_record->second->user_has_profile_access));
-    if (format == TRuntimeProfileFormat::BASE64) {
-      Base64Encode(query_record->second->compressed_profile, output);
-    } else if (format == TRuntimeProfileFormat::THRIFT) {
-      RETURN_IF_ERROR(RuntimeProfile::DecompressToThrift(
-          query_record->second->compressed_profile, thrift_output));
-    } else if (format == TRuntimeProfileFormat::JSON) {
-      ObjectPool tmp_pool;
-      RuntimeProfile* tmp_profile;
-      RETURN_IF_ERROR(RuntimeProfile::DecompressToProfile(
-          query_record->second->compressed_profile, &tmp_pool, &tmp_profile));
-      tmp_profile->ToJson(json_output);
-    } else {
-      DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
-      ObjectPool tmp_pool;
-      RuntimeProfile* tmp_profile;
-      RETURN_IF_ERROR(RuntimeProfile::DecompressToProfile(
-          query_record->second->compressed_profile, &tmp_pool, &tmp_profile));
-      tmp_profile->PrettyPrint(output);
-    }
+    RETURN_IF_ERROR(DecompressToProfile(format, query_record, profile));
+  }
+  return Status::OK();
+}
+
+Status ImpalaServer::DecompressToProfile(TRuntimeProfileFormat::type format,
+    QueryLogIndex::const_iterator query_record, RuntimeProfileOutput* profile) {
+  if (format == TRuntimeProfileFormat::BASE64) {
+    Base64Encode(query_record->second->compressed_profile, profile->string_output);
+  } else if (format == TRuntimeProfileFormat::THRIFT) {
+    RETURN_IF_ERROR(RuntimeProfile::DecompressToThrift(
+        query_record->second->compressed_profile, profile->thrift_output));
+  } else if (format == TRuntimeProfileFormat::JSON) {
+    ObjectPool tmp_pool;
+    RuntimeProfile* tmp_profile;
+    RETURN_IF_ERROR(RuntimeProfile::DecompressToProfile(
+        query_record->second->compressed_profile, &tmp_pool, &tmp_profile));
+    tmp_profile->ToJson(profile->json_output);
+  } else {
+    DCHECK_EQ(format, TRuntimeProfileFormat::STRING);
+    ObjectPool tmp_pool;
+    RuntimeProfile* tmp_profile;
+    RETURN_IF_ERROR(RuntimeProfile::DecompressToProfile(
+        query_record->second->compressed_profile, &tmp_pool, &tmp_profile));
+    tmp_profile->PrettyPrint(profile->string_output);
   }
   return Status::OK();
 }
@@ -2093,6 +2191,9 @@ void ImpalaServer::QueryStateRecord::Init(const ClientRequestState& query_handle
     resource_pool = query_handle.request_pool();
   }
   user_has_profile_access = query_handle.user_has_profile_access();
+
+  was_retried = query_handle.WasRetried();
+  if (was_retried) retried_query_id = make_unique<TUniqueId>(query_handle.retried_id());
 }
 
 bool ImpalaServer::QueryStateRecordLessThan::operator() (

@@ -700,6 +700,12 @@ struct TGetRuntimeProfileReq {
 
   3: optional RuntimeProfile.TRuntimeProfileFormat format =
       RuntimeProfile.TRuntimeProfileFormat.STRING
+
+  // If true, returns the profiles of all query attempts. A TGetRuntimeProfileReq
+  // always returns the profile for the most recent query attempt, regardless of the
+  // query id specified. Clients should set this to true if they want to retrieve the
+  // profiles of all query attempts (including the failed ones).
+  4: optional bool include_query_attempts = false
 }
 
 struct TGetRuntimeProfileResp {
@@ -711,6 +717,12 @@ struct TGetRuntimeProfileResp {
 
   // Will be set on success if TGetRuntimeProfileReq.format was THRIFT.
   3: optional RuntimeProfile.TRuntimeProfileTree thrift_profile
+
+  // A list of all the failed query attempts in either STRING, BASE64 or JSON format.
+  4: optional list<string> failed_profiles
+
+  // A list of all the failed query attempts in THRIFT format.
+  5: optional list<RuntimeProfile.TRuntimeProfileTree> failed_thrift_profiles
 }
 
 service ImpalaHiveServer2Service extends TCLIService.TCLIService {

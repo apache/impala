@@ -37,7 +37,7 @@ from tests.common.test_dimensions import create_client_protocol_dimension
 from time import sleep, time
 from util import (get_impalad_host_port, assert_var_substitution, run_impala_shell_cmd,
                   ImpalaShell, IMPALA_SHELL_EXECUTABLE, SHELL_IS_PYTHON_2,
-                  build_shell_env)
+                  build_shell_env, wait_for_query_state)
 from contextlib import closing
 
 
@@ -402,35 +402,13 @@ class TestImpalaShell(ImpalaTestSuite):
     # Kill happens in wait_to_finish state
     self.run_and_verify_query_cancellation_test(vector, stmt, "RUNNING")
 
-  def wait_for_query_state(self, vector, stmt, state, max_retry=15):
-    """Checks the in flight queries on Impala debug page. Polls the state of
-    the query statement from parameter every second until the query gets to
-    a state given via parameter or a maximum retry count is reached.
-    Restriction: Only works if there is only one in flight query."""
-    impalad_service = ImpaladService(get_impalad_host_port(vector).split(':')[0])
-    if not impalad_service.wait_for_num_in_flight_queries(1):
-      raise Exception("No in flight query found")
-
-    retry_count = 0
-    while retry_count <= max_retry:
-      query_info = impalad_service.get_in_flight_queries()[0]
-      if query_info['stmt'] != stmt:
-        exc_text = "The found in flight query is not the one under test: " + \
-            query_info['stmt']
-        raise Exception(exc_text)
-      if query_info['state'] == state:
-        return
-      retry_count += 1
-      sleep(1.0)
-    raise Exception("Query didn't reach desired state: " + state)
-
   def run_and_verify_query_cancellation_test(self, vector, stmt, cancel_at_state):
     """Starts the execution of the received query, waits until the query
     execution in fact starts and then cancels it. Expects the query
     cancellation to succeed."""
     p = ImpalaShell(vector, ['-q', stmt])
 
-    self.wait_for_query_state(vector, stmt, cancel_at_state)
+    wait_for_query_state(vector, stmt, cancel_at_state)
 
     os.kill(p.pid(), signal.SIGINT)
     result = p.get_result()

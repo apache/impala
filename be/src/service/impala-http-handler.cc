@@ -268,9 +268,11 @@ void ImpalaHttpHandler::QueryProfileHandler(const Webserver::WebRequest& req,
     return;
   }
 
+  ImpalaServer::RuntimeProfileOutput runtime_profile;
   stringstream ss;
+  runtime_profile.string_output = &ss;
   Status status = server_->GetRuntimeProfileOutput(
-      unique_id, "", TRuntimeProfileFormat::STRING, &ss, nullptr, nullptr);
+      unique_id, "", TRuntimeProfileFormat::STRING, &runtime_profile);
   if (!status.ok()) {
     Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
@@ -292,8 +294,11 @@ void ImpalaHttpHandler::QueryProfileHelper(const Webserver::WebRequest& req,
   if (!status.ok()) {
     ss << status.GetDetail();
   } else {
-    Status status = server_->GetRuntimeProfileOutput(
-      unique_id, "", format, &ss, nullptr, document);
+    ImpalaServer::RuntimeProfileOutput runtime_profile;
+    runtime_profile.string_output = &ss;
+    runtime_profile.json_output = document;
+    Status status =
+        server_->GetRuntimeProfileOutput(unique_id, "", format, &runtime_profile);
     if (!status.ok()) {
       ss.str(Substitute("Could not obtain runtime profile: $0", status.GetDetail()));
     }

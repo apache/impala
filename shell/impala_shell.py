@@ -103,6 +103,18 @@ class QueryOptionDisplayModes:
   ALL_OPTIONS = 2
 
 
+class QueryProfileDisplayModes:
+  """The display mode when runtime profiles are printed to the console. If the query has
+  not been retried, then the display mode does not change anything. The format is always
+  the same. If the query has been retried, then the ALL option will print both the
+  original and retried profiles. If the LATEST option is specified, then only the retried
+  profile will be printed. If the ORIGINAL option is specified, then only the original
+  profile will be printed."""
+  ALL = "all"
+  LATEST = "latest"
+  ORIGINAL = "original"
+
+
 # Py3 method resolution order requires 'object' to be last w/ multiple inheritance
 class ImpalaShell(cmd.Cmd, object):
   """ Simple Impala Shell.
@@ -981,10 +993,25 @@ class ImpalaShell(cmd.Cmd, object):
     if flush:
       file_descriptor.flush()
 
-  def print_runtime_profile(self, profile, status=False):
+  def print_runtime_profile(self, profile, failed_profile,
+          profile_display_mode=QueryProfileDisplayModes.LATEST, status=False):
+    """Prints the given runtime profiles to the console. Optionally prints the failed
+    profile if the query was retried. The format the profiles are printed is controlled
+    by the option profile_display_mode, see QueryProfileDisplayModes docs above.
+    """
     if self.show_profiles or status:
-      if profile is not None:
-        print("Query Runtime Profile:\n" + profile)
+      if profile:
+        query_profile_prefix = "Query Runtime Profile:\n"
+        if profile_display_mode == QueryProfileDisplayModes.ALL:
+          print(query_profile_prefix + profile)
+          if failed_profile:
+            print("Failed Query Runtime Profile(s):\n" + failed_profile)
+        elif profile_display_mode == QueryProfileDisplayModes.LATEST:
+          print(query_profile_prefix + profile)
+        elif profile_display_mode == QueryProfileDisplayModes.ORIGINAL:
+          print(query_profile_prefix + failed_profile if failed_profile else profile)
+        else:
+          raise FatalShellException("Invalid value for query profile display mode")
 
   def _parse_table_name_arg(self, arg):
     """ Parses an argument string and returns the result as a db name, table name combo.
@@ -1027,14 +1054,28 @@ class ImpalaShell(cmd.Cmd, object):
 
   def do_profile(self, args):
     """Prints the runtime profile of the last DML statement or SELECT query executed."""
-    if len(args) > 0:
-      print("'profile' does not accept any arguments", file=sys.stderr)
+    split_args = args.split()
+    if len(split_args) > 1:
+      print("'profile' only accepts 0 or 1 arguments", file=sys.stderr)
       return CmdStatus.ERROR
     elif self.last_query_handle is None:
       print('No previous query available to profile', file=sys.stderr)
       return CmdStatus.ERROR
-    profile = self.imp_client.get_runtime_profile(self.last_query_handle)
-    return self.print_runtime_profile(profile, True)
+
+    # Parse and validate the QueryProfileDisplayModes option.
+    profile_display_mode = QueryProfileDisplayModes.LATEST
+    if len(split_args) == 1:
+      profile_display_mode = str(split_args[0]).lower()
+      if profile_display_mode not in [QueryProfileDisplayModes.ALL,
+              QueryProfileDisplayModes.LATEST, QueryProfileDisplayModes.ORIGINAL]:
+        print("Invalid value for query profile display mode: \'" +
+                profile_display_mode + "\'. Valid values are [ALL | LATEST | ORIGINAL]")
+        return CmdStatus.ERROR
+
+    profile, failed_profile = self.imp_client.get_runtime_profile(
+        self.last_query_handle)
+    return self.print_runtime_profile(profile, failed_profile, profile_display_mode,
+            True)
 
   def do_select(self, args):
     """Executes a SELECT... query, fetching all rows"""
@@ -1211,8 +1252,9 @@ class ImpalaShell(cmd.Cmd, object):
       if not is_dml:
         self.imp_client.close_query(self.last_query_handle)
       try:
-        profile = self.imp_client.get_runtime_profile(self.last_query_handle)
-        self.print_runtime_profile(profile)
+        profile, retried_profile = self.imp_client.get_runtime_profile(
+            self.last_query_handle)
+        self.print_runtime_profile(profile, retried_profile)
       except RPCException as e:
         if self.show_profiles: raise e
       return CmdStatus.SUCCESS

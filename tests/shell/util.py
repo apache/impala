@@ -33,6 +33,7 @@ from subprocess import Popen, PIPE
 
 from tests.common.environ import (IMPALA_LOCAL_BUILD_VERSION,
                                   ImpalaTestClusterProperties)
+from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import (IMPALAD_BEESWAX_HOST_PORT,
     IMPALAD_HS2_HOST_PORT, IMPALAD_HS2_HTTP_HOST_PORT)
 
@@ -322,3 +323,27 @@ def get_unused_port():
     s.bind(('', 0))
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     return s.getsockname()[1]
+
+
+def wait_for_query_state(vector, stmt, state, max_retry=15):
+  """Waits for the given query 'stmt' to reach the given query 'state'. The state of the
+  query is taken from the debug web ui. Polls the state of 'stmt' every second until the
+  query gets to a state given via 'state' or a maximum retry count is reached.
+  Restriction: Only works if there is only one in flight query."""
+  impalad_service = ImpaladService(get_impalad_host_port(vector).split(':')[0])
+  if not impalad_service.wait_for_num_in_flight_queries(1):
+    raise Exception("No in flight query found")
+
+  retry_count = 0
+  while retry_count <= max_retry:
+    query_info = impalad_service.get_in_flight_queries()[0]
+    print(str(query_info))
+    if query_info['stmt'] != stmt:
+      exc_text = "The found in flight query is not the one under test: " + \
+          query_info['stmt']
+      raise Exception(exc_text)
+    if query_info['state'] == state:
+      return
+    retry_count += 1
+    time.sleep(1.0)
+  raise Exception("Query didn't reach desired state: " + state)

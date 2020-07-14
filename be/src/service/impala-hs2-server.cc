@@ -1022,6 +1022,62 @@ void ImpalaServer::GetExecSummary(TGetExecSummaryResp& return_val,
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
+void ImpalaServer::JsonProfileToStringProfile(
+    const rapidjson::Document& json_profile, stringstream* string_profile) {
+  // Serialize to JSON without extra whitespace/formatting.
+  rapidjson::StringBuffer sb;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+  json_profile.Accept(writer);
+  *string_profile << sb.GetString();
+}
+
+// Add the given Thrift profile to the list of failed thrift profiles for the given
+// TGetRuntimeProfileResp.
+void SetFailedProfile(
+    TRuntimeProfileTree* thrift_profile, TGetRuntimeProfileResp& return_val) {
+  DCHECK(thrift_profile != nullptr);
+  vector<TRuntimeProfileTree> failed_thrift_profiles;
+  failed_thrift_profiles.emplace_back(*thrift_profile);
+  return_val.__set_failed_thrift_profiles(failed_thrift_profiles);
+}
+
+// Add the given string profile to the list of failed profiles for the given
+// TGetRuntimeProfileResp.
+void SetFailedProfile(stringstream* ss, TGetRuntimeProfileResp& return_val) {
+  DCHECK(ss != nullptr);
+  vector<string> original_profiles;
+  original_profiles.emplace_back(ss->str());
+  return_val.__set_failed_profiles(original_profiles);
+}
+
+void ImpalaServer::SetProfile(TGetRuntimeProfileResp& get_profile_resp,
+    TRuntimeProfileFormat::type profile_format, const RuntimeProfileOutput& profile,
+    bool set_failed_profile) {
+  if (profile_format == TRuntimeProfileFormat::THRIFT) {
+    if (set_failed_profile) {
+      SetFailedProfile(profile.thrift_output, get_profile_resp);
+    } else {
+      get_profile_resp.__set_thrift_profile(*profile.thrift_output);
+    }
+  } else if (profile_format == TRuntimeProfileFormat::JSON) {
+    DCHECK(profile.json_output != nullptr);
+    JsonProfileToStringProfile(*profile.json_output, profile.string_output);
+    if (set_failed_profile) {
+      SetFailedProfile(profile.string_output, get_profile_resp);
+    } else {
+      get_profile_resp.__set_profile(profile.string_output->str());
+    }
+  } else {
+    DCHECK(profile_format == TRuntimeProfileFormat::STRING
+        || profile_format == TRuntimeProfileFormat::BASE64);
+    if (set_failed_profile) {
+      SetFailedProfile(profile.string_output, get_profile_resp);
+    } else {
+      get_profile_resp.__set_profile(profile.string_output->str());
+    }
+  }
+}
+
 void ImpalaServer::GetRuntimeProfile(
     TGetRuntimeProfileResp& return_val, const TGetRuntimeProfileReq& request) {
   TUniqueId session_id;
@@ -1046,35 +1102,45 @@ void ImpalaServer::GetRuntimeProfile(
 
   VLOG_RPC << "GetRuntimeProfile(): query_id=" << PrintId(query_id);
 
+  // Set the RuntimeProfileOutput for the retried query (e.g. the second attempt of a
+  // query). If the query has been retried this will be the retried profile. If the
+  // query has not been retried then all entries will be nullptr.
+  RuntimeProfileOutput retried_profile;
+  stringstream retried_ss;
+  TRuntimeProfileTree retried_thrift_profile;
+  rapidjson::Document retried_json_profile(rapidjson::kObjectType);
+  retried_profile.string_output = &retried_ss;
+  retried_profile.thrift_output = &retried_thrift_profile;
+  retried_profile.json_output = &retried_json_profile;
+
+  // Set the RuntimeProfileOutput for the original query (e.g. the first attempt of a
+  // query). If the query has been retried this will be the original profile (the
+  // profile of the original query attempt). If the query has not been retried then
+  // this will be the normal runtime profile.
+  RuntimeProfileOutput profile;
   stringstream ss;
   TRuntimeProfileTree thrift_profile;
   rapidjson::Document json_profile(rapidjson::kObjectType);
+  profile.string_output = &ss;
+  profile.thrift_output = &thrift_profile;
+  profile.json_output = &json_profile;
 
-  // If the query was retried, fetch the profile for the most recent attempt of the query
-  // The original query profile should still be accessible via the web ui.
-  QueryHandle query_handle;
-  Status status = GetActiveQueryHandle(query_id, &query_handle);
-  if (LIKELY(status.ok())) {
-    query_id = query_handle->query_id();
-  }
-
+  // Get the runtime profiles and load them into the given RuntimeProfileOutputs.
+  bool was_retried = false;
   HS2_RETURN_IF_ERROR(return_val,
-      GetRuntimeProfileOutput(query_id, GetEffectiveUser(*session), request.format, &ss,
-          &thrift_profile, &json_profile),
+      GetRuntimeProfileOutput(query_id, GetEffectiveUser(*session), request.format,
+                          &profile, &retried_profile, &was_retried),
       SQLSTATE_GENERAL_ERROR);
-  if (request.format == TRuntimeProfileFormat::THRIFT) {
-    return_val.__set_thrift_profile(thrift_profile);
-  } else if (request.format == TRuntimeProfileFormat::JSON) {
-    // Serialize to JSON without extra whitespace/formatting.
-    rapidjson::StringBuffer sb;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
-    json_profile.Accept(writer);
-    ss << sb.GetString();
-    return_val.__set_profile(ss.str());
-  } else {
-    DCHECK(request.format == TRuntimeProfileFormat::STRING
-        || request.format == TRuntimeProfileFormat::BASE64);
-    return_val.__set_profile(ss.str());
+
+  // Set the Thrift response in TGetRuntimeProfileResp. If the query was retried, then
+  // the retried profile should be returned. If not, the regular profile should be
+  // returned.
+  SetProfile(return_val, request.format, was_retried ? retried_profile : profile);
+
+  // If 'request.include_query_attempts' include the retried profile in the Thrift
+  // response.
+  if (was_retried && request.include_query_attempts) {
+    SetProfile(return_val, request.format, profile, true);
   }
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }

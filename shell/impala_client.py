@@ -302,7 +302,11 @@ class ImpalaClient(object):
 
   def get_runtime_profile(self, last_query_handle):
     """Get the runtime profile string from the server. Returns None if
-    an error was encountered."""
+    an error was encountered. If the query was retried, returns the profile of the failed
+    profile as well; the tuple (profile, failed_profile) is returned where 'profile' is
+    the profile of the most recent query attempt and 'failed_profile' is the profile of
+    the original query attempt that failed.. Currently, only the HS2 protocol supports
+    returning the failed profile."""
     raise NotImplementedError()
 
   def get_summary(self, last_query_handle):
@@ -863,14 +867,18 @@ class ImpalaHS2Client(ImpalaClient):
     return resp.operationState
 
   def get_runtime_profile(self, last_query_handle):
-    req = TGetRuntimeProfileReq(last_query_handle, self.session_handle)
+    req = TGetRuntimeProfileReq(last_query_handle, self.session_handle,
+        include_query_attempts=True)
 
     def GetRuntimeProfile():
       return self.imp_service.GetRuntimeProfile(req)
     # GetRuntimeProfile rpc is idempotent and so safe to retry.
     resp = self._do_hs2_rpc(GetRuntimeProfile, retry_on_error=True)
     self._check_hs2_rpc_status(resp.status)
-    return resp.profile
+    failed_profile = None
+    if resp.failed_profiles and len(resp.failed_profiles) >= 1:
+      failed_profile = resp.failed_profiles[0]
+    return resp.profile, failed_profile
 
   def get_summary(self, last_query_handle):
     req = TGetExecSummaryReq(last_query_handle, self.session_handle)
@@ -1138,8 +1146,8 @@ class ImpalaBeeswaxClient(ImpalaClient):
     profile, rpc_status = self._do_beeswax_rpc(
         lambda: self.imp_service.GetRuntimeProfile(last_query_handle))
     if rpc_status == RpcStatus.OK and profile:
-      return profile
-    return None
+      return profile, None
+    return None, None
 
   def get_summary(self, last_query_handle):
     summary, rpc_status = self._do_beeswax_rpc(

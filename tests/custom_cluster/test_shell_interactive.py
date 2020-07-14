@@ -16,13 +16,16 @@
 # under the License.
 
 import pytest
-import pexpect
-import os
 
+from multiprocessing.pool import ThreadPool
+from random import randint
+
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_vector import ImpalaTestVector
 from tests.common.test_dimensions import create_client_protocol_dimension
-from tests.shell.util import get_shell_cmd, get_impalad_port, spawn_shell
+from tests.shell.util import (get_shell_cmd, get_impalad_port, spawn_shell,
+                              wait_for_query_state)
 
 
 class TestShellInteractive(CustomClusterTestSuite):
@@ -54,3 +57,75 @@ class TestShellInteractive(CustomClusterTestSuite):
       proc.sendline("set live_progress=true;")
       proc.sendline("select 1;")
       proc.expect(expected_admission_status)
+
+  _test_retry_query =\
+        "select count(*) from functional.alltypes where bool_col = sleep(50)"
+  _query_retry_options = "set retry_failed_queries=true;"
+
+  @pytest.mark.execute_serially
+  def test_query_retries_profile_cmd(self):
+    """Tests transparent query retries via impala-shell. Validates the output of the
+    'profile [all | latest | original];' commands in impala-shell."""
+    query = "select count(*) from functional.alltypes where bool_col = sleep(50)"
+    vector = ImpalaTestVector([ImpalaTestVector.Value("protocol", "hs2")])
+    proc = self.__trigger_retry_shell(vector, query)
+
+    # Expect the correct results
+    proc.expect("3650", timeout=300)
+
+    # Check the output of 'profile all'
+    proc.sendline("profile all;")
+    proc.expect("Query Runtime Profile:")
+    proc.expect("Query State: FINISHED")
+    proc.expect("Failed Query Runtime Profile\(s\):")
+    proc.expect("Query State: EXCEPTION")
+    proc.expect("Retry Status: RETRIED")
+
+    # Check the output of 'profile latest' and 'profile'. The output of both cmds
+    # should be equivalent.
+    for profile_cmd in ["profile latest;", "profile;"]:
+      proc.sendline(profile_cmd)
+      proc.expect("Query Runtime Profile:")
+      proc.expect("Query State: FINISHED")
+      # Validate that the output does not contain info about the failed profile.
+      self.__proc_not_expect(proc, "Failed Query Runtime Profile\(s\):")
+      self.__proc_not_expect(proc, "Query State: EXCEPTION")
+      self.__proc_not_expect(proc, "Retry Status: RETRIED")
+
+    # Check the output of 'profile original'
+    proc.sendline("profile original;")
+    proc.expect("Query Runtime Profile:")
+    proc.expect("Query State: EXCEPTION")
+    proc.expect("Retry Status: RETRIED")
+    self.__proc_not_expect(proc, "Failed Query Runtime Profile\(s\):")
+    self.__proc_not_expect(proc, "Query State: FINISHED")
+
+  @pytest.mark.execute_serially
+  def test_query_retries_show_profiles(self):
+    """Tests transparent query retries via impala-shell. Validates that the output of the
+    impala-shell when the '-p' option is specified prints out both the original and
+    retried runtime profiles."""
+    query = "select count(*) from functional.alltypes where bool_col = sleep(50)"
+    vector = ImpalaTestVector([ImpalaTestVector.Value("protocol", "hs2")])
+    proc = self.__trigger_retry_shell(vector, query, shell_params=['-p'])
+
+    proc.expect("3650", timeout=300)
+    proc.expect("Query Runtime Profile:")
+    proc.expect("Query State: FINISHED")
+
+  def __proc_not_expect(self, proc, pattern):
+    """Helper method for pexpect.except to assert that a pattern is not present."""
+    proc.expect("^((?!{0}).)*$".format(pattern))
+
+  def __trigger_retry_shell(self, vector, query, shell_params=[]):
+    """Runs a query via the impala-shell and triggers a query retry."""
+    vector = ImpalaTestVector([ImpalaTestVector.Value("protocol", "hs2")])
+    pool = ThreadPool(processes=1)
+    proc = spawn_shell(get_shell_cmd(vector) + shell_params)
+    proc.expect("{0}] default>".format(get_impalad_port(vector)))
+    proc.sendline("set retry_failed_queries=true;")
+    pool.apply_async(lambda: proc.sendline(query + ";"))
+    wait_for_query_state(vector, query, "RUNNING")
+    self.cluster.impalads[
+        randint(1, ImpalaTestSuite.get_impalad_cluster_size() - 1)].kill()
+    return proc

@@ -1511,6 +1511,7 @@ void ClientRequestState::MarkAsRetried(const TUniqueId& retried_id) {
   summary_profile_->AddInfoString("Retried Query Id", PrintId(retried_id));
   UpdateExecState(ExecState::ERROR);
   block_until_retried_cv_.NotifyOne();
+  retried_id_ = make_unique<TUniqueId>(retried_id);
 }
 
 const string& ClientRequestState::effective_user() const {
