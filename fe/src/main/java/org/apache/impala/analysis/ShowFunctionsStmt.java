@@ -80,7 +80,7 @@ public class ShowFunctionsStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     postAnalysisDb_ = (parsedDb_ == null ? analyzer.getDefaultDb() : parsedDb_);
-    if (analyzer.getDb(postAnalysisDb_, Privilege.VIEW_METADATA) == null) {
+    if (analyzer.getDb(postAnalysisDb_, Privilege.ANY) == null) {
       throw new AnalysisException(Analyzer.DB_DOES_NOT_EXIST_ERROR_MSG + postAnalysisDb_);
     }
   }

@@ -355,13 +355,25 @@ public class AuditingTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestShow() throws AnalysisException, AuthorizationException{
+  public void TestShowViewMetadata() throws AnalysisException, AuthorizationException{
     String[] statsQuals = new String[]{ "partitions", "table stats", "column stats" };
     for (String qual: statsQuals) {
       Set<TAccessEvent> accessEvents =
           AnalyzeAccessEvents(String.format("show %s functional.alltypes", qual));
       Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
           "functional.alltypes", TCatalogObjectType.TABLE, "VIEW_METADATA")));
+    }
+  }
+
+  @Test
+  public void TestShowAny() throws AnalysisException, AuthorizationException {
+    String[] statsQuals = new String[] { "tables", "functions" };
+    for (String qual : statsQuals) {
+        Set<TAccessEvent> accessEvents = AnalyzeAccessEvents(String.format(
+            "show %s in functional", qual));
+        Assert.assertEquals(accessEvents,
+            Sets.newHashSet(new TAccessEvent("functional", TCatalogObjectType
+            .DATABASE, "ANY")));
     }
   }
 
