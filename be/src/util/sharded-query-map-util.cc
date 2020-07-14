@@ -18,6 +18,7 @@
 #include "util/sharded-query-map-util.h"
 
 #include "runtime/query-driver.h"
+#include "scheduling/admission-control-service.h"
 #include "util/debug-util.h"
 
 namespace impala {
@@ -74,5 +75,15 @@ template Status GenericShardedQueryMap<TUniqueId, std::shared_ptr<QueryDriver>>:
     TUniqueId const&, std::shared_ptr<QueryDriver>*);
 template Status GenericShardedQueryMap<TUniqueId, std::shared_ptr<QueryDriver>>::Delete(
     TUniqueId const&);
+
+// Needed by AdmissionControlService
+template Status GenericShardedQueryMap<UniqueIdPB,
+    std::shared_ptr<AdmissionControlService::AdmissionState>>::Add(UniqueIdPB const&,
+    const std::shared_ptr<AdmissionControlService::AdmissionState>&);
+template Status GenericShardedQueryMap<UniqueIdPB,
+    std::shared_ptr<AdmissionControlService::AdmissionState>>::Get(UniqueIdPB const&,
+    std::shared_ptr<AdmissionControlService::AdmissionState>*);
+template Status GenericShardedQueryMap<UniqueIdPB,
+    std::shared_ptr<AdmissionControlService::AdmissionState>>::Delete(UniqueIdPB const&);
 
 } // namespace impala

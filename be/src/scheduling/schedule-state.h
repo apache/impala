@@ -147,13 +147,10 @@ struct FragmentScheduleState {
 ///   everything else is discarded.
 class ScheduleState {
  public:
+  /// For testing only: specify 'is_test=true' to build a ScheduleState object without
+  /// running Init() and to seed the random number generator for deterministic results.
   ScheduleState(const UniqueIdPB& query_id, const TQueryExecRequest& request,
-      const TQueryOptions& query_options, RuntimeProfile* summary_profile,
-      RuntimeProfile::EventSequence* query_events);
-
-  /// For testing only: build a ScheduleState object but do not run Init().
-  ScheduleState(const UniqueIdPB& query_id, const TQueryExecRequest& request,
-      const TQueryOptions& query_options, RuntimeProfile* summary_profile);
+      const TQueryOptions& query_options, RuntimeProfile* summary_profile, bool is_test);
 
   /// Verifies that the schedule is well-formed (and DCHECKs if it isn't):
   /// - all fragments have a FragmentScheduleState
@@ -236,7 +233,6 @@ class ScheduleState {
 
 
   RuntimeProfile* summary_profile() { return summary_profile_; }
-  RuntimeProfile::EventSequence* query_events() { return query_events_; }
 
   int64_t largest_min_reservation() const { return largest_min_reservation_; }
 
@@ -312,7 +308,6 @@ class ScheduleState {
 
   /// TODO: move these into QueryState
   RuntimeProfile* summary_profile_;
-  RuntimeProfile::EventSequence* query_events_;
 
   /// Maps from plan node id to its fragment idx. Filled in c'tor.
   std::vector<int32_t> plan_node_to_fragment_idx_;

@@ -18,6 +18,7 @@
 #include "scheduling/local-admission-control-client.h"
 
 #include "runtime/exec-env.h"
+#include "util/runtime-profile-counters.h"
 #include "util/uid-util.h"
 
 #include "common/names.h"
@@ -30,9 +31,21 @@ LocalAdmissionControlClient::LocalAdmissionControlClient(const TUniqueId& query_
 
 Status LocalAdmissionControlClient::SubmitForAdmission(
     const AdmissionController::AdmissionRequest& request,
+    RuntimeProfile::EventSequence* query_events,
     std::unique_ptr<QuerySchedulePB>* schedule_result) {
-  return ExecEnv::GetInstance()->admission_controller()->SubmitForAdmission(
-      request, &admit_outcome_, schedule_result);
+  ScopedEvent completedEvent(
+      query_events, AdmissionControlClient::QUERY_EVENT_COMPLETED_ADMISSION);
+  query_events->MarkEvent(QUERY_EVENT_SUBMIT_FOR_ADMISSION);
+  bool queued;
+  Status status = ExecEnv::GetInstance()->admission_controller()->SubmitForAdmission(
+      request, &admit_outcome_, schedule_result, &queued);
+  if (queued) {
+    query_events->MarkEvent(QUERY_EVENT_QUEUED);
+    DCHECK(status.ok());
+    status = ExecEnv::GetInstance()->admission_controller()->WaitOnQueued(
+        request.query_id, schedule_result);
+  }
+  return status;
 }
 
 void LocalAdmissionControlClient::ReleaseQuery(int64_t peak_mem_consumption) {

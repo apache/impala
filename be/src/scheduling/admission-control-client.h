@@ -32,14 +32,19 @@ namespace impala {
 // controller running locally or to one running remotely.
 class AdmissionControlClient {
  public:
+  static const std::string QUERY_EVENT_SUBMIT_FOR_ADMISSION;
+  static const std::string QUERY_EVENT_QUEUED;
+  static const std::string QUERY_EVENT_COMPLETED_ADMISSION;
+
   // Creates a new AdmissionControlClient and returns it in 'client'.
   static void Create(
-      const TUniqueId& query_id, std::unique_ptr<AdmissionControlClient>* client);
+      const TQueryCtx& query_ctx, std::unique_ptr<AdmissionControlClient>* client);
 
   virtual ~AdmissionControlClient() {}
 
   // Called to schedule and admit the query. Blocks until an admission decision is made.
   virtual Status SubmitForAdmission(const AdmissionController::AdmissionRequest& request,
+      RuntimeProfile::EventSequence* query_events,
       std::unique_ptr<QuerySchedulePB>* schedule_result) = 0;
 
   // Called when the query has completed to release all of its resources.

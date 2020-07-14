@@ -54,29 +54,20 @@ FragmentScheduleState::FragmentScheduleState(
 }
 
 ScheduleState::ScheduleState(const UniqueIdPB& query_id, const TQueryExecRequest& request,
-    const TQueryOptions& query_options, RuntimeProfile* summary_profile,
-    RuntimeProfile::EventSequence* query_events)
+    const TQueryOptions& query_options, RuntimeProfile* summary_profile, bool is_test)
   : query_id_(query_id),
     request_(request),
     query_options_(query_options),
     query_schedule_pb_(new QuerySchedulePB()),
     summary_profile_(summary_profile),
-    query_events_(query_events),
     next_instance_id_(query_id) {
-  Init();
-}
-
-ScheduleState::ScheduleState(const UniqueIdPB& query_id, const TQueryExecRequest& request,
-    const TQueryOptions& query_options, RuntimeProfile* summary_profile)
-  : query_id_(query_id),
-    request_(request),
-    query_options_(query_options),
-    query_schedule_pb_(new QuerySchedulePB()),
-    summary_profile_(summary_profile),
-    next_instance_id_(query_id),
-    rng_(rand()) {
-  // Init() is not called, this constructor is for white box testing only.
-  DCHECK(TestInfo::is_test());
+  if (is_test) {
+    // For tests, don't call Init() and seed the random number generator for deterministic
+    // results.
+    rng_.seed(rand());
+  } else {
+    Init();
+  }
 }
 
 void ScheduleState::Init() {

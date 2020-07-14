@@ -41,6 +41,7 @@ class KuduClient;
 namespace impala {
 
 class AdmissionController;
+class AdmissionControlService;
 class BufferPool;
 class CallableThreadPool;
 class ClusterMembershipMgr;
@@ -143,6 +144,7 @@ class ExecEnv {
   ClusterMembershipMgr* cluster_membership_mgr() { return cluster_membership_mgr_.get(); }
   Scheduler* scheduler() { return scheduler_.get(); }
   AdmissionController* admission_controller() { return admission_controller_.get(); }
+  AdmissionControlService* admission_control_service() { return admission_svc_.get(); }
   StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
 
   const TNetworkAddress& configured_backend_address() const {
@@ -207,6 +209,7 @@ class ExecEnv {
   boost::scoped_ptr<RpcMgr> rpc_mgr_;
   boost::scoped_ptr<ControlService> control_svc_;
   boost::scoped_ptr<DataStreamService> data_svc_;
+  boost::scoped_ptr<AdmissionControlService> admission_svc_;
 
   /// Query-wide buffer pool and the root reservation tracker for the pool. The
   /// reservation limit is equal to the maximum capacity of the pool. Created in

@@ -83,11 +83,6 @@ STATESTORE_RPC_FREQUENCY_MS = 100
 SUBMISSION_DELAY_MS = \
     [0, STATESTORE_RPC_FREQUENCY_MS / 2, STATESTORE_RPC_FREQUENCY_MS * 3 / 2]
 
-# The number of queries to submit. The test does not support fewer queries than
-# MAX_NUM_CONCURRENT_QUERIES + MAX_NUM_QUEUED_QUERIES to keep some validation logic
-# simple.
-NUM_QUERIES = [15, 30, 50]
-
 # Whether we will submit queries to all available impalads (in a round-robin fashion)
 ROUND_ROBIN_SUBMISSION = [True, False]
 
@@ -281,6 +276,14 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       return profiles
     finally:
       client.close()
+
+  def get_ac_process(self):
+    """Returns the Process that is running the admission control service."""
+    return self.cluster.impalads[0]
+
+  def get_ac_log_name(self):
+    """Returns the prefix of the log files for the admission control process."""
+    return "impalad"
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -593,7 +596,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       self.client.wait_for_finished_timeout(handle, 1000)
       expected_mem_limits = self.__get_mem_limits_admission_debug_page()
       actual_mem_limits = self.__get_mem_limits_memz_debug_page(handle.get_handle().id)
-      mem_admitted = get_mem_admitted_backends_debug_page(self.cluster)
+      mem_admitted =\
+          get_mem_admitted_backends_debug_page(self.cluster, self.get_ac_process())
       debug_string = " expected_mem_limits:" + str(
         expected_mem_limits) + " actual_mem_limits:" + str(
         actual_mem_limits) + " mem_admitted:" + str(mem_admitted)
@@ -622,7 +626,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     and 'executor' and their respective mem values in bytes."""
     # Based on how the cluster is setup, the first impalad in the cluster is the
     # coordinator.
-    response_json = self.cluster.impalads[0].service.get_debug_webpage_json("admission")
+    response_json = self.get_ac_process().service.get_debug_webpage_json("admission")
     assert 'resource_pools' in response_json
     assert len(response_json['resource_pools']) == 1
     assert response_json['resource_pools'][0]['running_queries']
@@ -752,7 +756,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       handle = client.execute_async("select 1")
       sleep(1)
       client.close_query(handle)
-      self.assert_impalad_log_contains('INFO',
+      self.assert_log_contains(self.get_ac_log_name(), 'INFO',
           "Ready to be Rejected but already cancelled, query id=")
       client.clear_configuration()
 
@@ -760,7 +764,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       handle = client.execute_async("select 2")
       sleep(1)
       client.close_query(handle)
-      self.assert_impalad_log_contains('INFO',
+      self.assert_log_contains(self.get_ac_log_name(), 'INFO',
           "Ready to be Admitted immediately but already cancelled, query id=")
 
       client.set_configuration_option("debug_action",
@@ -794,7 +798,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       client.close_query(queued_query_handle)
       queued_profile = client.get_runtime_profile(queued_query_handle)
       assert "Admission result: Cancelled (queued)" in queued_profile, queued_profile
-      self.assert_impalad_log_contains('INFO', "Dequeued cancelled query=")
+      self.assert_log_contains(
+          self.get_ac_log_name(), 'INFO', "Dequeued cancelled query=")
       client.clear_configuration()
 
       handle = client.execute_async("select sleep(10000)")
@@ -807,12 +812,13 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       queued_profile = client.get_runtime_profile(queued_query_handle)
       assert "Admission result: Cancelled (queued)" in queued_profile
       for i in self.cluster.impalads:
-        i.service.wait_for_metric_value("impala-server.num-fragments-in-flight", 0)
-      assert self.cluster.impalads[0].service.get_metric_value(
+        i.service.wait_for_metric_value(
+            "impala-server.num-fragments-in-flight", 0, timeout=20)
+      assert self.get_ac_process().service.get_metric_value(
         "admission-controller.agg-num-running.default-pool") == 0
-      assert self.cluster.impalads[0].service.get_metric_value(
+      assert self.get_ac_process().service.get_metric_value(
         "admission-controller.total-admitted.default-pool") == 4
-      assert self.cluster.impalads[0].service.get_metric_value(
+      assert self.get_ac_process().service.get_metric_value(
         "admission-controller.total-queued.default-pool") == 2
     finally:
       client.close()
@@ -964,7 +970,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     NUM_QUERIES = 5
     coordinator_limited_metric = \
       "admission-controller.total-dequeue-failed-coordinator-limited"
-    original_metric_value = self.get_metric(coordinator_limited_metric)
+    original_metric_value = self.get_ac_process().service.get_metric_value(
+        coordinator_limited_metric)
     profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
         TIMEOUT_S, config_options={"mt_dop": 4})
 
@@ -991,7 +998,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
     # The number of admission control slots on the coordinator is limited
     # so the failures to dequeue should trigger a bump in the coordinator_limited_metric.
-    later_metric_value = self.get_metric(coordinator_limited_metric)
+    later_metric_value = self.get_ac_process().service.get_metric_value(
+        coordinator_limited_metric)
     assert later_metric_value > original_metric_value, \
       "Metric %s did not change" % coordinator_limited_metric
 
@@ -1017,7 +1025,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.client.wait_for_admission_control(handle_running)
     handle_queued = self.client.execute_async(query)
     self.client.wait_for_admission_control(handle_queued)
-    self.impalad_test_service.wait_for_metric_value(
+    self.get_ac_process().service.wait_for_metric_value(
       "admission-controller.total-queued.default-pool", 1)
     # Queued queries don't show up on backends
     self.__assert_num_queries_accounted(1, 1)
@@ -1082,7 +1090,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
     # Change config to be invalid.
     llama_site_path = os.path.join(RESOURCES_DIR, "copy-mem-limit-test-llama-site.xml")
-    config = ResourcePoolConfig(self.cluster.impalads[0].service, llama_site_path)
+    config = ResourcePoolConfig(
+        self.cluster.impalads[0].service, self.get_ac_process().service, llama_site_path)
     config.set_config_value(pool_name, config_str, 1)
     # Close running query so the queued one gets a chance.
     self.client.close_query(sleep_query_handle)
@@ -1140,9 +1149,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.wait_for_operation_state(queued_query_resp.operationHandle,
             TCLIService.TOperationState.PENDING_STATE)
     # Check whether the query log message correctly exposes the queuing status.
-    get_log_req = TCLIService.TGetLogReq()
-    get_log_req.operationHandle = queued_query_resp.operationHandle
-    log = self.hs2_client.GetLog(get_log_req).log
+    log = self.wait_for_log_message(
+        queued_query_resp.operationHandle, "Admission result :")
     assert "Admission result : Queued" in log, log
     assert "Latest admission queue reason : number of running queries 1 is at or over "
     "limit 1" in log, log
@@ -1171,7 +1179,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     """Test behaviour with a failed statestore. Queries should continue to be admitted
     but we should generate diagnostics about the stale topic."""
     self.cluster.statestored.kill()
-    impalad = self.cluster.impalads[0]
+    impalad = self.get_ac_process()
     # Sleep until the update should be definitely stale.
     sleep(STALE_TOPIC_THRESHOLD_MS / 1000. * 1.5)
     ac_json = impalad.service.get_debug_webpage_json('/admission')
@@ -1289,7 +1297,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
           in self.client.get_runtime_profile(handle))
       get_num_completed_backends(self.cluster.impalads[0].service,
         handle.get_handle().id) == 1
-      mem_admitted = get_mem_admitted_backends_debug_page(self.cluster)
+      mem_admitted =\
+          get_mem_admitted_backends_debug_page(self.cluster, self.get_ac_process())
       num_executor_zero_admitted = 0
       for executor_mem_admitted in mem_admitted['executor']:
         if executor_mem_admitted == 0:
@@ -1302,6 +1311,36 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       assert mem_admitted['coordinator'] == 0
       for executor_mem_admitted in mem_admitted['executor']:
         assert executor_mem_admitted == 0
+
+
+class TestAdmissionControllerWithACService(TestAdmissionController):
+  """Runs all of the tests from TestAdmissionController but with the second impalad in the
+  minicluster configured to perform all admission control."""
+
+  def get_ac_process(self):
+    return self.cluster.impalads[1]
+
+  def get_ac_log_name(self):
+    return "impalad_node1"
+
+  def setup_method(self, method):
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+
+    PER_IMPALAD_ACS_ARGS = [
+      '--is_admission_controller=false',
+      '--is_admission_controller=true',
+      '--is_admission_controller=false',
+    ]
+    if 'start_args' not in method.func_dict:
+      method.func_dict['start_args'] = list()
+    method.func_dict['start_args'].append(
+        "--per_impalad_args=" + ";".join(PER_IMPALAD_ACS_ARGS))
+    if 'impalad_args' not in method.func_dict:
+      method.func_dict["impalad_args"] = ""
+    method.func_dict["impalad_args"] +=\
+        " --admission_control_service_addr=127.0.0.1:27001 "
+    super(TestAdmissionController, self).setup_method(method)
 
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
@@ -1339,14 +1378,12 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
   def add_test_dimensions(cls):
     super(TestAdmissionControllerStress, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
-        ImpalaTestDimension('num_queries', *NUM_QUERIES))
-    cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('round_robin_submission', *ROUND_ROBIN_SUBMISSION))
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('submission_delay_ms', *SUBMISSION_DELAY_MS))
 
     # Additional constraints for code coverage jobs and core.
-    num_queries = None
+    num_queries = 50
     if ImpalaTestClusterProperties.get_instance().has_code_coverage():
       # Code coverage builds can't handle the increased concurrency.
       num_queries = 15
@@ -1357,9 +1394,11 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       cls.ImpalaTestMatrix.add_constraint(
           lambda v: v.get_value('round_robin_submission'))
 
-    if num_queries is not None:
-      cls.ImpalaTestMatrix.add_constraint(
-          lambda v: v.get_value('num_queries') == num_queries)
+    # The number of queries to submit. The test does not support fewer queries than
+    # MAX_NUM_CONCURRENT_QUERIES + MAX_NUM_QUEUED_QUERIES to keep some validation logic
+    # simple.
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('num_queries', num_queries))
 
   def setup(self):
     # All threads are stored in this list and it's used just to make sure we clean up
@@ -1395,6 +1434,12 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       LOG.debug("Join thread for query num %s %s", thread.query_num,
           "TIMED OUT" if thread.isAlive() else "")
 
+  def get_ac_processes(self):
+    """Returns a list of all Processes which may be used to perform admission control. If
+    round-robin submission is not being used, only the first Process in this list will
+    perform admission control."""
+    return self.cluster.impalads
+
   def get_admission_metrics(self):
     """
     Returns a map of the admission metrics, aggregated across all of the impalads.
@@ -1404,7 +1449,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     """
     metrics = {'admitted': 0, 'queued': 0, 'dequeued': 0, 'rejected': 0,
                'released': 0, 'timed-out': 0}
-    for impalad in self.impalads:
+    for impalad in self.ac_processes:
       keys = [metric_key(self.pool_name, 'total-%s' % short_name)
               for short_name in metrics.keys()]
       values = impalad.service.get_metric_values(keys, [0] * len(keys))
@@ -1683,13 +1728,28 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
           num_queued += 1
     return num_queued
 
+  def wait_on_queries_page_num_queued(self, min_queued, max_queued):
+    start_time = time()
+    LOG.info("Waiting for %s <= queued queries <= %s" % (min_queued, max_queued))
+    actual_queued = self._get_queries_page_num_queued()
+    while actual_queued < min_queued or actual_queued > max_queued:
+      assert (time() - start_time < STRESS_TIMEOUT), ("Timed out waiting %s seconds for "
+          "%s <= queued queries <= %s, %s currently queued.",
+            STRESS_TIMEOUT, min_queued, max_queued, actual_queued)
+      sleep(0.1)
+      actual_queued = self._get_queries_page_num_queued()
+    LOG.info("Found %s queued queries after %s seconds", actual_queued,
+        round(time() - start_time, 1))
+
   def run_admission_test(self, vector, additional_query_options):
     LOG.info("Starting test case with parameters: %s", vector)
     self.impalads = self.cluster.impalads
+    self.ac_processes = self.get_ac_processes()
     round_robin_submission = vector.get_value('round_robin_submission')
     submission_delay_ms = vector.get_value('submission_delay_ms')
     if not round_robin_submission:
       self.impalads = [self.impalads[0]]
+      self.ac_processes = [self.ac_processes[0]]
 
     num_queries = vector.get_value('num_queries')
     assert num_queries >= MAX_NUM_CONCURRENT_QUERIES + MAX_NUM_QUEUED_QUERIES
@@ -1738,10 +1798,9 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     initial_metric_deltas = metric_deltas
 
     # Like above, check that the count from the queries webpage json is reasonable.
-    queries_page_num_queued = self._get_queries_page_num_queued()
-    assert queries_page_num_queued >=\
-        min(num_queries - metric_deltas['admitted'], MAX_NUM_QUEUED_QUERIES)
-    assert queries_page_num_queued <= MAX_NUM_QUEUED_QUERIES * len(self.impalads)
+    min_queued = min(num_queries - metric_deltas['admitted'], MAX_NUM_QUEUED_QUERIES)
+    max_queued = MAX_NUM_QUEUED_QUERIES * len(self.impalads)
+    self.wait_on_queries_page_num_queued(min_queued, max_queued)
     self._check_queries_page_resource_pools()
 
     # Admit queries in waves until all queries are done. A new wave of admission
@@ -1792,8 +1851,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       assert metric_deltas['rejected'] == num_queries - expected_admitted
 
     # All queries should be completed by now.
-    queries_page_num_queued = self._get_queries_page_num_queued()
-    assert queries_page_num_queued == 0
+    self.wait_on_queries_page_num_queued(0, 0)
     self._check_queries_page_resource_pools()
 
     for thread in self.all_threads:
@@ -1865,3 +1923,33 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
     query_mem_limit = (proc_limit / MAX_NUM_CONCURRENT_QUERIES / num_impalads) - 1
     self.run_admission_test(vector,
         {'request_pool': self.pool_name, 'mem_limit': query_mem_limit})
+
+
+class TestAdmissionControllerStressWithACService(TestAdmissionControllerStress):
+  """Runs all of the tests from TestAdmissionControllerStress but with the second impalad
+  in the minicluster configured to perform all admission control."""
+
+  def get_ac_processes(self):
+    return [self.cluster.impalads[1]]
+
+  def get_ac_log_name(self):
+    return "impalad_node1"
+
+  def setup_method(self, method):
+    if self.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+
+    PER_IMPALAD_ACS_ARGS = [
+      '--is_admission_controller=false',
+      '--is_admission_controller=true',
+      '--is_admission_controller=false',
+    ]
+    if 'start_args' not in method.func_dict:
+      method.func_dict['start_args'] = list()
+    method.func_dict['start_args'].append(
+        "--per_impalad_args=" + ";".join(PER_IMPALAD_ACS_ARGS))
+    if 'impalad_args' not in method.func_dict:
+      method.func_dict["impalad_args"] = ""
+    method.func_dict["impalad_args"] +=\
+        " --admission_control_service_addr=127.0.0.1:27001 "
+    super(TestAdmissionControllerStress, self).setup_method(method)

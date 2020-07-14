@@ -164,7 +164,7 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
 
   summary_profile_->AddChild(frontend_profile_);
 
-  AdmissionControlClient::Create(query_ctx.query_id, &admission_control_client_);
+  AdmissionControlClient::Create(query_ctx_, &admission_control_client_);
 }
 
 ClientRequestState::~ClientRequestState() {
@@ -575,8 +575,8 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
   Status admit_status = admission_control_client_->SubmitForAdmission(
       {query_id_pb, ExecEnv::GetInstance()->backend_id(),
           exec_request_->query_exec_request, exec_request_->query_options,
-          summary_profile_, query_events_, blacklisted_executor_addresses_},
-      &schedule_);
+          summary_profile_, blacklisted_executor_addresses_},
+      query_events_, &schedule_);
   {
     lock_guard<mutex> l(lock_);
     if (!UpdateQueryStatus(admit_status).ok()) return;

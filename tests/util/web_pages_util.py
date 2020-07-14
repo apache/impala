@@ -30,7 +30,7 @@ def get_num_completed_backends(service, query_id):
     return num_complete_backends
 
 
-def get_mem_admitted_backends_debug_page(cluster):
+def get_mem_admitted_backends_debug_page(cluster, ac_process=None):
   """Helper method assumes a cluster using a dedicated coordinator. Returns the mem
   admitted to the backends extracted from the backends debug page of the coordinator
   impala daemon. Returns a dictionary with the keys 'coordinator' and 'executor' and
@@ -38,7 +38,9 @@ def get_mem_admitted_backends_debug_page(cluster):
   admitted for each executor."""
   # Based on how the cluster is setup, the first impalad in the cluster is the
   # coordinator.
-  response_json = cluster.impalads[0].service.get_debug_webpage_json('backends')
+  if ac_process is None:
+    ac_process = cluster.impalads[0]
+  response_json = ac_process.service.get_debug_webpage_json('backends')
   assert 'backends' in response_json
   assert len(response_json['backends']) >= 2
   ret = dict()

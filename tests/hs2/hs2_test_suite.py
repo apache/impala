@@ -335,6 +335,18 @@ class HS2TestSuite(ImpalaTestSuite):
     assert False, 'Did not complete admission control processing in time, current ' \
         'operation state of query: %s' % (get_operation_status_resp.operationState)
 
+  def wait_for_log_message(self, operationHandle, expected_message, timeout=10):
+    start_time = time()
+    while (time() - start_time < timeout):
+      get_log_req = TCLIService.TGetLogReq()
+      get_log_req.operationHandle = operationHandle
+      log = self.hs2_client.GetLog(get_log_req).log
+      if expected_message in log:
+        return log
+      sleep(0.05)
+    assert False, "Did not find expected log message '%s' in time, latest log: '%s'" \
+      % (expected_message, log)
+
   def execute_statement(self, statement, conf_overlay=None,
                         expected_status_code=TCLIService.TStatusCode.SUCCESS_STATUS,
                         expected_error_prefix=None):

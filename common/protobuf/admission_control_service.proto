@@ -152,3 +152,100 @@ message QuerySchedulePB {
   // successfully.
   optional int64 coord_backend_mem_to_admit = 8;
 }
+
+message AdmitQueryRequestPB {
+  optional UniqueIdPB query_id = 1;
+
+  // The BackendId of the coordinator for this query.
+  optional UniqueIdPB coord_id = 2;
+
+  // Idx of the TQueryExecRequest sidecar.
+  optional int32 query_exec_request_sidecar_idx = 3;
+
+  // List of backends this query should not be scheduled on.
+  repeated NetworkAddressPB blacklisted_executor_addresses = 4;
+}
+
+message AdmitQueryResponsePB {
+  // Ok if the request was successfully handed off to the admission thread pool for
+  // processing
+  optional StatusPB status = 1;
+}
+
+message GetQueryStatusRequestPB {
+  optional UniqueIdPB query_id = 1;
+}
+
+message GetQueryStatusResponsePB {
+  // Error if the query was rejected or retrieving the status failed.
+  optional StatusPB status = 1;
+
+  // The results of scheduling and admisison control. WIll only be set if admission was
+  // successful and the query has not yet been released.
+  optional QuerySchedulePB query_schedule = 2;
+
+  // Idx of the TRuntimeProfileTree sidecar.
+  optional int32 summary_profile_sidecar_idx = 3;
+}
+
+message ReleaseQueryRequestPB {
+  optional UniqueIdPB query_id = 1;
+
+  // Corresponds to the 'peak_mem_consumption' parameter of
+  // AdmissionController::ReleaseQuery()
+  optional int64 peak_mem_consumption = 3;
+}
+
+message ReleaseQueryResponsePB {
+  optional StatusPB status = 1;
+}
+
+message ReleaseQueryBackendsRequestPB {
+  optional UniqueIdPB query_id = 1;
+
+  // List of backends that have completed. The resources for this query on these backends
+  // will be released.
+  repeated NetworkAddressPB host_addr = 2;
+}
+
+message ReleaseQueryBackendsResponsePB {
+  optional StatusPB status = 1;
+}
+
+message CancelAdmissionRequestPB {
+  optional UniqueIdPB query_id = 1;
+}
+
+message CancelAdmissionResponsePB {
+  optional StatusPB status = 1;
+}
+
+service AdmissionControlService {
+  /// Called by the coordinator to start scheduling. The actual work is done on a thread
+  /// pool, so this call returns immedately. TODO: there are some situations where we can
+  /// return the admission result quickly, eg. if the query is rejected. We should
+  /// evaluate the benefits of saving a call to GetQueryStatus() in those situations.
+  rpc AdmitQuery(AdmitQueryRequestPB) returns (AdmitQueryResponsePB);
+
+  /// Called by the coordinator after AdmitQuery() to monitor the admission status of the
+  /// query. The call will block for a configurable amount of time before returning. This
+  /// call is idempotent and will return the schedule on each call between successful
+  /// admission and the query getting released.
+  rpc GetQueryStatus(GetQueryStatusRequestPB) returns (GetQueryStatusResponsePB);
+
+  /// Called by the coordinator when the query has completely finished, releases all
+  /// remaining resources.
+  rpc ReleaseQuery(ReleaseQueryRequestPB) returns (ReleaseQueryResponsePB);
+
+  /// Called after individual backends have finished to release their resources while
+  /// other backends are running. Due to the use of Coordinator::BackendResourceState,
+  /// this will be called a max of log(# of backends) times per query. TODO: we can save
+  /// an rpc if we combine the release of the final batch of backends with the call to
+  /// ReleaseQuery.
+  rpc ReleaseQueryBackends(ReleaseQueryBackendsRequestPB)
+      returns (ReleaseQueryBackendsResponsePB);
+
+  /// Called by the coordinator to cancel scheduling of a query for which GetQueryStatus
+  /// has not yet returned a schedule.
+  rpc CancelAdmission(CancelAdmissionRequestPB) returns (CancelAdmissionResponsePB);
+}

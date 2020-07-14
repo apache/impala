@@ -31,9 +31,9 @@ namespace impala {
 
 /// Implementation of AdmissionControlClient used to submit queries for admission to an
 /// AdmissionController running locally on the coordinator.
-class LocalAdmissionControlClient : public AdmissionControlClient {
+class RemoteAdmissionControlClient : public AdmissionControlClient {
  public:
-  LocalAdmissionControlClient(const TUniqueId& query_id);
+  RemoteAdmissionControlClient(const TQueryCtx& query_ctx);
 
   virtual Status SubmitForAdmission(const AdmissionController::AdmissionRequest& request,
       RuntimeProfile::EventSequence* query_events,
@@ -44,14 +44,30 @@ class LocalAdmissionControlClient : public AdmissionControlClient {
   virtual void CancelAdmission() override;
 
  private:
+  // Owned by the ClientRequestState.
+  const TQueryCtx& query_ctx_;
+
   // The id of the query being considered for admission.
   UniqueIdPB query_id_;
 
-  /// Promise used by the admission controller. AdmissionController:SubmitForAdmission()
-  /// will block on this promise until the query is either rejected, admitted, times out,
-  /// or is cancelled. Can be set to CANCELLED by CancelAdmission() in order to cancel,
-  /// but otherwise is set by AdmissionController with the admission decision.
-  Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER> admit_outcome_;
+  /// The address of the remote admission controller to use.
+  TNetworkAddress address_;
+
+  /// Protects 'pending_admit_' and 'cancelled_'.
+  std::mutex lock_;
+
+  /// If true, the AdmitQuery rpc has been sent but a final admission decision has not yet
+  /// been recieved by GetQueryStatus().
+  bool pending_admit_ = false;
+
+  /// If true, CancelAdmission() was called. If SubmitForAdmission() is called
+  /// subsequently, it will not send the AdmitQuery rpc
+  bool cancelled_ = false;
+
+  /// Constants related to retrying the idempotent rpcs.
+  static const int RPC_NUM_RETRIES = 3;
+  static const int64_t RPC_TIMEOUT_MS = 10 * MILLIS_PER_SEC;
+  static const int64_t RPC_BACKOFF_TIME_MS = 3 * MILLIS_PER_SEC;
 };
 
 } // namespace impala

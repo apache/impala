@@ -101,7 +101,7 @@ class AdmissionControllerTest : public testing::Test {
     TQueryOptions* query_options = pool_.Add(new TQueryOptions());
     query_options->__set_mem_limit(mem_limit);
     ScheduleState* schedule_state =
-        pool_.Add(new ScheduleState(*query_id, *request, *query_options, profile));
+        pool_.Add(new ScheduleState(*query_id, *request, *query_options, profile, true));
     schedule_state->set_executor_group(executor_group);
     SetHostsInScheduleState(*schedule_state, num_hosts, is_dedicated_coord);
     schedule_state->UpdateMemoryRequirements(config);
