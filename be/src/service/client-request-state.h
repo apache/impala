@@ -380,6 +380,13 @@ class ClientRequestState {
     return *original_id_;
   }
 
+  /// Can only be called if this query was retried. Returns the query id of the retried
+  /// query.
+  const TUniqueId& retried_id() const {
+    DCHECK(retried_id_ != nullptr);
+    return *retried_id_;
+  }
+
   /// Returns the QueryDriver that owns this ClientRequestState.
   QueryDriver* parent_driver() const { return parent_driver_; }
 
@@ -629,6 +636,11 @@ class ClientRequestState {
   /// "original" query is the query that was submitted by the user that failed and had to
   /// be retried.
   std::unique_ptr<const TUniqueId> original_id_ = nullptr;
+
+  /// Query id of the retried query. The retried query is the new query that is run
+  /// whenever the original query fails with a retryable error. See 'original_id_' for
+  /// an explanation of what the "original" query is.
+  std::unique_ptr<const TUniqueId> retried_id_ = nullptr;
 
   /// Condition variable used to signal any threads that are waiting until the query has
   /// been retried.

@@ -738,22 +738,59 @@ class ImpalaServer : public ImpalaServiceIf,
   Status CloseSessionInternal(const TUniqueId& session_id, const SecretArg& secret,
       bool ignore_if_absent) WARN_UNUSED_RESULT;
 
+  /// The output of a runtime profile. The output of a profile can be in one of three
+  /// formats: string, thrift, or json. The format is specified by TRuntimeProfileFormat.
+  /// The struct is a union of all output profiles types. The struct is similar to a
+  /// union because only one field can be set.
+  struct RuntimeProfileOutput {
+    std::stringstream* string_output = nullptr;
+    TRuntimeProfileTree* thrift_output = nullptr;
+    rapidjson::Document* json_output = nullptr;
+  };
+
   /// Gets the runtime profile string for a given query_id and writes it to the output
   /// stream. First searches for the query id in the map of in-flight queries. If no
   /// match is found there, the query log is searched. Returns OK if the profile was
   /// found, otherwise a Status object with an error message will be returned. The
   /// output stream will not be modified on error.
-  /// On success, if 'format' is BASE64 or STRING then 'output' will be set, or if
-  /// 'format' is THRIFT then 'thrift_output' will be set. If 'format' is JSON
-  /// then 'json_output' will be set.
+  /// On success, if 'format' is BASE64 or STRING then 'profile.string_output' will be
+  /// set, or if 'format' is THRIFT then 'profile.thrift_output' will be set. If 'format'
+  /// is JSON then 'profile.json_output' will be set.
   /// If the user asking for this profile is the same user that runs the query
   /// and that user has access to the runtime profile, the profile is written to
   /// the output. Otherwise, nothing is written to output and an error code is
   /// returned to indicate an authorization error.
-  Status GetRuntimeProfileOutput(const TUniqueId& query_id, const std::string& user,
-      TRuntimeProfileFormat::type format, std::stringstream* output,
-      TRuntimeProfileTree* thrift_output,
-      rapidjson::Document* json_output) WARN_UNUSED_RESULT;
+  Status GetRuntimeProfileOutput(const TUniqueId& query_id, const string& user,
+      TRuntimeProfileFormat::type format, RuntimeProfileOutput* profile);
+
+  /// Similar to GetRuntimeProfileOutput above, unless the query was retried then it sets
+  /// the runtime profile for both query attempts. 'original_profile' is set to the
+  /// profile of the original query attempt (the one that failed), and 'retried_profile'
+  /// is set to the profile of the most recent query attempt (the retried query attempt).
+  /// If the query was not retried, 'retried_profile' is not set and 'original_profile'
+  /// is set to the normal runtime profile. Both 'retried_profile' and 'original_profile'
+  /// cannot be nullptr.
+  Status GetRuntimeProfileOutput(const TUniqueId& query_id, const string& user,
+      TRuntimeProfileFormat::type format, RuntimeProfileOutput* original_profile,
+      RuntimeProfileOutput* retried_profile, bool* was_retried) WARN_UNUSED_RESULT;
+
+  /// Helper method for GetRuntimeProfileOutput that fetches the runtime profile for the
+  /// given QueryHandle.
+  Status GetRuntimeProfileOutput(const string& user, const QueryHandle& query_handle,
+      TRuntimeProfileFormat::type format, RuntimeProfileOutput* profile);
+
+  /// Converts a JSON Document representation of a profile to a string representation.
+  /// Both parameters cannot be nullptr.
+  void JsonProfileToStringProfile(const rapidjson::Document& json_profile,
+      std::stringstream* string_profile);
+
+  /// Set the profile (or thrift_profile) field for the given TRuntimeProfileFormat
+  /// using the profile from the given RuntimeProfileOutput. If 'set_failed_profile'
+  /// is true, then the profile is added to the 'failed_profile' field of
+  /// TGetRuntimeProfileResp, otherwise it is added to the normal profile field.
+  void SetProfile(TGetRuntimeProfileResp& get_profile_resp,
+      TRuntimeProfileFormat::type profile_format, const RuntimeProfileOutput& profile,
+      bool set_failed_profile = false);
 
   /// Returns the exec summary for this query if the user asking for the exec
   /// summary is the same user that run the query and that user has access to the full
@@ -906,6 +943,12 @@ class ImpalaServer : public ImpalaServiceIf,
     /// Resource pool to which the request was submitted for admission, or an empty
     /// string if this request doesn't go through admission control.
     std::string resource_pool;
+
+    /// True if this query was retried, false otherwise.
+    bool was_retried = false;
+
+    /// If this query was retried, the query id of the retried query.
+    std::unique_ptr<const TUniqueId> retried_query_id;
 
     /// Initialise from 'exec_state' of a completed query. 'compressed_profile' must be
     /// a runtime profile decompressed with RuntimeProfile::Compress().
@@ -1128,6 +1171,16 @@ class ImpalaServer : public ImpalaServiceIf,
   /// it is removed from 'query_log_'.
   typedef boost::unordered_map<TUniqueId, QueryStateRecord*> QueryLogIndex;
   QueryLogIndex query_log_index_;
+
+  /// Sets the given QueryLogIndex for the given query_id. Returns an error Status if the
+  /// given query_id cannot be found in the QueryLogIndex.
+  Status GetQueryRecord(
+      const TUniqueId& query_id, QueryLogIndex::const_iterator* query_record);
+
+  /// Decompresses the profile in the given QueryStateRecord into the specified format.
+  /// The decompressed profile is added to the given RuntimeProfileOutput.
+  Status DecompressToProfile(TRuntimeProfileFormat::type format,
+      QueryLogIndex::const_iterator query_record, RuntimeProfileOutput* profile);
 
   /// Logger for writing encoded query profiles, one per line with the following format:
   /// <ms-since-epoch> <query-id> <thrift query profile URL encoded and gzipped>

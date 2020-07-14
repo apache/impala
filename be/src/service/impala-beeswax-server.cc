@@ -435,8 +435,10 @@ void ImpalaServer::GetRuntimeProfile(
   }
 
   // GetRuntimeProfile() will validate that the user has access to 'query_id'.
+  RuntimeProfileOutput profile;
+  profile.string_output = &ss;
   status = GetRuntimeProfileOutput(query_id, GetEffectiveUser(*session),
-      TRuntimeProfileFormat::STRING, &ss, nullptr, nullptr);
+      TRuntimeProfileFormat::STRING, &profile);
   if (!status.ok()) {
     ss << "GetRuntimeProfile error: " << status.GetDetail();
     RaiseBeeswaxException(ss.str(), SQLSTATE_GENERAL_ERROR);
