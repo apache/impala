@@ -204,7 +204,7 @@ public class AnalysisContext {
      */
     public boolean isSingleColumnPrivStmt() {
       return isDescribeTableStmt() || isResetMetadataStmt() || isUseStmt()
-          || isShowTablesStmt() || isAlterTableStmt();
+          || isShowTablesStmt() || isAlterTableStmt() || isShowFunctionsStmt();
     }
 
     public AlterTableStmt getAlterTableStmt() {

@@ -815,6 +815,49 @@ class TestRanger(CustomClusterTestSuite):
       pytest.xfail("getTableIfCached() faulty behavior, known issue")
       self._test_ownership()
 
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_show_functions(self, unique_name):
+    user1 = getuser()
+    admin_client = self.create_impala_client()
+    unique_database = unique_name + "_db"
+    privileges = ["ALTER", "DROP", "CREATE", "INSERT", "SELECT", "REFRESH"]
+    fs_prefix = os.getenv("FILESYSTEM_PREFIX") or str()
+    try:
+      # Set-up temp database + function
+      admin_client.execute("drop database if exists {0} cascade".format(unique_database),
+                           user=ADMIN)
+      admin_client.execute("create database {0}".format(unique_database), user=ADMIN)
+      self.execute_query_expect_success(admin_client, "create function {0}.foo() RETURNS"
+                                      " int LOCATION '{1}/test-warehouse/libTestUdfs.so'"
+                                      "SYMBOL='Fn'".format(unique_database, fs_prefix),
+                                      user=ADMIN)
+      # Check "show functions" with no privilege granted.
+      result = self._run_query_as_user("show functions in {0}".format(unique_database),
+          user1, False)
+      err = "User '{0}' does not have privileges to access: {1}.*.*". \
+          format(user1, unique_database)
+      assert err in str(result)
+      for privilege in privileges:
+        try:
+          # Grant privilege
+          self.execute_query_expect_success(admin_client,
+                                            "grant {0} on database {1} to user {2}"
+                                            .format(privilege, unique_database, user1),
+                                            user=ADMIN)
+          # Check with current privilege
+          result = self._run_query_as_user("show functions in {0}"
+                                          .format(unique_database), user1, True)
+          assert "foo()", str(result)
+        finally:
+          # Revoke privilege
+          admin_client.execute("revoke {0} on database {1} from user {2}"
+                              .format(privilege, unique_database, user1), user=ADMIN)
+    finally:
+      # Drop database
+      self._run_query_as_user("drop database {0} cascade".format(unique_database),
+                              ADMIN, True)
+
   def _test_ownership(self):
     """Tests ownership privileges for databases and tables with ranger along with
     some known quirks in the implementation."""
