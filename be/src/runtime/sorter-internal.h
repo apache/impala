@@ -23,6 +23,8 @@
 
 #include <random>
 
+#include "common/compiler-util.h"
+
 namespace impala {
 
 /// Wrapper around BufferPool::PageHandle that tracks additional info about the page.
@@ -496,7 +498,8 @@ class Sorter::TupleSorter {
   Tuple* MedianOfThree(Tuple* t1, Tuple* t2, Tuple* t3);
 
   /// Swaps tuples pointed to by left and right using 'swap_tuple'.
-  static void Swap(Tuple* left, Tuple* right, Tuple* swap_tuple, int tuple_size);
+  static inline void Swap(Tuple* RESTRICT left, Tuple* RESTRICT right,
+      Tuple* RESTRICT swap_tuple, int tuple_size);
 };
 
 } // namespace impala
