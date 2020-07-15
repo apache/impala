@@ -48,21 +48,24 @@ void Sorter::TupleIterator::PrevPage(Sorter::Run* run) {
   tuple_ = run->fixed_len_pages_[page_index_].data() + last_tuple_page_offset;
 }
 
-void Sorter::TupleIterator::Next(Sorter::Run* run, int tuple_size) {
+// IMPALA-9956: Function is not inlined into Partition() without inline hint.
+inline void Sorter::TupleIterator::Next(Sorter::Run* run, int tuple_size) {
   DCHECK_LT(index_, run->num_tuples()) << "Can only advance one past end of run";
   tuple_ += tuple_size;
   ++index_;
   if (UNLIKELY(index_ >= buffer_end_index_)) NextPage(run);
 }
 
-void Sorter::TupleIterator::Prev(Sorter::Run* run, int tuple_size) {
+// IMPALA-9956: Function is not inlined into Partition() without inline hint.
+inline void Sorter::TupleIterator::Prev(Sorter::Run* run, int tuple_size) {
   DCHECK_GE(index_, 0) << "Can only advance one before start of run";
   tuple_ -= tuple_size;
   --index_;
   if (UNLIKELY(index_ < buffer_start_index_)) PrevPage(run);
 }
 
-bool Sorter::TupleSorter::Less(const TupleRow* lhs, const TupleRow* rhs) {
+// IMPALA-9956: Function is not inlined into Partition() without inline hint.
+inline bool Sorter::TupleSorter::Less(const TupleRow* lhs, const TupleRow* rhs) {
   --num_comparisons_till_free_;
   DCHECK_GE(num_comparisons_till_free_, 0);
   if (UNLIKELY(num_comparisons_till_free_ == 0)) {
@@ -242,8 +245,9 @@ Tuple* Sorter::TupleSorter::MedianOfThree(Tuple* t1, Tuple* t2, Tuple* t3) {
   }
 }
 
-void Sorter::TupleSorter::Swap(Tuple* left, Tuple* right, Tuple* swap_tuple,
-    int tuple_size) {
+// IMPALA-9956: Function is not inlined into Partition() without inline hint.
+inline void Sorter::TupleSorter::Swap(Tuple* RESTRICT left, Tuple* RESTRICT right,
+    Tuple* RESTRICT swap_tuple, int tuple_size) {
   memcpy(swap_tuple, left, tuple_size);
   memcpy(left, right, tuple_size);
   memcpy(right, swap_tuple, tuple_size);
