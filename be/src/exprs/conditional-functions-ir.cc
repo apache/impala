@@ -17,34 +17,7 @@
 
 #include "exprs/conditional-functions.h"
 
-#include "exprs/anyval-util.h"
-#include "exprs/scalar-expr-evaluator.h"
-#include "exprs/scalar-expr.inline.h"
-#include "udf/udf.h"
-
 using namespace impala;
-using namespace impala_udf;
-
-#define IS_NULL_COMPUTE_FUNCTION(type) \
-  type IsNullExpr::Get##type##Interpreted( \
-      ScalarExprEvaluator* eval, const TupleRow* row) const { \
-    DCHECK_EQ(children_.size(), 2); \
-    type val = GetChild(0)->Get##type(eval, row);  \
-    if (!val.is_null) return val; /* short-circuit */ \
-    return GetChild(1)->Get##type(eval, row); \
-  }
-
-IS_NULL_COMPUTE_FUNCTION(BooleanVal);
-IS_NULL_COMPUTE_FUNCTION(TinyIntVal);
-IS_NULL_COMPUTE_FUNCTION(SmallIntVal);
-IS_NULL_COMPUTE_FUNCTION(IntVal);
-IS_NULL_COMPUTE_FUNCTION(BigIntVal);
-IS_NULL_COMPUTE_FUNCTION(FloatVal);
-IS_NULL_COMPUTE_FUNCTION(DoubleVal);
-IS_NULL_COMPUTE_FUNCTION(StringVal);
-IS_NULL_COMPUTE_FUNCTION(TimestampVal);
-IS_NULL_COMPUTE_FUNCTION(DecimalVal);
-IS_NULL_COMPUTE_FUNCTION(DateVal);
 
 #define NULL_IF_ZERO_COMPUTE_FUNCTION(type) \
   type ConditionalFunctions::NullIfZero(FunctionContext* ctx, const type& val) { \
@@ -91,52 +64,6 @@ ZERO_IF_NULL_COMPUTE_FUNCTION(BigIntVal);
 ZERO_IF_NULL_COMPUTE_FUNCTION(FloatVal);
 ZERO_IF_NULL_COMPUTE_FUNCTION(DoubleVal);
 ZERO_IF_NULL_COMPUTE_FUNCTION(DecimalVal);
-
-#define IF_COMPUTE_FUNCTION(type) \
-  type IfExpr::Get##type##Interpreted( \
-      ScalarExprEvaluator* eval, const TupleRow* row) const { \
-    DCHECK_EQ(children_.size(), 3); \
-    BooleanVal cond = GetChild(0)->GetBooleanVal(eval, row); \
-    if (cond.is_null || !cond.val) { \
-      return GetChild(2)->Get##type(eval, row); \
-    } \
-    return GetChild(1)->Get##type(eval, row); \
-  }
-
-IF_COMPUTE_FUNCTION(BooleanVal);
-IF_COMPUTE_FUNCTION(TinyIntVal);
-IF_COMPUTE_FUNCTION(SmallIntVal);
-IF_COMPUTE_FUNCTION(IntVal);
-IF_COMPUTE_FUNCTION(BigIntVal);
-IF_COMPUTE_FUNCTION(FloatVal);
-IF_COMPUTE_FUNCTION(DoubleVal);
-IF_COMPUTE_FUNCTION(StringVal);
-IF_COMPUTE_FUNCTION(TimestampVal);
-IF_COMPUTE_FUNCTION(DecimalVal);
-IF_COMPUTE_FUNCTION(DateVal);
-
-#define COALESCE_COMPUTE_FUNCTION(type) \
-  type CoalesceExpr::Get##type##Interpreted( \
-      ScalarExprEvaluator* eval, const TupleRow* row) const { \
-    DCHECK_GE(children_.size(), 1); \
-    for (int i = 0; i < children_.size(); ++i) { \
-      type val = GetChild(i)->Get##type(eval, row); \
-      if (!val.is_null) return val; \
-    } \
-    return type::null(); \
-  }
-
-COALESCE_COMPUTE_FUNCTION(BooleanVal);
-COALESCE_COMPUTE_FUNCTION(TinyIntVal);
-COALESCE_COMPUTE_FUNCTION(SmallIntVal);
-COALESCE_COMPUTE_FUNCTION(IntVal);
-COALESCE_COMPUTE_FUNCTION(BigIntVal);
-COALESCE_COMPUTE_FUNCTION(FloatVal);
-COALESCE_COMPUTE_FUNCTION(DoubleVal);
-COALESCE_COMPUTE_FUNCTION(StringVal);
-COALESCE_COMPUTE_FUNCTION(TimestampVal);
-COALESCE_COMPUTE_FUNCTION(DecimalVal);
-COALESCE_COMPUTE_FUNCTION(DateVal);
 
 BooleanVal ConditionalFunctions::IsFalse(FunctionContext* ctx, const BooleanVal& val) {
   if (val.is_null) return BooleanVal(false);

@@ -178,7 +178,7 @@ string CaseExpr::DebugString() const {
 // }
 Status CaseExpr::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** fn) {
   const int num_children = GetNumChildren();
-  llvm::Function* child_fns[num_children];
+  vector<llvm::Function*> child_fns(num_children, nullptr);
   for (int i = 0; i < num_children; ++i) {
     RETURN_IF_ERROR(GetChild(i)->GetCodegendComputeFn(codegen, false, &child_fns[i]));
   }
