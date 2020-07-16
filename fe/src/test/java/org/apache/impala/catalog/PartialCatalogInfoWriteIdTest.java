@@ -77,6 +77,7 @@ public class PartialCatalogInfoWriteIdTest {
   private static final String testDbName = "partial_catalog_info_test";
   private static final String testTblName = "insert_only";
   private static final String testPartitionedTbl = "insert_only_partitioned";
+  private static final String testAcidTblName = "test_full_acid";
 
   @BeforeClass
   public static void setupTestEnv() throws SQLException, ClassNotFoundException {
@@ -342,6 +343,9 @@ public class PartialCatalogInfoWriteIdTest {
     ValidWriteIdList olderWriteIdList = getValidWriteIdList(testDbName,
         testPartitionedTbl);
     // row 3
+    executeHiveSql("insert into " + getPartitionedTblName() + " partition (part=1) "
+        + "values (2)");
+    // row 4
     executeHiveSql("insert into " + getPartitionedTblName() + " partition (part=2) "
         + "values (2)");
     executeHiveSql(
@@ -364,6 +368,8 @@ public class PartialCatalogInfoWriteIdTest {
     Assert.assertEquals(2, response.getTable_info().getPartitionsSize());
     for (TPartialPartitionInfo partitionInfo : response.getTable_info().getPartitions()) {
         Assert.assertEquals(1, partitionInfo.getFile_descriptors().size());
+        Assert.assertEquals(0, partitionInfo.getInsert_file_descriptors().size());
+        Assert.assertEquals(0, partitionInfo.getDelete_file_descriptors().size());
     }
     long numMissesAfter = getMetricCount(testDbName, testPartitionedTbl,
         HdfsTable.FILEMETADATA_CACHE_MISS_METRIC);
@@ -389,6 +395,8 @@ public class PartialCatalogInfoWriteIdTest {
       } else {
         Assert.assertTrue(partitionInfo.getFile_descriptors().isEmpty());
       }
+      Assert.assertEquals(0, partitionInfo.getInsert_file_descriptors().size());
+      Assert.assertEquals(0, partitionInfo.getDelete_file_descriptors().size());
     }
 
     numMisses = getMetricCount(testDbName, testPartitionedTbl,
@@ -412,6 +420,8 @@ public class PartialCatalogInfoWriteIdTest {
     Assert.assertEquals(2, response.getTable_info().getPartitionsSize());
     for (TPartialPartitionInfo partitionInfo : response.getTable_info().getPartitions()) {
       Assert.assertEquals(1, partitionInfo.getFile_descriptors().size());
+      Assert.assertEquals(0, partitionInfo.getInsert_file_descriptors().size());
+      Assert.assertEquals(0, partitionInfo.getDelete_file_descriptors().size());
     }
   }
 
@@ -541,6 +551,66 @@ public class PartialCatalogInfoWriteIdTest {
     }
   }
 
+  @Test
+  public void testFullAcidCompaction() throws Exception {
+    Assume.assumeTrue(MetastoreShim.getMajorVersion() >= 3);
+    // Create Full ACID table.
+    executeImpalaSql("create table " + getTestFullAcidTblName() + " like "
+        + "functional_orc_def.alltypes");
+    executeHiveSql("insert into " + getTestFullAcidTblName() + " select * from "
+        + "functional_orc_def.alltypes");
+    executeHiveSql("delete from " + getTestFullAcidTblName()
+        + " where id % 2 = 0");
+    catalog_.reset();
+    Table tbl = catalog_.getOrLoadTable(testDbName, testAcidTblName, "test", null);
+    Assert.assertFalse("Table must be loaded", tbl instanceof IncompleteTable);
+    ValidWriteIdList olderWriteIdList = getValidWriteIdList(testDbName, testAcidTblName);
+    // Let's delete again to generate a new write id for the table.
+    executeHiveSql("delete from " + getTestFullAcidTblName()
+        + " where id % 3 = 0");
+    executeHiveSql("alter table " + getTestFullAcidTblName()
+        + " partition(year=2010,month=10) compact 'major' and wait");
+    ValidWriteIdList currWriteIdList = getValidWriteIdList(testDbName, testAcidTblName);
+    // Issue a request with currWriteIdList to refresh Catalog.
+    TGetPartialCatalogObjectRequest request = new RequestBuilder()
+        .db(testDbName)
+        .tbl(testAcidTblName)
+        .writeId(currWriteIdList)
+        .wantFiles()
+        .build();
+    TGetPartialCatalogObjectResponse response = sendRequest(request);
+    // Check that we see the current state of the table.
+    Assert.assertEquals(24, response.getTable_info().getPartitionsSize());
+    for (TPartialPartitionInfo part : response.getTable_info().getPartitions()) {
+      if (part.getName().equalsIgnoreCase("year=2010/month=10")) {
+        // The compacted directory only contains a single file. And since there's no
+        // delete file, it is put into 'file_descriptors'.
+        Assert.assertEquals(1, part.file_descriptors.size());
+        Assert.assertEquals(0, part.insert_file_descriptors.size());
+        Assert.assertEquals(0, part.delete_file_descriptors.size());
+      } else {
+        Assert.assertEquals(0, part.file_descriptors.size());
+        Assert.assertEquals(1, part.insert_file_descriptors.size());
+        Assert.assertEquals(2, part.delete_file_descriptors.size());
+      }
+    }
+    // Now let's retrieve table metadata with the older write id list.
+    request = new RequestBuilder()
+        .db(testDbName)
+        .tbl(testAcidTblName)
+        .writeId(olderWriteIdList)
+        .wantFiles()
+        .build();
+    response = sendRequest(request);
+    // Let's check that we don't see the second delete, nor the compacted directory.
+    Assert.assertEquals(24, response.getTable_info().getPartitionsSize());
+    for (TPartialPartitionInfo part : response.getTable_info().getPartitions()) {
+      Assert.assertEquals(0, part.file_descriptors.size());
+      Assert.assertEquals(1, part.insert_file_descriptors.size());
+      Assert.assertEquals(1, part.delete_file_descriptors.size());
+    }
+  }
+
   private void executeHiveSql(String query) throws Exception {
     try (HiveJdbcClient hiveClient = hiveClientPool_.getClient()) {
       hiveClient.executeSql(query);
@@ -664,6 +734,10 @@ public class PartialCatalogInfoWriteIdTest {
 
   private static String getTestTblName() {
     return testDbName + "." + testTblName;
+  }
+
+  private static String getTestFullAcidTblName() {
+    return testDbName + "." + testAcidTblName;
   }
 
   private static String getPartitionedTblName() {

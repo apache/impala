@@ -690,7 +690,7 @@ public class HdfsTable extends Table implements FeFsTable {
     // have refreshed the top-level table properties without refreshing the files.
     new ParallelFileMetadataLoader(
         this, partBuilders, validWriteIds_, validTxnList, logPrefix)
-        .loadAndSet();
+        .load();
 
     // TODO(todd): would be good to log a summary of the loading process:
     // - how many block locations did we reuse/load individually/load via batch

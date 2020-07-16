@@ -507,6 +507,27 @@ public class AcidUtilsTest {
         new String[]{
           "base_0000005/abc.txt",
           "delete_delta_0000006_0000006/00000"});
+    assertFiltering(new String[]{
+            "base_0000005/",
+            "base_0000005/abc.txt",
+            "delete_delta_0000006_0000006/",
+            "delete_delta_0000006_0000006/00000",
+            "delete_delta_0000007_0000007/00000",
+            "delete_delta_0000007_0000007/00001",
+            "delete_delta_0000008_0000008/00000",
+            "delete_delta_0000009_0000009/00000",
+            "delete_delta_0000010_0000010/00000",
+            "delete_delta_0000011_0000011/00000"},
+        // all txns are valid
+        "",
+        // <tbl>:<hwm>:<minOpenWriteId>:<openWriteIds>:<abortedWriteIds>
+        "default.test:10:1234:6:9",
+        new String[]{
+          "base_0000005/abc.txt",
+          "delete_delta_0000007_0000007/00000",
+          "delete_delta_0000007_0000007/00001",
+          "delete_delta_0000008_0000008/00000",
+          "delete_delta_0000010_0000010/00000"});
   }
 
   public void testHiveStreamingFail() {

@@ -228,6 +228,7 @@ public class AcidUtils {
         return isValid;
       } else {
         ParsedDelta pd = parseDelta(dirPath);
+        if (pd == null) pd = parseDeleteDelta(dirPath);
         if (pd != null) {
           if (!isTxnValid(pd.visibilityTxnId)) return false;
           ValidWriteIdList.RangeResponse rr =

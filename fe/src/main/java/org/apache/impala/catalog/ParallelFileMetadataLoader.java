@@ -112,11 +112,11 @@ public class ParallelFileMetadataLoader {
 
   /**
    * Loads the file metadata for the given list of Partitions in the constructor. If the
-   * load is successful also set the fileDescriptors in the HdfsPartitions.
+   * load is successful also set the fileDescriptors in the HdfsPartition.Builders.
    * @throws TableLoadingException
    */
-  void loadAndSet() throws TableLoadingException {
-    load();
+  void load() throws TableLoadingException {
+    loadInternal();
 
     // Store the loaded FDs into the partitions.
     for (Map.Entry<Path, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
@@ -137,30 +137,11 @@ public class ParallelFileMetadataLoader {
   }
 
   /**
-   * Loads the file-metadata from FileSystem for the given list of HdfsPartitions
-   * @return a Mapping of HdfsPartition and its List of FileDescriptors
-   * @throws TableLoadingException
-   */
-  Map<HdfsPartition, List<FileDescriptor>> loadAndGet() throws TableLoadingException {
-    load();
-    Map<HdfsPartition, List<FileDescriptor>> result = Maps.newHashMap();
-    for (Map.Entry<Path, List<HdfsPartition.Builder>> e : partsByPath_.entrySet()) {
-      Path p = e.getKey();
-      FileMetadataLoader loader = loaders_.get(p);
-
-      for (HdfsPartition.Builder partBuilder : e.getValue()) {
-        result.put(partBuilder.getOldInstance(), loader.getLoadedFds());
-      }
-    }
-    return result;
-  }
-
-  /**
    * Call 'load()' in parallel on all of the loaders. If any loaders fail, throws
    * an exception. However, any successful loaders are guaranteed to complete
    * before any exception is thrown.
    */
-  private void load() throws TableLoadingException {
+  private void loadInternal() throws TableLoadingException {
     if (loaders_.isEmpty()) return;
 
     int failedLoadTasks = 0;
