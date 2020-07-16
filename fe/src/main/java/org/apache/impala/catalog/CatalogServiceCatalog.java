@@ -3146,17 +3146,19 @@ public class CatalogServiceCatalog extends Catalog {
       List<HdfsPartition.Builder> partBuilders = partToPartialInfoMap.keySet().stream()
           .map(HdfsPartition.Builder::new)
           .collect(Collectors.toList());
-      Map<HdfsPartition, List<FileDescriptor>> fdsByPart = new ParallelFileMetadataLoader(
-          table, partBuilders, reqWriteIdList, validTxnList, logPrefix)
-          .loadAndGet();
-      for (HdfsPartition partition : fdsByPart.keySet()) {
-        TPartialPartitionInfo partitionInfo = partToPartialInfoMap.get(partition);
-        List<FileDescriptor> fds = fdsByPart.get(partition);
-        List<THdfsFileDesc> fileDescs = Lists.newArrayListWithCapacity(fds.size());
-        for (FileDescriptor fd : fds) {
-          fileDescs.add(fd.toThrift());
-        }
-        partitionInfo.setFile_descriptors(fileDescs);
+      new ParallelFileMetadataLoader(
+          table, partBuilders, reqWriteIdList, validTxnList, logPrefix).load();
+      for (HdfsPartition.Builder builder : partBuilders) {
+        // Let's retrieve the original partition instance from builder because this is
+        // stored in the keys of 'partToPartialInfoMap'.
+        HdfsPartition part = builder.getOldInstance();
+        TPartialPartitionInfo partitionInfo = partToPartialInfoMap.get(part);
+        partitionInfo.setFile_descriptors(transformFds(
+            builder.getFileDescriptors()));
+        partitionInfo.setInsert_file_descriptors(transformFds(
+            builder.getInsertFileDescriptors()));
+        partitionInfo.setDelete_file_descriptors(transformFds(
+            builder.getDeleteFileDescriptors()));
       }
     } finally {
       LOG.info(
@@ -3164,6 +3166,14 @@ public class CatalogServiceCatalog extends Catalog {
               + " {}: {} msec.", table.getFullName(), reqWriteIdList,
           timer.stop().elapsed(TimeUnit.MILLISECONDS));
     }
+  }
+
+  private static List<THdfsFileDesc> transformFds(List<FileDescriptor> fds) {
+    List<THdfsFileDesc> ret = Lists.newArrayListWithCapacity(fds.size());
+    for (FileDescriptor fd : fds) {
+      ret.add(fd.toThrift());
+    }
+    return ret;
   }
 
   private static TGetPartialCatalogObjectResponse createGetPartialCatalogObjectError(

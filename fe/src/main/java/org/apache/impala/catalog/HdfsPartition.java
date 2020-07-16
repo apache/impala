@@ -944,6 +944,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
         encodedInsertFileDescriptors_ : encodedFileDescriptors_;
     return new HdfsPartition.Builder(this)
         .setId(id_)
+        .clearFileDescriptors()
         .setFileDescriptors(fileDescriptors)
         .build();
   }
@@ -953,6 +954,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
     if (encodedDeleteFileDescriptors_.isEmpty()) return null;
     return new HdfsPartition.Builder(this)
         .setId(id_)
+        .clearFileDescriptors()
         .setFileDescriptors(encodedDeleteFileDescriptors_)
         .build();
   }
@@ -1002,7 +1004,7 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       oldInstance_ = partition;
       partitionKeyValues_ = partition.partitionKeyValues_;
       fileFormatDescriptor_ = partition.fileFormatDescriptor_;
-      encodedFileDescriptors_ = partition.encodedFileDescriptors_;
+      setFileDescriptors(partition);
       location_ = partition.location_;
       isMarkedCached_ = partition.isMarkedCached_;
       accessLevel_ = partition.accessLevel_;
@@ -1177,6 +1179,20 @@ public class HdfsPartition implements FeFsPartition, PrunablePartition {
       if (encodedFileDescriptors_ == null) setFileDescriptors(new ArrayList<>());
       // Return a lazily transformed list from our internal bytes storage.
       return Lists.transform(encodedFileDescriptors_, FileDescriptor.FROM_BYTES);
+    }
+
+    public List<FileDescriptor> getInsertFileDescriptors() {
+      // Set an empty descriptors in case that setInsertFileDescriptors hasn't been called
+      if (encodedInsertFileDescriptors_ == null) setFileDescriptors(new ArrayList<>());
+      // Return a lazily transformed list from our internal bytes storage.
+      return Lists.transform(encodedInsertFileDescriptors_, FileDescriptor.FROM_BYTES);
+    }
+
+    public List<FileDescriptor> getDeleteFileDescriptors() {
+      // Set an empty descriptors in case that setDeleteFileDescriptors hasn't been called
+      if (encodedDeleteFileDescriptors_ == null) setFileDescriptors(new ArrayList<>());
+      // Return a lazily transformed list from our internal bytes storage.
+      return Lists.transform(encodedDeleteFileDescriptors_, FileDescriptor.FROM_BYTES);
     }
 
     public Builder clearFileDescriptors() {
