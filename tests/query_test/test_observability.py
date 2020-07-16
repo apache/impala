@@ -773,7 +773,7 @@ class TestQueryStates(ImpalaTestSuite):
       return self.__is_line_in_profile("Query State: FINISHED", profile) and \
              self.__is_line_in_profile("Impala Query State: FINISHED", profile)
 
-    self.assert_eventually(30, 1, assert_finished,
+    self.assert_eventually(300, 1, assert_finished,
       lambda: self.client.get_runtime_profile(handle))
 
     try:
