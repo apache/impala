@@ -40,6 +40,7 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "thirdparty/datasketches/hll.hpp"
+#include "thirdparty/datasketches/kll_sketch.hpp"
 #include "util/arithmetic-util.h"
 #include "util/mpfit-util.h"
 #include "util/pretty-printer.h"
@@ -54,6 +55,8 @@ using std::min_element;
 using std::nth_element;
 using std::pop_heap;
 using std::push_heap;
+using std::string;
+using std::stringstream;
 
 namespace {
 // Threshold for each precision where it's better to use linear counting instead
@@ -1612,6 +1615,14 @@ BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
   return estimate;
 }
 
+StringVal StringStreamToStringVal(FunctionContext* ctx,
+    const stringstream& str_stream) {
+  string str = str_stream.str();
+  StringVal dst(ctx, str.size());
+  memcpy(dst.ptr, str.c_str(), str.size());
+  return dst;
+}
+
 /// Auxiliary function that receives a hll_sketch and returns the serialized version of
 /// it wrapped into a StringVal.
 /// Introducing this function in the .cc to avoid including the whole DataSketches HLL
@@ -1620,10 +1631,7 @@ StringVal SerializeCompactDsHllSketch(FunctionContext* ctx,
     const datasketches::hll_sketch& sketch) {
   std::stringstream serialized_input;
   sketch.serialize_compact(serialized_input);
-  std::string serialized_input_str = serialized_input.str();
-  StringVal dst(ctx, serialized_input_str.size());
-  memcpy(dst.ptr, serialized_input_str.c_str(), serialized_input_str.size());
-  return dst;
+  return StringStreamToStringVal(ctx, serialized_input);
 }
 
 /// Auxiliary function that receives a hll_union, gets the underlying HLL sketch from the
@@ -1635,6 +1643,17 @@ StringVal SerializeDsHllUnion(FunctionContext* ctx,
   std::stringstream serialized_input;
   datasketches::hll_sketch sketch = ds_union.get_result(DS_HLL_TYPE);
   return SerializeCompactDsHllSketch(ctx, sketch);
+}
+
+/// Auxiliary function that receives a kll_sketch<float> and returns the serialized
+/// version of it wrapped into a StringVal.
+/// Introducing this function in the .cc to avoid including the whole DataSketches HLL
+/// functionality into the header
+StringVal SerializeDsKllSketch(FunctionContext* ctx,
+    const datasketches::kll_sketch<float>& sketch) {
+  std::stringstream serialized_sketch;
+  sketch.serialize(serialized_sketch);
+  return StringStreamToStringVal(ctx, serialized_sketch);
 }
 
 void AggregateFunctions::DsHllInit(FunctionContext* ctx, StringVal* dst) {
@@ -1743,10 +1762,10 @@ void AggregateFunctions::DsHllUnionUpdate(FunctionContext* ctx, const StringVal&
   if (src.is_null) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::hll_union));
-  // These parameters might be overwritten by DeserializeHllSketch() to use the settings
+  // These parameters might be overwritten by DeserializeDsSketch() to use the settings
   // from the deserialized sketch from 'src'.
   datasketches::hll_sketch src_sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
-  if (!DeserializeHllSketch(src, &src_sketch)) {
+  if (!DeserializeDsSketch(src, &src_sketch)) {
     LogSketchDeserializationError(ctx);
     return;
   }
@@ -1796,6 +1815,70 @@ StringVal AggregateFunctions::DsHllUnionFinalize(FunctionContext* ctx,
   StringVal result = SerializeCompactDsHllSketch(ctx, sketch);
   ctx->Free(src.ptr);
   return result;
+}
+
+void AggregateFunctions::DsKllInit(FunctionContext* ctx, StringVal* dst) {
+  AllocBuffer(ctx, dst, sizeof(datasketches::kll_sketch<float>));
+  if (UNLIKELY(dst->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
+  // Note, that kll_sketch will always have the same size regardless of the amount of
+  // data it keeps track of. This is because it's a wrapper class that holds all the
+  // inserted data on heap. Here, we put only the wrapper class into a StringVal.
+  datasketches::kll_sketch<float>* sketch_ptr =
+      reinterpret_cast<datasketches::kll_sketch<float>*>(dst->ptr);
+  *sketch_ptr = datasketches::kll_sketch<float>();
+}
+
+void AggregateFunctions::DsKllUpdate(FunctionContext* ctx, const FloatVal& src,
+    StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::kll_sketch<float>));
+  datasketches::kll_sketch<float>* sketch_ptr =
+      reinterpret_cast<datasketches::kll_sketch<float>*>(dst->ptr);
+  sketch_ptr->update(src.val);
+}
+
+StringVal AggregateFunctions::DsKllSerialize(FunctionContext* ctx,
+    const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::kll_sketch<float>));
+  datasketches::kll_sketch<float>* sketch_ptr =
+      reinterpret_cast<datasketches::kll_sketch<float>*>(src.ptr);
+  StringVal dst = SerializeDsKllSketch(ctx, *sketch_ptr);
+  ctx->Free(src.ptr);
+  return dst;
+}
+
+void AggregateFunctions::DsKllMerge(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  DCHECK(!src.is_null);
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::kll_sketch<float>));
+  datasketches::kll_sketch<float> src_sketch =
+      datasketches::kll_sketch<float>::deserialize((void*)src.ptr, src.len);
+
+  datasketches::kll_sketch<float>* dst_sketch_ptr =
+      reinterpret_cast<datasketches::kll_sketch<float>*>(dst->ptr);
+
+  dst_sketch_ptr->merge(src_sketch);
+}
+
+StringVal AggregateFunctions::DsKllFinalizeSketch(FunctionContext* ctx,
+    const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::kll_sketch<float>));
+  datasketches::kll_sketch<float>* sketch_ptr =
+      reinterpret_cast<datasketches::kll_sketch<float>*>(src.ptr);
+  if (sketch_ptr->get_n() == 0) {
+    ctx->Free(src.ptr);
+    return StringVal::null();
+  }
+  StringVal dst = SerializeDsKllSketch(ctx, *sketch_ptr);
+  ctx->Free(src.ptr);
+  return dst;
 }
 
 /// Intermediate aggregation state for the SampledNdv() function.

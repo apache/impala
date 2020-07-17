@@ -22,12 +22,26 @@
 namespace impala {
 
 using impala_udf::BigIntVal;
+using impala_udf::DoubleVal;
+using impala_udf::FloatVal;
 using impala_udf::FunctionContext;
 using impala_udf::StringVal;
 
 class DataSketchesFunctions {
 public:
-  static BigIntVal DsHllEstimate(FunctionContext*, const StringVal&);
+  /// 'serialized_sketch' is expected as a serialized Apache DataSketches HLL sketch. If
+  /// it is not then the query fails. Otherwise, returns the count(distinct) estimate
+  /// from the sketch.
+  static BigIntVal DsHllEstimate(FunctionContext* ctx,
+      const StringVal& serialized_sketch);
+
+  /// 'serialized_sketch' is expected as a serialized Apache DataSketches KLL sketch. If
+  /// it is not then the query fails. 'rank' is used to identify which item (estimate) to
+  /// return from the sketched dataset. E.g. 0.1 means the item where 10% of the sketched
+  /// dataset is lower or equals to this particular item. 'rank' should be in the range
+  /// of [0,1]. Otherwise this function returns error.
+  static FloatVal DsKllQuantile(FunctionContext* ctx, const StringVal& serialized_sketch,
+      const DoubleVal& rank);
 };
 
 }

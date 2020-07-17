@@ -931,7 +931,10 @@ visible_functions = [
   [['mask_hash'], 'DATE', ['DATE'], 'impala::MaskFunctions::MaskHash'],
 
   # Functions to use Apache DataSketches functionality
-  [['ds_hll_estimate'], 'BIGINT', ['STRING'], '_ZN6impala21DataSketchesFunctions13DsHllEstimateEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+  [['ds_hll_estimate'], 'BIGINT', ['STRING'],
+      '_ZN6impala21DataSketchesFunctions13DsHllEstimateEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+  [['ds_kll_quantile'], 'FLOAT', ['STRING', 'DOUBLE'],
+      '_ZN6impala21DataSketchesFunctions13DsKllQuantileEPN10impala_udf15FunctionContextERKNS1_9StringValERKNS1_9DoubleValE'],
 ]
 
 invisible_functions = [
