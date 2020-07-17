@@ -20,38 +20,47 @@
 using namespace impala;
 
 void TopNNode::InsertBatch(RowBatch* batch) {
-  for (int i = 0; i < batch->num_rows(); ++i) {
-    InsertTupleRow(batch->GetRow(i));
+  // TODO: after inlining the comparator calls with codegen - IMPALA-4065 - we could
+  // probably squeeze more performance out of this loop by ensure that as many loads
+  // are hoisted out of the loop as possible (either via code changes or __restrict__)
+  // annotations.
+  FOREACH_ROW(batch, 0, iter) {
+    bool replaced_existing_row = heap_->InsertTupleRow(this, iter.Get());
+    if (replaced_existing_row) ++rows_to_reclaim_;
   }
 }
 
-// Insert if either not at the limit or it's a new TopN tuple_row
-void TopNNode::InsertTupleRow(TupleRow* input_row) {
+bool TopNNode::Heap::InsertTupleRow(TopNNode* node, TupleRow* input_row) {
+  const TupleDescriptor& tuple_desc = *node->output_tuple_desc_;
+  bool replaced_existing_row = false;
   Tuple* insert_tuple = nullptr;
-
-  if (priority_queue_.size() < limit_ + offset_) {
+  if (priority_queue_.size() < heap_capacity()) {
+    // Add all tuples until we hit capacity.
     insert_tuple = reinterpret_cast<Tuple*>(
-        tuple_pool_->Allocate(output_tuple_desc_->byte_size()));
-    insert_tuple->MaterializeExprs<false, false>(input_row, *output_tuple_desc_,
-        output_tuple_expr_evals_, tuple_pool_.get());
+        node->tuple_pool_->Allocate(node->tuple_byte_size()));
+    insert_tuple->MaterializeExprs<false, false>(input_row, tuple_desc,
+        node->output_tuple_expr_evals_, node->tuple_pool_.get());
   } else {
+    // We're at capacity - compare to the first row in the priority queue to see if
+    // we need to insert this row into the queue.
     DCHECK(!priority_queue_.empty());
     Tuple* top_tuple = priority_queue_.front();
-    tmp_tuple_->MaterializeExprs<false, true>(input_row, *output_tuple_desc_,
-        output_tuple_expr_evals_, nullptr);
-    if (tuple_row_less_than_->Less(tmp_tuple_, top_tuple)) {
-      // TODO: DeepCopy() will allocate new buffers for the string data. This needs
-      // to be fixed to use a freelist
-      tmp_tuple_->DeepCopy(top_tuple, *output_tuple_desc_, tuple_pool_.get());
+    node->tmp_tuple_->MaterializeExprs<false, true>(input_row, tuple_desc,
+        node->output_tuple_expr_evals_, nullptr);
+    if (node->tuple_row_less_than_->Less(node->tmp_tuple_, top_tuple)) {
+      // Pop off the old head, and replace with the new tuple. Deep copy into 'top_tuple'
+      // to reuse the fixed-length memory of 'top_tuple'.
+      node->tmp_tuple_->DeepCopy(top_tuple, tuple_desc, node->tuple_pool_.get());
       insert_tuple = top_tuple;
       PopHeap(&priority_queue_,
-          ComparatorWrapper<TupleRowComparator>(*tuple_row_less_than_));
-      rows_to_reclaim_++;
+          ComparatorWrapper<TupleRowComparator>(*node->tuple_row_less_than_));
+      replaced_existing_row = true;
     }
   }
-
   if (insert_tuple != nullptr) {
     PushHeap(&priority_queue_,
-        ComparatorWrapper<TupleRowComparator>(*tuple_row_less_than_), insert_tuple);
+        ComparatorWrapper<TupleRowComparator>(*node->tuple_row_less_than_),
+        insert_tuple);
   }
+  return replaced_existing_row;
 }
