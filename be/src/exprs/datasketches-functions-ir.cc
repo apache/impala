@@ -18,19 +18,45 @@
 #include "exprs/datasketches-functions.h"
 
 #include "exprs/datasketches-common.h"
+#include "gutil/strings/substitute.h"
 #include "thirdparty/datasketches/hll.hpp"
+#include "thirdparty/datasketches/kll_sketch.hpp"
+#include "udf/udf-internal.h"
 
 namespace impala {
+
+using strings::Substitute;
 
 BigIntVal DataSketchesFunctions::DsHllEstimate(FunctionContext* ctx,
     const StringVal& serialized_sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return BigIntVal::null();
   datasketches::hll_sketch sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
-  if (!DeserializeHllSketch(serialized_sketch, &sketch)) {
+  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
     LogSketchDeserializationError(ctx);
     return BigIntVal::null();
   }
   return sketch.get_estimate();
+}
+
+FloatVal DataSketchesFunctions::DsKllQuantile(FunctionContext* ctx,
+    const StringVal& serialized_sketch, const DoubleVal& rank) {
+  if (serialized_sketch.is_null || serialized_sketch.len == 0) return FloatVal::null();
+  if (rank.val < 0.0 || rank.val > 1.0) {
+    ctx->SetError("Rank parameter should be in the range of [0,1]");
+    return FloatVal::null();
+  }
+  datasketches::kll_sketch<float> sketch;
+  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
+    LogSketchDeserializationError(ctx);
+    return FloatVal::null();
+  }
+  try {
+    return sketch.get_quantile(rank.val);
+  } catch (const std::exception& e) {
+    ctx->SetError(Substitute("Error while getting quantile from DataSketches KLL. "
+        "Message: $0", e.what()).c_str());
+    return FloatVal::null();
+  }
 }
 
 }

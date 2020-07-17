@@ -19,28 +19,36 @@
 
 #include "common/logging.h"
 #include "udf/udf-internal.h"
+#include "thirdparty/datasketches/kll_sketch.hpp"
 
 namespace impala {
 
 using datasketches::hll_sketch;
+using datasketches::kll_sketch;
 using impala_udf::StringVal;
 
 void LogSketchDeserializationError(FunctionContext* ctx) {
   ctx->SetError("Unable to deserialize sketch.");
 }
 
-bool DeserializeHllSketch(const StringVal& serialized_sketch, hll_sketch* sketch) {
+template<class T>
+bool DeserializeDsSketch(const StringVal& serialized_sketch, T* sketch) {
   DCHECK(sketch != nullptr);
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return false;
   try {
-    *sketch = hll_sketch::deserialize((void*)serialized_sketch.ptr,
-        serialized_sketch.len);
+    *sketch = T::deserialize((void*)serialized_sketch.ptr, serialized_sketch.len);
     return true;
-  } catch (const std::invalid_argument&) {
-    // Deserialization throws if the input string is not a serialized sketch.
+  } catch (const std::exception&) {
+    // One reason of throwing from deserialization is that the input string is not a
+    // serialized sketch.
     return false;
   }
 }
+
+template bool DeserializeDsSketch(const StringVal& serialized_sketch,
+    hll_sketch* sketch);
+template bool DeserializeDsSketch(const StringVal& serialized_sketch,
+    kll_sketch<float>* sketch);
 
 }
 

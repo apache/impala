@@ -250,6 +250,13 @@ class AggregateFunctions {
   static void DsHllUnionMerge(FunctionContext*, const StringVal& src, StringVal* dst);
   static StringVal DsHllUnionFinalize(FunctionContext*, const StringVal& src);
 
+  /// These functions implement Apache DataSketches KLL support for sketching.
+  static void DsKllInit(FunctionContext*, StringVal* slot);
+  static void DsKllUpdate(FunctionContext*, const FloatVal& src, StringVal* dst);
+  static StringVal DsKllSerialize(FunctionContext*, const StringVal& src);
+  static void DsKllMerge(FunctionContext*, const StringVal& src, StringVal* dst);
+  static StringVal DsKllFinalizeSketch(FunctionContext*, const StringVal& src);
+
   /// Estimates the number of distinct values (NDV) based on a sample of data and the
   /// corresponding sampling rate. The main idea of this function is to collect several
   /// (x,y) data points where x is the number of rows and y is the corresponding NDV

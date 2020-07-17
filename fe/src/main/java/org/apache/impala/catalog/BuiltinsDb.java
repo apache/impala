@@ -1323,6 +1323,16 @@ public class BuiltinsDb extends Db {
         prefix + "10CountMergeEPN10impala_udf15FunctionContextERKNS1_9BigIntValEPS4_",
         null, null));
 
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_kll_sketch",
+        Lists.<Type>newArrayList(Type.FLOAT), Type.STRING, Type.STRING,
+        prefix + "9DsKllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix + "11DsKllUpdateEPN10impala_udf15FunctionContextERKNS1_8FloatValEPNS1_" +
+            "9StringValE",
+        prefix + "10DsKllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix + "14DsKllSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        prefix + "19DsKllFinalizeSketchEPN10impala_udf15FunctionContextERKNS1_" +
+            "9StringValE", true, false, true));
+
     // The following 3 functions are never directly executed because they get rewritten
     db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
         db, "percent_rank", Lists.<Type>newArrayList(), Type.DOUBLE, Type.STRING));

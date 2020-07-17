@@ -37,13 +37,13 @@ const int DS_SKETCH_CONFIG = 12;
 /// Logs a common error message saying that sketch deserialization failed.
 void LogSketchDeserializationError(FunctionContext* ctx);
 
-/// Receives a serialized DataSketches HLL sketch in 'serialized_sketch', deserializes it
-/// and puts the deserialized sketch into 'sketch'. The outgoing 'sketch' will hold the
-/// same configs as 'serialized_sketch' regardless of what was provided when it was
-/// constructed before this function call. Returns false if the deserialization
-/// fails, true otherwise.
-bool DeserializeHllSketch(const StringVal& serialized_sketch,
-    datasketches::hll_sketch* sketch) WARN_UNUSED_RESULT;
-
+/// Receives a serialized DataSketches sketch  (either Hll or KLL) in
+/// 'serialized_sketch', deserializes it and puts the deserialized sketch into 'sketch'.
+/// The outgoing 'sketch' will hold the same configs as 'serialized_sketch' regardless of
+/// what was provided when it was constructed before this function call. Returns false if
+/// the deserialization fails, true otherwise.
+template<class T>
+bool DeserializeDsSketch(const StringVal& serialized_sketch, T* sketch)
+    WARN_UNUSED_RESULT;
 }
 
