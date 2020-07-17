@@ -20,6 +20,7 @@
 #define IMPALA_UTIL_TUPLE_ROW_COMPARE_H_
 
 #include "codegen/codegen-fn-ptr.h"
+#include "codegen/impala-ir.h"
 #include "common/compiler-util.h"
 #include "exprs/scalar-expr.h"
 #include "runtime/descriptors.h"
@@ -127,7 +128,7 @@ class TupleRowComparator {
   int ALWAYS_INLINE Compare(const TupleRow* lhs, const TupleRow* rhs) const {
     const TupleRowComparatorConfig::CompareFn codegend_compare_fn =
         codegend_compare_fn_.load();
-    if (codegend_compare_fn != nullptr) {
+    if (IR_LIKELY(codegend_compare_fn != nullptr)) {
       return codegend_compare_fn(ordering_expr_evals_lhs_.data(),
           ordering_expr_evals_rhs_.data(), lhs, rhs);
     }

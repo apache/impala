@@ -29,8 +29,10 @@
 /// best at that optimization setting.
 #define IR_NO_INLINE __attribute__((noinline))
 #define IR_ALWAYS_INLINE __attribute__((always_inline))
+#define IR_LIKELY(expr) __builtin_expect(!!(expr), 1)
 #else
 #define IR_NO_INLINE
 #define IR_ALWAYS_INLINE
+#define IR_LIKELY(expr) expr
 #endif
 

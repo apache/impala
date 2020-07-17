@@ -15,12 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#pragma once
 
-#ifndef IMPALA_EXEC_TOPN_NODE_H
-#define IMPALA_EXEC_TOPN_NODE_H
-
+#include <memory>
 #include <queue>
-#include <boost/scoped_ptr.hpp>
 
 #include "codegen/codegen-fn-ptr.h"
 #include "codegen/impala-ir.h"
@@ -42,6 +40,9 @@ class TopNPlanNode : public PlanNode {
   virtual Status CreateExecNode(RuntimeState* state, ExecNode** node) const override;
   virtual void Codegen(FragmentState* state) override;
 
+  int64_t offset() const {
+    return tnode_->sort_node.__isset.offset ? tnode_->sort_node.offset : 0;
+  }
   ~TopNPlanNode(){}
 
   /// Ordering expressions used for tuple comparison.
@@ -81,35 +82,23 @@ class TopNNode : public ExecNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
+  class Heap;
 
   friend class TupleLessThan;
 
   /// Inserts all the rows in 'batch' into the queue.
   void InsertBatch(RowBatch* batch);
 
-  /// Inserts a tuple row into the priority queue if it's in the TopN.  Creates a deep
-  /// copy of tuple_row, which it stores in tuple_pool_.
-  void IR_ALWAYS_INLINE InsertTupleRow(TupleRow* tuple_row);
-
-  /// Flatten and reverse the priority queue.
+  /// Prepare to output all of the rows in this operator in sorted order. Initializes
+  /// 'sorted_top_n_' and 'get_next_iterator_'.
   void PrepareForOutput();
 
-  // Re-materialize the elements in the priority queue into a new tuple pool, and release
-  // the previous pool.
+  // Re-materialize all tuples that reference 'tuple_pool_' and release 'tuple_pool_',
+  // replacing it with a new pool.
   Status ReclaimTuplePool(RuntimeState* state);
 
-  /// Helper methods for modifying priority_queue while maintaining ordered heap
-  /// invariants
-  inline static void PushHeap(std::vector<Tuple*>* priority_queue,
-      const ComparatorWrapper<TupleRowComparator>& comparator, Tuple* const insert_row) {
-    priority_queue->push_back(insert_row);
-    std::push_heap(priority_queue->begin(), priority_queue->end(), comparator);
-  }
-
-  inline static void PopHeap(std::vector<Tuple*>* priority_queue,
-      const ComparatorWrapper<TupleRowComparator>& comparator) {
-    std::pop_heap(priority_queue->begin(), priority_queue->end(), comparator);
-    priority_queue->pop_back();
+  IR_NO_INLINE int tuple_byte_size() const {
+    return output_tuple_desc_->byte_size();
   }
 
   /// Number of rows to skip.
@@ -123,7 +112,7 @@ class TopNNode : public ExecNode {
   TupleDescriptor* const output_tuple_desc_;
 
   /// Comparator for priority_queue_.
-  boost::scoped_ptr<TupleRowComparator> tuple_row_less_than_;
+  std::unique_ptr<TupleRowComparator> tuple_row_less_than_;
 
   /// After computing the TopN in the priority_queue, pop them and put them in this vector
   std::vector<Tuple*> sorted_top_n_;
@@ -134,7 +123,7 @@ class TopNNode : public ExecNode {
   Tuple* tmp_tuple_ = nullptr;
 
   /// Stores everything referenced in priority_queue_.
-  boost::scoped_ptr<MemPool> tuple_pool_;
+  std::unique_ptr<MemPool> tuple_pool_;
 
   /// Iterator over elements in sorted_top_n_.
   std::vector<Tuple*>::iterator get_next_iter_;
@@ -155,8 +144,53 @@ class TopNNode : public ExecNode {
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
+  /// A heap containing up to 'limit_' + 'offset_' rows.
+  std::unique_ptr<Heap> heap_;
+
   /// Number of rows skipped. Used for adhering to offset_.
   int64_t num_rows_skipped_;
+
+  /// END: Members that must be Reset()
+  /////////////////////////////////////////
+};
+
+/// This is the main data structure used for in-memory Top-N: a binary heap containing
+/// up to 'capacity' tuples.
+class TopNNode::Heap {
+ public:
+  Heap(int64_t capacity);
+
+  void Reset();
+  void Close();
+
+  /// Inserts a tuple row into the priority queue if it's in the TopN.  Creates a deep
+  /// copy of 'tuple_row', which it stores in 'tuple_pool'. Always inlined in IR into
+  /// TopNNode::InsertBatch() because codegen relies on this for substituting exprs
+  /// in the body of TopNNode.
+  /// Returns true if a previous row was replaced.
+  bool IR_ALWAYS_INLINE InsertTupleRow(TopNNode* node, TupleRow* input_row);
+
+  /// Copy the elements in the priority queue into a new tuple pool, and release
+  /// the previous pool.
+  Status RematerializeTuples(TopNNode* node, RuntimeState* state, MemPool* new_pool);
+
+  /// Put the tuples in the priority queue into 'sorted_top_n' in the correct order
+  /// for output.
+  void PrepareForOutput(
+      const TopNNode& RESTRICT node, std::vector<Tuple*>* sorted_top_n) RESTRICT;
+
+  /// Returns number of tuples currently in heap.
+  int64_t num_tuples() const { return priority_queue_.size(); }
+
+  IR_NO_INLINE int64_t heap_capacity() const { return capacity_; }
+
+ private:
+  /// Limit on capacity of 'priority_queue_'. If inserting a tuple into the queue
+  /// would exceed this, a tuple is popped off the queue.
+  const int64_t capacity_;
+
+  /////////////////////////////////////////
+  /// BEGIN: Members that must be Reset()
 
   /// The priority queue (represented by a vector and modified using
   /// push_heap()/pop_heap() to maintain ordered heap invariants) will never have more
@@ -167,8 +201,20 @@ class TopNNode : public ExecNode {
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
+
+  /// Helper methods for modifying priority_queue while maintaining ordered heap
+  /// invariants
+  inline static void PushHeap(std::vector<Tuple*>* priority_queue,
+      const ComparatorWrapper<TupleRowComparator>& comparator, Tuple* const insert_row) {
+    priority_queue->push_back(insert_row);
+    std::push_heap(priority_queue->begin(), priority_queue->end(), comparator);
+  }
+
+  inline static void PopHeap(std::vector<Tuple*>* priority_queue,
+      const ComparatorWrapper<TupleRowComparator>& comparator) {
+    std::pop_heap(priority_queue->begin(), priority_queue->end(), comparator);
+    priority_queue->pop_back();
+  }
 };
 
-};
-
-#endif
+}; // namespace impala
