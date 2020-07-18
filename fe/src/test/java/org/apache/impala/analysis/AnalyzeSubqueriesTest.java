@@ -1387,6 +1387,10 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
             + "id=a.id ) from functional.alltypes a",
         "A correlated scalar subquery is not supported in the expression: "
             + "(SELECT count(*) FROM functional.alltypestiny b WHERE id = a.id)");
+    AnalysisError("select id, min(id) in (select id from functional.alltypestiny) "
+            + "from functional.alltypes a",
+        "Only subqueries that are guaranteed to return a single row are supported: "
+            + "min(id) IN (SELECT id FROM functional.alltypestiny)");
   }
 
   @Test

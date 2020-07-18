@@ -326,9 +326,10 @@ public class SelectStmt extends QueryStmt {
                   "A subquery which may return more than one row is not supported in "
                   + "the expression: " + item.getExpr().toSql());
             }
-            Preconditions.checkState(((SelectStmt)s.getStatement()).returnsAtMostOneRow(),
-                "Invariant violated: Only subqueries that are guaranteed to return a "
-                    + "single row are supported: " + item.getExpr().toSql());
+            if (!((SelectStmt)s.getStatement()).returnsAtMostOneRow()) {
+              throw new AnalysisException("Only subqueries that are guaranteed to return "
+                   + "a single row are supported: " + item.getExpr().toSql());
+            }
           }
           resultExprs_.add(item.getExpr());
           String label = item.toColumnLabel(i, analyzer_.useHiveColLabels());
