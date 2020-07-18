@@ -210,6 +210,7 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
 
   // don't copy query_ctx, it's large and we already did that in the c'tor
   exec_rpc_params_.set_coord_state_idx(exec_rpc_params->coord_state_idx());
+  *exec_rpc_params_.mutable_coord_backend_id() = exec_rpc_params->coord_backend_id();
   exec_rpc_params_.mutable_fragment_ctxs()->Swap(
       const_cast<google::protobuf::RepeatedPtrField<impala::PlanFragmentCtxPB>*>(
           &exec_rpc_params->fragment_ctxs()));
@@ -386,10 +387,13 @@ void QueryState::UpdateBackendExecState() {
           BackendExecState::EXECUTING : BackendExecState::FINISHED;
     }
   }
-  // Send one last report if the query has reached the terminal state.
+  // Send one last report if the query has reached the terminal state
+  // and the coordinator is active.
   if (IsTerminalState()) {
     VLOG_QUERY << "UpdateBackendExecState(): last report for " << PrintId(query_id());
-    while (!ReportExecStatus()) SleepForMs(GetReportWaitTimeMs());
+    while (is_coord_active_.Load() && !ReportExecStatus()) {
+      SleepForMs(GetReportWaitTimeMs());
+    }
   }
 }
 
@@ -603,6 +607,7 @@ bool QueryState::ReportExecStatus() {
     if (!rpc_status.ok()) {
       LOG(ERROR) << "Cancelling fragment instances due to failure to reach the "
                  << "coordinator. (" << rpc_status.GetDetail() << ").";
+      is_coord_active_.Store(false);
     } else if (!result_status.ok()) {
       // If the ReportExecStatus RPC succeeded in reaching the coordinator and we get
       // back a non-OK status, it means that the coordinator expects us to cancel the

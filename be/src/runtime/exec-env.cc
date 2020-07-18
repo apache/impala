@@ -544,14 +544,27 @@ void ExecEnv::SetImpalaServer(ImpalaServer* server) {
   cluster_membership_mgr_->SetLocalBeDescFn([server]() {
     return server->GetLocalBackendDescriptor();
   });
-  cluster_membership_mgr_->RegisterUpdateCallbackFn(
-      [server](ClusterMembershipMgr::SnapshotPtr snapshot) {
-        std::unordered_set<BackendIdPB> current_backend_set;
-        for (const auto& it : snapshot->current_backends) {
-          current_backend_set.insert(it.second.backend_id());
-        }
-        server->CancelQueriesOnFailedBackends(current_backend_set);
-      });
+  if (FLAGS_is_coordinator) {
+    cluster_membership_mgr_->RegisterUpdateCallbackFn(
+        [server](ClusterMembershipMgr::SnapshotPtr snapshot) {
+          std::unordered_set<BackendIdPB> current_backend_set;
+          for (const auto& it : snapshot->current_backends) {
+            current_backend_set.insert(it.second.backend_id());
+          }
+          server->CancelQueriesOnFailedBackends(current_backend_set);
+        });
+  }
+  if (FLAGS_is_executor) {
+    cluster_membership_mgr_->RegisterUpdateCallbackFn(
+        [](ClusterMembershipMgr::SnapshotPtr snapshot) {
+          std::unordered_set<BackendIdPB> current_backend_set;
+          for (const auto& it : snapshot->current_backends) {
+            current_backend_set.insert(it.second.backend_id());
+          }
+          ExecEnv::GetInstance()->query_exec_mgr()->CancelQueriesForFailedCoordinators(
+              current_backend_set);
+        });
+  }
 }
 
 void ExecEnv::InitBufferPool(int64_t min_buffer_size, int64_t capacity,

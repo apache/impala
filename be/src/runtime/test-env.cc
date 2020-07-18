@@ -161,7 +161,9 @@ Status TestEnv::CreateQueryState(
   // param
   ExecQueryFInstancesRequestPB rpc_params;
   // create dummy -Ctx fields, we need them for FragmentInstance-/RuntimeState
+  UniqueIdPB dummy_backend_id;
   rpc_params.set_coord_state_idx(0);
+  *rpc_params.mutable_coord_backend_id() = dummy_backend_id;
   rpc_params.add_fragment_ctxs();
   rpc_params.add_fragment_instance_ctxs();
   TExecPlanFragmentInfo fragment_info;

@@ -152,6 +152,9 @@ class QueryState {
 
   /// The following getters are only valid after Init().
   ScannerMemLimiter* scanner_mem_limiter() const { return scanner_mem_limiter_; }
+  const UniqueIdPB& coord_backend_id() const {
+    return exec_rpc_params_.coord_backend_id();
+  }
 
   /// The following getters are only valid after Init() and should be called only from
   /// the backend execution (ie. not the coordinator side, since they require holding
@@ -214,6 +217,9 @@ class QueryState {
   /// Cancels all actively executing fragment instances. Blocks until all fragment
   /// instances have finished their Prepare phase. Idempotent.
   void Cancel();
+
+  /// Return true if the executing fragment instances have been cancelled.
+  bool IsCancelled() const { return (is_cancelled_.Load() == 1); }
 
   /// Increment the resource refcount. Must be decremented before the query state
   /// reference is released. A refcount should be held by a fragment or other entity
@@ -399,6 +405,10 @@ class QueryState {
   /// set to 1 when any fragment instance fails or when Cancel() is called; used to
   /// initiate cancellation exactly once
   AtomicInt32 is_cancelled_;
+
+  /// set to false when the coordinator has been detected as inactive in the cluster;
+  /// used to avoid sending the last execution report to the inactive/failed coordinator.
+  AtomicBool is_coord_active_{true};
 
   /// True if and only if ReleaseExecResources() has been called.
   bool released_backend_resources_ = false;

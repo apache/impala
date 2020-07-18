@@ -39,7 +39,7 @@
 #include "util/impalad-metrics.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
-#include "util/thread.h"
+#include "util/thread-pool.h"
 
 #include "common/names.h"
 
@@ -48,6 +48,26 @@ using namespace impala;
 // TODO: this logging should go into a per query log.
 DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory usage "
     "every log_mem_usage_interval'th fragment completion.");
+
+DEFINE_int32(query_exec_mgr_cancellation_thread_pool_size, 1,
+    "(Advanced) Size of the QueryExecMgr thread-pool processing cancellations due to "
+    "coordinator failure");
+
+const uint32_t QUERY_EXEC_MGR_MAX_CANCELLATION_QUEUE_SIZE = 65536;
+
+QueryExecMgr::QueryExecMgr() {
+  // Initialise the cancellation thread pool with 1 thread (by default). The max queue
+  // size is deliberately set so high that it should never fill; if it does we fill the
+  // queue up to the maximum limit and ignore the rest. The ignored queries will get
+  // cancelled when they time out trying to send status reports.
+  cancellation_thread_pool_.reset(new ThreadPool<QueryCancellationTask>("query-exec-mgr",
+      "cancellation-worker", FLAGS_query_exec_mgr_cancellation_thread_pool_size,
+      QUERY_EXEC_MGR_MAX_CANCELLATION_QUEUE_SIZE,
+      bind<void>(&QueryExecMgr::CancelFromThreadPool, this, _2)));
+  ABORT_IF_ERROR(cancellation_thread_pool_->Init());
+}
+
+QueryExecMgr::~QueryExecMgr() {}
 
 Status QueryExecMgr::StartQuery(const ExecQueryFInstancesRequestPB* request,
     const TQueryCtx& query_ctx, const TExecPlanFragmentInfo& fragment_info) {
@@ -193,4 +213,53 @@ void QueryExecMgr::ReleaseQueryState(QueryState* qs) {
   // BACKEND_NUM_QUERIES_EXECUTING is used to detect the backend being quiesced, so we
   // decrement it after we're completely done with the query.
   ImpaladMetrics::BACKEND_NUM_QUERIES_EXECUTING->Increment(-1);
+}
+
+void QueryExecMgr::AcquireQueryStateLocked(QueryState* qs) {
+  if (qs == nullptr) return;
+  int refcnt = qs->refcnt_.Add(1);
+  DCHECK(refcnt > 0);
+}
+
+void QueryExecMgr::CancelQueriesForFailedCoordinators(
+    const std::unordered_set<BackendIdPB>& current_membership) {
+  // Build a list of queries that are scheduled by failed coordinators (as
+  // evidenced by their absence from the cluster membership list).
+  std::vector<QueryCancellationTask> to_cancel;
+  qs_map_.DoFuncForAllEntries([&](QueryState* qs) {
+    if (qs != nullptr && !qs->IsCancelled()) {
+      if (current_membership.find(qs->coord_backend_id()) == current_membership.end()) {
+        // decremented by ReleaseQueryState()
+        AcquireQueryStateLocked(qs);
+        to_cancel.push_back(QueryCancellationTask(qs));
+      }
+    }
+  });
+
+  // Since we are the only producer for the cancellation thread pool, we can find the
+  // remaining capacity of the pool and submit the new cancellation requests without
+  // blocking.
+  int query_num_to_cancel = to_cancel.size();
+  int remaining_queue_size = QUERY_EXEC_MGR_MAX_CANCELLATION_QUEUE_SIZE
+      - cancellation_thread_pool_->GetQueueSize();
+  if (query_num_to_cancel > remaining_queue_size) {
+    // Fill the queue up to maximum limit, and ignore the rest which will get cancelled
+    // eventually anyways when QueryState::ReportExecStatus() hits the timeout.
+    LOG_EVERY_N(WARNING, 60) << "QueryExecMgr cancellation queue is full";
+    query_num_to_cancel = remaining_queue_size;
+    for (int i = query_num_to_cancel; i < to_cancel.size(); ++i) {
+      ReleaseQueryState(to_cancel[i].GetQueryState());
+    }
+  }
+  for (int i = 0; i < query_num_to_cancel; ++i) {
+    cancellation_thread_pool_->Offer(to_cancel[i]);
+  }
+}
+
+void QueryExecMgr::CancelFromThreadPool(const QueryCancellationTask& cancellation_task) {
+  QueryState* qs = cancellation_task.GetQueryState();
+  VLOG(1) << "CancelFromThreadPool(): cancel query " << qs->query_id();
+  qs->Cancel();
+  qs->is_coord_active_.Store(false);
+  ReleaseQueryState(qs);
 }
