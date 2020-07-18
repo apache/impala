@@ -17,6 +17,7 @@
 
 import pytest
 
+from beeswaxd.BeeswaxService import QueryState
 from tests.common.custom_cluster_test_suite import (
     DEFAULT_CLUSTER_SIZE,
     CustomClusterTestSuite)
@@ -55,6 +56,39 @@ class TestProcessFailures(CustomClusterTestSuite):
     client = impalad.service.create_beeswax_client()
     impalad.service.wait_for_metric_value('catalog.ready', 1, timeout=60)
     self.execute_query_expect_success(client, QUERY)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1,
+      impalad_args="--status_report_max_retry_s=600 --status_report_interval_ms=1000")
+  def test_kill_coordinator(self):
+    """"Tests that when a coordinator running multiple queries is killed, all
+    running fragments on executors are cancelled."""
+    impalad = self.cluster.impalads[0]
+    client = impalad.service.create_beeswax_client()
+    assert client is not None
+    # A query which is cancelable and takes long time to execute
+    query = "select * from tpch.lineitem t1, tpch.lineitem t2, tpch.lineitem t3 " \
+        "where t1.l_orderkey = t2.l_orderkey and t1.l_orderkey = t3.l_orderkey and " \
+        "t3.l_orderkey = t2.l_orderkey order by t1.l_orderkey, t2.l_orderkey, " \
+        "t3.l_orderkey limit 300"
+    num_concurrent_queries = 3
+    handles = []
+
+    # Run num_concurrent_queries asynchronously
+    for _ in xrange(num_concurrent_queries):
+      handles.append(client.execute_async(query))
+
+    # Wait for the queries to start running
+    for handle in handles:
+      self.wait_for_state(handle, QueryState.RUNNING, 1000, client=client)
+
+    # Kill the coordinator
+    impalad.kill()
+
+    # Assert that all executors have 0 in-flight fragments
+    for i in xrange(1, len(self.cluster.impalads)):
+      self.cluster.impalads[i].service.wait_for_metric_value(
+        "impala-server.num-fragments-in-flight", 0, timeout=30)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
