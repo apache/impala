@@ -1025,3 +1025,19 @@ class TestImpalaShell(ImpalaTestSuite):
       result = run_impala_shell_cmd(vector, ['-q', query, '-B', '--fetch_size', '512'])
       result_rows = result.stdout.strip().split('\n')
       assert len(result_rows) == 1024
+
+  def test_result_spooling_timeout(self, vector):
+    """Regression test for IMPALA-9953. Validates that if a fetch timeout occurs in the
+    middle of reading rows from Impala that all rows are still printed by the Impala
+    shell."""
+    # This query was stolen from __test_fetch_timeout in test_fetch_timeout.py. The query
+    # has a large delay between RowBatch production. So a fetch timeout will occur while
+    # fetching rows.
+    query_options = "set num_nodes=1; \
+                     set fetch_rows_timeout_ms=1; \
+                     set batch_size=1; \
+                     set spool_query_results=true;"
+    query = "select bool_col, avg(id) from functional.alltypes group by bool_col"
+    result = run_impala_shell_cmd(vector, ['-q', query_options + query, '-B'])
+    result_rows = result.stdout.strip().split('\n')
+    assert len(result_rows) == 2
