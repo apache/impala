@@ -480,10 +480,13 @@ struct TQueryOptions {
       PlanNodes.TMinmaxFilteringLevel.ROW_GROUP;
 }
 
-// Impala currently has two types of sessions: Beeswax and HiveServer2
+// Impala currently has three types of sessions: Beeswax, HiveServer2 and external
+// frontend. External frontend is a variation of HiveServer2 to support external
+// planning.
 enum TSessionType {
   BEESWAX = 0
   HIVESERVER2 = 1
+  EXTERNAL_FRONTEND = 2
 }
 
 // Client request including stmt to execute and query options.

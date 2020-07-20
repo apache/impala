@@ -1188,14 +1188,14 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
     TUniqueId query_id = (*query_handle)->query_id();
     // Generate TExecRequest here if one was not passed in or we want one
     // from the Impala planner to compare with
-    if (external_exec_request == nullptr || !FLAGS_dump_exec_request_path.empty()) {
-      // Takes the TQueryCtx and calls into the frontend to initialize the
-      // TExecRequest for this query.
+    if (!is_external_req || !FLAGS_dump_exec_request_path.empty()) {
+      // Takes the TQueryCtx and calls into the frontend to initialize the TExecRequest
+      // for this query.
       RETURN_IF_ERROR(query_handle->query_driver()->RunFrontendPlanner(query_ctx));
       DumpTExecReq((*query_handle)->exec_request(), "internal", query_id);
     }
 
-    if (external_exec_request != nullptr) {
+    if (is_external_req) {
       // Use passed in exec_request
       RETURN_IF_ERROR(query_handle->query_driver()->SetExternalPlan(
           query_ctx, *external_exec_request));
@@ -1209,7 +1209,10 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
     }
 
     const TExecRequest& result = (*query_handle)->exec_request();
-    (*query_handle)->query_events()->MarkEvent("Planning finished");
+    // If this is an external request, planning was done by the external frontend
+    if (!is_external_req) {
+      (*query_handle)->query_events()->MarkEvent("Planning finished");
+    }
     (*query_handle)->set_user_profile_access(result.user_has_profile_access);
     (*query_handle)->summary_profile()->AddEventSequence(
         result.timeline.name, result.timeline);
@@ -2513,7 +2516,8 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
                   >= FLAGS_disconnected_session_timeout * 1000L) {
             // This session has no active connections and is past the disconnected session
             // timeout, so close it.
-            DCHECK_ENUM_EQ(session_state->session_type, TSessionType::HIVESERVER2);
+            DCHECK(session_state->session_type == TSessionType::HIVESERVER2 ||
+                session_state->session_type == TSessionType::EXTERNAL_FRONTEND);
             LOG(INFO) << "Closing session: " << PrintId(session_id)
                       << ", user: " << session_state->connected_user
                       << ", because it no longer  has any open connections. The last "
