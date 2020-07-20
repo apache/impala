@@ -50,7 +50,9 @@ class TestFetchFirst(HS2TestSuite):
         TCLIService.TStatusCode.ERROR_STATUS,
         "Invalid value 'bad_number' for 'impala.resultset.cache.size' option")
     self.__verify_num_cached_rows(0)
-    assert 0 == impalad.get_num_in_flight_queries()
+    self.assert_eventually(30, 1,
+        lambda: 0 == impalad.get_num_in_flight_queries(),
+        "Num in flight queries did not reach 0")
 
     # Test that a result-cache size exceeding the per-Impalad maximum returns an error.
     # The default maximum result-cache size is 100000.
@@ -60,7 +62,9 @@ class TestFetchFirst(HS2TestSuite):
         TCLIService.TStatusCode.ERROR_STATUS,
         "Requested result-cache size of 100001 exceeds Impala's maximum of 100000")
     self.__verify_num_cached_rows(0)
-    assert 0 == impalad.get_num_in_flight_queries()
+    self.assert_eventually(30, 1,
+        lambda: 0 == impalad.get_num_in_flight_queries(),
+        "Num in flight queries did not reach 0")
 
   def __verify_num_cached_rows(self, num_cached_rows):
     """Asserts that Impala has the given number of rows in its result set cache. Also
