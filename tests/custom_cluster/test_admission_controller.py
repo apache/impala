@@ -887,6 +887,65 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=10, max_queued=10,
+        pool_max_mem=10 * 1024 * 1024, proc_mem_limit=2 * 1024 * 1024,
+        queue_wait_timeout_ms=1000),
+      statestored_args=_STATESTORED_ARGS)
+  def test_timeout_reason_host_memory(self):
+    """Test that queue details appear in the profile when queued and then timed out
+    due to a small 2MB host memory limit configuration."""
+    # Run a bunch of queries with mem_limit set so that only one can be admitted
+    # immediately. The rest should be queued and dequeued (timeout) due to host memory
+    # pressure.
+    STMT = "select sleep(100)"
+    TIMEOUT_S = 20
+    NUM_QUERIES = 5
+    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+        TIMEOUT_S, {'mem_limit': '2mb'}, True)
+
+    EXPECTED_REASON = """.*Admission for query exceeded timeout 1000ms in pool """\
+             """default-pool.*"""\
+             """Not enough memory available on host.*"""\
+             """Stats for host.*"""\
+             """topN_query_stats.*"""\
+             """all_query_stats:.*"""
+    num_reasons = len([profile for profile in profiles
+         if re.search(EXPECTED_REASON, profile, re.DOTALL)])
+    assert num_reasons >= 1, \
+        "At least one query should have been timed out with topN query details: " +\
+        '\n===\n'.join(profiles)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args=impalad_admission_ctrl_flags(max_requests=10, max_queued=10,
+        pool_max_mem=2 * 1024 * 1024, proc_mem_limit=20 * 1024 * 1024,
+        queue_wait_timeout_ms=1000),
+      statestored_args=_STATESTORED_ARGS)
+  def test_timeout_reason_pool_memory(self):
+    """Test that queue details appear in the profile when queued and then timed out
+    due to a small 2MB pool memory limit configuration."""
+    # Run a bunch of queries with mem_limit set so that only one can be admitted
+    # immediately. The rest should be queued and dequeued (timeout) due to pool memory
+    # pressure.
+    STMT = "select sleep(100)"
+    TIMEOUT_S = 20
+    NUM_QUERIES = 5
+    profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
+        TIMEOUT_S, {'mem_limit': '2mb'}, True)
+
+    EXPECTED_REASON = """.*Admission for query exceeded timeout 1000ms in pool """\
+            """default-pool.*"""\
+            """Not enough aggregate memory available in pool default-pool.*"""\
+            """Aggregated stats for pool.*"""\
+            """topN_query_stats.*"""
+    num_reasons = len([profile for profile in profiles
+         if re.search(EXPECTED_REASON, profile, re.DOTALL)])
+    assert num_reasons >= 1, \
+        "At least one query should have been timed out with topN query details: " +\
+        '\n===\n'.join(profiles)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
       impalad_args=impalad_admission_ctrl_flags(max_requests=100, max_queued=10,
           pool_max_mem=-1, admission_control_slots=4,
           executor_groups="default-pool-group1"),

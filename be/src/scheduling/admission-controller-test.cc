@@ -22,6 +22,7 @@
 #include "kudu/util/logging_test_util.h"
 #include "runtime/bufferpool/reservation-util.h"
 #include "runtime/exec-env.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
 #include "runtime/test-env.h"
 #include "scheduling/schedule-state.h"
@@ -30,6 +31,7 @@
 #include "testutil/gtest-util.h"
 #include "testutil/scoped-flag-setter.h"
 #include "util/metrics.h"
+#include <regex>
 
 // Access the flags that are defined in RequestPoolService.
 DECLARE_string(fair_scheduler_allocation_path);
@@ -47,11 +49,15 @@ static const string QUEUE_C = "root.queueC";
 static const string QUEUE_D = "root.queueD";
 
 // Host names
+static const string HOST_0 = "host0:25000";
 static const string HOST_1 = "host1:25000";
 static const string HOST_2 = "host2:25000";
 
 static const int64_t MEGABYTE = 1024L * 1024L;
 static const int64_t GIGABYTE = 1024L * MEGABYTE;
+
+// The default version of the heavy memory query list.
+static std::vector<THeavyMemoryQuery> empty_heavy_memory_query_list;
 
 /// Parent class for Admission Controller tests.
 /// Common code and constants should go here.
@@ -169,13 +175,54 @@ class AdmissionControllerTest : public testing::Test {
     return delta;
   }
 
+  // Form the hi part of a query Id which is an enumeration of the pool name.
+  static int64_t FormQueryIdHi(const std::string& pool_name) {
+    // Translate pool name to pool Id
+    int pool_id = 0; // for pool QUEUE_A
+    if (pool_name == QUEUE_B) {
+      pool_id = 1;
+    } else if (pool_name == QUEUE_C) {
+      pool_id = 2;
+    } else if (pool_name == QUEUE_D) {
+      pool_id = 3;
+    }
+    return ((int64_t)pool_id);
+  }
+
+  /// Build a vector of THeavyMemoryQuery objects with "queries" queries. The id of each
+  /// query is composed of the pool id and a sequence number. The memory consumed by the
+  /// query is a number randomly chosen between 1MB and 20MB.
+  static std::vector<THeavyMemoryQuery> MakeHeavyMemoryQueryList(
+      const std::string pool, const int queries) {
+    // Generate the query list
+    std::vector<THeavyMemoryQuery> query_list;
+    int64_t hi = FormQueryIdHi(pool);
+    for (int i = 0; i < queries; i++) {
+      THeavyMemoryQuery query;
+      query.memory_consumed = (rand() % 20 + 1) * MEGABYTE;
+      query.queryId.hi = hi;
+      query.queryId.lo = i;
+      query_list.emplace_back(query);
+    }
+    return query_list;
+  }
+
   /// Build a TPoolStats object.
   static TPoolStats MakePoolStats(const int backend_mem_reserved,
-      const int num_admitted_running, const int num_queued) {
+      const int num_admitted_running, const int num_queued,
+      const std::vector<THeavyMemoryQuery>& heavy_memory_queries =
+          empty_heavy_memory_query_list,
+      const int64_t min_memory_consumed = 0, const int64_t max_memory_consumed = 0,
+      const int64_t total_memory_consumed = 0, const int64_t num_running = 0) {
     TPoolStats stats;
     stats.backend_mem_reserved = backend_mem_reserved;
     stats.num_admitted_running = num_admitted_running;
     stats.num_queued = num_queued;
+    stats.heavy_memory_queries = heavy_memory_queries;
+    stats.min_memory_consumed = min_memory_consumed;
+    stats.max_memory_consumed = max_memory_consumed;
+    stats.total_memory_consumed = total_memory_consumed;
+    stats.num_running = num_running;
     return stats;
   }
 
@@ -241,8 +288,8 @@ class AdmissionControllerTest : public testing::Test {
     addr->__set_port(25000);
     ClusterMembershipMgr* cmm =
         pool_.Add(new ClusterMembershipMgr("", nullptr, metric_group));
-    return pool_.Add(new AdmissionController(
-        cmm, nullptr, request_pool_service, metric_group, *addr));
+    return pool_.Add(
+        new AdmissionController(cmm, nullptr, request_pool_service, metric_group, *addr));
   }
 
   static void checkPoolDisabled(
@@ -251,6 +298,13 @@ class AdmissionControllerTest : public testing::Test {
     pool_config.max_requests = max_requests;
     pool_config.max_mem_resources = max_mem_resources;
     ASSERT_EQ(expected_result, AdmissionController::PoolDisabled(pool_config));
+  }
+
+  void ResetMemConsumed(MemTracker* tracker) {
+    tracker->consumption_->Set(0);
+    for (MemTracker* child : tracker->child_trackers_) {
+      ResetMemConsumed(child);
+    }
   }
 };
 
@@ -279,14 +333,14 @@ TEST_F(AdmissionControllerTest, Simple) {
   // Check that the query can be admitted.
   string not_admitted_reason;
   ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *schedule_state, config_c, true, &not_admitted_reason));
+      *schedule_state, config_c, true, &not_admitted_reason, nullptr));
 
   // Create a ScheduleState just like 'schedule_state' to run on 3 hosts which can't be
   // admitted.
   ScheduleState* schedule_state_3_hosts =
       MakeScheduleState(QUEUE_C, config_c, 3, 64L * MEGABYTE);
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *schedule_state_3_hosts, config_c, true, &not_admitted_reason));
+      *schedule_state_3_hosts, config_c, true, &not_admitted_reason, nullptr));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough aggregate memory available in pool root.queueC with max mem "
       "resources 128.00 MB. Needed 192.00 MB but only 128.00 MB was available.");
@@ -317,9 +371,9 @@ TEST_F(AdmissionControllerTest, Simple) {
 
   // Test that the query cannot be admitted now.
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *schedule_state, config_c, true, &not_admitted_reason));
-  EXPECT_STR_CONTAINS(not_admitted_reason,
-      "number of running queries 11 is at or over limit 10.");
+      *schedule_state, config_c, true, &not_admitted_reason, nullptr));
+  EXPECT_STR_CONTAINS(
+      not_admitted_reason, "number of running queries 11 is at or over limit 10.");
 }
 
 /// Test CanAdmitRequest in the context of aggregated memory required to admit a query.
@@ -348,7 +402,7 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestMemory) {
   // Check that the query can be admitted.
   string not_admitted_reason;
   ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *schedule_state, config_d, true, &not_admitted_reason));
+      *schedule_state, config_d, true, &not_admitted_reason, nullptr));
 
   // Tests that this query cannot be admitted.
   // Increasing the number of hosts pushes the aggregate memory required to admit this
@@ -357,7 +411,7 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestMemory) {
   ScheduleState* schedule_state15 =
       MakeScheduleState(QUEUE_D, config_d, host_count, 30L * MEGABYTE);
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *schedule_state15, config_d, true, &not_admitted_reason));
+      *schedule_state15, config_d, true, &not_admitted_reason, nullptr));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough aggregate memory available in pool root.queueD with max mem resources "
       "400.00 MB. Needed 480.00 MB but only 400.00 MB was available.");
@@ -369,7 +423,7 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestMemory) {
       MakeScheduleState(QUEUE_D, config_d, host_count, 50L * MEGABYTE);
 
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *schedule_state_10_fail, config_d, true, &not_admitted_reason));
+      *schedule_state_10_fail, config_d, true, &not_admitted_reason, nullptr));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough aggregate memory available in pool root.queueD with max mem resources "
       "400.00 MB. Needed 500.00 MB but only 400.00 MB was available.");
@@ -404,17 +458,17 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestCount) {
 
   // Query can be admitted from queue...
   ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *schedule_state, config_d, true, &not_admitted_reason));
+      *schedule_state, config_d, true, &not_admitted_reason, nullptr));
   // ... but same Query cannot be admitted directly.
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *schedule_state, config_d, false, &not_admitted_reason));
+      *schedule_state, config_d, false, &not_admitted_reason, nullptr));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "queue is not empty (size 2); queued queries are executed first");
 
   // Simulate that there are 7 queries already running.
   pool_stats->agg_num_running_ = 7;
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *schedule_state, config_d, true, &not_admitted_reason));
+      *schedule_state, config_d, true, &not_admitted_reason, nullptr));
   EXPECT_STR_CONTAINS(
       not_admitted_reason, "number of running queries 7 is at or over limit 6");
 }
@@ -454,10 +508,10 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestSlots) {
 
   // Enough slots are available so it can be admitted in both cases.
   ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *default_group_schedule, config_d, true, &not_admitted_reason))
+      *default_group_schedule, config_d, true, &not_admitted_reason, nullptr))
       << not_admitted_reason;
   ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *other_group_schedule, config_d, true, &not_admitted_reason))
+      *other_group_schedule, config_d, true, &not_admitted_reason, nullptr))
       << not_admitted_reason;
 
   // Simulate that almost all the slots are in use, which prevents admission in the
@@ -465,10 +519,10 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestSlots) {
   SetSlotsInUse(admission_controller, host_addrs, slots_per_host - 1);
 
   ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *default_group_schedule, config_d, true, &not_admitted_reason))
+      *default_group_schedule, config_d, true, &not_admitted_reason, nullptr))
       << not_admitted_reason;
   ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *other_group_schedule, config_d, true, &not_admitted_reason));
+      *other_group_schedule, config_d, true, &not_admitted_reason, nullptr));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough admission control slots available on host host1:25000. Needed 4 "
       "slots but 15/16 are already in use.");
@@ -605,8 +659,7 @@ TEST_F(AdmissionControllerTest, GetMaxToDequeue) {
 
   int64_t max_to_dequeue;
   // Queue is empty, so nothing to dequeue
-  max_to_dequeue =
-      admission_controller->GetMaxToDequeue(queue_c, stats_c, config_c);
+  max_to_dequeue = admission_controller->GetMaxToDequeue(queue_c, stats_c, config_c);
   ASSERT_EQ(0, max_to_dequeue);
 
   AdmissionController::PoolStats stats(admission_controller, "test");
@@ -618,20 +671,17 @@ TEST_F(AdmissionControllerTest, GetMaxToDequeue) {
   stats.local_stats_.num_queued = 10;
   stats.agg_num_queued_ = 20;
   stats.agg_num_running_ = 10;
-  max_to_dequeue =
-      admission_controller->GetMaxToDequeue(queue_c, &stats, config);
+  max_to_dequeue = admission_controller->GetMaxToDequeue(queue_c, &stats, config);
   ASSERT_EQ(0, max_to_dequeue);
 
   // Can only dequeue 1.
   stats.agg_num_running_ = 9;
-  max_to_dequeue =
-      admission_controller->GetMaxToDequeue(queue_c, &stats, config);
+  max_to_dequeue = admission_controller->GetMaxToDequeue(queue_c, &stats, config);
   ASSERT_EQ(1, max_to_dequeue);
 
   // There is space for 10 but it looks like there are 2 coordinators.
   stats.agg_num_running_ = 0;
-  max_to_dequeue =
-      admission_controller->GetMaxToDequeue(queue_c, &stats, config);
+  max_to_dequeue = admission_controller->GetMaxToDequeue(queue_c, &stats, config);
   ASSERT_EQ(5, max_to_dequeue);
 }
 
@@ -789,7 +839,7 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
 
   TPoolConfig pool_config;
   ASSERT_OK(request_pool_service->GetPoolConfig("default", &pool_config));
-  pool_config.__set_max_mem_resources(2*GIGABYTE); // to enable memory based admission.
+  pool_config.__set_max_mem_resources(2 * GIGABYTE); // to enable memory based admission.
 
   // Set up a query schedule to test.
   const int64_t PER_EXEC_MEM_ESTIMATE = GIGABYTE;
@@ -902,6 +952,163 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
       "minimum memory reservation is greater "
       "than memory available to the query for buffer reservations. Memory reservation "
       "needed given the current plan: 1.00 GB");
+}
+
+/// Test that AdmissionController can identify 5 queries with top memory consumption
+/// from 4 pools. Each pool holds a number of queries with different memory consumptions.
+TEST_F(AdmissionControllerTest, TopNQueryCheck) {
+  // Pass the paths of the configuration files as command line flags
+  FLAGS_fair_scheduler_allocation_path = GetResourceFile("fair-scheduler-test2.xml");
+  FLAGS_llama_site_path = GetResourceFile("llama-site-test2.xml");
+
+  AdmissionController* admission_controller = MakeAdmissionController();
+  RequestPoolService* request_pool_service = admission_controller->request_pool_service_;
+
+  // A vector of 4 specs. Each spec defines a pool with a number of queries running
+  // in the pool.
+  std::vector<std::tuple<std::string, TPoolConfig, int>> resource_pools(4);
+
+  // Establish the pool names
+  std::get<0>(resource_pools[0]) = QUEUE_A;
+  std::get<0>(resource_pools[1]) = QUEUE_B;
+  std::get<0>(resource_pools[2]) = QUEUE_C;
+  std::get<0>(resource_pools[3]) = QUEUE_D;
+
+  // Setup the pool config
+  for (int i = 0; i < 4; i++) {
+    const std::string& pool_name = std::get<0>(resource_pools[i]);
+    TPoolConfig& pool_config = std::get<1>(resource_pools[i]);
+    ASSERT_OK(request_pool_service->GetPoolConfig(pool_name, &pool_config));
+  }
+
+  // Set the number of queries to run in each pool
+  std::get<2>(resource_pools[0]) = 5;
+  std::get<2>(resource_pools[1]) = 10;
+  std::get<2>(resource_pools[2]) = 20;
+  std::get<2>(resource_pools[3]) = 20;
+
+  // Set the seed for the random generator used below to generate
+  // memory needed for each query.
+  srand(19);
+
+  MemTracker* pool_mem_tracker = nullptr;
+
+  // Process each of the 4 pools.
+  for (int i = 0; i < 4; i++) {
+    // Get the parameters of the pool.
+    const std::string& pool_name = std::get<0>(resource_pools[i]);
+    TPoolConfig& pool_config = std::get<1>(resource_pools[i]);
+    int num_queries = std::get<2>(resource_pools[i]);
+
+    // For all queries in the pool, fabricate the hi part of the query Id.
+    TUniqueId id;
+    id.hi = FormQueryIdHi(pool_name);
+
+    // Create a number of queries to run inside the pool.
+    for (int j = 0; j < num_queries; j++) {
+      // For each query, fabricate the lo part of the query Id.
+      id.lo = j;
+      // Next create a ScheduleState that runs on this host with per host
+      // memory limit as a random number between 1MB and 10MB.
+      long per_host_mem_estimate = (rand() % 10 + 1) * MEGABYTE;
+      ScheduleState* schedule_state =
+          MakeScheduleState(pool_name, pool_config, 1, per_host_mem_estimate);
+      schedule_state->UpdateMemoryRequirements(pool_config);
+      // Admit the query to the pool.
+      string not_admitted_reason;
+      ASSERT_TRUE(admission_controller->CanAdmitRequest(
+          *schedule_state, pool_config, true, &not_admitted_reason, nullptr));
+      // Create a query memory tracker for the query and set the memory consumption
+      // as per_host_mem_estimate.
+      int64_t mem_consumed = per_host_mem_estimate;
+      MemTracker::CreateQueryMemTracker(id, -1 /*mem_limit*/, pool_name, &pool_)
+          ->Consume(mem_consumed);
+    }
+    // Get the pool mem tracker.
+    pool_mem_tracker =
+        ExecEnv::GetInstance()->pool_mem_trackers()->GetRequestPoolMemTracker(
+            pool_name, false);
+    ASSERT_TRUE(pool_mem_tracker);
+    // Create the pool stats.
+    AdmissionController::PoolStats* pool_stats =
+        admission_controller->GetPoolStats(pool_name, true);
+    // Update the local stats in pool stats with up to 5 top queries.
+    pool_stats->UpdateMemTrackerStats();
+  }
+  //
+  // Next make a TopicDeltaMap describing some activity on HOST_1 and HOST_2.
+  //
+  TTopicDelta membership = MakeTopicDelta(false);
+  AddStatsToTopic(&membership, HOST_1, QUEUE_B,
+      MakePoolStats(1000, 1, 0, MakeHeavyMemoryQueryList(QUEUE_B, 5),
+          5 * MEGABYTE /*min*/, 20 * MEGABYTE /*max*/, 100 * MEGABYTE /*total*/,
+          4 /*running*/));
+  AddStatsToTopic(&membership, HOST_1, QUEUE_C,
+      MakePoolStats(5000, 10, 0, MakeHeavyMemoryQueryList(QUEUE_C, 2),
+          10 * MEGABYTE /*min*/, 200 * MEGABYTE /*max*/, 500 * MEGABYTE /*total*/,
+          40 /*running*/));
+  AddStatsToTopic(&membership, HOST_2, QUEUE_C,
+      MakePoolStats(5000, 1, 0, MakeHeavyMemoryQueryList(QUEUE_C, 5),
+          10 * MEGABYTE /*min*/, 2000 * MEGABYTE /*max*/, 10000 * MEGABYTE /*total*/,
+          100 /*running*/));
+  // Imitate the StateStore passing updates on query activity to the
+  // AdmissionController.
+  StatestoreSubscriber::TopicDeltaMap incoming_topic_deltas;
+  incoming_topic_deltas.emplace(Statestore::IMPALA_REQUEST_QUEUE_TOPIC, membership);
+  vector<TTopicDelta> outgoing_topic_updates;
+  admission_controller->UpdatePoolStats(incoming_topic_deltas, &outgoing_topic_updates);
+
+  //
+  // Find the top 5 queries from these 4 pools in HOST_0
+  //
+  string mem_details_for_host0 =
+      admission_controller->GetLogStringForTopNQueriesOnHost(HOST_0);
+  // Verify that the 5 top ones appear in the following order.
+  std::regex pattern_pools_for_host0(".*"+
+       QUEUE_B+".*"+"id=0000000000000001:0000000000000002, consumed=10.00 MB"+".*"+
+       QUEUE_A+".*"+"id=0000000000000000:0000000000000000, consumed=10.00 MB"+".*"+
+       QUEUE_D+".*"+"id=0000000000000003:0000000000000011, consumed=9.00 MB"+".*"+
+                    "id=0000000000000003:000000000000000a, consumed=9.00 MB"+".*"+
+                    "id=0000000000000003:0000000000000007, consumed=9.00 MB"+".*"
+       ,std::regex::basic
+       );
+  ASSERT_TRUE(std::regex_match(mem_details_for_host0, pattern_pools_for_host0));
+
+  //
+  // Next find the top 5 queries from these 4 pools in HOST_1
+  //
+  string mem_details_for_host1 =
+      admission_controller->GetLogStringForTopNQueriesOnHost(HOST_1);
+  // Verify that the 5 top ones appear in the following order.
+  std::regex pattern_pools_for_host1(".*"+
+       QUEUE_B+".*"+"id=0000000000000001:0000000000000004, consumed=20.00 MB"+".*"+
+                    "id=0000000000000001:0000000000000003, consumed=19.00 MB"+".*"+
+                    "id=0000000000000001:0000000000000002, consumed=8.00 MB"+".*"+
+       QUEUE_C+".*"+"id=0000000000000002:0000000000000000, consumed=18.00 MB"+".*"+
+                    "id=0000000000000002:0000000000000001, consumed=12.00 MB"+".*"
+       ,std::regex::basic
+       );
+  ASSERT_TRUE(std::regex_match(mem_details_for_host1, pattern_pools_for_host1));
+  //
+  // Next find the top 5 queries from pool QUEUE_C among 3 hosts.
+  //
+  string mem_details_for_this_pool =
+      admission_controller->GetLogStringForTopNQueriesInPool(QUEUE_C);
+  // Verify that the 5 top ones appear in the following order.
+  std::regex pattern_aggregated(std::string(".*")+
+       "id=0000000000000002:0000000000000001, consumed=32.00 MB"+".*"+
+       "id=0000000000000002:0000000000000004, consumed=26.00 MB"+".*"+
+       "id=0000000000000002:0000000000000000, consumed=21.00 MB"+".*"+
+       "id=0000000000000002:0000000000000002, consumed=17.00 MB"+".*"+
+       "id=0000000000000002:000000000000000e, consumed=9.00 MB"+".*"
+       ,std::regex::basic
+       );
+  ASSERT_TRUE(std::regex_match(mem_details_for_this_pool, pattern_aggregated));
+
+  //
+  // Reset the consumption_ counter for all trackers so that TearDown() call
+  // can run cleanly.
+  ResetMemConsumed(pool_mem_tracker->GetRootMemTracker());
 }
 
 } // end namespace impala

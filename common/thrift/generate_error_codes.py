@@ -334,7 +334,7 @@ error_codes = (
   ("ADMISSION_REJECTED", 107, "Rejected query from pool $0: $1"),
 
   ("ADMISSION_TIMED_OUT", 108, "Admission for query exceeded timeout $0ms in pool $1. "
-     "Queued reason: $2"),
+          "Queued reason: $2 Additional Details: $3"),
 
   ("THREAD_CREATION_FAILED", 109, "Failed to create thread $0 in category $1: $2"),
 

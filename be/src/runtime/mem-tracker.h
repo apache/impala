@@ -39,7 +39,9 @@
 #include "util/runtime-profile-counters.h"
 #include "util/spinlock.h"
 
+#include "gen-cpp/StatestoreService.h" // for TPoolStats
 #include "gen-cpp/Types_types.h" // for TUniqueId
+#include <gtest/gtest_prod.h> // for FRIEND_TEST
 
 namespace impala {
 
@@ -329,8 +331,8 @@ class MemTracker {
   /// for the process MemTracker.
   /// TODO: once all memory is accounted in ReservationTracker hierarchy, move
   /// reporting there.
-  std::string LogUsage(int max_recursive_depth,
-      const std::string& prefix = "", int64_t* logged_consumption = nullptr);
+  std::string LogUsage(int max_recursive_depth, const std::string& prefix = "",
+      int64_t* logged_consumption = nullptr);
   /// Dumping the process MemTracker is expensive. Limiting the recursive depth
   /// to two levels limits the level of detail to a one-line summary for each query
   /// MemTracker, avoiding all MemTrackers below that level. This provides a summary
@@ -343,6 +345,16 @@ class MemTracker {
   /// Logs the usage of 'limit' number of queries based on maximum total memory
   /// consumption.
   std::string LogTopNQueries(int limit);
+
+  /// Update the following data members in pool_stats for all queries tracked through
+  /// query memory trackers:
+  ///   heavy_memory_queries: the query Ids of top 'limit' queries in memory consumption
+  ///   (in descending order)
+  ///   min_memory_consumed: the minimal memory consumed among all queries
+  ///   max_memory_consumed: the maximal memory consumed among all queries
+  ///   total_memory_consumed: the total memory consumed by all queries
+  ///   num_running: the total number of all queries
+  void UpdatePoolStatsForQueries(int limit, TPoolStats& pool_stats);
 
   /// Log the memory usage when memory limit is exceeded and return a status object with
   /// details of the allocation which caused the limit to be exceeded.
@@ -399,13 +411,16 @@ class MemTracker {
   /// and populates 'min_pq' with 'limit' number of elements (that contain state related
   /// to query MemTrackers) based on maximum total memory consumption.
   void GetTopNQueries(
-      std::priority_queue<pair<int64_t, string>,
-          vector<pair<int64_t, string>>, std::greater<pair<int64_t, string>>>& min_pq,
+      std::priority_queue<pair<int64_t, string>, vector<pair<int64_t, string>>,
+          std::greater<pair<int64_t, string>>>& min_pq,
       int limit);
 
   /// If an ancestor of this tracker is a query MemTracker, return that tracker.
   /// Otherwise return NULL.
   MemTracker* GetQueryMemTracker();
+
+  /// Return the root ancestor of this tracker.
+  MemTracker* GetRootMemTracker();
 
   /// Increases/Decreases the consumption of this tracker and the ancestors up to (but
   /// not including) end_tracker.
@@ -420,6 +435,26 @@ class MemTracker {
     }
     DCHECK(false) << "end_tracker is not an ancestor";
   }
+
+  /// Update the following fields in pool_stats.
+  ///   min_memory_consumed: take the min of min_memory_consumed and mem_consumed
+  ///   max_memory_consumed: take the max of max_memory_consumed and mem_consumed
+  ///   total_memory_consumed: increased by mem_consumed
+  ///   num_running++
+  void UpdatePoolStatsForMemoryConsumed(int64_t mem_consumed, TPoolStats& pool_stats);
+
+  /// Collect the top N queries into a priority queue, and computes the min, the max,
+  /// the total memory consumption, and the total number of all queries that are
+  /// all children query mem trackers. The top element in the queue is the
+  /// min-element such that the remaining elements after a sequence of pop operations
+  /// are the largest in memory consumptions. This method should only be called for
+  /// mem-trackers that are either query mem trackers or higher in the mem tracker
+  /// hierarchy.
+  typedef std::priority_queue<THeavyMemoryQuery, std::vector<THeavyMemoryQuery>,
+      std::greater<THeavyMemoryQuery>>
+      MinPriorityQueue;
+  void GetTopNQueriesAndUpdatePoolStats(
+      MinPriorityQueue& min_pq, int limit, TPoolStats& pool_stats);
 
   /// Lock to protect GcMemory(). This prevents many GCs from occurring at once.
   std::mutex gc_lock_;
@@ -505,6 +540,10 @@ class MemTracker {
 
   /// Metric for limit_.
   IntGauge* limit_metric_;
+
+  friend class AdmissionControllerTest;
+  friend class MemTestTest_TopN_Test;
+  FRIEND_TEST(AdmissionControllerTest, TopNQueryCheck);
 };
 
 /// Global registry for query and pool MemTrackers. Owned by ExecEnv.
