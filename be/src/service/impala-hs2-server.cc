@@ -309,7 +309,13 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
       std::make_shared<SessionState>(this, session_id, secret);
   state->closed = false;
   state->start_time_ms = UnixMillis();
-  state->session_type = TSessionType::HIVESERVER2;
+  const ThriftServer::ConnectionContext* connection_context =
+    ThriftServer::GetThreadConnectionContext();
+  if (connection_context->server_name == EXTERNAL_FRONTEND_SERVER_NAME) {
+    state->session_type = TSessionType::EXTERNAL_FRONTEND;
+  } else {
+    state->session_type = TSessionType::HIVESERVER2;
+  }
   state->network_address = ThriftServer::GetThreadConnectionContext()->network_address;
   state->last_accessed_ms = UnixMillis();
   // request.client_protocol is not guaranteed to be a valid TProtocolVersion::type, so
@@ -323,8 +329,6 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   state->kudu_latest_observed_ts = 0;
 
   // If the username was set by a lower-level transport, use it.
-  const ThriftServer::ConnectionContext* connection_context =
-      ThriftServer::GetThreadConnectionContext();
   if (!connection_context->username.empty()) {
     state->connected_user = connection_context->username;
     if (!connection_context->do_as_user.empty()) {

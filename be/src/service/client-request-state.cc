@@ -130,14 +130,21 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
   num_rows_fetched_from_cache_counter_ =
       ADD_COUNTER(server_profile_, "NumRowsFetchedFromCache", TUnit::UNIT);
   client_wait_timer_ = ADD_TIMER(server_profile_, "ClientFetchWaitTimer");
-  query_events_ = summary_profile_->AddEventSequence("Query Timeline");
+  bool is_external_fe = session_type() == TSessionType::EXTERNAL_FRONTEND;
+  // "Impala Backend Timeline" was specifically chosen to exploit the lexicographical
+  // ordering defined by the underlying std::map holding the timelines displayed in
+  // the web UI. This helps ensure that "Frontend Timeline" is displayed before
+  // "Impala Backend Timeline".
+  query_events_ = summary_profile_->AddEventSequence(
+      is_external_fe ? "Impala Backend Timeline" : "Query Timeline");
   query_events_->Start();
   profile_->AddChild(summary_profile_);
 
   profile_->set_name("Query (id=" + PrintId(query_id()) + ")");
   summary_profile_->AddInfoString("Session ID", PrintId(session_id()));
   summary_profile_->AddInfoString("Session Type", PrintThriftEnum(session_type()));
-  if (session_type() == TSessionType::HIVESERVER2) {
+  if (session_type() == TSessionType::HIVESERVER2 ||
+      session_type() == TSessionType::EXTERNAL_FRONTEND) {
     summary_profile_->AddInfoString("HiveServer2 Protocol Version",
         Substitute("V$0", 1 + session->hs2_version));
   }
