@@ -34,7 +34,6 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortInfo;
 import org.apache.impala.thrift.TSortNode;
 import org.apache.impala.thrift.TSortType;
-import org.apache.impala.thrift.TSortingOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +64,13 @@ public class SortNode extends PlanNode {
   // if true, the output of this node feeds an AnalyticNode
   private boolean isAnalyticSort_;
 
+  // if this is an analytic sort, this points to the corresponding
+  // analytic eval node otherwise null
+  private AnalyticEvalNode analyticEvalNode_;
+
+  // set only for the analytic sort node
+  private List<Expr> partitioningExprs_;
+
   // info_.sortTupleSlotExprs_ substituted with the outputSmap_ for materialized slots
   // in init().
   private List<Expr> resolvedTupleExprs_;
@@ -73,7 +79,7 @@ public class SortNode extends PlanNode {
   protected long offset_;
 
   // The type of sort. Determines the exec node used in the BE.
-  private final TSortType type_;
+  private TSortType type_;
 
   // Estimated bytes of input that will go into this sort node across all backends.
   // Used for sorter spill estimation in backend code.
@@ -115,7 +121,7 @@ public class SortNode extends PlanNode {
   public long getOffset() { return offset_; }
   public void setOffset(long offset) { offset_ = offset; }
   public boolean hasOffset() { return offset_ > 0; }
-  public boolean useTopN() { return type_ == TSortType.TOPN; }
+  public boolean isTypeTopN() { return type_ == TSortType.TOPN; }
   public SortInfo getSortInfo() { return info_; }
   public void setInputPartition(DataPartition inputPartition) {
     inputPartition_ = inputPartition;
@@ -123,6 +129,30 @@ public class SortNode extends PlanNode {
   public DataPartition getInputPartition() { return inputPartition_; }
   public boolean isAnalyticSort() { return isAnalyticSort_; }
   public void setIsAnalyticSort(boolean v) { isAnalyticSort_ = v; }
+  public void setAnalyticEvalNode(AnalyticEvalNode n) { analyticEvalNode_ = n; }
+  public AnalyticEvalNode getAnalyticEvalNode() { return analyticEvalNode_; }
+
+  /**
+   * Under special cases, the planner may decide to convert a total sort into a
+   * TopN sort with limit
+   */
+  public void convertToTopN(long limit, List<Expr> partitioningExprs,
+      Analyzer analyzer) {
+    Preconditions.checkArgument(type_ == TSortType.TOTAL);
+    type_ = TSortType.TOPN;
+    displayName_ = getDisplayName(type_);
+    setLimit(limit);
+    partitioningExprs_ = partitioningExprs;
+    computeStats(analyzer);
+  }
+
+  public List<Expr> getPartitioningExprs() { return partitioningExprs_ ; }
+
+  @Override
+  public boolean allowPartitioned() {
+    if (isAnalyticSort_ && hasLimit()) return true;
+    return super.allowPartitioned();
+  }
 
   @Override
   public boolean isBlockingNode() { return type_ != TSortType.PARTIAL; }
@@ -197,6 +227,8 @@ public class SortNode extends PlanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
+    Preconditions.checkState(!isTypeTopN() || hasLimit(), "Top-N must have limit");
+    Preconditions.checkState(offset_ >= 0);
     msg.node_type = TPlanNodeType.SORT_NODE;
     TSortInfo sort_info = new TSortInfo(Expr.treesToThrift(info_.getSortExprs()),
         info_.getIsAscOrder(), info_.getNullsFirst(), info_.getSortingOrder());

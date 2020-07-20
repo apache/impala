@@ -1761,7 +1761,7 @@ PLAN-ROOT SINK
 |  |  row-size=16B cardinality=8
 |  |
 |  02:SORT
-|  |  order by: bigint_col ASC NULLS FIRST
+|  |  order by: bigint_col ASC NULLS LAST
 |  |  row-size=12B cardinality=8
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]

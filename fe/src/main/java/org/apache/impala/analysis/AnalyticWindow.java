@@ -59,7 +59,7 @@ public class AnalyticWindow {
     }
   }
 
-  enum BoundaryType {
+  public enum BoundaryType {
     UNBOUNDED_PRECEDING("UNBOUNDED PRECEDING"),
     UNBOUNDED_FOLLOWING("UNBOUNDED FOLLOWING"),
     CURRENT_ROW("CURRENT ROW"),

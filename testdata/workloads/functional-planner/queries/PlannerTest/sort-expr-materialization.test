@@ -253,7 +253,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT)
 |
 01:SORT
-|  order by: default.testfn(double_col) ASC NULLS FIRST, random() ASC
+|  order by: default.testfn(double_col) ASC NULLS LAST, random() ASC
 |  materialized: default.testfn(double_col), random()
 |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=6 row-size=24B cardinality=8

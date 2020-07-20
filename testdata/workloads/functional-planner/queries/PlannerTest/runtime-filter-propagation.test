@@ -1058,7 +1058,7 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=11.00K
 |
 03:SORT
-|  order by: year ASC NULLS FIRST, month DESC
+|  order by: year ASC NULLS LAST, month DESC
 |  row-size=12B cardinality=11.00K
 |
 02:HASH JOIN [INNER JOIN]
@@ -1102,7 +1102,7 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=3.65K
 |
 01:SORT
-|  order by: year ASC NULLS FIRST, id ASC
+|  order by: year ASC NULLS LAST, id ASC
 |  row-size=12B cardinality=3.65K
 |
 00:SCAN HDFS [functional.alltypes]
@@ -1266,7 +1266,7 @@ PLAN-ROOT SINK
 |     row-size=32B cardinality=1
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.05MB
+   HDFS partitions=1/1 files=4 size=289.02MB
    row-size=32B cardinality=150.00K
 ====
 # Two-way join query where the build side is optimized into an empty set
@@ -1709,7 +1709,7 @@ PLAN-ROOT SINK
 |  row-size=419B cardinality=4
 |
 |--00:SCAN HDFS [tpch_parquet.lineitem]
-|     HDFS partitions=1/1 files=3 size=193.99MB
+|     HDFS partitions=1/1 files=3 size=193.98MB
 |     predicates: l_orderkey = 965
 |     row-size=231B cardinality=4
 |

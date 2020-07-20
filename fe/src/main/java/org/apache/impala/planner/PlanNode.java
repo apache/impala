@@ -990,4 +990,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public void setDisableCodegen(boolean disableCodegen) {
     disableCodegen_ = disableCodegen;
   }
+
+  public boolean allowPartitioned() { return !hasLimit(); }
 }

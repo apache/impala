@@ -20,9 +20,11 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.impala.common.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.impala.analysis.AnalyticExpr;
 import org.apache.impala.analysis.AnalyticWindow;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
@@ -30,6 +32,7 @@ import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.OrderByElement;
 import org.apache.impala.analysis.SlotDescriptor;
@@ -37,6 +40,8 @@ import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.CompoundPredicate.Operator;
+import org.apache.impala.analysis.NumericLiteral;
+import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.thrift.TAnalyticNode;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
@@ -356,4 +361,170 @@ public class AnalyticEvalNode extends PlanNode {
         .setMinMemReservationBytes(perInstanceMinMemReservation)
         .setSpillableBufferBytes(bufferSize).setMaxRowBufferBytes(bufferSize).build();
   }
+
+  /**
+   * Check if it is safe to push down limit to the Sort node of this AnalyticEval.
+   * Qualifying checks:
+   *  - The analytic node is evaluating a single analytic function which must be
+   *    a ranking function.
+   *  - The partition-by exprs must be a prefix of the sort exprs in sortInfo
+   *  - If there is a predicate on the analytic function (provided through the
+   *    selectNode), the predicate's eligibility is checked (see further below)
+   * @param sortInfo The sort info from the outer sort node
+   * @param selectNode The selection node with predicates on analytic function.
+   *    This can be null if no such predicate is present.
+   * @param limit Limit value from the outer sort node
+   * @param analyticNodeSort The analytic sort associated with this analytic node
+   * @param sortExprsForPartitioning A placeholder list supplied by caller that is
+   *     populated with the sort exprs of the analytic sort that will be later used
+   *     for hash partitioning of the distributed TopN.
+   * @param analyzer analyzer instance
+   * @return True if limit pushdown into analytic sort is safe, False if not
+   */
+  public boolean isLimitPushdownSafe(SortInfo sortInfo, SelectNode selectNode,
+    long limit, SortNode analyticNodeSort, List<Expr> sortExprsForPartitioning,
+    Analyzer analyzer) {
+    if (analyticFnCalls_.size() != 1) return false;
+    Expr expr = analyticFnCalls_.get(0);
+    if (!(expr instanceof FunctionCallExpr) ||
+         (!AnalyticExpr.isRankingFn(((FunctionCallExpr) expr).getFn()))) {
+      return false;
+    }
+    List<Expr> analyticSortSortExprs = analyticNodeSort.getSortInfo().getSortExprs();
+
+    // In the mapping below, we use the original sort exprs that the sortInfo was
+    // created with, not the sort exprs that got mapped in SortInfo.createSortTupleInfo().
+    // This allows us to substitute it using this node's output smap.
+    List<Expr> origSortExprs = sortInfo != null ? sortInfo.getOrigSortExprs() :
+            new ArrayList<>();
+    List<Expr> sortExprs = Expr.substituteList(origSortExprs, getOutputSmap(),
+            analyzer, false);
+    // Also use substituted partition exprs such that they can be compared with the
+    // sort exprs
+    List<Expr> pbExprs = substitutedPartitionExprs_;
+
+    if (sortExprs.size() == 0) {
+      // if there is no sort expr in the parent sort but only limit, we can push
+      // the limit to the sort below if there is no selection node or if
+      // the predicate in the selection node is eligible
+      if (selectNode == null) {
+        return true;
+      }
+      Pair<Boolean, Double> status =
+              isPredEligibleForLimitPushdown(selectNode.getConjuncts(), limit);
+      if (status.first) {
+        sortExprsForPartitioning.addAll(analyticSortSortExprs);
+        selectNode.setSelectivity(status.second);
+        return true;
+      }
+      return false;
+    }
+
+    if (sortExprs.size() > 0 && pbExprs.size() > sortExprs.size()) return false;
+
+    Preconditions.checkArgument(analyticSortSortExprs.size() >= pbExprs.size());
+    // Check if pby exprs are a prefix of the top level sort exprs
+    if (sortExprs.size() == 0) {
+      sortExprsForPartitioning.addAll(pbExprs);
+    } else {
+      for (int i = 0; i < pbExprs.size(); i++) {
+        Expr pbExpr = pbExprs.get(i);
+        Expr sortExpr = sortExprs.get(i);
+        if (!(pbExpr instanceof SlotRef && sortExpr instanceof SlotRef)) return false;
+
+        if (!((SlotRef) pbExpr).equals(((SlotRef) sortExpr))) {
+          // pby exprs are not a prefix of the top level sort exprs
+          return false;
+        } else {
+          // get the corresponding sort expr from the analytic sort
+          // since that's what will eventually be used for hash partitioning
+          sortExprsForPartitioning.add(analyticSortSortExprs.get(i));
+        }
+        // check the ASC/DESC and NULLS FIRST/LAST compatibility.
+        if (!sortInfo.getIsAscOrder().get(i) || sortInfo.getNullsFirst().get(i)) {
+          return false;
+        }
+      }
+    }
+
+    // check that the window frame is UNBOUNDED PRECEDING to CURRENT ROW
+    if (!(analyticWindow_.getLeftBoundary().getType() ==
+          AnalyticWindow.BoundaryType.UNBOUNDED_PRECEDING
+          && analyticWindow_.getRightBoundary().getType() ==
+            AnalyticWindow.BoundaryType.CURRENT_ROW)) {
+      return false;
+    }
+
+    if (selectNode == null) {
+      return true;
+    } else {
+      Pair<Boolean, Double> status =
+              isPredEligibleForLimitPushdown(selectNode.getConjuncts(), limit);
+      if (status.first) {
+        selectNode.setSelectivity(status.second);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Check eligibility of a predicate (provided as list of conjuncts) for limit
+   * pushdown optimization.
+   * @param conjuncts list of conjuncts from the predicate
+   * @param limit limit from outer sort
+   * @return a Pair whose first value is True if the conjuncts+limit allows pushdown,
+   *   False otherwise. Second value is the predicate's estimated selectivity
+   */
+  private Pair<Boolean, Double> isPredEligibleForLimitPushdown(List<Expr> conjuncts,
+        long limit) {
+    Pair<Boolean, Double> falseStatus = new Pair<>(false, -1.0);
+    // Currently, single conjuncts are supported.  In the future, multiple conjuncts
+    // involving a range e.g 'col >= 10 AND col <= 20' could potentially be supported
+    if (conjuncts.size() > 1) return falseStatus;
+    Expr conj = conjuncts.get(0);
+    if (!(Expr.IS_BINARY_PREDICATE.apply(conj))) return falseStatus;
+    BinaryPredicate pred = (BinaryPredicate) conj;
+    Expr lhs = pred.getChild(0);
+    Expr rhs = pred.getChild(1);
+    // Lhs of the binary predicate must be a ranking function.
+    // Also, it must be bound to the output tuple of this analytic eval node
+    if (!(lhs instanceof SlotRef)) {
+      return falseStatus;
+    }
+    List<Expr> lhsSourceExprs = ((SlotRef) lhs).getDesc().getSourceExprs();
+    if (lhsSourceExprs.size() > 1 ||
+          !(lhsSourceExprs.get(0) instanceof AnalyticExpr)) {
+      return falseStatus;
+    }
+    if (!(AnalyticExpr.isRankingFn(((AnalyticExpr) lhsSourceExprs.
+          get(0)).getFnCall().getFn()))
+          || !lhs.isBound(outputTupleDesc_.getId())) {
+      return falseStatus;
+    }
+    // Restrict the pushdown for =, <, <= predicates because these ensure the
+    // qualifying rows are fully 'contained' within the LIMIT value. Other
+    // types of predicates would select rows that fall outside the LIMIT range.
+    if (!(pred.getOp() == BinaryPredicate.Operator.EQ ||
+          pred.getOp() == BinaryPredicate.Operator.LT ||
+          pred.getOp() == BinaryPredicate.Operator.LE)) {
+      return falseStatus;
+    }
+    // Rhs of the predicate must be a numeric literal and its value
+    // must be less than or equal to the limit.
+    if (!(rhs instanceof NumericLiteral) ||
+          ((NumericLiteral)rhs).getLongValue() > limit) {
+      return falseStatus;
+    }
+    double selectivity = Expr.DEFAULT_SELECTIVITY;
+    // Since the predicate is qualified for limit pushdown, estimate its selectivity.
+    // For EQ conditions, leave it as the default.  For LT and LE, assume all of the
+    // 'limit' rows will be returned.
+    if (pred.getOp() == BinaryPredicate.Operator.LT ||
+            pred.getOp() == BinaryPredicate.Operator.LE) {
+      selectivity = 1.0;
+    }
+    return new Pair<Boolean, Double>(true, selectivity);
+  }
+
 }

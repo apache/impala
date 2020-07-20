@@ -1073,4 +1073,12 @@ public class PlannerTest extends PlannerTestBase {
   public void testAcidTableScans() {
     runPlannerTestFile("acid-scans", "functional_orc_def");
   }
+
+  /**
+   * Test limit pushdown into analytic sort under applicable conditions
+   */
+  @Test
+  public void testLimitPushdownAnalytic() {
+    runPlannerTestFile("limit-pushdown-analytic");
+  }
 }

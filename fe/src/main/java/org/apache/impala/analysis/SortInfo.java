@@ -49,6 +49,8 @@ public class SortInfo {
       Expr.FUNCTION_CALL_COST;
 
   private List<Expr> sortExprs_;
+  // List of original sort exprs (bofore smap substitutions)
+  private List<Expr> origSortExprs_;
   private final List<Boolean> isAscOrder_;
   // True if "NULLS FIRST", false if "NULLS LAST", null if not specified.
   private final List<Boolean> nullsFirstParams_;
@@ -72,6 +74,7 @@ public class SortInfo {
     Preconditions.checkArgument(sortExprs.size() == isAscOrder.size());
     Preconditions.checkArgument(sortExprs.size() == nullsFirstParams.size());
     sortExprs_ = sortExprs;
+    origSortExprs_ = Expr.cloneList(sortExprs_);
     isAscOrder_ = isAscOrder;
     nullsFirstParams_ = nullsFirstParams;
     materializedExprs_ = new ArrayList<>();
@@ -93,6 +96,7 @@ public class SortInfo {
   }
 
   public List<Expr> getSortExprs() { return sortExprs_; }
+  public List<Expr> getOrigSortExprs() { return origSortExprs_; }
   public List<Boolean> getIsAscOrder() { return isAscOrder_; }
   public List<Boolean> getNullsFirstParams() { return nullsFirstParams_; }
   public List<Expr> getMaterializedExprs() { return materializedExprs_; }

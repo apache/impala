@@ -340,16 +340,18 @@ public class AnalyticPlanner {
     for (OrderByElement elmt : orderByElements) {
       isConstSort = isConstSort && elmt.getExpr().isConstant();
     }
+
+    SortNode sortNode = null;
     // sort on partition by (pb) + order by (ob) exprs and create pb/ob predicates
     if (hasActivePartition || !isConstSort) {
       // first sort on partitionExprs (direction doesn't matter)
       List<Expr> sortExprs = Lists.newArrayList(partitionByExprs);
+      // for PB exprs use ASC, NULLS LAST to match the behavior of the default
+      // order-by and to ensure that limit pushdown works correctly
       List<Boolean> isAsc =
           Lists.newArrayList(Collections.nCopies(sortExprs.size(), new Boolean(true)));
-      // TODO: utilize a direction and nulls/first last that has benefit
-      // for subsequent sort groups
       List<Boolean> nullsFirst =
-          Lists.newArrayList(Collections.nCopies(sortExprs.size(), new Boolean(true)));
+          Lists.newArrayList(Collections.nCopies(sortExprs.size(), new Boolean(false)));
 
       // then sort on orderByExprs
       for (OrderByElement orderByElement: sortGroup.orderByElements) {
@@ -365,7 +367,7 @@ public class AnalyticPlanner {
       SortInfo sortInfo = createSortInfo(root, sortExprs, isAsc, nullsFirst);
       // IMPALA-8533: Avoid generating sort with empty tuple descriptor
       if(sortInfo.getSortTupleDescriptor().getSlots().size() > 0) {
-        SortNode sortNode =
+        sortNode =
             SortNode.createTotalSortNode(ctx_.getNextNodeId(), root, sortInfo, 0);
 
         // if this sort group does not have partitioning exprs, we want the sort
@@ -386,6 +388,7 @@ public class AnalyticPlanner {
       }
     }
 
+    AnalyticEvalNode lowestAnalyticNode = null;
     // create one AnalyticEvalNode per window group
     for (WindowGroup windowGroup: sortGroup.windowGroups) {
       root = new AnalyticEvalNode(ctx_.getNextNodeId(), root,
@@ -394,7 +397,12 @@ public class AnalyticPlanner {
           windowGroup.physicalIntermediateTuple, windowGroup.physicalOutputTuple,
           windowGroup.logicalToPhysicalSmap);
       root.init(analyzer_);
+      if (lowestAnalyticNode == null) {
+        lowestAnalyticNode = (AnalyticEvalNode) root;
+        if (sortNode != null) sortNode.setAnalyticEvalNode(lowestAnalyticNode);
+      }
     }
+
     return root;
   }
 

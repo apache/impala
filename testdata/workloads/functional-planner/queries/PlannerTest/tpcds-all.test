@@ -3543,7 +3543,7 @@ PLAN-ROOT SINK
 |  row-size=40B cardinality=6
 |
 08:SORT
-|  order by: i_manager_id ASC NULLS FIRST
+|  order by: i_manager_id ASC NULLS LAST
 |  row-size=24B cardinality=6
 |
 07:AGGREGATE [FINALIZE]
@@ -3608,7 +3608,7 @@ PLAN-ROOT SINK
 |  row-size=40B cardinality=6
 |
 08:SORT
-|  order by: i_manager_id ASC NULLS FIRST
+|  order by: i_manager_id ASC NULLS LAST
 |  row-size=24B cardinality=6
 |
 16:AGGREGATE [FINALIZE]
@@ -3686,7 +3686,7 @@ PLAN-ROOT SINK
 |  row-size=40B cardinality=6
 |
 08:SORT
-|  order by: i_manager_id ASC NULLS FIRST
+|  order by: i_manager_id ASC NULLS LAST
 |  row-size=24B cardinality=6
 |
 16:AGGREGATE [FINALIZE]
@@ -5077,7 +5077,7 @@ PLAN-ROOT SINK
 |  row-size=137B cardinality=10.67K
 |
 08:SORT
-|  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST
+|  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST
 |  row-size=121B cardinality=10.67K
 |
 07:AGGREGATE [FINALIZE]
@@ -5141,7 +5141,7 @@ PLAN-ROOT SINK
 |  row-size=137B cardinality=10.67K
 |
 08:SORT
-|  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST
+|  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST
 |  row-size=121B cardinality=10.67K
 |
 16:AGGREGATE [FINALIZE]
@@ -5218,7 +5218,7 @@ PLAN-ROOT SINK
 |  row-size=137B cardinality=10.67K
 |
 08:SORT
-|  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST
+|  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST
 |  row-size=121B cardinality=10.67K
 |
 16:AGGREGATE [FINALIZE]
@@ -5512,7 +5512,7 @@ PLAN-ROOT SINK
 |  row-size=214B cardinality=29.80K
 |
 06:SORT
-|  order by: i_class ASC NULLS FIRST
+|  order by: i_class ASC NULLS LAST
 |  row-size=198B cardinality=29.80K
 |
 05:AGGREGATE [FINALIZE]
@@ -5565,7 +5565,7 @@ PLAN-ROOT SINK
 |  row-size=214B cardinality=29.80K
 |
 06:SORT
-|  order by: i_class ASC NULLS FIRST
+|  order by: i_class ASC NULLS LAST
 |  row-size=198B cardinality=29.80K
 |
 13:AGGREGATE [FINALIZE]
@@ -5630,7 +5630,7 @@ PLAN-ROOT SINK
 |  row-size=214B cardinality=29.80K
 |
 06:SORT
-|  order by: i_class ASC NULLS FIRST
+|  order by: i_class ASC NULLS LAST
 |  row-size=198B cardinality=29.80K
 |
 13:AGGREGATE [FINALIZE]
@@ -6149,7 +6149,7 @@ PLAN-ROOT SINK
 |  |  row-size=113B cardinality=685.36K
 |  |
 |  31:SORT
-|  |  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC, d_moy ASC
+|  |  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST, d_year ASC, d_moy ASC
 |  |  row-size=105B cardinality=685.36K
 |  |
 |  30:AGGREGATE [FINALIZE]
@@ -6204,7 +6204,7 @@ PLAN-ROOT SINK
 |  |  row-size=129B cardinality=685.36K
 |  |
 |  10:SORT
-|  |  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC NULLS FIRST
+|  |  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST, d_year ASC NULLS LAST
 |  |  row-size=113B cardinality=685.36K
 |  |
 |  09:ANALYTIC
@@ -6215,7 +6215,7 @@ PLAN-ROOT SINK
 |  |  row-size=113B cardinality=685.36K
 |  |
 |  08:SORT
-|  |  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC, d_moy ASC
+|  |  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST, d_year ASC, d_moy ASC
 |  |  row-size=105B cardinality=685.36K
 |  |
 |  07:AGGREGATE [FINALIZE]
@@ -6264,7 +6264,7 @@ PLAN-ROOT SINK
 |  row-size=113B cardinality=685.36K
 |
 21:SORT
-|  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC, d_moy ASC
+|  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST, d_year ASC, d_moy ASC
 |  row-size=105B cardinality=685.36K
 |
 20:AGGREGATE [FINALIZE]
@@ -6331,7 +6331,7 @@ PLAN-ROOT SINK
 |  |  row-size=113B cardinality=685.36K
 |  |
 |  31:SORT
-|  |  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC, d_moy ASC
+|  |  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST, d_year ASC, d_moy ASC
 |  |  row-size=105B cardinality=685.36K
 |  |
 |  51:AGGREGATE [FINALIZE]
@@ -6403,7 +6403,7 @@ PLAN-ROOT SINK
 |  |  row-size=129B cardinality=685.36K
 |  |
 |  10:SORT
-|  |  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC NULLS FIRST
+|  |  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST, d_year ASC NULLS LAST
 |  |  row-size=113B cardinality=685.36K
 |  |
 |  09:ANALYTIC
@@ -6414,7 +6414,7 @@ PLAN-ROOT SINK
 |  |  row-size=113B cardinality=685.36K
 |  |
 |  08:SORT
-|  |  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC, d_moy ASC
+|  |  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST, d_year ASC, d_moy ASC
 |  |  row-size=105B cardinality=685.36K
 |  |
 |  45:AGGREGATE [FINALIZE]
@@ -6476,7 +6476,7 @@ PLAN-ROOT SINK
 |  row-size=113B cardinality=685.36K
 |
 21:SORT
-|  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC, d_moy ASC
+|  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST, d_year ASC, d_moy ASC
 |  row-size=105B cardinality=685.36K
 |
 40:AGGREGATE [FINALIZE]
@@ -6560,7 +6560,7 @@ PLAN-ROOT SINK
 |  |  row-size=113B cardinality=685.36K
 |  |
 |  31:SORT
-|  |  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC, d_moy ASC
+|  |  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST, d_year ASC, d_moy ASC
 |  |  row-size=105B cardinality=685.36K
 |  |
 |  51:AGGREGATE [FINALIZE]
@@ -6648,7 +6648,7 @@ PLAN-ROOT SINK
 |  |  row-size=129B cardinality=685.36K
 |  |
 |  10:SORT
-|  |  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC NULLS FIRST
+|  |  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST, d_year ASC NULLS LAST
 |  |  row-size=113B cardinality=685.36K
 |  |
 |  09:ANALYTIC
@@ -6659,7 +6659,7 @@ PLAN-ROOT SINK
 |  |  row-size=113B cardinality=685.36K
 |  |
 |  08:SORT
-|  |  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC, d_moy ASC
+|  |  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST, d_year ASC, d_moy ASC
 |  |  row-size=105B cardinality=685.36K
 |  |
 |  45:AGGREGATE [FINALIZE]
@@ -6733,7 +6733,7 @@ PLAN-ROOT SINK
 |  row-size=113B cardinality=685.36K
 |
 21:SORT
-|  order by: i_category ASC NULLS FIRST, i_brand ASC NULLS FIRST, s_store_name ASC NULLS FIRST, s_company_name ASC NULLS FIRST, d_year ASC, d_moy ASC
+|  order by: i_category ASC NULLS LAST, i_brand ASC NULLS LAST, s_store_name ASC NULLS LAST, s_company_name ASC NULLS LAST, d_year ASC, d_moy ASC
 |  row-size=105B cardinality=685.36K
 |
 40:AGGREGATE [FINALIZE]
@@ -10940,18 +10940,18 @@ PLAN-ROOT SINK
 |
 11:SELECT
 |  predicates: rank() <= 100
-|  row-size=100B cardinality=1.51M
+|  row-size=100B cardinality=100
 |
 10:ANALYTIC
 |  functions: rank()
 |  partition by: i_category
 |  order by: aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END) DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=100B cardinality=15.09M
+|  row-size=100B cardinality=100
 |
-09:SORT
-|  order by: CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN i_category WHEN 7 THEN i_category WHEN 8 THEN i_category WHEN 9 THEN i_category WHEN 10 THEN i_category WHEN 11 THEN i_category WHEN 12 THEN NULL END ASC NULLS FIRST, aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END) DESC
-|  row-size=92B cardinality=15.09M
+09:TOP-N [LIMIT=100]
+|  order by: CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN i_category WHEN 7 THEN i_category WHEN 8 THEN i_category WHEN 9 THEN i_category WHEN 10 THEN i_category WHEN 11 THEN i_category WHEN 12 THEN NULL END ASC NULLS LAST, aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END) DESC
+|  row-size=92B cardinality=100
 |
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END)
@@ -11021,11 +11021,11 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ss_item_sk, RF002 -> ss_store_sk, RF004 -> ss_sold_date_sk
    row-size=24B cardinality=2.88M
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=505.51MB Threads=11
-Per-Host Resource Estimates: Memory=53.08GB
+Max Per-Host Resource Reservation: Memory=493.51MB Threads=11
+Per-Host Resource Estimates: Memory=53.04GB
 PLAN-ROOT SINK
 |
-19:MERGING-EXCHANGE [UNPARTITIONED]
+20:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_category ASC, i_class ASC, i_brand ASC, i_product_name ASC, d_year ASC, d_qoy ASC, d_moy ASC, s_store_id ASC, sumsales ASC, rk ASC
 |  limit: 100
 |
@@ -11035,20 +11035,24 @@ PLAN-ROOT SINK
 |
 11:SELECT
 |  predicates: rank() <= 100
-|  row-size=100B cardinality=1.51M
+|  row-size=100B cardinality=100
 |
 10:ANALYTIC
 |  functions: rank()
 |  partition by: i_category
 |  order by: aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END) DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=100B cardinality=15.09M
+|  row-size=100B cardinality=100
 |
-09:SORT
-|  order by: CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN i_category WHEN 7 THEN i_category WHEN 8 THEN i_category WHEN 9 THEN i_category WHEN 10 THEN i_category WHEN 11 THEN i_category WHEN 12 THEN NULL END ASC NULLS FIRST, aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END) DESC
-|  row-size=92B cardinality=15.09M
+19:TOP-N [LIMIT=100]
+|  order by: CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN i_category WHEN 7 THEN i_category WHEN 8 THEN i_category WHEN 9 THEN i_category WHEN 10 THEN i_category WHEN 11 THEN i_category WHEN 12 THEN NULL END ASC NULLS LAST, aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END) DESC
+|  row-size=92B cardinality=100
 |
 18:EXCHANGE [HASH(CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN i_category WHEN 7 THEN i_category WHEN 8 THEN i_category WHEN 9 THEN i_category WHEN 10 THEN i_category WHEN 11 THEN i_category WHEN 12 THEN NULL END)]
+|
+09:TOP-N [LIMIT=100]
+|  order by: CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN i_category WHEN 7 THEN i_category WHEN 8 THEN i_category WHEN 9 THEN i_category WHEN 10 THEN i_category WHEN 11 THEN i_category WHEN 12 THEN NULL END ASC NULLS LAST, aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END) DESC
+|  row-size=92B cardinality=100
 |
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END)
@@ -12267,7 +12271,7 @@ PLAN-ROOT SINK
 |  row-size=54B cardinality=3
 |
 17:SORT
-|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) ASC NULLS FIRST, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC NULLS FIRST, aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END) DESC
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) ASC NULLS LAST, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC NULLS LAST, aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END) DESC
 |  row-size=46B cardinality=3
 |
 16:AGGREGATE [FINALIZE]
@@ -12304,7 +12308,7 @@ PLAN-ROOT SINK
 |  |  row-size=38B cardinality=1
 |  |
 |  09:SORT
-|  |  order by: s_state ASC NULLS FIRST, sum(ss_net_profit) DESC
+|  |  order by: s_state ASC NULLS LAST, sum(ss_net_profit) DESC
 |  |  row-size=30B cardinality=1
 |  |
 |  08:AGGREGATE [FINALIZE]
@@ -12381,7 +12385,7 @@ PLAN-ROOT SINK
 |  row-size=54B cardinality=3
 |
 17:SORT
-|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) ASC NULLS FIRST, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC NULLS FIRST, aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END) DESC
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) ASC NULLS LAST, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC NULLS LAST, aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END) DESC
 |  row-size=46B cardinality=3
 |
 29:EXCHANGE [HASH(aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END),CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END)]
@@ -12436,7 +12440,7 @@ PLAN-ROOT SINK
 |  |  row-size=38B cardinality=1
 |  |
 |  09:SORT
-|  |  order by: s_state ASC NULLS FIRST, sum(ss_net_profit) DESC
+|  |  order by: s_state ASC NULLS LAST, sum(ss_net_profit) DESC
 |  |  row-size=30B cardinality=1
 |  |
 |  25:AGGREGATE [FINALIZE]
@@ -13115,7 +13119,7 @@ PLAN-ROOT SINK
 |  row-size=54B cardinality=1.00K
 |
 07:SORT
-|  order by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) ASC NULLS FIRST, CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END ASC NULLS FIRST, aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN sum(ws_net_paid) WHEN 4 THEN sum(ws_net_paid) WHEN 5 THEN sum(ws_net_paid) END) DESC
+|  order by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) ASC NULLS LAST, CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END ASC NULLS LAST, aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN sum(ws_net_paid) WHEN 4 THEN sum(ws_net_paid) WHEN 5 THEN sum(ws_net_paid) END) DESC
 |  row-size=46B cardinality=1.00K
 |
 06:AGGREGATE [FINALIZE]
@@ -13179,7 +13183,7 @@ PLAN-ROOT SINK
 |  row-size=54B cardinality=1.00K
 |
 07:SORT
-|  order by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) ASC NULLS FIRST, CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END ASC NULLS FIRST, aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN sum(ws_net_paid) WHEN 4 THEN sum(ws_net_paid) WHEN 5 THEN sum(ws_net_paid) END) DESC
+|  order by: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) ASC NULLS LAST, CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END ASC NULLS LAST, aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN sum(ws_net_paid) WHEN 4 THEN sum(ws_net_paid) WHEN 5 THEN sum(ws_net_paid) END) DESC
 |  row-size=46B cardinality=1.00K
 |
 14:EXCHANGE [HASH(aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) + aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END),CASE WHEN aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) = 0 THEN CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END END)]
@@ -13475,7 +13479,7 @@ PLAN-ROOT SINK
 |  row-size=70B cardinality=1.00K
 |
 09:SORT
-|  order by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) ASC NULLS FIRST, CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END ASC NULLS FIRST, aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_net_profit) WHEN 5 THEN sum(ss_net_profit) WHEN 6 THEN sum(ss_net_profit) END) / aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_ext_sales_price) WHEN 5 THEN sum(ss_ext_sales_price) WHEN 6 THEN sum(ss_ext_sales_price) END) ASC
+|  order by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) ASC NULLS LAST, CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END ASC NULLS LAST, aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_net_profit) WHEN 5 THEN sum(ss_net_profit) WHEN 6 THEN sum(ss_net_profit) END) / aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_ext_sales_price) WHEN 5 THEN sum(ss_ext_sales_price) WHEN 6 THEN sum(ss_ext_sales_price) END) ASC
 |  row-size=62B cardinality=1.00K
 |
 08:AGGREGATE [FINALIZE]
@@ -13549,7 +13553,7 @@ PLAN-ROOT SINK
 |  row-size=70B cardinality=1.00K
 |
 09:SORT
-|  order by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) ASC NULLS FIRST, CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END ASC NULLS FIRST, aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_net_profit) WHEN 5 THEN sum(ss_net_profit) WHEN 6 THEN sum(ss_net_profit) END) / aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_ext_sales_price) WHEN 5 THEN sum(ss_ext_sales_price) WHEN 6 THEN sum(ss_ext_sales_price) END) ASC
+|  order by: aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) ASC NULLS LAST, CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END ASC NULLS LAST, aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_net_profit) WHEN 5 THEN sum(ss_net_profit) WHEN 6 THEN sum(ss_net_profit) END) / aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN sum(ss_ext_sales_price) WHEN 5 THEN sum(ss_ext_sales_price) WHEN 6 THEN sum(ss_ext_sales_price) END) ASC
 |  row-size=62B cardinality=1.00K
 |
 17:EXCHANGE [HASH(aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 0 WHEN 6 THEN 1 END) + aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END),CASE WHEN aggif(valid_tid(4,5,6) IN (4, 5, 6), CASE valid_tid(4,5,6) WHEN 4 THEN 0 WHEN 5 THEN 1 WHEN 6 THEN 1 END) = 0 THEN CASE valid_tid(4,5,6) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN NULL END END)]
@@ -13624,8 +13628,8 @@ PLAN-ROOT SINK
    HDFS partitions=1824/1824 files=1824 size=346.60MB
    runtime filters: RF000 -> ss_store_sk, RF002 -> ss_item_sk, RF004 -> ss_sold_date_sk
    row-size=24B cardinality=2.88M
-=======
----- QUERY: TPCDS-Q38
+====
+# TPCDS-Q38
 SELECT count(*)
 FROM
   (SELECT DISTINCT c_last_name,
@@ -13899,7 +13903,7 @@ PLAN-ROOT SINK
    runtime filters: RF012 -> store_sales.ss_customer_sk, RF014 -> store_sales.ss_sold_date_sk
    row-size=8B cardinality=2.88M
 ====
----- QUERY: TPCDS-Q87
+# TPCDS-Q87
 SELECT count(*)
 FROM ((SELECT DISTINCT c_last_name,
                          c_first_name,

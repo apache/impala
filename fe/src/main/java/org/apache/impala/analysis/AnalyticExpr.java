@@ -219,7 +219,7 @@ public class AnalyticExpr extends Expr {
     return isAnalyticFn(fn, MIN) || isAnalyticFn(fn, MAX);
   }
 
-  static private boolean isRankingFn(Function fn) {
+  public static boolean isRankingFn(Function fn) {
     return isAnalyticFn(fn, RANK) || isAnalyticFn(fn, DENSERANK) ||
         isAnalyticFn(fn, ROWNUMBER);
   }

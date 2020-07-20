@@ -322,6 +322,9 @@ public class SingleNodePlanner {
     } else {
       root.setLimit(stmt.getLimit());
       root.computeStats(analyzer);
+      if (root.hasLimit()) {
+        checkAndApplyLimitPushdown(root, null, root.getLimit(), analyzer);
+      }
     }
 
     return root;
@@ -336,6 +339,10 @@ public class SingleNodePlanner {
       throws ImpalaException {
     SortNode sortNode;
     long topNBytesLimit = ctx_.getQueryOptions().topn_bytes_limit;
+
+    if (hasLimit && offset == 0) {
+      checkAndApplyLimitPushdown(root, sortInfo, limit, analyzer);
+    }
 
     if (hasLimit && !disableTopN) {
       if (topNBytesLimit <= 0) {
@@ -361,7 +368,81 @@ public class SingleNodePlanner {
     Preconditions.checkState(sortNode.hasValidStats());
     sortNode.setLimit(limit);
     sortNode.init(analyzer);
+
     return sortNode;
+  }
+
+  /**
+   * For certain qualifying conditions, we can push a limit from the top level
+   * sort down to the sort associated with an AnalyticEval node.
+   */
+  private void checkAndApplyLimitPushdown(PlanNode root, SortInfo sortInfo, long limit,
+      Analyzer analyzer) {
+    boolean pushdownLimit = false;
+    AnalyticEvalNode analyticNode = null;
+    List<PlanNode> intermediateNodes = new ArrayList<>();
+    List<Expr>  partitioningExprs = new ArrayList<>();
+    SortNode analyticNodeSort = null;
+    PlanNode descendant = findDescendantAnalyticNode(root, intermediateNodes);
+    if (descendant != null && intermediateNodes.size() <= 1) {
+      Preconditions.checkArgument(descendant instanceof AnalyticEvalNode);
+      analyticNode = (AnalyticEvalNode) descendant;
+      if (!(analyticNode.getChild(0) instanceof SortNode)) {
+        // if the over() clause is empty, there won't be a child SortNode
+        // so limit pushdown is not applicable
+        return;
+      }
+      analyticNodeSort = (SortNode) analyticNode.getChild(0);
+      int numNodes = intermediateNodes.size();
+      if (numNodes > 1 ||
+              (numNodes == 1 && !(intermediateNodes.get(0) instanceof SelectNode))) {
+        pushdownLimit = false;
+      } else if (numNodes == 0) {
+        pushdownLimit = analyticNode.isLimitPushdownSafe(sortInfo, null,
+            limit, analyticNodeSort, partitioningExprs, ctx_.getRootAnalyzer());
+      } else {
+        SelectNode selectNode = (SelectNode) intermediateNodes.get(0);
+        pushdownLimit = analyticNode.isLimitPushdownSafe(sortInfo, selectNode,
+            limit, analyticNodeSort, partitioningExprs, ctx_.getRootAnalyzer());
+      }
+    }
+
+    if (pushdownLimit) {
+      Preconditions.checkArgument(analyticNode != null);
+      Preconditions.checkArgument(analyticNode.getChild(0) instanceof SortNode);
+      analyticNodeSort.convertToTopN(limit, partitioningExprs, analyzer);
+      // after the limit is pushed down, update stats for the analytic eval node
+      // and intermediate nodes
+      analyticNode.computeStats(analyzer);
+      for (PlanNode n : intermediateNodes) {
+        n.computeStats(analyzer);
+      }
+    }
+  }
+
+  /**
+   * Starting from the supplied root PlanNode, traverse the descendants
+   * to find the first AnalyticEvalNode.  If a blocking node such as
+   * Join, Aggregate, Sort is encountered, return null. The
+   * 'intermediateNodes' is populated with the nodes encountered during
+   * traversal.
+   */
+  private PlanNode findDescendantAnalyticNode(PlanNode root,
+    List<PlanNode> intermediateNodes) {
+    if (root == null || root instanceof AnalyticEvalNode) {
+      return root;
+    }
+    // If we encounter a blocking operator (sort, aggregate, join), or a Subplan,
+    // there's no need to go further. Also, we bail early if we encounter multi-input
+    // operator such as union-all.  In the future, we could potentially extend the
+    // limit pushdown to both sides of a union-all
+    if (root instanceof SortNode || root instanceof AggregationNode ||
+          root instanceof JoinNode || root instanceof SubplanNode ||
+          root.getChildren().size() > 1) {
+      return null;
+    }
+    intermediateNodes.add(root);
+    return findDescendantAnalyticNode(root.getChild(0), intermediateNodes);
   }
 
   /**
