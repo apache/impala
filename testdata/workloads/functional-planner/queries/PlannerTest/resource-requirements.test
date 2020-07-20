@@ -2993,7 +2993,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT)
 |
 01:SORT
-|  order by: int_col ASC NULLS FIRST
+|  order by: int_col ASC NULLS LAST
 |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=5B cardinality=7.30K
 |  in pipelines: 01(GETNEXT), 00(OPEN)
@@ -3036,7 +3036,7 @@ Per-Host Resources: mem-estimate=10.04MB mem-reservation=10.00MB thread-reservat
 |  in pipelines: 01(GETNEXT)
 |
 01:SORT
-|  order by: int_col ASC NULLS FIRST
+|  order by: int_col ASC NULLS LAST
 |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=5B cardinality=7.30K
 |  in pipelines: 01(GETNEXT), 00(OPEN)
@@ -3086,7 +3086,7 @@ Per-Instance Resources: mem-estimate=10.06MB mem-reservation=10.00MB thread-rese
 |  in pipelines: 01(GETNEXT)
 |
 01:SORT
-|  order by: int_col ASC NULLS FIRST
+|  order by: int_col ASC NULLS LAST
 |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=5B cardinality=7.30K
 |  in pipelines: 01(GETNEXT), 00(OPEN)
@@ -5859,7 +5859,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT)
 |
 01:SORT
-|  order by: tinyint_col ASC NULLS FIRST, smallint_col ASC
+|  order by: tinyint_col ASC NULLS LAST, smallint_col ASC
 |  mem-estimate=6.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=3B cardinality=11.00K
 |  in pipelines: 01(GETNEXT), 00(OPEN)
@@ -6090,4 +6090,135 @@ Per-Host Resources: mem-estimate=0B mem-reservation=0B thread-reservation=1
    mem-estimate=0B mem-reservation=0B thread-reservation=0
    tuple-ids=0 row-size=1B cardinality=1
    in pipelines: <none>
+====
+# IMPALA-9983: Limit pushdown into analytic sort
+select * from (
+  select l_partkey, l_quantity, l_orderkey,
+    rank() over (partition by l_partkey order by l_orderkey desc) rk
+  from tpch_parquet.lineitem) dt
+where rk <= 100
+order by l_partkey, l_quantity, l_orderkey, rk
+limit 100
+---- PLAN
+Max Per-Host Resource Reservation: Memory=20.00MB Threads=2
+Per-Host Resource Estimates: Memory=84MB
+Analyzed query: SELECT * FROM (SELECT l_partkey, l_quantity, l_orderkey, rank()
+OVER (PARTITION BY l_partkey ORDER BY l_orderkey DESC) rk FROM
+tpch_parquet.lineitem) dt WHERE rk <= CAST(100 AS BIGINT) ORDER BY l_partkey
+ASC, l_quantity ASC, l_orderkey ASC, rk ASC LIMIT CAST(100 AS TINYINT)
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=84.00MB mem-reservation=20.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: l_partkey, l_quantity, l_orderkey, rk
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+04:TOP-N [LIMIT=100]
+|  order by: l_partkey ASC, l_quantity ASC, l_orderkey ASC, rk ASC
+|  mem-estimate=3.12KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=32B cardinality=100
+|  in pipelines: 04(GETNEXT), 01(OPEN)
+|
+03:SELECT
+|  predicates: rank() <= CAST(100 AS BIGINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=8,7 row-size=32B cardinality=100
+|  in pipelines: 01(GETNEXT)
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: l_partkey
+|  order by: l_orderkey DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8,7 row-size=32B cardinality=100
+|  in pipelines: 01(GETNEXT)
+|
+01:TOP-N [LIMIT=100]
+|  order by: l_partkey ASC NULLS LAST, l_orderkey DESC
+|  mem-estimate=2.34KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=24B cardinality=100
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [tpch_parquet.lineitem]
+   HDFS partitions=1/1 files=3 size=193.98MB
+   stored statistics:
+     table: rows=6.00M size=193.98MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=16.00MB thread-reservation=1
+   tuple-ids=0 row-size=24B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=20.00MB Threads=4
+Per-Host Resource Estimates: Memory=84MB
+Analyzed query: SELECT * FROM (SELECT l_partkey, l_quantity, l_orderkey, rank()
+OVER (PARTITION BY l_partkey ORDER BY l_orderkey DESC) rk FROM
+tpch_parquet.lineitem) dt WHERE rk <= CAST(100 AS BIGINT) ORDER BY l_partkey
+ASC, l_quantity ASC, l_orderkey ASC, rk ASC LIMIT CAST(100 AS TINYINT)
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: l_partkey, l_quantity, l_orderkey, rk
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: l_partkey ASC, l_quantity ASC, l_orderkey ASC, rk ASC
+|  limit: 100
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=32B cardinality=100
+|  in pipelines: 04(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(l_partkey)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
+04:TOP-N [LIMIT=100]
+|  order by: l_partkey ASC, l_quantity ASC, l_orderkey ASC, rk ASC
+|  mem-estimate=3.12KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=32B cardinality=100
+|  in pipelines: 04(GETNEXT), 06(OPEN)
+|
+03:SELECT
+|  predicates: rank() <= CAST(100 AS BIGINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=8,7 row-size=32B cardinality=100
+|  in pipelines: 06(GETNEXT)
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: l_partkey
+|  order by: l_orderkey DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=8,7 row-size=32B cardinality=100
+|  in pipelines: 06(GETNEXT)
+|
+06:TOP-N [LIMIT=100]
+|  order by: l_partkey ASC NULLS LAST, l_orderkey DESC
+|  mem-estimate=2.34KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=24B cardinality=100
+|  in pipelines: 06(GETNEXT), 01(OPEN)
+|
+05:EXCHANGE [HASH(l_partkey)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=24B cardinality=100
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=80.00MB mem-reservation=16.00MB thread-reservation=2
+01:TOP-N [LIMIT=100]
+|  order by: l_partkey ASC NULLS LAST, l_orderkey DESC
+|  mem-estimate=2.34KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=24B cardinality=100
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
+   HDFS partitions=1/1 files=3 size=193.98MB
+   stored statistics:
+     table: rows=6.00M size=193.98MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=2.14M
+   mem-estimate=80.00MB mem-reservation=16.00MB thread-reservation=1
+   tuple-ids=0 row-size=24B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
 ====

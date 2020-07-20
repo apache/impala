@@ -76,9 +76,9 @@ PLAN-ROOT SINK
 |     row-size=89B cardinality=8
 |
 01:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=202.01KB
+   HDFS partitions=24/24 files=24 size=203.33KB
    runtime filters: RF000 -> int_col
-   row-size=4B cardinality=12.85K
+   row-size=4B cardinality=12.94K
 ---- PARALLELPLANS
 PLAN-ROOT SINK
 |
@@ -102,9 +102,9 @@ PLAN-ROOT SINK
 03:EXCHANGE [HASH(int_col)]
 |
 01:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=202.01KB
+   HDFS partitions=24/24 files=24 size=203.33KB
    runtime filters: RF000 -> int_col
-   row-size=4B cardinality=12.85K
+   row-size=4B cardinality=12.94K
 ====
 # IMPALA-1270: distinct should be added to subquery automatically because
 # it would reduce cardinality significantly.
@@ -912,7 +912,7 @@ PLAN-ROOT SINK
 |  |  row-size=16B cardinality=7.30K
 |  |
 |  02:SORT
-|  |  order by: int_col ASC NULLS FIRST, id ASC
+|  |  order by: int_col ASC NULLS LAST, id ASC
 |  |  row-size=8B cardinality=7.30K
 |  |
 |  01:SCAN HDFS [functional.alltypes t2]
@@ -957,7 +957,7 @@ PLAN-ROOT SINK
 |  |  row-size=16B cardinality=7.30K
 |  |
 |  02:SORT
-|  |  order by: int_col ASC NULLS FIRST, id ASC
+|  |  order by: int_col ASC NULLS LAST, id ASC
 |  |  row-size=8B cardinality=7.30K
 |  |
 |  06:EXCHANGE [HASH(int_col)]

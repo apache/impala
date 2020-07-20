@@ -36,9 +36,12 @@ import com.google.common.base.Preconditions;
  */
 public class SelectNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(SelectNode.class);
+  // in some optimizations the selectivity may be set explicitly
+  private double selectivity_;
 
   protected SelectNode(PlanNodeId id, PlanNode child, List<Expr> conjuncts) {
     super(id, "SELECT");
+    selectivity_ = -1.0;
     addChild(child);
     conjuncts_.addAll(conjuncts);
     computeTupleIds();
@@ -79,6 +82,16 @@ public class SelectNode extends PlanNode {
       LOG.trace("stats Select: cardinality=" + Long.toString(cardinality_));
     }
   }
+
+  @Override
+  protected double computeSelectivity() {
+    if (selectivity_ == -1) {
+      return super.computeSelectivity();
+    }
+    return selectivity_;
+  }
+
+  public void setSelectivity(double value) { selectivity_ = value; }
 
   @Override
   public void computeNodeResourceProfile(TQueryOptions queryOptions) {

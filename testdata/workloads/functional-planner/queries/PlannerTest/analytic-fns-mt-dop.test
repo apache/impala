@@ -14,7 +14,7 @@ PLAN-ROOT SINK
 |  row-size=28B cardinality=2.88M
 |
 03:SORT
-|  order by: ss_sold_date_sk ASC NULLS FIRST, ss_store_sk ASC NULLS FIRST
+|  order by: ss_sold_date_sk ASC NULLS LAST, ss_store_sk ASC NULLS LAST
 |  row-size=20B cardinality=2.88M
 |
 02:ANALYTIC
@@ -23,11 +23,11 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=2.88M
 |
 01:SORT
-|  order by: ss_addr_sk ASC NULLS FIRST, ss_store_sk ASC NULLS FIRST
+|  order by: ss_addr_sk ASC NULLS LAST, ss_store_sk ASC NULLS LAST
 |  row-size=12B cardinality=2.88M
 |
 00:SCAN HDFS [tpcds_parquet.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=196.96MB
+   HDFS partitions=1824/1824 files=1824 size=200.95MB
    row-size=12B cardinality=2.88M
 ---- PARALLELPLANS
 PLAN-ROOT SINK
@@ -40,7 +40,7 @@ PLAN-ROOT SINK
 |  row-size=28B cardinality=2.88M
 |
 03:SORT
-|  order by: ss_sold_date_sk ASC NULLS FIRST, ss_store_sk ASC NULLS FIRST
+|  order by: ss_sold_date_sk ASC NULLS LAST, ss_store_sk ASC NULLS LAST
 |  row-size=20B cardinality=2.88M
 |
 06:EXCHANGE [HASH(ss_sold_date_sk,ss_store_sk)]
@@ -51,13 +51,13 @@ PLAN-ROOT SINK
 |  row-size=20B cardinality=2.88M
 |
 01:SORT
-|  order by: ss_addr_sk ASC NULLS FIRST, ss_store_sk ASC NULLS FIRST
+|  order by: ss_addr_sk ASC NULLS LAST, ss_store_sk ASC NULLS LAST
 |  row-size=12B cardinality=2.88M
 |
 05:EXCHANGE [HASH(ss_addr_sk,ss_store_sk)]
 |
 00:SCAN HDFS [tpcds_parquet.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=196.96MB
+   HDFS partitions=1824/1824 files=1824 size=200.95MB
    row-size=12B cardinality=2.88M
 ====
 # Negative case for IMPALA-9000 - ss_item_sk has NDV=17975 and thus partitioning on it
@@ -74,7 +74,7 @@ PLAN-ROOT SINK
 |  row-size=32B cardinality=2.88M
 |
 03:SORT
-|  order by: ss_sold_date_sk ASC NULLS FIRST, ss_item_sk ASC NULLS FIRST
+|  order by: ss_sold_date_sk ASC NULLS LAST, ss_item_sk ASC NULLS LAST
 |  row-size=24B cardinality=2.88M
 |
 02:ANALYTIC
@@ -83,11 +83,11 @@ PLAN-ROOT SINK
 |  row-size=24B cardinality=2.88M
 |
 01:SORT
-|  order by: ss_addr_sk ASC NULLS FIRST, ss_item_sk ASC NULLS FIRST
+|  order by: ss_addr_sk ASC NULLS LAST, ss_item_sk ASC NULLS LAST
 |  row-size=16B cardinality=2.88M
 |
 00:SCAN HDFS [tpcds_parquet.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=196.96MB
+   HDFS partitions=1824/1824 files=1824 size=200.95MB
    row-size=16B cardinality=2.88M
 ---- PARALLELPLANS
 PLAN-ROOT SINK
@@ -100,7 +100,7 @@ PLAN-ROOT SINK
 |  row-size=32B cardinality=2.88M
 |
 03:SORT
-|  order by: ss_sold_date_sk ASC NULLS FIRST, ss_item_sk ASC NULLS FIRST
+|  order by: ss_sold_date_sk ASC NULLS LAST, ss_item_sk ASC NULLS LAST
 |  row-size=24B cardinality=2.88M
 |
 02:ANALYTIC
@@ -109,12 +109,12 @@ PLAN-ROOT SINK
 |  row-size=24B cardinality=2.88M
 |
 01:SORT
-|  order by: ss_addr_sk ASC NULLS FIRST, ss_item_sk ASC NULLS FIRST
+|  order by: ss_addr_sk ASC NULLS LAST, ss_item_sk ASC NULLS LAST
 |  row-size=16B cardinality=2.88M
 |
 05:EXCHANGE [HASH(ss_item_sk)]
 |
 00:SCAN HDFS [tpcds_parquet.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=196.96MB
+   HDFS partitions=1824/1824 files=1824 size=200.95MB
    row-size=16B cardinality=2.88M
 ====

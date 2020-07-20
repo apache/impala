@@ -1,0 +1,782 @@
+# IMPALA-9983
+# Base case. Limit pushdown into analytic sort should be applied
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk <= 10
+order by int_col, bigint_col, smallint_col, rk
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() <= 10
+|  row-size=22B cardinality=10
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  limit: 10
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() <= 10
+|  row-size=22B cardinality=10
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+06:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+05:EXCHANGE [HASH(int_col)]
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# row_number() predicate on equality instead of range.
+# Limit pushdown into analytic sort should be applied.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    row_number() over (partition by int_col order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk = 5
+order by int_col, bigint_col, smallint_col, rk
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=1
+|
+03:SELECT
+|  predicates: row_number() = 5
+|  row-size=22B cardinality=1
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  limit: 10
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=1
+|
+03:SELECT
+|  predicates: row_number() = 5
+|  row-size=22B cardinality=1
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+06:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+05:EXCHANGE [HASH(int_col)]
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# Multi column partition-by which is prefix of sort exprs.
+# Limit pushdown into analytic sort should be applied
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col, bigint_col
+                 order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk <= 10
+order by int_col, bigint_col, smallint_col, rk
+limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() <= 10
+|  row-size=22B cardinality=10
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col, bigint_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, bigint_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  limit: 10
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() <= 10
+|  row-size=22B cardinality=10
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col, bigint_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+06:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, bigint_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+05:EXCHANGE [HASH(int_col,bigint_col)]
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, bigint_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# No predicate after the analytic function.
+# Limit pushdown should be applied
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col, bigint_col
+                 order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+order by int_col, bigint_col, smallint_col, rk
+limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col, bigint_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, bigint_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  limit: 10
+|
+03:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col, bigint_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+05:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, bigint_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+04:EXCHANGE [HASH(int_col,bigint_col)]
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, bigint_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# Limit is present without Order By.
+# Limit pushdown should be applied.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk <= 10
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: rank() <= 10
+|  limit: 10
+|  row-size=22B cardinality=10
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|  limit: 10
+|
+03:SELECT
+|  predicates: rank() <= 10
+|  limit: 10
+|  row-size=22B cardinality=10
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+05:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+04:EXCHANGE [HASH(int_col,smallint_col)]
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# rank() predicate operands is flipped.
+# Limit pushdown should be applied.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where 10 > rk
+order by int_col, bigint_col, smallint_col, rk
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() < 10
+|  row-size=22B cardinality=10
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  limit: 10
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() < 10
+|  row-size=22B cardinality=10
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+06:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+05:EXCHANGE [HASH(int_col)]
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# Partition-by and order-by exprs refer to derived table
+# columns rather than base table columns.
+# Limit pushdown should be applied.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col order by smallint_col desc) rk
+  from (select int_col, bigint_col, smallint_col from functional.alltypesagg
+        group by int_col, bigint_col, smallint_col)dt1)dt2
+where rk <= 10
+order by int_col, bigint_col, smallint_col, rk
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+05:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+04:SELECT
+|  predicates: rank() <= 10
+|  row-size=22B cardinality=10
+|
+03:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=10
+|
+02:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=10
+|
+01:AGGREGATE [FINALIZE]
+|  group by: int_col, bigint_col, smallint_col
+|  row-size=14B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# No limit in the query.
+# Limit pushdown should not be applied.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk <= 10
+order by int_col, bigint_col, smallint_col, rk
+---- PLAN
+PLAN-ROOT SINK
+|
+04:SORT
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=1.10K
+|
+03:SELECT
+|  predicates: rank() <= 10
+|  row-size=22B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=11.00K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# Rank predicate's upper bound is greater than limit.
+# Limit pushdown should not be applied.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk <= 20
+order by int_col, bigint_col, smallint_col, rk
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() <= 20
+|  row-size=22B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=11.00K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# Function is not a ranking function.
+# Limit pushdown should not be applied.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    min(double_col) over (partition by int_col
+                          order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk <= 10
+order by int_col, bigint_col, smallint_col, rk
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: min(double_col) <= 10
+|  row-size=30B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: min(double_col)
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=30B cardinality=11.00K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=22B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=22B cardinality=11.00K
+====
+# Partition-by expr is not a prefix of the sort exprs.
+# Limit pushdown should not be applied.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk <= 10
+order by bigint_col, int_col, smallint_col, rk
+limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: bigint_col ASC, int_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() <= 10
+|  row-size=22B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=11.00K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# Blocking operator occurs between the top level TopN
+# operator and the analytic operator.
+# Limit pushdown should not be applied.
+select int_col, bigint_col, smallint_col, rk from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk <= 10
+group by int_col, bigint_col, smallint_col, rk
+order by int_col, bigint_col, smallint_col, rk
+limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+05:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+04:AGGREGATE [FINALIZE]
+|  group by: int_col, bigint_col, smallint_col, rank()
+|  row-size=22B cardinality=1.10K
+|
+03:SELECT
+|  predicates: rank() <= 10
+|  row-size=22B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=11.00K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# Rank predicate is not one of <, =, <= .
+# Limit pushdown should not be applied.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk in (10, 20, 30)
+order by int_col, bigint_col, smallint_col, rk
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() IN (10, 20, 30)
+|  row-size=22B cardinality=11.00K
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=11.00K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# 2 ranking functions with different partition-by exprs. Predicate is on
+# the dense_rank() function. If the dense_rank() appears as the top
+# level analytic function, the limit pushdown can be applied. Otherwise,
+# it should not.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    dense_rank() over (partition by bigint_col order by smallint_col desc) rk2,
+    rank() over (partition by int_col order by smallint_col desc) rk1
+  from functional.alltypesagg) dt
+where rk2 <= 10
+order by int_col, bigint_col, smallint_col, rk1, rk2
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+06:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk1 ASC, rk2 ASC
+|  row-size=30B cardinality=10
+|
+05:SELECT
+|  predicates: dense_rank() <= 10
+|  row-size=30B cardinality=1.10K
+|
+04:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=30B cardinality=11.00K
+|
+03:SORT
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=22B cardinality=11.00K
+|
+02:ANALYTIC
+|  functions: dense_rank()
+|  partition by: bigint_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=11.00K
+|
+01:SORT
+|  order by: bigint_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# Asc/Desc direction is different for the top order-by.
+# Limit pushdown should not be applied.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk <= 10
+order by int_col DESC, bigint_col, smallint_col, rk
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col DESC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() <= 10
+|  row-size=22B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=11.00K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# NULLS FIRST for the top order-by which is different compared
+# to the partition-by expr.
+# Limit pushdown should not be applied.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk <= 10
+order by int_col NULLS FIRST, bigint_col, smallint_col, rk
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC NULLS FIRST, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() <= 10
+|  row-size=22B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=11.00K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====

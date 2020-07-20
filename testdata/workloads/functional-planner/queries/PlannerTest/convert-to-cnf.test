@@ -365,7 +365,7 @@ PLAN-ROOT SINK
 |  limit: 5
 |  row-size=28B cardinality=5
 |
-01:SORT
+01:TOP-N [LIMIT=5]
 |  order by: if(l_quantity < 5 OR l_quantity > 45, 'invalid', 'valid') ASC
 |  row-size=20B cardinality=6.00M
 |

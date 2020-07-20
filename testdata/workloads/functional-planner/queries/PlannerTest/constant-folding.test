@@ -369,7 +369,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT)
 |
 01:SORT
-|  order by: concat('ab', string_col) ASC NULLS FIRST, greatest(20, bigint_col) ASC
+|  order by: concat('ab', string_col) ASC NULLS LAST, greatest(20, bigint_col) ASC
 |  materialized: concat('ab', string_col), greatest(20, bigint_col)
 |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=45B cardinality=7.30K

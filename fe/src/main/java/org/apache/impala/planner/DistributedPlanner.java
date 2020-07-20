@@ -99,7 +99,8 @@ public class DistributedPlanner {
       // allow child fragments to be partitioned, unless they contain a limit clause
       // (the result set with the limit constraint needs to be computed centrally);
       // merge later if needed
-      boolean childIsPartitioned = !child.hasLimit();
+      boolean childIsPartitioned = child.allowPartitioned();
+
       // Do not fragment the subplan of a SubplanNode since it is executed locally.
       if (root instanceof SubplanNode && child == root.getChild(1)) continue;
       childFragments.add(createPlanFragments(child, childIsPartitioned, fragments));
@@ -773,6 +774,11 @@ public class DistributedPlanner {
     childFragment.setDestination(exchangeNode);
   }
 
+  private PlanFragment createParentFragment(
+      PlanFragment childFragment, DataPartition parentPartition) throws ImpalaException {
+    return createParentFragment(childFragment, parentPartition, false);
+  }
+
   /**
    * Create a new fragment containing a single ExchangeNode that consumes the output
    * of childFragment, set the destination of childFragment to the new parent
@@ -784,11 +790,12 @@ public class DistributedPlanner {
    * correct for the input).
    */
   private PlanFragment createParentFragment(
-      PlanFragment childFragment, DataPartition parentPartition)
+      PlanFragment childFragment, DataPartition parentPartition, boolean unsetLimit)
       throws ImpalaException {
     ExchangeNode exchangeNode =
         new ExchangeNode(ctx_.getNextNodeId(), childFragment.getPlanRoot());
     exchangeNode.init(ctx_.getRootAnalyzer());
+    if (unsetLimit) exchangeNode.unsetLimit();
     PlanFragment parentFragment = new PlanFragment(ctx_.getNextFragmentId(),
         exchangeNode, parentPartition);
     childFragment.setDestination(exchangeNode);
@@ -1019,16 +1026,47 @@ public class DistributedPlanner {
     SortNode sortNode = (SortNode) node;
     Preconditions.checkState(sortNode.isAnalyticSort());
     PlanFragment analyticFragment = childFragment;
+
+    boolean addedLowerTopN = false;
+    SortNode lowerTopN = null;
+    AnalyticEvalNode analyticNode = sortNode.getAnalyticEvalNode();
     if (sortNode.getInputPartition() != null) {
       sortNode.getInputPartition().substitute(
           childFragment.getPlanRoot().getOutputSmap(), ctx_.getRootAnalyzer());
       // Make sure the childFragment's output is partitioned as required by the sortNode.
       DataPartition sortPartition = sortNode.getInputPartition();
       if (!childFragment.getDataPartition().equals(sortPartition)) {
-        analyticFragment = createParentFragment(childFragment, sortPartition);
+        if (sortNode.hasLimit() && sortNode.isTypeTopN()) {
+          lowerTopN = sortNode;
+          childFragment.addPlanRoot(lowerTopN);
+          addedLowerTopN = true;
+          DataPartition hashPartition =
+            DataPartition.hashPartitioned(lowerTopN.getPartitioningExprs());
+          // When creating the analytic fragment, pass in a flag to unset the limit
+          // on the partition exchange. This ensures that the exchange does not
+          // prematurely stop sending rows in case there's a downstream operator
+          // that has a LIMIT - for instance a Sort with LIMIT after the
+          // Analytic operator.
+          analyticFragment = createParentFragment(childFragment, hashPartition,
+             true);
+        } else {
+          analyticFragment = createParentFragment(childFragment, sortPartition);
+        }
       }
     }
-    analyticFragment.addPlanRoot(sortNode);
+    if (addedLowerTopN) {
+      // Create the upper TopN node
+      SortNode upperTopN = SortNode.createTopNSortNode(ctx_.getNextNodeId(),
+              childFragment.getPlanRoot(), lowerTopN.getSortInfo(), sortNode.getOffset());
+      upperTopN.setIsAnalyticSort(true);
+      upperTopN.init(ctx_.getRootAnalyzer());
+      upperTopN.setLimit(lowerTopN.getLimit());
+      // connect this to the analytic eval node
+      analyticNode.setChild(0, upperTopN);
+      analyticFragment.addPlanRoot(upperTopN);
+    } else {
+      analyticFragment.addPlanRoot(sortNode);
+    }
     return analyticFragment;
   }
 

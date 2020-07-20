@@ -1,0 +1,74 @@
+====
+---- QUERY
+# IMPALA-9983
+# Base case. Limit pushdown into analytic sort should be applied
+select * from (
+  select l_partkey, l_quantity, l_orderkey,
+    rank() over (partition by l_partkey order by l_orderkey desc) rk
+  from lineitem) dt
+where rk <= 10
+order by l_partkey, l_quantity, l_orderkey, rk
+limit 10
+---- RESULTS
+1,16.00,4464900,9
+1,20.00,4450401,10
+1,21.00,5618244,3
+1,30.00,4912929,7
+1,32.00,5926723,1
+1,33.00,5362629,4
+1,37.00,4810753,8
+1,38.00,5862498,2
+1,40.00,5352710,5
+1,42.00,5120486,6
+---- TYPES
+BIGINT, DECIMAL, BIGINT, BIGINT
+====
+---- QUERY
+# Multi column partition-by which is prefix of sort exprs.
+# Limit pushdown into analytic sort should be applied
+select * from (
+  select l_partkey, l_quantity, l_orderkey,
+    rank() over (partition by l_partkey, l_quantity
+                 order by l_orderkey desc) rk
+  from lineitem) dt
+where rk <= 10
+order by l_partkey, l_quantity, l_orderkey, rk
+limit 10
+---- RESULTS
+1,1.00,599361,1
+1,8.00,3438019,1
+1,11.00,4422049,1
+1,14.00,2535332,1
+1,15.00,545153,1
+1,16.00,1139363,3
+1,16.00,1695463,2
+1,16.00,4464900,1
+1,19.00,1876199,1
+1,20.00,4450401,1
+---- TYPES
+BIGINT, DECIMAL, BIGINT, BIGINT
+====
+---- QUERY
+# No predicate after the analytic function.
+# Limit pushdown should be applied
+select * from (
+  select l_partkey, l_quantity, l_orderkey,
+    rank() over (partition by l_partkey, l_quantity
+                 order by l_orderkey desc) rk
+  from lineitem) dt
+order by l_partkey, l_quantity, l_orderkey, rk
+limit 10
+---- RESULTS
+1,1.00,599361,1
+1,8.00,3438019,1
+1,11.00,4422049,1
+1,14.00,2535332,1
+1,15.00,545153,1
+1,16.00,1139363,3
+1,16.00,1695463,2
+1,16.00,4464900,1
+1,19.00,1876199,1
+1,20.00,4450401,1
+---- TYPES
+BIGINT, DECIMAL, BIGINT, BIGINT
+====
