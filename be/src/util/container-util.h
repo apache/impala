@@ -30,6 +30,7 @@
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Status_types.h"
 #include "gen-cpp/Types_types.h"
+#include "gen-cpp/StatestoreService_types.h"
 #include "gen-cpp/common.pb.h"
 
 /// Comparators for types that we commonly use in containers.
@@ -114,6 +115,14 @@ STATIC_ASSERT_SIZE(TCounter, 56);
 inline bool operator==(const TCounter& lhs, const TCounter& rhs) {
   return std::tie(lhs.name, lhs.unit, lhs.value)
       == std::tie(rhs.name, rhs.unit, rhs.value);
+}
+
+// THeavyMemoryQuery
+STATIC_ASSERT_SIZE(THeavyMemoryQuery, 40);
+
+inline bool operator>(const THeavyMemoryQuery& lhs, const THeavyMemoryQuery& rhs) {
+  return std::tie(lhs.memory_consumed, lhs.queryId)
+      > std::tie(rhs.memory_consumed, rhs.queryId);
 }
 
 /// Hash function for TNetworkAddress. This function must be called hash_value to be picked

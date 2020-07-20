@@ -25,6 +25,17 @@ enum StatestoreServiceVersion {
    V1 = 0
 }
 
+// Description of a single entry in a list of heavy memory usage queries
+struct THeavyMemoryQuery {
+
+  // The memory consumption of the query
+  1: required i64 memory_consumed;
+
+  // The Id of the query
+  2: required Types.TUniqueId queryId;
+}
+
+
 // Structure serialized for the topic AdmissionController::IMPALA_REQUEST_QUEUE_TOPIC.
 // Statistics for a single admission control pool. The topic key is of the form
 // "<pool_name>!<backend_id>".
@@ -42,6 +53,25 @@ struct TPoolStats {
   // execution on this impalad, this value increases by 10G. Any other impalads executing
   // this query will also increment their backend_mem_reserved by 10G.
   3: required i64 backend_mem_reserved;
+
+  // More entries about queries running in the backend.
+  //
+  // List of queries with top-k memory consumptions.
+  4: required list<THeavyMemoryQuery> heavy_memory_queries;
+
+  // Min memory consumption among all queries.
+  5: required i64 min_memory_consumed;
+
+  // Max memory consumption among all queries.
+  6: required i64 max_memory_consumed;
+
+  // Total memory consumption among all queries.
+  7: required i64 total_memory_consumed;
+
+  // The number of queries that have live fragments taking up memory on the host in
+  // a pool. These queries must be tracked by some query mem trackers. In comparison,
+  // num_admitted_running tracks the number of queries admitted in a host.
+  8: required i64 num_running;
 }
 
 // Description of a single entry in a topic

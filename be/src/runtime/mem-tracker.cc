@@ -31,6 +31,7 @@
 #include "util/pretty-printer.h"
 #include "util/test-info.h"
 #include "util/uid-util.h"
+#include "util/container-util.h"
 
 #include "common/names.h"
 
@@ -404,12 +405,83 @@ void MemTracker::GetTopNQueries(
   }
 }
 
+// Update the memory consumption related fields in pool_stats.
+void MemTracker::UpdatePoolStatsForMemoryConsumed(
+    int64_t mem_consumed, TPoolStats& pool_stats) {
+  if (pool_stats.min_memory_consumed > mem_consumed) {
+    pool_stats.min_memory_consumed = mem_consumed;
+  }
+  if (pool_stats.max_memory_consumed < mem_consumed) {
+    pool_stats.max_memory_consumed = mem_consumed;
+  }
+  pool_stats.total_memory_consumed += mem_consumed;
+  pool_stats.num_running++;
+}
+
+// Update pool_stats for all queries tracked through query memory trackers:
+void MemTracker::UpdatePoolStatsForQueries(int limit, TPoolStats& pool_stats) {
+  if (limit == 0) return;
+  // Init all memory consumption related fields
+  pool_stats.heavy_memory_queries.clear();
+  pool_stats.min_memory_consumed = std::numeric_limits<int64_t>::max();
+  pool_stats.max_memory_consumed = 0;
+  pool_stats.total_memory_consumed = 0;
+  pool_stats.num_running = 0;
+  // Collect the top 'limit' queries into 'min_pq'.
+  MinPriorityQueue min_pq;
+  GetTopNQueriesAndUpdatePoolStats(min_pq, limit, pool_stats);
+  // Grab all remaining entries from the priority queue and assign them in the descending
+  // order of memory consumption to the pool_stats.heavy_memory_queries field in
+  // pool_stats.
+  auto& queries = pool_stats.heavy_memory_queries;
+  queries.clear();
+  while (!min_pq.empty()) {
+    queries.push_back(min_pq.top());
+    min_pq.pop();
+  }
+  std::reverse(queries.begin(), queries.end());
+  // If not a single query is found, set the min_memory_consumed to 0.
+  if (pool_stats.num_running == 0) {
+    pool_stats.min_memory_consumed = 0;
+  }
+}
+
+void MemTracker::GetTopNQueriesAndUpdatePoolStats(
+    MinPriorityQueue& min_pq, int limit, TPoolStats& pool_stats) {
+  lock_guard<SpinLock> l(child_trackers_lock_);
+  for (MemTracker* tracker : child_trackers_) {
+    if (!tracker->is_query_mem_tracker_) {
+      tracker->GetTopNQueriesAndUpdatePoolStats(min_pq, limit, pool_stats);
+    } else {
+      DCHECK(tracker->is_query_mem_tracker_) << label_;
+      int64_t mem_consumed = tracker->consumption();
+
+      THeavyMemoryQuery heavy_memory_query;
+      heavy_memory_query.__set_memory_consumed(mem_consumed);
+      heavy_memory_query.__set_queryId(tracker->query_id_);
+
+      min_pq.push(heavy_memory_query);
+      if (min_pq.size() > limit) min_pq.pop();
+
+      UpdatePoolStatsForMemoryConsumed(mem_consumed, pool_stats);
+    }
+  }
+}
+
 MemTracker* MemTracker::GetQueryMemTracker() {
   MemTracker* tracker = this;
   while (tracker != nullptr && !tracker->is_query_mem_tracker_) {
     tracker = tracker->parent_;
   }
   return tracker;
+}
+
+MemTracker* MemTracker::GetRootMemTracker() {
+  MemTracker* ancestor = this;
+  while (ancestor && ancestor->parent()) {
+    ancestor = ancestor->parent();
+  }
+  return ancestor;
 }
 
 Status MemTracker::MemLimitExceeded(MemTracker* mtracker, RuntimeState* state,

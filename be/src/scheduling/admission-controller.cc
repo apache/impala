@@ -261,12 +261,54 @@ static inline bool ParsePoolTopicKey(const string& topic_key, string* pool_name,
   return true;
 }
 
+// Append to ss a debug string for memory consumption part of the pool stats.
+// Here is one example.
+// topN_query_stats: queries=[554b016cf0f3a37f:9a1bfcfd00000000,
+// 464dcd9cc47d724b:9e6a3f6400000000, 2844275a1458bf1f:0bc5887500000000,
+// a449dbc7bcbd2af1:647e6ded00000000, 8c430ea5ad38e94a:3c27bf4400000000],
+// total_mem_consumed=1.26 MB, fraction_of_pool_total_mem=0.61; pool_level_stats:
+// num_running=10, min=0, max=257.48 KB, pool_total_mem=2.06 MB, average_per_query=210.74
+// KB
+void AdmissionController::PoolStats::AppendStatsForConsumedMemory(
+    stringstream& ss, const TPoolStats& stats) {
+  ss << "topN_query_stats: ";
+  ss << "queries=[";
+  int num_ids = stats.heavy_memory_queries.size();
+  int64_t total_memory_consumed_by_top_queries = 0;
+  for (int i = 0; i < num_ids; i++) {
+    auto& query = stats.heavy_memory_queries[i];
+    total_memory_consumed_by_top_queries += query.memory_consumed;
+    ss << PrintId(query.queryId);
+    if (i < num_ids - 1) ss << ", ";
+  }
+  ss << "], ";
+  ss << "total_mem_consumed="
+     << PrettyPrinter::PrintBytes(total_memory_consumed_by_top_queries);
+  int64_t total_memory_consumed = stats.total_memory_consumed;
+  if (total_memory_consumed > 0) {
+    ss << ", fraction_of_pool_total_mem=" << setprecision(2)
+       << float(total_memory_consumed_by_top_queries) / total_memory_consumed;
+  }
+  ss << "; ";
+
+  ss << "pool_level_stats: ";
+  ss << "num_running=" << stats.num_running << ", ";
+  ss << "min=" << PrettyPrinter::PrintBytes(stats.min_memory_consumed) << ", ";
+  ss << "max=" << PrettyPrinter::PrintBytes(stats.max_memory_consumed) << ", ";
+  ss << "pool_total_mem=" << PrettyPrinter::PrintBytes(total_memory_consumed);
+  if (stats.num_running > 0) {
+    ss << ", average_per_query="
+       << PrettyPrinter::PrintBytes(total_memory_consumed / stats.num_running);
+  }
+}
+
 // Return a debug string for the pool stats.
-static string DebugPoolStats(const TPoolStats& stats) {
+string AdmissionController::PoolStats::DebugPoolStats(const TPoolStats& stats) const {
   stringstream ss;
   ss << "num_admitted_running=" << stats.num_admitted_running << ", ";
   ss << "num_queued=" << stats.num_queued << ", ";
-  ss << "backend_mem_reserved=" << PrintBytes(stats.backend_mem_reserved);
+  ss << "backend_mem_reserved=" << PrintBytes(stats.backend_mem_reserved) << ", ";
+  AppendStatsForConsumedMemory(ss, stats);
   return ss.str();
 }
 
@@ -278,6 +320,282 @@ string AdmissionController::PoolStats::DebugString() const {
   ss << " local_host(local_mem_admitted=" << PrintBytes(local_mem_admitted_) << ", ";
   ss << DebugPoolStats(local_stats_) << ")";
   return ss.str();
+}
+
+// Output the string 'value with indentation of 'n' space characters.
+// When eof is true, append a newline.
+static void OutputIndentedString(
+    stringstream& ss, int n, const std::string& value, bool eof = true) {
+  ss << std::string(n, ' ') << value;
+  if (eof) ss << std::endl;
+}
+
+// Return a string reporting top 5 queries with most memory consumed among all
+// pools in a host.
+//
+// Here is an example of the output string for two pools.
+//    pool_name=root.queueB:
+//      topN_query_stats:
+//         queries=[
+//            id=0000000000000001:0000000000000004, consumed=20.00 MB,
+//            id=0000000000000001:0000000000000003, consumed=19.00 MB,
+//            id=0000000000000001:0000000000000002, consumed=8.00 MB
+//         ],
+//         total_consumed=47.00 MB
+//         fraction_of_pool_total_mem=0.47
+//      all_query_stats:
+//         num_running=4,
+//         min=5.00 MB,
+//         max=20.00 MB,
+//         pool_total_mem=100.00 MB,
+//         average=25.00 MB
+//
+//   pool_name=root.queueC:
+//      topN_query_stats:
+//         queries=[
+//            id=0000000000000002:0000000000000000, consumed=18.00 MB,
+//            id=0000000000000002:0000000000000001, consumed=12.00 MB
+//         ],
+//         total_consumed=30.00 MB
+//         fraction_of_pool_total_mem=0.06
+//      all_query_stats:
+//         num_running=40,
+//         min=10.00 MB,
+//         max=200.00 MB,
+//         pool_total_mem=500.00 MB,
+//         average=12.50 MB
+string AdmissionController::GetLogStringForTopNQueriesOnHost(
+    const std::string& host_id) {
+  // All heavy memory queries about 'host_id' are the starting point. Collect them
+  // into listOfTopNs.
+  stringstream ss;
+  std::vector<Item> listOfTopNs;
+  for (auto& it : pool_stats_) {
+    const TPoolStats* tpool_stats = (host_id_ == host_id) ?
+        &(it.second.local_stats()) :
+        it.second.FindTPoolStatsForRemoteHost(host_id);
+    if (!tpool_stats) continue;
+    for (auto& query : tpool_stats->heavy_memory_queries) {
+      listOfTopNs.emplace_back(
+          Item(query.memory_consumed, it.first, query.queryId, tpool_stats));
+    }
+  }
+  // If the number of items is 0, no need to go any further.
+  if (listOfTopNs.size() == 0) return "";
+
+  // Sort the list in descending order of memory consumed, pool name, qid and
+  // the address of TPoolStats.
+  sort(listOfTopNs.begin(), listOfTopNs.end(), std::greater<Item>());
+
+  // Decide the number of topN items to report from the list
+  int items = (listOfTopNs.size() >= 5) ? 5 : listOfTopNs.size();
+  // Keep first 'items' items and remove the rest.
+  listOfTopNs.resize(items);
+
+  int indent = 0;
+  OutputIndentedString(ss, indent, "", true);
+  OutputIndentedString(ss, indent, std::string("Stats for host ") + host_id);
+
+  // Use an integer vector to remember the indices of items in listOfTopNs
+  // that belong to the same pool.
+  std::vector<int> indices;
+  while (items > 0) {
+    // The first item in the list becomes 'current'.
+    indices.clear();
+    auto& current = listOfTopNs[0];
+    indices.push_back(0);
+    // Look for all other items with identical pool name as 'current'.
+    for (int j=1; j < items; j++) {
+      auto& next = listOfTopNs[j];
+      // Check on the pool name
+      if (getName(current) == getName(next)) indices.push_back(j);
+    }
+
+    // Process a new group of items with each's entry index contained in
+    // 'indices'. All of them are in the same pool.
+    AppendHeavyMemoryQueriesForAPoolInHostAtIndices(ss, listOfTopNs, indices, indent+3);
+    // Remove elements just processed.
+    for (int i = indices.size() - 1; i >= 0; i--) {
+      listOfTopNs.erase(listOfTopNs.begin() + indices[i]);
+    }
+    // The number of items remaining in the list.
+    items = listOfTopNs.size();
+  }
+  return ss.str();
+}
+
+// Return a string reporting top 5 queries with most memory consumed among all
+// hosts in a pool.
+// Here is one example.
+//      topN_query_stats:
+//         queries=[
+//            id=0000000200000002:0000000000000001, consumed=20.00 MB,
+//            id=0000000200000002:0000000000000004, consumed=18.00 MB,
+//            id=0000000100000002:0000000000000000, consumed=18.00 MB,
+//            id=0000000100000002:0000000000000001, consumed=12.00 MB,
+//            id=0000000200000002:0000000000000002, consumed=9.00 MB
+//         ],
+//         total_consumed=77.00 MB
+//         fraction_of_pool_total_mem=0.6
+string AdmissionController::GetLogStringForTopNQueriesInPool(
+    const std::string& pool_name) {
+  // All stats in pool_stats are the starting point to collect top N queries.
+  PoolStats* pool_stats = GetPoolStats(pool_name, true);
+
+  std::vector<Item> listOfTopNs;
+
+  // Collect for local stats
+  const TPoolStats& local = pool_stats->local_stats();
+  for (auto& query : local.heavy_memory_queries) {
+    listOfTopNs.emplace_back(
+      Item(query.memory_consumed, host_id_, query.queryId, nullptr));
+  }
+
+  // Collect for all remote stats
+  for (auto& it : pool_stats->remote_stats()) {
+    const TPoolStats& remote_stats = it.second;
+    for (auto& query : remote_stats.heavy_memory_queries) {
+      listOfTopNs.emplace_back(
+          Item(query.memory_consumed, it.first /*host id*/, query.queryId, nullptr));
+    }
+  }
+
+  // If the number of items is 0, no need to go any further.
+  if (listOfTopNs.size() == 0) return "";
+
+  // Group items by queryId.
+  sort(listOfTopNs.begin(), listOfTopNs.end(), [&](const Item& lhs, const Item& rhs) {
+    return getTUniqueId(lhs) < getTUniqueId(rhs);
+  });
+  // Compute the total mem consumed by all these queries.
+  int64_t init_value = 0;
+  int64_t total_mem_consumed = std::accumulate(listOfTopNs.begin(), listOfTopNs.end(),
+      init_value, [&](auto sum, const auto& x) { return sum + getMemConsumed(x); });
+  // Next aggregate on mem_consumed for each group. First define a list of
+  // items that will receive the aggregates.
+  std::vector<Item> listOfAggregatedItems;
+  auto it = listOfTopNs.begin();
+  while (it != listOfTopNs.end()) {
+    // Find a span of items identical in queryId. The span is defined by [it, next)
+    auto next = it;
+    next++;
+    while (next != listOfTopNs.end() && getTUniqueId(*it) == getTUniqueId(*next)) {
+      next++;
+    }
+    // Aggregate over mem_consumed for items in the span.
+    init_value = 0;
+    auto sum_mem_consumed = std::accumulate(it, next, init_value,
+        [&](auto sum, const auto& x) { return sum + getMemConsumed(x); });
+    // Append a new Item at the end of listOfAggregatedItems.
+    listOfAggregatedItems.emplace_back(
+        Item(sum_mem_consumed, pool_name, getTUniqueId(*it), nullptr));
+    // Advance 'it' to possibly start a new span
+    it = next;
+  }
+  // Sort the list in descending order of memory consumed and queryId.
+  sort(listOfAggregatedItems.begin(), listOfAggregatedItems.end(),
+      std::greater<Item>());
+  // Decide the number of topN items to report from the list
+  int items = (listOfAggregatedItems.size() >= 5) ?
+      5 :
+      listOfAggregatedItems.size();
+  // Keep first 'items' items and remove the rest.
+  listOfAggregatedItems.resize(items);
+  // Now we are ready to report the stats.
+  // Prepare an index object that indicates the reporting for all elements.
+  std::vector<int> indices;
+  for (int i=0; i<items; i++) indices.emplace_back(i);
+  int indent = 0;
+  stringstream ss;
+  // Report the title.
+  OutputIndentedString(ss, indent, "", true);
+  OutputIndentedString(
+      ss, indent, std::string("Aggregated stats for pool ") + pool_name + ":");
+  // Report the topN aggregated queries.
+  indent += 3;
+  ReportTopNQueriesAtIndices(
+      ss, listOfAggregatedItems, indices, indent, total_mem_consumed);
+  return ss.str();
+}
+
+// Report the topN queries section in a string and append it to 'ss'.
+void AdmissionController::ReportTopNQueriesAtIndices(stringstream& ss,
+    std::vector<Item>& listOfTopNs, std::vector<int>& indices, int indent,
+    int64_t total_mem_consumed) const {
+  OutputIndentedString(ss, indent, "topN_query_stats: ");
+  indent += 3;
+  OutputIndentedString(ss, indent, "queries=[");
+  int items = indices.size();
+  int64_t total_mem_consumed_by_top_queries = 0;
+  indent += 3;
+  for (int i = 0; i < items; i++) {
+    // Fields in item: memory_consumed, name, queryId, &TPoolStats
+    const Item& item = listOfTopNs[indices[i]];
+    total_mem_consumed_by_top_queries += getMemConsumed(item);
+    // Print queryId.
+    OutputIndentedString(ss, indent, "id=", false);
+    ss << PrintId(getTUniqueId(item));
+    // Print mem consumed.
+    ss << ", consumed=" << PrintBytes(getMemConsumed(item));
+    if (i < items - 1) ss << ", ";
+    ss << std::endl;
+  }
+  indent -= 3;
+  OutputIndentedString(ss, indent, "],");
+  OutputIndentedString(ss, indent,
+      std::string("total_consumed=")
+          + PrintBytes(total_mem_consumed_by_top_queries));
+
+  // Lastly report the percentage of the total.
+  if ( total_mem_consumed > 0 ) {
+    stringstream local_ss;
+    local_ss << setprecision(2)
+             << (float)(total_mem_consumed_by_top_queries)
+            / total_mem_consumed;
+    OutputIndentedString(
+        ss, indent, std::string("fraction_of_pool_total_mem=") + local_ss.str());
+  }
+}
+
+// Append a new string to 'ss' describing queries running in a pool on
+// a host:
+//  1. The pool name;
+//  2. The top-N queries with most memory consumptions among these queries;
+//  3. Statistics about all queries
+void AdmissionController::AppendHeavyMemoryQueriesForAPoolInHostAtIndices(
+    stringstream& ss, std::vector<Item>& listOfTopNs, std::vector<int>& indices,
+    int indent) const {
+  DCHECK_GT(indices.size(), 0);
+  const Item& first_item = listOfTopNs[indices[0]];
+  const string& pool_name = getName(first_item);
+  // Report the pool name.
+  OutputIndentedString(ss, indent, std::string("pool_name=") + pool_name + ": ");
+  // Report topN queries.
+  indent += 3;
+  const TPoolStats* tpool_stats = getTPoolStats(first_item);
+  int64_t total_mem_consumed = getTPoolStats(first_item)->total_memory_consumed;
+  ReportTopNQueriesAtIndices(
+      ss, listOfTopNs, indices, indent, total_mem_consumed);
+
+  // Report stats about all queries
+  OutputIndentedString(ss, indent, "all_query_stats: ");
+  indent += 3;
+  OutputIndentedString(ss, indent, "num_running=", false);
+  ss << tpool_stats->num_running << ", " << std::endl;
+
+  OutputIndentedString(ss, indent, "min=", false);
+  ss << PrintBytes(tpool_stats->min_memory_consumed) << ", " << std::endl;
+
+  OutputIndentedString(ss, indent, "max=", false);
+  ss << PrintBytes(tpool_stats->max_memory_consumed) << ", " << std::endl;
+
+  OutputIndentedString(ss, indent, "pool_total_mem=", false);
+  ss << PrintBytes(total_mem_consumed) << ", " << std::endl;
+  if (tpool_stats->num_running > 0) {
+    OutputIndentedString(ss, indent, "average=", false);
+    ss << PrintBytes(total_mem_consumed / tpool_stats->num_running)
+       << std::endl;
+  }
 }
 
 // TODO: do we need host_id_ to come from host_addr or can it just take the same id
@@ -483,7 +801,8 @@ bool AdmissionController::CanAccommodateMaxInitialReservation(const ScheduleStat
 }
 
 bool AdmissionController::HasAvailableMemResources(const ScheduleState& state,
-    const TPoolConfig& pool_cfg, string* mem_unavailable_reason) {
+    const TPoolConfig& pool_cfg, string* mem_unavailable_reason,
+    string* not_admitted_details) {
   const string& pool_name = state.request_pool();
   const int64_t pool_max_mem = GetMaxMemForPool(pool_cfg);
   // If the pool doesn't have memory resources configured, always true.
@@ -508,6 +827,11 @@ bool AdmissionController::HasAvailableMemResources(const ScheduleState& state,
         PrintBytes(pool_max_mem), PrintBytes(cluster_mem_to_admit),
         PrintBytes(max(pool_max_mem - stats->EffectiveMemReserved(), 0L)),
         GetStalenessDetailLocked(" "));
+    // Find info about the top-N queries with most memory consumption from both
+    // local and remote stats in this pool.
+    if ( not_admitted_details ) {
+      *not_admitted_details = GetLogStringForTopNQueriesInPool(pool_name);
+    }
     return false;
   }
 
@@ -531,6 +855,11 @@ bool AdmissionController::HasAvailableMemResources(const ScheduleState& state,
           Substitute(HOST_MEM_NOT_AVAILABLE, host_id, PrintBytes(mem_to_admit),
               PrintBytes(max(admit_mem_limit - effective_host_mem_reserved, 0L)),
               PrintBytes(admit_mem_limit), GetStalenessDetailLocked(" "));
+      // Find info about the top-N queries with most memory consumption from all
+      // pools at this host.
+      if ( not_admitted_details ) {
+        *not_admitted_details = GetLogStringForTopNQueriesOnHost(host_id);
+      }
       return false;
     }
   }
@@ -565,7 +894,8 @@ bool AdmissionController::HasAvailableSlots(
 }
 
 bool AdmissionController::CanAdmitRequest(const ScheduleState& state,
-    const TPoolConfig& pool_cfg, bool admit_from_queue, string* not_admitted_reason) {
+    const TPoolConfig& pool_cfg, bool admit_from_queue,
+    string* not_admitted_reason, string* not_admitted_details) {
   // Can't admit if:
   //  (a) There are already queued requests (and this is not admitting from the queue).
   //  (b) The resource pool is already at the maximum number of requests.
@@ -595,7 +925,8 @@ bool AdmissionController::CanAdmitRequest(const ScheduleState& state,
     // TODO(IMPALA-8757): Extend slot based admission to default executor group
     return false;
   }
-  if (!HasAvailableMemResources(state, pool_cfg, not_admitted_reason)) {
+  if (!HasAvailableMemResources(
+          state, pool_cfg, not_admitted_reason, not_admitted_details)) {
     return false;
   }
   return true;
@@ -861,6 +1192,10 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
     RequestQueue* queue = &request_queue_map_[pool_name];
     VLOG_QUERY << "Queuing, query id=" << PrintId(request.query_id)
                << " reason: " << queue_node.not_admitted_reason;
+    if (queue_node.not_admitted_details.size() > 0) {
+      VLOG_RPC << "Top mem consuming queries: "
+               << queue_node.not_admitted_details;
+    }
     initial_queue_reason = queue_node.not_admitted_reason;
     stats->Queue();
     queue->Enqueue(&queue_node);
@@ -914,8 +1249,9 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
       pool_stats->Dequeue(true);
       request.summary_profile->AddInfoString(
           PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_TIME_OUT);
-      const ErrorMsg& rejected_msg = ErrorMsg(TErrorCode::ADMISSION_TIMED_OUT,
-          queue_wait_timeout_ms, pool_name, queue_node.not_admitted_reason);
+      const ErrorMsg& rejected_msg =
+          ErrorMsg(TErrorCode::ADMISSION_TIMED_OUT, queue_wait_timeout_ms, pool_name,
+              queue_node.not_admitted_reason, queue_node.not_admitted_details);
       VLOG_QUERY << rejected_msg.msg();
       return Status::Expected(rejected_msg);
     } else if (outcome == AdmissionOutcome::CANCELLED) {
@@ -1280,13 +1616,14 @@ bool AdmissionController::FindGroupToAdmitOrReject(
       return false;
     }
 
-    if (CanAdmitRequest(
-            *state, pool_config, admit_from_queue, &queue_node->not_admitted_reason)) {
+    if (CanAdmitRequest(*state, pool_config, admit_from_queue,
+            &queue_node->not_admitted_reason, &queue_node->not_admitted_details)) {
       queue_node->admitted_schedule = std::move(group_state.state);
       return true;
     } else {
       VLOG_RPC << "Cannot admit query " << queue_node->admission_request.query_id
-               << " to group " << group_name << ": " << queue_node->not_admitted_reason;
+               << " to group " << group_name << ": " << queue_node->not_admitted_reason
+               << " Details:" << queue_node->not_admitted_details;
     }
   }
   return true;
@@ -1297,6 +1634,13 @@ void AdmissionController::PoolStats::UpdateMemTrackerStats() {
   // node sent stats for this pool.
   MemTracker* tracker =
       ExecEnv::GetInstance()->pool_mem_trackers()->GetRequestPoolMemTracker(name_, false);
+
+  if (tracker) {
+    // Update local_stats_ with the query Ids of the top 5 queries, plus the min, the max,
+    // the total memory consumption, and the number of all queries running on this
+    // host tracked by this pool.
+    tracker->UpdatePoolStatsForQueries(5 /*limit*/, this->local_stats_);
+  }
 
   const int64_t current_reserved =
       tracker == nullptr ? static_cast<int64_t>(0) : tracker->GetPoolMemReserved();

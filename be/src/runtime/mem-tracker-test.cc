@@ -360,5 +360,42 @@ TEST(MemTestTest, GcFunctions) {
   // Clean up.
   t.Release(10);
 }
+
+// Test that we can compute topN queries from a hierarchy of mem trackers. These
+// queries are represented by 100 query mem trackers.
+TEST(MemTestTest, TopN) {
+  MemTracker root;
+  root.Consume(10);
+
+  static const int NUM_QUERY_MEM_TRACKERS = 100;
+  // Populate these many query mem trackers with some memory consumptions.
+  std::vector<MemTracker*> trackers;
+  for (int i = 0; i < NUM_QUERY_MEM_TRACKERS; i++) {
+    MemTracker* tracker = new MemTracker(-1, "", &root);
+    tracker->query_id_.hi = 0;
+    tracker->query_id_.lo = i;
+    tracker->Consume(int64_t(i + 1));
+    tracker->is_query_mem_tracker_ = true;
+    trackers.push_back(tracker);
+  }
+  // Ready to compute top 5 queries which should be the last 5 of those
+  // populated above. The result is to be saved in pool_stats.heavy_memory_queries.
+  TPoolStats pool_stats;
+  root.UpdatePoolStatsForQueries(5, pool_stats);
+  // Validate the top entries
+  for (int i = 0; i < 5; i++) {
+    EXPECT_EQ(pool_stats.heavy_memory_queries[i].queryId.hi, 0);
+    EXPECT_EQ(
+        pool_stats.heavy_memory_queries[i].queryId.lo, NUM_QUERY_MEM_TRACKERS - i - 1);
+    EXPECT_EQ(
+        pool_stats.heavy_memory_queries[i].memory_consumed, NUM_QUERY_MEM_TRACKERS - i);
+  }
+  // Delete the allocated query mem trackers.
+  for (int i = 0; i < NUM_QUERY_MEM_TRACKERS; i++) {
+    trackers[i]->Release(int64_t(i + 1));
+    delete trackers[i];
+  }
+  root.Release(10);
+}
 }
 
