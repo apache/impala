@@ -141,12 +141,12 @@ select ds_hll_estimate(date_string_col) from functional_parquet.alltypestiny;
 UDF ERROR: Unable to deserialize sketch.
 ====
 ---- QUERY
-# Check that ds_hll_estimate returns null for null inputs.
-select ds_hll_estimate(c) from functional_parquet.nulltable;
+# Check that ds_hll_estimate returns null for null and empty string inputs.
+select ds_hll_estimate(b), ds_hll_estimate(c) from functional_parquet.nulltable;
 ---- RESULTS
-NULL
+NULL,NULL
 ---- TYPES
-BIGINT
+BIGINT,BIGINT
 ====
 ---- QUERY
 # Check that sketches made by Hive can be read and used for estimating by Impala.
@@ -225,4 +225,27 @@ from hll_sketches_impala_hive;
 BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 ---- RESULTS
 5,7,6,5,6,8,6,6,NULL
+====
+---- QUERY
+# IMPALA-9942: DataSketches HLL shouldn't take empty strings as distinct values
+create table empty_string (s string, v varchar(1), c char(1));
+insert into empty_string values
+    ("", cast("" as varchar(1)), cast("" as char(1))),
+    ("a", cast("a" as varchar(1)), cast("a" as char(1))),
+    ("", cast("" as varchar(1)), cast("" as char(1))),
+    ("b", cast("b" as varchar(1)), cast("b" as char(1))),
+    ("b", cast("b" as varchar(1)), cast("b" as char(1)));
+# Check if HLL works with empty strings.
+select
+    ds_hll_estimate(ds_hll_sketch(s)),
+    ds_hll_estimate(ds_hll_sketch(v)),
+    ds_hll_estimate(ds_hll_sketch(c)),
+    ds_hll_sketch_and_estimate(s),
+    ds_hll_sketch_and_estimate(v),
+    ds_hll_sketch_and_estimate(c)
+from empty_string
+---- RESULTS
+2,2,3,2,2,3
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 ====
