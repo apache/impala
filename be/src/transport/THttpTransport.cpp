@@ -21,6 +21,8 @@
 
 #include "transport/THttpTransport.h"
 
+#include "common/logging.h"
+
 namespace apache {
 namespace thrift {
 namespace transport {
@@ -242,9 +244,11 @@ void THttpTransport::readHeaders() {
       }
     } else {
       if (statusLine) {
+        VLOG(4) << line;
         statusLine = false;
         finished = parseStatusLine(line);
       } else {
+        VLOG(4) << "  " << line;
         parseHeader(line);
       }
     }

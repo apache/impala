@@ -556,6 +556,15 @@ sq_callback_result_t Webserver::BeginRequestCallbackStatic(
 
 sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* connection,
     struct sq_request_info* request_info) {
+  if (VLOG_IS_ON(4)) {
+    VLOG(4) << request_info->request_method << " " << request_info->uri << " "
+            << request_info->http_version;
+    for (int i = 0; i < request_info->num_headers; ++i) {
+      VLOG(4) << "  " << request_info->http_headers[i].name << ": "
+              << request_info->http_headers[i].value;
+    }
+  }
+
   if (strncmp("OPTIONS", request_info->request_method, 7) == 0) {
     // Let Squeasel deal with the request. OPTIONS requests should not require
     // authentication, so do this before doing SPNEGO.
@@ -603,7 +612,14 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
         AddCookie(request_info, &response_headers);
       } else {
         total_basic_auth_failure_->Increment(1);
-        LOG(ERROR) << "Failed to authenticate: " << basic_status.GetDetail();
+        if (!sq_get_header(connection, "Authorization")) {
+          // This case is expected, as some clients will always initially try to connect
+          // without an 'Authorization' and only provide one after getting the
+          // 'WWW-Authenticate' back, so we don't log it as an error.
+          VLOG(2) << "Not authenticated: no Authorization header provided.";
+        } else {
+          LOG(ERROR) << "Failed to authenticate: " << basic_status.GetDetail();
+        }
         response_headers.push_back("WWW-Authenticate: Basic");
         SendResponse(connection, "401 Authentication Required", "text/plain",
             "Must authenticate with Basic authentication.", response_headers);
