@@ -215,4 +215,57 @@ public class LdapImpalaShellTest {
         buildCommand(query, "hs2-http", TEST_USER_1, TEST_PASSWORD_1, "/cliservice");
     RunShellCommand.Run(command, /* shouldSucceed */ true, TEST_USER_1, "");
   }
+
+  /**
+   * Tests the interaction between LDAP user and group filter configs and proxy user
+   * configs.
+   */
+  @Test
+  public void testLdapFiltersWithProxy() throws Exception {
+    String groupDN = "cn=%s,ou=Groups,dc=myorg,dc=com";
+    // These correspond to the values in fe/src/test/resources/users.ldif
+    // Sets up a cluster where TEST_USER_4 can act as a proxy for any other user but
+    // doesn't pass any filters themselves, TEST_USER_1 and TEST_USER_2 can pass the group
+    // filter, and TEST_USER_1 and TEST_USER_3 pass the user filter.
+    setUp(String.format("--ldap_group_filter=%s,another-group "
+            + "--ldap_user_filter=%s,%s,another-user "
+            + "--ldap_group_dn_pattern=%s "
+            + "--ldap_group_membership_key=uniqueMember "
+            + "--ldap_group_class_key=groupOfUniqueNames "
+            + "--authorized_proxy_user_config=%s=*",
+        TEST_USER_GROUP, TEST_USER_1, TEST_USER_3, groupDN, TEST_USER_4));
+
+    String query = "select logged_in_user()";
+
+    // Run as the proxy user with a delegate that passes both filters, should succeed
+    // and return the delegate user's name.
+    String[] command = buildCommand(
+        query, "hs2-http", TEST_USER_4, TEST_PASSWORD_4, "/?doAs=" + TEST_USER_1);
+    RunShellCommand.Run(command, /* shouldSucceed */ true, TEST_USER_1, "");
+
+    // Run as the proxy user with a delegate that only passes the user filter, should
+    // fail.
+    command = buildCommand(
+        query, "hs2-http", TEST_USER_4, TEST_PASSWORD_4, "/?doAs=" + TEST_USER_3);
+    RunShellCommand.Run(
+        command, /* shouldSucceed */ false, "", "Not connected to Impala");
+
+    // Run as the proxy user with a delegate that only passes the group filter, should
+    // fail.
+    command = buildCommand(
+        query, "hs2-http", TEST_USER_4, TEST_PASSWORD_4, "/?doAs=" + TEST_USER_2);
+    RunShellCommand.Run(
+        command, /* shouldSucceed */ false, "", "Not connected to Impala");
+
+    // Run as the proxy with a delegate that doesn't pass either filter, should fail.
+    command = buildCommand(
+        query, "hs2-http", TEST_USER_4, TEST_PASSWORD_4, "/?doAs=" + TEST_USER_4);
+    RunShellCommand.Run(
+        command, /* shouldSucceed */ false, "", "Not connected to Impala");
+
+    // Run as the proxy without a delegate user, should fail since the proxy user won't
+    // pass the filters.
+    command = buildCommand(query, "hs2-http", TEST_USER_4, TEST_PASSWORD_4, "/");
+    RunShellCommand.Run(command, /* shouldSucceed */ false, "", "");
+  }
 }

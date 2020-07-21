@@ -41,16 +41,20 @@ class ImpalaLdap {
       const std::string& user_filter, const std::string& group_filter) WARN_UNUSED_RESULT;
 
   /// Attempts to authenticate to LDAP using the given username and password, applying the
-  /// user or group filters as approrpriate. 'passlen' is the length of the password.
+  /// user or group filters as appropriate. 'passlen' is the length of the password.
   /// Returns true if authentication is successful.
+  ///
+  /// 'do_as_user' is an optional delegate user that 'username' is trying act as a proxy
+  /// for. If provided, the group and user filters will be applied to 'do_as_user' and not
+  /// 'username'.
   ///
   /// Note that this method uses ldap_sasl_bind_s(), which does *not* provide any security
   /// to the connection between Impala and the LDAP server. You must either set
   /// --ldap_tls or have a URI which has "ldaps://" as the scheme in order to get a secure
   /// connection. Use --ldap_ca_certificate to specify the location of the certificate
   /// used to confirm the authenticity of the LDAP server certificate.
-  bool LdapCheckPass(
-      const char* username, const char* password, unsigned passlen) WARN_UNUSED_RESULT;
+  bool LdapCheckPass(const char* username, const char* password, unsigned passlen,
+      std::string do_as_user = "") WARN_UNUSED_RESULT;
 
  private:
   /// If non-empty, only users in this set can successfully authenticate.
@@ -68,6 +72,10 @@ class ImpalaLdap {
 
   /// Returns the value part of the first attribute in the provided relative DN.
   static std::string GetShortName(const std::string& rdn);
+
+  /// Maps the user string into an acceptable LDAP "DN" (distinguished name) based on the
+  /// values of the LDAP config flags.
+  static std::string ConstructUserDN(const std::string& user);
 };
 
 } // namespace impala
