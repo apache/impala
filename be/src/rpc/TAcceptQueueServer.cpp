@@ -224,7 +224,7 @@ void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
   shared_ptr<TTransport> outputTransport;
   shared_ptr<TTransport> client = entry->client_;
   const string& socket_info = reinterpret_cast<TSocket*>(client.get())->getSocketInfo();
-  VLOG(1) << Substitute("TAcceptQueueServer: $0 started connection setup for client $1",
+  VLOG(2) << Substitute("TAcceptQueueServer: $0 started connection setup for client $1",
       name_, socket_info);
   try {
     MonotonicStopWatch timer;
@@ -242,7 +242,7 @@ void TAcceptQueueServer::SetupConnection(shared_ptr<TAcceptQueueEntry> entry) {
     if (metrics_enabled_) {
       cnxns_setup_time_us_metric_->Update(timer.ElapsedTime() / NANOS_PER_MICRO);
     }
-    VLOG(1) << Substitute("TAcceptQueueServer: $0 finished connection setup for "
+    VLOG(2) << Substitute("TAcceptQueueServer: $0 finished connection setup for "
         "client $1", name_, socket_info);
 
     TAcceptQueueServer::Task* task = new TAcceptQueueServer::Task(
