@@ -1666,7 +1666,7 @@ void AggregateFunctions::DsHllUpdate(FunctionContext* ctx, const T& src,
 template <>
 void AggregateFunctions::DsHllUpdate(
     FunctionContext* ctx, const StringVal& src, StringVal* dst) {
-  if (src.is_null) return;
+  if (src.is_null || src.len == 0) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::hll_sketch));
   datasketches::hll_sketch* sketch_ptr =
