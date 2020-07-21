@@ -146,7 +146,8 @@ Status ImpalaLdap::Init(const std::string& user_filter, const std::string& group
   return Status::OK();
 }
 
-bool ImpalaLdap::LdapCheckPass(const char* user, const char* pass, unsigned passlen) {
+bool ImpalaLdap::LdapCheckPass(
+    const char* user, const char* pass, unsigned passlen, string do_as_user) {
   if (passlen == 0 && !FLAGS_ldap_allow_anonymous_binds) {
     // Disable anonymous binds.
     return false;
@@ -178,32 +179,20 @@ bool ImpalaLdap::LdapCheckPass(const char* user, const char* pass, unsigned pass
     VLOG(2) << "Started TLS connection with LDAP server: " << FLAGS_ldap_uri;
   }
 
-  // Map the user string into an acceptable LDAP "DN" (distinguished name)
-  string user_str = user;
-  if (!FLAGS_ldap_domain.empty()) {
-    // Append @domain if there isn't already an @ in the user string.
-    if (user_str.find("@") == string::npos) {
-      user_str = Substitute("$0@$1", user_str, FLAGS_ldap_domain);
-    }
-  } else if (!FLAGS_ldap_baseDN.empty()) {
-    user_str = Substitute("uid=$0,$1", user_str, FLAGS_ldap_baseDN);
-  } else if (!FLAGS_ldap_bind_pattern.empty()) {
-    user_str = FLAGS_ldap_bind_pattern;
-    replace_all(user_str, "#UID", user);
-  }
+  string user_dn = ConstructUserDN(user);
 
   // Map the password into a credentials structure
   struct berval cred;
   cred.bv_val = const_cast<char*>(pass);
   cred.bv_len = passlen;
 
-  VLOG_QUERY << "Trying simple LDAP bind for: " << user_str;
+  VLOG_QUERY << "Trying simple LDAP bind for: " << user_dn;
 
   rc = ldap_sasl_bind_s(
-      ld, user_str.c_str(), LDAP_SASL_SIMPLE, &cred, nullptr, nullptr, nullptr);
+      ld, user_dn.c_str(), LDAP_SASL_SIMPLE, &cred, nullptr, nullptr, nullptr);
   // Free ld
   if (rc != LDAP_SUCCESS) {
-    LOG(WARNING) << "LDAP authentication failure for " << user_str << " : "
+    LOG(WARNING) << "LDAP authentication failure for " << user_dn << " : "
                  << ldap_err2string(rc);
     ldap_unbind_ext(ld, nullptr, nullptr);
     return false;
@@ -211,16 +200,18 @@ bool ImpalaLdap::LdapCheckPass(const char* user, const char* pass, unsigned pass
 
   VLOG_QUERY << "LDAP bind successful";
 
-  if (!user_filter_.empty() && user_filter_.count(user) != 1) {
-    LOG(WARNING) << "LDAP authentication failure for " << user_str << ". Bind was "
+  string filter_user = do_as_user == "" ? user : do_as_user;
+  if (!user_filter_.empty() && user_filter_.count(filter_user) != 1) {
+    LOG(WARNING) << "LDAP authentication failure for " << user_dn << ". Bind was "
                  << "successful but user is not in the authorized user list.";
     ldap_unbind_ext(ld, nullptr, nullptr);
     return false;
   }
 
+  string filter_user_dn = do_as_user == nullptr ? user_dn : ConstructUserDN(do_as_user);
   if (!group_filter_.empty()) {
-    if (!CheckGroupMembership(ld, user_str)) {
-      LOG(WARNING) << "LDAP authentication failure for " << user_str << ". Bind was "
+    if (!CheckGroupMembership(ld, filter_user_dn)) {
+      LOG(WARNING) << "LDAP authentication failure for " << user_dn << ". Bind was "
                    << "successful but user is not in any of the required groups.";
       ldap_unbind_ext(ld, nullptr, nullptr);
       return false;
@@ -231,12 +222,12 @@ bool ImpalaLdap::LdapCheckPass(const char* user, const char* pass, unsigned pass
   return true;
 }
 
-bool ImpalaLdap::CheckGroupMembership(LDAP* ld, const string& user_str) {
+bool ImpalaLdap::CheckGroupMembership(LDAP* ld, const string& user_dn) {
   // Construct a filter that will search for LDAP entries that represent groups
   // (determined by having the group class key) and that contain the user trying to
   // authenticate (determined by having a membership entry matching the user).
   string filter = Substitute("(&(objectClass=$0)($1=$2))", FLAGS_ldap_group_class_key,
-      FLAGS_ldap_group_membership_key, user_str);
+      FLAGS_ldap_group_membership_key, user_dn);
   VLOG(2) << "Searching for groups with filter: " << filter;
 
   for (const string& group_dn : group_filter_dns_) {
@@ -306,6 +297,22 @@ string ImpalaLdap::GetShortName(const string& rdn) {
   vector<string> attributes = Split(rdn, delimiter::Limit(",", 1));
   vector<string> value = Split(attributes[0], delimiter::Limit("=", 1));
   return value[1];
+}
+
+string ImpalaLdap::ConstructUserDN(const std::string& user) {
+  string user_dn = user;
+  if (!FLAGS_ldap_domain.empty()) {
+    // Append @domain if there isn't already an @ in the user string.
+    if (user_dn.find("@") == string::npos) {
+      user_dn = Substitute("$0@$1", user_dn, FLAGS_ldap_domain);
+    }
+  } else if (!FLAGS_ldap_baseDN.empty()) {
+    user_dn = Substitute("uid=$0,$1", user_dn, FLAGS_ldap_baseDN);
+  } else if (!FLAGS_ldap_bind_pattern.empty()) {
+    user_dn = FLAGS_ldap_bind_pattern;
+    replace_all(user_dn, "#UID", user);
+  }
+  return user_dn;
 }
 
 } // namespace impala

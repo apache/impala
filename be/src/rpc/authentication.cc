@@ -445,8 +445,8 @@ bool BasicAuth(ThriftServer::ConnectionContext* connection_context,
   }
   string username = decoded.substr(0, colon);
   string password = decoded.substr(colon + 1);
-  bool ret = AuthManager::GetInstance()->GetLdap()->LdapCheckPass(
-      username.c_str(), password.c_str(), password.length());
+  bool ret = AuthManager::GetInstance()->GetLdap()->LdapCheckPass(username.c_str(),
+      password.c_str(), password.length(), connection_context->do_as_user);
   if (ret) {
     // Authenication was successful, so set the username on the connection.
     connection_context->username = username;
@@ -1028,6 +1028,7 @@ void NoAuthProvider::SetupConnectionContext(
     ThriftServer::TransportType underlying_transport_type, TTransport* input_transport,
     TTransport* output_transport) {
   connection_ptr->username = "";
+  connection_ptr->do_as_user = "";
   TSocket* socket = nullptr;
   switch (underlying_transport_type) {
     case ThriftServer::BINARY: {
