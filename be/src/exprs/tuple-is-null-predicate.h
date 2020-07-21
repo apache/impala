@@ -32,7 +32,6 @@ class TExprNode;
 /// on non-nullable tuples (see IMPALA-904/IMPALA-5504). This happens for exprs that
 /// are evaluated before the outer join that makes the tuples given to this predicate
 /// nullable, e.g., in the ON-clause of that join.
-/// TODO: Implement codegen to eliminate overhead on non-nullable tuples.
 class TupleIsNullPredicate: public Predicate {
  protected:
   friend class ScalarExpr;
@@ -49,6 +48,11 @@ class TupleIsNullPredicate: public Predicate {
       ScalarExprEvaluator*, const TupleRow*) const override;
 
  private:
+  void FillCodegendComputeFnConstantFalse(
+      LlvmCodeGen* codegen, llvm::Function* function) const;
+  void FillCodegendComputeFnNonConstant(
+      LlvmCodeGen* codegen, llvm::Function* function, llvm::Value* args[2]) const;
+
   /// Tuple ids to check for NULL. May contain ids of nullable and non-nullable tuples.
   std::vector<TupleId> tuple_ids_;
 

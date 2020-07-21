@@ -56,6 +56,7 @@
 #include "exprs/scalar-expr-ir.cc"
 #include "exprs/string-functions-ir.cc"
 #include "exprs/timestamp-functions-ir.cc"
+#include "exprs/tuple-is-null-predicate-ir.cc"
 #include "exprs/udf-builtins-ir.cc"
 #include "exprs/utility-functions-ir.cc"
 #include "runtime/krpc-data-stream-sender-ir.cc"
