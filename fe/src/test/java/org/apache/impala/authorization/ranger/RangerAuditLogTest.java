@@ -146,6 +146,20 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       assertEquals("show partitions functional.alltypes", events.get(0).getRequestData());
     }, "show partitions functional.alltypes",
         onTable("functional", "alltypes", TPrivilegeLevel.SELECT));
+
+    // COMPUTE STATS results in two registrations of the PrivilegeRequest for ALTER.
+    // Check we do not have duplicate ALTER events when the fully-qualified table name is
+    // not in lowercase.
+    authzOk(events -> {
+      assertEquals(2, events.size());
+      assertEventEquals("@table", "alter", "functional/alltypes", 1,
+          events.get(0));
+      assertEventEquals("@table", "select", "functional/alltypes", 1,
+          events.get(1));
+      assertEquals("compute stats FUNCTIONAL.ALLTYPES", events.get(0).getRequestData());
+    }, "compute stats FUNCTIONAL.ALLTYPES",
+        onTable("functional", "alltypes", TPrivilegeLevel.ALTER,
+            TPrivilegeLevel.SELECT));
   }
 
   @Test
