@@ -79,7 +79,10 @@ public class PrivilegeRequestBuilder {
   public PrivilegeRequestBuilder onTable(
       String dbName, String tableName, String ownerUser) {
     Preconditions.checkState(authorizable_ == null);
-    authorizable_ = authzFactory_.newTable(dbName, tableName, ownerUser);
+    // Convert 'dbName' and 'tableName' to lowercase to avoid duplicate audit log entries
+    // for the PrivilegeRequest of ALTER.
+    authorizable_ = authzFactory_.newTable(dbName.toLowerCase(), tableName.toLowerCase(),
+        ownerUser);
     return this;
   }
 
