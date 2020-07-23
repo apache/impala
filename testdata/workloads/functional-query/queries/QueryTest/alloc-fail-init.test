@@ -68,5 +68,5 @@ FunctionContextImpl::AllocateForResults() failed to allocate 10 bytes.
 ---- QUERY
 select get_json_object('{"a": 1}', '$.a')
 ---- CATCH
-FunctionContextImpl::AllocateForResults() failed to allocate 32 bytes
+row_regex:(.*)FunctionContextImpl::AllocateForResults\(\) failed to allocate (32|48) bytes
 ====
