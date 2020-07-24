@@ -27,7 +27,9 @@ export IMPALA_HOME=${IMPALA_HOME:-"/opt/impala"}
 LOG_FILE="$IMPALA_HOME/logs/shutdown.log"
 
 function LOG() {
-  echo $* | tee -a $LOG_FILE
+  # IMPALA-10006: append to LOG_FILE if possible, but don't fail if the log file isn't
+  # writable.
+  echo $* | tee -a $LOG_FILE || true
 }
 
 # Default grace timeout is the same as the default for Impala (-shutdown_grace_period_s),
