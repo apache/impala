@@ -76,6 +76,7 @@ REDHAT8=
 UBUNTU=
 UBUNTU16=
 UBUNTU18=
+UBUNTU20=
 IN_DOCKER=
 if [[ -f /etc/redhat-release ]]; then
   REDHAT=true
@@ -109,6 +110,10 @@ else
     then
       UBUNTU18=true
       echo "Identified Ubuntu 18.04 system."
+    elif [[ $DISTRIB_RELEASE = 20.04 ]]
+    then
+      UBUNTU20=true
+      echo "Identified Ubuntu 20.04 system."
     else
       echo "This script only supports 16.04 or 18.04 of Ubuntu" >&2
       exit 1
@@ -140,6 +145,12 @@ function ubuntu16 {
 # Helper function to execute following command only on Ubuntu 18.04
 function ubuntu18 {
   if [[ "$UBUNTU18" == true ]]; then
+    "$@"
+  fi
+}
+
+function ubuntu20 {
+  if [[ "$UBUNTU20" == true ]]; then
     "$@"
   fi
 }
@@ -227,11 +238,12 @@ if [[ "$UBUNTU" == true ]]; then
   fi
 fi
 
-# Ubuntu 18.04 installs OpenJDK 11 and configures it as the default Java version.
+# Ubuntu 18.04 or 20.04 install OpenJDK 11 and configure it as the default Java version.
 # Impala is currently tested with OpenJDK 8, so configure that version as the default.
 ARCH_NAME=$(uname -p)
 if [[ $ARCH_NAME == 'aarch64' ]]; then
-  ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
+    ubuntu20 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
+    ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
 else
   ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
 fi
