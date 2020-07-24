@@ -24,13 +24,15 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
 /**
- * Support for recognizing compression suffixes on data files.
+ * Support for recognizing compression suffixes on data files. This is currently
+ * limited to text files. Other file formats embed metadata about the compression
+ * type and do not use the file suffixes.
  * Compression of a file is recognized in mapreduce by looking for suffixes of
  * supported codecs.
- * For now Impala supports GZIP, SNAPPY, BZIP2 and some additional formats if plugins
- * are available. Even if a plugin is available, we need to add the file suffixes here so
- * that we can resolve the compression type from the file name. LZO can use the specific
- * HIVE input class.
+ * For now Impala supports GZIP, SNAPPY_BLOCKED, BZIP2 and some additional formats if
+ * plugins are available. Even if a plugin is available, we need to add the file suffixes
+ * here so that we can resolve the compression type from the file name. LZO can use the
+ * specific HIVE input class.
  * Some compression types here are detected even though they are not supported. This
  * allows for better error messages (e.g. LZ4, LZO).
  */
@@ -39,7 +41,7 @@ public enum HdfsCompression {
   DEFLATE,
   GZIP,
   BZIP2,
-  SNAPPY,
+  SNAPPY_BLOCKED,
   LZO,
   LZO_INDEX, //Lzo index file.
   LZ4,
@@ -51,7 +53,7 @@ public enum HdfsCompression {
           put("deflate", DEFLATE).
           put("gz", GZIP).
           put("bz2", BZIP2).
-          put("snappy", SNAPPY).
+          put("snappy", SNAPPY_BLOCKED).
           put("lzo", LZO).
           put("index", LZO_INDEX).
           put("lz4", LZ4).
@@ -76,7 +78,7 @@ public enum HdfsCompression {
     case DEFLATE: return THdfsCompression.DEFLATE;
     case GZIP: return THdfsCompression.GZIP;
     case BZIP2: return THdfsCompression.BZIP2;
-    case SNAPPY: return THdfsCompression.SNAPPY_BLOCKED;
+    case SNAPPY_BLOCKED: return THdfsCompression.SNAPPY_BLOCKED;
     case LZO: return THdfsCompression.LZO;
     case LZ4: return THdfsCompression.LZ4;
     case ZSTD: return THdfsCompression.ZSTD;
@@ -90,7 +92,7 @@ public enum HdfsCompression {
       case DEFLATE: return FbCompression.DEFLATE;
       case GZIP: return FbCompression.GZIP;
       case BZIP2: return FbCompression.BZIP2;
-      case SNAPPY: return FbCompression.SNAPPY;
+      case SNAPPY_BLOCKED: return FbCompression.SNAPPY_BLOCKED;
       case LZO: return FbCompression.LZO;
       case LZ4: return FbCompression.LZ4;
       case ZSTD: return FbCompression.ZSTD;
