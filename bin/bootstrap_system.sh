@@ -244,7 +244,7 @@ if [[ "$UBUNTU" == true ]]; then
   fi
 fi
 
-# Ubuntu 18.04 or 20.04 install OpenJDK 11 and configure it as the default Java version.
+# Ubuntu 18.04 and 20.04 install OpenJDK 11 and configure it as the default Java version.
 # Impala is currently tested with OpenJDK 8, so configure that version as the default.
 if [[ $ARCH_NAME == 'aarch64' ]]; then
     ubuntu20 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
