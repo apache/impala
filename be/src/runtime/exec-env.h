@@ -124,6 +124,7 @@ class ExecEnv {
   HBaseTableFactory* htable_factory() { return htable_factory_.get(); }
   io::DiskIoMgr* disk_io_mgr() { return disk_io_mgr_.get(); }
   Webserver* webserver() { return webserver_.get(); }
+  Webserver* metrics_webserver() { return metrics_webserver_.get(); }
   MetricGroup* metrics() { return metrics_.get(); }
   MetricGroup* rpc_metrics() { return rpc_metrics_; }
   MemTracker* process_mem_tracker() { return mem_tracker_.get(); }
@@ -188,6 +189,7 @@ class ExecEnv {
   boost::scoped_ptr<HBaseTableFactory> htable_factory_;
   boost::scoped_ptr<io::DiskIoMgr> disk_io_mgr_;
   boost::scoped_ptr<Webserver> webserver_;
+  boost::scoped_ptr<Webserver> metrics_webserver_;
   boost::scoped_ptr<MemTracker> mem_tracker_;
   boost::scoped_ptr<PoolMemTrackerRegistry> pool_mem_trackers_;
   boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;

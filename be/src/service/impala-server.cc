@@ -2525,6 +2525,10 @@ Status ImpalaServer::Start(int32_t thrift_be_port, int32_t beeswax_port, int32_t
   // ExecEnv singleton and will receive a nullptr.
   http_handler_.reset(new ImpalaHttpHandler(this));
   http_handler_->RegisterHandlers(exec_env_->webserver());
+  if (exec_env_->metrics_webserver() != nullptr) {
+    http_handler_->RegisterHandlers(
+        exec_env_->metrics_webserver(), /* metrics_only */ true);
+  }
 
   if (!FLAGS_is_coordinator && !FLAGS_is_executor) {
     return Status("Impala does not have a valid role configured. "
