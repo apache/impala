@@ -35,8 +35,9 @@ class ImpalaHttpHandler {
  public:
   ImpalaHttpHandler(ImpalaServer* server) : server_(server) { }
 
-  /// Registers all the per-Impalad webserver callbacks
-  void RegisterHandlers(Webserver* webserver);
+  /// Registers per-Impalad webserver callbacks. If 'metrics_only' is true, only registers
+  /// the callbacks needed by the metrics server, i.e. /healthz.
+  void RegisterHandlers(Webserver* webserver, bool metrics_only = false);
 
  private:
   ImpalaServer* server_;

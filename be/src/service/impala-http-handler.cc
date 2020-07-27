@@ -91,7 +91,7 @@ static Status ParseIdFromRequest(const Webserver::WebRequest& req, TUniqueId* id
 
 }
 
-void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
+void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver, bool metrics_only) {
   DCHECK(webserver != NULL);
 
   Webserver::RawUrlCallback healthz_callback =
@@ -99,6 +99,8 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver) {
       return this->HealthzHandler(req, data, response);
     };
   webserver->RegisterUrlCallback("/healthz", healthz_callback);
+
+  if (metrics_only) return;
 
   webserver->RegisterUrlCallback("/backends", "backends.tmpl",
       MakeCallback(this, &ImpalaHttpHandler::BackendsHandler), true);

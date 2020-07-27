@@ -37,6 +37,8 @@
 DECLARE_int32(state_store_port);
 DECLARE_int32(webserver_port);
 DECLARE_bool(enable_webserver);
+DECLARE_string(metrics_webserver_interface);
+DECLARE_int32(metrics_webserver_port);
 
 #include "common/names.h"
 
@@ -54,13 +56,20 @@ int StatestoredMain(int argc, char** argv) {
 
   if (FLAGS_enable_webserver) {
     AddDefaultUrlCallbacks(webserver.get(), metrics.get());
+    ABORT_IF_ERROR(metrics->RegisterHttpHandlers(webserver.get()));
     ABORT_IF_ERROR(webserver->Start());
   } else {
     LOG(INFO) << "Not starting webserver";
   }
 
-  ABORT_IF_ERROR(
-      metrics->Init(FLAGS_enable_webserver ? webserver.get() : nullptr));
+  scoped_ptr<Webserver> metrics_webserver;
+  if (FLAGS_metrics_webserver_port > 0) {
+    metrics_webserver.reset(new Webserver(FLAGS_metrics_webserver_interface,
+        FLAGS_metrics_webserver_port, metrics.get(), Webserver::AuthMode::NONE));
+    ABORT_IF_ERROR(metrics->RegisterHttpHandlers(metrics_webserver.get()));
+    ABORT_IF_ERROR(metrics_webserver->Start());
+  }
+
   ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), false, nullptr, nullptr));
   ABORT_IF_ERROR(StartMemoryMaintenanceThread());
   ABORT_IF_ERROR(

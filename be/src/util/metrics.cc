@@ -137,7 +137,7 @@ TMetricDef MetricDefs::Get(const string& key, const string& arg) {
 MetricGroup::MetricGroup(const string& name)
     : obj_pool_(new ObjectPool()), name_(name) { }
 
-Status MetricGroup::Init(Webserver* webserver) {
+Status MetricGroup::RegisterHttpHandlers(Webserver* webserver) {
   if (webserver != NULL) {
     Webserver::UrlCallback default_callback =
         bind<void>(mem_fn(&MetricGroup::CMCompatibleCallback), this, _1, _2);

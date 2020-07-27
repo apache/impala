@@ -423,7 +423,7 @@ class MetricGroup {
 
   /// Register page callbacks with the webserver. Only the root of any metric group
   /// hierarchy needs to do this.
-  Status Init(Webserver* webserver);
+  Status RegisterHttpHandlers(Webserver* webserver);
 
   /// Converts this metric group (and optionally all of its children recursively) to JSON.
   void ToJson(bool include_children, rapidjson::Document* document,

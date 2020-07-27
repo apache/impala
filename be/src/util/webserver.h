@@ -83,9 +83,12 @@ class Webserver {
   /// as pretty printed JSON plain text.
   static const char* ENABLE_PLAIN_JSON_KEY;
 
+  enum AuthMode { NONE, HTPASSWD, SPNEGO, LDAP };
+
   /// Using this constructor, the webserver will bind to 'interface', or all available
   /// interfaces if not specified.
-  Webserver(const std::string& interface, const int port, MetricGroup* metrics);
+  Webserver(const std::string& interface, const int port, MetricGroup* metrics,
+      const AuthMode& auth_mode = GetConfiguredAuthMode());
 
   /// Uses FLAGS_webserver_{port, interface}
   Webserver(MetricGroup* metrics);
@@ -126,6 +129,9 @@ class Webserver {
 
   /// Returns the appropriate MIME type for a given ContentType.
   static const std::string GetMimeType(const ContentType& content_type);
+
+  /// Returns the authentication mode configured by the startup flags.
+  static AuthMode GetConfiguredAuthMode();
 
  private:
   /// Contains all information relevant to rendering one Url. Each Url has one callback
@@ -237,6 +243,8 @@ class Webserver {
 
   /// The resolved hostname from 'http_address_'.
   std::string hostname_;
+
+  AuthMode auth_mode_;
 
   /// Handle to Squeasel context; owned and freed by Squeasel internally
   struct sq_context* context_;

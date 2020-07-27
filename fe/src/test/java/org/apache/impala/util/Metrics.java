@@ -41,18 +41,26 @@ import org.json.simple.parser.JSONParser;
  */
 public class Metrics {
   private final static String WEBSERVER_HOST = "localhost";
-  private final static int WEBSERVER_PORT = 25000;
+  private final static int DEFAULT_WEBSERVER_PORT = 25000;
   private final static String JSON_METRICS = "/jsonmetrics?json";
 
   private CloseableHttpClient httpClient_;
+  private int port_;
   private String username_;
   private String password_;
 
-  public Metrics() { this("", ""); }
+  public Metrics() { this("", "", DEFAULT_WEBSERVER_PORT); }
+
+  public Metrics(int port) { this("", "", port); }
 
   public Metrics(String username, String password) {
+    this(username, password, DEFAULT_WEBSERVER_PORT);
+  }
+
+  public Metrics(String username, String password, int port) {
     this.username_ = username;
     this.password_ = password;
+    this.port_ = port;
     httpClient_ = HttpClients.createDefault();
   }
 
@@ -78,11 +86,11 @@ public class Metrics {
    * Retrieves the page at 'path' and returns its contents.
    */
   public String readContent(String path) throws IOException {
-    HttpHost targetHost = new HttpHost(WEBSERVER_HOST, WEBSERVER_PORT, "http");
+    HttpHost targetHost = new HttpHost(WEBSERVER_HOST, port_, "http");
     HttpClientContext context = HttpClientContext.create();
     if (!username_.equals("")) {
       CredentialsProvider credsProvider = new BasicCredentialsProvider();
-      credsProvider.setCredentials(new AuthScope(WEBSERVER_HOST, WEBSERVER_PORT),
+      credsProvider.setCredentials(new AuthScope(WEBSERVER_HOST, port_),
           new UsernamePasswordCredentials(username_, password_));
       AuthCache authCache = new BasicAuthCache();
       authCache.put(targetHost, new BasicScheme());

@@ -107,7 +107,8 @@ DEFINE_string(webserver_authentication_domain, "",
     "Domain used for debug webserver authentication");
 DEFINE_string(webserver_password_file, "",
     "(Optional) Location of .htpasswd file containing user names and hashed passwords for"
-    " debug webserver authentication");
+    " debug webserver authentication. Cannot be used with --webserver_require_ldap or "
+    "--webserver_require_spnego.");
 
 DEFINE_string(webserver_x_frame_options, "DENY",
     "webserver will add X-Frame-Options HTTP header with this value");
@@ -117,11 +118,12 @@ DEFINE_int32(webserver_max_post_length_bytes, 1024 * 1024,
 
 DEFINE_bool(webserver_require_spnego, false,
     "Require connections to the web server to authenticate via Kerberos using SPNEGO. "
-    "Cannot be used with --webserver_require_ldap.");
+    "Cannot be used with --webserver_require_ldap or --webserver_password_file.");
 
 DEFINE_bool(webserver_require_ldap, false,
     "Require connections to the web server to authenticate via LDAP using HTTP Basic "
-    "authentication. Cannot be used with --webserver_require_spnego.");
+    "authentication. Cannot be used with --webserver_require_spnego or "
+    "--webserver_password_file.");
 DEFINE_string(webserver_ldap_user_filter, "",
     "Comma separated list of usernames. If specified, users must be on this list for "
     "LDAP athentication to the webserver to succeed.");
@@ -258,29 +260,32 @@ kudu::Status RunSpnegoStep(
 } // anonymous namespace
 
 Webserver::Webserver(MetricGroup* metrics)
-  : Webserver(FLAGS_webserver_interface, FLAGS_webserver_port, metrics) {}
+  : Webserver(FLAGS_webserver_interface, FLAGS_webserver_port, metrics,
+        GetConfiguredAuthMode()) {}
 
-Webserver::Webserver(const string& interface, const int port, MetricGroup* metrics)
-  : context_(nullptr),
+Webserver::Webserver(const string& interface, const int port, MetricGroup* metrics,
+    const AuthMode& auth_mode)
+  : auth_mode_(auth_mode),
+    context_(nullptr),
     error_handler_(UrlHandler(
         bind<void>(&Webserver::ErrorHandler, this, _1, _2), "error.tmpl", false)),
     use_cookies_(FLAGS_max_cookie_lifetime_s > 0) {
   http_address_ = MakeNetworkAddress(interface.empty() ? "0.0.0.0" : interface, port);
   Init();
 
-  if (FLAGS_webserver_require_spnego) {
+  if (auth_mode_ == AuthMode::SPNEGO) {
     total_negotiate_auth_success_ =
         metrics->AddCounter("impala.webserver.total-negotiate-auth-success", 0);
     total_negotiate_auth_failure_ =
         metrics->AddCounter("impala.webserver.total-negotiate-auth-failure", 0);
   }
-  if (FLAGS_webserver_require_ldap) {
+  if (auth_mode_ == AuthMode::LDAP) {
     total_basic_auth_success_ =
         metrics->AddCounter("impala.webserver.total-basic-auth-success", 0);
     total_basic_auth_failure_ =
         metrics->AddCounter("impala.webserver.total-basic-auth-failure", 0);
   }
-  if (use_cookies_ && (FLAGS_webserver_require_spnego || FLAGS_webserver_require_ldap)) {
+  if (use_cookies_ && (auth_mode_ == AuthMode::SPNEGO || auth_mode_ == AuthMode::LDAP)) {
     total_cookie_auth_success_ =
         metrics->AddCounter("impala.webserver.total-cookie-auth-success", 0);
     total_cookie_auth_failure_ =
@@ -396,12 +401,7 @@ Status Webserver::Start() {
     options.push_back(FLAGS_webserver_password_file.c_str());
   }
 
-  if (FLAGS_webserver_require_spnego && FLAGS_webserver_require_ldap) {
-    return Status("Securing the web server with both Kerberos and LDAP is not "
-                  "currently supported.");
-  }
-
-  if (FLAGS_webserver_require_spnego) {
+  if (auth_mode_ == AuthMode::SPNEGO) {
     // If Kerberos has been configured, security::InitKerberosForServer() will
     // already have been called, ensuring that the keytab path has been
     // propagated into this environment variable where the GSSAPI calls will
@@ -412,9 +412,10 @@ Status Webserver::Start() {
       return Status("Unable to configure web server for SPNEGO authentication: "
                     "must configure a keytab file for the server");
     }
+    LOG(INFO) << "Webserver: secured with SPNEGO authentication.";
   }
 
-  if (FLAGS_webserver_require_ldap) {
+  if (auth_mode_ == AuthMode::LDAP) {
     if (!FLAGS_enable_ldap_auth) {
       return Status("Unable to secure web server with LDAP: LDAP authentication must be "
                     "configured for this daemon.");
@@ -427,6 +428,7 @@ Status Webserver::Start() {
     ldap_.reset(new ImpalaLdap());
     RETURN_IF_ERROR(
         ldap_->Init(FLAGS_webserver_ldap_user_filter, FLAGS_webserver_ldap_group_filter));
+    LOG(INFO) << "Webserver: secured with LDAP authentication.";
   }
 
   options.push_back("listening_ports");
@@ -572,7 +574,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
   }
 
   vector<string> response_headers;
-  bool authenticated = !FLAGS_webserver_require_spnego && !FLAGS_webserver_require_ldap;
+  bool authenticated = auth_mode_ != AuthMode::SPNEGO && auth_mode_ != AuthMode::LDAP;
   // Try authenticating with a cookie first, if enabled.
   if (!authenticated && use_cookies_) {
     const char* cookie_header = sq_get_header(connection, "Cookie");
@@ -593,7 +595,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
   }
 
   if (!authenticated) {
-    if (FLAGS_webserver_require_spnego) {
+    if (auth_mode_ == AuthMode::SPNEGO) {
       sq_callback_result_t spnego_result =
           HandleSpnego(connection, request_info, &response_headers);
       if (spnego_result == SQ_CONTINUE_HANDLING) {
@@ -604,7 +606,7 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
         return spnego_result;
       }
     } else {
-      DCHECK(FLAGS_webserver_require_ldap);
+      DCHECK(auth_mode_ == AuthMode::LDAP);
       Status basic_status = HandleBasic(connection, request_info, &response_headers);
       if (basic_status.ok()) {
         // Basic auth was successful.
@@ -885,5 +887,16 @@ const string Webserver::GetMimeType(const ContentType& content_type) {
       DCHECK(false) << "Invalid content_type: " << content_type;
       return "";
   }
+}
+
+Webserver::AuthMode Webserver::GetConfiguredAuthMode() {
+  if (!FLAGS_webserver_password_file.empty()) {
+    return AuthMode::HTPASSWD;
+  } else if (FLAGS_webserver_require_spnego) {
+    return AuthMode::SPNEGO;
+  } else if (FLAGS_webserver_require_ldap) {
+    return AuthMode::LDAP;
+  }
+  return AuthMode::NONE;
 }
 }

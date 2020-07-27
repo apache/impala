@@ -153,6 +153,14 @@ DEFINE_int32(catalog_client_rpc_retry_interval_ms, 3000, "(Advanced) The time to
     "before retrying when the catalog RPC client fails to connect to catalogd or when "
     "RPCs to the catalogd fail.");
 
+DEFINE_int32(metrics_webserver_port, 0,
+    "If non-zero, the port to run the metrics webserver on, which exposes the /metrics, "
+    "/jsonmetrics, /metrics_prometheus, and /healthz endpoints without authentication "
+    "enabled.");
+
+DEFINE_string(metrics_webserver_interface, "",
+    "Interface to start metrics webserver on. If blank, webserver binds to 0.0.0.0");
+
 const static string DEFAULT_FS = "fs.defaultFS";
 
 // The multiplier for how many queries a dedicated coordinator can run compared to an
@@ -284,6 +292,12 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
   admission_controller_.reset(
       new AdmissionController(cluster_membership_mgr_.get(), statestore_subscriber_.get(),
           request_pool_service_.get(), metrics_.get(), configured_backend_address_));
+
+  if (FLAGS_metrics_webserver_port > 0) {
+    metrics_webserver_.reset(new Webserver(FLAGS_metrics_webserver_interface,
+        FLAGS_metrics_webserver_port, metrics_.get(), Webserver::AuthMode::NONE));
+  }
+
   exec_env_ = this;
 }
 
@@ -364,7 +378,13 @@ Status ExecEnv::Init() {
 
   InitSystemStateInfo();
 
-  RETURN_IF_ERROR(metrics_->Init(enable_webserver_ ? webserver_.get() : nullptr));
+  if (enable_webserver_) {
+    RETURN_IF_ERROR(metrics_->RegisterHttpHandlers(webserver_.get()));
+  }
+  if (FLAGS_metrics_webserver_port > 0) {
+    RETURN_IF_ERROR(metrics_->RegisterHttpHandlers(metrics_webserver_.get()));
+    RETURN_IF_ERROR(metrics_webserver_->Start());
+  }
   catalogd_client_cache_->InitMetrics(metrics_.get(), "catalog.server");
   RETURN_IF_ERROR(RegisterMemoryMetrics(
       metrics_.get(), true, buffer_reservation_.get(), buffer_pool_.get()));

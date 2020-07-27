@@ -19,6 +19,7 @@ package org.apache.impala.customcluster;
 
 import static org.apache.impala.testutil.LdapUtil.*;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -54,7 +55,7 @@ public class LdapWebserverTest {
 
   Metrics metrics_ = new Metrics(TEST_USER_1, TEST_PASSWORD_1);
 
-  public void setUp(String extraArgs) throws Exception {
+  public void setUp(String extraArgs, String startArgs) throws Exception {
     String uri =
         String.format("ldap://localhost:%s", serverRule.getLdapServer().getPort());
     String dn = "cn=#UID,ou=Users,dc=myorg,dc=com";
@@ -65,7 +66,7 @@ public class LdapWebserverTest {
     Map<String, String> env = new HashMap<>();
     env.put("IMPALA_WEBSERVER_USERNAME", TEST_USER_1);
     env.put("IMPALA_WEBSERVER_PASSWORD", TEST_PASSWORD_1);
-    int ret = CustomClusterRunner.StartImpalaCluster(impalaArgs, env);
+    int ret = CustomClusterRunner.StartImpalaCluster(impalaArgs, env, startArgs);
     assertEquals(ret, 0);
   }
 
@@ -98,7 +99,7 @@ public class LdapWebserverTest {
 
   @Test
   public void testWebserver() throws Exception {
-    setUp("");
+    setUp("", "");
     // start-impala-cluster contacts the webui to confirm the impalads have started, so
     // there will already be some successful auth attempts.
     verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);
@@ -130,7 +131,7 @@ public class LdapWebserverTest {
             + "--ldap_group_dn_pattern=ou=Groups,dc=myorg,dc=com "
             + "--ldap_group_membership_key=uniqueMember "
             + "--ldap_group_class_key=groupOfUniqueNames",
-        TEST_USER_GROUP, TEST_USER_1, TEST_USER_3));
+        TEST_USER_GROUP, TEST_USER_1, TEST_USER_3), "");
     // start-impala-cluster contacts the webui to confirm the impalads have started, so
     // there will already be some successful auth attempts.
     verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);
@@ -157,5 +158,39 @@ public class LdapWebserverTest {
     assertTrue(result, result.contains("Must authenticate with Basic authentication."));
     // Check that there is now three unsuccessful auth attempts.
     verifyMetrics(Range.atLeast(1L), Range.closed(3L, 3L), Range.atLeast(1L), zero);
+  }
+
+  /**
+   * Tests that the metrics webserver servers the correct endpoints and without security
+   * even if LDAP auth is turned on for the regular webserver.
+   */
+  @Test
+  public void testMetricsWebserver() throws Exception {
+    // Use 'per_impalad_args' to turn the metrics webserver on only for the first impalad.
+    setUp("", "--per_impalad_args=--metrics_webserver_port=25030");
+    // Attempt to access the regular webserver without a username/password, should fail.
+    Metrics noUsername = new Metrics();
+    String result = noUsername.readContent("/");
+    assertTrue(result, result.contains("Must authenticate with Basic authentication."));
+
+    // Attempt to access the regular webserver with invalid username/password.
+    Metrics invalidUserPass = new Metrics("invalid", "invalid");
+    result = invalidUserPass.readContent("/");
+    assertTrue(result, result.contains("Must authenticate with Basic authentication."));
+
+    // Attempt to access the metrics webserver without a username/password.
+    Metrics noUsernameMetrics = new Metrics(25030);
+    // Should succeed for the metrics endpoints.
+    for (String endpoint :
+        new String[] {"/metrics", "/jsonmetrics", "/metrics_prometheus", "/healthz"}) {
+      result = noUsernameMetrics.readContent(endpoint);
+      assertFalse(
+          result, result.contains("Must authenticate with Basic authentication."));
+    }
+
+    for (String endpoint : new String[] {"/varz", "/backends"}) {
+      result = noUsernameMetrics.readContent(endpoint);
+      assertTrue(result, result.contains("No URI handler for"));
+    }
   }
 }
