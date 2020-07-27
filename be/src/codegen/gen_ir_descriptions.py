@@ -48,7 +48,7 @@ ir_functions = [
   ["AGG_FN_EVALUATOR_AGG_FN_CTX",
    "_ZNK6impala14AggFnEvaluator10agg_fn_ctxEv"],
   ["GROUPING_AGG_ADD_BATCH_IMPL",
-   "_ZN6impala18GroupingAggregator12AddBatchImplILb0EEENS_6StatusEPNS_8RowBatchENS_13TPrefetchMode4typeEPNS_12HashTableCtxE"],
+   "_ZN6impala18GroupingAggregator12AddBatchImplILb0EEENS_6StatusEPNS_8RowBatchENS_13TPrefetchMode4typeEPNS_12HashTableCtxEb"],
   ["NON_GROUPING_AGG_ADD_BATCH_IMPL",
    "_ZN6impala21NonGroupingAggregator12AddBatchImplEPNS_8RowBatchE"],
   ["GROUPING_AGG_ADD_BATCH_STREAMING_IMPL",

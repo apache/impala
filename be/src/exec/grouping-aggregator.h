@@ -162,7 +162,7 @@ class GroupingAggregatorConfig : public AggregatorConfig {
   const HashTableConfig* hash_table_config_;
 
   typedef Status (*AddBatchImplFn)(
-      GroupingAggregator*, RowBatch*, TPrefetchMode::type, HashTableCtx*);
+      GroupingAggregator*, RowBatch*, TPrefetchMode::type, HashTableCtx*, bool);
   /// Jitted AddBatchImpl function pointer. Null if codegen is disabled.
   CodegenFnPtr<AddBatchImplFn> add_batch_impl_fn_;
 
@@ -279,6 +279,15 @@ class GroupingAggregator : public Aggregator {
 
   /// Allocator for hash table memory.
   std::unique_ptr<Suballocator> ht_allocator_;
+  /// Saved reservation for writing a large page to a spilled stream or writing the last
+  /// large row to a pinned partition when building/repartitioning a spilled partition.
+  /// ('max_page_len' - 'default_page_len') reservation is saved when claiming the initial
+  /// min reservation.
+  BufferPool::SubReservation large_write_page_reservation_;
+  /// Saved reservation for reading a large page from a spilled stream.
+  /// ('max_page_len' - 'default_page_len') reservation is saved when claiming the initial
+  /// min reservation.
+  BufferPool::SubReservation large_read_page_reservation_;
 
   /// MemPool used to allocate memory during Close() when creating new output tuples. The
   /// pool should not be Reset() to allow amortizing memory allocation over a series of
@@ -441,6 +450,8 @@ class GroupingAggregator : public Aggregator {
 
     bool is_spilled() const { return hash_tbl.get() == nullptr; }
 
+    std::string DebugString() const;
+
     GroupingAggregator* parent;
 
     /// If true, this partition is closed and there is nothing left to do.
@@ -527,12 +538,15 @@ class GroupingAggregator : public Aggregator {
   /// 'prefetch_mode' specifies the prefetching mode in use. If it's not PREFETCH_NONE,
   ///     hash table buckets will be prefetched based on the hash values computed. Note
   ///     that 'prefetch_mode' will be substituted with constants during codegen time.
-  //
+  /// 'has_more_rows' is used in building/repartitioning a spilled partition, to indicate
+  ///     whether there are more rows after the given 'batch' in the input. We may restore
+  ///     the 'large_write_page_reservation_' when adding the last row.
+  ///
   /// This function is replaced by codegen. We pass in ht_ctx_.get() as an argument for
   /// performance.
   template <bool AGGREGATED_ROWS>
   Status IR_ALWAYS_INLINE AddBatchImpl(RowBatch* batch, TPrefetchMode::type prefetch_mode,
-      HashTableCtx* ht_ctx) WARN_UNUSED_RESULT;
+      HashTableCtx* ht_ctx, bool has_more_rows) WARN_UNUSED_RESULT;
 
   /// Evaluates the rows in 'batch' starting at 'start_row_idx' and stores the results in
   /// the expression values cache in 'ht_ctx'. The number of rows evaluated depends on
@@ -548,7 +562,7 @@ class GroupingAggregator : public Aggregator {
   /// May spill partitions if not enough memory is available.
   template <bool AGGREGATED_ROWS>
   Status IR_ALWAYS_INLINE ProcessRow(
-      TupleRow* row, HashTableCtx* ht_ctx) WARN_UNUSED_RESULT;
+      TupleRow* row, HashTableCtx* ht_ctx, bool has_more_rows) WARN_UNUSED_RESULT;
 
   /// Create a new intermediate tuple in partition, initialized with row. ht_ctx is
   /// the context for the partition's hash table and hash is the precomputed hash of
@@ -559,7 +573,8 @@ class GroupingAggregator : public Aggregator {
   /// for insertion returned from HashTable::FindBuildRowBucket().
   template <bool AGGREGATED_ROWS>
   Status IR_ALWAYS_INLINE AddIntermediateTuple(Partition* partition, TupleRow* row,
-      uint32_t hash, HashTable::Iterator insert_it) WARN_UNUSED_RESULT;
+      uint32_t hash, HashTable::Iterator insert_it, bool has_more_rows)
+      WARN_UNUSED_RESULT;
 
   /// Append a row to a spilled partition. The row may be aggregated or unaggregated
   /// according to AGGREGATED_ROWS. May spill partitions if needed to append the row
@@ -570,7 +585,8 @@ class GroupingAggregator : public Aggregator {
 
   /// Reads all the rows from input_stream and process them by calling AddBatchImpl().
   template <bool AGGREGATED_ROWS>
-  Status ProcessStream(BufferedTupleStream* input_stream) WARN_UNUSED_RESULT;
+  Status ProcessStream(BufferedTupleStream* input_stream, bool has_more_streams)
+      WARN_UNUSED_RESULT;
 
   /// Get rows for the next rowbatch from the next partition. Sets 'partition_eos_' to
   /// true if all rows from all partitions have been returned or the limit is reached.
@@ -682,6 +698,39 @@ class GroupingAggregator : public Aggregator {
   /// as the partitions aggregate stream needs to be serialized and rewritten.
   /// We do not spill streaming preaggregations, so we do not need to reserve any buffers.
   int64_t MinReservation() const;
+
+  /// Try to save the extra reservation ('max_row_buffer_size' - 'spillable_buffer_size')
+  /// for a large write page to 'large_write_page_reservation_'. Do nothing if there are
+  /// not enough unused reservation. Return true if succeeds.
+  bool TrySaveLargeWritePageReservation();
+
+  /// Similar to above but for the large read page.
+  bool TrySaveLargeReadPageReservation();
+
+  /// Same as TrySaveLargeWritePageReservation() but make sure it succeeds.
+  void SaveLargeWritePageReservation();
+
+  /// Same as TrySaveLargeReadPageReservation() but make sure it succeeds.
+  void SaveLargeReadPageReservation();
+
+  /// Restore the extra reservation we saved in 'large_write_page_reservation_' for a
+  /// large write page. 'large_write_page_reservation_' must not be used.
+  void RestoreLargeWritePageReservation();
+
+  /// Similar to above but for the large read page.
+  void RestoreLargeReadPageReservation();
+
+  /// A wrapper of 'stream->AddRow()' to add 'row' to a spilled 'stream'. When it fails to
+  /// add a large row due to run out of unused reservation and fails to increase the
+  /// reservation, retry it after restoring the large write page reservation when we don't
+  /// need to save this reservation for spilling partitions. If succeeds, returns true and
+  /// save back the large write page reservation. Otherwise, returns false with a non-ok
+  /// status.
+  bool AddRowToSpilledStream(BufferedTupleStream* stream, TupleRow* __restrict__ row,
+      Status* status);
+
+  /// Gets current number of pinned partitions.
+  int GetNumPinnedPartitions();
 };
 } // namespace impala
 

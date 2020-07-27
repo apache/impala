@@ -58,6 +58,7 @@ BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     buffer_pool_(ExecEnv::GetInstance()->buffer_pool()),
     buffer_pool_client_(buffer_pool_client),
     read_page_reservation_(buffer_pool_client_),
+    large_read_page_reservation_(buffer_pool_client_),
     write_page_reservation_(buffer_pool_client_),
     default_page_len_(default_page_len),
     max_page_len_(max_page_len),
@@ -170,6 +171,12 @@ string BufferedTupleStream::DebugString() const {
   } else {
     ss << read_page_reservation_.GetReservation();
   }
+  ss << " large_read_page_reservation=";
+  if (large_read_page_reservation_.is_closed()) {
+    ss << "<closed>";
+  } else {
+    ss << large_read_page_reservation_.GetReservation();
+  }
   ss << " write_page_reservation=";
   if (write_page_reservation_.is_closed()) {
     ss << "<closed>";
@@ -258,6 +265,7 @@ void BufferedTupleStream::Close(RowBatch* batch, FlushMode flush) {
     }
   }
   read_page_reservation_.Close();
+  large_read_page_reservation_.Close();
   write_page_reservation_.Close();
   pages_.clear();
   num_pages_ = 0;
@@ -474,6 +482,28 @@ void BufferedTupleStream::InvalidateWriteIterator() {
   }
 }
 
+void BufferedTupleStream::SaveLargeReadPageReservation() {
+  DCHECK(!pinned_);
+  if (large_read_page_reservation_.GetReservation() < max_page_len_ - default_page_len_) {
+    // Reclaim the reservation for reading the next large page.
+    // large_read_page_reservation_ may not be 0 since we might only used some portion of
+    // it in reading the previous large page which is smaller than max_page_len_.
+    int64_t reservation_to_reclaim = max_page_len_ - default_page_len_
+        - large_read_page_reservation_.GetReservation();
+    buffer_pool_client_->SaveReservation(&large_read_page_reservation_,
+        reservation_to_reclaim);
+  }
+}
+
+void BufferedTupleStream::RestoreLargeReadPageReservation() {
+  DCHECK(!pinned_);
+  buffer_pool_client_->RestoreAllReservation(&large_read_page_reservation_);
+}
+
+bool BufferedTupleStream::HasLargeReadPageReservation() {
+  return large_read_page_reservation_.GetReservation() > 0;
+}
+
 Status BufferedTupleStream::NextReadPage(ReadIterator* read_iter) {
   DCHECK(read_iter->is_valid());
   DCHECK(!closed_);
@@ -511,16 +541,24 @@ Status BufferedTupleStream::NextReadPage(ReadIterator* read_iter) {
   }
 
   int64_t read_page_len = read_iter->read_page_->len();
-  if (!pinned_ && read_page_len > default_page_len_
-      && buffer_pool_client_->GetUnusedReservation() < read_page_len) {
+  if (!pinned_ && read_page_len > default_page_len_) {
     // If we are iterating over an unpinned stream and encounter a page that is larger
     // than the default page length, then unpinning the previous page may not have
-    // freed up enough reservation to pin the next one. The client is responsible for
-    // ensuring the reservation is available, so this indicates a bug.
-    return Status(TErrorCode::INTERNAL_ERROR, Substitute("Internal error: couldn't pin "
+    // freed up enough reservation to pin the next one. Try to restore some extra saved
+    // reservation for reading a large page.
+    int64_t needed_reservation = read_page_len - default_page_len_;
+    if (large_read_page_reservation_.GetReservation() >= needed_reservation) {
+      buffer_pool_client_->RestoreReservation(&large_read_page_reservation_,
+          needed_reservation);
+    }
+    if (buffer_pool_client_->GetUnusedReservation() < read_page_len) {
+      // Still failed to get enough unused reservation. The client is responsible for
+      // ensuring the reservation is available, so this indicates a bug.
+      return Status(TErrorCode::INTERNAL_ERROR, Substitute("Internal error: couldn't pin "
           "large page of $0 bytes, client only had $1 bytes of unused reservation:\n$2",
           read_page_len, buffer_pool_client_->GetUnusedReservation(),
           buffer_pool_client_->DebugString()));
+    }
   }
   // Ensure the next page is pinned for reading. By this point we should have enough
   // reservation to pin the page. If the stream is pinned, the page is already pinned.
@@ -600,6 +638,14 @@ Status BufferedTupleStream::PrepareForReadInternal(
   } else {
     // Eagerly pin the first page in the stream.
     read_iter->SetReadPage(pages_.begin());
+    if (read_iter == &read_it_ && !pinned_
+        && read_iter->read_page_->len() > default_page_len_) {
+      int64_t extra_needed_reservation = read_iter->read_page_->len() - default_page_len_;
+      if (large_read_page_reservation_.GetReservation() >= extra_needed_reservation) {
+        buffer_pool_client_->RestoreReservation(&large_read_page_reservation_,
+            extra_needed_reservation);
+      }
+    }
     // Check if we need to increment the pin count of the read page.
     RETURN_IF_ERROR(PinPageIfNeeded(&*read_iter->read_page_, pinned_));
     DCHECK(read_iter->read_page_->is_pinned());

@@ -433,7 +433,9 @@ void ReservationTracker::CheckConsistency() const {
   DCHECK_LE(reservation_.Load(), reservation_limit_.Load());
   DCHECK_GE(child_reservations_.Load(), 0);
   DCHECK_GE(used_reservation_.Load(), 0);
-  DCHECK_LE(used_reservation_.Load() + child_reservations_.Load(), reservation_.Load());
+  DCHECK_LE(used_reservation_.Load() + child_reservations_.Load(), reservation_.Load())
+      << used_reservation_.Load() << " + " << child_reservations_.Load() << " > "
+      << reservation_.Load();
 
   DCHECK_EQ(reservation_.Load(), counters_.peak_reservation->current_value());
   DCHECK_LE(reservation_.Load(), counters_.peak_reservation->value());

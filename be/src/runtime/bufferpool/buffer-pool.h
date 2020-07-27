@@ -368,6 +368,9 @@ class BufferPool::ClientHandle {
   /// coordinate to ensure there is sufficient unused reservation.
   void RestoreReservation(SubReservation* src, int64_t bytes);
 
+  /// Same as above but move all of src's unused reservation to this client.
+  void RestoreAllReservation(SubReservation* src);
+
   /// Accessors for this client's reservation corresponding to the identically-named
   /// methods in ReservationTracker.
   int64_t GetReservation() const;

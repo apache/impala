@@ -26,7 +26,8 @@ using namespace impala;
 
 template <bool AGGREGATED_ROWS>
 Status GroupingAggregator::AddBatchImpl(RowBatch* batch,
-    TPrefetchMode::type prefetch_mode, HashTableCtx* __restrict__ ht_ctx) {
+    TPrefetchMode::type prefetch_mode, HashTableCtx* __restrict__ ht_ctx,
+    bool has_more_rows) {
   DCHECK(!hash_partitions_.empty());
   DCHECK(!is_streaming_preagg_);
 
@@ -45,7 +46,8 @@ Status GroupingAggregator::AddBatchImpl(RowBatch* batch,
     EvalAndHashPrefetchGroup<AGGREGATED_ROWS>(batch, group_start, prefetch_mode, ht_ctx);
 
     FOREACH_ROW_LIMIT(batch, group_start, cache_size, batch_iter) {
-      RETURN_IF_ERROR(ProcessRow<AGGREGATED_ROWS>(batch_iter.Get(), ht_ctx));
+      RETURN_IF_ERROR(ProcessRow<AGGREGATED_ROWS>(batch_iter.Get(), ht_ctx,
+          has_more_rows));
       expr_vals_cache->NextRow();
     }
     DCHECK(expr_vals_cache->AtEnd());
@@ -85,7 +87,7 @@ void IR_ALWAYS_INLINE GroupingAggregator::EvalAndHashPrefetchGroup(RowBatch* bat
 
 template <bool AGGREGATED_ROWS>
 Status GroupingAggregator::ProcessRow(
-    TupleRow* __restrict__ row, HashTableCtx* __restrict__ ht_ctx) {
+    TupleRow* __restrict__ row, HashTableCtx* __restrict__ ht_ctx, bool has_more_rows) {
   HashTableCtx::ExprValuesCache* expr_vals_cache = ht_ctx->expr_values_cache();
   // Hoist lookups out of non-null branch to speed up non-null case.
   const uint32_t hash = expr_vals_cache->CurExprValuesHash();
@@ -123,12 +125,14 @@ Status GroupingAggregator::ProcessRow(
 
   // If we are seeing this result row for the first time, we need to construct the
   // result row and initialize it.
-  return AddIntermediateTuple<AGGREGATED_ROWS>(dst_partition, row, hash, it);
+  return AddIntermediateTuple<AGGREGATED_ROWS>(dst_partition, row, hash, it,
+      has_more_rows);
 }
 
 template <bool AGGREGATED_ROWS>
 Status GroupingAggregator::AddIntermediateTuple(Partition* __restrict__ partition,
-    TupleRow* __restrict__ row, uint32_t hash, HashTable::Iterator insert_it) {
+    TupleRow* __restrict__ row, uint32_t hash, HashTable::Iterator insert_it,
+    bool has_more_rows) {
   while (true) {
     DCHECK(partition->aggregated_row_stream->is_pinned());
     Tuple* intermediate_tuple = ConstructIntermediateTuple(partition->agg_fn_evals,
@@ -142,6 +146,16 @@ Status GroupingAggregator::AddIntermediateTuple(Partition* __restrict__ partitio
       return Status::OK();
     } else if (!add_batch_status_.ok()) {
       return std::move(add_batch_status_);
+    }
+
+    // If we don't need to reserve extra space for the serialize stream, restore them
+    // before spilling any partitions. One case is we don't need the serialize stream at
+    // all. The other case is this is the last row to add, and 'partition' will be read
+    // out and closed after adding this row, so no partitions need to be spilled.
+    if ((!needs_serialize_ || !has_more_rows)
+        && large_write_page_reservation_.GetReservation() > 0) {
+      RestoreLargeWritePageReservation();
+      continue;
     }
 
     // We did not have enough memory to add intermediate_tuple to the stream.
@@ -244,6 +258,6 @@ bool GroupingAggregator::TryAddToHashTable(HashTableCtx* __restrict__ ht_ctx,
 
 // Instantiate required templates.
 template Status GroupingAggregator::AddBatchImpl<false>(
-    RowBatch*, TPrefetchMode::type, HashTableCtx*);
+    RowBatch*, TPrefetchMode::type, HashTableCtx*, bool);
 template Status GroupingAggregator::AddBatchImpl<true>(
-    RowBatch*, TPrefetchMode::type, HashTableCtx*);
+    RowBatch*, TPrefetchMode::type, HashTableCtx*, bool);
