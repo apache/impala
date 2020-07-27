@@ -19,6 +19,7 @@
 
 #include <set>
 #include <sstream>
+#include <gutil/strings/substitute.h>
 
 #include "exec/exec-node.h"
 #include "exec/hash-table.inline.h"
@@ -117,25 +118,60 @@ Status GroupingAggregator::Partition::SerializeStreamForSpilling() {
     Status status;
     BufferedTupleStream* new_stream = parent->serialize_stream_.get();
     HashTable::Iterator it = hash_tbl->Begin(parent->ht_ctx_.get());
+    // Marks if we have used the large write page reservation. We only reclaim it after we
+    // finish writing to 'new_stream', because there are no other works interleaving that
+    // could occupy it.
+    bool used_large_page_reservation = false;
     while (!it.AtEnd()) {
       Tuple* tuple = it.GetTuple();
       it.Next();
       AggFnEvaluator::Serialize(agg_fn_evals, tuple);
-      if (UNLIKELY(!new_stream->AddRow(reinterpret_cast<TupleRow*>(&tuple), &status))) {
-        DCHECK(!status.ok()) << "Stream was unpinned - AddRow() only fails on error";
-        // Even if we can't add to new_stream, finish up processing this agg stream to
-        // make clean up easier (someone has to finalize this stream and we don't want to
-        // remember where we are).
-        parent->CleanupHashTbl(agg_fn_evals, it);
-        hash_tbl->Close();
-        hash_tbl.reset();
-        aggregated_row_stream->Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
-        return status;
+      TupleRow* row = reinterpret_cast<TupleRow*>(&tuple);
+      if (UNLIKELY(!new_stream->AddRow(row, &status))) {
+        bool row_is_added = false;
+        if (status.ok()) {
+          // Don't get enough unused reservation to add the large row. Restore the saved
+          // reservation for a large write page and try again.
+          DCHECK(!used_large_page_reservation
+              && parent->large_write_page_reservation_.GetReservation() > 0)
+              << "Run out of large page reservation in spilling " << DebugString()
+              << "\nused_large_page_reservation=" << used_large_page_reservation << "\n"
+              << parent->DebugString() << "\n"
+              << parent->buffer_pool_client()->DebugString() << "\n"
+              << new_stream->DebugString() << "\n"
+              << this->aggregated_row_stream->DebugString();
+          used_large_page_reservation = true;
+          parent->RestoreLargeWritePageReservation();
+          row_is_added = new_stream->AddRow(row, &status);
+        }
+        if (UNLIKELY(!row_is_added)) {
+          if (status.ok()) {
+            // Still fail to write the large row after restoring all the extra reservation
+            // for the large page. We can't spill anything else to free some reservation
+            // since we are currently spilling a partition. This indicates a bug that some
+            // of the min reservation are used incorrectly.
+            status = Status(TErrorCode::INTERNAL_ERROR, strings::Substitute(
+                "Internal error: couldn't serialize a large row in $0 of $1, only had $2 "
+                "bytes of unused reservation:\n$3", DebugString(), parent->DebugString(),
+                parent->buffer_pool_client()->GetUnusedReservation(),
+                parent->buffer_pool_client()->DebugString()));
+          }
+          // Even if we can't add to new_stream, finish up processing this agg stream to
+          // make clean up easier (someone has to finalize this stream and we don't want
+          // to remember where we are).
+          parent->CleanupHashTbl(agg_fn_evals, it);
+          hash_tbl->Close();
+          hash_tbl.reset();
+          aggregated_row_stream->Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+          return status;
+        }
       }
     }
 
     aggregated_row_stream->Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
     aggregated_row_stream.swap(parent->serialize_stream_);
+    // Save back the large write page reservation if we have restored it.
+    if (used_large_page_reservation) parent->SaveLargeWritePageReservation();
     // Recreate the serialize_stream (and reserve 1 buffer) now in preparation for
     // when we need to spill again. We need to have this available before we need
     // to spill to make sure it is available. This should be acquirable since we just
@@ -223,5 +259,14 @@ void GroupingAggregator::Partition::Close(bool finalize_rows) {
   }
   for (AggFnEvaluator* eval : agg_fn_evals) eval->Close(parent->state_);
   if (agg_fn_perm_pool.get() != nullptr) agg_fn_perm_pool->FreeAll();
+}
+
+string GroupingAggregator::Partition::DebugString() const {
+  std::stringstream ss;
+  ss << "Partition " << this << " (id=" << idx << ", level=" << level << ", is_spilled="
+     << is_spilled() << ", is_closed=" << is_closed
+     << ", aggregated_row_stream=" << aggregated_row_stream->DebugString()
+     << ",\nunaggregated_row_stream=" << unaggregated_row_stream->DebugString() << ")";
+  return ss.str();
 }
 } // namespace impala

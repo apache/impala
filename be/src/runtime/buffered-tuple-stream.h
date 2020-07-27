@@ -368,6 +368,18 @@ class BufferedTupleStream {
   Status GetNext(
       RowBatch* batch, bool* eos, std::vector<FlatRowPtr>* flat_rows);
 
+  /// Saves extra reservation of the underlying buffer pool client for a large read page
+  /// in this stream. The caller should make sure there are enough unused reservation in
+  /// the buffer pool. The reservation of 'large_read_page_reservation_' will be
+  /// 'max_page_len_' - 'default_page_len_' after calling this.
+  void SaveLargeReadPageReservation();
+
+  /// Restores the large read page reservation back to the underlying buffer pool client.
+  void RestoreLargeReadPageReservation();
+
+  /// Returns true if we have saved some space for a large read page.
+  bool HasLargeReadPageReservation();
+
   /// Must be called once at the end to cleanup all resources. If 'batch' is non-NULL,
   /// attaches buffers from pinned pages that rows returned from GetNext() may reference.
   /// Otherwise deletes all pages. Does nothing if the stream was already closed. The
@@ -591,6 +603,10 @@ class BufferedTupleStream {
   /// is saved if there is a read iterator, no pinned read page, and the possibility
   /// that the read iterator will advance to a valid page.
   BufferPool::SubReservation read_page_reservation_;
+  /// Extra saved reservation for reading a large page.
+  /// 'max_page_len_' - 'default_page_len_' is saved if this is the only input stream of
+  /// the operator.
+  BufferPool::SubReservation large_read_page_reservation_;
 
   /// Pointer into write_page_ to the byte after the last row written.
   uint8_t* write_ptr_ = nullptr;
