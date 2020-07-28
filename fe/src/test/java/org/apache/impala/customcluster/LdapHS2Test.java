@@ -17,6 +17,7 @@
 
 package org.apache.impala.customcluster;
 
+import static org.apache.impala.testutil.LdapUtil.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -54,13 +55,13 @@ public class LdapHS2Test {
 
   Metrics metrics = new Metrics();
 
-  @Before
-  public void setUp() throws Exception {
+  public void setUp(String extraArgs) throws Exception {
     String uri =
         String.format("ldap://localhost:%s", serverRule.getLdapServer().getPort());
     String dn = "cn=#UID,ou=Users,dc=myorg,dc=com";
     String ldapArgs = String.format("--enable_ldap_auth --ldap_uri='%s' "
-        + "--ldap_bind_pattern='%s' --ldap_passwords_in_clear_ok", uri, dn);
+            + "--ldap_bind_pattern='%s' --ldap_passwords_in_clear_ok %s ",
+        uri, dn, extraArgs);
     int ret = CustomClusterRunner.StartImpalaCluster(ldapArgs);
     assertEquals(ret, 0);
   }
@@ -120,6 +121,7 @@ public class LdapHS2Test {
    */
   @Test
   public void testHiveserver2() throws Exception {
+    setUp("");
     verifyMetrics(0, 0);
     THttpClient transport = new THttpClient("http://localhost:28000");
     Map<String, String> headers = new HashMap<String, String>();
@@ -241,5 +243,65 @@ public class LdapHS2Test {
         assertEquals(e.getMessage(), "HTTP Response code: 401");
       }
     }
+  }
+
+  /**
+   * Test for the interaction between the HS2 'impala.doas.user' property and LDAP user
+   * and group filters.
+   */
+  @Test
+  public void testHS2Impersonation() throws Exception {
+    // These correspond to the values in fe/src/test/resources/users.ldif
+    // Sets up a cluster where TEST_USER_4 can act as a proxy for any other user but
+    // doesn't pass any filters themselves, TEST_USER_1 and TEST_USER_2 can pass the group
+    // filter, and TEST_USER_1 and TEST_USER_3 pass the user filter.
+    setUp(String.format("--ldap_group_filter=%s,another-group "
+            + "--ldap_user_filter=%s,%s,another-user "
+            + "--ldap_group_dn_pattern=%s "
+            + "--ldap_group_membership_key=uniqueMember "
+            + "--ldap_group_class_key=groupOfUniqueNames "
+            + "--authorized_proxy_user_config=%s=* "
+            + "--ldap_bind_dn=%s --ldap_bind_password_cmd='echo -n %s' ",
+        TEST_USER_GROUP, TEST_USER_1, TEST_USER_3, GROUP_DN_PATTERN, TEST_USER_4,
+        TEST_USER_DN_1, TEST_PASSWORD_1));
+
+    THttpClient transport = new THttpClient("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+    // Authenticate as the proxy user 'Test4Ldap'
+    headers.put("Authorization", "Basic VGVzdDRMZGFwOmZnaGlq");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    // Open a session without specifying a 'doas', should fail as the proxy user won't
+    // pass the filters.
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    TOpenSessionResp openResp = client.OpenSession(openReq);
+    assertEquals(openResp.getStatus().getStatusCode(), TStatusCode.ERROR_STATUS);
+
+    // Open a session with a 'doas' that will pass both filters, should succeed.
+    Map<String, String> config = new HashMap<String, String>();
+    config.put("impala.doas.user", TEST_USER_1);
+    openReq.setConfiguration(config);
+    openResp = client.OpenSession(openReq);
+    assertEquals(openResp.getStatus().getStatusCode(), TStatusCode.SUCCESS_STATUS);
+    // Running a query should succeed.
+    TOperationHandle operationHandle = execAndFetch(
+        client, openResp.getSessionHandle(), "select logged_in_user()", "Test1Ldap");
+
+    // Open a session with a 'doas' that doesn't pass the user filter, should fail.
+    config.put("impala.doas.user", TEST_USER_2);
+    openResp = client.OpenSession(openReq);
+    assertEquals(openResp.getStatus().getStatusCode(), TStatusCode.ERROR_STATUS);
+
+    // Open a session with a 'doas' that doesn't pass the group filter, should fail.
+    config.put("impala.doas.user", TEST_USER_3);
+    openResp = client.OpenSession(openReq);
+    assertEquals(openResp.getStatus().getStatusCode(), TStatusCode.ERROR_STATUS);
+
+    // Open a session with a 'doas' that doesn't pass either filter, should fail.
+    config.put("impala.doas.user", TEST_USER_4);
+    openResp = client.OpenSession(openReq);
+    assertEquals(openResp.getStatus().getStatusCode(), TStatusCode.ERROR_STATUS);
   }
 }

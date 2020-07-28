@@ -24,6 +24,8 @@
 #include <gutil/strings/util.h>
 
 #include "common/logging.h"
+#include "kudu/util/flag_tags.h"
+#include "util/os-util.h"
 
 #include "common/names.h"
 
@@ -55,7 +57,21 @@ DEFINE_string(ldap_group_membership_key, "member",
 DEFINE_string(ldap_group_class_key, "groupOfNames",
     "The LDAP objectClass each of the groups in --ldap_group_filter implements in LDAP.");
 
+DEFINE_string(ldap_bind_dn, "",
+    "Distinguished name of the user to bind as when doing user or group searches. Only "
+    "required if user or group filters are being used and the LDAP server is not "
+    "configured to allow anonymous searches.");
+DEFINE_string(ldap_bind_password_cmd, "",
+    "A Unix command whose output returns the password to use with --ldap_bind_dn. The "
+    "output of the command will be truncated to 1024 bytes and trimmed of trailing "
+    "whitespace.");
+TAG_FLAG(ldap_bind_password_cmd, sensitive);
+
 DECLARE_string(ldap_ca_certificate);
+DECLARE_string(ldap_user_filter);
+DECLARE_string(ldap_group_filter);
+DECLARE_string(principal);
+DECLARE_bool(skip_external_kerberos_auth);
 
 using boost::algorithm::replace_all;
 using namespace strings;
@@ -113,6 +129,13 @@ Status ImpalaLdap::ValidateFlags() {
                  << "hence passwords) could be intercepted by a "
                  << "man-in-the-middle attack";
   }
+
+  if ((!FLAGS_ldap_user_filter.empty() || !FLAGS_ldap_group_filter.empty())
+      && (!FLAGS_principal.empty() && !FLAGS_skip_external_kerberos_auth)) {
+    return Status("LDAP user and group filters may not be used if Kerberos auth is "
+                  "turned on for external connections.");
+  }
+
   return Status::OK();
 }
 
@@ -143,18 +166,37 @@ Status ImpalaLdap::Init(const std::string& user_filter, const std::string& group
     }
   }
 
+  if (!FLAGS_ldap_bind_password_cmd.empty()) {
+    if (!RunShellProcess(
+            FLAGS_ldap_bind_password_cmd, &bind_password_, true, {"JAVA_TOOL_OPTIONS"})) {
+      return Status(
+          Substitute("ldap_bind_password_cmd failed with output: '$0'", bind_password_));
+    }
+  }
+
   return Status::OK();
 }
 
-bool ImpalaLdap::LdapCheckPass(
-    const char* user, const char* pass, unsigned passlen, string do_as_user) {
+bool ImpalaLdap::LdapCheckPass(const char* user, const char* pass, unsigned passlen) {
   if (passlen == 0 && !FLAGS_ldap_allow_anonymous_binds) {
     // Disable anonymous binds.
     return false;
   }
 
+  string user_dn = ConstructUserDN(user);
   LDAP* ld;
-  int rc = ldap_initialize(&ld, FLAGS_ldap_uri.c_str());
+  VLOG_QUERY << "Trying simple LDAP bind for: " << user_dn;
+  bool success = Bind(user_dn, pass, passlen, &ld);
+  if (success) {
+    ldap_unbind_ext(ld, nullptr, nullptr);
+  }
+  VLOG(2) << "LDAP bind successful";
+  return success;
+}
+
+bool ImpalaLdap::Bind(
+    const std::string& user_dn, const char* pass, unsigned passlen, LDAP** ld) {
+  int rc = ldap_initialize(ld, FLAGS_ldap_uri.c_str());
   if (rc != LDAP_SUCCESS) {
     LOG(WARNING) << "Could not initialize connection with LDAP server (" << FLAGS_ldap_uri
                  << "). Error: " << ldap_err2string(rc);
@@ -163,62 +205,72 @@ bool ImpalaLdap::LdapCheckPass(
 
   // Force the LDAP version to 3 to make sure TLS is supported.
   int ldap_ver = 3;
-  ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &ldap_ver);
+  ldap_set_option(*ld, LDAP_OPT_PROTOCOL_VERSION, &ldap_ver);
 
   // If -ldap_tls is turned on, and the URI is ldap://, issue a STARTTLS operation.
   // Note that we'll ignore -ldap_tls when using ldaps:// because we've already
   // got a secure connection (and the LDAP server will reject the STARTTLS).
   if (FLAGS_ldap_tls && (FLAGS_ldap_uri.find(LDAP_URI_PREFIX) == 0)) {
-    int tls_rc = ldap_start_tls_s(ld, nullptr, nullptr);
+    int tls_rc = ldap_start_tls_s(*ld, nullptr, nullptr);
     if (tls_rc != LDAP_SUCCESS) {
       LOG(WARNING) << "Could not start TLS secure connection to LDAP server ("
                    << FLAGS_ldap_uri << "). Error: " << ldap_err2string(tls_rc);
-      ldap_unbind_ext(ld, nullptr, nullptr);
+      ldap_unbind_ext(*ld, nullptr, nullptr);
       return false;
     }
     VLOG(2) << "Started TLS connection with LDAP server: " << FLAGS_ldap_uri;
   }
-
-  string user_dn = ConstructUserDN(user);
 
   // Map the password into a credentials structure
   struct berval cred;
   cred.bv_val = const_cast<char*>(pass);
   cred.bv_len = passlen;
 
-  VLOG_QUERY << "Trying simple LDAP bind for: " << user_dn;
-
   rc = ldap_sasl_bind_s(
-      ld, user_dn.c_str(), LDAP_SASL_SIMPLE, &cred, nullptr, nullptr, nullptr);
+      *ld, user_dn.c_str(), LDAP_SASL_SIMPLE, &cred, nullptr, nullptr, nullptr);
   // Free ld
   if (rc != LDAP_SUCCESS) {
     LOG(WARNING) << "LDAP authentication failure for " << user_dn << " : "
                  << ldap_err2string(rc);
-    ldap_unbind_ext(ld, nullptr, nullptr);
+    ldap_unbind_ext(*ld, nullptr, nullptr);
     return false;
   }
 
-  VLOG_QUERY << "LDAP bind successful";
+  return true;
+}
 
-  string filter_user = do_as_user == "" ? user : do_as_user;
-  if (!user_filter_.empty() && user_filter_.count(filter_user) != 1) {
-    LOG(WARNING) << "LDAP authentication failure for " << user_dn << ". Bind was "
+bool ImpalaLdap::LdapCheckFilters(std::string username) {
+  if (user_filter_.empty() && group_filter_.empty()) return true;
+
+  VLOG(2) << "Checking LDAP filters for " << username;
+  if (username.empty()) {
+    LOG(WARNING) << "Failed to check LDAP filters: username empty.";
+    return false;
+  }
+
+  LDAP* ld;
+  bool success =
+      Bind(FLAGS_ldap_bind_dn, bind_password_.c_str(), bind_password_.size(), &ld);
+  if (!success) return false;
+
+  if (!user_filter_.empty() && user_filter_.count(username) != 1) {
+    LOG(WARNING) << "LDAP authentication failure for " << username << ". Bind was "
                  << "successful but user is not in the authorized user list.";
     ldap_unbind_ext(ld, nullptr, nullptr);
     return false;
   }
 
-  string filter_user_dn = do_as_user == nullptr ? user_dn : ConstructUserDN(do_as_user);
   if (!group_filter_.empty()) {
+    string filter_user_dn = ConstructUserDN(username);
     if (!CheckGroupMembership(ld, filter_user_dn)) {
-      LOG(WARNING) << "LDAP authentication failure for " << user_dn << ". Bind was "
+      LOG(WARNING) << "LDAP authentication failure for " << username << ". Bind was "
                    << "successful but user is not in any of the required groups.";
       ldap_unbind_ext(ld, nullptr, nullptr);
       return false;
     }
   }
   ldap_unbind_ext(ld, nullptr, nullptr);
-
+  VLOG(2) << "LDAP filter check for " << username << " was successful.";
   return true;
 }
 

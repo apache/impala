@@ -784,8 +784,8 @@ Status Webserver::HandleBasic(struct sq_connection* connection,
   }
   string username = decoded.substr(0, colon);
   string password = decoded.substr(colon + 1);
-  bool ret = ldap_->LdapCheckPass(username.c_str(), password.c_str(), password.length());
-  if (ret) {
+  if (ldap_->LdapCheckPass(username.c_str(), password.c_str(), password.length())
+      && ldap_->LdapCheckFilters(username)) {
     request_info->remote_user = strdup(username.c_str());
     return Status::OK();
   }

@@ -1729,6 +1729,23 @@ Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_
   return Status::Expected(error_msg_str);
 }
 
+bool ImpalaServer::IsAuthorizedProxyUser(const string& user) {
+  if (user.empty()) return false;
+
+  // Get the short version of the user name (the user name up to the first '/' or '@')
+  // from the full principal name.
+  size_t end_idx = min(user.find("/"), user.find("@"));
+  // If neither are found (or are found at the beginning of the user name),
+  // return the username. Otherwise, return the username up to the matching character.
+  string short_user(
+      end_idx == string::npos || end_idx == 0 ? user : user.substr(0, end_idx));
+
+  return authorized_proxy_user_config_.find(short_user)
+      != authorized_proxy_user_config_.end()
+      || authorized_proxy_group_config_.find(short_user)
+      != authorized_proxy_group_config_.end();
+}
+
 void ImpalaServer::CatalogUpdateVersionInfo::UpdateCatalogVersionMetrics()
 {
   ImpaladMetrics::CATALOG_VERSION->SetValue(catalog_version);

@@ -46,6 +46,7 @@
 #include "rpc/auth-provider.h"
 #include "rpc/cookie-util.h"
 #include "rpc/thrift-server.h"
+#include "runtime/exec-env.h"
 #include "transport/THttpServer.h"
 #include "transport/TSaslClientTransport.h"
 #include "util/auth-util.h"
@@ -177,6 +178,29 @@ static int SaslLogCallback(void* context, int level, const char* message) {
   return SASL_OK;
 }
 
+// Calls into the LDAP utils to check the provided user/pass.
+bool DoLdapCheck(const char* user, const char* pass, unsigned passlen) {
+  ImpalaLdap* ldap = AuthManager::GetInstance()->GetLdap();
+  bool success = ldap->LdapCheckPass(user, pass, passlen);
+
+  if (success) {
+    ImpalaServer* server = ExecEnv::GetInstance()->impala_server();
+    if (server == nullptr) {
+      LOG(FATAL) << "Invalid config: SASL LDAP is only supported for client connections "
+                 << "to an impalad.";
+    }
+    // If the user is an authorized proxy user, we do not yet know the effective user as
+    // it may be set by 'impala.doas.user', in which case we defer checking LDAP filters
+    // until OpenSession(). Otherwise, we prefer to check the filters as easly as
+    // possible, so check them here.
+    if (!server->IsAuthorizedProxyUser(user)) {
+      success = ldap->LdapCheckFilters(user);
+    }
+  }
+
+  return success;
+}
+
 // Wrapper around the function we use to check passwords with LDAP which has the function
 // signature required to work with SASL.
 //
@@ -189,8 +213,7 @@ static int SaslLogCallback(void* context, int level, const char* message) {
 // Return: SASL_OK on success, SASL_FAIL otherwise
 int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
     const char* pass, unsigned passlen, struct propctx* propctx) {
-  return AuthManager::GetInstance()->GetLdap()->LdapCheckPass(user, pass, passlen) ?
-      SASL_OK : SASL_FAIL;
+  return DoLdapCheck(user, pass, passlen) ? SASL_OK : SASL_FAIL;
 }
 
 // Sasl wants a way to ask us about some options, this function provides
@@ -445,8 +468,7 @@ bool BasicAuth(ThriftServer::ConnectionContext* connection_context,
   }
   string username = decoded.substr(0, colon);
   string password = decoded.substr(colon + 1);
-  bool ret = AuthManager::GetInstance()->GetLdap()->LdapCheckPass(username.c_str(),
-      password.c_str(), password.length(), connection_context->do_as_user);
+  bool ret = DoLdapCheck(username.c_str(), password.c_str(), password.length());
   if (ret) {
     // Authenication was successful, so set the username on the connection.
     connection_context->username = username;

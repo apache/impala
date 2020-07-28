@@ -70,13 +70,6 @@ public class LdapImpalaShellTest {
     assertEquals(ret, 0);
   }
 
-  @AfterClass
-  public static void cleanUp() throws Exception {
-    CustomClusterRunner.StartImpalaCluster();
-  }
-
-  /**
-
   /**
    * Checks if the local python supports SSLContext needed by shell http
    * transport tests. Python version shipped with CentOS6 is known to
@@ -182,14 +175,15 @@ public class LdapImpalaShellTest {
    */
   @Test
   public void testLdapFilters() throws Exception {
-    String groupDN = "cn=%s,ou=Groups,dc=myorg,dc=com";
     // These correspond to the values in fe/src/test/resources/users.ldif
     setUp(String.format("--ldap_group_filter=%s,another-group "
             + "--ldap_user_filter=%s,%s,another-user "
             + "--ldap_group_dn_pattern=%s "
             + "--ldap_group_membership_key=uniqueMember "
-            + "--ldap_group_class_key=groupOfUniqueNames",
-        TEST_USER_GROUP, TEST_USER_1, TEST_USER_3, groupDN));
+            + "--ldap_group_class_key=groupOfUniqueNames "
+            + "--ldap_bind_dn=%s --ldap_bind_password_cmd='echo -n %s' ",
+        TEST_USER_GROUP, TEST_USER_1, TEST_USER_3, GROUP_DN_PATTERN, TEST_USER_DN_1,
+        TEST_PASSWORD_1));
     String query = "select logged_in_user()";
 
     // Run with user that passes the group filter but not the user filter, should fail.
@@ -222,7 +216,6 @@ public class LdapImpalaShellTest {
    */
   @Test
   public void testLdapFiltersWithProxy() throws Exception {
-    String groupDN = "cn=%s,ou=Groups,dc=myorg,dc=com";
     // These correspond to the values in fe/src/test/resources/users.ldif
     // Sets up a cluster where TEST_USER_4 can act as a proxy for any other user but
     // doesn't pass any filters themselves, TEST_USER_1 and TEST_USER_2 can pass the group
@@ -232,11 +225,12 @@ public class LdapImpalaShellTest {
             + "--ldap_group_dn_pattern=%s "
             + "--ldap_group_membership_key=uniqueMember "
             + "--ldap_group_class_key=groupOfUniqueNames "
-            + "--authorized_proxy_user_config=%s=*",
-        TEST_USER_GROUP, TEST_USER_1, TEST_USER_3, groupDN, TEST_USER_4));
+            + "--authorized_proxy_user_config=%s=* "
+            + "--ldap_bind_dn=%s --ldap_bind_password_cmd='echo -n %s' ",
+        TEST_USER_GROUP, TEST_USER_1, TEST_USER_3, GROUP_DN_PATTERN, TEST_USER_4,
+        TEST_USER_DN_1, TEST_PASSWORD_1));
 
     String query = "select logged_in_user()";
-
     // Run as the proxy user with a delegate that passes both filters, should succeed
     // and return the delegate user's name.
     String[] command = buildCommand(
