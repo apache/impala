@@ -20,6 +20,7 @@ package org.apache.impala.testutil;
 public class LdapUtil {
   // These correspond to the values in fe/src/test/resources/users.ldif
   public static final String TEST_USER_1 = "Test1Ldap";
+  public static final String TEST_USER_DN_1 = "cn=Test1Ldap,ou=Users,dc=myorg,dc=com";
   public static final String TEST_PASSWORD_1 = "12345";
 
   public static final String TEST_USER_2 = "Test2Ldap";
@@ -33,4 +34,6 @@ public class LdapUtil {
 
   // TEST_USER_1 and TEST_USER_2 are members of this group.
   public static final String TEST_USER_GROUP = "group1";
+
+  public static final String GROUP_DN_PATTERN = "cn=%s,ou=Groups,dc=myorg,dc=com";
 }

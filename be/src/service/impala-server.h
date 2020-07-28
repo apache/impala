@@ -501,6 +501,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// Appends the lineage_entry to lineage_logger_.
   Status AppendLineageEntry(const std::string& lineage_entry);
 
+  /// Returns true if 'user' was configured as an authorized proxy user.
+  bool IsAuthorizedProxyUser(const std::string& user) WARN_UNUSED_RESULT;
+
   // Mapping between query option names and levels
   QueryOptionLevels query_option_levels_;
 

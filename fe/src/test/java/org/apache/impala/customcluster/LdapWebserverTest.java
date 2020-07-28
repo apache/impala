@@ -130,8 +130,9 @@ public class LdapWebserverTest {
             + "--webserver_ldap_user_filter=%s,%s "
             + "--ldap_group_dn_pattern=ou=Groups,dc=myorg,dc=com "
             + "--ldap_group_membership_key=uniqueMember "
-            + "--ldap_group_class_key=groupOfUniqueNames",
-        TEST_USER_GROUP, TEST_USER_1, TEST_USER_3), "");
+            + "--ldap_group_class_key=groupOfUniqueNames "
+            + "--ldap_bind_dn=%s --ldap_bind_password_cmd='echo -n %s' ",
+        TEST_USER_GROUP, TEST_USER_1, TEST_USER_3, TEST_USER_DN_1, TEST_PASSWORD_1), "");
     // start-impala-cluster contacts the webui to confirm the impalads have started, so
     // there will already be some successful auth attempts.
     verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);

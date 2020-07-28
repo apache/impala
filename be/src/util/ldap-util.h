@@ -44,17 +44,16 @@ class ImpalaLdap {
   /// user or group filters as appropriate. 'passlen' is the length of the password.
   /// Returns true if authentication is successful.
   ///
-  /// 'do_as_user' is an optional delegate user that 'username' is trying act as a proxy
-  /// for. If provided, the group and user filters will be applied to 'do_as_user' and not
-  /// 'username'.
-  ///
   /// Note that this method uses ldap_sasl_bind_s(), which does *not* provide any security
   /// to the connection between Impala and the LDAP server. You must either set
   /// --ldap_tls or have a URI which has "ldaps://" as the scheme in order to get a secure
   /// connection. Use --ldap_ca_certificate to specify the location of the certificate
   /// used to confirm the authenticity of the LDAP server certificate.
-  bool LdapCheckPass(const char* username, const char* password, unsigned passlen,
-      std::string do_as_user = "") WARN_UNUSED_RESULT;
+  bool LdapCheckPass(
+      const char* username, const char* password, unsigned passlen) WARN_UNUSED_RESULT;
+
+  /// Returns true if 'username' passes the LDAP user and group filters, if configured.
+  bool LdapCheckFilters(std::string username) WARN_UNUSED_RESULT;
 
  private:
   /// If non-empty, only users in this set can successfully authenticate.
@@ -65,6 +64,13 @@ class ImpalaLdap {
   std::unordered_set<std::string> group_filter_;
   /// The base DNs to use when preforming group searches.
   std::vector<std::string> group_filter_dns_;
+
+  /// The output of --ldap_bind_password_cmd, if specified.
+  std::string bind_password_;
+
+  /// Attempts a bind with 'user' and 'pass'. Returns true if successful and the handle is
+  /// returned in 'ldap', in which case the caller must call 'ldap_unbind_ext' on 'ldap'.
+  bool Bind(const std::string& user_dn, const char* pass, unsigned passlen, LDAP** ldap);
 
   /// Searches LDAP to determine if 'user_str' belong to one of the groups in
   /// 'group_filter_'. Returns true if so.

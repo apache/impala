@@ -90,6 +90,7 @@ const TProtocolVersion::type MAX_SUPPORTED_HS2_VERSION =
     } \
   } while (false)
 
+DECLARE_bool(enable_ldap_auth);
 DECLARE_string(hostname);
 DECLARE_int32(webserver_port);
 DECLARE_int32(idle_session_timeout);
@@ -296,8 +297,8 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
 
   // DO NOT log this Thrift struct in its entirety, in case a bad client sets the
   // password.
-  VLOG_QUERY << "Opening session: " << PrintId(session_id) << " username: "
-             << request.username;
+  VLOG_QUERY << "Opening session: " << PrintId(session_id)
+             << " request username: " << request.username;
 
   // create a session state: initialize start time, session type, database and default
   // query options.
@@ -363,6 +364,18 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
       }
     }
   }
+
+  // If the connected user is an authorized proxy user, we were not able to check the LDAP
+  // filters when the connection was created because we didn't know what the effective
+  // user would be yet, so check now.
+  if (FLAGS_enable_ldap_auth && IsAuthorizedProxyUser(state->connected_user)) {
+    bool success =
+        AuthManager::GetInstance()->GetLdap()->LdapCheckFilters(GetEffectiveUser(*state));
+    if (!success) {
+      HS2_RETURN_ERROR(return_val, "User is not authorized.", SQLSTATE_GENERAL_ERROR);
+    }
+  }
+
   RegisterSessionTimeout(state->session_timeout);
   TQueryOptionsToMap(state->QueryOptions(), &return_val.configuration);
 
@@ -389,8 +402,8 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   return_val.__isset.configuration = true;
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
   return_val.serverProtocolVersion = state->hs2_version;
-  VLOG_QUERY << "Opened session: " << PrintId(session_id) << " username: "
-             << request.username;
+  VLOG_QUERY << "Opened session: " << PrintId(session_id)
+             << " effective username: " << GetEffectiveUser(*state);
 }
 
 void ImpalaServer::CloseSession(TCloseSessionResp& return_val,

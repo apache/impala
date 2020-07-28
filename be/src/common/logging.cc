@@ -32,6 +32,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
+#include "kudu/util/flags.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
@@ -180,14 +181,15 @@ void impala::ShutdownLogging() {
 
 void impala::LogCommandLineFlags() {
   LOG(INFO) << "Flags (see also /varz are on debug webserver):" << endl
-            << google::CommandlineFlagsIntoString();
+            << kudu::CommandlineFlagsIntoString(kudu::EscapeMode::NONE);
 
   vector<google::CommandLineFlagInfo> flags;
   google::GetAllFlags(&flags, true);
   stringstream ss;
   for (const auto& flag: flags) {
     if (flag.hidden) {
-      ss << "--" << flag.name << "=" << flag.current_value << "\n";
+      string flag_value = CheckFlagAndRedact(flag, kudu::EscapeMode::NONE);
+      ss << "--" << flag.name << "=" << flag_value << "\n";
     }
   }
   string experimental_flags = ss.str();
