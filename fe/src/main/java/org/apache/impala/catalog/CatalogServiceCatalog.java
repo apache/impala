@@ -356,13 +356,15 @@ public class CatalogServiceCatalog extends Catalog {
    * Check whether the database is in blacklist
    */
   public boolean isBlacklistedDb(String dbName) {
-    return blacklistedDbs_.contains(dbName);
+    Preconditions.checkNotNull(dbName);
+    return blacklistedDbs_.contains(dbName.toLowerCase());
   }
 
   /**
    * Check whether the table is in blacklist
    */
   public boolean isBlacklistedTable(TableName table) {
+    Preconditions.checkNotNull(table);
     return blacklistedTables_.contains(table);
   }
 

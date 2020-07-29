@@ -52,13 +52,35 @@ class TestEventProcessing(CustomClusterTestSuite):
     """
     try:
       event_id_before = EventProcessorUtils.get_last_synced_event_id()
-      self.run_stmt_in_hive("create database testBlackListedDb")
+      # create a blacklisted database from hive and make sure event is ignored
+      self.run_stmt_in_hive("create database TESTblackListedDb")
+      # wait until all the events generated above are processed
+      EventProcessorUtils.wait_for_event_processing(self)
+      assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+      assert EventProcessorUtils.get_last_synced_event_id() > event_id_before
+      # make sure that the blacklisted db is ignored
+      assert "TESTblackListedDb".lower() not in self.all_db_names()
+
+      event_id_before = EventProcessorUtils.get_last_synced_event_id()
       self.run_stmt_in_hive("create table testBlackListedDb.testtbl (id int)")
+      # create a table on the blacklisted database with a different case
+      self.run_stmt_in_hive("create table TESTBLACKlISTEDDb.t2 (id int)")
       self.run_stmt_in_hive(
         "create table functional_parquet.testBlackListedTbl (id int, val string)"
         " partitioned by (part int) stored as parquet")
       self.run_stmt_in_hive(
         "alter table functional_parquet.testBlackListedTbl add partition (part=1)")
+      # wait until all the events generated above are processed
+      EventProcessorUtils.wait_for_event_processing(self)
+      assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+      assert EventProcessorUtils.get_last_synced_event_id() > event_id_before
+      # make sure that the black listed table is not created
+      table_names = self.client.execute("show tables in functional_parquet").get_data()
+      assert "testBlackListedTbl".lower() not in table_names
+
+      event_id_before = EventProcessorUtils.get_last_synced_event_id()
+      # generate a table level event with a different case
+      self.run_stmt_in_hive("drop table functional_parquet.TESTBlackListedTbl")
       # wait until all the events generated above are processed
       EventProcessorUtils.wait_for_event_processing(self)
       assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
