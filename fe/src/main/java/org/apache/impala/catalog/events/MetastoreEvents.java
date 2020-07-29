@@ -213,8 +213,8 @@ public class MetastoreEvents {
         String eventDb = currentEvent.getDbName();
         String eventTbl = currentEvent.getTableName();
         // if the event is on blacklisted db or table we should filter it out
-        if (catalog_.isBlacklistedDb(eventDb) || (eventTbl != null && catalog_
-            .isBlacklistedTable(eventDb, eventTbl))) {
+        if ((eventDb != null && catalog_.isBlacklistedDb(eventDb)) || (eventTbl != null
+            && catalog_.isBlacklistedTable(eventDb, eventTbl))) {
           String blacklistedObject = eventTbl != null ? new TableName(eventDb,
               eventTbl).toString() : eventDb;
           LOG.info(currentEvent.debugString("Filtering out this event since it is on a "
