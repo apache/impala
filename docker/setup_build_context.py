@@ -37,7 +37,6 @@ if args.debug_build:
 else:
   BUILD_TYPE = "release"
 OUTPUT_DIR = os.path.join(IMPALA_HOME, "docker/build_context", BUILD_TYPE)
-DOCKERFILE = os.path.join(IMPALA_HOME, "docker/impala_base/Dockerfile")
 
 IMPALA_TOOLCHAIN_PACKAGES_HOME = os.environ["IMPALA_TOOLCHAIN_PACKAGES_HOME"]
 IMPALA_GCC_VERSION = os.environ["IMPALA_GCC_VERSION"]
@@ -55,13 +54,22 @@ if os.path.exists(OUTPUT_DIR):
     shutil.rmtree(OUTPUT_DIR)
 os.makedirs(OUTPUT_DIR)
 
-os.symlink(os.path.relpath(DOCKERFILE, OUTPUT_DIR),
-    os.path.join(OUTPUT_DIR, "Dockerfile"))
-
 BIN_DIR = os.path.join(OUTPUT_DIR, "bin")
+
+# Contains all library dependencies for Impala Executors.
+EXEC_LIB_DIR = os.path.join(OUTPUT_DIR, "exec-lib")
+
+# Contains all library dependencies for all Impala daemons.
 LIB_DIR = os.path.join(OUTPUT_DIR, "lib")
+
+# Contains all library dependencies for statestored.
+# The statestore does not require any jar files since it does not run an embedded JVM.
+STATESTORE_LIB_DIR = os.path.join(OUTPUT_DIR, "statestore-lib")
+
 os.mkdir(BIN_DIR)
+os.mkdir(EXEC_LIB_DIR)
 os.mkdir(LIB_DIR)
+os.mkdir(STATESTORE_LIB_DIR)
 
 
 def symlink_file_into_dir(src_file, dst_dir):
@@ -69,10 +77,18 @@ def symlink_file_into_dir(src_file, dst_dir):
   os.symlink(src_file, os.path.join(dst_dir, os.path.basename(src_file)))
 
 
-def strip_debug_symbols(src_file, dst_file):
-  """Strips debug symbols from the given src_file and writes the output to the given
-  dst_file."""
-  check_call([STRIP, "--strip-debug", src_file, "-o", dst_file])
+def symlink_file_into_dirs(src_file, dst_dirs):
+  """Helper to symlink 'src_file' into all dirs in 'dst_dirs'."""
+  for dst_dir in dst_dirs:
+    symlink_file_into_dir(src_file, dst_dir)
+
+
+def strip_debug_symbols(src_file, dst_dirs):
+  """Strips debug symbols from the given 'src_file' and writes the output to the given
+  'dst_dirs', with the same file name as the 'src_file'."""
+  for dst_dir in dst_dirs:
+    check_call([STRIP, "--strip-debug", src_file, "-o",
+        os.path.join(dst_dir, os.path.basename(src_file))])
 
 # Impala binaries and native dependencies.
 
@@ -82,41 +98,49 @@ IMPALAD_BINARY = os.path.join(IMPALA_HOME, "be/build", BUILD_TYPE, "service/impa
 if args.debug_build:
   symlink_file_into_dir(IMPALAD_BINARY, BIN_DIR)
 else:
-  strip_debug_symbols(IMPALAD_BINARY, os.path.join(BIN_DIR, "impalad"))
+  strip_debug_symbols(IMPALAD_BINARY, [BIN_DIR])
 
 # Add libstc++ binaries to LIB_DIR. Strip debug symbols for release builds.
 for libstdcpp_so in glob.glob(os.path.join(
     GCC_HOME, "lib64/{0}*.so*".format("libstdc++"))):
   # Ignore 'libstdc++.so.*-gdb.py'.
   if not os.path.basename(libstdcpp_so).endswith(".py"):
+    dst_dirs = [LIB_DIR, EXEC_LIB_DIR, STATESTORE_LIB_DIR]
     if args.debug_build:
-      symlink_file_into_dir(libstdcpp_so, LIB_DIR)
+      symlink_file_into_dirs(libstdcpp_so, dst_dirs)
     else:
-      strip_debug_symbols(libstdcpp_so,
-          os.path.join(LIB_DIR, os.path.basename(libstdcpp_so)))
+      strip_debug_symbols(libstdcpp_so, dst_dirs)
 
 # Add libgcc binaries to LIB_DIR.
 for libgcc_so in glob.glob(os.path.join(GCC_HOME, "lib64/{0}*.so*".format("libgcc_s"))):
-  symlink_file_into_dir(libgcc_so, LIB_DIR)
+  symlink_file_into_dirs(libgcc_so, [LIB_DIR, EXEC_LIB_DIR, STATESTORE_LIB_DIR])
 
 # Add libkudu_client binaries to LIB_DIR. Strip debug symbols for release builds.
 for kudu_client_so in glob.glob(os.path.join(KUDU_LIB_DIR, "libkudu_client.so*")):
+  # For some reason, statestored requires libkudu_client.so.
+  dst_dirs = [LIB_DIR, EXEC_LIB_DIR, STATESTORE_LIB_DIR]
   if args.debug_build:
-    symlink_file_into_dir(kudu_client_so, LIB_DIR)
+    symlink_file_into_dirs(kudu_client_so, dst_dirs)
   else:
-    strip_debug_symbols(kudu_client_so,
-        os.path.join(LIB_DIR, os.path.basename(kudu_client_so)))
+    strip_debug_symbols(kudu_client_so, dst_dirs)
 
-# Impala dependencies.
+# Impala Coordinator dependencies.
 dep_classpath = file(os.path.join(IMPALA_HOME, "fe/target/build-classpath.txt")).read()
 for jar in dep_classpath.split(":"):
   assert os.path.exists(jar), "missing jar from classpath: {0}".format(jar)
   symlink_file_into_dir(jar, LIB_DIR)
 
-# Impala jars.
+# Impala Coordinator jars.
 for jar in glob.glob(
     os.path.join(IMPALA_HOME, "fe/target/impala-frontend-*-SNAPSHOT.jar")):
   symlink_file_into_dir(jar, LIB_DIR)
+
+# Impala Executor dependencies.
+dep_classpath = file(os.path.join(IMPALA_HOME,
+    "mvn-deps/executor-deps/target/build-executor-deps-classpath.txt")).read()
+for jar in dep_classpath.split(":"):
+  assert os.path.exists(jar), "missing jar from classpath: {0}".format(jar)
+  symlink_file_into_dir(jar, EXEC_LIB_DIR)
 
 # Templates for debug web pages.
 os.symlink(os.path.join(IMPALA_HOME, "www"), os.path.join(OUTPUT_DIR, "www"))

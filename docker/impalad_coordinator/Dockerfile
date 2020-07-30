@@ -18,6 +18,8 @@
 ARG BASE_IMAGE=impala_base
 FROM ${BASE_IMAGE}
 
+COPY --chown=impala lib /opt/impala/lib
+
 # Externally-facing ports
 # Beeswax
 EXPOSE 21000

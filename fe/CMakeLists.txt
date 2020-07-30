@@ -16,7 +16,7 @@
 # under the License.
 
 add_custom_target(fe ALL DEPENDS
-  shaded-deps-hive-exec shaded-deps-s3a-aws-sdk thrift-deps fb-deps yarn-extras
-      function-registry ext-data-source query-event-hook-api impala-parent
+  executor-deps shaded-deps-hive-exec shaded-deps-s3a-aws-sdk thrift-deps fb-deps
+      yarn-extras function-registry ext-data-source query-event-hook-api impala-parent
   COMMAND ${CMAKE_SOURCE_DIR}/bin/mvn-quiet.sh -B install -DskipTests
 )

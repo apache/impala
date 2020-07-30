@@ -18,6 +18,9 @@
 ARG BASE_IMAGE=impala_base
 FROM ${BASE_IMAGE}
 
+# Only copy library dependencies required to run Impala executors.
+COPY --chown=impala exec-lib /opt/impala/lib
+
 # Externally-facing ports
 # Debug webserver
 EXPOSE 25000
