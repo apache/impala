@@ -42,6 +42,11 @@ public:
   /// of [0,1]. Otherwise this function returns error.
   static FloatVal DsKllQuantile(FunctionContext* ctx, const StringVal& serialized_sketch,
       const DoubleVal& rank);
+
+  /// 'serialized_sketch' is expected as a serialized Apache DataSketches KLL sketch. If
+  /// it is not, then the query fails.
+  /// Returns the number of input values fed to 'serialized_sketch'.
+  static BigIntVal DsKllN(FunctionContext* ctx, const StringVal& serialized_sketch);
 };
 
 }

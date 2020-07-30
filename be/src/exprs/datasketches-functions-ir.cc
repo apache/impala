@@ -59,5 +59,16 @@ FloatVal DataSketchesFunctions::DsKllQuantile(FunctionContext* ctx,
   }
 }
 
+BigIntVal DataSketchesFunctions::DsKllN(FunctionContext* ctx,
+    const StringVal& serialized_sketch) {
+  if (serialized_sketch.is_null || serialized_sketch.len == 0) return BigIntVal::null();
+  datasketches::kll_sketch<float> sketch;
+  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
+    LogSketchDeserializationError(ctx);
+    return BigIntVal::null();
+  }
+  return sketch.get_n();
+}
+
 }
 
