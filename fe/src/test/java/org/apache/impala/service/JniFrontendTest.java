@@ -27,7 +27,7 @@ import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.security.JniBasedUnixGroupsMappingWithFallback;
 import org.apache.hadoop.security.JniBasedUnixGroupsNetgroupMappingWithFallback;
 import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
@@ -96,13 +96,14 @@ public class JniFrontendTest {
     socketDir.getParentFile().setExecutable(false);
 
     Configuration conf = mock(Configuration.class);
-    when(conf.getBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
-        DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_DEFAULT)).thenReturn(true);
-    when(conf.getTrimmed(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY,
-        DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_DEFAULT))
+    when(conf.getBoolean(HdfsClientConfigKeys.Read.ShortCircuit.KEY,
+        HdfsClientConfigKeys.Read.ShortCircuit.DEFAULT)).thenReturn(true);
+    when(conf.getTrimmed(HdfsClientConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY,
+        HdfsClientConfigKeys.DFS_DOMAIN_SOCKET_PATH_DEFAULT))
         .thenReturn(socketDir.getAbsolutePath());
-    when(conf.getBoolean(DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL,
-        DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL_DEFAULT)).thenReturn(false);
+    when(conf.getBoolean(HdfsClientConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL,
+             HdfsClientConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL_DEFAULT))
+        .thenReturn(false);
     BackendConfig.INSTANCE = mock(BackendConfig.class);
 
     when(BackendConfig.INSTANCE.isDedicatedCoordinator()).thenReturn(true);
@@ -113,7 +114,7 @@ public class JniFrontendTest {
     actualErrorMessage = JniFrontend.checkShortCircuitRead(conf);
     assertEquals("Invalid short-circuit reads configuration:\n"
         + "  - Impala cannot read or execute the parent directory of "
-        + DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY + "\n",
+        + HdfsClientConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY + "\n",
         actualErrorMessage);
 
     if (socketDir != null) {

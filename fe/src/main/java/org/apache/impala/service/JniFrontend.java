@@ -30,7 +30,7 @@ import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
 import org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.client.HdfsClientConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.security.Groups;
 import org.apache.hadoop.security.JniBasedUnixGroupsMappingWithFallback;
@@ -753,8 +753,8 @@ public class JniFrontend {
    */
   @VisibleForTesting
   protected static String checkShortCircuitRead(Configuration conf) {
-    if (!conf.getBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
-        DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_DEFAULT)) {
+    if (!conf.getBoolean(HdfsClientConfigKeys.Read.ShortCircuit.KEY,
+        HdfsClientConfigKeys.Read.ShortCircuit.DEFAULT)) {
       LOG.info("Short-circuit reads are not enabled.");
       return "";
     }
@@ -765,11 +765,12 @@ public class JniFrontend {
     StringBuilder errorCause = new StringBuilder();
 
     // dfs.domain.socket.path must be set properly
-    String domainSocketPath = conf.getTrimmed(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY,
-        DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_DEFAULT);
+    String domainSocketPath =
+        conf.getTrimmed(HdfsClientConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY,
+            HdfsClientConfigKeys.DFS_DOMAIN_SOCKET_PATH_DEFAULT);
     if (domainSocketPath.isEmpty()) {
       errorCause.append(prefix);
-      errorCause.append(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY);
+      errorCause.append(HdfsClientConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY);
       errorCause.append(" is not configured.\n");
     } else {
       // The socket path parent directory must be readable and executable.
@@ -781,16 +782,16 @@ public class JniFrontend {
       } else if (socketDir == null || !socketDir.canRead() || !socketDir.canExecute()) {
         errorCause.append(prefix);
         errorCause.append("Impala cannot read or execute the parent directory of ");
-        errorCause.append(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY);
+        errorCause.append(HdfsClientConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY);
         errorCause.append("\n");
       }
     }
 
     // dfs.client.use.legacy.blockreader.local must be set to false
-    if (conf.getBoolean(DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL,
-        DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL_DEFAULT)) {
+    if (conf.getBoolean(HdfsClientConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL,
+        HdfsClientConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL_DEFAULT)) {
       errorCause.append(prefix);
-      errorCause.append(DFSConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL);
+      errorCause.append(HdfsClientConfigKeys.DFS_CLIENT_USE_LEGACY_BLOCKREADERLOCAL);
       errorCause.append(" should not be enabled.\n");
     }
 

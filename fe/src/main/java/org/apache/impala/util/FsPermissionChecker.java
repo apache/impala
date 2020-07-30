@@ -39,8 +39,7 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.hdfs.protocol.AclException;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
+import static org.apache.hadoop.hdfs.client.HdfsClientConfigKeys.DeprecatedKeys.DFS_PERMISSIONS_SUPERUSERGROUP_KEY;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -72,8 +71,9 @@ public class FsPermissionChecker {
   private FsPermissionChecker() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     groups_.addAll(Arrays.asList(ugi.getGroupNames()));
-    supergroup_ = CONF.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY,
-        DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT);
+    // The default value is taken from the String DFS_PERMISSIONS_SUPERUSERGROUP_DEFAULT
+    // in DFSConfigKeys.java from the hadoop-hdfs jar.
+    supergroup_ = CONF.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY, "supergroup");
     user_ = ugi.getShortUserName();
   }
 
