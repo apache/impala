@@ -257,6 +257,21 @@ class AggregateFunctions {
   static void DsKllMerge(FunctionContext*, const StringVal& src, StringVal* dst);
   static StringVal DsKllFinalizeSketch(FunctionContext*, const StringVal& src);
 
+  // Helper functions to keep common code for DataSketches KLL sketch and union
+  // operations.
+  static void DsKllInitHelper(FunctionContext* ctx, StringVal* slot);
+  static StringVal DsKllSerializeHelper(FunctionContext* ctx, const StringVal& src);
+  static void DsKllMergeHelper(FunctionContext* ctx, const StringVal& src,
+      StringVal* dst);
+  static StringVal DsKllFinalizeHelper(FunctionContext*, const StringVal& src);
+
+  /// These functions implement ds_kll_union().
+  static void DsKllUnionInit(FunctionContext*, StringVal* slot);
+  static void DsKllUnionUpdate(FunctionContext*, const StringVal& src, StringVal* dst);
+  static StringVal DsKllUnionSerialize(FunctionContext*, const StringVal& src);
+  static void DsKllUnionMerge(FunctionContext*, const StringVal& src, StringVal* dst);
+  static StringVal DsKllUnionFinalize(FunctionContext*, const StringVal& src);
+
   /// Estimates the number of distinct values (NDV) based on a sample of data and the
   /// corresponding sampling rate. The main idea of this function is to collect several
   /// (x,y) data points where x is the number of rows and y is the corresponding NDV

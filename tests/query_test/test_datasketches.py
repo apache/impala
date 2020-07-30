@@ -39,4 +39,5 @@ class TestDatasketches(ImpalaTestSuite):
 
   def test_kll(self, vector, unique_database):
     create_table_from_parquet(self.client, unique_database, 'kll_sketches_from_hive')
+    create_table_from_parquet(self.client, unique_database, 'kll_sketches_from_impala')
     self.run_test_case('QueryTest/datasketches-kll', vector, unique_database)
