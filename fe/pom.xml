@@ -35,14 +35,6 @@ under the License.
   <name>Apache Impala Query Engine Frontend</name>
 
   <dependencies>
-    <!-- Force json-smart dependency.
-         See https://issues.apache.org/jira/browse/HADOOP-14903 -->
-    <dependency>
-      <groupId>net.minidev</groupId>
-      <artifactId>json-smart</artifactId>
-      <version>2.3</version>
-    </dependency>
-
     <dependency>
       <groupId>org.apache.impala</groupId>
       <artifactId>query-event-hook-api</artifactId>
@@ -54,46 +46,18 @@ under the License.
       <artifactId>impala-data-source-api</artifactId>
       <version>${impala.extdatasrc.api.version}</version>
     </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs</artifactId>
-      <version>${hadoop.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
-          <groupId>org.fusesource.leveldbjni</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
-          <groupId>io.netty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.sun.jersey</groupId>
-          <artifactId>jersey-server</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
+
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs-client</artifactId>
       <version>${hadoop.version}</version>
     </dependency>
+
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
       <version>${hadoop.version}</version>
       <exclusions>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>org.eclipse.jetty</groupId>
           <artifactId>*</artifactId>
@@ -113,17 +77,11 @@ under the License.
         </exclusion>
       </exclusions>
     </dependency>
+
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-auth</artifactId>
       <version>${hadoop.version}</version>
-      <exclusions>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>
@@ -162,13 +120,6 @@ under the License.
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-azure-datalake</artifactId>
       <version>${hadoop.version}</version>
-      <exclusions>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>
@@ -218,7 +169,7 @@ under the License.
       <exclusions>
         <exclusion>
           <groupId>org.apache.kafka</groupId>
-          <artifactId>kafka_2.11</artifactId>
+          <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.apache.shiro</groupId>
@@ -230,12 +181,14 @@ under the License.
         </exclusion>
       </exclusions>
     </dependency>
-    <!-- this is needed by ranger-plugins-audit -->
+
+    <!-- This is needed by ranger-plugins-audit -->
     <dependency>
       <groupId>javax.mail</groupId>
       <artifactId>mail</artifactId>
       <version>1.4</version>
     </dependency>
+
     <dependency>
       <groupId>javax.ws.rs</groupId>
       <artifactId>javax.ws.rs-api</artifactId>
@@ -290,26 +243,12 @@ under the License.
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-client</artifactId>
       <version>${hbase.version}</version>
-       <exclusions>
-         <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-         <exclusion>
-           <groupId>net.minidev</groupId>
-           <artifactId>json-smart</artifactId>
-         </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-common</artifactId>
       <version>${hbase.version}</version>
-       <exclusions>
-         <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-         <exclusion>
-           <groupId>net.minidev</groupId>
-           <artifactId>json-smart</artifactId>
-         </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>
@@ -382,6 +321,7 @@ under the License.
       <artifactId>slf4j-api</artifactId>
       <version>${slf4j.version}</version>
     </dependency>
+
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
@@ -401,9 +341,9 @@ under the License.
     </dependency>
 
     <dependency>
-        <groupId>com.google.errorprone</groupId>
-        <artifactId>error_prone_annotations</artifactId>
-        <version>2.3.1</version>
+      <groupId>com.google.errorprone</groupId>
+      <artifactId>error_prone_annotations</artifactId>
+      <version>2.3.1</version>
     </dependency>
 
     <dependency>
@@ -424,6 +364,7 @@ under the License.
       <artifactId>json-simple</artifactId>
       <version>1.1.1</version>
     </dependency>
+
     <dependency>
       <groupId>org.glassfish</groupId>
       <artifactId>javax.json</artifactId>
@@ -979,11 +920,6 @@ under the License.
               <groupId>org.apache.logging.log4j</groupId>
               <artifactId>log4j-1.2-api</artifactId>
             </exclusion>
-            <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-            <exclusion>
-              <groupId>net.minidev</groupId>
-              <artifactId>json-smart</artifactId>
-            </exclusion>
             <exclusion>
               <groupId>org.apache.hive</groupId>
               <artifactId>hive-serde</artifactId>
@@ -1035,6 +971,16 @@ under the License.
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
           <version>${ozone.version}</version>
+          <!-- Remove all transitive dependencies from the Apache Ozone dependency.
+          hadoop-ozone-filesystem-hadoop3 is a shaded-jar, which already includes
+          all required transitive dependencies. For some reason, Ozone still pulls
+          in some transitive dependencies even though they are not needed. -->
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
         </dependency>
       </dependencies>
     </profile>

@@ -22,7 +22,6 @@ import java.util.Map;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
@@ -265,9 +264,11 @@ public class HdfsCachingUtil {
 
     // The refresh interval is how often HDFS will update cache directive stats. We use
     // this value to determine how frequently we should poll for changes.
+    // The key dfs.namenode.path.based.cache.refresh.interval.ms is copied from the string
+    // DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS in DFSConfigKeys.java from the
+    // hadoop-hdfs jar.
     long hdfsRefreshIntervalMs = getDfs().getConf().getLong(
-        DFSConfigKeys.DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS,
-        DFSConfigKeys.DFS_NAMENODE_PATH_BASED_CACHE_REFRESH_INTERVAL_MS_DEFAULT);
+        "dfs.namenode.path.based.cache.refresh.interval.ms", 30000L);
     Preconditions.checkState(hdfsRefreshIntervalMs > 0);
 
     // Loop until either MAX_UNCHANGED_CACHING_REFRESH_INTERVALS have passed with no
