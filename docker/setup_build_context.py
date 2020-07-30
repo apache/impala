@@ -69,6 +69,11 @@ def symlink_file_into_dir(src_file, dst_dir):
   os.symlink(src_file, os.path.join(dst_dir, os.path.basename(src_file)))
 
 
+def strip_debug_symbols(src_file, dst_file):
+  """Strips debug symbols from the given src_file and writes the output to the given
+  dst_file."""
+  check_call([STRIP, "--strip-debug", src_file, "-o", dst_file])
+
 # Impala binaries and native dependencies.
 
 # Strip debug symbols from release build to reduce image size. Keep them for
@@ -77,14 +82,30 @@ IMPALAD_BINARY = os.path.join(IMPALA_HOME, "be/build", BUILD_TYPE, "service/impa
 if args.debug_build:
   symlink_file_into_dir(IMPALAD_BINARY, BIN_DIR)
 else:
-  check_call([STRIP, "--strip-debug", IMPALAD_BINARY,
-              "-o", os.path.join(BIN_DIR, "impalad")])
-for lib in ["libstdc++", "libgcc"]:
-  for so in glob.glob(os.path.join(GCC_HOME, "lib64/{0}*.so*".format(lib))):
-    symlink_file_into_dir(so, LIB_DIR)
+  strip_debug_symbols(IMPALAD_BINARY, os.path.join(BIN_DIR, "impalad"))
 
-for so in glob.glob(os.path.join(KUDU_LIB_DIR, "libkudu_client.so*")):
-  symlink_file_into_dir(so, LIB_DIR)
+# Add libstc++ binaries to LIB_DIR. Strip debug symbols for release builds.
+for libstdcpp_so in glob.glob(os.path.join(
+    GCC_HOME, "lib64/{0}*.so*".format("libstdc++"))):
+  # Ignore 'libstdc++.so.*-gdb.py'.
+  if not os.path.basename(libstdcpp_so).endswith(".py"):
+    if args.debug_build:
+      symlink_file_into_dir(libstdcpp_so, LIB_DIR)
+    else:
+      strip_debug_symbols(libstdcpp_so,
+          os.path.join(LIB_DIR, os.path.basename(libstdcpp_so)))
+
+# Add libgcc binaries to LIB_DIR.
+for libgcc_so in glob.glob(os.path.join(GCC_HOME, "lib64/{0}*.so*".format("libgcc_s"))):
+  symlink_file_into_dir(libgcc_so, LIB_DIR)
+
+# Add libkudu_client binaries to LIB_DIR. Strip debug symbols for release builds.
+for kudu_client_so in glob.glob(os.path.join(KUDU_LIB_DIR, "libkudu_client.so*")):
+  if args.debug_build:
+    symlink_file_into_dir(kudu_client_so, LIB_DIR)
+  else:
+    strip_debug_symbols(kudu_client_so,
+        os.path.join(LIB_DIR, os.path.basename(kudu_client_so)))
 
 # Impala dependencies.
 dep_classpath = file(os.path.join(IMPALA_HOME, "fe/target/build-classpath.txt")).read()
