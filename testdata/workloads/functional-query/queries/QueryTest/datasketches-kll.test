@@ -107,27 +107,29 @@ STRING
 # Note, the plan is to write sketches as binary instead of strings. For this we have to
 # wait for the binary support (IMPALA-9482).
 create table sketch_store
-    (year int, month int, float_sketch string)
+    (year int, month int, id_sketch string, float_sketch string)
 stored as parquet;
 insert into sketch_store
     select
         year,
         month,
+        ds_kll_sketch(id),
         ds_kll_sketch(float_col)
     from functional_parquet.alltypessmall
     group by year, month;
 select
     year,
     month,
+    ds_kll_quantile(id_sketch, 0.5),
     ds_kll_quantile(float_sketch, 0.5)
 from sketch_store;
 ---- RESULTS
-2009,1,4.400000095367432
-2009,2,4.400000095367432
-2009,3,4.400000095367432
-2009,4,4.400000095367432
+2009,1,12,4.400000095367432
+2009,2,37,4.400000095367432
+2009,3,62,4.400000095367432
+2009,4,87,4.400000095367432
 ---- TYPES
-INT,INT,FLOAT
+INT,INT,FLOAT,FLOAT
 ====
 ---- QUERY
 # Check that sketches made by Hive can be read and used for estimating by Impala.
@@ -231,4 +233,58 @@ from kll_sketches_from_hive;
 0,0.1666666666666667,0.3333333333333333,0.5,0.6666666666666666,0.8333333333333334,1
 ---- TYPES
 DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE
+====
+---- QUERY
+# Unions the sketches from sketch_store and checks if the union produces the same result
+# as if the whole data was sketched together into a single sketch.
+select
+    ds_kll_quantile(ds_kll_union(id_sketch), 0.5),
+    ds_kll_quantile(ds_kll_union(float_sketch), 0.5)
+from sketch_store;
+---- TYPES
+FLOAT,FLOAT
+---- RESULTS
+50,4.400000095367432
+====
+---- QUERY
+# Checks that ds_kll_union() produces NULL for an empty dataset.
+select ds_kll_union(field) from functional_parquet.emptytable;
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Checks that ds_kll_union() produces NULL for NULL inputs.
+select ds_kll_union(null_str) from functional_parquet.nullrows;
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# ds_kll_union() returns an error if it receives an invalid serialized sketch.
+select ds_kll_union(date_string_col) from functional_parquet.alltypestiny where id=1;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# Get the same sketches from Impala and Hive and put them into the same table. When we
+# get the estimates from the unions of these sketches the expectation is to get the same
+# results as if these sketches were used separately to get the estimates.
+create table kll_sketches_impala_hive like kll_sketches_from_impala stored as parquet;
+insert into kll_sketches_impala_hive select * from kll_sketches_from_hive;
+insert into kll_sketches_impala_hive select * from kll_sketches_from_impala;
+select
+    ds_kll_quantile(ds_kll_union(f), 0.5),
+    ds_kll_quantile(ds_kll_union(repetitions), 0.5),
+    ds_kll_quantile(ds_kll_union(some_nulls), 0.5),
+    ds_kll_quantile(ds_kll_union(all_nulls), 0.5),
+    ds_kll_quantile(ds_kll_union(some_nans), 0.5),
+    ds_kll_quantile(ds_kll_union(all_nans), 0.5)
+from kll_sketches_impala_hive;
+---- TYPES
+FLOAT,FLOAT,FLOAT,FLOAT,FLOAT,FLOAT
+---- RESULTS
+100.1999969482422,25000.099609375,50.90000152587891,NULL,50.5,NULL
 ====

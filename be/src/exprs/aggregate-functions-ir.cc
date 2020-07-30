@@ -1792,8 +1792,11 @@ void AggregateFunctions::DsHllUnionMerge(
   DCHECK_EQ(dst->len, sizeof(datasketches::hll_union));
 
   // Note, 'src' is a serialized hll_sketch and not a serialized hll_union.
-  datasketches::hll_sketch src_sketch =
-      datasketches::hll_sketch::deserialize(reinterpret_cast<char*>(src.ptr), src.len);
+  datasketches::hll_sketch src_sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
+  if (!DeserializeDsSketch(src, &src_sketch)) {
+    LogSketchDeserializationError(ctx);
+    return;
+  }
 
   datasketches::hll_union* dst_union_ptr =
       reinterpret_cast<datasketches::hll_union*>(dst->ptr);
@@ -1817,9 +1820,9 @@ StringVal AggregateFunctions::DsHllUnionFinalize(FunctionContext* ctx,
   return result;
 }
 
-void AggregateFunctions::DsKllInit(FunctionContext* ctx, StringVal* dst) {
-  AllocBuffer(ctx, dst, sizeof(datasketches::kll_sketch<float>));
-  if (UNLIKELY(dst->is_null)) {
+void AggregateFunctions::DsKllInitHelper(FunctionContext* ctx, StringVal* slot) {
+  AllocBuffer(ctx, slot, sizeof(datasketches::kll_sketch<float>));
+  if (UNLIKELY(slot->is_null)) {
     DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
     return;
   }
@@ -1827,8 +1830,61 @@ void AggregateFunctions::DsKllInit(FunctionContext* ctx, StringVal* dst) {
   // data it keeps track of. This is because it's a wrapper class that holds all the
   // inserted data on heap. Here, we put only the wrapper class into a StringVal.
   datasketches::kll_sketch<float>* sketch_ptr =
-      reinterpret_cast<datasketches::kll_sketch<float>*>(dst->ptr);
+      reinterpret_cast<datasketches::kll_sketch<float>*>(slot->ptr);
   *sketch_ptr = datasketches::kll_sketch<float>();
+}
+
+StringVal AggregateFunctions::DsKllSerializeHelper(FunctionContext* ctx,
+    const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::kll_sketch<float>));
+  datasketches::kll_sketch<float>* sketch_ptr =
+      reinterpret_cast<datasketches::kll_sketch<float>*>(src.ptr);
+  StringVal dst = SerializeDsKllSketch(ctx, *sketch_ptr);
+  ctx->Free(src.ptr);
+  return dst;
+}
+
+void AggregateFunctions::DsKllMergeHelper(FunctionContext* ctx, const StringVal& src,
+      StringVal* dst) {
+  DCHECK(!src.is_null);
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::kll_sketch<float>));
+  datasketches::kll_sketch<float> src_sketch;
+  if (!DeserializeDsSketch(src, &src_sketch)) {
+    LogSketchDeserializationError(ctx);
+    return;
+  }
+
+  datasketches::kll_sketch<float>* dst_sketch_ptr =
+      reinterpret_cast<datasketches::kll_sketch<float>*>(dst->ptr);
+
+  try {
+    dst_sketch_ptr->merge(src_sketch);
+  } catch (const std::exception& e) {
+    ctx->SetError(Substitute("Error while merging DataSketches KLL sketches. "
+        "Message: $0", e.what()).c_str());
+    return;
+  }
+}
+
+StringVal AggregateFunctions::DsKllFinalizeHelper(FunctionContext* ctx,
+    const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::kll_sketch<float>));
+  datasketches::kll_sketch<float>* sketch_ptr =
+      reinterpret_cast<datasketches::kll_sketch<float>*>(src.ptr);
+  if (sketch_ptr->get_n() == 0) {
+    ctx->Free(src.ptr);
+    return StringVal::null();
+  }
+  StringVal dst = SerializeDsKllSketch(ctx, *sketch_ptr);
+  ctx->Free(src.ptr);
+  return dst;
+}
+
+void AggregateFunctions::DsKllInit(FunctionContext* ctx, StringVal* dst) {
+  DsKllInitHelper(ctx, dst);
 }
 
 void AggregateFunctions::DsKllUpdate(FunctionContext* ctx, const FloatVal& src,
@@ -1843,42 +1899,60 @@ void AggregateFunctions::DsKllUpdate(FunctionContext* ctx, const FloatVal& src,
 
 StringVal AggregateFunctions::DsKllSerialize(FunctionContext* ctx,
     const StringVal& src) {
-  DCHECK(!src.is_null);
-  DCHECK_EQ(src.len, sizeof(datasketches::kll_sketch<float>));
-  datasketches::kll_sketch<float>* sketch_ptr =
-      reinterpret_cast<datasketches::kll_sketch<float>*>(src.ptr);
-  StringVal dst = SerializeDsKllSketch(ctx, *sketch_ptr);
-  ctx->Free(src.ptr);
-  return dst;
+  return DsKllSerializeHelper(ctx, src);
 }
 
 void AggregateFunctions::DsKllMerge(
     FunctionContext* ctx, const StringVal& src, StringVal* dst) {
-  DCHECK(!src.is_null);
-  DCHECK(!dst->is_null);
-  DCHECK_EQ(dst->len, sizeof(datasketches::kll_sketch<float>));
-  datasketches::kll_sketch<float> src_sketch =
-      datasketches::kll_sketch<float>::deserialize((void*)src.ptr, src.len);
-
-  datasketches::kll_sketch<float>* dst_sketch_ptr =
-      reinterpret_cast<datasketches::kll_sketch<float>*>(dst->ptr);
-
-  dst_sketch_ptr->merge(src_sketch);
+  DsKllMergeHelper(ctx, src, dst);
 }
 
 StringVal AggregateFunctions::DsKllFinalizeSketch(FunctionContext* ctx,
     const StringVal& src) {
-  DCHECK(!src.is_null);
-  DCHECK_EQ(src.len, sizeof(datasketches::kll_sketch<float>));
-  datasketches::kll_sketch<float>* sketch_ptr =
-      reinterpret_cast<datasketches::kll_sketch<float>*>(src.ptr);
-  if (sketch_ptr->get_n() == 0) {
-    ctx->Free(src.ptr);
-    return StringVal::null();
+  return DsKllFinalizeHelper(ctx, src);
+}
+
+void AggregateFunctions::DsKllUnionInit(FunctionContext* ctx, StringVal* slot) {
+  // Note, comparing to HLL Union with hll_union type, for KLL Union there is no such
+  // type as kll_union. As a result kll_sketch is used here to store intermediate results
+  // of the union operation.
+  DsKllInitHelper(ctx, slot);
+}
+
+void AggregateFunctions::DsKllUnionUpdate(FunctionContext* ctx, const StringVal& src,
+    StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::kll_sketch<float>));
+  datasketches::kll_sketch<float> src_sketch;
+  if (!DeserializeDsSketch(src, &src_sketch)) {
+    LogSketchDeserializationError(ctx);
+    return;
   }
-  StringVal dst = SerializeDsKllSketch(ctx, *sketch_ptr);
-  ctx->Free(src.ptr);
-  return dst;
+  datasketches::kll_sketch<float>* dst_sketch =
+      reinterpret_cast<datasketches::kll_sketch<float>*>(dst->ptr);
+  try {
+    dst_sketch->merge(src_sketch);
+  } catch (const std::exception& e) {
+    ctx->SetError(Substitute("Error while merging DataSketches KLL sketches. "
+        "Message: $0", e.what()).c_str());
+    return;
+  }
+}
+
+StringVal AggregateFunctions::DsKllUnionSerialize(FunctionContext* ctx,
+    const StringVal& src) {
+  return DsKllSerializeHelper(ctx, src);
+}
+
+void AggregateFunctions::DsKllUnionMerge(FunctionContext* ctx, const StringVal& src,
+    StringVal* dst) {
+  DsKllMergeHelper(ctx, src, dst);
+}
+
+StringVal AggregateFunctions::DsKllUnionFinalize(FunctionContext* ctx,
+    const StringVal& src) {
+  return DsKllFinalizeHelper(ctx, src);
 }
 
 /// Intermediate aggregation state for the SampledNdv() function.

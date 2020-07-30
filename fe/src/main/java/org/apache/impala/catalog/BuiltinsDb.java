@@ -1323,6 +1323,7 @@ public class BuiltinsDb extends Db {
         prefix + "10CountMergeEPN10impala_udf15FunctionContextERKNS1_9BigIntValEPS4_",
         null, null));
 
+    // DataSketches HLL sketch
     db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_kll_sketch",
         Lists.<Type>newArrayList(Type.FLOAT), Type.STRING, Type.STRING,
         prefix + "9DsKllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
@@ -1332,6 +1333,20 @@ public class BuiltinsDb extends Db {
         prefix + "14DsKllSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "19DsKllFinalizeSketchEPN10impala_udf15FunctionContextERKNS1_" +
             "9StringValE", true, false, true));
+
+    // DataSketches KLL union
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_kll_union",
+        Lists.<Type>newArrayList(Type.STRING), Type.STRING, Type.STRING,
+        prefix + "14DsKllUnionInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix +
+            "16DsKllUnionUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "15DsKllUnionMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "19DsKllUnionSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        prefix +
+            "18DsKllUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        true, false, true));
 
     // The following 3 functions are never directly executed because they get rewritten
     db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
