@@ -18,6 +18,11 @@
 ARG BASE_IMAGE=impala_base
 FROM ${BASE_IMAGE}
 
+# IMPALA-10068: Split out jars for catalog Docker images
+# For now, we copy in all Impala dependencies. One way to decrease the catalogd image
+# size would be to only copy in jars required by catalogd.
+COPY --chown=impala lib /opt/impala/lib
+
 # Externally-facing ports
 # Debug webserver
 EXPOSE 25020

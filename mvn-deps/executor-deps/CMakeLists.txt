@@ -15,16 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-ARG BASE_IMAGE=impala_base
-FROM ${BASE_IMAGE}
-
-# Only copy in dependencies required for the statestored.
-COPY --chown=impala statestore-lib /opt/impala/lib
-
-# Externally-facing ports
-# Debug webserver
-EXPOSE 25010
-
-ENTRYPOINT ["/opt/impala/bin/daemon_entrypoint.sh", "/opt/impala/bin/statestored",\
-     "-log_dir=/opt/impala/logs",\
-     "-use_resolved_hostname=true"]
+add_custom_target(executor-deps ALL DEPENDS shaded-deps-hive-exec shaded-deps-s3a-aws-sdk
+  COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh -B install -DskipTests
+)

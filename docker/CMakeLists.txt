@@ -42,7 +42,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
   # Add a target to build a base docker image for 'build_type'. 'build_context_args' are
   # passed to the setup_build_context.py script.
   function(add_base_image build_type build_context_args)
-    # Build context depends on daemons and frontend jars
+    # Build context depends on daemons and frontend jars.
     # Sending the whole impala workspace including test binaries, testdata, etc
     # to the docker daemon can be very expensive, so we create a build context
     # with symlinks
@@ -54,9 +54,13 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
     )
     # Target for the base Impala image.
     add_custom_target(impala_base_image_${build_type}
-      # Use tar with -h flag to assemble a tarball including all the symlinked files and
-      # directories in the build context.
-      COMMAND cd ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type} && tar cvh . | docker build -t impala_base_${build_type} --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -
+      # Run docker build inside the build context directory so that all dependencies are
+      # sent to the docker daemon. This allows the Dockerfile built to copy all necessary
+      # dependencies.
+      COMMAND cd ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type} &&
+              tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/impala_base/ . |
+              docker build -t impala_base_${build_type}
+                  --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -
       DEPENDS impala_base_build_context_${build_type} ${CMAKE_SOURCE_DIR}/docker/impala_base/Dockerfile
       DEPENDS ${CMAKE_SOURCE_DIR}/docker/daemon_entrypoint.sh
       DEPENDS ${CMAKE_SOURCE_DIR}/bin/graceful_shutdown_backends.sh
@@ -80,8 +84,13 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
   function(add_daemon_docker_image target daemon_name image_name build_type)
     set(build_dir ${CMAKE_SOURCE_DIR}/docker/${daemon_name})
     add_custom_target(${target}
-      # Supply the appropriate base image as an argument for the Dockerfile.
-      COMMAND cd ${build_dir} && docker build --build-arg BASE_IMAGE=impala_base_${build_type} -t ${image_name} .
+      # Supply the appropriate base image as an argument for the Dockerfile. The same
+      # build context used for the base image is used for each daemon image. This allows
+      # each daemon image to only copy in the dependencies it requires.
+      COMMAND cd ${IMPALA_BASE_BUILD_CONTEXT_DIR}/${build_type} &&
+              tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/${daemon_name}/ . |
+              docker build --build-arg BASE_IMAGE=impala_base_${build_type}
+                  -t ${image_name} -
       DEPENDS impala_base_image_${build_type} ${build_dir}/Dockerfile
       COMMENT "Building ${image_name} docker image."
       VERBATIM

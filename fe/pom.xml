@@ -44,6 +44,13 @@ under the License.
 
     <dependency>
       <groupId>org.apache.impala</groupId>
+      <artifactId>impala-executor-deps</artifactId>
+      <version>${project.version}</version>
+      <type>pom</type>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.impala</groupId>
       <artifactId>query-event-hook-api</artifactId>
       <version>${impala.query.event.hook.api.version}</version>
     </dependency>
@@ -56,88 +63,7 @@ under the License.
 
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs-client</artifactId>
-      <version>${hadoop.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
-      <version>${hadoop.version}</version>
-      <exclusions>
-        <!-- Exclude json-smart to pin the version -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
-          <groupId>io.netty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.sun.jersey</groupId>
-          <artifactId>jersey-server</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.sun.jersey</groupId>
-          <artifactId>jersey-servlet</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-auth</artifactId>
-      <version>${hadoop.version}</version>
-      <exclusions>
-        <!-- Exclude json-smart to pin the version -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-aws</artifactId>
-      <version>${hadoop.version}</version>
-      <!-- Exclude the aws-java-sdk-bundle dependency because the Impala minimal
-           version of this dependency is used instead. -->
-      <exclusions>
-        <exclusion>
-          <groupId>com.amazonaws</groupId>
-          <artifactId>aws-java-sdk-bundle</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.impala</groupId>
-      <artifactId>impala-minimal-s3a-aws-sdk</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-azure</artifactId>
-      <version>${hadoop.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-azure-datalake</artifactId>
       <version>${hadoop.version}</version>
       <exclusions>
         <!-- Exclude json-smart to pin the version -->
@@ -273,32 +199,6 @@ under the License.
         <exclusion>
           <groupId>org.apache.hive</groupId>
           <artifactId>*</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-client</artifactId>
-      <version>${hbase.version}</version>
-      <exclusions>
-        <!-- Exclude json-smart to pin the version -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-common</artifactId>
-      <version>${hbase.version}</version>
-      <exclusions>
-        <!-- Exclude json-smart to pin the version -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -473,6 +373,122 @@ under the License.
       <artifactId>iceberg-core</artifactId>
       <version>${iceberg.version}</version>
     </dependency>
+
+    <!-- Needed for tests like JdbcTest which instantiates HiveDriver -->
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-jdbc</artifactId>
+      <version>${hive.version}</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hbase</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-slf4j-impl</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-1.2-api</artifactId>
+        </exclusion>
+        <!-- We should exclude hive-serde since it brings along a
+           different version of flatbuffers causing problems for loading tables -->
+        <exclusion>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-serde</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-metastore</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hive.shims</groupId>
+          <artifactId>hive-shims-0.20</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.ant</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
+          <groupId>org.fusesource.leveldbjni</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
+          <groupId>io.netty</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <!-- Exclude json-smart to pin the version -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-standalone-metastore</artifactId>
+      <version>${hive.version}</version>
+      <exclusions>
+        <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-slf4j-impl</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-1.2-api</artifactId>
+        </exclusion>
+        <!-- Exclude json-smart to pin the version -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-serde</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-shims</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <!-- needed for JobConf, which HiveConf inherits from -->
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-mapreduce-client-core</artifactId>
+      <version>${hadoop.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>*</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <!-- Needed by tests like TestCaseLoader instantiate HMS in embedded mode which
+    needs datanucleus as test dependency-->
+    <dependency>
+      <groupId>org.datanucleus</groupId>
+      <artifactId>javax.jdo</artifactId>
+      <version>3.2.0-m3</version>
+      <scope>test</scope>
+    </dependency>
+
   </dependencies>
 
   <reporting>
@@ -879,165 +895,6 @@ under the License.
   </build>
 
   <profiles>
-    <!-- Profile which includes all of the Hive 3.x dependencies and appropriate exclusions. -->
-    <profile>
-      <id>hive-3</id>
-      <activation>
-        <property>
-          <name>env.IMPALA_HIVE_MAJOR_VERSION</name>
-          <value>3</value>
-        </property>
-      </activation>
-      <dependencies>
-        <!-- This reduced dependency is derived from hive-exec and only contains classes needed
-             by Impala. See shaded-deps/pom.xml for more details -->
-        <dependency>
-          <groupId>org.apache.impala</groupId>
-          <artifactId>impala-minimal-hive-exec</artifactId>
-          <version>${project.version}</version>
-        </dependency>
-        <!-- Needed for tests like JdbcTest which instantiates HiveDriver -->
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-jdbc</artifactId>
-          <version>${hive.version}</version>
-          <scope>test</scope>
-          <exclusions>
-            <exclusion>
-              <groupId>org.apache.hbase</groupId>
-              <artifactId>*</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-slf4j-impl</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-1.2-api</artifactId>
-            </exclusion>
-            <!-- We should exclude hive-serde since it brings along a
-               different version of flatbuffers causing problems for loading tables -->
-            <exclusion>
-              <groupId>org.apache.hive</groupId>
-              <artifactId>hive-serde</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.hive</groupId>
-              <artifactId>hive-metastore</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.hive.shims</groupId>
-              <artifactId>hive-shims-0.20</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.ant</groupId>
-              <artifactId>*</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.eclipse.jetty</groupId>
-              <artifactId>*</artifactId>
-            </exclusion>
-            <exclusion>
-              <!-- IMPALA-9108: Avoid pulling in leveldbjni, which is unneeded. -->
-              <groupId>org.fusesource.leveldbjni</groupId>
-              <artifactId>*</artifactId>
-            </exclusion>
-            <exclusion>
-              <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
-              <groupId>io.netty</groupId>
-              <artifactId>*</artifactId>
-            </exclusion>
-            <!-- Exclude json-smart to pin the version -->
-            <exclusion>
-              <groupId>net.minidev</groupId>
-              <artifactId>json-smart</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hive</groupId>
-          <artifactId>hive-standalone-metastore</artifactId>
-          <version>${hive.version}</version>
-          <exclusions>
-            <!-- Impala uses log4j v1; avoid pulling in slf4j handling for log4j2 -->
-            <exclusion>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-slf4j-impl</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.logging.log4j</groupId>
-              <artifactId>log4j-1.2-api</artifactId>
-            </exclusion>
-            <!-- Exclude json-smart to pin the version -->
-            <exclusion>
-              <groupId>net.minidev</groupId>
-              <artifactId>json-smart</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.hive</groupId>
-              <artifactId>hive-serde</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.hive</groupId>
-              <artifactId>hive-shims</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.hadoop</groupId>
-              <artifactId>*</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <!-- needed for JobConf, which HiveConf inherits from -->
-        <dependency>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-mapreduce-client-core</artifactId>
-          <version>${hadoop.version}</version>
-          <exclusions>
-            <exclusion>
-              <groupId>*</groupId>
-              <artifactId>*</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <!-- Needed by tests like TestCaseLoader instantiate HMS in embedded mode which
-        needs datanucleus as test dependency-->
-        <dependency>
-          <groupId>org.datanucleus</groupId>
-          <artifactId>javax.jdo</artifactId>
-          <version>3.2.0-m3</version>
-          <scope>test</scope>
-        </dependency>
-        <!-- IMPALA-8766: Include Knox jars on the classpath -->
-        <dependency>
-          <groupId>org.apache.knox</groupId>
-          <artifactId>gateway-cloud-bindings</artifactId>
-          <version>${knox.version}</version>
-          <exclusions>
-            <!-- Impala currently doesn't support GCS, so exclude those jars -->
-            <exclusion>
-              <groupId>com.google.cloud.bigdataoss</groupId>
-              <artifactId>*</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
-          <version>${ozone.version}</version>
-          <!-- Remove all transitive dependencies from the Apache Ozone dependency.
-          hadoop-ozone-filesystem-hadoop3 is a shaded-jar, which already includes
-          all required transitive dependencies. For some reason, Ozone still pulls
-          in some transitive dependencies even though they are not needed. -->
-          <exclusions>
-            <exclusion>
-              <groupId>*</groupId>
-              <artifactId>*</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-      </dependencies>
-    </profile>
-
     <profile>
       <id>thrift-home-defined</id>
       <activation>

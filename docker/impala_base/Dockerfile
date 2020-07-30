@@ -33,9 +33,10 @@ RUN groupadd -r impala && useradd --no-log-init -r -g impala impala && \
     chmod ugo+w /etc/passwd
 USER impala
 
-# Copy build artifacts required for the daemon processes.
+# Copy build artifacts required for the daemon processes. The daemon images are
+# responsible for copying in the required jar files, as each daemon has a different
+# set of jar dependencies.
 # Need to have multiple copy commands to preserve directory structure.
-COPY --chown=impala lib /opt/impala/lib
 COPY --chown=impala www /opt/impala/www
 COPY --chown=impala bin /opt/impala/bin
 # Symlink here instead of in setup_build_context to avoid duplicate binaries.
