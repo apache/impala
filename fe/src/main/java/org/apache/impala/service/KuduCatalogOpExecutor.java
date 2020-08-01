@@ -542,6 +542,21 @@ public class KuduCatalogOpExecutor {
     alterKuduTable(tbl, alterTableOptions, errMsg);
   }
 
+  public static void alterSetOwner(KuduTable tbl, String newOwner)
+      throws ImpalaRuntimeException {
+    // We still need to call alterKuduTable() even if tbl.getOwnerUser() equals
+    // 'newOwner'. It is possible that the owner of 'tbl' from Kudu's perspective is
+    // different than that from HMS' perspective, i.e., tbl.getOwnerUser(). Such a
+    // discrepancy is possible if 'tbl' is changed to a synchronized Kudu table from an
+    // external, non-synchronized table before this method is called.
+
+    AlterTableOptions alterTableOptions = new AlterTableOptions();
+    alterTableOptions.setOwner(newOwner);
+    String errMsg = String.format(
+        "Error setting the owner of Kudu table %s to %s", tbl.getName(), newOwner);
+    alterKuduTable(tbl, alterTableOptions, errMsg);
+  }
+
   /**
    * Alters a Kudu table based on the specified AlterTableOptions params. Blocks until
    * the alter table operation is finished or until the operation timeout is reached.

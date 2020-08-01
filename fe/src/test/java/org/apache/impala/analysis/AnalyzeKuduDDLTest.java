@@ -722,5 +722,8 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     AnalysisError("alter table functional_kudu.alltypes set tblproperties("
         + "'sort.order'='true')",
         "'sort.*' table properties are not supported for Kudu tables.");
+
+    // ALTER TABLE SET OWNER USER
+    AnalyzesOk("ALTER TABLE functional_kudu.testtbl SET OWNER USER new_owner");
   }
 }
