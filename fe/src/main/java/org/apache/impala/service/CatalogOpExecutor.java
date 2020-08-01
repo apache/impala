@@ -3778,7 +3778,21 @@ public class CatalogOpExecutor {
     PrincipalType oldOwnerType = msTbl.getOwnerType();
     msTbl.setOwner(params.owner_name);
     msTbl.setOwnerType(PrincipalType.valueOf(params.owner_type.name()));
-    applyAlterTable(msTbl);
+
+    // A KuduTable is synchronized if it is a managed KuduTable, or an external table
+    // with the property of 'external.table.purge' being true.
+    boolean isSynchronizedKuduTable = (tbl instanceof KuduTable) &&
+        KuduTable.isSynchronizedTable(msTbl);
+    boolean altersHMSTable = true;
+    if (isSynchronizedKuduTable) {
+      boolean isKuduHmsIntegrationEnabled = isKuduHmsIntegrationEnabled(msTbl);
+      // We need to update HMS when the integration between Kudu and HMS is not enabled.
+      altersHMSTable = !isKuduHmsIntegrationEnabled;
+      KuduCatalogOpExecutor.alterSetOwner((KuduTable) tbl, params.owner_name);
+    }
+
+    if (altersHMSTable) applyAlterTable(msTbl);
+
     if (authzConfig_.isEnabled()) {
       authzManager_.updateTableOwnerPrivilege(params.server_name, msTbl.getDbName(),
           msTbl.getTableName(), oldOwner, oldOwnerType, msTbl.getOwner(),

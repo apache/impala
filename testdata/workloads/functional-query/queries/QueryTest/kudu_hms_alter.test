@@ -48,6 +48,22 @@ alter table simple set tblproperties ('kudu.master_addresses' = 'invalid_host')
 ImpalaRuntimeException: Kudu table '$DATABASE.simple' does not exist on master 'invalid_host'
 ====
 ---- QUERY
+alter table simple set owner user new_owner
+---- RESULTS
+'Updated table/view.'
+---- TYPES
+STRING
+====
+---- QUERY
+# The change to the owner should be reflected whether or not the integration between Kudu
+# and HMS is enabled.
+describe formatted simple
+----RESULTS: VERIFY_IS_SUBSET
+'Owner:              ','new_owner           ','NULL'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
 alter table simple rename to simple_new;
 ---- RESULTS
 'Renaming was successful.'
