@@ -18,6 +18,7 @@
 #pragma once
 
 #include <map>
+#include <random>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -294,6 +295,8 @@ class ScheduleState {
 
   void set_executor_group(string executor_group);
 
+  std::mt19937* rng() { return &rng_; }
+
  private:
   /// These references are valid for the lifetime of this query schedule because they
   /// are all owned by the enclosing QueryExecState.
@@ -338,6 +341,9 @@ class ScheduleState {
   /// The name of the executor group that this schedule was computed for. Set by the
   /// Scheduler and only valid after scheduling completes successfully.
   std::string executor_group_;
+
+  /// Random number generated used for any randomized decisions during scheduling.
+  std::mt19937 rng_;
 
   /// Map from fragment idx to references into the 'request_'.
   std::unordered_map<int32_t, const TPlanFragment&> fragments_;

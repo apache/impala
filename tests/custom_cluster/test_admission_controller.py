@@ -64,6 +64,15 @@ LOG = logging.getLogger('admission_test')
 # that running queries can be correlated with the thread that submitted them.
 QUERY = " union all ".join(["select * from functional.alltypesagg where id != {0}"] * 30)
 
+# Same query but with additional unpartitioned non-coordinator fragments.
+# The unpartitioned fragments are both interior fragments that consume input
+# from a scan fragment and non-interior fragments with a constant UNION.
+QUERY_WITH_UNPARTITIONED_FRAGMENTS = """
+    select *, (select count(distinct int_col) from alltypestiny) subquery1,
+           (select count(distinct int_col) from alltypes) subquery2,
+           (select 1234) subquery3
+    from (""" + QUERY + """) v"""
+
 # The statestore heartbeat and topic update frequency (ms). Set low for testing.
 STATESTORE_RPC_FREQUENCY_MS = 100
 
@@ -575,28 +584,34 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     'using_dedicated_coord_estimates' is true."""
     self.client.set_configuration_option('request_pool', "root.regularPool")
     ImpalaTestSuite.change_database(self.client, vector.get_value('table_format'))
-    handle = self.client.execute_async(QUERY.format(1))
-    self.client.wait_for_finished_timeout(handle, 1000)
-    expected_mem_limits = self.__get_mem_limits_admission_debug_page()
-    actual_mem_limits = self.__get_mem_limits_memz_debug_page(handle.get_handle().id)
-    mem_admitted = get_mem_admitted_backends_debug_page(self.cluster)
-    debug_string = " expected_mem_limits:" + str(
-      expected_mem_limits) + " actual_mem_limits:" + str(
-      actual_mem_limits) + " mem_admitted:" + str(mem_admitted)
-    MB = 1 << 20
-    # Easiest way to check float in-equality.
-    assert abs(expected_mem_limits['coordinator'] - expected_mem_limits[
-      'executor']) > 0.0001 or not using_dedicated_coord_estimates, debug_string
-    # There may be some rounding errors so keep a margin of 5MB when verifying
-    assert abs(actual_mem_limits['coordinator'] - expected_mem_limits[
-      'coordinator']) < 5 * MB, debug_string
-    assert abs(actual_mem_limits['executor'] - expected_mem_limits[
-      'executor']) < 5 * MB, debug_string
-    assert abs(mem_admitted['coordinator'] - expected_mem_limits[
-      'coordinator']) < 5 * MB, debug_string
-    assert abs(
-      mem_admitted['executor'][0] - expected_mem_limits['executor']) < 5 * MB, \
-        debug_string
+    # Use a test query that has unpartitioned non-coordinator fragments to make
+    # sure those are handled correctly (IMPALA-10036).
+    for query in [QUERY, QUERY_WITH_UNPARTITIONED_FRAGMENTS]:
+      handle = self.client.execute_async(query.format(1))
+      self.client.wait_for_finished_timeout(handle, 1000)
+      expected_mem_limits = self.__get_mem_limits_admission_debug_page()
+      actual_mem_limits = self.__get_mem_limits_memz_debug_page(handle.get_handle().id)
+      mem_admitted = get_mem_admitted_backends_debug_page(self.cluster)
+      debug_string = " expected_mem_limits:" + str(
+        expected_mem_limits) + " actual_mem_limits:" + str(
+        actual_mem_limits) + " mem_admitted:" + str(mem_admitted)
+      MB = 1 << 20
+      # Easiest way to check float in-equality.
+      assert abs(expected_mem_limits['coordinator'] - expected_mem_limits[
+        'executor']) > 0.0001 or not using_dedicated_coord_estimates, debug_string
+      # There may be some rounding errors so keep a margin of 5MB when verifying
+      assert abs(actual_mem_limits['coordinator'] - expected_mem_limits[
+        'coordinator']) < 5 * MB, debug_string
+      assert abs(actual_mem_limits['executor'] - expected_mem_limits[
+        'executor']) < 5 * MB, debug_string
+      assert abs(mem_admitted['coordinator'] - expected_mem_limits[
+        'coordinator']) < 5 * MB, debug_string
+      assert abs(
+        mem_admitted['executor'][0] - expected_mem_limits['executor']) < 5 * MB, \
+          debug_string
+      # Ensure all fragments finish executing before running next query.
+      self.client.fetch(query, handle)
+      self.client.close_query(handle)
 
   def __get_mem_limits_admission_debug_page(self):
     """Helper method assumes a 2 node cluster using a dedicated coordinator. Returns the
