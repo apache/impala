@@ -73,7 +73,8 @@ ScheduleState::ScheduleState(const UniqueIdPB& query_id, const TQueryExecRequest
     query_options_(query_options),
     query_schedule_pb_(new QuerySchedulePB()),
     summary_profile_(summary_profile),
-    next_instance_id_(query_id) {
+    next_instance_id_(query_id),
+    rng_(rand()) {
   // Init() is not called, this constructor is for white box testing only.
   DCHECK(TestInfo::is_test());
 }
@@ -281,6 +282,9 @@ void ScheduleState::UpdateMemoryRequirements(const TPoolConfig& pool_cfg) {
     coord_backend_mem_to_admit = use_dedicated_coord_estimates ?
         GetDedicatedCoordMemoryEstimate() :
         GetPerExecutorMemoryEstimate();
+    VLOG(3) << "use_dedicated_coord_estimates=" << use_dedicated_coord_estimates
+            << " coord_backend_mem_to_admit=" << coord_backend_mem_to_admit
+            << " per_backend_mem_to_admit=" << per_backend_mem_to_admit;
     if (!mimic_old_behaviour) {
       int64_t min_mem_limit_required =
           ReservationUtil::GetMinMemLimitFromReservation(largest_min_reservation());

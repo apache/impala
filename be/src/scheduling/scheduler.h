@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <random>
 #include <string>
 #include <vector>
 #include <boost/heap/binomial_heap.hpp>
@@ -151,7 +152,7 @@ class Scheduler {
   class AssignmentCtx {
    public:
     AssignmentCtx(const ExecutorGroup& executor_group, IntCounter* total_assignments,
-        IntCounter* total_local_assignments);
+        IntCounter* total_local_assignments, std::mt19937* rng);
 
     /// Among hosts in 'data_locations', select the one with the minimum number of
     /// assigned bytes. If executors have been assigned equal amounts of work and
@@ -344,13 +345,14 @@ class Scheduler {
   /// exec_at_coord:           Whether to schedule all scan ranges on the coordinator.
   /// query_options:           Query options for the current query.
   /// timer:                   Tracks execution time of ComputeScanRangeAssignment.
+  /// rng:                     Random number generated used for any random decisions
   /// assignment:              Output parameter, to which new assignments will be added.
   Status ComputeScanRangeAssignment(const ExecutorConfig& executor_config,
       PlanNodeId node_id, const TReplicaPreference::type* node_replica_preference,
       bool node_random_replica, const std::vector<TScanRangeLocationList>& locations,
       const std::vector<TNetworkAddress>& host_list, bool exec_at_coord,
       const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
-      FragmentScanRangeAssignment* assignment);
+      std::mt19937* rng, FragmentScanRangeAssignment* assignment);
 
   /// Computes execution parameters for all backends assigned in the query and always one
   /// for the coordinator backend since it participates in execution regardless. Must be

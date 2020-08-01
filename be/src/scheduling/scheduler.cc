@@ -194,7 +194,7 @@ Status Scheduler::ComputeScanRangeAssignment(
       RETURN_IF_ERROR(
           ComputeScanRangeAssignment(executor_config, node_id, node_replica_preference,
               node_random_replica, *locations, exec_request.host_list, exec_at_coord,
-              state->query_options(), total_assignment_timer, assignment));
+              state->query_options(), total_assignment_timer, state->rng(), assignment));
       state->IncNumScanRanges(locations->size());
     }
   }
@@ -275,20 +275,51 @@ void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
             << fragment_state->fragment.display_name;
     CreateCollocatedJoinBuildInstances(fragment_state, state);
   } else if (fragment.partition.type == TPartitionType::UNPARTITIONED) {
-    // case 1: root fragment instance executed at coordinator
-    VLOG(3) << "Computing exec params for coordinator fragment "
-            << fragment_state->fragment.display_name;
-    const BackendDescriptorPB& local_be_desc = executor_config.local_be_desc;
-    const NetworkAddressPB& coord = local_be_desc.address();
-    DCHECK(local_be_desc.has_krpc_address());
-    const NetworkAddressPB& krpc_coord = local_be_desc.krpc_address();
-    DCHECK(IsResolvedAddress(krpc_coord));
+    // case 1: unpartitioned fragment - either the coordinator fragment at the root of
+    // the plan that must be executed at the coordinator or an unpartitioned fragment
+    // that can be executed anywhere.
+    VLOG(3) << "Computing exec params for "
+            << (fragment_state->is_coord_fragment ? "coordinator" : "unpartitioned")
+            << " fragment " << fragment_state->fragment.display_name;
+    NetworkAddressPB host;
+    NetworkAddressPB krpc_host;
+    if (fragment_state->is_coord_fragment || executor_config.group.NumExecutors() == 0) {
+      // The coordinator fragment must be scheduled on the coordinator. Otherwise if
+      // no executors are available, we need to schedule on the coordinator.
+      const BackendDescriptorPB& local_be_desc = executor_config.local_be_desc;
+      host = local_be_desc.address();
+      DCHECK(local_be_desc.has_krpc_address());
+      krpc_host = local_be_desc.krpc_address();
+    } else if (fragment_state->exchange_input_fragments.size() > 0) {
+      // Interior unpartitioned fragments can be scheduled on an arbitrary executor.
+      // Pick a random instance from the first input fragment.
+      const FragmentScheduleState& input_fragment_state =
+          *state->GetFragmentScheduleState(fragment_state->exchange_input_fragments[0]);
+      int num_input_instances = input_fragment_state.instance_states.size();
+      int instance_idx =
+          std::uniform_int_distribution<int>(0, num_input_instances - 1)(*state->rng());
+      host = input_fragment_state.instance_states[instance_idx].host;
+      krpc_host = input_fragment_state.instance_states[instance_idx].krpc_host;
+    } else {
+      // Other fragments, e.g. ones with only a constant union or empty set, are scheduled
+      // on a random executor.
+      vector<BackendDescriptorPB> all_executors =
+          executor_config.group.GetAllExecutorDescriptors();
+      int idx = std::uniform_int_distribution<int>(0, all_executors.size() - 1)(
+          *state->rng());
+      const BackendDescriptorPB& be_desc = all_executors[idx];
+      host = be_desc.address();
+      DCHECK(be_desc.has_krpc_address());
+      krpc_host = be_desc.krpc_address();
+    }
+    VLOG(3) << "Scheduled unpartitioned fragment on " << krpc_host;
+    DCHECK(IsResolvedAddress(krpc_host));
     // make sure that the coordinator instance ends up with instance idx 0
     UniqueIdPB instance_id = fragment_state->is_coord_fragment ?
         state->query_id() :
         state->GetNextInstanceId();
     fragment_state->instance_states.emplace_back(
-        instance_id, coord, krpc_coord, 0, *fragment_state);
+        instance_id, host, krpc_host, 0, *fragment_state);
     FInstanceScheduleState& instance_state = fragment_state->instance_states.back();
     *fragment_state->exec_params->add_instances() = instance_id;
 
@@ -524,7 +555,7 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
     PlanNodeId node_id, const TReplicaPreference::type* node_replica_preference,
     bool node_random_replica, const vector<TScanRangeLocationList>& locations,
     const vector<TNetworkAddress>& host_list, bool exec_at_coord,
-    const TQueryOptions& query_options, RuntimeProfile::Counter* timer,
+    const TQueryOptions& query_options, RuntimeProfile::Counter* timer, std::mt19937* rng,
     FragmentScanRangeAssignment* assignment) {
   const ExecutorGroup& executor_group = executor_config.group;
   if (executor_group.NumExecutors() == 0 && !exec_at_coord) {
@@ -557,9 +588,8 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
   const BackendDescriptorPB& local_be_desc = executor_config.local_be_desc;
   coord_only_executor_group.AddExecutor(local_be_desc);
   VLOG_ROW << "Exec at coord is " << (exec_at_coord ? "true" : "false");
-  AssignmentCtx assignment_ctx(
-      exec_at_coord ? coord_only_executor_group : executor_group, total_assignments_,
-      total_local_assignments_);
+  AssignmentCtx assignment_ctx(exec_at_coord ? coord_only_executor_group : executor_group,
+      total_assignments_, total_local_assignments_, rng);
 
   // Holds scan ranges that must be assigned for remote reads.
   vector<const TScanRangeLocationList*> remote_scan_range_locations;
@@ -863,15 +893,14 @@ void Scheduler::ComputeBackendExecParams(
 }
 
 Scheduler::AssignmentCtx::AssignmentCtx(const ExecutorGroup& executor_group,
-    IntCounter* total_assignments, IntCounter* total_local_assignments)
+    IntCounter* total_assignments, IntCounter* total_local_assignments, std::mt19937* rng)
   : executor_group_(executor_group),
     first_unused_executor_idx_(0),
     total_assignments_(total_assignments),
     total_local_assignments_(total_local_assignments) {
   DCHECK_GT(executor_group.NumExecutors(), 0);
   random_executor_order_ = executor_group.GetAllExecutorIps();
-  std::mt19937 g(rand());
-  std::shuffle(random_executor_order_.begin(), random_executor_order_.end(), g);
+  std::shuffle(random_executor_order_.begin(), random_executor_order_.end(), *rng);
   // Initialize inverted map for executor rank lookups
   int i = 0;
   for (const IpAddr& ip : random_executor_order_) random_executor_rank_[ip] = i++;
