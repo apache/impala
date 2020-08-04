@@ -937,6 +937,8 @@ visible_functions = [
       '_ZN6impala21DataSketchesFunctions13DsKllQuantileEPN10impala_udf15FunctionContextERKNS1_9StringValERKNS1_9DoubleValE'],
   [['ds_kll_n'], 'BIGINT', ['STRING'],
       '_ZN6impala21DataSketchesFunctions6DsKllNEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+  [['ds_kll_rank'], 'DOUBLE', ['STRING', 'FLOAT'],
+      '_ZN6impala21DataSketchesFunctions9DsKllRankEPN10impala_udf15FunctionContextERKNS1_9StringValERKNS1_8FloatValE'],
 ]
 
 invisible_functions = [
