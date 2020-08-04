@@ -36,6 +36,7 @@ import javax.annotation.Nullable;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.PartitionKeyValue;
@@ -906,11 +907,30 @@ public class HdfsPartition extends CatalogObjectImpl
    * metastore.
    */
   public org.apache.hadoop.hive.metastore.api.Partition toHmsPartition() {
+    StorageDescriptor storageDescriptor = getStorageDescriptor();
+    if (storageDescriptor == null) return null;
+    // Make a copy so that the callers can modify the parameters as needed.
+    Map<String, String> hmsParams = Maps.newHashMap(getParameters());
+    PartitionStatsUtil.partStatsToParams(this, hmsParams);
+    org.apache.hadoop.hive.metastore.api.Partition partition =
+        new org.apache.hadoop.hive.metastore.api.Partition(
+            getPartitionValuesAsStrings(true), getTable().getDb().getName(),
+            getTable().getName(), cachedMsPartitionDescriptor_.msCreateTime,
+            cachedMsPartitionDescriptor_.msLastAccessTime, storageDescriptor,
+            hmsParams);
+    return partition;
+  }
+
+  /**
+   * Gets the StorageDescriptor for this partition. Useful for sending RPCs to metastore
+   * and comparing against the partitions from metastore.
+   */
+  public StorageDescriptor getStorageDescriptor() {
     if (cachedMsPartitionDescriptor_ == null) return null;
     Preconditions.checkNotNull(table_.getNonPartitionFieldSchemas());
     // Update the serde library class based on the currently used file format.
-    org.apache.hadoop.hive.metastore.api.StorageDescriptor storageDescriptor =
-        new org.apache.hadoop.hive.metastore.api.StorageDescriptor(
+    StorageDescriptor storageDescriptor =
+        new StorageDescriptor(
           // Make a shallow copy of the field schemas instead of passing a reference to
           // the source list since it could potentially be modified once the current
           // thread is out of table lock scope.
@@ -924,17 +944,7 @@ public class HdfsPartition extends CatalogObjectImpl
             cachedMsPartitionDescriptor_.sdBucketCols,
             cachedMsPartitionDescriptor_.sdSortCols,
             cachedMsPartitionDescriptor_.sdParameters);
-    // Make a copy so that the callers do not need to delete the incremental stats
-    // strings from the hmsParams_ map later.
-    Map<String, String> hmsParams = Maps.newHashMap(getParameters());
-    PartitionStatsUtil.partStatsToParams(this, hmsParams);
-    org.apache.hadoop.hive.metastore.api.Partition partition =
-        new org.apache.hadoop.hive.metastore.api.Partition(
-            getPartitionValuesAsStrings(true), getTable().getDb().getName(),
-            getTable().getName(), cachedMsPartitionDescriptor_.msCreateTime,
-            cachedMsPartitionDescriptor_.msLastAccessTime, storageDescriptor,
-            hmsParams);
-    return partition;
+    return storageDescriptor;
   }
 
   public static HdfsPartition prototypePartition(

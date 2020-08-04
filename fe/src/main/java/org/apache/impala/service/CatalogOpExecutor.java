@@ -939,7 +939,7 @@ public class CatalogOpExecutor {
           getMetaStoreTable(msClient, tbl);
       if (tbl instanceof HdfsTable) {
         ((HdfsTable) tbl).load(true, msClient.getHiveClient(), msTbl,
-            reloadFileMetadata, reloadTableSchema, partitionsToUpdate, reason);
+            reloadFileMetadata, reloadTableSchema, false, partitionsToUpdate, reason);
       } else {
         tbl.load(true, msClient.getHiveClient(), msTbl, reason);
       }
@@ -4207,7 +4207,8 @@ public class CatalogOpExecutor {
                 //     ACID tables, there is a Jira to cover this: HIVE-22062.
                 //   2: If no need for a full table reload then fetch partition level
                 //     writeIds and reload only the ones that changed.
-                updatedThriftTable = catalog_.reloadTable(tbl, cmdString);
+                updatedThriftTable = catalog_
+                    .reloadTable(tbl, req.refresh_updated_hms_partitions, cmdString);
               }
             } else {
               // Table was loaded from scratch, so it's already "refreshed".
