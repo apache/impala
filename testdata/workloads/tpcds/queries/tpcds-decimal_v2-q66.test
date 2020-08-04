@@ -1,0 +1,228 @@
+====
+---- QUERY: TPCDS-Q66
+select
+         w_warehouse_name
+  ,w_warehouse_sq_ft
+  ,w_city
+  ,w_county
+  ,w_state
+  ,w_country
+        ,ship_carriers
+        ,year_
+  ,sum(jan_sales) as jan_sales
+  ,sum(feb_sales) as feb_sales
+  ,sum(mar_sales) as mar_sales
+  ,sum(apr_sales) as apr_sales
+  ,sum(may_sales) as may_sales
+  ,sum(jun_sales) as jun_sales
+  ,sum(jul_sales) as jul_sales
+  ,sum(aug_sales) as aug_sales
+  ,sum(sep_sales) as sep_sales
+  ,sum(oct_sales) as oct_sales
+  ,sum(nov_sales) as nov_sales
+  ,sum(dec_sales) as dec_sales
+  ,sum(jan_sales/w_warehouse_sq_ft) as jan_sales_per_sq_foot
+  ,sum(feb_sales/w_warehouse_sq_ft) as feb_sales_per_sq_foot
+  ,sum(mar_sales/w_warehouse_sq_ft) as mar_sales_per_sq_foot
+  ,sum(apr_sales/w_warehouse_sq_ft) as apr_sales_per_sq_foot
+  ,sum(may_sales/w_warehouse_sq_ft) as may_sales_per_sq_foot
+  ,sum(jun_sales/w_warehouse_sq_ft) as jun_sales_per_sq_foot
+  ,sum(jul_sales/w_warehouse_sq_ft) as jul_sales_per_sq_foot
+  ,sum(aug_sales/w_warehouse_sq_ft) as aug_sales_per_sq_foot
+  ,sum(sep_sales/w_warehouse_sq_ft) as sep_sales_per_sq_foot
+  ,sum(oct_sales/w_warehouse_sq_ft) as oct_sales_per_sq_foot
+  ,sum(nov_sales/w_warehouse_sq_ft) as nov_sales_per_sq_foot
+  ,sum(dec_sales/w_warehouse_sq_ft) as dec_sales_per_sq_foot
+  ,sum(jan_net) as jan_net
+  ,sum(feb_net) as feb_net
+  ,sum(mar_net) as mar_net
+  ,sum(apr_net) as apr_net
+  ,sum(may_net) as may_net
+  ,sum(jun_net) as jun_net
+  ,sum(jul_net) as jul_net
+  ,sum(aug_net) as aug_net
+  ,sum(sep_net) as sep_net
+  ,sum(oct_net) as oct_net
+  ,sum(nov_net) as nov_net
+  ,sum(dec_net) as dec_net
+ from (
+     select
+  w_warehouse_name
+  ,w_warehouse_sq_ft
+  ,w_city
+  ,w_county
+  ,w_state
+  ,w_country
+  ,'DHL,BARIAN' as ship_carriers
+       ,d_year as year_
+  ,sum(case when d_moy = 1
+    then ws_ext_sales_price* ws_quantity else 0 end) as jan_sales
+  ,sum(case when d_moy = 2
+    then ws_ext_sales_price* ws_quantity else 0 end) as feb_sales
+  ,sum(case when d_moy = 3
+    then ws_ext_sales_price* ws_quantity else 0 end) as mar_sales
+  ,sum(case when d_moy = 4
+    then ws_ext_sales_price* ws_quantity else 0 end) as apr_sales
+  ,sum(case when d_moy = 5
+    then ws_ext_sales_price* ws_quantity else 0 end) as may_sales
+  ,sum(case when d_moy = 6
+    then ws_ext_sales_price* ws_quantity else 0 end) as jun_sales
+  ,sum(case when d_moy = 7
+    then ws_ext_sales_price* ws_quantity else 0 end) as jul_sales
+  ,sum(case when d_moy = 8
+    then ws_ext_sales_price* ws_quantity else 0 end) as aug_sales
+  ,sum(case when d_moy = 9
+    then ws_ext_sales_price* ws_quantity else 0 end) as sep_sales
+  ,sum(case when d_moy = 10
+    then ws_ext_sales_price* ws_quantity else 0 end) as oct_sales
+  ,sum(case when d_moy = 11
+    then ws_ext_sales_price* ws_quantity else 0 end) as nov_sales
+  ,sum(case when d_moy = 12
+    then ws_ext_sales_price* ws_quantity else 0 end) as dec_sales
+  ,sum(case when d_moy = 1
+    then ws_net_paid * ws_quantity else 0 end) as jan_net
+  ,sum(case when d_moy = 2
+    then ws_net_paid * ws_quantity else 0 end) as feb_net
+  ,sum(case when d_moy = 3
+    then ws_net_paid * ws_quantity else 0 end) as mar_net
+  ,sum(case when d_moy = 4
+    then ws_net_paid * ws_quantity else 0 end) as apr_net
+  ,sum(case when d_moy = 5
+    then ws_net_paid * ws_quantity else 0 end) as may_net
+  ,sum(case when d_moy = 6
+    then ws_net_paid * ws_quantity else 0 end) as jun_net
+  ,sum(case when d_moy = 7
+    then ws_net_paid * ws_quantity else 0 end) as jul_net
+  ,sum(case when d_moy = 8
+    then ws_net_paid * ws_quantity else 0 end) as aug_net
+  ,sum(case when d_moy = 9
+    then ws_net_paid * ws_quantity else 0 end) as sep_net
+  ,sum(case when d_moy = 10
+    then ws_net_paid * ws_quantity else 0 end) as oct_net
+  ,sum(case when d_moy = 11
+    then ws_net_paid * ws_quantity else 0 end) as nov_net
+  ,sum(case when d_moy = 12
+    then ws_net_paid * ws_quantity else 0 end) as dec_net
+     from
+          web_sales
+         ,warehouse
+         ,date_dim
+         ,time_dim
+    ,ship_mode
+     where
+            ws_warehouse_sk =  w_warehouse_sk
+        and ws_sold_date_sk = d_date_sk
+        and ws_sold_time_sk = t_time_sk
+  and ws_ship_mode_sk = sm_ship_mode_sk
+        and d_year = 2001
+  and t_time between 30838 and 30838+28800
+  and sm_carrier in ('DHL','BARIAN')
+     group by
+        w_warehouse_name
+  ,w_warehouse_sq_ft
+  ,w_city
+  ,w_county
+  ,w_state
+  ,w_country
+       ,d_year
+ union all
+     select
+  w_warehouse_name
+  ,w_warehouse_sq_ft
+  ,w_city
+  ,w_county
+  ,w_state
+  ,w_country
+  ,'DHL,BARIAN' as ship_carriers
+       ,d_year as year_
+  ,sum(case when d_moy = 1
+    then cs_sales_price* cs_quantity else 0 end) as jan_sales
+  ,sum(case when d_moy = 2
+    then cs_sales_price* cs_quantity else 0 end) as feb_sales
+  ,sum(case when d_moy = 3
+    then cs_sales_price* cs_quantity else 0 end) as mar_sales
+  ,sum(case when d_moy = 4
+    then cs_sales_price* cs_quantity else 0 end) as apr_sales
+  ,sum(case when d_moy = 5
+    then cs_sales_price* cs_quantity else 0 end) as may_sales
+  ,sum(case when d_moy = 6
+    then cs_sales_price* cs_quantity else 0 end) as jun_sales
+  ,sum(case when d_moy = 7
+    then cs_sales_price* cs_quantity else 0 end) as jul_sales
+  ,sum(case when d_moy = 8
+    then cs_sales_price* cs_quantity else 0 end) as aug_sales
+  ,sum(case when d_moy = 9
+    then cs_sales_price* cs_quantity else 0 end) as sep_sales
+  ,sum(case when d_moy = 10
+    then cs_sales_price* cs_quantity else 0 end) as oct_sales
+  ,sum(case when d_moy = 11
+    then cs_sales_price* cs_quantity else 0 end) as nov_sales
+  ,sum(case when d_moy = 12
+    then cs_sales_price* cs_quantity else 0 end) as dec_sales
+  ,sum(case when d_moy = 1
+    then cs_net_paid_inc_tax * cs_quantity else 0 end) as jan_net
+  ,sum(case when d_moy = 2
+    then cs_net_paid_inc_tax * cs_quantity else 0 end) as feb_net
+  ,sum(case when d_moy = 3
+    then cs_net_paid_inc_tax * cs_quantity else 0 end) as mar_net
+  ,sum(case when d_moy = 4
+    then cs_net_paid_inc_tax * cs_quantity else 0 end) as apr_net
+  ,sum(case when d_moy = 5
+    then cs_net_paid_inc_tax * cs_quantity else 0 end) as may_net
+  ,sum(case when d_moy = 6
+    then cs_net_paid_inc_tax * cs_quantity else 0 end) as jun_net
+  ,sum(case when d_moy = 7
+    then cs_net_paid_inc_tax * cs_quantity else 0 end) as jul_net
+  ,sum(case when d_moy = 8
+    then cs_net_paid_inc_tax * cs_quantity else 0 end) as aug_net
+  ,sum(case when d_moy = 9
+    then cs_net_paid_inc_tax * cs_quantity else 0 end) as sep_net
+  ,sum(case when d_moy = 10
+    then cs_net_paid_inc_tax * cs_quantity else 0 end) as oct_net
+  ,sum(case when d_moy = 11
+    then cs_net_paid_inc_tax * cs_quantity else 0 end) as nov_net
+  ,sum(case when d_moy = 12
+    then cs_net_paid_inc_tax * cs_quantity else 0 end) as dec_net
+     from
+          catalog_sales
+         ,warehouse
+         ,date_dim
+         ,time_dim
+   ,ship_mode
+     where
+            cs_warehouse_sk =  w_warehouse_sk
+        and cs_sold_date_sk = d_date_sk
+        and cs_sold_time_sk = t_time_sk
+  and cs_ship_mode_sk = sm_ship_mode_sk
+        and d_year = 2001
+  and t_time between 30838 AND 30838+28800
+  and sm_carrier in ('DHL','BARIAN')
+     group by
+        w_warehouse_name
+  ,w_warehouse_sq_ft
+  ,w_city
+  ,w_county
+  ,w_state
+  ,w_country
+       ,d_year
+ ) x
+ group by
+        w_warehouse_name
+  ,w_warehouse_sq_ft
+  ,w_city
+  ,w_county
+  ,w_state
+  ,w_country
+  ,ship_carriers
+       ,year_
+ order by w_warehouse_name
+LIMIT 100
+---- RESULTS
+'Bad cards must make.',621234,'Fairview','Williamson County','TN','United States','DHL,BARIAN',2001,9506753.46,8008140.33,6116769.63,11973045.15,7756254.92,5352978.49,13733996.10,16418794.37,17212743.32,17042707.41,34304935.61,35324164.21,15.303015,12.890699,9.846160,19.273004,12.485239,8.616687,22.107605,26.429324,27.707343,27.433635,55.220635,56.861286,30534943.77,24481685.94,22178710.81,25695798.18,29954903.78,18084140.05,30805576.13,47156887.22,51158588.86,55759942.80,86253544.16,83451555.63
+'Conventional childr',977787,'Fairview','Williamson County','TN','United States','DHL,BARIAN',2001,8860645.55,14415813.74,6761497.23,11820654.76,8246260.69,6636877.49,11434492.25,25673812.14,23074206.96,21834581.94,26894900.53,33575091.74,9.061938,14.743307,6.915102,12.089192,8.433596,6.787651,11.694257,26.257060,23.598398,22.330612,27.505889,34.337838,23836085.83,32073313.37,25037904.18,22659895.86,21757401.03,24451608.10,21933001.85,55996703.43,57371880.44,62087214.51,82849910.15,88970319.31
+'Doors canno',294242,'Fairview','Williamson County','TN','United States','DHL,BARIAN',2001,6355232.31,10198920.36,10246200.97,12209716.50,8566998.28,8806316.81,9789405.60,16466584.88,26443785.61,27016047.80,33660589.67,27462468.62,21.598658,34.661674,34.822360,41.495491,29.115484,29.928823,33.269913,55.962728,89.870873,91.815743,114.397637,93.332932,22645143.09,24487254.60,24925759.42,30503655.27,26558160.29,20976233.52,29895796.09,56002198.38,53488158.53,76287235.46,82483747.59,88088266.69
+'Important issues liv',138504,'Fairview','Williamson County','TN','United States','DHL,BARIAN',2001,11748784.55,14351305.77,9896470.93,7990874.78,8879247.90,7362383.09,10011144.75,17741201.32,21346976.05,18074978.16,29675125.64,32545325.29,84.826319,103.616544,71.452600,57.694180,64.108242,53.156465,72.280546,128.091617,154.125340,130.501488,214.254647,234.977512,27204167.15,25980378.13,19943398.93,25710421.13,19484481.03,26346611.48,25075158.43,54094778.13,41066732.11,54547058.28,72465962.92,92770328.27
+'NULL',NULL,'Fairview','Williamson County','TN','United States','DHL,BARIAN',2001,9597806.95,11121820.57,8670867.91,8994786.04,10887248.09,14187671.36,9732598.41,19798897.07,21007842.34,21495513.67,34795669.17,33122997.94,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,21913594.59,32518476.51,24885662.72,25698343.86,33735910.61,35527031.58,25465193.48,53623238.66,51409986.76,54159173.90,92227043.25,83435390.84
+---- TYPES
+STRING, INT, STRING, STRING, STRING, STRING, STRING, INT, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
+====
