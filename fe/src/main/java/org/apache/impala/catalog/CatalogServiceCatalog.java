@@ -2225,13 +2225,24 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Wrapper around {@link #reloadTable(Table, boolean, String)} which passes false for
+   * {@code refreshUpdatedPartitions} argument.
+   */
+  public TCatalogObject reloadTable(Table tbl, String reason) throws CatalogException {
+    return reloadTable(tbl, false, reason);
+  }
+
+  /**
    * Reloads metadata for table 'tbl' which must not be an IncompleteTable. Updates the
    * table metadata in-place by calling load() on the given table. Returns the
    * TCatalogObject representing 'tbl'. Applies proper synchronization to protect the
    * metadata load from concurrent table modifications and assigns a new catalog version.
    * Throws a CatalogException if there is an error loading table metadata.
+   * If {@code refreshUpdatedParts} is true, the refresh logic detects updated
+   * partitions in metastore and reloads them too.
    */
-  public TCatalogObject reloadTable(Table tbl, String reason) throws CatalogException {
+  public TCatalogObject reloadTable(Table tbl, boolean refreshUpdatedParts, String reason)
+      throws CatalogException {
     LOG.info(String.format("Refreshing table metadata: %s", tbl.getFullName()));
     Preconditions.checkState(!(tbl instanceof IncompleteTable));
     String dbName = tbl.getDb().getName();
@@ -2253,7 +2264,12 @@ public class CatalogServiceCatalog extends Catalog {
           throw new TableLoadingException("Error loading metadata for table: " +
               dbName + "." + tblName, e);
         }
-        tbl.load(true, msClient.getHiveClient(), msTbl, reason);
+        if (tbl instanceof HdfsTable) {
+          ((HdfsTable) tbl)
+              .load(true, msClient.getHiveClient(), msTbl, refreshUpdatedParts, reason);
+        } else {
+          tbl.load(true, msClient.getHiveClient(), msTbl, reason);
+        }
       }
       tbl.setCatalogVersion(newCatalogVersion);
       LOG.info(String.format("Refreshed table metadata: %s", tbl.getFullName()));

@@ -386,8 +386,8 @@ public class Frontend {
    * Constructs a TCatalogOpRequest and attaches it, plus any metadata, to the
    * result argument.
    */
-  private void createCatalogOpRequest(AnalysisResult analysis,
-      TExecRequest result) throws InternalException {
+  private void createCatalogOpRequest(AnalysisResult analysis, TExecRequest result)
+      throws InternalException {
     TCatalogOpRequest ddl = new TCatalogOpRequest();
     TResultSetMetadata metadata = new TResultSetMetadata();
     if (analysis.isUseStmt()) {
@@ -667,6 +667,8 @@ public class Frontend {
     }
     if (ddl.getOp_type() == TCatalogOpType.RESET_METADATA) {
       ddl.getReset_metadata_params().setSync_ddl(ddl.isSync_ddl());
+      ddl.getReset_metadata_params().setRefresh_updated_hms_partitions(
+          result.getQuery_options().isRefresh_updated_hms_partitions());
     }
   }
 

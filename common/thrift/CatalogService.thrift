@@ -249,6 +249,10 @@ struct TResetMetadataRequest {
 
   // If set, refreshes authorization metadata.
   8: optional bool authorization
+
+  // If set, refreshes partition objects which are modified externally.
+  // Applicable only when refreshing the table.
+  9: optional bool refresh_updated_hms_partitions
 }
 
 // Response from TResetMetadataRequest

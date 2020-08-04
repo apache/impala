@@ -33,7 +33,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -1050,7 +1049,17 @@ public class HdfsTable extends Table implements FeFsTable {
   public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl, String reason)
       throws TableLoadingException {
-    load(reuseMetadata, client, msTbl, true, true, null, reason);
+    load(reuseMetadata, client, msTbl, /* loadPartitionFileMetadata */
+        true, /* loadTableSchema*/true, false,
+        /* partitionsToUpdate*/null, reason);
+  }
+
+  public void load(boolean reuseMetadata, IMetaStoreClient client,
+      org.apache.hadoop.hive.metastore.api.Table msTbl, boolean refreshUpdatedPartitions,
+      String reason) throws TableLoadingException {
+    load(reuseMetadata, client, msTbl, /* loadPartitionFileMetadata */
+        true, /* loadTableSchema*/true, refreshUpdatedPartitions,
+        /* partitionsToUpdate*/null, reason);
   }
 
   /**
@@ -1080,7 +1089,8 @@ public class HdfsTable extends Table implements FeFsTable {
   public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl,
       boolean loadParitionFileMetadata, boolean loadTableSchema,
-      Set<String> partitionsToUpdate, String reason) throws TableLoadingException {
+      boolean refreshUpdatedPartitions, Set<String> partitionsToUpdate, String reason)
+      throws TableLoadingException {
     final Timer.Context context =
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
     String annotation = String.format("%s metadata for %s%s partition(s) of %s.%s (%s)",
@@ -1121,7 +1131,8 @@ public class HdfsTable extends Table implements FeFsTable {
             }
           } else {
             storageMetadataLoadTime_ += updatePartitionsFromHms(
-                client, partitionsToUpdate, loadParitionFileMetadata);
+                client, partitionsToUpdate, loadParitionFileMetadata,
+                refreshUpdatedPartitions);
           }
           LOG.info("Incrementally loaded table metadata for: " + getFullName());
         } else {
@@ -1257,80 +1268,311 @@ public class HdfsTable extends Table implements FeFsTable {
    * spent loading file metadata in nanoseconds.
    */
   private long updatePartitionsFromHms(IMetaStoreClient client,
-      Set<String> partitionsToUpdate, boolean loadPartitionFileMetadata)
-      throws Exception {
-    long fileMdLoadTime = 0;
+      Set<String> partitionsToUpdate, boolean loadPartitionFileMetadata,
+      boolean refreshUpdatedPartitions) throws Exception {
     if (LOG.isTraceEnabled()) LOG.trace("Sync table partitions: " + getFullName());
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
     Preconditions.checkState(msTbl.getPartitionKeysSize() != 0);
     Preconditions.checkState(loadPartitionFileMetadata || partitionsToUpdate == null);
+    PartitionDeltaUpdater deltaUpdater =
+        refreshUpdatedPartitions ? new PartBasedDeltaUpdater(client,
+            loadPartitionFileMetadata, partitionsToUpdate)
+            : new PartNameBasedDeltaUpdater(client, loadPartitionFileMetadata,
+                partitionsToUpdate);
+    deltaUpdater.apply();
+    return deltaUpdater.loadTimeForFileMdNs_;
+  }
 
-    // Retrieve all the partition names from the Hive Metastore. We need this to
-    // identify the delta between partitions of the local HdfsTable and the table entry
-    // in the Hive Metastore. Note: This is a relatively "cheap" operation
-    // (~.3 secs for 30K partitions).
-    Set<String> msPartitionNames = new HashSet<>();
-    msPartitionNames.addAll(client.listPartitionNames(db_.getName(), name_, (short) -1));
-    // Names of loaded partitions in this table
-    Set<String> partitionNames = new HashSet<>();
-    // Partitions for which file metadata must be loaded
-    List<HdfsPartition.Builder> partitionsToLoadFiles = new ArrayList<>();
-    // Partitions that need to be dropped and recreated from scratch
-    List<HdfsPartition.Builder> dirtyPartitions = new ArrayList<>();
-    // Partitions removed from the Hive Metastore.
-    List<HdfsPartition> removedPartitions = new ArrayList<>();
-    // Identify dirty partitions that need to be loaded from the Hive Metastore and
-    // partitions that no longer exist in the Hive Metastore.
-    for (HdfsPartition partition: partitionMap_.values()) {
-      // Remove partitions that don't exist in the Hive Metastore. These are partitions
-      // that were removed from HMS using some external process, e.g. Hive.
-      if (!msPartitionNames.contains(partition.getPartitionName())) {
-        removedPartitions.add(partition);
-      } else if (isDirtyPartition(partition)) {
-        // The modification of dirty partitions have been started. Pick up the in-progress
-        // partition builders to finalize the modification.
-        dirtyPartitions.add(pickInprogressPartitionBuilder(partition));
-      } else if (partitionsToUpdate == null && loadPartitionFileMetadata) {
-        partitionsToLoadFiles.add(new HdfsPartition.Builder(partition));
+  /**
+   * Util class to compute the delta of partitions known to this table and the partitions
+   * in Hive Metastore. This is used to incrementally refresh the table. It identifies
+   * the partitions which are removed [added] from metastore and removes [adds] them.
+   * Additionally, it also updates partitions which are provided or found to be stale.
+   */
+  private abstract class PartitionDeltaUpdater {
+    // flag used to determine if the file-metadata needs to be reloaded for stale
+    // partitions
+    private final boolean loadFileMd_;
+    // total time taken to load file-metadata in nano-seconds.
+    private long loadTimeForFileMdNs_;
+    // metastore client used to fetch partition information from metastore.
+    protected final IMetaStoreClient client_;
+    // Nullable set of partition names which when set is used to force load partitions.
+    // if loadFileMd_ flag is set, files for these partitions will also be
+    // reloaded.
+    private final Set<String> partitionsToUpdate_;
+
+    PartitionDeltaUpdater(IMetaStoreClient client, boolean loadPartitionFileMetadata,
+        Set<String> partitionsToUpdate) {
+      this.client_ = client;
+      this.loadFileMd_ = loadPartitionFileMetadata;
+      this.partitionsToUpdate_ = partitionsToUpdate;
+    }
+
+    /**
+     * This method used to determine if the given HdfsPartition has been removed from
+     * hive metastore.
+     * @return true if partition does not exist in metastore, else false.
+     */
+    public abstract boolean isRemoved(HdfsPartition hdfsPartition);
+
+    /**
+     * Loads any partitions which are known to metastore but not provided in
+     * knownPartitions. All such new partitions will be added in the given
+     * {@code addedPartNames} set.
+     * @param knownPartitions Known set of partition names to this Table.
+     * @param addedPartNames Set of part names which is used to return the newly added
+     *                       partNames
+     * @return Time taken in nanoseconds for file-metadata loading for new partitions.
+     */
+    public abstract long loadNewPartitions(Set<String> knownPartitions,
+        Set<String> addedPartNames) throws Exception;
+
+    /**
+     * Gets a {@link HdfsPartition.Builder} to construct a updated HdfsPartition for
+     * the given partition.
+     */
+    public abstract HdfsPartition.Builder getUpdatedPartition(HdfsPartition partition)
+        throws Exception;
+
+    /**
+     * Loads both the HMS and file-metadata of the partitions provided by the given
+     * map of HdfsPartition.Builders.
+     * @param updatedPartitionBuilders The map of partition names and the corresponding
+     *                                 HdfsPartition.Builders which need to be loaded.
+     * @return Time taken to load file-metadata in nanoseconds.
+     */
+    public abstract long loadUpdatedPartitions(
+        Map<String, HdfsPartition.Builder> updatedPartitionBuilders) throws Exception;
+
+    /**
+     * This method applies the partition delta (create new, remove old, update stale)
+     * when compared to the current state of partitions in the metastore.
+     */
+    public void apply() throws Exception {
+      List<HdfsPartition> removedPartitions = new ArrayList<>();
+      Map<String, HdfsPartition.Builder> updatedPartitions = new HashMap<>();
+      List<HdfsPartition.Builder> partitionsToLoadFiles = new ArrayList<>();
+      Set<String> partitionNames = new HashSet<>();
+      for (HdfsPartition partition: partitionMap_.values()) {
+        // Remove partitions that don't exist in the Hive Metastore. These are partitions
+        // that were removed from HMS using some external process, e.g. Hive.
+        if (isRemoved(partition)) {
+          removedPartitions.add(partition);
+        } else {
+          HdfsPartition.Builder updatedPartBuilder = getUpdatedPartition(partition);
+          if (updatedPartBuilder != null) {
+            // If there are any self-updated (dirty) or externally updated partitions
+            // add them to the list of updatedPartitions so that they are reloaded later.
+            updatedPartitions.put(partition.getPartitionName(), updatedPartBuilder);
+          } else if (loadFileMd_ && partitionsToUpdate_ == null) {
+            partitionsToLoadFiles.add(new HdfsPartition.Builder(partition));
+          }
+        }
+        Preconditions.checkNotNull(partition.getCachedMsPartitionDescriptor());
+        partitionNames.add(partition.getPartitionName());
       }
-      Preconditions.checkNotNull(partition.getCachedMsPartitionDescriptor());
-      partitionNames.add(partition.getPartitionName());
+      dropPartitions(removedPartitions);
+      // Load dirty partitions from Hive Metastore. File metadata of dirty partitions will
+      // always be reloaded (ignore the loadPartitionFileMetadata flag).
+      loadTimeForFileMdNs_ = loadUpdatedPartitions(updatedPartitions);
+      Preconditions.checkState(!hasInProgressModification());
+      Set<String> addedPartitions = new HashSet<>();
+      loadTimeForFileMdNs_ += loadNewPartitions(partitionNames, addedPartitions);
+      // If a list of modified partitions (old and new) is specified, don't reload file
+      // metadata for the new ones as they have already been detected in HMS and have been
+      // reloaded by loadNewPartitions().
+      if (partitionsToUpdate_ != null) {
+        partitionsToUpdate_.removeAll(addedPartitions);
+      }
+      // Load file metadata. Until we have a notification mechanism for when a
+      // file changes in hdfs, it is sometimes required to reload all the file
+      // descriptors and block metadata of a table (e.g. REFRESH statement).
+      if (loadFileMd_) {
+        if (partitionsToUpdate_ != null) {
+          Preconditions.checkState(partitionsToLoadFiles.isEmpty());
+          // Only reload file metadata of partitions specified in 'partitionsToUpdate'
+          List<HdfsPartition> parts = getPartitionsForNames(partitionsToUpdate_);
+          partitionsToLoadFiles = parts.stream().map(HdfsPartition.Builder::new)
+              .collect(Collectors.toList());
+        }
+        loadTimeForFileMdNs_ += loadFileMetadataForPartitions(client_,
+            partitionsToLoadFiles,/* isRefresh=*/true);
+        updatePartitions(partitionsToLoadFiles);
+      }
     }
-    dropPartitions(removedPartitions);
-    // Load dirty partitions from Hive Metastore. File metadata of dirty partitions will
-    // always be reloaded (ignore the loadPartitionFileMetadata flag).
-    fileMdLoadTime += loadPartitionsFromMetastore(dirtyPartitions, client);
-    Preconditions.checkState(!hasInProgressModification());
 
-    // Identify and load partitions that were added in the Hive Metastore but don't
-    // exist in this table. File metadata of them will be loaded.
-    Set<String> newPartitionsInHms = Sets.difference(msPartitionNames, partitionNames);
-    fileMdLoadTime += loadPartitionsFromMetastore(newPartitionsInHms,
-        /*inprogressPartBuilders=*/null, client);
-    // If a list of modified partitions (old and new) is specified, don't reload file
-    // metadata for the new ones as they have already been detected in HMS and have been
-    // reloaded by loadPartitionsFromMetastore().
-    if (partitionsToUpdate != null) {
-      partitionsToUpdate.removeAll(newPartitionsInHms);
+    /**
+     * Returns the total time taken to load file-metadata in nanoseconds. Mostly used
+     * for legacy reasons to return to the coordinators the time taken load file-metadata.
+     */
+    public long getTotalFileMdLoadTime() {
+      return loadTimeForFileMdNs_;
     }
+  }
 
-    // Load file metadata. Until we have a notification mechanism for when a
-    // file changes in hdfs, it is sometimes required to reload all the file
-    // descriptors and block metadata of a table (e.g. REFRESH statement).
-    if (loadPartitionFileMetadata) {
+  /**
+   * Util class which computes the delta of partitions for this table when compared to
+   * HMS. This class fetches all the partition objects from metastore and then evaluates
+   * the delta with what is known to this HdfsTable. It also detects changed partitions
+   * unlike {@link PartNameBasedDeltaUpdater} which only determines change in list
+   * of partition names.
+   */
+  private class PartBasedDeltaUpdater extends PartitionDeltaUpdater {
+    private final Map<String, Partition> msPartitions_ = new HashMap<>();
+    private final FsPermissionCache permCache_ = new FsPermissionCache();
+
+    public PartBasedDeltaUpdater(
+        IMetaStoreClient client, boolean loadPartitionFileMetadata,
+        Set<String> partitionsToUpdate) throws Exception {
+      super(client, loadPartitionFileMetadata, partitionsToUpdate);
+      Stopwatch sw = Stopwatch.createStarted();
+      List<Partition> partitionList;
       if (partitionsToUpdate != null) {
-        Preconditions.checkState(partitionsToLoadFiles.isEmpty());
-        // Only reload file metadata of partitions specified in 'partitionsToUpdate'
-        List<HdfsPartition> parts = getPartitionsForNames(partitionsToUpdate);
-        partitionsToLoadFiles = parts.stream().map(HdfsPartition.Builder::new)
-            .collect(Collectors.toList());
+        partitionList = MetaStoreUtil
+            .fetchPartitionsByName(client, Lists.newArrayList(partitionsToUpdate),
+                db_.getName(), name_);
+      } else {
+        partitionList =
+            MetaStoreUtil.fetchAllPartitions(
+                client_, db_.getName(), name_, NUM_PARTITION_FETCH_RETRIES);
       }
-      fileMdLoadTime += loadFileMetadataForPartitions(client, partitionsToLoadFiles,
-          /* isRefresh=*/true);
-      updatePartitions(partitionsToLoadFiles);
+      LOG.debug("Time taken to fetch all partitions of table {}: {} msec", getFullName(),
+          sw.stop().elapsed(TimeUnit.MILLISECONDS));
+      List<String> partitionColNames = getClusteringColNames();
+      for (Partition part : partitionList) {
+        msPartitions_
+            .put(MetastoreShim.makePartName(partitionColNames, part.getValues()), part);
+      }
     }
-    return fileMdLoadTime;
+
+    @Override
+    public boolean isRemoved(HdfsPartition hdfsPartition) {
+      return !msPartitions_.containsKey(hdfsPartition.getPartitionName());
+    }
+
+    /**
+     * In addition to the dirty partitions (representing partitions which are updated
+     * via on-going table metadata changes in this Catalog), this also detects staleness
+     * by comparing the {@link StorageDescriptor} of the given HdfsPartition with what is
+     * present in the HiveMetastore. This is useful to perform "deep" refresh table so
+     * that outside changes to existing partitions (eg. location update) are detected.
+     */
+    @Override
+    public HdfsPartition.Builder getUpdatedPartition(HdfsPartition hdfsPartition)
+        throws Exception {
+      HdfsPartition.Builder updatedPartitionBuilder = pickInprogressPartitionBuilder(
+          hdfsPartition);
+      Partition msPartition = Preconditions
+          .checkNotNull(msPartitions_.get(hdfsPartition.getPartitionName()));
+      Preconditions.checkNotNull(msPartition.getSd());
+      // we compare the StorageDescriptor from HdfsPartition object to the one
+      // from HMS and if they don't match we assume that the partition has been updated
+      // in HMS. This would catch the cases where partition fields, locations or
+      // file-format are changed from external systems.
+      StorageDescriptor sd = hdfsPartition.getStorageDescriptor();
+      if(!msPartition.getSd().equals(sd)) {
+        // if the updatePartitionBuilder is null, it means that this partition update
+        // was not from an in-progress modification in this catalog, but rather from
+        // and outside update to the partition.
+        if (updatedPartitionBuilder == null) {
+          updatedPartitionBuilder = new HdfsPartition.Builder(hdfsPartition);
+        }
+        // msPartition is different than what we have in HdfsTable
+        updatedPartitionBuilder = createOrUpdatePartitionBuilder(msPartition.getSd(),
+            msPartition, permCache_, updatedPartitionBuilder);
+      }
+      return updatedPartitionBuilder;
+    }
+
+    @Override
+    public long loadNewPartitions(Set<String> knownPartitions, Set<String> addedPartNames)
+        throws Exception {
+      // get the names of the partitions which present in HMS but not in this table.
+      List<Partition> newMsPartitions = new ArrayList<>();
+      for (String partNameInMs : msPartitions_.keySet()) {
+        if (!knownPartitions.contains(partNameInMs)) {
+          newMsPartitions.add(msPartitions_.get(partNameInMs));
+          addedPartNames.add(partNameInMs);
+        }
+      }
+      return loadPartitionsFromMetastore(newMsPartitions,
+          /*inprogressPartBuilders=*/null, client_);
+    }
+
+    @Override
+    public long loadUpdatedPartitions(
+        Map<String, HdfsPartition.Builder> updatedPartBuilders) throws Exception {
+      List<Partition> updatedPartitions = new ArrayList<>();
+      for (String partName : updatedPartBuilders.keySet()) {
+        updatedPartitions.add(Preconditions
+            .checkNotNull(msPartitions_.get(partName)));
+      }
+      return loadPartitionsFromMetastore(updatedPartitions, updatedPartBuilders, client_);
+    }
+  }
+
+
+  /**
+   * This DeltaChecker uses partition names to determine the delta between metastore
+   * and catalog. As such this is faster than {@link PartBasedDeltaUpdater} but it cannot
+   * detect partition updates other than partition names (e.g. outside partition location
+   * updates will not be detected).
+   */
+  private class PartNameBasedDeltaUpdater extends PartitionDeltaUpdater {
+    private final Set<String> partitionNamesFromHms_;
+
+    public PartNameBasedDeltaUpdater(
+        IMetaStoreClient client, boolean loadPartitionFileMetadata,
+        Set<String> partitionsToUpdate) throws Exception {
+      super(client, loadPartitionFileMetadata, partitionsToUpdate);
+      // Retrieve all the partition names from the Hive Metastore. We need this to
+      // identify the delta between partitions of the local HdfsTable and the table entry
+      // in the Hive Metastore. Note: This is a relatively "cheap" operation
+      // (~.3 secs for 30K partitions).
+      partitionNamesFromHms_ = new HashSet<>(client_
+          .listPartitionNames(db_.getName(), name_, (short) -1));
+    }
+
+    @Override
+    public boolean isRemoved(HdfsPartition hdfsPartition) {
+      return !partitionNamesFromHms_.contains(hdfsPartition.getPartitionName());
+    }
+
+    @Override
+    public HdfsPartition.Builder getUpdatedPartition(HdfsPartition hdfsPartition) {
+      return pickInprogressPartitionBuilder(hdfsPartition);
+    }
+
+    @Override
+    public long loadNewPartitions(Set<String> knownPartitionNames,
+        Set<String> addedPartNames) throws Exception {
+      // Identify and load partitions that were added in the Hive Metastore but don't
+      // exist in this table. File metadata of them will be loaded.
+      addedPartNames.addAll(Sets
+          .difference(partitionNamesFromHms_, knownPartitionNames));
+      return loadPartitionsFromMetastore(addedPartNames,
+          /*inprogressPartBuilders=*/null, client_);
+    }
+
+    @Override
+    public long loadUpdatedPartitions(
+        Map<String, HdfsPartition.Builder> updatedPartitionBuilders) throws Exception {
+      return loadPartitionsFromMetastore(updatedPartitionBuilders.keySet(),
+          updatedPartitionBuilders, client_);
+    }
+  }
+
+  /**
+   * Gets the names of partition columns.
+   */
+  public List<String> getClusteringColNames() {
+    List<String> colNames = new ArrayList<>(getNumClusteringCols());
+    for (Column column : getClusteringColumns()) {
+      colNames.add(column.name_);
+    }
+    return colNames;
   }
 
   /**
@@ -1443,26 +1685,6 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
-   * Loads partitions from the Hive Metastore and adds them to the internal list of
-   * table partitions.
-   * @return time in nanoseconds spent in loading file metadata.
-   */
-  private long loadPartitionsFromMetastore(List<HdfsPartition.Builder> partitions,
-      IMetaStoreClient client) throws Exception {
-    Preconditions.checkNotNull(partitions);
-    if (partitions.isEmpty()) return 0;
-    if (LOG.isTraceEnabled()) {
-      LOG.trace(String.format("Incrementally updating %d/%d partitions.",
-          partitions.size(), partitionMap_.size()));
-    }
-    Map<String, HdfsPartition.Builder> partBuilders = Maps.newHashMap();
-    for (HdfsPartition.Builder part: partitions) {
-      partBuilders.put(part.getPartitionName(), part);
-    }
-    return loadPartitionsFromMetastore(partBuilders.keySet(), partBuilders, client);
-  }
-
-  /**
    * Loads from the Hive Metastore and file system the partitions that correspond to
    * the specified 'partitionNames' and adds/updates them to the internal list of table
    * partitions.
@@ -1480,7 +1702,12 @@ public class HdfsTable extends Table implements FeFsTable {
     List<Partition> msPartitions = new ArrayList<>(
         MetaStoreUtil.fetchPartitionsByName(
             client, Lists.newArrayList(partitionNames), db_.getName(), name_));
+    return loadPartitionsFromMetastore(msPartitions, inprogressPartBuilders, client);
+  }
 
+  private long loadPartitionsFromMetastore(List<Partition> msPartitions,
+      Map<String, HdfsPartition.Builder> inprogressPartBuilders, IMetaStoreClient client)
+      throws Exception {
     FsPermissionCache permCache = preloadPermissionsCache(msPartitions);
     List<HdfsPartition.Builder> partBuilders = new ArrayList<>(msPartitions.size());
     for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {

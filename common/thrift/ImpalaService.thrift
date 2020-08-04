@@ -551,6 +551,12 @@ enum TImpalaQueryOptions {
   // Sets an upper limit on the number of fs writer instances to be scheduled during
   // insert. Currently this limit only applies to HDFS inserts.
   MAX_FS_WRITERS = 107
+  // When this query option is set, a refresh table statement will detect existing
+  // partitions which have been changed in metastore and refresh them. By default, this
+  // option is disabled since there is additional performance hit to fetch all the
+  // partitions and detect if they are not same as ones in the catalogd. Currently, this
+  // option is only applicable for refresh table statement.
+  REFRESH_UPDATED_HMS_PARTITIONS = 108
 }
 
 // The summary of a DML statement.
