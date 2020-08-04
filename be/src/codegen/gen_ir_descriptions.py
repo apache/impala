@@ -238,7 +238,17 @@ ir_functions = [
   ["KRPC_DSS_GET_PART_EXPR_EVAL",
   "_ZN6impala20KrpcDataStreamSender25GetPartitionExprEvaluatorEi"],
   ["KRPC_DSS_HASH_AND_ADD_ROWS",
-  "_ZN6impala20KrpcDataStreamSender14HashAndAddRowsEPNS_8RowBatchE"]
+  "_ZN6impala20KrpcDataStreamSender14HashAndAddRowsEPNS_8RowBatchE"],
+  ["GET_FUNCTION_CTX",
+  "_ZN6impala11HiveUdfCall18GetFunctionContextEPNS_19ScalarExprEvaluatorEi"],
+  ["GET_JNI_CONTEXT",
+  "_ZN6impala11HiveUdfCall13GetJniContextEPN10impala_udf15FunctionContextE"],
+  ["JNI_CTX_SET_INPUT_NULL_BUFF_ELEM",
+   "_ZN6impala11HiveUdfCall10JniContext26SetInputNullsBufferElementEPS1_ih"],
+  ["JNI_CTX_INPUT_VAL_BUFF_AT_OFFSET",
+   "_ZN6impala11HiveUdfCall10JniContext28GetInputValuesBufferAtOffsetEPS1_i"],
+  ["HIVE_UDF_CALL_CALL_JAVA",
+   "_ZN6impala11HiveUdfCall22CallJavaAndStoreResultEPKNS_10ColumnTypeEPN10impala_udf15FunctionContextEPNS0_10JniContextE"],
 ]
 
 enums_preamble = '\

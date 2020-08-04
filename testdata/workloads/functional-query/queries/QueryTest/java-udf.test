@@ -317,3 +317,26 @@ string
 ---- RESULTS
 'Hello'
 ====
+---- QUERY
+# In the interpreted code path of HiveUdfCall, we use ScalarExprEvaluator::GetValue which
+# evaluates the child expression and returns a nullptr if it is NULL. But in the case of
+# TYPE_DATE it also returns nullptr if the date is invalid, so the interpreted path would
+# handle invalid dates as nulls. Java UDFs involving Date are not allowed yet, this test
+# is a reminder that we'll have to handle this case in codegen when we add support for Date.
+create function identity(Date) returns Date
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestUdf';
+---- CATCH
+AnalysisException: Type DATE is not supported for Java UDFs.
+====
+---- QUERY
+# Timestamp values are not supported in Java UDFs yet and the implementation may have been
+# written without Timestamps in mind. This test is a reminder that we'll need to review
+# and test the implementation of HiveUdfCall (especially codegen) with Timestamp values
+# when we add support for them.
+create function identity(Timestamp) returns Timestamp
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
+symbol='org.apache.impala.TestUdf';
+---- CATCH
+AnalysisException: Type TIMESTAMP is not supported for Java UDFs.
+====

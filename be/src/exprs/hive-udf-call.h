@@ -41,6 +41,7 @@ using impala_udf::StringVal;
 using impala_udf::DecimalVal;
 using impala_udf::DateVal;
 
+class LlvmBuilder;
 class RuntimeState;
 class ScalarExprEvaluator;
 class TExprNode;
@@ -105,6 +106,14 @@ class HiveUdfCall : public ScalarExpr {
   /// error.
   AnyVal* Evaluate(ScalarExprEvaluator* eval, const TupleRow* row) const;
 
+  /// Codegens the code that evaluates and stores the children of this expression.
+  /// 'first_block' is the block codegenning the first child should start. 'next_block' is
+  /// an output parameter that will be set to the block where the function should
+  /// continue.
+  Status CodegenEvalChildren(LlvmCodeGen* codegen, LlvmBuilder* builder,
+      llvm::Function* function, llvm::Value* (*args)[2], llvm::Value* jni_ctx,
+      llvm::BasicBlock* const first_block, llvm::BasicBlock** next_block);
+
   /// input_byte_offsets_[i] is the byte offset child ith's input argument should
   /// be written to.
   std::vector<int> input_byte_offsets_;
@@ -118,6 +127,39 @@ class HiveUdfCall : public ScalarExpr {
   static jmethodID executor_ctor_id_;
   static jmethodID executor_evaluate_id_;
   static jmethodID executor_close_id_;
+
+  struct JniContext {
+    JNIEnv* jni_env = nullptr;
+    jobject executor = nullptr;
+
+    uint8_t* input_values_buffer = nullptr;
+    uint8_t* input_nulls_buffer = nullptr;
+    uint8_t* output_value_buffer = nullptr;
+    uint8_t output_null_value;
+    bool warning_logged = false;
+
+    /// Used for logging errors.
+    const char* hdfs_location = nullptr;
+    const char* scalar_fn_symbol = nullptr;
+
+    /// AnyVal to evaluate the expression into. Only used as temporary storage during
+    /// expression evaluation.
+    AnyVal* output_anyval = nullptr;
+
+    /// These functions are cross-compiled to IR and used by codegen.
+   static void SetInputNullsBufferElement(
+       JniContext* jni_ctx, int index, uint8_t value);
+   static uint8_t* GetInputValuesBufferAtOffset(JniContext* jni_ctx, int offset);
+  };
+
+  /// Static helper functions for codegen.
+  static jclass* GetExecutorClass();
+  static jmethodID* GetExecutorEvaluateId();
+  static FunctionContext* GetFunctionContext(ScalarExprEvaluator* eval, int fn_ctx_idx);
+  static JniContext* GetJniContext(FunctionContext* fn_ctx);
+  static JNIEnv* GetJniEnv(JniContext* jni_ctx);
+  static AnyVal* CallJavaAndStoreResult(const  ColumnType* type, FunctionContext* fn_ctx,
+      JniContext* jni_ctx);
 };
 
 }

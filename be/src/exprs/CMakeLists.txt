@@ -43,6 +43,7 @@ add_library(Exprs
   decimal-operators-ir.cc
   expr.cc
   hive-udf-call.cc
+  hive-udf-call-ir.cc
   in-predicate-ir.cc
   is-not-empty-predicate.cc
   is-null-predicate-ir.cc
