@@ -30,16 +30,16 @@ using impala_udf::StringVal;
 class DataSketchesFunctions {
 public:
   /// 'serialized_sketch' is expected as a serialized Apache DataSketches HLL sketch. If
-  /// it is not then the query fails. Otherwise, returns the count(distinct) estimate
+  /// it is not, then the query fails. Otherwise, returns the count(distinct) estimate
   /// from the sketch.
   static BigIntVal DsHllEstimate(FunctionContext* ctx,
       const StringVal& serialized_sketch);
 
   /// 'serialized_sketch' is expected as a serialized Apache DataSketches KLL sketch. If
-  /// it is not then the query fails. 'rank' is used to identify which item (estimate) to
-  /// return from the sketched dataset. E.g. 0.1 means the item where 10% of the sketched
-  /// dataset is lower or equals to this particular item. 'rank' should be in the range
-  /// of [0,1]. Otherwise this function returns error.
+  /// it is not, then the query fails. 'rank' is used to identify which item (estimate)
+  /// to return from the sketched dataset. E.g. 0.1 means the item where 10% of the
+  /// sketched dataset is lower or equals to this particular item. 'rank' should be in
+  /// the range of [0,1]. Otherwise this function returns error.
   static FloatVal DsKllQuantile(FunctionContext* ctx, const StringVal& serialized_sketch,
       const DoubleVal& rank);
 
@@ -47,6 +47,13 @@ public:
   /// it is not, then the query fails.
   /// Returns the number of input values fed to 'serialized_sketch'.
   static BigIntVal DsKllN(FunctionContext* ctx, const StringVal& serialized_sketch);
+
+  /// 'serialized_sketch' is expected as a serialized Apache DataSketches KLL sketch. If
+  /// it is not, then the query fails. This function returns a value in the range of [0,1]
+  /// where e.g. 0.2 means that 'probe_value' is greater than the 20% of the values in
+  /// 'serialized_sketch'. Note, this is an approximate calculation.
+  static DoubleVal DsKllRank(FunctionContext* ctx, const StringVal& serialized_sketch,
+      const FloatVal& probe_value);
 };
 
 }

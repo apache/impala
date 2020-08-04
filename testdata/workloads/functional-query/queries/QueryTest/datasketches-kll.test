@@ -181,3 +181,54 @@ select ds_kll_n(f) from kll_sketches_from_hive;
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+select
+    ds_kll_rank(ds_kll_sketch(int_col), 0),
+    ds_kll_rank(ds_kll_sketch(int_col), 1.5),
+    ds_kll_rank(ds_kll_sketch(int_col), 5),
+    ds_kll_rank(ds_kll_sketch(int_col), 7.5),
+    ds_kll_rank(ds_kll_sketch(int_col), 10)
+from functional_parquet.alltypessmall;
+---- RESULTS
+0,0.24,0.6,0.84,1
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE
+====
+---- QUERY
+# Check that ds_kll_rank() returns null for an empty sketch.
+select ds_kll_rank(ds_kll_sketch(cast(f2 as float)), 10.0) from functional_parquet.emptytable;
+---- RESULTS
+NULL
+---- TYPES
+DOUBLE
+====
+---- QUERY
+# Check that ds_kll_rank() returns null for a null input.
+select ds_kll_rank(c, 10.0) from functional_parquet.nulltable;
+---- RESULTS
+NULL
+---- TYPES
+DOUBLE
+====
+---- QUERY
+# Check that ds_kll_rank() returns error for strings that are not serialized sketches.
+select ds_kll_rank(date_string_col, 10.0) from functional_parquet.alltypestiny;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch
+====
+---- QUERY
+# Check that ds_kll_rank() works on sketches created by Hive.
+select
+    ds_kll_rank(f, 0.0),
+    ds_kll_rank(f, 10.0),
+    ds_kll_rank(f, 20.5),
+    ds_kll_rank(f, 50.6),
+    ds_kll_rank(f, 100.2001),
+    ds_kll_rank(f, 123.33),
+    ds_kll_rank(f, 200.46)
+from kll_sketches_from_hive;
+---- RESULTS
+0,0.1666666666666667,0.3333333333333333,0.5,0.6666666666666666,0.8333333333333334,1
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE
+====

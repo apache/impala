@@ -70,5 +70,16 @@ BigIntVal DataSketchesFunctions::DsKllN(FunctionContext* ctx,
   return sketch.get_n();
 }
 
+DoubleVal DataSketchesFunctions::DsKllRank(FunctionContext* ctx,
+    const StringVal& serialized_sketch, const FloatVal& probe_value) {
+  if (serialized_sketch.is_null || serialized_sketch.len == 0) return DoubleVal::null();
+  datasketches::kll_sketch<float> sketch;
+  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
+    LogSketchDeserializationError(ctx);
+    return DoubleVal::null();
+  }
+  return sketch.get_rank(probe_value.val);
+}
+
 }
 
