@@ -1,5 +1,6 @@
 ====
 ---- QUERY: TPCDS-Q10A
+# Official variant for lack of multiple subqueries in OR predicate.
 select
   cd_gender,
   cd_marital_status,
