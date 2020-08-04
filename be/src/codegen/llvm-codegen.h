@@ -531,7 +531,10 @@ class LlvmCodeGen {
   llvm::Constant* GetIntConstant(int byte_size, uint64_t low_bits, uint64_t high_bits);
 
   /// Initialise a constant global string and returns an i8* pointer to it.
-  llvm::Value* GetStringConstant(LlvmBuilder* builder, char* data, int len);
+  llvm::Value* GetStringConstant(LlvmBuilder* builder, const char* data, int len);
+  llvm::Value* GetStringConstant(LlvmBuilder* builder, const std::string& str) {
+    return GetStringConstant(builder, str.c_str(), str.size());
+  }
 
   /// Returns true/false constants (bool type)
   llvm::Constant* true_value() { return true_value_; }

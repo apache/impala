@@ -22,6 +22,8 @@
 #include <llvm/IR/IRBuilder.h>
 
 #include "codegen/llvm-codegen.h"
+#include "runtime/string-value.h"
+#include "runtime/timestamp-value.h"
 
 namespace impala {
 
@@ -57,6 +59,32 @@ class CodeGenUtil {
     llvm::raw_string_ostream stream(str);
     value_or_type->print(stream);
     return str;
+  }
+
+  /// Return the byte size of the given PrimitiveType.
+  static int64_t GetTypeSize(const PrimitiveType type) {
+    switch (type) {
+      case TYPE_BOOLEAN:
+      case TYPE_TINYINT:
+        return 1;
+      case TYPE_SMALLINT:
+        return 2;
+      case TYPE_INT:
+      case TYPE_FLOAT:
+      case TYPE_DATE:
+        return 4;
+      case TYPE_BIGINT:
+      case TYPE_DOUBLE:
+        return 8;
+      case TYPE_TIMESTAMP:
+        return sizeof(TimestampValue);
+      case TYPE_STRING:
+      case TYPE_VARCHAR:
+        return sizeof(StringValue);
+      default:
+        DCHECK(false) << "NYI";
+        return 0;
+    }
   }
 
 };

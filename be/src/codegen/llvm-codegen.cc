@@ -618,7 +618,8 @@ llvm::Constant* LlvmCodeGen::GetIntConstant(
   return llvm::ConstantInt::get(context(), llvm::APInt(8 * num_bytes, vals));
 }
 
-llvm::Value* LlvmCodeGen::GetStringConstant(LlvmBuilder* builder, char* data, int len) {
+llvm::Value* LlvmCodeGen::GetStringConstant(
+    LlvmBuilder* builder, const char* data, int len) {
   // Create a global string with private linkage.
   llvm::Constant* const_string =
       llvm::ConstantDataArray::getString(context(), llvm::StringRef(data, len), false);
