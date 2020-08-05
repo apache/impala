@@ -44,7 +44,6 @@ DECLARE_string(ssl_minimum_version);
 
 DECLARE_int32(state_store_port);
 
-DECLARE_int32(be_port);
 DECLARE_int32(beeswax_port);
 
 static string IMPALA_HOME(getenv("IMPALA_HOME"));
@@ -508,31 +507,6 @@ TEST(ConcurrencyTest, MaxConcurrentConnections) {
   // If we did not reach the maximum number of concurrent connections, the test was not
   // effective.
   EXPECT_TRUE(did_reach_max);
-}
-
-/// Test disabled because requires a high ulimit -n on build machines. Since the test does
-/// not always fail, we don't lose much coverage by disabling it until we fix the build
-/// infra issue.
-TEST(ConcurrencyTest, DISABLED_ManyConcurrentConnections) {
-  // Test that a large number of concurrent connections will all succeed and not time out
-  // waiting to be accepted. (IMPALA-4135)
-  // Note that without the fix for IMPALA-4135, this test won't always fail, depending on
-  // the hardware that it is run on.
-  int port = GetServerPort();
-  ThriftServer* server;
-  EXPECT_OK(ThriftServerBuilder("DummyServer", MakeProcessor(), port).Build(&server));
-  ASSERT_OK(server->Start());
-
-  ThreadPool<int64_t> pool(
-      "group", "test", 256, 10000, [port](int tid, const int64_t& item) {
-        using Client = ThriftClient<ImpalaInternalServiceClient>;
-        Client* client = new Client("127.0.0.1", port, "", nullptr, false);
-        Status status = client->Open();
-        ASSERT_OK(status);
-      });
-  ASSERT_OK(pool.Init());
-  for (int i = 0; i < 1024 * 16; ++i) pool.Offer(i);
-  pool.DrainAndShutdown();
 }
 
 TEST(NoPasswordPemFile, BadServerCertificate) {

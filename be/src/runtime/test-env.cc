@@ -146,8 +146,8 @@ Status TestEnv::CreateQueryState(
   query_ctx.query_id.hi = 0;
   query_ctx.query_id.lo = query_id;
   query_ctx.request_pool = "test-pool";
-  query_ctx.coord_address = exec_env_->configured_backend_address_;
-  query_ctx.coord_krpc_address = exec_env_->krpc_address_;
+  query_ctx.coord_hostname = exec_env_->configured_backend_address_.hostname;
+  query_ctx.coord_ip_address = exec_env_->krpc_address_;
   query_ctx.coord_backend_id.hi = 0;
   query_ctx.coord_backend_id.lo = 0;
   TQueryOptions* query_options_to_use = &query_ctx.client_request.query_options;

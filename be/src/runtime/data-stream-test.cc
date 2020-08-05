@@ -38,7 +38,6 @@
 #include "runtime/krpc-data-stream-sender.h"
 #include "runtime/descriptors.h"
 #include "runtime/client-cache.h"
-#include "runtime/backend-client.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
 #include "service/data-stream-service.h"

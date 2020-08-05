@@ -30,7 +30,6 @@
 #include "exec/kudu-util.h"
 #include "kudu/rpc/service_if.h"
 #include "rpc/rpc-mgr.h"
-#include "runtime/backend-client.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/client-cache.h"
@@ -228,23 +227,20 @@ struct ExecEnv::KuduClientPtr {
 ExecEnv* ExecEnv::exec_env_ = nullptr;
 
 ExecEnv::ExecEnv()
-  : ExecEnv(FLAGS_be_port, FLAGS_krpc_port,
-        FLAGS_state_store_subscriber_port, FLAGS_webserver_port,
+  : ExecEnv(FLAGS_krpc_port, FLAGS_state_store_subscriber_port, FLAGS_webserver_port,
         FLAGS_state_store_host, FLAGS_state_store_port) {}
 
-ExecEnv::ExecEnv(int backend_port, int krpc_port,
-    int subscriber_port, int webserver_port, const string& statestore_host,
-    int statestore_port)
+ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
+    const string& statestore_host, int statestore_port)
   : obj_pool_(new ObjectPool),
     metrics_(new MetricGroup("impala-metrics")),
     // Create the CatalogServiceClientCache with num_retries = 1 and wait_ms = 0.
     // Connections are still retried, but the retry mechanism is driven by
     // DoRpcWithRetry. Clients should always use DoRpcWithRetry rather than DoRpc to
     // ensure that both RPCs and connections are retried.
-    catalogd_client_cache_(
-        new CatalogServiceClientCache(1, 0,
-            FLAGS_catalog_client_rpc_timeout_ms, FLAGS_catalog_client_rpc_timeout_ms, "",
-            !FLAGS_ssl_client_ca_certificate.empty())),
+    catalogd_client_cache_(new CatalogServiceClientCache(1, 0,
+        FLAGS_catalog_client_rpc_timeout_ms, FLAGS_catalog_client_rpc_timeout_ms, "",
+        !FLAGS_ssl_client_ca_certificate.empty())),
     htable_factory_(new HBaseTableFactory()),
     disk_io_mgr_(new io::DiskIoMgr()),
     webserver_(new Webserver(FLAGS_webserver_interface, webserver_port, metrics_.get())),
@@ -256,7 +252,7 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
     query_exec_mgr_(new QueryExecMgr()),
     rpc_metrics_(metrics_->GetOrCreateChildGroup("rpc")),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
-    configured_backend_address_(MakeNetworkAddress(FLAGS_hostname, backend_port)) {
+    configured_backend_address_(MakeNetworkAddress(FLAGS_hostname, krpc_port)) {
   UUIDToUniqueIdPB(boost::uuids::random_generator()(), &backend_id_);
 
   // Resolve hostname to IP address.
@@ -275,9 +271,10 @@ ExecEnv::ExecEnv(int backend_port, int krpc_port,
   TNetworkAddress statestore_address =
       MakeNetworkAddress(statestore_host, statestore_port);
 
-  statestore_subscriber_.reset(new StatestoreSubscriber(
-      Substitute("impalad@$0", TNetworkAddressToString(configured_backend_address_)),
-      subscriber_address, statestore_address, metrics_.get()));
+  // Set StatestoreSubscriber::subscriber_id as hostname + be_port.
+  statestore_subscriber_.reset(
+      new StatestoreSubscriber(Substitute("impalad@$0:$1", FLAGS_hostname, FLAGS_be_port),
+          subscriber_address, statestore_address, metrics_.get()));
 
   if (FLAGS_is_coordinator) {
     hdfs_op_thread_pool_.reset(
@@ -648,11 +645,6 @@ void ExecEnv::InitSystemStateInfo() {
   PeriodicCounterUpdater::RegisterUpdateFunction([s = system_state_info_.get()]() {
     s->CaptureSystemStateSnapshot();
   });
-}
-
-TNetworkAddress ExecEnv::GetThriftBackendAddress() const {
-  DCHECK(impala_server_ != nullptr);
-  return impala_server_->GetThriftBackendAddress();
 }
 
 Status ExecEnv::GetKuduClient(

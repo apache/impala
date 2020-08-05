@@ -32,7 +32,6 @@
 #include "exec/kudu-util.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "rpc/rpc-mgr.inline.h"
-#include "runtime/backend-client.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
@@ -158,7 +157,7 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
   summary_profile_->AddInfoStringRedacted(
       "Sql Statement", query_ctx_.client_request.stmt);
   summary_profile_->AddInfoString("Coordinator",
-      TNetworkAddressToString(ExecEnv::GetInstance()->GetThriftBackendAddress()));
+      TNetworkAddressToString(ExecEnv::GetInstance()->configured_backend_address()));
 
   summary_profile_->AddChild(frontend_profile_);
 

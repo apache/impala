@@ -5430,9 +5430,9 @@ TEST_P(ExprTest, UtilityFunctions) {
   TestIsNull("fnv_hash(NULL)", TYPE_BIGINT);
 }
 
-// Test that UtilityFunctions::Coordinator() will return null if coord_address is unset
+// Test that UtilityFunctions::Coordinator() will return null if coord_hostname is unset
 TEST_P(ExprTest, CoordinatorFunction) {
-  // Make a RuntimeState where the query context does not have coord_address set.
+  // Make a RuntimeState where the query context does not have coord_hostname set.
   // Note that this should never happen in a real impalad.
   RuntimeState state(TQueryCtx(), ExecEnv::GetInstance());
   MemTracker tracker;

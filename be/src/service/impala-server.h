@@ -31,7 +31,6 @@
 #include "common/status.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/ImpalaHiveServer2Service.h"
-#include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/control_service.pb.h"
 #include "kudu/util/random.h"
@@ -209,9 +208,8 @@ class ImpalaServer : public ImpalaServiceIf,
   /// the port the server run on. A port value of 0 means to choose an arbitrary
   /// ephemeral port in tests and to not start the service in a daemon. A port < 0
   /// always means to not start the service. The port values can be obtained after
-  /// Start() by calling GetThriftBackendPort(), GetBeeswaxPort() or GetHS2Port().
-  Status Start(int32_t thrift_be_port, int32_t beeswax_port, int32_t hs2_port,
-      int32_t hs2_http_port);
+  /// Start() by calling GetBeeswaxPort() or GetHS2Port().
+  Status Start(int32_t beeswax_port, int32_t hs2_port, int32_t hs2_http_port);
 
   /// Blocks until the server shuts down.
   void Join();
@@ -361,7 +359,7 @@ class ImpalaServer : public ImpalaServiceIf,
   void PrepareQueryContext(TQueryCtx* query_ctx);
 
   /// Static helper for PrepareQueryContext() that is used from expr-benchmark.
-  static void PrepareQueryContext(const TNetworkAddress& backend_addr,
+  static void PrepareQueryContext(const std::string& hostname,
       const TNetworkAddress& krpc_addr, TQueryCtx* query_ctx);
 
   /// SessionHandlerIf methods
@@ -441,14 +439,6 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Returns whether this backend is healthy, i.e. able to accept queries.
   bool IsHealthy();
-
-  /// Returns the port that the thrift backend server is listening on. Valid to call after
-  /// the server has started successfully.
-  int GetThriftBackendPort();
-
-  /// Returns the network address that the thrift backend server is listening on. Valid
-  /// to call after the server has started successfully.
-  TNetworkAddress GetThriftBackendAddress();
 
   /// Returns the port that the Beeswax server is listening on. Valid to call after
   /// the server has started successfully.
@@ -1579,7 +1569,6 @@ class ImpalaServer : public ImpalaServiceIf,
   boost::scoped_ptr<ThriftServer> beeswax_server_;
   boost::scoped_ptr<ThriftServer> hs2_server_;
   boost::scoped_ptr<ThriftServer> hs2_http_server_;
-  boost::scoped_ptr<ThriftServer> thrift_be_server_;
 
   /// Flag that records if backend and/or client services have been started. The flag is
   /// set after all services required for the server have been started.

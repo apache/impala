@@ -29,13 +29,13 @@
 #include "kudu/util/monotime.h"
 #include "kudu/util/status.h"
 #include "rpc/rpc-mgr.h"
-#include "runtime/backend-client.h"
+#include "rpc/thrift-util.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/bufferpool/reservation-util.h"
 #include "runtime/exec-env.h"
-#include "runtime/fragment-state.h"
 #include "runtime/fragment-instance-state.h"
+#include "runtime/fragment-state.h"
 #include "runtime/initial-reservations.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
@@ -268,8 +268,8 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
   RETURN_IF_ERROR(InitBufferPoolState());
 
   // Initialize the RPC proxy once and report any error.
-  RETURN_IF_ERROR(ControlService::GetProxy(query_ctx().coord_krpc_address,
-      query_ctx().coord_address.hostname, &proxy_));
+  RETURN_IF_ERROR(ControlService::GetProxy(
+      query_ctx().coord_ip_address, query_ctx().coord_hostname, &proxy_));
 
   // don't copy query_ctx, it's large and we already did that in the c'tor
   exec_rpc_params_.set_coord_state_idx(exec_rpc_params->coord_state_idx());

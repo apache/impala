@@ -277,12 +277,11 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     assert ("This may be because the port specified is wrong.") not in str(ex)
 
     # Test that pointing to the wrong thrift service (the HS2 port) fails gracefully-ish.
-    thrift_ports = [21051, 22001]  # HS2 port, old backend port.
-    for port in thrift_ports:
-      ex = self.execute_query_expect_failure(self.client,
-          ":shutdown('localhost:{0}')".format(port))
-      assert ("failed with error 'RemoteShutdown() RPC failed") in str(ex)
-      assert ("This may be because the port specified is wrong.") in str(ex)
+    thrift_port = 21051  # HS2 port.
+    ex = self.execute_query_expect_failure(self.client,
+        ":shutdown('localhost:{0}')".format(thrift_port))
+    assert ("failed with error 'RemoteShutdown() RPC failed") in str(ex)
+    assert ("This may be because the port specified is wrong.") in str(ex)
 
     # Test RPC error handling with debug action.
     ex = self.execute_query_expect_failure(self.client, ":shutdown('localhost:27001')",

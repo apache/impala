@@ -56,6 +56,9 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
   /// Start up the thread pool.
   Status Init(int num_threads);
 
+  /// Wait until all working threads complete execution.
+  void Join();
+
   /// Shut down the queue and the thread pool.
   void Shutdown();
 
@@ -112,6 +115,13 @@ class ImpalaServicePool : public kudu::rpc::RpcService {
   /// Consider removing lock.
   std::mutex shutdown_lock_;
   bool closing_ = false;
+
+  /// Protects is_closed_.
+  std::mutex close_lock_;
+
+  /// Set as true when all working threads complete execution.
+  /// Protected by 'close_lock_'.
+  bool is_joined_ = false;
 
   /// The address this service is running on.
   const std::string hostname_;

@@ -141,7 +141,8 @@ void ControlService::ExecQueryFInstances(const ExecQueryFInstancesRequestPB* req
   ScopedThreadContext scoped_tdi(GetThreadDebugInfo(), query_ctx.query_id);
   VLOG_QUERY << "ExecQueryFInstances():"
              << " query_id=" << PrintId(query_ctx.query_id)
-             << " coord=" << TNetworkAddressToString(query_ctx.coord_address)
+             << " coord=" << query_ctx.coord_hostname << ":"
+             << query_ctx.coord_ip_address.port
              << " #instances=" << fragment_info.fragment_instance_ctxs.size();
   Status resp_status = ExecEnv::GetInstance()->query_exec_mgr()->StartQuery(
       request, query_ctx, fragment_info);

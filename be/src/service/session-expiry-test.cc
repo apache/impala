@@ -37,7 +37,6 @@ using namespace impala;
 
 DECLARE_bool(abort_on_config_error);
 DECLARE_int32(idle_session_timeout);
-DECLARE_int32(be_port);
 DECLARE_int32(beeswax_port);
 
 // TODO: When sleep(..) queries can be cancelled, write a test that confirms long-running

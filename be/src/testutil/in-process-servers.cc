@@ -37,7 +37,6 @@
 
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
-DECLARE_int32(be_port);
 DECLARE_int32(krpc_port);
 
 using namespace apache::thrift;
@@ -45,31 +44,27 @@ using namespace impala;
 
 Status InProcessImpalaServer::StartWithEphemeralPorts(const string& statestore_host,
     int statestore_port, InProcessImpalaServer** server) {
-  // These flags are read directly in several places to find the address of the local
-  // backend interface.
-  FLAGS_be_port = 0;
-  // Thrift server ctor allows port to be set to 0. Not supported with KRPC.
-  // So KRPC port must be explicitly set here.
+  // This flag is read directly in several places to find the address of the backend
+  // interface, so we must set it here.
   FLAGS_krpc_port = FindUnusedEphemeralPort();
 
-  // Use wildcard addresses of 0 so that the Thrift servers will pick their own port.
-  *server = new InProcessImpalaServer(FLAGS_hostname, 0, FLAGS_krpc_port, 0, 0,
-      statestore_host, statestore_port);
+  *server = new InProcessImpalaServer(
+      FLAGS_hostname, FLAGS_krpc_port, 0, 0, statestore_host, statestore_port);
   // Start the daemon and check if it works, if not delete the current server object and
   // pick a new set of ports
   return (*server)->StartWithClientServers(0, 0, 0);
 }
 
-InProcessImpalaServer::InProcessImpalaServer(const string& hostname, int backend_port,
-    int krpc_port, int subscriber_port, int webserver_port, const string& statestore_host,
+InProcessImpalaServer::InProcessImpalaServer(const string& hostname, int krpc_port,
+    int subscriber_port, int webserver_port, const string& statestore_host,
     int statestore_port)
-  : backend_port_(backend_port),
+  : krpc_port_(krpc_port),
     beeswax_port_(0),
     hs2_port_(0),
     hs2_http_port_(0),
     impala_server_(NULL),
-    exec_env_(new ExecEnv(backend_port, krpc_port, subscriber_port, webserver_port,
-        statestore_host, statestore_port)) {}
+    exec_env_(new ExecEnv(
+        krpc_port, subscriber_port, webserver_port, statestore_host, statestore_port)) {}
 
 void InProcessImpalaServer::SetCatalogIsReady() {
   DCHECK(impala_server_ != NULL) << "Call Start*() first.";
@@ -85,15 +80,10 @@ Status InProcessImpalaServer::StartWithClientServers(
 
   impala_server_.reset(new ImpalaServer(exec_env_.get()));
   SetCatalogIsReady();
-  RETURN_IF_ERROR(
-      impala_server_->Start(backend_port_, beeswax_port, hs2_port, hs2_http_port_));
-
-  // This flag is read directly in several places to find the address of the local
-  // backend interface.
-  FLAGS_be_port = impala_server_->GetThriftBackendPort();
+  RETURN_IF_ERROR(impala_server_->Start(beeswax_port, hs2_port, hs2_http_port));
 
   // Wait for up to 1s for the backend server to start
-  RETURN_IF_ERROR(WaitForServer(FLAGS_hostname, FLAGS_be_port, 10, 100));
+  RETURN_IF_ERROR(WaitForServer(FLAGS_hostname, krpc_port_, 10, 100));
   return Status::OK();
 }
 

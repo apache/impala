@@ -35,7 +35,6 @@
 #include "exec/scan-node.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "kudu/rpc/rpc_context.h"
-#include "runtime/backend-client.h"
 #include "runtime/client-cache.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-state.h"

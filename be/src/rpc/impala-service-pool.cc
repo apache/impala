@@ -96,16 +96,24 @@ Status ImpalaServicePool::Init(int num_threads) {
   return Status::OK();
 }
 
+void ImpalaServicePool::Join() {
+  VLOG_QUERY << "join Impala Service pool\n";
+  std::lock_guard<std::mutex> l(close_lock_);
+  if (is_joined_) return;
+  // TODO (from KRPC): Use a proper thread pool implementation.
+  for (std::unique_ptr<Thread>& thread : threads_) {
+    thread->Join();
+  }
+  is_joined_ = true;
+}
+
 void ImpalaServicePool::Shutdown() {
   service_queue_.Shutdown();
 
   lock_guard<mutex> lock(shutdown_lock_);
   if (closing_) return;
   closing_ = true;
-  // TODO (from KRPC): Use a proper thread pool implementation.
-  for (std::unique_ptr<Thread>& thread : threads_) {
-    thread->Join();
-  }
+  Join();
 
   // Now we must drain the service queue.
   kudu::Status status = kudu::Status::ServiceUnavailable("Service is shutting down");
