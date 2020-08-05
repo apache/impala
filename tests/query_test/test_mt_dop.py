@@ -37,6 +37,7 @@ WAIT_TIME_MS = build_flavor_timeout(60000, slow_build_timeout=100000)
 # the value 0 to cover the non-MT path as well.
 MT_DOP_VALUES = [0, 1, 2, 8]
 
+
 class TestMtDop(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
@@ -96,48 +97,6 @@ class TestMtDop(ImpalaTestSuite):
       vector.get_value('exec_option'))
     assert expected_results in results.data
 
-
-class TestMtDopScanNode(ImpalaTestSuite):
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestMtDopScanNode, cls).add_test_dimensions()
-    cls.ImpalaTestMatrix.add_constraint(
-      lambda v: v.get_value('table_format').file_format == 'text' and v.get_value(
-        'table_format').compression_codec == 'none')
-
-  def test_mt_dop_scan_node(self, vector, unique_database):
-    """Regression test to make sure scan ranges are shared among all scan node instances
-    when using mt_dop. This runs a selective hash join that will dynamically prune
-    partitions leaving less than 5% of the data. Before IMPALA-9655 this would almost
-    always result in a failure where at least one instance would have all its statically
-    assigned scan ranges pruned."""
-    fq_table_name = "%s.store_sales_subset" % unique_database
-    self.execute_query("create table %s as select distinct(ss_sold_date_sk) as "
-                       "sold_date from tpcds.store_sales limit 50" % fq_table_name)
-    vector.get_value('exec_option')['mt_dop'] = 8
-    vector.get_value('exec_option')['runtime_filter_wait_time_ms'] = 100000
-
-    # Since this depends on instances fetching scan ranges from a shared queue, running
-    # it multiple times ensures any flakiness is removed. On a release build it has a
-    # 0.05% failure rate.
-    NUM_TRIES = 100
-    failed_count = 0
-    for i in xrange(NUM_TRIES):
-      try:
-        result = self.execute_query(
-          "select count(ss_sold_date_sk) from tpcds.store_sales, %s where "
-          "ss_sold_date_sk = sold_date" % fq_table_name,
-          vector.get_value('exec_option'))
-        assert "- BytesRead: 0" not in result.runtime_profile, result.runtime_profile
-        break
-      except Exception:
-        failed_count += 1
-        if i == NUM_TRIES - 1: raise
-    LOG.info("Num of times failed before success {0}".format(failed_count))
 
 class TestMtDopParquet(ImpalaTestSuite):
   @classmethod
