@@ -1200,6 +1200,10 @@ Status ImpalaServer::ExecuteInternal(const TQueryCtx& query_ctx,
       RETURN_IF_ERROR(query_handle->query_driver()->SetExternalPlan(
           query_ctx, *external_exec_request));
 
+      if(external_exec_request->query_exec_request.query_ctx.transaction_id > 0) {
+        RETURN_IF_ERROR(exec_env_->frontend()->addTransaction(
+            external_exec_request->query_exec_request.query_ctx));
+      }
       exec_status = Status::OK();
       DumpTExecReq((*query_handle)->exec_request(), "external", query_id);
     }

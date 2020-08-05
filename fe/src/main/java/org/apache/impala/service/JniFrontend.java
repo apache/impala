@@ -688,6 +688,19 @@ public class JniFrontend {
   }
 
   /**
+   * Adds a transaction started externally.
+   * @param transactionId the id of the transaction to abort.
+   * @throws TransactionException
+   */
+  public void addTransaction(byte[] thriftQueryContext)
+      throws TransactionException, ImpalaException {
+    Preconditions.checkNotNull(frontend_);
+    TQueryCtx queryCtx = new TQueryCtx();
+    JniUtil.deserializeThrift(protocolFactory_, queryCtx, thriftQueryContext);
+    this.frontend_.addTransaction(queryCtx);
+  }
+
+  /**
    * Aborts a transaction.
    * @param transactionId the id of the transaction to abort.
    * @throws TransactionException

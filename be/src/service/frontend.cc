@@ -111,6 +111,7 @@ Frontend::Frontend() {
     {"buildTestDescriptorTable", "([B)[B", &build_test_descriptor_table_id_},
     {"callQueryCompleteHooks", "([B)V", &call_query_complete_hooks_id_},
     {"abortTransaction", "(J)V", &abort_txn_},
+    {"addTransaction", "([B)V", &add_txn_},
     {"unregisterTransaction", "(J)V", &unregister_txn_},
     {"getSaml2Redirect", "([B)[B", &get_saml2_redirect_id_},
     {"validateSaml2Response", "([B)[B", &validate_saml2_response_id_},
@@ -276,6 +277,10 @@ Status Frontend::GetHadoopGroups(const TGetHadoopGroupsRequest& request,
 
 Status Frontend::LoadData(const TLoadDataReq& request, TLoadDataResp* response) {
   return JniUtil::CallJniMethod(fe_, load_table_data_id_, request, response);
+}
+
+Status Frontend::addTransaction(const TQueryCtx& query_ctx) {
+  return JniUtil::CallJniMethod(fe_, add_txn_, query_ctx);
 }
 
 Status Frontend::AbortTransaction(int64_t transaction_id) {
