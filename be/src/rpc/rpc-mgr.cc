@@ -220,6 +220,13 @@ Status RpcMgr::StartServices() {
   return Status::OK();
 }
 
+void RpcMgr::Join() {
+  if (services_started_) {
+    if (messenger_.get() == nullptr) return;
+    for (auto service_pool : service_pools_) service_pool->Join();
+  }
+}
+
 void RpcMgr::Shutdown() {
   if (messenger_.get() == nullptr) return;
   for (auto service_pool : service_pools_) service_pool->Shutdown();

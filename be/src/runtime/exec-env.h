@@ -82,9 +82,8 @@ class ExecEnv {
  public:
   ExecEnv();
 
-  ExecEnv(int backend_port, int krpc_port,
-      int subscriber_port, int webserver_port, const std::string& statestore_host,
-      int statestore_port);
+  ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
+      const std::string& statestore_host, int statestore_port);
 
   /// Returns the most recently created exec env instance. In a normal impalad, this is
   /// the only instance. In test setups with multiple ExecEnv's per process,
@@ -109,10 +108,6 @@ class ExecEnv {
   /// Registers the ImpalaServer 'server' with this ExecEnv instance. May only be called
   /// once.
   void SetImpalaServer(ImpalaServer* server);
-
-  /// Get the address of the thrift backend service. Only valid to call if
-  /// StartServices() was successful.
-  TNetworkAddress GetThriftBackendAddress() const;
 
   const BackendIdPB& backend_id() const { return backend_id_; }
 
@@ -148,6 +143,10 @@ class ExecEnv {
   Scheduler* scheduler() { return scheduler_.get(); }
   AdmissionController* admission_controller() { return admission_controller_.get(); }
   StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
+
+  const TNetworkAddress& configured_backend_address() const {
+    return configured_backend_address_;
+  }
 
   const IpAddr& ip_address() const { return ip_address_; }
 
@@ -230,14 +229,14 @@ class ExecEnv {
   static ExecEnv* exec_env_;
   bool is_fe_tests_ = false;
 
-  /// Address of the thrift based ImpalaInternalService. In backend tests we allow
-  /// wildcard port 0, so this may not be the actual backend address.
+  /// The network address that the backend KRPC service is listening on:
+  /// hostname + krpc_port.
   TNetworkAddress configured_backend_address_;
 
   /// Resolved IP address of the host name.
   IpAddr ip_address_;
 
-  /// Address of the KRPC-based ImpalaInternalService
+  /// IP address of the KRPC backend service: ip_address + krpc_port.
   TNetworkAddress krpc_address_;
 
   /// fs.defaultFs value set in core-site.xml

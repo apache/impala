@@ -151,6 +151,9 @@ class RpcMgr {
   Status GetProxy(const TNetworkAddress& address, const std::string& hostname,
       std::unique_ptr<P>* proxy) WARN_UNUSED_RESULT;
 
+  /// Wait until all reactor threads complete execution.
+  void Join();
+
   /// Shut down all previously registered services. All service pools are shut down.
   /// All acceptor and reactor threads within the messenger are also shut down.
   /// All unprocessed incoming requests will be replied with error messages.

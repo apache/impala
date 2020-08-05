@@ -27,7 +27,6 @@
 #include "kudu/rpc/rpc_context.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "kudu/rpc/rpc_sidecar.h"
-#include "runtime/backend-client.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/client-cache.h"
 #include "runtime/exec-env.h"
@@ -271,18 +270,17 @@ void RuntimeFilterBank::UpdateFilterFromLocal(
       DCHECK_EQ(type, TRuntimeFilterType::MIN_MAX);
       min_max_filter->ToProtobuf(params.mutable_min_max_filter());
     }
-    const TNetworkAddress& krpc_address = query_state_->query_ctx().coord_krpc_address;
-    const TNetworkAddress& host_address = query_state_->query_ctx().coord_address;
+    const TNetworkAddress& krpc_address = query_state_->query_ctx().coord_ip_address;
+    const std::string& hostname = query_state_->query_ctx().coord_hostname;
 
     // Use 'proxy' to send the filter to the coordinator.
     unique_ptr<DataStreamServiceProxy> proxy;
-    Status get_proxy_status =
-        DataStreamService::GetProxy(krpc_address, host_address.hostname, &proxy);
+    Status get_proxy_status = DataStreamService::GetProxy(krpc_address, hostname, &proxy);
     if (!get_proxy_status.ok()) {
       // Failing to send a filter is not a query-wide error - the remote fragment will
       // continue regardless.
-      LOG(INFO) << Substitute("Failed to get proxy to coordinator $0: $1",
-          host_address.hostname, get_proxy_status.msg().msg());
+      LOG(INFO) << Substitute("Failed to get proxy to coordinator $0: $1", hostname,
+          get_proxy_status.msg().msg());
       return;
     }
     // Increment 'num_inflight_rpcs_' to make sure that the filter will not be deallocated

@@ -33,7 +33,7 @@
 
 using std::numeric_limits;
 
-DECLARE_int32(be_port);
+DECLARE_int32(krpc_port);
 DECLARE_string(hostname);
 
 namespace impala {
@@ -59,7 +59,7 @@ Status InitialReservations::Init(
           query_min_reservation, &reservation_status)) {
     return Status(TErrorCode::MINIMUM_RESERVATION_UNAVAILABLE,
         PrettyPrinter::Print(query_min_reservation, TUnit::BYTES), FLAGS_hostname,
-        FLAGS_be_port, PrintId(query_id), reservation_status.GetDetail());
+        FLAGS_krpc_port, PrintId(query_id), reservation_status.GetDetail());
   }
   VLOG(2) << "Successfully claimed initial reservations ("
           << PrettyPrinter::Print(query_min_reservation, TUnit::BYTES) << ") for"

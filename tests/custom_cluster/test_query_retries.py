@@ -944,7 +944,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     """Validate that the given profile indicates that the given impalad was blacklisted
     during query execution."""
     assert "Blacklisted Executors: {0}:{1}".format(blacklisted_impalad.hostname,
-        blacklisted_impalad.service.be_port) in profile, profile
+        blacklisted_impalad.service.krpc_port) in profile, profile
 
   def __assert_executors_not_blacklisted(self, impalad, profile):
     """Validate that the given profile indicates that the given impalad was not

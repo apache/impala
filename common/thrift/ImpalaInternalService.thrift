@@ -533,12 +533,12 @@ struct TQueryCtx {
   // Process ID of the impalad to which the user is connected.
   5: required i32 pid
 
-  // The initiating coordinator's address of its thrift based ImpalaInternalService.
+  // The coordinator's hostname.
   // TODO: determine whether we can get this somehow via the Thrift rpc mechanism.
-  6: optional Types.TNetworkAddress coord_address
+  6: optional string coord_hostname
 
   // The initiating coordinator's address of its KRPC based ImpalaInternalService.
-  7: optional Types.TNetworkAddress coord_krpc_address
+  7: optional Types.TNetworkAddress coord_ip_address
 
   // List of tables missing relevant table and/or column stats. Used for
   // populating query-profile fields consumed by CM as well as warning messages.
@@ -784,8 +784,4 @@ struct TParseDateStringResult {
   // Canonical date string (formed as 'yyyy-MM-dd'). Used only if 'valid' is true and the
   // parsed date string was not in a canonical form.
   3: optional string canonical_date_string
-}
-
-service ImpalaInternalService {
-
 }

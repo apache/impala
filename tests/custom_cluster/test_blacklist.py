@@ -64,7 +64,8 @@ class TestBlacklist(CustomClusterTestSuite):
     backends_json = self.cluster.impalads[0].service.get_debug_webpage_json("/backends")
     match = re.search("Blacklisted Executors: (.*)", result.runtime_profile)
     assert match.group(1) == "%s:%s" % \
-        (killed_impalad.hostname, killed_impalad.service.be_port), result.runtime_profile
+        (killed_impalad.hostname, killed_impalad.service.krpc_port), \
+        result.runtime_profile
     assert backends_json["num_blacklisted_backends"] == 1, backends_json
     assert backends_json["num_active_backends"] == 2, backends_json
     assert len(backends_json["backends"]) == 3, backends_json
@@ -111,7 +112,8 @@ class TestBlacklist(CustomClusterTestSuite):
     result = self.execute_query("select count(*) from tpch.lineitem")
     match = re.search("Blacklisted Executors: (.*)", result.runtime_profile)
     assert match.group(1) == "%s:%s" % \
-        (killed_impalad.hostname, killed_impalad.service.be_port), result.runtime_profile
+        (killed_impalad.hostname, killed_impalad.service.krpc_port), \
+        result.runtime_profile
 
     # Restart the impalad.
     killed_impalad.start()
@@ -165,5 +167,5 @@ class TestBlacklist(CustomClusterTestSuite):
     result = self.execute_query("select count(*) from tpch.lineitem")
     match = re.search("Blacklisted Executors: (.*)", result.runtime_profile)
     assert match is not None and match.group(1) == "%s:%s" % \
-      (killed_impalad.hostname, killed_impalad.service.be_port), \
+      (killed_impalad.hostname, killed_impalad.service.krpc_port), \
       result.runtime_profile

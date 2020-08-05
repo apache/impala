@@ -140,7 +140,6 @@ class FragmentInstanceState {
   const TUniqueId& instance_id() const { return instance_ctx_.fragment_instance_id; }
   FInstanceExecStatePB current_state() const { return current_state_.Load(); }
   bool final_report_sent() const { return final_report_sent_; }
-  const TNetworkAddress& coord_address() const { return query_ctx().coord_address; }
   bool IsDone() const { return current_state_.Load() == FInstanceExecStatePB::FINISHED; }
   ObjectPool* obj_pool();
   int64_t scan_ranges_complete() const { return scan_ranges_complete_; }

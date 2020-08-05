@@ -155,7 +155,7 @@ class TestProcessFailures(CustomClusterTestSuite):
     # Assert that the query status on the query profile web page contains the expected
     # failed hostport.
     failed_hostport = "%s:%s" % (worker_impalad.service.hostname,
-                                 worker_impalad.service.be_port)
+                                 worker_impalad.service.krpc_port)
     query_profile_page = impalad.service.read_query_profile_page(query_id)
     assert failed_hostport in query_profile_page,\
         "Query status did not contain expected hostport %s\n\n%s" % (failed_hostport,

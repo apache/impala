@@ -40,10 +40,8 @@
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaService_types.h"
-#include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/ImpalaService.h"
-#include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Frontend_types.h"
 #include "rpc/thrift-server.h"
 #include "codegen/llvm-codegen.h"
@@ -81,8 +79,9 @@ class Planner {
     query_ctx.client_request.stmt = stmt;
     query_ctx.client_request.query_options = query_options_;
     query_ctx.__set_session(session_state_);
-    TNetworkAddress dummy;
-    ImpalaServer::PrepareQueryContext(dummy, dummy, &query_ctx);
+    string dummy_hostname = "";
+    TNetworkAddress dummy_addr;
+    ImpalaServer::PrepareQueryContext(dummy_hostname, dummy_addr, &query_ctx);
     runtime_state_.reset(new RuntimeState(query_ctx, &exec_env_));
     TPlanFragment* fragment = runtime_state_->obj_pool()->Add(new TPlanFragment());
     PlanFragmentCtxPB* fragment_ctx =

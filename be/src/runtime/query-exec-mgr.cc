@@ -73,7 +73,8 @@ Status QueryExecMgr::StartQuery(const ExecQueryFInstancesRequestPB* request,
     const TQueryCtx& query_ctx, const TExecPlanFragmentInfo& fragment_info) {
   TUniqueId query_id = query_ctx.query_id;
   VLOG(2) << "StartQueryFInstances() query_id=" << PrintId(query_id)
-          << " coord=" << TNetworkAddressToString(query_ctx.coord_address);
+          << " coord=" << query_ctx.coord_hostname << ":"
+          << query_ctx.coord_ip_address.port;
   bool dummy;
   QueryState* qs =
       GetOrCreateQueryState(query_ctx, request->per_backend_mem_limit(), &dummy);

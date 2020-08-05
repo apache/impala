@@ -661,8 +661,8 @@ class TestWebPage(ImpalaTestSuite):
 
     # The 'address' column is the backend port of the impalad.
     assert len(backend_row['address']) > 0
-    be_ports = ('22000', '22001', '22002')
-    assert backend_row['address'].endswith(be_ports)
+    krpc_ports = ('27000', '27001', '27002')
+    assert backend_row['address'].endswith(krpc_ports)
 
     # The 'krpc_address' is the krpc address of the impalad.
     assert len(backend_row['krpc_address']) > 0

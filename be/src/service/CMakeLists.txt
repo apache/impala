@@ -38,7 +38,6 @@ add_library(Service
   impala-beeswax-server.cc
   impala-hs2-server.cc
   impala-http-handler.cc
-  impala-internal-service.cc
   impalad-main.cc
   impala-server.cc
   query-options.cc

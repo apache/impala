@@ -64,7 +64,7 @@ using boost::tokenizer;
 using namespace beeswax;
 using namespace parquet;
 
-DECLARE_int32(be_port);
+DECLARE_int32(krpc_port);
 DECLARE_string(hostname);
 
 namespace impala {
@@ -314,7 +314,7 @@ string GetStackTrace() {
 }
 
 string GetBackendString() {
-  return Substitute("$0:$1", FLAGS_hostname, FLAGS_be_port);
+  return Substitute("$0:$1", FLAGS_hostname, FLAGS_krpc_port);
 }
 
 DebugActionTokens TokenizeDebugActions(const string& debug_actions) {

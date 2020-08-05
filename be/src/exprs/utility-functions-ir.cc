@@ -178,8 +178,8 @@ StringVal UtilityFunctions::CurrentSession(FunctionContext* ctx) {
 StringVal UtilityFunctions::Coordinator(FunctionContext* ctx) {
   const TQueryCtx& query_ctx = ctx->impl()->state()->query_ctx();
   // An empty string indicates the coordinator was not set in the query request.
-  return query_ctx.__isset.coord_address ?
-      AnyValUtil::FromString(ctx, query_ctx.coord_address.hostname) :
+  return query_ctx.__isset.coord_hostname ?
+      AnyValUtil::FromString(ctx, query_ctx.coord_hostname) :
       StringVal::null();
 }
 

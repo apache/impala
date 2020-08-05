@@ -31,7 +31,6 @@
 #include "kudu/util/status.h"
 #include "rpc/rpc-mgr.inline.h"
 #include "rpc/sidecar-util.h"
-#include "runtime/backend-client.h"
 #include "runtime/client-cache.h"
 #include "runtime/coordinator-filter-state.h"
 #include "runtime/debug-options.h"
