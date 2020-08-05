@@ -1212,7 +1212,12 @@ void ImpalaServer::FinishUnregisterQuery(const QueryHandle& query_handle) {
   Status status = query_handle.query_driver()->Unregister(&query_driver_map_);
   string err_msg = "QueryDriver can only be deleted once: " + status.GetDetail();
   DCHECK(status.ok()) << err_msg;
-  if (UNLIKELY(!status.ok())) LOG(ERROR) << status.GetDetail();
+  if (UNLIKELY(!status.ok())) {
+    LOG(ERROR) << status.GetDetail();
+  } else {
+    VLOG_QUERY << "Query successfully unregistered: query_id="
+               << PrintId(query_handle->query_id());
+  }
 }
 
 void ImpalaServer::UnregisterQueryDiscardResult(
