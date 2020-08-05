@@ -27,10 +27,13 @@
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/Types_types.h"
 #include "catalog/catalog.h"
+#include "kudu/util/web_callback_registry.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/condition-variable.h"
 #include "util/metrics-fwd.h"
 #include "rapidjson/rapidjson.h"
+
+using kudu::HttpStatusCode;
 
 namespace impala {
 
@@ -78,7 +81,14 @@ class CatalogServer {
   bool AddPendingTopicItem(std::string key, int64_t version, const uint8_t* item_data,
       uint32_t size, bool deleted);
 
+  /// Mark service as started. Should be called only after the thrift server hosting this
+  /// service has started.
+  void MarkServiceAsStarted();
+
  private:
+  /// Indicates whether the catalog service is ready.
+  std::atomic_bool service_started_{false};
+
   /// Thrift API implementation which proxies requests onto this CatalogService.
   boost::shared_ptr<CatalogServiceIf> thrift_iface_;
   ThriftSerializer thrift_serializer_;
@@ -236,6 +246,10 @@ class CatalogServer {
   // metastore event processor metrics and adds it to the document
   void EventMetricsUrlCallback(
       const Webserver::WebRequest& req, rapidjson::Document* document);
+
+  /// Raw callback to indicate whether the service is ready.
+  void HealthzHandler(const Webserver::WebRequest& req, std::stringstream* data,
+      HttpStatusCode* response);
 };
 
 }

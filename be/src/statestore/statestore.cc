@@ -453,7 +453,7 @@ Statestore::Statestore(MetricGroup* metrics)
 }
 
 Statestore::~Statestore() {
-  CHECK(initialized_) << "Cannot shutdown Statestore once initialized.";
+  CHECK(service_started_) << "Cannot shutdown Statestore once initialized and started.";
 }
 
 Status Statestore::Init(int32_t state_store_port) {
@@ -482,12 +482,17 @@ Status Statestore::Init(int32_t state_store_port) {
   RETURN_IF_ERROR(subscriber_heartbeat_threadpool_.Init());
   RETURN_IF_ERROR(Thread::Create("statestore-heartbeat", "heartbeat-monitoring-thread",
       &Statestore::MonitorSubscriberHeartbeat, this, &heartbeat_monitoring_thread_));
-  initialized_ = true;
+  service_started_ = true;
 
   return Status::OK();
 }
 
 void Statestore::RegisterWebpages(Webserver* webserver) {
+  Webserver::RawUrlCallback healthz_callback =
+      [this](const auto& req, auto* data, auto* response) {
+        return this->HealthzHandler(req, data, response);
+      };
+  webserver->RegisterUrlCallback("/healthz", healthz_callback);
   Webserver::UrlCallback topics_callback =
       bind<void>(mem_fn(&Statestore::TopicsHandler), this, _1, _2);
   webserver->RegisterUrlCallback("/topics", "statestore_topics.tmpl",
@@ -1074,4 +1079,15 @@ void Statestore::ShutdownForTesting() {
 
 int64_t Statestore::FailedExecutorDetectionTimeMs() {
   return FLAGS_statestore_max_missed_heartbeats * FLAGS_statestore_heartbeat_frequency_ms;
+}
+
+void Statestore::HealthzHandler(
+    const Webserver::WebRequest& req, std::stringstream* data, HttpStatusCode* response) {
+  if (service_started_) {
+    (*data) << "OK";
+    *response = HttpStatusCode::Ok;
+    return;
+  }
+  *(data) << "Not Available";
+  *response = HttpStatusCode::ServiceUnavailable;
 }

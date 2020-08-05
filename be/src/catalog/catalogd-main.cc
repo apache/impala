@@ -107,6 +107,7 @@ int CatalogdMain(int argc, char** argv) {
   }
   ABORT_IF_ERROR(builder.metrics(metrics.get()).Build(&server));
   ABORT_IF_ERROR(server->Start());
+  catalog_server.MarkServiceAsStarted();
   LOG(INFO) << "CatalogService started on port: " << FLAGS_catalog_service_port;
   server->Join();
 

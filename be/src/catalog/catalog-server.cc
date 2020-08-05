@@ -97,6 +97,7 @@ const string TABLE_METRICS_WEB_PAGE = "/table_metrics";
 const string TABLE_METRICS_TEMPLATE = "table_metrics.tmpl";
 const string EVENT_WEB_PAGE = "/events";
 const string EVENT_METRICS_TEMPLATE = "events.tmpl";
+const string CATALOG_SERVICE_HEALTH_WEB_PAGE = "/healthz";
 
 const int REFRESH_METRICS_INTERVAL_MS = 1000;
 
@@ -287,6 +288,11 @@ Status CatalogServer::Start() {
 }
 
 void CatalogServer::RegisterWebpages(Webserver* webserver) {
+  Webserver::RawUrlCallback healthz_callback =
+      [this](const auto& req, auto* data, auto* response) {
+        return this->HealthzHandler(req, data, response);
+      };
+  webserver->RegisterUrlCallback(CATALOG_SERVICE_HEALTH_WEB_PAGE, healthz_callback);
   webserver->RegisterUrlCallback(CATALOG_WEB_PAGE, CATALOG_TEMPLATE,
       [this](const auto& args, auto* doc) { this->CatalogUrlCallback(args, doc); }, true);
   webserver->RegisterUrlCallback(CATALOG_OBJECT_WEB_PAGE, CATALOG_OBJECT_TEMPLATE,
@@ -739,4 +745,17 @@ bool CatalogServer::AddPendingTopicItem(std::string key, int64_t version,
           << (FLAGS_compact_catalog_topic ?
               Substitute(", compressed size=$0", item.value.size()) : string());
   return true;
+}
+
+void CatalogServer::MarkServiceAsStarted() { service_started_ = true; }
+
+void CatalogServer::HealthzHandler(
+    const Webserver::WebRequest& req, std::stringstream* data, HttpStatusCode* response) {
+  if (service_started_) {
+    (*data) << "OK";
+    *response = HttpStatusCode::Ok;
+    return;
+  }
+  *(data) << "Not Available";
+  *response = HttpStatusCode::ServiceUnavailable;
 }

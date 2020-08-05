@@ -44,6 +44,8 @@
 #include "util/thread-pool.h"
 #include "util/webserver.h"
 
+using kudu::HttpStatusCode;
+
 namespace impala {
 
 class Status;
@@ -565,8 +567,8 @@ class Statestore : public CacheLineAligned {
   /// Thread that monitors the heartbeats of all subscribers.
   std::unique_ptr<Thread> heartbeat_monitoring_thread_;
 
-  /// Flag to indicate that the statestore has been initialized.
-  bool initialized_ = false;
+  /// Indicates whether the statestore has been initialized and the service is ready.
+  std::atomic_bool service_started_{false};
 
   /// Cache of subscriber clients used for UpdateState() RPCs. Only one client per
   /// subscriber should be used, but the cache helps with the client lifecycle on failure.
@@ -722,6 +724,10 @@ class Statestore : public CacheLineAligned {
   /// last_heartbeat_ts_ has not been updated in that interval, it logs the subscriber's
   /// id.
   [[noreturn]] void MonitorSubscriberHeartbeat();
+
+  /// Raw callback to indicate whether the service is ready.
+  void HealthzHandler(const Webserver::WebRequest& req, std::stringstream* data,
+      HttpStatusCode* response);
 };
 
 } // namespace impala

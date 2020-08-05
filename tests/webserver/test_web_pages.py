@@ -50,6 +50,7 @@ class TestWebPage(ImpalaTestSuite):
   RESET_RESOURCE_POOL_STATS_URL = "http://localhost:{0}/resource_pool_reset"
   BACKENDS_URL = "http://localhost:{0}/backends"
   PROMETHEUS_METRICS_URL = "http://localhost:{0}/metrics_prometheus"
+  HEALTHZ_URL = "http://localhost:{0}/healthz"
 
   # log4j changes do not apply to the statestore since it doesn't
   # have an embedded JVM. So we make two sets of ports to test the
@@ -729,8 +730,9 @@ class TestWebPage(ImpalaTestSuite):
 
   def test_healthz_endpoint(self):
     """Test to check that the /healthz endpoint returns 200 OK."""
-    page = requests.get("http://localhost:25000/healthz")
-    assert page.status_code == requests.codes.ok
+    for port in self.TEST_PORTS_WITH_SS:
+      page = requests.get(self.HEALTHZ_URL.format(port))
+      assert page.status_code == requests.codes.ok
 
   def test_knox_compatibility(self):
     """Checks that the template files conform to the requirements for compatibility with
