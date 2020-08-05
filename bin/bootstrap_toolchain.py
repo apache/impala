@@ -182,7 +182,8 @@ class DownloadUnpackTarball(object):
       # Clean up any partially-unpacked result.
       if os.path.isdir(unpack_dir):
         shutil.rmtree(unpack_dir)
-      if os.path.isdir(download_dir):
+      # Only delete the download directory if it is a temporary directory
+      if download_dir != self.destination_basedir and os.path.isdir(download_dir):
         shutil.rmtree(download_dir)
       raise
     if self.makedir:
