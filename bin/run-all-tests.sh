@@ -254,6 +254,10 @@ do
       # Some test frameworks (e.g. the docker-based tests) use this.
       run_ee_tests
     else
+      # Increase the maximum number of log files so that the logs from the shards
+      # don't get aged out. Multiply the default number by the number of shards.
+      IMPALA_MAX_LOG_FILES_SAVE="${IMPALA_MAX_LOG_FILES:-10}"
+      export IMPALA_MAX_LOG_FILES="$((${EE_TEST_SHARDS} * ${IMPALA_MAX_LOG_FILES_SAVE}))"
       # When the EE tests are sharded, it runs 1/Nth of the tests at a time, restarting
       # Impala between the shards. There are two benefits:
       # 1. It isolates errors so that if Impala crashes, the next shards will still run
@@ -268,6 +272,7 @@ do
         run_ee_tests "--shard_tests=$shard_idx/${EE_TEST_SHARDS}"
         start_impala_cluster
       done
+      export IMPALA_MAX_LOG_FILES="${IMPALA_MAX_LOG_FILES_SAVE}"
     fi
   fi
 
