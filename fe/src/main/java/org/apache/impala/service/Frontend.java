@@ -2035,6 +2035,19 @@ public class Frontend {
   }
 
   /**
+   * Adds a transaction to the keepalive object.
+   * @param queryCtx context that the transaction is associated with
+   * @throws TransactionException
+   */
+  public void addTransaction(TQueryCtx queryCtx) throws TransactionException {
+    Preconditions.checkState(queryCtx.isSetTransaction_id());
+    long transactionId = queryCtx.getTransaction_id();
+    HeartbeatContext ctx = new HeartbeatContext(queryCtx, System.nanoTime());
+    transactionKeepalive_.addTransaction(transactionId, ctx);
+    LOG.info("Opened transaction: " + Long.toString(transactionId));
+  }
+
+  /**
    * Opens a new transaction and registers it to the keepalive object.
    * @param queryCtx context of the query that requires the transaction.
    * @return the transaction id.
@@ -2043,13 +2056,10 @@ public class Frontend {
   private long openTransaction(TQueryCtx queryCtx) throws TransactionException {
     try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
       IMetaStoreClient hmsClient = client.getHiveClient();
-      long transactionId = MetastoreShim.openTransaction(hmsClient);
-      HeartbeatContext ctx = new HeartbeatContext(queryCtx, System.nanoTime());
-      transactionKeepalive_.addTransaction(transactionId, ctx);
-      LOG.info("Opened transaction: " + Long.toString(transactionId));
-      queryCtx.setTransaction_id(transactionId);
-      return transactionId;
+      queryCtx.setTransaction_id(MetastoreShim.openTransaction(hmsClient));
+      addTransaction(queryCtx);
     }
+    return queryCtx.getTransaction_id();
   }
 
   /**

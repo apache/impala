@@ -170,6 +170,9 @@ class Frontend {
   /// completed successfully.
   Status LoadData(const TLoadDataReq& load_data_request, TLoadDataResp* response);
 
+  /// Adds a transaction that was started externally
+  Status addTransaction(const TQueryCtx& queryCtx);
+
   /// Aborts transaction with the given transaction id.
   Status AbortTransaction(int64_t transaction_id);
 
@@ -242,8 +245,9 @@ class Frontend {
   jmethodID get_table_files_id_; // JniFrontend.getTableFiles
   jmethodID show_create_function_id_; // JniFrontend.showCreateFunction
   jmethodID call_query_complete_hooks_id_; // JniFrontend.callQueryCompleteHooks
+  jmethodID add_txn_; // JniFrontend.addTransaction()
   jmethodID abort_txn_; // JniFrontend.abortTransaction()
-  jmethodID unregister_txn_; // JniFrontend.abortTransaction()
+  jmethodID unregister_txn_; // JniFrontend.unregisterTransaction()
   jmethodID get_saml2_redirect_id_; // JniFrontend.getSaml2Redirect()
   jmethodID validate_saml2_response_id_; // JniFrontend.validateSaml2Response()
   jmethodID validate_saml2_bearer_id_; // JniFrontend.validateSaml2Bearer()
