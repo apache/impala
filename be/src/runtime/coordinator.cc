@@ -714,9 +714,7 @@ void Coordinator::HandleExecStateTransition(
   // execution and release resources.
   ReleaseExecResources();
   if (new_state == ExecState::RETURNED_RESULTS) {
-    // Cancel all backends, but wait for the final status reports to be received so that
-    // we have a complete profile for this successful query.
-    CancelBackends(/*fire_and_forget=*/ false);
+    // TODO: IMPALA-6984: cancel all backends in this case too.
     WaitForBackends();
   } else {
     CancelBackends(/*fire_and_forget=*/ true);
