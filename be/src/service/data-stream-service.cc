@@ -143,7 +143,7 @@ void DataStreamService::PublishFilter(
 template<typename ResponsePBType>
 void DataStreamService::RespondRpc(const Status& status,
     ResponsePBType* response, kudu::rpc::RpcContext* ctx) {
-  MonoDelta duration(MonoTime::Now().GetDeltaSince(ctx->GetTimeReceived()));
+  MonoDelta duration(MonoTime::Now() - ctx->GetTimeReceived());
   status.ToProto(response->mutable_status());
   response->set_receiver_latency_ns(duration.ToNanoseconds());
   ctx->RespondSuccess();

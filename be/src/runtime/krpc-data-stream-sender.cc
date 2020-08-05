@@ -496,6 +496,8 @@ void KrpcDataStreamSender::Channel::TransmitDataCompleteCb() {
   const kudu::Status controller_status = rpc_controller_.status();
   if (LIKELY(controller_status.ok())) {
     DCHECK(rpc_in_flight_batch_ != nullptr);
+    // 'receiver_latency_ns' is calculated with MonoTime, so it must be non-negative.
+    DCHECK_GE(resp_.receiver_latency_ns(), 0);
     int64_t row_batch_size = RowBatch::GetSerializedSize(*rpc_in_flight_batch_);
     int64_t network_time = total_time - resp_.receiver_latency_ns();
     COUNTER_ADD(parent_->bytes_sent_counter_, row_batch_size);
@@ -628,6 +630,8 @@ void KrpcDataStreamSender::Channel::EndDataStreamCompleteCb() {
   int64_t total_time_ns = MonotonicNanos() - rpc_start_time_ns_;
   const kudu::Status controller_status = rpc_controller_.status();
   if (LIKELY(controller_status.ok())) {
+    // 'receiver_latency_ns' is calculated with MonoTime, so it must be non-negative.
+    DCHECK_GE(resp_.receiver_latency_ns(), 0);
     int64_t network_time_ns = total_time_ns - resp_.receiver_latency_ns();
     parent_->network_time_stats_->UpdateCounter(network_time_ns);
     parent_->recvr_time_stats_->UpdateCounter(eos_resp_.receiver_latency_ns());
