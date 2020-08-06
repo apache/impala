@@ -806,6 +806,9 @@ done:
       DCHECK(entry.second->IsDone());
     }
   } else {
+    // If the query execution hit an error, when the final status report is sent, the
+    // coordinator's response will instruct the QueryState to cancel itself, so Cancel()
+    // should have always been called by this point.
     DCHECK_EQ(is_cancelled_.Load(), 1);
   }
 }

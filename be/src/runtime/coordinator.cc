@@ -1005,7 +1005,12 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
 
   // If query execution has terminated, return a cancelled status to force the fragment
   // instance to stop executing.
-  return IsExecuting() ? Status::OK() : Status::CANCELLED;
+  // After cancelling backend_state, it's possible that current exec_state is still
+  // EXECUTING but the backend status is not OK since execution status report is not
+  // applied to update the overall status. In such case, we should return a cancelled
+  // status to backend.
+  return (IsExecuting() && backend_state->GetStatus().ok()) ? Status::OK() :
+                                                              Status::CANCELLED;
 }
 
 Status Coordinator::UpdateBlacklistWithAuxErrorInfo(

@@ -226,15 +226,17 @@ void QueryExecMgr::CancelQueriesForFailedCoordinators(
   // Build a list of queries that are scheduled by failed coordinators (as
   // evidenced by their absence from the cluster membership list).
   std::vector<QueryCancellationTask> to_cancel;
-  qs_map_.DoFuncForAllEntries([&](QueryState* qs) {
-    if (qs != nullptr && !qs->IsCancelled()) {
-      if (current_membership.find(qs->coord_backend_id()) == current_membership.end()) {
-        // decremented by ReleaseQueryState()
-        AcquireQueryStateLocked(qs);
-        to_cancel.push_back(QueryCancellationTask(qs));
-      }
-    }
-  });
+  ExecEnv::GetInstance()->query_exec_mgr()->qs_map_.DoFuncForAllEntries(
+      [&](QueryState* qs) {
+        if (qs != nullptr && !qs->IsCancelled()) {
+          if (current_membership.find(qs->coord_backend_id())
+              == current_membership.end()) {
+            // decremented by ReleaseQueryState()
+            AcquireQueryStateLocked(qs);
+            to_cancel.push_back(QueryCancellationTask(qs));
+          }
+        }
+      });
 
   // Since we are the only producer for the cancellation thread pool, we can find the
   // remaining capacity of the pool and submit the new cancellation requests without
