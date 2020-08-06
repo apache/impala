@@ -302,6 +302,7 @@ class BufferPool : public CacheLineAligned {
   /// power-of-two buffer sizes.
   static constexpr int LOG_MAX_BUFFER_BYTES = 48;
   static constexpr int64_t MAX_BUFFER_BYTES = 1L << LOG_MAX_BUFFER_BYTES;
+  static constexpr int MAX_PAGE_ITER_DEBUG = 100;
 
  protected:
   friend class BufferPoolTest;

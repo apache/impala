@@ -42,6 +42,7 @@ namespace impala {
 
 constexpr int BufferPool::LOG_MAX_BUFFER_BYTES;
 constexpr int64_t BufferPool::MAX_BUFFER_BYTES;
+constexpr int BufferPool::MAX_PAGE_ITER_DEBUG;
 
 void BufferPool::BufferHandle::Open(uint8_t* data, int64_t len, int home_core) {
   DCHECK_LE(0, home_core);
@@ -808,12 +809,23 @@ string BufferPool::Client::DebugStringLocked() {
       this, name_, write_status_.GetDetail(), buffers_allocated_bytes_, num_pages_,
       pinned_pages_.bytes(), dirty_unpinned_pages_.bytes(),
       in_flight_write_pages_.bytes(), reservation_.DebugString());
-  ss << "\n  " << pinned_pages_.size() << " pinned pages: ";
-  pinned_pages_.Iterate(bind<bool>(Page::DebugStringCallback, &ss, _1));
-  ss << "\n  " << dirty_unpinned_pages_.size() << " dirty unpinned pages: ";
-  dirty_unpinned_pages_.Iterate(bind<bool>(Page::DebugStringCallback, &ss, _1));
-  ss << "\n  " << in_flight_write_pages_.size() << " in flight write pages: ";
-  in_flight_write_pages_.Iterate(bind<bool>(Page::DebugStringCallback, &ss, _1));
+  int page_to_print = min(pinned_pages_.size(), BufferPool::MAX_PAGE_ITER_DEBUG);
+  ss << "\n  " << page_to_print << " out of " << pinned_pages_.size()
+     << " pinned pages: ";
+  pinned_pages_.IterateFirstN(
+      bind<bool>(Page::DebugStringCallback, &ss, _1), page_to_print);
+
+  page_to_print = min(dirty_unpinned_pages_.size(), MAX_PAGE_ITER_DEBUG);
+  ss << "\n  " << page_to_print << " out of " << dirty_unpinned_pages_.size()
+     << " dirty unpinned pages: ";
+  dirty_unpinned_pages_.IterateFirstN(
+      bind<bool>(Page::DebugStringCallback, &ss, _1), page_to_print);
+
+  page_to_print = min(in_flight_write_pages_.size(), MAX_PAGE_ITER_DEBUG);
+  ss << "\n  " << page_to_print << " out of " << in_flight_write_pages_.size()
+     << " in flight write pages: ";
+  in_flight_write_pages_.IterateFirstN(
+      bind<bool>(Page::DebugStringCallback, &ss, _1), page_to_print);
   return ss.str();
 }
 

@@ -52,6 +52,8 @@ std::string GetTablesMissingStatsWarning(
 /// as strings to the message. These details should only be accessed internally.
 class ErrorMsg {
  public:
+  static constexpr int MAX_ERROR_MESSAGE_LEN = 128 * 1024; // 128kb
+
   typedef strings::internal::SubstituteArg ArgType;
 
   /// Trivial constructor.
@@ -117,11 +119,6 @@ class ErrorMsg {
     error_ = e;
   }
 
-  /// Set a specific error message.
-  void SetErrorMsg(const std::string& msg) {
-    message_ = msg;
-  }
-
   /// Return the formatted error string.
   const std::string& msg() const {
     return message_;
@@ -130,6 +127,10 @@ class ErrorMsg {
   const std::vector<std::string>& details() const {
     return details_;
   }
+
+  /// Set a specific error message. Truncate the message if the length is longer than
+  /// MAX_ERROR_MESSAGE_LEN.
+  void SetErrorMsg(const std::string& msg);
 
   /// Produce a string representation of the error message that includes the formatted
   /// message of the original error and the attached detail strings.

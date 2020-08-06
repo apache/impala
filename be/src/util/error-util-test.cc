@@ -27,6 +27,8 @@
 
 namespace impala {
 
+constexpr int ErrorMsg::MAX_ERROR_MESSAGE_LEN;
+
 TEST(ErrorMsg, GenericFormatting) {
   ErrorMsg msg(TErrorCode::GENERAL, "This is a test");
   ASSERT_EQ("This is a test", msg.msg());
@@ -39,6 +41,11 @@ TEST(ErrorMsg, GenericFormatting) {
   msg = ErrorMsg(TErrorCode::MISSING_BUILTIN, "fun", "sym");
   ASSERT_EQ("Builtin 'fun' with symbol 'sym' does not exist. Verify that "
       "all your impalads are the same version.", msg.msg());
+
+  // Test long error message and truncation.
+  string long_msg = std::string(256 * 1024, '-'); // 256kb string
+  msg = ErrorMsg(TErrorCode::GENERAL, long_msg);
+  ASSERT_EQ(ErrorMsg::MAX_ERROR_MESSAGE_LEN, msg.msg().size());
 }
 
 TEST(ErrorMsg, MergeMap) {

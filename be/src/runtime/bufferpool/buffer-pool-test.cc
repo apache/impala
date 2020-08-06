@@ -2353,6 +2353,60 @@ TEST_F(BufferPoolTest, BufferPoolGc) {
   buffer_pool->FreeBuffer(&client, &buffer);
   buffer_pool->DeregisterClient(&client);
 }
+
+/// IMPALA-9851: Cap the number of pages that can be printed at
+/// BufferPool::Client::DebugString().
+TEST_F(BufferPoolTest, ShortDebugString) {
+  // Allocate pages more than BufferPool::MAX_PAGE_ITER_DEBUG.
+  int num_pages = 105;
+  int64_t max_page_len = TEST_BUFFER_LEN;
+  int64_t total_mem = num_pages * max_page_len;
+  global_reservations_.InitRootTracker(NULL, total_mem);
+  BufferPool pool(test_env_->metrics(), TEST_BUFFER_LEN, total_mem, total_mem);
+  BufferPool::ClientHandle client;
+  ASSERT_OK(pool.RegisterClient("test client", NULL, &global_reservations_, NULL,
+      total_mem, NewProfile(), &client));
+  ASSERT_TRUE(client.IncreaseReservation(total_mem));
+
+  vector<BufferPool::PageHandle> handles(num_pages);
+
+  // Create pages of various valid sizes.
+  for (int i = 0; i < num_pages; ++i) {
+    int64_t page_len = TEST_BUFFER_LEN;
+    int64_t used_before = client.GetUsedReservation();
+    ASSERT_OK(pool.CreatePage(&client, page_len, &handles[i]));
+    ASSERT_TRUE(handles[i].is_open());
+    ASSERT_TRUE(handles[i].is_pinned());
+    const BufferHandle* buffer;
+    ASSERT_OK(handles[i].GetBuffer(&buffer));
+    ASSERT_TRUE(buffer->data() != NULL);
+    ASSERT_EQ(handles[i].len(), page_len);
+    ASSERT_EQ(buffer->len(), page_len);
+    ASSERT_EQ(client.GetUsedReservation(), used_before + page_len);
+  }
+
+  // Verify that only subset of pages are included in DebugString().
+  string page_count_substr = Substitute(
+      "$0 out of $1 pinned pages:", BufferPool::MAX_PAGE_ITER_DEBUG, num_pages);
+  string debug_string = client.DebugString();
+  ASSERT_NE(debug_string.find(page_count_substr), string::npos)
+      << page_count_substr << " not found at BufferPool::Client::DebugString(). "
+      << debug_string;
+
+  // Close the handles and check memory consumption.
+  for (int i = 0; i < num_pages; ++i) {
+    int64_t used_before = client.GetUsedReservation();
+    int page_len = handles[i].len();
+    pool.DestroyPage(&client, &handles[i]);
+    ASSERT_EQ(client.GetUsedReservation(), used_before - page_len);
+  }
+
+  pool.DeregisterClient(&client);
+
+  // All the reservations should be released at this point.
+  ASSERT_EQ(global_reservations_.GetReservation(), 0);
+  global_reservations_.Close();
+}
 } // namespace impala
 
 int main(int argc, char** argv) {
