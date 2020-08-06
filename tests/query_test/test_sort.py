@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import re
 from copy import copy, deepcopy
 
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -76,17 +77,16 @@ class TestQueryFullSort(ImpalaTestSuite):
        a query is, the more sort runs are likely to be produced and spilled.
        Case 1 : 0 SpilledRuns, because all rows fit within the maximum reservation.
                 sort_run_bytes_limit is not enforced.
-       Case 2 : 3 SpilledRuns, because the first run hit reservation limit, and the
-                next 2 runs are capped to 100m.
-       Case 3 : 4 SpilledRuns, because sort node estimate that spill is inevitable.
+       Case 2 : 4 SpilledRuns, because sort node estimate that spill is inevitable.
                 So all runs are capped to 130m, including the first one."""
-    options = [('3g', '100m', '0'), ('620m', '100m', '3'), ('400m', '130m', '4')]
+    options = [('2g', '100m', '0'), ('400m', '130m', '4')]
     for (mem_limit, sort_run_bytes_limit, spilled_runs) in options:
       exec_option['mem_limit'] = mem_limit
       exec_option['sort_run_bytes_limit'] = sort_run_bytes_limit
       query_result = self.execute_query(
           query, exec_option, table_format=table_format)
-      assert "SpilledRuns: " + spilled_runs in query_result.runtime_profile
+      m = re.search(r'\s+\- SpilledRuns: .*', query_result.runtime_profile)
+      assert "SpilledRuns: " + spilled_runs in m.group()
       result = transpose_results(query_result.data)
       assert(result[0] == sorted(result[0]))
 
