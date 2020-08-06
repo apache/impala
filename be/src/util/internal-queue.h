@@ -274,6 +274,19 @@ class InternalQueueBase {
     }
   }
 
+  // Iterate over first 'n' elements of queue, calling 'fn' for each element. If 'n' is
+  // larger than the size of the queue, iteration will finish after the last element
+  // reached. If 'fn' returns false, terminate iteration. It is invalid to call other
+  // InternalQueue methods from 'fn'.
+  void IterateFirstN(boost::function<bool(T*)> fn, int n) {
+    std::lock_guard<LockType> lock(lock_);
+    for (Node* current = head_; (current != nullptr) && (n > 0);
+         current = current->next) {
+      if (!fn(reinterpret_cast<T*>(current))) return;
+      n--;
+    }
+  }
+
   /// Prints the queue ptrs to a string.
   std::string DebugString() {
     std::stringstream ss;

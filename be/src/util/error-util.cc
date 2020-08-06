@@ -16,6 +16,7 @@
 // under the License.
 
 #include "util/error-util-internal.h"
+#include "util/string-util.h"
 
 #include <errno.h>
 #include <string.h>
@@ -55,74 +56,79 @@ string GetTablesMissingStatsWarning(const vector<TTableName>& tables_missing_sta
   return ss.str();
 }
 
-ErrorMsg::ErrorMsg(TErrorCode::type error)
-    : error_(error),
-      message_(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_])) {}
+ErrorMsg::ErrorMsg(TErrorCode::type error) : error_(error) {
+  SetErrorMsg(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_]));
+}
 
-ErrorMsg::ErrorMsg(TErrorCode::type error, const ArgType& arg0)
-    : error_(error),
-      message_(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_],
-              arg0)) {}
+ErrorMsg::ErrorMsg(TErrorCode::type error, const ArgType& arg0) : error_(error) {
+  SetErrorMsg(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_], arg0));
+}
 
 ErrorMsg::ErrorMsg(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1)
-    : error_(error),
-      message_(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_],
-              arg0, arg1)) {}
+  : error_(error) {
+  SetErrorMsg(
+      strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_], arg0, arg1));
+}
 
-ErrorMsg::ErrorMsg(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-    const ArgType& arg2)
-    : error_(error),
-      message_(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_],
-              arg0, arg1, arg2)) {}
+ErrorMsg::ErrorMsg(
+    TErrorCode::type error, const ArgType& arg0, const ArgType& arg1, const ArgType& arg2)
+  : error_(error) {
+  SetErrorMsg(strings::Substitute(
+      g_ErrorCodes_constants.TErrorMessage[error_], arg0, arg1, arg2));
+}
 
 ErrorMsg::ErrorMsg(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
     const ArgType& arg2, const ArgType& arg3)
-    : error_(error),
-      message_(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_],
-              arg0, arg1, arg2, arg3)) {}
+  : error_(error) {
+  SetErrorMsg(strings::Substitute(
+      g_ErrorCodes_constants.TErrorMessage[error_], arg0, arg1, arg2, arg3));
+}
 
 ErrorMsg::ErrorMsg(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
     const ArgType& arg2, const ArgType& arg3, const ArgType& arg4)
-    : error_(error),
-      message_(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_],
-              arg0, arg1, arg2, arg3, arg4)) {}
+  : error_(error) {
+  SetErrorMsg(strings::Substitute(
+      g_ErrorCodes_constants.TErrorMessage[error_], arg0, arg1, arg2, arg3, arg4));
+}
 
 ErrorMsg::ErrorMsg(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
-    const ArgType& arg5)
-    : error_(error),
-      message_(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_],
-              arg0, arg1, arg2, arg3, arg4, arg5)) {}
+    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5)
+  : error_(error) {
+  SetErrorMsg(strings::Substitute(
+      g_ErrorCodes_constants.TErrorMessage[error_], arg0, arg1, arg2, arg3, arg4, arg5));
+}
 
 ErrorMsg::ErrorMsg(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
-    const ArgType& arg5, const ArgType& arg6)
-    : error_(error),
-      message_(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_],
-              arg0, arg1, arg2, arg3, arg4, arg5, arg6)) {}
+    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5,
+    const ArgType& arg6)
+  : error_(error) {
+  SetErrorMsg(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_], arg0,
+      arg1, arg2, arg3, arg4, arg5, arg6));
+}
 
 ErrorMsg::ErrorMsg(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
-    const ArgType& arg5, const ArgType& arg6, const ArgType& arg7)
-    : error_(error),
-      message_(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_],
-              arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7)) {}
+    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5,
+    const ArgType& arg6, const ArgType& arg7)
+  : error_(error) {
+  SetErrorMsg(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_], arg0,
+      arg1, arg2, arg3, arg4, arg5, arg6, arg7));
+}
 
 ErrorMsg::ErrorMsg(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
-    const ArgType& arg5, const ArgType& arg6, const ArgType& arg7,
-    const ArgType& arg8)
-    : error_(error),
-      message_(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_],
-              arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)) {}
+    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5,
+    const ArgType& arg6, const ArgType& arg7, const ArgType& arg8)
+  : error_(error) {
+  SetErrorMsg(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_], arg0,
+      arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8));
+}
 
 ErrorMsg::ErrorMsg(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
-    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
-    const ArgType& arg5, const ArgType& arg6, const ArgType& arg7,
-    const ArgType& arg8, const ArgType& arg9)
-    : error_(error),
-      message_(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_],
-              arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9)) {}
+    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4, const ArgType& arg5,
+    const ArgType& arg6, const ArgType& arg7, const ArgType& arg8, const ArgType& arg9)
+  : error_(error) {
+  SetErrorMsg(strings::Substitute(g_ErrorCodes_constants.TErrorMessage[error_], arg0,
+      arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9));
+}
 
 ErrorMsg ErrorMsg::Init(TErrorCode::type error, const ArgType& arg0,
     const ArgType& arg1, const ArgType& arg2, const ArgType& arg3,
@@ -132,9 +138,8 @@ ErrorMsg ErrorMsg::Init(TErrorCode::type error, const ArgType& arg0,
   ErrorCodesConstants error_strings;
   ErrorMsg m;
   m.error_ = error;
-  m.message_ = strings::Substitute(error_strings.TErrorMessage[m.error_],
-      arg0, arg1, arg2, arg3, arg4, arg5,
-      arg6, arg7, arg8, arg9);
+  m.SetErrorMsg(strings::Substitute(error_strings.TErrorMessage[m.error_], arg0, arg1,
+      arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9));
   return m;
 }
 
@@ -215,6 +220,11 @@ size_t ErrorCount(const ErrorLogMap& errors) {
   ErrorLogMap::const_iterator cit = errors.find(TErrorCode::GENERAL);
   if (cit == errors.end()) return errors.size();
   return errors.size() + cit->second.messages_size() - 1;
+}
+
+void ErrorMsg::SetErrorMsg(const std::string& msg) {
+  Status status = TruncateDown(msg, ErrorMsg::MAX_ERROR_MESSAGE_LEN, &message_);
+  DCHECK_OK(status);
 }
 
 string ErrorMsg::GetFullMessageDetails() const {
