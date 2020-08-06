@@ -26,6 +26,7 @@ namespace impala {
 using datasketches::hll_sketch;
 using datasketches::kll_sketch;
 using impala_udf::StringVal;
+using std::stringstream;
 
 void LogSketchDeserializationError(FunctionContext* ctx) {
   ctx->SetError("Unable to deserialize sketch.");
@@ -49,6 +50,13 @@ template bool DeserializeDsSketch(const StringVal& serialized_sketch,
     hll_sketch* sketch);
 template bool DeserializeDsSketch(const StringVal& serialized_sketch,
     kll_sketch<float>* sketch);
+
+StringVal StringStreamToStringVal(FunctionContext* ctx, const stringstream& str_stream) {
+  string str = str_stream.str();
+  StringVal dst(ctx, str.size());
+  memcpy(dst.ptr, str.c_str(), str.size());
+  return dst;
+}
 
 }
 

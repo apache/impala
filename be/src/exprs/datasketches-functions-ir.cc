@@ -81,5 +81,39 @@ DoubleVal DataSketchesFunctions::DsKllRank(FunctionContext* ctx,
   return sketch.get_rank(probe_value.val);
 }
 
+StringVal DataSketchesFunctions::DsKllQuantilesAsString(FunctionContext* ctx,
+    const StringVal& serialized_sketch, int num_args, const DoubleVal* args) {
+  DCHECK(num_args > 0);
+  if (args == nullptr) return StringVal::null();
+  if (serialized_sketch.is_null || serialized_sketch.len == 0) return StringVal::null();
+  for (int i = 0; i < num_args; ++i) {
+    if (args[i].is_null || std::isnan(args[i].val)) {
+      ctx->SetError("NULL or NaN provided in the input list.");
+      return StringVal::null();
+    }
+  }
+  datasketches::kll_sketch<float> sketch;
+  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
+    LogSketchDeserializationError(ctx);
+    return StringVal::null();
+  }
+  double quantiles_input[(unsigned int)num_args];
+  for (int i = 0; i < num_args; ++i) quantiles_input[i] = args[i].val;
+  try {
+    std::vector<float> quantiles_results =
+        sketch.get_quantiles(quantiles_input, num_args);
+    std::stringstream result_stream;
+    for(int i = 0; i < quantiles_results.size(); ++i) {
+      if (i > 0) result_stream << ",";
+      result_stream << quantiles_results[i];
+    }
+    return StringStreamToStringVal(ctx, result_stream);
+  } catch(const std::exception& e) {
+    ctx->SetError(Substitute("Error while getting quantiles from DataSketches KLL. "
+        "Message: $0", e.what()).c_str());
+    return StringVal::null();
+  }
+}
+
 }
 
