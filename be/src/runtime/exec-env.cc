@@ -574,7 +574,7 @@ void ExecEnv::SetImpalaServer(ImpalaServer* server) {
           server->CancelQueriesOnFailedBackends(current_backend_set);
         });
   }
-  if (FLAGS_is_executor) {
+  if (FLAGS_is_executor && !TestInfo::is_test()) {
     cluster_membership_mgr_->RegisterUpdateCallbackFn(
         [](ClusterMembershipMgr::SnapshotPtr snapshot) {
           std::unordered_set<BackendIdPB> current_backend_set;
