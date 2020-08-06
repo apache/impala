@@ -54,6 +54,15 @@ public:
   /// 'serialized_sketch'. Note, this is an approximate calculation.
   static DoubleVal DsKllRank(FunctionContext* ctx, const StringVal& serialized_sketch,
       const FloatVal& probe_value);
+
+  /// 'serialized_sketch' is expected as a serialized Apache DataSketches KLL sketch. If
+  /// it is not, then the query fails. This function is similar to DsKllQuantile() but
+  /// this one can receive multiple ranks and returns a comma separated string that
+  /// contains the results for all the given ranks.
+  /// Note, this function is meant to return an Array of floats as the result but with
+  /// that we have to wait for the complex type support. Tracking Jira is IMPALA-9520.
+  static StringVal DsKllQuantilesAsString(FunctionContext* ctx,
+      const StringVal& serialized_sketch, int num_args, const DoubleVal* args);
 };
 
 }

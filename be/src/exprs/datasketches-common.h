@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <sstream>
+
 #include "common/status.h"
 #include "thirdparty/datasketches/hll.hpp"
 #include "udf/udf.h"
@@ -45,5 +47,10 @@ void LogSketchDeserializationError(FunctionContext* ctx);
 template<class T>
 bool DeserializeDsSketch(const StringVal& serialized_sketch, T* sketch)
     WARN_UNUSED_RESULT;
+
+/// Helper function that receives an std::stringstream and converts it to StringVal. Uses
+/// 'ctx' for memory allocation.
+StringVal StringStreamToStringVal(FunctionContext* ctx,
+    const std::stringstream& str_stream);
 }
 

@@ -288,3 +288,122 @@ FLOAT,FLOAT,FLOAT,FLOAT,FLOAT,FLOAT
 ---- RESULTS
 100.1999969482422,25000.099609375,50.90000152587891,NULL,50.5,NULL
 ====
+---- QUERY
+# Checks that ds_kll_quantiles_as_string() produces NULL for an empty dataset.
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(cast(f2 as float)), 0.5)
+from functional_parquet.emptytable;
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Check that ds_kll_quantiles_as_string() returns null for a null input.
+select ds_kll_quantiles_as_string(c, 0.5) from functional_parquet.nulltable;
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# Check that ds_kll_quantiles_as_string() returns error for strings that are not
+# serialized sketches.
+select
+    ds_kll_quantiles_as_string(date_string_col, 0.5)
+from functional_parquet.alltypestiny;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch
+====
+---- QUERY
+# Check error when rank is out of range
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(float_col), 0, -1, 1, 0.5)
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: Error while getting quantiles from DataSketches KLL. Message: Fraction cannot be less than zero or greater than 1.0
+====
+---- QUERY
+# Check error when rank is out of range
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(float_col), 0, 1.1, 1, 0.5)
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: Error while getting quantiles from DataSketches KLL. Message: Fraction cannot be less than zero or greater than 1.0
+====
+---- QUERY
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(float_col), 0, 0.2, 0.5, 0.8, 1)
+from functional_parquet.alltypessmall;
+---- RESULTS
+'0,1.1,4.4,7.7,9.9'
+---- TYPES
+STRING
+====
+---- QUERY
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(float_col), 0.5, 1, 0, 0.2, 0.8)
+from functional_parquet.alltypessmall;
+---- RESULTS
+'4.4,9.9,0,1.1,7.7'
+---- TYPES
+STRING
+====
+---- QUERY
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(float_col), 0.5)
+from functional_parquet.alltypessmall;
+---- RESULTS
+'4.4'
+---- TYPES
+STRING
+====
+---- QUERY
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(float_col), 0, 0.2, NULL, 0.8, 1)
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: NULL or NaN provided in the input list.
+====
+---- QUERY
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(float_col), 0, 0.2, 0.5, 0.8, NULL)
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: NULL or NaN provided in the input list.
+====
+---- QUERY
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(float_col), NULL)
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: NULL or NaN provided in the input list.
+====
+---- QUERY
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(float_col), 0, 0.5, cast('nan' as float), 1)
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: NULL or NaN provided in the input list.
+====
+---- QUERY
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(float_col), 0, 0.5, 1, cast('nan' as float))
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: NULL or NaN provided in the input list.
+====
+---- QUERY
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(float_col), cast('nan' as float))
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: NULL or NaN provided in the input list.
+====
+---- QUERY
+select
+    ds_kll_quantiles_as_string(ds_kll_sketch(float_col))
+from functional_parquet.alltypessmall;
+---- CATCH
+AnalysisException: No matching function with signature: ds_kll_quantiles_as_string(STRING)
+====

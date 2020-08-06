@@ -1615,14 +1615,6 @@ BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
   return estimate;
 }
 
-StringVal StringStreamToStringVal(FunctionContext* ctx,
-    const stringstream& str_stream) {
-  string str = str_stream.str();
-  StringVal dst(ctx, str.size());
-  memcpy(dst.ptr, str.c_str(), str.size());
-  return dst;
-}
-
 /// Auxiliary function that receives a hll_sketch and returns the serialized version of
 /// it wrapped into a StringVal.
 /// Introducing this function in the .cc to avoid including the whole DataSketches HLL
