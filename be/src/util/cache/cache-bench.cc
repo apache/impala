@@ -167,7 +167,8 @@ INSTANTIATE_TEST_CASE_P(Patterns, CacheBench, testing::ValuesIn(std::vector<Benc
       {BenchSetup::Pattern::ZIPFIAN, 1.0},
       {BenchSetup::Pattern::ZIPFIAN, 3.0},
       {BenchSetup::Pattern::UNIFORM, 1.0},
-      {BenchSetup::Pattern::UNIFORM, 3.0}
+      {BenchSetup::Pattern::UNIFORM, 3.0},
+      {BenchSetup::Pattern::UNIFORM, 500.0},
     }));
 
 TEST_P(CacheBench, RunBench) {
