@@ -225,8 +225,8 @@ public:
   Cache::EvictionCallback* eviction_callback_;
   // Recency list double-link
   list_member_hook<> recency_list_hook_;
-  // Unprotected list double-link
-  list_member_hook<> unprotected_list_hook_;
+  // Unprotected/Tombstone list double-link.
+  list_member_hook<> unprotected_tombstone_list_hook_;
 
   // The boost functionality is the same as the std library functionality. Using boost
   // solves a linking issue when using UBSAN with dynamic linking.
@@ -307,12 +307,13 @@ struct LIRSThreadState {
 // Boost intrusive lists allow the handle to easily be on multiple lists simultaneously.
 // Each hook is equivalent to a prev/next pointer.
 typedef member_hook<LIRSHandle, list_member_hook<>,
-                    &LIRSHandle::recency_list_hook_> RecencyListOption;
+    &LIRSHandle::recency_list_hook_> RecencyListOption;
 typedef boost::intrusive::list<LIRSHandle, RecencyListOption> RecencyList;
 
 typedef member_hook<LIRSHandle, list_member_hook<>,
-                    &LIRSHandle::unprotected_list_hook_> UnprotectedListOption;
-typedef boost::intrusive::list<LIRSHandle, UnprotectedListOption> UnprotectedList;
+    &LIRSHandle::unprotected_tombstone_list_hook_> UnprotectedTombstoneListOption;
+typedef boost::intrusive::list<LIRSHandle,
+    UnprotectedTombstoneListOption> UnprotectedTombstoneList;
 
 // A single shard of sharded cache.
 class LIRSCacheShard : public CacheShard {
@@ -362,6 +363,20 @@ class LIRSCacheShard : public CacheShard {
   // entries until the oldest entry is a PROTECTED entry.
   void TrimRecencyList(LIRSThreadState* tstate);
 
+  // Helper functions for adding to the UNPROTECTED block in the
+  // unprotected_tombstone_list_. This sets unprotected_list_front_ if this
+  // is the first UNPROTECTED entry in the list. This function relies on
+  // appropriate ordering of operations. List operations like this need to
+  // happen before updating counts/usage (e.g. num_unprotected_).
+  void AddToUnprotectedList(LIRSHandle* e);
+
+  // Helper function for removing from the UNPROTECTED block in the
+  // unprotected_tombstone_list_. This detects whether this is the front of the
+  // unprotected block and maintains unprotected_list_front_ appropriately.
+  // This function relies on appropriate ordering of operations. List operations
+  // like this need to happen before updating counts/usage (e.g. num_unprotected_).
+  void RemoveFromUnprotectedList(LIRSHandle* e);
+
   // This iterates the recency list from oldest to newest removing TOMBSTONE entires
   // until the number of TOMBSTONE entries is less than the limit specified by
   // lirs_tombstone_multiple.
@@ -402,6 +417,7 @@ class LIRSCacheShard : public CacheShard {
 
   // Capacity is split between protected and unprotected entities. Unprotected entities
   // make up a much smaller proportion of the cache than protected.
+  // Note: updates to counts/usage happen after doing list operations.
   size_t capacity_;
   size_t unprotected_capacity_;
   size_t unprotected_usage_ = 0;
@@ -417,8 +433,32 @@ class LIRSCacheShard : public CacheShard {
   // Recency list (called the LIRS stack in the paper)
   RecencyList recency_list_;
 
-  // Unprotected list (called the HIR list in the paper)
-  UnprotectedList unprotected_list_;
+  // This list is a combination of the unprotected list (called the HIR list in the
+  // paper) and the tombstone list (not in the paper). The tombstone list is used
+  // to efficiently implement the lirs_tombstone_multiple. Without a tombstone list,
+  // finding the oldest TOMBSTONE entry requires traversing the recency list,
+  // potentially passing a large number of entries before reaching a TOMBSTONE entry.
+  // The tombstone list makes this O(1).
+  //
+  // The combined list still behaves like two separate lists. In particular, the
+  // UNPROTECTED entries and TOMBSTONE entries are each contiguous blocks.
+  // The block of newer UNPROTECTED entries is at the back of the list. The block
+  // of oldest TOMBSTONE entries is at the front. The unprotected_list_front_ points
+  // to the UNPROTECTED entry that is at the block boundary.
+  // Visually, it is:
+  // newest/end() |--- UNPROTECTED entries ---|--- TOMBSTONE entries ---| oldest/begin()
+  //               ^                         ^                         ^
+  //              back()             unprotected_list_front_          front()
+  //
+  // Combining the two lists reduces the cost of transferring an element from
+  // UNPROTECTED to TOMBSTONE, which is a common operation. To simplify operations on the
+  // UNPROTECTED block, see the two helper functions AddToUnprotectedList() and
+  // RemoveFromUnprotectedList().
+  UnprotectedTombstoneList unprotected_tombstone_list_;
+
+  // The front of the UNPROTECTED block in the unprotected_tombstone_list_. This is
+  // nullptr if there are no UNPROTECTED entries.
+  LIRSHandle* unprotected_list_front_ = nullptr;
 
   // Hash table that maps keys to handles.
   HandleTable table_;
@@ -444,14 +484,17 @@ LIRSCacheShard::~LIRSCacheShard() {
     // This removes it from the recency list and the unprotected list (if appropriate)
     ToUninitialized(&tstate, e);
   }
-  // Anything remaining was not on the recency list. This progresses
-  while (!unprotected_list_.empty()) {
-    LIRSHandle* e = &*unprotected_list_.begin();
+  // Anything remaining was not on the recency list. All the TOMBSTONE entries are
+  // on the recency list and get removed in the previous step, so this is now purely
+  // UNPROTECTED entries.
+  while (!unprotected_tombstone_list_.empty()) {
+    LIRSHandle* e = &*unprotected_tombstone_list_.begin();
     DCHECK_EQ(e->state(), UNPROTECTED);
     DCHECK_EQ(e->num_references(), 0);
     // This removes it from the unprotected list
     ToUninitialized(&tstate, e);
   }
+  DCHECK(unprotected_list_front_ == nullptr);
   CleanupThreadState(&tstate);
   // Eviction calls UpdateMemTracker() for each handle, but UpdateMemTracker() only
   // updates the underlying mem_tracker_ if the deferred consumption exceeds the
@@ -540,17 +583,15 @@ void LIRSCacheShard::EnforceTombstoneLimit(LIRSThreadState* tstate) {
   size_t tombstone_limit =
     static_cast<size_t>(static_cast<double>(num_elems) * FLAGS_lirs_tombstone_multiple);
   if (num_tombstones_ <= tombstone_limit) return;
-  // Start with the oldest entry in the recency list and iterate towards more recent
-  // entries
-  auto it = recency_list_.begin();
-  while (it != recency_list_.end() && num_tombstones_ > tombstone_limit) {
+  // Remove the oldest TOMBSTONE entries from the front of unprotected_tombstone_list_
+  // until we are back under the limit.
+  auto it = unprotected_tombstone_list_.begin();
+  while (num_tombstones_ > tombstone_limit) {
     LIRSHandle* e = &*it;
-    if (e->state() == TOMBSTONE) {
-      it = recency_list_.erase(it);
-      ToUninitialized(tstate, e);
-    } else {
-      ++it;
-    }
+    it = unprotected_tombstone_list_.erase(it);
+    DCHECK_EQ(e->state(), TOMBSTONE);
+    // This will remove the entry from the recency_list_.
+    ToUninitialized(tstate, e);
   }
 }
 
@@ -558,8 +599,10 @@ void LIRSCacheShard::EnforceUnprotectedCapacity(LIRSThreadState* tstate) {
   while (unprotected_usage_ > unprotected_capacity_) {
     // Evict the oldest UNPROTECTED entry from the unprotected list. This transitions it
     // from UNPROTECTED to a TOMBSTONE entry
-    DCHECK(!unprotected_list_.empty());
-    LIRSHandle* oldest = &*unprotected_list_.begin();
+    DCHECK_GT(num_unprotected_, 0);
+    DCHECK(!unprotected_tombstone_list_.empty());
+    DCHECK(unprotected_list_front_ != nullptr);
+    LIRSHandle* oldest = unprotected_list_front_;
     if (oldest->recency_list_hook_.is_linked()) {
       UnprotectedToTombstone(tstate, oldest);
     } else {
@@ -593,51 +636,96 @@ void LIRSCacheShard::MoveToRecencyListBack(LIRSThreadState* tstate, LIRSHandle *
   }
 }
 
+void LIRSCacheShard::AddToUnprotectedList(LIRSHandle* e) {
+  DCHECK(!e->unprotected_tombstone_list_hook_.is_linked());
+  DCHECK_EQ(e->state(), UNPROTECTED);
+  unprotected_tombstone_list_.push_back(*e);
+  // Updates to counts are always after list operations. If the list is empty,
+  // this count is zero.
+  if (num_unprotected_ == 0) {
+    DCHECK(unprotected_list_front_ == nullptr);
+    unprotected_list_front_ = e;
+  }
+}
+
+void LIRSCacheShard::RemoveFromUnprotectedList(LIRSHandle* e) {
+  DCHECK(e->unprotected_tombstone_list_hook_.is_linked());
+  DCHECK_EQ(e->state(), UNPROTECTED);
+  DCHECK_GE(num_unprotected_, 1);
+  auto it = unprotected_tombstone_list_.iterator_to(*e);
+  it = unprotected_tombstone_list_.erase(it);
+  // If it was the front of the list, then unprotected_list_front_ needs to be
+  // updated.
+  if (e == unprotected_list_front_) {
+    // Updates to counts are always after list operations, so num_unprotected_
+    // includes this entry.
+    if (num_unprotected_ > 1) {
+      // This was not the last unprotected entry
+      DCHECK(it != unprotected_tombstone_list_.end());
+      unprotected_list_front_ = &*it;
+    } else {
+      // This was the last unprotected entry
+      DCHECK(it == unprotected_tombstone_list_.end());
+      unprotected_list_front_ = nullptr;
+    }
+  }
+}
+
 void LIRSCacheShard::UnprotectedToProtected(LIRSThreadState* tstate, LIRSHandle *e) {
   // This only happens for entries that are only the recency list
   DCHECK(e->recency_list_hook_.is_linked());
-  // Make this the most recent entry in the recency list
+  // Make this the most recent entry in the recency list and remove from the
+  // unprotected list.
   MoveToRecencyListBack(tstate, e);
-  // Remove from unprotected list, decrement unprotected usage
-  unprotected_usage_ -= e->charge();
+  RemoveFromUnprotectedList(e);
+  e->set_state(UNPROTECTED, PROTECTED);
+  // List operations happen before changes to the counts/usage
   --num_unprotected_;
   ++num_protected_;
-  DCHECK(e->unprotected_list_hook_.is_linked());
-  unprotected_list_.erase(unprotected_list_.iterator_to(*e));
-  e->set_state(UNPROTECTED, PROTECTED);
-  // Increment protected usage
+  // Transfer the usage
+  unprotected_usage_ -= e->charge();
   protected_usage_ += e->charge();
   // If necessary, evict old entries from the recency list, protected to unprotected
   EnforceProtectedCapacity(tstate);
 }
 
 void LIRSCacheShard::ProtectedToUnprotected(LIRSThreadState* tstate, LIRSHandle* e) {
-  DCHECK(!e->unprotected_list_hook_.is_linked());
+  DCHECK(!e->unprotected_tombstone_list_hook_.is_linked());
   DCHECK(e->recency_list_hook_.is_linked());
   recency_list_.erase(recency_list_.iterator_to(*e));
   // Trim the recency list after the removal
   TrimRecencyList(tstate);
-  // Decrement protected usage
-  protected_usage_ -= e->charge();
   e->set_state(PROTECTED, UNPROTECTED);
   // Add to unprotected list as the newest entry
-  unprotected_list_.push_back(*e);
-  // Increment unprotected usage
-  unprotected_usage_ += e->charge();
+  AddToUnprotectedList(e);
+  // List operations happen before changes to the counts/usage
   --num_protected_;
   ++num_unprotected_;
+  // Transfer the usage
+  protected_usage_ -= e->charge();
+  unprotected_usage_ += e->charge();
   // If necessary, evict an entry from the unprotected list
   EnforceUnprotectedCapacity(tstate);
 }
 
 void LIRSCacheShard::UnprotectedToTombstone(LIRSThreadState* tstate, LIRSHandle* e) {
   // Decrement unprotected usage
-  DCHECK(e->unprotected_list_hook_.is_linked());
+  DCHECK(e->unprotected_tombstone_list_hook_.is_linked());
   DCHECK(e->recency_list_hook_.is_linked());
-  unprotected_list_.erase(unprotected_list_.iterator_to(*e));
-  unprotected_usage_ -= e->charge();
-  --num_unprotected_;
-  ++num_tombstones_;
+
+  // Optimized code to go from UNPROTECTED to TOMBSTONE without adding/removing
+  // it from a list. Only the unprotected_list_front_ moves.
+  DCHECK_EQ(e, unprotected_list_front_);
+  if (num_unprotected_ > 1) {
+    // There is some other UNPROTECTED entry
+    auto it = unprotected_tombstone_list_.iterator_to(*e);
+    ++it;
+    unprotected_list_front_ = &*it;
+  } else {
+    // This was the only UNPROTECTED entry, the unprotected list is empty
+    unprotected_list_front_ = nullptr;
+  }
+
   // Set state to TOMBSTONE. If there are currently no references, this thread is
   // responsible for eviction, so it must also set the residency to EVICTING.
   auto state_transition = e->modify_atomic_state([](AtomicState& cur_state) {
@@ -650,31 +738,39 @@ void LIRSCacheShard::UnprotectedToTombstone(LIRSThreadState* tstate, LIRSHandle*
   if (state_transition.before.ref_count == 0) {
     tstate->handles_to_evict.push_back(e);
   }
+  // List operations happen before changes to the counts/usage
+  --num_unprotected_;
+  ++num_tombstones_;
+
+  // This will be evicted, so the charge disappears
+  unprotected_usage_ -= e->charge();
   EnforceTombstoneLimit(tstate);
 }
 
 void LIRSCacheShard::UninitializedToProtected(LIRSThreadState* tstate, LIRSHandle* e) {
-  DCHECK(!e->unprotected_list_hook_.is_linked());
+  DCHECK(!e->unprotected_tombstone_list_hook_.is_linked());
   DCHECK(!e->recency_list_hook_.is_linked());
   e->set_state(UNINITIALIZED, PROTECTED);
   HandleBase* existing = table_.Insert(e);
   DCHECK(existing == nullptr);
-  MoveToRecencyListBack(tstate, e, false);
-  protected_usage_ += e->charge();
+  recency_list_.push_back(*e);
+  // List operations happen before changes to the counts/usage
   ++num_protected_;
+  protected_usage_ += e->charge();
   EnforceProtectedCapacity(tstate);
 }
 
 bool LIRSCacheShard::UninitializedToUnprotected(LIRSThreadState* tstate, LIRSHandle* e) {
-  DCHECK(!e->unprotected_list_hook_.is_linked());
+  DCHECK(!e->unprotected_tombstone_list_hook_.is_linked());
   DCHECK(!e->recency_list_hook_.is_linked());
   e->set_state(UNINITIALIZED, UNPROTECTED);
   HandleBase* existing = table_.Insert(e);
   DCHECK(existing == nullptr);
   recency_list_.push_back(*e);
-  unprotected_usage_ += e->charge();
+  AddToUnprotectedList(e);
+  // List operations happen before changes to the counts/usage
   ++num_unprotected_;
-  unprotected_list_.push_back(*e);
+  unprotected_usage_ += e->charge();
   // If necessary, evict an entry from the unprotected list
   EnforceUnprotectedCapacity(tstate);
   // There is exactly one failure case:
@@ -682,13 +778,13 @@ bool LIRSCacheShard::UninitializedToUnprotected(LIRSThreadState* tstate, LIRSHan
   // unprotected entries to be removed (including itself).
   if (e->charge() > unprotected_capacity_) {
     DCHECK(e->state() == UNINITIALIZED || e->state() == TOMBSTONE);
-    DCHECK(unprotected_list_.empty());
+    DCHECK_EQ(num_unprotected_, 0);
     return false;
   }
   // The entry remains in the cache
   DCHECK_EQ(e->state(), UNPROTECTED);
-  DCHECK(!unprotected_list_.empty());
-  DCHECK(e->unprotected_list_hook_.is_linked());
+  DCHECK(!unprotected_tombstone_list_.empty());
+  DCHECK(e->unprotected_tombstone_list_hook_.is_linked());
   return true;
 }
 
@@ -696,24 +792,28 @@ void LIRSCacheShard::ToUninitialized(LIRSThreadState* tstate, LIRSHandle* e) {
   DCHECK_NE(e->state(), UNINITIALIZED);
   LIRSHandle* removed_elem = static_cast<LIRSHandle*>(table_.Remove(e->key(), e->hash()));
   DCHECK(e == removed_elem || removed_elem == nullptr);
-  if (e->state() == UNPROTECTED) {
-    // Remove from the unprotected list and decrement usage
-    unprotected_list_.erase(unprotected_list_.iterator_to(*e));
-    unprotected_usage_ -= e->charge();
-    --num_unprotected_;
-  } else {
-    DCHECK(!e->unprotected_list_hook_.is_linked());
-  }
   // Remove from the list (if it is in the list)
   if (e->recency_list_hook_.is_linked()) {
     recency_list_.erase(recency_list_.iterator_to(*e));
   }
+  if (e->state() == UNPROTECTED) {
+    if (e->unprotected_tombstone_list_hook_.is_linked()) {
+      // Remove from the unprotected list and decrement usage
+      RemoveFromUnprotectedList(e);
+    }
+    --num_unprotected_;
+    unprotected_usage_ -= e->charge();
+  } else if (e->state() == TOMBSTONE) {
+    if (e->unprotected_tombstone_list_hook_.is_linked()) {
+      unprotected_tombstone_list_.erase(unprotected_tombstone_list_.iterator_to(*e));
+    }
+    --num_tombstones_;
+  } else {
+    DCHECK(!e->unprotected_tombstone_list_hook_.is_linked());
+  }
   if (e->state() == PROTECTED) {
     protected_usage_ -= e->charge();
     --num_protected_;
-  }
-  if (e->state() == TOMBSTONE) {
-    --num_tombstones_;
   }
 
   auto state_transition = e->modify_atomic_state([](AtomicState& cur_state) {
@@ -813,8 +913,8 @@ HandleBase* LIRSCacheShard::Lookup(const Slice& key, uint32_t hash,
           // an UNPROTECTED entry, but it should be added back to the recency list and
           // readded as the most recent entry on the unprotected list.
           MoveToRecencyListBack(&tstate, e, false);
-          unprotected_list_.erase(unprotected_list_.iterator_to(*e));
-          unprotected_list_.push_back(*e);
+          RemoveFromUnprotectedList(e);
+          AddToUnprotectedList(e);
         }
         break;
       default:

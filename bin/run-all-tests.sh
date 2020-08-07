@@ -62,6 +62,8 @@ fi
 : ${DATA_CACHE_DIR:=}
 # Data cache size.
 : ${DATA_CACHE_SIZE:=}
+# Data cache eviction policy
+: ${DATA_CACHE_EVICTION_POLICY:=}
 if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
   # TODO: Remove abort_on_config_error flag from here and create-load-data.sh once
   # checkConfiguration() accepts the local filesystem (see IMPALA-1850).
@@ -75,7 +77,11 @@ fi
 # Enable data cache if configured.
 if [[ -n "${DATA_CACHE_DIR}" && -n "${DATA_CACHE_SIZE}" ]]; then
    TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} "`
-       `"--data_cache_dir=${DATA_CACHE_DIR} --data_cache_size=${DATA_CACHE_SIZE}"
+       `"--data_cache_dir=${DATA_CACHE_DIR} --data_cache_size=${DATA_CACHE_SIZE} "
+   if [[ -n "${DATA_CACHE_EVICTION_POLICY}" ]]; then
+       TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} "`
+           `"--data_cache_eviction_policy=${DATA_CACHE_EVICTION_POLICY}"
+   fi
    # Force use of data cache for HDFS. Data cache is only enabled for remote reads.
    if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
       TEST_START_CLUSTER_ARGS="${TEST_START_CLUSTER_ARGS} "`
