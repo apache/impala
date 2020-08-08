@@ -147,10 +147,13 @@ QueryState::~QueryState() {
 
 Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
     const TExecPlanFragmentInfo& fragment_info) {
+  std::lock_guard<std::mutex> l(init_lock_);
   // Decremented in QueryExecMgr::StartQueryHelper() on success or by the caller of
   // Init() on failure. We need to do this before any returns because Init() always
   // returns a resource refcount to its caller.
   AcquireBackendResourceRefcount();
+
+  if (IsCancelled()) return Status::CANCELLED;
 
   RETURN_IF_ERROR(DebugAction(query_options(), "QUERY_STATE_INIT"));
 
@@ -225,11 +228,6 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
       non_const_fragment_info.fragment_instance_ctxs);
   fragment_info_.__isset.fragment_instance_ctxs = true;
 
-  instances_prepared_barrier_.reset(
-      new CountingBarrier(fragment_info_.fragment_instance_ctxs.size()));
-  instances_finished_barrier_.reset(
-      new CountingBarrier(fragment_info_.fragment_instance_ctxs.size()));
-
   // Claim the query-wide minimum reservation. Do this last so that we don't need
   // to handle releasing it if a later step fails.
   initial_reservations_ =
@@ -239,6 +237,14 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
       query_id(), exec_rpc_params->min_mem_reservation_bytes()));
   RETURN_IF_ERROR(InitFilterBank());
   scanner_mem_limiter_ = obj_pool_.Add(new ScannerMemLimiter);
+
+  // Set barriers only for successful initialization. Otherwise the barriers
+  // never be notified.
+  instances_prepared_barrier_.reset(
+      new CountingBarrier(fragment_info_.fragment_instance_ctxs.size()));
+  instances_finished_barrier_.reset(
+      new CountingBarrier(fragment_info_.fragment_instance_ctxs.size()));
+  is_initialized_ = true;
   return Status::OK();
 }
 
@@ -847,6 +853,13 @@ void QueryState::ExecFInstance(FragmentInstanceState* fis) {
 
 void QueryState::Cancel() {
   VLOG_QUERY << "Cancel: query_id=" << PrintId(query_id());
+  {
+    std::lock_guard<std::mutex> l(init_lock_);
+    if (!is_initialized_) {
+      discard_result(is_cancelled_.CompareAndSwap(0, 1));
+      return;
+    }
+  }
   discard_result(WaitForPrepare());
   if (!is_cancelled_.CompareAndSwap(0, 1)) return;
   if (filter_bank_ != nullptr) filter_bank_->Cancel();
