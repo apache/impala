@@ -109,7 +109,10 @@ class TRuntimeProfileForest;
 /// indicator). If execution ended with an error, that error status will be part of
 /// the final report (it will not be overridden by the resulting cancellation).
 ///
-/// Thread-safe, unless noted otherwise.
+/// Thread-safe Notes:
+/// - Init() must be called first. After Init() returns successfully, all other public
+///   functions are thread-safe to be called unless noted otherwise.
+/// - Cancel() is safe to be called at any time (before or during Init()).
 ///
 /// TODO:
 /// - set up kudu clients in Init(), remove related locking
@@ -186,7 +189,7 @@ class QueryState {
   /// it to the caller on both success and failure. The caller must release it by
   /// calling ReleaseBackendResourceRefcount().
   ///
-  /// Uses few cycles and never blocks. Not idempotent, not thread-safe.
+  /// Uses few cycles and blocks Cancel() to execute. Not idempotent.
   /// The remaining public functions must be called only after Init().
   Status Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
       const TExecPlanFragmentInfo& fragment_info) WARN_UNUSED_RESULT;
@@ -216,6 +219,8 @@ class QueryState {
 
   /// Cancels all actively executing fragment instances. Blocks until all fragment
   /// instances have finished their Prepare phase. Idempotent.
+  /// For uninitialized QueryState, just set is_cancelled_ and don't need to cancel
+  /// fragment instances.
   void Cancel();
 
   /// Return true if the executing fragment instances have been cancelled.
@@ -401,6 +406,13 @@ class QueryState {
 
   ObjectPool obj_pool_;
   AtomicInt32 refcnt_;
+
+  /// Protects 'is_initialized_'.
+  std::mutex init_lock_;
+
+  /// Set as true on successful initialization.
+  /// Protected by 'init_lock_'.
+  bool is_initialized_ = false;
 
   /// set to 1 when any fragment instance fails or when Cancel() is called; used to
   /// initiate cancellation exactly once
