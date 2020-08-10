@@ -253,6 +253,7 @@ def _compute_defaults():
   if total_memory_gb >= 140:
     suite_concurrency = 6
     memlimit_gb = 11
+    parallel_test_concurrency = min(cpus, 12)
   elif total_memory_gb >= 95:
     suite_concurrency = 4
     memlimit_gb = 11
