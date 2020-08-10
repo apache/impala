@@ -37,7 +37,6 @@
 #include "util/thread.h"
 
 namespace impala {
-
 namespace io {
 
 class DataCache;
@@ -74,10 +73,20 @@ class DiskQueue;
 /// are made. It is the responsibility of the client to ensure that the data to be
 /// written is valid. The file to be written is created if not already present.
 ///
+/// For File Operations:
+/// In addition to operations for readers and writers, there is a special operation type
+/// which is the file operation, allows io operations (upload or fetch) on the entire file
+/// between local filesystem and remote filesystem. Each file operation range is enqueued
+/// in the specific file operation queue, and processed by a disk thread for doing the
+/// file operation. After the operation is done, a callback function of the file operation
+/// range is invoked. There is a memory allocation for a block to do the data
+/// transmission, and the memory is released immediately after the operation is done.
+///
 /// There are several key methods for scanning data with the IoMgr.
 ///  1. RequestContext::StartScanRange(): adds range to the IoMgr to start immediately.
 ///  2. RequestContext::AddScanRanges(): adds ranges to the IoMgr that the reader wants to
-///     scan, but does not start them until RequestContext::GetNextUnstartedRange() is called.
+///     scan, but does not start them until RequestContext::GetNextUnstartedRange() is
+///     called.
 ///  3. RequestContext::GetNextUnstartedRange(): returns to the caller the next scan range
 ///     it should process.
 ///  4. ScanRange::GetNext(): returns the next buffer for this range, blocking until
@@ -98,7 +107,9 @@ class DiskQueue;
 /// by a write, and a write is followed by a read, i.e. reads and writes alternate.
 /// If multiple write ranges are enqueued for a single disk, they will be processed
 /// by the disk threads in order, but may complete in any order. No guarantees are made
-/// on ordering of writes across disks.
+/// on ordering of writes across disks. The strategy of scheduling is the same for file
+/// operation ranges, but the file operation ranges are in a sperate queue compared to
+/// read(scan) or write ranges.
 ///
 /// Resource Management: the IoMgr is designed to share the available disk I/O capacity
 /// between many clients and to help use the available I/O capacity efficiently. The IoMgr
@@ -278,7 +289,7 @@ class DiskIoMgr : public CacheLineAligned {
   /// disk_queues_.  The disk_id is the volume ID for the local disk that holds the
   /// files, or -1 if unknown.  Flag expected_local is true iff this impalad is
   /// co-located with the datanode for this file.
-  int AssignQueue(const char* file, int disk_id, bool expected_local);
+  int AssignQueue(const char* file, int disk_id, bool expected_local = false);
 
   int64_t min_buffer_size() const { return min_buffer_size_; }
   int64_t max_buffer_size() const { return max_buffer_size_; }
@@ -295,8 +306,18 @@ class DiskIoMgr : public CacheLineAligned {
   /// The disk ID (and therefore disk_queues_ index) used for DFS accesses.
   int RemoteDfsDiskId() const { return num_local_disks() + REMOTE_DFS_DISK_OFFSET; }
 
+  /// The disk ID used for DFS File Operations (upload or fetch) accesses.
+  int RemoteDfsDiskFileOperId() const {
+    return num_local_disks() + REMOTE_DFS_DISK_FILE_OPER_OFFSET;
+  }
+
   /// The disk ID (and therefore disk_queues_ index) used for S3 accesses.
   int RemoteS3DiskId() const { return num_local_disks() + REMOTE_S3_DISK_OFFSET; }
+
+  /// The disk ID used for S3 File Operations (upload or fetch) accesses.
+  int RemoteS3DiskFileOperId() const {
+    return num_local_disks() + REMOTE_S3_DISK_FILE_OPER_OFFSET;
+  }
 
   /// The disk ID (and therefore disk_queues_ index) used for ABFS accesses.
   int RemoteAbfsDiskId() const { return num_local_disks() + REMOTE_ABFS_DISK_OFFSET; }
@@ -352,12 +373,17 @@ class DiskIoMgr : public CacheLineAligned {
 
   /// "Disk" queue offsets for remote accesses.  Offset 0 corresponds to
   /// disk ID (i.e. disk_queue_ index) of num_local_disks().
+  /// DISK_FILE_OPER queues are for the file operations, such as file upload
+  /// or fetch, to be isolated from the range read/write operations in ordinary
+  /// queues mainly for efficiency consideration.
   enum {
     REMOTE_DFS_DISK_OFFSET = 0,
     REMOTE_S3_DISK_OFFSET,
     REMOTE_ADLS_DISK_OFFSET,
     REMOTE_ABFS_DISK_OFFSET,
     REMOTE_OZONE_DISK_OFFSET,
+    REMOTE_DFS_DISK_FILE_OPER_OFFSET,
+    REMOTE_S3_DISK_FILE_OPER_OFFSET,
     REMOTE_NUM_DISKS
   };
 
@@ -387,7 +413,10 @@ class DiskIoMgr : public CacheLineAligned {
   /// BEGIN: private members that are accessed by other io:: classes
   friend class DiskQueue;
   friend class ScanRange;
+  friend class WriteRange;
+  friend class RemoteOperRange;
   friend class HdfsFileReader;
+  friend class LocalFileWriter;
 
   /// Write the specified range to disk and calls writer_context->WriteDone() when done.
   /// Responsible for opening and closing the file that is written.

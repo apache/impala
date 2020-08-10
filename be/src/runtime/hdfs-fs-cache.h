@@ -40,6 +40,7 @@ namespace impala {
 class HdfsFsCache {
  public:
   typedef boost::unordered_map<std::string, hdfsFS> HdfsFsMap;
+  typedef std::vector<std::pair<string, string>> HdfsConnOptions;
 
   static HdfsFsCache* instance() { return HdfsFsCache::instance_.get(); }
 
@@ -51,10 +52,11 @@ class HdfsFsCache {
 
   /// Get connection to specific fs by specifying a path.  Optionally, a local cache can
   /// be provided so that the process-wide lock can be avoided on subsequent calls for
-  /// the same filesystem.  The caller is responsible for synchronizing the local cache
+  /// the same filesystem. Also, options can be provided to create the hdfs connection.
+  /// The caller is responsible for synchronizing the local cache
   /// (e.g. by passing a thread-local cache).
-  Status GetConnection(const std::string& path, hdfsFS* fs,
-      HdfsFsMap* local_cache = NULL);
+  Status GetConnection(const std::string& path, hdfsFS* fs, HdfsFsMap* local_cache = NULL,
+      const HdfsConnOptions* options = NULL);
 
   /// Get NameNode info from path, set error message if path is not valid.
   /// Exposed as a static method for testing purpose.

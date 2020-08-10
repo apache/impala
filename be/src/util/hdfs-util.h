@@ -24,6 +24,14 @@
 
 namespace impala {
 
+/// Define prefix of remote file systems
+extern const char* FILESYS_PREFIX_HDFS;
+extern const char* FILESYS_PREFIX_S3;
+extern const char* FILESYS_PREFIX_ABFS;
+extern const char* FILESYS_PREFIX_ABFS_SEC;
+extern const char* FILESYS_PREFIX_ADL;
+extern const char* FILESYS_PREFIX_OZONE;
+
 /// Utility function to get error messages from HDFS. This function takes prefix/file and
 /// appends errno to it. Note: any stdlib function can reset errno, this should be called
 /// immediately following the failed call into libhdfs.
@@ -44,19 +52,22 @@ Status CopyHdfsFile(const hdfsFS& src_conn, const std::string& src_path,
                     const hdfsFS& dst_conn, const std::string& dst_path);
 
 /// Returns true iff the path refers to a location on an HDFS filesystem.
-bool IsHdfsPath(const char* path);
+/// If check_default_fs is true, the function checks and returns true if the default
+/// filesystem is HDFS when the path doen't contain any prefix like 'hdfs://'.
+/// If check_default_fs is false, the fucntion checks the path only.
+bool IsHdfsPath(const char* path, bool check_default_fs = true);
 
 /// Returns true iff the path refers to a location on an S3A filesystem.
-bool IsS3APath(const char* path);
+bool IsS3APath(const char* path, bool check_default_fs = true);
 
 /// Returns true iff the path refers to a location on an ABFS filesystem.
-bool IsABFSPath(const char* path);
+bool IsABFSPath(const char* path, bool check_default_fs = true);
 
 /// Returns true iff the path refers to a location on an ADL filesystem.
-bool IsADLSPath(const char* path);
+bool IsADLSPath(const char* path, bool check_default_fs = true);
 
 /// Returns true iff the path refers to a location on an Ozone filesystem.
-bool IsOzonePath(const char* path);
+bool IsOzonePath(const char* path, bool check_default_fs = true);
 
 /// Returns true iff 'pathA' and 'pathB' are on the same filesystem.
 bool FilesystemsMatch(const char* pathA, const char* pathB);

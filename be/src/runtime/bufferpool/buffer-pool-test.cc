@@ -59,9 +59,17 @@ using std::uniform_real_distribution;
 DECLARE_bool(disk_spill_encryption);
 DECLARE_string(disk_spill_compression_codec);
 DECLARE_bool(disk_spill_punch_holes);
+DECLARE_string(remote_tmp_file_block_size);
+DECLARE_string(remote_tmp_file_size);
+DECLARE_bool(allow_spill_to_hdfs);
 
 // This suffix is appended to a tmp dir
 const string SCRATCH_SUFFIX = "/impala-scratch";
+
+/// For testing spill to remote.
+static const string HDFS_LOCAL_URL = "hdfs://localhost";
+static const string REMOTE_URL = HDFS_LOCAL_URL;
+static const string LOCAL_BUFFER_PATH = "/tmp/buffer-pool-test-buffer";
 
 namespace impala {
 
@@ -73,6 +81,9 @@ class BufferPoolTest : public ::testing::Test {
  public:
   virtual void SetUp() {
     test_env_.reset(new TestEnv);
+    FLAGS_allow_spill_to_hdfs = true;
+    FLAGS_remote_tmp_file_size = "512KB";
+
     // Don't create global buffer pool in 'test_env_' - we'll create a buffer pool in
     // each test function.
     test_env_->DisableBufferPool();
@@ -137,6 +148,37 @@ class BufferPoolTest : public ::testing::Test {
     test_env_->SetTmpFileMgrArgs(tmp_dirs, false, compression, punch_holes);
     EXPECT_OK(test_env_->Init());
     EXPECT_EQ(num_dirs, test_env_->tmp_file_mgr()->NumActiveTmpDevices());
+    return tmp_dirs;
+  }
+
+  /// Init a new tmp file manager with spill to remote options.
+  vector<string> InitTmpFileMgrSpillToRemote(
+      int num_local_dirs, int64_t local_spill_limit, int64_t local_buffer_limit) {
+    vector<string> tmp_dirs;
+    int expected_tmp_dirs_num = num_local_dirs + 2;
+    int expected_active_dev = num_local_dirs + 1;
+    if (local_buffer_limit == -1) {
+      tmp_dirs.push_back(LOCAL_BUFFER_PATH);
+    } else {
+      tmp_dirs.push_back(Substitute(LOCAL_BUFFER_PATH + ":$0", local_buffer_limit));
+    }
+    tmp_dirs.push_back(REMOTE_URL);
+    EXPECT_OK(FileSystemUtil::RemoveAndCreateDirectory(LOCAL_BUFFER_PATH));
+    for (int i = 0; i < num_local_dirs; ++i) {
+      const string& create_dir = Substitute("/tmp/buffer-pool-test.$0", i);
+      // Fix permissions in case old directories were left from previous runs of test.
+      chmod((create_dir + SCRATCH_SUFFIX).c_str(), S_IRWXU);
+      EXPECT_OK(FileSystemUtil::RemoveAndCreateDirectory(create_dir));
+      created_tmp_dirs_.push_back(create_dir);
+      const string& dir = Substitute("/tmp/buffer-pool-test.$0:$1", i, local_spill_limit);
+      tmp_dirs.push_back(dir);
+    }
+    EXPECT_EQ(expected_tmp_dirs_num, tmp_dirs.size());
+    test_env_.reset(new TestEnv);
+    test_env_->DisableBufferPool();
+    test_env_->SetTmpFileMgrArgs(tmp_dirs, false, "", false);
+    EXPECT_OK(test_env_->Init());
+    EXPECT_EQ(expected_active_dev, test_env_->tmp_file_mgr()->NumActiveTmpDevices());
     return tmp_dirs;
   }
 
@@ -2014,6 +2056,22 @@ TEST_F(BufferPoolTest, Multi4Random) {
 }
 
 TEST_F(BufferPoolTest, Multi8Random) {
+  TestRandomInternalMulti(8, 8 * 1024, true);
+  TestRandomInternalMulti(8, 8 * 1024, false);
+}
+
+// Test with remote scratch space mixed with two local dirs.
+TEST_F(BufferPoolTest, Multi8RandomSpillToRemoteMix) {
+  // 4M buffer size.
+  InitTmpFileMgrSpillToRemote(2, 8 * 1024, 4 * 1024 * 1024);
+  TestRandomInternalMulti(8, 8 * 1024, true);
+  TestRandomInternalMulti(8, 8 * 1024, false);
+}
+
+// Test with remote scratch space only.
+TEST_F(BufferPoolTest, Multi8RandomSpillToRemote) {
+  // 4M buffer size.
+  InitTmpFileMgrSpillToRemote(0, -1, 4 * 1024 * 1024);
   TestRandomInternalMulti(8, 8 * 1024, true);
   TestRandomInternalMulti(8, 8 * 1024, false);
 }

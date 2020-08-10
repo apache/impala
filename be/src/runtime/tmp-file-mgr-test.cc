@@ -52,6 +52,8 @@ DECLARE_bool(disk_spill_punch_holes);
 #ifndef NDEBUG
 DECLARE_int32(stress_scratch_write_delay_ms);
 #endif
+DECLARE_string(remote_tmp_file_size);
+DECLARE_bool(allow_spill_to_hdfs);
 
 namespace impala {
 
@@ -61,6 +63,11 @@ static const int64_t KILOBYTE = 1024L;
 static const int64_t MEGABYTE = 1024L * KILOBYTE;
 static const int64_t GIGABYTE = 1024L * MEGABYTE;
 static const int64_t TERABYTE = 1024L * GIGABYTE;
+
+/// For testing spill to remote.
+static const string HDFS_LOCAL_URL = "hdfs://localhost";
+static const string REMOTE_URL = HDFS_LOCAL_URL;
+static const string LOCAL_BUFFER_PATH = "/tmp/tmp-file-mgr-test-buffer";
 
 class TmpFileMgrTest : public ::testing::Test {
  public:
@@ -73,6 +80,8 @@ class TmpFileMgrTest : public ::testing::Test {
 #ifndef NDEBUG
     FLAGS_stress_scratch_write_delay_ms = 0;
 #endif
+    FLAGS_remote_tmp_file_size = "8MB";
+    FLAGS_allow_spill_to_hdfs = true;
 
     metrics_.reset(new MetricGroup("tmp-file-mgr-test"));
     profile_ = RuntimeProfile::Create(&obj_pool_, "tmp-file-mgr-test");
@@ -180,6 +189,10 @@ class TmpFileMgrTest : public ::testing::Test {
     group->io_ctx_->Cancel();
   }
 
+  static void SetWriteRangeContext(WriteRange* write_range, TmpFileGroup* group) {
+    write_range->SetRequestContext(group->io_ctx_.get());
+  }
+
   /// Helper to get the # of bytes allocated by the group. Validates that the sum across
   /// all files equals this total.
   static int64_t BytesAllocated(TmpFileGroup* group) {
@@ -190,7 +203,7 @@ class TmpFileMgrTest : public ::testing::Test {
       EXPECT_GE(allocated, reclaimed);
       bytes_allocated += allocated - reclaimed;
     }
-    EXPECT_EQ(bytes_allocated, group->current_bytes_allocated_);
+    EXPECT_EQ(bytes_allocated, group->current_bytes_allocated_.Load());
     return bytes_allocated;
   }
 
@@ -238,7 +251,16 @@ class TmpFileMgrTest : public ::testing::Test {
   void TestBlockVerification();
 
   /// Implementation of TestCompressBufferManagment
-  void TestCompressBufferManagement();
+  void TestCompressBufferManagement(bool spill_to_remote, bool wait_upload);
+
+  /// Helper function to do test on TmpFileBufferPool.
+  void TestTmpFileBufferPoolHelper(TmpFileMgr& tmp_file_mgr,
+      unique_ptr<TmpFileGroup>* tmp_file_group,
+      boost::scoped_ptr<io::WriteRange>& write_range,
+      WriteRange::WriteDoneCallback& callback);
+
+  /// Check the TmpFileBufferPool after the test case tears down.
+  void TestTmpFileBufferPoolTearDown(TmpFileMgr& tmp_file_mgr);
 
   ObjectPool obj_pool_;
   scoped_ptr<MetricGroup> metrics_;
@@ -944,15 +966,41 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsing) {
 // Test compression buffer memory management for reads and writes.
 TEST_F(TmpFileMgrTest, TestCompressBufferManagement) {
   FLAGS_disk_spill_encryption = false;
-  TestCompressBufferManagement();
+  TestCompressBufferManagement(false, false);
 }
 
 TEST_F(TmpFileMgrTest, TestCompressBufferManagementEncrypted) {
   FLAGS_disk_spill_encryption = true;
-  TestCompressBufferManagement();
+  TestCompressBufferManagement(false, false);
 }
 
-void TmpFileMgrTest::TestCompressBufferManagement() {
+// Test spill to a remote directory with compression or encryption.
+TEST_F(TmpFileMgrTest, TestCompressBufferManagementRemote) {
+  FLAGS_disk_spill_encryption = false;
+  TestCompressBufferManagement(true, false);
+}
+
+TEST_F(TmpFileMgrTest, TestCompressBufferManagementEncryptedRemote) {
+  FLAGS_disk_spill_encryption = true;
+  TestCompressBufferManagement(true, false);
+}
+
+// Test spill to a remote directory with compression or encryption, and wait for the
+// upload finished.
+TEST_F(TmpFileMgrTest, TestCompressBufferManagementRemoteUpload) {
+  FLAGS_disk_spill_encryption = false;
+  FLAGS_remote_tmp_file_size = "8B";
+  TestCompressBufferManagement(true, true);
+}
+
+TEST_F(TmpFileMgrTest, TestCompressBufferManagementEncryptedRemoteUpload) {
+  FLAGS_disk_spill_encryption = true;
+  FLAGS_remote_tmp_file_size = "8B";
+  TestCompressBufferManagement(true, true);
+}
+
+void TmpFileMgrTest::TestCompressBufferManagement(
+    bool spill_to_remote, bool wait_upload) {
   // Data string should be long and redundant enough to be compressible.
   const string DATA = "the quick brown fox jumped over the lazy dog"
                       "the fast red fox leaped over the sleepy dog";
@@ -964,8 +1012,14 @@ void TmpFileMgrTest::TestCompressBufferManagement() {
   // for 'data' (since compression buffers need to be slightly larger than
   // uncompressed data).
   TmpFileMgr tmp_file_mgr;
-  ASSERT_OK(tmp_file_mgr.InitCustom(
-      vector<string>{"/tmp/tmp-file-mgr-test.1"}, true, "lz4", true, metrics_.get()));
+  if (spill_to_remote) {
+    RemoveAndCreateDirs(vector<string>{LOCAL_BUFFER_PATH});
+    ASSERT_OK(tmp_file_mgr.InitCustom(vector<string>{REMOTE_URL, LOCAL_BUFFER_PATH}, true,
+        "lz4", true, metrics_.get()));
+  } else {
+    ASSERT_OK(tmp_file_mgr.InitCustom(
+        vector<string>{"/tmp/tmp-file-mgr-test.1"}, true, "lz4", true, metrics_.get()));
+  }
   MemTracker* compressed_buffer_tracker = tmp_file_mgr.compressed_buffer_tracker();
   TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, TUniqueId());
   MemRange data_mem_range(reinterpret_cast<uint8_t*>(&data[0]), data.size());
@@ -1001,6 +1055,25 @@ void TmpFileMgrTest::TestCompressBufferManagement() {
   WaitForCallbacks(2);
   EXPECT_EQ(0, compressed_buffer_tracker->consumption())
       << "No memory should be consumed when no reads or writes in-flight";
+
+  if (spill_to_remote && wait_upload) {
+    EXPECT_NE(compressed_handle->file_, uncompressed_handle->file_);
+    auto wait_upload_func = [&](TmpFile* tmp_file) {
+      // Wait until the file has been uploaded to remote dir.
+      // Should be finished in 2 seconds.
+      int wait_times = 10;
+      while (wait_times-- > 0) {
+        if (tmp_file->DiskFile()->GetFileStatus() == io::DiskFileStatus::PERSISTED) break;
+        usleep(200 * 1000);
+      }
+      EXPECT_EQ(tmp_file->DiskFile()->GetFileStatus(), io::DiskFileStatus::PERSISTED);
+      // Remove the local buffer to enforce reading from the remote file.
+      tmp_file->GetWriteFile()->SetStatus(io::DiskFileStatus::DELETED);
+      EXPECT_OK(FileSystemUtil::RemovePaths({tmp_file->GetWriteFile()->path()}));
+    };
+    wait_upload_func(compressed_handle->file_);
+    wait_upload_func(uncompressed_handle->file_);
+  }
 
   vector<uint8_t> tmp(data.size());
   vector<uint8_t> big_tmp(big_data.size());
@@ -1189,4 +1262,499 @@ TEST_F(TmpFileMgrTest, TestPriorityBasedSpilling) {
 
   file_group1.Close();
 }
+
+/// Test the case we have one remote dir with one local dir as buffer.
+TEST_F(TmpFileMgrTest, TestRemoteOneDir) {
+  vector<string> tmp_dirs({LOCAL_BUFFER_PATH});
+  TmpFileMgr tmp_file_mgr;
+  RemoveAndCreateDirs(tmp_dirs);
+  tmp_dirs.push_back(REMOTE_URL);
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  int64_t alloc_size = 1024;
+
+  EXPECT_EQ(1, tmp_file_mgr.NumActiveTmpDevices());
+  vector<TmpFileMgr::DeviceId> devices = tmp_file_mgr.ActiveTmpDevices();
+  EXPECT_EQ(1, devices.size());
+  TmpFile* file = nullptr;
+  int64_t offset = -1;
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &file, &offset));
+  ASSERT_TRUE(file != nullptr);
+  EXPECT_EQ(0, offset);
+  // Check the prefix is the expected temporary directory.
+  EXPECT_EQ(0, file->path().find(tmp_dirs[1]));
+  file_group.Close();
+  CheckMetrics(&tmp_file_mgr);
+}
+
+/// Test that reporting a write error is possible but does not result in
+/// blacklisting the device.
+TEST_F(TmpFileMgrTest, TestRemoteDirReportError) {
+  int64_t alloc_size = 1024;
+  int64_t alloc_size2 = 512;
+  FLAGS_remote_tmp_file_size = "2K";
+  vector<string> tmp_dirs({LOCAL_BUFFER_PATH});
+  TmpFileMgr tmp_file_mgr;
+  RemoveAndCreateDirs(tmp_dirs);
+  tmp_dirs.push_back(REMOTE_URL);
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+
+  EXPECT_EQ(1, tmp_file_mgr.NumActiveTmpDevices());
+  vector<TmpFileMgr::DeviceId> devices = tmp_file_mgr.ActiveTmpDevices();
+  EXPECT_EQ(1, devices.size());
+  CheckMetrics(&tmp_file_mgr);
+
+  TmpFile* good_file = nullptr;
+  int64_t offset = -1;
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &good_file, &offset));
+  ASSERT_TRUE(good_file != nullptr);
+  EXPECT_EQ(0, offset);
+
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &good_file, &offset));
+  ASSERT_TRUE(good_file != nullptr);
+  EXPECT_EQ(alloc_size, offset);
+
+  // A new file should be created.
+  TmpFile* bad_file = nullptr;
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &bad_file, &offset));
+  ASSERT_TRUE(bad_file != nullptr);
+  EXPECT_EQ(0, offset);
+
+  // Inject an error on one device so that we can validate it is handled correctly.
+  ErrorMsg errmsg(TErrorCode::GENERAL, "A fake error");
+  bad_file->Blacklist(errmsg);
+
+  // File-level blacklisting is enabled but not device-level.
+  EXPECT_TRUE(bad_file->is_blacklisted());
+  // The bad device should still be active.
+  EXPECT_EQ(1, tmp_file_mgr.NumActiveTmpDevices());
+  vector<TmpFileMgr::DeviceId> devices_after = tmp_file_mgr.ActiveTmpDevices();
+  EXPECT_EQ(1, devices_after.size());
+  CheckMetrics(&tmp_file_mgr);
+
+  // Attempts to expand bad file should change a file.
+  TmpFile* bad_file2;
+  TmpFile* good_file2;
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size2, &bad_file2, &offset));
+  EXPECT_EQ(0, offset);
+  EXPECT_NE(bad_file, bad_file2);
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &good_file2, &offset));
+  EXPECT_EQ(alloc_size2, offset);
+  EXPECT_EQ(bad_file2, good_file2);
+  file_group.Close();
+  CheckMetrics(&tmp_file_mgr);
+}
+
+TEST_F(TmpFileMgrTest, TestRemoteAllocateNonWritable) {
+  vector<string> tmp_dirs({LOCAL_BUFFER_PATH});
+  TmpFileMgr tmp_file_mgr;
+  RemoveAndCreateDirs(tmp_dirs);
+  tmp_dirs.push_back(REMOTE_URL);
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  int64_t alloc_size = 1024;
+
+  EXPECT_EQ(1, tmp_file_mgr.NumActiveTmpDevices());
+  vector<TmpFileMgr::DeviceId> devices = tmp_file_mgr.ActiveTmpDevices();
+  EXPECT_EQ(1, devices.size());
+  TmpFile* file = nullptr;
+  int64_t offset = -1;
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &file, &offset));
+  ASSERT_TRUE(file != nullptr);
+  EXPECT_EQ(0, offset);
+
+  // Make local buffer non-writable and test allocation at different stages:
+  // new file creation, files with no allocated blocks. files with allocated space.
+  // No errors should be encountered during allocation since allocation is purely logical.
+  chmod(LOCAL_BUFFER_PATH.c_str(), 0);
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &file, &offset));
+  ASSERT_TRUE(file != nullptr);
+  EXPECT_EQ(alloc_size, offset);
+  chmod(LOCAL_BUFFER_PATH.c_str(), S_IRWXU);
+  file_group.Close();
+}
+
+TEST_F(TmpFileMgrTest, TestRemoteScratchLimit) {
+  int64_t alloc_size = 512;
+  int64_t limit = alloc_size * 2;
+  FLAGS_remote_tmp_file_size = "1K";
+  vector<string> tmp_dirs({LOCAL_BUFFER_PATH});
+  TmpFileMgr tmp_file_mgr;
+  RemoveAndCreateDirs(tmp_dirs);
+  tmp_dirs.push_back(REMOTE_URL);
+
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id, limit);
+
+  // Test individual limit is enforced.
+  Status status;
+  int64_t offset;
+  TmpFile* alloc_file = nullptr;
+
+  // Alloc from file 1 should succeed.
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &alloc_file, &offset));
+  ASSERT_TRUE(alloc_file != nullptr);
+  ASSERT_EQ(0, offset);
+
+  // Allocate up to the max.
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &alloc_file, &offset));
+  ASSERT_TRUE(alloc_file != nullptr);
+  ASSERT_EQ(alloc_size, offset);
+
+  // Test aggregate limit is enforced.
+  status = GroupAllocateSpace(&file_group, 1, &alloc_file, &offset);
+  ASSERT_FALSE(status.ok());
+  ASSERT_EQ(status.code(), TErrorCode::SCRATCH_LIMIT_EXCEEDED);
+  ASSERT_NE(string::npos, status.msg().msg().find(GetBackendString()));
+
+  // Check HWM metrics
+  checkHWMMetrics(limit, limit);
+  file_group.Close();
+  checkHWMMetrics(0, limit);
+}
+
+/// Test writing a single record to the remote dir and read it back from
+/// the local buffer and verify the data correctness.
+/// There is a testcase to verify the data correctness in DiskIoMgrTest for
+/// reading from the remote file.
+TEST_F(TmpFileMgrTest, TestRemoteWriteRange) {
+  FLAGS_disk_spill_encryption = false;
+  vector<string> tmp_dirs({LOCAL_BUFFER_PATH});
+  TmpFileMgr tmp_file_mgr;
+  RemoveAndCreateDirs(tmp_dirs);
+  tmp_dirs.push_back(REMOTE_URL);
+
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  string data = "the quick brown fox jumped over the lazy dog";
+  MemRange data_mem_range(reinterpret_cast<uint8_t*>(&data[0]), data.size());
+
+  // Start a write in flight, which should write it to disk without encryption.
+  unique_ptr<TmpWriteHandle> handle;
+  WriteRange::WriteDoneCallback callback =
+      bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
+  ASSERT_OK(file_group.Write(data_mem_range, callback, &handle));
+
+  WaitForWrite(handle.get());
+  WaitForCallbacks(1);
+
+  vector<uint8_t> tmp;
+  tmp.resize(data.size());
+  Status read_status = file_group.Read(handle.get(), MemRange(tmp.data(), tmp.size()));
+  EXPECT_TRUE(read_status.ok());
+  EXPECT_EQ(tmp.size(), data.size());
+  for (int i = 0; i < data.size(); i++) {
+    EXPECT_EQ(tmp[i], data[i]);
+  }
+  file_group.Close();
+}
+
+/// Test writing a single record with encryption to a remote dir with local
+/// buffer.
+TEST_F(TmpFileMgrTest, TestRemoteBlockVerification) {
+  FLAGS_disk_spill_encryption = true;
+  vector<string> tmp_dirs({LOCAL_BUFFER_PATH});
+  TmpFileMgr tmp_file_mgr;
+  RemoveAndCreateDirs(tmp_dirs);
+  tmp_dirs.push_back(REMOTE_URL);
+
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  string data = "the quick brown fox jumped over the lazy dog";
+  MemRange data_mem_range(reinterpret_cast<uint8_t*>(&data[0]), data.size());
+
+  // Start a write in flight, which should encrypt the data and write it to disk.
+  unique_ptr<TmpWriteHandle> handle;
+  WriteRange::WriteDoneCallback callback =
+      bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
+  ASSERT_OK(file_group.Write(data_mem_range, callback, &handle));
+  string file_path = handle->TmpFileBufferPath();
+
+  WaitForWrite(handle.get());
+  WaitForCallbacks(1);
+
+  // Modify the data in the local buffer file and check that a read error occurs.
+  LOG(INFO) << "Corrupting " << file_path;
+  uint8_t corrupt_byte = data[0] ^ 1;
+  FILE* file = fopen(file_path.c_str(), "rb+");
+  ASSERT_TRUE(file != nullptr);
+  ASSERT_EQ(corrupt_byte, fputc(corrupt_byte, file));
+  ASSERT_EQ(0, fclose(file));
+  vector<uint8_t> tmp;
+  tmp.resize(data.size());
+  Status read_status = file_group.Read(handle.get(), MemRange(tmp.data(), tmp.size()));
+  LOG(INFO) << read_status.GetDetail();
+  EXPECT_EQ(TErrorCode::SCRATCH_READ_VERIFY_FAILED, read_status.code())
+      << read_status.GetDetail();
+
+  // Modify the data in memory. Restoring the data should fail.
+  LOG(INFO) << "Corrupting data in memory";
+  data[0] = corrupt_byte;
+  Status restore_status = file_group.RestoreData(move(handle), data_mem_range);
+  LOG(INFO) << restore_status.GetDetail();
+  EXPECT_EQ(TErrorCode::SCRATCH_READ_VERIFY_FAILED, restore_status.code())
+      << restore_status.GetDetail();
+
+  file_group.Close();
+  test_env_->TearDownQueries();
+}
+
+/// Test when the total file size reaches the remote directory limits.
+TEST_F(TmpFileMgrTest, TestRemoteDirectoryLimits) {
+  vector<string> tmp_dirs{{LOCAL_BUFFER_PATH}};
+  TmpFileMgr tmp_file_mgr;
+  RemoveAndCreateDirs(tmp_dirs);
+  tmp_dirs.push_back(REMOTE_URL);
+  int64_t alloc_size = 1024;
+  int64_t file_size = 1024;
+  FLAGS_remote_tmp_file_size = "1K";
+
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group_1(&tmp_file_mgr, io_mgr(), profile_, id);
+  TmpFileGroup file_group_2(&tmp_file_mgr, io_mgr(), profile_, id);
+
+  IntGauge* dir_usage = metrics_->FindMetricForTesting<IntGauge>(
+      "tmp-file-mgr.scratch-space-bytes-used.dir-0");
+  IntGauge* local_buff_usage = metrics_->FindMetricForTesting<IntGauge>(
+      "tmp-file-mgr.local-buff-bytes-used.dir-0");
+
+  int64_t offset;
+  TmpFile* alloc_file;
+
+  ASSERT_OK(GroupAllocateSpace(&file_group_1, alloc_size, &alloc_file, &offset));
+  EXPECT_EQ(file_size, dir_usage->GetValue());
+  EXPECT_EQ(file_size, local_buff_usage->GetValue());
+
+  // This time we should hit the limit on the first directory. Do this from a
+  // different file group to show that limits are enforced across file groups.
+  ASSERT_OK(GroupAllocateSpace(&file_group_2, alloc_size, &alloc_file, &offset));
+  EXPECT_EQ(2 * file_size, dir_usage->GetValue());
+  EXPECT_EQ(2 * file_size, local_buff_usage->GetValue());
+
+  file_group_2.Close();
+  // Metrics should be decremented when the file groups delete the underlying files.
+  EXPECT_EQ(file_size, dir_usage->GetValue());
+  EXPECT_EQ(file_size, local_buff_usage->GetValue());
+
+  // We should be able to reuse the space freed up.
+  ASSERT_OK(GroupAllocateSpace(&file_group_1, alloc_size, &alloc_file, &offset));
+  EXPECT_EQ(2 * file_size, dir_usage->GetValue());
+  EXPECT_EQ(2 * file_size, local_buff_usage->GetValue());
+
+  file_group_1.Close();
+  EXPECT_EQ(0, dir_usage->GetValue());
+  EXPECT_EQ(0, local_buff_usage->GetValue());
+}
+
+/// Test when both remote and local dir exist, if the directory limits
+/// work.
+TEST_F(TmpFileMgrTest, TestMixDirectoryLimits) {
+  vector<string> tmp_create_dirs{{LOCAL_BUFFER_PATH, "/tmp/tmp-file-mgr-test-local"}};
+  vector<string> tmp_dirs{{LOCAL_BUFFER_PATH, "/tmp/tmp-file-mgr-test-local:1024"}};
+  TmpFileMgr tmp_file_mgr;
+  RemoveAndCreateDirs(tmp_create_dirs);
+  tmp_dirs.push_back(REMOTE_URL);
+  int64_t alloc_size = 1024;
+  int64_t file_size = 1024;
+  FLAGS_remote_tmp_file_size = "1K";
+
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group_1(&tmp_file_mgr, io_mgr(), profile_, id);
+  TmpFileGroup file_group_2(&tmp_file_mgr, io_mgr(), profile_, id);
+
+  IntGauge* dir_usage_local = metrics_->FindMetricForTesting<IntGauge>(
+      "tmp-file-mgr.scratch-space-bytes-used.dir-0");
+  IntGauge* dir_usage_remote = metrics_->FindMetricForTesting<IntGauge>(
+      "tmp-file-mgr.scratch-space-bytes-used.dir-1");
+  IntGauge* local_buff_usage = metrics_->FindMetricForTesting<IntGauge>(
+      "tmp-file-mgr.local-buff-bytes-used.dir-0");
+
+  ASSERT_TRUE(dir_usage_remote != nullptr);
+  ASSERT_TRUE(dir_usage_local != nullptr);
+  ASSERT_TRUE(local_buff_usage != nullptr);
+
+  int64_t offset;
+  TmpFile* alloc_file;
+
+  // Allocate space from local.
+  ASSERT_OK(GroupAllocateSpace(&file_group_1, alloc_size, &alloc_file, &offset));
+  EXPECT_EQ(file_size, dir_usage_local->GetValue());
+  EXPECT_EQ(0, dir_usage_remote->GetValue());
+  EXPECT_EQ(0, local_buff_usage->GetValue());
+
+  // This time we should hit the limit on the local directory. Should allocate
+  // from the remote directory.
+  ASSERT_OK(GroupAllocateSpace(&file_group_2, alloc_size, &alloc_file, &offset));
+  EXPECT_EQ(file_size, dir_usage_local->GetValue());
+  EXPECT_EQ(file_size, dir_usage_remote->GetValue());
+  EXPECT_EQ(file_size, local_buff_usage->GetValue());
+
+  file_group_2.Close();
+  // Metrics of the remote directory should be decremented when the
+  // second file groups delete the underlying files.
+  EXPECT_EQ(file_size, dir_usage_local->GetValue());
+  EXPECT_EQ(0, dir_usage_remote->GetValue());
+  EXPECT_EQ(0, local_buff_usage->GetValue());
+
+  // Should allocate from the remote directory again.
+  ASSERT_OK(GroupAllocateSpace(&file_group_1, alloc_size, &alloc_file, &offset));
+  EXPECT_EQ(file_size, dir_usage_local->GetValue());
+  EXPECT_EQ(file_size, dir_usage_remote->GetValue());
+  EXPECT_EQ(file_size, local_buff_usage->GetValue());
+
+  file_group_1.Close();
+  EXPECT_EQ(0, dir_usage_local->GetValue());
+  EXPECT_EQ(0, dir_usage_remote->GetValue());
+  EXPECT_EQ(0, local_buff_usage->GetValue());
+}
+
+/// Config a value bigger than the max remote file size allowed, should be
+/// adjusted to the max size.
+TEST_F(TmpFileMgrTest, TestMixTmpFileLimits) {
+  vector<string> tmp_create_dirs{{LOCAL_BUFFER_PATH}};
+  vector<string> tmp_dirs{{LOCAL_BUFFER_PATH}};
+  TmpFileMgr tmp_file_mgr;
+  RemoveAndCreateDirs(tmp_create_dirs);
+  tmp_dirs.push_back(REMOTE_URL);
+  int64_t alloc_size = 1024;
+  int64_t file_size = 256 * 1024 * 1024;
+  int64_t offset;
+  TmpFile* alloc_file;
+  FLAGS_remote_tmp_file_size = "512MB";
+
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  EXPECT_EQ(tmp_file_mgr.GetRemoteTmpFileSize(), file_size);
+  IntGauge* dir_usage_local = metrics_->FindMetricForTesting<IntGauge>(
+      "tmp-file-mgr.scratch-space-bytes-used.dir-0");
+  ASSERT_TRUE(dir_usage_local != nullptr);
+  // Allocate space from local.
+  ASSERT_OK(GroupAllocateSpace(&file_group, alloc_size, &alloc_file, &offset));
+  EXPECT_EQ(file_size, dir_usage_local->GetValue());
+  file_group.Close();
+}
+
+void TmpFileMgrTest::TestTmpFileBufferPoolHelper(TmpFileMgr& tmp_file_mgr,
+    unique_ptr<TmpFileGroup>* tmp_file_group,
+    boost::scoped_ptr<io::WriteRange>& write_range,
+    WriteRange::WriteDoneCallback& callback) {
+  TUniqueId id;
+  vector<string> tmp_create_dirs{{LOCAL_BUFFER_PATH}};
+  vector<string> tmp_dirs{{Substitute(LOCAL_BUFFER_PATH + ":$0", 2048)}};
+  RemoveAndCreateDirs(tmp_create_dirs);
+  tmp_dirs.push_back(REMOTE_URL);
+  int64_t alloc_size = 1024;
+  int64_t file_size = 1024;
+  FLAGS_remote_tmp_file_size = "1KB";
+  int64_t offset;
+  TmpFile *file1, *file2, *file3;
+  cb_counter_ = 0;
+
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, false, "", false, metrics_.get()));
+  unique_ptr<TmpFileGroup> unique_file_group =
+      make_unique<TmpFileGroup>(&tmp_file_mgr, io_mgr(), profile_, id);
+  auto file_group = unique_file_group.get();
+  EXPECT_EQ(tmp_file_mgr.GetRemoteTmpFileSize(), file_size);
+  IntGauge* dir_usage_local = metrics_->FindMetricForTesting<IntGauge>(
+      "tmp-file-mgr.scratch-space-bytes-used.dir-0");
+  ASSERT_TRUE(dir_usage_local != nullptr);
+  ASSERT_OK(GroupAllocateSpace(file_group, alloc_size, &file1, &offset));
+  EXPECT_EQ(file_size, dir_usage_local->GetValue());
+  ASSERT_OK(GroupAllocateSpace(file_group, alloc_size, &file2, &offset));
+  EXPECT_NE(file1, file2);
+  EXPECT_TRUE(file1->GetWriteFile()->IsSpaceReserved());
+  EXPECT_TRUE(file2->GetWriteFile()->IsSpaceReserved());
+  ASSERT_OK(GroupAllocateSpace(file_group, alloc_size, &file3, &offset));
+  EXPECT_NE(file2, file3);
+
+  write_range.reset(new WriteRange(
+      file3->path(), offset, file3->AssignDiskQueue(!file3->is_local()), callback));
+  const char* dummy_data = "dummy data";
+  write_range->SetData((const uint8_t*)dummy_data, strlen(dummy_data));
+  write_range->SetDiskFile(file3->GetWriteFile());
+  SetWriteRangeContext(write_range.get(), file_group);
+  // The space hasn't been reserved for file3 because the pool size is 2K, and there are
+  // two files in use, we use the AsyncWriteRange() function to wait untial a file is
+  // available to be evicted, then finish the writing of file3.
+  EXPECT_FALSE(file3->GetWriteFile()->IsSpaceReserved());
+  ASSERT_OK(tmp_file_mgr.AsyncWriteRange(write_range.get(), file3));
+  *tmp_file_group = move(unique_file_group);
+}
+
+void TmpFileMgrTest::TestTmpFileBufferPoolTearDown(TmpFileMgr& tmp_file_mgr) {
+  auto tmp_file_pool = tmp_file_mgr.tmp_dirs_remote_ctrl_.tmp_file_pool_.get();
+  ASSERT_TRUE(tmp_file_pool->io_ctx_to_file_set_map_.empty());
+  ASSERT_TRUE(tmp_file_pool->write_ranges_to_add_.empty());
+  ASSERT_TRUE(tmp_file_pool->write_ranges_.empty());
+  ASSERT_TRUE(tmp_file_pool->write_ranges_iterator_.empty());
+}
+
+// Test one write is waiting in the pool for the reservation, but file group is closed
+// before the reservation is done. The write's callback function should be called.
+TEST_F(TmpFileMgrTest, TestTmpFileBufferPoolOneWriteCancel) {
+  TmpFileMgr tmp_file_mgr;
+  unique_ptr<TmpFileGroup> file_group;
+  boost::scoped_ptr<io::WriteRange> write_range;
+  WriteRange::WriteDoneCallback callback =
+      bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
+  TestTmpFileBufferPoolHelper(tmp_file_mgr, &file_group, write_range, callback);
+  file_group->Close();
+  WaitForCallbacks(1);
+  TestTmpFileBufferPoolTearDown(tmp_file_mgr);
+}
+
+// Test two writes are waiting in the pool for the reservation, but file group is closed
+// before the reservation is done. The writes' callback functions should be called.
+TEST_F(TmpFileMgrTest, TestTmpFileBufferPoolTwoWritesCancel) {
+  TmpFileMgr tmp_file_mgr;
+  unique_ptr<TmpFileGroup> file_group;
+  boost::scoped_ptr<io::WriteRange> write_range;
+  WriteRange::WriteDoneCallback callback =
+      bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
+  TestTmpFileBufferPoolHelper(tmp_file_mgr, &file_group, write_range, callback);
+  TmpFile* file4;
+  int64_t alloc_size = 1024;
+  int64_t offset;
+  TmpFileGroup* tmp_file_group = file_group.get();
+  ASSERT_OK(GroupAllocateSpace(tmp_file_group, alloc_size, &file4, &offset));
+  boost::scoped_ptr<io::WriteRange> write_range2;
+  write_range2.reset(new WriteRange(
+      file4->path(), offset, file4->AssignDiskQueue(!file4->is_local()), callback));
+  const char* dummy_data = "dummy data";
+  write_range2->SetData((const uint8_t*)dummy_data, strlen(dummy_data));
+  write_range2->SetDiskFile(file4->GetWriteFile());
+  SetWriteRangeContext(write_range2.get(), tmp_file_group);
+  EXPECT_FALSE(file4->GetWriteFile()->IsSpaceReserved());
+  ASSERT_OK(tmp_file_mgr.AsyncWriteRange(write_range2.get(), file4));
+  file_group->Close();
+  WaitForCallbacks(2);
+  TestTmpFileBufferPoolTearDown(tmp_file_mgr);
+}
+
+// Test one write is waiting in the pool for the reservation, when a file is returned to
+// the buffer pool, the reservation should be done.
+TEST_F(TmpFileMgrTest, TestTmpFileBufferPoolOneWriteDone) {
+  TmpFileMgr tmp_file_mgr;
+  unique_ptr<TmpFileGroup> file_group;
+  boost::scoped_ptr<io::WriteRange> write_range;
+  WriteRange::WriteDoneCallback callback =
+      bind(mem_fn(&TmpFileMgrTest::SignalCallback), this, _1);
+  TestTmpFileBufferPoolHelper(tmp_file_mgr, &file_group, write_range, callback);
+  // Return a dummy file to the pool.
+  tmp_file_mgr.EnqueueTmpFilesPoolDummyFile();
+  WaitForCallbacks(1);
+  file_group->Close();
+  TestTmpFileBufferPoolTearDown(tmp_file_mgr);
+}
+
 } // namespace impala

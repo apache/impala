@@ -2331,6 +2331,26 @@
     "key": "tmp-file-mgr.scratch-space-bytes-used.dir-$0"
   },
   {
+    "description": "The current total spilled bytes for the local buffer directory.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Per-directory local buffer space bytes used",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tmp-file-mgr.local-buff-bytes-used.dir-$0"
+  },
+  {
+    "description": "The durations of dequeuing from the TmpFileBufferPool.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Dequeue durations for the TmpFileBufferPool",
+    "units": "TIME_NS",
+    "kind": "HISTOGRAM",
+    "key": "tmp-file-mgr.tmp-file-buff-pool-dequeue-durations"
+  },
+  {
     "description": "Number of senders waiting for receiving fragment to initialize",
     "contexts": [
       "IMPALAD"

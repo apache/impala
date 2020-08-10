@@ -29,6 +29,13 @@
 
 namespace impala {
 
+const char* FILESYS_PREFIX_HDFS = "hdfs://";
+const char* FILESYS_PREFIX_S3 = "s3a://";
+const char* FILESYS_PREFIX_ABFS = "abfs://";
+const char* FILESYS_PREFIX_ABFS_SEC = "abfss://";
+const char* FILESYS_PREFIX_ADL = "adl://";
+const char* FILESYS_PREFIX_OZONE = "o3fs://";
+
 string GetHdfsErrorMsg(const string& prefix, const string& file) {
   string error_msg = GetStrErrMsg();
   stringstream ss;
@@ -73,40 +80,36 @@ Status CopyHdfsFile(const hdfsFS& src_conn, const string& src_path,
   return Status::OK();
 }
 
-bool IsHdfsPath(const char* path) {
-  if (strstr(path, ":/") == NULL) {
-    return ExecEnv::GetInstance()->default_fs().compare(0, 7, "hdfs://") == 0;
+bool IsSpecificPath(
+    const char* path, const char* specific_prefix, bool check_default_fs) {
+  size_t prefix_len = strlen(specific_prefix);
+  if (check_default_fs && strstr(path, ":/") == NULL) {
+    return strncmp(
+               ExecEnv::GetInstance()->default_fs().c_str(), specific_prefix, prefix_len)
+        == 0;
   }
-  return strncmp(path, "hdfs://", 7) == 0;
+  return strncmp(path, specific_prefix, prefix_len) == 0;
 }
 
-bool IsS3APath(const char* path) {
-  if (strstr(path, ":/") == NULL) {
-    return ExecEnv::GetInstance()->default_fs().compare(0, 6, "s3a://") == 0;
-  }
-  return strncmp(path, "s3a://", 6) == 0;
+bool IsHdfsPath(const char* path, bool check_default_fs) {
+  return IsSpecificPath(path, FILESYS_PREFIX_HDFS, check_default_fs);
 }
 
-bool IsABFSPath(const char* path) {
-  if (strstr(path, ":/") == NULL) {
-    return ExecEnv::GetInstance()->default_fs().compare(0, 7, "abfs://") == 0 ||
-        ExecEnv::GetInstance()->default_fs().compare(0, 8, "abfss://") == 0;
-  }
-  return strncmp(path, "abfs://", 7) == 0 || strncmp(path, "abfss://", 8) == 0;
+bool IsS3APath(const char* path, bool check_default_fs) {
+  return IsSpecificPath(path, FILESYS_PREFIX_S3, check_default_fs);
 }
 
-bool IsADLSPath(const char* path) {
-  if (strstr(path, ":/") == NULL) {
-    return ExecEnv::GetInstance()->default_fs().compare(0, 6, "adl://") == 0;
-  }
-  return strncmp(path, "adl://", 6) == 0;
+bool IsABFSPath(const char* path, bool check_default_fs) {
+  return IsSpecificPath(path, FILESYS_PREFIX_ABFS, check_default_fs)
+      || IsSpecificPath(path, FILESYS_PREFIX_ABFS_SEC, check_default_fs);
 }
 
-bool IsOzonePath(const char* path) {
-  if (strstr(path, ":/") == NULL) {
-    return ExecEnv::GetInstance()->default_fs().compare(0, 7, "o3fs://") == 0;
-  }
-  return strncmp(path, "o3fs://", 7) == 0;
+bool IsADLSPath(const char* path, bool check_default_fs) {
+  return IsSpecificPath(path, FILESYS_PREFIX_ADL, check_default_fs);
+}
+
+bool IsOzonePath(const char* path, bool check_default_fs) {
+  return IsSpecificPath(path, FILESYS_PREFIX_OZONE, check_default_fs);
 }
 
 // Returns the length of the filesystem name in 'path' which is the length of the

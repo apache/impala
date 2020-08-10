@@ -139,6 +139,10 @@ class RequestContext {
   /// on the IoMgr disk queue.
   Status AddWriteRange(WriteRange* write_range) WARN_UNUSED_RESULT;
 
+  /// Add a RemoteOperRange for the writer. This is non-blocking and schedules the context
+  /// on the IoMgr disk queue.
+  Status AddRemoteOperRange(RemoteOperRange* write_range) WARN_UNUSED_RESULT;
+
   /// Cancel the context asynchronously. All outstanding requests are cancelled
   /// asynchronously. This does not need to be called if the context finishes normally.
   /// Calling GetNext() on any scan ranges belonging to this RequestContext will return
@@ -223,6 +227,9 @@ class RequestContext {
   friend class DiskIoMgr;
   friend class ScanRange;
   friend class HdfsFileReader;
+  friend class WriteRange;
+  friend class RemoteOperRange;
+  friend class LocalFileWriter;
 
   enum State {
     /// Reader is initialized and maps to a client
@@ -279,11 +286,11 @@ class RequestContext {
   /// Caller must not hold 'lock_'.
   void ReadDone(int disk_id, ReadOutcome outcome, ScanRange* range);
 
-  /// Invokes write_range->callback() after the range has been written and
-  /// updates per-disk state and handle state. The status of the write OK/RUNTIME_ERROR
-  /// etc. is passed via write_status and to the callback. A write error does not cancel
-  /// the writer context - that decision is left to the callback handler.
-  void WriteDone(WriteRange* write_range, const Status& write_status);
+  /// Invokes write_range->callback() or oper_range->callback() after the range has been
+  /// executed, and updates per-disk state and handle state. The status of the operation
+  /// OK/RUNTIME_ERROR etc. is passed via status and to the callback. An error status
+  /// does not cancel the request context - that decision is left to the callback handler.
+  void OperDone(RequestRange* range, const Status& status);
 
   /// Cancel the context if not already cancelled, wait for all scan ranges to finish
   /// and mark the context as inactive, after which it cannot be used.

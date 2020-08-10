@@ -25,6 +25,7 @@ add_library(Io
   data-cache.cc
   disk-io-mgr.cc
   disk-io-mgr-stress.cc
+  disk-file.cc
   local-file-system.cc
   local-file-system-with-fault-injection.cc
   error-converter.cc
@@ -32,6 +33,7 @@ add_library(Io
   scan-range.cc
   hdfs-file-reader.cc
   local-file-reader.cc
+  local-file-writer.cc
   hdfs-monitored-ops.cc
   data-cache-trace.cc
 )

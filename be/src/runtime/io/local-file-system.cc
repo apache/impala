@@ -32,8 +32,18 @@ FILE* LocalFileSystem::FdopenAux(int file_desc, const char* options) {
   return fdopen(file_desc, options);
 }
 
-Status LocalFileSystem::OpenForWrite(const char* file_name, int oflag, int mode,
-    FILE** file) {
+Status LocalFileSystem::OpenForRead(
+    const char* file_name, int oflag, int mode, FILE** file) {
+  return Open(file_name, oflag, mode, "rb", file);
+}
+
+Status LocalFileSystem::OpenForWrite(
+    const char* file_name, int oflag, int mode, FILE** file) {
+  return Open(file_name, oflag, mode, "wb", file);
+}
+
+Status LocalFileSystem::Open(
+    const char* file_name, int oflag, int mode, const char* fd_option, FILE** file) {
   DCHECK(file_name != nullptr);
   DCHECK(file != nullptr);
 
@@ -42,7 +52,7 @@ Status LocalFileSystem::OpenForWrite(const char* file_name, int oflag, int mode,
     return ErrorConverter::GetErrorStatusFromErrno("open()", file_name, errno);
   }
 
-  *file = FdopenAux(file_desc, "wb");
+  *file = FdopenAux(file_desc, fd_option);
   if (*file == nullptr) {
     Status fdopen_status = ErrorConverter::GetErrorStatusFromErrno("fdopen()", file_name,
         errno);
@@ -84,11 +94,25 @@ size_t LocalFileSystem::FwriteAux(FILE* file_handle, const WriteRange* write_ran
   return fwrite(write_range->data(), 1, write_range->len(), file_handle);
 }
 
-Status LocalFileSystem::Fclose(FILE* file_handle, const WriteRange* write_range) {
+Status LocalFileSystem::Fread(
+    FILE* file_handle, uint8_t* buffer, int64_t length, const char* file_path) {
+  DCHECK(file_handle != nullptr);
+  int64_t bytes_read = FreadAux(file_handle, buffer, length);
+  if (bytes_read < length) {
+    return ErrorConverter::GetErrorStatusFromErrno(
+        "fread()", file_path, errno, {{"range_length", SimpleItoa(length)}});
+  }
+  return Status::OK();
+}
+
+size_t LocalFileSystem::FreadAux(FILE* file_handle, uint8_t* buffer, int64_t length) {
+  return fread(buffer, 1, length, file_handle);
+}
+
+Status LocalFileSystem::Fclose(FILE* file_handle, const char* file_path) {
   DCHECK(file_handle != nullptr);
   if (FcloseAux(file_handle) != 0) {
-    return ErrorConverter::GetErrorStatusFromErrno("fclose()", write_range->file(),
-        errno);
+    return ErrorConverter::GetErrorStatusFromErrno("fclose()", file_path, errno);
   }
   return Status::OK();
 }
@@ -97,5 +121,14 @@ int LocalFileSystem::FcloseAux(FILE* file_handle) {
   return fclose(file_handle);
 }
 
+Status LocalFileSystem::Write(int file_desc, const WriteRange* range) {
+  DCHECK(range != nullptr);
+  int64_t bytes_written = write(file_desc, range->data(), range->len());
+  if (bytes_written < range->len()) {
+    return ErrorConverter::GetErrorStatusFromErrno(
+        "write()", range->file(), errno, {{"range_length", SimpleItoa(range->len())}});
+  }
+  return Status::OK();
+}
 }
 }
