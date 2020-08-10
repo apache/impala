@@ -18,14 +18,22 @@
 #include "runtime/io/disk-io-mgr.h"
 
 #include "common/global-flags.h"
+#include "common/names.h"
 #include "common/thread-debug-info.h"
 #include "runtime/exec-env.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "runtime/io/data-cache.h"
+#include "runtime/io/disk-file.h"
 #include "runtime/io/disk-io-mgr-internal.h"
-#include "runtime/io/handle-cache.inline.h"
 #include "runtime/io/error-converter.h"
+#include "runtime/io/file-writer.h"
+#include "runtime/io/handle-cache.inline.h"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/uuid/random_generator.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 #include "gutil/strings/substitute.h"
 #include "util/bit-util.h"
@@ -35,6 +43,7 @@
 #include "util/hdfs-util.h"
 #include "util/histogram-metric.h"
 #include "util/metrics.h"
+#include "util/os-util.h"
 #include "util/test-info.h"
 #include "util/time.h"
 
@@ -48,6 +57,9 @@ using namespace impala;
 using namespace impala::io;
 using namespace strings;
 
+using boost::shared_mutex;
+using boost::filesystem::path;
+using boost::uuids::random_generator;
 using std::to_string;
 
 // Control the number of disks on the machine.  If 0, this comes from the system
@@ -94,11 +106,20 @@ DEFINE_int32(num_io_threads_per_solid_state_disk, 0,
 // across the local disk queues.
 DEFINE_int32(num_remote_hdfs_io_threads, 8, "Number of remote HDFS I/O threads");
 
+// The maximum number of HDFS I/O threads for doing file operations, such as file
+// uploading. The default value of 8 was chosen empirically to maximize HDFS throughput.
+DEFINE_int32(num_remote_hdfs_file_oper_io_threads, 8,
+    "Number of remote HDFS file operations I/O threads");
+
 // The maximum number of S3 I/O threads. The default value of 16 was chosen emperically
 // to maximize S3 throughput. Maximum throughput is achieved with multiple connections
 // open to S3 and use of multiple CPU cores since S3 reads are relatively compute
 // expensive (SSL and JNI buffer overheads).
 DEFINE_int32(num_s3_io_threads, 16, "Number of S3 I/O threads");
+
+// The maximum number of S3 I/O threads for doing file operations, such as file
+// uploading. The default value of 16 was chosen empirically to maximize S3 throughput.
+DEFINE_int32(num_s3_file_oper_io_threads, 16, "Number of S3 file operations I/O threads");
 
 // The maximum number of ABFS I/O threads. TODO: choose the default empirically.
 DEFINE_int32(num_abfs_io_threads, 16, "Number of ABFS I/O threads");
@@ -203,6 +224,161 @@ void WriteRange::SetData(const uint8_t* buffer, int64_t len) {
   len_ = len;
 }
 
+void WriteRange::SetOffset(int64_t file_offset) {
+  offset_ = file_offset;
+}
+
+Status WriteRange::DoWrite() {
+  Status ret_status = Status::OK();
+  Status close_status = Status::OK();
+  DiskQueue* queue = io_ctx_->parent_->disk_queues_[disk_id_];
+  int64_t written_bytes = 0;
+  FileWriter* file_writer = disk_file_->GetFileWriter();
+  /// DoWrite is used for Spilling.
+  /// For spilling to local, we will open and close the file handle for
+  /// each write range, which is the WriteOne() function, since it could
+  /// be a random write in each file.
+  /// For spilling to remote, we will keep the file handle open, until the
+  /// write range is the last one of the file to do the sequential write.
+  if (disk_file_->disk_type() == DiskFileType::LOCAL) {
+    return file_writer->WriteOne(this);
+  }
+  {
+    ScopedHistogramTimer write_timer(queue->write_latency());
+    shared_lock<shared_mutex> lock(disk_file_->physical_file_lock_);
+    ret_status = file_writer->Open();
+    if (!ret_status.ok()) return DoWriteEnd(queue, ret_status);
+    ret_status = file_writer->Write(this, &written_bytes);
+    int64_t actual_file_size = disk_file_->actual_file_size();
+    // actual_file_size is only set once, otherwise it is 0 by default. If it is still
+    // not set, it is impossible to be full.
+    if (actual_file_size != 0) {
+      DCHECK_LE(written_bytes, disk_file_->actual_file_size());
+      is_full_ = written_bytes == actual_file_size;
+    } else {
+      // If the actual size hasn't been set, the written bytes must be less than the
+      // default file size.
+      DCHECK_LT(written_bytes, disk_file_->file_size());
+    }
+    if (is_full_) close_status = file_writer->Close();
+    if (ret_status.ok() && !close_status.ok()) ret_status = close_status;
+    if (ret_status.ok() && is_full_) {
+      // If the file is full, the file handle should be closed,
+      // so set the file to persisted status.
+      disk_file_->SetStatus(io::DiskFileStatus::PERSISTED);
+    }
+  }
+  return DoWriteEnd(queue, ret_status);
+}
+
+Status WriteRange::DoWriteEnd(DiskQueue* queue, const Status& ret_status) {
+  if (ret_status.ok()) {
+    queue->write_size()->Update(len());
+  } else {
+    queue->write_io_err()->Increment(1);
+  }
+  return ret_status;
+}
+
+RemoteOperRange::RemoteOperRange(DiskFile* src_file, DiskFile* dst_file,
+    int64_t block_size, int disk_id, RequestType::type type, DiskIoMgr* io_mgr,
+    RemoteOperDoneCallback callback)
+  : RequestRange(type, disk_id),
+    callback_(callback),
+    io_mgr_(io_mgr),
+    disk_file_src_(src_file),
+    disk_file_dst_(dst_file),
+    block_size_(block_size) {}
+
+Status RemoteOperRange::DoOper(uint8_t* buffer, int64_t buffer_size) {
+  DCHECK(request_type() == RequestType::FILE_UPLOAD);
+  return DoUpload(buffer, buffer_size);
+}
+
+Status RemoteOperRange::DoUpload(uint8_t* buffer, int64_t buffer_size) {
+  DCHECK(disk_file_src_ != nullptr);
+  DCHECK(disk_file_dst_ != nullptr);
+  hdfsFS hdfs_conn = disk_file_dst_->hdfs_conn_;
+  int64_t file_size = disk_file_src_->actual_file_size_.Load();
+  DCHECK(hdfs_conn != nullptr);
+  DCHECK(file_size != 0);
+  const char* remote_file_path = disk_file_dst_->path().c_str();
+  const char* local_file_path = disk_file_src_->path().c_str();
+  DiskQueue* queue = io_mgr_->disk_queues_[disk_id_];
+  Status status = Status::OK();
+  int64_t ret, offset = 0;
+  FILE* local_file = nullptr;
+
+  // To get the shared lock to protect the physical files from deleting during the
+  // upload. The sequence is to acquire the local file lock, then remote file lock,
+  // or it might cause deadlocks.
+  shared_lock<shared_mutex> srcl(disk_file_src_->physical_file_lock_);
+  shared_lock<shared_mutex> dstl(disk_file_dst_->physical_file_lock_);
+
+  // If it is not persisted, the cases could be the query is cancelled or finished.
+  auto src_status = disk_file_src_->GetFileStatus();
+  if (src_status != io::DiskFileStatus::PERSISTED) {
+    DCHECK(src_status == io::DiskFileStatus::DELETED);
+    return Status::OK();
+  }
+
+  RETURN_IF_ERROR(io_mgr_->local_file_system_->OpenForRead(
+      local_file_path, O_RDONLY, S_IRUSR | S_IWUSR, &local_file));
+  hdfsFile remote_hdfs_file =
+      hdfsOpenFile(hdfs_conn, remote_file_path, O_WRONLY, 0, 0, buffer_size);
+
+  if (remote_hdfs_file == nullptr) {
+    status = Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
+        Substitute("Could not open file: $0: $1", remote_file_path, GetStrErrMsg()));
+    goto end;
+  }
+
+  /// Read the blocks from the local buffer file and write the blocks
+  /// to the remote file.
+  while (file_size != offset) {
+    int bytes = min(file_size - offset, buffer_size);
+    status =
+        io_mgr_->local_file_system_->Fread(local_file, buffer, bytes, local_file_path);
+    if (!status.ok()) goto end;
+    {
+      ScopedHistogramTimer write_timer(queue->write_latency());
+      // Write local buffer to the remote file.
+      ret = hdfsWrite(hdfs_conn, remote_hdfs_file, buffer, bytes);
+    }
+    if (ret == -1 || ret != bytes) {
+      queue->write_io_err()->Increment(1);
+      status = Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
+          Substitute("Error writing to $0 in file: $1 $2", offset, remote_file_path,
+              GetHdfsErrorMsg("")));
+      goto end;
+    }
+    offset += bytes;
+    queue->write_size()->Update(bytes);
+  }
+
+end:
+  if (remote_hdfs_file != nullptr) {
+    // We count file close as write latency, as it takes time for
+    // S3 to close to finish the upload procedure.
+    ScopedHistogramTimer write_timer(queue->write_latency());
+    if (hdfsCloseFile(hdfs_conn, remote_hdfs_file) != 0) {
+      // Try to close the local file if error happens.
+      RETURN_IF_ERROR(io_mgr_->local_file_system_->Fclose(local_file, local_file_path));
+      return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
+          Substitute(
+              "Failed to close HDFS file: $0", remote_file_path, GetHdfsErrorMsg("")));
+    }
+  }
+  RETURN_IF_ERROR(io_mgr_->local_file_system_->Fclose(local_file, local_file_path));
+  if (status.ok()) {
+    disk_file_dst_->SetStatus(io::DiskFileStatus::PERSISTED);
+    disk_file_dst_->SetActualFileSize(file_size);
+  } else {
+    LOG(WARNING) << "File upload failed, msg:" << status.msg().msg();
+  }
+  return status;
+}
+
 static void CheckSseSupport() {
   if (!CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     LOG(WARNING) << "This machine does not support sse4_2.  The default IO system "
@@ -292,6 +468,12 @@ Status DiskIoMgr::Init() {
     } else if (i == RemoteOzoneDiskId()) {
       num_threads_per_disk = FLAGS_num_ozone_io_threads;
       device_name = "Ozone remote";
+    } else if (i == RemoteDfsDiskFileOperId()) {
+      num_threads_per_disk = FLAGS_num_remote_hdfs_file_oper_io_threads;
+      device_name = "HDFS remote file operations";
+    } else if (i == RemoteS3DiskFileOperId()) {
+      num_threads_per_disk = FLAGS_num_s3_file_oper_io_threads;
+      device_name = "S3 remote file operations";
     } else if (DiskInfo::is_rotational(i)) {
       num_threads_per_disk = num_io_threads_per_rotational_disk_;
       // During tests, i may not point to an existing disk.
@@ -496,7 +678,8 @@ int64_t DiskIoMgr::ComputeIdealBufferReservation(int64_t scan_range_len) {
 // work is available or the thread is shut down.
 // Work is available if there is a RequestContext with
 //  - A ScanRange with a buffer available, or
-//  - A WriteRange in unstarted_write_ranges_.
+//  - A WriteRange in unstarted_write_ranges_ or
+//  - A RemoteOperRange in unstarted_remote_upload_ranges_
 RequestRange* DiskQueue::GetNextRequestRange(RequestContext** request_context) {
   // This loops returns either with work to do or when the disk IoMgr shuts down.
   while (true) {
@@ -545,13 +728,41 @@ void DiskQueue::DiskThreadLoop(DiskIoMgr* io_mgr) {
     ScopedThreadContext tdi_scope(GetThreadDebugInfo(), worker_context->query_id(),
         worker_context->instance_id());
 
-    if (range->request_type() == RequestType::READ) {
-      ScanRange* scan_range = static_cast<ScanRange*>(range);
-      ReadOutcome outcome = scan_range->DoRead(this, disk_id_);
-      worker_context->ReadDone(disk_id_, outcome, scan_range);
-    } else {
-      DCHECK(range->request_type() == RequestType::WRITE);
-      io_mgr->Write(worker_context, static_cast<WriteRange*>(range));
+    switch (range->request_type()) {
+      case RequestType::READ: {
+        ScanRange* scan_range = static_cast<ScanRange*>(range);
+        ReadOutcome outcome = scan_range->DoRead(this, disk_id_);
+        worker_context->ReadDone(disk_id_, outcome, scan_range);
+        break;
+      }
+      case RequestType::WRITE: {
+        WriteRange* write_range = static_cast<WriteRange*>(range);
+        Status status = write_range->DoWrite();
+        worker_context->OperDone(write_range, status);
+        break;
+      }
+      case RequestType::FILE_UPLOAD: {
+        RemoteOperRange* oper_range = static_cast<RemoteOperRange*>(range);
+        int64_t size = oper_range->block_size();
+        // Use malloc to get the memory in case there is no available space
+        // in the buffer pool because spilling to disk happens when scarcity
+        // of memory in the buffer pool. Be better to preserve memory than
+        // malloc.
+        uint8_t* buffer = static_cast<uint8_t*>(malloc(size));
+        if (UNLIKELY(buffer == nullptr)) {
+          worker_context->OperDone(oper_range,
+              Status(Substitute("Couldn't allocate memory for remote file operations, "
+                                "block size: '$0'",
+                  size)));
+        } else {
+          Status oper_status = oper_range->DoOper(buffer, size);
+          worker_context->OperDone(oper_range, oper_status);
+          free(buffer);
+        }
+        break;
+      }
+      default:
+        DCHECK(false) << "Invalid request type: " << range->request_type();
     }
   }
 }
@@ -570,7 +781,7 @@ void DiskIoMgr::Write(RequestContext* writer_context, WriteRange* write_range) {
 
     ret_status = WriteRangeHelper(file_handle, write_range);
 
-    close_status = local_file_system_->Fclose(file_handle, write_range);
+    close_status = local_file_system_->Fclose(file_handle, write_range->file());
     if (ret_status.ok() && !close_status.ok()) ret_status = close_status;
   }
 
@@ -580,13 +791,13 @@ end:
   } else {
     queue->write_io_err()->Increment(1);
   }
-  writer_context->WriteDone(write_range, ret_status);
+  writer_context->OperDone(write_range, ret_status);
 }
 
 Status DiskIoMgr::WriteRangeHelper(FILE* file_handle, WriteRange* write_range) {
   // Seek to the correct offset and perform the write.
-  RETURN_IF_ERROR(local_file_system_->Fseek(file_handle, write_range->offset(), SEEK_SET,
-      write_range));
+  RETURN_IF_ERROR(local_file_system_->Fseek(
+      file_handle, write_range->offset(), SEEK_SET, write_range));
 
 #ifndef NDEBUG
   if (FLAGS_stress_scratch_write_delay_ms > 0) {

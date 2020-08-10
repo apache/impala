@@ -33,8 +33,10 @@
 #include "kudu/util/env.h"
 #include "runtime/bufferpool/buffer-pool-counters.h"
 #include "runtime/exec-env.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "runtime/io/disk-io-mgr.h"
 #include "runtime/io/error-converter.h"
+#include "runtime/io/local-file-writer.h"
 #include "runtime/io/request-context.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
@@ -45,7 +47,10 @@
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/filesystem-util.h"
+#include "util/hdfs-util.h"
+#include "util/histogram-metric.h"
 #include "util/kudu-status-util.h"
+#include "util/os-util.h"
 #include "util/parse-util.h"
 #include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
@@ -91,6 +96,23 @@ DEFINE_string(scratch_dirs, "/tmp",
 DEFINE_bool(allow_multiple_scratch_dirs_per_device, true,
     "If false and --scratch_dirs contains multiple directories on the same device, "
     "then only the first writable directory is used");
+DEFINE_string(remote_tmp_file_size, "16M",
+    "Specify the size of a remote temporary file. Upper bound is 256MB. Lower bound "
+    "is the block size. The size should be power of 2 and integer times of the block "
+    "size.");
+DEFINE_string(remote_tmp_file_block_size, "1M",
+    "Specify the size of the block for doing file uploading and fetching. The block "
+    "size should be power of 2 and less than the size of remote temporary file.");
+DEFINE_bool(remote_tmp_files_avail_pool_lifo, false,
+    "If true, lifo is the algo to evict the local buffer files during spilling "
+    "to the remote. Otherwise, fifo would be used.");
+DEFINE_bool(allow_spill_to_hdfs, false,
+    "Spill to HDFS is a test-only feature, only when set true, the user can configure "
+    "a HDFS scratch path.");
+DEFINE_int32(wait_for_spill_buffer_timeout_s, 60,
+    "Specify the timeout duration waiting for the buffer to write (second). If a spilling"
+    "opertion fails to get a buffer from the pool within the duration, the operation"
+    "fails.");
 
 using boost::algorithm::is_any_of;
 using boost::algorithm::join;
@@ -112,6 +134,13 @@ constexpr int64_t TmpFileMgr::HOLE_PUNCH_BLOCK_SIZE_BYTES;
 
 const string TMP_SUB_DIR_NAME = "impala-scratch";
 const uint64_t AVAILABLE_SPACE_THRESHOLD_MB = 1024;
+const uint64_t MAX_REMOTE_TMPFILE_SIZE_THRESHOLD_MB = 256;
+
+// Default path for Spill to HDFS.
+// The Spill to HDFS is only supported for testing, and a fixed default HDFS path is used,
+// To support a flexible HDFS path input, we may need some modifications, Jira
+// IMPALA-10429 is tracking the limitation.
+const string TMP_DIR_HDFS_LOCAL_DEFAULT = "hdfs://localhost:20500/tmp";
 
 // Metric keys
 const string TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS = "tmp-file-mgr.active-scratch-dirs";
@@ -123,6 +152,15 @@ const string TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED =
     "tmp-file-mgr.scratch-space-bytes-used";
 const string SCRATCH_DIR_BYTES_USED_FORMAT =
     "tmp-file-mgr.scratch-space-bytes-used.dir-$0";
+const string LOCAL_BUFF_BYTES_USED_FORMAT = "tmp-file-mgr.local-buff-bytes-used.dir-$0";
+const string TMP_FILE_BUFF_POOL_DEQUEUE_DURATIONS =
+    "tmp-file-mgr.tmp-file-buff-pool-dequeue-durations";
+
+static const Status& TMP_FILE_MGR_NO_AVAILABLE_FILE_TO_EVICT = Status(ErrorMsg::Init(
+    TErrorCode::GENERAL,
+    "TmpFileMgr::ReserveLocalBufferSpace() failed to find available files to evict."));
+static const Status& TMP_FILE_BUFFER_POOL_CONTEXT_CANCELLED =
+    Status::CancelledInternal("TmpFileBufferPool");
 
 using DeviceId = TmpFileMgr::DeviceId;
 using TmpDir = TmpFileMgr::TmpDir;
@@ -175,13 +213,72 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
               ExecEnv::GetInstance()->process_mem_tracker()));
     }
   }
+
+  bool is_percent;
+  tmp_dirs_remote_ctrl_.remote_tmp_file_size_ =
+      ParseUtil::ParseMemSpec(FLAGS_remote_tmp_file_size, &is_percent, 0);
+  if (tmp_dirs_remote_ctrl_.remote_tmp_file_size_ <= 0) {
+    return Status(Substitute(
+        "Invalid value of remote_tmp_file_size '$0'", FLAGS_remote_tmp_file_size));
+  }
+  if (tmp_dirs_remote_ctrl_.remote_tmp_file_size_
+      > MAX_REMOTE_TMPFILE_SIZE_THRESHOLD_MB * 1024 * 1024) {
+    tmp_dirs_remote_ctrl_.remote_tmp_file_size_ =
+        MAX_REMOTE_TMPFILE_SIZE_THRESHOLD_MB * 1024 * 1024;
+  }
+  tmp_dirs_remote_ctrl_.remote_tmp_block_size_ =
+      ParseUtil::ParseMemSpec(FLAGS_remote_tmp_file_block_size, &is_percent,
+          tmp_dirs_remote_ctrl_.remote_tmp_file_size_);
+  if (tmp_dirs_remote_ctrl_.remote_tmp_block_size_ <= 0) {
+    return Status(Substitute(
+        "Invalid value of remote_tmp_block_size '$0'", FLAGS_remote_tmp_file_block_size));
+  }
+  tmp_dirs_remote_ctrl_.wait_for_spill_buffer_timeout_us_ =
+      FLAGS_wait_for_spill_buffer_timeout_s * MICROS_PER_SEC;
+  if (tmp_dirs_remote_ctrl_.wait_for_spill_buffer_timeout_us_ <= 0) {
+    return Status(Substitute("Invalid value of wait_for_spill_buffer_timeout_us '$0'",
+        FLAGS_wait_for_spill_buffer_timeout_s));
+  }
+  // Below options are using for test by setting different modes to implement the
+  // spilling to the remote.
+  tmp_dirs_remote_ctrl_.remote_tmp_files_avail_pool_lifo_ =
+      FLAGS_remote_tmp_files_avail_pool_lifo;
+  tmp_dirs_remote_ctrl_.allow_spill_to_hdfs_ = FLAGS_allow_spill_to_hdfs;
+
   vector<std::unique_ptr<TmpDir>> tmp_dirs;
+  // need_local_buffer_dir indicates if currently we need to a directory in local scratch
+  // space for being the buffer of a remote directory.
+  bool need_local_buffer_dir = false;
+
   // Parse the directory specifiers. Don't return an error on parse errors, just log a
   // warning - we don't want to abort process startup because of misconfigured scratch,
   // since queries will generally still be runnable.
   for (const string& tmp_dir_spec : tmp_dir_specifiers) {
+    string tmp_dirs_without_prefix, prefix;
+    string tmp_dir_spec_trimmed(boost::algorithm::trim_left_copy(tmp_dir_spec));
+
+    if (IsHdfsPath(tmp_dir_spec_trimmed.c_str(), false)) {
+      if (!tmp_dirs_remote_ctrl_.allow_spill_to_hdfs_) {
+        return Status("HDFS scratch space is not allowed. Please set allow_spill_to_hdfs "
+                      "if HDFS path is needed.");
+      }
+      prefix = FILESYS_PREFIX_HDFS;
+      tmp_dirs_without_prefix = tmp_dir_spec_trimmed.substr(strlen(FILESYS_PREFIX_HDFS));
+      need_local_buffer_dir = true;
+    } else if (IsS3APath(tmp_dir_spec.c_str(), false)) {
+      prefix = FILESYS_PREFIX_S3;
+      tmp_dirs_without_prefix = tmp_dir_spec_trimmed.substr(strlen(FILESYS_PREFIX_S3));
+      need_local_buffer_dir = true;
+      // Initialize the S3 options for later getting S3 connection.
+      s3a_options_ = {make_pair("fs.s3a.fast.upload", "true"),
+          make_pair("fs.s3a.fast.upload.buffer", "disk")};
+    } else {
+      prefix = "";
+      tmp_dirs_without_prefix = tmp_dir_spec_trimmed.substr(0);
+    }
+
     vector<string> toks;
-    split(toks, tmp_dir_spec, is_any_of(":"), token_compress_off);
+    split(toks, tmp_dirs_without_prefix, is_any_of(":"), token_compress_off);
     if (toks.size() > 3) {
       LOG(ERROR) << "Could not parse temporary dir specifier, too many colons: '"
                  << tmp_dir_spec << "'";
@@ -193,7 +290,7 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
       bytes_limit = ParseUtil::ParseMemSpec(toks[1], &is_percent, 0);
       if (bytes_limit < 0 || is_percent) {
         LOG(ERROR) << "Malformed scratch directory capacity configuration '"
-                   << tmp_dir_spec << "'";
+                   << tmp_dirs_without_prefix << "'";
         continue;
       } else if (bytes_limit == 0) {
         // Interpret -1, 0 or empty string as no limit.
@@ -210,64 +307,91 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
         continue;
       }
     }
-    IntGauge* bytes_used_metric = metrics->AddGauge(
-        SCRATCH_DIR_BYTES_USED_FORMAT, 0, Substitute("$0", tmp_dirs.size()));
-    tmp_dirs.emplace_back(new TmpDir(toks[0], bytes_limit, priority, bytes_used_metric));
+    tmp_dirs.emplace_back(
+        new TmpDir(prefix.append(toks[0]), bytes_limit, priority, nullptr));
   }
-
-  // Sort the tmp directories by priority.
-  std::sort(tmp_dirs.begin(), tmp_dirs.end(),
-      [](const std::unique_ptr<TmpDir>& a, const std::unique_ptr<TmpDir>& b) {
-        return a->priority < b->priority;
-      });
 
   vector<bool> is_tmp_dir_on_disk(DiskInfo::num_disks(), false);
   // For each tmp directory, find the disk it is on,
   // so additional tmp directories on the same disk can be skipped.
   for (int i = 0; i < tmp_dirs.size(); ++i) {
+    Status status;
     path tmp_path(trim_right_copy_if(tmp_dirs[i]->path, is_any_of("/")));
-    tmp_path = absolute(tmp_path);
-    path scratch_subdir_path(tmp_path / TMP_SUB_DIR_NAME);
-    // tmp_path must be a writable directory.
-    Status status = FileSystemUtil::VerifyIsDirectory(tmp_path.string());
-    if (!status.ok()) {
-      LOG(WARNING) << "Cannot use directory " << tmp_path.string() << " for scratch: "
-                   << status.msg().msg();
-      continue;
-    }
-    // Find the disk id of tmp_path. Add the scratch directory if there isn't another
-    // directory on the same disk (or if we don't know which disk it is on).
-    int disk_id = DiskInfo::disk_id(tmp_path.c_str());
-    if (!one_dir_per_device || disk_id < 0 || !is_tmp_dir_on_disk[disk_id]) {
-      uint64_t available_space;
-      RETURN_IF_ERROR(FileSystemUtil::GetSpaceAvailable(tmp_path.string(),
-          &available_space));
-      if (available_space < AVAILABLE_SPACE_THRESHOLD_MB * 1024 * 1024) {
-        LOG(WARNING) << "Filesystem containing scratch directory " << tmp_path
-                     << " has less than " << AVAILABLE_SPACE_THRESHOLD_MB
-                     << "MB available.";
+    bool is_hdfs_path = IsHdfsPath(tmp_path.c_str(), false);
+    bool is_s3a_path = IsS3APath(tmp_path.c_str(), false);
+    if (is_hdfs_path || is_s3a_path) {
+      // Only support one remote dir.
+      if (tmp_dirs_remote_ != nullptr) {
+        LOG(WARNING) << "Only one remote directory is supported. Directory "
+                     << tmp_path.c_str() << " is abandoned.";
+        continue;
       }
-      // Create the directory, destroying if already present. If this succeeds, we will
-      // have an empty writable scratch directory.
-      status = FileSystemUtil::RemoveAndCreateDirectory(scratch_subdir_path.string());
-      if (status.ok()) {
-        if (disk_id >= 0) is_tmp_dir_on_disk[disk_id] = true;
-        LOG(INFO) << "Using scratch directory " << scratch_subdir_path.string() << " on "
-                  << "disk " << disk_id
-                  << " limit: " << PrettyPrinter::PrintBytes(tmp_dirs[i]->bytes_limit);
-        tmp_dirs_.emplace_back(scratch_subdir_path.string(), tmp_dirs[i]->bytes_limit,
-            tmp_dirs[i]->priority, tmp_dirs[i]->bytes_used_metric);
+      string scratch_subdir_path_str;
+      if (is_hdfs_path) {
+        hdfsFS hdfs_conn;
+        RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
+            TMP_DIR_HDFS_LOCAL_DEFAULT, &hdfs_conn, &hdfs_conns_));
+        scratch_subdir_path_str = TMP_DIR_HDFS_LOCAL_DEFAULT + "/" + TMP_SUB_DIR_NAME;
+        if (hdfsExists(hdfs_conn, scratch_subdir_path_str.c_str()) != 0) {
+          if (hdfsCreateDirectory(hdfs_conn, scratch_subdir_path_str.c_str()) != 0) {
+            return Status(
+                GetHdfsErrorMsg("HDFS create path failed: ", scratch_subdir_path_str));
+          }
+        }
       } else {
-        LOG(WARNING) << "Could not remove and recreate directory "
-                     << scratch_subdir_path.string() << ": cannot use it for scratch. "
-                     << "Error was: " << status.msg().msg();
+        DCHECK(is_s3a_path);
+        path scratch_subdir_path(tmp_path / TMP_SUB_DIR_NAME);
+        scratch_subdir_path_str = scratch_subdir_path.string();
       }
-      if (punch_holes_) {
-        // Make sure hole punching is supported for the directory.
-        // IMPALA-9798: this file should *not* be created inside impala-scratch
-        // subdirectory to avoid races with multiple impalads starting up.
-        RETURN_IF_ERROR(FileSystemUtil::CheckHolePunch(tmp_path.string()));
+      tmp_dirs_remote_ =
+          std::make_unique<TmpDir>(scratch_subdir_path_str, tmp_dirs[i]->bytes_limit,
+              tmp_dirs[i]->priority, tmp_dirs[i]->bytes_used_metric, false);
+    } else {
+      tmp_path = absolute(tmp_path);
+      path scratch_subdir_path(tmp_path / TMP_SUB_DIR_NAME);
+      // tmp_path must be a writable directory.
+      status = FileSystemUtil::VerifyIsDirectory(tmp_path.string());
+      if (!status.ok()) {
+        LOG(WARNING) << "Cannot use directory " << tmp_path.string()
+                     << " for scratch: " << status.msg().msg();
+        continue;
       }
+
+      // Find the disk id of tmp_path. Add the scratch directory if there isn't another
+      // directory on the same disk (or if we don't know which disk it is on).
+      int disk_id = DiskInfo::disk_id(tmp_path.c_str());
+      if (!one_dir_per_device || disk_id < 0 || !is_tmp_dir_on_disk[disk_id]) {
+        uint64_t available_space;
+        RETURN_IF_ERROR(
+            FileSystemUtil::GetSpaceAvailable(tmp_path.string(), &available_space));
+        if (available_space < AVAILABLE_SPACE_THRESHOLD_MB * 1024 * 1024) {
+          LOG(WARNING) << "Filesystem containing scratch directory " << tmp_path
+                       << " has less than " << AVAILABLE_SPACE_THRESHOLD_MB
+                       << "MB available.";
+        }
+        RETURN_IF_ERROR(CreateDirectory(scratch_subdir_path.string(), tmp_path.string(),
+            tmp_dirs[i], metrics, &is_tmp_dir_on_disk, &need_local_buffer_dir, disk_id));
+      }
+    }
+  }
+
+  // Sort the tmp directories by priority.
+  std::sort(tmp_dirs_.begin(), tmp_dirs_.end(),
+      [](const TmpDir& a, const TmpDir& b) { return a.priority < b.priority; });
+
+  if (tmp_dirs_remote_ != nullptr) {
+    if (local_buff_dir_ == nullptr) {
+      // Should at least have one local dir for the buffer. Later we might allow to use
+      // s3 fast upload directly without a buffer.
+      return Status(
+          Substitute("No local directory configured for remote scratch space:  $0",
+              tmp_dirs_remote_->path));
+    } else {
+      LOG(INFO) << "Using scratch directory " << tmp_dirs_remote_->path
+                << " limit: " << PrettyPrinter::PrintBytes(tmp_dirs_remote_->bytes_limit);
+      IntGauge* bytes_used_metric = metrics->AddGauge(
+          SCRATCH_DIR_BYTES_USED_FORMAT, 0, Substitute("$0", tmp_dirs_.size()));
+      tmp_dirs_remote_->bytes_used_metric = bytes_used_metric;
     }
   }
 
@@ -276,21 +400,93 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
       metrics->AddGauge(TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS, 0);
   active_scratch_dirs_metric_ = SetMetric<string>::CreateAndRegister(
       metrics, TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS_LIST, set<string>());
-  num_active_scratch_dirs_metric_->SetValue(tmp_dirs_.size());
+  if (tmp_dirs_remote_ == nullptr) {
+    num_active_scratch_dirs_metric_->SetValue(tmp_dirs_.size());
+  } else {
+    num_active_scratch_dirs_metric_->SetValue(tmp_dirs_.size() + 1);
+  }
   for (int i = 0; i < tmp_dirs_.size(); ++i) {
     active_scratch_dirs_metric_->Add(tmp_dirs_[i].path);
   }
+  if (tmp_dirs_remote_ != nullptr) {
+    active_scratch_dirs_metric_->Add(tmp_dirs_remote_->path);
+    RETURN_IF_ERROR(CreateTmpFileBufferPoolThread(metrics));
+  }
+
   scratch_bytes_used_metric_ =
       metrics->AddHWMGauge(TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED_HIGH_WATER_MARK,
           TMP_FILE_MGR_SCRATCH_SPACE_BYTES_USED, 0);
 
   initialized_ = true;
 
-  if (tmp_dirs_.empty() && !tmp_dirs.empty()) {
+  if ((tmp_dirs_.empty() && local_buff_dir_ == nullptr) && !tmp_dirs.empty()) {
     LOG(ERROR) << "Running without spill to disk: could not use any scratch "
                << "directories in list: " << join(tmp_dir_specifiers, ",")
                << ". See previous warnings for information on causes.";
   }
+  return Status::OK();
+}
+
+Status TmpFileMgr::CreateDirectory(const string& scratch_subdir_path,
+    const string& tmp_path, const std::unique_ptr<TmpDir>& tmp_dir, MetricGroup* metrics,
+    vector<bool>* is_tmp_dir_on_disk, bool* need_local_buffer_dir, int disk_id) {
+  // Create the directory, destroying if already present. If this succeeds, we will
+  // have an empty writable scratch directory.
+  Status status = FileSystemUtil::RemoveAndCreateDirectory(scratch_subdir_path);
+  if (status.ok()) {
+    if (*need_local_buffer_dir) {
+      *need_local_buffer_dir = false;
+      // Add the first local dir as local buffer, the dir is only served as the buffer for
+      // Spill to Remote FS. At least we need the dir has two default file size space.
+      if (tmp_dir->bytes_limit < tmp_dirs_remote_ctrl_.remote_tmp_file_size_ * 2) {
+        return Status(Substitute(
+            "Local buffer directory $0 configured for remote scratch "
+            "space has a size limit of $1 bytes, should be at least twice as the "
+            "temporary file size "
+            "$2 bytes",
+            tmp_dir->path, tmp_dir->bytes_limit,
+            tmp_dirs_remote_ctrl_.remote_tmp_file_size_));
+      }
+      IntGauge* local_buff_bytes_used_metric =
+          metrics->AddGauge(LOCAL_BUFF_BYTES_USED_FORMAT, 0, Substitute("$0", 0));
+      local_buff_dir_ = std::make_unique<TmpDir>(
+          scratch_subdir_path, tmp_dir->bytes_limit, 0, local_buff_bytes_used_metric);
+      return Status::OK();
+    }
+    if (disk_id >= 0) (*is_tmp_dir_on_disk)[disk_id] = true;
+    LOG(INFO) << "Using scratch directory " << scratch_subdir_path << " on "
+              << "disk " << disk_id
+              << " limit: " << PrettyPrinter::PrintBytes(tmp_dir->bytes_limit);
+    IntGauge* bytes_used_metric = metrics->AddGauge(
+        SCRATCH_DIR_BYTES_USED_FORMAT, 0, Substitute("$0", tmp_dirs_.size()));
+    tmp_dirs_.emplace_back(
+        scratch_subdir_path, tmp_dir->bytes_limit, tmp_dir->priority, bytes_used_metric);
+  } else {
+    LOG(WARNING) << "Could not remove and recreate directory " << scratch_subdir_path
+                 << ": cannot use it for scratch. "
+                 << "Error was: " << status.msg().msg();
+  }
+  if (punch_holes_) {
+    // Make sure hole punching is supported for the directory.
+    // IMPALA-9798: this file should *not* be created inside impala-scratch
+    // subdirectory to avoid races with multiple impalads starting up.
+    RETURN_IF_ERROR(FileSystemUtil::CheckHolePunch(tmp_path));
+  }
+  return Status::OK();
+}
+
+Status TmpFileMgr::CreateTmpFileBufferPoolThread(MetricGroup* metrics) {
+  DCHECK(metrics != nullptr);
+  tmp_dirs_remote_ctrl_.tmp_file_pool_.reset(new TmpFileBufferPool(this));
+  std::unique_ptr<Thread> t;
+  RETURN_IF_ERROR(Thread::Create("tmp-file-pool", "work-loop(TmpFileSpaceReserve Worker)",
+      &TmpFileBufferPool::TmpFileSpaceReserveThreadLoop,
+      tmp_dirs_remote_ctrl_.tmp_file_pool_.get(), &t));
+  tmp_dirs_remote_ctrl_.tmp_file_mgr_thread_group_.AddThread(move(t));
+  int64_t ONE_HOUR_IN_NS = 60L * 60L * NANOS_PER_SEC;
+  tmp_dirs_remote_ctrl_.tmp_file_pool_->dequeue_timer_metric_ =
+      metrics->RegisterMetric(new HistogramMetric(
+          MetricDefs::Get(TMP_FILE_BUFF_POOL_DEQUEUE_DURATIONS), ONE_HOUR_IN_NS, 3));
   return Status::OK();
 }
 
@@ -307,53 +503,159 @@ void TmpFileMgr::NewFile(
   path new_file_path(tmp_dirs_[device_id].path);
   new_file_path /= file_name.str();
 
-  new_file->reset(new TmpFile(file_group, device_id, new_file_path.string()));
+  new_file->reset(new TmpFileLocal(file_group, device_id, new_file_path.string()));
 }
 
-string TmpFileMgr::GetTmpDirPath(DeviceId device_id) const {
-  DCHECK(initialized_);
-  DCHECK_GE(device_id, 0);
-  DCHECK_LT(device_id, tmp_dirs_.size());
-  return tmp_dirs_[device_id].path;
+void TmpFileMgr::RemoveRemoteDir(TmpFileGroup* file_group, DeviceId device_id) {
+  if (tmp_dirs_remote_ == nullptr) return;
+  string dir = tmp_dirs_remote_->path;
+  stringstream files_dir;
+  files_dir << dir << "/" << PrintId(ExecEnv::GetInstance()->backend_id(), "_") << "_"
+            << PrintId(file_group->unique_id(), "_");
+  hdfsFS hdfs_conn;
+  Status status =
+      HdfsFsCache::instance()->GetConnection(files_dir.str(), &hdfs_conn, &hdfs_conns_);
+  DCHECK(hdfs_conn != nullptr);
+  hdfsDelete(hdfs_conn, files_dir.str().c_str(), 1);
 }
 
-int TmpFileMgr::NumActiveTmpDevices() {
+Status TmpFileMgr::AsyncWriteRange(WriteRange* write_range, TmpFile* tmp_file) {
+  if (write_range->disk_file()->disk_type() == io::DiskFileType::LOCAL) {
+    DCHECK(write_range != nullptr);
+    DCHECK(write_range->io_ctx() != nullptr);
+    return write_range->io_ctx()->AddWriteRange(write_range);
+  }
+  // If spill to a remote directory, TmpFileBufferPool is helping to send the writes to
+  // the DiskQueue because the local buffer for the remote file may be used up and it may
+  // need to wait in the pool before the writes can be sent to the DiskQueue.
+  DCHECK(tmp_dirs_remote_ctrl_.tmp_file_pool_ != nullptr);
+  DCHECK(tmp_file != nullptr);
+  return tmp_dirs_remote_ctrl_.tmp_file_pool_->EnqueueWriteRange(write_range, tmp_file);
+}
+
+void TmpFileMgr::EnqueueTmpFilesPoolDummyFile() {
+  EnqueueTmpFilesPool(tmp_dirs_remote_ctrl_.tmp_file_pool_->tmp_file_dummy_, true);
+}
+
+void TmpFileMgr::EnqueueTmpFilesPool(shared_ptr<TmpFile>& tmp_file, bool front) {
+  tmp_dirs_remote_ctrl_.tmp_file_pool_->EnqueueTmpFilesPool(tmp_file, front);
+}
+
+Status TmpFileMgr::DequeueTmpFilesPool(shared_ptr<TmpFile>* tmp_file, bool quick_return) {
+  return tmp_dirs_remote_ctrl_.tmp_file_pool_->DequeueTmpFilesPool(
+      tmp_file, quick_return);
+}
+
+Status TmpFileMgr::TryEvictFile(TmpFile* tmp_file) {
+  DCHECK(tmp_file != nullptr);
+  if (tmp_file->disk_type() == io::DiskFileType::DUMMY) return Status::OK();
+
+  // Remove the buffer of the TmpFile.
+  // After deletion of the buffer, if the TmpFile doesn't exist in the remote file system
+  // either, that means the TmpFile shared pointer can be removed from the TmpFileMgr,
+  // because in this case, the physical file is considered no longer in the system.
+  // Fetch the unique locks of the files when doing the deletion.
+  TmpFileRemote* tmp_file_remote = static_cast<TmpFileRemote*>(tmp_file);
+  DiskFile* buffer_file = tmp_file_remote->DiskBufferFile();
+  Status status = Status::OK();
+  {
+    unique_lock<shared_mutex> buffer_lock(buffer_file->physical_file_lock_);
+    if (buffer_file->GetFileStatus() == io::DiskFileStatus::PERSISTED) {
+      status = buffer_file->Delete(buffer_lock);
+    }
+  }
+  return status;
+}
+
+Status TmpFileMgr::ReserveLocalBufferSpace(bool quick_return) {
+  int64_t file_size = GetRemoteTmpFileSize();
+
+  // The high water mark is used to record the total bytes which have been assigned, we
+  // can assume that all the assigned bytes will be finally returned to the pool.
+  // Before the high water mark reaches the bytes limit of the local buffer directory,
+  // the caller can gain space freely. But if the high water mark is over the bytes limit,
+  // the caller needs to gain space from the pool because all the available spaces are in
+  // the pool now.
+  TmpDir* dir = local_buff_dir_.get();
+  if (tmp_dirs_remote_ctrl_.local_buff_dir_bytes_high_water_mark_.Add(file_size)
+      > dir->bytes_limit) {
+    tmp_dirs_remote_ctrl_.local_buff_dir_bytes_high_water_mark_.Add(-file_size);
+  } else {
+    GetLocalBufferDir()->bytes_used_metric->Increment(file_size);
+    return Status::OK();
+  }
+
+  shared_ptr<TmpFile> tmp_file;
+  // If all of the space of the buffer directory has been assigned, gain a file which
+  // is available to be evicted from the TmpFileBufferPool. It can be a long wait if
+  // quick return is not set and there is no available file in the pool.
+  Status status = DequeueTmpFilesPool(&tmp_file, quick_return);
+  if (!status.ok()) {
+    DCHECK(tmp_file == nullptr);
+    return status;
+  }
+  // Evict the file to release the physical space.
+  // If error happens during eviction, we log an warning, and return status ok instead to
+  // keep the caller doing the writing since probably the physical file is already
+  // deleted.
+  status = TryEvictFile(tmp_file.get());
+  if (!status.ok()) {
+    LOG(WARNING) << "File Eviction Failed: " << tmp_file->GetWriteFile()->path();
+  }
+  return Status::OK();
+}
+
+TmpDir* TmpFileMgr::GetLocalBufferDir() const {
+  return local_buff_dir_.get();
+}
+
+int TmpFileMgr::NumActiveTmpDevicesLocal() {
   DCHECK(initialized_);
   return tmp_dirs_.size();
 }
 
+int TmpFileMgr::NumActiveTmpDevices() {
+  DCHECK(initialized_);
+  return tmp_dirs_.size() + ((tmp_dirs_remote_ == nullptr) ? 0 : 1);
+}
+
 vector<DeviceId> TmpFileMgr::ActiveTmpDevices() {
   vector<DeviceId> devices;
-  for (DeviceId device_id = 0; device_id < tmp_dirs_.size(); ++device_id) {
+  DeviceId device_id = 0;
+  for (; device_id < tmp_dirs_.size(); ++device_id) {
+    devices.push_back(device_id);
+  }
+  if (tmp_dirs_remote_ != nullptr) {
     devices.push_back(device_id);
   }
   return devices;
 }
 
-TmpFile::TmpFile(TmpFileGroup* file_group, DeviceId device_id, const string& path)
+string TmpFileMgr::GetTmpDirPath(DeviceId device_id) const {
+  DCHECK(initialized_);
+  DCHECK_GE(device_id, 0);
+  DCHECK_LT(device_id, tmp_dirs_.size() + ((tmp_dirs_remote_ == nullptr) ? 0 : 1));
+  if (device_id < tmp_dirs_.size()) {
+    return tmp_dirs_[device_id].path;
+  } else {
+    return tmp_dirs_remote_->path;
+  }
+}
+
+TmpFile::TmpFile(
+    TmpFileGroup* file_group, DeviceId device_id, const string& path, bool expected_local)
   : file_group_(file_group),
     path_(path),
     device_id_(device_id),
     disk_id_(DiskInfo::disk_id(path.c_str())),
-    blacklisted_(false) {
-  DCHECK(file_group != nullptr);
-}
+    expected_local_(expected_local),
+    blacklisted_(false) {}
 
-bool TmpFile::AllocateSpace(int64_t num_bytes, int64_t* offset) {
-  DCHECK_GT(num_bytes, 0);
-  TmpDir* dir = GetDir();
-  // Increment optimistically and roll back if the limit is exceeded.
-  if (dir->bytes_used_metric->Increment(num_bytes) > dir->bytes_limit) {
-    dir->bytes_used_metric->Increment(-num_bytes);
-    return false;
+int TmpFile::AssignDiskQueue(bool is_local_buffer) const {
+  if (is_local_buffer) {
+    return file_group_->io_mgr_->AssignQueue(local_buffer_path_.c_str(), -1, true);
   }
-  *offset = allocation_offset_;
-  allocation_offset_ += num_bytes;
-  return true;
-}
-
-int TmpFile::AssignDiskQueue() const {
-  return file_group_->io_mgr_->AssignQueue(path_.c_str(), disk_id_, false);
+  return file_group_->io_mgr_->AssignQueue(path_.c_str(), disk_id_, expected_local_);
 }
 
 bool TmpFile::Blacklist(const ErrorMsg& msg) {
@@ -366,18 +668,14 @@ bool TmpFile::Blacklist(const ErrorMsg& msg) {
   }
 }
 
-Status TmpFile::Remove() {
-  // Remove the file if present (it may not be present if no writes completed).
-  Status status = FileSystemUtil::RemovePaths({path_});
-  int64_t bytes_in_use = file_group_->tmp_file_mgr_->punch_holes() ?
-      allocation_offset_ - bytes_reclaimed_.Load() :
-      allocation_offset_;
-  GetDir()->bytes_used_metric->Increment(-bytes_in_use);
-  return status;
-}
-
 TmpFileMgr::TmpDir* TmpFile::GetDir() {
-  return &file_group_->tmp_file_mgr_->tmp_dirs_[device_id_];
+  auto tmp_file_mgr = file_group_->tmp_file_mgr_;
+  if (device_id_ >= tmp_file_mgr->tmp_dirs_.size()) {
+    // Only one remote directory supported.
+    DCHECK(device_id_ - tmp_file_mgr->tmp_dirs_.size() == 0);
+    return tmp_file_mgr->tmp_dirs_remote_.get();
+  }
+  return &tmp_file_mgr->tmp_dirs_[device_id_];
 }
 
 Status TmpFile::PunchHole(int64_t offset, int64_t len) {
@@ -400,6 +698,138 @@ string TmpFile::DebugString() {
   return Substitute(
       "File $0 path '$1' device id $2 disk id $3 allocation offset $4 blacklisted $5",
       this, path_, device_id_, disk_id_, allocation_offset_, blacklisted_);
+}
+
+TmpFileLocal::TmpFileLocal(TmpFileGroup* file_group, TmpFileMgr::DeviceId device_id,
+    const std::string& path, bool expected_local)
+  : TmpFile(file_group, device_id, path, expected_local) {
+  DCHECK(file_group != nullptr);
+  disk_file_ = make_unique<io::DiskFile>(path_, file_group->io_mgr_);
+  disk_type_ = io::DiskFileType::LOCAL;
+}
+
+bool TmpFileLocal::AllocateSpace(int64_t num_bytes, int64_t* offset) {
+  DCHECK_GT(num_bytes, 0);
+  TmpDir* dir = GetDir();
+  // Increment optimistically and roll back if the limit is exceeded.
+  if (dir->bytes_used_metric->Increment(num_bytes) > dir->bytes_limit) {
+    dir->bytes_used_metric->Increment(-num_bytes);
+    return false;
+  }
+  *offset = allocation_offset_;
+  allocation_offset_ += num_bytes;
+  return true;
+}
+
+io::DiskFile* TmpFileLocal::GetWriteFile() {
+  return disk_file_.get();
+}
+
+Status TmpFileLocal::Remove() {
+  // Remove the file if present (it may not be present if no writes completed).
+  Status status = FileSystemUtil::RemovePaths({path_});
+  int64_t bytes_in_use = file_group_->tmp_file_mgr_->punch_holes() ?
+      allocation_offset_ - bytes_reclaimed_.Load() :
+      allocation_offset_;
+  GetDir()->bytes_used_metric->Increment(-bytes_in_use);
+  return status;
+}
+
+TmpFileRemote::TmpFileRemote(TmpFileGroup* file_group, TmpFileMgr::DeviceId device_id,
+    const std::string& path, const std::string& local_buffer_path, bool expected_local,
+    const char* hdfs_url)
+  : TmpFile(file_group, device_id, path, expected_local) {
+  DCHECK(hdfs_url != nullptr);
+  hdfs_conn_ = nullptr;
+  if (IsHdfsPath(hdfs_url, false)) {
+    hdfs_conn_ = hdfsConnect("default", 0);
+    disk_type_ = io::DiskFileType::DFS;
+    disk_id_ = file_group->io_mgr_->RemoteDfsDiskId();
+  } else if (IsS3APath(hdfs_url, false)) {
+    disk_type_ = io::DiskFileType::S3;
+    disk_id_ = file_group->io_mgr_->RemoteS3DiskId();
+    Status status = HdfsFsCache::instance()->GetConnection(hdfs_url, &hdfs_conn_,
+        &file_group_->tmp_file_mgr_->hdfs_conns_,
+        file_group_->tmp_file_mgr_->s3a_options());
+  }
+  file_size_ = file_group_->tmp_file_mgr_->GetRemoteTmpFileSize();
+  local_buffer_path_ = local_buffer_path;
+  disk_file_ = make_unique<io::DiskFile>(path_, file_group->io_mgr_,
+      file_group_->tmp_file_mgr_->GetRemoteTmpFileSize(), disk_type_, &hdfs_conn_);
+  disk_buffer_file_ = make_unique<io::DiskFile>(local_buffer_path_, file_group_->io_mgr_,
+      file_group_->tmp_file_mgr_->GetRemoteTmpFileSize(), io::DiskFileType::LOCAL_BUFFER);
+}
+
+TmpFileRemote::~TmpFileRemote() {
+  // Need to return the buffer before deconstruction if buffer space is reserved.
+  if (DiskBufferFile()->IsSpaceReserved()) DCHECK(is_buffer_returned());
+}
+
+bool TmpFileRemote::AllocateSpace(int64_t num_bytes, int64_t* offset) {
+  DCHECK_GT(num_bytes, 0);
+  if (at_capacity_) return false;
+  *offset = allocation_offset_;
+  allocation_offset_ += num_bytes;
+  // The actual size could be a little over the file size.
+  if (allocation_offset_ >= file_size_) {
+    // Set the actual file size of the disk file for the use of writing.
+    GetWriteFile()->SetActualFileSize(allocation_offset_);
+    at_capacity_ = true;
+  }
+  return true;
+}
+
+io::DiskFile* TmpFileRemote::GetWriteFile() {
+  return disk_buffer_file_.get();
+}
+
+TmpFileMgr::TmpDir* TmpFileRemote::GetLocalBufferDir() const {
+  return file_group_->tmp_file_mgr_->GetLocalBufferDir();
+}
+
+Status TmpFileRemote::Remove() {
+  Status status = Status::OK();
+  // If True, we need to enqueue the file back to the pool after deletion.
+  bool to_return_the_buffer = false;
+
+  // The order of acquiring the lock must be from local to remote to avoid deadlocks.
+  unique_lock<shared_mutex> buffer_file_lock(*(disk_buffer_file_->GetFileLock()));
+  unique_lock<shared_mutex> file_lock(*(disk_file_->GetFileLock()));
+
+  // Delete the local buffer file if exists.
+  if (disk_buffer_file_->GetFileStatus() != io::DiskFileStatus::DELETED) {
+    status = disk_buffer_file_->Delete(buffer_file_lock);
+    if (!status.ok()) {
+      // If the physical file is failed to delete, log a warning, and set a deleted flag
+      // anyway.
+      LOG(WARNING) << "Delete file: " << disk_buffer_file_->path() << " failed.";
+      disk_buffer_file_->SetStatus(io::DiskFileStatus::DELETED);
+    } else if (disk_file_->GetFileStatus() != io::DiskFileStatus::PERSISTED
+        && disk_buffer_file_->IsSpaceReserved()) {
+      // If the file is not uploaded and the buffer space is reserved, we need to return
+      // the buffer to the pool after deletion of the TmpFile. The buffer of a uploaded
+      // file should have been returned to the pool after upload operation completes.
+      to_return_the_buffer = true;
+    } else {
+      // Do nothing.
+    }
+  }
+
+  // Set the remote file status to deleted. The physical remote files would be deleted
+  // during deconstruction of TmpFileGroup by deleting the entire remote
+  // directory for efficiency consideration.
+  disk_file_->SetStatus(io::DiskFileStatus::DELETED);
+
+  // Update the metrics.
+  GetDir()->bytes_used_metric->Increment(-file_size_);
+
+  // Return the file to the pool if it hasn't been enqueued.
+  if (to_return_the_buffer) {
+    file_group_->tmp_file_mgr()->EnqueueTmpFilesPool(
+        file_group_->FindTmpFileSharedPtr(this), true);
+  }
+
+  return status;
 }
 
 TmpFileGroup::TmpFileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
@@ -425,6 +855,7 @@ TmpFileGroup::TmpFileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
     num_blacklisted_files_(0),
     spilling_disk_faulty_(false),
     current_bytes_allocated_(0),
+    current_bytes_allocated_remote_(0),
     next_allocation_index_(0),
     free_ranges_(64) {
   DCHECK(tmp_file_mgr != nullptr);
@@ -456,17 +887,18 @@ Status TmpFileGroup::CreateFiles() {
   lock_.DCheckLocked();
   DCHECK(tmp_files_.empty());
   vector<DeviceId> tmp_devices = tmp_file_mgr_->ActiveTmpDevices();
+  DCHECK(tmp_file_mgr_->NumActiveTmpDevicesLocal() <= tmp_devices.size());
   int files_allocated = 0;
   // Initialize the tmp files and the initial file to use.
-  for (int i = 0; i < tmp_devices.size(); ++i) {
+  for (int i = 0; i < tmp_file_mgr_->NumActiveTmpDevicesLocal(); ++i) {
     DeviceId device_id = tmp_devices[i];
     unique_ptr<TmpFile> tmp_file;
     tmp_file_mgr_->NewFile(this, device_id, &tmp_file);
     tmp_files_.emplace_back(std::move(tmp_file));
     ++files_allocated;
   }
-  DCHECK_EQ(tmp_files_.size(), files_allocated);
-  DCHECK_EQ(tmp_file_mgr_->tmp_dirs_.size(), tmp_files_.size());
+  DCHECK_EQ(tmp_file_mgr_->NumActiveTmpDevicesLocal(), files_allocated);
+  DCHECK_EQ(tmp_file_mgr_->NumActiveTmpDevicesLocal(), tmp_files_.size());
   if (tmp_files_.size() == 0) return ScratchAllocationFailedStatus({});
   // Initialize the next allocation index for each priority.
   for (const auto& entry: tmp_files_index_range_) {
@@ -479,21 +911,36 @@ Status TmpFileGroup::CreateFiles() {
   return Status::OK();
 }
 
-void TmpFileGroup::Close() {
-  // Cancel writes before deleting the files, since in-flight writes could re-create
-  // deleted files.
-  if (io_ctx_ != nullptr) io_mgr_->UnregisterContext(io_ctx_.get());
-  for (std::unique_ptr<TmpFile>& file : tmp_files_) {
+template <typename T>
+void TmpFileGroup::CloseInternal(vector<T>& tmp_files) {
+  for (auto& file : tmp_files) {
     Status status = file->Remove();
     if (!status.ok()) {
       LOG(WARNING) << "Error removing scratch file '" << file->path()
                    << "': " << status.msg().msg();
     }
   }
+  tmp_files.clear();
+}
+
+void TmpFileGroup::Close() {
+  // Cancel writes before deleting the files, since in-flight writes could re-create
+  // deleted files.
+  if (io_ctx_ != nullptr) {
+    if (tmp_file_mgr_->HasRemoteDir()) {
+      // Remove all the writes using the io_ctx and waiting for buffer reservation in
+      // the pool.
+      DCHECK(tmp_file_mgr_->tmp_dirs_remote_ctrl_.tmp_file_pool_ != nullptr);
+      tmp_file_mgr_->tmp_dirs_remote_ctrl_.tmp_file_pool_->RemoveWriteRanges(
+          io_ctx_.get());
+    }
+    io_mgr_->UnregisterContext(io_ctx_.get());
+  }
+  CloseInternal<std::unique_ptr<TmpFile>>(tmp_files_);
+  CloseInternal<std::shared_ptr<TmpFile>>(tmp_files_remote_);
+  tmp_file_mgr_->RemoveRemoteDir(this, 0);
   tmp_file_mgr_->scratch_bytes_used_metric_->Increment(
       -1 * scratch_space_bytes_used_counter_->value());
-
-  tmp_files_.clear();
 }
 
 // Rounds up to the smallest unit of allocation in a scratch file
@@ -509,9 +956,118 @@ static int64_t RoundUpToScratchRangeSize(bool punch_holes, int64_t bytes) {
   }
 }
 
-Status TmpFileGroup::AllocateSpace(
-    int64_t num_bytes, TmpFile** tmp_file, int64_t* file_offset) {
-  lock_guard<SpinLock> lock(lock_);
+void TmpFileGroup::UpdateScratchSpaceMetrics(int64_t num_bytes, bool is_remote) {
+  scratch_space_bytes_used_counter_->Add(num_bytes);
+  tmp_file_mgr_->scratch_bytes_used_metric_->Increment(num_bytes);
+  current_bytes_allocated_.Add(num_bytes);
+  if (is_remote) current_bytes_allocated_remote_.Add(num_bytes);
+}
+
+string TmpFileGroup::GenerateNewPath(string& dir, string& unique_name) {
+  stringstream file_name;
+  file_name << TMP_SUB_DIR_NAME << "-" << unique_name;
+  path new_file_path(dir);
+  new_file_path /= file_name.str();
+  return new_file_path.string();
+}
+
+std::shared_ptr<TmpFile>& TmpFileGroup::FindTmpFileSharedPtr(TmpFile* tmp_file) {
+  DCHECK(tmp_file != nullptr);
+  DCHECK(tmp_file->DiskFile()->disk_type() != io::DiskFileType::LOCAL);
+  lock_guard<SpinLock> lock(tmp_files_remote_ptrs_lock_);
+  auto shared_file_it = tmp_files_remote_ptrs_.find(tmp_file);
+  DCHECK(shared_file_it != tmp_files_remote_ptrs_.end());
+  return shared_file_it->second;
+}
+
+Status TmpFileGroup::AllocateRemoteSpace(int64_t num_bytes, TmpFile** tmp_file,
+    int64_t* file_offset, vector<int>* at_capacity_dirs) {
+  // Only one remote dir supported currently.
+  string dir = tmp_file_mgr_->tmp_dirs_remote_->path;
+  // It is not supposed to have a remote directory other than HDFS or S3.
+  DCHECK(IsHdfsPath(dir.c_str(), false) || IsS3APath(dir.c_str(), false));
+
+  // Look for the space from a previous created file.
+  if (!tmp_files_remote_.empty()) {
+    TmpFile* tmp_file_cur = tmp_files_remote_.back().get();
+    // If the file is blocklisted or is at capacity, we will create a new file instead.
+    if (!tmp_file_cur->is_blacklisted()) {
+      if (tmp_file_cur->AllocateSpace(num_bytes, file_offset)) {
+        *tmp_file = tmp_file_cur;
+        return Status::OK();
+      }
+    }
+  }
+
+  // Return an error if the new bytes is over the bytes limit of the query or the remote
+  // directory.
+  int64_t new_bytes =
+      current_bytes_allocated_.Load() + tmp_file_mgr_->GetRemoteTmpFileSize();
+  if (bytes_limit_ != -1 && new_bytes > bytes_limit_) {
+    return Status(TErrorCode::SCRATCH_LIMIT_EXCEEDED, bytes_limit_, GetBackendString());
+  }
+
+  int64_t remote_dir_bytes_limit = tmp_file_mgr_->tmp_dirs_remote_->bytes_limit;
+  if (remote_dir_bytes_limit != -1 && new_bytes > remote_dir_bytes_limit) {
+    return Status(
+        TErrorCode::SCRATCH_LIMIT_EXCEEDED, remote_dir_bytes_limit, GetBackendString());
+  }
+
+  // The device id of remote directory is defined as the max local device id
+  // plus the index of the remote dir. Since we only support one remote dir now,
+  // the id is the max local device id plus one.
+  DeviceId dev_id = tmp_file_mgr_->tmp_dirs_.size();
+  string unique_name = lexical_cast<string>(random_generator()());
+  stringstream file_name;
+  dir = dir + "/" + PrintId(ExecEnv::GetInstance()->backend_id(), "_") + "_"
+      + PrintId(unique_id(), "_");
+
+  string new_file_path = GenerateNewPath(dir, unique_name);
+  string local_buffer_dir = tmp_file_mgr_->local_buff_dir_->path;
+  string new_file_path_local = GenerateNewPath(local_buffer_dir, unique_name);
+
+  TmpFileRemote* tmp_file_r = new TmpFileRemote(
+      this, dev_id, new_file_path, new_file_path_local, false, dir.c_str());
+  if (tmp_file_r == nullptr) {
+    return Status("Failed to allocate temporary file object.");
+  }
+  if (tmp_file_r->hdfs_conn_ == nullptr) {
+    return Status(Substitute("Failed to connect to FS: $0.", dir));
+  }
+  shared_ptr<TmpFile> tmp_file_remote(move(tmp_file_r));
+  int64_t file_size = tmp_file_mgr_->GetRemoteTmpFileSize();
+  TmpFileMgr::TmpDir* tmp_dir_remote = tmp_file_remote->GetDir();
+  if (tmp_dir_remote->bytes_limit != -1
+      && tmp_dir_remote->bytes_used_metric->Increment(file_size)
+          > tmp_dir_remote->bytes_limit) {
+    tmp_dir_remote->bytes_used_metric->Increment(-file_size);
+    at_capacity_dirs->push_back(dev_id);
+    return Status(Substitute("Reach the size limit $0 of dir: $1",
+        tmp_dir_remote->bytes_limit, tmp_dir_remote->path));
+  }
+  UpdateScratchSpaceMetrics(file_size, true);
+
+  // It should be a successful return to allocate the first range from the new file.
+  DCHECK(tmp_file_remote->AllocateSpace(num_bytes, file_offset));
+
+  tmp_files_remote_.emplace_back(std::move(tmp_file_remote));
+  *tmp_file = tmp_files_remote_.back().get();
+  {
+    lock_guard<SpinLock> lock(tmp_files_remote_ptrs_lock_);
+    tmp_files_remote_ptrs_.emplace(*tmp_file, tmp_files_remote_.back());
+  }
+  *file_offset = 0;
+
+  // Try to reserve the space for local buffer with a quick return to avoid
+  // a long wait, if failed, caller should do the reservation for the buffer.
+  Status reserve_status = tmp_file_mgr_->ReserveLocalBufferSpace(true);
+  if (reserve_status.ok()) (*tmp_file)->GetWriteFile()->SetSpaceReserved();
+
+  return Status::OK();
+}
+
+Status TmpFileGroup::AllocateLocalSpace(int64_t num_bytes, TmpFile** tmp_file,
+    int64_t* file_offset, vector<int>* at_capacity_dirs, bool* alloc_full) {
   int64_t scratch_range_bytes =
       RoundUpToScratchRangeSize(tmp_file_mgr_->punch_holes(), num_bytes);
   int free_ranges_idx = BitUtil::Log2Ceiling64(scratch_range_bytes);
@@ -524,17 +1080,12 @@ Status TmpFileGroup::AllocateSpace(
   }
 
   if (bytes_limit_ != -1
-      && current_bytes_allocated_ + scratch_range_bytes > bytes_limit_) {
+      && current_bytes_allocated_.Load() + scratch_range_bytes > bytes_limit_) {
     return Status(TErrorCode::SCRATCH_LIMIT_EXCEEDED, bytes_limit_, GetBackendString());
   }
 
   // Lazily create the files on the first write.
   if (tmp_files_.empty()) RETURN_IF_ERROR(CreateFiles());
-
-  // Track the indices of any directories where we failed due to capacity. This is
-  // required for error reporting if we are totally out of capacity so that it's clear
-  // that some disks were at capacity.
-  vector<int> at_capacity_dirs;
 
   // Find the next physical file in priority based round-robin order and allocate a range
   // from it.
@@ -550,18 +1101,52 @@ Status TmpFileGroup::AllocateSpace(
       next_allocation_index_[priority] = start + (idx - start + 1) % (end - start + 1);
       *tmp_file = tmp_files_[idx].get();
       if ((*tmp_file)->is_blacklisted()) continue;
-
       // Check the per-directory limit.
       if (!(*tmp_file)->AllocateSpace(scratch_range_bytes, file_offset)) {
-        at_capacity_dirs.push_back(idx);
+        at_capacity_dirs->push_back(idx);
         continue;
       }
-      scratch_space_bytes_used_counter_->Add(scratch_range_bytes);
-      tmp_file_mgr_->scratch_bytes_used_metric_->Increment(scratch_range_bytes);
-      current_bytes_allocated_ += scratch_range_bytes;
+      UpdateScratchSpaceMetrics(scratch_range_bytes);
       return Status::OK();
     }
   }
+
+  // Using a bool to notify there is no more space left, could cost less overhead than
+  // using a Status, because we want the error reporting as fast as possible for the
+  // case of mixing use of remote and local scratch space, so that it can keep trying to
+  // allocate from the remote after this.
+  *alloc_full = true;
+  return Status::OK();
+}
+
+Status TmpFileGroup::AllocateSpace(
+    int64_t num_bytes, TmpFile** tmp_file, int64_t* file_offset) {
+  // Since in eviction, it probably waits for the async upload task if it
+  // reaches bytes limit, so it can be slow here.
+  lock_guard<SpinLock> lock(lock_);
+
+  // Track the indices of any directories where we failed due to capacity. This is
+  // required for error reporting if we are totally out of capacity so that it's clear
+  // that some disks were at capacity.
+  vector<int> at_capacity_dirs;
+
+  if (!tmp_file_mgr_->tmp_dirs_.empty()) {
+    // If alloc_full is set true, meaning all of the local directories are at capacity.
+    bool alloc_full = false;
+    Status status = AllocateLocalSpace(
+        num_bytes, tmp_file, file_offset, &at_capacity_dirs, &alloc_full);
+    // If the all of the dirs are at capacity, try remote scratch space.
+    // Otherwise, return the status (could be an okay or error).
+    if (!status.ok() || !alloc_full) return status;
+  }
+
+  // If can't find any space locally, allocate from remote scratch space.
+  if (tmp_file_mgr_->tmp_dirs_remote_ != nullptr) {
+    Status remote_status =
+        AllocateRemoteSpace(num_bytes, tmp_file, file_offset, &at_capacity_dirs);
+    if (remote_status.ok() || at_capacity_dirs.empty()) return remote_status;
+  }
+
   return ScratchAllocationFailedStatus(at_capacity_dirs);
 }
 
@@ -580,14 +1165,15 @@ void TmpFileGroup::RecycleFileRange(unique_ptr<TmpWriteHandle> handle) {
     }
     scratch_space_bytes_used_counter_->Add(-space_used_bytes);
     tmp_file_mgr_->scratch_bytes_used_metric_->Increment(-space_used_bytes);
-    {
-      lock_guard<SpinLock> lock(lock_);
-      current_bytes_allocated_ -= space_used_bytes;
-    }
+    current_bytes_allocated_.Add(-space_used_bytes);
   } else {
-    int free_ranges_idx = BitUtil::Log2Ceiling64(space_used_bytes);
-    lock_guard<SpinLock> lock(lock_);
-    free_ranges_[free_ranges_idx].emplace_back(file, handle->write_range_->offset());
+    // For the remote files, we don't recycle the file and range because the remote file
+    // is not allowed to in-place modification.
+    if (file->DiskFile()->disk_type() == io::DiskFileType::LOCAL) {
+      int free_ranges_idx = BitUtil::Log2Ceiling64(space_used_bytes);
+      lock_guard<SpinLock> lock(lock_);
+      free_ranges_[free_ranges_idx].emplace_back(file, handle->write_range_->offset());
+    }
   }
 }
 
@@ -639,11 +1225,27 @@ Status TmpFileGroup::ReadAsync(TmpWriteHandle* handle, MemRange buffer) {
   // Don't grab handle->write_state_lock_, it is safe to touch all of handle's state
   // since the write is not in flight.
   handle->read_range_ = scan_range_pool_.Add(new ScanRange);
-  handle->read_range_->Reset(nullptr, handle->write_range_->file(),
-      handle->write_range_->len(), handle->write_range_->offset(),
-      handle->write_range_->disk_id(), false, ScanRange::INVALID_MTIME,
-      BufferOpts::ReadInto(
-          read_buffer.data(), read_buffer.len(), BufferOpts::NO_CACHING));
+
+  if (handle->file_ != nullptr && !handle->file_->is_local()) {
+    TmpFileRemote* tmp_file = static_cast<TmpFileRemote*>(handle->file_);
+    DiskFile* disk_buffer_file = tmp_file->DiskBufferFile();
+    DiskFile* disk_file = tmp_file->DiskFile();
+    // Reset the read_range, use the remote filesystem's disk id.
+    handle->read_range_->Reset(tmp_file->hdfs_conn_, disk_file->path().c_str(),
+        handle->write_range_->len(), handle->write_range_->offset(), tmp_file->disk_id(),
+        false, tmp_file->mtime_,
+        BufferOpts::ReadInto(
+            read_buffer.data(), read_buffer.len(), BufferOpts::NO_CACHING),
+        nullptr, disk_file, disk_buffer_file);
+  } else {
+    // Read from local.
+    handle->read_range_->Reset(nullptr, handle->write_range_->file(),
+        handle->write_range_->len(), handle->write_range_->offset(),
+        handle->write_range_->disk_id(), false, ScanRange::INVALID_MTIME,
+        BufferOpts::ReadInto(
+            read_buffer.data(), read_buffer.len(), BufferOpts::NO_CACHING));
+  }
+
   read_counter_->Add(1);
   bytes_read_counter_->Add(read_buffer.len());
   bool needs_buffers;
@@ -809,13 +1411,17 @@ Status TmpFileGroup::ScratchAllocationFailedStatus(
   }
   vector<string> at_capacity_dir_paths;
   for (int dir_idx : at_capacity_dirs) {
-    at_capacity_dir_paths.push_back(tmp_file_mgr_->tmp_dirs_[dir_idx].path);
+    if (dir_idx >= tmp_file_mgr_->tmp_dirs_.size()) {
+      at_capacity_dir_paths.push_back(tmp_file_mgr_->tmp_dirs_remote_->path);
+    } else {
+      at_capacity_dir_paths.push_back(tmp_file_mgr_->tmp_dirs_[dir_idx].path);
+    }
   }
   Status status(TErrorCode::SCRATCH_ALLOCATION_FAILED, join(tmp_dir_paths, ","),
       GetBackendString(),
       PrettyPrinter::PrintBytes(
-        tmp_file_mgr_->scratch_bytes_used_metric_->current_value()->GetValue()),
-      PrettyPrinter::PrintBytes(current_bytes_allocated_),
+          tmp_file_mgr_->scratch_bytes_used_metric_->current_value()->GetValue()),
+      PrettyPrinter::PrintBytes(current_bytes_allocated_.Load()),
       join(at_capacity_dir_paths, ","));
   // Include all previous errors that may have caused the failure.
   for (Status& err : scratch_errors_) status.MergeStatus(err);
@@ -831,7 +1437,7 @@ string TmpFileGroup::DebugString() {
   lock_guard<SpinLock> lock(lock_);
   stringstream ss;
   ss << "TmpFileGroup " << this << " bytes limit " << bytes_limit_
-     << " current bytes allocated " << current_bytes_allocated_
+     << " current bytes allocated " << current_bytes_allocated_.Load()
      << " next allocation index [ ";
   // Get priority based allocation index.
   for (const auto& entry: next_allocation_index_) {
@@ -869,6 +1475,11 @@ string TmpWriteHandle::TmpFilePath() const {
   return file_->path();
 }
 
+string TmpWriteHandle::TmpFileBufferPath() const {
+  if (file_ == nullptr) return "";
+  return file_->LocalBuffPath();
+}
+
 int64_t TmpWriteHandle::on_disk_len() const {
   return write_range_->len();
 }
@@ -890,6 +1501,10 @@ Status TmpWriteHandle::Write(RequestContext* io_ctx, MemRange buffer,
   // Allocate space after doing compression, to avoid overallocating space.
   TmpFile* tmp_file;
   int64_t file_offset;
+  Status status = Status::OK();
+
+  // For the second unpin of a page, it will be written to a new file since the
+  // content should be changed
   RETURN_IF_ERROR(parent_->AllocateSpace(buffer_to_write.len(), &tmp_file, &file_offset));
 
   if (FLAGS_disk_spill_encryption) {
@@ -900,13 +1515,19 @@ Status TmpWriteHandle::Write(RequestContext* io_ctx, MemRange buffer,
   // WriteComplete() may be called concurrently with the remainder of this function.
   data_len_ = buffer.len();
   file_ = tmp_file;
-  write_range_.reset(new WriteRange(
-      tmp_file->path(), file_offset, tmp_file->AssignDiskQueue(), callback));
+  write_range_.reset(new WriteRange(tmp_file->path(), file_offset,
+      tmp_file->AssignDiskQueue(!tmp_file->is_local()), callback));
   write_range_->SetData(buffer_to_write.data(), buffer_to_write.len());
+  // For remote files, we write the range to the local buffer.
+  write_range_->SetDiskFile(tmp_file->GetWriteFile());
   VLOG(3) << "Write " << tmp_file->path() << " " << file_offset << " "
           << buffer_to_write.len();
   write_in_flight_ = true;
-  Status status = io_ctx->AddWriteRange(write_range_.get());
+
+  write_range_->SetRequestContext(io_ctx);
+  // Add the write range asyncly to the DiskQueue for writing.
+  status = parent_->tmp_file_mgr()->AsyncWriteRange(write_range_.get(), tmp_file);
+
   if (!status.ok()) {
     // The write will not be in flight if we returned with an error.
     write_in_flight_ = false;
@@ -963,6 +1584,7 @@ Status TmpWriteHandle::RetryWrite(RequestContext* io_ctx, TmpFile* file, int64_t
   DCHECK(write_in_flight_);
   file_ = file;
   write_range_->SetRange(file->path(), offset, file->AssignDiskQueue());
+  write_range_->SetDiskFile(file->GetWriteFile());
   Status status = io_ctx->AddWriteRange(write_range_.get());
   if (!status.ok()) {
     // The write will not be in flight if we returned with an error.
@@ -972,8 +1594,23 @@ Status TmpWriteHandle::RetryWrite(RequestContext* io_ctx, TmpFile* file, int64_t
   return Status::OK();
 }
 
+void TmpWriteHandle::UploadComplete(TmpFile* tmp_file, const Status& upload_status) {
+  if (upload_status.ok()) {
+    // If uploaded, the local buffer is available to be evicted, so enqueue it to the
+    // pool.
+    DCHECK(tmp_file != nullptr);
+    TmpFileGroup* file_group = tmp_file->file_group_;
+    file_group->tmp_file_mgr_->EnqueueTmpFilesPool(
+        file_group->FindTmpFileSharedPtr(tmp_file),
+        file_group->tmp_file_mgr_->GetRemoteTmpFileBufferPoolLifo());
+  } else {
+    LOG(WARNING) << "Upload temporary file: '" << tmp_file->path() << " failed";
+  }
+}
+
 void TmpWriteHandle::WriteComplete(const Status& write_status) {
   WriteDoneCallback cb;
+  Status status = write_status;
   {
     lock_guard<mutex> lock(write_state_lock_);
     DCHECK(write_in_flight_);
@@ -987,13 +1624,30 @@ void TmpWriteHandle::WriteComplete(const Status& write_status) {
       FreeCompressedBuffer();
     }
 
+    if (status.ok() && !file_->expected_local_) {
+      // Do file upload if the local buffer file is finished.
+      if (write_range_->is_full()) {
+        TmpFileRemote* tmp_file = static_cast<TmpFileRemote*>(file_);
+        int disk_id = tmp_file->DiskFile()->disk_type() == io::DiskFileType::S3 ?
+            parent_->io_mgr_->RemoteS3DiskFileOperId() :
+            parent_->io_mgr_->RemoteDfsDiskFileOperId();
+        RemoteOperRange::RemoteOperDoneCallback u_callback =
+            [this, tmp_file](
+                const Status& upload_status) { UploadComplete(tmp_file, upload_status); };
+        tmp_file->upload_range_.reset(new RemoteOperRange(tmp_file->DiskBufferFile(),
+            tmp_file->DiskFile(), parent_->tmp_file_mgr()->GetRemoteTmpBlockSize(),
+            disk_id, RequestType::FILE_UPLOAD, parent_->io_mgr_, u_callback));
+        status = parent_->io_ctx_->AddRemoteOperRange(tmp_file->upload_range_.get());
+      }
+    }
+
     // Notify before releasing the lock - after the lock is released 'this' may be
     // destroyed.
     write_complete_cv_.NotifyAll();
   }
   // Call 'cb' last - once 'cb' is called client code may call Read() or destroy this
   // handle.
-  cb(write_status);
+  cb(status);
 }
 
 void TmpWriteHandle::Cancel() {
@@ -1079,4 +1733,233 @@ string TmpWriteHandle::DebugString() {
   }
   return ss.str();
 }
+
+TmpFileBufferPool::TmpFileBufferPool(TmpFileMgr* tmp_file_mgr)
+  : tmp_file_mgr_(tmp_file_mgr) {
+  tmp_file_dummy_.reset(new TmpFileDummy());
+}
+
+TmpFileBufferPool::~TmpFileBufferPool() {
+  {
+    unique_lock<mutex> l(lock_);
+    shut_down_ = true;
+  }
+  // Wake up the waiting thread.
+  work_available_.NotifyAll();
+}
+
+void TmpFileBufferPool::TmpFileSpaceReserveThreadLoop() {
+  while (true) {
+    {
+      unique_lock<mutex> l(lock_);
+      while (!shut_down_ && write_ranges_.empty()) {
+        // Wait if there are no ranges in the queue.
+        work_available_.Wait(l);
+      }
+      if (shut_down_) return;
+      DCHECK(!write_ranges_.empty());
+      cur_write_range_ = write_ranges_.front();
+      write_ranges_.pop_front();
+      DCHECK(cur_write_range_ != nullptr);
+
+      // Find out the TmpFile which the current range is associated with, and store the
+      // shared_ptr of the file to cur_tmp_file_ in case it is deconstructed while waiting
+      // for reservation.
+      auto it = write_ranges_iterator_.find(cur_write_range_);
+      DCHECK(it != write_ranges_iterator_.end());
+      TmpFile* tmp_file = it->second.second;
+      cur_tmp_file_ = tmp_file->FileGroup()->FindTmpFileSharedPtr(tmp_file);
+      DCHECK(cur_tmp_file_ != nullptr);
+      DCHECK_EQ(cur_write_range_->disk_file(), cur_tmp_file_->GetWriteFile());
+      write_ranges_iterator_.erase(it);
+    }
+
+    // Reserve space from the tmp_files_avail_pool_. The process could need a long wait.
+    Status status = tmp_file_mgr_->ReserveLocalBufferSpace(false);
+    vector<TmpFileMgr::WriteDoneCallback> write_callbacks;
+    {
+      unique_lock<mutex> lock(lock_);
+      if (status.ok()) {
+        DCHECK(cur_tmp_file_ != nullptr);
+        cur_tmp_file_->GetWriteFile()->SetSpaceReserved();
+        if (cur_write_range_ != nullptr) {
+          // Send all of the writes of the same disk file to the disk queue.
+          status = MoveWriteRangesHelper(
+              cur_write_range_->disk_file(), &write_callbacks, false);
+        } else {
+          // If the current range becomes a nullptr, it must be set by
+          // RemoveWriteRanges(). In this case, the io_ctx which the range belongs to is
+          // cancelled, and all the writes using that io_ctx are already cancelled. So, we
+          // are safe to return the TmpFile to the pool to recycle the buffer space.
+          EnqueueTmpFilesPool(cur_tmp_file_, true);
+        }
+      } else if (!status.ok() && cur_write_range_ != nullptr) {
+        // Cancel the spilling if fails to reserve the buffer.
+        RemoveWriteRangesInternal(cur_write_range_->io_ctx(), &write_callbacks);
+        status = Status::CancelledInternal(
+            Substitute("TmpFileBufferPool because: $0", status.GetDetail()).c_str());
+      }
+      cur_write_range_ = nullptr;
+      cur_tmp_file_.reset();
+    }
+    for (const TmpFileMgr::WriteDoneCallback& write_callback : write_callbacks) {
+      write_callback(status);
+    }
+  }
+}
+
+Status TmpFileBufferPool::MoveWriteRangesHelper(DiskFile* disk_file,
+    vector<TmpFileMgr::WriteDoneCallback>* write_callbacks, bool is_cancelled) {
+  Status status = Status::OK();
+  auto write_ranges_it = write_ranges_to_add_.find(disk_file);
+  if (write_ranges_it != write_ranges_to_add_.end()) {
+    auto write_range_it = write_ranges_it->second.begin();
+    while (write_range_it != write_ranges_it->second.end()) {
+      auto range = *write_range_it;
+      DCHECK(range != nullptr);
+      if (status.ok() && !is_cancelled) {
+        status = range->io_ctx()->AddWriteRange(range);
+      } else {
+        write_callbacks->push_back(range->callback());
+        if (is_cancelled && range->offset() == 0) {
+          // If is_cancelled is set, try to remove the range from the write_ranges list.
+          // If the range hasn't been popped, it must still be in the write_ranges list.
+          if (cur_write_range_ != range) {
+            auto key_range_it = write_ranges_iterator_.find(range);
+            DCHECK(key_range_it != write_ranges_iterator_.end());
+            DCHECK_EQ(*(key_range_it->second.first), range);
+            write_ranges_.erase(key_range_it->second.first);
+            write_ranges_iterator_.erase(key_range_it);
+          }
+        }
+      }
+      write_range_it = write_ranges_it->second.erase(write_range_it);
+    }
+    write_ranges_to_add_.erase(write_ranges_it);
+  }
+  return status;
+}
+
+Status TmpFileBufferPool::EnqueueWriteRange(io::WriteRange* range, TmpFile* tmp_file) {
+  Status status = Status::OK();
+  {
+    unique_lock<mutex> write_range_list_lock(lock_);
+    DCHECK(range != nullptr);
+    DCHECK(range->disk_file() != nullptr);
+    DCHECK(range->io_ctx() != nullptr);
+    if (range->disk_file()->IsSpaceReserved()) {
+      // If the space is reserved, send the range to the DiskQueue.
+      return range->io_ctx()->AddWriteRange(range);
+    } else if (range->io_ctx()->IsCancelled()) {
+      // If the io_ctx is cancelled, nofity the caller to cancel the query.
+      return TMP_FILE_BUFFER_POOL_CONTEXT_CANCELLED;
+    } else {
+      io_ctx_to_file_set_map_[range->io_ctx()].insert(range->disk_file());
+      write_ranges_to_add_[range->disk_file()].emplace_back(range);
+    }
+    // Put the first range of a file to the queue for waiting for the available space,
+    // the ranges in the queue would be popped one by one, when the space is reserved,
+    // all ranges of the file are added to the DiskQueue by io_ctx.
+    if (range->offset() == 0) {
+      write_ranges_.emplace_back(range);
+      DCHECK(tmp_file != nullptr);
+      write_ranges_iterator_[range] =
+          std::make_pair(prev(write_ranges_.cend()), tmp_file);
+    }
+  }
+  work_available_.NotifyAll();
+  return status;
+}
+
+void TmpFileBufferPool::RemoveWriteRangesInternal(
+    RequestContext* io_ctx, vector<TmpFileMgr::WriteDoneCallback>* write_callbacks) {
+  auto file_set_it = io_ctx_to_file_set_map_.find(io_ctx);
+  if (file_set_it != io_ctx_to_file_set_map_.end()) {
+    auto file_it = file_set_it->second.begin();
+    while (file_it != file_set_it->second.end()) {
+      DCHECK(*file_it != nullptr);
+      // Remove all the ranges belonging to the file, and fetch the callback
+      // functions of the ranges.
+      Status status = MoveWriteRangesHelper(*file_it, write_callbacks, true);
+      DCHECK_OK(status);
+      if (cur_write_range_ != nullptr && *file_it == cur_write_range_->disk_file()) {
+        // Set the current write range to nullptr if the TmpFileGroup is closing to
+        // notify the reservation thread (it is waiting for the reservation) that the
+        // space is no longer needed for the write range.
+        cur_write_range_ = nullptr;
+      }
+      file_it = file_set_it->second.erase(file_it);
+    }
+    io_ctx_to_file_set_map_.erase(file_set_it);
+  }
+}
+
+void TmpFileBufferPool::RemoveWriteRanges(RequestContext* io_ctx) {
+  DCHECK(io_ctx != nullptr);
+  vector<TmpFileMgr::WriteDoneCallback> write_callbacks;
+  {
+    unique_lock<mutex> lock(lock_);
+    RemoveWriteRangesInternal(io_ctx, &write_callbacks);
+  }
+  for (const TmpFileMgr::WriteDoneCallback& write_callback : write_callbacks) {
+    write_callback(TMP_FILE_BUFFER_POOL_CONTEXT_CANCELLED);
+  }
+}
+
+void TmpFileBufferPool::EnqueueTmpFilesPool(shared_ptr<TmpFile>& tmp_file, bool front) {
+  DCHECK(tmp_file != nullptr);
+  {
+    unique_lock<mutex> buffer_lock(tmp_files_avail_pool_lock_);
+    if (tmp_file->disk_type() != io::DiskFileType::DUMMY) {
+      TmpFileRemote* tmp_file_remote = static_cast<TmpFileRemote*>(tmp_file.get());
+      if (tmp_file_remote->is_enqueued()) return;
+      tmp_file_remote->SetEnqueued(true);
+      tmp_file_remote->SetBufferReturned();
+    }
+    if (front) {
+      tmp_files_avail_pool_.push_front(tmp_file);
+    } else {
+      tmp_files_avail_pool_.push_back(tmp_file);
+    }
+    tmp_file_mgr_->GetLocalBufferDir()->bytes_used_metric->Increment(
+        -1 * tmp_file_mgr_->GetRemoteTmpFileSize());
+  }
+  tmp_files_available_cv_.NotifyOne();
+}
+
+Status TmpFileBufferPool::DequeueTmpFilesPool(
+    shared_ptr<TmpFile>* tmp_file, bool quick_return) {
+  DCHECK(tmp_file != nullptr);
+  DCHECK(dequeue_timer_metric_ != nullptr);
+  ScopedHistogramTimer wait_timer(dequeue_timer_metric_);
+  unique_lock<mutex> buffer_lock(tmp_files_avail_pool_lock_);
+  // If quick return is set and no buffer is available, return immediately.
+  if (quick_return && tmp_files_avail_pool_.empty()) {
+    return TMP_FILE_MGR_NO_AVAILABLE_FILE_TO_EVICT;
+  }
+  while (tmp_files_avail_pool_.empty()) {
+    // Wait if there is no temporary file on the queue.
+    // If timeout, return immediately.
+    if (!tmp_files_available_cv_.WaitFor(
+            buffer_lock, tmp_file_mgr_->GetSpillBufferWaitTimeout())) {
+      return Status(Substitute("Timeout waiting for a local buffer in $0 seconds",
+          tmp_file_mgr_->GetSpillBufferWaitTimeout() / MICROS_PER_SEC));
+    };
+  }
+  DCHECK(!tmp_files_avail_pool_.empty());
+  *tmp_file = tmp_files_avail_pool_.front();
+  tmp_files_avail_pool_.pop_front();
+  DCHECK(*tmp_file != nullptr);
+  if ((*tmp_file)->disk_type() != io::DiskFileType::DUMMY) {
+    TmpFileRemote* tmp_file_remote = static_cast<TmpFileRemote*>(tmp_file->get());
+    // Assert the default size remains the same in case the object is corrupted.
+    DCHECK_EQ(tmp_file_remote->file_size_, tmp_file_mgr_->GetRemoteTmpFileSize());
+    DCHECK(tmp_file_remote->is_enqueued());
+    tmp_file_remote->SetEnqueued(false);
+  }
+  tmp_file_mgr_->GetLocalBufferDir()->bytes_used_metric->Increment(
+      tmp_file_mgr_->GetRemoteTmpFileSize());
+  return Status::OK();
+}
+
 } // namespace impala

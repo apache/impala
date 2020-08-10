@@ -22,15 +22,19 @@
 #include <memory>
 #include <unordered_map>
 #include <utility>
+#include <bits/stdc++.h>
 
 #include <mutex>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/shared_mutex.hpp>
 #include <gtest/gtest_prod.h>
 
+#include "common/atomic.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "gen-cpp/CatalogObjects_types.h" // for THdfsCompression
 #include "gen-cpp/Types_types.h" // for TUniqueId
+#include "hdfs-fs-cache.h"
 #include "runtime/scoped-buffer.h"
 #include "util/condition-variable.h"
 #include "util/mem-range.h"
@@ -38,6 +42,7 @@
 #include "util/openssl-util.h"
 #include "util/runtime-profile.h"
 #include "util/spinlock.h"
+#include "util/thread.h"
 
 namespace impala {
 namespace io {
@@ -45,10 +50,13 @@ namespace io {
   class RequestContext;
   class ScanRange;
   class WriteRange;
+  class RemoteOperRange;
 }
 struct BufferPoolClientCounters;
 class MemTracker;
 class TmpFile;
+class TmpFileRemote;
+class TmpFileBufferPool;
 class TmpFileGroup;
 class TmpWriteHandle;
 
@@ -85,6 +93,32 @@ class TmpWriteHandle;
 /// TmpFileMgr provides some basic support for managing local disk space consumption.
 /// A TmpFileGroup can be created with a limit on the total number of bytes allocated
 /// across all files. Writes that would exceed the limit fail with an error status.
+/// The TmpFileBufferPool provides the ability for write ranges to wait for local
+/// buffer space in a separate thread during spilling to remote file system, the purpose
+/// of the pool is to handle the competitions for buffer files allocation with limited
+/// local space.
+///
+/// Locking:
+/// During spilling, multiple locks could be acquired, to avoid deadlocks, the order
+/// of acquiring must be from lower-numbered locks to higher-numbered locks:
+/// 1. BufferPool::Client::lock_
+/// 2. BufferPool::Page::buffer_lock
+/// 3. TmpFileGroup::lock_
+/// 4. TmpFileBufferPool::lock_
+/// 5. TmpWriteHandle::write_state_lock_
+/// 6. RequestContext::lock_
+/// 7. ScanRange::lock_
+/// 8. DiskFile::physical_file_lock_
+/// Specially, it may need to acquire both locks of two types of DiskFile during spilling
+/// to remote filesystem, the order to acquire DiskFile's locks must be from local
+/// DiskFile to remote DiskFile.
+///
+/// Ohter than the locks above, terminal locks, meaning no other locks should be acquired
+/// while holding this one, could be used during spilling:
+/// TmpFileBufferPool::tmp_files_avail_pool_lock_
+/// TmpFileGroup::tmp_files_remote_ptrs_lock_
+/// DiskQueue::lock_
+/// DiskFile::status_lock_
 ///
 /// TODO: IMPALA-4683: we could implement smarter handling of failures, e.g. to
 /// temporarily blacklist devices that show I/O errors.
@@ -101,22 +135,62 @@ class TmpFileMgr {
   /// A configured temporary directory that TmpFileMgr allocates files in.
   struct TmpDir {
     TmpDir(const std::string& path, int64_t bytes_limit, int priority,
-      IntGauge* bytes_used_metric)
-      : path(path), bytes_limit(bytes_limit), priority(priority),
-        bytes_used_metric(bytes_used_metric) {}
+        IntGauge* bytes_used_metric, bool is_local_dir = true)
+      : path(path),
+        bytes_limit(bytes_limit),
+        priority(priority),
+        bytes_used_metric(bytes_used_metric),
+        is_local_dir(is_local_dir) {}
 
     /// Path to the temporary directory.
-    const std::string path;
+    std::string path;
 
     /// Limit on bytes that should be written to this path. Set to maximum value
     /// of int64_t if there is no limit.
-    const int64_t bytes_limit;
+    int64_t bytes_limit;
 
     /// Scratch directory priority.
-    const int priority;
+    int priority;
 
     /// The current bytes of scratch used for this temporary directory.
-    IntGauge* const bytes_used_metric;
+    IntGauge* bytes_used_metric;
+
+    /// If the dir is expected in the local file system or in the remote.
+    bool is_local_dir;
+  };
+
+  /// A configuration for the control parameters of remote temporary directories.
+  /// The struct is used by TmpFileMgr and has the same lifecycle as TmpFileMgr.
+  struct TmpDirRemoteCtrl {
+    /// The high water mark metric for local buffer directory.
+    AtomicInt64 local_buff_dir_bytes_high_water_mark_{0};
+
+    /// The default size of a remote temporary file.
+    int64_t remote_tmp_file_size_;
+
+    /// The default block size of a remote temporary file. The block is used as a buffer
+    /// while doing upload and fetch a remote temporary file.
+    int64_t remote_tmp_block_size_;
+
+    /// Specify the mode to enqueue the tmp file to the pool.
+    /// If true, the file would be placed in the first to be poped out from the pool.
+    /// If false, the file would be placed in the last of the pool.
+    bool remote_tmp_files_avail_pool_lifo_;
+
+    /// The spill to hdfs is a test-only feature, and is not allowed unless the option of
+    /// allow_spill_to_hdfs is set true.
+    bool allow_spill_to_hdfs_;
+
+    /// Temporary file buffer pool managed by TmpFileMgr, is only activated when there is
+    /// a remote scratch space is registered. So, if TmpFileMgr::HasRemoteDir() is true,
+    /// the tmp_file_pool_ is non-null. Otherwise, it is null.
+    std::unique_ptr<TmpFileBufferPool> tmp_file_pool_;
+
+    /// Thread group containing threads created by the TmpFileMgr.
+    ThreadGroup tmp_file_mgr_thread_group_;
+
+    /// Timeout duration for waiting for the buffer (us).
+    int64_t wait_for_spill_buffer_timeout_us_;
   };
 
   TmpFileMgr();
@@ -139,8 +213,49 @@ class TmpFileMgr {
       bool one_dir_per_device, const std::string& compression_codec, bool punch_holes,
       MetricGroup* metrics) WARN_UNUSED_RESULT;
 
+  /// A helper function for InitCustom() to create a scratch directory.
+  Status CreateDirectory(const string& scratch_subdir_path, const string& tmp_path,
+      const std::unique_ptr<TmpDir>& tmp_dir, MetricGroup* metrics,
+      vector<bool>* is_tmp_dir_on_disk, bool* has_remote_dir,
+      int disk_id) WARN_UNUSED_RESULT;
+
+  // Create the TmpFile buffer pool thread for async buffer file reservation.
+  Status CreateTmpFileBufferPoolThread(MetricGroup* metrics) WARN_UNUSED_RESULT;
+
+  /// Try to reserve space for the buffer file from local buffer directory.
+  /// If quick_return is true, the function won't wait if there is no available space.
+  Status ReserveLocalBufferSpace(bool quick_return) WARN_UNUSED_RESULT;
+
   /// Return the scratch directory path for the device.
   std::string GetTmpDirPath(DeviceId device_id) const;
+
+  /// Return the remote temporary file size.
+  int64_t GetRemoteTmpFileSize() const {
+    return tmp_dirs_remote_ctrl_.remote_tmp_file_size_;
+  }
+
+  /// Return the remote temporary block size.
+  int64_t GetRemoteTmpBlockSize() const {
+    return tmp_dirs_remote_ctrl_.remote_tmp_block_size_;
+  }
+
+  /// Return the timeout duration of waiting for spill buffer.
+  int64_t GetSpillBufferWaitTimeout() const {
+    return tmp_dirs_remote_ctrl_.wait_for_spill_buffer_timeout_us_;
+  }
+
+  /// Return if return the remote temporary file to the pool by LIFO.
+  /// If false is returned, it is set by FIFO.
+  bool GetRemoteTmpFileBufferPoolLifo() {
+    return tmp_dirs_remote_ctrl_.remote_tmp_files_avail_pool_lifo_;
+  }
+
+  /// Return the local buffer dir for remote spilling.
+  TmpDir* GetLocalBufferDir() const;
+
+  /// Total number of devices with tmp directories that are active in local file system.
+  /// There is one tmp directory per device.
+  int NumActiveTmpDevicesLocal();
 
   /// Total number of devices with tmp directories that are active. There is one tmp
   /// directory per device.
@@ -149,6 +264,45 @@ class TmpFileMgr {
   /// Return vector with device ids of all tmp devices being actively used.
   /// I.e. those that haven't been blacklisted.
   std::vector<DeviceId> ActiveTmpDevices();
+
+  /// Add the write range to the TmpFileBufferPool for waiting the reservation of the
+  /// buffer of the TmpFile the range writes into. The pool would send the range to the
+  /// disk queue once reservation is done. If the space of the buffer is already reserved,
+  /// an error would return, and the caller should enqueue the range to the disk queue by
+  /// itself.
+  Status AsyncWriteRange(io::WriteRange* write_range, TmpFile* file);
+
+  /// A helper function to enqueue a dummy temporary file to the TmpFileBufferPool.
+  void EnqueueTmpFilesPoolDummyFile();
+
+  /// Enqueue the temporary files into the pool when the local buffer of the file is ready
+  /// to be deleted to release buffer space.
+  /// If front set to true, the file is enqueued to the front of the pool and is to be
+  /// popped first.
+  void EnqueueTmpFilesPool(std::shared_ptr<TmpFile>& tmp_file, bool front);
+
+  /// Dequeue the temporary files from the pool. The caller which successfully
+  /// dequeues a file from the pool has the right to delete the local buffer of the file
+  /// and create its buffer.
+  /// The function is called by TryEvictFile() to gain space from the pool if the
+  /// local buffer directory reaches byte limit. If there is no file in the pool, the
+  /// caller needs to wait until a file is enqueued (often after a file is uploaded).
+  /// It could be possible a long wait if no file is uploaded due a jammed disk queue
+  /// or a slow network, so it is not recommended to hold an exclusive lock while calling
+  /// the function.
+  /// If quick_return is true, one won't wait if no file is in the pool. Otherwise,
+  /// one would wait util a file is dequeued.
+  Status DequeueTmpFilesPool(std::shared_ptr<TmpFile>* tmp_file, bool quick_return);
+
+  /// Try to delete the buffer of a TmpFile to make some space for other buffers.
+  /// May return an error status if error happens during deletion of the buffer.
+  Status TryEvictFile(TmpFile* tmp_file);
+
+  /// If a remote scratch space is registered in the TmpFileMgr.
+  bool HasRemoteDir() { return tmp_dirs_remote_ != nullptr; }
+
+  /// Return default S3 options for spilling.
+  const vector<std::pair<string, string>>* s3a_options() { return &s3a_options_; }
 
   MemTracker* compressed_buffer_tracker() const {
     return compressed_buffer_tracker_.get();
@@ -169,9 +323,10 @@ class TmpFileMgr {
   static constexpr int64_t HOLE_PUNCH_BLOCK_SIZE_BYTES = 4096;
 
  private:
-  friend class TmpFileMgrTest;
   friend class TmpFile;
+  friend class TmpFileRemote;
   friend class TmpFileGroup;
+  friend class TmpFileMgrTest;
 
   /// Return a new TmpFile handle with a path based on file_group->unique_id. The file is
   /// associated with the 'file_group' and the file path is within the (single) scratch
@@ -180,6 +335,9 @@ class TmpFileMgr {
   /// the file is written.
   void NewFile(TmpFileGroup* file_group, DeviceId device_id,
     std::unique_ptr<TmpFile>* new_file);
+
+  /// Remove the remote directory which stores tmp files of the tmp file group.
+  void RemoveRemoteDir(TmpFileGroup* file_group, DeviceId device_id);
 
   bool initialized_ = false;
 
@@ -194,8 +352,24 @@ class TmpFileMgr {
   /// Whether hole punching is enabled.
   bool punch_holes_ = false;
 
-  /// The paths of the created tmp directories.
+  /// The paths of the created tmp directories, which are used for spilling to local
+  /// filesystem.
   std::vector<TmpDir> tmp_dirs_;
+
+  /// The paths of remote directories, which are used for spilling to remote filesystem.
+  std::unique_ptr<TmpDir> tmp_dirs_remote_;
+
+  /// The control parameters for remote temporary directories.
+  TmpDirRemoteCtrl tmp_dirs_remote_ctrl_;
+
+  /// The path of the directory to store local buffers for remote temporary files.
+  std::unique_ptr<TmpDir> local_buff_dir_;
+
+  /// Default S3 options for spilling to S3.
+  HdfsFsCache::HdfsConnOptions s3a_options_;
+
+  /// Local cache for HDFS connection handle.
+  HdfsFsCache::HdfsFsMap hdfs_conns_;
 
   /// Memory tracker to track compressed buffers. Set up in InitCustom() if disk spill
   /// compression is enabled
@@ -235,6 +409,10 @@ class TmpFileGroup {
   /// may rewrite the data in 'buffer' in-place (e.g. to do in-place encryption or
   /// compression). The caller should not modify the data in 'buffer' until the write
   /// completes or is cancelled, otherwise invalid data may be written to disk.
+  ///
+  /// The write may take some time to complete. It may be queued behind other I/O
+  /// operations. If remote scratch is enabled, it may also need to wait for other queries
+  /// to make progress and release space in the local buffer directory.
   ///
   /// Returns an error if the scratch space cannot be allocated or the write cannot
   /// be started. Otherwise 'handle' is set and 'cb' will be called asynchronously from
@@ -281,6 +459,17 @@ class TmpFileGroup {
   /// Calls Remove() on all the files in the group and deletes them.
   void Close();
 
+  /// A function template to close files from local or remote scratch space.
+  template <typename T>
+  void CloseInternal(vector<T>& tmp_files);
+
+  /// Update the corresponding metrics of scratch space after new scratch space
+  /// is allocated.
+  void UpdateScratchSpaceMetrics(int64_t num_bytes, bool is_remote = false);
+
+  /// Assemble and return a new path.
+  std::string GenerateNewPath(string& dir, string& unique_name);
+
   std::string DebugString();
 
   const TUniqueId& unique_id() const { return unique_id_; }
@@ -292,10 +481,18 @@ class TmpFileGroup {
   /// Return true if spill-to-disk failed due to local faulty disk.
   bool IsSpillingDiskFaulty();
 
+  /// Return the shared_ptr of a remote TmpFile.
+  std::shared_ptr<TmpFile>& FindTmpFileSharedPtr(TmpFile* tmp_file);
+
  private:
   friend class TmpFile;
+  friend class TmpFileLocal;
+  friend class TmpFileRemote;
   friend class TmpFileMgrTest;
   friend class TmpWriteHandle;
+  friend class io::WriteRange;
+  friend class io::ScanRange;
+  friend class io::RemoteOperRange;
 
   /// Initializes the file group with one temporary file per disk with a scratch
   /// directory. Returns OK if at least one temporary file could be created.
@@ -308,6 +505,17 @@ class TmpFileGroup {
   /// limit is exceeded. Must be called without 'lock_' held.
   Status AllocateSpace(
       int64_t num_bytes, TmpFile** tmp_file, int64_t* file_offset) WARN_UNUSED_RESULT;
+
+  /// Try to allocate 'num_bytes' bytes from local scratch space. Called by the
+  /// AllocateSpace().
+  /// The alloc_full returns true, if all of the directories are at capacity.
+  Status AllocateLocalSpace(int64_t num_bytes, TmpFile** tmp_file, int64_t* file_offset,
+      vector<int>* at_capacity_dirs, bool* alloc_full) WARN_UNUSED_RESULT;
+
+  /// Try to allocate 'num_bytes' bytes from remote scratch space when there is no
+  /// space left in the local scratch space. Called by the AllocateSpace().
+  Status AllocateRemoteSpace(int64_t num_bytes, TmpFile** tmp_file, int64_t* file_offset,
+      vector<int>* at_capacity_dirs) WARN_UNUSED_RESULT;
 
   /// Recycle the range of bytes in a scratch file and destroy 'handle'. Called when the
   /// range is no longer in use for 'handle'. The disk space associated with the file can
@@ -389,6 +597,12 @@ class TmpFileGroup {
   /// is not enabled.
   RuntimeProfile::Counter* compression_timer_;
 
+  /// Protects tmp_files_remote_ptrs_lock_.
+  SpinLock tmp_files_remote_ptrs_lock_;
+
+  /// A map of raw pointer and its shared_ptr of remote TmpFiles.
+  std::unordered_map<TmpFile*, std::shared_ptr<TmpFile>> tmp_files_remote_ptrs_;
+
   /// Protects below members.
   SpinLock lock_;
 
@@ -403,6 +617,9 @@ class TmpFileGroup {
   /// true if all temporary (a.k.a. scratch) files in this TmpFileGroup are blacklisted,
   /// or getting disk error when reading temporary file back.
   bool spilling_disk_faulty_;
+
+  /// List of remote files representing the TmpFileGroup.
+  std::vector<std::shared_ptr<TmpFile>> tmp_files_remote_;
 
   /// Index Range in the 'tmp_files'. Used to keep track of index range
   /// corresponding to a given priority.
@@ -419,7 +636,10 @@ class TmpFileGroup {
   std::map<int, TmpFileIndexRange> tmp_files_index_range_;
 
   /// Total space allocated in this group's files.
-  int64_t current_bytes_allocated_;
+  AtomicInt64 current_bytes_allocated_;
+
+  /// Total space allocated remotely in this group's files.
+  AtomicInt64 current_bytes_allocated_remote_;
 
   /// Index into 'tmp_files' denoting the file to which the next temporary file range
   /// should be allocated from, for a given priority. Used to implement round-robin
@@ -463,6 +683,11 @@ class TmpWriteHandle {
   /// Path of temporary file backing the block. Intended for use in testing.
   /// Returns empty string if no backing file allocated.
   std::string TmpFilePath() const;
+
+  /// Buffer path of temporary file backing the block. Intended for use in testing.
+  /// Returns empty string if no backing file allocated or the temporary file is not in
+  /// remote.
+  std::string TmpFileBufferPath() const;
 
   /// The length of the in-memory data written to disk in bytes, before any compression.
   int64_t data_len() const { return data_len_; }
@@ -509,6 +734,10 @@ class TmpWriteHandle {
   /// Called when the write has completed successfully or not. Sets 'write_in_flight_'
   /// then calls 'cb_'.
   void WriteComplete(const Status& write_status);
+
+  /// Called when the upload has completed successfully or not.
+  /// Enqueue the file into the available pool if the upload succeeds.
+  void UploadComplete(TmpFile* file, const Status& write_status);
 
   /// Cancels any in-flight writes or reads. Reads are cancelled synchronously and
   /// writes are cancelled asynchronously. After Cancel() is called, writes are not
@@ -560,9 +789,8 @@ class TmpWriteHandle {
 
   /// Protects all fields below while 'write_in_flight_' is true. At other times, it is
   /// invalid to call WriteRange/TmpFileGroup methods concurrently from multiple
-  /// threads,
-  /// so no locking is required. This is a terminal lock and should not be held while
-  /// acquiring other locks or invoking 'cb_'.
+  /// threads, so no locking is required.
+  /// The lock should not be held while invoking 'cb_' to avoid a deadlock.
   std::mutex write_state_lock_;
 
   /// True if the the write has been cancelled (but is not necessarily complete).

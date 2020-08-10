@@ -32,14 +32,19 @@ class LocalFileSystem {
 public:
   // A wrapper around open() and fdopen(). For the possible values of oflag and mode
   // see the documentation of open(). Sets 'file' to a FILE* returned from fdopen().
-  Status OpenForWrite(const char* file_name, int oflag, int mode, FILE** file);
+ Status Open(
+     const char* file_name, int oflag, int mode, const char* fd_option, FILE** file);
+ Status OpenForRead(const char* file_name, int oflag, int mode, FILE** file);
+ Status OpenForWrite(const char* file_name, int oflag, int mode, FILE** file);
 
-  Status Fseek(FILE* file_handle, off_t offset, int whence,
-      const WriteRange* write_range);
-  Status Fwrite(FILE* file_handle, const WriteRange* write_range);
-  Status Fclose(FILE* file_handle, const WriteRange* write_range);
+ Status Fseek(FILE* file_handle, off_t offset, int whence, const WriteRange* write_range);
+ Status Fwrite(FILE* file_handle, const WriteRange* write_range);
+ Status Fread(FILE* file_handle, uint8_t* buffer, int64_t length, const char* file_path);
+ Status Fclose(FILE* file_handle, const char* file_path);
+ virtual ~LocalFileSystem() {}
 
-  virtual ~LocalFileSystem() {}
+ // Wrapper function to use write() to write the bytes.
+ Status Write(int file_desc, const WriteRange* range);
 
 protected:
   // Wrapper functions around open(), fdopen(), fseek(), fwrite() and fclose().
@@ -48,6 +53,7 @@ protected:
   virtual FILE* FdopenAux(int file_desc, const char* options);
   virtual int FseekAux(FILE* file_handle, off_t offset, int whence);
   virtual size_t FwriteAux(FILE* file_handle, const WriteRange* write_range);
+  virtual size_t FreadAux(FILE* file_handle, uint8_t* buffer, int64_t length);
   virtual int FcloseAux(FILE* file_handle);
 };
 

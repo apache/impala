@@ -22,12 +22,14 @@
 #include <functional>
 #include <mutex>
 
+#include <boost/thread/shared_mutex.hpp>
 #include <gtest/gtest_prod.h> // for FRIEND_TEST
 
 #include "common/atomic.h"
 #include "common/hdfs.h"
 #include "common/status.h"
 #include "runtime/bufferpool/buffer-pool.h"
+#include "runtime/io/disk-file.h"
 #include "util/condition-variable.h"
 #include "util/internal-queue.h"
 
@@ -37,6 +39,7 @@ class DiskIoMgr;
 class DiskQueue;
 class ExclusiveHdfsFileHandle;
 class FileReader;
+class FileWriter;
 class RequestContext;
 class ScanRange;
 
@@ -105,10 +108,13 @@ class BufferDescriptor {
 };
 
 /// The request type, read or write associated with a request range.
+/// Ohter than those, request type file_upload is the type for remote file operation
+/// ranges, for doing file uploading to the remote.
 struct RequestType {
   enum type {
     READ,
     WRITE,
+    FILE_UPLOAD,
   };
 };
 
@@ -140,8 +146,12 @@ class RequestRange : public InternalQueue<RequestRange>::Node {
   RequestType::type request_type() const { return request_type_; }
 
  protected:
-  RequestRange(RequestType::type request_type)
-    : fs_(nullptr), offset_(-1), len_(-1), disk_id_(-1), request_type_(request_type) {}
+  RequestRange(RequestType::type request_type, int disk_id = -1)
+    : fs_(nullptr),
+      offset_(-1),
+      len_(-1),
+      disk_id_(disk_id),
+      request_type_(request_type) {}
 
   /// Hadoop filesystem that contains file_, or set to nullptr for local filesystem.
   hdfsFS fs_;
@@ -155,7 +165,7 @@ class RequestRange : public InternalQueue<RequestRange>::Node {
   /// Length of data read or written.
   int64_t len_;
 
-  /// Id of disk containing byte range.
+  /// Id of disk queue containing byte range.
   int disk_id_;
 
   /// The type of IO request, READ or WRITE.
@@ -264,19 +274,25 @@ class ScanRange : public RequestRange {
   /// 'buffer_opts' specifies buffer management options - see the DiskIoMgr class comment
   /// and the BufferOpts comments for details.
   /// 'meta_data' is an arbitrary client-provided pointer for any auxiliary data.
-  ///
+  /// 'disk_file' and 'disk_buffer_file' provides methods to confirm and guarantee the
+  /// status of the physical file is available to access for the scanning. They are used
+  /// for scanning a file related to spilling to a remote filesystem, both should be
+  /// non-null, for other cases, like scanning a file related to spilling to local
+  /// filesytem, both would not be used and should be null.
   /// TODO: IMPALA-4249: clarify if a ScanRange can be reused after Reset(). Currently
   /// it is not generally safe to do so, but some unit tests reuse ranges after
   /// successfully reading to eos.
   void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
       bool expected_local, int64_t mtime, const BufferOpts& buffer_opts,
-      void* meta_data = nullptr);
+      void* meta_data = nullptr, DiskFile* disk_file = nullptr,
+      DiskFile* disk_buffer_file = nullptr);
 
   /// Same as above, but it also adds sub-ranges. No need to merge contiguous sub-ranges
   /// in advance, as this method will do the merge.
   void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
       bool expected_local, int64_t mtime, const BufferOpts& buffer_opts,
-      std::vector<SubRange>&& sub_ranges, void* meta_data = nullptr);
+      std::vector<SubRange>&& sub_ranges, void* meta_data = nullptr,
+      DiskFile* disk_file = nullptr, DiskFile* disk_buffer_file = nullptr);
 
   void* meta_data() const { return meta_data_; }
   int cache_options() const { return cache_options_; }
@@ -285,6 +301,7 @@ class ScanRange : public RequestRange {
   bool read_in_flight() const { return read_in_flight_; }
   bool expected_local() const { return expected_local_; }
   int64_t bytes_to_read() const { return bytes_to_read_; }
+  bool use_local_buffer() const { return use_local_buffer_; }
 
   /// Returns the next buffer for this scan range. buffer is an output parameter.
   /// This function blocks until a buffer is ready or an error occurred. If this is
@@ -356,6 +373,9 @@ class ScanRange : public RequestRange {
   /// ID of the disk queue. 'queue' is updated with the sizes and latencies of reads from
   /// the underlying filesystem. Caller must not hold 'lock_'.
   ReadOutcome DoRead(DiskQueue* queue, int disk_id);
+
+  /// The function runs the actual read logic to read content with the specific reader.
+  ReadOutcome DoReadInternal(DiskQueue* queue, int disk_id, FileReader* file_reader);
 
   /// Cleans up a buffer that was not returned to the client.
   /// Either ReturnBuffer() or CleanUpBuffer() is called for every BufferDescriptor.
@@ -444,7 +464,8 @@ class ScanRange : public RequestRange {
   /// If cached data is available, then memcpy() from it instead of actually reading the
   /// files. 'queue' is updated with the latencies and sizes of reads from the underlying
   /// filesystem.
-  Status ReadSubRanges(DiskQueue* queue, BufferDescriptor* buffer, bool* eof);
+  Status ReadSubRanges(
+      DiskQueue* queue, BufferDescriptor* buffer, bool* eof, FileReader* file_reader);
 
   /// Validates the internal state of this range. lock_ must be taken
   /// before calling this.
@@ -557,8 +578,23 @@ class ScanRange : public RequestRange {
   /// Polymorphic object that is responsible for doing file operations.
   std::unique_ptr<FileReader> file_reader_;
 
+  /// Polymorphic object that is responsible for doing file operations if the path
+  /// is a remote url and the file is in the local buffer.
+  std::unique_ptr<FileReader> local_buffer_reader_;
+
+  /// If set to true, the scan range is using local_buffer_reader_ to do scan operations.
+  /// The flag is set during DoRead(). If the path is a remote path and the file has
+  /// a local buffer, the flag is set to true, otherwise the flag is false.
+  bool use_local_buffer_{false};
+
   /// If not empty, the ScanRange will only read these parts from the file.
   std::vector<SubRange> sub_ranges_;
+
+  /// The file handle of the physical file to be accessed.
+  DiskFile* disk_file_ = nullptr;
+
+  /// The file handle of the physical buffer file to be accessed.
+  DiskFile* disk_buffer_file_ = nullptr;
 
   // Read position in the sub-ranges.
   struct SubRangePosition {
@@ -604,17 +640,111 @@ class WriteRange : public RequestRange {
   /// is called or after the write callback was called).
   void SetData(const uint8_t* buffer, int64_t len);
 
+  /// Set the offset of this WriteRange.
+  /// Caller should guarantee the thread safe of calling the function.
+  void SetOffset(int64_t file_offset);
+
+  /// Set the DiskFile pointer which the WriteRange belongs to.
+  /// Can only be called when the write is not in flight (i.e. before AddWriteRange()
+  /// is called or after the write callback was called).
+  void SetDiskFile(DiskFile* disk_file) { disk_file_ = disk_file; }
+
+  /// Set the IO context to this WriteRange.
+  /// Can only be called when the write is not in flight (i.e. before AddWriteRange()
+  /// is called or after the write callback was called).
+  void SetRequestContext(RequestContext* io_ctx) { io_ctx_ = io_ctx; }
+
+  /// Execute writing the this range to the corresponding file.
+  Status DoWrite();
+
+  /// Handle the status of Function DoWrite().
+  Status DoWriteEnd(DiskQueue* queue, const Status& ret_status);
+
+  /// Return the data to be written.
   const uint8_t* data() const { return data_; }
+
+  /// Return the disk file pointer of the write range.
+  DiskFile* disk_file() const { return disk_file_; }
+
+  RequestContext* io_ctx() const { return io_ctx_; }
+
+  /// Return if the disk file that the write range belongs to is completed.
+  bool is_full() const { return is_full_; }
+
   WriteDoneCallback callback() const { return callback_; }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(WriteRange);
+
+  friend class LocalFileWriter;
+
   /// Data to be written. RequestRange::len_ contains the length of data
   /// to be written.
   const uint8_t* data_;
 
   /// Callback to invoke after the write is complete.
   WriteDoneCallback callback_;
+
+  /// IO context is to help to find out the disk queue and corresponding metrics.
+  RequestContext* io_ctx_;
+
+  /// The DiskFile is which the WriteRange writes into.
+  /// A DiskFile can have multiple WriteRanges.
+  DiskFile* disk_file_ = nullptr;
+
+  /// Indicate if the file which the write range belongs to is full after writing.
+  bool is_full_ = false;
+};
+
+class RemoteOperRange : public RequestRange {
+ public:
+  /// This callback is invoked on each RemoteOperRange after the operation is complete
+  /// or the context is cancelled. The status returned by the callback parameter indicates
+  /// if the operation was successful (i.e. Status::OK), if there was an error
+  /// TErrorCode::RUNTIME_ERROR) or if the context was cancelled
+  /// (TErrorCode::CANCELLED_INTERNALLY). The callback is only invoked if this
+  /// RemoteOperRange was successfully added (i.e. AddRemoteOperRange() succeeded).
+  /// No locks are held while the callback is invoked.
+  typedef std::function<void(const Status&)> RemoteOperDoneCallback;
+  RemoteOperRange(DiskFile* src_file, DiskFile* dst_file, int64_t file_offset,
+      int disk_id, RequestType::type type, DiskIoMgr* io_mgr,
+      RemoteOperDoneCallback callback);
+
+  /// Called from a disk I/O thread to do the file operation of this range. The
+  /// returned Status describes what the result of the read was. 'buff' is the
+  /// block buffer which is used for file operations. 'buff_size' is the size of the
+  /// block buffer. Caller must not hold 'lock_'.
+  Status DoOper(uint8_t* buff, int64_t buff_size);
+
+  int64_t block_size() { return block_size_; }
+
+  RemoteOperDoneCallback callback() const { return callback_; }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(RemoteOperRange);
+
+  friend class LocalFileWriter;
+
+  /// Callback to invoke after the operation is complete.
+  RemoteOperDoneCallback callback_;
+
+  /// IO manager is to help to find out the disk queue and corresponding metrics.
+  DiskIoMgr* io_mgr_;
+
+  /// disk_file_src_ contains the information of the file which is the source to
+  /// do the file operation. For example, if the operation is file upload, this
+  /// is the handle for the source physical file to be uploaded.
+  DiskFile* disk_file_src_;
+
+  /// disk_file_dst_ contains the information of the file which is the destination
+  /// of the file operation.
+  DiskFile* disk_file_dst_;
+
+  /// block size to do the file operation.
+  int64_t block_size_;
+
+  /// Execute the upload file operation.
+  Status DoUpload(uint8_t* buff, int64_t buff_size);
 };
 
 inline bool BufferDescriptor::is_cached() const {

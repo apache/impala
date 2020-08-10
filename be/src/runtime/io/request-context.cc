@@ -58,6 +58,10 @@ class RequestContext::PerDiskState {
   const InternalQueue<WriteRange>* unstarted_write_ranges() const {
     return &unstarted_write_ranges_;
   }
+  const InternalQueue<RemoteOperRange>* unstarted_remote_upload_ranges() const {
+    return &unstarted_remote_upload_ranges_;
+  }
+
   const InternalQueue<RequestRange>* in_flight_ranges() const {
     return &in_flight_ranges_;
   }
@@ -66,6 +70,10 @@ class RequestContext::PerDiskState {
   InternalQueue<WriteRange>* unstarted_write_ranges() {
     return &unstarted_write_ranges_;
   }
+  InternalQueue<RemoteOperRange>* unstarted_remote_upload_ranges() {
+    return &unstarted_remote_upload_ranges_;
+  }
+
   InternalQueue<RequestRange>* in_flight_ranges() { return &in_flight_ranges_; }
 
   /// Schedules the request context on this disk if it's not already on the queue.
@@ -188,6 +196,9 @@ class RequestContext::PerDiskState {
   /// GetNextRequestRange() and GetNextUnstartedRange() may result in only reads being
   /// processed)
   InternalQueue<WriteRange> unstarted_write_ranges_;
+
+  /// A Queue for file operation ranges to process uploading operations to remote disks.
+  InternalQueue<RemoteOperRange> unstarted_remote_upload_ranges_;
 };
 
 void RequestContext::ReadDone(int disk_id, ReadOutcome outcome, ScanRange* range) {
@@ -218,15 +229,22 @@ void RequestContext::ReadDone(int disk_id, ReadOutcome outcome, ScanRange* range
   DCHECK(Validate()) << endl << DebugString();
 }
 
-void RequestContext::WriteDone(WriteRange* write_range, const Status& write_status) {
-  // Copy disk_id before running callback: the callback may modify write_range.
-  int disk_id = write_range->disk_id();
+void RequestContext::OperDone(RequestRange* range, const Status& status) {
+  DCHECK(range != nullptr);
+
+  // Copy disk_id before running callback: the callback may modify range.
+  int disk_id = range->disk_id();
 
   // Execute the callback before decrementing the thread count. Otherwise
   // RequestContext::Cancel() that waits for the disk ref count to be 0 will
   // return, creating a race, e.g. see IMPALA-1890.
-  // The status of the write does not affect the status of the writer context.
-  write_range->callback()(write_status);
+  // The status of the operation does not affect the status of the request context.
+  if (range->request_type() == RequestType::WRITE) {
+    (static_cast<WriteRange*>(range))->callback()(status);
+  } else {
+    DCHECK(range->request_type() == RequestType::FILE_UPLOAD);
+    (static_cast<RemoteOperRange*>(range))->callback()(status);
+  }
   {
     unique_lock<mutex> lock(lock_);
     DCHECK(Validate()) << endl << DebugString();
@@ -264,6 +282,7 @@ void RequestContext::WriteDone(WriteRange* write_range, const Status& write_stat
 void RequestContext::Cancel() {
   // Callbacks are collected in this vector and invoked while no lock is held.
   vector<WriteRange::WriteDoneCallback> write_callbacks;
+  vector<RemoteOperRange::RemoteOperDoneCallback> remote_oper_callbacks;
   {
     unique_lock<mutex> lock(lock_);
     DCHECK(Validate()) << endl << DebugString();
@@ -292,6 +311,12 @@ void RequestContext::Cancel() {
       while ((write_range = disk_state.unstarted_write_ranges()->Dequeue()) != nullptr) {
         write_callbacks.push_back(write_range->callback());
       }
+
+      RemoteOperRange* oper_range;
+      while ((oper_range = disk_state.unstarted_remote_upload_ranges()->Dequeue())
+          != nullptr) {
+        remote_oper_callbacks.push_back(oper_range->callback());
+      }
     }
     // Clear out the lists of scan ranges.
     while (ready_to_start_ranges_.Dequeue() != nullptr);
@@ -307,6 +332,11 @@ void RequestContext::Cancel() {
 
   for (const WriteRange::WriteDoneCallback& write_callback: write_callbacks) {
     write_callback(CONTEXT_CANCELLED);
+  }
+
+  for (const RemoteOperRange::RemoteOperDoneCallback& oper_callback :
+      remote_oper_callbacks) {
+    oper_callback(CONTEXT_CANCELLED);
   }
 
   // Signal reader and unblock the GetNext/Read thread.  That read will fail with
@@ -366,8 +396,7 @@ void RequestContext::AddRangeToDisk(const unique_lock<mutex>& lock,
         disk_state->ScheduleContext(lock, this, range->disk_id());
       }
     }
-  } else {
-    DCHECK(range->request_type() == RequestType::WRITE);
+  } else if (range->request_type() == RequestType::WRITE) {
     DCHECK(schedule_mode == ScheduleMode::IMMEDIATELY) << static_cast<int>(schedule_mode);
     WriteRange* write_range = static_cast<WriteRange*>(range);
     disk_state->unstarted_write_ranges()->Enqueue(write_range);
@@ -375,7 +404,14 @@ void RequestContext::AddRangeToDisk(const unique_lock<mutex>& lock,
     // Ensure that the context is scheduled so that the write range gets picked up.
     // ScheduleContext() has no effect if already scheduled, so this is safe to do always.
     disk_state->ScheduleContext(lock, this, range->disk_id());
+  } else {
+    DCHECK(range->request_type() == RequestType::FILE_UPLOAD);
+    DCHECK(schedule_mode == ScheduleMode::IMMEDIATELY) << static_cast<int>(schedule_mode);
+    RemoteOperRange* oper_range = static_cast<RemoteOperRange*>(range);
+    disk_state->unstarted_remote_upload_ranges()->Enqueue(oper_range);
+    disk_state->ScheduleContext(lock, this, range->disk_id());
   }
+
   ++disk_state->num_remaining_ranges();
 }
 
@@ -530,7 +566,15 @@ Status RequestContext::TryReadFromCache(const unique_lock<mutex>& lock,
 Status RequestContext::AddWriteRange(WriteRange* write_range) {
   unique_lock<mutex> lock(lock_);
   if (state_ == RequestContext::Cancelled) return CONTEXT_CANCELLED;
+  write_range->SetRequestContext(this);
   AddRangeToDisk(lock, write_range, ScheduleMode::IMMEDIATELY);
+  return Status::OK();
+}
+
+Status RequestContext::AddRemoteOperRange(RemoteOperRange* oper_range) {
+  unique_lock<mutex> lock(lock_);
+  if (state_ == RequestContext::Cancelled) return CONTEXT_CANCELLED;
+  AddRangeToDisk(lock, oper_range, ScheduleMode::IMMEDIATELY);
   return Status::OK();
 }
 
@@ -602,6 +646,15 @@ RequestRange* RequestContext::GetNextRequestRange(int disk_id) {
   if (!request_disk_state->unstarted_write_ranges()->empty()) {
     WriteRange* write_range = request_disk_state->unstarted_write_ranges()->Dequeue();
     request_disk_state->in_flight_ranges()->Enqueue(write_range);
+  }
+
+  // Do remote temporary files related work.
+  if (!request_disk_state->unstarted_remote_upload_ranges()->empty()) {
+    RemoteOperRange* oper_range;
+    if (!request_disk_state->unstarted_remote_upload_ranges()->empty()) {
+      oper_range = request_disk_state->unstarted_remote_upload_ranges()->Dequeue();
+      request_disk_state->in_flight_ranges()->Enqueue(oper_range);
+    }
   }
 
   // Get the next scan range to work on from the reader. Only in_flight_ranges
