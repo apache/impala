@@ -76,6 +76,13 @@ class BufferedPlanRootSink : public PlanRootSink {
   /// status.
   virtual void Cancel(RuntimeState* state) override;
 
+  /// Blocks until all results are spooled or we fail to do this due to batch_queue_ is
+  /// full, cancellation or any errors. Returns if we fail to do this due to batch_queue_
+  /// is full.
+  bool WaitForAllResultsSpooled() {
+    return all_results_spooled_.Get();
+  }
+
  private:
   /// The maximum number of rows that can be fetched at a time. Set to 100x the
   /// DEFAULT_BATCH_SIZE. Limiting the fetch size is necessary so that the resulting
@@ -138,6 +145,10 @@ class BufferedPlanRootSink : public PlanRootSink {
   /// The index of the next row to be read from 'current_batch_' in the next call to
   /// 'GetNext'. If 'current_batch_' is nullptr, the value of 'current_batch_row_' is 0.
   int current_batch_row_ = 0;
+
+  /// Set when all results are spooled or we fail to do this due to batch_queue_ full or
+  /// any errors.
+  Promise<bool> all_results_spooled_;
 
   /// Returns true if the 'queue' (not the 'batch_queue_') is empty. 'queue' refers to
   /// the logical queue of RowBatches and thus includes any RowBatch that

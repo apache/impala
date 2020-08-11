@@ -1070,6 +1070,27 @@ class ImpalaTestSuite(BaseTestSuite):
                     actual_state))
     return actual_state
 
+  def wait_for_progress(self, handle, expected_progress, timeout, client=None):
+    """Waits for the given query handle to reach expected progress rate"""
+    if client is None: client = self.client
+    start_time = time.time()
+    summary = client.get_exec_summary(handle)
+    while time.time() - start_time < timeout and \
+        self.__get_query_progress_rate(summary.progress) <= expected_progress:
+      summary = client.get_exec_summary(handle)
+      time.sleep(0.5)
+    actual_progress = self.__get_query_progress_rate(summary.progress)
+    if actual_progress <= expected_progress:
+      raise Timeout("query {0} did not reach the expected progress {1}, "
+                    "current progress {2}".format(handle.get_handle().id,
+                    expected_progress, actual_progress))
+    return actual_progress
+
+  def __get_query_progress_rate(self, progress):
+    if progress is None:
+      return 0
+    return float(progress.num_completed_scan_ranges) / progress.total_scan_ranges
+
   def wait_for_db_to_appear(self, db_name, timeout_s):
     """Wait until the database with 'db_name' is present in the impalad's local catalog.
     Fail after timeout_s if the doesn't appear."""

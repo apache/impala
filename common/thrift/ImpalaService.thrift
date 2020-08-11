@@ -551,12 +551,22 @@ enum TImpalaQueryOptions {
   // Sets an upper limit on the number of fs writer instances to be scheduled during
   // insert. Currently this limit only applies to HDFS inserts.
   MAX_FS_WRITERS = 107
+
   // When this query option is set, a refresh table statement will detect existing
   // partitions which have been changed in metastore and refresh them. By default, this
   // option is disabled since there is additional performance hit to fetch all the
   // partitions and detect if they are not same as ones in the catalogd. Currently, this
   // option is only applicable for refresh table statement.
   REFRESH_UPDATED_HMS_PARTITIONS = 108
+
+  // If RETRY_FAILED_QUERIES and SPOOL_QUERY_RESULTS are enabled and this is true,
+  // retryable queries will try to spool all results before returning any to the client.
+  // If the result set is too large to fit into the spooling memory (including the spill
+  // mem), results will be returned and the query will not be retryable. This may have
+  // some performance impact. Set it to false then clients can fetch results immediately
+  // when any of them are ready. Note that in this case, query retry will be skipped if
+  // the client has fetched some results.
+  SPOOL_ALL_RESULTS_FOR_RETRIES = 109
 }
 
 // The summary of a DML statement.
