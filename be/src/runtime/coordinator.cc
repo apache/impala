@@ -29,6 +29,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/hdfs.h"
+#include "exec/buffered-plan-root-sink.h"
 #include "exec/data-sink.h"
 #include "exec/plan-root-sink.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
@@ -799,8 +800,20 @@ Status Coordinator::Wait() {
 
   if (stmt_type_ == TStmtType::QUERY) {
     DCHECK(coord_instance_ != nullptr);
-    return UpdateExecState(coord_instance_->WaitForOpen(),
-        &coord_instance_->runtime_state()->fragment_instance_id(), FLAGS_hostname);
+    RETURN_IF_ERROR(UpdateExecState(coord_instance_->WaitForOpen(),
+        &coord_instance_->runtime_state()->fragment_instance_id(), FLAGS_hostname));
+    if (query_state_->query_options().retry_failed_queries
+        && query_state_->query_options().spool_query_results
+        && query_state_->query_options().spool_all_results_for_retries) {
+      // Wait until the BufferedPlanRootSink spooled all results or any errors stopping
+      // it, e.g. batch queue full, cancellation or failures.
+      auto sink = static_cast<BufferedPlanRootSink*>(coord_sink_);
+      if (sink->WaitForAllResultsSpooled()) {
+        VLOG_QUERY << "Cannot spool all results in the allocated result spooling space."
+            " Query retry will be skipped if any results have been returned.";
+      }
+    }
+    return Status::OK();
   }
   DCHECK_EQ(stmt_type_, TStmtType::DML);
   // DML finalization can only happen when all backends have completed all side-effects

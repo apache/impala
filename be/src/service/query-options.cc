@@ -938,6 +938,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_refresh_updated_hms_partitions(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::SPOOL_ALL_RESULTS_FOR_RETRIES: {
+        query_options->__set_spool_all_results_for_retries(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

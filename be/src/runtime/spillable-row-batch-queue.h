@@ -130,7 +130,7 @@ class SpillableRowBatchQueue {
   const TDebugOptions& debug_options_;
 
   /// The max number of bytes that can be unpinned in the BufferedTupleStream. Set by the
-  /// query option MAX_UNPINNED_RESULT_SPOOLING_MEMORY.
+  /// query option MAX_SPILLED_RESULT_SPOOLING_MEM.
   const int64_t max_unpinned_bytes_;
 
   /// True if the queue has been closed, false otherwise.

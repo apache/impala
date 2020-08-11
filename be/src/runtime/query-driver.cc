@@ -309,6 +309,13 @@ void QueryDriver::CreateRetriedClientRequestState(ClientRequestState* request_st
   // TExecRequest object.
   retry_exec_request_ = make_unique<TExecRequest>(*exec_request_);
   TQueryCtx query_ctx = retry_exec_request_->query_exec_request.query_ctx;
+  if (query_ctx.client_request.query_options.spool_all_results_for_retries) {
+    // Reset this flag in the retry query since we won't retry again, so results can be
+    // returned immediately.
+    query_ctx.client_request.query_options.__set_spool_all_results_for_retries(false);
+    VLOG_QUERY << "Unset SPOOL_ALL_RESULTS_FOR_RETRIES when retrying query "
+        << PrintId(client_request_state_->query_id());
+  }
   parent_server_->PrepareQueryContext(&query_ctx);
   retry_exec_request_->query_exec_request.__set_query_ctx(query_ctx);
 

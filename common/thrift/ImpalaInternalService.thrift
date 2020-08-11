@@ -441,6 +441,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   109: optional bool refresh_updated_hms_partitions = false;
+
+  // See comment in ImpalaService.thrift
+  110: optional bool spool_all_results_for_retries = true;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
