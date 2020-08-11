@@ -27,6 +27,7 @@ using datasketches::hll_sketch;
 using datasketches::kll_sketch;
 using impala_udf::StringVal;
 using std::stringstream;
+using std::vector;
 
 void LogSketchDeserializationError(FunctionContext* ctx) {
   ctx->SetError("Unable to deserialize sketch.");
@@ -57,6 +58,40 @@ StringVal StringStreamToStringVal(FunctionContext* ctx, const stringstream& str_
   memcpy(dst.ptr, str.c_str(), str.size());
   return dst;
 }
+
+template<class T>
+StringVal DsKllVectorResultToStringVal(FunctionContext* ctx,
+    const vector<T>& kll_result) {
+  std::stringstream result_stream;
+  for(int i = 0; i < kll_result.size(); ++i) {
+    if (i > 0) result_stream << ",";
+    result_stream << kll_result[i];
+  }
+  return StringStreamToStringVal(ctx, result_stream);
+}
+
+template StringVal DsKllVectorResultToStringVal(FunctionContext* ctx,
+    const vector<float>& kll_result);
+template StringVal DsKllVectorResultToStringVal(FunctionContext* ctx,
+    const vector<double>& kll_result);
+
+template<class T>
+bool RaiseErrorForNullOrNaNInput(FunctionContext* ctx, int num_args, const T* args) {
+  DCHECK(num_args > 0);
+  DCHECK(args != nullptr);
+  for (int i = 0; i < num_args; ++i) {
+    if (args[i].is_null || std::isnan(args[i].val)) {
+      ctx->SetError("NULL or NaN provided in the input list.");
+      return true;
+    }
+  }
+  return false;
+}
+
+template bool RaiseErrorForNullOrNaNInput(FunctionContext* ctx, int num_args,
+    const DoubleVal* args);
+template bool RaiseErrorForNullOrNaNInput(FunctionContext* ctx, int num_args,
+    const FloatVal* args);
 
 }
 

@@ -18,6 +18,7 @@
 #pragma once
 
 #include <sstream>
+#include <vector>
 
 #include "common/status.h"
 #include "thirdparty/datasketches/hll.hpp"
@@ -26,6 +27,8 @@
 namespace impala {
 
 using impala_udf::FunctionContext;
+using impala_udf::DoubleVal;
+using impala_udf::FloatVal;
 using impala_udf::StringVal;
 
 /// Config for DataSketches HLL algorithm to set the size of each entry within the
@@ -52,5 +55,18 @@ bool DeserializeDsSketch(const StringVal& serialized_sketch, T* sketch)
 /// 'ctx' for memory allocation.
 StringVal StringStreamToStringVal(FunctionContext* ctx,
     const std::stringstream& str_stream);
-}
 
+
+/// Helper function that receives a vector and returns a comma separated StringVal that
+/// holds the items from the vector keeping the order.
+template<class T>
+StringVal DsKllVectorResultToStringVal(FunctionContext* ctx,
+    const std::vector<T>& kll_result);
+
+/// Helper function to check if there is a NULL or NaN in the array represented by
+/// 'num_args' and 'args'. Sets an error to 'ctx' if NULL or NaN is found and returns
+/// true. Returns false otherwise.
+template<class T>
+bool RaiseErrorForNullOrNaNInput(FunctionContext* ctx, int num_args, const T* args);
+
+}
