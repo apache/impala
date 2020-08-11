@@ -140,7 +140,8 @@ DECLARE_bool(enable_ldap_auth);
 DECLARE_bool(use_local_catalog);
 
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served."
-    "If 0 or less, the Beeswax server is not started.");
+    "If 0 or less, the Beeswax server is not started. This interface is deprecated and "
+    "will be removed in a future version.");
 DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served."
     "If 0 or less, the HiveServer2 server is not started.");
 DEFINE_int32(hs2_http_port, 28000, "port on which HiveServer2 HTTP(s) client "
