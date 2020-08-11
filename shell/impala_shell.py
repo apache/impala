@@ -1790,6 +1790,11 @@ def get_intro(options):
   if not options.ssl and options.creds_ok_in_clear and options.use_ldap:
     intro += ("\n\nLDAP authentication is enabled, but the connection to Impala is "
               "not secured by TLS.\nALL PASSWORDS WILL BE SENT IN THE CLEAR TO IMPALA.")
+
+  if options.protocol == 'beeswax':
+    intro += ("\n\nWARNING: The beeswax protocol is deprecated and will be removed in a "
+              "future version of Impala.")
+
   return intro
 
 
