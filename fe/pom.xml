@@ -130,6 +130,20 @@ under the License.
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-aws</artifactId>
       <version>${hadoop.version}</version>
+      <!-- Exclude the aws-java-sdk-bundle dependency because the Impala minimal
+           version of this dependency is used instead. -->
+      <exclusions>
+        <exclusion>
+          <groupId>com.amazonaws</groupId>
+          <artifactId>aws-java-sdk-bundle</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.impala</groupId>
+      <artifactId>impala-minimal-s3a-aws-sdk</artifactId>
+      <version>${project.version}</version>
     </dependency>
 
     <dependency>
