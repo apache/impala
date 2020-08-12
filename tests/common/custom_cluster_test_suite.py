@@ -38,6 +38,7 @@ NUM_COORDINATORS = DEFAULT_CLUSTER_SIZE
 IMPALAD_ARGS = 'impalad_args'
 STATESTORED_ARGS = 'state_store_args'
 CATALOGD_ARGS = 'catalogd_args'
+ADMISSIOND_ARGS = 'admissiond_args'
 KUDU_ARGS = 'kudu_args'
 # Additional args passed to the start-impala-cluster script.
 START_ARGS = 'start_args'
@@ -135,7 +136,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   def setup_method(self, method):
     cluster_args = list()
-    for arg in [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS]:
+    for arg in [IMPALAD_ARGS, STATESTORED_ARGS, CATALOGD_ARGS, ADMISSIOND_ARGS]:
       if arg in method.func_dict:
         cluster_args.append("--%s=%s " % (arg, method.func_dict[arg]))
     if START_ARGS in method.func_dict:
@@ -285,6 +286,8 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     # cluster_size (# of impalad) + 1 (for catalogd).
     if expected_subscribers == 0:
       expected_subscribers = expected_num_executors + 1
+      if "--enable_admission_service" in options:
+        expected_subscribers += 1
 
     statestored.service.wait_for_live_subscribers(expected_subscribers,
                                                   timeout=statestored_timeout_s)

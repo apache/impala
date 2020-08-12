@@ -1318,28 +1318,20 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
   minicluster configured to perform all admission control."""
 
   def get_ac_process(self):
-    return self.cluster.impalads[1]
+    return self.cluster.admissiond
 
   def get_ac_log_name(self):
-    return "impalad_node1"
+    return "admissiond"
 
   def setup_method(self, method):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
 
-    PER_IMPALAD_ACS_ARGS = [
-      '--is_admission_controller=false',
-      '--is_admission_controller=true',
-      '--is_admission_controller=false',
-    ]
     if 'start_args' not in method.func_dict:
       method.func_dict['start_args'] = list()
-    method.func_dict['start_args'].append(
-        "--per_impalad_args=" + ";".join(PER_IMPALAD_ACS_ARGS))
-    if 'impalad_args' not in method.func_dict:
-      method.func_dict["impalad_args"] = ""
-    method.func_dict["impalad_args"] +=\
-        " --admission_control_service_addr=127.0.0.1:27001 "
+    method.func_dict["start_args"].append("--enable_admission_service")
+    if "impalad_args" in method.func_dict:
+      method.func_dict["admissiond_args"] = method.func_dict["impalad_args"]
     super(TestAdmissionController, self).setup_method(method)
 
 
@@ -1930,26 +1922,17 @@ class TestAdmissionControllerStressWithACService(TestAdmissionControllerStress):
   in the minicluster configured to perform all admission control."""
 
   def get_ac_processes(self):
-    return [self.cluster.impalads[1]]
+    return [self.cluster.admissiond]
 
   def get_ac_log_name(self):
-    return "impalad_node1"
+    return "admissiond"
 
   def setup_method(self, method):
     if self.exploration_strategy() != 'exhaustive':
       pytest.skip('runs only in exhaustive')
-
-    PER_IMPALAD_ACS_ARGS = [
-      '--is_admission_controller=false',
-      '--is_admission_controller=true',
-      '--is_admission_controller=false',
-    ]
     if 'start_args' not in method.func_dict:
       method.func_dict['start_args'] = list()
-    method.func_dict['start_args'].append(
-        "--per_impalad_args=" + ";".join(PER_IMPALAD_ACS_ARGS))
-    if 'impalad_args' not in method.func_dict:
-      method.func_dict["impalad_args"] = ""
-    method.func_dict["impalad_args"] +=\
-        " --admission_control_service_addr=127.0.0.1:27001 "
+    method.func_dict["start_args"].append("--enable_admission_service")
+    if "impalad_args" in method.func_dict:
+      method.func_dict["admissiond_args"] = method.func_dict["impalad_args"]
     super(TestAdmissionControllerStress, self).setup_method(method)

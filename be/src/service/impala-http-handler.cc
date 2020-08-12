@@ -38,6 +38,7 @@
 #include "runtime/timestamp-value.inline.h"
 #include "scheduling/admission-control-service.h"
 #include "scheduling/admission-controller.h"
+#include "scheduling/admissiond-env.h"
 #include "scheduling/cluster-membership-mgr.h"
 #include "service/client-request-state.h"
 #include "service/frontend.h"
@@ -65,8 +66,7 @@ using namespace strings;
 DECLARE_int32(query_log_size);
 DECLARE_int32(query_stmt_size);
 DECLARE_bool(use_local_catalog);
-DECLARE_bool(is_admission_controller);
-DECLARE_string(admission_control_service_addr);
+DECLARE_string(admission_service_host);
 
 namespace {
 
@@ -94,8 +94,30 @@ static Status ParseIdFromRequest(const Webserver::WebRequest& req, TUniqueId* id
 
 }
 
+ImpalaHttpHandler::ImpalaHttpHandler(ImpalaServer* server,
+    AdmissionController* admission_controller,
+    ClusterMembershipMgr* cluster_membership_mgr, bool is_admissiond)
+  : server_(server),
+    admission_controller_(admission_controller),
+    cluster_membership_mgr_(cluster_membership_mgr),
+    is_admissiond_(is_admissiond) {}
+
 void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver, bool metrics_only) {
   DCHECK(webserver != NULL);
+
+  if (is_admissiond_) {
+    // The admissiond only exposes a subset of endpoints that have info relevant to
+    // admission control.
+    webserver->RegisterUrlCallback("/backends", "backends.tmpl",
+        MakeCallback(this, &ImpalaHttpHandler::BackendsHandler), true);
+
+    webserver->RegisterUrlCallback("/admission", "admission_controller.tmpl",
+        MakeCallback(this, &ImpalaHttpHandler::AdmissionStateHandler), true);
+
+    webserver->RegisterUrlCallback("/resource_pool_reset", "",
+        MakeCallback(this, &ImpalaHttpHandler::ResetResourcePoolStatsHandler), false);
+    return;
+  }
 
   Webserver::RawUrlCallback healthz_callback =
     [this](const auto& req, auto* data, auto* response) {
@@ -173,15 +195,14 @@ void ImpalaHttpHandler::RegisterHandlers(Webserver* webserver, bool metrics_only
       [this](const auto& req, auto* doc) {
         this->QuerySummaryHandler(false, false, req, doc); }, false);
 
-  // Only enable the admission control endpoints for impalads that are running admission
-  // control, which is all impalads if the admission control service is not enabled,
-  // indicated by 'admission_control_service_addr' not being specified.
-  if (FLAGS_admission_control_service_addr.empty() || FLAGS_is_admission_controller) {
+  // Only enable the admission control endpoints for impalads if the admission service is
+  // not enabled, otherwise these will be exposed on the admissiond.
+  if (!ExecEnv::GetInstance()->AdmissionServiceEnabled()) {
     webserver->RegisterUrlCallback("/admission", "admission_controller.tmpl",
-      MakeCallback(this, &ImpalaHttpHandler::AdmissionStateHandler), true);
+        MakeCallback(this, &ImpalaHttpHandler::AdmissionStateHandler), true);
 
     webserver->RegisterUrlCallback("/resource_pool_reset", "",
-      MakeCallback(this, &ImpalaHttpHandler::ResetResourcePoolStatsHandler), false);
+        MakeCallback(this, &ImpalaHttpHandler::ResetResourcePoolStatsHandler), false);
   }
 
   RegisterLogLevelCallbacks(webserver, true);
@@ -955,17 +976,15 @@ void ImpalaHttpHandler::QuerySummaryHandler(bool include_json_plan, bool include
 void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
     Document* document) {
   AdmissionController::PerHostStats host_stats;
-  ExecEnv::GetInstance()->admission_controller()->PopulatePerHostMemReservedAndAdmitted(
-      &host_stats);
+  DCHECK(admission_controller_ != nullptr);
+  admission_controller_->PopulatePerHostMemReservedAndAdmitted(&host_stats);
   Value backends_list(kArrayType);
   int num_active_backends = 0;
   int num_quiescing_backends = 0;
   int num_blacklisted_backends = 0;
-  ClusterMembershipMgr* cluster_membership_mgr =
-      ExecEnv::GetInstance()->cluster_membership_mgr();
-  DCHECK(cluster_membership_mgr != nullptr);
+  DCHECK(cluster_membership_mgr_ != nullptr);
   ClusterMembershipMgr::SnapshotPtr membership_snapshot =
-      cluster_membership_mgr->GetSnapshot();
+      cluster_membership_mgr_->GetSnapshot();
   DCHECK(membership_snapshot.get() != nullptr);
   for (const auto& entry : membership_snapshot->current_backends) {
     BackendDescriptorPB backend = entry.second;
@@ -1057,14 +1076,13 @@ void ImpalaHttpHandler::BackendsHandler(const Webserver::WebRequest& req,
 void ImpalaHttpHandler::AdmissionStateHandler(
     const Webserver::WebRequest& req, Document* document) {
   const auto& args = req.parsed_args;
-  AdmissionController* ac = ExecEnv::GetInstance()->admission_controller();
   Webserver::ArgumentMap::const_iterator pool_name_arg = args.find("pool_name");
   bool get_all_pools = (pool_name_arg == args.end());
   Value resource_pools(kArrayType);
   if (get_all_pools) {
-    ac->AllPoolsToJson( &resource_pools, document);
+    admission_controller_->AllPoolsToJson(&resource_pools, document);
   } else {
-    ac->PoolToJson(pool_name_arg->second, &resource_pools, document);
+    admission_controller_->PoolToJson(pool_name_arg->second, &resource_pools, document);
   }
 
   // Now get running queries from CRS map.
@@ -1077,8 +1095,8 @@ void ImpalaHttpHandler::AdmissionStateHandler(
     unsigned long num_backends;
   };
   unordered_map<string, vector<QueryInfo>> running_queries;
-  if (FLAGS_is_admission_controller) {
-    ExecEnv::GetInstance()
+  if (is_admissiond_) {
+    AdmissiondEnv::GetInstance()
         ->admission_control_service()
         ->admission_state_map_.DoFuncForAllEntries(
             [&running_queries](
@@ -1148,7 +1166,8 @@ void ImpalaHttpHandler::AdmissionStateHandler(
         "running_queries", queries_in_pool, document->GetAllocator());
   }
   int64_t ms_since_last_statestore_update;
-  string staleness_detail = ac->GetStalenessDetail("", &ms_since_last_statestore_update);
+  string staleness_detail =
+      admission_controller_->GetStalenessDetail("", &ms_since_last_statestore_update);
 
   // In order to embed a plain json inside the webpage generated by mustache, we need
   // to stringify it and write it out as a json element. We do not need to pretty-print
@@ -1178,9 +1197,8 @@ void ImpalaHttpHandler::ResetResourcePoolStatsHandler(
   Webserver::ArgumentMap::const_iterator pool_name_arg = args.find("pool_name");
   bool reset_all_pools = (pool_name_arg == args.end());
   if (reset_all_pools) {
-    ExecEnv::GetInstance()->admission_controller()->ResetAllPoolInformationalStats();
+    admission_controller_->ResetAllPoolInformationalStats();
   } else {
-    ExecEnv::GetInstance()->admission_controller()->ResetPoolInformationalStats(
-        pool_name_arg->second);
+    admission_controller_->ResetPoolInformationalStats(pool_name_arg->second);
   }
 }

@@ -33,7 +33,6 @@
 
 #include "common/names.h"
 
-DECLARE_string(admission_control_service_addr);
 
 DEFINE_int32(admission_status_retry_time_ms, 10,
     "(Advanced) The number of milliseconds coordinators will wait before retrying the "
@@ -45,8 +44,7 @@ using namespace kudu::rpc;
 namespace impala {
 
 RemoteAdmissionControlClient::RemoteAdmissionControlClient(const TQueryCtx& query_ctx)
-  : query_ctx_(query_ctx),
-    address_(MakeNetworkAddress(FLAGS_admission_control_service_addr)) {
+  : query_ctx_(query_ctx) {
   TUniqueIdToUniqueIdPB(query_ctx.query_id, &query_id_);
 }
 
@@ -58,7 +56,7 @@ Status RemoteAdmissionControlClient::SubmitForAdmission(
       query_events, AdmissionControlClient::QUERY_EVENT_COMPLETED_ADMISSION);
 
   std::unique_ptr<AdmissionControlServiceProxy> proxy;
-  RETURN_IF_ERROR(AdmissionControlService::GetProxy(address_, address_.hostname, &proxy));
+  RETURN_IF_ERROR(AdmissionControlService::GetProxy(&proxy));
   AdmitQueryRequestPB req;
   AdmitQueryResponsePB resp;
   RpcController rpc_controller;
@@ -137,8 +135,7 @@ Status RemoteAdmissionControlClient::SubmitForAdmission(
 
 void RemoteAdmissionControlClient::ReleaseQuery(int64_t peak_mem_consumption) {
   std::unique_ptr<AdmissionControlServiceProxy> proxy;
-  Status get_proxy_status =
-      AdmissionControlService::GetProxy(address_, address_.hostname, &proxy);
+  Status get_proxy_status = AdmissionControlService::GetProxy(&proxy);
   if (!get_proxy_status.ok()) {
     LOG(ERROR) << "ReleaseQuery for " << query_id_
                << " failed to get proxy: " << get_proxy_status;
@@ -169,8 +166,7 @@ void RemoteAdmissionControlClient::ReleaseQuery(int64_t peak_mem_consumption) {
 void RemoteAdmissionControlClient::ReleaseQueryBackends(
     const vector<NetworkAddressPB>& host_addrs) {
   std::unique_ptr<AdmissionControlServiceProxy> proxy;
-  Status get_proxy_status =
-      AdmissionControlService::GetProxy(address_, address_.hostname, &proxy);
+  Status get_proxy_status = AdmissionControlService::GetProxy(&proxy);
   if (!get_proxy_status.ok()) {
     LOG(ERROR) << "ReleaseQueryBackends for " << query_id_
                << " failed to get proxy: " << get_proxy_status;
@@ -213,8 +209,7 @@ void RemoteAdmissionControlClient::CancelAdmission() {
   }
 
   std::unique_ptr<AdmissionControlServiceProxy> proxy;
-  Status get_proxy_status =
-      AdmissionControlService::GetProxy(address_, address_.hostname, &proxy);
+  Status get_proxy_status = AdmissionControlService::GetProxy(&proxy);
   if (!get_proxy_status.ok()) {
     LOG(WARNING) << "CancelAdmission for " << query_id_
                  << " failed to get proxy: " << get_proxy_status;

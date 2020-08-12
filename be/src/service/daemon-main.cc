@@ -25,6 +25,7 @@ using namespace std;
 int StatestoredMain(int, char**);
 int CatalogdMain(int, char**);
 int ImpaladMain(int, char**);
+int AdmissiondMain(int, char**);
 
 int main(int argc, char** argv) {
   path cmd_line_path(argv[0]);
@@ -39,6 +40,10 @@ int main(int argc, char** argv) {
 
   if (daemon == "catalogd") {
     return CatalogdMain(argc, argv);
+  }
+
+  if (daemon == "admissiond") {
+    return AdmissiondMain(argc, argv);
   }
 
   cerr << "Unknown daemon name: " << daemon

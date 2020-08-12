@@ -28,6 +28,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "scheduling/admission-controller.h"
+#include "scheduling/admissiond-env.h"
 #include "util/cpu-info.h"
 #include "util/kudu-status-util.h"
 #include "util/memory-metrics.h"
@@ -51,10 +52,10 @@ DEFINE_int32(admission_thread_pool_size, 5,
 DEFINE_int32(max_admission_queue_size, 50,
     "(Advanced) Max size of the queue for the AdmitQuery thread pool.");
 
-DEFINE_string(admission_control_service_addr, "",
-    "(Experimental) If provided, queries submitted to this impalad will be scheduled and "
-    "admitted by contacting the admission control service at the specified address. This "
-    "flag will be removed in a future version, see IMPALA-9155.");
+DEFINE_string(admission_service_host, "",
+    "If provided, queries submitted to this impalad will be scheduled and admitted by "
+    "contacting the admission control service at the specified address and "
+    "--admission_service_port.");
 DEFINE_int32(admission_status_wait_time_ms, 100,
     "(Advanced) The number of milliseconds the GetQueryStatus() rpc in the admission "
     "control service will wait for admission to complete before returning.");
@@ -71,9 +72,9 @@ namespace impala {
   } while (false)
 
 AdmissionControlService::AdmissionControlService(MetricGroup* metric_group)
-  : AdmissionControlServiceIf(ExecEnv::GetInstance()->rpc_mgr()->metric_entity(),
-        ExecEnv::GetInstance()->rpc_mgr()->result_tracker()) {
-  MemTracker* process_mem_tracker = ExecEnv::GetInstance()->process_mem_tracker();
+  : AdmissionControlServiceIf(AdmissiondEnv::GetInstance()->rpc_mgr()->metric_entity(),
+        AdmissiondEnv::GetInstance()->rpc_mgr()->result_tracker()) {
+  MemTracker* process_mem_tracker = AdmissiondEnv::GetInstance()->process_mem_tracker();
   bool is_percent; // not used
   int64_t bytes_limit =
       ParseUtil::ParseMemSpec(FLAGS_admission_control_service_queue_mem_limit,
@@ -96,9 +97,9 @@ Status AdmissionControlService::Init() {
       CpuInfo::num_cores();
   // The maximum queue length is set to maximum 32-bit value. Its actual capacity is
   // bound by memory consumption against 'mem_tracker_'.
-  RETURN_IF_ERROR(ExecEnv::GetInstance()->rpc_mgr()->RegisterService(num_svc_threads,
-      std::numeric_limits<int32_t>::max(), this, mem_tracker_.get(),
-      ExecEnv::GetInstance()->rpc_metrics()));
+  RETURN_IF_ERROR(AdmissiondEnv::GetInstance()->rpc_mgr()->RegisterService(
+      num_svc_threads, std::numeric_limits<int32_t>::max(), this, mem_tracker_.get(),
+      AdmissiondEnv::GetInstance()->rpc_metrics()));
 
   admission_thread_pool_.reset(
       new ThreadPool<UniqueIdPB>("admission-control-service", "admission-worker",
@@ -109,10 +110,16 @@ Status AdmissionControlService::Init() {
   return Status::OK();
 }
 
-Status AdmissionControlService::GetProxy(const TNetworkAddress& address,
-    const string& hostname, unique_ptr<AdmissionControlServiceProxy>* proxy) {
+void AdmissionControlService::Join() {
+  admission_thread_pool_->Join();
+}
+
+Status AdmissionControlService::GetProxy(
+    unique_ptr<AdmissionControlServiceProxy>* proxy) {
   // Create a AdmissionControlService proxy to the destination.
-  RETURN_IF_ERROR(ExecEnv::GetInstance()->rpc_mgr()->GetProxy(address, hostname, proxy));
+  RETURN_IF_ERROR(ExecEnv::GetInstance()->rpc_mgr()->GetProxy(
+      ExecEnv::GetInstance()->admission_service_address(), FLAGS_admission_service_host,
+      proxy));
   return Status::OK();
 }
 
@@ -153,9 +160,9 @@ void AdmissionControlService::GetQueryStatus(const GetQueryStatusRequestPB* req,
       if (!admission_state->admission_done) {
         bool timed_out;
         admission_state->admit_status =
-            ExecEnv::GetInstance()->admission_controller()->WaitOnQueued(req->query_id(),
-                &admission_state->schedule, FLAGS_admission_status_wait_time_ms,
-                &timed_out);
+            AdmissiondEnv::GetInstance()->admission_controller()->WaitOnQueued(
+                req->query_id(), &admission_state->schedule,
+                FLAGS_admission_status_wait_time_ms, &timed_out);
         if (!timed_out) {
           admission_state->admission_done = true;
           if (admission_state->admit_status.ok()) {
@@ -204,7 +211,7 @@ void AdmissionControlService::ReleaseQuery(const ReleaseQueryRequestPB* req,
   {
     lock_guard<mutex> l(admission_state->lock);
     if (!admission_state->released) {
-      ExecEnv::GetInstance()->admission_controller()->ReleaseQuery(
+      AdmissiondEnv::GetInstance()->admission_controller()->ReleaseQuery(
           req->query_id(), req->peak_mem_consumption());
       admission_state->released = true;
     } else {
@@ -239,7 +246,7 @@ void AdmissionControlService::ReleaseQueryBackends(
       admission_state->unreleased_backends.erase(it);
     }
 
-    ExecEnv::GetInstance()->admission_controller()->ReleaseQueryBackends(
+    AdmissiondEnv::GetInstance()->admission_controller()->ReleaseQueryBackends(
         req->query_id(), host_addrs);
   }
 
@@ -272,7 +279,7 @@ void AdmissionControlService::AdmitFromThreadPool(UniqueIdPB query_id) {
         admission_state->summary_profile,
         admission_state->blacklisted_executor_addresses};
     admission_state->admit_status =
-        ExecEnv::GetInstance()->admission_controller()->SubmitForAdmission(request,
+        AdmissiondEnv::GetInstance()->admission_controller()->SubmitForAdmission(request,
             &admission_state->admit_outcome, &admission_state->schedule, &queued,
             &admission_state->request_pool);
     admission_state->submitted = true;

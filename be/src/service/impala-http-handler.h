@@ -28,19 +28,43 @@ using kudu::HttpStatusCode;
 
 namespace impala {
 
+class AdmissionController;
+class ClusterMembershipMgr;
+
 /// Handles all webserver callbacks for an ImpalaServer. This class is a friend of
 /// ImpalaServer in order to access the internal state needed to generate the debug
 /// webpages.
 class ImpalaHttpHandler {
  public:
-  ImpalaHttpHandler(ImpalaServer* server) : server_(server) { }
+  static ImpalaHttpHandler* CreateImpaladHandler(ImpalaServer* server,
+      AdmissionController* admission_controller,
+      ClusterMembershipMgr* cluster_membership_mgr) {
+    return new ImpalaHttpHandler(
+        server, admission_controller, cluster_membership_mgr, false);
+  }
+
+  static ImpalaHttpHandler* CreateAdmissiondHandler(
+      AdmissionController* admission_controller,
+      ClusterMembershipMgr* cluster_membership_mgr) {
+    return new ImpalaHttpHandler(
+        nullptr, admission_controller, cluster_membership_mgr, true);
+  }
 
   /// Registers per-Impalad webserver callbacks. If 'metrics_only' is true, only registers
   /// the callbacks needed by the metrics server, i.e. /healthz.
   void RegisterHandlers(Webserver* webserver, bool metrics_only = false);
 
  private:
+  ImpalaHttpHandler(ImpalaServer* server, AdmissionController* admission_controller,
+      ClusterMembershipMgr* cluster_membership_mgr, bool is_admissiond);
+
   ImpalaServer* server_;
+  AdmissionController* admission_controller_;
+  ClusterMembershipMgr* cluster_membership_mgr_;
+
+  /// If true, this is an admissiond and we'll only expose admission related endpoints,
+  /// otherwise its an impalad.
+  bool is_admissiond_;
 
   /// Raw callback to indicate whether the server is ready to accept queries.
   void HealthzHandler(const Webserver::WebRequest& req, std::stringstream* data,
