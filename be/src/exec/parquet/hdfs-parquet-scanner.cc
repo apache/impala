@@ -1331,8 +1331,9 @@ Status HdfsParquetScanner::ProcessFooter() {
   uint8_t* magic_number_ptr = buffer + scan_range_len - sizeof(PARQUET_VERSION_NUMBER);
   if (memcmp(magic_number_ptr, PARQUET_VERSION_NUMBER,
              sizeof(PARQUET_VERSION_NUMBER)) != 0) {
+    // Report the ill-formatted Parquet version string in hex.
     return Status(TErrorCode::PARQUET_BAD_VERSION_NUMBER, filename(),
-        string(reinterpret_cast<char*>(magic_number_ptr), sizeof(PARQUET_VERSION_NUMBER)),
+        ReadWriteUtil::HexDump(magic_number_ptr, sizeof(PARQUET_VERSION_NUMBER)),
         scan_node_->hdfs_table()->fully_qualified_name());
   }
 
