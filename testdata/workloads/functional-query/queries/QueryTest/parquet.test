@@ -50,7 +50,7 @@ bigint,bigint,string,string,boolean,boolean,bigint,bigint,bigint,bigint
 # Parquet file with invalid magic number
 SELECT * from bad_magic_number
 ---- CATCH
-File '$NAMENODE/test-warehouse/bad_magic_number_parquet/bad_magic_number.parquet' has an invalid Parquet version number: XXXX
+File '$NAMENODE/test-warehouse/bad_magic_number_parquet/bad_magic_number.parquet' has an invalid Parquet version number: 58 58 58 58
 ====
 ---- QUERY
 # count(*) query on parquet file with multiple blocks (one block per node)

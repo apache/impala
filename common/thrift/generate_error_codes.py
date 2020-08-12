@@ -193,7 +193,7 @@ error_codes = (
    "Try running \\\"refresh $1\\\" to reload the file metadata."),
 
   ("PARQUET_BAD_VERSION_NUMBER", 60, "File '$0' has an invalid Parquet version number: "
-   "$1\\n. Please check that it is a valid Parquet file. "
+   "$1.\\nPlease check that it is a valid Parquet file. "
    "This error can also occur due to stale metadata. "
    "If you believe this is a valid Parquet file, try running \\\"refresh $2\\\"."),
 
