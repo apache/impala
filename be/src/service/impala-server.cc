@@ -2710,7 +2710,8 @@ Status ImpalaServer::Start(
   // We must register the HTTP handlers after registering the ImpalaServer with the
   // ExecEnv. Otherwise the HTTP handlers will try to resolve the ImpalaServer through the
   // ExecEnv singleton and will receive a nullptr.
-  http_handler_.reset(new ImpalaHttpHandler(this));
+  http_handler_.reset(ImpalaHttpHandler::CreateImpaladHandler(
+      this, exec_env_->admission_controller(), exec_env_->cluster_membership_mgr()));
   http_handler_->RegisterHandlers(exec_env_->webserver());
   if (exec_env_->metrics_webserver() != nullptr) {
     http_handler_->RegisterHandlers(

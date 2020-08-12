@@ -43,7 +43,6 @@
 #include "runtime/query-exec-mgr.h"
 #include "runtime/thread-resource-mgr.h"
 #include "runtime/tmp-file-mgr.h"
-#include "scheduling/admission-control-service.h"
 #include "scheduling/admission-controller.h"
 #include "scheduling/cluster-membership-mgr.h"
 #include "scheduling/request-pool-service.h"
@@ -53,7 +52,6 @@
 #include "service/frontend.h"
 #include "service/impala-server.h"
 #include "statestore/statestore-subscriber.h"
-#include "util/cgroup-util.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/default-path-handlers.h"
@@ -136,6 +134,8 @@ DECLARE_bool(is_executor);
 DECLARE_string(webserver_interface);
 DECLARE_int32(webserver_port);
 DECLARE_int64(tcmalloc_max_total_thread_cache_bytes);
+DECLARE_string(admission_service_host);
+DECLARE_int32(admission_service_port);
 
 DECLARE_string(ssl_client_ca_certificate);
 
@@ -162,12 +162,6 @@ DEFINE_int32(metrics_webserver_port, 0,
 
 DEFINE_string(metrics_webserver_interface, "",
     "Interface to start metrics webserver on. If blank, webserver binds to 0.0.0.0");
-
-DEFINE_bool(is_admission_controller, false,
-    "(Experimental) If true, this impalad will export the AdmissionControlService "
-    "interface, allowing it to perform admission control for coordinators that have "
-    "--admission_control_service_addr set to point to this impalad. This flag will be "
-    "removed in a future version, see IMPALA-9155.");
 
 const static string DEFAULT_FS = "fs.defaultFS";
 
@@ -289,7 +283,9 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
     hdfs_op_thread_pool_.reset(
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024));
   }
-  if (FLAGS_is_coordinator || FLAGS_is_admission_controller) {
+  if (FLAGS_is_coordinator && !AdmissionServiceEnabled()) {
+    // We only need a Scheduler if we're performing admission control locally, i.e. if
+    // this is a coordinator and there isn't an admissiond.
     scheduler_.reset(new Scheduler(metrics_.get(), request_pool_service_.get()));
   }
 
@@ -304,6 +300,16 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
   if (FLAGS_metrics_webserver_port > 0) {
     metrics_webserver_.reset(new Webserver(FLAGS_metrics_webserver_interface,
         FLAGS_metrics_webserver_port, metrics_.get(), Webserver::AuthMode::NONE));
+  }
+
+  if (AdmissionServiceEnabled()) {
+    admission_service_address_ =
+        MakeNetworkAddress(FLAGS_admission_service_host, FLAGS_admission_service_port);
+    if (!IsResolvedAddress(admission_service_address_)) {
+      IpAddr ip;
+      ABORT_IF_ERROR(HostnameToIpAddr(FLAGS_admission_service_host, &ip));
+      admission_service_address_ = MakeNetworkAddress(ip, FLAGS_admission_service_port);
+    }
   }
 
   exec_env_ = this;
@@ -419,11 +425,6 @@ Status ExecEnv::Init() {
   data_svc_.reset(new DataStreamService(rpc_metrics_));
   RETURN_IF_ERROR(data_svc_->Init());
   RETURN_IF_ERROR(stream_mgr_->Init(data_svc_->mem_tracker()));
-  // Initialize the AdmissionControlService, if enabled.
-  if (FLAGS_is_admission_controller) {
-    admission_svc_.reset(new AdmissionControlService(rpc_metrics_));
-    RETURN_IF_ERROR(admission_svc_->Init());
-  }
 
   // Bump thread cache to 1GB to reduce contention for TCMalloc central
   // list's spinlock.
@@ -490,72 +491,6 @@ Status ExecEnv::InitHadoopConfig() {
     default_fs_ = config_response.value;
   } else {
     default_fs_ = "hdfs://";
-  }
-  return Status::OK();
-}
-
-Status ExecEnv::ChooseProcessMemLimit(int64_t* bytes_limit) {
-  // Depending on the system configuration, we detect the total amount of memory
-  // available to the system - either the available physical memory, or if overcommitting
-  // is turned off, we use the memory commit limit from /proc/meminfo (see IMPALA-1690).
-  // The 'memory' CGroup can also impose a lower limit on memory consumption,
-  // so we take the minimum of the system memory and the CGroup memory limit.
-  int64_t avail_mem = MemInfo::physical_mem();
-  bool use_commit_limit =
-      MemInfo::vm_overcommit() == 2 && MemInfo::commit_limit() < MemInfo::physical_mem();
-  if (use_commit_limit) {
-    avail_mem = MemInfo::commit_limit();
-    // There might be the case of misconfiguration, when on a system swap is disabled
-    // and overcommitting is turned off the actual usable memory is less than the
-    // available physical memory.
-    LOG(WARNING) << "This system shows a discrepancy between the available "
-                 << "memory and the memory commit limit allowed by the "
-                 << "operating system. ( Mem: " << MemInfo::physical_mem()
-                 << "<=> CommitLimit: " << MemInfo::commit_limit() << "). "
-                 << "Impala will adhere to the smaller value when setting the process "
-                 << "memory limit. Please verify the system configuration. Specifically, "
-                 << "/proc/sys/vm/overcommit_memory and "
-                 << "/proc/sys/vm/overcommit_ratio.";
-  }
-  LOG(INFO) << "System memory available: " << PrettyPrinter::PrintBytes(avail_mem)
-            << " (from " << (use_commit_limit ? "commit limit" : "physical mem") << ")";
-  int64_t cgroup_mem_limit;
-  Status cgroup_mem_status = CGroupUtil::FindCGroupMemLimit(&cgroup_mem_limit);
-  if (cgroup_mem_status.ok()) {
-    if (cgroup_mem_limit < avail_mem) {
-      avail_mem = cgroup_mem_limit;
-      LOG(INFO) << "CGroup memory limit for this process reduces physical memory "
-                << "available to: " << PrettyPrinter::PrintBytes(avail_mem);
-    }
-  } else {
-    LOG(WARNING) << "Could not detect CGroup memory limit, assuming unlimited: $0"
-                 << cgroup_mem_status.GetDetail();
-  }
-  bool is_percent;
-  *bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent, avail_mem);
-  // ParseMemSpec() returns -1 for invalid input and 0 to mean unlimited. From Impala
-  // 2.11 onwards we do not support unlimited process memory limits.
-  if (*bytes_limit <= 0) {
-    return Status(Substitute("The process memory limit (--mem_limit) must be a positive "
-                             "bytes value or percentage: $0", FLAGS_mem_limit));
-  }
-  if (is_percent) {
-    LOG(INFO) << "Using process memory limit: " << PrettyPrinter::PrintBytes(*bytes_limit)
-              << " (--mem_limit=" << FLAGS_mem_limit << " of "
-              << PrettyPrinter::PrintBytes(avail_mem) << ")";
-  } else {
-    LOG(INFO) << "Using process memory limit: " << PrettyPrinter::PrintBytes(*bytes_limit)
-              << " (--mem_limit=" << FLAGS_mem_limit << ")";
-  }
-  if (*bytes_limit > MemInfo::physical_mem()) {
-    LOG(WARNING) << "Process memory limit " << PrettyPrinter::PrintBytes(*bytes_limit)
-                 << " exceeds physical memory of "
-                 << PrettyPrinter::PrintBytes(MemInfo::physical_mem());
-  }
-  if (cgroup_mem_status.ok() && *bytes_limit > cgroup_mem_limit) {
-    LOG(WARNING) << "Process Memory limit " << PrettyPrinter::PrintBytes(*bytes_limit)
-                 << " exceeds CGroup memory limit of "
-                 << PrettyPrinter::PrintBytes(cgroup_mem_limit);
   }
   return Status::OK();
 }
@@ -691,6 +626,10 @@ Status ExecEnv::GetKuduClient(
     *client = kudu_client_map_it->second->kudu_client.get();
   }
   return Status::OK();
+}
+
+bool ExecEnv::AdmissionServiceEnabled() const {
+  return !FLAGS_admission_service_host.empty();
 }
 
 } // namespace impala

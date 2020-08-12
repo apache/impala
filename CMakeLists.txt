@@ -452,7 +452,7 @@ add_custom_target(notests_independent_targets DEPENDS
   java cscope tarballs
 )
 add_custom_target(notests_regular_targets DEPENDS
-  impalad statestored catalogd fesupport loggingsupport ImpalaUdf udasample udfsample
+  impalad statestored catalogd admissiond fesupport loggingsupport ImpalaUdf udasample udfsample
 )
 
 add_custom_target(notests_all_targets DEPENDS

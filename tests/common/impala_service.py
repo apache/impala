@@ -494,3 +494,10 @@ class CatalogdService(BaseImpalaService):
         LOG.info('Catalogd version not yet available.')
       sleep(interval)
     assert False, 'Catalog version not ready in expected time.'
+
+
+class AdmissiondService(BaseImpalaService):
+  def __init__(self, hostname, webserver_interface, webserver_port,
+      webserver_certificate_file):
+    super(AdmissiondService, self).__init__(
+        hostname, webserver_interface, webserver_port, webserver_certificate_file)

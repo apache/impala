@@ -2754,5 +2754,15 @@
     "units": "NONE",
     "kind": "COUNTER",
     "key": "admission-controller.total-dequeue-failed-coordinator-limited"
+  },
+  {
+    "description": "The full version string of the Admission Control Server.",
+    "contexts": [
+      "ADMISSIOND"
+    ],
+    "label": "Admission Control Service Version",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "admissiond.version"
   }
 ]

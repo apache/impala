@@ -65,8 +65,17 @@ enum class AdmissionOutcome {
 /// queue size, incoming queries will be rejected. Requests in the queue will time out
 /// after a configurable timeout.
 ///
-/// Depending on the -is_coordinator startup flag, multiple impalads can act as a
-/// coordinator and thus also an admission controller, so some cluster state must be
+/// Admission control can be run in two possible modes:
+/// - Distributed mode: each coordinator performs admission control independently, based
+///   on eventually consistent info about the admission decisions made by other
+///   coordinators, which is distributed by the statestore. This is the traditional Impala
+///   set up.
+/// - Admission service mode: coordinators are configured with --admission_service_host to
+///   send their queries to the admissiond which performs all admission control based on
+///   its complete view of cluster load. This mode is currently considered experimental.
+///
+/// In distributed mode, depending on the -is_coordinator flag, multiple impalads can act
+/// as a coordinator and thus also an admission controller, so some cluster state must be
 /// shared between impalads in order to make admission decisions on any of them. Every
 /// coordinator maintains some per-pool and per-host statistics related to the requests it
 /// itself is servicing as the admission controller. Some of these local admission

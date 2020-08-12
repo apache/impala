@@ -50,6 +50,9 @@ class AdmissionControlService : public AdmissionControlServiceIf,
   /// This mustn't be called until RPC manager has been initialized.
   Status Init();
 
+  /// Blocks until the service shuts down.
+  void Join();
+
   virtual void AdmitQuery(const AdmitQueryRequestPB* req, AdmitQueryResponsePB* resp,
       kudu::rpc::RpcContext* context) override;
   virtual void GetQueryStatus(const GetQueryStatusRequestPB* req,
@@ -61,10 +64,9 @@ class AdmissionControlService : public AdmissionControlServiceIf,
   virtual void CancelAdmission(const CancelAdmissionRequestPB* req,
       CancelAdmissionResponsePB* resp, kudu::rpc::RpcContext* context) override;
 
-  /// Gets a AdmissionControlService proxy to a server with 'address' and 'hostname'.
+  /// Gets a AdmissionControlService proxy to the configured admission control service.
   /// The newly created proxy is returned in 'proxy'. Returns error status on failure.
-  static Status GetProxy(const TNetworkAddress& address, const std::string& hostname,
-      std::unique_ptr<AdmissionControlServiceProxy>* proxy);
+  static Status GetProxy(std::unique_ptr<AdmissionControlServiceProxy>* proxy);
 
  private:
   friend class ImpalaHttpHandler;

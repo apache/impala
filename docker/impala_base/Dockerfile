@@ -41,6 +41,7 @@ COPY --chown=impala www /opt/impala/www
 COPY --chown=impala bin /opt/impala/bin
 # Symlink here instead of in setup_build_context to avoid duplicate binaries.
 RUN cd /opt/impala/bin && ln -s impalad statestored && ln -s impalad catalogd && \
+    ln -s impalad admissiond && \
 # Create conf directory for later config injection.
     mkdir /opt/impala/conf && \
 # Create logs directory to collect container logs.

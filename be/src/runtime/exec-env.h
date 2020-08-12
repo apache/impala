@@ -41,7 +41,6 @@ class KuduClient;
 namespace impala {
 
 class AdmissionController;
-class AdmissionControlService;
 class BufferPool;
 class CallableThreadPool;
 class ClusterMembershipMgr;
@@ -144,7 +143,6 @@ class ExecEnv {
   ClusterMembershipMgr* cluster_membership_mgr() { return cluster_membership_mgr_.get(); }
   Scheduler* scheduler() { return scheduler_.get(); }
   AdmissionController* admission_controller() { return admission_controller_.get(); }
-  AdmissionControlService* admission_control_service() { return admission_svc_.get(); }
   StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
 
   const TNetworkAddress& configured_backend_address() const {
@@ -175,6 +173,13 @@ class ExecEnv {
 
   int64_t admit_mem_limit() const { return admit_mem_limit_; }
   int64_t admission_slots() const { return admission_slots_; }
+
+  const TNetworkAddress& admission_service_address() const {
+    return admission_service_address_;
+  }
+
+  /// Returns true if the admission control service is enabled.
+  bool AdmissionServiceEnabled() const;
 
  private:
   // Used to uniquely identify this impalad.
@@ -209,7 +214,6 @@ class ExecEnv {
   boost::scoped_ptr<RpcMgr> rpc_mgr_;
   boost::scoped_ptr<ControlService> control_svc_;
   boost::scoped_ptr<DataStreamService> data_svc_;
-  boost::scoped_ptr<AdmissionControlService> admission_svc_;
 
   /// Query-wide buffer pool and the root reservation tracker for the pool. The
   /// reservation limit is equal to the maximum capacity of the pool. Created in
@@ -279,14 +283,12 @@ class ExecEnv {
   /// this backend. Queries take up multiple slots only when mt_dop > 1.
   int64_t admission_slots_;
 
+  /// If the admission control service is enabled, the resolved IP address and port where
+  /// the service is running.
+  TNetworkAddress admission_service_address_;
+
   /// Initialize ExecEnv based on Hadoop config from frontend.
   Status InitHadoopConfig();
-
-  /// Choose a memory limit (returned in *bytes_limit) based on the --mem_limit flag and
-  /// the memory available to the daemon process. Returns an error if the memory limit is
-  /// invalid or another error is encountered that should prevent starting up the daemon.
-  /// Logs the memory limit chosen and any relevant diagnostics related to that choice.
-  Status ChooseProcessMemLimit(int64_t* bytes_limit);
 
   /// Initialise 'buffer_pool_' and 'buffer_reservation_' with given capacity.
   void InitBufferPool(int64_t min_page_len, int64_t capacity, int64_t clean_pages_limit);

@@ -17,13 +17,11 @@
 
 #include "scheduling/admission-control-client.h"
 
+#include "runtime/exec-env.h"
 #include "scheduling/local-admission-control-client.h"
 #include "scheduling/remote-admission-control-client.h"
 
 #include "common/names.h"
-
-DECLARE_string(admission_control_service_addr);
-DECLARE_bool(is_admission_controller);
 
 namespace impala {
 
@@ -36,10 +34,10 @@ const string AdmissionControlClient::QUERY_EVENT_COMPLETED_ADMISSION =
 
 void AdmissionControlClient::Create(
     const TQueryCtx& query_ctx, unique_ptr<AdmissionControlClient>* client) {
-  if (FLAGS_is_admission_controller || FLAGS_admission_control_service_addr.empty()) {
-    client->reset(new LocalAdmissionControlClient(query_ctx.query_id));
-  } else {
+  if (ExecEnv::GetInstance()->AdmissionServiceEnabled()) {
     client->reset(new RemoteAdmissionControlClient(query_ctx));
+  } else {
+    client->reset(new LocalAdmissionControlClient(query_ctx.query_id));
   }
 }
 

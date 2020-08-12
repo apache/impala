@@ -33,6 +33,7 @@ from time import sleep
 
 import tests.common.environ
 from tests.common.impala_service import (
+    AdmissiondService,
     CatalogdService,
     ImpaladService,
     StateStoredService)
@@ -57,6 +58,7 @@ DEFAULT_STATE_STORE_SUBSCRIBER_PORT = 23000
 DEFAULT_IMPALAD_WEBSERVER_PORT = 25000
 DEFAULT_STATESTORED_WEBSERVER_PORT = 25010
 DEFAULT_CATALOGD_WEBSERVER_PORT = 25020
+DEFAULT_ADMISSIOND_WEBSERVER_PORT = 25030
 
 DEFAULT_IMPALAD_JVM_DEBUG_PORT = 30000
 DEFAULT_CATALOGD_JVM_DEBUG_PORT = 30030
@@ -74,8 +76,9 @@ CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
 # * The docker minicluster with one container per process connected to a user-defined
 #   bridge network.
 class ImpalaCluster(object):
-  def __init__(self, docker_network=None):
+  def __init__(self, docker_network=None, use_admission_service=False):
     self.docker_network = docker_network
+    self.use_admission_service = use_admission_service
     self.refresh()
 
   @classmethod
@@ -90,13 +93,18 @@ class ImpalaCluster(object):
     Helpful to confirm that processes have been killed.
     """
     if self.docker_network is None:
-      self.__impalads, self.__statestoreds, self.__catalogd =\
+      self.__impalads, self.__statestoreds, self.__catalogd, self.__admissiond =\
           self.__build_impala_process_lists()
     else:
-      self.__impalads, self.__statestoreds, self.__catalogd =\
+      self.__impalads, self.__statestoreds, self.__catalogd, self.__admissiond =\
           self.__find_docker_containers()
-    LOG.debug("Found %d impalad/%d statestored/%d catalogd process(es)" %
-        (len(self.__impalads), len(self.__statestoreds), 1 if self.__catalogd else 0))
+    admissiond_str = ""
+    if self.use_admission_service:
+      admissiond_str = "/%d admissiond" % (1 if self.__admissiond else 0)
+
+    LOG.debug("Found %d impalad/%d statestored/%d catalogd%s process(es)" %
+        (len(self.__impalads), len(self.__statestoreds), 1 if self.__catalogd else 0,
+         admissiond_str))
 
   @property
   def statestored(self):
@@ -118,6 +126,11 @@ class ImpalaCluster(object):
   def catalogd(self):
     """Returns the catalogd process, or None if no catalogd process was found"""
     return self.__catalogd
+
+  @property
+  def admissiond(self):
+    """Returns the admisisond process, or None if no admissiond process was found"""
+    return self.__admissiond
 
   def get_first_impalad(self):
     return self.impalads[0]
@@ -220,7 +233,9 @@ class ImpalaCluster(object):
     impalads = list()
     statestored = list()
     catalogd = None
-    for binary, process in find_user_processes(['impalad', 'catalogd', 'statestored']):
+    admissiond = None
+    daemons = ['impalad', 'catalogd', 'statestored', 'admissiond']
+    for binary, process in find_user_processes(daemons):
       # IMPALA-6889: When a process shuts down and becomes a zombie its cmdline becomes
       # empty for a brief moment, before it gets reaped by its parent (see man proc). We
       # copy the cmdline to prevent it from changing between the following checks and
@@ -240,9 +255,11 @@ class ImpalaCluster(object):
         statestored.append(StateStoreProcess(cmdline))
       elif binary == 'catalogd':
         catalogd = CatalogdProcess(cmdline)
+      elif binary == 'admissiond':
+        admissiond = AdmissiondProcess(cmdline)
 
     self.__sort_impalads(impalads)
-    return impalads, statestored, catalogd
+    return impalads, statestored, catalogd, admissiond
 
   def __find_docker_containers(self):
     """
@@ -251,6 +268,7 @@ class ImpalaCluster(object):
     impalads = []
     statestoreds = []
     catalogd = None
+    admissiond = None
     output = check_output(["docker", "network", "inspect", self.docker_network])
     # Only one network should be present in the top level array.
     for container_id in json.loads(output)[0]["Containers"]:
@@ -277,8 +295,12 @@ class ImpalaCluster(object):
         assert catalogd is None
         catalogd = CatalogdProcess(args, container_id=container_id,
                                    port_map=port_map)
+      elif executable == 'admissiond':
+        assert admissiond is None
+        admissiond = AdmissiondProcess(args, container_id=container_id,
+                                       port_map=port_map)
     self.__sort_impalads(impalads)
-    return impalads, statestoreds, catalogd
+    return impalads, statestoreds, catalogd, admissiond
 
   def __sort_impalads(self, impalads):
     """Does an in-place sort of a list of ImpaladProcess objects into a canonical order.
@@ -547,6 +569,16 @@ class CatalogdProcess(BaseImpalaProcess):
       self.service.wait_for_metric_value('statestore-subscriber.connected',
                                          expected_value=1, timeout=30)
 
+
+# Represents an admission control process.
+class AdmissiondProcess(BaseImpalaProcess):
+  def __init__(self, cmd, container_id=None, port_map=None):
+    super(AdmissiondProcess, self).__init__(cmd, container_id, port_map)
+    self.service = AdmissiondService(self.hostname, self.webserver_interface,
+        self.get_webserver_port(), self._get_webserver_certificate_file())
+
+  def _get_default_webserver_port(self):
+    return DEFAULT_ADMISSIOND_WEBSERVER_PORT
 
 def find_user_processes(binaries):
   """Returns an iterator over all processes owned by the current user with a matching

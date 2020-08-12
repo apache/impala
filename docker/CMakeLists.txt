@@ -119,6 +119,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
   add_daemon_docker_images(impalad_executor)
   add_daemon_docker_images(catalogd)
   add_daemon_docker_images(statestored)
+  add_daemon_docker_images(admissiond)
 
   # Generate a text file with all of the release daemon images.
   file(WRITE ${CMAKE_SOURCE_DIR}/docker/docker-images.txt "${daemon_image_names}")

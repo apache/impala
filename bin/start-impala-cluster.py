@@ -39,14 +39,15 @@ from tests.common.impala_cluster import (ImpalaCluster, DEFAULT_BEESWAX_PORT,
     DEFAULT_HS2_PORT, DEFAULT_KRPC_PORT, DEFAULT_HS2_HTTP_PORT,
     DEFAULT_STATE_STORE_SUBSCRIBER_PORT, DEFAULT_IMPALAD_WEBSERVER_PORT,
     DEFAULT_STATESTORED_WEBSERVER_PORT, DEFAULT_CATALOGD_WEBSERVER_PORT,
-    DEFAULT_CATALOGD_JVM_DEBUG_PORT, DEFAULT_IMPALAD_JVM_DEBUG_PORT,
-    find_user_processes, run_daemon)
+    DEFAULT_ADMISSIOND_WEBSERVER_PORT, DEFAULT_CATALOGD_JVM_DEBUG_PORT,
+    DEFAULT_IMPALAD_JVM_DEBUG_PORT, find_user_processes, run_daemon)
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 LOG.setLevel(level=logging.DEBUG)
 
 KUDU_MASTER_HOSTS = os.getenv("KUDU_MASTER_HOSTS", "127.0.0.1")
 DEFAULT_IMPALA_MAX_LOG_FILES = os.environ.get("IMPALA_MAX_LOG_FILES", 10)
+INTERNAL_LISTEN_HOST = os.getenv("INTERNAL_LISTEN_HOST", "localhost")
 
 # Options
 parser = OptionParser()
@@ -69,6 +70,9 @@ parser.add_option("--state_store_args", dest="state_store_args", action="append"
 parser.add_option("--catalogd_args", dest="catalogd_args", action="append",
                   type="string", default=[],
                   help="Additional arguments to pass to the Catalog Service at startup")
+parser.add_option("--admissiond_args", dest="admissiond_args",
+                  action="append", type="string", default=[], help="Additional arguments "
+                  "to pass to the Admission Control Service at startup")
 parser.add_option("--kill", "--kill_only", dest="kill_only", action="store_true",
                   default=False, help="Instead of starting the cluster, just kill all"
                   " the running impalads and the statestored.")
@@ -128,6 +132,11 @@ parser.add_option("--data_cache_eviction_policy", dest="data_cache_eviction_poli
 parser.add_option("--data_cache_enable_tracing", dest="data_cache_enable_tracing",
                   action="store_true", default=False,
                   help="If the data cache is enabled, this enables tracing accesses.")
+parser.add_option("--enable_admission_service", dest="enable_admission_service",
+                  action="store_true", default=False,
+                  help="If true, enables the Admissison Control Service - the cluster "
+                  "will be launched with an admissiond and all coordinators configured "
+                  "to use it for admission control.")
 
 # For testing: list of comma-separated delays, in milliseconds, that delay impalad catalog
 # replica initialization. The ith delay is applied to the ith impalad.
@@ -283,13 +292,20 @@ def build_catalogd_arg_list():
       combine_arg_list_opts(options.catalogd_args))
 
 
+def build_admissiond_arg_list():
+  """Build a list of command line arguments to pass to the admissiond."""
+  return (build_logging_args("admissiond") + build_kerberos_args("admissiond") +
+      combine_arg_list_opts(options.admissiond_args))
+
+
 def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordinators,
-    remap_ports, start_idx=0):
+    remap_ports, start_idx=0, admissiond_host=INTERNAL_LISTEN_HOST):
   """Build the argument lists for impala daemons in the cluster. Returns a list of
   argument lists, one for each impala daemon in the cluster. Each argument list is
   a list of strings. 'num_coordinators' and 'use_exclusive_coordinators' allow setting
   up the cluster with dedicated coordinators.  If 'remap_ports' is true, the impalad
-  ports are changed from their default values to avoid port conflicts."""
+  ports are changed from their default values to avoid port conflicts. If the admission
+  service is enabled, 'admissiond_host' is the hostname for the admissiond."""
   # TODO: currently we build a big string blob then split it. It would be better to
   # build up the lists directly.
 
@@ -396,6 +412,10 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
             tracing_args=tracing_args)
         args = "{tracing_args} {args}".format(tracing_args=tracing_args, args=args)
 
+    if options.enable_admission_service:
+      args = "{args} -admission_service_host={host}".format(
+          args=args, host=admissiond_host)
+
     # Appended at the end so they can override previous args.
     if i < len(per_impalad_args):
       args = "{args} {per_impalad_args}".format(
@@ -406,10 +426,10 @@ def build_impalad_arg_lists(cluster_size, num_coordinators, use_exclusive_coordi
 
 def build_kerberos_args(daemon):
   """If the cluster is kerberized, returns arguments to pass to daemon process.
-  daemon should either be "impalad", "catalogd" or "statestored"."""
+  daemon should either be "impalad", "catalogd", "statestored", or "admissiond"."""
   # Note: this code has probably bit-rotted but is preserved in case someone needs to
   # revive the kerberized minicluster.
-  assert daemon in ("impalad", "catalogd", "statestored")
+  assert daemon in ("impalad", "catalogd", "statestored", "admissiond")
   if call([os.path.join(IMPALA_HOME, "testdata/cluster/admin"), "is_kerberized"]) != 0:
     return []
   args = ["-keytab_file={0}".format(os.getenv("KRB5_KTNAME")),
@@ -450,10 +470,10 @@ class MiniClusterOperations(object):
   """
   def get_cluster(self):
     """Return an ImpalaCluster instance."""
-    return ImpalaCluster()
+    return ImpalaCluster(use_admission_service=options.enable_admission_service)
 
   def kill_all_daemons(self, force=False):
-    kill_matching_processes(["catalogd", "impalad", "statestored"], force)
+    kill_matching_processes(["catalogd", "impalad", "statestored", "admissiond"], force)
 
   def kill_all_impalads(self, force=False):
     kill_matching_processes(["impalad"], force=force)
@@ -463,6 +483,9 @@ class MiniClusterOperations(object):
 
   def kill_statestored(self, force=False):
     kill_matching_processes(["statestored"], force=force)
+
+  def kill_admissiond(self, force=False):
+    kill_matching_processes(["admissiond"], force=force)
 
   def start_statestore(self):
     LOG.info("Starting State Store logging to {log_dir}/statestored.INFO".format(
@@ -481,6 +504,15 @@ class MiniClusterOperations(object):
         jvm_debug_port=DEFAULT_CATALOGD_JVM_DEBUG_PORT)
     if not check_process_exists("catalogd", 10):
       raise RuntimeError("Unable to start catalogd. Check log or file permissions"
+                         " for more details.")
+
+  def start_admissiond(self):
+    LOG.info("Starting Admission Control Service logging to {log_dir}/admissiond.INFO"
+        .format(log_dir=options.log_dir))
+    output_file = os.path.join(options.log_dir, "admissiond-out.log")
+    run_daemon_with_options("admissiond", build_admissiond_arg_list(), output_file)
+    if not check_process_exists("admissiond", 10):
+      raise RuntimeError("Unable to start admissiond. Check log or file permissions"
                          " for more details.")
 
   def start_impalads(self, cluster_size, num_coordinators, use_exclusive_coordinators,
@@ -531,11 +563,13 @@ class DockerMiniClusterOperations(object):
 
   def get_cluster(self):
     """Return an ImpalaCluster instance."""
-    return ImpalaCluster(docker_network=self.network_name)
+    return ImpalaCluster(docker_network=self.network_name,
+        use_admission_service=options.enable_admission_service)
 
   def kill_all_daemons(self, force=False):
     self.kill_statestored(force=force)
     self.kill_catalogd(force=force)
+    self.kill_admissiond(force=force)
     self.kill_all_impalads(force=force)
 
   def kill_all_impalads(self, force=False):
@@ -554,6 +588,9 @@ class DockerMiniClusterOperations(object):
   def kill_statestored(self, force=False):
     self.__stop_container__("statestored")
 
+  def kill_admissiond(self, force=False):
+    self.__stop_container__("admissiond")
+
   def start_statestore(self):
     self.__run_container__("statestored", build_statestored_arg_list(),
         {DEFAULT_STATESTORED_WEBSERVER_PORT: DEFAULT_STATESTORED_WEBSERVER_PORT})
@@ -562,9 +599,13 @@ class DockerMiniClusterOperations(object):
     self.__run_container__("catalogd", build_catalogd_arg_list(),
           {DEFAULT_CATALOGD_WEBSERVER_PORT: DEFAULT_CATALOGD_WEBSERVER_PORT})
 
+  def start_admissiond(self):
+    self.__run_container__("admissiond", build_admissiond_arg_list(),
+          {DEFAULT_ADMISSIOND_WEBSERVER_PORT: DEFAULT_ADMISSIOND_WEBSERVER_PORT})
+
   def start_impalads(self, cluster_size, num_coordinators, use_exclusive_coordinators):
-    impalad_arg_lists = build_impalad_arg_lists(
-        cluster_size, num_coordinators, use_exclusive_coordinators, remap_ports=False)
+    impalad_arg_lists = build_impalad_arg_lists(cluster_size, num_coordinators,
+        use_exclusive_coordinators, remap_ports=False, admissiond_host="admissiond")
     assert cluster_size == len(impalad_arg_lists)
     mem_limit = compute_impalad_mem_limit(cluster_size)
     for i in xrange(cluster_size):
@@ -774,6 +815,8 @@ if __name__ == "__main__":
     else:
       cluster_ops.start_statestore()
       cluster_ops.start_catalogd()
+      if options.enable_admission_service:
+        cluster_ops.start_admissiond()
       cluster_ops.start_impalads(options.cluster_size, options.num_coordinators,
                                  options.use_exclusive_coordinators)
     # Sleep briefly to reduce log spam: the cluster takes some time to start up.

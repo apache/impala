@@ -50,9 +50,6 @@ class RemoteAdmissionControlClient : public AdmissionControlClient {
   // The id of the query being considered for admission.
   UniqueIdPB query_id_;
 
-  /// The address of the remote admission controller to use.
-  TNetworkAddress address_;
-
   /// Protects 'pending_admit_' and 'cancelled_'.
   std::mutex lock_;
 
