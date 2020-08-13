@@ -162,7 +162,7 @@ class TestConcurrentDdls(CustomClusterTestSuite):
       return True
     return False
 
-  @pytest.mark.timeout(120)
+  @pytest.mark.timeout(300)
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=true",
