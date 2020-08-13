@@ -2692,11 +2692,12 @@ select * from functional.alltypessmall where
 ---- PLAN
 PLAN-ROOT SINK
 |
-03:NESTED LOOP JOIN [CROSS JOIN]
-|  row-size=93B cardinality=100
+03:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  row-size=89B cardinality=100
 |
 |--02:SELECT
-|  |  predicates: 1 != int_col
+|  |  predicates: 1 IS NULL OR int_col IS NULL OR int_col = 1
+|  |  limit: 1
 |  |  row-size=4B cardinality=1
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
@@ -4762,4 +4763,49 @@ PLAN-ROOT SINK
 01:SCAN HDFS [functional.alltypesagg b]
    HDFS partitions=11/11 files=11 size=814.73KB
    row-size=25B cardinality=11.00K
+====
+# IMPALA-7782: incorrect results for subquery with HAVING predicate.
+# Subqueries with HAVING clauses need to be rewritten to an outer join
+# because they may return an empty result set.
+SELECT id
+FROM functional.alltypestiny
+WHERE -1 NOT IN (SELECT COUNT(id) FROM functional.alltypestiny HAVING false)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  row-size=4B cardinality=8
+|
+|--01:EMPTYSET
+|     limit: 1
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
+====
+# IMPALA-7782: incorrect results for subquery with HAVING predicate.
+# Subqueries with HAVING clauses need to be rewritten to an outer join
+# because they may return an empty result set.
+SELECT id
+FROM functional.alltypestiny
+WHERE -1 NOT IN (SELECT COUNT(id) FROM functional.alltypestiny HAVING count(id) > 100)
+---- PLAN
+PLAN-ROOT SINK
+|
+03:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  row-size=4B cardinality=8
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: count(id)
+|  |  having: count(id) > 100, -1 IS NULL OR count(id) IS NULL OR count(id) = -1
+|  |  limit: 1
+|  |  row-size=8B cardinality=1
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=4B cardinality=8
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=4B cardinality=8
 ====
