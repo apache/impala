@@ -1690,8 +1690,16 @@ public class CatalogServiceCatalog extends Catalog {
     // pause the event processing since the cache is anyways being cleared
     metastoreEventProcessor_.pause();
     // Update the HDFS cache pools
-    CachePoolReader reader = new CachePoolReader(true);
-    reader.run();
+    try {
+      // We want only 'true' HDFS filesystems to poll the HDFS cache (i.e not S3,
+      // local, etc.)
+      if (FileSystemUtil.getDefaultFileSystem() instanceof DistributedFileSystem) {
+        CachePoolReader reader = new CachePoolReader(true);
+        reader.run();
+      }
+    } catch (IOException e) {
+      LOG.error("Couldn't identify the default FS. Cache Pool reader will be disabled.");
+    }
     versionLock_.writeLock().lock();
     // In case of an empty new catalog, the version should still change to reflect the
     // reset operation itself and to unblock impalads by making the catalog version >
