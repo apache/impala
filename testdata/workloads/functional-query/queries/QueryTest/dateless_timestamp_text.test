@@ -6,7 +6,6 @@ SELECT * FROM $DATABASE.timestamp_text_table;
 TIMESTAMP
 ---- CATCH
 Error converting column: 0 to TIMESTAMP
-Error parsing row: file: $NAMENODE/test-warehouse/test_dateless_timestamp_text_
 ====
 ---- QUERY
 SET abort_on_error=0;
