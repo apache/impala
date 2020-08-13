@@ -299,3 +299,65 @@ SELECT a.id FROM alltypessmall a WHERE
 ---- TYPES
 INT
 ====
+---- QUERY
+# IMPALA-7782: incorrect results for subquery with HAVING predicate.
+# The subquery is empty so the predicate is always true
+SELECT id
+FROM alltypestiny
+WHERE -1 NOT IN (SELECT COUNT(id) FROM alltypestiny HAVING false)
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+---- TYPES
+INT
+====
+---- QUERY
+# IMPALA-7782: incorrect results for subquery with HAVING predicate.
+# The subquery is empty so the predicate is always true
+SELECT id
+FROM alltypestiny
+WHERE NULL NOT IN (SELECT COUNT(id) FROM alltypestiny HAVING false)
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+---- TYPES
+INT
+====
+---- QUERY
+# IMPALA-7782: true having predicate is also handled correctly.
+SELECT id
+FROM alltypestiny
+WHERE 0 NOT IN (SELECT COUNT(id) FROM alltypestiny HAVING count(id) > 1)
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+---- TYPES
+INT
+====
+---- QUERY
+# IMPALA-7782: true having predicate is also handled correctly.
+SELECT id
+FROM alltypestiny
+WHERE 8 NOT IN (SELECT COUNT(id) FROM alltypestiny HAVING count(id) > 1)
+---- RESULTS
+---- TYPES
+INT
+====
