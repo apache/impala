@@ -135,8 +135,8 @@ const Statestore::TopicEntry::Version Statestore::Subscriber::TOPIC_INITIAL_VERS
 // Updates or heartbeats that miss their deadline by this much are logged.
 const uint32_t DEADLINE_MISS_THRESHOLD_MS = 2000;
 
-const string Statestore::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
-const string Statestore::IMPALA_REQUEST_QUEUE_TOPIC("impala-request-queue");
+const char* Statestore::IMPALA_MEMBERSHIP_TOPIC = "impala-membership";
+const char* Statestore::IMPALA_REQUEST_QUEUE_TOPIC = "impala-request-queue";
 
 typedef ClientConnection<StatestoreSubscriberClientWrapper> StatestoreSubscriberConn;
 
@@ -392,7 +392,11 @@ void Statestore::Subscriber::SetLastTopicVersionProcessed(const TopicId& topic_i
   // modified.
   Topics* subscribed_topics = GetTopicsMapForId(topic_id);
   Topics::iterator topic_it = subscribed_topics->find(topic_id);
-  DCHECK(topic_it != subscribed_topics->end());
+  // IMPALA-7714: log warning to aid debugging in release builds without DCHECK.
+  if (UNLIKELY(topic_it == subscribed_topics->end())) {
+    LOG(ERROR) << "Couldn't find subscribed topic " << topic_id;
+  }
+  DCHECK(topic_it != subscribed_topics->end()) << topic_id;
   topic_it->second.last_version.Store(version);
 }
 
