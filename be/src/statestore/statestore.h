@@ -173,9 +173,9 @@ class Statestore : public CacheLineAligned {
   /// interface for specifying prioritized topics, but for now we only have a small
   /// fixed set of topics.
   /// Topic tracking the set of live Impala daemon instances.
-  static const std::string IMPALA_MEMBERSHIP_TOPIC;
+  static const char* IMPALA_MEMBERSHIP_TOPIC;
   /// Topic tracking the state of admission control on all coordinators.
-  static const std::string IMPALA_REQUEST_QUEUE_TOPIC;
+  static const char* IMPALA_REQUEST_QUEUE_TOPIC;
 
   int32_t port() { return thrift_server_->port(); }
 
