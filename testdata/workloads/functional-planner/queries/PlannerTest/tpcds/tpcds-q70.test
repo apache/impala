@@ -1,0 +1,501 @@
+# TPCDS-Q70
+select
+    sum(ss_net_profit) as total_sum
+   ,s_state
+   ,s_county
+   ,grouping(s_state)+grouping(s_county) as lochierarchy
+   ,rank() over (
+        partition by grouping(s_state)+grouping(s_county),
+        case when grouping(s_county) = 0 then s_state end
+        order by sum(ss_net_profit) desc) as rank_within_parent
+ from
+    store_sales
+   ,date_dim       d1
+   ,store
+ where
+    d1.d_month_seq between 1212 and 1212+11
+ and d1.d_date_sk = ss_sold_date_sk
+ and s_store_sk  = ss_store_sk
+ and s_state in
+             ( select s_state
+               from  (select s_state as s_state,
+                            rank() over ( partition by s_state order by sum(ss_net_profit) desc) as ranking
+                      from   store_sales, store, date_dim
+                      where  d_month_seq between 1212 and 1212+11
+                            and d_date_sk = ss_sold_date_sk
+                            and s_store_sk  = ss_store_sk
+                      group by s_state
+                     ) tmp1
+               where ranking <= 5
+             )
+ group by rollup(s_state,s_county)
+ order by
+   lochierarchy desc
+  -- Modified from original because Impala does not allow aliases within order by
+  -- expressions, except at the top level.
+  ,case when grouping(s_state)+grouping(s_county) = 0 then s_state end
+  ,rank_within_parent
+ limit 100
+---- PLAN
+Max Per-Host Resource Reservation: Memory=32.34MB Threads=7
+Per-Host Resource Estimates: Memory=229MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=228.75MB mem-reservation=32.34MB thread-reservation=7 runtime-filters-memory=5.00MB
+PLAN-ROOT SINK
+|  output exprs: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END), CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END, CASE valid_tid(11,12,13) WHEN 11 THEN s_county WHEN 12 THEN NULL WHEN 13 THEN NULL END, CAST(aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) AS SMALLINT) + CAST(aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) AS SMALLINT), rank()
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+19:TOP-N [LIMIT=100]
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) DESC, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC, rank() ASC
+|  mem-estimate=150B mem-reservation=0B thread-reservation=0
+|  tuple-ids=17 row-size=50B cardinality=3
+|  in pipelines: 19(GETNEXT), 17(OPEN)
+|
+18:ANALYTIC
+|  functions: rank()
+|  partition by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END), CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END) DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=30,29 row-size=54B cardinality=3
+|  in pipelines: 17(GETNEXT)
+|
+17:SORT
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) ASC NULLS LAST, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC NULLS LAST, aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END) DESC
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=30 row-size=46B cardinality=3
+|  in pipelines: 17(GETNEXT), 16(OPEN)
+|
+16:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(11,12,13) IN (CAST(11 AS INT), CAST(12 AS INT), CAST(13 AS INT)), CASE valid_tid(11,12,13) WHEN CAST(11 AS INT) THEN sum(ss_net_profit) WHEN CAST(12 AS INT) THEN sum(ss_net_profit) WHEN CAST(13 AS INT) THEN sum(ss_net_profit) END), aggif(valid_tid(11,12,13) IN (CAST(11 AS INT), CAST(12 AS INT), CAST(13 AS INT)), CASE valid_tid(11,12,13) WHEN CAST(11 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(12 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(13 AS INT) THEN CAST(1 AS TINYINT) END), aggif(valid_tid(11,12,13) IN (CAST(11 AS INT), CAST(12 AS INT), CAST(13 AS INT)), CASE valid_tid(11,12,13) WHEN CAST(11 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(12 AS INT) THEN CAST(1 AS TINYINT) WHEN CAST(13 AS INT) THEN CAST(1 AS TINYINT) END)
+|  group by: CASE valid_tid(11,12,13) WHEN CAST(11 AS INT) THEN s_state WHEN CAST(12 AS INT) THEN s_state WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(11,12,13) WHEN CAST(11 AS INT) THEN s_county WHEN CAST(12 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(11,12,13) WHEN CAST(11 AS INT) THEN CAST(11 AS INT) WHEN CAST(12 AS INT) THEN CAST(12 AS INT) WHEN CAST(13 AS INT) THEN CAST(13 AS INT) END
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=14 row-size=46B cardinality=3
+|  in pipelines: 16(GETNEXT), 15(OPEN)
+|
+15:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: sum(ss_net_profit)
+|    group by: s_state, s_county
+|  Class 1
+|    output: sum(ss_net_profit)
+|    group by: s_state, NULL
+|  Class 2
+|    output: sum(ss_net_profit)
+|    group by: NULL, NULL
+|  mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=0
+|  tuple-ids=11N,12N,13N row-size=141B cardinality=3
+|  in pipelines: 15(GETNEXT), 00(OPEN)
+|
+14:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: s_state = s_state
+|  runtime filters: RF000[bloom] <- s_state
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1,2 row-size=67B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 09(OPEN)
+|
+|--11:SELECT
+|  |  predicates: rank() <= CAST(5 AS BIGINT)
+|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=26,25 row-size=38B cardinality=1
+|  |  in pipelines: 09(GETNEXT)
+|  |
+|  10:ANALYTIC
+|  |  functions: rank()
+|  |  partition by: s_state
+|  |  order by: sum(ss_net_profit) DESC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=26,25 row-size=38B cardinality=1
+|  |  in pipelines: 09(GETNEXT)
+|  |
+|  09:SORT
+|  |  order by: s_state ASC NULLS LAST, sum(ss_net_profit) DESC
+|  |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=26 row-size=30B cardinality=1
+|  |  in pipelines: 09(GETNEXT), 08(OPEN)
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  output: sum(ss_net_profit)
+|  |  group by: s_state
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=6 row-size=30B cardinality=1
+|  |  in pipelines: 08(GETNEXT), 03(OPEN)
+|  |
+|  07:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  |  runtime filters: RF006[bloom] <- d_date_sk
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=3,4,5 row-size=38B cardinality=2.88M
+|  |  in pipelines: 03(GETNEXT), 05(OPEN)
+|  |
+|  |--05:SCAN HDFS [tpcds_parquet.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=2.15MB
+|  |     predicates: d_month_seq <= CAST(1223 AS INT), d_month_seq >= CAST(1212 AS INT)
+|  |     stored statistics:
+|  |       table: rows=73.05K size=2.15MB
+|  |       columns: all
+|  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|  |     parquet statistics predicates: d_month_seq <= CAST(1223 AS INT), d_month_seq >= CAST(1212 AS INT)
+|  |     parquet dictionary predicates: d_month_seq <= CAST(1223 AS INT), d_month_seq >= CAST(1212 AS INT)
+|  |     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|  |     tuple-ids=5 row-size=8B cardinality=7.30K
+|  |     in pipelines: 05(GETNEXT)
+|  |
+|  06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF008[bloom] <- s_store_sk
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=3,4 row-size=30B cardinality=2.88M
+|  |  in pipelines: 03(GETNEXT), 04(OPEN)
+|  |
+|  |--04:SCAN HDFS [tpcds_parquet.store]
+|  |     HDFS partitions=1/1 files=1 size=9.93KB
+|  |     stored statistics:
+|  |       table: rows=12 size=9.93KB
+|  |       columns: all
+|  |     extrapolated-rows=disabled max-scan-range-rows=12
+|  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
+|  |     tuple-ids=4 row-size=18B cardinality=12
+|  |     in pipelines: 04(GETNEXT)
+|  |
+|  03:SCAN HDFS [tpcds_parquet.store_sales]
+|     HDFS partitions=1824/1824 files=1824 size=201.02MB
+|     runtime filters: RF006[bloom] -> ss_sold_date_sk, RF008[bloom] -> ss_store_sk
+|     stored statistics:
+|       table: rows=2.88M size=201.02MB
+|       partitions: 1824/1824 rows=2.88M
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
+|     tuple-ids=3 row-size=12B cardinality=2.88M
+|     in pipelines: 03(GETNEXT)
+|
+13:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = s_store_sk
+|  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  runtime filters: RF002[bloom] <- s_store_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1,2 row-size=67B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:SCAN HDFS [tpcds_parquet.store]
+|     HDFS partitions=1/1 files=1 size=9.93KB
+|     runtime filters: RF000[bloom] -> s_state
+|     stored statistics:
+|       table: rows=12 size=9.93KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=12
+|     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
+|     tuple-ids=2 row-size=47B cardinality=12
+|     in pipelines: 02(GETNEXT)
+|
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d1.d_date_sk
+|  fk/pk conjuncts: ss_sold_date_sk = d1.d_date_sk
+|  runtime filters: RF004[bloom] <- d1.d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=20B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--01:SCAN HDFS [tpcds_parquet.date_dim d1]
+|     HDFS partitions=1/1 files=1 size=2.15MB
+|     predicates: d1.d_month_seq <= CAST(1223 AS INT), d1.d_month_seq >= CAST(1212 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d1.d_month_seq <= CAST(1223 AS INT), d1.d_month_seq >= CAST(1212 AS INT)
+|     parquet dictionary predicates: d1.d_month_seq <= CAST(1223 AS INT), d1.d_month_seq >= CAST(1212 AS INT)
+|     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=1 row-size=8B cardinality=7.30K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=201.02MB
+   runtime filters: RF002[bloom] -> ss_store_sk, RF004[bloom] -> ss_sold_date_sk
+   stored statistics:
+     table: rows=2.88M size=201.02MB
+     partitions: 1824/1824 rows=2.88M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
+   tuple-ids=0 row-size=12B cardinality=2.88M
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=68.41MB Threads=16
+Per-Host Resource Estimates: Memory=346MB
+F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END), CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END, CASE valid_tid(11,12,13) WHEN 11 THEN s_county WHEN 12 THEN NULL WHEN 13 THEN NULL END, CAST(aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) AS SMALLINT) + CAST(aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) AS SMALLINT), rank()
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+30:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) DESC, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC, rank() ASC
+|  limit: 100
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=17 row-size=50B cardinality=3
+|  in pipelines: 19(GETNEXT)
+|
+F08:PLAN FRAGMENT [HASH(aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END),CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.02MB mem-reservation=16.00MB thread-reservation=1
+19:TOP-N [LIMIT=100]
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) DESC, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC, rank() ASC
+|  mem-estimate=150B mem-reservation=0B thread-reservation=0
+|  tuple-ids=17 row-size=50B cardinality=3
+|  in pipelines: 19(GETNEXT), 17(OPEN)
+|
+18:ANALYTIC
+|  functions: rank()
+|  partition by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END), CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END) DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=30,29 row-size=54B cardinality=3
+|  in pipelines: 17(GETNEXT)
+|
+17:SORT
+|  order by: aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) ASC NULLS LAST, CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END ASC NULLS LAST, aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN sum(ss_net_profit) WHEN 12 THEN sum(ss_net_profit) WHEN 13 THEN sum(ss_net_profit) END) DESC
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=30 row-size=46B cardinality=3
+|  in pipelines: 17(GETNEXT), 16(OPEN)
+|
+29:EXCHANGE [HASH(aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 0 WHEN 13 THEN 1 END) + aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END),CASE WHEN aggif(valid_tid(11,12,13) IN (11, 12, 13), CASE valid_tid(11,12,13) WHEN 11 THEN 0 WHEN 12 THEN 1 WHEN 13 THEN 1 END) = 0 THEN CASE valid_tid(11,12,13) WHEN 11 THEN s_state WHEN 12 THEN s_state WHEN 13 THEN NULL END END)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=14 row-size=46B cardinality=3
+|  in pipelines: 16(GETNEXT)
+|
+F07:PLAN FRAGMENT [HASH(CASE valid_tid(11,12,13) WHEN 11 THEN murmur_hash(s_state) WHEN 12 THEN murmur_hash(s_state) WHEN 13 THEN murmur_hash(NULL) END,CASE valid_tid(11,12,13) WHEN 11 THEN murmur_hash(s_county) WHEN 12 THEN murmur_hash(NULL) WHEN 13 THEN murmur_hash(NULL) END)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=40.00MB mem-reservation=7.75MB thread-reservation=1
+16:AGGREGATE [FINALIZE]
+|  output: aggif(valid_tid(11,12,13) IN (CAST(11 AS INT), CAST(12 AS INT), CAST(13 AS INT)), CASE valid_tid(11,12,13) WHEN CAST(11 AS INT) THEN sum(ss_net_profit) WHEN CAST(12 AS INT) THEN sum(ss_net_profit) WHEN CAST(13 AS INT) THEN sum(ss_net_profit) END), aggif(valid_tid(11,12,13) IN (CAST(11 AS INT), CAST(12 AS INT), CAST(13 AS INT)), CASE valid_tid(11,12,13) WHEN CAST(11 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(12 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(13 AS INT) THEN CAST(1 AS TINYINT) END), aggif(valid_tid(11,12,13) IN (CAST(11 AS INT), CAST(12 AS INT), CAST(13 AS INT)), CASE valid_tid(11,12,13) WHEN CAST(11 AS INT) THEN CAST(0 AS TINYINT) WHEN CAST(12 AS INT) THEN CAST(1 AS TINYINT) WHEN CAST(13 AS INT) THEN CAST(1 AS TINYINT) END)
+|  group by: CASE valid_tid(11,12,13) WHEN CAST(11 AS INT) THEN s_state WHEN CAST(12 AS INT) THEN s_state WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(11,12,13) WHEN CAST(11 AS INT) THEN s_county WHEN CAST(12 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(11,12,13) WHEN CAST(11 AS INT) THEN CAST(11 AS INT) WHEN CAST(12 AS INT) THEN CAST(12 AS INT) WHEN CAST(13 AS INT) THEN CAST(13 AS INT) END
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=14 row-size=46B cardinality=3
+|  in pipelines: 16(GETNEXT), 28(OPEN)
+|
+28:AGGREGATE [FINALIZE]
+|  Class 0
+|    output: sum:merge(ss_net_profit)
+|    group by: s_state, s_county
+|  Class 1
+|    output: sum:merge(ss_net_profit)
+|    group by: s_state, NULL
+|  Class 2
+|    output: sum:merge(ss_net_profit)
+|    group by: NULL, NULL
+|  mem-estimate=30.00MB mem-reservation=5.81MB thread-reservation=0
+|  tuple-ids=11N,12N,13N row-size=141B cardinality=3
+|  in pipelines: 28(GETNEXT), 00(OPEN)
+|
+27:EXCHANGE [HASH(CASE valid_tid(11,12,13) WHEN 11 THEN murmur_hash(s_state) WHEN 12 THEN murmur_hash(s_state) WHEN 13 THEN murmur_hash(NULL) END,CASE valid_tid(11,12,13) WHEN 11 THEN murmur_hash(s_county) WHEN 12 THEN murmur_hash(NULL) WHEN 13 THEN murmur_hash(NULL) END)]
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=11N,12N,13N row-size=141B cardinality=3
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=70.91MB mem-reservation=15.81MB thread-reservation=2 runtime-filters-memory=3.00MB
+15:AGGREGATE [STREAMING]
+|  Class 0
+|    output: sum(ss_net_profit)
+|    group by: s_state, s_county
+|  Class 1
+|    output: sum(ss_net_profit)
+|    group by: s_state, NULL
+|  Class 2
+|    output: sum(ss_net_profit)
+|    group by: NULL, NULL
+|  mem-estimate=30.00MB mem-reservation=6.00MB thread-reservation=0
+|  tuple-ids=11N,12N,13N row-size=141B cardinality=3
+|  in pipelines: 00(GETNEXT)
+|
+14:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: s_state = s_state
+|  runtime filters: RF000[bloom] <- s_state
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1,2 row-size=67B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 09(OPEN)
+|
+|--26:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=26,25 row-size=38B cardinality=1
+|  |  in pipelines: 09(GETNEXT)
+|  |
+|  F06:PLAN FRAGMENT [HASH(s_state)] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=26.00MB mem-reservation=17.94MB thread-reservation=1
+|  11:SELECT
+|  |  predicates: rank() <= CAST(5 AS BIGINT)
+|  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=26,25 row-size=38B cardinality=1
+|  |  in pipelines: 09(GETNEXT)
+|  |
+|  10:ANALYTIC
+|  |  functions: rank()
+|  |  partition by: s_state
+|  |  order by: sum(ss_net_profit) DESC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=26,25 row-size=38B cardinality=1
+|  |  in pipelines: 09(GETNEXT)
+|  |
+|  09:SORT
+|  |  order by: s_state ASC NULLS LAST, sum(ss_net_profit) DESC
+|  |  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  tuple-ids=26 row-size=30B cardinality=1
+|  |  in pipelines: 09(GETNEXT), 25(OPEN)
+|  |
+|  25:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(ss_net_profit)
+|  |  group by: s_state
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=6 row-size=30B cardinality=1
+|  |  in pipelines: 25(GETNEXT), 03(OPEN)
+|  |
+|  24:EXCHANGE [HASH(s_state)]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=6 row-size=30B cardinality=1
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  F03:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+|  Per-Host Resources: mem-estimate=47.96MB mem-reservation=8.88MB thread-reservation=2 runtime-filters-memory=2.00MB
+|  08:AGGREGATE [STREAMING]
+|  |  output: sum(ss_net_profit)
+|  |  group by: s_state
+|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=6 row-size=30B cardinality=1
+|  |  in pipelines: 03(GETNEXT)
+|  |
+|  07:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
+|  |  runtime filters: RF006[bloom] <- d_date_sk
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=3,4,5 row-size=38B cardinality=2.88M
+|  |  in pipelines: 03(GETNEXT), 05(OPEN)
+|  |
+|  |--23:EXCHANGE [BROADCAST]
+|  |  |  mem-estimate=69.07KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=5 row-size=8B cardinality=7.30K
+|  |  |  in pipelines: 05(GETNEXT)
+|  |  |
+|  |  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=2
+|  |  05:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
+|  |     HDFS partitions=1/1 files=1 size=2.15MB
+|  |     predicates: d_month_seq <= CAST(1223 AS INT), d_month_seq >= CAST(1212 AS INT)
+|  |     stored statistics:
+|  |       table: rows=73.05K size=2.15MB
+|  |       columns: all
+|  |     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|  |     parquet statistics predicates: d_month_seq <= CAST(1223 AS INT), d_month_seq >= CAST(1212 AS INT)
+|  |     parquet dictionary predicates: d_month_seq <= CAST(1223 AS INT), d_month_seq >= CAST(1212 AS INT)
+|  |     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|  |     tuple-ids=5 row-size=8B cardinality=7.30K
+|  |     in pipelines: 05(GETNEXT)
+|  |
+|  06:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF008[bloom] <- s_store_sk
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=3,4 row-size=30B cardinality=2.88M
+|  |  in pipelines: 03(GETNEXT), 04(OPEN)
+|  |
+|  |--22:EXCHANGE [BROADCAST]
+|  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=4 row-size=18B cardinality=12
+|  |  |  in pipelines: 04(GETNEXT)
+|  |  |
+|  |  F04:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  |  Per-Host Resources: mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=2
+|  |  04:SCAN HDFS [tpcds_parquet.store, RANDOM]
+|  |     HDFS partitions=1/1 files=1 size=9.93KB
+|  |     stored statistics:
+|  |       table: rows=12 size=9.93KB
+|  |       columns: all
+|  |     extrapolated-rows=disabled max-scan-range-rows=12
+|  |     mem-estimate=32.00MB mem-reservation=16.00KB thread-reservation=1
+|  |     tuple-ids=4 row-size=18B cardinality=12
+|  |     in pipelines: 04(GETNEXT)
+|  |
+|  03:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
+|     HDFS partitions=1824/1824 files=1824 size=201.02MB
+|     runtime filters: RF006[bloom] -> ss_sold_date_sk, RF008[bloom] -> ss_store_sk
+|     stored statistics:
+|       table: rows=2.88M size=201.02MB
+|       partitions: 1824/1824 rows=2.88M
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=130.09K
+|     mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
+|     tuple-ids=3 row-size=12B cardinality=2.88M
+|     in pipelines: 03(GETNEXT)
+|
+13:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_store_sk = s_store_sk
+|  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  runtime filters: RF002[bloom] <- s_store_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1,2 row-size=67B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--21:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=47B cardinality=12
+|  |  in pipelines: 02(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=49.00MB mem-reservation=1.02MB thread-reservation=2 runtime-filters-memory=1.00MB
+|  02:SCAN HDFS [tpcds_parquet.store, RANDOM]
+|     HDFS partitions=1/1 files=1 size=9.93KB
+|     runtime filters: RF000[bloom] -> s_state
+|     stored statistics:
+|       table: rows=12 size=9.93KB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=12
+|     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
+|     tuple-ids=2 row-size=47B cardinality=12
+|     in pipelines: 02(GETNEXT)
+|
+12:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_sold_date_sk = d1.d_date_sk
+|  fk/pk conjuncts: ss_sold_date_sk = d1.d_date_sk
+|  runtime filters: RF004[bloom] <- d1.d_date_sk
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,1 row-size=20B cardinality=2.88M
+|  in pipelines: 00(GETNEXT), 01(OPEN)
+|
+|--20:EXCHANGE [BROADCAST]
+|  |  mem-estimate=69.07KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=1 row-size=8B cardinality=7.30K
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=2
+|  01:SCAN HDFS [tpcds_parquet.date_dim d1, RANDOM]
+|     HDFS partitions=1/1 files=1 size=2.15MB
+|     predicates: d1.d_month_seq <= CAST(1223 AS INT), d1.d_month_seq >= CAST(1212 AS INT)
+|     stored statistics:
+|       table: rows=73.05K size=2.15MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=73.05K
+|     parquet statistics predicates: d1.d_month_seq <= CAST(1223 AS INT), d1.d_month_seq >= CAST(1212 AS INT)
+|     parquet dictionary predicates: d1.d_month_seq <= CAST(1223 AS INT), d1.d_month_seq >= CAST(1212 AS INT)
+|     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
+|     tuple-ids=1 row-size=8B cardinality=7.30K
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
+   HDFS partitions=1824/1824 files=1824 size=201.02MB
+   runtime filters: RF002[bloom] -> ss_store_sk, RF004[bloom] -> ss_sold_date_sk
+   stored statistics:
+     table: rows=2.88M size=201.02MB
+     partitions: 1824/1824 rows=2.88M
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=130.09K
+   mem-estimate=32.00MB mem-reservation=1.00MB thread-reservation=1
+   tuple-ids=0 row-size=12B cardinality=2.88M
+   in pipelines: 00(GETNEXT)
+====
