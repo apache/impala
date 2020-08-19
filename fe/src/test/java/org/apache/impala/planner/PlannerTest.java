@@ -550,16 +550,6 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
-  public void testTpcds() {
-    // Uses ss_sold_date_sk as the partition key of store_sales to allow static partition
-    // pruning. The original predicates were rephrased in terms of the ss_sold_date_sk
-    // partition key, with the query semantics identical to the original queries.
-    runPlannerTestFile("tpcds-all", "tpcds",
-        ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER,
-            PlannerTestOption.VALIDATE_RESOURCES));
-  }
-
-  @Test
   public void testSmallQueryOptimization() {
     TQueryOptions options = new TQueryOptions();
     options.setExec_single_node_rows_threshold(8);

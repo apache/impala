@@ -89,7 +89,7 @@ public class PlannerTestBase extends FrontendTestBase {
   private final static boolean GENERATE_OUTPUT_FILE = true;
   private final java.nio.file.Path testDir_ = Paths.get("functional-planner", "queries",
       "PlannerTest");
-  private static java.nio.file.Path outDir_;
+  protected static java.nio.file.Path outDir_;
   private static KuduClient kuduClient_;
 
   // Map from plan ID (TPlanNodeId) to the plan node with that ID.

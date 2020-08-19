@@ -1,0 +1,343 @@
+# TPCDS-Q41
+SELECT distinct(i_product_name)
+FROM item i1
+WHERE i_manufact_id BETWEEN 738 AND 738+40
+  AND
+    (SELECT count(*) AS item_cnt
+     FROM item
+     WHERE (i_manufact = i1.i_manufact
+            AND ((i_category = 'Women'
+                  AND (i_color = 'powder'
+                       OR i_color = 'khaki')
+                  AND (i_units = 'Ounce'
+                       OR i_units = 'Oz')
+                  AND (i_size = 'medium'
+                       OR i_size = 'extra large'))
+                 OR (i_category = 'Women'
+                     AND (i_color = 'brown'
+                          OR i_color = 'honeydew')
+                     AND (i_units = 'Bunch'
+                          OR i_units = 'Ton')
+                     AND (i_size = 'N/A'
+                          OR i_size = 'small'))
+                 OR (i_category = 'Men'
+                     AND (i_color = 'floral'
+                          OR i_color = 'deep')
+                     AND (i_units = 'N/A'
+                          OR i_units = 'Dozen')
+                     AND (i_size = 'petite'
+                          OR i_size = 'petite'))
+                 OR (i_category = 'Men'
+                     AND (i_color = 'light'
+                          OR i_color = 'cornflower')
+                     AND (i_units = 'Box'
+                          OR i_units = 'Pound')
+                     AND (i_size = 'medium'
+                          OR i_size = 'extra large'))))
+       OR (i_manufact = i1.i_manufact
+           AND ((i_category = 'Women'
+                 AND (i_color = 'midnight'
+                      OR i_color = 'snow')
+                 AND (i_units = 'Pallet'
+                      OR i_units = 'Gross')
+                 AND (i_size = 'medium'
+                      OR i_size = 'extra large'))
+                OR (i_category = 'Women'
+                    AND (i_color = 'cyan'
+                         OR i_color = 'papaya')
+                    AND (i_units = 'Cup'
+                         OR i_units = 'Dram')
+                    AND (i_size = 'N/A'
+                         OR i_size = 'small'))
+                OR (i_category = 'Men'
+                    AND (i_color = 'orange'
+                         OR i_color = 'frosted')
+                    AND (i_units = 'Each'
+                         OR i_units = 'Tbl')
+                    AND (i_size = 'petite'
+                         OR i_size = 'petite'))
+                OR (i_category = 'Men'
+                    AND (i_color = 'forest'
+                         OR i_color = 'ghost')
+                    AND (i_units = 'Lb'
+                         OR i_units = 'Bundle')
+                    AND (i_size = 'medium'
+                         OR i_size = 'extra large'))))) > 0
+ORDER BY i_product_name
+LIMIT 100;
+
+---- PLAN
+Max Per-Host Resource Reservation: Memory=4.38MB Threads=3
+Per-Host Resource Estimates: Memory=138MB
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=4.38MB thread-reservation=3
+PLAN-ROOT SINK
+|  output exprs: (i_product_name)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+05:TOP-N [LIMIT=100]
+|  order by: (i_product_name) ASC
+|  mem-estimate=2.93KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=30B cardinality=100
+|  in pipelines: 05(GETNEXT), 04(OPEN)
+|
+04:AGGREGATE [FINALIZE]
+|  group by: (i_product_name)
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4 row-size=30B cardinality=1.80K
+|  in pipelines: 04(GETNEXT), 00(OPEN)
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: i1.i_manufact = i_manufact
+|  fk/pk conjuncts: none
+|  other predicates: zeroifnull(count(*)) > CAST(0 AS BIGINT)
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,2N row-size=89B cardinality=1.80K
+|  in pipelines: 00(GETNEXT), 02(OPEN)
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  group by: i_manufact
+|  |  having: zeroifnull(count(*)) > CAST(0 AS BIGINT)
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=2 row-size=31B cardinality=1
+|  |  in pipelines: 02(GETNEXT), 01(OPEN)
+|  |
+|  01:SCAN HDFS [tpcds_parquet.item]
+|     HDFS partitions=1/1 files=1 size=1.73MB
+|     predicates: ((i_category = 'Women' AND ((i_color IN ('powder', 'khaki') AND i_units IN ('Ounce', 'Oz') AND i_size IN ('medium', 'extra large')) OR (i_color IN ('brown', 'honeydew') AND i_units IN ('Bunch', 'Ton') AND i_size IN ('N/A', 'small'))) OR (i_category = 'Men' AND i_color IN ('floral', 'deep') AND i_units IN ('N/A', 'Dozen') AND i_size = 'petite') OR (i_category = 'Men' AND i_color IN ('light', 'cornflower') AND i_units IN ('Box', 'Pound') AND i_size IN ('medium', 'extra large'))) OR (i_category = 'Women' AND ((i_color IN ('midnight', 'snow') AND i_units IN ('Pallet', 'Gross') AND i_size IN ('medium', 'extra large')) OR (i_color IN ('cyan', 'papaya') AND i_units IN ('Cup', 'Dram') AND i_size IN ('N/A', 'small'))) OR (i_category = 'Men' AND i_color IN ('orange', 'frosted') AND i_units IN ('Each', 'Tbl') AND i_size = 'petite') OR (i_category = 'Men' AND i_color IN ('forest', 'ghost') AND i_units IN ('Lb', 'Bundle') AND i_size IN ('medium', 'extra large'))))
+|     stored statistics:
+|       table: rows=18.00K size=1.73MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=18.00K
+|     mem-estimate=80.00MB mem-reservation=128.00KB thread-reservation=1
+|     tuple-ids=1 row-size=91B cardinality=8
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.item i1]
+   HDFS partitions=1/1 files=1 size=1.73MB
+   predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   stored statistics:
+     table: rows=18.00K size=1.73MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=18.00K
+   parquet statistics predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   parquet dictionary predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   mem-estimate=48.00MB mem-reservation=512.00KB thread-reservation=1
+   tuple-ids=0 row-size=57B cardinality=1.80K
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=10.44MB Threads=7
+Per-Host Resource Estimates: Memory=170MB
+F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: (i_product_name)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+11:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: (i_product_name) ASC
+|  limit: 100
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=30B cardinality=100
+|  in pipelines: 05(GETNEXT)
+|
+F03:PLAN FRAGMENT [HASH((i_product_name))] hosts=1 instances=1
+Per-Host Resources: mem-estimate=10.08MB mem-reservation=1.94MB thread-reservation=1
+05:TOP-N [LIMIT=100]
+|  order by: (i_product_name) ASC
+|  mem-estimate=2.93KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=30B cardinality=100
+|  in pipelines: 05(GETNEXT), 10(OPEN)
+|
+10:AGGREGATE [FINALIZE]
+|  group by: (i_product_name)
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4 row-size=30B cardinality=1.80K
+|  in pipelines: 10(GETNEXT), 00(OPEN)
+|
+09:EXCHANGE [HASH((i_product_name))]
+|  mem-estimate=86.84KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=30B cardinality=1.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Host Resources: mem-estimate=59.95MB mem-reservation=4.44MB thread-reservation=2
+04:AGGREGATE [STREAMING]
+|  group by: (i_product_name)
+|  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4 row-size=30B cardinality=1.80K
+|  in pipelines: 00(GETNEXT)
+|
+03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash predicates: i1.i_manufact = i_manufact
+|  fk/pk conjuncts: none
+|  other predicates: zeroifnull(count(*)) > CAST(0 AS BIGINT)
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,2N row-size=89B cardinality=1.80K
+|  in pipelines: 00(GETNEXT), 07(OPEN)
+|
+|--08:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=31B cardinality=1
+|  |  in pipelines: 07(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [HASH(i_manufact)] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+|  07:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  group by: i_manufact
+|  |  having: zeroifnull(count(*)) > CAST(0 AS BIGINT)
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=2 row-size=31B cardinality=1
+|  |  in pipelines: 07(GETNEXT), 01(OPEN)
+|  |
+|  06:EXCHANGE [HASH(i_manufact)]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=31B cardinality=8
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=90.00MB mem-reservation=2.12MB thread-reservation=2
+|  02:AGGREGATE [STREAMING]
+|  |  output: count(*)
+|  |  group by: i_manufact
+|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=2 row-size=31B cardinality=8
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  01:SCAN HDFS [tpcds_parquet.item, RANDOM]
+|     HDFS partitions=1/1 files=1 size=1.73MB
+|     predicates: ((i_category = 'Women' AND ((i_color IN ('powder', 'khaki') AND i_units IN ('Ounce', 'Oz') AND i_size IN ('medium', 'extra large')) OR (i_color IN ('brown', 'honeydew') AND i_units IN ('Bunch', 'Ton') AND i_size IN ('N/A', 'small'))) OR (i_category = 'Men' AND i_color IN ('floral', 'deep') AND i_units IN ('N/A', 'Dozen') AND i_size = 'petite') OR (i_category = 'Men' AND i_color IN ('light', 'cornflower') AND i_units IN ('Box', 'Pound') AND i_size IN ('medium', 'extra large'))) OR (i_category = 'Women' AND ((i_color IN ('midnight', 'snow') AND i_units IN ('Pallet', 'Gross') AND i_size IN ('medium', 'extra large')) OR (i_color IN ('cyan', 'papaya') AND i_units IN ('Cup', 'Dram') AND i_size IN ('N/A', 'small'))) OR (i_category = 'Men' AND i_color IN ('orange', 'frosted') AND i_units IN ('Each', 'Tbl') AND i_size = 'petite') OR (i_category = 'Men' AND i_color IN ('forest', 'ghost') AND i_units IN ('Lb', 'Bundle') AND i_size IN ('medium', 'extra large'))))
+|     stored statistics:
+|       table: rows=18.00K size=1.73MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=18.00K
+|     mem-estimate=80.00MB mem-reservation=128.00KB thread-reservation=1
+|     tuple-ids=1 row-size=91B cardinality=8
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.item i1, RANDOM]
+   HDFS partitions=1/1 files=1 size=1.73MB
+   predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   stored statistics:
+     table: rows=18.00K size=1.73MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=18.00K
+   parquet statistics predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   parquet dictionary predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   mem-estimate=48.00MB mem-reservation=512.00KB thread-reservation=1
+   tuple-ids=0 row-size=57B cardinality=1.80K
+   in pipelines: 00(GETNEXT)
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=12.38MB Threads=6
+Per-Host Resource Estimates: Memory=76MB
+F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: (i_product_name)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+11:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: (i_product_name) ASC
+|  limit: 100
+|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=30B cardinality=100
+|  in pipelines: 05(GETNEXT)
+|
+F03:PLAN FRAGMENT [HASH((i_product_name))] hosts=1 instances=1
+Per-Instance Resources: mem-estimate=10.08MB mem-reservation=1.94MB thread-reservation=1
+05:TOP-N [LIMIT=100]
+|  order by: (i_product_name) ASC
+|  mem-estimate=2.93KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=30B cardinality=100
+|  in pipelines: 05(GETNEXT), 10(OPEN)
+|
+10:AGGREGATE [FINALIZE]
+|  group by: (i_product_name)
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4 row-size=30B cardinality=1.80K
+|  in pipelines: 10(GETNEXT), 00(OPEN)
+|
+09:EXCHANGE [HASH((i_product_name))]
+|  mem-estimate=86.84KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=4 row-size=30B cardinality=1.80K
+|  in pipelines: 00(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.50MB thread-reservation=1
+04:AGGREGATE [STREAMING]
+|  group by: (i_product_name)
+|  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=4 row-size=30B cardinality=1.80K
+|  in pipelines: 00(GETNEXT)
+|
+03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
+|  hash-table-id=00
+|  hash predicates: i1.i_manufact = i_manufact
+|  fk/pk conjuncts: none
+|  other predicates: zeroifnull(count(*)) > CAST(0 AS BIGINT)
+|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  tuple-ids=0,2N row-size=89B cardinality=1.80K
+|  in pipelines: 00(GETNEXT), 07(OPEN)
+|
+|--F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  |  Per-Instance Resources: mem-estimate=3.89MB mem-reservation=3.88MB thread-reservation=1
+|  JOIN BUILD
+|  |  join-table-id=00 plan-id=01 cohort-id=01
+|  |  build expressions: i_manufact
+|  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
+|  |
+|  08:EXCHANGE [BROADCAST]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=31B cardinality=1
+|  |  in pipelines: 07(GETNEXT)
+|  |
+|  F02:PLAN FRAGMENT [HASH(i_manufact)] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=1.94MB thread-reservation=1
+|  07:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
+|  |  group by: i_manufact
+|  |  having: zeroifnull(count(*)) > CAST(0 AS BIGINT)
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=2 row-size=31B cardinality=1
+|  |  in pipelines: 07(GETNEXT), 01(OPEN)
+|  |
+|  06:EXCHANGE [HASH(i_manufact)]
+|  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=31B cardinality=8
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.12MB thread-reservation=1
+|  02:AGGREGATE [STREAMING]
+|  |  output: count(*)
+|  |  group by: i_manufact
+|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
+|  |  tuple-ids=2 row-size=31B cardinality=8
+|  |  in pipelines: 01(GETNEXT)
+|  |
+|  01:SCAN HDFS [tpcds_parquet.item, RANDOM]
+|     HDFS partitions=1/1 files=1 size=1.73MB
+|     predicates: ((i_category = 'Women' AND ((i_color IN ('powder', 'khaki') AND i_units IN ('Ounce', 'Oz') AND i_size IN ('medium', 'extra large')) OR (i_color IN ('brown', 'honeydew') AND i_units IN ('Bunch', 'Ton') AND i_size IN ('N/A', 'small'))) OR (i_category = 'Men' AND i_color IN ('floral', 'deep') AND i_units IN ('N/A', 'Dozen') AND i_size = 'petite') OR (i_category = 'Men' AND i_color IN ('light', 'cornflower') AND i_units IN ('Box', 'Pound') AND i_size IN ('medium', 'extra large'))) OR (i_category = 'Women' AND ((i_color IN ('midnight', 'snow') AND i_units IN ('Pallet', 'Gross') AND i_size IN ('medium', 'extra large')) OR (i_color IN ('cyan', 'papaya') AND i_units IN ('Cup', 'Dram') AND i_size IN ('N/A', 'small'))) OR (i_category = 'Men' AND i_color IN ('orange', 'frosted') AND i_units IN ('Each', 'Tbl') AND i_size = 'petite') OR (i_category = 'Men' AND i_color IN ('forest', 'ghost') AND i_units IN ('Lb', 'Bundle') AND i_size IN ('medium', 'extra large'))))
+|     stored statistics:
+|       table: rows=18.00K size=1.73MB
+|       columns: all
+|     extrapolated-rows=disabled max-scan-range-rows=18.00K
+|     mem-estimate=16.00MB mem-reservation=128.00KB thread-reservation=0
+|     tuple-ids=1 row-size=91B cardinality=8
+|     in pipelines: 01(GETNEXT)
+|
+00:SCAN HDFS [tpcds_parquet.item i1, RANDOM]
+   HDFS partitions=1/1 files=1 size=1.73MB
+   predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   stored statistics:
+     table: rows=18.00K size=1.73MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=18.00K
+   parquet statistics predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   parquet dictionary predicates: i_manufact_id <= CAST(778 AS INT), i_manufact_id >= CAST(738 AS INT)
+   mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
+   tuple-ids=0 row-size=57B cardinality=1.80K
+   in pipelines: 00(GETNEXT)
+====
