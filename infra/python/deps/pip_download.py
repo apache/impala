@@ -30,13 +30,7 @@ import re
 import sys
 from random import randint
 from time import sleep
-# The path to import is different for libraries in Python 2 & 3 - this try/catch ensures
-# that this code runs in both
-try:
-  # This should be removed when support for Python2 is dropped
-  from urllib import urlopen, FancyURLopener
-except ImportError:
-  from urllib.request import urlopen, FancyURLopener
+import subprocess
 
 NUM_DOWNLOAD_ATTEMPTS = 8
 
@@ -95,7 +89,7 @@ def get_package_info(pkg_name, pkg_version):
   # We parse the page with regex instead of an html parser because that requires
   # downloading an extra package before running this script. Since the HTML is guaranteed
   # to be formatted according to PEP 503, this is acceptable.
-  pkg_info = urlopen(url).read()
+  pkg_info = subprocess.check_output(["wget", "-q", "-O", "-", url])
   regex = r'<a .*?href=\".*?packages/(.*?)#(.*?)=(.*?)\".*?>(.*?)<\/a>'
   for match in re.finditer(regex, pkg_info):
     path = match.group(1)
@@ -122,10 +116,10 @@ def download_package(pkg_name, pkg_version):
       expected_digest):
     print('File with matching digest already exists, skipping {0}'.format(file_name))
     return True
-  downloader = FancyURLopener()
   pkg_url = '{0}/packages/{1}'.format(PYPI_MIRROR, path)
   print('Downloading {0} from {1}'.format(file_name, pkg_url))
-  downloader.retrieve(pkg_url, file_name)
+  if 0 != subprocess.check_call(["wget", pkg_url, "-q", "-O", file_name]):
+    return False
   if check_digest(file_name, hash_algorithm, expected_digest):
     return True
   else:
