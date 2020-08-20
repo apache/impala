@@ -10,6 +10,7 @@ table_name:insertalltypesaggbinary, constraint:restrict_to, table_format:hbase/n
 table_name:hbasealltypeserror, constraint:restrict_to, table_format:hbase/none/none
 table_name:hbasealltypeserrornonulls, constraint:restrict_to, table_format:hbase/none/none
 
+table_name:alltypes_date_partition, constraint:restrict_to, table_format:text/none/none
 table_name:alltypesinsert, constraint:restrict_to, table_format:text/none/none
 table_name:alltypes_promoted, constraint:restrict_to, table_format:orc/def/block
 table_name:alltypes_deleted_rows, constraint:restrict_to, table_format:orc/def/block

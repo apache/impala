@@ -92,6 +92,24 @@ public class BinaryPredicate extends Predicate {
     }
   }
 
+  public static final com.google.common.base.Predicate<BinaryPredicate>
+      IS_RANGE_PREDICATE = new com.google.common.base.Predicate<BinaryPredicate>() {
+        @Override
+        public boolean apply(BinaryPredicate arg) {
+          return arg.getOp() == Operator.LT
+              || arg.getOp() == Operator.LE
+              || arg.getOp() == Operator.GT
+              || arg.getOp() == Operator.GE;
+        }
+      };
+  public static final com.google.common.base.Predicate<BinaryPredicate> IS_EQ_PREDICATE =
+      new com.google.common.base.Predicate<BinaryPredicate>() {
+        @Override
+        public boolean apply(BinaryPredicate arg) {
+          return arg.getOp() == Operator.EQ;
+        }
+      };
+
   public static void initBuiltins(Db db) {
     for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue; // NULL is handled through type promotion.
