@@ -28,7 +28,26 @@ from tests.common.test_dimensions import add_exec_option_dimension
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
 LOG = logging.getLogger(__name__)
 
-class TestKuduOperations(CustomClusterTestSuite, KuduTestSuite):
+
+class CustomKuduTest(CustomClusterTestSuite, KuduTestSuite):
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_custom_cluster_constraints(cls):
+    # Override this method to relax the set of constraints added in
+    # CustomClusterTestSuite.add_custom_cluster_constraints() so that a test vector with
+    # 'file_format' and 'compression_codec' being "kudu" and "none" respectively will not
+    # be skipped.
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('exec_option')['batch_size'] == 0 and
+        v.get_value('exec_option')['disable_codegen'] is False and
+        v.get_value('exec_option')['num_nodes'] == 0)
+
+
+class TestKuduOperations(CustomKuduTest):
 
   @classmethod
   def get_workload(cls):
@@ -95,7 +114,8 @@ class TestKuduOperations(CustomClusterTestSuite, KuduTestSuite):
     except Exception as e:
       assert "Error overflow in Kudu session." in str(e)
 
-class TestKuduClientTimeout(CustomClusterTestSuite, KuduTestSuite):
+
+class TestKuduClientTimeout(CustomKuduTest):
   """Kudu tests that set the Kudu client operation timeout to 1ms and expect
      specific timeout exceptions. While we expect all exercised operations to take at
      least 1ms, it is possible that some may not and thus the test could be flaky. If
@@ -114,7 +134,7 @@ class TestKuduClientTimeout(CustomClusterTestSuite, KuduTestSuite):
     self.run_test_case('QueryTest/kudu-timeouts-impalad', vector)
 
 
-class TestKuduHMSIntegration(CustomClusterTestSuite, KuduTestSuite):
+class TestKuduHMSIntegration(CustomKuduTest):
   # TODO(IMPALA-8614): parameterize the common tests in query_test/test_kudu.py
   # to run with HMS integration enabled. Also avoid restarting Impala to reduce
   # tests time.
