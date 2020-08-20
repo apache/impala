@@ -404,3 +404,125 @@ PLAN-ROOT SINK
 |
 00:EMPTYSET
 ====
+# IMPALA-10064
+# Constant propagation for range predicates on timestamp.
+# Also enables partition pruning.
+select * from functional.alltypes_date_partition
+where date_col = cast(timestamp_col as date)
+and timestamp_col between '2009-01-01' and '2009-02-01';
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   partition predicates: date_col >= DATE '2009-01-01' AND date_col <= DATE '2009-02-01'
+   HDFS partitions=32/55 files=32 size=15.99KB
+   predicates: timestamp_col <= TIMESTAMP '2009-02-01 00:00:00', timestamp_col >= TIMESTAMP '2009-01-01 00:00:00', date_col = CAST(timestamp_col AS DATE)
+   row-size=65B cardinality=30
+====
+# Same as above but using a WITH clause (to emulate views)
+with dp_view as
+(select * from functional.alltypes_date_partition
+where date_col = cast(timestamp_col as date))
+select * from dp_view
+where timestamp_col between '2009-01-01' and '2009-02-01';
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   partition predicates: date_col >= DATE '2009-01-01' AND date_col <= DATE '2009-02-01'
+   HDFS partitions=32/55 files=32 size=15.99KB
+   predicates: functional.alltypes_date_partition.timestamp_col <= TIMESTAMP '2009-02-01 00:00:00', functional.alltypes_date_partition.timestamp_col >= TIMESTAMP '2009-01-01 00:00:00', date_col = CAST(timestamp_col AS DATE)
+   row-size=65B cardinality=30
+====
+# Mix of various predicates some of which are eligible for propagation
+with dp_view as
+(select * from functional.alltypes_date_partition
+where date_col = cast(timestamp_col as date))
+select * from dp_view
+where int_col < 100 and timestamp_col >= '2009-01-01'
+and bigint_col in (5, 10)
+and timestamp_col <= '2009-02-01';
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   partition predicates: date_col >= DATE '2009-01-01' AND date_col <= DATE '2009-02-01'
+   HDFS partitions=32/55 files=32 size=15.99KB
+   predicates: functional.alltypes_date_partition.bigint_col IN (5, 10), functional.alltypes_date_partition.int_col < 100, functional.alltypes_date_partition.timestamp_col <= TIMESTAMP '2009-02-01 00:00:00', functional.alltypes_date_partition.timestamp_col >= TIMESTAMP '2009-01-01 00:00:00', date_col = CAST(timestamp_col AS DATE)
+   row-size=65B cardinality=13
+====
+# Mix of predicates. Propagate equality constant predicates to
+# one set of conjuncts and range predicates to date/timestamp
+select * from functional.alltypes_date_partition
+where date_col = cast(timestamp_col as date)
+and int_col = bigint_col + 1
+and timestamp_col >= '2009-01-01'
+and bigint_col = 100
+and timestamp_col <= '2009-02-01';
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   partition predicates: date_col >= DATE '2009-01-01' AND date_col <= DATE '2009-02-01'
+   HDFS partitions=32/55 files=32 size=15.99KB
+   predicates: bigint_col = 100, int_col = 101, timestamp_col <= TIMESTAMP '2009-02-01 00:00:00', timestamp_col >= TIMESTAMP '2009-01-01 00:00:00', date_col = CAST(timestamp_col AS DATE)
+   row-size=65B cardinality=4
+====
+# Swapped order of <constant> <op> <column>.
+# Should create the same plan with the constant propagated.
+with dp_view as
+(select * from functional.alltypes_date_partition
+where date_col = cast(timestamp_col as date))
+select * from dp_view
+where int_col = bigint_col + 1
+and '2009-01-01' <= timestamp_col
+and bigint_col = 100
+and '2009-02-01' >= timestamp_col
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   partition predicates: date_col >= DATE '2009-01-01' AND date_col <= DATE '2009-02-01'
+   HDFS partitions=32/55 files=32 size=15.99KB
+   predicates: functional.alltypes_date_partition.bigint_col = 100, functional.alltypes_date_partition.int_col = 101, functional.alltypes_date_partition.timestamp_col <= TIMESTAMP '2009-02-01 00:00:00', functional.alltypes_date_partition.timestamp_col >= TIMESTAMP '2009-01-01 00:00:00', date_col = CAST(timestamp_col AS DATE)
+   row-size=65B cardinality=4
+====
+# Constant propagation for equality predicates on timestamp.
+select * from functional.alltypes_date_partition
+where date_col = cast(timestamp_col as date)
+and timestamp_col = '2009-01-01';
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   partition predicates: date_col = DATE '2009-01-01'
+   HDFS partitions=1/55 files=1 size=257B
+   predicates: timestamp_col = TIMESTAMP '2009-01-01 00:00:00'
+   row-size=65B cardinality=1
+====
+# Don't do constant propagation if range predicate is not on
+# timestamp or date column
+select * from functional.alltypes_date_partition
+where bigint_col = cast(int_col as bigint)
+and int_col > 5;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=55/55 files=55 size=27.27KB
+   predicates: int_col > 5, bigint_col = CAST(int_col AS BIGINT)
+   row-size=65B cardinality=50
+====
+# Constant propagation when a timestamp function is used.
+select * from functional.alltypes_date_partition
+where date_col = cast(timestamp_col as date)
+and timestamp_col > from_timestamp('2009-02-01 00:02:00', 'yyyy-mm-dd');
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   partition predicates: date_col > DATE '2009-02-01'
+   HDFS partitions=23/55 files=23 size=11.28KB
+   predicates: timestamp_col > TIMESTAMP '2009-02-01 00:00:00', date_col = CAST(timestamp_col AS DATE)
+   row-size=65B cardinality=21
+====

@@ -2899,3 +2899,37 @@ LIKE PARQUET '/test-warehouse/hudi_parquet/year=2015/month=03/day=16/5f541af5-ca
 STORED AS PARQUET
 LOCATION '/test-warehouse/hudi_parquet';
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+alltypes_date_partition
+---- PARTITION_COLUMNS
+date_col date
+---- COLUMNS
+id int COMMENT 'Add a comment'
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+string_col string
+timestamp_col timestamp
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (date_col)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, string_col, timestamp_col,
+case when id % 2 = 0 then cast(timestamp_col as date)
+else cast(cast(timestamp_col as date) + interval 5 days as date) end date_col
+FROM {db_name}{db_suffix}.alltypes where id < 500;
+---- LOAD
+SET hive.exec.dynamic.partition.mode=nonstrict;
+SET hive.exec.dynamic.partition=true;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (date_col)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, string_col, timestamp_col,
+case when id % 2 = 0 then cast(timestamp_col as date)
+else cast(cast(timestamp_col as date) + interval 5 days as date) end date_col
+FROM {db_name}{db_suffix}.alltypes where id < 500;
+====

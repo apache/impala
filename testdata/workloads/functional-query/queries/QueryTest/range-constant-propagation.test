@@ -1,0 +1,25 @@
+====
+---- QUERY
+# Constant propagation for range predicates on timestamp.
+select count(*), sum(int_col) from alltypes_date_partition
+where date_col = cast(timestamp_col as date)
+and timestamp_col between '2009-01-01' and '2009-02-01';
+---- RESULTS
+156,620
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+# Mix of various predicates some of which are eligible for propagation
+with dp_view as
+(select * from alltypes_date_partition
+where date_col = cast(timestamp_col as date))
+select count(*), sum(int_col) from dp_view
+where int_col < 100 and timestamp_col >= '2009-01-01'
+and bigint_col in (20, 40)
+and timestamp_col <= '2009-02-01';
+---- RESULTS
+62,186
+---- TYPES
+BIGINT, BIGINT
+====

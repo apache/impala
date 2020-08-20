@@ -1183,36 +1183,28 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Propagates constant expressions of the form <slot ref> = <constant> to
+   * Propagates constant expressions of the form <slot ref> = <constant> or,
+   * for certain data types, <slot ref> range_operator <constant> to
    * other uses of slot ref in the given conjuncts; returns a BitSet with
    * bits set to true in all changed indices.  Only one round of substitution
    * is performed.  The candidates BitSet is used to determine which members of
-   * conjuncts are considered for propagation.
+   * conjuncts are considered for propagation. The keepConjuncts list is
+   * populated in specific cases (e.g for date/time range predicate propagation)
+   * with the original conjuncts that need to be preserved even after rewrite.
    */
   private static BitSet propagateConstants(List<Expr> conjuncts, BitSet candidates,
-      Analyzer analyzer) {
+      List<Expr> keepConjuncts, Analyzer analyzer) {
     Preconditions.checkState(conjuncts.size() <= candidates.size());
+
+    // first pass: gather the constant predicates into separate buckets
+    // for range and equality predicates
+    ConstantPredicateHandler handler = new ConstantPredicateHandler();
+    handler.classifyPredicates(conjuncts, candidates);
+
+    // second pass: propagate constants to the other predicates and keep track
+    // of which other predicates have been changed
     BitSet changed = new BitSet(conjuncts.size());
-    for (int i = candidates.nextSetBit(0); i >= 0; i = candidates.nextSetBit(i+1)) {
-      if (!(conjuncts.get(i) instanceof BinaryPredicate)) continue;
-      BinaryPredicate bp = (BinaryPredicate) conjuncts.get(i);
-      if (bp.getOp() != BinaryPredicate.Operator.EQ) continue;
-      SlotRef slotRef = bp.getBoundSlot();
-      if (slotRef == null || !bp.getChild(1).isConstant()) continue;
-      Expr subst = bp.getSlotBinding(slotRef.getSlotId());
-      ExprSubstitutionMap smap = new ExprSubstitutionMap();
-      smap.put(slotRef, subst);
-      for (int j = 0; j < conjuncts.size(); ++j) {
-        // Don't rewrite with our own substitution!
-        if (j == i) continue;
-        Expr toRewrite = conjuncts.get(j);
-        Expr rewritten = toRewrite.substitute(smap, analyzer, true);
-        if (!rewritten.equals(toRewrite)) {
-          conjuncts.set(j, rewritten);
-          changed.set(j, true);
-        }
-      }
-    }
+    handler.propagateConstantPreds(conjuncts, changed, keepConjuncts, analyzer);
     return changed;
   }
 
@@ -1226,6 +1218,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public static boolean optimizeConjuncts(List<Expr> conjuncts, Analyzer analyzer) {
     Preconditions.checkNotNull(conjuncts);
     List<Expr> tmpConjuncts = new ArrayList<>();
+    List<Expr> keepConjuncts = new ArrayList<>();
     try {
       BitSet candidates = new BitSet(conjuncts.size());
       candidates.set(0, Math.min(conjuncts.size(), CONST_PROPAGATION_EXPR_LIMIT));
@@ -1238,7 +1231,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         // change the content of the first input param. We do not want to
         // change the expr in conjucts before make sure the constant propagation
         // does not cause analysis failures.
-        BitSet changed = propagateConstants(tmpConjuncts, candidates, analyzer);
+        BitSet changed = propagateConstants(tmpConjuncts, candidates, keepConjuncts,
+            analyzer);
         candidates.clear();
         int pruned = 0;
         for (int i = changed.nextSetBit(0); i >= 0; i = changed.nextSetBit(i+1)) {
@@ -1278,6 +1272,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       LOG.warn("Not able to analyze after rewrite: " + e.toString() + " conjuncts: " +
           Expr.debugString(conjuncts));
     }
+    // add the conjuncts that need to be preserved
+    conjuncts.addAll(keepConjuncts);
     Expr.removeDuplicates(conjuncts);
     return true;
   }

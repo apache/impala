@@ -213,6 +213,9 @@ class TestQueriesTextTables(ImpalaTestSuite):
   def test_data_source_tables(self, vector):
     self.run_test_case('QueryTest/data-source-tables', vector)
 
+  def test_range_constant_propagation(self, vector):
+    self.run_test_case('QueryTest/range-constant-propagation', vector)
+
   def test_distinct_estimate(self, vector):
     # These results will vary slightly depending on how the values get split up
     # so only run with 1 node and on text.

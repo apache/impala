@@ -538,12 +538,10 @@ public class HdfsScanNode extends ScanNode {
     if (!constExpr.isConstant()) return;
     if (Expr.IS_NULL_VALUE.apply(constExpr)) return;
 
-    BinaryPredicate.Operator op = binaryPred.getOp();
-    if (op == BinaryPredicate.Operator.LT || op == BinaryPredicate.Operator.LE ||
-        op == BinaryPredicate.Operator.GE || op == BinaryPredicate.Operator.GT) {
+    if (BinaryPredicate.IS_RANGE_PREDICATE.apply(binaryPred)) {
       addMinMaxOriginalConjunct(slotRef.getDesc().getParent(), binaryPred);
-      buildStatsPredicate(analyzer, slotRef, binaryPred, op);
-    } else if (op == BinaryPredicate.Operator.EQ) {
+      buildStatsPredicate(analyzer, slotRef, binaryPred, binaryPred.getOp());
+    } else if (BinaryPredicate.IS_EQ_PREDICATE.apply(binaryPred)) {
       addMinMaxOriginalConjunct(slotRef.getDesc().getParent(), binaryPred);
       // TODO: this could be optimized for boolean columns.
       buildStatsPredicate(analyzer, slotRef, binaryPred, BinaryPredicate.Operator.LE);
