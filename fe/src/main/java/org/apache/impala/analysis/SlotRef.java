@@ -73,7 +73,7 @@ public class SlotRef extends Expr {
     evalCost_ = SLOT_REF_COST;
     String alias = desc.getParent().getAlias();
     label_ = (alias != null ? alias + "." : "") + desc.getLabel();
-    numDistinctValues_ = desc.getStats().getNumDistinctValues();
+    numDistinctValues_ = adjustNumDistinctValues();
     analysisDone();
   }
 
@@ -86,6 +86,26 @@ public class SlotRef extends Expr {
     label_ = other.label_;
     desc_ = other.desc_;
     type_ = other.type_;
+  }
+
+  /**
+   * Applies an adjustment to an ndv of zero with nulls. NULLs aren't accounted for in the
+   * ndv during stats computation. When computing cardinality in the cases where ndv is
+   * zero and the slot is nullable we set the ndv to one to prevent the cardinalities from
+   * zeroing out and leading to bad plans. Addressing IMPALA-7310 would include an extra
+   * ndv for whenever nulls are present in general, not just in the case of a zero ndv.
+   */
+  private long adjustNumDistinctValues() {
+    Preconditions.checkNotNull(desc_);
+    Preconditions.checkNotNull(desc_.getStats());
+
+    long numDistinctValues = desc_.getStats().getNumDistinctValues();
+    // Adjust an ndv of zero to 1 if stats indicate there are null values.
+    if (numDistinctValues == 0 && desc_.getIsNullable() &&
+        (desc_.getStats().hasNulls() || !desc_.getStats().hasNullsStats())) {
+      numDistinctValues = 1;
+    }
+    return numDistinctValues;
   }
 
   @Override
@@ -114,7 +134,7 @@ public class SlotRef extends Expr {
       throw new UnsupportedFeatureException("Unsupported type in '" + toSql() + "'.");
     }
 
-    numDistinctValues_ = desc_.getStats().getNumDistinctValues();
+    numDistinctValues_ = adjustNumDistinctValues();
     FeTable rootTable = resolvedPath.getRootTable();
     if (rootTable != null && rootTable.getNumRows() > 0) {
       // The NDV cannot exceed the #rows in the table.

@@ -208,8 +208,7 @@ public class ExprCardinalityTest {
 
     // Stats, with null values
     verifySelectCol("nullrows", "id", 26, 0);
-    // Bug: NDV should be 1 to include nulls
-    verifySelectCol("nullrows", "null_str", 0, 26);
+    verifySelectCol("nullrows", "null_str", 1, 26);
     verifySelectCol("nullrows", "group_str", 6, 0);
     verifySelectCol("nullrows", "some_nulls", 6, 20);
     // Oddly, boolean columns DO include nulls in NDV.
@@ -262,10 +261,9 @@ public class ExprCardinalityTest {
     verifySelectExpr("alltypes", "int_col = 10", 3, 1.0/10);
 
     verifySelectExpr("nullrows", "id = 'foo'", 3, 1.0/26);
-    // Bug: All nulls, so NDV should = 1, so Sel should be 1.0/1
-    //verifySelectExpr("nullrows", "c = 'foo'", 3, 1.0/1);
-    verifySelectExpr("nullrows", "null_str = 'foo'", 3, -1);
+    verifySelectExpr("nullrows", "null_str = 'foo'", 3, 1.0/1);
     verifySelectExpr("nullrows", "group_str = 'foo'", 3, 1.0/6);
+    // Bug: nulls should count to NDV
     //verifySelectExpr("nullrows", "some_nulls = 'foo'", 3, 1.0/7);
     verifySelectExpr("nullrows", "some_nulls = 'foo'", 3, 1.0/6);
 
@@ -297,9 +295,8 @@ public class ExprCardinalityTest {
     //verifySelectExpr("nullrows", "id is not distinct from null", 2, 0);
     verifySelectExpr("nullrows", "id is not distinct from null", 3, 1.0/26);
     // Bug: All nulls, so NDV should = 1, so Sel should be 1.0/1
-    //verifySelectExpr("nullrows", "null_str is not distinct from 'foo'", 2, 1.0/1);
-    verifySelectExpr("nullrows", "null_str is not distinct from 'foo'", 3, -1);
-    verifySelectExpr("nullrows", "null_str is not distinct from null", 3, -1);
+    verifySelectExpr("nullrows", "null_str is not distinct from 'foo'", 3, 1.0/1);
+    verifySelectExpr("nullrows", "null_str is not distinct from null", 3, 1.0/1);
     verifySelectExpr("nullrows", "group_str is not distinct from 'foo'", 3, 1.0/6);
     //verifySelectExpr("nullrows", "group_str is not distinct from null", 2, 1);
     verifySelectExpr("nullrows", "group_str is not distinct from null", 3, 1.0/6);
@@ -472,9 +469,7 @@ public class ExprCardinalityTest {
         "int_col in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)", 3, 1);
 
     verifySelectExpr("nullrows", "id in ('a', 'b', 'c')", 3, 3.0/26);
-    // Bug: Why -1?
-    //verifySelectExpr("nullrows", "null_str in ('a', 'b', 'c')", 3, 1);
-    verifySelectExpr("nullrows", "null_str in ('a', 'b', 'c')", 3, -1);
+    verifySelectExpr("nullrows", "null_str in ('a', 'b', 'c')", 3, 1);
     verifySelectExpr("nullrows", "group_str in ('a', 'b', 'c')", 3, 3.0/6);
     //verifySelectExpr("nullrows", "some_nulls in ('a', 'b', 'c')", 3, 3.0/7);
     verifySelectExpr("nullrows", "some_nulls in ('a', 'b', 'c')", 3, 3.0/6);
@@ -501,10 +496,9 @@ public class ExprCardinalityTest {
         "int_col not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)", 3, 0);
 
     verifySelectExpr("nullrows", "id not in ('a', 'b', 'c')", 3, 1 - 3.0/26);
-    // Bug: Why -1?
-    //verifySelectExpr("nullrows", "null_str not in ('a', 'b', 'c')", 3, 1);
-    verifySelectExpr("nullrows", "null_str not in ('a', 'b', 'c')", 3, -1);
+    verifySelectExpr("nullrows", "null_str not in ('a', 'b', 'c')", 3, 0);
     verifySelectExpr("nullrows", "group_str not in ('a', 'b', 'c')", 3, 1 - 3.0/6);
+    // Bug: NULL should count as ndv
     //verifySelectExpr("nullrows", "some_nulls not in ('a', 'b', 'c')", 3, 1 - 3.0/7);
     verifySelectExpr("nullrows", "some_nulls not in ('a', 'b', 'c')", 3, 1 - 3.0/6);
 

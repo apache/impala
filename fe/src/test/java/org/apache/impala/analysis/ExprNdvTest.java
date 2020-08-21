@@ -173,24 +173,20 @@ public class ExprNdvTest extends FrontendTestBase {
   @Test
   public void testNulls() throws ImpalaException {
     // A table with nulls for which stats have been computed
-    // NDV(a) = 26
+    // NDV(id) = 26
     verifyNdvStmt("SELECT id FROM functional.nullrows", 26);
-    // NDV(f) = 6
+    // NDV(some_nulls) = 6
     verifyNdvStmt("SELECT some_nulls FROM functional.nullrows", 6);
-    // NDV(c) = 0 (all nulls), but add 1 for nulls
+    // NDV(null_str) = 0 (all nulls), but add 1 for nulls
+    verifyNdvStmt("SELECT null_str FROM functional.nullrows", 1);
+    // NDV(blanks) = 1, add 1 for nulls
     // Bug: See IMPALA-7310, IMPALA-8094
-    //verifyNdvStmt("SELECT null_str FROM functional.nullrows", 1);
-    verifyNdvStmt("SELECT null_str FROM functional.nullrows", 0);
-    // NDV(b) = 1, add 1 for nulls
-    // Bug: Same as above
     //verifyNdvStmt("SELECT blanks FROM functional.nullrows", 2);
     verifyNdvStmt("SELECT blank FROM functional.nullrows", 1);
 
     // Same schema, one row
     verifyNdvStmt("SELECT a FROM functional.nulltable", 1);
-    // Bug: Same as above
-    //verifyNdvStmt("SELECT c FROM functional.nulltable", 1);
-    verifyNdvStmt("SELECT c FROM functional.nulltable", 0);
+    verifyNdvStmt("SELECT c FROM functional.nulltable", 1);
 
     // 11K rows, no stats
     // Bug: Should come up with some estimate from size
