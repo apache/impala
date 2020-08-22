@@ -232,24 +232,37 @@ public class StmtRewriter {
         case EXCEPT:
         case INTERSECT:
           if (eiSelect == null) {
-            // For a new SelectStmt the left most tableref will either by the first
+            // For a new SelectStmt the left most tableref will either be the first
             // operand or a the SelectStmt from the union operands.
             InlineViewRef leftMostView = null;
             SelectList sl =
                 new SelectList(Lists.newArrayList(SelectListItem.createStarItem(null)));
             // Intersect/Except have set semantics in SQL they must not return duplicates
-            // As an optimization if the leftmost operand is already distinct we remove
-            // the distinct here.
+            // As an optimization we push this distinct down into the first operand if
+            // it's not a UNION and has no other aggregations.
             // This would be best done in a cost based manner during planning.
             sl.setIsDistinct(true);
             eiSelect = new SelectStmt(sl, null, null, null, null, null, null);
 
             if (i == 1) {
               if (firstOperand.getQueryStmt() instanceof SelectStmt) {
-                // optimize out the distinct aggregation in the outer query
-                if (((SelectStmt) firstOperand.getQueryStmt()).getSelectList()
-                    .isDistinct()) {
+                // push down the distinct aggregation if the first operand isn't a UNION
+                // there are no window functions, and we determine the results exprs
+                // already produce distinct results.
+                SelectStmt firstOpStmt = (SelectStmt) firstOperand.getQueryStmt();
+                // DISTINCT is already set
+                if (firstOpStmt.getSelectList().isDistinct()) {
                   sl.setIsDistinct(false);
+                } else {
+                  // Must not have window functions
+                  if (firstOpStmt.getTableRefs().size() > 0
+                      && !firstOpStmt.hasAnalyticInfo()) {
+                    // Add distinct if there isn't any other grouping
+                    if (!firstOpStmt.hasMultiAggInfo()) {
+                      firstOpStmt.getSelectList().setIsDistinct(true);
+                    }
+                    sl.setIsDistinct(false);
+                  }
                 }
               }
               leftMostView = new InlineViewRef(tableAliasGenerator.getNextAlias(),
