@@ -556,7 +556,7 @@ PLAN-ROOT SINK
 |  03:EMPTYSET
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.01MB
+   HDFS partitions=1/1 files=4 size=289.06MB
    predicates: c_custkey < 10
    row-size=56B cardinality=15.00K
 ====
@@ -598,7 +598,7 @@ PLAN-ROOT SINK
 |     row-size=8B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.01MB
+   HDFS partitions=1/1 files=4 size=289.06MB
    predicates: c_custkey = 1
    row-size=44B cardinality=1
 ====
@@ -643,20 +643,20 @@ select int_col from functional.alltypes where "abc" = "cde"
 ---- PLAN
 PLAN-ROOT SINK
 |
-03:AGGREGATE [FINALIZE]
-|  group by: int_col
-|  row-size=4B cardinality=0
-|
-02:HASH JOIN [LEFT SEMI JOIN]
+03:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: int_col IS NOT DISTINCT FROM int_col
 |  runtime filters: RF000 <- int_col
 |  row-size=4B cardinality=0
 |
-|--01:EMPTYSET
+|--02:EMPTYSET
+|
+01:AGGREGATE [FINALIZE]
+|  group by: int_col
+|  row-size=4B cardinality=10
 |
 00:SCAN HDFS [functional.alltypessmall]
    HDFS partitions=4/4 files=4 size=6.32KB
-   runtime filters: RF000 -> int_col
+   runtime filters: RF000 -> functional.alltypessmall.int_col
    row-size=4B cardinality=100
 ====
 # Improve this so limit 0 removes the entire branch
@@ -668,27 +668,27 @@ select id from functional.alltypestiny where int_col > 0
 ---- PLAN
 PLAN-ROOT SINK
 |
-05:AGGREGATE [FINALIZE]
-|  group by: id
-|  row-size=4B cardinality=0
-|
-04:HASH JOIN [RIGHT ANTI JOIN]
+05:HASH JOIN [RIGHT ANTI JOIN]
 |  hash predicates: id IS NOT DISTINCT FROM id
 |  row-size=4B cardinality=0
 |
-|--03:HASH JOIN [LEFT SEMI JOIN]
+|--04:HASH JOIN [LEFT SEMI JOIN]
 |  |  hash predicates: id IS NOT DISTINCT FROM id
 |  |  runtime filters: RF000 <- id
 |  |  row-size=4B cardinality=0
 |  |
-|  |--01:EMPTYSET
+|  |--02:EMPTYSET
+|  |
+|  01:AGGREGATE [FINALIZE]
+|  |  group by: id
+|  |  row-size=4B cardinality=99
 |  |
 |  00:SCAN HDFS [functional.alltypessmall]
 |     HDFS partitions=4/4 files=4 size=6.32KB
-|     runtime filters: RF000 -> id
+|     runtime filters: RF000 -> functional.alltypessmall.id
 |     row-size=4B cardinality=100
 |
-02:SCAN HDFS [functional.alltypestiny]
+03:SCAN HDFS [functional.alltypestiny]
    HDFS partitions=4/4 files=4 size=460B
    predicates: int_col > 0
    row-size=8B cardinality=1
