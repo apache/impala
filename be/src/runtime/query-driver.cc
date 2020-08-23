@@ -127,10 +127,13 @@ void QueryDriver::TryQueryRetry(
 
     // Triggering a retry from the INITIALIZED phase is possible: the
     // cancellation thread pool can kill a query while it is in the INITIALIZATION phase.
+    // Triggering a retry from the FINISHED phase is also possible: the retryable failure
+    // happens after rows are available and before the client fetches any rows.
     ClientRequestState::ExecState exec_state = client_request_state_->exec_state();
     DCHECK(exec_state == ClientRequestState::ExecState::INITIALIZED
         || exec_state == ClientRequestState::ExecState::PENDING
-        || exec_state == ClientRequestState::ExecState::RUNNING)
+        || exec_state == ClientRequestState::ExecState::RUNNING
+        || exec_state == ClientRequestState::ExecState::FINISHED)
         << Substitute(
             "Illegal state: $0", ClientRequestState::ExecStateToString(exec_state));
 
