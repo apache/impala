@@ -496,6 +496,27 @@ class TestQueryRetries(CustomClusterTestSuite):
         assert "Cancelled" in str(e)
 
   @pytest.mark.execute_serially
+  def test_retry_finished_query(self):
+    """Test that queries in FINISHED state can still be retried before the client fetch
+    any rows. Sets batch_size to 1 so results will be available as soon as possible.
+    The query state becomes FINISHED when results are available."""
+    query = "select * from functional.alltypes where bool_col = sleep(50)"
+    handle = self.execute_query_async(query,
+        query_options={'retry_failed_queries': 'true', 'batch_size': '1'})
+    self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
+
+    self.__kill_random_impalad()
+    time.sleep(5)
+
+    self.client.fetch(query, handle)
+
+    # Verifies the query is retried.
+    retried_query_id = self.__get_retried_query_id_from_summary(handle)
+    assert retried_query_id is not None
+
+    self.client.close_query(handle)
+
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       statestored_args="-statestore_heartbeat_frequency_ms=60000")
   def test_retry_query_cancel(self):
