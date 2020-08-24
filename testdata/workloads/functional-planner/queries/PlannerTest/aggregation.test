@@ -1612,3 +1612,63 @@ PLAN-ROOT SINK
    partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
 ====
+# IMPALA-10096: use the original ordinal if the group by ordinal reference is a
+# constant int
+select 13, id, count(1) from functional.dimtbl group by 1, 2
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: 13, id
+|  row-size=17B cardinality=10
+|
+00:SCAN HDFS [functional.dimtbl]
+   HDFS partitions=1/1 files=1 size=171B
+   row-size=8B cardinality=10
+====
+# IMPALA-10096: use the original ordinal if the group by ordinal reference is a
+# constant int
+select -1, id, count(1) from functional.dimtbl group by 1, 2
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: -1, id
+|  row-size=17B cardinality=10
+|
+00:SCAN HDFS [functional.dimtbl]
+   HDFS partitions=1/1 files=1 size=171B
+   row-size=8B cardinality=10
+====
+# IMPALA-10096: use the original ordinal if the group by ordinal reference is a
+# constant int
+select 2, id, count(1) from functional.dimtbl group by 1, 2
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: 2, id
+|  row-size=17B cardinality=10
+|
+00:SCAN HDFS [functional.dimtbl]
+   HDFS partitions=1/1 files=1 size=171B
+   row-size=8B cardinality=10
+====
+# IMPALA-10096: use the original ordinal if the group by ordinal reference is a
+# constant int
+select 2 + 1, id, count(1) from functional.dimtbl group by 1, 2
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: 2 + 1, id
+|  row-size=18B cardinality=10
+|
+00:SCAN HDFS [functional.dimtbl]
+   HDFS partitions=1/1 files=1 size=171B
+   row-size=8B cardinality=10
+====

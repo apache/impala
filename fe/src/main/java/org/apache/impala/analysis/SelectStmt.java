@@ -756,7 +756,17 @@ public class SelectStmt extends QueryStmt {
         }
       }
       // initialize groupingExprs_ with the analyzed version
-      groupingExprs_ = groupingExprsCopy_;
+      // use the original ordinal if the analyzed expr is a INT literal
+      List<Expr> groupingExprs = new ArrayList<>();
+      for (int i = 0; i < groupingExprsCopy_.size(); ++i) {
+        Expr expr = groupingExprsCopy_.get(i);
+        if (expr instanceof NumericLiteral && Expr.IS_INT_LITERAL.apply(expr)) {
+          groupingExprs.add(groupingExprs_.get(i).clone());
+        } else {
+          groupingExprs.add(expr);
+        }
+      }
+      groupingExprs_ = groupingExprs;
 
       if (groupByClause_ != null && groupByClause_.hasGroupingSets()) {
         groupByClause_.analyzeGroupingSets(groupingExprsCopy_);
