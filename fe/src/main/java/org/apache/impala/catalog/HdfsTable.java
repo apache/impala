@@ -1471,8 +1471,7 @@ public class HdfsTable extends Table implements FeFsTable {
       // from HMS and if they don't match we assume that the partition has been updated
       // in HMS. This would catch the cases where partition fields, locations or
       // file-format are changed from external systems.
-      StorageDescriptor sd = hdfsPartition.getStorageDescriptor();
-      if(!msPartition.getSd().equals(sd)) {
+      if(!hdfsPartition.compareSd(msPartition.getSd())) {
         // if the updatePartitionBuilder is null, it means that this partition update
         // was not from an in-progress modification in this catalog, but rather from
         // and outside update to the partition.
