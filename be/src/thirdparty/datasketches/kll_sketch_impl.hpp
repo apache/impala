@@ -312,9 +312,9 @@ std::vector<T, A> kll_sketch<T, C, S, A>::get_quantiles(size_t num) const {
 template<typename T, typename C, typename S, typename A>
 double kll_sketch<T, C, S, A>::get_rank(const T& value) const {
   if (is_empty()) return std::numeric_limits<double>::quiet_NaN();
-  uint8_t level(0);
-  uint64_t weight(1);
-  uint64_t total(0);
+  uint8_t level = 0;
+  uint64_t weight = 1;
+  uint64_t total = 0;
   while (level < num_levels_) {
     const auto from_index(levels_[level]);
     const auto to_index(levels_[level + 1]); // exclusive
@@ -391,7 +391,7 @@ void kll_sketch<T, C, S, A>::serialize(std::ostream& os) const {
   os.write(reinterpret_cast<const char*>(&flags_byte), sizeof(flags_byte));
   os.write((char*)&k_, sizeof(k_));
   os.write((char*)&m_, sizeof(m_));
-  const uint8_t unused(0);
+  const uint8_t unused = 0;
   os.write(reinterpret_cast<const char*>(&unused), sizeof(unused));
   if (is_empty()) return;
   if (!is_single_item) {
@@ -412,7 +412,7 @@ vector_u8<A> kll_sketch<T, C, S, A>::serialize(unsigned header_size_bytes) const
   const size_t size = header_size_bytes + get_serialized_size_bytes();
   vector_u8<A> bytes(size);
   uint8_t* ptr = bytes.data() + header_size_bytes;
-  uint8_t* end_ptr = ptr + size;
+  const uint8_t* end_ptr = ptr + size;
   const uint8_t preamble_ints(is_empty() || is_single_item ? PREAMBLE_INTS_SHORT : PREAMBLE_INTS_FULL);
   ptr += copy_to_mem(&preamble_ints, ptr, sizeof(preamble_ints));
   const uint8_t serial_version(is_single_item ? SERIAL_VERSION_2 : SERIAL_VERSION_1);
@@ -427,7 +427,7 @@ vector_u8<A> kll_sketch<T, C, S, A>::serialize(unsigned header_size_bytes) const
   ptr += copy_to_mem(&flags_byte, ptr, sizeof(flags_byte));
   ptr += copy_to_mem(&k_, ptr, sizeof(k_));
   ptr += copy_to_mem(&m_, ptr, sizeof(m_));
-  const uint8_t unused(0);
+  const uint8_t unused = 0;
   ptr += copy_to_mem(&unused, ptr, sizeof(unused));
   if (!is_empty()) {
     if (!is_single_item) {
@@ -776,8 +776,8 @@ vector_d<A> kll_sketch<T, C, S, A>::get_PMF_or_CDF(const T* split_points, uint32
   if (is_empty()) return vector_d<A>();
   kll_helper::validate_values<T, C>(split_points, size);
   vector_d<A> buckets(size + 1, 0);
-  uint8_t level(0);
-  uint64_t weight(1);
+  uint8_t level = 0;
+  uint64_t weight = 1;
   while (level < num_levels_) {
     const auto from_index = levels_[level];
     const auto to_index = levels_[level + 1]; // exclusive
@@ -871,8 +871,9 @@ void kll_sketch<T, C, S, A>::merge_higher_levels(O&& other, uint64_t final_n) {
   const uint32_t free_space_at_bottom = result.final_capacity - result.final_num_items;
   kll_helper::move_construct<T>(workbuf.get(), outlevels[0], outlevels[0] + result.final_num_items, items_, free_space_at_bottom, true);
 
-  if (levels_.size() < (result.final_num_levels + 1)) {
-    levels_.resize(result.final_num_levels + 1);
+  const size_t new_levels_size = result.final_num_levels + 1;
+  if (levels_.size() < new_levels_size) {
+    levels_.resize(new_levels_size);
   }
   const uint32_t offset = free_space_at_bottom - outlevels[0];
   for (uint8_t lvl = 0; lvl < levels_.size(); lvl++) { // includes the "extra" index
@@ -1027,7 +1028,7 @@ string<A> kll_sketch<T, C, S, A>::to_string(bool print_levels, bool print_items)
 
   if (print_items) {
     os << "### KLL sketch data:" << std::endl;
-    uint8_t level(0);
+    uint8_t level = 0;
     while (level < num_levels_) {
       const uint32_t from_index = levels_[level];
       const uint32_t to_index = levels_[level + 1]; // exclusive

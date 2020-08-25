@@ -26,31 +26,38 @@ namespace datasketches {
 
 template <typename T, typename C, typename A>
 class kll_quantile_calculator {
-  typedef typename std::allocator_traits<A>::template rebind_alloc<uint32_t> AllocU32;
-  typedef typename std::allocator_traits<A>::template rebind_alloc<uint64_t> AllocU64;
   public:
     // assumes that all levels are sorted including level 0
     kll_quantile_calculator(const T* items, const uint32_t* levels, uint8_t num_levels, uint64_t n);
-    ~kll_quantile_calculator();
     T get_quantile(double fraction) const;
 
   private:
+    using AllocU32 = typename std::allocator_traits<A>::template rebind_alloc<uint32_t>;
+    using vector_u32 = std::vector<uint32_t, AllocU32>;
+    using Entry = std::pair<T, uint64_t>;
+    using AllocEntry = typename std::allocator_traits<A>::template rebind_alloc<Entry>;
+    using Container = std::vector<Entry, AllocEntry>;
     uint64_t n_;
-    T* items_;
-    uint64_t* weights_;
-    uint32_t* levels_;
-    uint8_t levels_size_;
-    uint8_t num_levels_;
+    vector_u32 levels_;
+    Container entries_;
 
-    void populate_from_sketch(const T* items, uint32_t num_items, const uint32_t* levels, uint8_t num_levels);
+    void populate_from_sketch(const T* items, const uint32_t* levels, uint8_t num_levels);
     T approximately_answer_positional_query(uint64_t pos) const;
-    static void convert_to_preceding_cummulative(uint64_t* weights, uint32_t weights_size);
+    void convert_to_preceding_cummulative();
+    uint32_t chunk_containing_pos(uint64_t pos) const;
+    uint32_t search_for_chunk_containing_pos(uint64_t pos, uint32_t l, uint32_t r) const;
+    static void merge_sorted_blocks(Container& entries, const uint32_t* levels, uint8_t num_levels, uint32_t num_items);
+    static void merge_sorted_blocks_direct(Container& orig, Container& temp, const uint32_t* levels, uint8_t starting_level, uint8_t num_levels);
+    static void merge_sorted_blocks_reversed(Container& orig, Container& temp, const uint32_t* levels, uint8_t starting_level, uint8_t num_levels);
     static uint64_t pos_of_phi(double phi, uint64_t n);
-    static uint32_t chunk_containing_pos(uint64_t* weights, uint32_t weights_size, uint64_t pos);
-    static uint32_t search_for_chunk_containing_pos(const uint64_t* arr, uint64_t pos, uint32_t l, uint32_t r);
-    static void blocky_tandem_merge_sort(T* items, uint64_t* weights, uint32_t num_items, const uint32_t* levels, uint8_t num_levels);
-    static void blocky_tandem_merge_sort_recursion(T* items_src, uint64_t* weights_src, T* items_dst, uint64_t* weights_dst, const uint32_t* levels, uint8_t starting_level, uint8_t num_levels);
-    static void tandem_merge(const T* items_src, const uint64_t* weights_src, T* items_dst, uint64_t* weights_dst, const uint32_t* levels, uint8_t starting_level_1, uint8_t num_levels_1, uint8_t starting_level_2, uint8_t num_levels_2);
+
+    template<typename Comparator>
+    struct compare_pair_by_first {
+      template<typename Entry1, typename Entry2>
+      bool operator()(Entry1&& a, Entry2&& b) const {
+        return Comparator()(std::forward<Entry1>(a).first, std::forward<Entry2>(b).first);
+      }
+    };
 };
 
 } /* namespace datasketches */
