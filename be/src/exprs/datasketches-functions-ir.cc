@@ -104,8 +104,9 @@ StringVal DataSketchesFunctions::DsKllQuantilesAsString(FunctionContext* ctx,
   }
 }
 
-StringVal DataSketchesFunctions::DsKllPMFAsString(FunctionContext* ctx,
-    const StringVal& serialized_sketch, int num_args, const FloatVal* args) {
+StringVal DataSketchesFunctions::GetDsKllPMFOrCDF(FunctionContext* ctx,
+    const StringVal& serialized_sketch, int num_args, const FloatVal* args,
+    PMFCDF mode) {
   DCHECK(num_args > 0);
   if (args == nullptr || args->is_null) return StringVal::null();
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return StringVal::null();
@@ -115,17 +116,28 @@ StringVal DataSketchesFunctions::DsKllPMFAsString(FunctionContext* ctx,
     LogSketchDeserializationError(ctx);
     return StringVal::null();
   }
-  float pmf_input[(unsigned int)num_args];
-  for (int i = 0; i < num_args; ++i) pmf_input[i] = args[i].val;
+  float input_ranges[(unsigned int)num_args];
+  for (int i = 0; i < num_args; ++i) input_ranges[i] = args[i].val;
   try {
-    std::vector<double> results = sketch.get_PMF(pmf_input, num_args);
+    std::vector<double> results = (mode == PMF) ?
+        sketch.get_PMF(input_ranges, num_args) : sketch.get_CDF(input_ranges, num_args);
     return DsKllVectorResultToStringVal(ctx, results);
   } catch(const std::exception& e) {
-    ctx->SetError(Substitute("Error while running PMF from DataSketches KLL. "
+    ctx->SetError(Substitute("Error while running DataSketches KLL function. "
         "Message: $0", e.what()).c_str());
     return StringVal::null();
   }
   return StringVal::null();
+}
+
+StringVal DataSketchesFunctions::DsKllPMFAsString(FunctionContext* ctx,
+    const StringVal& serialized_sketch, int num_args, const FloatVal* args) {
+  return GetDsKllPMFOrCDF(ctx, serialized_sketch, num_args, args, PMF);
+}
+
+StringVal DataSketchesFunctions::DsKllCDFAsString(FunctionContext* ctx,
+    const StringVal& serialized_sketch, int num_args, const FloatVal* args) {
+  return GetDsKllPMFOrCDF(ctx, serialized_sketch, num_args, args, CDF);
 }
 
 }

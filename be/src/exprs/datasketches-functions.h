@@ -76,6 +76,32 @@ public:
   /// that we have to wait for the complex type support. Tracking Jira is IMPALA-9520.
   static StringVal DsKllPMFAsString(FunctionContext* ctx,
       const StringVal& serialized_sketch, int num_args, const FloatVal* args);
+
+
+  /// 'serialized_sketch' is expected as a serialized Apache DataSketches KLL sketch. If
+  /// it is not, then the query fails.
+  /// 'args' holds one or more numbers that will be used as ranges to divide the input
+  /// of the sketch. E.g. [1.0, 3.5, 10.1] will create the following ranges:
+  ///     (-inf, 1.0), (-inf, 3.5), (-inf, 10.1), (-inf, +inf)
+  /// This function returns a comma separated string that contains the probability of
+  /// having an item in each of the received ranges. E.g. a return value of 0.2 means
+  /// that approximately 20% of the items are in that given range.
+  /// Note, this function is meant to return an Array of doubles as the result but with
+  /// that we have to wait for the complex type support. Tracking Jira is IMPALA-9520.
+  static StringVal DsKllCDFAsString(FunctionContext* ctx,
+      const StringVal& serialized_sketch, int num_args, const FloatVal* args);
+
+private:
+  enum PMFCDF {
+    PMF,
+    CDF
+  };
+
+  /// Helper functions for DsKllPMFAsString() and DsKllCDFAsString(). 'mode' indicates
+  /// whether get_PMF() or get_CDF() should be invoked on the KLL sketch.
+  static StringVal GetDsKllPMFOrCDF(FunctionContext* ctx,
+      const StringVal& serialized_sketch, int num_args, const FloatVal* args,
+      PMFCDF mode);
 };
 
 }
