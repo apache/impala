@@ -8,9 +8,8 @@ changed during this process as originally the following folders were affected:
 I copied the content of these folders into the same directory so that Impala
 can compile them without rewriting the include paths in the files themselves.
 
-The git hash of the snapshot I used as a source for the files:
-c67d92faad3827932ca3b5d864222e64977f2c20
+The git branch of the snapshot I used as a source for the files: 2.1.0-incubating
+The hash: c1a6f8edb49699520f248d3d02019b87429b4241
 
 Browse the source files here:
-https://github.com/apache/incubator-datasketches-cpp
-
+https://github.com/apache/incubator-datasketches-cpp/tree/2.1.0-incubating-rc1
