@@ -947,6 +947,33 @@ public class HdfsPartition extends CatalogObjectImpl
     return storageDescriptor;
   }
 
+  /**
+   * Compares the {@link StorageDescriptor} of this partition with the one provided.
+   * We only care of some fields of the StorageDescriptor (eg.
+   * {@link org.apache.hadoop.hive.metastore.api.SkewedInfo} is not used) which are
+   * relevant to determine of this HdfsPartition's storage descriptor
+   * is same as the one provided.
+   * @param hmsSd The StorageDescriptor object to compare against. Typically, this is
+   *              fetched directly from HMS.
+   * @return true if the HdfsPartition's StorageDescriptor is identical to the given
+   * StorageDescriptor, false otherwise.
+   */
+  public boolean compareSd(StorageDescriptor hmsSd) {
+    Preconditions.checkNotNull(hmsSd);
+    StorageDescriptor sd = getStorageDescriptor();
+    if (sd == null) return false;
+    if (!sd.getCols().equals(hmsSd.getCols())) return false;
+    if (!sd.getLocation().equals(hmsSd.getLocation())) return false;
+    if (!sd.getInputFormat().equals(hmsSd.getInputFormat())) return false;
+    if (!sd.getOutputFormat().equals(hmsSd.getOutputFormat())) return false;
+    if (sd.isCompressed() != hmsSd.isCompressed()) return false;
+    if (sd.getNumBuckets() != hmsSd.getNumBuckets()) return false;
+    if (!sd.getSerdeInfo().equals(hmsSd.getSerdeInfo())) return false;
+    if (!sd.getBucketCols().equals(hmsSd.getBucketCols())) return false;
+    if (!sd.getSortCols().equals(hmsSd.getSortCols())) return false;
+    return sd.getParameters().equals(hmsSd.getParameters());
+  }
+
   public static HdfsPartition prototypePartition(
       HdfsTable table, HdfsStorageDescriptor storageDescriptor) {
     return new Builder(table, CatalogObjectsConstants.PROTOTYPE_PARTITION_ID)

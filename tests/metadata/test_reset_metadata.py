@@ -82,6 +82,8 @@ class TestResetMetadata(TestDdlBase):
       query_options={"REFRESH_UPDATED_HMS_PARTITIONS": "true"})
     result = self.execute_query("show partitions {0}".format(tbl))
     assert new_loc in result.get_data()
+    result = self.get_impala_partition_info(unique_database + ".test", "year", "month")
+    assert len(result) == 4
 
     # case2: change the partition to a different file-format, note that the table's
     # file-format is text.
@@ -109,9 +111,20 @@ class TestResetMetadata(TestDdlBase):
     result = self.execute_query(
       "show files in {0} partition (year=2020, month=8)".format(tbl))
     assert ".parq" in result.get_data()
-    # make sure that the other partitions are still in text format
+    result = self.get_impala_partition_info(unique_database + ".test", "year", "month")
+    assert len(result) == 5
+    # make sure that the other partitions are still in text format new as well as old
     self.execute_query("insert into {0} partition (year=2020, month=1) "
       "select c1 from {0} where year=2009 and month=1".format(tbl))
     result = self.execute_query(
       "show files in {0} partition (year=2020, month=1)".format(tbl))
     assert ".txt" in result.get_data()
+    result = self.get_impala_partition_info(unique_database + ".test", "year", "month")
+    assert len(result) == 6
+    self.execute_query("insert into {0} partition (year=2009, month=3) "
+                       "select c1 from {0} where year=2009 and month=1".format(tbl))
+    result = self.execute_query(
+      "show files in {0} partition (year=2009, month=3)".format(tbl))
+    assert ".txt" in result.get_data()
+    result = self.get_impala_partition_info(unique_database + ".test", "year", "month")
+    assert len(result) == 6
