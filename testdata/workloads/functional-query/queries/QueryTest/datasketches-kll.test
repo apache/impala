@@ -475,12 +475,96 @@ select
     ds_kll_pmf_as_string(ds_kll_sketch(float_col), 1, 5, 3)
 from functional_parquet.alltypessmall;
 ---- CATCH
-UDF ERROR: Error while running PMF from DataSketches KLL. Message: Values must be unique and monotonically increasing
+UDF ERROR: Error while running DataSketches KLL function. Message: Values must be unique and monotonically increasing
 ====
 ---- QUERY
 select
     ds_kll_pmf_as_string(ds_kll_sketch(float_col), 1, 5, 5)
 from functional_parquet.alltypessmall;
 ---- CATCH
-UDF ERROR: Error while running PMF from DataSketches KLL. Message: Values must be unique and monotonically increasing
+UDF ERROR: Error while running DataSketches KLL function. Message: Values must be unique and monotonically increasing
+====
+---- QUERY
+# Checks that ds_kll_cdf_as_string() produces NULL for an empty dataset.
+select
+    ds_kll_cdf_as_string(ds_kll_sketch(cast(f2 as float)), 0.5)
+from functional_parquet.emptytable;
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Check that ds_kll_cdf_as_string() returns null for a null input.
+select ds_kll_cdf_as_string(c, 0.5) from functional_parquet.nulltable;
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# Check that ds_kll_cdf_as_string() returns error for strings that are not serialized
+# sketches.
+select ds_kll_cdf_as_string(date_string_col, 0.5) from functional_parquet.alltypestiny;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch
+====
+---- QUERY
+select
+    ds_kll_cdf_as_string(ds_kll_sketch(float_col), 0, 0.5, cast('nan' as float), 1)
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: NULL or NaN provided in the input list.
+====
+---- QUERY
+select
+    ds_kll_cdf_as_string(ds_kll_sketch(float_col), 0, 0.5, 1, cast('nan' as float))
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: NULL or NaN provided in the input list.
+====
+---- QUERY
+select
+    ds_kll_cdf_as_string(ds_kll_sketch(float_col), cast('nan' as float))
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: NULL or NaN provided in the input list.
+====
+---- QUERY
+select
+    ds_kll_cdf_as_string(ds_kll_sketch(float_col), 0, 0.5, NULL, 1)
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: NULL or NaN provided in the input list.
+====
+---- QUERY
+select
+    ds_kll_cdf_as_string(ds_kll_sketch(float_col), 5)
+from functional_parquet.alltypessmall;
+---- RESULTS
+'0.6,1'
+---- TYPES
+STRING
+====
+---- QUERY
+select ds_kll_cdf_as_string(ds_kll_sketch(float_col), 1, 5, 8, 9)
+from functional_parquet.alltypessmall;
+---- RESULTS
+'0.12,0.6,0.84,0.92,1'
+---- TYPES
+STRING
+====
+---- QUERY
+select
+    ds_kll_cdf_as_string(ds_kll_sketch(float_col), 1, 5, 3)
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: Error while running DataSketches KLL function. Message: Values must be unique and monotonically increasing
+====
+---- QUERY
+select
+    ds_kll_cdf_as_string(ds_kll_sketch(float_col), 1, 5, 5)
+from functional_parquet.alltypessmall;
+---- CATCH
+UDF ERROR: Error while running DataSketches KLL function. Message: Values must be unique and monotonically increasing
 ====
