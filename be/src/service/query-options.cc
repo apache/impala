@@ -942,6 +942,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_spool_all_results_for_retries(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::RUNTIME_FILTER_ERROR_RATE: {
+        StringParser::ParseResult result;
+        const double val =
+            StringParser::StringToFloat<double>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || val <= 0 || val >= 1) {
+          return Status(Substitute("Invalid runtime filter error rate: "
+                "'$0'. Only values between 0 to 1 (exclusive) are allowed.", value));
+        }
+        query_options->__set_runtime_filter_error_rate(val);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

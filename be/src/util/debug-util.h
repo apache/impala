@@ -72,6 +72,7 @@ std::string PrintThriftEnum(const TPlanNodeType::type& value);
 std::string PrintThriftEnum(const TPrefetchMode::type& value);
 std::string PrintThriftEnum(const TReplicaPreference::type& value);
 std::string PrintThriftEnum(const TRuntimeFilterMode::type& value);
+std::string PrintThriftEnum(const TRuntimeFilterType::type& value);
 std::string PrintThriftEnum(const TSessionType::type& value);
 std::string PrintThriftEnum(const TStmtType::type& value);
 std::string PrintThriftEnum(const TUnit::type& value);

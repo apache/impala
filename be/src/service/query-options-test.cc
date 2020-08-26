@@ -372,6 +372,26 @@ TEST(QueryOptions, SetSpecialOptions) {
     TestError("8191"); // default value of FLAGS_min_buffer_size is 8KB
     TestOk("64KB", 64 * 1024);
   }
+  {
+    // RUNTIME_FILTER_ERROR_RATE is a double in range (0.0, 1.0)
+    OptionDef<double> key_def = MAKE_OPTIONDEF(runtime_filter_error_rate);
+    auto TestOk = MakeTestOkFn(options, key_def);
+    auto TestError = MakeTestErrFn(options, key_def);
+    TestOk("0.5", 0.5);
+    TestOk("0.01", 0.01);
+    TestOk("0.001", 0.001);
+    TestOk("0.0001", 0.0001);
+    TestOk("0.0000000001", 0.0000000001);
+    TestOk("0.999999999", 0.999999999);
+    TestOk(" 0.9", 0.9);
+    // Out of range values
+    TestError("1");
+    TestError("0");
+    TestError("-1");
+    TestError("-0.1");
+    TestError("1.1");
+    TestError("Not a number!");
+  }
 }
 
 TEST(QueryOptions, ParseQueryOptions) {

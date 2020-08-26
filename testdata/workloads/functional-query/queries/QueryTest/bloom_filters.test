@@ -138,3 +138,22 @@ select STRAIGHT_JOIN count(*) from alltypes a join [SHUFFLE] alltypes b on a.id 
 row_regex: .*1 of 1 Runtime Filter Published.*
 row_regex: .*Filter 0 \(8.00 KB\).*
 ====
+---- QUERY
+####################################################
+# Test case 5: RUNTIME_FILTER_ERROR_RATE affects filter size.
+# This uses the first query from test case 2 and modifies the fpp to
+# result in a different filter size.
+####################################################
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
+SET RUNTIME_FILTER_MIN_SIZE=64KB;
+SET RUNTIME_FILTER_ERROR_RATE=0.01;
+with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
+select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
+    join (select * from l LIMIT 125000) b on a.l_orderkey = -b.l_orderkey;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*Filter 0 \(256.00 KB\).*
+====

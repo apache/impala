@@ -123,6 +123,9 @@ public final class RuntimeFilterGenerator {
     // Pre-computed default filter size, in bytes, rounded up to a power of two.
     public final long defaultVal;
 
+    // Target false positive probability, between 0 and 1 exclusive.
+    public final double targetFpp;
+
     public FilterSizeLimits(TQueryOptions tQueryOptions) {
       // Round up all limits to a power of two and make sure filter size is more
       // than the min buffer size that can be allocated by the buffer pool.
@@ -138,6 +141,13 @@ public final class RuntimeFilterGenerator {
       long defaultValue = tQueryOptions.getRuntime_bloom_filter_size();
       defaultValue = Math.max(defaultValue, minVal);
       defaultVal = BitUtil.roundUpToPowerOf2(Math.min(defaultValue, maxVal));
+
+      // Target FPP is determined by runtime_filter_error_rate query option, or if that
+      // is not set, --max_filter_error_rate, which was the legacy option controlling
+      // this that also had other effects.
+      targetFpp = tQueryOptions.isSetRuntime_filter_error_rate() ?
+          tQueryOptions.getRuntime_filter_error_rate() :
+          BackendConfig.INSTANCE.getMaxFilterErrorRate();
     }
   };
 
@@ -527,8 +537,8 @@ public final class RuntimeFilterGenerator {
         filterSizeBytes_ = filterSizeLimits.defaultVal;
         return;
       }
-      double fpp = BackendConfig.INSTANCE.getMaxFilterErrorRate();
-      int logFilterSize = FeSupport.GetMinLogSpaceForBloomFilter(ndvEstimate_, fpp);
+      double targetFpp = filterSizeLimits.targetFpp;
+      int logFilterSize = FeSupport.GetMinLogSpaceForBloomFilter(ndvEstimate_, targetFpp);
       filterSizeBytes_ = 1L << logFilterSize;
       filterSizeBytes_ = Math.max(filterSizeBytes_, filterSizeLimits.minVal);
       filterSizeBytes_ = Math.min(filterSizeBytes_, filterSizeLimits.maxVal);

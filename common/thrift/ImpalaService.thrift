@@ -567,6 +567,10 @@ enum TImpalaQueryOptions {
   // when any of them are ready. Note that in this case, query retry will be skipped if
   // the client has fetched some results.
   SPOOL_ALL_RESULTS_FOR_RETRIES = 109
+
+  // A value (0.0, 1.0) that is the target false positive probability for runtime bloom
+  // filters. If not set, falls back to max_filter_error_rate.
+  RUNTIME_FILTER_ERROR_RATE = 110
 }
 
 // The summary of a DML statement.
