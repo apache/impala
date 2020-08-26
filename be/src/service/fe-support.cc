@@ -464,7 +464,7 @@ Java_org_apache_impala_service_FeSupport_NativeLookupSymbol(
 
 // Add a catalog update to pending_topic_updates_.
 extern "C"
-JNIEXPORT jboolean JNICALL
+JNIEXPORT jint JNICALL
 Java_org_apache_impala_service_FeSupport_NativeAddPendingTopicItem(JNIEnv* env,
     jclass fe_support_class, jlong native_catalog_server_ptr, jstring key, jlong version,
     jbyteArray serialized_object, jboolean deleted) {
@@ -472,18 +472,18 @@ Java_org_apache_impala_service_FeSupport_NativeAddPendingTopicItem(JNIEnv* env,
   {
     JniUtfCharGuard key_str;
     if (!JniUtfCharGuard::create(env, key, &key_str).ok()) {
-      return static_cast<jboolean>(false);
+      return static_cast<jint>(-1);
     }
     key_string.assign(key_str.get());
   }
   JniScopedArrayCritical obj_buf;
   if (!JniScopedArrayCritical::Create(env, serialized_object, &obj_buf)) {
-    return static_cast<jboolean>(false);
+    return static_cast<jint>(-1);
   }
-  reinterpret_cast<CatalogServer*>(native_catalog_server_ptr)->
+  int res = reinterpret_cast<CatalogServer*>(native_catalog_server_ptr)->
       AddPendingTopicItem(std::move(key_string), version, obj_buf.get(),
       static_cast<uint32_t>(obj_buf.size()), deleted);
-  return static_cast<jboolean>(true);
+  return static_cast<jint>(res);
 }
 
 // Get the next catalog update pointed by 'callback_ctx'.
@@ -732,7 +732,7 @@ static JNINativeMethod native_methods[] = {
   },
   {
       const_cast<char*>("NativeAddPendingTopicItem"),
-      const_cast<char*>("(JLjava/lang/String;J[BZ)Z"),
+      const_cast<char*>("(JLjava/lang/String;J[BZ)I"),
       (void*)::Java_org_apache_impala_service_FeSupport_NativeAddPendingTopicItem
   },
   {

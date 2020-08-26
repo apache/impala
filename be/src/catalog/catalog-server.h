@@ -76,9 +76,9 @@ class CatalogServer {
   }
   Catalog* catalog() const { return catalog_.get(); }
 
-  /// Add a topic item to pending_topic_updates_. Caller must hold catalog_lock_.
-  /// The return value is true if the operation succeeds and false otherwise.
-  bool AddPendingTopicItem(std::string key, int64_t version, const uint8_t* item_data,
+  /// Adds a topic item to pending_topic_updates_. Caller must hold catalog_lock_.
+  /// Returns the actual size of the item data. Returns a negative value for failures.
+  int AddPendingTopicItem(std::string key, int64_t version, const uint8_t* item_data,
       uint32_t size, bool deleted);
 
   /// Mark service as started. Should be called only after the thrift server hosting this

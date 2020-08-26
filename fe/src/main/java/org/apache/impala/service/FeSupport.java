@@ -86,8 +86,8 @@ public class FeSupport {
 
   // Adds a topic item to the backend's pending metadata-topic update.
   // 'serializationBuffer' is a serialized TCatalogObject.
-  // The return value is true if the operation succeeds and false otherwise.
-  public native static boolean NativeAddPendingTopicItem(long nativeCatalogServerPtr,
+  // Returns the actual value size and -1 if the operation fails.
+  public native static int NativeAddPendingTopicItem(long nativeCatalogServerPtr,
       String key, long version, byte[] serializationBuffer, boolean deleted);
 
   // Get a catalog object update from the backend. A pair of isDeletion flag and

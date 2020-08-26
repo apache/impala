@@ -210,6 +210,8 @@ public class BackendConfig {
 
   public boolean isColumnMaskingEnabled() { return backendCfg_.enable_column_masking; }
 
+  public boolean isCompactCatalogTopic() { return backendCfg_.compact_catalog_topic; }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

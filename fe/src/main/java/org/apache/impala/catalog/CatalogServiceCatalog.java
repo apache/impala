@@ -685,6 +685,11 @@ public class CatalogServiceCatalog extends Catalog {
     }
 
     void addCatalogObject(TCatalogObject obj, boolean delete) throws TException {
+      addCatalogObject(obj, delete, null);
+    }
+
+    void addCatalogObject(TCatalogObject obj, boolean delete,
+        PartitionMetaSummary summary) throws TException {
       String key = Catalog.toCatalogObjectKey(obj);
       if (obj.type != TCatalogObjectType.CATALOG) {
         topicUpdateLog_.add(key,
@@ -696,10 +701,14 @@ public class CatalogServiceCatalog extends Catalog {
       if (topicMode_ == TopicMode.FULL || topicMode_ == TopicMode.MIXED) {
         String v1Key = CatalogServiceConstants.CATALOG_TOPIC_V1_PREFIX + key;
         byte[] data = serializer.serialize(obj);
-        if (!FeSupport.NativeAddPendingTopicItem(nativeCatalogServerPtr, v1Key,
-            obj.catalog_version, data, delete)) {
+        int actualSize = FeSupport.NativeAddPendingTopicItem(nativeCatalogServerPtr,
+            v1Key, obj.catalog_version, data, delete);
+        if (actualSize < 0) {
           LOG.error("NativeAddPendingTopicItem failed in BE. key=" + v1Key + ", delete="
               + delete + ", data_size=" + data.length);
+        } else if (summary != null && obj.type == HDFS_PARTITION) {
+          summary.update(true, delete, obj.hdfs_partition.partition_name,
+              obj.catalog_version, data.length, actualSize);
         }
       }
 
@@ -711,10 +720,14 @@ public class CatalogServiceCatalog extends Catalog {
         if (minimalObject != null) {
           byte[] data = serializer.serialize(minimalObject);
           String v2Key = CatalogServiceConstants.CATALOG_TOPIC_V2_PREFIX + key;
-          if (!FeSupport.NativeAddPendingTopicItem(nativeCatalogServerPtr, v2Key,
-              obj.catalog_version, data, delete)) {
+          int actualSize = FeSupport.NativeAddPendingTopicItem(nativeCatalogServerPtr,
+              v2Key, obj.catalog_version, data, delete);
+          if (actualSize < 0) {
             LOG.error("NativeAddPendingTopicItem failed in BE. key=" + v2Key + ", delete="
                 + delete + ", data_size=" + data.length);
+          } else if (summary != null && obj.type == HDFS_PARTITION) {
+            summary.update(false, delete, obj.hdfs_partition.partition_name,
+                obj.catalog_version, data.length, actualSize);
           }
         }
       }
@@ -791,6 +804,15 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Creates a partition meta summary for the given table name.
+   */
+  private PartitionMetaSummary createPartitionMetaSummary(String tableName) {
+    return new PartitionMetaSummary(tableName, /*inCatalogd*/true,
+        topicMode_ == TopicMode.FULL || topicMode_ == TopicMode.MIXED,
+        topicMode_ == TopicMode.MINIMAL || topicMode_ == TopicMode.MIXED);
+  }
+
+  /**
    * Identifies the catalog objects that were added/modified/deleted in the catalog with
    * versions > 'fromVersion'. It operates on a snaphsot of the catalog without holding
    * the catalog lock which means that other concurrent metadata operations can still make
@@ -847,6 +869,9 @@ public class CatalogServiceCatalog extends Catalog {
         Preconditions.checkState(
             !hdfsTable.has_full_partitions && hdfsTable.has_partition_names,
             /*errorMessage*/hdfsTable);
+        String tblName = removedObject.getTable().db_name + "."
+            + removedObject.getTable().tbl_name;
+        PartitionMetaSummary deleteSummary = createPartitionMetaSummary(tblName);
         for (THdfsPartition part : hdfsTable.partitions.values()) {
           Preconditions.checkState(part.id >= HdfsPartition.INITIAL_PARTITION_ID
               && part.db_name != null
@@ -857,9 +882,10 @@ public class CatalogServiceCatalog extends Catalog {
           removedPart.setHdfs_partition(part);
           if (!ctx.updatedCatalogObjects.contains(
               Catalog.toCatalogObjectKey(removedPart))) {
-            ctx.addCatalogObject(removedPart, true);
+            ctx.addCatalogObject(removedPart, true, deleteSummary);
           }
         }
+        LOG.info(deleteSummary.toString());
       }
     }
     // Each topic update should contain a single "TCatalog" object which is used to
@@ -1318,11 +1344,14 @@ public class CatalogServiceCatalog extends Catalog {
     // statestored restarts).
     if (ctx.isFullUpdate()) hdfsTable.resetMaxSentPartitionId();
 
+    PartitionMetaSummary updateSummary = createPartitionMetaSummary(
+        hdfsTable.getFullName());
+
     // Add updates for new partitions.
     long maxSentId = hdfsTable.getMaxSentPartitionId();
     for (TCatalogObject catalogPart : hdfsTable.getNewPartitionsSinceLastUpdate()) {
       maxSentId = Math.max(maxSentId, catalogPart.getHdfs_partition().getId());
-      ctx.addCatalogObject(catalogPart, false);
+      ctx.addCatalogObject(catalogPart, false, updateSummary);
     }
     hdfsTable.setMaxSentPartitionId(maxSentId);
 
@@ -1330,10 +1359,12 @@ public class CatalogServiceCatalog extends Catalog {
       TCatalogObject removedPart = part.toMinimalTCatalogObject();
       if (!ctx.updatedCatalogObjects.contains(
           Catalog.toCatalogObjectKey(removedPart))) {
-        ctx.addCatalogObject(removedPart, true);
+        ctx.addCatalogObject(removedPart, true, updateSummary);
       }
     }
     hdfsTable.resetDroppedPartitions();
+
+    LOG.info(updateSummary.toString());
   }
 
   /**

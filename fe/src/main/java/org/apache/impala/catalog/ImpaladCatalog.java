@@ -206,6 +206,7 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
     // Maps that group incremental partition updates by table names so we can apply them
     // when updating the table.
     Map<TableName, List<THdfsPartition>> newPartitionsByTable = new HashMap<>();
+    Map<TableName, PartitionMetaSummary> partUpdates = new HashMap<>();
     long newCatalogVersion = lastSyncedCatalogVersion_.get();
     Pair<Boolean, ByteBuffer> update;
     while ((update = FeSupport.NativeGetNextCatalogObjectUpdate(req.native_iterator_ptr))
@@ -219,21 +220,33 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
         LOG.info("Received large catalog object(>100mb): " + key + " is " + len +
             "bytes");
       }
-      LOG.info((isDelete ? "Deleting: " : "Adding: ") + key + " version: "
-          + obj.catalog_version + " size: " + len);
+      if (!key.contains("HDFS_PARTITION")) {
+        LOG.info((isDelete ? "Deleting: " : "Adding: ") + key + " version: "
+            + obj.catalog_version + " size: " + len);
+      }
       // For statestore updates, the service ID and updated version is wrapped in a
       // CATALOG catalog object.
       if (obj.type == TCatalogObjectType.CATALOG) {
         setCatalogServiceId(obj.catalog.catalog_service_id);
         newCatalogVersion = obj.catalog_version;
-      } else if (obj.type == TCatalogObjectType.HDFS_PARTITION && !isDelete) {
+      } else if (obj.type == TCatalogObjectType.HDFS_PARTITION) {
         TableName tblName = new TableName(obj.getHdfs_partition().db_name,
             obj.getHdfs_partition().tbl_name);
-        newPartitionsByTable.computeIfAbsent(tblName, (s) -> new ArrayList<>())
-            .add(obj.getHdfs_partition());
+        partUpdates.computeIfAbsent(tblName,
+            (s) -> new PartitionMetaSummary(tblName.toString(), /*inCatalogd*/false,
+                /*hasV1Updates*/true, /*hasV2Updates*/false))
+            .update(/*isV1Key*/true, isDelete, obj.hdfs_partition.partition_name,
+                obj.catalog_version, len, /*unused*/-1);
+        if (!isDelete) {
+          newPartitionsByTable.computeIfAbsent(tblName, (s) -> new ArrayList<>())
+              .add(obj.getHdfs_partition());
+        }
       } else {
         sequencer.add(obj, isDelete);
       }
+    }
+    for (PartitionMetaSummary summary : partUpdates.values()) {
+      LOG.info(summary.toString());
     }
 
     for (TCatalogObject catalogObject: sequencer.getUpdatedObjects()) {
