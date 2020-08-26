@@ -35,30 +35,6 @@ class FragmentState;
 class RuntimeState;
 class ScalarExprEvaluator;
 
-/// A wrapper around types Comparator with a Less() method. This wrapper allows the use of
-/// type Comparator with STL containers which expect a type like std::less<T>, which uses
-/// operator() instead of Less() and is cheap to copy.
-///
-/// The C++ standard requires that std::priority_queue operations behave as wrappers to
-/// {push,pop,make,sort}_heap, which take their comparator object by value. Therefore, it
-/// is inefficient to use comparator objects that have expensive construction,
-/// destruction, and copying with std::priority_queue.
-///
-/// ComparatorWrapper takes a reference to an object of type Comparator, rather than
-/// copying that object. ComparatorWrapper<Comparator>(comp) is not safe to use beyond the
-/// lifetime of comp.
-template <typename Comparator>
-class ComparatorWrapper {
-  const Comparator& comp_;
- public:
-  ComparatorWrapper(const Comparator& comp) : comp_(comp) {}
-
-  template <typename T>
-  bool operator()(const T& lhs, const T& rhs) const {
-    return comp_.Less(lhs, rhs);
-  }
-};
-
 /// TupleRowComparatorConfig contains the static state initialized from its corresponding
 /// thrift structure. It serves as an input for creating instances of the
 /// TupleRowComparator class.
@@ -71,7 +47,15 @@ class TupleRowComparatorConfig {
       const TSortInfo& tsort_info, const std::vector<ScalarExpr*>& ordering_exprs);
 
   /// Codegens a Compare() function for this comparator that is used in Compare().
-  Status Codegen(FragmentState* state);
+  /// The pointer to this llvm function object is returned in 'compare_fn'.
+  Status Codegen(FragmentState* state, llvm::Function** compare_fn);
+
+  /// A version of the above Cdegen() function that does not care the llvm function
+  /// object.
+  Status Codegen(FragmentState* state) {
+    llvm::Function* compare_fn = nullptr;
+    return Codegen(state, &compare_fn);
+  }
 
   /// Indicates the sorting ordering used. Specified using the SORT BY clause.
   TSortingOrder::type sorting_order_;
@@ -121,19 +105,8 @@ class TupleRowComparator {
   /// Release resources held by the ordering expressions' evaluators.
   void Close(RuntimeState* state);
 
-  /// Returns a negative value if lhs is less than rhs, a positive value if lhs is
-  /// greater than rhs, or 0 if they are equal. All exprs (ordering_exprs_lhs_ and
-  /// ordering_exprs_rhs_) must have been prepared and opened before calling this,
-  /// i.e. 'sort_key_exprs' in the constructor must have been opened.
   int ALWAYS_INLINE Compare(const TupleRow* lhs, const TupleRow* rhs) const {
-    const TupleRowComparatorConfig::CompareFn codegend_compare_fn =
-        codegend_compare_fn_.load();
-    if (IR_LIKELY(codegend_compare_fn != nullptr)) {
-      return codegend_compare_fn(ordering_expr_evals_lhs_.data(),
-          ordering_expr_evals_rhs_.data(), lhs, rhs);
-    }
-
-    return CompareInterpreted(lhs, rhs);
+    return Compare(nullptr, nullptr, lhs, rhs);
   }
 
   /// Returns true if lhs is strictly less than rhs.
@@ -142,7 +115,9 @@ class TupleRowComparator {
   /// Force inlining because it tends not to be always inlined at callsites, even in
   /// hot loops.
   bool ALWAYS_INLINE Less(const TupleRow* lhs, const TupleRow* rhs) const {
-    return Compare(lhs, rhs) < 0;
+    return Compare(
+               ordering_expr_evals_lhs_.data(), ordering_expr_evals_rhs_.data(), lhs, rhs)
+        < 0;
   }
 
   bool ALWAYS_INLINE Less(const Tuple* lhs, const Tuple* rhs) const {
@@ -150,6 +125,18 @@ class TupleRowComparator {
     TupleRow* rhs_row = reinterpret_cast<TupleRow*>(&rhs);
     return Less(lhs_row, rhs_row);
   }
+
+  /// A Symbol (or a substring of the symbol) of following.
+  ///
+  /// int Compare(ScalarExprEvaluator* const* evaluator_lhs,
+  ///    ScalarExprEvaluator* const* evaluator_rhs, const TupleRow* lhs,
+  ///    const TupleRow* rhs) const;
+  ///
+  /// It is passed to LlvmCodeGen::ReplaceCallSites().
+  static const char* COMPARE_SYMBOL;
+
+  /// Class name in LLVM IR.
+  static const char* LLVM_CLASS_NAME;
 
  protected:
   /// References to ordering expressions owned by the plan node which owns the
@@ -168,6 +155,23 @@ class TupleRowComparator {
  private:
   /// Interpreted implementation of Compare().
   virtual int CompareInterpreted(const TupleRow* lhs, const TupleRow* rhs) const = 0;
+
+  /// Returns a negative value if lhs is less than rhs, a positive value if lhs is
+  /// greater than rhs, or 0 if they are equal. All exprs (ordering_exprs_lhs_ and
+  /// ordering_exprs_rhs_) must have been prepared and opened before calling this,
+  /// i.e. 'sort_key_exprs' in the constructor must have been opened.
+  ///
+  /// This method calls CompareInterpreted(lhs, rhs) in non-code-gen version and
+  /// morphs into the code-gen version otherwise.
+  ///
+  /// The presence of evaluator_lhs and evaluator_rhs in argument is to match similar
+  /// arguments in the code-gen version.
+  ///
+  /// Mark the method IR_NO_INLINE to facilitate call site replacement during code-gen.
+  /// Do not remove this attribute.
+  IR_NO_INLINE int Compare(ScalarExprEvaluator* const* evaluator_lhs,
+      ScalarExprEvaluator* const* evaluator_rhs, const TupleRow* lhs,
+      const TupleRow* rhs) const;
 };
 
 /// Compares two TupleRows based on a set of exprs, in lexicographical order.

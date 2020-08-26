@@ -130,6 +130,7 @@ add_library(UtilTests STATIC
   os-util-test.cc
   parse-util-test.cc
   pretty-printer-test.cc
+  priority-queue-test.cc
   proc-info-test.cc
   redactor-config-parser-test.cc
   redactor-test.cc
@@ -195,6 +196,7 @@ ADD_UNIFIED_BE_LSAN_TEST(os-info-test "OsInfo.*")
 ADD_UNIFIED_BE_LSAN_TEST(os-util-test "OsUtil.*")
 ADD_UNIFIED_BE_LSAN_TEST(parse-util-test "ParseMemSpecs.*")
 ADD_UNIFIED_BE_LSAN_TEST(pretty-printer-test "PrettyPrinterTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(priority-queue-test "PriorityQueueTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(proc-info-test "MemInfo.*:ProcessStateInfo.*:MappedMapInfo.*:CGroupInfo.*")
 # IMPALA-4128: promise-test has a non-standard main(), so it can't be unified yet
 ADD_BE_LSAN_TEST(promise-test)
