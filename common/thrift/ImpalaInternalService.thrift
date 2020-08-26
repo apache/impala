@@ -444,6 +444,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   110: optional bool spool_all_results_for_retries = true;
+
+  // See comment in ImpalaService.thrift
+  111: optional double runtime_filter_error_rate;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

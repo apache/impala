@@ -54,7 +54,9 @@ using namespace impala;
 using namespace strings;
 
 DEFINE_double(max_filter_error_rate, 0.75, "(Advanced) The maximum probability of false "
-    "positives in a runtime filter before it is disabled.");
+    "positives in a runtime bloom filter before it is disabled. Also, if not overridden "
+    "by the RUNTIME_FILTER_ERROR_RATE query option, the target false positive "
+    "probability used to determine the ideal size for each bloom filter size.");
 
 const int64_t RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE;
 const int64_t RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE;

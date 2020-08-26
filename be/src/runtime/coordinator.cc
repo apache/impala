@@ -18,6 +18,8 @@
 #include "runtime/coordinator.h"
 
 #include <cerrno>
+#include <iomanip>
+#include <sstream>
 #include <unordered_set>
 
 #include <thrift/protocol/TDebugProtocol.h>
@@ -48,6 +50,7 @@
 #include "scheduling/admission-controller.h"
 #include "scheduling/scheduler.h"
 #include "service/client-request-state.h"
+#include "util/bit-util.h"
 #include "util/bloom-filter.h"
 #include "util/hdfs-bulk-ops.h"
 #include "util/hdfs-util.h"
@@ -577,6 +580,8 @@ string Coordinator::FilterDebugString() {
     table_printer.AddColumn("Completed", false);
   }
   table_printer.AddColumn("Enabled", false);
+  table_printer.AddColumn("Bloom Size", false);
+  table_printer.AddColumn("Est fpp", false);
   for (auto& v: filter_routing_table_->id_to_filter) {
     vector<string> row;
     const FilterState& state = v.second;
@@ -613,6 +618,20 @@ string Coordinator::FilterDebugString() {
     // completion to prevent further update. In such case, we should check if all filter
     // updates have been successfully received.
     row.push_back(state.enabled() || state.received_all_updates() ? "true" : "false");
+
+    // Add size and fpp for bloom filters, the filter type otherwise.
+    if (state.is_bloom_filter()) {
+      int64_t filter_size = state.desc().filter_size_bytes;
+      row.push_back(PrettyPrinter::Print(filter_size, TUnit::BYTES));
+      double fpp = BloomFilter::FalsePositiveProb(
+          state.desc().ndv_estimate, BitUtil::Log2Ceiling64(filter_size));
+      stringstream ss;
+      ss << setprecision(3) << fpp;
+      row.push_back(ss.str());
+    } else {
+      row.push_back(PrintThriftEnum(state.desc().type));
+      row.push_back("");
+    }
     table_printer.AddRow(row);
   }
   // Add a line break, as in all contexts this is called we need to start a new line to
