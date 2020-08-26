@@ -568,3 +568,40 @@ from functional_parquet.alltypessmall;
 ---- CATCH
 UDF ERROR: Error while running DataSketches KLL function. Message: Values must be unique and monotonically increasing
 ====
+---- QUERY
+# Check that ds_kll_stringify() returns null for an empty sketch.
+select ds_kll_stringify(ds_kll_sketch(cast(f2 as float))) from functional_parquet.emptytable;
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# Check that ds_kll_stringify() returns null for a null input.
+select ds_kll_stringify(c) from functional_parquet.nulltable;
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# Check that ds_kll_stringify() returns error for strings that are not serialized sketches.
+select ds_kll_stringify(date_string_col) from functional_parquet.alltypestiny;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch
+====
+---- QUERY
+# Check that ds_kll_stringify() works on sketches created by Hive.
+select ds_kll_stringify(f) from kll_sketches_from_hive;
+---- RESULTS
+row_regex: .*### KLL sketch summary:.*Epsilon.*Epsilon PMF.*Empty.*Estimation mode.*Levels.*### End sketch summary.*
+---- TYPES
+STRING
+====
+---- QUERY
+select ds_kll_stringify(ds_kll_sketch(float_col)) from functional_parquet.alltypestiny;
+---- RESULTS
+row_regex: .*### KLL sketch summary:.*Epsilon.*Epsilon PMF.*Empty.*Estimation mode.*Levels.*### End sketch summary.*
+---- TYPES
+STRING
+====
