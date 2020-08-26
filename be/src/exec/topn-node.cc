@@ -33,6 +33,7 @@
 #include "runtime/tuple.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
+#include "util/tuple-row-compare.h"
 
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/PlanNodes_types.h"
@@ -103,7 +104,8 @@ void TopNPlanNode::Codegen(FragmentState* state) {
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);
 
-  Status codegen_status = row_comparator_config_->Codegen(state);
+  llvm::Function* compare_fn = nullptr;
+  Status codegen_status = row_comparator_config_->Codegen(state, &compare_fn);
   if (codegen_status.ok()) {
     llvm::Function* insert_batch_fn =
         codegen->GetFunction(IRFunction::TOPN_NODE_INSERT_BATCH, true);
@@ -128,6 +130,14 @@ void TopNPlanNode::Codegen(FragmentState* state) {
         int replaced = codegen->ReplaceCallSites(insert_batch_fn,
             materialize_exprs_tuple_pool_fn, Tuple::MATERIALIZE_EXPRS_SYMBOL);
         DCHECK_REPLACE_COUNT(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
+
+        // The total number of calls to TupleRowComparator::Less(Tuple*, Tuple*)
+        // is 3 in PriorityQueue and 1 in TopNNode::Heap::InsertTupleRow().
+        // Each Less(Tuple*, Tuple*) indirectly calls TupleRowComparator::Compare()
+        // once.
+        replaced = codegen->ReplaceCallSites(insert_batch_fn,
+            compare_fn, TupleRowComparator::COMPARE_SYMBOL);
+        DCHECK_REPLACE_COUNT(replaced, 4) << LlvmCodeGen::Print(insert_batch_fn);
 
         replaced = codegen->ReplaceCallSites(insert_batch_fn,
             materialize_exprs_no_pool_fn, Tuple::MATERIALIZE_EXPRS_NULL_POOL_SYMBOL);
@@ -161,7 +171,7 @@ Status TopNNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
 
-  heap_.reset(new Heap(limit_ + offset_));
+  heap_.reset(new Heap(*tuple_row_less_than_, limit_ + offset_));
 
   // Allocate memory for a temporary tuple.
   tmp_tuple_ = reinterpret_cast<Tuple*>(
@@ -264,14 +274,10 @@ void TopNNode::PrepareForOutput() {
 void TopNNode::Heap::PrepareForOutput(
     const TopNNode& RESTRICT node, vector<Tuple*>* sorted_top_n) RESTRICT {
   // Reverse the order of the tuples in the priority queue
-  sorted_top_n->resize(priority_queue_.size());
+  sorted_top_n->resize(priority_queue_.Size());
   int64_t index = sorted_top_n->size() - 1;
-
-  ComparatorWrapper<TupleRowComparator> cmp(*node.tuple_row_less_than_);
-  while (priority_queue_.size() > 0) {
-    Tuple* tuple = priority_queue_.front();
-    PopHeap(&priority_queue_, cmp);
-    (*sorted_top_n)[index] = tuple;
+  while (priority_queue_.Size() > 0) {
+    (*sorted_top_n)[index] = priority_queue_.Pop();
     --index;
   }
 }
@@ -308,21 +314,24 @@ void TopNNode::DebugString(int indentation_level, stringstream* out) const {
   *out << ")";
 }
 
-TopNNode::Heap::Heap(int64_t capacity) : capacity_(capacity) {}
+TopNNode::Heap::Heap(const TupleRowComparator& c, int64_t capacity)
+  : capacity_(capacity), priority_queue_(c) {
+  priority_queue_.Reserve(capacity);
+}
 
 void TopNNode::Heap::Reset() {
-  priority_queue_.clear();
+  priority_queue_.Clear();
 }
 
 void TopNNode::Heap::Close() {
-  priority_queue_.clear();
+  priority_queue_.Clear();
 }
 
 Status TopNNode::Heap::RematerializeTuples(TopNNode* node,
     RuntimeState* state, MemPool* new_pool) {
   const TupleDescriptor& tuple_desc = *node->output_tuple_desc_;
   int tuple_size = tuple_desc.byte_size();
-  for (int i = 0; i < priority_queue_.size(); i++) {
+  for (int i = 0; i < priority_queue_.Size(); i++) {
     Tuple* insert_tuple = reinterpret_cast<Tuple*>(new_pool->TryAllocate(tuple_size));
     if (UNLIKELY(insert_tuple == nullptr)) {
       return new_pool->mem_tracker()->MemLimitExceeded(state,
@@ -333,3 +342,6 @@ Status TopNNode::Heap::RematerializeTuples(TopNNode* node,
   }
   return Status::OK();
 }
+
+template class impala::PriorityQueue<Tuple*, TupleRowComparator>;
+template class impala::PriorityQueueIterator<Tuple*, TupleRowComparator>;

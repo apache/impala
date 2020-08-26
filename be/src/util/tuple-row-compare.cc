@@ -32,6 +32,12 @@
 using namespace impala;
 using namespace strings;
 
+const char* TupleRowComparator::COMPARE_SYMBOL =
+    "_ZNK6impala18TupleRowComparator7CompareEPKPNS_19ScalarExprEvaluatorES4_PKNS_"
+    "8TupleRowES7_";
+
+const char* TupleRowComparator::LLVM_CLASS_NAME = "class.impala::TupleRowComparator";
+
 TupleRowComparatorConfig::TupleRowComparatorConfig(
     const TSortInfo& tsort_info, const std::vector<ScalarExpr*>& ordering_exprs)
   : sorting_order_(tsort_info.sorting_order),
@@ -41,6 +47,12 @@ TupleRowComparatorConfig::TupleRowComparatorConfig(
   for (bool null_first : tsort_info.nulls_first) {
     nulls_first_.push_back(null_first ? -1 : 1);
   }
+}
+
+int TupleRowComparator::Compare(ScalarExprEvaluator* const* evaluator_lhs,
+    ScalarExprEvaluator* const* evaluator_rhs, const TupleRow* lhs,
+    const TupleRow* rhs) const {
+  return CompareInterpreted(lhs, rhs);
 }
 
 Status TupleRowComparator::Open(ObjectPool* pool, RuntimeState* state,
@@ -64,15 +76,14 @@ void TupleRowComparator::Close(RuntimeState* state) {
   ScalarExprEvaluator::Close(ordering_expr_evals_lhs_, state);
 }
 
-Status TupleRowComparatorConfig::Codegen(FragmentState* state) {
+Status TupleRowComparatorConfig::Codegen(FragmentState* state, llvm::Function** fn) {
   if (sorting_order_ == TSortingOrder::ZORDER) {
     return Status("Codegen not yet implemented for sorting order: ZORDER");
   }
-  llvm::Function* fn;
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != nullptr);
-  RETURN_IF_ERROR(CodegenLexicalCompare(codegen, &fn));
-  codegen->AddFunctionToJit(fn, &codegend_compare_fn_);
+  RETURN_IF_ERROR(CodegenLexicalCompare(codegen, fn));
+  codegen->AddFunctionToJit(*fn, &codegend_compare_fn_);
   return Status::OK();
 }
 
@@ -103,7 +114,8 @@ int TupleRowLexicalComparator::CompareInterpreted(
 // Example IR for comparing an int column then a float column:
 //
 // ; Function Attrs: alwaysinline
-// define i32 @Compare(%"class.impala::ScalarExprEvaluator"**
+// define i32 @Compare(%"class.impala::TupleRowComparator"*,
+//                     %"class.impala::ScalarExprEvaluator"**
 //                         %ordering_expr_evals_lhs,
 //                     %"class.impala::ScalarExprEvaluator"**
 //                         %ordering_expr_evals_rhs,
@@ -231,27 +243,38 @@ Status TupleRowComparatorConfig::CodegenLexicalCompare(
     }
   }
 
-  // Construct function signature (note that this is different than the interpreted
-  // Compare() function signature):
+  // Construct function signature as follows.
+  //
+  // int Compare(TupleRowComparator*, ScalarExprEvaluator** ordering_expr_evals_lhs,
+  //     ScalarExprEvaluator** ordering_expr_evals_rhs,
+  //     TupleRow* lhs, TupleRow* rhs)
+  //
+  // Note that this is different than the interpreted Compare() function signature:
+  //
   // int Compare(ScalarExprEvaluator** ordering_expr_evals_lhs,
   //     ScalarExprEvaluator** ordering_expr_evals_rhs,
   //     TupleRow* lhs, TupleRow* rhs)
+  //
+  llvm::PointerType* tuple_row_comparator_type =
+      codegen->GetStructPtrType<TupleRowComparator>();
   llvm::PointerType* expr_evals_type =
       codegen->GetStructPtrPtrType<ScalarExprEvaluator>();
   llvm::PointerType* tuple_row_type = codegen->GetStructPtrType<TupleRow>();
   LlvmCodeGen::FnPrototype prototype(codegen, "Compare", codegen->i32_type());
+  prototype.AddArgument("tuple_row_comparator_type", tuple_row_comparator_type);
   prototype.AddArgument("ordering_expr_evals_lhs", expr_evals_type);
   prototype.AddArgument("ordering_expr_evals_rhs", expr_evals_type);
   prototype.AddArgument("lhs", tuple_row_type);
   prototype.AddArgument("rhs", tuple_row_type);
 
   LlvmBuilder builder(context);
-  llvm::Value* args[4];
+  llvm::Value* args[5];
   *fn = prototype.GeneratePrototype(&builder, args);
-  llvm::Value* lhs_evals_arg = args[0];
-  llvm::Value* rhs_evals_arg = args[1];
-  llvm::Value* lhs_arg = args[2];
-  llvm::Value* rhs_arg = args[3];
+  args[0] = nullptr;
+  llvm::Value* lhs_evals_arg = args[1];
+  llvm::Value* rhs_evals_arg = args[2];
+  llvm::Value* lhs_arg = args[3];
+  llvm::Value* rhs_arg = args[4];
 
   // Unrolled loop over each key expr
   for (int i = 0; i < ordering_exprs.size(); ++i) {

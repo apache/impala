@@ -25,6 +25,7 @@
 #include "exec/exec-node.h"
 #include "runtime/descriptors.h"  // for TupleId
 #include "util/tuple-row-compare.h"
+#include "util/priority-queue.h"
 
 namespace impala {
 
@@ -158,7 +159,7 @@ class TopNNode : public ExecNode {
 /// up to 'capacity' tuples.
 class TopNNode::Heap {
  public:
-  Heap(int64_t capacity);
+  Heap(const TupleRowComparator& c, int64_t capacity);
 
   void Reset();
   void Close();
@@ -180,11 +181,11 @@ class TopNNode::Heap {
       const TopNNode& RESTRICT node, std::vector<Tuple*>* sorted_top_n) RESTRICT;
 
   /// Returns number of tuples currently in heap.
-  int64_t num_tuples() const { return priority_queue_.size(); }
+  int64_t num_tuples() const { return priority_queue_.Size(); }
 
   IR_NO_INLINE int64_t heap_capacity() const { return capacity_; }
 
- private:
+private:
   /// Limit on capacity of 'priority_queue_'. If inserting a tuple into the queue
   /// would exceed this, a tuple is popped off the queue.
   const int64_t capacity_;
@@ -197,24 +198,10 @@ class TopNNode::Heap {
   /// elements in it than the LIMIT + OFFSET. The order of the queue is the opposite of
   /// what the ORDER BY clause specifies, such that the top of the queue is the last
   /// sorted element.
-  std::vector<Tuple*> priority_queue_;
+  PriorityQueue<Tuple*, TupleRowComparator> priority_queue_;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////
-
-  /// Helper methods for modifying priority_queue while maintaining ordered heap
-  /// invariants
-  inline static void PushHeap(std::vector<Tuple*>* priority_queue,
-      const ComparatorWrapper<TupleRowComparator>& comparator, Tuple* const insert_row) {
-    priority_queue->push_back(insert_row);
-    std::push_heap(priority_queue->begin(), priority_queue->end(), comparator);
-  }
-
-  inline static void PopHeap(std::vector<Tuple*>* priority_queue,
-      const ComparatorWrapper<TupleRowComparator>& comparator) {
-    std::pop_heap(priority_queue->begin(), priority_queue->end(), comparator);
-    priority_queue->pop_back();
-  }
 };
 
 }; // namespace impala

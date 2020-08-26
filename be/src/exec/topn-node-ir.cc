@@ -34,33 +34,30 @@ bool TopNNode::Heap::InsertTupleRow(TopNNode* node, TupleRow* input_row) {
   const TupleDescriptor& tuple_desc = *node->output_tuple_desc_;
   bool replaced_existing_row = false;
   Tuple* insert_tuple = nullptr;
-  if (priority_queue_.size() < heap_capacity()) {
+  if (priority_queue_.Size() < heap_capacity()) {
     // Add all tuples until we hit capacity.
     insert_tuple = reinterpret_cast<Tuple*>(
         node->tuple_pool_->Allocate(node->tuple_byte_size()));
     insert_tuple->MaterializeExprs<false, false>(input_row, tuple_desc,
         node->output_tuple_expr_evals_, node->tuple_pool_.get());
+
+    priority_queue_.Push(insert_tuple);
   } else {
     // We're at capacity - compare to the first row in the priority queue to see if
     // we need to insert this row into the queue.
-    DCHECK(!priority_queue_.empty());
-    Tuple* top_tuple = priority_queue_.front();
+    DCHECK(!priority_queue_.Empty());
+    Tuple* top_tuple = priority_queue_.Top();
     node->tmp_tuple_->MaterializeExprs<false, true>(input_row, tuple_desc,
         node->output_tuple_expr_evals_, nullptr);
+    // If the new tuple is less than the top, need to swap it with the top and re-heapify.
     if (node->tuple_row_less_than_->Less(node->tmp_tuple_, top_tuple)) {
-      // Pop off the old head, and replace with the new tuple. Deep copy into 'top_tuple'
-      // to reuse the fixed-length memory of 'top_tuple'.
+      // Deep copy the new tuple into 'top_tuple' to reuse the fixed-length memory
+      // of 'top_tuple'. The top element in the heap points at 'top_tuple'.
       node->tmp_tuple_->DeepCopy(top_tuple, tuple_desc, node->tuple_pool_.get());
-      insert_tuple = top_tuple;
-      PopHeap(&priority_queue_,
-          ComparatorWrapper<TupleRowComparator>(*node->tuple_row_less_than_));
+      // Re-heapify from the top element and down.
+      priority_queue_.HeapifyFromTop();
       replaced_existing_row = true;
     }
-  }
-  if (insert_tuple != nullptr) {
-    PushHeap(&priority_queue_,
-        ComparatorWrapper<TupleRowComparator>(*node->tuple_row_less_than_),
-        insert_tuple);
   }
   return replaced_existing_row;
 }
