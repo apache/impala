@@ -1546,6 +1546,22 @@ Status AdmissionController::ComputeGroupScheduleStates(
     DCHECK(executor_group->IsHealthy()
         || cluster_membership_mgr_->GetEmptyExecutorGroup() == executor_group)
         << executor_group->name();
+    // Create a temporary ExecutorGroup if we need to filter out executors with the
+    // the set of blacklisted executor addresses in the request.
+    // Note: Coordinator-only query should not be failed due to RPC error, nor make
+    // executor to be blacklisted.
+    const ExecutorGroup* orig_executor_group = executor_group;
+    std::unique_ptr<ExecutorGroup> temp_executor_group;
+    if (!request.blacklisted_executor_addresses.empty()
+        && cluster_membership_mgr_->GetEmptyExecutorGroup() != executor_group) {
+      temp_executor_group.reset(ExecutorGroup::GetFilteredExecutorGroup(
+          executor_group, request.blacklisted_executor_addresses));
+      // If all executors are blacklisted, the retried query cannot be executed so
+      // the Scheduler::Schedule() can be skipped.
+      if (temp_executor_group.get()->NumExecutors() == 0) continue;
+      executor_group = temp_executor_group.get();
+    }
+
     unique_ptr<ScheduleState> group_state =
         make_unique<ScheduleState>(request.query_id, request.request,
             request.query_options, request.summary_profile, request.query_events);
@@ -1556,9 +1572,15 @@ Status AdmissionController::ComputeGroupScheduleStates(
     RETURN_IF_ERROR(
         ExecEnv::GetInstance()->scheduler()->Schedule(group_config, group_state.get()));
     DCHECK(!group_state->executor_group().empty());
-    output_schedules->emplace_back(std::move(group_state), *executor_group);
+    output_schedules->emplace_back(std::move(group_state), *orig_executor_group);
   }
-  DCHECK(!output_schedules->empty());
+  if (output_schedules->empty()) {
+    // Retried query could not be scheduled since all executors are blacklisted.
+    // To keep consistent with the other blacklisting logic, set not_admitted_reason as
+    // REASON_NO_EXECUTOR_GROUPS.
+    queue_node->not_admitted_reason = REASON_NO_EXECUTOR_GROUPS;
+    LOG(WARNING) << queue_node->not_admitted_reason;
+  }
   return Status::OK();
 }
 

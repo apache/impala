@@ -236,6 +236,11 @@ void QueryDriver::RetryQueryFromThread(
     return;
   }
 
+  // Transfer the blacklisted_executor_addresses from the original query to the query to
+  // be retried.
+  retry_request_state->SetBlacklistedExecutorAddresses(
+      client_request_state_->GetBlacklistedExecutorAddresses());
+
   // Run the new query.
   status = retry_request_state->Exec();
   if (!status.ok()) {

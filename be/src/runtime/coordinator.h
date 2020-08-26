@@ -605,7 +605,7 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   /// fragment on that node failed due to a disk IO error.
   /// 'status' is the Status of the given BackendState. 'backend_state' is the
   /// BackendState that reported an error.
-  /// Returns the Status object used when blacklising a backend, or Status::OK if no
+  /// Returns the Status object used when blacklisting a backend, or Status::OK if no
   /// backends were blacklisted.
   Status UpdateBlacklistWithAuxErrorInfo(std::vector<AuxErrorInfoPB>* aux_error_info,
       const Status& status, BackendState* backend_state) WARN_UNUSED_RESULT;

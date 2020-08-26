@@ -36,6 +36,18 @@ ExecutorGroup::ExecutorGroup(string name, int64_t min_size)
 ExecutorGroup::ExecutorGroup(const ExecutorGroupDescPB& desc)
   : ExecutorGroup(desc.name(), desc.min_size()) {}
 
+ExecutorGroup* ExecutorGroup::GetFilteredExecutorGroup(const ExecutorGroup* group,
+    const std::unordered_set<NetworkAddressPB>& blacklisted_executor_addresses) {
+  ExecutorGroup* filtered_group = new ExecutorGroup(*group);
+  for (const NetworkAddressPB& be_address : blacklisted_executor_addresses) {
+    const BackendDescriptorPB* be_desc = filtered_group->LookUpBackendDesc(be_address);
+    if (be_desc != nullptr) {
+      filtered_group->RemoveExecutor(BackendDescriptorPB(*be_desc));
+    }
+  }
+  return filtered_group;
+}
+
 const ExecutorGroup::Executors& ExecutorGroup::GetExecutorsForHost(
     const IpAddr& ip) const {
   ExecutorMap::const_iterator it = executor_map_.find(ip);

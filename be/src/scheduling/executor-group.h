@@ -50,6 +50,11 @@ class ExecutorGroup {
   explicit ExecutorGroup(const ExecutorGroupDescPB& desc);
   ExecutorGroup(const ExecutorGroup& other) = default;
 
+  /// Get an ExecutorGroup with the executors from the given ExecutorGroup, excluding
+  /// the executors with address in the given set of blacklisted executor addresses.
+  static ExecutorGroup* GetFilteredExecutorGroup(const ExecutorGroup* group,
+      const std::unordered_set<NetworkAddressPB>& blacklisted_executor_addresses);
+
   /// List of backends, in this case they're all executors.
   typedef std::vector<BackendDescriptorPB> Executors;
   typedef std::vector<IpAddr> IpAddrs;

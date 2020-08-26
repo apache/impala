@@ -386,6 +386,26 @@ class ClientRequestState {
   /// Returns true if results cacheing is enabled, false otherwise.
   bool IsResultCacheingEnabled() const { return result_cache_max_size_ >= 0; }
 
+  /// Add an executor address to the set of blacklisted executor addresses. The scheduler
+  /// will not schedule any query fragment instance on the given executor.
+  /// Note: The given address is added to the set of blacklisted addresses only if the
+  /// request has not been retried, e.g retry_state_ is not equal RETRYING nor RETRIED.
+  void AddBlacklistedExecutorAddress(const NetworkAddressPB& addr);
+
+  /// Return blacklisted executor addresses for the query
+  /// This function should be called after the request is retried, no more executor
+  /// address will be added to the set of blacklisted addresses so there is no data race.
+  std::unordered_set<NetworkAddressPB>& GetBlacklistedExecutorAddresses() {
+    return blacklisted_executor_addresses_;
+  }
+
+  /// Set a set of blacklisted executor addresses. The scheduler will not schedule any
+  /// query fragment instance on the given set of executors.
+  /// This function is called before the retried request is executed so don't need
+  /// mutex protection.
+  void SetBlacklistedExecutorAddresses(
+      std::unordered_set<NetworkAddressPB>& executor_addresses);
+
  protected:
   /// Updates the end_time_us_ of this query if it isn't set. The end time is determined
   /// when this function is called for the first time, calling it multiple times does not
@@ -474,6 +494,10 @@ class ClientRequestState {
   /// Used by GetCoordinator() to check if 'coord_' can be made accessible. Set to true by
   /// the async-exec-thread only after Exec() has been successfully called on 'coord_'.
   AtomicBool coord_exec_called_;
+
+  /// Set of executor addresses, which allow caller to tell the scheduler to not schedule
+  /// the query on this set of executors.
+  std::unordered_set<NetworkAddressPB> blacklisted_executor_addresses_;
 
   /// Runs statements that query or modify the catalog via the CatalogService.
   boost::scoped_ptr<CatalogOpExecutor> catalog_op_executor_;
