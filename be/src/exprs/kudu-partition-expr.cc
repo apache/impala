@@ -19,6 +19,8 @@
 
 #include <kudu/common/partial_row.h>
 
+#include "codegen/codegen-anyval.h"
+#include "codegen/llvm-codegen.h"
 #include "exec/kudu-util.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "gutil/strings/substitute.h"
@@ -32,15 +34,6 @@
 #include "common/names.h"
 
 namespace impala {
-
-/// Per-thread context for KuduPartitionExpr.
-struct KuduPartitionExprCtx {
-  /// Used to call into Kudu to determine partitions.
-  unique_ptr<kudu::client::KuduPartitioner> partitioner;
-
-  /// Stores the col values for each row that is partitioned.
-  unique_ptr<kudu::KuduPartialRow> row;
-};
 
 KuduPartitionExpr::KuduPartitionExpr(const TExprNode& node)
   : ScalarExpr(node), tkudu_partition_expr_(node.kudu_partition_expr) {}
@@ -127,9 +120,196 @@ IntVal KuduPartitionExpr::GetIntValInterpreted(
   return IntVal(kudu_partition);
 }
 
+/// Codegens code that retrieves the KuduPartialRow and KuduPartitioner pointers stored in
+/// the function context. Sets *kudu_row_ptr' and '*kudu_partitioner_ptr' to point to the
+/// 'llvm::Value's that represent these pointers.
+void CodegenGetKuduPartialRowAndPartitioner(LlvmCodeGen* codegen, LlvmBuilder* builder,
+    llvm::Value* eval, int fn_ctx_idx,
+    llvm::Value** kudu_row_ptr, llvm::Value** kudu_partitioner_ptr) {
+  llvm::Type* const kudu_row_ptr_type =
+      codegen->GetNamedPtrType("class.kudu::KuduPartialRow");
+  llvm::Value* const kudu_row_ptr_ptr = codegen->CreateEntryBlockAlloca(
+      *builder, kudu_row_ptr_type, "kudu_row_ptr_ptr");
+
+  llvm::Type* const kudu_partitioner_ptr_type =
+      codegen->GetNamedPtrType("class.kudu::client::KuduPartitioner");
+  llvm::Value* const kudu_partitioner_ptr_ptr = codegen->CreateEntryBlockAlloca(*builder,
+      kudu_partitioner_ptr_type, "kudu_partitioner_ptr_ptr");
+
+  llvm::Function* const set_kudu_partial_row_and_partitioner_fn =
+      codegen->GetFunction(IRFunction::SET_KUDU_PARTIAL_ROW_AND_PARTITIONER, false);
+  builder->CreateCall(set_kudu_partial_row_and_partitioner_fn,
+      {eval, codegen->GetI32Constant(fn_ctx_idx),
+      kudu_row_ptr_ptr, kudu_partitioner_ptr_ptr});
+
+  *kudu_row_ptr = builder->CreateLoad(kudu_row_ptr_ptr, "kudu_row_ptr");
+  *kudu_partitioner_ptr = builder->CreateLoad(
+      kudu_partitioner_ptr_ptr, "kudu_partitioner_ptr");
+}
+
+void CodegenCallWriteKuduValue(LlvmCodeGen* codegen, LlvmBuilder* builder, int col,
+    const ColumnType& type, llvm::Value* kudu_row_ptr, llvm::Value* child_native_val) {
+  llvm::Function* const write_kudu_fn =
+      codegen->GetFunction(IRFunction::WRITE_KUDU_VALUE, false);
+
+  llvm::Type* const status_type = codegen->GetNamedType(Status::LLVM_CLASS_NAME);
+  llvm::Value* const status_ptr = codegen->CreateEntryBlockAlloca(*builder,
+      status_type, "status_ptr");
+
+  llvm::Value* const col_type_ptr = codegen->GetPtrTo(builder, type.ToIR(codegen));
+  llvm::Value* const child_i8 = builder->CreateBitCast(
+      child_native_val, codegen->i8_type()->getPointerTo());
+
+  // This can only fail if we set a col to an incorrect type, which would be a bug in
+  // planning, so we could DCHECK but in codegen code we can't so we do not check it.
+  builder->CreateCall(write_kudu_fn,
+      {status_ptr, codegen->GetI32Constant(col), col_type_ptr,
+      child_i8, codegen->GetBoolConstant(false), kudu_row_ptr});
+}
+
+/// Sample IR:
+/// define i64 @KuduPartitionExpr(%"class.impala::ScalarExprEvaluator"* %eval,
+///                               %"class.impala::TupleRow"* %row) #46 {
+/// entry:
+///   %0 = alloca %"struct.impala::ColumnType"
+///   %status_ptr = alloca %"class.impala::Status"
+///   %1 = alloca i32
+///   %kudu_partitioner_ptr_ptr = alloca %"class.kudu::client::KuduPartitioner"*
+///   %kudu_row_ptr_ptr = alloca %"class.kudu::KuduPartialRow"*
+///   ; The next two lines should be one line but the name of the identifier is too long.
+///   call void @_ZN6impala17KuduPartitionExpr31SetKuduPartialRowAndPartitionerEPNS_19
+///ScalarExprEvaluatorEiPPN4kudu14KuduPartialRowEPPNS3_6client15KuduPartitionerE(
+///       %"class.impala::ScalarExprEvaluator"* %eval,
+///       i32 0,
+///       %"class.kudu::KuduPartialRow"** %kudu_row_ptr_ptr,
+///       %"class.kudu::client::KuduPartitioner"** %kudu_partitioner_ptr_ptr)
+///   %kudu_row_ptr = load %"class.kudu::KuduPartialRow"*,
+///                        %"class.kudu::KuduPartialRow"** %kudu_row_ptr_ptr
+///   %kudu_partitioner_ptr = load %"class.kudu::client::KuduPartitioner"*,
+///                                %"class.kudu::client::KuduPartitioner"**
+///                                %kudu_partitioner_ptr_ptr
+///   br label %eval_child
+///
+/// eval_child:                                       ; preds = %entry
+///   %child = call i64 @GetSlotRef.3(%"class.impala::ScalarExprEvaluator"* %eval,
+///                                   %"class.impala::TupleRow"* %row)
+///   %is_null = trunc i64 %child to i1
+///   br i1 %is_null, label %child_null, label %child_not_null
+///
+/// child_null:                                       ; preds = %eval_child
+///   ret i64 -4294967296
+///
+/// child_not_null:                                   ; preds = %eval_child
+///   %2 = ashr i64 %child, 32
+///   %3 = trunc i64 %2 to i32
+///   store i32 %3, i32* %1
+///   store %"struct.impala::ColumnType" {
+///       i32 5, i32 -1, i32 -1, i32 -1,
+///       %"class.std::vector.13" zeroinitializer,
+///       %"class.std::vector.18" zeroinitializer },
+///       %"struct.impala::ColumnType"* %0
+///   %4 = bitcast i32* %1 to i8*
+///   call void
+///       @_ZN6impala14WriteKuduValueEiRKNS_10ColumnTypeEPKvbPN4kudu14KuduPartialRowE(
+///       %"class.impala::Status"* %status_ptr,
+///       i32 0,
+///       %"struct.impala::ColumnType"* %0,
+///       i8* %4,
+///       i1 false,
+///       %"class.kudu::KuduPartialRow"* %kudu_row_ptr)
+///   br label %partition_block
+///
+/// partition_block:                                  ; preds = %child_not_null
+///   ; The next two lines should be one line but the name of the identifier is too long.
+///   %ret_val = call i64 @_ZN6impala19GetKuduPartitionRowEPN4kudu6client15
+///KuduPartitionerEPNS0_14KuduPartialRowE(
+///       %"class.kudu::client::KuduPartitioner"* %kudu_partitioner_ptr,
+///       %"class.kudu::KuduPartialRow"* %kudu_row_ptr)
+///   ret i64 %ret_val
+/// }
 Status KuduPartitionExpr::GetCodegendComputeFnImpl(
     LlvmCodeGen* codegen, llvm::Function** fn) {
-  return GetCodegendComputeFnWrapper(codegen, fn);
+  llvm::Function* const kudu_partition_row_fn =
+      codegen->GetFunction(IRFunction::GET_KUDU_PARTITION_ROW, false);
+
+  // Function prototype.
+  llvm::LLVMContext& context = codegen->context();
+  LlvmBuilder builder(context);
+
+  // Parameters of the generated function (ScalarExprEvaluator*, TupleRow*).
+  llvm::Value* args[2];
+  llvm::Function* const function =
+      CreateIrFunctionPrototype("KuduPartitionExpr", codegen, &args);
+
+  // Codegen the initialisation of function context etc.
+  llvm::BasicBlock* const entry_block =
+      llvm::BasicBlock::Create(context, "entry", function);
+  builder.SetInsertPoint(entry_block);
+
+  llvm::Value* kudu_row_ptr = nullptr;
+  llvm::Value* kudu_partitioner_ptr = nullptr;
+  CodegenGetKuduPartialRowAndPartitioner(codegen, &builder, args[0], fn_ctx_idx_,
+      &kudu_row_ptr, &kudu_partitioner_ptr);
+
+  llvm::BasicBlock* current_eval_child_block = llvm::BasicBlock::Create(
+      context, "eval_child", function);
+  builder.CreateBr(current_eval_child_block);
+
+  const int num_children = GetNumChildren();
+  for (int i = 0; i < num_children; ++i) {
+    ScalarExpr* const child_expr = GetChild(i);
+    llvm::Function* child_fn = nullptr;
+    RETURN_IF_ERROR(child_expr->GetCodegendComputeFn(codegen, false, &child_fn));
+
+    builder.SetInsertPoint(current_eval_child_block);
+    const ColumnType& child_type = child_expr->type();
+    CodegenAnyVal child_wrapped = CodegenAnyVal::CreateCallWrapped(
+        codegen, &builder, child_type, child_fn, {args[0], args[1]}, "child");
+
+    llvm::BasicBlock* null_block =
+        llvm::BasicBlock::Create(context, "child_null", function);
+    llvm::BasicBlock* not_null_block =
+        llvm::BasicBlock::Create(context, "child_not_null", function);
+    builder.CreateCondBr(child_wrapped.GetIsNull(), null_block, not_null_block);
+
+    // Child is null.
+    builder.SetInsertPoint(null_block);
+    CodegenAnyVal error_ret_val =
+        CodegenAnyVal::GetNonNullVal(codegen, &builder, type(), "error_ret_val");
+    error_ret_val.SetVal(-1);
+    builder.CreateRet(error_ret_val.GetLoweredValue());
+
+    // Child is not null.
+    builder.SetInsertPoint(not_null_block);
+    const int col = tkudu_partition_expr_.referenced_columns[i];
+    const ColumnDescriptor& col_desc = table_desc_->col_descs()[col];
+    const ColumnType& type = col_desc.type();
+    DCHECK_EQ(child_expr->type().type, type.type);
+
+    llvm::Value* const child_native_val = child_wrapped.ToNativePtr();
+
+    CodegenCallWriteKuduValue(codegen, &builder, col, type,
+        kudu_row_ptr, child_native_val);
+
+    llvm::BasicBlock* next_eval_child_block =
+        llvm::BasicBlock::Create(context, "eval_child", function);
+    builder.CreateBr(next_eval_child_block);
+    current_eval_child_block = next_eval_child_block;
+  }
+
+  llvm::BasicBlock* const partition_block = current_eval_child_block;
+  partition_block->setName("partition_block");
+  builder.SetInsertPoint(partition_block);
+  llvm::Value* const ret_val = builder.CreateCall(kudu_partition_row_fn,
+      {kudu_partitioner_ptr, kudu_row_ptr}, "ret_val");
+  builder.CreateRet(ret_val);
+
+  *fn = codegen->FinalizeFunction(function);
+  if (UNLIKELY(*fn == nullptr)) {
+    return Status(TErrorCode::IR_VERIFY_FAILED, "KuduPartitionExpr");
+  }
+
+  return Status::OK();
 }
 
 } // namespace impala

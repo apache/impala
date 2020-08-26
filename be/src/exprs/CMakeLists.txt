@@ -48,6 +48,7 @@ add_library(Exprs
   is-not-empty-predicate.cc
   is-null-predicate-ir.cc
   kudu-partition-expr.cc
+  kudu-partition-expr-ir.cc
   like-predicate.cc
   like-predicate-ir.cc
   literal.cc

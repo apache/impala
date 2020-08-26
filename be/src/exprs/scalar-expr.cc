@@ -399,36 +399,6 @@ Status ScalarExpr::GetCodegendComputeFn(
   return Status::OK();
 }
 
-Status ScalarExpr::GetCodegendComputeFnWrapper(
-    LlvmCodeGen* codegen, llvm::Function** fn) {
-  for (ScalarExpr* expr : children_) {
-    llvm::Function* dummy;
-    // The codegen'd function will call expr->Get*Val(). Ensure that the child expr
-    // is a codegen entry point we expr->GetVal() uses the fast codegen'd path.
-    RETURN_IF_ERROR(expr->GetCodegendComputeFn(codegen, true, &dummy));
-  }
-
-  llvm::Function* static_getval_fn = GetStaticGetValWrapper(type(), codegen);
-
-  // Call it passing this as the additional first argument.
-  llvm::Value* args[2];
-  *fn = CreateIrFunctionPrototype("CodegenComputeFnWrapper", codegen, &args);
-  llvm::BasicBlock* entry_block =
-      llvm::BasicBlock::Create(codegen->context(), "entry", *fn);
-  LlvmBuilder builder(entry_block);
-  llvm::Value* this_ptr =
-      codegen->CastPtrToLlvmPtr(codegen->GetStructPtrType<ScalarExpr>(), this);
-  llvm::Value* compute_fn_args[] = {this_ptr, args[0], args[1]};
-  llvm::Value* ret = CodegenAnyVal::CreateCall(
-      codegen, &builder, static_getval_fn, compute_fn_args, "ret");
-  builder.CreateRet(ret);
-  *fn = codegen->FinalizeFunction(*fn);
-  if (UNLIKELY(*fn == nullptr)) {
-    return Status(TErrorCode::IR_VERIFY_FAILED, "CodegendComputeFnWrapper");
-  }
-  return Status::OK();
-}
-
 #define SCALAR_EXPR_GET_VAL_INTERPRETED(type)                 \
   type ScalarExpr::Get##type##Interpreted(                    \
       ScalarExprEvaluator* eval, const TupleRow* row) const { \

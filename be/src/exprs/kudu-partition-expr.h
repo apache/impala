@@ -64,6 +64,20 @@ class KuduPartitionExpr : public ScalarExpr {
 
   /// Kudu table object, used to construct per-thread partitioner. Thread-safe.
   kudu::client::sp::shared_ptr<kudu::client::KuduTable> table_;
+
+  /// Per-thread context for KuduPartitionExpr.
+  struct KuduPartitionExprCtx {
+    /// Used to call into Kudu to determine partitions.
+    std::unique_ptr<kudu::client::KuduPartitioner> partitioner;
+
+    /// Stores the col values for each row that is partitioned.
+    std::unique_ptr<kudu::KuduPartialRow> row;
+  };
+
+  /// Helper function used in codegen. Sets '*row' and '*partitioner' to the values stored
+  /// in the function context.
+  static void SetKuduPartialRowAndPartitioner(ScalarExprEvaluator* eval, int fn_ctx_idx,
+      kudu::KuduPartialRow** row, kudu::client::KuduPartitioner** partitioner);
 };
 
 } // namespace impala
