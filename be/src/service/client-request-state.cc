@@ -188,6 +188,20 @@ void ClientRequestState::SetFrontendProfile(TRuntimeProfileNode profile) {
   frontend_profile_->Update(prof_tree);
 }
 
+void ClientRequestState::AddBlacklistedExecutorAddress(const NetworkAddressPB& addr) {
+  lock_guard<mutex> l(lock_);
+  if (!WasRetried()) blacklisted_executor_addresses_.emplace(addr);
+}
+
+void ClientRequestState::SetBlacklistedExecutorAddresses(
+    std::unordered_set<NetworkAddressPB>& executor_addresses) {
+  DCHECK(blacklisted_executor_addresses_.empty());
+  if (!executor_addresses.empty()) {
+    blacklisted_executor_addresses_.insert(
+        executor_addresses.begin(), executor_addresses.end());
+  }
+}
+
 Status ClientRequestState::Exec() {
   MarkActive();
 
@@ -534,7 +548,7 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
   Status admit_status =
       ExecEnv::GetInstance()->admission_controller()->SubmitForAdmission(
           {query_id_pb, exec_request_->query_exec_request, exec_request_->query_options,
-              summary_profile_, query_events_},
+              summary_profile_, query_events_, blacklisted_executor_addresses_},
           &admit_outcome_, &schedule_);
   {
     lock_guard<mutex> l(lock_);

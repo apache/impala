@@ -321,6 +321,7 @@ class AdmissionController {
     const TQueryOptions& query_options;
     RuntimeProfile* summary_profile;
     RuntimeProfile::EventSequence* query_events;
+    std::unordered_set<NetworkAddressPB>& blacklisted_executor_addresses;
   };
 
   /// Submits the request for admission. May returns immediately if rejected, but

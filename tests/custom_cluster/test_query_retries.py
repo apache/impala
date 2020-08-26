@@ -32,8 +32,15 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.errors import Timeout
-from tests.common.skip import SkipIfEC
+from tests.common.skip import SkipIfEC, SkipIfBuildType
 
+# The BE krpc port of the impalad to simulate rpc errors in tests.
+FAILED_KRPC_PORT = 27001
+
+
+def _get_rpc_fail_action(port):
+  return "IMPALA_SERVICE_POOL:127.0.0.1:{port}:ExecQueryFInstances:FAIL" \
+      .format(port=port)
 
 # All tests in this class have SkipIfEC because all tests run a query and expect
 # the query to be retried when killing a random impalad. On EC this does not always work
@@ -267,6 +274,136 @@ class TestQueryRetries(CustomClusterTestSuite):
     # Validate the state of the web ui. The query must be closed before validating the
     # state since it asserts that no queries are in flight.
     self.client.close_query(handle)
+    self.__validate_web_ui_state()
+
+  @SkipIfBuildType.not_dev_build
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--debug_actions=" + _get_rpc_fail_action(FAILED_KRPC_PORT),
+      statestored_args="--statestore_heartbeat_frequency_ms=1000 \
+          --statestore_max_missed_heartbeats=2")
+  def test_retry_exec_rpc_failure_before_admin_delay(self):
+    """Test retried query triggered by RPC failures by simulating RPC errors at the port
+    of the 2nd node in the cluster. Simulate admission delay for query with debug_action
+    so that the 2nd node is removed from the blacklist when making schedule for retried
+    query. Verify that retried query is executed successfully, while the 2nd node is not
+    in the executor blacklist and it is not assigned to any fragment instance."""
+
+    impalad_service = self.cluster.get_first_impalad().service
+    rpc_not_accessible_impalad = self.cluster.impalads[1]
+    assert rpc_not_accessible_impalad.service.krpc_port == FAILED_KRPC_PORT
+
+    # The 2nd node cannot be accessible through KRPC so that it's added to blacklist
+    # and the query should be retried. Add delay before admission so that the 2nd node
+    # is removed from the blacklist before scheduler makes schedule for the retried
+    # query.
+    query = "select count(*) from tpch_parquet.lineitem"
+    handle = self.execute_query_async(query,
+        query_options={'retry_failed_queries': 'true',
+                       'debug_action': 'CRS_BEFORE_ADMISSION:SLEEP@18000'})
+    self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 80)
+
+    # Validate that the query was retried.
+    self.__validate_runtime_profiles_from_service(impalad_service, handle)
+
+    # Assert that the query succeeded and returned the correct results.
+    results = self.client.fetch(query, handle)
+    assert results.success
+    assert len(results.data) == 1
+    assert "6001215" in results.data[0]
+
+    # The runtime profile of the retried query.
+    retried_runtime_profile = self.client.get_runtime_profile(handle)
+
+    # Assert that the 2nd node does not show up in the list of blacklisted executors
+    # from the runtime profile.
+    self.__assert_executors_not_blacklisted(rpc_not_accessible_impalad,
+        retried_runtime_profile)
+
+    # Assert that the 2nd node is not assigned any fragment instance for retried query
+    # execution.
+    self.__assert_executors_not_assigned_any_finstance(rpc_not_accessible_impalad,
+        retried_runtime_profile)
+
+    # Validate the live exec summary.
+    retried_query_id = self.__get_retried_query_id_from_summary(handle)
+    assert retried_query_id is not None
+
+    # Validate the state of the runtime profiles.
+    self.__validate_runtime_profiles(
+        retried_runtime_profile, handle.get_handle().id, retried_query_id)
+
+    # Validate the state of the client log.
+    self.__validate_client_log(handle, retried_query_id)
+
+    # Validate the state of the web ui. The query must be closed before validating the
+    # state since it asserts that no queries are in flight.
+    self.client.close_query(handle)
+    self.__validate_web_ui_state()
+
+  @SkipIfBuildType.not_dev_build
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--debug_actions=" + _get_rpc_fail_action(FAILED_KRPC_PORT),
+      statestored_args="--statestore_heartbeat_frequency_ms=1000 \
+          --statestore_max_missed_heartbeats=2",
+      cluster_size=2, num_exclusive_coordinators=1)
+  def test_retry_query_failure_all_executors_blacklisted(self):
+    """Test retried query triggered by RPC failures by simulating RPC errors at the port
+    of the 2nd node, which is the only executor in the cluster. Simulate admission delay
+    for query with debug_action so that the 2nd node is removed from the blacklist and
+    added back to executor group when making schedule for retried query. Verify that
+    retried query fails due to no executor available even the 2nd node is not in the
+    executor blacklist."""
+
+    rpc_not_accessible_impalad = self.cluster.impalads[1]
+    assert rpc_not_accessible_impalad.service.krpc_port == FAILED_KRPC_PORT
+
+    query = "select count(*) from tpch_parquet.lineitem"
+    handle = self.execute_query_async(query,
+        query_options={'retry_failed_queries': 'true',
+                       'debug_action': 'CRS_BEFORE_ADMISSION:SLEEP@18000'})
+    # Wait until the query fails.
+    self.wait_for_state(handle, self.client.QUERY_STATES['EXCEPTION'], 140)
+
+    # Validate the live exec summary.
+    retried_query_id = self.__get_retried_query_id_from_summary(handle)
+    assert retried_query_id is not None
+
+    # The runtime profile and client log of the retried query, need to be retrieved
+    # before fetching results, since the failed fetch attempt will close the
+    # query handle.
+    retried_runtime_profile = self.client.get_runtime_profile(handle)
+    self.__validate_client_log(handle, retried_query_id)
+
+    # Assert that the query failed since all executors are blacklisted and no executor
+    # available for scheduling the query to be retried. To keep consistent with the other
+    # blacklisting logic, Impalad return error message "Admission for query exceeded
+    # timeout 60000ms in pool default-pool. Queued reason: Waiting for executors to
+    # start...".
+    try:
+      self.client.fetch(self._shuffle_heavy_query, handle)
+      assert False
+    except ImpalaBeeswaxException, e:
+      assert "Admission for query exceeded timeout 60000ms in pool default-pool." \
+          in str(e)
+      assert "Queued reason: Waiting for executors to start. Only DDL queries and " \
+             "queries scheduled only on the coordinator (either NUM_NODES set to 1 " \
+             "or when small query optimization is triggered) can currently run" in str(e)
+      assert "Additional Details: Not Applicable" in str(e)
+
+    # Assert that the RPC un-reachable impalad not shows up in the list of blacklisted
+    # executors from the runtime profile.
+    self.__assert_executors_not_blacklisted(rpc_not_accessible_impalad,
+        retried_runtime_profile)
+
+    # Assert that the query id of the original query is in the runtime profile of the
+    # retried query.
+    self.__validate_original_id_in_profile(retried_runtime_profile,
+        handle.get_handle().id)
+
+    # Validate the state of the web ui. The query must be closed before validating the
+    # state since it asserts that no queries are in flight.
     self.__validate_web_ui_state()
 
   @pytest.mark.execute_serially
@@ -808,6 +945,18 @@ class TestQueryRetries(CustomClusterTestSuite):
     during query execution."""
     assert "Blacklisted Executors: {0}:{1}".format(blacklisted_impalad.hostname,
         blacklisted_impalad.service.be_port) in profile, profile
+
+  def __assert_executors_not_blacklisted(self, impalad, profile):
+    """Validate that the given profile indicates that the given impalad was not
+    blacklisted during retried query execution"""
+    assert not ("Blacklisted Executors: {0}:{1}".format(impalad.hostname,
+        impalad.service.be_port) in profile), profile
+
+  def __assert_executors_not_assigned_any_finstance(self, impalad, profile):
+    """Validate that the given profile indicates that the given impalad was not
+    assigned any fragment instance for query execution"""
+    assert not ("host={0}:{1}".format(impalad.hostname,
+        impalad.service.be_port) in profile), profile
 
   def __validate_client_log(self, handle, retried_query_id, use_hs2_client=False):
     """Validate the GetLog result contains query retry information"""

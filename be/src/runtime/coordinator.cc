@@ -509,6 +509,8 @@ Status Coordinator::StartBackendExec() {
         const UniqueIdPB& backend_id = backend_state->exec_params().backend_id();
         ExecEnv::GetInstance()->cluster_membership_mgr()->BlacklistExecutor(backend_id,
             FromKuduStatus(backend_state->exec_rpc_status(), "Exec() rpc failed"));
+        parent_request_state_->AddBlacklistedExecutorAddress(
+            backend_state->exec_params().address());
       }
     }
     if (!failed_backend_states.empty()) {
@@ -1094,6 +1096,8 @@ Status Coordinator::UpdateBlacklistWithAuxErrorInfo(
 
         ExecEnv::GetInstance()->cluster_membership_mgr()->BlacklistExecutor(
             dest_node_exec_params.backend_id(), retryable_status);
+        parent_request_state_->AddBlacklistedExecutorAddress(
+            dest_node_exec_params.address());
 
         // Only blacklist one node per report.
         return retryable_status;
