@@ -140,5 +140,18 @@ StringVal DataSketchesFunctions::DsKllCDFAsString(FunctionContext* ctx,
   return GetDsKllPMFOrCDF(ctx, serialized_sketch, num_args, args, CDF);
 }
 
+StringVal DataSketchesFunctions::DsKllStringify( FunctionContext* ctx,
+    const StringVal& serialized_sketch) {
+  if (serialized_sketch.is_null || serialized_sketch.len == 0) return StringVal::null();
+  datasketches::kll_sketch<float> sketch;
+  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
+    LogSketchDeserializationError(ctx);
+    return StringVal::null();
+  }
+  string str = sketch.to_string(false, false);
+  StringVal dst(ctx, str.size());
+  memcpy(dst.ptr, str.c_str(), str.size());
+  return dst;
 }
 
+}

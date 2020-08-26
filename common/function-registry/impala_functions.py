@@ -945,6 +945,8 @@ visible_functions = [
       '_ZN6impala21DataSketchesFunctions16DsKllPMFAsStringEPN10impala_udf15FunctionContextERKNS1_9StringValEiPKNS1_8FloatValE'],
   [['ds_kll_cdf_as_string'], 'STRING', ['STRING', 'FLOAT', '...'],
       '_ZN6impala21DataSketchesFunctions16DsKllCDFAsStringEPN10impala_udf15FunctionContextERKNS1_9StringValEiPKNS1_8FloatValE'],
+  [['ds_kll_stringify'], 'STRING', ['STRING'],
+      '_ZN6impala21DataSketchesFunctions14DsKllStringifyEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
 ]
 
 invisible_functions = [

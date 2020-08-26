@@ -91,6 +91,12 @@ public:
   static StringVal DsKllCDFAsString(FunctionContext* ctx,
       const StringVal& serialized_sketch, int num_args, const FloatVal* args);
 
+  /// 'serialized_sketch' is expected as a serialized Apache DataSketches KLL sketch. If
+  /// it is not, then the query fails. This function returns the stringified format of
+  /// an Apache DataSketches sketch.
+  static StringVal DsKllStringify(FunctionContext* ctx,
+      const StringVal& serialized_sketch);
+
 private:
   enum PMFCDF {
     PMF,
@@ -102,7 +108,7 @@ private:
   static StringVal GetDsKllPMFOrCDF(FunctionContext* ctx,
       const StringVal& serialized_sketch, int num_args, const FloatVal* args,
       PMFCDF mode);
+
 };
 
 }
-
