@@ -32,6 +32,7 @@ from kudu.util import to_unixtime_micros
 import logging
 import pytest
 import random
+import re
 import textwrap
 import threading
 import time
@@ -548,6 +549,73 @@ class TestKuduOperations(KuduTestSuite):
     cursor.execute("""insert into %s select id, string_col from functional.alltypes
     where id > 2 limit 100""" % table_name)
     self._retry_query(cursor, "select count(*) from %s" % table_name, [(103,)])
+
+
+class TestKuduPartitioning(KuduTestSuite):
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestKuduPartitioning, cls).add_test_dimensions()
+
+    # Test both the interpreted and the codegen'd path.
+    add_exec_option_dimension(cls, "disable_codegen", "0")
+    extend_exec_option_dimension(cls, "disable_codegen", "1")
+
+  def test_partitions_evenly_distributed(self, vector, cursor,
+      kudu_client, unique_database):
+    """Sanity check for KuduPartitionExpr. We insert numbers into a table and check that
+    inserted elements are distributed evenly among the partitions. The assumption here is
+    that the source distribution is more or less uniform and that hashing retains this
+    property. This protects against some but not all errors. The number of partitions
+    should be the same as the number of impalads."""
+
+    table_name = "partitioning"
+    table_full_name = unique_database + ".partitioning"
+    cursor.execute("""CREATE TABLE %s (a INT PRIMARY KEY)
+        PARTITION BY HASH(a) PARTITIONS 3 STORED AS KUDU""" % table_full_name)
+    assert kudu_client.table_exists(KuduTestSuite.to_kudu_table_name(
+        unique_database, table_name))
+
+    query = "INSERT INTO %s SELECT id FROM functional.alltypes" % table_full_name
+    exec_options = dict((k, str(v)) for k, v
+        in vector.get_value('exec_option').iteritems())
+    cursor.execute(query, configuration=exec_options)
+
+    profile = cursor.get_profile()
+
+    numbers = TestKuduPartitioning.extract_kudu_rows_from_profile(profile)
+    TestKuduPartitioning.assert_rows_evenly_distributed(numbers)
+
+  @staticmethod
+  def assert_rows_evenly_distributed(rows):
+    TOLERANCE_RATIO = 0.1
+    avg = rows[0]  # The first result is from the averaged summary.
+    values = rows[1:]
+
+    for value in values:
+      abs_diff = abs(avg - value)
+      ratio = float(abs_diff) / avg
+      assert ratio < TOLERANCE_RATIO
+
+  @staticmethod
+  def extract_kudu_rows_from_profile(profile):
+    # First we look for a header that contains "KuduTableSink", then under that we find
+    # the number of rows.
+    res = []
+    kudu_table_sink = "KuduTableSink"
+    total_num_rows_re = re.compile("TotalNumRows:.*\(([0-9]+)\)")
+
+    within_kudu_table_sink_section = False
+    for line in profile.splitlines():
+        if within_kudu_table_sink_section:
+            match = total_num_rows_re.search(line)
+            if match:
+                res.append(int(match.group(1)))
+                within_kudu_table_sink_section = False
+        else:
+            if kudu_table_sink in line:
+                within_kudu_table_sink_section = True
+    return res
+
 
 class TestCreateExternalTable(KuduTestSuite):
 

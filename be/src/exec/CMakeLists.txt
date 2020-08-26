@@ -90,6 +90,7 @@ add_library(Exec
   kudu-scan-node-mt.cc
   kudu-table-sink.cc
   kudu-util.cc
+  kudu-util-ir.cc
   read-write-util.cc
   scan-node.cc
   scanner-context.cc

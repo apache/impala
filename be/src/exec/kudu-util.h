@@ -31,6 +31,7 @@ struct tm;
 
 namespace impala {
 
+class DateValue;
 class TimestampValue;
 
 /// Returns false when running on an operating system that Kudu doesn't support. If this
@@ -82,6 +83,12 @@ ColumnType KuduDataTypeToColumnType(kudu::client::KuduColumnSchema::DataType typ
 /// returned.
 Status StringToKuduReadMode(
     const std::string& mode, kudu::client::KuduScanner::ReadMode* out) WARN_UNUSED_RESULT;
+
+// Converts a TimestampValue to Kudu's representation which is returned in 'ts_micros'.
+Status ConvertTimestampValueToKudu(const TimestampValue* tv, int64_t* ts_micros);
+
+// Converts a DateValue to Kudu's representation which is returned in 'days'.
+Status ConvertDateValueToKudu(const DateValue* dv, int32_t* days);
 
 } /// namespace impala
 #endif

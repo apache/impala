@@ -127,12 +127,13 @@ class KuduTestSuite(ImpalaTestSuite):
 
   @contextmanager
   def temp_kudu_table(self, kudu, col_types, name=None, num_key_cols=1, col_names=None,
-      prepend_db_name=True, db_name=None):
+      prepend_db_name=True, db_name=None, num_partitions=2):
     """Create and return a table. This function should be used in a "with" context.
        'kudu' must be a kudu.client.Client. If a table name is not provided, a random
        name will be used. If 'prepend_db_name' is True, the table name will be prepended
        with (get_db_name() + "."). If column names are not provided, the letters
-       "a", "b", "c", ... will be used.
+       "a", "b", "c", ... will be used. The number of partitions can be set using
+       'num_partitions'.
 
        Example:
          with self.temp_kudu_table(kudu, [INT32]) as kudu_table:
@@ -154,7 +155,8 @@ class KuduTestSuite(ImpalaTestSuite):
     if prepend_db_name:
       name = (db_name or self.get_db_name().lower()) + "." + name
     kudu.create_table(name, schema,
-        partitioning=Partitioning().add_hash_partitions(col_names[:num_key_cols], 2))
+        partitioning=Partitioning().add_hash_partitions(col_names[:num_key_cols],
+            num_partitions))
     try:
       yield kudu.table(name)
     finally:

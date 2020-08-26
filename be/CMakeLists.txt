@@ -336,6 +336,7 @@ set(CLANG_INCLUDE_FLAGS
   "-I${ORC_INCLUDE_DIR}"
   # Include Boost as a system directory to suppress warnings from headers.
   "-isystem${BOOST_INCLUDEDIR}"
+  "-I${KUDU_CLIENT_INCLUDE_DIR}"
   # Required so that jni.h can be found during Clang compilation
   "-I${JAVA_INCLUDE_PATH}"
   "-I${JAVA_INCLUDE_PATH2}"

@@ -249,6 +249,12 @@ ir_functions = [
    "_ZN6impala11HiveUdfCall10JniContext28GetInputValuesBufferAtOffsetEPS1_i"],
   ["HIVE_UDF_CALL_CALL_JAVA",
    "_ZN6impala11HiveUdfCall22CallJavaAndStoreResultEPKNS_10ColumnTypeEPN10impala_udf15FunctionContextEPNS0_10JniContextE"],
+  ["SET_KUDU_PARTIAL_ROW_AND_PARTITIONER",
+   "_ZN6impala17KuduPartitionExpr31SetKuduPartialRowAndPartitionerEPNS_19ScalarExprEvaluatorEiPPN4kudu14KuduPartialRowEPPNS3_6client15KuduPartitionerE"],
+  ["WRITE_KUDU_VALUE",
+   "_ZN6impala14WriteKuduValueEiRKNS_10ColumnTypeEPKvbPN4kudu14KuduPartialRowE"],
+  ["GET_KUDU_PARTITION_ROW",
+   "_ZN6impala19GetKuduPartitionRowEPN4kudu6client15KuduPartitionerEPNS0_14KuduPartialRowE"],
 ]
 
 enums_preamble = '\
