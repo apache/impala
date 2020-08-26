@@ -723,7 +723,7 @@ void CatalogServer::TableMetricsUrlCallback(const Webserver::WebRequest& req,
   }
 }
 
-bool CatalogServer::AddPendingTopicItem(std::string key, int64_t version,
+int CatalogServer::AddPendingTopicItem(std::string key, int64_t version,
     const uint8_t* item_data, uint32_t size, bool deleted) {
   pending_topic_updates_.emplace_back();
   TTopicItem& item = pending_topic_updates_.back();
@@ -732,7 +732,7 @@ bool CatalogServer::AddPendingTopicItem(std::string key, int64_t version,
     if (!status.ok()) {
       pending_topic_updates_.pop_back();
       LOG(ERROR) << "Error compressing topic item: " << status.GetDetail();
-      return false;
+      return -1;
     }
   } else {
     item.value.assign(reinterpret_cast<const char*>(item_data),
@@ -740,11 +740,13 @@ bool CatalogServer::AddPendingTopicItem(std::string key, int64_t version,
   }
   item.key = std::move(key);
   item.deleted = deleted;
+  // Skip logging partition items since FE will log their summary (IMPALA-10076).
+  if (item.key.find("HDFS_PARTITION") != string::npos) return item.value.size();
   VLOG(1) << "Collected " << (deleted ? "deletion: " : "update: ") << item.key
           << ", version=" << version << ", original size=" << size
           << (FLAGS_compact_catalog_topic ?
               Substitute(", compressed size=$0", item.value.size()) : string());
-  return true;
+  return item.value.size();
 }
 
 void CatalogServer::MarkServiceAsStarted() { service_started_ = true; }
