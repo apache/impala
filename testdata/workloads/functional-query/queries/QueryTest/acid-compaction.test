@@ -69,3 +69,40 @@ select * from upgraded_table;
 2
 3
 ====
+---- HIVE_QUERY
+use $DATABASE;
+create table full_acid (x int) stored as orc tblproperties('transactional'='true');
+
+insert into full_acid values (1);
+insert into full_acid values (2);
+insert into full_acid values (3);
+====
+---- QUERY
+invalidate metadata full_acid;
+select * from full_acid;
+---- RESULTS
+1
+2
+3
+====
+---- HIVE_QUERY
+use $DATABASE;
+alter table full_acid compact 'major' and wait;
+====
+---- QUERY
+refresh full_acid;
+select * from full_acid
+---- RESULTS
+1
+2
+3
+====
+---- QUERY
+show files in full_acid;
+---- LABELS
+Path,Size,Partition
+---- RESULTS
+row_regex:'$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE.db/full_acid/base_0000003_v\d+/.*','\d+B',''
+---- TYPES
+STRING,STRING,STRING
+====
