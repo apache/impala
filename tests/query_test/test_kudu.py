@@ -1483,3 +1483,62 @@ class TestCreateSynchronizedTable(KuduTestSuite):
       except Exception as e:
         assert "Not allowed to set 'kudu.table_name' manually for" \
                " synchronized Kudu tables" in str(e)
+
+
+class TestKuduReadTokenSplit(KuduTestSuite):
+  """
+  This suite verifies impala's integration of Kudu's split token API.
+  """
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestKuduReadTokenSplit, cls).add_test_dimensions()
+    # The default read mode of READ_LATEST does not provide high enough consistency for
+    # these tests.
+    add_exec_option_dimension(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
+
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_scanner(self, vector, unique_database):
+    """This runs explain query with variations of mt_dop and
+    targeted_kudu_scan_range_length to verify targeted_kudu_scan_range_length's
+    functionality."""
+    explain_query = "explain select * from tpch_kudu.lineitem "
+    plans = []
+
+    regular_num_inst = self.__get_num_scanner_instances(explain_query, mt_dop=None,
+      targeted_kudu_scan_range_length=None, plans=plans)
+
+    mt_dop_1_num_inst = self.__get_num_scanner_instances(explain_query, mt_dop=1,
+      targeted_kudu_scan_range_length=None, plans=plans)
+
+    # targeted_kudu_scan_range_length should be disabled by default and num instances
+    # will be equal to the number of partitions
+    with_mt_dop_num_inst = self.__get_num_scanner_instances(explain_query, mt_dop=10,
+      targeted_kudu_scan_range_length=None, plans=plans)
+
+    # This will result is more splits
+    with_mt_dop_and_low_range_len_num_inst = self.__get_num_scanner_instances(
+      explain_query, mt_dop=10, targeted_kudu_scan_range_length="8mb", plans=plans)
+
+    assert mt_dop_1_num_inst == regular_num_inst, str(plans)
+    assert regular_num_inst < with_mt_dop_num_inst, str(plans)
+    assert with_mt_dop_num_inst < with_mt_dop_and_low_range_len_num_inst, str(plans)
+
+  def __get_num_scanner_instances(self, explain_query, mt_dop,
+                                  targeted_kudu_scan_range_length, plans):
+    """This is a helper method that runs the explain query with the provided query
+    options (mt_dop and targeted_kudu_scan_range_length). Appends the generated plan to
+    'plans' and returns the num of kudu scanner instances """
+    regex = r'F00:PLAN FRAGMENT \[RANDOM\] hosts=3 instances=([0-9]+)'
+    self.client.set_configuration_option("explain_level", 3)
+    if targeted_kudu_scan_range_length:
+      self.client.set_configuration_option("targeted_kudu_scan_range_length",
+                                           targeted_kudu_scan_range_length)
+    if mt_dop:
+      self.client.set_configuration_option("mt_dop", mt_dop)
+    result = self.client.execute(explain_query)
+    plan = "\n".join(result.data)
+    plans.append(plan)
+    matches = re.search(regex, plan)
+    assert len(matches.groups()) == 1
+    self.client.clear_configuration()
+    return int(matches.group(1))

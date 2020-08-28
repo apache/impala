@@ -456,6 +456,10 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   114: optional bool enable_outer_join_to_inner_transformation = false;
+
+  // Initialized with -1 to indicate it is unspecified.
+  // See comment in ImpalaService.thrift
+  115: optional i64 targeted_kudu_scan_range_length = -1;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

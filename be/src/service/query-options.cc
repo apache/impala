@@ -965,6 +965,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
          query_options->__set_enable_outer_join_to_inner_transformation(IsTrue(value));
          break;
       }
+      case TImpalaQueryOptions::TARGETED_KUDU_SCAN_RANGE_LENGTH: {
+              int64_t scan_length = 0;
+              RETURN_IF_ERROR(
+                  ParseMemValue(value, "targeted kudu scan range length", &scan_length));
+              query_options->__set_targeted_kudu_scan_range_length(scan_length);
+              break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

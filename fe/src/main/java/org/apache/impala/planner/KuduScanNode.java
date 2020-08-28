@@ -214,7 +214,7 @@ public class KuduScanNode extends ScanNode {
       throws ImpalaRuntimeException {
     scanRangeSpecs_ = new TScanRangeSpec();
 
-    List<KuduScanToken> scanTokens = createScanTokens(client, rpcTable);
+    List<KuduScanToken> scanTokens = createScanTokens(analyzer, client, rpcTable);
     for (KuduScanToken token: scanTokens) {
       LocatedTablet tablet = token.getTablet();
       List<TScanRangeLocation> locations = new ArrayList<>();
@@ -253,7 +253,7 @@ public class KuduScanNode extends ScanNode {
    * will be pushed to Kudu. The projected Kudu columns are ordered by offset in an
    * Impala tuple to make the Impala and Kudu tuple layouts identical.
    */
-  private List<KuduScanToken> createScanTokens(KuduClient client,
+  private List<KuduScanToken> createScanTokens(Analyzer analyzer, KuduClient client,
       org.apache.kudu.client.KuduTable rpcTable) {
     List<String> projectedCols = new ArrayList<>();
     for (SlotDescriptor desc: getTupleDesc().getSlotsOrderedByOffset()) {
@@ -263,6 +263,9 @@ public class KuduScanNode extends ScanNode {
     }
     KuduScanTokenBuilder tokenBuilder = client.newScanTokenBuilder(rpcTable);
     tokenBuilder.setProjectedColumnNames(projectedCols);
+    long split_size_hint = analyzer.getQueryOptions()
+        .getTargeted_kudu_scan_range_length();
+    if (split_size_hint > 0) tokenBuilder.setSplitSizeBytes(split_size_hint);
     for (KuduPredicate predicate: kuduPredicates_) tokenBuilder.addPredicate(predicate);
     return tokenBuilder.build();
   }
