@@ -23,6 +23,7 @@
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
+#include "gutil/stringprintf.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.inline.h"
@@ -93,6 +94,15 @@ HdfsTableSink::HdfsTableSink(TDataSinkId sink_id, const HdfsTableSinkConfig& sin
   if (hdfs_sink.__isset.write_id) {
     write_id_ = hdfs_sink.write_id;
     DCHECK_GT(write_id_, 0);
+  }
+
+  // Optional output path provided by an external FE
+  if (hdfs_sink.__isset.external_output_dir) {
+    external_output_dir_ = hdfs_sink.external_output_dir;
+  }
+
+  if (hdfs_sink.__isset.external_output_partition_depth) {
+    external_output_partition_depth_ = hdfs_sink.external_output_partition_depth;
   }
 }
 
@@ -216,7 +226,7 @@ Status HdfsTableSink::Open(RuntimeState* state) {
 
 void HdfsTableSink::BuildHdfsFileNames(
     const HdfsPartitionDescriptor& partition_descriptor,
-    OutputPartition* output_partition) {
+    OutputPartition* output_partition, const string &external_partition_name) {
 
   // Create final_hdfs_file_name_prefix and tmp_hdfs_file_name_prefix.
   // Path: <hdfs_base_dir>/<partition_values>/<unique_id_str>
@@ -243,7 +253,13 @@ void HdfsTableSink::BuildHdfsFileNames(
       output_partition->tmp_hdfs_dir_name, output_partition->partition_name,
       query_suffix);
 
-  if (partition_descriptor.location().empty()) {
+  if (HasExternalOutputDir()) {
+    // When an external FE has provided a staging directory we use that directly.
+    // We are trusting that the external frontend implementation has done appropriate
+    // authorization checks on the external output directory.
+    output_partition->final_hdfs_file_name_prefix = Substitute("$0/$1/",
+        external_output_dir_, external_partition_name);
+  } else if (partition_descriptor.location().empty()) {
     output_partition->final_hdfs_file_name_prefix = Substitute("$0/$1/",
         table_desc_->hdfs_base_dir(), output_partition->partition_name);
   } else {
@@ -254,8 +270,23 @@ void HdfsTableSink::BuildHdfsFileNames(
         Substitute("$0/", partition_descriptor.location());
   }
   if (IsHiveAcid()) {
-    string acid_dir = Substitute(overwrite_ ? "/base_$0/" : "/delta_$0_$0/", write_id_);
-    output_partition->final_hdfs_file_name_prefix += acid_dir;
+    if (HasExternalOutputDir()) {
+      // The 0 padding on base and delta is to match the behavior of Hive since various
+      // systems will expect a certain format for dynamic partition creation. Additionally
+      // include an 0 statement id for delta directory so various Hive AcidUtils detect
+      // the directory (such as AcidUtils.baseOrDeltaSubdir()). Multiple statements in a
+      // single transaction is not supported.
+      if (overwrite_) {
+        output_partition->final_hdfs_file_name_prefix += StringPrintf("/base_%07ld/",
+            write_id_);
+      } else {
+        output_partition->final_hdfs_file_name_prefix += StringPrintf(
+            "/delta_%07ld_%07ld_0000/", write_id_, write_id_);
+      }
+    } else {
+      string acid_dir = Substitute(overwrite_ ? "/base_$0/" : "/delta_$0_$0/", write_id_);
+      output_partition->final_hdfs_file_name_prefix += acid_dir;
+    }
   }
   if (IsIceberg()) {
     //TODO: implement LocationProviders.
@@ -469,12 +500,21 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
   // Build the unique name for this partition from the partition keys, e.g. "j=1/f=foo/"
   // etc.
   stringstream partition_name_ss;
+  stringstream external_partition_name_ss;
   for (int j = 0; j < partition_key_expr_evals_.size(); ++j) {
+    bool is_external_part = HasExternalOutputDir() &&
+        j >= external_output_partition_depth_;
+    if (is_external_part) {
+      external_partition_name_ss << GetPartitionName(j) << "=";
+    }
     partition_name_ss << GetPartitionName(j) << "=";
     void* value = partition_key_expr_evals_[j]->GetValue(row);
     // nullptr partition keys get a special value to be compatible with Hive.
     if (value == nullptr) {
       partition_name_ss << table_desc_->null_partition_key_value();
+      if (is_external_part) {
+        external_partition_name_ss << table_desc_->null_partition_key_value();
+      }
     } else {
       string value_str;
       partition_key_expr_evals_[j]->PrintValue(value, &value_str);
@@ -488,16 +528,26 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
       // decoded partition key value.
       string encoded_str;
       UrlEncode(value_str, &encoded_str, true);
+      string part_key_value = (encoded_str.empty() ?
+                              table_desc_->null_partition_key_value() : encoded_str);
       // If the string is empty, map it to nullptr (mimicking Hive's behaviour)
-      partition_name_ss << (encoded_str.empty() ?
-                        table_desc_->null_partition_key_value() : encoded_str);
+      partition_name_ss << part_key_value;
+      if (is_external_part) {
+        external_partition_name_ss << part_key_value;
+      }
     }
-    if (j < partition_key_expr_evals_.size() - 1) partition_name_ss << "/";
+    if (j < partition_key_expr_evals_.size() - 1) {
+      partition_name_ss << "/";
+      if (is_external_part) {
+        external_partition_name_ss << "/";
+      }
+    }
   }
 
   // partition_name_ss now holds the unique descriptor for this partition,
   output_partition->partition_name = partition_name_ss.str();
-  BuildHdfsFileNames(partition_descriptor, output_partition);
+  BuildHdfsFileNames(partition_descriptor, output_partition,
+      external_partition_name_ss.str());
 
   if (ShouldSkipStaging(state, output_partition)) {
     // We will be writing to the final file if we're skipping staging, so get a connection
@@ -739,9 +789,8 @@ void HdfsTableSink::Close(RuntimeState* state) {
 }
 
 bool HdfsTableSink::ShouldSkipStaging(RuntimeState* state, OutputPartition* partition) {
-  if (IsTransactional()) return true;
+  if (IsTransactional() || HasExternalOutputDir() || is_result_sink_) return true;
   // We skip staging if we are writing query results
-  if (is_result_sink_) return true;
   return (IsS3APath(partition->final_hdfs_file_name_prefix.c_str()) && !overwrite_ &&
       state->query_options().s3_skip_insert_staging);
 }

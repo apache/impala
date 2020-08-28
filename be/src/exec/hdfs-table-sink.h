@@ -176,7 +176,7 @@ class HdfsTableSink : public DataSink {
   /// the partition_key_names_ and the evaluated partition_key_exprs_.
   /// The Hdfs file name is the unique_id_str_.
   void BuildHdfsFileNames(const HdfsPartitionDescriptor& partition_descriptor,
-      OutputPartition* output);
+      OutputPartition* output, const std::string &external_partition_path);
 
   /// Writes all rows referenced by the row index vector in 'partition_pair' to the
   /// partition's writer and clears the row index vector afterwards.
@@ -216,6 +216,9 @@ class HdfsTableSink : public DataSink {
 
   /// Returns TRUE for Iceberg tables.
   bool IsIceberg() const { return table_desc_->IsIcebergTable(); }
+
+  /// Returns TRUE if an external output directory was provided.
+  bool HasExternalOutputDir() { return !external_output_dir_.empty(); }
 
   /// Descriptor of target table. Set in Prepare().
   const HdfsTableDescriptor* table_desc_;
@@ -262,6 +265,14 @@ class HdfsTableSink : public DataSink {
   /// The directory in which to write intermediate results. Set to
   /// <hdfs_table_base_dir>/_impala_insert_staging/ during Prepare()
   std::string staging_dir_;
+
+  /// The directory in which an external FE expects results to be written to.
+  std::string external_output_dir_;
+
+  /// How deep into the partition specification in which to start creating partition
+  // directories. Used in conjunction with external_output_dir_ to inform the table
+  // sink which directories are pre-created.
+  int external_output_partition_depth_ = 0;
 
   /// string representation of the unique fragment instance id. Used for per-partition
   /// Hdfs file names, and for tmp Hdfs directories. Set in Prepare();

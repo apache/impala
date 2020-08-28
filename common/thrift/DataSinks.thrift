@@ -90,6 +90,13 @@ struct THdfsTableSink {
 
   // Indicates that this HdfsTableSink is writing query results
   8: optional bool is_result_sink = false;
+
+  // Indicates that an external FE is expecting results here
+  9: optional string external_output_dir;
+
+  // Indicates how deep into the partition specification in which to start creating
+  // partition directories
+  10: optional i32 external_output_partition_depth;
 }
 
 // Structure to encapsulate specific options that are passed down to the KuduTableSink

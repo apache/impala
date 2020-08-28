@@ -1796,19 +1796,28 @@ public class Frontend {
   private static void addFinalizationParamsForInsert(
       TQueryCtx queryCtx, TQueryExecRequest queryExecRequest, InsertStmt insertStmt) {
     FeTable targetTable = insertStmt.getTargetTable();
+    addFinalizationParamsForInsert(queryCtx, queryExecRequest,
+        targetTable, insertStmt.getWriteId(), insertStmt.isOverwrite());
+  }
+
+  // This is public to allow external frontends to utilize this method to fill in the
+  // finalization parameters for externally generated INSERTs.
+  public static void addFinalizationParamsForInsert(
+      TQueryCtx queryCtx, TQueryExecRequest queryExecRequest, FeTable targetTable,
+          long writeId, boolean isOverwrite) {
     if (targetTable instanceof FeFsTable) {
       TFinalizeParams finalizeParams = new TFinalizeParams();
-      finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
-      finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
+      finalizeParams.setIs_overwrite(isOverwrite);
+      finalizeParams.setTable_name(targetTable.getTableName().getTbl());
       finalizeParams.setTable_id(DescriptorTable.TABLE_SINK_ID);
-      String db = insertStmt.getTargetTableName().getDb();
+      String db = targetTable.getTableName().getDb();
       finalizeParams.setTable_db(db == null ? queryCtx.session.database : db);
-      FeFsTable hdfsTable = (FeFsTable) insertStmt.getTargetTable();
+      FeFsTable hdfsTable = (FeFsTable) targetTable;
       finalizeParams.setHdfs_base_dir(hdfsTable.getHdfsBaseDir());
-      if (insertStmt.getWriteId() != -1) {
+      if (writeId != -1) {
         Preconditions.checkState(queryCtx.isSetTransaction_id());
         finalizeParams.setTransaction_id(queryCtx.getTransaction_id());
-        finalizeParams.setWrite_id(insertStmt.getWriteId());
+        finalizeParams.setWrite_id(writeId);
       } else if (targetTable instanceof FeIcebergTable) {
         FeIcebergTable iceTable = (FeIcebergTable)targetTable;
         finalizeParams.setSpec_id(iceTable.getDefaultPartitionSpecId());
