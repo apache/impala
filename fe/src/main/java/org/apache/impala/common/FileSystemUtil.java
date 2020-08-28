@@ -422,7 +422,8 @@ public class FileSystemUtil {
     HDFS,
     LOCAL,
     S3,
-    OZONE;
+    OZONE,
+    ALLUXIO;
 
     private static final Map<String, FsType> SCHEME_TO_FS_MAPPING =
         ImmutableMap.<String, FsType>builder()
@@ -433,6 +434,7 @@ public class FileSystemUtil {
             .put("hdfs", HDFS)
             .put("s3a", S3)
             .put("o3fs", OZONE)
+            .put("alluxio", ALLUXIO)
             .build();
 
     /**
