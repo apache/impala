@@ -83,6 +83,21 @@ public class HdfsTableSink extends TableSink {
   // A value of 0 means no limit.
   private int maxHdfsSinks_;
 
+  // Stores the desired location for the sink output. Primarily intended to be used by
+  // external FEs that expect the results at a certain location for the purposes of
+  // post processing and finalization.
+  protected String externalOutputDir_;
+
+  // This specifies the position in the partition specifition in which to start
+  // creating partition directories.
+  // Example:
+  // Partition specification: year, month, day
+  // The external frontend has provided a path that has year, month created
+  // by them and thus provides a depth of 2 which hints to the TableSink to skip the
+  // first two partition keys and create the day directory for new results. This is
+  // usually used by tables with dynamic partition columns.
+  private int externalOutputPartitionDepth_;
+
   public HdfsTableSink(FeTable targetTable, List<Expr> partitionKeyExprs,
       List<Expr> outputExprs, boolean overwrite, boolean inputIsClustered,
       Pair<List<Integer>, TSortingOrder> sortProperties, long writeId,
@@ -97,6 +112,14 @@ public class HdfsTableSink extends TableSink {
     writeId_ = writeId;
     maxHdfsSinks_ = maxTableSinks;
     isResultSink_ = isResultSink;
+  }
+
+  public void setExternalOutputDir(String externalOutputDir) {
+    externalOutputDir_ = externalOutputDir;
+  }
+
+  public void setExternalOutputPartitionDepth(int partitionDepth) {
+    externalOutputPartitionDepth_ = partitionDepth;
   }
 
   @Override
@@ -220,6 +243,10 @@ public class HdfsTableSink extends TableSink {
     hdfsTableSink.setSort_columns(sortColumns_);
     hdfsTableSink.setSorting_order(sortingOrder_);
     hdfsTableSink.setIs_result_sink(isResultSink_);
+    if (externalOutputDir_ != null) {
+      hdfsTableSink.setExternal_output_dir(externalOutputDir_);
+      hdfsTableSink.setExternal_output_partition_depth(externalOutputPartitionDepth_);
+    }
     if (writeId_ != -1) hdfsTableSink.setWrite_id(writeId_);
     TTableSink tTableSink = new TTableSink(DescriptorTable.TABLE_SINK_ID,
         TTableSinkType.HDFS, sinkOp_.toThrift());
