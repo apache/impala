@@ -190,8 +190,9 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   RETURN_IF_ERROR(footer_status);
 
   bool is_table_full_acid = scan_node_->hdfs_table()->IsTableFullAcid();
-  bool is_file_full_acid = reader_->hasMetadataValue(HIVE_ACID_VERSION_KEY) &&
-                           reader_->getMetadataValue(HIVE_ACID_VERSION_KEY) == "2";
+  schema_resolver_.reset(new OrcSchemaResolver(*scan_node_->hdfs_table(),
+      &reader_->getType(), filename(), is_table_full_acid));
+  bool is_file_full_acid = schema_resolver_->HasFullAcidV2Schema();
   acid_original_file_ = is_table_full_acid && !is_file_full_acid;
   if (is_table_full_acid) {
     acid_write_id_range_ = valid_write_ids_.GetWriteIdRange(filename());
@@ -218,9 +219,6 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
           filename()));
     }
   }
-  schema_resolver_.reset(new OrcSchemaResolver(*scan_node_->hdfs_table(),
-      &reader_->getType(), filename(), is_table_full_acid, is_file_full_acid));
-  RETURN_IF_ERROR(schema_resolver_->ValidateFullAcidFileSchema());
 
   // Hive Streaming Ingestion allocates multiple write ids, hence create delta directories
   // like delta_5_10. Then it continuously appends new stripes (and footers) to the

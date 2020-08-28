@@ -17,8 +17,12 @@
 
 #include "exec/orc-metadata-utils.h"
 
+#include <boost/algorithm/string.hpp>
+
 #include "util/debug-util.h"
 #include "common/names.h"
+
+using boost::algorithm::iequals;
 
 namespace impala {
 
@@ -90,7 +94,6 @@ Status OrcSchemaResolver::ResolveColumn(const SchemaPath& col_path,
   *node = root_;
   *pos_field = false;
   *missing_field = false;
-  DCHECK_OK(ValidateFullAcidFileSchema()); // Should have already been validated.
   if (col_path.empty()) return Status::OK();
   SchemaPath table_path, file_path;
   TranslateColPaths(col_path, &table_path, &file_path);
@@ -318,28 +321,27 @@ bool OrcSchemaResolver::IsAcidColumn(const SchemaPath& col_path) const {
          col_path.front() >= num_part_cols && col_path.front() < num_part_cols + 5;
 }
 
-Status OrcSchemaResolver::ValidateFullAcidFileSchema() const {
-  if (!is_file_full_acid_) return Status::OK();
-  string error_msg = Substitute("File %0 should have full ACID schema.", filename_);
-  if (root_->getKind() != orc::TypeKind::STRUCT) return Status(error_msg);
-  if (root_->getSubtypeCount() != 6) return Status(error_msg);
+void OrcSchemaResolver::DetermineFullAcidSchema() {
+  is_file_full_acid_ = false;
+  if (root_->getKind() != orc::TypeKind::STRUCT) return;
+  if (root_->getSubtypeCount() != 6) return;
   if (root_->getSubtype(0)->getKind() != orc::TypeKind::INT ||
       root_->getSubtype(1)->getKind() != orc::TypeKind::LONG ||
       root_->getSubtype(2)->getKind() != orc::TypeKind::INT ||
       root_->getSubtype(3)->getKind() != orc::TypeKind::LONG ||
       root_->getSubtype(4)->getKind() != orc::TypeKind::LONG ||
       root_->getSubtype(5)->getKind() != orc::TypeKind::STRUCT) {
-    return Status(error_msg);
+    return;
   }
-  if (root_->getFieldName(0) != "operation" ||
-      root_->getFieldName(1) != "originalTransaction" ||
-      root_->getFieldName(2) != "bucket" ||
-      root_->getFieldName(3) != "rowId" ||
-      root_->getFieldName(4) != "currentTransaction" ||
-      root_->getFieldName(5) != "row") {
-    return Status(error_msg);
+  if (!iequals(root_->getFieldName(0), "operation") ||
+      !iequals(root_->getFieldName(1), "originaltransaction") ||
+      !iequals(root_->getFieldName(2), "bucket") ||
+      !iequals(root_->getFieldName(3), "rowid") ||
+      !iequals(root_->getFieldName(4), "currenttransaction") ||
+      !iequals(root_->getFieldName(5), "row")) {
+    return;
   }
-  return Status::OK();
+  is_file_full_acid_ = true;
 }
 
 } // namespace impala

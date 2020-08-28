@@ -562,3 +562,8 @@ It contains the folloving lines:
 1996-04-22 00:00:00
 10:00:00.432100000
 10:00:00
+
+full_acid_schema_but_no_acid_version.orc
+IMPALA-10115: Impala should check file schema as well to check full ACIDv2 files
+Genereted by query-based compaction by Hive 3.1. The file has full ACIDv2 schema, but
+doesn't have the file user metadata 'hive.acid.version'.
