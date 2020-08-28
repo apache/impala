@@ -21,6 +21,7 @@ import static org.apache.impala.common.FileSystemUtil.HIVE_TEMP_FILE_PREFIX;
 import static org.apache.impala.common.FileSystemUtil.isIgnoredDir;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
@@ -82,6 +83,13 @@ public class FileSystemUtilTest {
         isIgnoredDir(new Path(TEST_TABLE_PATH, ".hidden-dir")));
     assertFalse(isIgnoredDir(TEST_TABLE_PATH));
     assertFalse(isIgnoredDir(new Path(TEST_TABLE_PATH + "/part=100/datafile")));
+  }
+
+  @Test
+  public void testAlluxioFsType() {
+    Path path = new Path("alluxio://zk@zk-1:2181,zk-2:2181,zk-3:2181/path/");
+    assertEquals(FileSystemUtil.FsType.ALLUXIO,
+        FileSystemUtil.FsType.getFsType(path.toUri().getScheme()));
   }
 
   private boolean testIsInIgnoredDirectory(Path input) {
