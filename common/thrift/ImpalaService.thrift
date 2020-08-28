@@ -579,10 +579,17 @@ enum TImpalaQueryOptions {
 
   // When true, TIMESTAMPs read from files written by Parquet-MR (used by Hive) will
   // be converted from UTC to local time. Writes are unaffected.
+
   CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS = 112
 
   // Indicates whether the FE should attempt to transform outer joins into inner joins.
   ENABLE_OUTER_JOIN_TO_INNER_TRANSFORMATION = 113
+
+  // Set the target scan range length for scanning kudu tables (in bytes). This is
+  // used to split kudu scan tokens and is treated as a hint by kudu. Therefore,
+  // does not guarantee a limit on the size of the scan range. If unspecified or
+  // set to 0 disables this feature.
+  TARGETED_KUDU_SCAN_RANGE_LENGTH = 114
 }
 
 // The summary of a DML statement.
