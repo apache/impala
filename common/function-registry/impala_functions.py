@@ -933,6 +933,8 @@ visible_functions = [
   # Functions to use Apache DataSketches functionality
   [['ds_hll_estimate'], 'BIGINT', ['STRING'],
       '_ZN6impala21DataSketchesFunctions13DsHllEstimateEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+  [['ds_hll_stringify'], 'STRING', ['STRING'],
+      '_ZN6impala21DataSketchesFunctions14DsHllStringifyEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
   [['ds_kll_quantile'], 'FLOAT', ['STRING', 'DOUBLE'],
       '_ZN6impala21DataSketchesFunctions13DsKllQuantileEPN10impala_udf15FunctionContextERKNS1_9StringValERKNS1_9DoubleValE'],
   [['ds_kll_n'], 'BIGINT', ['STRING'],

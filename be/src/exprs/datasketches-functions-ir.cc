@@ -38,6 +38,20 @@ BigIntVal DataSketchesFunctions::DsHllEstimate(FunctionContext* ctx,
   return sketch.get_estimate();
 }
 
+StringVal DataSketchesFunctions::DsHllStringify(FunctionContext* ctx,
+    const StringVal& serialized_sketch) {
+  if (serialized_sketch.is_null || serialized_sketch.len == 0) return StringVal::null();
+  datasketches::hll_sketch sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
+  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
+    LogSketchDeserializationError(ctx);
+    return StringVal::null();
+  }
+  string str = sketch.to_string(true, false, false, false);
+  StringVal dst(ctx, str.size());
+  memcpy(dst.ptr, str.c_str(), str.size());
+  return dst;
+}
+
 FloatVal DataSketchesFunctions::DsKllQuantile(FunctionContext* ctx,
     const StringVal& serialized_sketch, const DoubleVal& rank) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return FloatVal::null();
