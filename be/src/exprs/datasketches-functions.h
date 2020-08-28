@@ -35,6 +35,12 @@ public:
   static BigIntVal DsHllEstimate(FunctionContext* ctx,
       const StringVal& serialized_sketch);
 
+  /// 'serialized_sketch' is expected as a serialized Apache DataSketches HLL sketch. If
+  /// it is not, then the query fails. This function returns the stringified format of
+  /// an Apache DataSketches HLL sketch.
+  static StringVal DsHllStringify(FunctionContext* ctx,
+      const StringVal& serialized_sketch);
+
   /// 'serialized_sketch' is expected as a serialized Apache DataSketches KLL sketch. If
   /// it is not, then the query fails. 'rank' is used to identify which item (estimate)
   /// to return from the sketched dataset. E.g. 0.1 means the item where 10% of the
