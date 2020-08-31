@@ -82,6 +82,7 @@ the same dependencies
                 <!-- Needed to support Hive udfs -->
                 <include>org/apache/hadoop/hive/ql/exec/*UDF*</include>
                 <include>org/apache/hadoop/hive/ql/exec/FunctionUtils*</include>
+                <include>org/apache/hadoop/hive/ql/parse/GenericHiveLexer*</include>
                 <include>org/apache/hadoop/hive/ql/parse/HiveLexer*</include>
                 <include>org/apache/hadoop/hive/ql/udf/**/*</include>
                 <!-- Many of the UDFs are annotated with their vectorized counter-parts.
