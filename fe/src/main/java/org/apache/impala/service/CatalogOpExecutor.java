@@ -367,7 +367,7 @@ public class CatalogOpExecutor {
           TCreateDbParams create_db_params = ddlRequest.getCreate_db_params();
           tTableName = Optional.of(new TTableName(create_db_params.db, ""));
           catalogOpMetric_.increment(ddl_type, tTableName);
-          createDatabase(create_db_params, response);
+          createDatabase(create_db_params, response, syncDdl);
           break;
         case CREATE_TABLE_AS_SELECT:
           TCreateTableParams create_table_as_select_params =
@@ -1275,9 +1275,10 @@ public class CatalogOpExecutor {
    * metadata cache, marking its metadata to be lazily loaded on the next access.
    * Re-throws any Hive Meta Store exceptions encountered during the create, these
    * may vary depending on the Meta Store connection type (thrift vs direct db).
+   * @param  syncDdl tells if SYNC_DDL option is enabled on this DDL request.
    */
-  private void createDatabase(TCreateDbParams params, TDdlExecResponse resp)
-      throws ImpalaException {
+  private void createDatabase(TCreateDbParams params, TDdlExecResponse resp,
+      boolean syncDdl) throws ImpalaException {
     Preconditions.checkNotNull(params);
     String dbName = params.getDb();
     Preconditions.checkState(dbName != null && !dbName.isEmpty(),
@@ -1292,6 +1293,29 @@ public class CatalogOpExecutor {
             + "and IF NOT EXISTS was specified.");
       }
       Preconditions.checkNotNull(existingDb);
+      if (syncDdl) {
+        tryLock(existingDb, "create database");
+        try {
+          // When SYNC_DDL is enabled and the database already exists, we force a version
+          // bump on it so that it is added to the next statestore update. Without this
+          // we could potentially be referring to a database object that has already been
+          // GC'ed from the TopicUpdateLog and waitForSyncDdlVersion() cannot find a
+          // covering topic version (IMPALA-7961).
+          //
+          // This is a conservative hack to not break the SYNC_DDL semantics and could
+          // possibly result in false-positive invalidates on this database. However,
+          // that is better than breaking the SYNC_DDL semantics and the subsequent
+          // queries referring to this database failing with "database not found" errors.
+          long newVersion = catalog_.incrementAndGetCatalogVersion();
+          existingDb.setCatalogVersion(newVersion);
+          LOG.trace("Database {} version bumped to {} because SYNC_DDL is enabled.",
+              dbName, newVersion);
+        } finally {
+          // Release the locks held in tryLock().
+          catalog_.getLock().writeLock().unlock();
+          existingDb.getLock().unlock();
+        }
+      }
       // TODO(IMPALA-9936): if client is a 'v2' impalad, only send back invalidation
       resp.getResult().addToUpdated_catalog_objects(existingDb.toTCatalogObject());
       resp.getResult().setVersion(existingDb.getCatalogVersion());
