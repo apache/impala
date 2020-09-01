@@ -516,24 +516,27 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     # readline gets its input from tty, so using stdin does not work.
     shell_cmd = get_shell_cmd(vector)
     child_proc = spawn_shell(shell_cmd)
-    # set up history
+
+    # initialize history
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline("select 1;")
     child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
     child_proc.expect(PROMPT_REGEX)
     child_proc.sendline("quit;")
     child_proc.wait()
+
+    # create a new shell and send SIGINT
     child_proc = spawn_shell(shell_cmd)
     child_proc.expect(PROMPT_REGEX)
-
-    # send SIGINT then quit to save history
     child_proc.sendintr()
+    child_proc.expect("\^C")
     child_proc.sendline("select 2;")
     child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
+    child_proc.expect(PROMPT_REGEX)
     child_proc.sendline("quit;")
     child_proc.wait()
 
-    # check history in a new instance
+    # check history in a new shell instance
     p = ImpalaShell(vector)
     p.send_cmd('history')
     result = p.get_result().stderr.splitlines()
