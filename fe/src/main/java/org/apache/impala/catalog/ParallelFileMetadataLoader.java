@@ -120,6 +120,13 @@ public class ParallelFileMetadataLoader {
       FileMetadataLoader loader = loaders_.get(p);
 
       for (HdfsPartition.Builder partBuilder : e.getValue()) {
+        // Checks if we can reuse the old file descriptors. Partition builders in the list
+        // may have different old file descriptors. We need to verify them one by one.
+        if ((!loader.hasFilesChangedCompareTo(partBuilder.getFileDescriptors()))) {
+          LOG.trace("Detected files unchanged on partition {}",
+              partBuilder.getPartitionName());
+          continue;
+        }
         partBuilder.clearFileDescriptors();
         List<FileDescriptor> deleteDescriptors = loader.getLoadedDeleteDeltaFds();
         if (deleteDescriptors != null && !deleteDescriptors.isEmpty()) {
