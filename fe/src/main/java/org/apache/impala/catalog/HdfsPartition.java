@@ -281,6 +281,27 @@ public class HdfsPartition extends CatalogObjectImpl
     }
 
     /**
+     * Compares the modification time and file size between current FileDescriptor and the
+     * latest FileStatus to determine if the file has changed. Returns true if the file
+     * has changed and false otherwise. Note that block location changes are not
+     * considered as file changes. Table reloading won't recognize block location changes
+     * which require an INVALIDATE METADATA command on the table to clear the stale
+     * locations.
+     */
+    public boolean isChanged(FileStatus latestStatus) {
+      return latestStatus == null || getFileLength() != latestStatus.getLen()
+          || getModificationTime() != latestStatus.getModificationTime();
+    }
+
+    /**
+     * Same as above but compares to a FileDescriptor instance.
+     */
+    public boolean isChanged(FileDescriptor latestFd) {
+      return latestFd == null || getFileLength() != latestFd.getFileLength()
+          || getModificationTime() != latestFd.getModificationTime();
+    }
+
+    /**
      * Function to convert from a byte[] flatbuffer to the wrapper class. Note that
      * this returns a shallow copy which continues to reflect any changes to the
      * passed byte[].
@@ -1554,6 +1575,22 @@ public class HdfsPartition extends CatalogObjectImpl
         throw new CatalogException("Partition (" + getPartitionName() +
             ") has invalid partition column values: ", e);
       }
+    }
+
+    public boolean equalsToOriginal(HdfsPartition oldInstance) {
+      return (oldInstance == oldInstance_
+          && encodedFileDescriptors_ == oldInstance.encodedFileDescriptors_
+          && encodedInsertFileDescriptors_ == oldInstance.encodedInsertFileDescriptors_
+          && encodedDeleteFileDescriptors_ == oldInstance.encodedDeleteFileDescriptors_
+          && fileFormatDescriptor_ == oldInstance.fileFormatDescriptor_
+          && location_ == oldInstance.location_
+          && isMarkedCached_ == oldInstance.isMarkedCached_
+          && accessLevel_ == oldInstance.accessLevel_
+          && hmsParameters_.equals(oldInstance.hmsParameters_)
+          && partitionStats_ == oldInstance.partitionStats_
+          && hasIncrementalStats_ == oldInstance.hasIncrementalStats_
+          && numRows_ == oldInstance.numRows_
+          && writeId_ == oldInstance.writeId_);
     }
   }
 

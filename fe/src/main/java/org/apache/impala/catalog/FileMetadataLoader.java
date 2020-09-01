@@ -223,8 +223,8 @@ public class FileMetadataLoader {
         }
         String relPath = FileSystemUtil.relativizePath(fileStatus.getPath(), partDir_);
         FileDescriptor fd = oldFdsByRelPath_.get(relPath);
-        if (listWithLocations || forceRefreshLocations ||
-            hasFileChanged(fd, fileStatus)) {
+        if (listWithLocations || forceRefreshLocations || fd == null ||
+            fd.isChanged(fileStatus)) {
           fd = createFd(fs, fileStatus, relPath, numUnknownDiskIds);
           ++loadStats_.loadedFiles;
         } else {
@@ -272,13 +272,18 @@ public class FileMetadataLoader {
   }
 
   /**
-   * Compares the modification time and file size between the FileDescriptor and the
-   * FileStatus to determine if the file has changed. Returns true if the file has changed
-   * and false otherwise.
+   * Given a file descriptor list 'oldFds', returns true if the loaded file descriptors
+   * are the same as them.
    */
-  private static boolean hasFileChanged(FileDescriptor fd, FileStatus status) {
-    return (fd == null) || (fd.getFileLength() != status.getLen()) ||
-      (fd.getModificationTime() != status.getModificationTime());
+  public boolean hasFilesChangedCompareTo(List<FileDescriptor> oldFds) {
+    if (oldFds.size() != loadedFds_.size()) return true;
+    ImmutableMap<String, FileDescriptor> oldFdsByRelPath =
+        Maps.uniqueIndex(oldFds, FileDescriptor::getRelativePath);
+    for (FileDescriptor fd : loadedFds_) {
+      FileDescriptor oldFd = oldFdsByRelPath.get(fd.getRelativePath());
+      if (fd.isChanged(oldFd)) return true;
+    }
+    return false;
   }
 
   /**

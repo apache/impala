@@ -928,8 +928,16 @@ public class HdfsTable extends Table implements FeFsTable {
 
   public void updatePartition(HdfsPartition.Builder partBuilder) throws CatalogException {
     HdfsPartition oldPartition = partBuilder.getOldInstance();
-    Preconditions.checkNotNull(oldPartition);
-    Preconditions.checkState(partitionMap_.containsKey(oldPartition.getId()));
+    Preconditions.checkNotNull(oldPartition,
+        "Old partition instance should exist for updates");
+    Preconditions.checkState(partitionMap_.containsKey(oldPartition.getId()),
+        "Updating a non existing partition instance");
+    Preconditions.checkState(partitionMap_.get(partBuilder.getOldId()) == oldPartition,
+        "Concurrent modification on partitions: old instance changed");
+    boolean partitionNotChanged = partBuilder.equalsToOriginal(oldPartition);
+    LOG.trace("Partition {} {}", oldPartition.getName(),
+        partitionNotChanged ? "changed" : "unchanged");
+    if (partitionNotChanged) return;
     HdfsPartition newPartition = partBuilder.build();
     // Partition is reloaded and hence cache directives are not dropped.
     dropPartition(oldPartition, false);
