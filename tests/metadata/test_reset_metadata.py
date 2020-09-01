@@ -16,6 +16,9 @@
 # under the License.
 
 from test_ddl_base import TestDdlBase
+from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS,
+                               SkipIfIsilon, SkipIfLocal)
+
 
 class TestResetMetadata(TestDdlBase):
   def test_reset_metadata_case_sensitivity(self, unique_database):
@@ -33,6 +36,11 @@ class TestResetMetadata(TestDdlBase):
     self.client.execute('refresh functions %s' % unique_database)
     self.client.execute('refresh functions %s' % unique_database.upper())
 
+  @SkipIfS3.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   def test_refresh_updated_partitions(self, unique_database):
     """
     Test to exercise and confirm the query option REFRESH_UPDATED_HMS_PARTITIONS
