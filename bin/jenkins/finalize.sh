@@ -72,14 +72,35 @@ function check_for_asan_error {
   fi
 }
 
-# Check for AddressSanitizer messages. ASAN errors can show up in ERROR logs
-# (particularly for impalad). Some backend tests generate ERROR logs.
+function check_for_tsan_error {
+  ERROR_LOG=${1}
+  if grep -q "WARNING: ThreadSanitizer:" ${ERROR_LOG} ; then
+    # Extract out the TSAN message from the log file into a temp file.
+    # Starts with WARNING: ThreadSanitizer and then ends with a line with several '='
+    # characters (currently 18, we match 10).
+    tmp_tsan_output=$(mktemp)
+    sed -n '/ThreadSanitizer:/,/==========/p' ${ERROR_LOG} > "${tmp_tsan_output}"
+    # Make each TSAN issue use its own JUnitXML file by including the log filename
+    # in the step.
+    base=$(basename ${ERROR_LOG})
+    "${IMPALA_HOME}"/bin/generate_junitxml.py --phase finalize \
+      --step "tsan_error_${base}" \
+      --error "Thread Sanitizer message detected in ${ERROR_LOG}" \
+      --stderr "$(cat ${tmp_tsan_output})"
+    rm "${tmp_tsan_output}"
+  fi
+}
+
+# Check for AddressSanitizer/ThreadSanitizer messages. ASAN/TSAN errors can show up
+# in ERROR logs (particularly for impalad). Some backend tests generate ERROR logs.
 for error_log in $(find $LOGS_DIR -name "*ERROR*"); do
   check_for_asan_error ${error_log}
+  check_for_tsan_error ${error_log}
 done
 # Backend tests can also generate output in logs/be_tests/LastTest.log
 if [[ -f ${LOGS_DIR}/be_tests/LastTest.log ]]; then
   check_for_asan_error ${LOGS_DIR}/be_tests/LastTest.log
+  check_for_tsan_error ${LOGS_DIR}/be_tests/LastTest.log
 fi
 
 # Check for DCHECK messages. DCHECKs translate into CHECKs, which log at FATAL level
