@@ -2111,7 +2111,7 @@ public class CatalogOpExecutor {
 
   /**
    * Creates new empty base directories for an ACID table. The directories won't be
-   * really empty, they will contain the hidden "_empty" file. It's needed because
+   * really empty, they will contain the "empty" file. It's needed because
    * FileSystemUtil.listFiles() doesn't see empty directories. See IMPALA-8739.
    * @param partitions the partitions in which we create new directories.
    * @param writeId the write id of the new base directory.
@@ -2125,7 +2125,7 @@ public class CatalogOpExecutor {
       String baseDirStr =
           part.getLocation() + Path.SEPARATOR + "base_" + String.valueOf(writeId);
       fs.mkdirs(new Path(baseDirStr));
-      String emptyFile = baseDirStr + Path.SEPARATOR + "_empty";
+      String emptyFile = baseDirStr + Path.SEPARATOR + "empty";
       fs.create(new Path(emptyFile)).close();
     }
   }
