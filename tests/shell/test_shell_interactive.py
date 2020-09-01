@@ -1058,6 +1058,18 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       result = p.get_result()
       assert "Fetched 0 row" in result.stderr
 
+  def test_quotes_in_with_clause(self, vector):
+    # IMPALA-10051: This test verifies that the fix prevents ValueErrors caused by
+    # shlex library when quotes and whitespace characters are mixed.
+    p = ImpalaShell(vector)
+    cmd = ("with foo as "
+           "(select *, regexp_replace(string_col,\"[a-zA-Z]\",\"+ \") "
+           "from functional.alltypestiny) "
+           "select * from foo limit 1")
+    p.send_cmd(cmd)
+    result = p.get_result()
+    assert "Fetched 1 row" in result.stderr
+
   def test_http_interactions(self, vector, http_503_server):
     """Test interactions with the http server when using hs2-http protocol.
     Check that the shell prints a good message when the server returns a 503 error."""

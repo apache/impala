@@ -1322,16 +1322,14 @@ class ImpalaShell(cmd.Cmd, object):
   def do_with(self, args):
     """Executes a query with a WITH clause, fetching all rows"""
     query = self._build_query_string(self.last_leading_comment, self.orig_cmd, args)
-    # Use shlex to deal with escape quotes in string literals.
-    # Set posix=False to preserve the quotes.
-    tokens = shlex.split(strip_comments(query.lstrip()), posix=False)
+    # Parse the query with sqlparse to identify if it is a DML query or not.
+    # Because the WITH clause may precede DML or SELECT queries, checking the
+    # first string token is insufficient.
+    parsed = sqlparse.parse(query)[0]
+    query_type = sqlparse.sql.Statement(parsed.tokens).get_type()
     try:
-      # Because the WITH clause may precede DML or SELECT queries,
-      # just checking the first token is insufficient.
-      is_dml = False
-      if any(self.DML_REGEX.match(t) for t in tokens):
-        is_dml = True
-      return self._execute_stmt(query, is_dml=is_dml, print_web_link=True)
+      is_dml = self.DML_REGEX.match(query_type.lower())
+      return self._execute_stmt(query, bool(is_dml), print_web_link=True)
     except ValueError:
       return self._execute_stmt(query, print_web_link=True)
 
