@@ -367,27 +367,27 @@ Status QueryDriver::Finalize(
   return Status::OK();
 }
 
-Status QueryDriver::Unregister(QueryDriverMap* query_driver_map) {
+Status QueryDriver::Unregister(ImpalaServer::QueryDriverMap* query_driver_map) {
   DCHECK(finalized_.Load());
   const TUniqueId* query_id = nullptr;
   const TUniqueId* retry_query_id = nullptr;
   {
     // In order to preserve a consistent lock ordering, client_request_state_lock_ is
-    // released before DeleteQueryDriver is called, as DeleteQueryDriver requires taking
+    // released before QueryDriverMap::Delete() is called, as Delete() requires taking
     // a ScopedShardedMapRef (a sharded map lock). Methods in ImpalaServer (such as
     // UnresponsiveBackendThread) require taking a ScopedShardedMapRef and then calling
     // Get*ClientRequestState methods. So in order to define a consistent lock ordering
     // (e.g. acquire ScopedShardedMapRef before client_request_state_lock_)
-    // client_request_state_lock_ is released before calling DeleteQueryDriver.
+    // client_request_state_lock_ is released before calling Delete().
     lock_guard<SpinLock> l(client_request_state_lock_);
     query_id = &client_request_state_->query_id();
     if (retried_client_request_state_ != nullptr) {
       retry_query_id = &retried_client_request_state_->query_id();
     }
   }
-  RETURN_IF_ERROR(query_driver_map->DeleteQueryDriver(*query_id));
+  RETURN_IF_ERROR(query_driver_map->Delete(*query_id));
   if (retry_query_id != nullptr) {
-    RETURN_IF_ERROR(query_driver_map->DeleteQueryDriver(*retry_query_id));
+    RETURN_IF_ERROR(query_driver_map->Delete(*retry_query_id));
   }
   return Status::OK();
 }

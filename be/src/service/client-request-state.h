@@ -34,6 +34,7 @@
 
 namespace impala {
 
+class AdmissionControlClient;
 class ClientRequestStateCleaner;
 class Coordinator;
 class Expr;
@@ -44,7 +45,6 @@ class RuntimeState;
 class Thread;
 class TRuntimeProfileTree;
 class TupleRow;
-enum class AdmissionOutcome;
 class QuerySchedulePB;
 
 /// Execution state of the client-facing side of a query. This captures everything
@@ -390,6 +390,10 @@ class ClientRequestState {
   /// Returns the QueryDriver that owns this ClientRequestState.
   QueryDriver* parent_driver() const { return parent_driver_; }
 
+  AdmissionControlClient* admission_control_client() const {
+    return admission_control_client_.get();
+  }
+
   /// Returns true if results cacheing is enabled, false otherwise.
   bool IsResultCacheingEnabled() const { return result_cache_max_size_ >= 0; }
 
@@ -453,12 +457,6 @@ class ClientRequestState {
 
   /// Executor for any child queries (e.g. compute stats subqueries). Always non-NULL.
   const boost::scoped_ptr<ChildQueryExecutor> child_query_executor_;
-
-  /// Promise used by the admission controller. AdmissionController:AdmitQuery() will
-  /// block on this promise until the query is either rejected, admitted, times out, or is
-  /// cancelled. Can be set to CANCELLED by the ClientRequestState in order to cancel, but
-  /// otherwise is set by AdmissionController with the admission decision.
-  Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER> admit_outcome_;
 
   /// Protects all following fields. Acquirers should be careful not to hold it for too
   /// long, e.g. during RPCs because this lock is required to make progress on various
@@ -649,6 +647,10 @@ class ClientRequestState {
   /// The QueryDriver that owns this ClientRequestState. The reference is set in the
   /// constructor. It always outlives the ClientRequestState.
   QueryDriver* parent_driver_;
+
+  /// Manages interactions with the AdmissionController, which may be either local or
+  /// remote.
+  std::unique_ptr<AdmissionControlClient> admission_control_client_;
 
   /// Executes a local catalog operation (an operation that does not need to execute
   /// against the catalog service). Includes USE, SHOW, DESCRIBE, and EXPLAIN statements.

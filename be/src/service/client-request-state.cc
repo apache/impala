@@ -39,7 +39,7 @@
 #include "runtime/query-driver.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "scheduling/admission-controller.h"
+#include "scheduling/admission-control-client.h"
 #include "scheduling/scheduler.h"
 #include "service/frontend.h"
 #include "service/impala-server.h"
@@ -161,6 +161,8 @@ ClientRequestState::ClientRequestState(const TQueryCtx& query_ctx, Frontend* fro
       TNetworkAddressToString(ExecEnv::GetInstance()->GetThriftBackendAddress()));
 
   summary_profile_->AddChild(frontend_profile_);
+
+  AdmissionControlClient::Create(query_ctx.query_id, &admission_control_client_);
 }
 
 ClientRequestState::~ClientRequestState() {
@@ -539,17 +541,14 @@ Status ClientRequestState::ExecAsyncQueryOrDmlRequest(
 }
 
 void ClientRequestState::FinishExecQueryOrDmlRequest() {
-  DebugActionNoFail(exec_request_->query_options, "CRS_BEFORE_ADMISSION");
-
-  DCHECK(ExecEnv::GetInstance()->admission_controller() != nullptr);
   DCHECK(exec_request_->__isset.query_exec_request);
   UniqueIdPB query_id_pb;
   TUniqueIdToUniqueIdPB(query_id(), &query_id_pb);
-  Status admit_status =
-      ExecEnv::GetInstance()->admission_controller()->SubmitForAdmission(
-          {query_id_pb, exec_request_->query_exec_request, exec_request_->query_options,
-              summary_profile_, query_events_, blacklisted_executor_addresses_},
-          &admit_outcome_, &schedule_);
+  Status admit_status = admission_control_client_->SubmitForAdmission(
+      {query_id_pb, ExecEnv::GetInstance()->backend_id(),
+          exec_request_->query_exec_request, exec_request_->query_options,
+          summary_profile_, query_events_, blacklisted_executor_addresses_},
+      &schedule_);
   {
     lock_guard<mutex> l(lock_);
     if (!UpdateQueryStatus(admit_status).ok()) return;
@@ -1189,7 +1188,7 @@ Status ClientRequestState::Cancel(
           || retry_state() == RetryState::RETRYING);
     }
 
-    admit_outcome_.Set(AdmissionOutcome::CANCELLED);
+    admission_control_client_->CancelAdmission();
     is_cancelled_ = true;
   } // Release lock_ before doing cancellation work.
 

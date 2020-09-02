@@ -182,7 +182,7 @@ class QueryDriver {
   Status Finalize(QueryHandle* query_handle, bool check_inflight, const Status* cause);
 
   /// Delete this query from the given QueryDriverMap.
-  Status Unregister(QueryDriverMap* query_driver_map) WARN_UNUSED_RESULT;
+  Status Unregister(ImpalaServer::QueryDriverMap* query_driver_map) WARN_UNUSED_RESULT;
 
   /// True if Finalize() was called.
   bool finalized() const { return finalized_.Load(); }

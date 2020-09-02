@@ -1215,8 +1215,7 @@ Status ImpalaServer::RegisterQuery(const TUniqueId& query_id,
     return Status::Expected("Session has been closed, ignoring query.");
   }
   DCHECK_EQ(this, ExecEnv::GetInstance()->impala_server());
-  RETURN_IF_ERROR(
-      query_driver_map_.AddQueryDriver(query_id, query_handle->query_driver()));
+  RETURN_IF_ERROR(query_driver_map_.Add(query_id, query_handle->query_driver()));
   // Metric is decremented in UnregisterQuery().
   ImpaladMetrics::NUM_QUERIES_REGISTERED->Increment(1L);
   VLOG_QUERY << "Registered query query_id=" << PrintId(query_id) << " session_id="

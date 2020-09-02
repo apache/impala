@@ -37,12 +37,12 @@
 #include "kudu/util/random.h"
 #include "rpc/thrift-server.h"
 #include "runtime/types.h"
-#include "service/query-driver-map.h"
 #include "service/query-options.h"
 #include "statestore/statestore-subscriber.h"
 #include "util/condition-variable.h"
 #include "util/container-util.h"
 #include "util/runtime-profile.h"
+#include "util/sharded-query-map-util.h"
 #include "util/simple-logger.h"
 #include "util/thread-pool.h"
 #include "util/time.h"
@@ -1244,6 +1244,7 @@ class ImpalaServer : public ImpalaServiceIf,
   /// 3. Additional cleanup work is done by CloseClientRequestState(), and an entry
   ///    is added to 'query_log_' for this query.
   /// 4. The QueryDriver is removed from this map.
+  typedef ShardedQueryMap<std::shared_ptr<QueryDriver>> QueryDriverMap;
   QueryDriverMap query_driver_map_;
 
   /// Default query options in the form of TQueryOptions and beeswax::ConfigVariable

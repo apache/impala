@@ -210,7 +210,8 @@ const string REASON_THREAD_RESERVATION_AGG_LIMIT_EXCEEDED =
     "THREAD_RESERVATION_AGGREGATE_LIMIT query option value: $1 > $2.";
 // $0 is the error message returned by the scheduler.
 const string REASON_SCHEDULER_ERROR = "Error during scheduling: $0";
-const string REASON_LOCAL_BACKEND_NOT_STARTED = "Local backend has not started up yet.";
+const string REASON_COORDINATOR_NOT_FOUND =
+    "Coordinator not registered with the statestore.";
 const string REASON_NO_EXECUTOR_GROUPS =
     "Waiting for executors to start. Only DDL queries and queries scheduled only on the "
     "coordinator (either NUM_NODES set to 1 or when small query optimization is "
@@ -1114,6 +1115,7 @@ void AdmissionController::PoolStats::UpdateConfigMetrics(const TPoolConfig& pool
 Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
     Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admit_outcome,
     unique_ptr<QuerySchedulePB>* schedule_result) {
+  DebugActionNoFail(request.query_options, "AC_BEFORE_ADMISSION");
   DCHECK(schedule_result->get() == nullptr);
 
   ClusterMembershipMgr::SnapshotPtr membership_snapshot =
@@ -1519,15 +1521,19 @@ Status AdmissionController::ComputeGroupScheduleStates(
   std::vector<GroupScheduleState>* output_schedules = &queue_node->group_states;
   output_schedules->clear();
 
-  // If the first statestore update arrives before the local backend has finished starting
-  // up, we might not have a local backend descriptor yet. We return no schedules, which
-  // will result in the query being queued.
-  if (membership_snapshot->local_be_desc == nullptr) {
-    queue_node->not_admitted_reason = REASON_LOCAL_BACKEND_NOT_STARTED;
+  // Queries may arrive before we've gotten a statestore update containing the descriptor
+  // for their coordinator, in which case we queue the query until it arrives. It's also
+  // possible (though very unlikely) that the coordinator was removed from the cluster
+  // membership after submitting this query for admission. Currently in this case the
+  // query will remain queued until it times out, but we can consider detecting failed
+  // coordinators and cleaning up their queued queries.
+  auto it = membership_snapshot->current_backends.find(PrintId(request.coord_id));
+  if (it == membership_snapshot->current_backends.end()) {
+    queue_node->not_admitted_reason = REASON_COORDINATOR_NOT_FOUND;
     LOG(WARNING) << queue_node->not_admitted_reason;
     return Status::OK();
   }
-  const BackendDescriptorPB& local_be_desc = *membership_snapshot->local_be_desc;
+  const BackendDescriptorPB& coord_desc = it->second;
 
   vector<const ExecutorGroup*> executor_groups =
       GetExecutorGroupsForQuery(membership_snapshot->executor_groups, request);
@@ -1568,7 +1574,7 @@ Status AdmissionController::ComputeGroupScheduleStates(
     const string& group_name = executor_group->name();
     VLOG(3) << "Scheduling for executor group: " << group_name << " with "
             << executor_group->NumExecutors() << " executors";
-    const Scheduler::ExecutorConfig group_config = {*executor_group, local_be_desc};
+    const Scheduler::ExecutorConfig group_config = {*executor_group, coord_desc};
     RETURN_IF_ERROR(
         ExecEnv::GetInstance()->scheduler()->Schedule(group_config, group_state.get()));
     DCHECK(!group_state->executor_group().empty());

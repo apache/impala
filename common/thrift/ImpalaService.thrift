@@ -106,7 +106,7 @@ enum TImpalaQueryOptions {
   //    The code executing the debug action may respond to different error messages by
   //    exercising different error paths.
   // Examples:
-  // - CRS_BEFORE_ADMISSION:SLEEP@1000
+  // - AC_BEFORE_ADMISSION:SLEEP@1000
   //   Causes a 1 second sleep before queries are submitted to the admission controller.
   // - IMPALA_SERVICE_POOL:127.0.0.1:27002:TransmitData:FAIL@0.1@REJECT_TOO_BUSY
   //   Causes TransmitData rpcs to the third minicluster impalad to fail 10% of the time

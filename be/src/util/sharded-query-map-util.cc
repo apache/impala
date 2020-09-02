@@ -15,20 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "service/query-driver-map.h"
+#include "util/sharded-query-map-util.h"
 
-#include "gutil/strings/substitute.h"
-#include "util/container-util.h"
+#include "runtime/query-driver.h"
 #include "util/debug-util.h"
-#include "util/uid-util.h"
-
-#include "common/names.h"
 
 namespace impala {
 
-Status QueryDriverMap::AddQueryDriver(
-    const TUniqueId& query_id, std::shared_ptr<QueryDriver> query_driver) {
-  ScopedShardedMapRef<std::shared_ptr<QueryDriver>> map_ref(query_id, this);
+template <typename K, typename V>
+Status GenericShardedQueryMap<K, V>::Add(const K& query_id, const V& obj) {
+  GenericScopedShardedMapRef<K, V> map_ref(query_id, this);
   DCHECK(map_ref.get() != nullptr);
 
   auto entry = map_ref->find(query_id);
@@ -38,12 +34,28 @@ Status QueryDriverMap::AddQueryDriver(
     return Status(ErrorMsg(TErrorCode::INTERNAL_ERROR,
         strings::Substitute("query id $0 already exists", PrintId(query_id))));
   }
-  map_ref->insert(make_pair(query_id, query_driver));
+  map_ref->insert(make_pair(query_id, obj));
   return Status::OK();
 }
 
-Status QueryDriverMap::DeleteQueryDriver(const TUniqueId& query_id) {
-  ScopedShardedMapRef<std::shared_ptr<QueryDriver>> map_ref(query_id, this);
+template <typename K, typename V>
+Status GenericShardedQueryMap<K, V>::Get(const K& query_id, V* obj) {
+  GenericScopedShardedMapRef<K, V> map_ref(query_id, this);
+  DCHECK(map_ref.get() != nullptr);
+
+  auto entry = map_ref->find(query_id);
+  if (entry == map_ref->end()) {
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    VLOG(1) << err.GetDetail();
+    return err;
+  }
+  *obj = entry->second;
+  return Status::OK();
+}
+
+template <typename K, typename V>
+Status GenericShardedQueryMap<K, V>::Delete(const K& query_id) {
+  GenericScopedShardedMapRef<K, V> map_ref(query_id, this);
   DCHECK(map_ref.get() != nullptr);
   auto entry = map_ref->find(query_id);
   if (entry == map_ref->end()) {
@@ -54,5 +66,13 @@ Status QueryDriverMap::DeleteQueryDriver(const TUniqueId& query_id) {
   map_ref->erase(entry);
   return Status::OK();
 }
+
+// Needed by ImpalaServer
+template Status GenericShardedQueryMap<TUniqueId, std::shared_ptr<QueryDriver>>::Add(
+    TUniqueId const&, const std::shared_ptr<QueryDriver>&);
+template Status GenericShardedQueryMap<TUniqueId, std::shared_ptr<QueryDriver>>::Get(
+    TUniqueId const&, std::shared_ptr<QueryDriver>*);
+template Status GenericShardedQueryMap<TUniqueId, std::shared_ptr<QueryDriver>>::Delete(
+    TUniqueId const&);
 
 } // namespace impala

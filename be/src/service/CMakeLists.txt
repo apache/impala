@@ -41,7 +41,6 @@ add_library(Service
   impala-internal-service.cc
   impalad-main.cc
   impala-server.cc
-  query-driver-map.cc
   query-options.cc
   query-result-set.cc
 )

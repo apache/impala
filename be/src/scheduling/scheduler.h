@@ -65,7 +65,7 @@ class Scheduler {
   /// Current snapshot of executors to be used for scheduling a scan.
   struct ExecutorConfig {
     const ExecutorGroup& group;
-    const BackendDescriptorPB& local_be_desc;
+    const BackendDescriptorPB& coord_desc;
   };
 
   /// Populates given query schedule and assigns fragments to hosts based on scan
@@ -415,7 +415,7 @@ class Scheduler {
 
   /// Add all hosts that the scans identified by 'scan_ids' are executed on to
   /// 'scan_hosts'.
-  void GetScanHosts(const BackendDescriptorPB& local_be_desc,
+  void GetScanHosts(const BackendDescriptorPB& coord_desc,
       const std::vector<TPlanNodeId>& scan_ids,
       const FragmentScheduleState& fragment_state,
       std::vector<NetworkAddressPB>* scan_hosts);

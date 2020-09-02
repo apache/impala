@@ -29,11 +29,13 @@ set_source_files_properties(${ADMISSION_CONTROL_SERVICE_PROTO_SRCS} PROPERTIES G
 add_library(Scheduling STATIC
   ${ADMISSION_CONTROL_SERVICE_PROTO_SRCS}
   admission-controller.cc
+  admission-control-client.cc
   executor-blacklist.cc
   cluster-membership-mgr.cc
   cluster-membership-test-util.cc
   executor-group.cc
   hash-ring.cc
+  local-admission-control-client.cc
   request-pool-service.cc
   scheduler-test-util.cc
   schedule-state.cc

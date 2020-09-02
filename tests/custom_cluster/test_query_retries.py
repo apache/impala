@@ -300,7 +300,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     query = "select count(*) from tpch_parquet.lineitem"
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true',
-                       'debug_action': 'CRS_BEFORE_ADMISSION:SLEEP@18000'})
+                       'debug_action': 'AC_BEFORE_ADMISSION:SLEEP@18000'})
     self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 80)
 
     # Validate that the query was retried.
@@ -362,7 +362,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     query = "select count(*) from tpch_parquet.lineitem"
     handle = self.execute_query_async(query,
         query_options={'retry_failed_queries': 'true',
-                       'debug_action': 'CRS_BEFORE_ADMISSION:SLEEP@18000'})
+                       'debug_action': 'AC_BEFORE_ADMISSION:SLEEP@18000'})
     # Wait until the query fails.
     self.wait_for_state(handle, self.client.QUERY_STATES['EXCEPTION'], 140)
 
