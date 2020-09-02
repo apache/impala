@@ -486,6 +486,9 @@ if [[ $ARCH_NAME == 'aarch64' ]]; then
   if ! [[ -d "$NATIVE_TOOLCHAIN_HOME" ]]; then
     time -p git clone https://github.com/cloudera/native-toolchain/ \
       "$NATIVE_TOOLCHAIN_HOME"
+  else
+    # pull newest code of native-toolchain if exists
+    git pull
   fi
   cd "$NATIVE_TOOLCHAIN_HOME"
   echo "Begin build tool chain, may need several hours, please be patient...."
