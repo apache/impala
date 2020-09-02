@@ -956,7 +956,10 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
 
 /// Test that AdmissionController can identify 5 queries with top memory consumption
 /// from 4 pools. Each pool holds a number of queries with different memory consumptions.
+/// Run the test only when undefined behavior sanitizer check is off to avoid core
+/// generated from std::regex_match().
 TEST_F(AdmissionControllerTest, TopNQueryCheck) {
+#ifndef UNDEFINED_SANITIZER
   // Pass the paths of the configuration files as command line flags
   FLAGS_fair_scheduler_allocation_path = GetResourceFile("fair-scheduler-test2.xml");
   FLAGS_llama_site_path = GetResourceFile("llama-site-test2.xml");
@@ -1109,6 +1112,7 @@ TEST_F(AdmissionControllerTest, TopNQueryCheck) {
   // Reset the consumption_ counter for all trackers so that TearDown() call
   // can run cleanly.
   ResetMemConsumed(pool_mem_tracker->GetRootMemTracker());
+#endif
 }
 
 } // end namespace impala
