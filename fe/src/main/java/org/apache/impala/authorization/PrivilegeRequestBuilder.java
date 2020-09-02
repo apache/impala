@@ -18,12 +18,15 @@
 package org.apache.impala.authorization;
 
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.View;
+import org.apache.impala.common.RuntimeEnv;
 
 /**
  * Class that helps build PrivilegeRequest objects.
@@ -64,13 +67,42 @@ public class PrivilegeRequestBuilder {
   }
 
   /**
+   * Determines whether the given FeTable corresponds to a view whose creation was not
+   * authorized.
+   */
+  public static boolean isViewCreatedWithoutAuthz(FeTable table) {
+    // In the FE test environment, there is no metastore.api.Table object created and
+    // thus 'view' would be null. To prevent a NullPointerException from being thrown
+    // due to the call to getParameters(), we only check the value of the key
+    // 'Authorized' when we are not in the FE test environment and we return false in
+    // the FE test environment assuming that the view was authorized at creation.
+    // In addition, when 'table' is null, we also assume that 'table' does not correspond
+    // to a view not authorized at the creation time. 'table' could be null if it is
+    // returned from a method call to Analyzer#getTableNoThrow() and the corresponding
+    // FeTable is not currently cached in the local Catalog.
+    if (!(table instanceof View) || RuntimeEnv.INSTANCE.isTestEnv()) {
+      return false;
+    }
+    org.apache.hadoop.hive.metastore.api.Table view = table.getMetaStoreTable();
+    Preconditions.checkNotNull(view);
+    Map<String, String> parameters = view.getParameters();
+    return (parameters != null && parameters.get("Authorized") != null &&
+        parameters.get("Authorized").equalsIgnoreCase("false"));
+  }
+
+  /**
    * Sets the authorizable object to be a table.
    */
   public PrivilegeRequestBuilder onTable(FeTable table) {
     Preconditions.checkNotNull(table);
     String dbName = Preconditions.checkNotNull(table.getTableName().getDb());
     String tblName = Preconditions.checkNotNull(table.getTableName().getTbl());
-    return onTable(dbName, tblName, table.getOwnerUser());
+
+    // TODO(IMPALA-10122): Remove the need for computing 'isViewCreatedWithoutAuthz' once
+    // we can properly process a PrivilegeRequest for a view whose creation was not
+    // authorized.
+    boolean isViewCreatedWithoutAuthz = isViewCreatedWithoutAuthz(table);
+    return onTable(dbName, tblName, table.getOwnerUser(), isViewCreatedWithoutAuthz);
   }
 
   /**
@@ -78,11 +110,24 @@ public class PrivilegeRequestBuilder {
    */
   public PrivilegeRequestBuilder onTable(
       String dbName, String tableName, String ownerUser) {
+    return onTable(dbName, tableName, ownerUser, false);
+  }
+
+  /**
+   * Sets the authorizable object to be a table. This method is only called by
+   * onTable(FeTable table) when 'table' corresponds to a view whose creation was not
+   * authorized.
+   * TODO(IMPALA-10122): Remove the argument of 'viewCreatedWithoutAuthz' once we can
+   * properly process a PrivilegeRequest for a view whose creation was not authorized.
+   */
+  public PrivilegeRequestBuilder onTable(
+      String dbName, String tableName, String ownerUser,
+      boolean viewCreatedWithoutAuthz) {
     Preconditions.checkState(authorizable_ == null);
     // Convert 'dbName' and 'tableName' to lowercase to avoid duplicate audit log entries
     // for the PrivilegeRequest of ALTER.
     authorizable_ = authzFactory_.newTable(dbName.toLowerCase(), tableName.toLowerCase(),
-        ownerUser);
+        ownerUser, viewCreatedWithoutAuthz);
     return this;
   }
 
@@ -91,7 +136,20 @@ public class PrivilegeRequestBuilder {
     // This call path is specifically meant for cases that try to mask the
     // TableNotFound AnalysisExceptions and instead propagate that as an
     // AuthorizationException.
-    return onTable(dbName, tableName, null);
+    return onTableUnknownOwner(dbName, tableName, false);
+  }
+
+  /**
+   * TODO(IMPALA-10122): Remove the argument of 'viewCreatedWithoutAuthz' once we can
+   * properly process a PrivilegeRequest for a view whose creation was not authorized.
+   */
+  public PrivilegeRequestBuilder onTableUnknownOwner(String dbName, String tableName,
+      boolean viewCreatedWithoutAuthz) {
+    // Useful when owner cannot be determined because the table does not exist.
+    // This call path is specifically meant for cases that try to mask the
+    // TableNotFound AnalysisExceptions and instead propagate that as an
+    // AuthorizationException.
+    return onTable(dbName, tableName, null, viewCreatedWithoutAuthz);
   }
 
   /**
