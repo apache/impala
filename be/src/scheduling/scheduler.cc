@@ -90,11 +90,11 @@ const BackendDescriptorPB& Scheduler::LookUpBackendDesc(
     const ExecutorConfig& executor_config, const NetworkAddressPB& host) {
   const BackendDescriptorPB* desc = executor_config.group.LookUpBackendDesc(host);
   if (desc == nullptr) {
-    // Local host may not be in executor_config's executor group if it's a dedicated
+    // Coordinator host may not be in executor_config's executor group if it's a dedicated
     // coordinator, or if it is configured to be in a different executor group.
-    const BackendDescriptorPB& local_be_desc = executor_config.local_be_desc;
-    DCHECK(host == local_be_desc.address());
-    desc = &local_be_desc;
+    const BackendDescriptorPB& coord_desc = executor_config.coord_desc;
+    DCHECK(host == coord_desc.address());
+    desc = &coord_desc;
   }
   return *desc;
 }
@@ -286,10 +286,10 @@ void Scheduler::ComputeFragmentExecParams(const ExecutorConfig& executor_config,
     if (fragment_state->is_coord_fragment || executor_config.group.NumExecutors() == 0) {
       // The coordinator fragment must be scheduled on the coordinator. Otherwise if
       // no executors are available, we need to schedule on the coordinator.
-      const BackendDescriptorPB& local_be_desc = executor_config.local_be_desc;
-      host = local_be_desc.address();
-      DCHECK(local_be_desc.has_krpc_address());
-      krpc_host = local_be_desc.krpc_address();
+      const BackendDescriptorPB& coord_desc = executor_config.coord_desc;
+      host = coord_desc.address();
+      DCHECK(coord_desc.has_krpc_address());
+      krpc_host = coord_desc.krpc_address();
     } else if (fragment_state->exchange_input_fragments.size() > 0) {
       // Interior unpartitioned fragments can be scheduled on an arbitrary executor.
       // Pick a random instance from the first input fragment.
@@ -410,8 +410,7 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
   DCHECK(has_union || scan_node_ids.size() == 1) << "This method may need revisiting "
       << "for plans with no union and multiple scans per fragment";
   vector<NetworkAddressPB> scan_hosts;
-  GetScanHosts(
-      executor_config.local_be_desc, scan_node_ids, *fragment_state, &scan_hosts);
+  GetScanHosts(executor_config.coord_desc, scan_node_ids, *fragment_state, &scan_hosts);
   for (const NetworkAddressPB& host_addr : scan_hosts) {
     // Ensure that the num instances is at least as many as input fragments. We don't
     // want to increment if there were already some instances from the input fragment,
@@ -625,8 +624,8 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
   // TODO: Either get this from the ExecutorConfig or modify the AssignmentCtx interface
   // to handle this case.
   ExecutorGroup coord_only_executor_group("coordinator-only-group");
-  const BackendDescriptorPB& local_be_desc = executor_config.local_be_desc;
-  coord_only_executor_group.AddExecutor(local_be_desc);
+  const BackendDescriptorPB& coord_desc = executor_config.coord_desc;
+  coord_only_executor_group.AddExecutor(coord_desc);
   VLOG_ROW << "Exec at coord is " << (exec_at_coord ? "true" : "false");
   AssignmentCtx assignment_ctx(exec_at_coord ? coord_only_executor_group : executor_group,
       total_assignments_, total_local_assignments_, rng);
@@ -642,9 +641,9 @@ Status Scheduler::ComputeScanRangeAssignment(const ExecutorConfig& executor_conf
     // Select executor for the current scan range.
     if (exec_at_coord) {
       DCHECK(assignment_ctx.executor_group().LookUpExecutorIp(
-          local_be_desc.address().hostname(), nullptr));
-      assignment_ctx.RecordScanRangeAssignment(local_be_desc, node_id, host_list,
-          scan_range_locations, assignment);
+          coord_desc.address().hostname(), nullptr));
+      assignment_ctx.RecordScanRangeAssignment(
+          coord_desc, node_id, host_list, scan_range_locations, assignment);
     } else {
       // Collect executor candidates with smallest memory distance.
       vector<IpAddr> executor_candidates;
@@ -786,7 +785,7 @@ std::vector<TPlanNodeId> Scheduler::FindScanNodes(const TPlan& plan) {
   return FindNodes(plan, SCAN_NODE_TYPES);
 }
 
-void Scheduler::GetScanHosts(const BackendDescriptorPB& local_be_desc,
+void Scheduler::GetScanHosts(const BackendDescriptorPB& coord_desc,
     const vector<TPlanNodeId>& scan_ids, const FragmentScheduleState& fragment_state,
     vector<NetworkAddressPB>* scan_hosts) {
   for (const TPlanNodeId& scan_id : scan_ids) {
@@ -804,7 +803,7 @@ void Scheduler::GetScanHosts(const BackendDescriptorPB& local_be_desc,
       // TODO: we'll need to revisit this strategy once we can partition joins
       // (in which case this fragment might be executing a right outer join
       // with a large build table)
-      scan_hosts->push_back(local_be_desc.address());
+      scan_hosts->push_back(coord_desc.address());
     }
   }
 }
@@ -890,7 +889,7 @@ void Scheduler::ComputeBackendExecParams(
 
   // This also ensures an entry always exists for the coordinator backend.
   int64_t coord_min_reservation = 0;
-  const NetworkAddressPB& coord_addr = executor_config.local_be_desc.address();
+  const NetworkAddressPB& coord_addr = executor_config.coord_desc.address();
   BackendScheduleState& coord_be_state =
       state->GetOrCreateBackendScheduleState(coord_addr);
   coord_be_state.exec_params->set_is_coord_backend(true);

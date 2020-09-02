@@ -24,11 +24,12 @@
 #include "kudu/rpc/rpc_controller.h"
 #include "rpc/rpc-mgr.h"
 #include "rpc/rpc-mgr.inline.h"
+#include "rpc/sidecar-util.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/query-exec-mgr.h"
 #include "runtime/query-driver.h"
+#include "runtime/query-exec-mgr.h"
 #include "runtime/query-state.h"
 #include "service/client-request-state.h"
 #include "service/impala-server.h"
@@ -111,18 +112,6 @@ Status ControlService::GetProfile(const ReportExecStatusRequestPB& request,
   uint32_t len = thrift_profiles_slice.size();
   RETURN_IF_ERROR(DeserializeThriftMsg(thrift_profiles_slice.data(),
       &len, true, thrift_profiles));
-  return Status::OK();
-}
-
-// Retrieves the sidecar at 'sidecar_idx' from 'rpc_context' and deserializes it into
-// 'thrift_obj'.
-template <typename T>
-static Status GetSidecar(int sidecar_idx, RpcContext* rpc_context, T* thrift_obj) {
-  kudu::Slice sidecar_slice;
-  KUDU_RETURN_IF_ERROR(rpc_context->GetInboundSidecar(sidecar_idx, &sidecar_slice),
-      "Failed to get sidecar");
-  uint32_t len = sidecar_slice.size();
-  RETURN_IF_ERROR(DeserializeThriftMsg(sidecar_slice.data(), &len, true, thrift_obj));
   return Status::OK();
 }
 

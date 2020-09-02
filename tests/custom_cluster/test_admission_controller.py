@@ -745,7 +745,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     impalad = self.cluster.impalads[0]
     client = impalad.service.create_beeswax_client()
     try:
-      client.set_configuration_option("debug_action", "CRS_BEFORE_ADMISSION:SLEEP@2000")
+      client.set_configuration_option("debug_action", "AC_BEFORE_ADMISSION:SLEEP@2000")
       client.set_configuration_option("mem_limit", self.PROC_MEM_TEST_LIMIT + 1)
       handle = client.execute_async("select 1")
       sleep(1)
@@ -754,7 +754,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
           "Ready to be Rejected but already cancelled, query id=")
       client.clear_configuration()
 
-      client.set_configuration_option("debug_action", "CRS_BEFORE_ADMISSION:SLEEP@2000")
+      client.set_configuration_option("debug_action", "AC_BEFORE_ADMISSION:SLEEP@2000")
       handle = client.execute_async("select 2")
       sleep(1)
       client.close_query(handle)
@@ -1239,7 +1239,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     profile = result.runtime_profile
     reasons = self.__extract_init_queue_reasons([profile])
     assert len(reasons) == 1
-    assert "Local backend has not started up yet." in reasons[0]
+    assert "Coordinator not registered with the statestore." in reasons[0]
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(num_exclusive_coordinators=1)

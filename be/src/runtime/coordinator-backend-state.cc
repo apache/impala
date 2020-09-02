@@ -30,6 +30,7 @@
 #include "kudu/util/slice.h"
 #include "kudu/util/status.h"
 #include "rpc/rpc-mgr.inline.h"
+#include "rpc/sidecar-util.h"
 #include "runtime/backend-client.h"
 #include "runtime/client-cache.h"
 #include "runtime/coordinator-filter-state.h"
@@ -268,38 +269,20 @@ void Coordinator::BackendState::ExecAsync(const DebugOptions& debug_options,
     exec_rpc_controller_.set_timeout(
         MonoDelta::FromMilliseconds(FLAGS_backend_client_rpc_timeout_ms));
 
-    // Serialize the sidecar and add it to the rpc controller. The serialized buffer is
-    // owned by 'serializer' and is freed when it is destructed.
-    ThriftSerializer serializer(true);
-    uint8_t* serialized_buf = nullptr;
-    uint32_t serialized_len = 0;
-    Status serialize_status =
+    // Serialize the sidecar and add it to the rpc controller.
+    Status serialize_debug_status =
         DebugAction(exec_params_.query_options(), "EXEC_SERIALIZE_FRAGMENT_INFO");
-    if (LIKELY(serialize_status.ok())) {
-      serialize_status =
-          serializer.SerializeToBuffer(&fragment_info, &serialized_len, &serialized_buf);
-    }
-    if (UNLIKELY(!serialize_status.ok())) {
-      SetExecError(serialize_status, exec_status_barrier);
-      goto done;
-    } else if (serialized_len > FLAGS_rpc_max_message_size) {
-      SetExecError(
-          Status::Expected("Serialized Exec() request exceeds --rpc_max_message_size."),
-          exec_status_barrier);
+    if (UNLIKELY(!serialize_debug_status.ok())) {
+      SetExecError(serialize_debug_status, exec_status_barrier);
       goto done;
     }
-
-    // TODO: eliminate the extra copy here by using a Slice
-    unique_ptr<kudu::faststring> sidecar_buf = make_unique<kudu::faststring>();
-    sidecar_buf->assign_copy(serialized_buf, serialized_len);
-    unique_ptr<RpcSidecar> rpc_sidecar = RpcSidecar::FromFaststring(move(sidecar_buf));
 
     int sidecar_idx;
-    kudu::Status sidecar_status =
-        exec_rpc_controller_.AddOutboundSidecar(move(rpc_sidecar), &sidecar_idx);
-    if (!sidecar_status.ok()) {
-      SetExecError(
-          FromKuduStatus(sidecar_status, "Failed to add sidecar"), exec_status_barrier);
+    // TODO: eliminate the extra copy here by using a Slice
+    Status sidecar_status =
+        SetFaststringSidecar(fragment_info, &exec_rpc_controller_, &sidecar_idx);
+    if (UNLIKELY(!sidecar_status.ok())) {
+      SetExecError(sidecar_status, exec_status_barrier);
       goto done;
     }
     request.set_plan_fragment_info_sidecar_idx(sidecar_idx);

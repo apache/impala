@@ -317,6 +317,7 @@ class AdmissionController {
   /// are owned by the ClientRequestState).
   struct AdmissionRequest {
     const UniqueIdPB& query_id;
+    const UniqueIdPB& coord_id;
     const TQueryExecRequest& request;
     const TQueryOptions& query_options;
     RuntimeProfile* summary_profile;

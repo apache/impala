@@ -374,7 +374,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     # the shutdown grace period expires. This demonstrates that queries don't get
     # cancelled if the cluster membership changes while they're waiting for admission.
     before_shutdown_admission_handle = self.execute_query_async(QUERY,
-        {'debug_action': 'CRS_BEFORE_ADMISSION:SLEEP@30000'})
+        {'debug_action': 'AC_BEFORE_ADMISSION:SLEEP@30000'})
 
     # Shut down and wait for the shutdown state to propagate through statestore.
     result = self.execute_query_expect_success(self.client, SHUTDOWN_EXEC2)

@@ -47,7 +47,7 @@
 #include "runtime/query-driver.h"
 #include "runtime/query-exec-mgr.h"
 #include "runtime/query-state.h"
-#include "scheduling/admission-controller.h"
+#include "scheduling/admission-control-client.h"
 #include "scheduling/scheduler.h"
 #include "service/client-request-state.h"
 #include "util/bit-util.h"
@@ -1270,24 +1270,24 @@ void Coordinator::ReleaseQueryAdmissionControlResources() {
   // AdmissionController::ReleaseQuery.
   backend_released_barrier_.Wait();
   LOG(INFO) << "Release admission control resources for query_id=" << PrintId(query_id());
-  AdmissionController* admission_controller =
-      ExecEnv::GetInstance()->admission_controller();
-  DCHECK(admission_controller != nullptr);
-  admission_controller->ReleaseQuery(exec_params_.query_id(),
+  AdmissionControlClient* admission_control_client =
+      parent_request_state_->admission_control_client();
+  DCHECK(admission_control_client != nullptr);
+  admission_control_client->ReleaseQuery(
       ComputeQueryResourceUtilization().peak_per_host_mem_consumption);
   query_events_->MarkEvent("Released admission control resources");
 }
 
 void Coordinator::ReleaseBackendAdmissionControlResources(
     const vector<BackendState*>& backend_states) {
-  AdmissionController* admission_controller =
-      ExecEnv::GetInstance()->admission_controller();
-  DCHECK(admission_controller != nullptr);
+  AdmissionControlClient* admission_control_client =
+      parent_request_state_->admission_control_client();
+  DCHECK(admission_control_client != nullptr);
   vector<NetworkAddressPB> host_addrs;
   for (auto backend_state : backend_states) {
     host_addrs.push_back(backend_state->impalad_address());
   }
-  admission_controller->ReleaseQueryBackends(exec_params_.query_id(), host_addrs);
+  admission_control_client->ReleaseQueryBackends(host_addrs);
 }
 
 Coordinator::ResourceUtilization Coordinator::ComputeQueryResourceUtilization() {

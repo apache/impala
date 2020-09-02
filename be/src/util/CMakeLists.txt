@@ -84,6 +84,7 @@ add_library(Util
   process-state-info.cc
   redactor.cc
   runtime-profile.cc
+  sharded-query-map-util.cc
   simple-logger.cc
   string-parser.cc
   string-util.cc
