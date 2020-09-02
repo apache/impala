@@ -37,10 +37,15 @@ public interface AuthorizableFactory {
   Authorizable newDatabase(String dbName, @Nullable String ownerUser);
 
   /**
-   * Creates a new instance of table {@link Authorizable} for given database and table
-   * names owned by a given user.
+   * Creates a new instance of table {@link Authorizable} for a given database and a
+   * table name owned by a given user. The additional argument of
+   * 'viewCreatedWithoutAuthz' indicates whether this table corresponds to a view whose
+   * creation was not authorized.
+   * TODO(IMPALA-10122): Remove the argument of 'viewCreatedWithoutAuthz' once we can
+   * properly process a PrivilegeRequest for a view whose creation was not authorized.
    */
-  Authorizable newTable(String dbName, String tableName, @Nullable String ownerUser);
+  Authorizable newTable(String dbName, String tableName, @Nullable String ownerUser,
+      boolean viewCreatedWithoutAuthz);
 
   /**
    * Creates a new instance of column {@link Authorizable} for a given database name and

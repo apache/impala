@@ -21,6 +21,7 @@ import java.util.List;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.authorization.PrivilegeRequestBuilder;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
@@ -176,9 +177,19 @@ public class ResetMetadataStmt extends StatementBase {
                 builder.onTableUnknownOwner(
                   dbName, tableName_.getTbl()).allOf(Privilege.REFRESH).build());
           } else {
+            // Notice that in isViewCreatedWithoutAuthz() we assume that 'tbl' is not a
+            // view whose creation was not authorized if we cannot find it currently
+            // cached in the local Catalog, i.e., when 'tbl' is null.
+            // TODO(IMPALA-10122): Remove the need for computing
+            // 'isViewCreatedWithoutAuthz' once we can properly process a
+            // PrivilegeRequest for a view whose creation was not authorized.
+            boolean isViewCreatedWithoutAuthz =
+                PrivilegeRequestBuilder.isViewCreatedWithoutAuthz(tbl);
             analyzer.registerPrivReq(
                 builder -> builder.onTable(dbName, tableName_.getTbl(),
-                  tbl.getOwnerUser()).allOf(Privilege.REFRESH).build());
+                    tbl.getOwnerUser(), isViewCreatedWithoutAuthz)
+                    .allOf(Privilege.REFRESH)
+                    .build());
           }
         }
         break;
