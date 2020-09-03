@@ -57,9 +57,11 @@ static int64_t CalcSoftLimit(int64_t limit) {
   return static_cast<int64_t>(limit * frac);
 }
 
-MemTracker::MemTracker(
-    int64_t byte_limit, const string& label, MemTracker* parent, bool log_usage_if_zero)
-  : limit_(byte_limit),
+MemTracker::MemTracker(int64_t byte_limit, const string& label, MemTracker* parent,
+    bool log_usage_if_zero, bool is_query_mem_tracker, const TUniqueId& query_id)
+  : is_query_mem_tracker_(is_query_mem_tracker),
+    query_id_(query_id),
+    limit_(byte_limit),
     soft_limit_(CalcSoftLimit(byte_limit)),
     label_(label),
     parent_(parent),
@@ -231,9 +233,7 @@ MemTracker* MemTracker::CreateQueryMemTracker(const TUniqueId& id,
       ExecEnv::GetInstance()->pool_mem_trackers()->GetRequestPoolMemTracker(
           pool_name, true);
   MemTracker* tracker = obj_pool->Add(new MemTracker(
-      mem_limit, Substitute("Query($0)", PrintId(id)), pool_tracker));
-  tracker->is_query_mem_tracker_ = true;
-  tracker->query_id_ = id;
+      mem_limit, Substitute("Query($0)", PrintId(id)), pool_tracker, true, true, id));
   return tracker;
 }
 
