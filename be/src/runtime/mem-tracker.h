@@ -93,7 +93,8 @@ class MemTracker {
   /// included
   /// in LogUsage() output if consumption is 0.
   MemTracker(int64_t byte_limit = -1, const std::string& label = std::string(),
-      MemTracker* parent = nullptr, bool log_usage_if_zero = true);
+      MemTracker* parent = nullptr, bool log_usage_if_zero = true,
+      bool is_query_mem_tracker = false, const TUniqueId& query_id = TUniqueId());
 
   /// C'tor for tracker for which consumption counter is created as part of a profile.
   /// The counter is created with name COUNTER_NAME.
