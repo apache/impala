@@ -192,7 +192,7 @@ public class FunctionCallExpr extends Expr {
   /**
    *  Returns true if this is a call to an Impala builtin cast function.
    */
-  private boolean isBuiltinCastFunction() {
+  public boolean isBuiltinCastFunction() {
     return fnName_.isBuiltin() &&
         fnName_.getFunction().startsWith(CastExpr.CAST_FUNCTION_PREFIX);
   }
