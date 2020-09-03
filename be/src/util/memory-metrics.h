@@ -19,7 +19,7 @@
 
 #include "util/metrics.h"
 
-#include <mutex>
+#include <boost/thread/shared_mutex.hpp>
 #include <gperftools/malloc_extension.h>
 #if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
 #include <sanitizer/allocator_interface.h>
@@ -179,13 +179,18 @@ class JvmMetricCache {
     static JvmMetricCache* GetInstance();
 
   private:
-    /// Updates metrics if over CACHE_PERIOD_MILLIS has elapsed.
+    /// Updates metrics if over CACHE_PERIOD_MILLIS has elapsed. Thread safe.
     void GrabMetricsIfNecessary();
 
-    std::mutex lock_;
+    /// A shared lock that allows low-overhead reads of last_fetch_ and last_response_.
+    /// The write lock is only acquired when the CACHE_PERIOD_MILLIS timeout expires and
+    /// last_response_ and last_fetch_ need to be updated.
+    boost::shared_mutex lock_;
+
     /// Time when metrics were last fetched, using MonotonicMillis().
     /// Protected by lock_.
     int64_t last_fetch_ = 0;
+
     /// Last available metrics.
     /// Protected by lock_.
     TGetJvmMemoryMetricsResponse last_response_;
@@ -243,7 +248,14 @@ class JvmMemoryMetric : public IntGauge {
 // A counter that represents metrics about JVM Memory. It acesses the underlying
 // data via JniUtil::GetJvmMemoryMetrics() via JvmMetricCache.
 class JvmMemoryCounterMetric : public IntCounter {
-  virtual int64_t GetValue() override;
+  public:
+    virtual int64_t GetValue() override;
+
+    static JvmMemoryCounterMetric* GC_COUNT;
+    static JvmMemoryCounterMetric* GC_TIME_MILLIS;
+    static JvmMemoryCounterMetric* GC_NUM_WARN_THRESHOLD_EXCEEDED;
+    static JvmMemoryCounterMetric* GC_NUM_INFO_THRESHOLD_EXCEEDED;
+    static JvmMemoryCounterMetric* GC_TOTAL_EXTRA_SLEEP_TIME_MILLIS;
 
   private:
     friend class JvmMemoryMetric;

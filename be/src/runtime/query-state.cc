@@ -48,6 +48,7 @@
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
+#include "util/memory-metrics.h"
 #include "util/metrics.h"
 #include "util/system-state-info.h"
 #include "util/thread.h"
@@ -70,6 +71,26 @@ DEFINE_int32_hidden(stress_status_report_delay_ms, 0, "Stress option to inject a
     "before status reports. Has no effect on release builds.");
 
 namespace impala {
+
+PROFILE_DEFINE_DERIVED_COUNTER(GcCount, STABLE_LOW, TUnit::UNIT,
+    "Per-Impalad Counter: The number of GC collections that have occurred in the Impala "
+    "process over the duration of the query. Reported by JMX.");
+PROFILE_DEFINE_DERIVED_COUNTER(GcTimeMillis, STABLE_LOW, TUnit::TIME_MS,
+    "Per-Impalad Counter: The amount of time spent in GC in the Impala process over the "
+    "duration of the query. Reported by JMX.");
+PROFILE_DEFINE_DERIVED_COUNTER(GcNumWarnThresholdExceeded, STABLE_LOW,
+    TUnit::UNIT,
+    "Per-Impalad Counter: The number of JVM process pauses that occurred in this Impala "
+    "process over the duration of the query. Tracks the number of pauses at the WARN "
+    "threshold. See JvmPauseMonitor for details. Reported by the JvmPauseMonitor.");
+PROFILE_DEFINE_DERIVED_COUNTER(GcNumInfoThresholdExceeded, STABLE_LOW,
+    TUnit::UNIT,
+    "Per-Impalad Counter: The number of JVM process pauses that occurred in this Impala "
+    "process over the duration of the query. Tracks the number of pauses at the INFO "
+    "threshold. See JvmPauseMonitor for details. Reported by the JvmPauseMonitor.");
+PROFILE_DEFINE_DERIVED_COUNTER(GcTotalExtraSleepTimeMillis, STABLE_LOW, TUnit::TIME_MS,
+    "Per-Impalad Counter: The amount of time the JVM process paused over the duration "
+    "of the query. See JvmPauseMonitor for details. Reported by the JvmPauseMonitor.");
 
 QueryState::ScopedRef::ScopedRef(const TUniqueId& query_id) {
   DCHECK(ExecEnv::GetInstance()->query_exec_mgr() != nullptr);
@@ -158,6 +179,45 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
   RETURN_IF_ERROR(DebugAction(query_options(), "QUERY_STATE_INIT"));
 
   ExecEnv* exec_env = ExecEnv::GetInstance();
+
+  RuntimeProfile* jvm_host_profile = RuntimeProfile::Create(&obj_pool_, "JVM");
+  host_profile_->AddChild(jvm_host_profile);
+
+  int64_t gc_count = JvmMemoryCounterMetric::GC_COUNT->GetValue();
+  PROFILE_GcCount.Instantiate(jvm_host_profile,
+      [gc_count]() {
+        return JvmMemoryCounterMetric::GC_COUNT->GetValue() - gc_count;
+      });
+
+  int64_t gc_time_millis = JvmMemoryCounterMetric::GC_TIME_MILLIS->GetValue();
+  PROFILE_GcTimeMillis.Instantiate(jvm_host_profile,
+      [gc_time_millis]() {
+        return JvmMemoryCounterMetric::GC_TIME_MILLIS->GetValue() - gc_time_millis;
+      });
+
+  int64_t gc_num_warn_threshold_exceeded =
+      JvmMemoryCounterMetric::GC_NUM_WARN_THRESHOLD_EXCEEDED->GetValue();
+  PROFILE_GcNumWarnThresholdExceeded.Instantiate(jvm_host_profile,
+      [gc_num_warn_threshold_exceeded]() {
+        return JvmMemoryCounterMetric::GC_NUM_WARN_THRESHOLD_EXCEEDED->GetValue()
+            - gc_num_warn_threshold_exceeded;
+      });
+
+  int64_t gc_num_info_threshold_exceeded =
+      JvmMemoryCounterMetric::GC_NUM_INFO_THRESHOLD_EXCEEDED->GetValue();
+  PROFILE_GcNumInfoThresholdExceeded.Instantiate(jvm_host_profile,
+      [gc_num_info_threshold_exceeded]() {
+        return JvmMemoryCounterMetric::GC_NUM_INFO_THRESHOLD_EXCEEDED->GetValue()
+            - gc_num_info_threshold_exceeded;
+      });
+
+  int64_t gc_total_extra_sleep_time_millis =
+      JvmMemoryCounterMetric::GC_TOTAL_EXTRA_SLEEP_TIME_MILLIS->GetValue();
+  PROFILE_GcTotalExtraSleepTimeMillis.Instantiate(jvm_host_profile,
+      [gc_total_extra_sleep_time_millis]() {
+        return JvmMemoryCounterMetric::GC_TOTAL_EXTRA_SLEEP_TIME_MILLIS->GetValue()
+            - gc_total_extra_sleep_time_millis;
+      });
 
   // Initialize resource tracking counters.
   if (query_ctx().trace_resource_usage) {
