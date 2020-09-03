@@ -1615,11 +1615,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Returns the first child if this Expr is a CastExpr. Otherwise, returns 'this'.
+   * Returns the first child if this Expr is a CastExpr or builtin cast
+   * function. Otherwise, returns 'this'.
    */
   public Expr unwrapExpr(boolean implicitOnly) {
-    if (this instanceof CastExpr
-        && (!implicitOnly || ((CastExpr) this).isImplicit())) {
+    if ((this instanceof CastExpr
+        && (!implicitOnly || ((CastExpr) this).isImplicit()))
+        || (this instanceof FunctionCallExpr
+            && ((FunctionCallExpr) this).isBuiltinCastFunction())) {
       return children_.get(0);
     }
     return this;
