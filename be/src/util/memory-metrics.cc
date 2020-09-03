@@ -29,7 +29,10 @@
 #include "util/time.h"
 
 using boost::algorithm::to_lower;
-using std::lock_guard;
+using boost::shared_lock;
+using boost::shared_mutex;
+using boost::unique_lock;
+
 using namespace impala;
 using namespace strings;
 
@@ -60,6 +63,13 @@ SanitizerMallocMetric* SanitizerMallocMetric::BYTES_ALLOCATED = nullptr;
 bool JvmMemoryMetric::initialized_ = false;
 JvmMemoryMetric* JvmMemoryMetric::HEAP_MAX_USAGE = nullptr;
 JvmMemoryMetric* JvmMemoryMetric::NON_HEAP_COMMITTED = nullptr;
+
+JvmMemoryCounterMetric* JvmMemoryCounterMetric::GC_COUNT = nullptr;
+JvmMemoryCounterMetric* JvmMemoryCounterMetric::GC_TIME_MILLIS = nullptr;
+JvmMemoryCounterMetric* JvmMemoryCounterMetric::GC_NUM_WARN_THRESHOLD_EXCEEDED = nullptr;
+JvmMemoryCounterMetric* JvmMemoryCounterMetric::GC_NUM_INFO_THRESHOLD_EXCEEDED = nullptr;
+JvmMemoryCounterMetric* JvmMemoryCounterMetric::GC_TOTAL_EXTRA_SLEEP_TIME_MILLIS =
+    nullptr;
 
 BufferPoolMetric* BufferPoolMetric::LIMIT = nullptr;
 BufferPoolMetric* BufferPoolMetric::SYSTEM_ALLOCATED = nullptr;
@@ -209,22 +219,37 @@ void JvmMemoryMetric::InitMetrics(MetricGroup* parent) {
     JvmMemoryMetric::CreateAndRegister(
         metrics, "jvm.$0.peak-init-usage-bytes", name, PEAK_INIT);
   }
-  JvmMemoryCounterMetric::CreateAndRegister(metrics, "jvm.gc_time_millis",
-      [](const TGetJvmMemoryMetricsResponse& r) { return r.gc_time_millis; });
-  JvmMemoryCounterMetric::CreateAndRegister(metrics, "jvm.gc_num_info_threshold_exceeded",
-      [](const TGetJvmMemoryMetricsResponse& r) {
-      return r.gc_num_info_threshold_exceeded;
-  });
-  JvmMemoryCounterMetric::CreateAndRegister(metrics, "jvm.gc_num_warn_threshold_exceeded",
-      [](const TGetJvmMemoryMetricsResponse& r) {
-      return r.gc_num_warn_threshold_exceeded;
-  });
-  JvmMemoryCounterMetric::CreateAndRegister(metrics, "jvm.gc_count",
-      [](const TGetJvmMemoryMetricsResponse& r) { return r.gc_count; });
-  JvmMemoryCounterMetric::CreateAndRegister(metrics,
-      "jvm.gc_total_extra_sleep_time_millis", [](const TGetJvmMemoryMetricsResponse& r) {
-      return r.gc_total_extra_sleep_time_millis;
-  });
+
+  JvmMemoryCounterMetric::GC_TIME_MILLIS =
+      JvmMemoryCounterMetric::CreateAndRegister(metrics,
+          "jvm.gc_time_millis",
+          [](const TGetJvmMemoryMetricsResponse& r) {
+          return r.gc_time_millis;
+          });
+  JvmMemoryCounterMetric::GC_NUM_INFO_THRESHOLD_EXCEEDED =
+      JvmMemoryCounterMetric::CreateAndRegister(metrics,
+          "jvm.gc_num_info_threshold_exceeded",
+          [](const TGetJvmMemoryMetricsResponse& r) {
+            return r.gc_num_info_threshold_exceeded;
+          });
+  JvmMemoryCounterMetric::GC_NUM_WARN_THRESHOLD_EXCEEDED =
+      JvmMemoryCounterMetric::CreateAndRegister(metrics,
+          "jvm.gc_num_warn_threshold_exceeded",
+          [](const TGetJvmMemoryMetricsResponse& r) {
+            return r.gc_num_warn_threshold_exceeded;
+          });
+  JvmMemoryCounterMetric::GC_COUNT =
+    JvmMemoryCounterMetric::CreateAndRegister(metrics,
+          "jvm.gc_count",
+          [](const TGetJvmMemoryMetricsResponse& r) {
+            return r.gc_count;
+          });
+  JvmMemoryCounterMetric::GC_TOTAL_EXTRA_SLEEP_TIME_MILLIS =
+      JvmMemoryCounterMetric::CreateAndRegister(metrics,
+          "jvm.gc_total_extra_sleep_time_millis",
+          [](const TGetJvmMemoryMetricsResponse& r) {
+            return r.gc_total_extra_sleep_time_millis;
+          });
   initialized_ = true;
 }
 
@@ -251,6 +276,19 @@ JvmMetricCache* JvmMetricCache::GetInstance() {
 }
 
 void JvmMetricCache::GrabMetricsIfNecessary() {
+  // Acquire the read lock and check if the cache timeout has expired. Acquiring the read
+  // lock should be cheap, so optimize for the fast path where the timeout has not been
+  // hit.
+  {
+    shared_lock<shared_mutex> shared_l(lock_);
+    int64_t now = MonotonicMillis();
+    if (now - last_fetch_ < CACHE_PERIOD_MILLIS) return;
+  }
+
+  // If the timeout has been hit, then refresh 'last_response_'. Since the read lock is
+  // released before the write lock is acquired, it is possible another thread
+  // already refreshed 'last_response_' so check the value of 'last_fetch_' again.
+  unique_lock<shared_mutex> unique_l(lock_);
   int64_t now = MonotonicMillis();
   if (now - last_fetch_ < CACHE_PERIOD_MILLIS) return;
   Status status = JniUtil::GetJvmMemoryMetrics(&last_response_);
@@ -264,16 +302,16 @@ void JvmMetricCache::GrabMetricsIfNecessary() {
 
 int64_t JvmMetricCache::GetCounterMetric(
     int64_t(*accessor)(const TGetJvmMemoryMetricsResponse&)) {
-  lock_guard<std::mutex> lock_guard(lock_);
   GrabMetricsIfNecessary();
+  shared_lock<shared_mutex> shared_l(lock_);
   return accessor(last_response_);
 }
 
 int64_t JvmMetricCache::GetPoolMetric(const std::string& mempool_name,
     JvmMemoryMetricType type) {
-  lock_guard<std::mutex> lock_guard(lock_);
   GrabMetricsIfNecessary();
 
+  shared_lock<shared_mutex> shared_l(lock_);
   for (const TJvmMemoryPool& pool : last_response_.memory_pools) {
     if (pool.name == mempool_name) {
       switch (type) {
@@ -303,9 +341,9 @@ int64_t JvmMetricCache::GetPoolMetric(const std::string& mempool_name,
 }
 
 vector<string> JvmMetricCache::GetPoolNames() {
-  lock_guard<std::mutex> lock_guard(lock_);
   GrabMetricsIfNecessary();
   vector<string> names;
+  shared_lock<shared_mutex> shared_l(lock_);
   for (const TJvmMemoryPool& usage: last_response_.memory_pools) {
     names.push_back(usage.name);
   }
