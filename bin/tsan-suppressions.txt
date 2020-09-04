@@ -41,3 +41,6 @@ race:impala::Hs2HttpTest_TestSpnego_Test
 # 'g_kinit_ctx' (init.cc). On a production cluster, Impala daemons should only call
 # 'InitAuth' once.
 race:impala::RpcMgrKerberizedTest
+
+# TODO: IMPALA-9403: Allow TSAN to be set on codegen
+race:impala::HdfsColumnarScanner::ProcessScratchBatchCodegenOrInterpret

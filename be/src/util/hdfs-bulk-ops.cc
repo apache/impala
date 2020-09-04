@@ -81,8 +81,7 @@ void HdfsOp::Execute() const {
   if (op_set_->ShouldAbort()) return;
   int err = 0;
   hdfsFS src_connection;
-  Status connection_status = HdfsFsCache::instance()->GetConnection(src_, &src_connection,
-      op_set_->connection_cache());
+  Status connection_status = op_set_->GetHdfsFsConnection(src_, &src_connection);
 
   if (!connection_status.ok()) {
     AddError(connection_status.GetDetail());
@@ -104,8 +103,7 @@ void HdfsOp::Execute() const {
       break;
     case MOVE:
       hdfsFS dst_connection;
-      connection_status = HdfsFsCache::instance()->GetConnection(dst_, &dst_connection,
-          op_set_->connection_cache());
+      connection_status = op_set_->GetHdfsFsConnection(dst_, &dst_connection);
       if (!connection_status.ok()) break;
       err = hdfsMove(src_connection, src_.c_str(), dst_connection, dst_.c_str());
       VLOG_FILE << "hdfsMove() src_file=" << src_ << " dst_file=" << dst_;
@@ -188,4 +186,9 @@ void HdfsOperationSet::MarkOneOpDone() {
 bool HdfsOperationSet::ShouldAbort() {
   lock_guard<mutex> l(errors_lock_);
   return abort_on_error_ && !errors_.empty();
+}
+
+Status HdfsOperationSet::GetHdfsFsConnection(const string& path, hdfsFS* fs) {
+  lock_guard<mutex> l(connection_cache_lock_);
+  return HdfsFsCache::instance()->GetConnection(path, fs, connection_cache_);
 }
