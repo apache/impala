@@ -128,6 +128,10 @@ class HdfsOperationSet {
   /// the set are complete.
   boost::scoped_ptr<CountingBarrier> ops_complete_barrier_;
 
+  /// Protects 'connection_cache_'. Acquired before acquiring a hdfsFS connection via
+  /// HdfsFsCache::GetConnection.
+  std::mutex connection_cache_lock_;
+
   /// A connection cache used by this operation set. Not owned.
   HdfsFsCache::HdfsFsMap* connection_cache_;
 
@@ -152,6 +156,10 @@ class HdfsOperationSet {
   /// Called by HdfsOp at the start of execution to decide whether to continue. Returns
   /// true iff abort_on_error_ is true and at least one error has been recorded.
   bool ShouldAbort();
+
+  /// Gets a hdfsFS connection for the given filesystem path. Acquires
+  /// 'connection_cache_lock_'.
+  Status GetHdfsFsConnection(const std::string& path, hdfsFS* fs);
 };
 
 }
