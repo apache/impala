@@ -34,6 +34,9 @@ Impala's internals and architecture, visit the
 ## Supported Platforms
 
 Impala only supports Linux at the moment.
+Impala supports x86_64 and has experimental support for arm64 (as of Impala 4.0).
+[Impala Requirements](https://impala.apache.org/docs/build/html/topics/impala_prereqs.html)
+contains more detailed information on the minimum CPU requirements.
 
 ## Export Control Notice
 
