@@ -1095,15 +1095,7 @@ class ImpalaBeeswaxClient(ImpalaClient):
                                         self.fetch_size))
       if rpc_status != RpcStatus.OK:
         raise RPCException()
-
-      def split_row_and_decode_if_needed(row):
-        try:
-          return row.split('\t')
-        except UnicodeDecodeError:
-          return row.decode('utf-8', 'replace').split('\t')
-
-      yield [split_row_and_decode_if_needed(row) for row in result.data]
-
+      yield [row.split('\t') for row in result.data]
       if not result.has_more:
         return
 
