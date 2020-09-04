@@ -35,25 +35,11 @@ class PrettyOutputFormatter(object):
 
   def format(self, rows):
     """Returns string containing representation of the table data."""
-
-    def decode_if_needed(row):
-      # Checking if the values in row is decodable. If it is we just give back the row
-      # as it is, if not we generate a new row and give that back instead where the
-      # undecodable parts are swapped out.
-      try:
-        ''.join(str(row))
-        return row
-      except UnicodeDecodeError:
-        new_row = []
-        for entry in row:
-          new_row.append(entry.decode('UTF-8', 'replace'))
-        return new_row
-
     # Clear rows that already exist in the table.
     self.prettytable.clear_rows()
     try:
       for row in rows:
-        self.prettytable.add_row(decode_if_needed(row))
+        self.prettytable.add_row(row)
       return self.prettytable.get_string()
     except Exception as e:
       # beeswax returns each row as a tab separated string. If a string column
@@ -63,8 +49,7 @@ class PrettyOutputFormatter(object):
                    "embedded tabs. Reverting to tab delimited text output")
       print(error_msg, file=sys.stderr)
       print('{0}: {1}'.format(type(e), str(e)), file=sys.stderr)
-
-      return '\n'.join(['\t'.join(decode_if_needed(row)) for row in rows])
+      return '\n'.join(['\t'.join(row) for row in rows])
 
 
 class DelimitedOutputFormatter(object):
@@ -92,7 +77,7 @@ class DelimitedOutputFormatter(object):
                         lineterminator='\n', quoting=csv.QUOTE_MINIMAL)
     for row in rows:
       if sys.version_info.major == 2:
-        row = [val.encode('utf-8', 'replace') for val in row]
+        row = [val.encode('utf-8') for val in row]
       writer.writerow(row)
     rows = temp_buffer.getvalue().rstrip()
     temp_buffer.close()

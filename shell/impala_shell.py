@@ -1221,15 +1221,6 @@ class ImpalaShell(cmd.Cmd, object):
     except RPCException as e:
       # could not complete the rpc successfully
       print(e, file=sys.stderr)
-    except UnicodeDecodeError as e:
-      # An error occoured possibly during the fetching.
-      # Depending of which protocol is at use it can come from different places.
-      # Possibly occours because we try to display binary data which contains
-      # undecodable elements.
-      if self.last_query_handle is not None:
-        self.imp_client.close_query(self.last_query_handle)
-      print('UnicodeDecodeError : %s \nPlease check for columns containing binary data '
-          'to find the possible source of the error.' % (e,), file=sys.stderr)
     except QueryStateException as e:
       # an exception occurred while executing the query
       if self.last_query_handle is not None:
@@ -1357,7 +1348,7 @@ class ImpalaShell(cmd.Cmd, object):
     if self.readline and self.readline.get_current_history_length() > 0:
       for index in xrange(1, self.readline.get_current_history_length() + 1):
         cmd = self.readline.get_history_item(index)
-        print('[%d]: %s' % (index, cmd.decode('utf-8', 'replace')), file=sys.stderr)
+        print('[%d]: %s' % (index, cmd), file=sys.stderr)
     else:
       print(READLINE_UNAVAILABLE_ERROR, file=sys.stderr)
 
