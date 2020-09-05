@@ -24,7 +24,7 @@ import time
 from hive_metastore.ttypes import CommitTxnRequest, OpenTxnRequest
 from subprocess import check_call
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import (SkipIfHive2, SkipIfCatalogV2, SkipIfS3, SkipIfABFS,
+from tests.common.skip import (SkipIf, SkipIfHive2, SkipIfCatalogV2, SkipIfS3, SkipIfABFS,
                                SkipIfADLS, SkipIfIsilon, SkipIfLocal)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 
@@ -316,6 +316,7 @@ class TestAcid(ImpalaTestSuite):
     assert len(self.execute_query("select * from {}".format(tbl_name)).data) == 0
 
   @SkipIfHive2.acid
+  @SkipIf.not_hdfs
   def test_full_acid_schema_without_file_metadata_tag(self, vector, unique_database):
     """IMPALA-10115: Some files have full ACID schema without having
     'hive.acid.version' set. We still need to identify such files as full ACID"""
