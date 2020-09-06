@@ -282,6 +282,89 @@ Path,Size,Partition
 STRING,STRING,STRING
 ====
 ---- QUERY
+SELECT count(*) from iceberg_partitioned_orc_external;
+---- TYPES
+bigint
+---- RESULTS
+20
+====
+---- QUERY
+SELECT count(*) from iceberg_partitioned_orc_external
+where id > 10
+---- TYPES
+bigint
+---- RESULTS
+10
+====
+---- QUERY
+SELECT count(*) from iceberg_partitioned_orc_external
+where action <> 'click'
+---- TYPES
+bigint
+---- RESULTS
+14
+====
+---- QUERY
+# Test distinct count
+SELECT count(distinct id),count(distinct action) from iceberg_partitioned_orc_external
+---- TYPES
+bigint,bigint
+---- RESULTS
+20,3
+====
+---- QUERY
+SELECT * from iceberg_partitioned_orc_external
+where id < 5
+ORDER BY id
+---- TYPES
+int,string,string
+---- RESULTS
+1,'Alex','view'
+2,'Lisa','download'
+3,'Alan','click'
+4,'Alex','view'
+====
+---- QUERY
+SHOW PARTITIONS iceberg_partitioned_orc_external
+---- TYPES
+bigint,bigint,bigint,string,string
+---- RESULTS
+0,3,1000,'action','IDENTITY'
+====
+---- QUERY
+SHOW FILES in iceberg_partitioned_orc_external
+---- LABELS
+Path,Size,Partition
+---- RESULTS
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=click/00004-4-0982a5d3-48c0-4dd0-ab87-d24190894251-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=click/00014-14-dc56d2c8-e285-428d-b81e-f3d07ec53c12-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=click/00015-15-d4a071f4-5d57-493e-8d21-8f82655087e4-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=click/00019-19-e9fa9638-8693-43dc-b1ba-2d8dc390b585-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=click/00020-20-4526ff61-8991-4645-b448-bf3535492111-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=click/00028-28-439376ff-3d17-4494-94ba-586fa00caadd-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=download/00003-3-fb7663c5-aade-4690-bdfc-2334d605a891-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=download/00007-7-fc53a761-1ee2-4ce4-9507-c9917917d2c9-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=download/00011-11-8887c762-b6a8-4e2c-b1e0-6069d6141917-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=download/00012-12-a85e02aa-ff28-4311-b996-a83f67a5e39b-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=download/00022-22-dea5a8ec-ea06-4688-8293-486a62563ef3-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=download/00025-25-d182fe7e-de19-4df8-ac19-27bbfe17b5bd-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=view/00001-1-d5df20b1-6ce6-486a-b084-ea55b7954431-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=view/00006-6-b30cc130-03a1-45e5-b927-d80545593f9a-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=view/00009-9-6476cc9e-9b5a-48d3-8cce-ea7ebb2d904f-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=view/00017-17-c2ab6dc5-3586-4b45-8a3c-860fdc71980d-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=view/00023-23-fd03c61f-8c73-4639-8974-1f6431a30bc5-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=view/00027-27-9baec6d2-8e31-4d19-8259-1a9e546aaea5-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=view/00030-30-433b1afa-9fee-4581-89fb-105483ebf1a2-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/data/action=view/00031-31-e0156a2d-4240-4c8e-9724-6ad3231cf178-00000.orc',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/metadata/02fb8198-e791-4d89-8afa-c75fb5443346-m0.avro',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/metadata/snap-3506237933060603670-1-02fb8198-e791-4d89-8afa-c75fb5443346.avro',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/metadata/v1.metadata.json',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/metadata/v2.metadata.json',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc/metadata/version-hint.text',regex:.*,''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
 describe formatted iceberg_partitioned;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned','NULL'
@@ -306,6 +389,17 @@ describe formatted hadoop_catalog_test_external;
 '','iceberg.catalog_location','/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test'
 '','iceberg.table_identifier','functional_parquet.hadoop_catalog_test'
 '','iceberg.file_format ','parquet             '
+'','iceberg.catalog     ','hadoop.catalog      '
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe formatted iceberg_partitioned_orc_external;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc','NULL'
+'','iceberg.catalog_location','/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc'
+'','iceberg.table_identifier','functional_parquet.iceberg_partitioned_orc'
+'','iceberg.file_format ','orc                 '
 '','iceberg.catalog     ','hadoop.catalog      '
 ---- TYPES
 string, string, string

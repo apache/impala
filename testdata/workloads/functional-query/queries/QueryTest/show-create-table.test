@@ -689,3 +689,25 @@ TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.catalog'='hadoop.catalog'
     'iceberg.file_format'='parquet',
     'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
 ====
+---- CREATE_TABLE
+CREATE TABLE iceberg_test_orc (
+  level STRING
+)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.file_format'='orc', 'iceberg.catalog'='hadoop.tables')
+---- RESULTS-HIVE
+CREATE TABLE show_create_table_test_db.iceberg_test_orc (
+  level STRING
+)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES('iceberg.file_format'='orc', 'iceberg.catalog'='hadoop.tables')
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test_orc (
+  level STRING
+)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='orc',
+'iceberg.catalog'='hadoop.tables')
+====

@@ -224,7 +224,11 @@ public class IcebergUtil {
    * Get TIcebergFileFormat from a string, usually from table properties
    */
   public static TIcebergFileFormat getIcebergFileFormat(String format){
-    if ("PARQUET".equalsIgnoreCase(format)) return TIcebergFileFormat.PARQUET;
+    if ("PARQUET".equalsIgnoreCase(format)) {
+      return TIcebergFileFormat.PARQUET;
+    } else if ("ORC".equalsIgnoreCase(format)) {
+      return TIcebergFileFormat.ORC;
+    }
     return null;
   }
 

@@ -2973,3 +2973,15 @@ TBLPROPERTIES('iceberg.file_format'='parquet', 'iceberg.catalog'='hadoop.catalog
 `hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog && \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/hadoop_catalog_test /test-warehouse/iceberg_test/hadoop_catalog/
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+iceberg_partitioned_orc_external
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.file_format'='orc', 'iceberg.catalog'='hadoop.catalog', 'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc', 'iceberg.table_identifier'='functional_parquet.iceberg_partitioned_orc');
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/iceberg_partitioned_orc /test-warehouse/iceberg_test/hadoop_catalog/
+====
