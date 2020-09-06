@@ -288,3 +288,54 @@ DESCRIBE FORMATTED iceberg_test9;
 ---- TYPES
 string, string, string
 ====
+---- QUERY
+CREATE TABLE iceberg_test10(
+  level STRING,
+  event_time TIMESTAMP,
+  register_time DATE,
+  message STRING,
+  price DECIMAL(8,1),
+  map_test MAP <STRING, array <STRING>>,
+  struct_test STRUCT <f1: BIGINT, f2: BIGINT>
+)
+PARTITION BY SPEC
+(
+  level IDENTITY,
+  event_time IDENTITY,
+  event_time HOUR,
+  register_time DAY
+)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.file_format'='orc','iceberg_catalog'='hadoop.tables',
+'iceberg.catalog_location'='/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+DESCRIBE iceberg_test10;
+---- RESULTS
+'level','string',''
+'event_time','timestamp',''
+'register_time','date',''
+'message','string',''
+'price','decimal(8,1)',''
+'map_test','map<string,array<string>>',''
+'struct_test','struct<\n  f1:bigint,\n  f2:bigint\n>',''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+SHOW PARTITIONS iceberg_test10;
+---- RESULTS
+0,1,1000,'level','IDENTITY'
+0,2,1001,'event_time','IDENTITY'
+0,2,1002,'event_time_hour','HOUR'
+0,3,1003,'register_time_day','DAY'
+---- TYPES
+BIGINT,BIGINT,BIGINT,STRING,STRING
+====
+---- QUERY
+DROP TABLE iceberg_test10;
+---- RESULTS
+'Table has been dropped.'
+====
