@@ -1241,6 +1241,7 @@ Status ClientRequestState::UpdateCatalog() {
       catalog_update.is_overwrite = finalize_params.is_overwrite;
       if (InTransaction()) {
         catalog_update.__set_transaction_id(finalize_params.transaction_id);
+        catalog_update.__set_write_id(finalize_params.write_id);
       }
 
       Status cnxn_status;

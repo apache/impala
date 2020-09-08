@@ -56,6 +56,12 @@ CONFIG.update({
   # TODO(todd): should we be enabling stats autogather?
   'hive.stats.autogather': 'false',
   'hive.support.concurrency': 'true',
+  # There are tests which issue Hive's replication command. The repl
+  # dump command will wait in case there are any open transactions.
+  # The default value of this configuration is 1h which will block
+  # the test for long time. Overriding this configuration helps with
+  # the runtime of the test.
+  'hive.repl.bootstrap.dump.open.txn.timeout': '120s'
 })
 
 if variant == 'changed_external_dir':

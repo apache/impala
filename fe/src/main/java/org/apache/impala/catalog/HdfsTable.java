@@ -735,11 +735,13 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   public FileSystem getFileSystem() throws CatalogException {
+    FileSystem tableFs;
     try {
-      return (new Path(getLocation())).getFileSystem(CONF);
+      tableFs = (new Path(getLocation())).getFileSystem(CONF);
     } catch (IOException e) {
       throw new CatalogException("Invalid table path for table: " + getFullName(), e);
     }
+    return tableFs;
   }
 
   /**

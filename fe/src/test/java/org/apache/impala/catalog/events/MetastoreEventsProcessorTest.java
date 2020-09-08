@@ -33,6 +33,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -46,12 +47,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
@@ -59,6 +64,9 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
+import org.apache.hadoop.hive.metastore.messaging.CommitTxnMessage;
+import org.apache.hadoop.hive.metastore.messaging.InsertMessage;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.HdfsUri;
 import org.apache.impala.authorization.NoopAuthorizationFactory;
@@ -80,6 +88,7 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
 import org.apache.impala.catalog.events.MetastoreEvents.AlterTableEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.InsertEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
@@ -114,6 +123,7 @@ import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TCreateDbParams;
 import org.apache.impala.thrift.TCreateFunctionParams;
+import org.apache.impala.thrift.TCreateTableLikeParams;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlType;
@@ -138,7 +148,6 @@ import org.apache.impala.thrift.TTypeNode;
 import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
-import org.apache.impala.util.MetaStoreUtil.InsertEventInfo;
 import org.apache.thrift.TException;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -720,50 +729,148 @@ public class MetastoreEventsProcessorTest {
    * should be treated as self-event.
    */
   @Test
-  public void testInsertFromImpala() throws ImpalaException {
+  public void testInsertFromImpala() throws Exception {
     Assume.assumeTrue("Skipping this test because it only works with Hive-3 or greater",
         TestUtils.getHiveMajorVersion() >= 3);
     // Test insert into multiple partitions
     createDatabaseFromImpala(TEST_DB_NAME, null);
     String tableToInsertPart = "tbl_with_mul_part";
-    createTableFromImpala(TEST_DB_NAME, tableToInsertPart, true);
     String tableToInsertMulPart = "tbl_to_insert_mul_part";
-    createTableFromImpala(TEST_DB_NAME, tableToInsertMulPart, true);
-    // add first partition
-    TPartitionDef partitionDef = new TPartitionDef();
-    partitionDef.addToPartition_spec(new TPartitionKeyValue("p1", "1"));
-    partitionDef.addToPartition_spec(new TPartitionKeyValue("p2", "100"));
-    alterTableAddPartition(TEST_DB_NAME, tableToInsertPart, partitionDef);
-    alterTableAddPartition(TEST_DB_NAME, tableToInsertMulPart, partitionDef);
-    // add second partition
-    partitionDef = new TPartitionDef();
-    partitionDef.addToPartition_spec(new TPartitionKeyValue("p1", "1"));
-    partitionDef.addToPartition_spec(new TPartitionKeyValue("p2", "200"));
-    alterTableAddPartition(TEST_DB_NAME, tableToInsertPart, partitionDef);
-    alterTableAddPartition(TEST_DB_NAME, tableToInsertMulPart, partitionDef);
-    eventsProcessor_.processEvents();
+    createInsertTestTbls(tableToInsertPart, tableToInsertMulPart);
     // count self event from here, numberOfSelfEventsBefore=4 as we have 4 ADD PARTITION
     // events
     long numberOfSelfEventsBefore =
         eventsProcessor_.getMetrics()
             .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS)
             .getCount();
+    runInsertTest(tableToInsertPart, tableToInsertMulPart, numberOfSelfEventsBefore,
+        false);
+  }
+
+  @Test
+  public void testInsertOverwriteFromImpala() throws Exception {
+    Assume.assumeTrue("Skipping this test because it only works with Hive-3 or greater",
+        TestUtils.getHiveMajorVersion() >= 3);
+    // Test insert into multiple partitions
+    createDatabaseFromImpala(TEST_DB_NAME, null);
+    String tableToInsertPart = "tbl_with_mul_part";
+    String tableToInsertMulPart = "tbl_to_insert_mul_part";
+    createInsertTestTbls(tableToInsertPart, tableToInsertMulPart);
+    // count self event from here, numberOfSelfEventsBefore=4 as we have 4 ADD PARTITION
+    // events
+    long numberOfSelfEventsBefore =
+        eventsProcessor_.getMetrics()
+            .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS)
+            .getCount();
+    runInsertTest(tableToInsertPart, tableToInsertMulPart, numberOfSelfEventsBefore,
+        true);
+  }
+
+  private void createInsertTestTbls(String tableToInsertPart, String tableToInsertMulPart)
+      throws Exception {
+    createTableLike("functional", "alltypes", TEST_DB_NAME, tableToInsertPart);
+    createTableLike("functional", "alltypes", TEST_DB_NAME, tableToInsertMulPart);
+    // add first partition
+    TPartitionDef partitionDef = new TPartitionDef();
+    partitionDef.addToPartition_spec(new TPartitionKeyValue("year", "2009"));
+    partitionDef.addToPartition_spec(new TPartitionKeyValue("month", "1"));
+    alterTableAddPartition(TEST_DB_NAME, tableToInsertPart, partitionDef);
+    alterTableAddPartition(TEST_DB_NAME, tableToInsertMulPart, partitionDef);
+    // add second partition
+    partitionDef = new TPartitionDef();
+    partitionDef.addToPartition_spec(new TPartitionKeyValue("year", "2009"));
+    partitionDef.addToPartition_spec(new TPartitionKeyValue("month", "2"));
+    alterTableAddPartition(TEST_DB_NAME, tableToInsertPart, partitionDef);
+    alterTableAddPartition(TEST_DB_NAME, tableToInsertMulPart, partitionDef);
+
+    HdfsTable allTypes = (HdfsTable) catalog_
+        .getOrLoadTable("functional", "alltypes", "test", null);
+    HdfsTable insertTbl = (HdfsTable) catalog_
+        .getOrLoadTable(TEST_DB_NAME, tableToInsertPart, "test", null);
+    HdfsTable multiInsertTbl = (HdfsTable) catalog_
+        .getOrLoadTable(TEST_DB_NAME, tableToInsertMulPart, "test", null);
+    // copy files from the source tables so that we have some data
+    copyFiles(allTypes.getFileSystem(),
+        new Path(allTypes.getHdfsBaseDir() + "/year=2009/month=1"),
+        insertTbl.getFileSystem(),
+        new Path(insertTbl.getHdfsBaseDir() + "/year=2009/month=1"), true, null);
+    copyFiles(allTypes.getFileSystem(),
+        new Path(allTypes.getHdfsBaseDir() + "/year=2009/month=2"),
+        insertTbl.getFileSystem(),
+        new Path(insertTbl.getHdfsBaseDir() + "/year=2009/month=2"), true, null);
+    copyFiles(allTypes.getFileSystem(),
+        new Path(allTypes.getHdfsBaseDir() + "/year=2009/month=1"),
+        multiInsertTbl.getFileSystem(),
+        new Path(multiInsertTbl.getHdfsBaseDir() + "/year=2009/month=1"), true, null);
+    copyFiles(allTypes.getFileSystem(),
+        new Path(allTypes.getHdfsBaseDir() + "/year=2009/month=2"),
+        multiInsertTbl.getFileSystem(),
+        new Path(multiInsertTbl.getHdfsBaseDir() + "/year=2009/month=2"), true, null);
+    // load the created tables
+    catalog_.reloadTable(multiInsertTbl, "test");
+    catalog_.reloadTable(insertTbl, "test");
+    eventsProcessor_.processEvents();
+  }
+
+  private void runInsertTest(String tableToInsertPart, String tableToInsertMulPart,
+      long numberOfSelfEventsBefore, boolean overwrite) throws Exception {
     // insert into partition
-    insertFromImpala(tableToInsertPart, true, "1", "100");
-    insertFromImpala(tableToInsertPart, true, "1", "200");
+    HdfsTable allTypes = (HdfsTable) catalog_
+        .getOrLoadTable("functional", "alltypes", "test", null);
+    HdfsTable insertTbl = (HdfsTable) catalog_
+        .getOrLoadTable(TEST_DB_NAME, tableToInsertPart, "test", null);
+    HdfsTable multiInsertTbl = (HdfsTable) catalog_
+        .getOrLoadTable(TEST_DB_NAME, tableToInsertMulPart, "test", null);
+    // we copy files from the src tbl and then issue a insert catalogOp to simulate a
+    // insert operation
+    List<String> tbl1Part1Files = copyFiles(allTypes.getFileSystem(),
+        new Path(allTypes.getHdfsBaseDir() + "/year=2009/month=1"),
+        insertTbl.getFileSystem(),
+        new Path(insertTbl.getHdfsBaseDir() + "/year=2009/month=1"), overwrite, "copy_");
+    List<String> tbl1Part2Files = copyFiles(allTypes.getFileSystem(),
+        new Path(allTypes.getHdfsBaseDir() + "/year=2009/month=2"),
+        insertTbl.getFileSystem(),
+        new Path(insertTbl.getHdfsBaseDir() + "/year=2009/month=2"), overwrite, "copy_");
+    List<String> tbl2Part1Files = copyFiles(allTypes.getFileSystem(),
+        new Path(allTypes.getHdfsBaseDir() + "/year=2009/month=1"),
+        multiInsertTbl.getFileSystem(),
+        new Path(multiInsertTbl.getHdfsBaseDir() + "/year=2009/month=1"), overwrite,
+        "copy_");
+    List<String> tbl2Part2Files = copyFiles(allTypes.getFileSystem(),
+        new Path(allTypes.getHdfsBaseDir() + "/year=2009/month=2"),
+        multiInsertTbl.getFileSystem(),
+        new Path(multiInsertTbl.getHdfsBaseDir() + "/year=2009/month=2"), overwrite,
+        "copy_");
+    insertFromImpala(tableToInsertPart, true, "year=2009", "month=1", overwrite);
+    insertFromImpala(tableToInsertPart, true, "year=2009", "month=2", overwrite);
     // insert into multiple partition
     Set<String> created_partitions = new HashSet<String>();
-    String partition1 = "p1=1/p2=100/";
-    String partition2 = "p1=1/p2=200/";
+    String partition1 = "year=2009/month=1/";
+    String partition2 = "year=2009/month=2/";
     created_partitions.add(partition1);
     created_partitions.add(partition2);
-    insertMulPartFromImpala(tableToInsertMulPart, tableToInsertPart, created_partitions);
+    insertMulPartFromImpala(tableToInsertMulPart, tableToInsertPart, created_partitions,
+        overwrite);
+    // we expect 3 INSERT events (2 for the insertTbl and 1 for multiInsertTbl)
+    List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
+    assertEquals(4, events.size());
+    assertEquals(tbl1Part1Files, getFilesFromEvent(events.get(0)));
+    assertEquals(tbl1Part2Files, getFilesFromEvent(events.get(1)));
+    assertEquals(tbl2Part1Files, getFilesFromEvent(events.get(2)));
+    assertEquals(tbl2Part2Files, getFilesFromEvent(events.get(3)));
     eventsProcessor_.processEvents();
 
     // Test insert into table
-    String tableToInsert = "tbl_to_insert";
-    createTableFromImpala(TEST_DB_NAME, tableToInsert, false);
-    insertFromImpala(tableToInsert, false, "", "");
+    String unpartitionedTbl = "tbl_to_insert";
+    createTableLike("functional", "tinytable", TEST_DB_NAME, unpartitionedTbl);
+    HdfsTable tinyTable = (HdfsTable) catalog_
+        .getOrLoadTable("functional", "tinytable", "test", null);
+    HdfsTable unpartTable =
+        (HdfsTable) catalog_.getOrLoadTable(TEST_DB_NAME, unpartitionedTbl, "test", null);
+    copyFiles(tinyTable.getFileSystem(), new Path(tinyTable.getHdfsBaseDir()),
+        unpartTable.getFileSystem(), new Path(unpartTable.getHdfsBaseDir()), overwrite,
+        "copy_");
+    insertFromImpala(unpartitionedTbl, false, "", "", overwrite);
     eventsProcessor_.processEvents();
 
     long selfEventsCountAfter =
@@ -776,6 +883,50 @@ public class MetastoreEventsProcessorTest {
         numberOfSelfEventsBefore + 5, selfEventsCountAfter);
   }
 
+  private List<String> getFilesFromEvent(NotificationEvent event) {
+    assertEquals("INSERT", event.getEventType());
+    List<String> files= new ArrayList<>();
+    for (String f : MetastoreEventsProcessor.getMessageDeserializer()
+        .getInsertMessage(event.getMessage()).getFiles()) {
+      // Metastore InsertMessage appends "###" for some reason. Ignoring that bit in the
+      // comparison below.
+      files.add(f.replaceAll("###", ""));
+    }
+    return files;
+  }
+
+  private static final Configuration CONF = new Configuration();
+
+  private static List<String> copyFiles(FileSystem srcFs, Path src, FileSystem destFs,
+      Path dest, boolean overwrite, String prefix) throws Exception {
+    FSDataOutputStream out = null;
+    try {
+      if (srcFs.isDirectory(src)) {
+        if (!destFs.exists(dest)) {
+          destFs.mkdirs(dest);
+        } else if(overwrite) {
+          destFs.delete(dest, true);
+          destFs.mkdirs(dest);
+        }
+      }
+      List<String> filesCopied = new ArrayList<>();
+      RemoteIterator<? extends FileStatus> it = FileSystemUtil
+          .listStatus(srcFs, src, true);
+      while (it.hasNext()) {
+        FileStatus status = it.next();
+        if (status.isDirectory()) continue;
+        InputStream in = srcFs.open(status.getPath());
+        String copyFileName = (prefix == null ? "" : prefix) + status.getPath().getName();
+        out = destFs.create(new Path(dest, copyFileName), false);
+        IOUtils.copyBytes(in, out, CONF, true);
+        filesCopied.add(new Path(dest, copyFileName).toString());
+      }
+      return filesCopied;
+    } catch (IOException ex) {
+      IOUtils.closeStream(out);
+      throw ex;
+    }
+  }
   /**
    * Test generates a sequence of create_table, insert and drop_table in the event stream
    * to make sure when the insert event is processed on a removed table, it doesn't cause
@@ -900,10 +1051,14 @@ public class MetastoreEventsProcessorTest {
     List <String> newFiles = addFilesToDirectory(parentPath, "testFile.",
         totalNumberOfFilesToAdd, isOverwrite);
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
-      List<InsertEventInfo> insertEventInfos = new ArrayList<>();
-      insertEventInfos.add(new InsertEventInfo(null, newFiles, isOverwrite));
+      List<InsertEventRequestData> partitionInsertEventInfos = new ArrayList<>();
+      InsertEventRequestData insertEventRequestData = new InsertEventRequestData();
+      insertEventRequestData.setFilesAdded(newFiles);
+      insertEventRequestData.setReplace(isOverwrite);
+      partitionInsertEventInfos
+          .add(insertEventRequestData);
       MetastoreShim.fireInsertEventHelper(metaStoreClient.getHiveClient(),
-          insertEventInfos, msTbl.getDbName(), msTbl.getTableName());
+          partitionInsertEventInfos, msTbl.getDbName(), msTbl.getTableName());
     }
   }
 
@@ -2436,6 +2591,19 @@ public class MetastoreEventsProcessorTest {
     catalogOpExecutor_.execDdlRequest(req);
   }
 
+  private void createTableLike(String srcDb, String srcTbl, String destDb, String destTbl)
+      throws Exception {
+    HdfsTable table = (HdfsTable) catalog_.getOrLoadTable(srcDb, srcTbl, "Test", null);
+    TCreateTableLikeParams createTableLikeParams = new TCreateTableLikeParams();
+    createTableLikeParams.setSrc_table_name(new TTableName(srcDb, srcTbl));
+    createTableLikeParams.setTable_name(new TTableName(destDb, destTbl));
+    createTableLikeParams.setIs_external(false);
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(TDdlType.CREATE_TABLE_LIKE);
+    req.create_table_like_params = createTableLikeParams;
+    catalogOpExecutor_.execDdlRequest(req);
+  }
+
   private void createTableFromImpala(String dbName, String tblName, boolean isPartitioned)
       throws ImpalaException {
     createTableFromImpala(dbName, tblName, null, isPartitioned);
@@ -2781,11 +2949,11 @@ public class MetastoreEventsProcessorTest {
    * Insert multiple partitions into table from Impala
    */
   private void insertMulPartFromImpala(String tblName1, String tblName2,
-      Set<String> created_partitions) throws ImpalaException {
+      Set<String> created_partitions, boolean overwrite) throws ImpalaException {
     String insert_mul_part = String.format(
         "insert into table %s partition(p1, p2) select * from %s", tblName1, tblName2);
     TUpdateCatalogRequest testInsertRequest = createTestTUpdateCatalogRequest(
-        TEST_DB_NAME, tblName1, insert_mul_part, created_partitions);
+        TEST_DB_NAME, tblName1, insert_mul_part, created_partitions, overwrite);
     catalogOpExecutor_.updateCatalog(testInsertRequest);
   }
 
@@ -2796,16 +2964,16 @@ public class MetastoreEventsProcessorTest {
    * @return
    */
   private void insertFromImpala(String tblName, boolean isPartitioned, String p1val,
-      String p2val) throws ImpalaException {
-    String partition = String.format("partition (p1=%s, p2='%s')", p1val, p2val);
+      String p2val, boolean isOverwrite) throws ImpalaException {
+    String partition = String.format("partition (%s, %s)", p1val, p2val);
     String test_insert_tbl = String.format("insert into table %s %s values ('a','aa') ",
         tblName, isPartitioned ? partition : "");
-    Set<String> created_partitions = new HashSet<String>();
+    Set<String> created_partitions = new HashSet<>();
     String created_part_str =
-        isPartitioned ? String.format("p1=%s/p2=%s/", p1val, p2val) : "";
+        isPartitioned ? String.format("%s/%s/", p1val, p2val) : "";
     created_partitions.add(created_part_str);
     TUpdateCatalogRequest testInsertRequest = createTestTUpdateCatalogRequest(
-        TEST_DB_NAME, tblName, test_insert_tbl, created_partitions);
+        TEST_DB_NAME, tblName, test_insert_tbl, created_partitions, isOverwrite);
     catalogOpExecutor_.updateCatalog(testInsertRequest);
   }
 
@@ -2818,13 +2986,15 @@ public class MetastoreEventsProcessorTest {
    * @return
    */
   private TUpdateCatalogRequest createTestTUpdateCatalogRequest(String dBName,
-      String tableName, String redacted_sql_stmt, Set<String> created_partitions) {
+      String tableName, String redacted_sql_stmt, Set<String> created_partitions,
+      boolean isOverwrite) {
     TUpdateCatalogRequest tUpdateCatalogRequest = new TUpdateCatalogRequest();
     tUpdateCatalogRequest.setDb_name(dBName);
     tUpdateCatalogRequest.setTarget_table(tableName);
     tUpdateCatalogRequest.setCreated_partitions((created_partitions));
     tUpdateCatalogRequest.setHeader(new TCatalogServiceRequestHeader());
     tUpdateCatalogRequest.getHeader().setRedacted_sql_stmt(redacted_sql_stmt);
+    if (isOverwrite) tUpdateCatalogRequest.setIs_overwrite(true);
     return tUpdateCatalogRequest;
   }
 
