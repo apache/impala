@@ -242,6 +242,10 @@ public class MultiAggregateInfo {
     List<FunctionCallExpr> groupingBuiltinExprs = new ArrayList<>();
     for (FunctionCallExpr aggExpr : aggExprs_) {
       if (aggExpr.isGroupingBuiltin() || aggExpr.isGroupingIdBuiltin()) {
+        if (!hasGrouping()) {
+          throw new AnalysisException("grouping() or grouping_id() function requires a " +
+              "GROUP BY clause: '" + aggExpr.toSql() + "'");
+        }
         groupingBuiltinExprs.add(aggExpr);
       } else if (aggExpr.isDistinct()) {
         List<Expr> children = AggregateFunction.getCanonicalDistinctAggChildren(aggExpr);
