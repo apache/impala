@@ -241,7 +241,7 @@ public class MetastoreShim {
   public static void createTableWithConstraints(IMetaStoreClient client,
       Table newTbl, List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys)
       throws InvalidOperationException, MetaException, TException {
-    client.createTableWithConstraints(newTbl,primaryKeys, foreignKeys, null, null,
+    client.createTableWithConstraints(newTbl, primaryKeys, foreignKeys, null, null,
         null, null);
   }
 
@@ -470,6 +470,15 @@ public class MetastoreShim {
   public static String getTableInformation(
       org.apache.hadoop.hive.ql.metadata.Table table) {
     return HiveMetadataFormatUtils.getTableInformation(table.getTTable(), false);
+  }
+
+  /**
+   * Wrapper method around Hive-3's MetadataFormatUtils.getConstraintsInformation
+   * @return
+   */
+  public static String getConstraintsInformation(
+      org.apache.hadoop.hive.ql.metadata.Table table) {
+    return HiveMetadataFormatUtils.getConstraintsInformation(table);
   }
 
   /**

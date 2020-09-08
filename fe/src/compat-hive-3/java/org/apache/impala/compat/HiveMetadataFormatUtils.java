@@ -45,6 +45,8 @@ import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo;
+import org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 
 /**
@@ -98,7 +100,7 @@ public class HiveMetadataFormatUtils {
   private static void formatColumnsHeader(StringBuilder columnInformation,
       List<ColumnStatisticsObj> colStats) {
     columnInformation.append("# "); // Easy for shell scripts to ignore
-    formatOutput(getColumnsHeader(colStats), columnInformation, false);
+    formatOutput(getColumnsHeader(colStats), columnInformation, false, true);
     columnInformation.append(LINE_DELIM);
   }
 
@@ -112,26 +114,36 @@ public class HiveMetadataFormatUtils {
    *     contains newlines?
    */
   private static void formatOutput(String[] fields, StringBuilder tableInfo,
-      boolean isLastLinePadded) {
-    int[] paddings = new int[fields.length - 1];
-    if (fields.length > 1) {
-      for (int i = 0; i < fields.length - 1; i++) {
-        if (fields[i] == null) {
-          tableInfo.append(FIELD_DELIM);
-          continue;
+      boolean isLastLinePadded, boolean isFormatted) {
+    if (!isFormatted) {
+      for (int i = 0; i < fields.length; i++) {
+        Object value = StringEscapeUtils.escapeJava(fields[i]);
+        if (value != null) {
+          tableInfo.append(value);
         }
-        tableInfo.append(String.format("%-" + ALIGNMENT + "s", fields[i]))
-            .append(FIELD_DELIM);
-        paddings[i] = ALIGNMENT > fields[i].length() ? ALIGNMENT : fields[i].length();
+        tableInfo.append((i == fields.length - 1) ? LINE_DELIM : FIELD_DELIM);
       }
-    }
-    if (fields.length > 0) {
-      String value = fields[fields.length - 1];
-      String unescapedValue = (isLastLinePadded && value != null) ? value
-          .replaceAll("\\\\n|\\\\r|\\\\r\\\\n", "\n") : value;
-      indentMultilineValue(unescapedValue, tableInfo, paddings, false);
     } else {
-      tableInfo.append(LINE_DELIM);
+      int[] paddings = new int[fields.length - 1];
+      if (fields.length > 1) {
+        for (int i = 0; i < fields.length - 1; i++) {
+          if (fields[i] == null) {
+            tableInfo.append(FIELD_DELIM);
+            continue;
+          }
+          tableInfo.append(String.format("%-" + ALIGNMENT + "s", fields[i]))
+              .append(FIELD_DELIM);
+          paddings[i] = ALIGNMENT > fields[i].length() ? ALIGNMENT : fields[i].length();
+        }
+      }
+      if (fields.length > 0) {
+        String value = fields[fields.length - 1];
+        String unescapedValue = (isLastLinePadded && value != null) ? value
+            .replaceAll("\\\\n|\\\\r|\\\\r\\\\n", "\n") : value;
+        indentMultilineValue(unescapedValue, tableInfo, paddings, false);
+      } else {
+        tableInfo.append(LINE_DELIM);
+      }
     }
   }
 
@@ -384,6 +396,75 @@ public class HiveMetadataFormatUtils {
     return null;
   }
 
+  public static String getConstraintsInformation(
+      org.apache.hadoop.hive.ql.metadata.Table table) {
+    StringBuilder constraintsInfo = new StringBuilder(DEFAULT_STRINGBUILDER_SIZE);
+
+    constraintsInfo.append(LINE_DELIM).append("# Constraints").append(LINE_DELIM);
+
+    if (PrimaryKeyInfo.isPrimaryKeyInfoNotEmpty(table.getPrimaryKeyInfo())) {
+      constraintsInfo.append(LINE_DELIM).append("# Primary Key").append(LINE_DELIM);
+      getPrimaryKeyInformation(constraintsInfo, table.getPrimaryKeyInfo());
+    }
+    if (ForeignKeyInfo.isForeignKeyInfoNotEmpty(table.getForeignKeyInfo())) {
+      constraintsInfo.append(LINE_DELIM).append("# Foreign Keys").append(LINE_DELIM);
+      getForeignKeysInformation(constraintsInfo, table.getForeignKeyInfo());
+    }
+
+    return constraintsInfo.toString();
+  }
+
+  private static void getPrimaryKeyInformation(StringBuilder constraintsInfo,
+      PrimaryKeyInfo pkInfo) {
+    formatOutput("Table:", pkInfo.getDatabaseName() + "." + pkInfo.getTableName(),
+        constraintsInfo);
+    formatOutput("Constraint Name:", pkInfo.getConstraintName(), constraintsInfo);
+    Map<Integer, String> colNames = pkInfo.getColNames();
+    final String title = "Column Name:".intern();
+    for (String colName : colNames.values()) {
+      constraintsInfo.append(String.format("%-" + ALIGNMENT + "s", title))
+          .append(FIELD_DELIM);
+      formatOutput(new String[] {colName}, constraintsInfo);
+    }
+  }
+
+  private static void getForeignKeyColInformation(StringBuilder constraintsInfo,
+    ForeignKeyInfo.ForeignKeyCol fkCol) {
+      String[] fkcFields = new String[3];
+      fkcFields[0] = "Parent Column Name:" + fkCol.parentDatabaseName +
+          "."+ fkCol.parentTableName + "." + fkCol.parentColName;
+      fkcFields[1] = "Column Name:" + fkCol.childColName;
+      fkcFields[2] = "Key Sequence:" + fkCol.position;
+      formatOutput(fkcFields, constraintsInfo);
+  }
+
+  private static void getForeignKeyRelInformation(
+    StringBuilder constraintsInfo,
+    String constraintName,
+    List<ForeignKeyInfo.ForeignKeyCol> fkRel) {
+    formatOutput("Constraint Name:", constraintName, constraintsInfo);
+    if (fkRel != null && fkRel.size() > 0) {
+      for (ForeignKeyInfo.ForeignKeyCol fkc : fkRel) {
+        getForeignKeyColInformation(constraintsInfo, fkc);
+      }
+    }
+    constraintsInfo.append(LINE_DELIM);
+  }
+
+  private static void getForeignKeysInformation(StringBuilder constraintsInfo,
+      ForeignKeyInfo fkInfo) {
+    formatOutput("Table:",
+        fkInfo.getChildDatabaseName() + "." + fkInfo.getChildTableName(),
+        constraintsInfo);
+    Map<String, List<ForeignKeyInfo.ForeignKeyCol>> foreignKeys = fkInfo.getForeignKeys();
+    if (foreignKeys != null && foreignKeys.size() > 0) {
+      for (Map.Entry<String, List<ForeignKeyInfo.ForeignKeyCol>> me : foreignKeys
+          .entrySet()) {
+        getForeignKeyRelInformation(constraintsInfo, me.getKey(), me.getValue());
+      }
+    }
+  }
+
   public static String getTableInformation(Table table, boolean isOutputPadded) {
     StringBuilder tableInfo = new StringBuilder(DEFAULT_STRINGBUILDER_SIZE);
 
@@ -391,6 +472,7 @@ public class HiveMetadataFormatUtils {
     tableInfo.append(LINE_DELIM).append("# Detailed Table Information")
         .append(LINE_DELIM);
     getTableMetaDataInformation(tableInfo, table, isOutputPadded);
+
 
     // Storage information.
     tableInfo.append(LINE_DELIM).append("# Storage Information").append(LINE_DELIM);
@@ -463,6 +545,15 @@ public class HiveMetadataFormatUtils {
   }
 
   /**
+   * Prints a row the given fields to a formatted line
+   * @param fields The fields to print
+   * @param tableInfo The target builder
+   */
+  private static void formatOutput(String[] fields, StringBuilder tableInfo) {
+    formatOutput(fields, tableInfo, false, true);
+  }
+
+  /**
    * Prints the name value pair It the output is padded then unescape the value, so it
    * could be printed in multiple lines. In this case it assumes the pair is already
    * indented with a field delimiter
@@ -493,6 +584,7 @@ public class HiveMetadataFormatUtils {
     int colNameLength = ALIGNMENT > name.length() ? ALIGNMENT : name.length();
     indentMultilineValue(value, tableInfo, new int[]{0, colNameLength}, true);
   }
+
 
   private static String formatDate(long timeInSeconds) {
     if (timeInSeconds != 0) {
