@@ -65,6 +65,7 @@ bigint,bigint
 ====
 ---- QUERY
 # Test timestamp filter for iceberg derived partition 'HOUR'
+SET TIMEZONE=UTC;
 SELECT count(*) from iceberg_partitioned
 where event_time > to_timestamp('2020-01-01 09:00:00','yyyy-MM-dd HH:mm:ss')
 ---- TYPES
@@ -73,6 +74,7 @@ bigint
 6
 ====
 ---- QUERY
+SET TIMEZONE=UTC;
 SELECT count(*) from iceberg_non_partitioned
 where event_time > to_timestamp('2020-01-01 09:00:00','yyyy-MM-dd HH:mm:ss')
 ---- TYPES
@@ -82,6 +84,7 @@ bigint
 ====
 ---- QUERY
 # Test non-count query for partition filter
+SET TIMEZONE=UTC;
 SELECT * from iceberg_partitioned
 where event_time > to_timestamp('2020-01-01 09:00:00','yyyy-MM-dd HH:mm:ss')
 ORDER BY id
@@ -97,6 +100,7 @@ int,string,string,timestamp
 ====
 ---- QUERY
 # Test non-count query for non-partition filter
+SET TIMEZONE=UTC;
 SELECT * from iceberg_non_partitioned
 where id < 5
 ORDER BY id
