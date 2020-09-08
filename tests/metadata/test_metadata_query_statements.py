@@ -133,6 +133,19 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
         "describe formatted functional.alltypes_view_sub",
         compare=compare_describe_formatted)
 
+    # test for primary / foreign constraints
+    self.exec_and_compare_hive_and_impala_hs2(\
+        "describe formatted functional.child_table",
+        compare=compare_describe_formatted)
+
+    self.exec_and_compare_hive_and_impala_hs2(\
+        "describe formatted functional.parent_table_2",
+        compare=compare_describe_formatted)
+
+    self.exec_and_compare_hive_and_impala_hs2(\
+        "describe formatted tpcds.store_returns",
+        compare=compare_describe_formatted)
+
   @pytest.mark.execute_serially # due to data src setup/teardown
   @SkipIfCatalogV2.data_sources_unsupported()
   def test_show_data_sources(self, vector):

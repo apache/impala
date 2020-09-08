@@ -214,12 +214,23 @@ public class DescribeResultFactory {
     org.apache.hadoop.hive.ql.metadata.Table hiveTable =
         new org.apache.hadoop.hive.ql.metadata.Table();
     hiveTable.setTTable(msTable);
+    org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo pki =
+        new org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo(
+            table.getSqlConstraints().getPrimaryKeys(), table.getName(),
+            table.getDb().getName());
+    hiveTable.setPrimaryKeyInfo(pki);
+    org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo fki =
+        new org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo(
+            table.getSqlConstraints().getForeignKeys(), table.getName(),
+            table.getDb().getName());
+    hiveTable.setForeignKeyInfo(fki);
     StringBuilder sb = new StringBuilder();
     // First add all the columns (includes partition columns).
     sb.append(MetastoreShim.getAllColumnsInformation(msTable.getSd().getCols(),
         msTable.getPartitionKeys(), true, false, true));
     // Add the extended table metadata information.
     sb.append(MetastoreShim.getTableInformation(hiveTable));
+    sb.append(MetastoreShim.getConstraintsInformation(hiveTable));
 
     for (String line: sb.toString().split("\n")) {
       // To match Hive's HiveServer2 output, split each line into multiple column
