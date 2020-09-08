@@ -1,6 +1,7 @@
 ====
 ---- QUERY
 # This query will filter files by partition column predicate
+SET TIMEZONE=UTC;
 select * from functional_parquet.iceberg_partitioned
 where event_time > to_timestamp('2020-01-01 09:00:00','yyyy-MM-dd HH:mm:ss')
 ---- RUNTIME_PROFILE
