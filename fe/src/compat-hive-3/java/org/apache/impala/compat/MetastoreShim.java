@@ -25,8 +25,10 @@ import static org.apache.impala.service.MetadataOp.TABLE_TYPE_TABLE;
 import static org.apache.impala.service.MetadataOp.TABLE_TYPE_VIEW;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableMap;
 
+import com.google.common.collect.Iterables;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -35,6 +37,7 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
@@ -74,6 +77,7 @@ import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableValidWriteIds;
 import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
+import org.apache.hadoop.hive.metastore.api.WriteNotificationLogRequest;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.EventMessage;
@@ -102,7 +106,7 @@ import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AcidUtils.TblTransaction;
-import org.apache.impala.util.MetaStoreUtil.InsertEventInfo;
+import org.apache.impala.util.MetaStoreUtil.TableInsertEventInfo;
 import org.apache.thrift.TException;
 
 import com.google.common.base.Preconditions;
@@ -1061,16 +1065,62 @@ public class MetastoreShim {
    * In case of any exception, we just log the failure of firing insert events.
    */
   public static List<Long> fireInsertEvents(MetaStoreClient msClient,
-      List<InsertEventInfo> insertEventInfos, String dbName, String tableName) {
+      TableInsertEventInfo insertEventInfo, String dbName, String tableName) {
+    Stopwatch sw = Stopwatch.createStarted();
     try {
-      return fireInsertEventHelper(msClient.getHiveClient(), insertEventInfos, dbName, tableName);
+      if (insertEventInfo.isTransactional()) {
+        // if the table is transactional we use a different API to fire these
+        // events. Note that we don't really need the event ids here for self-event
+        // detection since these events are not fetched by the EventsProcessor later
+        // These events are mostly required for incremental replication in Hive
+        fireInsertTransactionalEventHelper(msClient.getHiveClient(),
+            insertEventInfo, dbName, tableName);
+      } else {
+        return fireInsertEventHelper(msClient.getHiveClient(),
+            insertEventInfo.getInsertEventReqData(), dbName,
+            tableName);
+      }
     } catch (Exception e) {
       LOG.error("Failed to fire insert event. Some tables might not be"
               + " refreshed on other impala clusters.", e);
     } finally {
+      LOG.info("Time taken to fire insert events on table {}.{}: {} msec", dbName,
+          tableName, sw.stop().elapsed(TimeUnit.MILLISECONDS));
       msClient.close();
     }
     return Collections.emptyList();
+  }
+
+  /**
+   * Fires a listener event of the type ACID_WRITE on a transactional table in metastore.
+   * This event is polled by other external systems to detect insert operations into
+   * ACID tables.
+   * @throws TException in case of errors during HMS API call.
+   */
+  private static void fireInsertTransactionalEventHelper(
+      IMetaStoreClient hiveClient, TableInsertEventInfo insertEventInfo, String dbName,
+      String tableName) throws TException {
+    for (InsertEventRequestData insertData : insertEventInfo.getInsertEventReqData()) {
+      // TODO(Vihang) unfortunately there is no bulk insert event API for transactional
+      // tables. It is possible that this may take long time here if there are lots of
+      // partitions which were inserted.
+      if (LOG.isDebugEnabled()) {
+        String msg =
+            "Firing write notification log request for table " + dbName + "." + tableName
+                + (insertData.isSetPartitionVal() ? " on partition " + insertData
+                .getPartitionVal() : "");
+        LOG.debug(msg);
+      }
+      WriteNotificationLogRequest rqst = new WriteNotificationLogRequest(
+          insertEventInfo.getTxnId(), insertEventInfo.getWriteId(), dbName, tableName,
+          insertData);
+      if (insertData.isSetPartitionVal()) {
+        rqst.setPartitionVals(insertData.getPartitionVal());
+      }
+      // TODO(Vihang) metastore should return the event id here so that we can get rid
+      // of firing INSERT event types for transactional tables.
+      hiveClient.addWriteNotificationLog(rqst);
+    }
   }
 
   /**
@@ -1078,43 +1128,39 @@ public class MetastoreShim {
    *  all partition insert events will be fired by a bulk API.
    *
    * @param msClient Metastore client,
-   * @param insertEventInfos A list of insert event encapsulating the information needed
-   * to fire insert
+   * @param insertEventDataList A list of insert event info encapsulating the information
+   *                            needed to fire insert events.
    * @param dbName
    * @param tableName
    * @return a list of eventIds for the insert events
    */
   @VisibleForTesting
   public static List<Long> fireInsertEventHelper(IMetaStoreClient msClient,
-      List<InsertEventInfo> insertEventInfos, String dbName, String tableName)
+      List<InsertEventRequestData> insertEventDataList, String dbName, String tableName)
       throws TException {
     Preconditions.checkNotNull(msClient);
     Preconditions.checkNotNull(dbName);
     Preconditions.checkNotNull(tableName);
-    Preconditions.checkState(!insertEventInfos.isEmpty(), "Atleast one insert event "
+    Preconditions.checkState(!insertEventDataList.isEmpty(), "Atleast one insert event "
         + "info must be provided.");
     LOG.debug(String.format(
-        "Firing %s insert event for %s", insertEventInfos.size(), tableName));
+        "Firing %s insert event(s) for %s.%s", insertEventDataList.size(), dbName,
+        tableName));
     FireEventRequestData data = new FireEventRequestData();
     FireEventRequest rqst = new FireEventRequest(true, data);
     rqst.setDbName(dbName);
     rqst.setTableName(tableName);
-    List<InsertEventRequestData> insertDatas = new ArrayList<>();
-    for (InsertEventInfo info : insertEventInfos) {
-      InsertEventRequestData insertData = new InsertEventRequestData();
-      Preconditions.checkNotNull(info.getNewFiles());
-      insertData.setFilesAdded(new ArrayList<>(info.getNewFiles()));
-      insertData.setReplace(info.isOverwrite());
-      if (info.getPartVals() != null) insertData.setPartitionVal(info.getPartVals());
-      insertDatas.add(insertData);
-    }
-    if (insertDatas.size() == 1) {
-      if (insertEventInfos.get(0).getPartVals() != null) {
-        rqst.setPartitionVals(insertEventInfos.get(0).getPartVals());
+    if (insertEventDataList.size() == 1) {
+      InsertEventRequestData insertEventData = Iterables
+          .getOnlyElement(insertEventDataList);
+      if (insertEventData.getPartitionVal() != null) {
+        rqst.setPartitionVals(insertEventData.getPartitionVal());
       }
-      data.setInsertData(insertDatas.get(0));
+      // single insert event API
+      data.setInsertData(insertEventData);
     } else {
-      data.setInsertDatas(insertDatas);
+      // use bulk insert API
+      data.setInsertDatas(insertEventDataList);
     }
     FireEventResponse response = msClient.fireListenerEvent(rqst);
     if (!response.isSetEventIds()) {

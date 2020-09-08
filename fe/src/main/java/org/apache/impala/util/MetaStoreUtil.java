@@ -25,11 +25,14 @@ import java.util.List;
 import java.util.Map;
 
 import java.util.Collection;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
@@ -321,33 +324,39 @@ public class MetaStoreUtil {
     return msTbl.getSd().getNumBuckets() > 0;
   }
 
-  /**
-   * A helper class that encapsulates all the information needed to fire and insert event
-   * with HMS.
-   */
-  public static class InsertEventInfo {
-    // List of partition values corresponding to the partition keys in
-    // a partitioned table. This is null for non-partitioned table.
-    private List<String> partVals;
+  public static class TableInsertEventInfo {
+    // list of partition level insert event info
+    private final List<InsertEventRequestData> insertEventRequestData_;
+    // transaction id in case this represents a transactional table.
+    private final long txnId_;
+    // writeId in case this is for a transactional table.
+    private final long writeId_;
+    // true in case this is for transactional table.
+    private final boolean isTransactional_;
 
-    // Set of all the 'new' files added by this insert. This is empty in
-    // case of insert overwrite.
-    private Collection<String> newFiles;
-
-    // If true, sets the 'replace' flag to true indicating that the
-    // operation was an insert overwrite in the notification log. Will set the same to
-    // false otherwise.
-    private boolean isOverwrite;
-
-    public InsertEventInfo(
-        List<String> partVals, Collection<String> newFiles, boolean isOverwrite) {
-      this.partVals = partVals;
-      this.newFiles = newFiles;
-      this.isOverwrite = isOverwrite;
+    public TableInsertEventInfo(
+        List<InsertEventRequestData> insertEventInfos_, boolean isTransactional,
+        long txnId, long writeId) {
+      this.insertEventRequestData_ = insertEventInfos_;
+      this.txnId_ = txnId;
+      this.writeId_ = writeId;
+      this.isTransactional_ = isTransactional;
     }
 
-    public List<String> getPartVals() { return this.partVals; }
-    public Collection<String> getNewFiles() { return this.newFiles; }
-    public boolean isOverwrite() { return this.isOverwrite; }
+    public boolean isTransactional() {
+      return isTransactional_;
+    }
+
+    public List<InsertEventRequestData> getInsertEventReqData() {
+      return insertEventRequestData_;
+    }
+
+    public long getTxnId() {
+      return txnId_;
+    }
+
+    public long getWriteId() {
+      return writeId_;
+    }
   }
 }

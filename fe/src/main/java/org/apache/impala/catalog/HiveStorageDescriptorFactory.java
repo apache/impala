@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
@@ -47,6 +48,8 @@ public class HiveStorageDescriptorFactory {
     sd.setInputFormat(hdfsFileFormat.inputFormat());
     sd.setOutputFormat(hdfsFileFormat.outputFormat());
     sd.getSerdeInfo().setSerializationLib(hdfsFileFormat.serializationLib());
+    sd.setBucketCols(new ArrayList<>(0));
+    sd.setSortCols(new ArrayList<>(0));
     setSerdeInfo(rowFormat, sd.getSerdeInfo());
     return sd;
   }

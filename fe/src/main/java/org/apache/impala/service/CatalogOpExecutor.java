@@ -19,9 +19,15 @@ package org.apache.impala.service;
 
 import static org.apache.impala.analysis.Analyzer.ACCESSTYPE_READWRITE;
 
+import com.codahale.metrics.Timer;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
-
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -36,8 +42,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
@@ -54,6 +60,7 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
@@ -61,7 +68,9 @@ import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.metastore.api.TruncateTableRequest;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
@@ -100,8 +109,8 @@ import org.apache.impala.catalog.Transaction;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
-import org.apache.impala.catalog.monitor.CatalogOperationMetrics;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
+import org.apache.impala.catalog.monitor.CatalogOperationMetrics;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -141,6 +150,7 @@ import org.apache.impala.thrift.TColumnStats;
 import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TCommentOnParams;
+import org.apache.impala.thrift.TCopyTestCaseReq;
 import org.apache.impala.thrift.TCreateDataSourceParams;
 import org.apache.impala.thrift.TCreateDbParams;
 import org.apache.impala.thrift.TCreateDropRoleParams;
@@ -163,7 +173,6 @@ import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.THdfsCachingOp;
 import org.apache.impala.thrift.THdfsFileFormat;
-import org.apache.impala.thrift.TCopyTestCaseReq;
 import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
@@ -183,25 +192,16 @@ import org.apache.impala.thrift.TTestCaseData;
 import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdateCatalogResponse;
-import org.apache.impala.util.CompressionUtil;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AcidUtils.TblTransaction;
+import org.apache.impala.util.CompressionUtil;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
-import org.apache.impala.util.MetaStoreUtil.InsertEventInfo;
-import org.slf4j.Logger;
+import org.apache.impala.util.MetaStoreUtil.TableInsertEventInfo;
 import org.apache.thrift.TException;
-
-import com.codahale.metrics.Timer;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -2080,39 +2080,72 @@ public class CatalogOpExecutor {
         catalog_.getLock().writeLock().unlock();
         TblTransaction tblTxn = MetastoreShim.createTblTransaction(hmsClient,
             table.getMetaStoreTable(), txn.getId());
-        HdfsTable hdfsTable = (HdfsTable)table;
-        Collection<? extends FeFsPartition> parts =
-            FeCatalogUtils.loadAllPartitions(hdfsTable);
-        createEmptyBaseDirectories(parts, tblTxn.writeId);
-        // Currently Impala cannot update the statistics properly. So instead of
-        // writing correct stats, let's just remove COLUMN_STATS_ACCURATE parameter from
-        // each partition.
-        // TODO(IMPALA-8883): properly update statistics
-        List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitions =
-            Lists.newArrayListWithCapacity(parts.size());
-        if (table.getNumClusteringCols() > 0) {
-          for (FeFsPartition part: parts) {
-            org.apache.hadoop.hive.metastore.api.Partition hmsPart =
-                ((HdfsPartition)part).toHmsPartition();
-            Preconditions.checkNotNull(hmsPart);
-            if (hmsPart.getParameters() != null) {
-              hmsPart.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
-              hmsPartitions.add(hmsPart);
+        HdfsTable hdfsTable = (HdfsTable) table;
+        // if the table is replicated we should use the HMS API to truncate it so that
+        // if moves the files into in replication change manager location which is later
+        // used for replication.
+        if (isTableBeingReplicated(hmsClient, hdfsTable)) {
+          Stopwatch sw = Stopwatch.createStarted();
+          String dbName = Preconditions.checkNotNull(hdfsTable.getDb()).getName();
+          hmsClient.truncateTable(dbName, hdfsTable.getName(), null, tblTxn.validWriteIds,
+              tblTxn.writeId);
+          LOG.debug("Time taken to truncate table {} using HMS API: {} msec",
+              hdfsTable.getFullName(), sw.stop().elapsed(TimeUnit.MILLISECONDS));
+        } else {
+          Collection<? extends FeFsPartition> parts =
+              FeCatalogUtils.loadAllPartitions(hdfsTable);
+          createEmptyBaseDirectories(parts, tblTxn.writeId);
+          // Currently Impala cannot update the statistics properly. So instead of
+          // writing correct stats, let's just remove COLUMN_STATS_ACCURATE parameter from
+          // each partition.
+          // TODO(IMPALA-8883): properly update statistics
+          List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitions =
+              Lists.newArrayListWithCapacity(parts.size());
+          if (table.getNumClusteringCols() > 0) {
+            for (FeFsPartition part : parts) {
+              org.apache.hadoop.hive.metastore.api.Partition hmsPart =
+                  ((HdfsPartition) part).toHmsPartition();
+              Preconditions.checkNotNull(hmsPart);
+              if (hmsPart.getParameters() != null) {
+                hmsPart.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
+                hmsPartitions.add(hmsPart);
+              }
             }
           }
+          // For partitioned tables we need to alter all the partitions in HMS.
+          if (!hmsPartitions.isEmpty()) {
+            unsetPartitionsColStats(table.getMetaStoreTable(), hmsPartitions, tblTxn);
+          }
+          // Remove COLUMN_STATS_ACCURATE property from the table.
+          unsetTableColStats(table.getMetaStoreTable(), tblTxn);
         }
-        // For partitioned tables we need to alter all the partitions in HMS.
-        if (!hmsPartitions.isEmpty()) {
-          unsetPartitionsColStats(table.getMetaStoreTable(), hmsPartitions, tblTxn);
-        }
-        // Remove COLUMN_STATS_ACCURATE property from the table.
-        unsetTableColStats(table.getMetaStoreTable(), tblTxn);
         txn.commit();
       }
       return newCatalogVersion;
     } catch (Exception e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "truncateTable"), e);
+    }
+  }
+
+  /**
+   * Helper method to check if the database which table belongs to is a source of
+   * Hive replication. We cannot rely on the Db object here due to eventual nature of
+   * cache updates.
+   */
+  private boolean isTableBeingReplicated(IMetaStoreClient metastoreClient,
+      HdfsTable tbl) throws CatalogException {
+    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    String dbName = tbl.getDb().getName();
+    try {
+      Database db = metastoreClient.getDatabase(dbName);
+      if (!db.isSetParameters()) return false;
+      return org.apache.commons.lang.StringUtils
+          .isNotEmpty(db.getParameters().get("repl.source.for"));
+    } catch (TException tException) {
+      throw new CatalogException(
+          String.format("Could not determine if the table %s is a replication source",
+          tbl.getFullName()), tException);
     }
   }
 
@@ -2123,6 +2156,18 @@ public class CatalogOpExecutor {
     long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
     catalog_.getLock().writeLock().unlock();
     HdfsTable hdfsTable = (HdfsTable) table;
+    // if the table is being replicated we issue the HMS API to truncate the table
+    // since it generates additional events which are used by Hive Replication.
+    try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+      if (isTableBeingReplicated(metaStoreClient.getHiveClient(), hdfsTable)) {
+        String dbName = Preconditions.checkNotNull(hdfsTable.getDb()).getName();
+        Stopwatch sw = Stopwatch.createStarted();
+        metaStoreClient.getHiveClient().truncateTable(dbName, hdfsTable.getName(), null);
+        LOG.debug("Time taken to truncate table {} using HMS API: {} msec",
+            hdfsTable.getFullName(), sw.stop().elapsed(TimeUnit.MILLISECONDS));
+        return newCatalogVersion;
+      }
+    }
     Collection<? extends FeFsPartition> parts = FeCatalogUtils
         .loadAllPartitions(hdfsTable);
     for (FeFsPartition part : parts) {
@@ -4516,16 +4561,37 @@ public class CatalogOpExecutor {
       // Commit transactional inserts on success. We don't abort the transaction
       // here in case of failures, because the client, i.e. query coordinator, is
       // always responsible for aborting transactions when queries hit errors.
+      boolean skipTransactionalInsertEvent = false;
       if (update.isSetTransaction_id()) {
         if (response.getResult().getStatus().getStatus_code() == TErrorCode.OK) {
           commitTransaction(update.getTransaction_id());
+        } else {
+          // do not generate the insert event if the transaction was aborted.
+          skipTransactionalInsertEvent = true;
         }
+      }
+      // the load operation below changes the partitions in-place (this was later
+      // changed in upstream). If the partitions are loaded in-place, we cannot keep track
+      // of files before the load and hence the firing of insert events later below
+      // cannot find the new files.
+      Map<String, Set<String>> filesBeforeInsert = Maps.newHashMap();
+      if (shouldGenerateInsertEvents()) {
+        filesBeforeInsert = getPartitionNameFilesMap(affectedExistingPartitions);
       }
       loadTableMetadata(table, newCatalogVersion, true, false, partsToLoadMetadata,
           "INSERT");
       // After loading metadata, fire insert events if external event processing is
       // enabled.
-      createInsertEvents(table, affectedExistingPartitions, update.is_overwrite);
+      if (!skipTransactionalInsertEvent) {
+        // new parts are only created in case the table is partitioned.
+        Set<String> newPartsCreated = table.getNumClusteringCols() > 0 ? Sets
+            .difference(Preconditions.checkNotNull(partsToLoadMetadata),
+                filesBeforeInsert.keySet()) : Sets.newHashSetWithExpectedSize(0);
+        long txnId = tblTxn == null ? -1 : tblTxn.txnId;
+        long writeId = tblTxn == null ? -1: tblTxn.writeId;
+        createInsertEvents(table, filesBeforeInsert, newPartsCreated,
+            update.is_overwrite, txnId, writeId);
+      }
       addTableToCatalogUpdate(table, response.result);
     } finally {
       context.stop();
@@ -4544,89 +4610,91 @@ public class CatalogOpExecutor {
    * Populates insert event data and calls fireInsertEvents() if external event
    * processing is enabled. This is no-op if event processing is disabled or there are
    * no existing partitions affected by this insert.
-   *
-   * @param affectedExistingPartitions List of existing partitions touched by the insert.
-   * @param isInsertOverwrite indicates if the operation was an insert overwrite. If it
-   *     is not, all the new files added by this insert is calculated.
+   *  @param partitionFilesMapBeforeInsert List of files for each partition in which data
+   *                                     was inserted.
+   * @param newPartsCreated represents all the partitions names which got created by
+   *                       the insert operation.
+   * @param isInsertOverwrite indicates if the operation was an insert overwrite.
    */
   private void createInsertEvents(Table table,
-      List<FeFsPartition> affectedExistingPartitions, boolean isInsertOverwrite) {
-    boolean isInsertEventsEnabled = BackendConfig.INSTANCE.isInsertEventsEnabled();
-    if (!catalog_.isEventProcessingActive() || !isInsertEventsEnabled
-        || affectedExistingPartitions.size() == 0) {
+      Map<String, Set<String>> partitionFilesMapBeforeInsert,
+      Set<String> newPartsCreated, boolean isInsertOverwrite,
+      long txnId, long writeId) throws CatalogException {
+    if (!shouldGenerateInsertEvents()) {
       return;
     }
 
     // List of all insert events that we call HMS fireInsertEvent() on.
-    List<InsertEventInfo> insertEventInfos = new ArrayList<>();
+    List<InsertEventRequestData> insertEventReqDatas = new ArrayList<>();
     // List of all partitions that we insert into
     List<HdfsPartition> partitions = new ArrayList<>();
-
-    // Map of partition names to file names of all existing partitions touched by the
-    // insert.
-    Map<String, Set<String>> partitionFilesMapBeforeInsert = new HashMap<>();
-    if (!isInsertOverwrite) {
-      partitionFilesMapBeforeInsert =
-          getPartitionNameFilesMap(affectedExistingPartitions);
-    }
-    // If table is partitioned, we add all existing partitions touched by this insert
-    // to the insert event.
     Collection<? extends FeFsPartition> partsPostInsert;
     partsPostInsert =
-        ((HdfsTable) table).getPartitionsForNames(
-            partitionFilesMapBeforeInsert.keySet());
+        ((HdfsTable) table).getPartitionsForNames(partitionFilesMapBeforeInsert.keySet());
 
-    // If it is not an insert overwrite operation, we find new files added by this insert.
-    Map<String, Set<String>> partitionFilesMapPostInsert = new HashMap<>();
-    if (!isInsertOverwrite) {
-      partitionFilesMapPostInsert =
-          getPartitionNameFilesMap(partsPostInsert);
-    }
+    Map<String, Set<String>> partitionFilesMapPostInsert = getPartitionNameFilesMap(
+        partsPostInsert);
 
     for (FeFsPartition part : partsPostInsert) {
       // Find the delta of the files added by the insert if it is not an overwrite
       // operation. HMS fireListenerEvent() expects an empty list if no new files are
       // added or if the operation is an insert overwrite.
       HdfsPartition hdfsPartition = (HdfsPartition) part;
-      Set<String> deltaFiles = new HashSet<>();
+      // newFiles keeps track of newly added files by this insert operation.
+      Set<String> newFiles;
       List<String> partVals = null;
-      if (!isInsertOverwrite) {
-        String partitionName = hdfsPartition.getPartitionName() + "/";
-        Set<String> filesPostInsert =
-            partitionFilesMapPostInsert.get(partitionName);
-        if (table.getNumClusteringCols() > 0) {
-          Set<String> filesBeforeInsert =
-              partitionFilesMapBeforeInsert.get(partitionName);
-          deltaFiles = Sets.difference(filesBeforeInsert, filesPostInsert);
-          partVals = hdfsPartition.getPartitionValuesAsStrings(true);
-        } else {
-          Map.Entry<String, Set<String>> entry =
-              partitionFilesMapBeforeInsert.entrySet().iterator().next();
-          deltaFiles = Sets.difference(entry.getValue(), filesPostInsert);
-        }
-        LOG.info("{} new files detected for table {} partition {}.",
-            filesPostInsert.size(), table.getTableName(),
-            hdfsPartition.getPartitionName());
-      }
-      if (deltaFiles != null || isInsertOverwrite) {
+      String partitionName = hdfsPartition.getPartitionName() + "/";
+      Set<String> filesPostInsert =
+          partitionFilesMapPostInsert.get(partitionName);
+      Set<String> filesBeforeInsert =
+          partitionFilesMapBeforeInsert.get(partitionName);
+      newFiles = isInsertOverwrite ? filesPostInsert
+          : Sets.difference(filesPostInsert, filesBeforeInsert);
+      // if the table is unpartitioned partVals will be empty
+      partVals = hdfsPartition.getPartitionValuesAsStrings(true);
+      LOG.info(String.format("%s new files detected for table %s%s", newFiles.size(),
+          table.getFullName(),
+          ((HdfsTable) table).isPartitioned() ? " partition " + hdfsPartition
+              .getPartitionName() : ""));
+      if (!newFiles.isEmpty()) {
         // Collect all the insert events.
-        insertEventInfos.add(
-            new InsertEventInfo(partVals, deltaFiles, isInsertOverwrite));
-        if (partVals != null) {
+        insertEventReqDatas.add(
+            makeInsertEventData((HdfsTable) table, partVals, newFiles,
+                isInsertOverwrite));
+        if (!partVals.isEmpty()) {
           // insert into partition
           partitions.add(hdfsPartition);
         }
-      } else {
-        LOG.info("No new files were created, and is not a replace. Skipping "
-            + "generating INSERT event.");
       }
     }
 
-    if (insertEventInfos.isEmpty()) return;
+    // if the table is transaction table we should generate a transactional
+    // insert event type.
+    boolean isTransactional = AcidUtils.isTransactionalTable(table.getMetaStoreTable()
+        .getParameters());
+    Preconditions.checkState(!isTransactional || txnId > 0, String
+        .format("Invalid transaction id %s for generating insert events on table %s",
+            txnId, table.getFullName()));
+    Preconditions.checkState(!isTransactional || writeId > 0,
+        String.format("Invalid write id %s for generating insert events on table %s",
+            writeId, table.getFullName()));
+    // if the table is transactional we fire the event for new partitions as well.
+    if (isTransactional) {
+      for (HdfsPartition newPart : ((HdfsTable) table)
+          .getPartitionsForNames(newPartsCreated)) {
+        insertEventReqDatas.add(makeInsertEventData((HdfsTable) table,
+            newPart.getPartitionValuesAsStrings(true), newPart.getFileNames(),
+            isInsertOverwrite));
+      }
+    }
+
+    if (insertEventReqDatas.isEmpty()) return;
 
     MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient();
+    TableInsertEventInfo insertEventInfo = new TableInsertEventInfo(
+        insertEventReqDatas, isTransactional, txnId, writeId);
     List<Long> eventIds = MetastoreShim.fireInsertEvents(metaStoreClient,
-        insertEventInfos, table.getDb().getName(), table.getName());
+        insertEventInfo, table.getDb().getName(), table.getName());
     if (!eventIds.isEmpty()) {
       if (partitions.size() == 0) { // insert into table
         catalog_.addVersionsForInflightEvents(true, table, eventIds.get(0));
@@ -4639,14 +4707,58 @@ public class CatalogOpExecutor {
     }
   }
 
+  private boolean shouldGenerateInsertEvents() {
+    return catalog_.isEventProcessingActive() && BackendConfig.INSTANCE
+        .isInsertEventsEnabled();
+  }
+
+  private InsertEventRequestData makeInsertEventData(HdfsTable tbl, List<String> partVals,
+      Set<String> newFiles, boolean isInsertOverwrite) throws CatalogException {
+    Preconditions.checkNotNull(newFiles);
+    Preconditions.checkNotNull(partVals);
+    InsertEventRequestData insertEventRequestData = new InsertEventRequestData(
+        Lists.newArrayListWithCapacity(
+            newFiles.size()));
+    boolean isTransactional = AcidUtils
+        .isTransactionalTable(tbl.getMetaStoreTable().getParameters());
+    // in case of unpartitioned table, partVals will be empty
+    if (!partVals.isEmpty()) insertEventRequestData.setPartitionVal(partVals);
+    FileSystem fs = tbl.getFileSystem();
+    for (String file : newFiles) {
+      try {
+        Path filePath = new Path(file);
+        FileChecksum checkSum = fs.getFileChecksum(filePath);
+        String checksumStr = checkSum == null ? ""
+            : StringUtils.byteToHexString(checkSum.getBytes(), 0, checkSum.getLength());
+        insertEventRequestData.addToFilesAdded(file);
+        insertEventRequestData.addToFilesAddedChecksum(checksumStr);
+        if (isTransactional) {
+          String acidDirPath = AcidUtils.getFirstLevelAcidDirPath(filePath, fs);
+          if (acidDirPath != null) {
+            insertEventRequestData.addToSubDirectoryList(acidDirPath);
+          }
+        }
+        insertEventRequestData.setReplace(isInsertOverwrite);
+      } catch (IOException e) {
+        throw new CatalogException("Could not get the file checksum for file " + file, e);
+      }
+    }
+    return insertEventRequestData;
+  }
+
   /**
    * Util method to return a map of partition names to list of files for that partition.
    */
   private static Map<String, Set<String>> getPartitionNameFilesMap(Collection<?
       extends FeFsPartition> partitions) {
-        return partitions.stream().collect(
-            Collectors.toMap(p -> p.getPartitionName() + "/",
-                p -> ((HdfsPartition) p).getFileNames()));
+    Map<String, Set<String>> partitionFilePaths = new HashMap<>();
+    for (FeFsPartition partition : partitions) {
+      String key = partition.getPartitionName() + "/";
+      Set<String> filenames = ((HdfsPartition) partition).getFileNames();
+      partitionFilePaths.putIfAbsent(key, new HashSet<>(filenames.size()));
+      partitionFilePaths.get(key).addAll(filenames);
+    }
+    return partitionFilePaths;
   }
 
   /**

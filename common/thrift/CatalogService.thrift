@@ -215,7 +215,10 @@ struct TUpdateCatalogRequest {
   7: required bool is_overwrite;
 
   // ACID transaction ID for transactional inserts.
-  8: optional i64 transaction_id;
+  8: optional i64 transaction_id
+
+  // ACID write ID for transactional inserts.
+  9: optional i64 write_id
 }
 
 // Response from a TUpdateCatalogRequest

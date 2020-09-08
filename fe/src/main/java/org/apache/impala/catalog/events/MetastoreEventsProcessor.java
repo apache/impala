@@ -233,7 +233,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   private final long pollingFrequencyInSec_;
 
   // catalog service instance to be used while processing events
-  private final CatalogServiceCatalog catalog_;
+  protected final CatalogServiceCatalog catalog_;
 
   // scheduler daemon thread executor for processing events at given frequency
   private final ScheduledExecutorService scheduler_ = Executors

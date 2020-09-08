@@ -22,7 +22,9 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Range;
 import com.google.errorprone.annotations.Immutable;
 
+import java.io.IOException;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
@@ -170,6 +172,45 @@ public class AcidUtils {
         props.put(TABLE_TRANSACTIONAL_PROPERTIES, INSERTONLY_TRANSACTIONAL_PROPERTY);
         break;
     }
+  }
+
+  /**
+   * This method is copied from Hive's org.apache.hadoop.hive.ql.io.AcidUtils.java
+   * (commit hash 17ac1d9f230b8d663c09c22016753012a9b91edf). It is used to generate
+   * the ACID directory names to be added to the insert events on the transactional
+   * tables.
+   */
+  //Get the first level acid directory (if any) from a given path
+  public static String getFirstLevelAcidDirPath(Path dataPath, FileSystem fileSystem)
+      throws IOException {
+    if (dataPath == null) {
+      return null;
+    }
+    String firstLevelAcidDir = getAcidSubDir(dataPath);
+    if (firstLevelAcidDir != null) {
+      return firstLevelAcidDir;
+    }
+
+    String acidDirPath = getFirstLevelAcidDirPath(dataPath.getParent(), fileSystem);
+    if (acidDirPath == null) {
+      return null;
+    }
+
+    // We need the path for directory so no need to append file name
+    if (fileSystem.isDirectory(dataPath)) {
+      return acidDirPath + Path.SEPARATOR + dataPath.getName();
+    }
+    return acidDirPath;
+  }
+
+  private static String getAcidSubDir(Path dataPath) {
+    String dataDir = dataPath.getName();
+    if (dataDir.startsWith("base_")
+        || dataDir.startsWith("delta_")
+        || dataDir.startsWith("delete_delta_")) {
+      return dataDir;
+    }
+    return null;
   }
 
   /**

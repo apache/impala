@@ -187,6 +187,179 @@ class TestEventProcessing(CustomClusterTestSuite):
     self.__run_self_events_test(unique_database, True)
     self.__run_self_events_test(unique_database, False)
 
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
+  def test_event_based_replication(self):
+    self.__run_event_based_replication_tests()
+
+  def __run_event_based_replication_tests(self, transactional=True):
+    """Hive Replication relies on the insert events generated on the tables.
+    This test issues some basic replication commands from Hive and makes sure
+    that the replicated table has correct data."""
+    TBLPROPERTIES = self.__get_transactional_tblproperties(transactional)
+    source_db = self.__get_random_name("repl_source_")
+    target_db = self.__get_random_name("repl_target_")
+    unpartitioned_tbl = "unpart_tbl"
+    partitioned_tbl = "part_tbl"
+    try:
+      self.run_stmt_in_hive("create database {0}".format(source_db))
+      self.run_stmt_in_hive(
+        "alter database {0} set dbproperties ('repl.source.for'='xyz')".format(source_db))
+      # explicit create table command since create table like doesn't allow tblproperties
+      self.client.execute("create table {0}.{1} (a string, b string) stored as parquet"
+        " {2}".format(source_db, unpartitioned_tbl, TBLPROPERTIES))
+      EventProcessorUtils.wait_for_event_processing(self)
+      self.client.execute(
+        "create table {0}.{1} (id int, bool_col boolean, tinyint_col tinyint, "
+        "smallint_col smallint, int_col int, bigint_col bigint, float_col float, "
+        "double_col double, date_string string, string_col string, "
+        "timestamp_col timestamp) partitioned by (year int, month int) stored as parquet"
+        " {2}".format(source_db, partitioned_tbl, TBLPROPERTIES))
+
+      # case I: insert
+      # load the table with some data from impala, this also creates new partitions.
+      self.client.execute("insert into {0}.{1}"
+        " select * from functional.tinytable".format(source_db,
+          unpartitioned_tbl))
+      self.client.execute("insert into {0}.{1} partition(year,month)"
+        " select * from functional_parquet.alltypessmall".format(
+          source_db, partitioned_tbl))
+      rows_in_unpart_tbl = int(self.execute_scalar(
+        "select count(*) from {0}.{1}".format(source_db, unpartitioned_tbl)).split('\t')[
+        0])
+      rows_in_part_tbl = int(self.execute_scalar(
+        "select count(*) from {0}.{1}".format(source_db, partitioned_tbl)).split('\t')[0])
+      assert rows_in_unpart_tbl > 0
+      assert rows_in_part_tbl > 0
+      # bootstrap the replication
+      self.run_stmt_in_hive("repl dump {0}".format(source_db))
+      # create a target database where tables will be replicated
+      self.client.execute("create database {0}".format(target_db))
+      # replicate the table from source to target
+      self.run_stmt_in_hive("repl load {0} into {1}".format(source_db, target_db))
+      EventProcessorUtils.wait_for_event_processing(self)
+      assert unpartitioned_tbl in self.client.execute(
+        "show tables in {0}".format(target_db)).get_data()
+      assert partitioned_tbl in self.client.execute(
+        "show tables in {0}".format(target_db)).get_data()
+      # confirm the number of rows in target match with the source table.
+      rows_in_unpart_tbl_target = int(self.execute_scalar(
+        "select count(*) from {0}.{1}".format(target_db, unpartitioned_tbl))
+          .split('\t')[0])
+      rows_in_part_tbl_target = int(self.execute_scalar(
+        "select count(*) from {0}.{1}".format(target_db, partitioned_tbl))
+          .split('\t')[0])
+      assert rows_in_unpart_tbl == rows_in_unpart_tbl_target
+      assert rows_in_part_tbl == rows_in_part_tbl_target
+
+      # case II: insert into existing partitions.
+      self.client.execute("insert into {0}.{1}"
+        " select * from functional.tinytable".format(
+          source_db, unpartitioned_tbl))
+      self.client.execute("insert into {0}.{1} partition(year,month)"
+        " select * from functional_parquet.alltypessmall".format(
+          source_db, partitioned_tbl))
+      self.run_stmt_in_hive("repl dump {0}".format(source_db))
+      # replicate the table from source to target
+      self.run_stmt_in_hive("repl load {0} into {1}".format(source_db, target_db))
+      # we wait until the events catch up in case repl command above did some HMS
+      # operations.
+      EventProcessorUtils.wait_for_event_processing(self)
+      # confirm the number of rows in target match with the source table.
+      rows_in_unpart_tbl_target = int(self.execute_scalar(
+        "select count(*) from {0}.{1}".format(target_db, unpartitioned_tbl))
+          .split('\t')[0])
+      rows_in_part_tbl_target = int(self.execute_scalar(
+        "select count(*) from {0}.{1}".format(target_db, partitioned_tbl)).split('\t')[0])
+      assert 2 * rows_in_unpart_tbl == rows_in_unpart_tbl_target
+      assert 2 * rows_in_part_tbl == rows_in_part_tbl_target
+
+      # Case III: insert overwrite
+      # impala does a insert overwrite of the tables.
+      self.client.execute("insert overwrite table {0}.{1}"
+        " select * from functional.tinytable".format(
+          source_db, unpartitioned_tbl))
+      self.client.execute("insert overwrite table {0}.{1} partition(year,month)"
+        " select * from functional_parquet.alltypessmall".format(
+          source_db, partitioned_tbl))
+      self.run_stmt_in_hive("repl dump {0}".format(source_db))
+      # replicate the table from source to target
+      self.run_stmt_in_hive("repl load {0} into {1}".format(source_db, target_db))
+      # we wait until the events catch up in case repl command above did some HMS
+      # operations.
+      EventProcessorUtils.wait_for_event_processing(self)
+      # confirm the number of rows in target match with the source table.
+      rows_in_unpart_tbl_target = int(self.execute_scalar(
+        "select count(*) from {0}.{1}".format(target_db, unpartitioned_tbl))
+          .split('\t')[0])
+      rows_in_part_tbl_target = int(self.execute_scalar(
+        "select count(*) from {0}.{1}".format(target_db, partitioned_tbl)).split('\t')[0])
+      assert rows_in_unpart_tbl == rows_in_unpart_tbl_target
+      assert rows_in_part_tbl == rows_in_part_tbl_target
+
+      # Case IV: CTAS which creates a transactional table.
+      self.client.execute(
+        "create table {0}.insertonly_nopart_ctas {1} as "
+        "select * from {0}.{2}".format(source_db, TBLPROPERTIES, unpartitioned_tbl))
+      self.client.execute(
+        "create table {0}.insertonly_part_ctas partitioned by (year, month) {1}"
+        " as select * from {0}.{2}".format(source_db, TBLPROPERTIES, partitioned_tbl))
+      self.run_stmt_in_hive("repl dump {0}".format(source_db))
+      # replicate the table from source to target
+      self.run_stmt_in_hive("repl load {0} into {1}".format(source_db, target_db))
+      # we wait until the events catch up in case repl command above did some HMS
+      # operations.
+      EventProcessorUtils.wait_for_event_processing(self)
+      # confirm the number of rows in target match with the source table.
+      rows_in_unpart_tbl_source = int(self.execute_scalar("select count(*) from "
+        "{0}.insertonly_nopart_ctas".format(source_db)).split('\t')[0])
+      rows_in_unpart_tbl_target = int(self.execute_scalar("select count(*) from "
+          "{0}.insertonly_nopart_ctas".format(target_db)).split('\t')[0])
+      assert rows_in_unpart_tbl_source == rows_in_unpart_tbl_target
+      rows_in_unpart_tbl_source = int(self.execute_scalar("select count(*) from "
+        "{0}.insertonly_part_ctas".format(source_db)).split('\t')[0])
+      rows_in_unpart_tbl_target = int(self.execute_scalar("select count(*) from "
+        "{0}.insertonly_part_ctas".format(target_db)).split('\t')[0])
+      assert rows_in_unpart_tbl_source == rows_in_unpart_tbl_target
+
+      # Case V: truncate table
+      # impala truncates both the tables. Make sure replication sees that.
+      self.client.execute("truncate table {0}.{1}".format(source_db, unpartitioned_tbl))
+      self.client.execute("truncate table {0}.{1}".format(source_db, partitioned_tbl))
+      self.run_stmt_in_hive("repl dump {0}".format(source_db))
+      # replicate the table from source to target
+      self.run_stmt_in_hive("repl load {0} into {1}".format(source_db, target_db))
+      # we wait until the events catch up in case repl command above did some HMS
+      # operations.
+      EventProcessorUtils.wait_for_event_processing(self)
+      # confirm the number of rows in target match with the source table.
+      rows_in_unpart_tbl_target = int(self.execute_scalar(
+        "select count(*) from {0}.{1}".format(target_db, unpartitioned_tbl))
+          .split('\t')[0])
+      rows_in_part_tbl_target = int(self.execute_scalar(
+        "select count(*) from {0}.{1}".format(target_db, partitioned_tbl)).split('\t')[0])
+      assert rows_in_unpart_tbl_target == 0
+      assert rows_in_part_tbl_target == 0
+    finally:
+      src_db = self.__get_db_nothrow(source_db)
+      target_db_obj = self.__get_db_nothrow(target_db)
+      if src_db is not None:
+        self.run_stmt_in_hive(
+          "alter database {0} set dbproperties ('repl.source.for'='')".format(source_db))
+        self.run_stmt_in_hive("drop database if exists {0} cascade".format(source_db))
+      if target_db_obj is not None:
+        self.run_stmt_in_hive("drop database if exists {0} cascade".format(target_db))
+      # workaround for HIVE-24135. the managed db location doesn't get cleaned up
+      if src_db is not None and src_db.managedLocationUri is not None:
+        self.filesystem_client.delete_file_dir(src_db.managedLocationUri, True)
+      if target_db_obj is not None and target_db_obj.managedLocationUri is not None:
+        self.filesystem_client.delete_file_dir(target_db.src_db.managedLocationUri, True)
+
+  def __get_db_nothrow(self, name):
+    try:
+      return self.hive_client.get_database(name)
+    except:
+      return None
+
   def _run_test_empty_partition_events(self, unique_database, is_transactional):
     test_tbl = unique_database + ".test_events"
     TBLPROPERTIES = self.__get_transactional_tblproperties(is_transactional)
@@ -321,6 +494,7 @@ class TestEventProcessing(CustomClusterTestSuite):
           # drop non-existing partition; essentially this is a no-op
           "alter table {0}.{1} drop if exists partition (year=2100, month=1)".format(
             db_name, tbl_name),
+          # empty table case where no insert events are generated
           "insert overwrite {0}.{1} select * from {0}.{1}".format(
             db_name, empty_unpartitioned_tbl),
           "insert overwrite {0}.{1} partition(part) select * from {0}.{1}".format(
@@ -328,10 +502,14 @@ class TestEventProcessing(CustomClusterTestSuite):
       ]
     }
     if HIVE_MAJOR_VERSION >= 3:
-      # insert into a existing partition; generates INSERT events
+      # insert into a existing partition; generates INSERT self-event
       self_event_test_queries[True].append("insert into table {0}.{1} partition "
           "(year, month) select * from functional.alltypessmall where year=2009 "
           "and month=1".format(db_name, tbl2))
+      # insert overwrite query from Impala also generates a INSERT self-event
+      self_event_test_queries[True].append("insert overwrite table {0}.{1} partition "
+         "(year, month) select * from functional.alltypessmall where year=2009 "
+         "and month=1".format(db_name, tbl2))
     return self_event_test_queries
 
   def __get_hive_test_queries(self, db_name, recover_tbl_name):
