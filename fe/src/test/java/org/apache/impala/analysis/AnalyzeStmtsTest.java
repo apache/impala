@@ -2578,6 +2578,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select count(*), grouping_id(count(*)) from functional.alltypes " +
         "group by rollup(int_col, string_col)",
         "count(*) is not a grouping expression");
+
+    // grouping() and grouping_id() require GROUP BY clause.
+    AnalysisError("select int_col, grouping(int_col) from functional.alltypes",
+        "grouping() or grouping_id() function requires a GROUP BY clause: '" +
+        "grouping(int_col)'");
+    AnalysisError("select int_col, grouping_id() from functional.alltypes",
+        "grouping() or grouping_id() function requires a GROUP BY clause: '" +
+        "grouping_id()'");
   }
 
   @Test
