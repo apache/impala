@@ -161,10 +161,10 @@ DATE_ADD (<varname>timestamp</varname>, INTERVAL <varname>interval</varname> <va
       <codeph>&#8209;&#8209;use_local_tz_for_unix_timestamp_conversions</codeph> startup flag to
       <codeph>TRUE</codeph>, Impala treats the <codeph>TIMESTAMP</codeph> values specified in
       the local time zone. The local time zone is determined in the following order with the
-      <codeph>TIMESTAMP</codeph> query option takes the highest precedence:
+      <codeph>TIMEZONE</codeph> query option takes the highest precedence:
       <ol>
         <li>
-          The <codeph>TIMESTAMP</codeph> query option
+          The <codeph>TIMEZONE</codeph> query option
         </li>
 
         <li>
