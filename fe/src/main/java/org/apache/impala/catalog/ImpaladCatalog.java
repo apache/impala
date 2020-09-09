@@ -246,7 +246,7 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
       }
     }
     for (PartitionMetaSummary summary : partUpdates.values()) {
-      LOG.info(summary.toString());
+      if (summary.hasUpdates()) LOG.info(summary.toString());
     }
 
     for (TCatalogObject catalogObject: sequencer.getUpdatedObjects()) {

@@ -159,4 +159,6 @@ struct TBackendGflags {
   67: required bool enable_insert_events
 
   68: required bool compact_catalog_topic
+
+  69: required bool enable_incremental_metadata_updates
 }

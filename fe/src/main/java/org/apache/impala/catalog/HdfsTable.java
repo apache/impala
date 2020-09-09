@@ -63,6 +63,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.fb.FbFileBlock;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TAccessLevel;
@@ -291,7 +292,7 @@ public class HdfsTable extends Table implements FeFsTable {
 
   // Dropped partitions since last catalog update. These partitions need to be removed
   // in coordinator's cache if there are no updates on them.
-  private final Set<HdfsPartition> droppedPartitions = new HashSet<>();
+  private final Set<HdfsPartition> droppedPartitions_ = new HashSet<>();
 
   // Represents a set of storage-related statistics aggregated at the table or partition
   // level.
@@ -987,7 +988,10 @@ public class HdfsTable extends Table implements FeFsTable {
     // nullPartitionIds_ and partitionValuesMap_ are only maintained in coordinators.
     if (!isStoredInImpaladCatalogCache()) {
       dirtyPartitions_.remove(partitionId);
-      droppedPartitions.add(partition.genMinimalPartition());
+      // Only tracks the dropped partition instances when we need partition-level updates.
+      if (BackendConfig.INSTANCE.isIncrementalMetadataUpdatesEnabled()) {
+        droppedPartitions_.add(partition.genMinimalPartition());
+      }
       return partition;
     }
     for (int i = 0; i < partition.getPartitionValues().size(); ++i) {
@@ -1910,6 +1914,9 @@ public class HdfsTable extends Table implements FeFsTable {
   @Override
   public TCatalogObject toMinimalTCatalogObject() {
     TCatalogObject catalogObject = super.toMinimalTCatalogObject();
+    if (!BackendConfig.INSTANCE.isIncrementalMetadataUpdatesEnabled()) {
+      return catalogObject;
+    }
     catalogObject.getTable().setTable_type(TTableType.HDFS_TABLE);
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
         nullPartitionKeyValue_, nullColumnValue_,
@@ -1949,13 +1956,13 @@ public class HdfsTable extends Table implements FeFsTable {
    * Gets the deleted/replaced partition instances since last catalog topic update.
    */
   public List<HdfsPartition> getDroppedPartitions() {
-    return ImmutableList.copyOf(droppedPartitions);
+    return ImmutableList.copyOf(droppedPartitions_);
   }
 
   /**
    * Clears the deleted/replaced partition instance set.
    */
-  public void resetDroppedPartitions() { droppedPartitions.clear(); }
+  public void resetDroppedPartitions() { droppedPartitions_.clear(); }
 
   /**
    * Gets catalog objects of new partitions since last catalog update. They are partitions

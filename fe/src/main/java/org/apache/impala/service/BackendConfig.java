@@ -212,6 +212,10 @@ public class BackendConfig {
 
   public boolean isCompactCatalogTopic() { return backendCfg_.compact_catalog_topic; }
 
+  public boolean isIncrementalMetadataUpdatesEnabled() {
+    return backendCfg_.enable_incremental_metadata_updates;
+  }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

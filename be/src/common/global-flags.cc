@@ -341,6 +341,14 @@ DEFINE_bool_hidden(use_customized_user_groups_mapper_for_ranger, false,
 DEFINE_bool(enable_column_masking, true,
     "If false, disable the column masking feature. Defaults to be true.");
 
+DEFINE_bool(enable_incremental_metadata_updates, true,
+    "If true, Catalog Server will send incremental table updates in partition level in "
+    "the statestore topic updates. Legacy coordinators will apply the partition updates "
+    "incrementally, i.e. reuse unchanged partition metadata. Disable this feature by "
+    "setting this to false in the Catalog Server. Then metadata of each table will be "
+    "propagated as a whole object in the statestore topic updates. Note that legacy "
+    "coordinators can apply incremental or full table updates so don't need this flag.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++
