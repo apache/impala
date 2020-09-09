@@ -160,7 +160,8 @@ class TestCompactCatalogUpdates(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args="--use_local_catalog=true",
-    catalogd_args="--catalog_topic_mode=minimal")
+    catalogd_args="--catalog_topic_mode=minimal "
+                  "--enable_incremental_metadata_updates=true")
   def test_invalidate_stale_partitions(self, unique_database):
     """
     Test that partition level invalidations are sent from catalogd and processed

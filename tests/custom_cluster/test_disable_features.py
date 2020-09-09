@@ -18,6 +18,7 @@
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.parametrize import UniqueDatabase
 
 
 class TestDisableFeatures(CustomClusterTestSuite):
@@ -31,3 +32,16 @@ class TestDisableFeatures(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args("--enable_orc_scanner=false")
   def test_disable_orc_scanner(self, vector):
     self.run_test_case('QueryTest/disable-orc-scanner', vector)
+
+  @pytest.mark.execute_serially
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--enable_incremental_metadata_updates=false")
+  def test_disable_incremental_metadata_updates(self, vector, unique_database):
+    """Canary tests for disabling incremental metadata updates. Copy some partition
+    related tests in metadata/test_ddl.py here."""
+    vector.get_value('exec_option')['sync_ddl'] = True
+    self.run_test_case('QueryTest/alter-table-hdfs-caching', vector,
+        use_db=unique_database, multiple_impalad=True)
+    self.run_test_case('QueryTest/alter-table-set-column-stats', vector,
+        use_db=unique_database, multiple_impalad=True)

@@ -861,9 +861,15 @@ public class CatalogServiceCatalog extends Catalog {
           Catalog.toCatalogObjectKey(removedObject))) {
         ctx.addCatalogObject(removedObject, true);
       }
-      // If this is a HdfsTable, make sure we send deletes for removed partitions.
-      // So we won't leak partition topic entries in the statestored catalog topic.
-      if (removedObject.type == TCatalogObjectType.TABLE
+      // If this is a HdfsTable and incremental metadata updates are enabled, make sure we
+      // send deletes for removed partitions. So we won't leak partition topic entries in
+      // the statestored catalog topic. Partitions are only included as objects in topic
+      // updates if incremental metadata updates are enabled. Don't need this if
+      // incremental metadata updates are disabled, because in this case the table
+      // snapshot will be sent as a complete object. See more details in
+      // addTableToCatalogDeltaHelper().
+      if (BackendConfig.INSTANCE.isIncrementalMetadataUpdatesEnabled()
+          && removedObject.type == TCatalogObjectType.TABLE
           && removedObject.getTable().getTable_type() == TTableType.HDFS_TABLE) {
         THdfsTable hdfsTable = removedObject.getTable().getHdfs_table();
         Preconditions.checkState(
@@ -885,7 +891,7 @@ public class CatalogServiceCatalog extends Catalog {
             ctx.addCatalogObject(removedPart, true, deleteSummary);
           }
         }
-        LOG.info(deleteSummary.toString());
+        if (deleteSummary.hasUpdates()) LOG.info(deleteSummary.toString());
       }
     }
     // Each topic update should contain a single "TCatalog" object which is used to
@@ -1320,7 +1326,8 @@ public class CatalogServiceCatalog extends Catalog {
         return;
       }
       try {
-        if (tbl instanceof HdfsTable) {
+        if (BackendConfig.INSTANCE.isIncrementalMetadataUpdatesEnabled()
+            && tbl instanceof HdfsTable) {
           catalogTbl.setTable(((HdfsTable) tbl).toThriftWithMinimalPartitions());
           addHdfsPartitionsToCatalogDelta((HdfsTable) tbl, ctx);
         } else {
@@ -1364,7 +1371,7 @@ public class CatalogServiceCatalog extends Catalog {
     }
     hdfsTable.resetDroppedPartitions();
 
-    LOG.info(updateSummary.toString());
+    if (updateSummary.hasUpdates()) LOG.info(updateSummary.toString());
   }
 
   /**

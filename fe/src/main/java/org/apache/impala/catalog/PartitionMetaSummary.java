@@ -188,6 +188,11 @@ public class PartitionMetaSummary {
     }
   }
 
+  /**
+   * Returns whether we have collected any partition updates/deletes.
+   */
+  public boolean hasUpdates() { return numUpdatedParts_ > 0 || numDeletedParts_ > 0; }
+
   @Override
   public String toString() {
     StringBuilder res = new StringBuilder();
