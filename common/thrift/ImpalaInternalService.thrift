@@ -617,6 +617,9 @@ struct TQueryCtx {
   // If mt_dop was overridden by admission control's max mt_dop setting, then this
   // is set to the original value. If mt_dop was not overridden, then this is not set.
   26: optional i32 overridden_mt_dop_value
+
+  // The initiating coordinator's backend_id.
+  27: optional Types.TUniqueId coord_backend_id
 }
 
 // Descriptor that indicates that a runtime filter is produced by a plan node.

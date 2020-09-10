@@ -384,9 +384,6 @@ message ExecQueryFInstancesRequestPB {
   // Execution parameters for specific fragment instances. Corresponds to
   // 'fragment_instance_ctxs' in the TExecPlanFragmentInfo sidecar.
   repeated PlanFragmentInstanceCtxPB fragment_instance_ctxs = 8;
-
-  // The Backend ID of the coordinator.
-  optional UniqueIdPB coord_backend_id = 9;
 }
 
 message ExecQueryFInstancesResponsePB {

@@ -152,12 +152,10 @@ class QueryState {
   }
   MemTracker* query_mem_tracker() const { return query_mem_tracker_; }
   RuntimeProfile* host_profile() const { return host_profile_; }
+  UniqueIdPB GetCoordinatorBackendId() const;
 
   /// The following getters are only valid after Init().
   ScannerMemLimiter* scanner_mem_limiter() const { return scanner_mem_limiter_; }
-  const UniqueIdPB& coord_backend_id() const {
-    return exec_rpc_params_.coord_backend_id();
-  }
 
   /// The following getters are only valid after Init() and should be called only from
   /// the backend execution (ie. not the coordinator side, since they require holding

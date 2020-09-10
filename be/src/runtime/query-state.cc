@@ -213,7 +213,6 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
 
   // don't copy query_ctx, it's large and we already did that in the c'tor
   exec_rpc_params_.set_coord_state_idx(exec_rpc_params->coord_state_idx());
-  *exec_rpc_params_.mutable_coord_backend_id() = exec_rpc_params->coord_backend_id();
   exec_rpc_params_.mutable_fragment_ctxs()->Swap(
       const_cast<google::protobuf::RepeatedPtrField<impala::PlanFragmentCtxPB>*>(
           &exec_rpc_params->fragment_ctxs()));
@@ -246,6 +245,12 @@ Status QueryState::Init(const ExecQueryFInstancesRequestPB* exec_rpc_params,
       new CountingBarrier(fragment_info_.fragment_instance_ctxs.size()));
   is_initialized_ = true;
   return Status::OK();
+}
+
+UniqueIdPB QueryState::GetCoordinatorBackendId() const {
+  UniqueIdPB backend_id_pb;
+  TUniqueIdToUniqueIdPB(query_ctx_.coord_backend_id, &backend_id_pb);
+  return backend_id_pb;
 }
 
 int64_t QueryState::GetMaxReservation() {

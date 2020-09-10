@@ -110,7 +110,6 @@ void Coordinator::BackendState::SetRpcParams(const DebugOptions& debug_options,
     const FilterRoutingTable& filter_routing_table, ExecQueryFInstancesRequestPB* request,
     TExecPlanFragmentInfo* fragment_info) {
   request->set_coord_state_idx(state_idx_);
-  *request->mutable_coord_backend_id() = ExecEnv::GetInstance()->backend_id();
   request->set_min_mem_reservation_bytes(
       backend_exec_params_.min_mem_reservation_bytes());
   request->set_initial_mem_reservation_total_claims(
