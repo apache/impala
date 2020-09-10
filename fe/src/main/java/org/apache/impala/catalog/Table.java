@@ -522,10 +522,18 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   private TCatalogObject toMinimalTCatalogObjectHelper() {
     TCatalogObject catalogObject =
         new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
-    catalogObject.setTable(new TTable());
-    catalogObject.getTable().setDb_name(getDb().getName());
-    catalogObject.getTable().setTbl_name(getName());
+    catalogObject.setTable(new TTable(getDb().getName(), getName()));
     return catalogObject;
+  }
+
+  /**
+   * Returns a TCatalogObject with only the table name for invalidation. For non-hdfs
+   * tables, it's the same as toMinimalTCatalogObject(). For hdfs tables, their
+   * toMinimalTCatalogObject() will also return the partition names. So we use this method
+   * to get a light-weight object for invalidation in LocalCatalog.
+   */
+  public TCatalogObject toInvalidationObject() {
+    return toMinimalTCatalogObjectHelper();
   }
 
   /**
@@ -542,6 +550,21 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   @Override
   protected void setTCatalogObject(TCatalogObject catalogObject) {
     catalogObject.setTable(toThrift());
+  }
+
+  /**
+   * Generates a TCatalogObject based on the required form. See more details in comments
+   * of ThriftObjectType.
+   */
+  public TCatalogObject toTCatalogObject(ThriftObjectType resultType) {
+    switch (resultType) {
+      case FULL: return toTCatalogObject();
+      case DESCRIPTOR_ONLY: return toMinimalTCatalogObject();
+      case INVALIDATION: return toInvalidationObject();
+      case NONE:
+      default:
+        return null;
+    }
   }
 
   /**

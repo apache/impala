@@ -682,6 +682,8 @@ public class Frontend {
       TClientRequest clientRequest = queryCtx.getClient_request();
       header.setRedacted_sql_stmt(clientRequest.isSetRedacted_stmt() ?
           clientRequest.getRedacted_stmt() : clientRequest.getStmt());
+      header.setWant_minimal_response(
+          BackendConfig.INSTANCE.getBackendCfg().use_local_catalog);
       ddl.getDdl_params().setHeader(header);
       ddl.getDdl_params().setSync_ddl(ddl.isSync_ddl());
       // forward debug_actions to the catalogd
@@ -689,11 +691,12 @@ public class Frontend {
         ddl.getDdl_params()
             .setDebug_action(result.getQuery_options().getDebug_action());
       }
-    }
-    if (ddl.getOp_type() == TCatalogOpType.RESET_METADATA) {
+    } else if (ddl.getOp_type() == TCatalogOpType.RESET_METADATA) {
       ddl.getReset_metadata_params().setSync_ddl(ddl.isSync_ddl());
       ddl.getReset_metadata_params().setRefresh_updated_hms_partitions(
           result.getQuery_options().isRefresh_updated_hms_partitions());
+      ddl.getReset_metadata_params().getHeader().setWant_minimal_response(
+          BackendConfig.INSTANCE.getBackendCfg().use_local_catalog);
       // forward debug_actions to the catalogd
       if (result.getQuery_options().isSetDebug_action()) {
         ddl.getReset_metadata_params()

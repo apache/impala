@@ -465,6 +465,12 @@ public class Db extends CatalogObjectImpl implements FeDb {
     catalogObject.setDb(toThrift());
   }
 
+  public TCatalogObject toMinimalTCatalogObject() {
+    TCatalogObject min = new TCatalogObject(getCatalogObjectType(), getCatalogVersion());
+    min.setDb(new TDatabase(getName()));
+    return min;
+  }
+
   /**
    * Get partial information about this DB in order to service CatalogdMetaProvider
    * running in a remote impalad.

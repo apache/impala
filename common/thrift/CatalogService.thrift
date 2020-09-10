@@ -55,6 +55,10 @@ struct TCatalogServiceRequestHeader {
 
   // The client IP address.
   3: optional string client_ip
+
+  // Set by LocalCatalog coordinators. The response will contain minimal catalog objects
+  // (for invalidations) instead of full catalog objects.
+  4: optional bool want_minimal_response
 }
 
 // Returns details on the result of an operation that updates the catalog. Information

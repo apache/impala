@@ -2272,11 +2272,13 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Wrapper around {@link #reloadTable(Table, boolean, String)} which passes false for
-   * {@code refreshUpdatedPartitions} argument.
+   * Wrapper around {@link #reloadTable(Table, boolean, CatalogObject.ThriftObjectType,
+   * String)} which passes false for {@code refreshUpdatedPartitions} argument and ignore
+   * the result.
    */
-  public TCatalogObject reloadTable(Table tbl, String reason) throws CatalogException {
-    return reloadTable(tbl, new TResetMetadataRequest(), reason);
+  public void reloadTable(Table tbl, String reason) throws CatalogException {
+    reloadTable(tbl, new TResetMetadataRequest(), CatalogObject.ThriftObjectType.NONE,
+        reason);
   }
 
   /**
@@ -2287,9 +2289,10 @@ public class CatalogServiceCatalog extends Catalog {
    * Throws a CatalogException if there is an error loading table metadata.
    * If {@code refreshUpdatedParts} is true, the refresh logic detects updated
    * partitions in metastore and reloads them too.
+   * if {@code wantMinimalResult} is true, returns the result in the minimal form.
    */
   public TCatalogObject reloadTable(Table tbl, TResetMetadataRequest request,
-      String reason) throws CatalogException {
+      CatalogObject.ThriftObjectType resultType, String reason) throws CatalogException {
     LOG.info(String.format("Refreshing table metadata: %s", tbl.getFullName()));
     Preconditions.checkState(!(tbl instanceof IncompleteTable));
     String dbName = tbl.getDb().getName();
@@ -2321,7 +2324,7 @@ public class CatalogServiceCatalog extends Catalog {
       }
       tbl.setCatalogVersion(newCatalogVersion);
       LOG.info(String.format("Refreshed table metadata: %s", tbl.getFullName()));
-      return tbl.toTCatalogObject();
+      return tbl.toTCatalogObject(resultType);
     } finally {
       context.stop();
       Preconditions.checkState(!versionLock_.isWriteLockedByCurrentThread());
@@ -2506,7 +2509,8 @@ public class CatalogServiceCatalog extends Catalog {
       throw new TableNotLoadedException(dbName + "." + tblName + " is not loaded");
     }
     Reference<Boolean> wasPartitionRefreshed = new Reference<>(false);
-    reloadPartition(table, tPartSpec, wasPartitionRefreshed, reason);
+    reloadPartition(table, tPartSpec, wasPartitionRefreshed,
+        CatalogObject.ThriftObjectType.NONE, reason);
     return wasPartitionRefreshed.getRef();
   }
 
@@ -2837,9 +2841,9 @@ public class CatalogServiceCatalog extends Catalog {
    * 'partitionSpec' in table 'tbl'. Returns the resulting table's TCatalogObject after
    * the partition metadata was reloaded.
    */
-  public TCatalogObject reloadPartition(Table tbl,
-      List<TPartitionKeyValue> partitionSpec,
-      Reference<Boolean> wasPartitionReloaded, String reason) throws CatalogException {
+  public TCatalogObject reloadPartition(Table tbl, List<TPartitionKeyValue> partitionSpec,
+      Reference<Boolean> wasPartitionReloaded, CatalogObject.ThriftObjectType resultType,
+      String reason) throws CatalogException {
     if (!tryLockTable(tbl)) {
       throw new CatalogException(String.format("Error reloading partition of table %s " +
           "due to lock contention", tbl.getFullName()));
@@ -2876,7 +2880,7 @@ public class CatalogServiceCatalog extends Catalog {
                     + "it does not exist in metastore anymore",
                 hdfsTable.getFullName() + " " + partitionName));
           }
-          return hdfsTable.toTCatalogObject();
+          return hdfsTable.toTCatalogObject(resultType);
         } catch (Exception e) {
           throw new CatalogException("Error loading metadata for partition: "
               + hdfsTable.getFullName() + " " + partitionName, e);
@@ -2887,7 +2891,7 @@ public class CatalogServiceCatalog extends Catalog {
       wasPartitionReloaded.setRef(true);
       LOG.info(String.format("Refreshed partition metadata: %s %s",
           hdfsTable.getFullName(), partitionName));
-      return hdfsTable.toTCatalogObject();
+      return hdfsTable.toTCatalogObject(resultType);
     } finally {
       Preconditions.checkState(!versionLock_.isWriteLockedByCurrentThread());
       tbl.getLock().unlock();
