@@ -30,12 +30,15 @@ public interface CatalogObject extends HasName {
    * "full" form with all information, used in catalog topic updates and DDL responses to
    * coordinators. When sending incremental update for a hdfs table, its "descriptor" form
    * is used with no partitions. Its incremental partition updates will follow it in the
-   * same topic update.
+   * same topic update. "invalidation" form means only the name will be included. "none"
+   * form means return nothing, i.e. null.
    */
   static enum ThriftObjectType {
     FULL,
-    DESCRIPTOR_ONLY
-  };
+    DESCRIPTOR_ONLY,
+    INVALIDATION,
+    NONE
+  }
 
   // Returns the TCatalogObject type of this Catalog object.
   public TCatalogObjectType getCatalogObjectType();

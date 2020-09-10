@@ -84,6 +84,7 @@ DECLARE_int32(krpc_port);
 DECLARE_int32(catalog_service_port);
 DECLARE_string(catalog_service_host);
 DECLARE_int64(max_result_cache_size);
+DECLARE_bool(use_local_catalog);
 
 namespace impala {
 
@@ -258,6 +259,8 @@ Status ClientRequestState::Exec() {
       reset_req.__set_op_type(TCatalogOpType::RESET_METADATA);
       reset_req.__set_reset_metadata_params(TResetMetadataRequest());
       reset_req.reset_metadata_params.__set_header(TCatalogServiceRequestHeader());
+      reset_req.reset_metadata_params.header.__set_want_minimal_response(
+          FLAGS_use_local_catalog);
       reset_req.reset_metadata_params.__set_is_refresh(true);
       reset_req.reset_metadata_params.__set_table_name(
           exec_request_->load_data_request.table_name);
@@ -1269,6 +1272,7 @@ Status ClientRequestState::UpdateCatalog() {
     catalog_update.__set_header(TCatalogServiceRequestHeader());
     catalog_update.header.__set_requesting_user(effective_user());
     catalog_update.header.__set_client_ip(session()->network_address.hostname);
+    catalog_update.header.__set_want_minimal_response(FLAGS_use_local_catalog);
     catalog_update.header.__set_redacted_sql_stmt(
         query_ctx_.client_request.__isset.redacted_stmt ?
             query_ctx_.client_request.redacted_stmt : query_ctx_.client_request.stmt);

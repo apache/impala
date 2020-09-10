@@ -66,6 +66,29 @@ static Status CatalogRpcDebugFn(int* attempt) {
       Status::OK();
 }
 
+/// Used in LocalCatalog mode to verify the catalog RPC reponse only contains minimal
+/// catalog objects, i.e. database objects have only db names and table objects have only
+/// db and table names.
+static void VerifyMinimalResponse(const TCatalogUpdateResult& result) {
+  for (const TCatalogObject& obj : result.updated_catalog_objects) {
+    if (obj.type == impala::TCatalogObjectType::TABLE) {
+      // Make sure the table object only contains db_name and tbl_name and nothing else.
+      DCHECK(!obj.table.__isset.metastore_table);
+      DCHECK(!obj.table.__isset.columns);
+      DCHECK(!obj.table.__isset.clustering_columns);
+      DCHECK(!obj.table.__isset.table_stats);
+      DCHECK(!obj.table.__isset.hdfs_table);
+      DCHECK(!obj.table.__isset.kudu_table);
+      DCHECK(!obj.table.__isset.hbase_table);
+      DCHECK(!obj.table.__isset.iceberg_table);
+      DCHECK(!obj.table.__isset.data_source_table);
+    } else if (obj.type == impala::TCatalogObjectType::DATABASE) {
+      DCHECK(!obj.db.__isset.metastore_db)
+          << "Minimal database TCatalogObject should have empty metastore_db";
+    }
+  }
+}
+
 Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
   Status status;
   DCHECK(profile_ != NULL);
@@ -88,6 +111,7 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
               FLAGS_catalog_client_rpc_retry_interval_ms,
               [&attempt]() { return CatalogRpcDebugFn(&attempt); }, exec_response_.get());
       RETURN_IF_ERROR(rpc_status.status);
+      if (FLAGS_use_local_catalog) VerifyMinimalResponse(exec_response_.get()->result);
       catalog_update_result_.reset(
           new TCatalogUpdateResult(exec_response_.get()->result));
       Status status(exec_response_->result.status);
@@ -110,6 +134,7 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
               FLAGS_catalog_client_rpc_retry_interval_ms,
               [&attempt]() { return CatalogRpcDebugFn(&attempt); }, &response);
       RETURN_IF_ERROR(rpc_status.status);
+      if (FLAGS_use_local_catalog) VerifyMinimalResponse(response.result);
       catalog_update_result_.reset(new TCatalogUpdateResult(response.result));
       return Status(response.result.status);
     }
@@ -133,6 +158,8 @@ Status CatalogOpExecutor::ExecComputeStats(
   update_stats_req.__set_ddl_type(TDdlType::ALTER_TABLE);
   update_stats_req.__set_sync_ddl(compute_stats_request.sync_ddl);
   update_stats_req.__set_debug_action(compute_stats_request.ddl_params.debug_action);
+  update_stats_req.__set_header(TCatalogServiceRequestHeader());
+  update_stats_req.header.__set_want_minimal_response(FLAGS_use_local_catalog);
 
   const TComputeStatsParams& compute_stats_params =
       compute_stats_request.ddl_params.compute_stats_params;
