@@ -148,6 +148,8 @@ Status TestEnv::CreateQueryState(
   query_ctx.request_pool = "test-pool";
   query_ctx.coord_address = exec_env_->configured_backend_address_;
   query_ctx.coord_krpc_address = exec_env_->krpc_address_;
+  query_ctx.coord_backend_id.hi = 0;
+  query_ctx.coord_backend_id.lo = 0;
   TQueryOptions* query_options_to_use = &query_ctx.client_request.query_options;
   int64_t mem_limit =
       query_options_to_use->__isset.mem_limit && query_options_to_use->mem_limit > 0 ?
@@ -161,9 +163,7 @@ Status TestEnv::CreateQueryState(
   // param
   ExecQueryFInstancesRequestPB rpc_params;
   // create dummy -Ctx fields, we need them for FragmentInstance-/RuntimeState
-  UniqueIdPB dummy_backend_id;
   rpc_params.set_coord_state_idx(0);
-  *rpc_params.mutable_coord_backend_id() = dummy_backend_id;
   rpc_params.add_fragment_ctxs();
   rpc_params.add_fragment_instance_ctxs();
   TExecPlanFragmentInfo fragment_info;

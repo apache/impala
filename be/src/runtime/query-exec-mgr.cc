@@ -229,7 +229,7 @@ void QueryExecMgr::CancelQueriesForFailedCoordinators(
   ExecEnv::GetInstance()->query_exec_mgr()->qs_map_.DoFuncForAllEntries(
       [&](QueryState* qs) {
         if (qs != nullptr && !qs->IsCancelled()) {
-          if (current_membership.find(qs->coord_backend_id())
+          if (current_membership.find(qs->GetCoordinatorBackendId())
               == current_membership.end()) {
             // decremented by ReleaseQueryState()
             AcquireQueryStateLocked(qs);

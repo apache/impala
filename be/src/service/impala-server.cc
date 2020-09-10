@@ -1068,6 +1068,9 @@ void ImpalaServer::PrepareQueryContext(const TNetworkAddress& backend_addr,
   query_ctx->__set_start_unix_millis(now_us / MICROS_PER_MILLI);
   query_ctx->__set_coord_address(backend_addr);
   query_ctx->__set_coord_krpc_address(krpc_addr);
+  TUniqueId backend_id;
+  UniqueIdPBToTUniqueId(ExecEnv::GetInstance()->backend_id(), &backend_id);
+  query_ctx->__set_coord_backend_id(backend_id);
   query_ctx->__set_local_time_zone(local_tz_name);
   query_ctx->__set_status_report_interval_ms(FLAGS_status_report_interval_ms);
   query_ctx->__set_status_report_max_retry_s(FLAGS_status_report_max_retry_s);
