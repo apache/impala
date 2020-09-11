@@ -23,19 +23,16 @@ STRING, STRING, STRING
 ====
 ---- QUERY
 create table $DATABASE.temp_chars_table like ORC
-'$NAMENODE/$MANAGED_WAREHOUSE_DIR/chars_tiny_orc_def/base_0000001/bucket_00000_0'
+'$NAMENODE/test-warehouse/chars_formats_orc_def/chars-formats.orc'
 ---- RESULTS
 'Table has been created.'
 ====
 ---- QUERY
 describe $DATABASE.temp_chars_table
 ---- RESULTS
-'operation','int','Inferred from ORC file.'
-'originaltransaction','bigint','Inferred from ORC file.'
-'rowid','bigint','Inferred from ORC file.'
-'bucket','int','Inferred from ORC file.'
-'currenttransaction','bigint','Inferred from ORC file.'
-'row','struct<\n  cs:char(5),\n  cl:char(140),\n  vc:varchar(32)\n>','Inferred from ORC file.'
+'cs','char(5)','Inferred from ORC file.'
+'cl','char(140)','Inferred from ORC file.'
+'vc','varchar(32)','Inferred from ORC file.'
 ---- TYPES
 STRING, STRING, STRING
 ====
@@ -115,7 +112,7 @@ STRING, STRING, STRING
 ====
 ---- QUERY
 create external table transactional_complextypes_clone like ORC
-'$NAMENODE/$MANAGED_WAREHOUSE_DIR/complextypestbl_orc_def/base_0000001/bucket_00000_0'
+'$TRANSACTIONAL_COMPLEXTYPESTBL_FILE'
 stored as orc;
 ---- RESULTS
 'Table has been created.'
