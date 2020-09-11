@@ -36,6 +36,7 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
+import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
@@ -60,8 +61,10 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     Preconditions.checkNotNull(msTable);
     try {
       TableParams params = new TableParams(msTable);
+      String tableName = IcebergUtil.getIcebergTableIdentifier(msTable);
       TableMetadata metadata =
-          IcebergUtil.getIcebergTableMetadata(params.icebergTableLocation_);
+          IcebergUtil.getIcebergTableMetadata(params.icebergCatalog_, tableName,
+              params.icebergCatalogLocation_);
 
       List<IcebergPartitionSpec> partitionSpecs =
           Utils.loadPartitionSpecByIceberg(metadata);
@@ -84,13 +87,13 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     partitionSpecs_ = partitionSpecs;
     localFsTable_ = LocalFsTable.load(db, msTable, ref);
     try {
-      pathMD5ToFileDescMap_ = Utils.loadAllPartition(tableParams_.icebergTableLocation_,
-          this);
+      pathMD5ToFileDescMap_ = Utils.loadAllPartition(this);
     } catch (IOException e) {
       throw new TableLoadingException(e.getMessage());
     }
 
     icebergFileFormat_ = Utils.getIcebergFileFormat(msTable);
+
   }
 
   @Override
@@ -101,6 +104,16 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   @Override
   public String getIcebergTableLocation() {
     return tableParams_.icebergTableLocation_;
+  }
+
+  @Override
+  public TIcebergCatalog getIcebergCatalog() {
+    return tableParams_.icebergCatalog_;
+  }
+
+  @Override
+  public String getIcebergCatalogLocation() {
+    return tableParams_.icebergCatalogLocation_;
   }
 
   @Override
@@ -160,6 +173,8 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   @Immutable
   private static class TableParams {
     private final String icebergTableLocation_;
+    private final TIcebergCatalog icebergCatalog_;
+    private final String icebergCatalogLocation_;
 
     TableParams(Table msTable) {
       String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
@@ -168,6 +183,13 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
       } else {
         throw new LocalCatalogException("Cannot find iceberg table location for table "
             + fullTableName);
+      }
+      icebergCatalog_ = IcebergUtil.getIcebergCatalog(msTable);
+
+      if (icebergCatalog_ == TIcebergCatalog.HADOOP_CATALOG) {
+        icebergCatalogLocation_ = Utils.getIcebergCatalogLocation(msTable);
+      } else {
+        icebergCatalogLocation_ = icebergTableLocation_;
       }
     }
   }

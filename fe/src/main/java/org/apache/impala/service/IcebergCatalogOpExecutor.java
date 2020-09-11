@@ -20,7 +20,11 @@ package org.apache.impala.service;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.iceberg.hadoop.HadoopTables;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Types;
 import org.apache.impala.catalog.ArrayType;
@@ -32,6 +36,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateTableParams;
+import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.log4j.Logger;
 
@@ -47,15 +52,43 @@ public class IcebergCatalogOpExecutor {
   // Keep id increase for each thread
   private static ThreadLocal<Integer> iThreadLocal = new ThreadLocal<>();
 
-  public static void createTable(String metadataLoc, TCreateTableParams params)
-      throws ImpalaRuntimeException {
+  /**
+   * Create Iceberg table by Iceberg api
+   * Return value is table location from Iceberg
+   */
+  public static String createTable(TIcebergCatalog catalog, String identifier,
+      String location, TCreateTableParams params) throws ImpalaRuntimeException {
     // Each table id increase from zero
     iThreadLocal.set(0);
-    HadoopTables tables = IcebergUtil.getHadoopTables();
     Schema schema = createIcebergSchema(params);
-    tables.create(schema, IcebergUtil.createIcebergPartition(schema, params),
-        metadataLoc);
+    PartitionSpec spec = IcebergUtil.createIcebergPartition(schema, params);
+    String tableLoc = null;
+    if (catalog == TIcebergCatalog.HADOOP_CATALOG) {
+      tableLoc = createTableByHadoopCatalog(location, schema, spec, identifier);
+    } else {
+      Preconditions.checkArgument(catalog == TIcebergCatalog.HADOOP_TABLES);
+      tableLoc = createTableByHadoopTables(location, schema, spec);
+    }
     LOG.info("Create iceberg table successful.");
+    return tableLoc;
+  }
+
+  // Create Iceberg table by HadoopTables
+  private static String createTableByHadoopTables(String metadataLoc, Schema schema,
+      PartitionSpec spec) {
+    HadoopTables tables = IcebergUtil.getHadoopTables();
+    BaseTable table = (BaseTable) tables.create(schema, spec, null, metadataLoc);
+    return table.location();
+  }
+
+  // Create Iceberg table by HadoopCatalog
+  private static String createTableByHadoopCatalog(String catalogLoc, Schema schema,
+      PartitionSpec spec, String identifier) {
+    // Each table id increase from zero
+    HadoopCatalog catalog = IcebergUtil.getHadoopCatalog(catalogLoc);
+    BaseTable table = (BaseTable) catalog.createTable(TableIdentifier.parse(identifier),
+        schema, spec, null);
+    return table.location();
   }
 
   /**

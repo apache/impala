@@ -173,6 +173,8 @@ import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.THdfsCachingOp;
 import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TCopyTestCaseReq;
+import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
@@ -197,6 +199,7 @@ import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.impala.util.CompressionUtil;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.HdfsCachingUtil;
+import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.util.MetaStoreUtil.TableInsertEventInfo;
@@ -2599,8 +2602,7 @@ public class CatalogOpExecutor {
    * Creates a new Iceberg table.
    */
   private boolean createIcebergTable(org.apache.hadoop.hive.metastore.api.Table newTable,
-                                  TCreateTableParams params, TDdlExecResponse response)
-      throws ImpalaException {
+      TCreateTableParams params, TDdlExecResponse response) throws ImpalaException {
     Preconditions.checkState(IcebergTable.isIcebergTable(newTable));
 
     try {
@@ -2612,20 +2614,41 @@ public class CatalogOpExecutor {
               msClient.getHiveClient().tableExists(newTable.getDbName(),
                   newTable.getTableName());
           if (!tableInMetastore) {
+            TIcebergCatalog catalog = IcebergUtil.getIcebergCatalog(newTable);
             String location = newTable.getSd().getLocation();
             //Create table in iceberg if necessary
             if (IcebergTable.needsCreateInIceberg(newTable)) {
+              //Set location here if not been specified in sql
               if (location == null) {
-                //Set location here if not been specified in sql
-                location = MetastoreShim.getPathForNewTable(
-                    msClient.getHiveClient().getDatabase(newTable.getDbName()), newTable);
-                newTable.getSd().setLocation(location);
+                if (catalog == TIcebergCatalog.HADOOP_CATALOG) {
+                  // Using catalog location to create table
+                  // We cannot set location for 'hadoop.catalog' table in SQL
+                  location = IcebergUtil.getIcebergCatalogLocation(newTable);
+                } else {
+                  // Using normal location as 'hadoop.tables' table location and create
+                  // table
+                  location = MetastoreShim.getPathForNewTable(
+                      msClient.getHiveClient().getDatabase(newTable.getDbName()),
+                      newTable);
+                }
               }
-              IcebergCatalogOpExecutor.createTable(location, params);
+              String tableLoc = IcebergCatalogOpExecutor.createTable(catalog,
+                  IcebergUtil.getIcebergTableIdentifier(newTable), location, params);
+              newTable.getSd().setLocation(tableLoc);
             } else {
               if (location == null) {
-                addSummary(response, "Location is necessary for external iceberg table.");
-                return false;
+                if (catalog == TIcebergCatalog.HADOOP_CATALOG) {
+                  // When creating external Iceberg table with 'hadoop.catalog'
+                  // We use catalog location and table identifier as location
+                  String identifier = IcebergUtil.getIcebergTableIdentifier(newTable);
+                  newTable.getSd().setLocation(String.format("%s/%s/%s",
+                      IcebergUtil.getIcebergCatalogLocation(newTable),
+                      identifier.split("\\.")[0], identifier.split("\\.")[1]));
+                } else {
+                  addSummary(response,
+                      "Location is necessary for external iceberg table.");
+                  return false;
+                }
               }
             }
 

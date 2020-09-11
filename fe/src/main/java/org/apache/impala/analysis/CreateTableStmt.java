@@ -36,11 +36,13 @@ import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.AvroSchemaConverter;
 import org.apache.impala.util.AvroSchemaParser;
 import org.apache.impala.util.AvroSchemaUtils;
+import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
 
@@ -572,16 +574,16 @@ public class CreateTableStmt extends StatementBase {
           IcebergTable.TBL_PROP_EXTERNAL_TABLE_PURGE));
     }
 
-    if ((!isExternal() || Boolean.parseBoolean(getTblProperties().get(
-        Table.TBL_PROP_EXTERNAL_TABLE_PURGE))) && getColumnDefs().isEmpty()) {
-      // External iceberg table can have empty column, but managed iceberg table
-      // requires at least one column.
-      throw new AnalysisException("Table requires at least 1 column for " +
-          "managed iceberg table.");
-    }
+    // Check for managed table
+    if (!isExternal() || Boolean.parseBoolean(getTblProperties().get(
+        Table.TBL_PROP_EXTERNAL_TABLE_PURGE))) {
+      if (getColumnDefs().isEmpty()) {
+        // External iceberg table can have empty column, but managed iceberg table
+        // requires at least one column.
+        throw new AnalysisException("Table requires at least 1 column for " +
+            "managed iceberg table.");
+      }
 
-    if ((!isExternal() || Boolean.parseBoolean(getTblProperties().get(
-        Table.TBL_PROP_EXTERNAL_TABLE_PURGE)))) {
       // Check partition columns for managed iceberg table
       checkPartitionColumns();
     }
@@ -597,6 +599,28 @@ public class CreateTableStmt extends StatementBase {
     String fileformat = getTblProperties().get(IcebergTable.ICEBERG_FILE_FORMAT);
     if (fileformat == null || fileformat.isEmpty()) {
       putGeneratedKuduProperty(IcebergTable.ICEBERG_FILE_FORMAT, "parquet");
+    }
+
+    String catalog = getTblProperties().get(IcebergTable.ICEBERG_CATALOG);
+    if (catalog == null || catalog.isEmpty()) {
+      putGeneratedKuduProperty(IcebergTable.ICEBERG_CATALOG, "hadoop.catalog");
+    }
+
+    // Some constraints for Iceberg table with 'hadoop.catalog'
+    if (catalog == null || catalog.isEmpty() ||
+        IcebergUtil.getIcebergCatalog(catalog) == TIcebergCatalog.HADOOP_CATALOG) {
+      // Table location cannot be set in SQL when using 'hadoop.catalog'
+      if (getLocation() != null) {
+        throw new AnalysisException(String.format("Location cannot be set for Iceberg " +
+            "table with 'hadoop.catalog'."));
+      }
+
+      String catalogLoc = getTblProperties().get(IcebergTable.ICEBERG_CATALOG_LOCATION);
+      if (catalogLoc == null || catalogLoc.isEmpty()) {
+        throw new AnalysisException(String.format("Table property '%s' is necessary " +
+            "for Iceberg table with 'hadoop.catalog'.",
+            IcebergTable.ICEBERG_CATALOG_LOCATION));
+      }
     }
   }
 

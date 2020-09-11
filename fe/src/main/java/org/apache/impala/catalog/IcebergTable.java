@@ -36,6 +36,7 @@ import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsTable;
+import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
@@ -67,6 +68,21 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // Iceberg file format key in tblproperties
   public static final String ICEBERG_FILE_FORMAT = "iceberg_file_format";
 
+  // Iceberg catalog type key in tblproperties
+  public static final String ICEBERG_CATALOG = "iceberg.catalog";
+
+  // Iceberg table catalog location key in tblproperties when using HadoopCatalog
+  // This property is necessary for both managed and external Iceberg table with
+  // 'hadoop.catalog'
+  public static final String ICEBERG_CATALOG_LOCATION = "iceberg.catalog_location";
+
+  // Iceberg table namespace key in tblproperties when using HadoopCatalog,
+  // We use database.table instead if this property not been set in SQL
+  public static final String ICEBERG_TABLE_IDENTIFIER = "iceberg.table_identifier";
+
+  // Iceberg catalog type dependend on table properties
+  private TIcebergCatalog icebergCatalog_;
+
   // Iceberg file format dependend on table properties
   private TIcebergFileFormat icebergFileFormat_;
 
@@ -89,6 +105,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
       Db db, String name, String owner) {
     super(msTable, db, name, owner);
     icebergTableLocation_ = msTable.getSd().getLocation();
+    icebergCatalog_ = IcebergUtil.getIcebergCatalog(msTable);
     icebergFileFormat_ = Utils.getIcebergFileFormat(msTable);
     hdfsTable_ = new HdfsTable(msTable, db, name, owner);
   }
@@ -131,6 +148,16 @@ public class IcebergTable extends Table implements FeIcebergTable {
 
   public static boolean isIcebergTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
     return isIcebergStorageHandler(msTbl.getParameters().get(KEY_STORAGE_HANDLER));
+  }
+
+  @Override
+  public TIcebergCatalog getIcebergCatalog() {
+    return icebergCatalog_;
+  }
+
+  @Override
+  public String getIcebergCatalogLocation() {
+    return Utils.getIcebergCatalogLocation(this);
   }
 
   @Override
@@ -192,8 +219,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         // Loading hdfs table after loaded schema from Iceberg,
         // in case we create external Iceberg table skipping column info in sql.
         hdfsTable_.load(false, msClient, msTable_, true, true, false, null, reason);
-        pathMD5ToFileDescMap_ = Utils.loadAllPartition(msTable_.getSd().getLocation(),
-            this);
+        pathMD5ToFileDescMap_ = Utils.loadAllPartition(this);
         loadAllColumnStats(msClient);
       } catch (Exception e) {
         throw new TableLoadingException("Error loading metadata for Iceberg table " +
@@ -225,7 +251,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
    * Load schema and partitioning schemes directly from Iceberg.
    */
   public void loadSchemaFromIceberg() throws TableLoadingException {
-    TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(icebergTableLocation_);
+    TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(this);
     icebergSchema_ = metadata.schema();
     loadSchema();
     partitionSpecs_ = Utils.loadPartitionSpecByIceberg(metadata);

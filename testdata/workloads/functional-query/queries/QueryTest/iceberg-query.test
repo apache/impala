@@ -187,3 +187,126 @@ Path,Size,Partition
 ---- TYPES
 STRING,STRING,STRING
 ====
+---- QUERY
+SELECT count(*) from hadoop_catalog_test_external
+---- TYPES
+bigint
+---- RESULTS
+20
+====
+---- QUERY
+SELECT count(*) from hadoop_catalog_test_external
+where id > 10
+---- TYPES
+bigint
+---- RESULTS
+10
+====
+---- QUERY
+SELECT count(*) from hadoop_catalog_test_external
+where action <> 'click'
+---- TYPES
+bigint
+---- RESULTS
+14
+---- QUERY
+SELECT count(distinct id),count(distinct action) from hadoop_catalog_test_external
+---- TYPES
+bigint,bigint
+---- RESULTS
+20,3
+====
+---- QUERY
+SET TIMEZONE=UTC;
+SELECT count(*) from hadoop_catalog_test_external
+where event_time > to_timestamp('2020-01-01 09:00:00','yyyy-MM-dd HH:mm:ss')
+---- TYPES
+bigint
+---- RESULTS
+6
+====
+---- QUERY
+SET TIMEZONE=UTC;
+SELECT * from hadoop_catalog_test_external
+where event_time > to_timestamp('2020-01-01 09:00:00','yyyy-MM-dd HH:mm:ss')
+ORDER BY id
+---- TYPES
+int,string,string,timestamp
+---- RESULTS
+2,'Lisa','download',2020-01-01 10:00:00
+5,'Lisa','download',2020-01-01 10:00:00
+7,'Lisa','download',2020-01-01 10:00:00
+8,'Lisa','download',2020-01-01 10:00:00
+14,'Lisa','download',2020-01-01 10:00:00
+16,'Lisa','download',2020-01-01 10:00:00
+====
+---- QUERY
+SHOW PARTITIONS hadoop_catalog_test_external
+---- TYPES
+bigint,bigint,bigint,string,string
+---- RESULTS
+0,4,1000,'event_time_hour','HOUR'
+0,3,1001,'action','IDENTITY'
+====
+---- QUERY
+SHOW FILES in hadoop_catalog_test_external
+---- LABELS
+Path,Size,Partition
+---- RESULTS
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-08/action=view/00001-1-bc402da0-b562-4310-9001-06f9b6b0f9ae-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-08/action=view/00006-6-d253aefa-65fc-4698-8f26-b155fc965cf6-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-08/action=view/00009-9-5d04b016-05e1-43fc-b4a0-0e0df52a5035-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-08/action=view/00017-17-20b92523-c3b9-401d-b429-363c245dbe9c-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-08/action=view/00023-23-c86370cf-10a1-4e49-86dc-b094fe739aa6-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-08/action=view/00027-27-f32f86fa-286f-4cd3-8337-98685c48176d-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-08/action=view/00030-30-b18d2bbc-46a2-4040-a4a8-7488447de3b6-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-08/action=view/00031-31-c9bda250-ed1c-4868-bbf1-f2aad65fa80c-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-09/action=click/00004-4-0ed77823-ded1-4a12-9e03-4027cd43966a-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-09/action=click/00014-14-f698d7a4-245f-44d5-8a59-ed511854c8f8-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-09/action=click/00015-15-7c1d5490-91f7-47bd-a3b6-e86caa7fe47d-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-09/action=click/00019-19-d2ef5fcf-4346-421f-b2ef-1f9d55fb4c84-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-09/action=click/00020-20-a70c64ed-7a99-4f43-ada7-225c92f6a993-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-09/action=click/00028-28-bb02c862-3d63-42cb-8041-0a0b14b8ca13-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-10/action=download/00003-3-d5288e68-c862-4248-b3e5-84228a3ec39d-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-10/action=download/00007-7-92031dc0-b7eb-424d-9edb-dd2cedc59784-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-10/action=download/00011-11-9361e5f3-cfa7-4190-bb30-0db1d53202fd-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-10/action=download/00012-12-e82b52b1-dc5b-4417-81b7-8e9fd992280b-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-10/action=download/00022-22-c646ba9a-9387-4c38-bab8-a0598c400fde-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/data/event_time_hour=2020-01-01-10/action=download/00025-25-7f8283a3-b39f-4273-984b-cf7faf39dd9d-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/metadata/2c2fa00b-eb20-460a-835b-d69b32560e21-m0.avro',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/metadata/snap-7412008513947276465-1-2c2fa00b-eb20-460a-835b-d69b32560e21.avro',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/metadata/v1.metadata.json',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/metadata/v2.metadata.json',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test/metadata/version-hint.text',regex:.*,''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+describe formatted iceberg_partitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned','NULL'
+'','iceberg_file_format ','parquet             '
+'','iceberg.catalog     ','hadoop.tables       '
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe formatted iceberg_non_partitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned','NULL'
+'','iceberg_file_format ','parquet             '
+'','iceberg.catalog     ','hadoop.tables       '
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe formatted hadoop_catalog_test_external;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test','NULL'
+'','iceberg.catalog_location','/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test'
+'','iceberg.table_identifier','functional_parquet.hadoop_catalog_test'
+'','iceberg_file_format ','parquet             '
+'','iceberg.catalog     ','hadoop.catalog      '
+---- TYPES
+string, string, string
+====

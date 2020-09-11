@@ -2941,7 +2941,7 @@ iceberg_partitioned
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 STORED AS ICEBERG
 LOCATION '/test-warehouse/iceberg_test/iceberg_partitioned'
-TBLPROPERTIES('iceberg_file_format'='parquet');
+TBLPROPERTIES('iceberg_file_format'='parquet', 'iceberg.catalog'='hadoop.tables');
 ---- DEPENDENT_LOAD
 `hadoop fs -mkdir -p /test-warehouse/iceberg_test && \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_partitioned /test-warehouse/iceberg_test/
@@ -2954,8 +2954,22 @@ iceberg_non_partitioned
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 STORED AS ICEBERG
 LOCATION '/test-warehouse/iceberg_test/iceberg_non_partitioned'
-TBLPROPERTIES('iceberg_file_format'='parquet');
+TBLPROPERTIES('iceberg_file_format'='parquet', 'iceberg.catalog'='hadoop.tables');
 ---- DEPENDENT_LOAD
 `hadoop fs -mkdir -p /test-warehouse/iceberg_test && \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/iceberg_non_partitioned /test-warehouse/iceberg_test/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+hadoop_catalog_test_external
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg_file_format'='parquet', 'iceberg.catalog'='hadoop.catalog',
+'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test',
+'iceberg.table_identifier'='functional_parquet.hadoop_catalog_test');
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/hadoop_catalog_test /test-warehouse/iceberg_test/hadoop_catalog/
 ====

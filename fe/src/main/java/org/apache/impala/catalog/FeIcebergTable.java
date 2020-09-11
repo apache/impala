@@ -46,6 +46,7 @@ import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergTable;
 import org.apache.impala.thrift.TNetworkAddress;
@@ -71,12 +72,26 @@ public interface FeIcebergTable extends FeFsTable {
   FeFsTable getFeFsTable();
 
   /**
+   * Return iceberg catalog type from table properties
+   */
+  TIcebergCatalog getIcebergCatalog();
+
+  /**
+   * Return Iceberg catalog location, we use this location to load metadata from Iceberg
+   * When using 'hadoop.tables', this value equals to table location
+   * When using 'hadoop.catalog', this value equals to 'iceberg.catalog_location'
+   */
+  String getIcebergCatalogLocation();
+
+  /**
    * Return iceberg file format from table properties
    */
   TIcebergFileFormat getIcebergFileFormat();
 
   /**
-   * Return the name of iceberg table name, usually a hdfs location path
+   * Return the table location of Iceberg table
+   * When using 'hadoop.tables', this value is a normal table location
+   * When using 'hadoop.catalog', this value is 'iceberg.catalog_location' + identifier
    */
   String getIcebergTableLocation();
 
@@ -215,8 +230,7 @@ public interface FeIcebergTable extends FeFsTable {
       resultSchema.addToColumns(new TColumn("Field Partition Transform",
           Type.STRING.toThrift()));
 
-      TableMetadata metadata = IcebergUtil.
-          getIcebergTableMetadata(table.getIcebergTableLocation());
+      TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(table);
       if (!metadata.specs().isEmpty()) {
         // Just show the latest PartitionSpec from iceberg table metadata
         PartitionSpec latestSpec = metadata.specs().get(metadata.specs().size() - 1);
@@ -231,6 +245,29 @@ public interface FeIcebergTable extends FeFsTable {
         }
       }
       return result;
+    }
+
+    /**
+     * Get Iceberg table catalog location by table properties
+     */
+    public static String getIcebergCatalogLocation(FeIcebergTable table) {
+      if (table.getIcebergCatalog() == TIcebergCatalog.HADOOP_CATALOG) {
+        return getIcebergCatalogLocation(table.getMetaStoreTable());
+      } else {
+        return table.getIcebergTableLocation();
+      }
+    }
+
+    /**
+     * When using 'hadoop.catalog', we need to use this method to get qualified catalog
+     * location, for example: transform '/test-warehouse/hadoop_catalog_test' to
+     * 'hdfs://localhost:20500/test-warehouse/hadoop_catalog_test'
+     */
+    public static String getIcebergCatalogLocation(
+        org.apache.hadoop.hive.metastore.api.Table msTable) {
+      String location =
+          msTable.getParameters().get(IcebergTable.ICEBERG_CATALOG_LOCATION);
+      return FileSystemUtil.createFullyQualifiedPath(new Path(location)).toString();
     }
 
     /**
@@ -295,15 +332,16 @@ public interface FeIcebergTable extends FeFsTable {
      * Get all FileDescriptor from iceberg table without any predicates.
      */
     public static Map<String, HdfsPartition.FileDescriptor> loadAllPartition(
-        String location, FeIcebergTable table) throws IOException {
+        FeIcebergTable table) throws IOException {
       // Empty predicates
-      List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(
-          location, new ArrayList<>());
+      List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(table,
+          new ArrayList<>());
 
       Map<String, HdfsPartition.FileDescriptor> fileDescMap = new HashMap<>();
       for (DataFile file : dataFileList) {
         HdfsPartition.FileDescriptor fileDesc = getFileDescriptor(
-            new Path(file.path().toString()), new Path(location), table.getHostIndex());
+            new Path(file.path().toString()),
+            new Path(table.getIcebergTableLocation()), table.getHostIndex());
         fileDescMap.put(IcebergUtil.getDataFileMD5(file), fileDesc);
       }
       return fileDescMap;

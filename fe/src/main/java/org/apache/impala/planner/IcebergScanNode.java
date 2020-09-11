@@ -89,8 +89,8 @@ public class IcebergScanNode extends HdfsScanNode {
    */
   public List<FileDescriptor> getFileDescriptorByIcebergPredicates()
       throws ImpalaRuntimeException{
-    List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(
-        icebergTable_.getIcebergTableLocation(), icebergPredicates_);
+    List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(icebergTable_,
+        icebergPredicates_);
 
     List<FileDescriptor> fileDescList = new ArrayList<>();
     for (DataFile dataFile : dataFileList) {
