@@ -36,6 +36,7 @@ from tests.util.filesystem_utils import (
     IS_ADLS,
     FILESYSTEM_NAME)
 from tests.common.impala_cluster import ImpalaCluster
+from tests.util.filesystem_utils import FILESYSTEM_PREFIX
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(TestDdlBase):
@@ -298,9 +299,17 @@ class TestDdlStatements(TestDdlBase):
   @SkipIfS3.hive
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_create_table_like_file_orc(self, vector, unique_database):
+    COMPLEXTYPETBL_PATH = 'test-warehouse/managed/complextypestbl_orc_def/'
+    base_dir = filter(lambda s: s.startswith('base'),
+      self.filesystem_client.ls(COMPLEXTYPETBL_PATH))[0]
+    bucket_file = filter(lambda s: s.startswith('bucket'),
+      self.filesystem_client.ls(COMPLEXTYPETBL_PATH + base_dir))[0]
     vector.get_value('exec_option')['abort_on_error'] = False
     self.run_test_case('QueryTest/create-table-like-file-orc', vector,
-        use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector))
+        use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector),
+        test_file_vars={
+          '$TRANSACTIONAL_COMPLEXTYPESTBL_FILE':
+          FILESYSTEM_PREFIX + '/' + COMPLEXTYPETBL_PATH + base_dir + '/' + bucket_file})
 
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_create_table_as_select(self, vector, unique_database):

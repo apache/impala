@@ -2022,10 +2022,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     // Inferring primitive and complex types
     AnalyzesOk("create table if not exists newtbl_DNE like orc " +
-        "'/test-warehouse/managed/alltypestiny_orc_def/year=2009/month=1/" +
-        "base_0000001/bucket_00000_0'");
+        "'/test-warehouse/schemas/alltypes_non_acid.orc'");
     AnalyzesOk("create table if not exists newtbl_DNE like orc " +
-        "'/test-warehouse/managed/complextypestbl_orc_def/base_0000001/bucket_00000_0'");
+        "'/test-warehouse/complextypestbl_non_transactional_orc_def/nullable.orc'");
 
     // check invalid paths
     AnalysisError("create table if not exists functional.zipcode_incomes like ORC " +
