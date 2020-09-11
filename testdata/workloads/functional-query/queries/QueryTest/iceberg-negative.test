@@ -22,7 +22,8 @@ AnalysisException: Cannot find source column: event_time
 CREATE TABLE iceberg_test3(
   level STRING
 )
-STORED AS ICEBERG;
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 INSERT INTO iceberg_test3 values('1');
 ---- CATCH
 AnalysisException: Impala does not support INSERTing into iceberg table: $DATABASE.iceberg_test3
@@ -42,4 +43,46 @@ AnalysisException: ALTER TABLE not allowed on iceberg table: iceberg_test3
 SHOW PARTITIONS functional_parquet.iceberg_non_partitioned
 ---- CATCH
 AnalysisException: Table is not partitioned: functional_parquet.iceberg_non_partitioned
+====
+---- QUERY
+CREATE TABLE iceberg_test4(
+  level STRING
+)
+STORED AS ICEBERG
+LOCATION '/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
+TBLPROPERTIES('iceberg.catalog'='hadoop.catalog');
+---- CATCH
+AnalysisException: Location cannot be set for Iceberg table with 'hadoop.catalog'.
+====
+---- QUERY
+CREATE TABLE iceberg_test5(
+  level STRING
+)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.catalog');
+---- CATCH
+AnalysisException: Table property 'iceberg.catalog_location' is necessary for Iceberg table with 'hadoop.catalog'.
+====
+---- QUERY
+CREATE EXTERNAL TABLE iceberg_test6
+STORED AS ICEBERG
+LOCATION '/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
+TBLPROPERTIES('iceberg.catalog_location'='/test-warehouse/fake_table', 'iceberg.table_identifier'='fake_db.fake_table');
+---- CATCH
+AnalysisException: Location cannot be set for Iceberg table with 'hadoop.catalog'.
+====
+---- QUERY
+CREATE EXTERNAL TABLE iceberg_test7
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.table_identifier'='fake_db.fake_table');
+---- CATCH
+AnalysisException: Table property 'iceberg.catalog_location' is necessary for Iceberg table with 'hadoop.catalog'.
+====
+---- QUERY
+CREATE EXTERNAL TABLE iceberg_test8
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog_location'='/test-warehouse/fake_table', 'iceberg.table_identifier'='fake_db.fake_table');
+SHOW CREATE TABLE iceberg_test8;
+---- CATCH
+row_regex:.*CAUSED BY: NoSuchTableException: Table does not exist: fake_db.fake_table*
 ====

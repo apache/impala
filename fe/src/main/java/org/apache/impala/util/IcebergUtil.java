@@ -23,11 +23,12 @@ import java.util.List;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.expressions.UnboundPredicate;
-import org.apache.iceberg.hadoop.HadoopTableOperations;
+import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
@@ -35,7 +36,10 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.types.Types;
 import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.Catalog;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
@@ -46,6 +50,7 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsFileFormat;
+import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionTransform;
@@ -60,20 +65,80 @@ public class IcebergUtil {
   }
 
   /**
-   * Get BaseTable by iceberg file system table location
+   * Get HadoopCatalog by impala cluster related config
    */
-  public static BaseTable getBaseTable(String tableLocation) {
-    HadoopTables tables = IcebergUtil.getHadoopTables();
-    return (BaseTable) tables.load(tableLocation);
+  public static HadoopCatalog getHadoopCatalog(String location) {
+    return new HadoopCatalog(FileSystemUtil.getConfiguration(), location);
   }
 
   /**
-   * Get TableMetadata by iceberg file system table location
+   * Get BaseTable from FeIcebergTable
    */
-  public static TableMetadata getIcebergTableMetadata(String tableLocation) {
-    HadoopTableOperations operations = (HadoopTableOperations)
-        getBaseTable(tableLocation).operations();
-    return operations.current();
+  public static BaseTable getBaseTable(FeIcebergTable table) {
+    return getBaseTable(table.getIcebergCatalog(), getIcebergTableIdentifier(table),
+        table.getIcebergCatalogLocation());
+  }
+
+  /**
+   * Get BaseTable from each parameters
+   */
+  public static BaseTable getBaseTable(TIcebergCatalog catalog, String tableName,
+      String location) {
+    if (catalog == TIcebergCatalog.HADOOP_CATALOG) {
+      return getBaseTableByHadoopCatalog(tableName, location);
+    } else {
+      // We use HadoopTables as default Iceberg catalog type
+      HadoopTables hadoopTables = IcebergUtil.getHadoopTables();
+      return (BaseTable) hadoopTables.load(location);
+    }
+  }
+
+  /**
+   * Use location, namespace(database) and name(table) to get BaseTable by HadoopCatalog
+   */
+  private static BaseTable getBaseTableByHadoopCatalog(String tableName,
+      String catalogLoc) {
+    HadoopCatalog hadoopCatalog = IcebergUtil.getHadoopCatalog(catalogLoc);
+    return (BaseTable) hadoopCatalog.loadTable(TableIdentifier.parse(tableName));
+  }
+
+  /**
+   * Get TableMetadata by FeIcebergTable
+   */
+  public static TableMetadata getIcebergTableMetadata(FeIcebergTable table) {
+    return getIcebergTableMetadata(table.getIcebergCatalog(),
+        getIcebergTableIdentifier(table), table.getIcebergCatalogLocation());
+  }
+
+  /**
+   * Get TableMetadata by related info
+   * tableName is table full name, usually database.table
+   */
+  public static TableMetadata getIcebergTableMetadata(TIcebergCatalog catalog,
+      String tableName, String location) {
+    BaseTable baseTable = getBaseTable(catalog, tableName, location);
+    return baseTable.operations().current();
+  }
+
+  /**
+   * Get Iceberg table identifier by table property
+   */
+  public static String getIcebergTableIdentifier(FeIcebergTable table) {
+    return getIcebergTableIdentifier(table.getMetaStoreTable());
+  }
+
+  public static String getIcebergTableIdentifier(
+      org.apache.hadoop.hive.metastore.api.Table msTable) {
+    String name = msTable.getParameters().get(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
+    if (name == null || name.isEmpty()) {
+      return msTable.getDbName() + "." + msTable.getTableName();
+    }
+
+    // If database not been specified in property, use default
+    if (!name.contains(".")) {
+      return Catalog.DEFAULT_DB + "." + name;
+    }
+    return name;
   }
 
   /**
@@ -83,7 +148,7 @@ public class IcebergUtil {
   public static PartitionSpec createIcebergPartition(Schema schema,
       TCreateTableParams params) throws ImpalaRuntimeException {
     if (params.getPartition_spec() == null) {
-      return null;
+      return PartitionSpec.unpartitioned();
     }
     PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
     List<TIcebergPartitionField> partitionFields =
@@ -105,6 +170,38 @@ public class IcebergUtil {
       }
     }
     return builder.build();
+  }
+
+  /**
+   * Get iceberg table catalog type from hms table properties
+   * use HadoopCatalog as default
+   */
+  public static TIcebergCatalog getIcebergCatalog(
+      org.apache.hadoop.hive.metastore.api.Table msTable) {
+    TIcebergCatalog catalog = getIcebergCatalog(
+        msTable.getParameters().get(IcebergTable.ICEBERG_CATALOG));
+    return catalog == null ? TIcebergCatalog.HADOOP_CATALOG : catalog;
+  }
+
+  /**
+   * Get TIcebergCatalog from a string, usually from table properties
+   */
+  public static TIcebergCatalog getIcebergCatalog(String catalog){
+    if ("hadoop.tables".equalsIgnoreCase(catalog)) {
+      return TIcebergCatalog.HADOOP_TABLES;
+    } else if ("hadoop.catalog".equalsIgnoreCase(catalog)) {
+      return TIcebergCatalog.HADOOP_CATALOG;
+    }
+    return null;
+  }
+
+  /**
+   * Get Iceberg table catalog location with 'iceberg.catalog_location' when using
+   * 'hadoop.catalog'
+   */
+  public static String getIcebergCatalogLocation(
+      org.apache.hadoop.hive.metastore.api.Table msTable) {
+    return msTable.getParameters().get(IcebergTable.ICEBERG_CATALOG_LOCATION);
   }
 
   /**
@@ -229,10 +326,10 @@ public class IcebergUtil {
   /**
    * Get iceberg data file by file system table location and iceberg predicates
    */
-  public static List<DataFile> getIcebergDataFiles(String location,
+  public static List<DataFile> getIcebergDataFiles(FeIcebergTable table,
       List<UnboundPredicate> predicates) {
-    BaseTable table = IcebergUtil.getBaseTable(location);
-    TableScan scan = table.newScan();
+    BaseTable baseTable = IcebergUtil.getBaseTable(table);
+    TableScan scan = baseTable.newScan();
     for (UnboundPredicate predicate : predicates) {
       scan = scan.filter(predicate);
     }

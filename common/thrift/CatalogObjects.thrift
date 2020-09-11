@@ -93,6 +93,12 @@ enum TIcebergFileFormat {
   ORC = 1
 }
 
+// Iceberg table catalog type identified by table property 'iceberg.catalog'
+enum TIcebergCatalog {
+  HADOOP_TABLES = 0
+  HADOOP_CATALOG = 1
+}
+
 enum TColumnEncoding {
   AUTO = 0
   PLAIN = 1

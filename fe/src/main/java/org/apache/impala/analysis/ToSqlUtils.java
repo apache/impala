@@ -49,8 +49,10 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.RowFormat;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.KuduUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -514,7 +516,14 @@ public class ToSqlUtils {
             "WITH SERDEPROPERTIES " + propertyMapToSql(serdeParameters) + "\n");
       }
     }
-    if (location != null) {
+
+    // Iceberg table with 'hadoop.catalog' do not display table LOCATION when using
+    // 'show create table', user can use 'describe formatted/extended' to get location
+    TIcebergCatalog icebergCatalog =
+        IcebergUtil.getIcebergCatalog(tblProperties.get(IcebergTable.ICEBERG_CATALOG));
+    boolean isHadoopCatalog = fileFormat == HdfsFileFormat.ICEBERG &&
+        icebergCatalog == TIcebergCatalog.HADOOP_CATALOG;
+    if (location != null && !isHadoopCatalog) {
       sb.append("LOCATION '" + location.toString() + "'\n");
     }
     if (tblProperties != null && !tblProperties.isEmpty()) {
