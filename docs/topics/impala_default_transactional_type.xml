@@ -38,12 +38,12 @@ under the License.
   <conbody>
 
     <p>
-      Use the <codeph>DEFAULT_TRANSACTION_TYPE</codeph> query option to create insert-only
+      Use the <codeph>DEFAULT_TRANSACTIONAL_TYPE</codeph> query option to create insert-only
       transactional tables by default.
     </p>
 
     <note>
-      The <codeph>DEFAULT_TRANSACTION_TYPE</codeph> query option applies only when integrated
+      The <codeph>DEFAULT_TRANSACTIONAL_TYPE</codeph> query option applies only when integrated
       with Hive 3.
     </note>
 
@@ -67,7 +67,7 @@ under the License.
     </p>
 
     <note>
-      The <codeph>DEFAULT_TRANSACTION_TYPE</codeph> query option does not affect external, Kudu,
+      The <codeph>DEFAULT_TRANSACTIONAL_TYPE</codeph> query option does not affect external, Kudu,
       or HBase tables as these cannot be transactional.
     </note>
 
