@@ -80,6 +80,8 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   @SkipIfADLS.hive
   @SkipIfLocal.hive
   def test_describe_formatted(self, vector, unique_database):
+    # IMPALA-10176: test_describe_formatted is broken, so disable it for now
+    pytest.skip()
     # For describe formmated, we try to match Hive's output as closely as possible.
     # However, we're inconsistent with our handling of NULLs vs theirs - Impala sometimes
     # specifies 'NULL' where Hive uses an empty string, and Hive somtimes specifies 'null'

@@ -42,7 +42,12 @@ if [ ! -s "$FE_CP_FILE" ]; then
   return 1
 fi
 
-CLASSPATH=$(cat "$IMPALA_HOME"/fe/target/build-classpath.txt):"$CLASSPATH"
+CLASSPATH=$(cat $FE_CP_FILE):"$CLASSPATH"
+
+if [ "${1:-notest}" == "test" ]; then
+  FE_TEST_CP_FILE="$IMPALA_HOME/fe/target/test-classpath.txt"
+  CLASSPATH=$(cat $FE_TEST_CP_FILE):"$CLASSPATH"
+fi
 
 : ${CUSTOM_CLASSPATH=}
 CLASSPATH="$CUSTOM_CLASSPATH:$CLASSPATH"
