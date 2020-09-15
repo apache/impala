@@ -17,5 +17,5 @@
 # specific language governing permissions and limitations
 # under the License.
 
-. ${IMPALA_HOME}/bin/set-classpath.sh
+. ${IMPALA_HOME}/bin/set-classpath.sh test
 "$JAVA" -cp $CLASSPATH org.apache.impala.testutil.ImpalaJdbcClient "$@"

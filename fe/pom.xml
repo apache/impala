@@ -538,6 +538,17 @@ under the License.
               <excludeTypes>pom</excludeTypes>
             </configuration>
           </execution>
+          <execution>
+            <id>write-test-classpath</id>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <outputFile>${project.build.directory}/test-classpath.txt</outputFile>
+              <includeScope>test</includeScope>
+              <excludeTypes>pom</excludeTypes>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
 
