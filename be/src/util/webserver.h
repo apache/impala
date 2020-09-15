@@ -157,11 +157,11 @@ class Webserver {
 
    private:
     /// If true, the page appears in the navigation bar.
-    bool is_on_nav_bar_;
+    const bool is_on_nav_bar_;
 
     /// If true, use the template rendering callback, otherwise the 'raw' callback is
     /// used.
-    bool use_templates_;
+    const bool use_templates_;
 
     /// Callback to produce a Json document to render via a template.
     UrlCallback template_callback_;

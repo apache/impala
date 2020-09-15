@@ -523,16 +523,19 @@ void Webserver::GetCommonJson(
   }
 
   Value lst(kArrayType);
-  for (const UrlHandlerMap::value_type& handler: url_handlers_) {
-    if (handler.second.is_on_nav_bar()) {
-      Value hdl(kObjectType);
-      // Though we set link and title the same value, be careful with RapidJSON's MOVE
-      // semantic. We create the values by deep-copy here.
-      Value link(handler.first.c_str(), document->GetAllocator());
-      Value title(handler.first.c_str(), document->GetAllocator());
-      hdl.AddMember("link", link, document->GetAllocator());
-      hdl.AddMember("title", title, document->GetAllocator());
-      lst.PushBack(hdl, document->GetAllocator());
+  {
+    shared_lock<shared_mutex> lock(url_handlers_lock_);
+    for (const UrlHandlerMap::value_type& handler : url_handlers_) {
+      if (handler.second.is_on_nav_bar()) {
+        Value hdl(kObjectType);
+        // Though we set link and title the same value, be careful with RapidJSON's MOVE
+        // semantic. We create the values by deep-copy here.
+        Value link(handler.first.c_str(), document->GetAllocator());
+        Value title(handler.first.c_str(), document->GetAllocator());
+        hdl.AddMember("link", link, document->GetAllocator());
+        hdl.AddMember("title", title, document->GetAllocator());
+        lst.PushBack(hdl, document->GetAllocator());
+      }
     }
   }
 
