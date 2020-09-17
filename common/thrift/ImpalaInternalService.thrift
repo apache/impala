@@ -447,6 +447,12 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   111: optional double runtime_filter_error_rate;
+
+  // See comment in ImpalaService.thrift
+  112: optional bool use_local_tz_for_unix_timestamp_conversions = false;
+
+  // See comment in ImpalaService.thrift
+  113: optional bool convert_legacy_hive_parquet_utc_timestamps = false;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

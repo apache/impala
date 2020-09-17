@@ -309,6 +309,18 @@ DEFINE_int32(query_event_hook_nthreads, 1, "Number of threads to use for "
 
 DECLARE_bool(compact_catalog_topic);
 
+DEFINE_bool(use_local_tz_for_unix_timestamp_conversions, false,
+    "When true, TIMESTAMPs are interpreted in the local time zone when converting to "
+    "and from Unix times. When false, TIMESTAMPs are interpreted in the UTC time zone. "
+    "Set to true for Hive compatibility. "
+    "Can be overriden with the query option with the same name.");
+
+// Provide a workaround for IMPALA-1658.
+DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,
+    "When true, TIMESTAMPs read from files written by Parquet-MR (used by Hive) will "
+    "be converted from UTC to local time. Writes are unaffected. "
+    "Can be overriden with the query option with the same name.");
+
 namespace {
 using namespace impala;
 
@@ -1580,6 +1592,13 @@ void ImpalaServer::InitializeConfigVariables() {
   // Set idle_session_timeout here to let the SET command return the value of
   // the command line option FLAGS_idle_session_timeout
   default_query_options_.__set_idle_session_timeout(FLAGS_idle_session_timeout);
+  // The next query options used to be set with flags. Setting them in
+  // default_query_options_ here in order to make default_query_options
+  // take precedence over the legacy flags.
+  default_query_options_.__set_use_local_tz_for_unix_timestamp_conversions(
+    FLAGS_use_local_tz_for_unix_timestamp_conversions);
+  default_query_options_.__set_convert_legacy_hive_parquet_utc_timestamps(
+    FLAGS_convert_legacy_hive_parquet_utc_timestamps);
   QueryOptionsMask set_query_options; // unused
   Status status = ParseQueryOptions(FLAGS_default_query_options,
       &default_query_options_, &set_query_options);

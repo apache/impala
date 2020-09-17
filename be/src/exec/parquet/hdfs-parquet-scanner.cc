@@ -1824,9 +1824,8 @@ ColumnStatsReader HdfsParquetScanner::CreateColumnStatsReader(
 ParquetTimestampDecoder HdfsParquetScanner::CreateTimestampDecoder(
     const parquet::SchemaElement& element) {
   bool timestamp_conversion_needed_for_int96_timestamps =
-      FLAGS_convert_legacy_hive_parquet_utc_timestamps &&
       file_version_.application == "parquet-mr" &&
-      state_->local_time_zone() != UTCPTR;
+      state_->time_zone_for_legacy_parquet_time_conversions() != UTCPTR;
 
   return ParquetTimestampDecoder(element, state_->local_time_zone(),
       timestamp_conversion_needed_for_int96_timestamps);

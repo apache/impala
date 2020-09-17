@@ -36,11 +36,6 @@
 
 #include "common/names.h"
 
-// Provide a workaround for IMPALA-1658.
-DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,
-    "When true, TIMESTAMPs read from files written by Parquet-MR (used by Hive) will "
-    "be converted from UTC to local time. Writes are unaffected.");
-
 using namespace impala::io;
 
 using parquet::Encoding;
@@ -920,7 +915,6 @@ template <>
 bool ScalarColumnReader<TimestampValue, parquet::Type::INT96, true>::ConvertSlot(
     const TimestampValue* src, void* slot) {
   // Conversion should only happen when this flag is enabled.
-  DCHECK(FLAGS_convert_legacy_hive_parquet_utc_timestamps);
   DCHECK(timestamp_decoder_.NeedsConversion());
   TimestampValue* dst_ts = reinterpret_cast<TimestampValue*>(slot);
   *dst_ts = *src;

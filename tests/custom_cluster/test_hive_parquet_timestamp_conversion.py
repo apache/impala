@@ -72,6 +72,11 @@ class TestHiveParquetTimestampConversion(CustomClusterTestSuite):
   def test_conversion(self, vector, unique_database):
     self.check_sanity(True)
     self._test_conversion_with_validation(vector, unique_database)
+    # Override query option convert_legacy_hive_parquet_utc_timestamps.
+    query_options = {"timezone": "PST8PDT",
+        "convert_legacy_hive_parquet_utc_timestamps": "0"}
+    self._test_no_conversion(vector, query_options, "PST8PDT")
+
     # Test with UTC too to check the optimizations added in IMPALA-9385.
     for tz_name in ["PST8PDT", "UTC"]:
       # The value read from the Hive table should be the same as reading a UTC converted
@@ -106,15 +111,20 @@ class TestHiveParquetTimestampConversion(CustomClusterTestSuite):
       "-hdfs_zone_info_zip=%s" % get_fs_path("/test-warehouse/tzdb/2017c.zip"))
   def test_no_conversion(self, vector):
     self.check_sanity(False)
+    # Do not override query option convert_legacy_hive_parquet_utc_timestamps.
+    query_options = {"timezone": "PST8PDT"}
+    self._test_no_conversion(vector, query_options, "PST8PDT")
+
+  def _test_no_conversion(self, vector, query_options, tz_name):
     # Without conversion all the values will be different.
-    tz_name = "PST8PDT"
+
     data = self.execute_query_expect_success(self.client, """
         SELECT h.id, h.day, h.timestamp_col, i.timestamp_col
         FROM functional_parquet.alltypesagg_hive_13_1 h
         JOIN functional_parquet.alltypesagg
           i ON i.id = h.id AND i.day = h.day  -- serves as a unique key
         WHERE h.timestamp_col != FROM_UTC_TIMESTAMP(i.timestamp_col, '%s')
-        """ % tz_name, query_options={"timezone": tz_name})\
+        """ % tz_name, query_options=query_options)\
         .get_data()
     assert len(data.split('\n')) == 10000
     # A value should either stay null or stay not null.
@@ -126,7 +136,7 @@ class TestHiveParquetTimestampConversion(CustomClusterTestSuite):
         WHERE
           (h.timestamp_col IS NULL AND i.timestamp_col IS NOT NULL)
           OR (h.timestamp_col IS NOT NULL AND i.timestamp_col IS NULL)
-        """, query_options={"timezone": tz_name})\
+        """, query_options=query_options)\
         .get_data()
     assert len(data) == 0
 

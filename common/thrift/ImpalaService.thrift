@@ -571,6 +571,15 @@ enum TImpalaQueryOptions {
   // A value (0.0, 1.0) that is the target false positive probability for runtime bloom
   // filters. If not set, falls back to max_filter_error_rate.
   RUNTIME_FILTER_ERROR_RATE = 110
+
+  // When true, TIMESTAMPs are interpreted in the local time zone (set in query option
+  // TIMEZONE) when converting to and from Unix times.
+  // When false, TIMESTAMPs are interpreted in the UTC time zone.
+  USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS = 111
+
+  // When true, TIMESTAMPs read from files written by Parquet-MR (used by Hive) will
+  // be converted from UTC to local time. Writes are unaffected.
+  CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS = 112
 }
 
 // The summary of a DML statement.
