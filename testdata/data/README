@@ -525,8 +525,7 @@ created by Impala instead of Hive.
 
 iceberg:
 IMPALA-9741: Support querying Iceberg table by impala
-Since impala cannot insert iceberg table now, we generated data by
-spark-shell, version is 2.4.x, and there are two tables' data in
+We generated data by spark-shell, version is 2.4.x, and there are two tables' data in
 testdata/data/iceberg_test. Iceberg table location contains
 two directories: metadata, which contains table metadata managed
 by iceberg; data, which contains the data files.

@@ -56,3 +56,25 @@ class TestIcebergTable(ImpalaTestSuite):
   @SkipIf.not_hdfs
   def test_insert_into_iceberg_table(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-insert', vector, use_db=unique_database)
+
+  def test_describe_history(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-table-history', vector, use_db=unique_database)
+
+    # Create a table with multiple snapshots and verify the table history.
+    tbl_name = unique_database + ".iceberg_multi_snapshots"
+    self.client.execute("""create table {0} (i int) stored as iceberg
+        tblproperties('iceberg.catalog'='hadoop.tables')""".format(tbl_name))
+    result = self.client.execute("INSERT INTO {0} VALUES (1)".format(tbl_name))
+    result = self.client.execute("INSERT INTO {0} VALUES (2)".format(tbl_name))
+    result = self.client.execute("DESCRIBE HISTORY {0}".format(tbl_name))
+    assert(len(result.data) == 2)
+    first_snapshot = result.data[0].split("\t")
+    second_snapshot = result.data[1].split("\t")
+    # Check that first snapshot is older than the second snapshot.
+    assert(first_snapshot[0] < second_snapshot[0])
+    # Check that second snapshot's parent ID is the snapshot ID of the first snapshot.
+    assert(first_snapshot[1] == second_snapshot[2])
+    # The first snapshot has no parent snapshot ID.
+    assert(first_snapshot[2] == "NULL")
+    # Check "is_current_ancestor" column.
+    assert(first_snapshot[3] == "TRUE" and second_snapshot[3] == "TRUE")

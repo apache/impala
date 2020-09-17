@@ -118,6 +118,9 @@ public class AnalysisContext {
     public boolean isUseStmt() { return stmt_ instanceof UseStmt; }
     public boolean isSetStmt() { return stmt_ instanceof SetStmt; }
     public boolean isShowTablesStmt() { return stmt_ instanceof ShowTablesStmt; }
+    public boolean isDescribeHistoryStmt() {
+      return stmt_ instanceof DescribeHistoryStmt;
+    }
     public boolean isShowDbsStmt() { return stmt_ instanceof ShowDbsStmt; }
     public boolean isShowDataSrcsStmt() { return stmt_ instanceof ShowDataSrcsStmt; }
     public boolean isShowStatsStmt() { return stmt_ instanceof ShowStatsStmt; }
@@ -175,7 +178,8 @@ public class AnalysisContext {
       return isShowFilesStmt() || isShowTablesStmt() || isShowDbsStmt() ||
           isShowFunctionsStmt() || isShowRolesStmt() || isShowGrantPrincipalStmt() ||
           isShowCreateTableStmt() || isShowDataSrcsStmt() || isShowStatsStmt() ||
-          isDescribeTableStmt() || isDescribeDbStmt() || isShowCreateFunctionStmt();
+          isDescribeTableStmt() || isDescribeDbStmt() || isShowCreateFunctionStmt() ||
+          isDescribeHistoryStmt();
     }
 
     private boolean isGrantRevokeStmt() {
@@ -335,6 +339,11 @@ public class AnalysisContext {
     public ShowFilesStmt getShowFilesStmt() {
       Preconditions.checkState(isShowFilesStmt());
       return (ShowFilesStmt) stmt_;
+    }
+
+    public DescribeHistoryStmt getDescribeHistoryStmt() {
+      Preconditions.checkState(isDescribeHistoryStmt());
+      return (DescribeHistoryStmt) stmt_;
     }
 
     public DescribeDbStmt getDescribeDbStmt() {

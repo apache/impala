@@ -46,6 +46,11 @@ import org.apache.hadoop.hive.metastore.api.LockLevel;
 import org.apache.hadoop.hive.metastore.api.LockType;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.HistoryEntry;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.util.SnapshotUtil;
 import org.apache.impala.analysis.AlterDbStmt;
 import org.apache.impala.analysis.AnalysisContext;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
@@ -105,6 +110,7 @@ import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ImpaladTableUsageTracker;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.InconsistentMetadataFetchException;
 import org.apache.impala.common.AnalysisException;
@@ -142,6 +148,8 @@ import org.apache.impala.thrift.TExplainResult;
 import org.apache.impala.thrift.TFinalizeParams;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.apache.impala.thrift.TGetCatalogMetricsResult;
+import org.apache.impala.thrift.TGetTableHistoryResult;
+import org.apache.impala.thrift.TGetTableHistoryResultItem;
 import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.TLineageGraph;
@@ -168,6 +176,7 @@ import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
+import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.impala.util.TSessionStateUtil;
@@ -444,6 +453,14 @@ public class Frontend {
       ddl.op_type = TCatalogOpType.SHOW_FILES;
       ddl.setShow_files_params(analysis.getShowFilesStmt().toThrift());
       metadata.setColumns(Collections.<TColumn>emptyList());
+    } else if (analysis.isDescribeHistoryStmt()) {
+      ddl.op_type = TCatalogOpType.DESCRIBE_HISTORY;
+      ddl.setDescribe_history_params(analysis.getDescribeHistoryStmt().toThrift());
+      metadata.setColumns(Arrays.asList(
+          new TColumn("creation_time", Type.STRING.toThrift()),
+          new TColumn("snapshot_id", Type.STRING.toThrift()),
+          new TColumn("parent_id", Type.STRING.toThrift()),
+          new TColumn("is_current_ancestor", Type.STRING.toThrift())));
     } else if (analysis.isDescribeDbStmt()) {
       ddl.op_type = TCatalogOpType.DESCRIBE_DB;
       ddl.setDescribe_db_params(analysis.getDescribeDbStmt().toThrift());
@@ -1054,6 +1071,35 @@ public class Frontend {
     }
 
     return dbs;
+  }
+
+  /**
+   *  Handles DESCRIBE HISTORY queries.
+   */
+  public TGetTableHistoryResult getTableHistory(String dbName, String tableName)
+      throws DatabaseNotFoundException, TableLoadingException {
+    FeTable feTable = getCatalog().getTable(dbName, tableName);
+    Preconditions.checkState(feTable instanceof FeIcebergTable);
+    FeIcebergTable feIcebergTable = (FeIcebergTable) feTable;
+    TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(feIcebergTable);
+    Table table = IcebergUtil.loadTable(feIcebergTable);
+    Set<Long> ancestorIds = Sets.newHashSet(SnapshotUtil.currentAncestors(table));
+
+    TGetTableHistoryResult result = new TGetTableHistoryResult();
+    result.result = Lists.newArrayList();
+    for (HistoryEntry historyEntry : metadata.snapshotLog()) {
+      TGetTableHistoryResultItem resultItem = new TGetTableHistoryResultItem();
+      long snapshotId = historyEntry.snapshotId();
+      resultItem.setCreation_time(historyEntry.timestampMillis());
+      resultItem.setSnapshot_id(snapshotId);
+      Snapshot snapshot = metadata.snapshot(snapshotId);
+      if (snapshot != null && snapshot.parentId() != null) {
+        resultItem.setParent_id(snapshot.parentId());
+      }
+      resultItem.setIs_current_ancestor(ancestorIds.contains(snapshotId));
+      result.result.add(resultItem);
+    }
+    return result;
   }
 
   /**

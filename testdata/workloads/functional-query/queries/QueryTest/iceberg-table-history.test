@@ -1,0 +1,20 @@
+====
+---- QUERY
+# DESCRIBE HISTORY for empty Iceberg table.
+CREATE TABLE iceberg_empty(i int)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
+DESCRIBE HISTORY iceberg_empty;
+---- RESULTS
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+# DESCRIBE HISTORY for partitioned Iceberg table.
+set timezone=CET;
+DESCRIBE HISTORY functional_parquet.iceberg_partitioned;
+---- RESULTS
+'2020-08-31 07:58:08.440000000','8270633197658268308','NULL','TRUE'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
