@@ -54,6 +54,8 @@ class TestLocalTzConversion(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args("--use_local_tz_for_unix_timestamp_conversions=true")
   def test_timestamp_functions(self, vector):
     """Tests timestamp functions with --use_local_tz_for_unix_timestamp_conversions=true
+       TODO: this test can be probably removed as a query option is created for
+             use_local_tz_for_unix_timestamp_conversions in IMPALA-10171
     """
     vector.get_value('exec_option')['enable_expr_rewrites'] = \
         vector.get_value('enable_expr_rewrites')

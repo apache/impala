@@ -953,6 +953,14 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_runtime_filter_error_rate(val);
         break;
       }
+      case TImpalaQueryOptions::USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS: {
+        query_options->__set_use_local_tz_for_unix_timestamp_conversions(IsTrue(value));
+        break;
+      }
+      case TImpalaQueryOptions::CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS: {
+        query_options->__set_convert_legacy_hive_parquet_utc_timestamps(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

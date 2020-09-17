@@ -77,8 +77,6 @@
 
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disable_optimization_passes);
-DECLARE_bool(use_local_tz_for_unix_timestamp_conversions);
-DECLARE_bool(use_utc_for_unix_timestamp_conversions);
 DECLARE_string(hdfs_zone_info_zip);
 
 namespace posix_time = boost::posix_time;
@@ -178,17 +176,16 @@ class ScopedTimeZoneOverride {
   const Timezone* new_tz_;
 };
 
-// Enable FLAGS_use_local_tz_for_unix_timestamp_conversions for the duration of the scope.
-class ScopedLocalUnixTimestampConversionOverride {
- bool original_;
+class ScopedExecOption {
+ ImpaladQueryExecutor* executor_;
  public:
-  ScopedLocalUnixTimestampConversionOverride() {
-    original_ = FLAGS_use_local_tz_for_unix_timestamp_conversions;
-    FLAGS_use_local_tz_for_unix_timestamp_conversions = true;
+  ScopedExecOption(ImpaladQueryExecutor* executor, string option_string)
+      : executor_(executor) {
+    executor->PushExecOption(option_string);
   }
 
-  ~ScopedLocalUnixTimestampConversionOverride() {
-    FLAGS_use_local_tz_for_unix_timestamp_conversions = original_;
+  ~ScopedExecOption() {
+    executor_->PopExecOption();
   }
 };
 
@@ -6735,7 +6732,8 @@ TEST_P(ExprTest, TimestampFunctions) {
   // Test Unix epoch conversions again but now converting into local timestamp values.
   {
     ScopedTimeZoneOverride time_zone("PST8PDT");
-    ScopedLocalUnixTimestampConversionOverride use_local;
+    ScopedExecOption use_local(executor_,
+        "USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=1");
     // Determine what the local time would have been when it was 1970-01-01 GMT
     ptime local_time_at_epoch = c_local_adjustor<ptime>::utc_to_local(from_time_t(0));
     // ... and as an Impala compatible string.
@@ -6954,7 +6952,8 @@ TEST_P(ExprTest, TimestampFunctions) {
   // Tests from Hive. When casting from timestamp to numeric, timestamps are considered
   // to be local values.
   {
-    ScopedLocalUnixTimestampConversionOverride use_local;
+    ScopedExecOption use_local(executor_,
+        "USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=1");
     ScopedTimeZoneOverride time_zone("PST8PDT");
     TestValue("cast(cast('2011-01-01 01:01:01' as timestamp) as boolean)", TYPE_BOOLEAN,
         true);
@@ -7027,7 +7026,8 @@ TEST_P(ExprTest, TimestampFunctions) {
 
     // Check again with the flag enabled.
     {
-      ScopedLocalUnixTimestampConversionOverride use_local;
+      ScopedExecOption use_local(executor_,
+          "USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=1");
       tm before = to_tm(posix_time::microsec_clock::local_time());
       unix_start_time = mktime(&before);
       unix_timestamp_result = ConvertValue<int64_t>(GetValue("unix_timestamp()",
@@ -7041,7 +7041,8 @@ TEST_P(ExprTest, TimestampFunctions) {
   // Test that now() and current_timestamp() are reasonable.
   {
     ScopedTimeZoneOverride time_zone(TEST_TZ_WITHOUT_DST);
-    ScopedLocalUnixTimestampConversionOverride use_local;
+    ScopedExecOption use_local(executor_,
+        "USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=1");
     const Timezone& local_tz = time_zone.GetTimezone();
 
     const TimestampValue start_time =
@@ -7067,7 +7068,8 @@ TEST_P(ExprTest, TimestampFunctions) {
   // Test cast(unix_timestamp() as timestamp).
   {
     ScopedTimeZoneOverride time_zone(TEST_TZ_WITHOUT_DST);
-    ScopedLocalUnixTimestampConversionOverride use_local;
+    ScopedExecOption use_local(executor_,
+        "USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=1");
     const Timezone& local_tz = time_zone.GetTimezone();
 
     // UNIX_TIMESTAMP() has second precision so the comparison start time is shifted back
@@ -8219,7 +8221,8 @@ TEST_P(ExprTest, DateFunctions) {
   // Test that current_date() is reasonable.
   {
     ScopedTimeZoneOverride time_zone(TEST_TZ_WITHOUT_DST);
-    ScopedLocalUnixTimestampConversionOverride use_local;
+    ScopedExecOption use_local(executor_,
+        "USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS=1");
     const Timezone& local_tz = time_zone.GetTimezone();
 
     const boost::gregorian::date start_date =
