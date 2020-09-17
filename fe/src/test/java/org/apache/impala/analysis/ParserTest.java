@@ -2045,7 +2045,7 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
-  public void TestDescribe() {
+  public void TestDescribeTable() {
     // Missing argument
     ParserError("DESCRIBE");
     ParserError("DESCRIBE FORMATTED");
@@ -2068,6 +2068,19 @@ public class ParserTest extends FrontendTestBase {
     ParsesOk("DESCRIBE FORMATTED databasename.tablename.field1.field2");
     ParsesOk("DESCRIBE EXTENDED databasename.tablename.field1");
     ParsesOk("DESCRIBE EXTENDED databasename.tablename.field1.field2");
+  }
+
+  @Test
+  public void TestDescribeHistory() {
+    // Unqualified table ok
+    ParsesOk("DESCRIBE HISTORY tablename");
+
+    // Fully-qualified table ok
+    ParsesOk("DESCRIBE HISTORY databasename.tablename");
+
+    // EXTENDED and FORMATTED not applicable
+    ParserError("DESCRIBE EXTENDED HISTORY tablename");
+    ParserError("DESCRIBE FORMATTED HISTORY tablename");
   }
 
   @Test

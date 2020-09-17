@@ -98,6 +98,7 @@ Frontend::Frontend() {
     {"getDataSrcMetadata", "([B)[B", &get_data_src_metadata_id_},
     {"getStats", "([B)[B", &get_stats_id_},
     {"getFunctions", "([B)[B", &get_functions_id_},
+    {"getTableHistory", "([B)[B", &get_table_history_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
     {"getRoles", "([B)[B", &show_roles_id_},
     {"getPrincipalPrivileges", "([B)[B", &get_principal_privileges_id_},
@@ -200,6 +201,11 @@ Status Frontend::GetDataSrcMetadata(const string* pattern,
 Status Frontend::GetStats(const TShowStatsParams& params,
     TResultSet* result) {
   return JniUtil::CallJniMethod(fe_, get_stats_id_, params, result);
+}
+
+Status Frontend::GetTableHistory(const TDescribeHistoryParams& params,
+      TGetTableHistoryResult* result) {
+  return JniUtil::CallJniMethod(fe_, get_table_history_id_, params, result);
 }
 
 Status Frontend::GetPrincipalPrivileges(const TShowGrantPrincipalParams& params,

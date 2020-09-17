@@ -362,8 +362,7 @@ nonterminal ShowStatsStmt show_stats_stmt, show_partitions_stmt,
   show_range_partitions_stmt;
 nonterminal String show_pattern;
 nonterminal ShowFilesStmt show_files_stmt;
-nonterminal DescribeDbStmt describe_db_stmt;
-nonterminal DescribeTableStmt describe_table_stmt;
+nonterminal StatementBase describe_stmt;
 nonterminal ShowCreateTableStmt show_create_tbl_stmt;
 nonterminal TCatalogObjectType show_create_tbl_object_type;
 nonterminal ShowCreateFunctionStmt show_create_function_stmt;
@@ -657,9 +656,7 @@ stmt ::=
   {: RESULT = show_create_function; :}
   | show_files_stmt:show_files
   {: RESULT = show_files; :}
-  | describe_db_stmt:describe
-  {: RESULT = describe; :}
-  | describe_table_stmt:describe
+  | describe_stmt:describe
   {: RESULT = describe; :}
   | alter_db_stmt:alter_db
   {: RESULT = alter_db; :}
@@ -2784,14 +2781,20 @@ show_files_stmt ::=
   {: RESULT = new ShowFilesStmt(table, partitions); :}
   ;
 
-describe_db_stmt ::=
+describe_stmt ::=
   KW_DESCRIBE db_or_schema_kw describe_output_style:style ident_or_default:db
   {: RESULT = new DescribeDbStmt(db, style); :}
-  ;
-
-describe_table_stmt ::=
-  KW_DESCRIBE describe_output_style:style dotted_path:path
-  {: RESULT = new DescribeTableStmt(path, style); :}
+  | KW_DESCRIBE KW_FORMATTED dotted_path:path
+  {: RESULT = new DescribeTableStmt(path, TDescribeOutputStyle.FORMATTED); :}
+  | KW_DESCRIBE KW_EXTENDED dotted_path:path
+  {: RESULT = new DescribeTableStmt(path, TDescribeOutputStyle.EXTENDED); :}
+  | KW_DESCRIBE dotted_path:path
+  {: RESULT = new DescribeTableStmt(path, TDescribeOutputStyle.MINIMAL); :}
+  | KW_DESCRIBE IDENT:history_id table_name:table
+  {:
+    parser.checkIdentKeyword("HISTORY", history_id);
+    RESULT = new DescribeHistoryStmt(table);
+  :}
   ;
 
 describe_output_style ::=

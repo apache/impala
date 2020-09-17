@@ -72,6 +72,7 @@ import org.apache.impala.thrift.TGetHadoopConfigRequest;
 import org.apache.impala.thrift.TGetHadoopConfigResponse;
 import org.apache.impala.thrift.TGetHadoopGroupsRequest;
 import org.apache.impala.thrift.TGetHadoopGroupsResponse;
+import org.apache.impala.thrift.TGetTableHistoryResult;
 import org.apache.impala.thrift.TGetTablesParams;
 import org.apache.impala.thrift.TGetTablesResult;
 import org.apache.impala.thrift.TLoadDataReq;
@@ -86,6 +87,7 @@ import org.apache.impala.thrift.TShowGrantPrincipalParams;
 import org.apache.impala.thrift.TShowRolesParams;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
+import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
@@ -313,6 +315,25 @@ public class JniFrontend {
     List<TDatabase> tDbs = Lists.newArrayListWithCapacity(dbs.size());
     for (FeDb db: dbs) tDbs.add(db.toThrift());
     result.setDbs(tDbs);
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /** Returns the snapshot history for an Iceberg table.
+   *  The argument is a serialized TDescribeHistoryParams object.
+   *  Returns a serialized TGetTableHistoryResult object.
+   */
+  public byte[] getTableHistory(byte[] thriftParams) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
+    TDescribeHistoryParams params = new TDescribeHistoryParams();
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftParams);
+    TGetTableHistoryResult result = frontend_.getTableHistory(
+        params.getTable_name().getDb_name(), params.getTable_name().getTable_name());
+
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);

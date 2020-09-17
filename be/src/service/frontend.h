@@ -96,6 +96,10 @@ class Frontend {
   Status GetPrincipalPrivileges(const TShowGrantPrincipalParams& params,
       TResultSet* result);
 
+  /// Call FE to get table history for an Iceberg table.
+  Status GetTableHistory(const TDescribeHistoryParams& params,
+      TGetTableHistoryResult* result);
+
   /// Return all functions of 'category' that match the optional argument 'pattern'.
   /// If pattern is NULL match all functions, otherwise match only those functions that
   /// match the pattern string.
@@ -213,6 +217,7 @@ class Frontend {
   jmethodID get_data_src_metadata_id_; // JniFrontend.getDataSrcMetadata
   jmethodID get_stats_id_; // JniFrontend.getTableStats
   jmethodID get_functions_id_; // JniFrontend.getFunctions
+  jmethodID get_table_history_id_; // JniFrontend.getTableHistory
   jmethodID get_catalog_object_id_; // JniFrontend.getCatalogObject
   jmethodID show_roles_id_; // JniFrontend.getRoles
   jmethodID get_principal_privileges_id_; // JniFrontend.getPrincipalPrivileges

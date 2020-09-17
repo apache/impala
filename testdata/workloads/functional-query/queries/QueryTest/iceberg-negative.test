@@ -272,3 +272,8 @@ tblproperties('iceberg.catalog'='hadoop.catalog',
 ---- CATCH
 Iceberg tables cannot have Hive ACID table properties.
 ====
+---- QUERY
+DESCRIBE HISTORY functional_parquet.emptytable;
+---- CATCH
+DESCRIBE HISTORY must specify an Iceberg table: functional_parquet.emptytable
+====

@@ -30,6 +30,7 @@
 #include "catalog/catalog-service-client-wrapper.h"
 #include "common/status.h"
 #include "exec/kudu-util.h"
+#include "exprs/timezone_db.h"
 #include "kudu/rpc/rpc_controller.h"
 #include "rpc/rpc-mgr.inline.h"
 #include "runtime/coordinator.h"
@@ -38,6 +39,8 @@
 #include "runtime/query-driver.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "runtime/timestamp-value.h"
+#include "runtime/timestamp-value.inline.h"
 #include "scheduling/admission-control-client.h"
 #include "scheduling/scheduler.h"
 #include "service/frontend.h"
@@ -421,6 +424,32 @@ Status ClientRequestState::ExecLocalCatalogOp(
       // Set the result set and its schema from the response.
       request_result_set_.reset(new vector<TResultRow>(response.rows));
       result_metadata_ = response.schema;
+      return Status::OK();
+    }
+    case TCatalogOpType::DESCRIBE_HISTORY: {
+      // This operation is supported for Iceberg tables only.
+      const TDescribeHistoryParams& params = catalog_op.describe_history_params;
+      TGetTableHistoryResult result;
+      RETURN_IF_ERROR(frontend_->GetTableHistory(params, &result));
+
+      request_result_set_.reset(new vector<TResultRow>);
+      request_result_set_->resize(result.result.size());
+      for (int i = 0; i < result.result.size(); ++i) {
+        const TGetTableHistoryResultItem item = result.result[i];
+        TResultRow &result_row = (*request_result_set_.get())[i];
+        result_row.__isset.colVals = true;
+        result_row.colVals.resize(4);
+        const Timezone* local_tz = TimezoneDatabase::FindTimezone(
+            query_options().timezone);
+        TimestampValue tv = TimestampValue::FromUnixTimeMicros(
+            item.creation_time * 1000, local_tz);
+        result_row.colVals[0].__set_string_val(tv.ToString());
+        result_row.colVals[1].__set_string_val(std::to_string(item.snapshot_id));
+        result_row.colVals[2].__set_string_val(
+            (item.__isset.parent_id) ? std::to_string(item.parent_id) : "NULL");
+        result_row.colVals[3].__set_string_val(
+            (item.is_current_ancestor) ? "TRUE" : "FALSE");
+      }
       return Status::OK();
     }
     case TCatalogOpType::DESCRIBE_DB: {

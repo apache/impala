@@ -225,6 +225,11 @@ struct TShowStatsParams {
   2: CatalogObjects.TTableName table_name
 }
 
+// Parameters for DESCRIBE HISTORY command
+struct TDescribeHistoryParams {
+  1: CatalogObjects.TTableName table_name
+}
+
 // Parameters for SHOW FUNCTIONS commands
 struct TShowFunctionsParams {
   // Category of function to show.
@@ -277,6 +282,20 @@ struct TShowRolesParams {
 // Result of a SHOW ROLES command
 struct TShowRolesResult {
   1: required list<string> role_names
+}
+
+// Result of the DESCRIBE HISTORY command.
+struct TGetTableHistoryResult {
+  1: required list<TGetTableHistoryResultItem> result
+}
+
+// Represents one row in the DESCRIBE HISTORY command's result.
+struct TGetTableHistoryResultItem {
+  // Timestamp in millis
+  1: required i64 creation_time
+  2: required i64 snapshot_id
+  3: optional i64 parent_id
+  4: required bool is_current_ancestor
 }
 
 // Parameters for SHOW GRANT ROLE/USER commands
@@ -468,6 +487,7 @@ enum TCatalogOpType {
   SHOW_GRANT_PRINCIPAL = 12
   SHOW_FILES = 13
   SHOW_CREATE_FUNCTION = 14
+  DESCRIBE_HISTORY = 15
 }
 
 // TODO: Combine SHOW requests with a single struct that contains a field
@@ -528,6 +548,9 @@ struct TCatalogOpRequest {
 
   // Parameters for SHOW_CREATE_FUNCTION
   18: optional TGetFunctionsParams show_create_function_params
+
+  // Parameters for DESCRIBE HISTORY
+  19: optional TDescribeHistoryParams describe_history_params
 }
 
 // Parameters for the SET query option command
