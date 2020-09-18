@@ -359,8 +359,15 @@ DateVal CastFunctions::CastToDateVal(FunctionContext* ctx, const StringVal& val)
   }
   if (UNLIKELY(!dv.IsValid())) {
     string invalid_val = string(string_val, val.len);
-    ctx->SetError(Substitute("String to Date parse failed. Invalid string val: \"$0\"",
-        invalid_val).c_str());
+    string error_msg;
+    if (format_ctx == nullptr) {
+      error_msg = Substitute("String to Date parse failed. Invalid string val: '$0'",
+        invalid_val);
+    } else {
+      error_msg = Substitute("String to Date parse failed. Input '$0' doesn't match "
+        "with format '$1'", invalid_val, format_ctx->fmt);
+    }
+    ctx->SetError(error_msg.c_str());
     return DateVal::null();
   }
   return dv.ToDateVal();

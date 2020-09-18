@@ -1455,6 +1455,12 @@ class TestCastWithFormat(ImpalaTestSuite):
         r''' 'FXYYYY-"\\\'"-MM-DD') ''')
     assert result.data == ["2010-02-01"]
 
+    # Test error message where format contains text token with escaped double quote.
+    err = self.execute_query_expect_failure(self.client,
+        r'''select cast('1985-AB"CD11-23' as date format 'YYYY-"AB\"C"MM-DD')''')
+    assert (r'''String to Date parse failed. Input '1985-AB"CD11-23' doesn't match '''
+        r'''with format 'YYYY-"AB\"C"MM-DD''' in str(err))
+
   def test_iso8601_week_based_date_tokens(self):
     # Format 0001-01-01 and 9999-12-31 dates.
     # 0001-01-01 is Monday, belongs to the 1st week of year 1.
@@ -1474,10 +1480,12 @@ class TestCastWithFormat(ImpalaTestSuite):
     # Year 9999 has 52 weeks. 9999-12-31 is Friday.
     err = self.execute_query_expect_failure(self.client,
         "select cast('9999/52/06' as date format 'IYYY/IW/ID')")
-    assert 'String to Date parse failed. Invalid string val: "9999/52/06"' in str(err)
+    assert (r'''String to Date parse failed. Input '9999/52/06' doesn't match with '''
+        r'''format 'IYYY/IW/ID''' in str(err))
     err = self.execute_query_expect_failure(self.client,
         "select cast('9999/53/01' as date format 'IYYY/IW/ID')")
-    assert 'String to Date parse failed. Invalid string val: "9999/53/01"' in str(err)
+    assert (r'''String to Date parse failed. Input '9999/53/01' doesn't match with '''
+        r'''format 'IYYY/IW/ID''' in str(err))
 
     # Format 1400-01-01 and 9999-12-31 timestamps.
     # 1400-01-01 is Wednesday, belongs to the 1st week of year 1400.
@@ -1529,7 +1537,8 @@ class TestCastWithFormat(ImpalaTestSuite):
 
     err = self.execute_query_expect_failure(self.client,
         "select cast('2019/53/01' as date format 'IYYY/IW/ID')")
-    assert 'String to Date parse failed. Invalid string val: "2019/53/01"' in str(err)
+    assert (r'''String to Date parse failed. Input '2019/53/01' doesn't match with '''
+        r'''format 'IYYY/IW/ID''' in str(err))
 
     # Format 4, 3, 2, 1-digit week numbering year.
     # 2020-01-01 is Wednesday, belongs to week 1 of year 2020.
@@ -1670,7 +1679,8 @@ class TestCastWithFormat(ImpalaTestSuite):
     assert result.data == ["NULL\tNULL\tNULL\tNULL\tNULL"]
     err = self.execute_query_expect_failure(self.client,
         "select cast('2015/3/05' as date format 'FXIYYY/IW/ID')")
-    assert 'String to Date parse failed. Invalid string val: "2015/3/05"' in str(err)
+    assert (r'''String to Date parse failed. Input '2015/3/05' doesn't match with '''
+        r'''format 'FXIYYY/IW/ID''' in str(err))
 
     query_options = dict({'now_string': '2019-01-01 11:11:11'})
     result = self.execute_query(
