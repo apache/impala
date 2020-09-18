@@ -1579,7 +1579,8 @@ public class Frontend {
         if (!analysisResult.isCreateTableAsSelectStmt()) {
           return result;
         }
-      } else if (analysisResult.isInsertStmt() ||
+      }
+      if (analysisResult.isInsertStmt() ||
           analysisResult.isCreateTableAsSelectStmt()) {
         InsertStmt insertStmt = analysisResult.getInsertStmt();
         FeTable targetTable = insertStmt.getTargetTable();
@@ -2020,7 +2021,9 @@ public class Frontend {
     Preconditions.checkState(
         AcidUtils.isTransactionalTable(targetTable.getMetaStoreTable().getParameters()));
     List<LockComponent> lockComponents = new ArrayList<>(tables.size());
-    for (FeTable table : tables) {
+    List<FeTable> lockTables = new ArrayList<>(tables);
+    if (!lockTables.contains(targetTable)) lockTables.add(targetTable);
+    for (FeTable table : lockTables) {
       if (!AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
         continue;
       }
