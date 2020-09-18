@@ -241,10 +241,12 @@ class TestObservability(ImpalaTestSuite):
     """IMPALA-6081: Test that the expected number of fragment instances and their exec
     nodes appear in the runtime profile, even when fragments may be quickly cancelled when
     all results are already returned."""
+    query_opts = {'report_skew_limit': -1}
     results = self.execute_query("""
         with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
         select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
-        join (select * from l LIMIT 2000000) b on a.l_orderkey = -b.l_orderkey;""")
+        join (select * from l LIMIT 2000000) b on a.l_orderkey = -b.l_orderkey;""",
+        query_opts)
     # There are 3 scan nodes and each appears in the profile n+1 times (for n fragment
     # instances + the averaged fragment). n depends on how data is loaded and scheduler's
     # decision.
@@ -730,6 +732,33 @@ class TestObservability(ImpalaTestSuite):
     assert result.success
     self.__verify_hashtable_stats_profile(result.runtime_profile)
 
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  def test_skew_reporting_in_runtime_profile(self):
+    """Test that the skew summary and skew details are reported in runtime profile
+    correctly"""
+    query = """select ca_state, count(*) from tpcds_parquet.store_sales,
+            tpcds_parquet.customer, tpcds_parquet.customer_address
+            where ss_customer_sk = c_customer_sk and
+            c_current_addr_sk = ca_address_sk
+            group by ca_state
+            order by ca_state
+            """
+    "Set up the skew threshold to 0.02"
+    query_opts = {'report_skew_limit': 0.02}
+    results = self.execute_query(query, query_opts)
+    assert results.success
+
+    "Expect to see the skew summary"
+    skews_found = 'skew\(s\) found at:.*HASH_JOIN.*HASH_JOIN.*HDFS_SCAN_NODE'
+    assert len(re.findall(skews_found, results.runtime_profile, re.M)) == 1
+
+    "Expect to see skew details twice at the hash join nodes."
+    probe_rows_at_hj = 'HASH_JOIN_NODE.*\n.*Skew details: ProbeRows'
+    assert len(re.findall(probe_rows_at_hj, results.runtime_profile, re.M)) == 2
+
+    "Expect to see skew details once at the scan node."
+    probe_rows_at_hdfs_scan = 'HDFS_SCAN_NODE.*\n.*Skew details: RowsRead'
+    assert len(re.findall(probe_rows_at_hdfs_scan, results.runtime_profile, re.M)) == 1
 
 class TestQueryStates(ImpalaTestSuite):
   """Test that the 'Query State' and 'Impala Query State' are set correctly in the

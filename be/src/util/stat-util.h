@@ -25,24 +25,38 @@ namespace impala {
 
 class StatUtil {
  public:
-  /// Computes mean and standard deviation
+  /// Computes the standard deviation (population) from an array of values in 'values'.
+  /// The total number of such values is 'N' and the mean is already computed in 'mean'.
+  /// On return:
+  ///  *stddev is the stddev
   template <typename T>
-  static void ComputeMeanStddev(const T* values, int N, double* mean, double* stddev) {
-    *mean = 0;
+  static void ComputeStddevP(const T* values, int N, T mean, double* stddev) {
     *stddev = 0;
+
+    for (int i = 0; i < N; ++i) {
+      double d = values[i] - mean;
+      *stddev += d*d;
+    }
+
+    *stddev /= N;
+    *stddev = sqrt(*stddev);
+  }
+
+  /// Computes the mean and the standard deviation (population) from an array of
+  /// values in 'values'. The total number of such values is 'N'.
+  /// On return:
+  ///  *mean is the mean
+  ///  *stddev is the stddev
+  template <typename T>
+  static void ComputeMeanStddevP(const T* values, int N, T* mean, double* stddev) {
+    *mean = 0;
 
     for (int i = 0; i < N; ++i) {
       *mean += values[i];
     }
     *mean /= N;
 
-    for (int i = 0; i < N; ++i) {
-      double d = values[i] - *mean;
-      *stddev += d*d;
-    }
-
-    *stddev /= N;
-    *stddev = sqrt(*stddev);
+    ComputeStddev(values, N, *mean, stddev);
   }
 };
 

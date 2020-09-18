@@ -972,6 +972,19 @@ Status impala::SetQueryOption(const string& key, const string& value,
               query_options->__set_targeted_kudu_scan_range_length(scan_length);
               break;
       }
+      case TImpalaQueryOptions::REPORT_SKEW_LIMIT: {
+        StringParser::ParseResult result;
+        const double skew_threshold =
+            StringParser::StringToFloat<double>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS) {
+          return Status(
+              Substitute("$0 is not valid for REPORT_SKEW_LIMIT. Only numeric "
+                         "values (such as 1.0) are allowed.",
+                  value));
+        }
+        query_options->__set_report_skew_limit(skew_threshold);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

@@ -590,6 +590,10 @@ enum TImpalaQueryOptions {
   // does not guarantee a limit on the size of the scan range. If unspecified or
   // set to 0 disables this feature.
   TARGETED_KUDU_SCAN_RANGE_LENGTH = 114
+
+  // Enable (>=0) or disable(<0) reporting of skews for a query in runtime profile.
+  // When enabled, used as the CoV threshold value in the skew detection formula.
+  REPORT_SKEW_LIMIT = 115
 }
 
 // The summary of a DML statement.

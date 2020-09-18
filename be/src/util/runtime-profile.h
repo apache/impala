@@ -199,6 +199,16 @@ class RuntimeProfileBase {
   /// Always 1 for non-aggregated profiles.
   virtual int GetNumInputProfiles() const = 0;
 
+  /// Identify skews in certain counters for certain operators from children_ profiles
+  //  recursively. Add the skew info (if identified) as follows.
+  ///  1. a list of profile names to the 'root' profile with key SKEW_SUMMARY;
+  ///  2. a list of counter names plus the details in those child profiles with key
+  ///     SKEW_DETAILS.
+  static const std::string SKEW_SUMMARY;
+  static const std::string SKEW_DETAILS;
+  /// Argument 'threshold' provides the threshold used in the formula to detect skew.
+  void AddSkewInfo(RuntimeProfileBase* root, double threshold);
+
  protected:
   /// Name of the counter maintaining the total time.
   static const std::string TOTAL_TIME_COUNTER_NAME;
@@ -403,6 +413,13 @@ class RuntimeProfile : public RuntimeProfileBase {
   /// Sorts all children according to descending total time. Does not
   /// invalidate pointers to profiles.
   void SortChildrenByTotalTime();
+
+  /// Updates the AveragedCounter counters in this profile with the counters from the
+  /// 'src' profile. If a counter is present in 'src' but missing in this profile, a new
+  /// AveragedCounter is created with the same name. This method should not be invoked
+  /// if is_average_profile_ is false. Obtains locks on the counter maps and child counter
+  /// maps in both this and 'src' profiles.
+  void UpdateAverage(RuntimeProfile* src);
 
   /// Updates this profile w/ the thrift profile.
   /// Counters and child profiles in thrift_profile that already exist in this profile

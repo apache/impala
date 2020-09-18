@@ -135,6 +135,10 @@ class TestHashJoinTimer(ImpalaTestSuite):
     check_fragment_count = 0
     asyn_build = False
     for line in profile.split("\n"):
+      if ("skew(s)" in line):
+        # Sample line:
+        # skew(s) found at: HASH_JOIN_NODE (id=3), EXCHANGE_NODE (id=8)
+        continue
       if ("(id=3)" in line):
         # Sample line:
         # HASH_JOIN_NODE (id=3):(Total: 3s580ms, non-child: 11.89ms, % non-child: 0.31%)
