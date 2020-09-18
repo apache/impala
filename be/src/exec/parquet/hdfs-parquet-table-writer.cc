@@ -964,9 +964,20 @@ HdfsParquetTableWriter::HdfsParquetTableWriter(HdfsTableSink* parent, RuntimeSta
     file_size_limit_(0),
     reusable_col_mem_pool_(new MemPool(parent_->mem_tracker())),
     per_file_mem_pool_(new MemPool(parent_->mem_tracker())),
-    row_idx_(0) {}
+    row_idx_(0) {
+  is_iceberg_file_ = table_desc->IsIcebergTable();
+}
 
 HdfsParquetTableWriter::~HdfsParquetTableWriter() {
+}
+
+void HdfsParquetTableWriter::ConfigureTimestampType() {
+  if (is_iceberg_file_) {
+    // The Iceberg spec states that timestamps are stored as INT64 micros.
+    timestamp_type_ = TParquetTimestampType::INT64_MICROS;
+    return;
+  }
+  timestamp_type_ = state_->query_options().parquet_timestamp_type;
 }
 
 Status HdfsParquetTableWriter::Init() {
@@ -1033,6 +1044,8 @@ Status HdfsParquetTableWriter::Init() {
 
   Codec::CodecInfo codec_info(codec, clevel);
 
+  ConfigureTimestampType();
+
   columns_.resize(num_cols);
   // Initialize each column structure.
   for (int i = 0; i < columns_.size(); ++i) {
@@ -1070,7 +1083,7 @@ Status HdfsParquetTableWriter::Init() {
           new ColumnWriter<double>(this, output_expr_evals_[i], codec_info, col_name);
         break;
       case TYPE_TIMESTAMP:
-        switch (state_->query_options().parquet_timestamp_type) {
+        switch (timestamp_type_) {
           case TParquetTimestampType::INT96_NANOS:
             writer =
                 new ColumnWriter<TimestampValue>(
@@ -1138,13 +1151,18 @@ Status HdfsParquetTableWriter::CreateSchema() {
   file_metadata_.schema.resize(columns_.size() + 1);
   file_metadata_.schema[0].__set_num_children(columns_.size());
   file_metadata_.schema[0].name = "schema";
+  const int num_clustering_cols = table_desc_->num_clustering_cols();
 
   for (int i = 0; i < columns_.size(); ++i) {
     parquet::SchemaElement& col_schema = file_metadata_.schema[i + 1];
     const ColumnType& col_type = output_expr_evals_[i]->root().type();
     col_schema.name = columns_[i]->column_name();
+    const ColumnDescriptor& col_desc = table_desc_->col_descs()[i + num_clustering_cols];
+    DCHECK_EQ(col_desc.name(), columns_[i]->column_name());
+    const int field_id = col_desc.field_id();
+    if (field_id != -1) col_schema.__set_field_id(field_id);
     ParquetMetadataUtils::FillSchemaElement(col_type, state_->query_options(),
-                                            &col_schema);
+                                            timestamp_type_, &col_schema);
   }
 
   return Status::OK();
@@ -1160,7 +1178,7 @@ Status HdfsParquetTableWriter::AddRowGroup() {
   for (int i = 0; i < columns_.size(); ++i) {
     parquet::ColumnMetaData metadata;
     metadata.type = ParquetMetadataUtils::ConvertInternalToParquetType(
-        columns_[i]->type().type, state_->query_options());
+        columns_[i]->type().type, timestamp_type_);
     metadata.path_in_schema.push_back(columns_[i]->column_name());
     metadata.codec = columns_[i]->GetParquetCodec();
     current_row_group_->columns[i].__set_meta_data(metadata);
@@ -1300,7 +1318,12 @@ Status HdfsParquetTableWriter::Finalize() {
   RETURN_IF_ERROR(WriteFileFooter());
   *stats_.mutable_parquet_stats() = parquet_dml_stats_;
   COUNTER_ADD(parent_->rows_inserted_counter(), row_count_);
+  FinalizePartitionInfo();
   return Status::OK();
+}
+
+void HdfsParquetTableWriter::FinalizePartitionInfo() {
+  output_->bytes_written = file_pos_;
 }
 
 void HdfsParquetTableWriter::Close() {
@@ -1462,9 +1485,12 @@ Status HdfsParquetTableWriter::WriteFileFooter() {
   RETURN_IF_ERROR(thrift_serializer_->SerializeToBuffer(
       &file_metadata_, &file_metadata_len, &buffer));
   RETURN_IF_ERROR(Write(buffer, file_metadata_len));
+  file_pos_ += file_metadata_len;
 
   // Write footer
   RETURN_IF_ERROR(Write<uint32_t>(file_metadata_len));
+  file_pos_ += sizeof(uint32_t);
   RETURN_IF_ERROR(Write(PARQUET_VERSION_NUMBER, sizeof(PARQUET_VERSION_NUMBER)));
+  file_pos_ += sizeof(PARQUET_VERSION_NUMBER);
   return Status::OK();
 }

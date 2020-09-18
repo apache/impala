@@ -24,6 +24,7 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TColumnDescriptor;
 import org.apache.impala.thrift.TColumnStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,21 +94,25 @@ public class Column {
     String comment = columnDesc.isSetComment() ? columnDesc.getComment() : null;
     Preconditions.checkState(columnDesc.isSetPosition());
     int position = columnDesc.getPosition();
+    Type type = Type.fromThrift(columnDesc.getColumnType());
     Column col;
-    if (columnDesc.isIs_hbase_column()) {
+    if (columnDesc.isIs_iceberg_column()) {
+      Preconditions.checkState(columnDesc.isSetIceberg_field_id());
+      col = new IcebergColumn(columnDesc.getColumnName(), type, comment, position,
+          columnDesc.getIceberg_field_id());
+    } else if (columnDesc.isIs_hbase_column()) {
       // HBase table column. The HBase column qualifier (column name) is not be set for
       // the HBase row key, so it being set in the thrift struct is not a precondition.
       Preconditions.checkState(columnDesc.isSetColumn_family());
       Preconditions.checkState(columnDesc.isSetIs_binary());
       col = new HBaseColumn(columnDesc.getColumnName(), columnDesc.getColumn_family(),
           columnDesc.getColumn_qualifier(), columnDesc.isIs_binary(),
-          Type.fromThrift(columnDesc.getColumnType()), comment, position);
+          type, comment, position);
     } else if (columnDesc.isIs_kudu_column()) {
       col = KuduColumn.fromThrift(columnDesc, position);
     } else {
       // Hdfs table column.
-      col = new Column(columnDesc.getColumnName(),
-          Type.fromThrift(columnDesc.getColumnType()), comment, position);
+      col = new Column(columnDesc.getColumnName(), type, comment, position);
     }
     if (columnDesc.isSetCol_stats()) col.updateStats(columnDesc.getCol_stats());
     return col;
@@ -119,6 +124,10 @@ public class Column {
     colDesc.setPosition(position_);
     colDesc.setCol_stats(getStats().toThrift());
     return colDesc;
+  }
+
+  public TColumnDescriptor toDescriptor() {
+    return new TColumnDescriptor(getName(), getType().toThrift());
   }
 
   public static List<FieldSchema> toFieldSchemas(List<Column> columns) {

@@ -206,11 +206,13 @@ class ColumnDescriptor {
   ColumnDescriptor(const TColumnDescriptor& tdesc);
   const std::string& name() const { return name_; }
   const ColumnType& type() const { return type_; }
+  int field_id() const { return field_id_; }
   std::string DebugString() const;
 
  private:
   std::string name_;
   ColumnType type_;
+  int field_id_ = -1;
 };
 
 /// Base class for table descriptors.
@@ -330,8 +332,11 @@ class HdfsTableDescriptor : public TableDescriptor {
   }
 
   bool IsTableFullAcid() const { return is_full_acid_; }
+  bool IsIcebergTable() const { return is_iceberg_; }
 
   const TValidWriteIdList& ValidWriteIdList() const { return valid_write_id_list_; }
+
+  const std::string& IcebergTableLocation() const { return iceberg_table_location; }
 
   virtual std::string DebugString() const;
 
@@ -346,6 +351,8 @@ class HdfsTableDescriptor : public TableDescriptor {
   std::string avro_schema_;
   bool is_full_acid_;
   TValidWriteIdList valid_write_id_list_;
+  bool is_iceberg_ = false;
+  std::string iceberg_table_location;
 };
 
 class HBaseTableDescriptor : public TableDescriptor {

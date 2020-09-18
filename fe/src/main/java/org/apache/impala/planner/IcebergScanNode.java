@@ -106,7 +106,8 @@ public class IcebergScanNode extends HdfsScanNode {
       fileDescList.add(fileDesc);
       //Todo: how to deal with iceberg metadata update, we need to invalidate manually now
       if (fileDesc == null) {
-        throw new ImpalaRuntimeException("Cannot find file in cache: " + dataFile.path());
+        throw new ImpalaRuntimeException("Cannot find file in cache: " + dataFile.path()
+            + " with snapshot id: " + String.valueOf(icebergTable_.snapshotId()));
       }
     }
     return fileDescList;

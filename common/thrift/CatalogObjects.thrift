@@ -254,7 +254,7 @@ struct TColumn {
   8: optional string column_qualifier
   9: optional bool is_binary
 
-  // All the following are Kudu-specific column properties
+  // The followings are Kudu-specific column properties
   10: optional bool is_kudu_column
   11: optional bool is_key
   12: optional bool is_nullable
@@ -264,6 +264,10 @@ struct TColumn {
   16: optional i32 block_size
   // The column name, in the case that it appears in Kudu.
   17: optional string kudu_column_name
+
+  // Here come the Iceberg-specific fields.
+  18: optional bool is_iceberg_column
+  19: optional i32 iceberg_field_id
 }
 
 // Represents an HDFS file in a partition.
@@ -549,6 +553,8 @@ struct TIcebergTable {
   3: required i32 default_partition_spec_id
   // Map from 128-bit Murmur3 hash of data file path to its file descriptor
   4: optional map<string,THdfsFileDesc> path_hash_to_file_descriptor
+  // Iceberg snapshot id of the table
+  5: optional i64 snapshot_id
 }
 
 // Represents a table or view.

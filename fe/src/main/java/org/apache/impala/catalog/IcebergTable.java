@@ -106,6 +106,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // Treat iceberg table as a non-partitioned hdfs table in backend
   private HdfsTable hdfsTable_;
 
+  private long snapshotId_ = -1;
+
   protected IcebergTable(org.apache.hadoop.hive.metastore.api.Table msTable,
       Db db, String name, String owner) {
     super(msTable, db, name, owner);
@@ -141,6 +143,14 @@ public class IcebergTable extends Table implements FeIcebergTable {
   @Override
   public TCatalogObjectType getCatalogObjectType() {
     return TCatalogObjectType.TABLE;
+  }
+
+  @Override
+  public void setCatalogVersion(long newVersion) {
+    // We use 'hdfsTable_' to answer CatalogServiceCatalog.doGetPartialCatalogObject(), so
+    // its version number needs to be updated as well.
+    super.setCatalogVersion(newVersion);
+    hdfsTable_.setCatalogVersion(newVersion);
   }
 
   @Override
@@ -201,6 +211,11 @@ public class IcebergTable extends Table implements FeIcebergTable {
   }
 
   @Override
+  public long snapshotId() {
+    return snapshotId_;
+  }
+
+  @Override
   public TTable toThrift() {
     TTable table = super.toThrift();
     table.setTable_type(TTableType.ICEBERG_TABLE);
@@ -229,7 +244,11 @@ public class IcebergTable extends Table implements FeIcebergTable {
       final Timer.Context ctxStorageLdTime =
           getMetrics().getTimer(Table.LOAD_DURATION_STORAGE_METADATA).time();
       try {
-        loadSchemaFromIceberg();
+        TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(this);
+        if (metadata.currentSnapshot() != null) {
+            snapshotId_ = metadata.currentSnapshot().snapshotId();
+        }
+        loadSchemaFromIceberg(metadata);
         // Loading hdfs table after loaded schema from Iceberg,
         // in case we create external Iceberg table skipping column info in sql.
         hdfsTable_.load(false, msClient, msTable_, true, true, false, null, null, reason);
@@ -264,8 +283,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
   /**
    * Load schema and partitioning schemes directly from Iceberg.
    */
-  public void loadSchemaFromIceberg() throws TableLoadingException {
-    TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(this);
+  public void loadSchemaFromIceberg(TableMetadata metadata) throws TableLoadingException {
     icebergSchema_ = metadata.schema();
     loadSchema();
     partitionSpecs_ = Utils.loadPartitionSpecByIceberg(metadata);
@@ -289,7 +307,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
       cols.add(new FieldSchema(column.name(), colType.toSql().toLowerCase(),
           column.doc()));
       // Update impala Table columns by iceberg NestedField
-      addColumn(new Column(column.name(), colType, column.doc(), pos++));
+      addColumn(new IcebergColumn(column.name(), colType, column.doc(), pos++,
+          column.fieldId()));
     }
   }
 
@@ -302,6 +321,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     defaultPartitionSpecId_ = ticeberg.getDefault_partition_spec_id();
     pathHashToFileDescMap_ = loadFileDescFromThrift(
         ticeberg.getPath_hash_to_file_descriptor());
+    snapshotId_ = ticeberg.getSnapshot_id();
     hdfsTable_.loadFromThrift(thriftTable);
   }
 

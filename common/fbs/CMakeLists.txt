@@ -68,6 +68,7 @@ message(${CPP_ARGS})
 # Add new FlatBuffer schema files here.
 set (SRC_FILES
   CatalogObjects.fbs
+  IcebergObjects.fbs
 )
 
 FB_GEN(FB_ALL_FILES ${SRC_FILES})

@@ -16,6 +16,7 @@
 // under the License.
 package org.apache.impala.catalog;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -27,6 +28,9 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
@@ -63,6 +67,12 @@ import com.google.common.collect.Lists;
 public interface FeFsTable extends FeTable {
   /** hive's default value for table property 'serialization.null.format' */
   public static final String DEFAULT_NULL_COLUMN_VALUE = "\\N";
+
+  // Caching this configuration object makes calls to getFileSystem much quicker
+  // (saves ~50ms on a standard plan)
+  // TODO(henry): confirm that this is thread safe - cursory inspection of the class
+  // and its usage in getFileSystem suggests it should be.
+  public static final Configuration CONF = new Configuration();
 
   /**
    * @return true if the table and all its partitions reside at locations which
@@ -188,6 +198,16 @@ public interface FeFsTable extends FeTable {
    */
   SqlConstraints getSqlConstraints();
 
+  default FileSystem getFileSystem() throws CatalogException {
+    FileSystem tableFs;
+    try {
+      tableFs = (new Path(getLocation())).getFileSystem(CONF);
+    } catch (IOException e) {
+      throw new CatalogException("Invalid table path for table: " + getFullName(), e);
+    }
+    return tableFs;
+  }
+
   /**
    * @return  List of primary keys column names, useful for toSqlUtils. In local
    * catalog mode, this causes load of constraints.
@@ -199,6 +219,13 @@ public interface FeFsTable extends FeTable {
       primaryKeys.stream().forEach(p -> primaryKeyColNames.add(p.getColumn_name()));
     }
     return primaryKeyColNames;
+  }
+
+  /**
+   * Returns true if the table is partitioned, false otherwise.
+   */
+  default boolean isPartitioned() {
+    return getMetaStoreTable().getPartitionKeysSize() > 0;
   }
 
   /**

@@ -140,7 +140,7 @@ public abstract class FeCatalogUtils {
   public static List<TColumnDescriptor> getTColumnDescriptors(FeTable table) {
     List<TColumnDescriptor> colDescs = new ArrayList<>();
     for (Column col: table.getColumns()) {
-      colDescs.add(new TColumnDescriptor(col.getName(), col.getType().toThrift()));
+      colDescs.add(col.toDescriptor());
     }
     return colDescs;
   }

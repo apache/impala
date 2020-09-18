@@ -33,6 +33,7 @@ import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
@@ -55,6 +56,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   private int defaultPartitionSpecId_;
   private Map<String, FileDescriptor> pathHashToFileDescMap_;
   private LocalFsTable localFsTable_;
+  private long snapshotId_ = -1;
 
   static LocalTable loadFromIceberg(LocalDb db, Table msTable,
       MetaProvider.TableMetaRef ref) throws TableLoadingException {
@@ -72,8 +74,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     } catch (Exception e) {
       String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
       throw new TableLoadingException(
-          String.format("Error opening Icberg table '%s', error: %s",
-              fullTableName, e.getMessage()));
+          String.format("Error opening Iceberg table '%s'", fullTableName), e);
     }
   }
 
@@ -85,12 +86,16 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     partitionSpecs_ = Utils.loadPartitionSpecByIceberg(metadata);
     defaultPartitionSpecId_ = metadata.defaultSpecId();
     localFsTable_ = LocalFsTable.load(db, msTable, ref);
+    if (metadata.currentSnapshot() != null) {
+      snapshotId_ = metadata.currentSnapshot().snapshotId();
+    }
     try {
       pathHashToFileDescMap_ = Utils.loadAllPartition(this);
     } catch (IOException e) {
-      throw new TableLoadingException(e.getMessage());
+      throw new TableLoadingException(String.format(
+          "Failed to load table: %s.%s", msTable.getDbName(), msTable.getTableName()),
+          (Exception)e);
     }
-
     icebergFileFormat_ = Utils.getIcebergFileFormat(msTable);
 
   }
@@ -141,6 +146,11 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   @Override
   protected void loadColumnStats() {
     localFsTable_.loadColumnStats();
+  }
+
+  @Override
+  public long snapshotId() {
+    return snapshotId_;
   }
 
   @Override

@@ -54,6 +54,9 @@ struct TSlotDescriptor {
 struct TColumnDescriptor {
   1: required string name
   2: required Types.TColumnType type
+
+  // Field id of an iceberg column.
+  3: optional i32 icebergFieldId
 }
 
 // "Union" of all table types.

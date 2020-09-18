@@ -356,9 +356,6 @@ class TestIceberg(ImpalaTestSuite):
   def test_iceberg_query(self, vector):
     self.run_test_case('QueryTest/iceberg-query', vector)
 
-  def test_iceberg_negative(self, vector, unique_database):
-    self.run_test_case('QueryTest/iceberg-negative', vector, use_db=unique_database)
-
   def test_iceberg_profile(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-profile', vector, use_db=unique_database)
 

@@ -159,10 +159,14 @@ bool SlotDescriptor::LayoutEquals(const SlotDescriptor& other_desc) const {
 ColumnDescriptor::ColumnDescriptor(const TColumnDescriptor& tdesc)
   : name_(tdesc.name),
     type_(ColumnType::FromThrift(tdesc.type)) {
+  if (tdesc.__isset.icebergFieldId) {
+    field_id_ = tdesc.icebergFieldId;
+  }
 }
 
 string ColumnDescriptor::DebugString() const {
-  return Substitute("$0: $1", name_, type_.DebugString());
+  return Substitute("$0: $1$2", name_, type_.DebugString(),
+      field_id_ != -1 ? " field_id: " + std::to_string(field_id_): "");
 }
 
 TableDescriptor::TableDescriptor(const TTableDescriptor& tdesc)
@@ -237,6 +241,10 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPo
   avro_schema_ = tdesc.hdfsTable.__isset.avroSchema ? tdesc.hdfsTable.avroSchema : "";
   is_full_acid_ = tdesc.hdfsTable.is_full_acid;
   valid_write_id_list_ = tdesc.hdfsTable.valid_write_ids;
+  if (tdesc.__isset.icebergTable) {
+    is_iceberg_ = true;
+    iceberg_table_location = tdesc.icebergTable.table_location;
+  }
 }
 
 void HdfsTableDescriptor::ReleaseResources() {

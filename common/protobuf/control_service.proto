@@ -69,6 +69,9 @@ message DmlPartitionStatusPB {
   // The latest observed Kudu timestamp reported by the local KuduSession.
   // This value is an unsigned int64.
   optional int64 kudu_latest_observed_ts = 5;
+
+  // List of flat buffer encoded Iceberg data files. See IcebergObjects.fbs
+  repeated bytes iceberg_data_files_fb = 6;
 }
 
 // The results of a DML statement, sent to the coordinator as part of

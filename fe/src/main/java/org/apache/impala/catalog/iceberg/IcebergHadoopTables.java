@@ -17,17 +17,21 @@
 
 package org.apache.impala.catalog.iceberg;
 
+import java.lang.NullPointerException;
 import java.util.Map;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.exceptions.RuntimeIOException;
 import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TIcebergCatalog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 
@@ -35,6 +39,8 @@ import com.google.common.base.Preconditions;
  * Implementation of IcebergCatalog for tables stored in HadoopTables.
  */
 public class IcebergHadoopTables implements IcebergCatalog {
+  private final static Logger LOG = LoggerFactory.getLogger(IcebergHadoopTables.class);
+
   private static IcebergHadoopTables instance_;
 
   public synchronized static IcebergHadoopTables getInstance() {
@@ -71,12 +77,34 @@ public class IcebergHadoopTables implements IcebergCatalog {
   public Table loadTable(TableIdentifier tableId, String tableLocation)
       throws TableLoadingException {
     Preconditions.checkState(tableLocation != null);
-    try {
-      return hadoopTables.load(tableLocation);
-    } catch (NoSuchTableException e) {
-      throw new TableLoadingException(String.format(
-          "Failed to load Iceberg table at location: %s", tableLocation), e);
+    final int MAX_ATTEMPTS = 5;
+    final int SLEEP_MS = 500;
+    int attempt = 0;
+    while (attempt < MAX_ATTEMPTS) {
+      try {
+        return hadoopTables.load(tableLocation);
+      } catch (NoSuchTableException e) {
+        throw new TableLoadingException(e.getMessage());
+      } catch (NullPointerException | RuntimeIOException e) {
+        if (attempt == MAX_ATTEMPTS - 1) {
+          // Throw exception on last attempt.
+          throw new TableLoadingException(String.format(
+              "Could not load Iceberg table at location: %s", tableLocation),
+              (Exception)e);
+        }
+        LOG.warn("Caught Exception during Iceberg table loading at location: {}: {}",
+            tableLocation, e);
+      }
+      ++attempt;
+      try {
+        Thread.sleep(SLEEP_MS);
+      } catch (InterruptedException e) {
+        // Ignored.
+      }
     }
+    // We shouldn't really get there, but to make the compiler happy:
+    throw new TableLoadingException(String.format(
+        "Could not load Iceberg table at location: %s", tableLocation));
   }
 
   @Override

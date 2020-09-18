@@ -63,7 +63,7 @@ public class HdfsTableSink extends TableSink {
 
   private static final Set<HdfsFileFormat> SUPPORTED_FILE_FORMATS = ImmutableSet.of(
       HdfsFileFormat.PARQUET, HdfsFileFormat.TEXT, HdfsFileFormat.RC_FILE,
-      HdfsFileFormat.SEQUENCE_FILE, HdfsFileFormat.AVRO);
+      HdfsFileFormat.SEQUENCE_FILE, HdfsFileFormat.AVRO, HdfsFileFormat.ICEBERG);
 
   // Stores the indices into the list of non-clustering columns of the target table that
   // are stored in the 'sort.columns' table property. This is sent to the backend to

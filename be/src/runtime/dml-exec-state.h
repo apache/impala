@@ -30,6 +30,7 @@ namespace impala {
 class DmlExecStatusPB;
 class DmlPartitionStatusPB;
 class DmlStatsPB;
+struct OutputPartition;
 class TDmlResult;
 class TFinalizeParams;
 class TUpdateCatalogRequest;
@@ -66,6 +67,9 @@ class DmlExecState {
   /// Requires that the partition already exist.
   void UpdatePartition(const std::string& partition_name,
       int64_t num_modified_rows_delta, const DmlStatsPB* insert_stats);
+
+  /// Extract information from 'partition', and add a new Iceberg data file.
+  void AddIcebergDataFile(const OutputPartition& partition);
 
   /// Used to initialize this state when execute Kudu DML. Must be called before
   /// SetKuduDmlStats().

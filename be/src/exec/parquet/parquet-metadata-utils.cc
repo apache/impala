@@ -151,12 +151,12 @@ void SetDecimalConvertedAndLogicalType(
 /// normalization, and older readers that do not use logical types would incorrectly
 /// interpret TIMESTAMP_MILLIS/MICROS as UTC normalized.
 /// Leaves logical type empty for int96 timestamps.
-void SetTimestampLogicalType(const TQueryOptions& query_options,
+void SetTimestampLogicalType(TParquetTimestampType::type parquet_timestamp_type,
     parquet::SchemaElement* col_schema) {
-  if(query_options.parquet_timestamp_type == TParquetTimestampType::INT96_NANOS) return;
+  if (parquet_timestamp_type == TParquetTimestampType::INT96_NANOS) return;
 
   parquet::TimeUnit time_unit;
-  switch (query_options.parquet_timestamp_type) {
+  switch (parquet_timestamp_type) {
     case TParquetTimestampType::INT64_MILLIS:
       time_unit.__set_MILLIS(parquet::MilliSeconds());
       break;
@@ -386,19 +386,19 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
 }
 
 parquet::Type::type ParquetMetadataUtils::ConvertInternalToParquetType(
-    PrimitiveType type, const TQueryOptions& query_options) {
+    PrimitiveType type, TParquetTimestampType::type timestamp_type) {
   DCHECK_GE(type, 0);
   DCHECK_LT(type, INTERNAL_TO_PARQUET_TYPES_SIZE);
-  if (type == TYPE_TIMESTAMP &&
-      query_options.parquet_timestamp_type != TParquetTimestampType::INT96_NANOS) {
+  if (type == TYPE_TIMESTAMP && timestamp_type != TParquetTimestampType::INT96_NANOS) {
     return parquet::Type::INT64;
   }
   return INTERNAL_TO_PARQUET_TYPES[type];
 }
 
 void ParquetMetadataUtils::FillSchemaElement(const ColumnType& col_type,
-    const TQueryOptions& query_options, parquet::SchemaElement* col_schema) {
-  col_schema->__set_type(ConvertInternalToParquetType(col_type.type, query_options));
+    const TQueryOptions& query_options, TParquetTimestampType::type timestamp_type,
+    parquet::SchemaElement* col_schema) {
+  col_schema->__set_type(ConvertInternalToParquetType(col_type.type, timestamp_type));
   col_schema->__set_repetition_type(parquet::FieldRepetitionType::OPTIONAL);
 
   switch (col_type.type) {
@@ -433,7 +433,7 @@ void ParquetMetadataUtils::FillSchemaElement(const ColumnType& col_type,
       SetIntLogicalType(64, col_schema);
       break;
     case TYPE_TIMESTAMP:
-      SetTimestampLogicalType(query_options, col_schema);
+      SetTimestampLogicalType(timestamp_type, col_schema);
       break;
     case TYPE_DATE:
       SetDateLogicalType(col_schema);

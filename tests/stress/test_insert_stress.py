@@ -23,6 +23,7 @@ from multiprocessing import Value
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
+from tests.common.skip import SkipIf
 from tests.stress.stress_util import run_tasks, Task
 
 
@@ -39,17 +40,17 @@ class TestInsertStress(ImpalaTestSuite):
         lambda v: (v.get_value('table_format').file_format == 'parquet' and
                    v.get_value('table_format').compression_codec == 'snappy'))
 
-  def _impala_role_concurrent_writer(self, tbl_name, wid, counter):
-    """Writes ascending numbers into column 'i'. To column 'wid' it writes its identifier
-    passed in parameter 'wid'."""
+  def _impala_role_concurrent_writer(self, tbl_name, wid, num_inserts, counter):
+    """Writes ascending numbers up to 'num_inserts' into column 'i'. To column 'wid' it
+    writes its identifier passed in parameter 'wid'."""
     target_impalad = wid % ImpalaTestSuite.get_impalad_cluster_size()
     impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
     try:
-      num_inserts = 0
-      while num_inserts < 50:
+      insert_cnt = 0
+      while insert_cnt < num_inserts:
         impalad_client.execute("insert into table %s values (%i, %i)" % (
-            tbl_name, wid, num_inserts))
-        num_inserts += 1
+            tbl_name, wid, insert_cnt))
+        insert_cnt += 1
     finally:
       with counter.get_lock():
         counter.value += 1
@@ -86,14 +87,41 @@ class TestInsertStress(ImpalaTestSuite):
     if the table contains continuous ranges of integers."""
     tbl_name = "%s.test_concurrent_inserts" % unique_database
     self.client.set_configuration_option("SYNC_DDL", "true")
-    self.client.execute("drop table if exists %s" % tbl_name)
     self.client.execute("""create table {0} (wid int, i int)""".format(tbl_name))
 
     counter = Value('i', 0)
     num_writers = 16
     num_checkers = 4
+    inserts = 50
 
-    writers = [Task(self._impala_role_concurrent_writer, tbl_name, i, counter)
+    writers = [Task(self._impala_role_concurrent_writer, tbl_name, i, inserts, counter)
+               for i in xrange(0, num_writers)]
+    checkers = [Task(self._impala_role_concurrent_checker, tbl_name, i, counter,
+                     num_writers)
+                for i in xrange(0, num_checkers)]
+    run_tasks(writers + checkers)
+
+  @pytest.mark.execute_serially
+  @pytest.mark.stress
+  @SkipIf.not_hdfs
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_iceberg_inserts(self, unique_database):
+    """Issues INSERT statements against multiple impalads in a way that some
+    invariants must be true when a spectator process inspects the table. E.g.
+    if the table contains continuous ranges of integers."""
+    tbl_name = "%s.test_concurrent_inserts" % unique_database
+    self.client.set_configuration_option("SYNC_DDL", "true")
+    self.client.execute("""create table {0} (wid int, i int) stored as iceberg
+        tblproperties('iceberg.catalog'='hadoop.catalog',
+                      'iceberg.catalog_location'='{1}')""".format(
+        tbl_name, '/test-warehouse/' + unique_database))
+
+    counter = Value('i', 0)
+    num_writers = 4
+    num_checkers = 2
+    inserts = 30
+
+    writers = [Task(self._impala_role_concurrent_writer, tbl_name, i, inserts, counter)
                for i in xrange(0, num_writers)]
     checkers = [Task(self._impala_role_concurrent_checker, tbl_name, i, counter,
                      num_writers)

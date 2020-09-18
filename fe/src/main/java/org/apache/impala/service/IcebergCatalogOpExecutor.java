@@ -17,14 +17,21 @@
 
 package org.apache.impala.service;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.iceberg.Table;
-import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.AppendFiles;
+import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.types.Types;
+import org.apache.iceberg.hadoop.HadoopCatalog;
+import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergTable;
@@ -32,10 +39,12 @@ import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.fb.FbIcebergDataFile;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TIcebergCatalog;
@@ -150,21 +159,24 @@ public class IcebergCatalogOpExecutor {
         case FLOAT:
           return Types.FloatType.get();
         case TIMESTAMP:
-          return Types.TimestampType.withZone();
+          // Impala TIMESTAMP has timestamp without time zone semantics which is
+          // the TIMESTAMP type in Iceberg.
+          return Types.TimestampType.withoutZone();
         case DECIMAL:
           return Types.DecimalType.of(s.decimalPrecision(), s.decimalScale());
         case DATE:
           return Types.DateType.get();
         case BINARY:
           return Types.BinaryType.get();
-        /* Fall through below */
-        case INVALID_TYPE:
-        case NULL_TYPE:
-        case DATETIME:
         case CHAR:
+          return Types.FixedType.ofLength(s.getLength());
+        /* Fall through below */
         case TINYINT:
         case SMALLINT:
+        case INVALID_TYPE:
+        case NULL_TYPE:
         case VARCHAR:
+        case DATETIME:
         default:
           throw new ImpalaRuntimeException(String.format(
               "Type %s is not supported in Iceberg", s.toSql()));
@@ -190,6 +202,27 @@ public class IcebergCatalogOpExecutor {
       throw new ImpalaRuntimeException(String.format(
           "Type %s is not supported in Iceberg", t.toSql()));
     }
+  }
+
+  /**
+   * Append the newly inserted data files to the Iceberg table using the AppendFiles
+   * API.
+   */
+  public static void appendFiles(FeIcebergTable feIcebergTable,
+      List<ByteBuffer> dataFilesFb) throws ImpalaRuntimeException, TableLoadingException {
+    org.apache.iceberg.Table nativeIcebergTable =
+        IcebergUtil.loadTable(feIcebergTable);
+    AppendFiles append = nativeIcebergTable.newAppend();
+    for (ByteBuffer buf : dataFilesFb) {
+      FbIcebergDataFile dataFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
+      DataFiles.Builder builder = DataFiles.builder(nativeIcebergTable.spec())
+          .withPath(dataFile.path())
+          .withFormat(IcebergUtil.fbFileFormatToIcebergFileFormat(dataFile.format()))
+          .withRecordCount(dataFile.recordCount())
+          .withFileSizeInBytes(dataFile.fileSizeInBytes());
+      append.appendFile(builder.build());
+    }
+    append.commit();
   }
 
   private static int getNextId() {
