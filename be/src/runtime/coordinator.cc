@@ -1219,6 +1219,12 @@ void Coordinator::ComputeQuerySummary() {
   COUNTER_SET(PROFILE_InnerNodeSelectivityRatio.Instantiate(query_profile_),
       inner_node_ratio);
 
+  double skew_threshold = query_state_->query_options().report_skew_limit;
+  if (skew_threshold >= 0) {
+    // Add skews info (if any)
+    query_profile_->AddSkewInfo(query_profile_, skew_threshold);
+  }
+
   // TODO(IMPALA-8126): Move to host profiles
   query_profile_->AddInfoString("Per Node Peak Memory Usage", mem_info.str());
   query_profile_->AddInfoString("Per Node Bytes Read", bytes_read_info.str());

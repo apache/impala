@@ -27,6 +27,7 @@
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
+#include <boost/range/adaptor/transformed.hpp>
 
 #include "common/object-pool.h"
 #include "gutil/strings/strip.h"
@@ -70,6 +71,9 @@ static const string ROOT_COUNTER = "";
 const string RuntimeProfileBase::TOTAL_TIME_COUNTER_NAME = "TotalTime";
 const string RuntimeProfileBase::LOCAL_TIME_COUNTER_NAME = "LocalTime";
 const string RuntimeProfileBase::INACTIVE_TIME_COUNTER_NAME = "InactiveTotalTime";
+
+const string RuntimeProfileBase::SKEW_SUMMARY = "skew(s) found at";
+const string RuntimeProfileBase::SKEW_DETAILS = "Skew details";
 
 constexpr ProfileEntryPrototype::Significance ProfileEntryPrototype::ALLSIGNIFICANCE[];
 
@@ -663,6 +667,50 @@ void RuntimeProfileBase::GetAllChildren(vector<RuntimeProfileBase*>* children) {
 int RuntimeProfileBase::num_counters() const {
   std::lock_guard<SpinLock> l(counter_map_lock_);
   return counter_map_.size();
+}
+
+void RuntimeProfileBase::AddSkewInfo(RuntimeProfileBase* root, double threshold) {
+  lock_guard<SpinLock> l(children_lock_);
+  DCHECK(root);
+  // A map of specs for profiles and average counters in profiles that can potentially
+  // harbor skews. Each spec is a pair of a profile name prefix and a list of counter
+  // names. Lookup of the map for a profile name prefix is O(1).
+  typedef string NodeNamePrefix;
+  typedef vector<string> CounterNames;
+  static const unordered_map<NodeNamePrefix, CounterNames> skew_profile_specs = {
+      {"KUDU_SCAN_NODE", {"RowsRead"}}, {"HDFS_SCAN_NODE", {"RowsRead"}},
+      {"HASH_JOIN_NODE", {"ProbeRows", "BuildRows"}},
+      {"GroupingAggregator", {"RowsReturned"}}, {"EXCHANGE_NODE", {"RowsReturned"}},
+      {"SORT_NODE", {"RowsReturned"}}};
+  // If this profile can potentially harbor skews, identify the corresponding counters
+  // within it and verify.
+  for (auto& skew_profile_it : skew_profile_specs) {
+    // Test if the profile name prefix is indeed a prefix of the profile name.
+    if (name().find(skew_profile_it.first) == 0) {
+      for (auto& counter_name_it : skew_profile_it.second) {
+        auto counter_it = counter_map_.find(counter_name_it);
+        // Test if the counter name is in the counter spec.
+        if (counter_it != counter_map_.end()) {
+          auto average_counter =
+              dynamic_cast<RuntimeProfile::AveragedCounter*>(counter_it->second);
+          string details;
+          // Skew detection can only be done for an average counter.
+          if (average_counter && average_counter->HasSkew(threshold, &details)) {
+            // Skew detected:
+            // Log the profile name in the 'root' profile
+            root->AddInfoStringInternal(SKEW_SUMMARY, name(), true);
+            // Log the counter name and skew details in 'this' profile
+            this->AddInfoStringInternal(
+                SKEW_DETAILS, counter_name_it + " " + details, true);
+          }
+        }
+      }
+    }
+  }
+  // Keep looking from within each child profile.
+  for (auto child : children_) {
+    child.first->AddSkewInfo(root, threshold);
+  }
 }
 
 void RuntimeProfile::SortChildrenByTotalTime() {
@@ -1857,6 +1905,65 @@ void RuntimeProfileBase::AveragedCounter::ToThrift(
     tcounter->has_value[i] = has_value_[i].Load();
     tcounter->values[i] = values_[i].Load();
   }
+}
+
+bool RuntimeProfile::AveragedCounter::HasSkew(double threshold, string* details) {
+  bool has_skew = false;
+  stringstream ss_details;
+  if (unit_ == TUnit::DOUBLE_VALUE) {
+    has_skew = EvaluateSkewWithCoV<double>(threshold, &ss_details);
+  } else {
+    has_skew = EvaluateSkewWithCoV<int64_t>(threshold, &ss_details);
+  }
+  if (has_skew && details) {
+    *details = ss_details.str();
+    return true;
+  }
+  return false;
+}
+
+template <typename T>
+bool RuntimeProfile::AveragedCounter::EvaluateSkewWithCoV(
+    double threshold, stringstream* details) {
+  T mean = value();
+  if (mean > ROW_AVERAGE_LIMIT) {
+    double stddev = 0.0;
+    string valid_value_list;
+    ComputeStddevPForValidValues<T>(&valid_value_list, &stddev);
+    double cov = stddev / mean;
+    if (cov > threshold) {
+      DCHECK(details);
+      *details << "(" << valid_value_list << ", CoV=" << std::fixed
+               << std::setprecision(2) << cov << ", mean=" << std::fixed
+               << std::setprecision(2) << mean << ")";
+      return true;
+    }
+  }
+  return false;
+}
+
+template <typename T>
+void RuntimeProfile::AveragedCounter::ComputeStddevPForValidValues(
+    string* valid_value_list, double* stddev) {
+  DCHECK(valid_value_list);
+  DCHECK(stddev);
+  // Collect raw values.
+  vector<T> values;
+  stringstream ss;
+  ss << "[";
+  for (int i = 0; i < num_values_; i++) {
+    if (has_value_[i].Load()) {
+      T v = BitcastFromInt64<T>(values_[i].Load());
+      values.emplace_back(v);
+    }
+  }
+  ss << boost::algorithm::join(
+      values | boost::adaptors::transformed([](T d) { return std::to_string(d); }), ",");
+  ss << "]";
+  *valid_value_list = ss.str();
+  T mean = value();
+  // Finally compute the population stddev.
+  StatUtil::ComputeStddevP<T>(values.data(), values.size(), mean, stddev);
 }
 
 void RuntimeProfileBase::SummaryStatsCounter::ToThrift(

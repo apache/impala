@@ -30,6 +30,7 @@
 #include "common/logging.h"
 #include "gutil/singleton.h"
 #include "util/arithmetic-util.h"
+#include "util/stat-util.h"
 #include "util/runtime-profile.h"
 #include "util/stopwatch.h"
 #include "util/streaming-sampler.h"
@@ -409,6 +410,21 @@ class RuntimeProfileBase::AveragedCounter : public RuntimeProfileBase::Counter {
   /// It is safe for it to be read at the same time as it is updated.
   void UpdateCounter(Counter* new_counter, int idx);
 
+  /// Answer the question whether there exists skew among all valid raw values
+  /// backing this average counter.
+  ///
+  ///  Input argument threshold: the threshold used to evaluate skews.
+  ///
+  /// Return true if skew is detected and 'details' is populated with a list of
+  /// all valid raw values and the population stddev in the form of:
+  /// ([raw_value, raw_value ...], <skew-detection-formula>).
+  ///  <skew-detection-formula> ::=
+  ///      CoV=coefficient_of_variation_value, mean=mean_value
+  ///
+  /// Return false if no skew is detected and 'details' argument is not altered.
+  ///
+  bool HasSkew(double threshold, std::string* details);
+
   /// The value for this counter should be updated through UpdateCounter().
   /// Set() and Add() should not be used.
   void Set(double value) override { DCHECK(false); }
@@ -465,6 +481,28 @@ class RuntimeProfileBase::AveragedCounter : public RuntimeProfileBase::Counter {
   /// Returns the mean value, or the double bit pattern stored in an int64_t.
   template <typename T>
   int64_t ComputeMean() const;
+
+  /// Decide whether skew exists among all valid raw values V in this counter with the
+  /// following formula:
+  ///
+  ///   CoV(V) > threshold && mean(V) > 5000
+  ///
+  /// where CoV(V) is the coefficient of variation, defined as
+  /// stddev_population(V) / mean(V). CoV measures the variability in relation to the
+  /// mean. When values in V are identical (no skew), CoV(V) = 0. When values in V
+  /// differ, CoV(V) > 0. The above formula excludes small skew casess when the average
+  /// raw value is no greater than 5000.
+  ///
+  /// Returns true if the above formula is evaluated to true, false otherwise.
+  ///
+  static const int ROW_AVERAGE_LIMIT = 5000;
+  template <typename T>
+  bool EvaluateSkewWithCoV(double threshold, std::stringstream* details);
+
+  /// Compute the population stddev from all valid values (of type T) in
+  /// values_[] and collect these values in a comma separated list through 'details'.
+  template <typename T>
+  void ComputeStddevPForValidValues(std::string* details, double* stddev);
 };
 
 /// This counter records multiple values and keeps a track of the minimum, maximum and

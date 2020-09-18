@@ -460,6 +460,9 @@ struct TQueryOptions {
   // Initialized with -1 to indicate it is unspecified.
   // See comment in ImpalaService.thrift
   115: optional i64 targeted_kudu_scan_range_length = -1;
+
+  // See comment in ImpalaService.thrift
+  116: optional double report_skew_limit = 1.0;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
