@@ -222,6 +222,9 @@ struct TUpdateCatalogRequest {
 
   // ACID write ID for transactional inserts.
   9: optional i64 write_id
+
+  // Iceberg data files to append to the table, encoded in FlatBuffers.
+  10: required list<binary> iceberg_data_files_fb
 }
 
 // Response from a TUpdateCatalogRequest

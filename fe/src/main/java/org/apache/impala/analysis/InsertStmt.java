@@ -445,10 +445,6 @@ public class InsertStmt extends StatementBase {
       throw new AnalysisException(
           String.format("Impala does not support %sing into views: %s", getOpName(),
               table_.getFullName()));
-    } else if (table_ instanceof FeIcebergTable) {
-      throw new AnalysisException(
-          String.format("Impala does not support %sing into iceberg table: %s",
-              getOpName(), table_.getFullName()));
     }
 
     Analyzer.ensureTableNotFullAcid(table_, "INSERT");
@@ -541,6 +537,16 @@ public class InsertStmt extends StatementBase {
       if (partitionKeyValues_ != null && !partitionKeyValues_.isEmpty()) {
         throw new AnalysisException(
             "Partition specifications are not supported for Kudu tables.");
+      }
+    }
+
+    if (table_ instanceof FeIcebergTable) {
+      if (overwrite_) {
+        throw new AnalysisException("INSERT OVERWRITE not supported for Iceberg tables.");
+      }
+      FeIcebergTable iceTable = (FeIcebergTable)table_;
+      if (iceTable.getDefaultPartitionSpec().hasPartitionFields()) {
+        throw new AnalysisException("Impala cannot write partitioned Iceberg tables.");
       }
     }
 

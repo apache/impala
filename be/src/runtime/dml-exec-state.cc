@@ -26,6 +26,7 @@
 
 #include "common/logging.h"
 #include "exec/data-sink.h"
+#include "exec/output-partition.h"
 #include "util/pretty-printer.h"
 #include "util/container-util.h"
 #include "util/hdfs-bulk-ops.h"
@@ -35,6 +36,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/exec-env.h"
 #include "gen-cpp/control_service.pb.h"
+#include "gen-cpp/IcebergObjects_generated.h"
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -106,6 +108,9 @@ void DmlExecState::Update(const DmlExecStatusPB& dml_exec_status) {
     status->set_partition_base_dir(part.second.partition_base_dir());
     if (part.second.has_stats()) {
       MergeDmlStats(part.second.stats(), status->mutable_stats());
+    }
+    for (int i = 0; i < part.second.iceberg_data_files_fb_size(); ++i) {
+      status->add_iceberg_data_files_fb(part.second.iceberg_data_files_fb(i));
     }
   }
   files_to_move_.insert(
@@ -448,6 +453,24 @@ void DmlExecState::UpdatePartition(const string& partition_name,
       entry->second.num_modified_rows() + num_modified_rows_delta);
   if (insert_stats == nullptr) return;
   MergeDmlStats(*insert_stats, entry->second.mutable_stats());
+}
+
+void DmlExecState::AddIcebergDataFile(const OutputPartition& partition) {
+  using namespace org::apache::impala::fb;
+  lock_guard<mutex> l(lock_);
+  const string& partition_name = partition.partition_name;
+  PartitionStatusMap::iterator entry = per_partition_status_.find(partition_name);
+  DCHECK(entry != per_partition_status_.end());
+
+  flatbuffers::FlatBufferBuilder fbb;
+  flatbuffers::Offset<FbIcebergDataFile> data_file = CreateFbIcebergDataFile(fbb,
+      fbb.CreateString(partition.current_file_name),
+      FbFileFormat::FbFileFormat_PARQUET,
+      partition.num_rows,
+      partition.bytes_written);
+  fbb.Finish(data_file);
+  string data_file_str(reinterpret_cast<char*>(fbb.GetBufferPointer()), fbb.GetSize());
+  entry->second.add_iceberg_data_files_fb(std::move(data_file_str));
 }
 
 void DmlExecState::MergeDmlStats(const DmlStatsPB& src, DmlStatsPB* dst) {

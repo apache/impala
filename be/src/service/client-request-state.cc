@@ -1203,6 +1203,26 @@ Status ClientRequestState::Cancel(
   return Status::OK();
 }
 
+vector<string> createIcebergDataFilesVector(DmlExecState& dml_exec_state) {
+  vector<string> ret;
+  DmlExecStatusPB exec_state_pb;
+  dml_exec_state.ToProto(&exec_state_pb);
+  typedef google::protobuf::Map<string, DmlPartitionStatusPB> PerPartitionStatusPBMap;
+  const PerPartitionStatusPBMap& per_part_map = exec_state_pb.per_partition_status();
+  // Iceberg tables only have a single partition.
+  if (per_part_map.size() != 1) return ret;
+  const PerPartitionStatusPBMap::value_type& part = *per_part_map.begin();
+  int64_t num_data_files = part.second.iceberg_data_files_fb_size();
+  ret.reserve(num_data_files);
+  for (const PerPartitionStatusPBMap::value_type& part : per_part_map) {
+    for (int i = 0; i < num_data_files; ++i) {
+      string data_file_fb = part.second.iceberg_data_files_fb(i);
+      ret.emplace_back(std::move(data_file_fb));
+    }
+  }
+  return ret;
+}
+
 Status ClientRequestState::UpdateCatalog() {
   if (!exec_request_->__isset.query_exec_request ||
       exec_request_->query_exec_request.stmt_type != TStmtType::DML) {
@@ -1223,7 +1243,8 @@ Status ClientRequestState::UpdateCatalog() {
     catalog_update.header.__set_redacted_sql_stmt(
         query_ctx_.client_request.__isset.redacted_stmt ?
             query_ctx_.client_request.redacted_stmt : query_ctx_.client_request.stmt);
-    if (!GetCoordinator()->dml_exec_state()->PrepareCatalogUpdate(&catalog_update)) {
+    DmlExecState* dml_exec_state = GetCoordinator()->dml_exec_state();
+    if (!dml_exec_state->PrepareCatalogUpdate(&catalog_update)) {
       VLOG_QUERY << "No partitions altered, not updating metastore (query id: "
                  << PrintId(query_id()) << ")";
     } else {
@@ -1240,6 +1261,10 @@ Status ClientRequestState::UpdateCatalog() {
       if (InTransaction()) {
         catalog_update.__set_transaction_id(finalize_params.transaction_id);
         catalog_update.__set_write_id(finalize_params.write_id);
+      }
+      vector<string> iceberg_data_files = createIcebergDataFilesVector(*dml_exec_state);
+      if (!iceberg_data_files.empty()) {
+        catalog_update.__set_iceberg_data_files_fb(iceberg_data_files);
       }
 
       Status cnxn_status;

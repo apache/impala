@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 import org.apache.avro.Schema;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -343,12 +342,6 @@ public class HdfsTable extends Table implements FeFsTable {
   private final static Logger LOG = LoggerFactory.getLogger(HdfsTable.class);
 
   public final static long LOADING_WARNING_TIME_NS = 5000000000L;
-
-  // Caching this configuration object makes calls to getFileSystem much quicker
-  // (saves ~50ms on a standard plan)
-  // TODO(henry): confirm that this is thread safe - cursory inspection of the class
-  // and its usage in getFileSystem suggests it should be.
-  private static final Configuration CONF = new Configuration();
 
   public HdfsTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
       Db db, String name, String owner) {
@@ -748,16 +741,6 @@ public class HdfsTable extends Table implements FeFsTable {
     LOG.info("Loaded file and block metadata for {} partitions: {}. Time taken: {}",
         getFullName(), partNames, PrintUtils.printTimeNs(duration));
     return duration;
-  }
-
-  public FileSystem getFileSystem() throws CatalogException {
-    FileSystem tableFs;
-    try {
-      tableFs = (new Path(getLocation())).getFileSystem(CONF);
-    } catch (IOException e) {
-      throw new CatalogException("Invalid table path for table: " + getFullName(), e);
-    }
-    return tableFs;
   }
 
   /**
@@ -2609,13 +2592,6 @@ public class HdfsTable extends Table implements FeFsTable {
     tmpTable.initializePartitionMetadata(msTbl);
     tmpTable.setTableStats(msTbl);
     return tmpTable;
-  }
-
-  /**
-   * Returns true if the table is partitioned, false otherwise.
-   */
-  public boolean isPartitioned() {
-    return getMetaStoreTable().getPartitionKeysSize() > 0;
   }
 
   /**

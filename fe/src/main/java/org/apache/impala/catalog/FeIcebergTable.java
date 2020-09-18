@@ -41,6 +41,7 @@ import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.thrift.TColumn;
@@ -218,6 +219,11 @@ public interface FeIcebergTable extends FeFsTable {
   }
 
   /**
+   * Current snapshot id of the table.
+   */
+  long snapshotId();
+
+  /**
    * Utility functions
    */
   public static abstract class Utils {
@@ -310,6 +316,7 @@ public interface FeIcebergTable extends FeFsTable {
         tIcebergTable.putToPath_hash_to_file_descriptor(entry.getKey(),
           entry.getValue().toThrift());
       }
+      tIcebergTable.setSnapshot_id(icebergTable.snapshotId());
       return tIcebergTable;
     }
 

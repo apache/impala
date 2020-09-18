@@ -61,6 +61,8 @@ class SkipIfS3:
       reason="Tests rely on HDFS qualified paths, IMPALA-1872")
   eventually_consistent = pytest.mark.skipif(IS_S3,
       reason="Flakiness on account of S3 eventual consistency.")
+  iceberg = pytest.mark.skipif(IS_S3,
+      reason="Currently Iceberg is only supported on HDFS.")
 
 
 class SkipIfABFS:

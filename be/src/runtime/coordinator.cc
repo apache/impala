@@ -50,6 +50,7 @@
 #include "scheduling/admission-control-client.h"
 #include "scheduling/scheduler.h"
 #include "service/client-request-state.h"
+#include "service/frontend.h"
 #include "util/bit-util.h"
 #include "util/bloom-filter.h"
 #include "util/hdfs-bulk-ops.h"
@@ -763,13 +764,13 @@ Status Coordinator::FinalizeHdfsDml() {
   // staging directory.
   DCHECK(has_called_wait_.Load());
   DCHECK(finalize_params() != nullptr);
-  bool is_transactional = finalize_params()->__isset.write_id;
+  bool is_hive_acid = finalize_params()->__isset.write_id;
 
   VLOG_QUERY << "Finalizing query: " << PrintId(query_id());
   SCOPED_TIMER(finalization_timer_);
   Status return_status = UpdateExecState(Status::OK(), nullptr, FLAGS_hostname);
+  HdfsTableDescriptor* hdfs_table = nullptr;
   if (return_status.ok()) {
-    HdfsTableDescriptor* hdfs_table;
     DCHECK(query_ctx().__isset.desc_tbl_serialized);
     RETURN_IF_ERROR(DescriptorTbl::CreateHdfsTblDescriptor(
             query_ctx().desc_tbl_serialized, finalize_params()->table_id, obj_pool(),
@@ -777,8 +778,12 @@ Status Coordinator::FinalizeHdfsDml() {
     DCHECK(hdfs_table != nullptr)
         << "INSERT target table not known in descriptor table: "
         << finalize_params()->table_id;
-    // There is no need for finalization for transactional inserts.
-    if (!is_transactional) {
+    if (hdfs_table->IsIcebergTable()) {
+      // No-op. The data files are written by the table sink operators to their final
+      // places. We append them to the table in UpdateCatalog().
+    }
+    // There is no need for finalization for Hive ACID transactional inserts.
+    else if (!is_hive_acid) {
       // 'write_id' is NOT set, therefore we need to do some finalization, e.g. moving
       // files or delete old files in case of INSERT OVERWRITE.
       return_status = dml_exec_state_.FinalizeHdfsInsert(*finalize_params(),
@@ -786,10 +791,11 @@ Status Coordinator::FinalizeHdfsDml() {
           hdfs_table, query_profile_);
     }
     hdfs_table->ReleaseResources();
-  } else if (is_transactional) {
+  } else if (is_hive_acid) {
     parent_request_state_->AbortTransaction();
   }
-  if (is_transactional) {
+  // Cleanup after DML operation.
+  if (is_hive_acid || (hdfs_table && hdfs_table->IsIcebergTable())) {
     DCHECK(!finalize_params()->__isset.staging_dir);
   } else {
     RETURN_IF_ERROR(DeleteQueryLevelStagingDir());

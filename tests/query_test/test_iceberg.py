@@ -18,8 +18,9 @@
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIf
 
-class TestCreatingIcebergTable(ImpalaTestSuite):
-  """Test creating iceberg managed and external table"""
+
+class TestIcebergTable(ImpalaTestSuite):
+  """Tests related to Iceberg tables."""
 
   @classmethod
   def get_workload(cls):
@@ -27,9 +28,12 @@ class TestCreatingIcebergTable(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestCreatingIcebergTable, cls).add_test_dimensions()
+    super(TestIcebergTable, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_iceberg_negative(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-negative', vector, use_db=unique_database)
 
   def test_create_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-create', vector, use_db=unique_database)
@@ -45,3 +49,7 @@ class TestCreatingIcebergTable(ImpalaTestSuite):
                       'iceberg.catalog_location'='{1}')""".format(tbl_name, cat_location))
     self.hdfs_client.delete_file_dir(cat_location, True)
     self.execute_query_expect_success(self.client, """drop table {0}""".format(tbl_name))
+
+  @SkipIf.not_hdfs
+  def test_insert_into_iceberg_table(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-insert', vector, use_db=unique_database)

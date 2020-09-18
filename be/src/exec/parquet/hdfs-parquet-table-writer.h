@@ -157,6 +157,12 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   /// new row group.  current_row_group_ will be flushed.
   Status AddRowGroup();
 
+  /// Selects the Parquet timestamp type to be used by this writer.
+  void ConfigureTimestampType();
+
+  /// Updates output partition with some summary about the written file.
+  void FinalizePartitionInfo();
+
   /// Thrift serializer utility object.  Reusing this object allows for
   /// fewer memory allocations.
   boost::scoped_ptr<ThriftSerializer> thrift_serializer_;
@@ -212,6 +218,13 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
 
   /// Maximum row count written in a page.
   int32_t page_row_count_limit_ = std::numeric_limits<int32_t>::max();
+
+  /// The Timestamp type used to write timestamp values.
+  TParquetTimestampType::type timestamp_type_;
+
+  /// True if we are writing an Iceberg data file. In that case the writer behaves a
+  /// bit differently, e.g. writes specific type of timestamps, fills some extra metadata.
+  bool is_iceberg_file_ = false;
 };
 
 }

@@ -90,6 +90,7 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsFileFormat;
@@ -4429,7 +4430,7 @@ public class CatalogOpExecutor {
     // Only update metastore for Hdfs tables.
     Table table = getExistingTable(update.getDb_name(), update.getTarget_table(),
         "Load for INSERT");
-    if (!(table instanceof HdfsTable)) {
+    if (!(table instanceof FeFsTable)) {
       throw new InternalException("Unexpected table type: " +
           update.getTarget_table());
     }
@@ -4472,7 +4473,7 @@ public class CatalogOpExecutor {
       List<String> errorMessages = Lists.newArrayList();
       HashSet<String> partsToLoadMetadata = null;
       Collection<? extends FeFsPartition> parts =
-          FeCatalogUtils.loadAllPartitions((HdfsTable) table);
+          FeCatalogUtils.loadAllPartitions((FeFsTable) table);
       List<FeFsPartition> affectedExistingPartitions = new ArrayList<>();
       List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitionsStatsUnset =
           Lists.newArrayList();
@@ -4642,6 +4643,12 @@ public class CatalogOpExecutor {
           skipTransactionalInsertEvent = true;
         }
       }
+
+      if (table instanceof FeIcebergTable && update.isSetIceberg_data_files_fb()) {
+        IcebergCatalogOpExecutor.appendFiles((FeIcebergTable)table,
+            update.getIceberg_data_files_fb());
+      }
+
       // the load operation below changes the partitions in-place (this was later
       // changed in upstream). If the partitions are loaded in-place, we cannot keep track
       // of files before the load and hence the firing of insert events later below
@@ -4661,8 +4668,8 @@ public class CatalogOpExecutor {
                 filesBeforeInsert.keySet()) : Sets.newHashSetWithExpectedSize(0);
         long txnId = tblTxn == null ? -1 : tblTxn.txnId;
         long writeId = tblTxn == null ? -1: tblTxn.writeId;
-        createInsertEvents(table, filesBeforeInsert, newPartsCreated,
-            update.is_overwrite, txnId, writeId);
+        createInsertEvents(table, filesBeforeInsert, affectedExistingPartitions,
+            newPartsCreated, update.is_overwrite, txnId, writeId);
       }
       addTableToCatalogUpdate(table, response.result);
     } finally {
@@ -4682,14 +4689,17 @@ public class CatalogOpExecutor {
    * Populates insert event data and calls fireInsertEvents() if external event
    * processing is enabled. This is no-op if event processing is disabled or there are
    * no existing partitions affected by this insert.
-   *  @param partitionFilesMapBeforeInsert List of files for each partition in which data
+   * @param partitionFilesMapBeforeInsert List of files for each partition in which data
    *                                     was inserted.
+   * @param affectedExistingPartitions List of all affected partitions that were already
+   *                                   existed.
    * @param newPartsCreated represents all the partitions names which got created by
    *                       the insert operation.
    * @param isInsertOverwrite indicates if the operation was an insert overwrite.
    */
   private void createInsertEvents(Table table,
       Map<String, Set<String>> partitionFilesMapBeforeInsert,
+      List<FeFsPartition> affectedExistingPartitions,
       Set<String> newPartsCreated, boolean isInsertOverwrite,
       long txnId, long writeId) throws CatalogException {
     if (!shouldGenerateInsertEvents()) {
@@ -4701,8 +4711,12 @@ public class CatalogOpExecutor {
     // List of all partitions that we insert into
     List<HdfsPartition> partitions = new ArrayList<>();
     Collection<? extends FeFsPartition> partsPostInsert;
-    partsPostInsert =
-        ((HdfsTable) table).getPartitionsForNames(partitionFilesMapBeforeInsert.keySet());
+    if (table.getNumClusteringCols() > 0) {
+      partsPostInsert = ((HdfsTable) table).getPartitionsForNames(
+          partitionFilesMapBeforeInsert.keySet());
+    } else {
+      partsPostInsert = FeCatalogUtils.loadAllPartitions((FeFsTable) table);
+    }
 
     Map<String, Set<String>> partitionFilesMapPostInsert = getPartitionNameFilesMap(
         partsPostInsert);
@@ -4726,12 +4740,12 @@ public class CatalogOpExecutor {
       partVals = hdfsPartition.getPartitionValuesAsStrings(true);
       LOG.info(String.format("%s new files detected for table %s%s", newFiles.size(),
           table.getFullName(),
-          ((HdfsTable) table).isPartitioned() ? " partition " + hdfsPartition
+          ((FeFsTable) table).isPartitioned() ? " partition " + hdfsPartition
               .getPartitionName() : ""));
       if (!newFiles.isEmpty()) {
         // Collect all the insert events.
         insertEventReqDatas.add(
-            makeInsertEventData((HdfsTable) table, partVals, newFiles,
+            makeInsertEventData((FeFsTable) table, partVals, newFiles,
                 isInsertOverwrite));
         if (!partVals.isEmpty()) {
           // insert into partition
@@ -4784,7 +4798,7 @@ public class CatalogOpExecutor {
         .isInsertEventsEnabled();
   }
 
-  private InsertEventRequestData makeInsertEventData(HdfsTable tbl, List<String> partVals,
+  private InsertEventRequestData makeInsertEventData(FeFsTable tbl, List<String> partVals,
       Set<String> newFiles, boolean isInsertOverwrite) throws CatalogException {
     Preconditions.checkNotNull(newFiles);
     Preconditions.checkNotNull(partVals);
@@ -4812,6 +4826,11 @@ public class CatalogOpExecutor {
         }
         insertEventRequestData.setReplace(isInsertOverwrite);
       } catch (IOException e) {
+        if (tbl instanceof FeIcebergTable) {
+          // TODO IMPALA-10254: load data files via Iceberg API. Currently we load
+          // Iceberg data files via file listing, so we might see files being written.
+          continue;
+        }
         throw new CatalogException("Could not get the file checksum for file " + file, e);
       }
     }

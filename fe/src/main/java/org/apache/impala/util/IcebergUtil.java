@@ -19,6 +19,7 @@ package org.apache.impala.util;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 
 import com.google.common.collect.Maps;
@@ -91,13 +92,8 @@ public class IcebergUtil {
    * Helper method to load native Iceberg table for 'feTable'.
    */
   public static Table loadTable(FeIcebergTable feTable) throws TableLoadingException {
-    try {
-      IcebergCatalog cat = getIcebergCatalog(feTable);
-      return cat.loadTable(feTable);
-    } catch (ImpalaRuntimeException e) {
-      throw new TableLoadingException(String.format(
-          "Failed to load Iceberg table: %s", feTable.getFullName()), e);
-    }
+    return loadTable(feTable.getIcebergCatalog(), getIcebergTableIdentifier(feTable),
+        feTable.getIcebergCatalogLocation());
   }
 
   /**
@@ -406,6 +402,9 @@ public class IcebergUtil {
         return Type.DOUBLE;
       case STRING:
         return Type.STRING;
+      case FIXED:
+        Types.FixedType fixed = (Types.FixedType) t;
+        return ScalarType.createCharType(fixed.length());
       case DATE:
         return Type.DATE;
       case BINARY:
@@ -445,8 +444,9 @@ public class IcebergUtil {
    */
   public static List<DataFile> getIcebergDataFiles(FeIcebergTable table,
       List<UnboundPredicate> predicates) throws TableLoadingException {
-    BaseTable baseTable = (BaseTable)IcebergUtil.loadTable(table);
-    TableScan scan = baseTable.newScan();
+    if (table.snapshotId() == -1) return Collections.emptyList();
+    BaseTable baseTable =  (BaseTable)IcebergUtil.loadTable(table);
+    TableScan scan = baseTable.newScan().useSnapshot(table.snapshotId());
     for (UnboundPredicate predicate : predicates) {
       scan = scan.filter(predicate);
     }
@@ -465,5 +465,19 @@ public class IcebergUtil {
     Hasher hasher = Hashing.murmur3_128().newHasher();
     hasher.putUnencodedChars(dataFile.path().toString());
     return hasher.hash().toString();
+  }
+
+  /**
+   * Converts Flat Buffer file format to Iceberg file format.
+   */
+  public static org.apache.iceberg.FileFormat fbFileFormatToIcebergFileFormat(
+      byte fbFileFormat) throws ImpalaRuntimeException {
+    switch (fbFileFormat){
+      case org.apache.impala.fb.FbFileFormat.PARQUET:
+          return org.apache.iceberg.FileFormat.PARQUET;
+      default:
+          throw new ImpalaRuntimeException(String.format("Unexpected file format: %s",
+              org.apache.impala.fb.FbFileFormat.name(fbFileFormat)));
+    }
   }
 }

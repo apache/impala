@@ -60,12 +60,13 @@ class ParquetMetadataUtils {
   /// Returns the Parquet type corresponding to Impala's internal type. The caller must
   /// validate that the input type is valid, otherwise this will DCHECK.
   static parquet::Type::type ConvertInternalToParquetType(PrimitiveType type,
-      const TQueryOptions& query_options);
+      const TParquetTimestampType::type timestamp_type);
 
   /// Sets type related fields in a SchemaElement based on the column's internal type
   /// and query options.
   static void FillSchemaElement(const ColumnType& col_type,
-      const TQueryOptions& query_options, parquet::SchemaElement* col_schema);
+      const TQueryOptions& query_options, TParquetTimestampType::type timestamp_type,
+      parquet::SchemaElement* col_schema);
 };
 
 struct ParquetFileVersion {

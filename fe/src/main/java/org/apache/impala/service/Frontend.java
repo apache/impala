@@ -1729,7 +1729,8 @@ public class Frontend {
    */
   private static void addFinalizationParamsForInsert(
       TQueryCtx queryCtx, TQueryExecRequest queryExecRequest, InsertStmt insertStmt) {
-    if (insertStmt.getTargetTable() instanceof FeFsTable) {
+    FeTable targetTable = insertStmt.getTargetTable();
+    if (targetTable instanceof FeFsTable) {
       TFinalizeParams finalizeParams = new TFinalizeParams();
       finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
       finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
@@ -1742,6 +1743,8 @@ public class Frontend {
         Preconditions.checkState(queryCtx.isSetTransaction_id());
         finalizeParams.setTransaction_id(queryCtx.getTransaction_id());
         finalizeParams.setWrite_id(insertStmt.getWriteId());
+      } else if (targetTable instanceof FeIcebergTable) {
+        // No-op. There is no need to set additional params for Iceberg tables.
       } else {
         // TODO: Currently this flag only controls the removal of the query-level staging
         // directory. HdfsTableSink (that creates the staging dir) calculates the path

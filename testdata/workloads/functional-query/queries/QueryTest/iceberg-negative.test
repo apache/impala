@@ -24,9 +24,6 @@ CREATE TABLE iceberg_test3(
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
-INSERT INTO iceberg_test3 values('1');
----- CATCH
-AnalysisException: Impala does not support INSERTing into iceberg table: $DATABASE.iceberg_test3
 ====
 ---- QUERY
 TRUNCATE iceberg_test3
@@ -84,5 +81,40 @@ STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog_location'='/test-warehouse/fake_table', 'iceberg.table_identifier'='fake_db.fake_table');
 SHOW CREATE TABLE iceberg_test8;
 ---- CATCH
-row_regex:.*CAUSED BY: NoSuchTableException: Table does not exist: fake_db.fake_table*
+row_regex:.*CAUSED BY: TableLoadingException: Table does not exist: fake_db.fake_table*
+====
+---- QUERY
+CREATE TABLE iceberg_ctas
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.tables')
+AS SELECT id FROM functional.alltypes;
+---- CATCH
+AnalysisException: CREATE TABLE AS SELECT does not support the (ICEBERG) file format.
+====
+---- QUERY
+CREATE TABLE iceberg_overwrite (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
+INSERT OVERWRITE iceberg_overwrite VALUES (1), (2), (3);
+---- CATCH
+AnalysisException: INSERT OVERWRITE not supported for Iceberg tables.
+====
+---- QUERY
+CREATE TABLE iceberg_partitioned_insert(
+  level STRING,
+  event_time TIMESTAMP
+)
+PARTITION BY SPEC
+(
+  level IDENTITY
+)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+INSERT INTO iceberg_partitioned_insert SELECT * FROM iceberg_partitioned_insert;
+---- CATCH
+AnalysisException: Impala cannot write partitioned Iceberg tables.
 ====

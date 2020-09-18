@@ -95,14 +95,6 @@ HdfsTableSink::HdfsTableSink(TDataSinkId sink_id, const HdfsTableSinkConfig& sin
   }
 }
 
-OutputPartition::OutputPartition()
-  : hdfs_connection(nullptr),
-    tmp_hdfs_file(nullptr),
-    num_rows(0),
-    num_files(0),
-    partition_descriptor(nullptr),
-    block_size(0) {}
-
 Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {
   RETURN_IF_ERROR(DataSink::Prepare(state, parent_mem_tracker));
   unique_id_str_ = PrintId(state->fragment_instance_id(), "-");
@@ -258,9 +250,14 @@ void HdfsTableSink::BuildHdfsFileNames(
     output_partition->final_hdfs_file_name_prefix =
         Substitute("$0/", partition_descriptor.location());
   }
-  if (IsTransactional()) {
+  if (IsHiveAcid()) {
     string acid_dir = Substitute(overwrite_ ? "/base_$0/" : "/delta_$0_$0/", write_id_);
     output_partition->final_hdfs_file_name_prefix += acid_dir;
+  }
+  if (IsIceberg()) {
+    //TODO: implement LocationProviders.
+    output_partition->final_hdfs_file_name_prefix =
+        table_desc_->IcebergTableLocation() + "/data/";
   }
   output_partition->final_hdfs_file_name_prefix += query_suffix;
 
@@ -652,6 +649,9 @@ Status HdfsTableSink::FinalizePartitionFile(
     RETURN_IF_ERROR(partition->writer->Finalize());
     state->dml_exec_state()->UpdatePartition(
         partition->partition_name, partition->num_rows, &partition->writer->stats());
+    if (IsIceberg()) {
+      state->dml_exec_state()->AddIcebergDataFile(*partition);
+    }
   }
 
   RETURN_IF_ERROR(ClosePartitionFile(state, partition));
