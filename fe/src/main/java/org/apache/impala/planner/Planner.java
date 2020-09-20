@@ -534,11 +534,14 @@ public class Planner {
       } else if (isInvertedJoinCheaper(joinNode, isLocalPlan)) {
         joinNode.invertJoin();
       }
+      // Re-compute the numNodes and numInstances based on the new input order
+      joinNode.recomputeNodes();
     }
 
     // Re-compute tuple ids because the backend assumes that their order corresponds to
     // the order of children.
     root.computeTupleIds();
+
   }
 
   /**

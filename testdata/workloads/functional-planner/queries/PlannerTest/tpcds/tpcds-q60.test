@@ -386,10 +386,10 @@ PLAN-ROOT SINK
 |     in pipelines: 02(GETNEXT)
 |
 01:SCAN HDFS [tpcds_parquet.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=201.02MB
+   HDFS partitions=1824/1824 files=1824 size=200.95MB
    runtime filters: RF006[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_addr_sk
    stored statistics:
-     table: rows=2.88M size=201.02MB
+     table: rows=2.88M size=200.95MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -878,10 +878,10 @@ Per-Host Resources: mem-estimate=54.97MB mem-reservation=8.88MB thread-reservati
 |     in pipelines: 02(GETNEXT)
 |
 01:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=201.02MB
+   HDFS partitions=1824/1824 files=1824 size=200.95MB
    runtime filters: RF006[bloom] -> ss_sold_date_sk, RF004[bloom] -> ss_addr_sk, RF002[bloom] -> ss_item_sk
    stored statistics:
-     table: rows=2.88M size=201.02MB
+     table: rows=2.88M size=200.95MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K

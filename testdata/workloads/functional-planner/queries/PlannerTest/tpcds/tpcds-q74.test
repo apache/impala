@@ -283,10 +283,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 03(GETNEXT)
 |  |
 |  02:SCAN HDFS [tpcds_parquet.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=201.02MB
+|     HDFS partitions=1824/1824 files=1824 size=200.95MB
 |     runtime filters: RF012[bloom] -> ss_sold_date_sk, RF010[bloom] -> ss_customer_sk
 |     stored statistics:
-|       table: rows=2.88M size=201.02MB
+|       table: rows=2.88M size=200.95MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -347,10 +347,10 @@ PLAN-ROOT SINK
 |     in pipelines: 10(GETNEXT)
 |
 09:SCAN HDFS [tpcds_parquet.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=201.02MB
+   HDFS partitions=1824/1824 files=1824 size=200.95MB
    runtime filters: RF008[bloom] -> ss_sold_date_sk, RF006[bloom] -> ss_customer_sk
    stored statistics:
-     table: rows=2.88M size=201.02MB
+     table: rows=2.88M size=200.95MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -711,10 +711,10 @@ Per-Host Resources: mem-estimate=72.08MB mem-reservation=52.19MB thread-reservat
 |  |     in pipelines: 03(GETNEXT)
 |  |
 |  02:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=201.02MB
+|     HDFS partitions=1824/1824 files=1824 size=200.95MB
 |     runtime filters: RF012[bloom] -> ss_sold_date_sk, RF010[bloom] -> ss_customer_sk
 |     stored statistics:
-|       table: rows=2.88M size=201.02MB
+|       table: rows=2.88M size=200.95MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -810,10 +810,10 @@ Per-Host Resources: mem-estimate=35.95MB mem-reservation=4.94MB thread-reservati
 |     in pipelines: 10(GETNEXT)
 |
 09:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=201.02MB
+   HDFS partitions=1824/1824 files=1824 size=200.95MB
    runtime filters: RF008[bloom] -> ss_sold_date_sk, RF006[bloom] -> ss_customer_sk
    stored statistics:
-     table: rows=2.88M size=201.02MB
+     table: rows=2.88M size=200.95MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -1251,10 +1251,10 @@ Per-Instance Resources: mem-estimate=27.52MB mem-reservation=17.00MB thread-rese
 |  |     in pipelines: 03(GETNEXT)
 |  |
 |  02:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=201.02MB
+|     HDFS partitions=1824/1824 files=1824 size=200.95MB
 |     runtime filters: RF012[bloom] -> ss_sold_date_sk, RF010[bloom] -> ss_customer_sk
 |     stored statistics:
-|       table: rows=2.88M size=201.02MB
+|       table: rows=2.88M size=200.95MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -1368,10 +1368,10 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=1.00MB thread-reser
 |     in pipelines: 10(GETNEXT)
 |
 09:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=201.02MB
+   HDFS partitions=1824/1824 files=1824 size=200.95MB
    runtime filters: RF008[bloom] -> ss_sold_date_sk, RF006[bloom] -> ss_customer_sk
    stored statistics:
-     table: rows=2.88M size=201.02MB
+     table: rows=2.88M size=200.95MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
