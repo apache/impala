@@ -167,10 +167,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 04(GETNEXT)
 |  |
 |  03:SCAN HDFS [tpcds_parquet.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=201.02MB
+|     HDFS partitions=1824/1824 files=1824 size=200.95MB
 |     runtime filters: RF006[bloom] -> ss_customer_sk, RF008[bloom] -> ss_sold_date_sk
 |     stored statistics:
-|       table: rows=2.88M size=201.02MB
+|       table: rows=2.88M size=200.95MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -250,7 +250,7 @@ PLAN-ROOT SINK
 Max Per-Host Resource Reservation: Memory=43.00MB Threads=19
 Per-Host Resource Estimates: Memory=509MB
 F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=18.08KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=30.66KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: cd_gender, cd_marital_status, cd_education_status, count(*), cd_purchase_estimate, count(*), cd_credit_rating, count(*), cd_dep_count, count(*), cd_dep_employed_count, count(*), cd_dep_college_count, count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -258,12 +258,12 @@ PLAN-ROOT SINK
 29:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: cd_gender ASC, cd_marital_status ASC, cd_education_status ASC, cd_purchase_estimate ASC, cd_credit_rating ASC, cd_dep_count ASC, cd_dep_employed_count ASC, cd_dep_college_count ASC
 |  limit: 100
-|  mem-estimate=18.08KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=30.66KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=14 row-size=91B cardinality=100
 |  in pipelines: 18(GETNEXT)
 |
-F11:PLAN FRAGMENT [HASH(cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating,cd_dep_count,cd_dep_employed_count,cd_dep_college_count)] hosts=1 instances=1
-Per-Host Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reservation=1
+F11:PLAN FRAGMENT [HASH(cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating,cd_dep_count,cd_dep_employed_count,cd_dep_college_count)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=10.10MB mem-reservation=1.94MB thread-reservation=1
 18:TOP-N [LIMIT=100]
 |  order by: cd_gender ASC, cd_marital_status ASC, cd_education_status ASC, cd_purchase_estimate ASC, cd_credit_rating ASC, cd_dep_count ASC, cd_dep_employed_count ASC, cd_dep_college_count ASC
 |  mem-estimate=8.85KB mem-reservation=0B thread-reservation=0
@@ -278,11 +278,11 @@ Per-Host Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 28(GETNEXT), 07(OPEN), 10(OPEN)
 |
 27:EXCHANGE [HASH(cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating,cd_dep_count,cd_dep_employed_count,cd_dep_college_count)]
-|  mem-estimate=57.50KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=97.48KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=13 row-size=91B cardinality=318
 |  in pipelines: 07(GETNEXT), 10(GETNEXT)
 |
-F10:PLAN FRAGMENT [HASH(c.c_customer_sk)] hosts=1 instances=1
+F10:PLAN FRAGMENT [HASH(c.c_customer_sk)] hosts=3 instances=3
 Per-Host Resources: mem-estimate=17.34MB mem-reservation=7.88MB thread-reservation=1 runtime-filters-memory=2.00MB
 17:AGGREGATE [STREAMING]
 |  output: count(*)
@@ -413,10 +413,10 @@ Per-Host Resources: mem-estimate=17.34MB mem-reservation=7.88MB thread-reservati
 |  |     in pipelines: 04(GETNEXT)
 |  |
 |  03:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=201.02MB
+|     HDFS partitions=1824/1824 files=1824 size=200.95MB
 |     runtime filters: RF006[bloom] -> ss_customer_sk, RF008[bloom] -> ss_sold_date_sk
 |     stored statistics:
-|       table: rows=2.88M size=201.02MB
+|       table: rows=2.88M size=200.95MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -517,7 +517,7 @@ Per-Host Resources: mem-estimate=100.95MB mem-reservation=8.94MB thread-reservat
 Max Per-Host Resource Reservation: Memory=60.06MB Threads=19
 Per-Host Resource Estimates: Memory=238MB
 F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=18.08KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=30.66KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: cd_gender, cd_marital_status, cd_education_status, count(*), cd_purchase_estimate, count(*), cd_credit_rating, count(*), cd_dep_count, count(*), cd_dep_employed_count, count(*), cd_dep_college_count, count(*)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -525,12 +525,12 @@ PLAN-ROOT SINK
 29:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: cd_gender ASC, cd_marital_status ASC, cd_education_status ASC, cd_purchase_estimate ASC, cd_credit_rating ASC, cd_dep_count ASC, cd_dep_employed_count ASC, cd_dep_college_count ASC
 |  limit: 100
-|  mem-estimate=18.08KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=30.66KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=14 row-size=91B cardinality=100
 |  in pipelines: 18(GETNEXT)
 |
-F11:PLAN FRAGMENT [HASH(cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating,cd_dep_count,cd_dep_employed_count,cd_dep_college_count)] hosts=1 instances=1
-Per-Instance Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reservation=1
+F11:PLAN FRAGMENT [HASH(cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating,cd_dep_count,cd_dep_employed_count,cd_dep_college_count)] hosts=3 instances=3
+Per-Instance Resources: mem-estimate=10.10MB mem-reservation=1.94MB thread-reservation=1
 18:TOP-N [LIMIT=100]
 |  order by: cd_gender ASC, cd_marital_status ASC, cd_education_status ASC, cd_purchase_estimate ASC, cd_credit_rating ASC, cd_dep_count ASC, cd_dep_employed_count ASC, cd_dep_college_count ASC
 |  mem-estimate=8.85KB mem-reservation=0B thread-reservation=0
@@ -545,11 +545,11 @@ Per-Instance Resources: mem-estimate=10.06MB mem-reservation=1.94MB thread-reser
 |  in pipelines: 28(GETNEXT), 07(OPEN), 10(OPEN)
 |
 27:EXCHANGE [HASH(cd_gender,cd_marital_status,cd_education_status,cd_purchase_estimate,cd_credit_rating,cd_dep_count,cd_dep_employed_count,cd_dep_college_count)]
-|  mem-estimate=57.50KB mem-reservation=0B thread-reservation=0
+|  mem-estimate=97.48KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=13 row-size=91B cardinality=318
 |  in pipelines: 07(GETNEXT), 10(GETNEXT)
 |
-F10:PLAN FRAGMENT [HASH(c.c_customer_sk)] hosts=1 instances=1
+F10:PLAN FRAGMENT [HASH(c.c_customer_sk)] hosts=3 instances=3
 Per-Instance Resources: mem-estimate=10.20MB mem-reservation=2.00MB thread-reservation=1
 17:AGGREGATE [STREAMING]
 |  output: count(*)
@@ -565,7 +565,7 @@ Per-Instance Resources: mem-estimate=10.20MB mem-reservation=2.00MB thread-reser
 |  tuple-ids=2,0,1 row-size=129B cardinality=318
 |  in pipelines: 07(GETNEXT), 10(GETNEXT), 03(OPEN)
 |
-|--F13:PLAN FRAGMENT [HASH(c.c_customer_sk)] hosts=1 instances=1
+|--F13:PLAN FRAGMENT [HASH(c.c_customer_sk)] hosts=3 instances=3
 |  |  Per-Instance Resources: mem-estimate=4.29MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
@@ -580,7 +580,7 @@ Per-Instance Resources: mem-estimate=10.20MB mem-reservation=2.00MB thread-reser
 |  |  tuple-ids=2,0,1 row-size=129B cardinality=318
 |  |  in pipelines: 03(GETNEXT), 02(OPEN)
 |  |
-|  |--F14:PLAN FRAGMENT [HASH(c.c_customer_sk)] hosts=1 instances=1
+|  |--F14:PLAN FRAGMENT [HASH(c.c_customer_sk)] hosts=3 instances=3
 |  |  |  Per-Instance Resources: mem-estimate=3.02MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
@@ -723,10 +723,10 @@ Per-Instance Resources: mem-estimate=10.20MB mem-reservation=2.00MB thread-reser
 |  |     in pipelines: 04(GETNEXT)
 |  |
 |  03:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=201.02MB
+|     HDFS partitions=1824/1824 files=1824 size=200.95MB
 |     runtime filters: RF006[bloom] -> ss_customer_sk, RF008[bloom] -> ss_sold_date_sk
 |     stored statistics:
-|       table: rows=2.88M size=201.02MB
+|       table: rows=2.88M size=200.95MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K

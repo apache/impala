@@ -575,6 +575,14 @@ public abstract class JoinNode extends PlanNode {
     return stats.getNumDistinctValues();
   }
 
+  /**
+   * Reset the numNodes_ and numInstances_ based on the left child
+   */
+  public void recomputeNodes() {
+    numNodes_ = getChild(0).numNodes_;
+    numInstances_ = getChild(0).numInstances_;
+  }
+
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);

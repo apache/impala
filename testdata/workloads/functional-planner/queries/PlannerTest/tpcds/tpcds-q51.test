@@ -195,11 +195,11 @@ PLAN-ROOT SINK
 |     in pipelines: 07(GETNEXT)
 |
 06:SCAN HDFS [tpcds_parquet.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=201.02MB
+   HDFS partitions=1824/1824 files=1824 size=200.95MB
    predicates: ss_item_sk IS NOT NULL
    runtime filters: RF000[bloom] -> ss_sold_date_sk
    stored statistics:
-     table: rows=2.88M size=201.02MB
+     table: rows=2.88M size=200.95MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -208,8 +208,8 @@ PLAN-ROOT SINK
    tuple-ids=5 row-size=16B cardinality=2.88M
    in pipelines: 06(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=232.88MB Threads=13
-Per-Host Resource Estimates: Memory=560MB
+Max Per-Host Resource Reservation: Memory=215.88MB Threads=13
+Per-Host Resource Estimates: Memory=543MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=21.29KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
@@ -224,7 +224,7 @@ PLAN-ROOT SINK
 |  in pipelines: 16(GETNEXT)
 |
 F07:PLAN FRAGMENT [HASH(CASE WHEN ws_item_sk IS NOT NULL THEN ws_item_sk ELSE ss_item_sk END)] hosts=2 instances=2
-Per-Host Resources: mem-estimate=36.27MB mem-reservation=16.00MB thread-reservation=1
+Per-Host Resources: mem-estimate=36.41MB mem-reservation=16.00MB thread-reservation=1
 16:TOP-N [LIMIT=100]
 |  order by: item_sk ASC, d_date ASC
 |  mem-estimate=8.20KB mem-reservation=0B thread-reservation=0
@@ -253,16 +253,16 @@ Per-Host Resources: mem-estimate=36.27MB mem-reservation=16.00MB thread-reservat
 |  in pipelines: 13(GETNEXT), 10(OPEN)
 |
 25:EXCHANGE [HASH(CASE WHEN ws_item_sk IS NOT NULL THEN ws_item_sk ELSE ss_item_sk END)]
-|  mem-estimate=10.27MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=10.41MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=22N,21N,17N,16N row-size=124B cardinality=3.60M
 |  in pipelines: 10(GETNEXT)
 |
-F06:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-Per-Host Resources: mem-estimate=54.34MB mem-reservation=34.00MB thread-reservation=1
+F06:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=37.34MB mem-reservation=17.00MB thread-reservation=1
 12:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
 |  hash predicates: ss_item_sk = ws_item_sk, d_date = d_date
 |  fk/pk conjuncts: d_date = d_date
-|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=22N,21N,17N,16N row-size=124B cardinality=3.60M
 |  in pipelines: 10(GETNEXT), 04(OPEN)
 |
@@ -422,11 +422,11 @@ Per-Host Resources: mem-estimate=104.68MB mem-reservation=37.94MB thread-reserva
 |     in pipelines: 07(GETNEXT)
 |
 06:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=201.02MB
+   HDFS partitions=1824/1824 files=1824 size=200.95MB
    predicates: ss_item_sk IS NOT NULL
    runtime filters: RF000[bloom] -> ss_sold_date_sk
    stored statistics:
-     table: rows=2.88M size=201.02MB
+     table: rows=2.88M size=200.95MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -435,8 +435,8 @@ Per-Host Resources: mem-estimate=104.68MB mem-reservation=37.94MB thread-reserva
    tuple-ids=5 row-size=16B cardinality=2.88M
    in pipelines: 06(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=323.75MB Threads=14
-Per-Host Resource Estimates: Memory=454MB
+Max Per-Host Resource Reservation: Memory=306.75MB Threads=16
+Per-Host Resource Estimates: Memory=458MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=21.29KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
@@ -451,7 +451,7 @@ PLAN-ROOT SINK
 |  in pipelines: 16(GETNEXT)
 |
 F07:PLAN FRAGMENT [HASH(CASE WHEN ws_item_sk IS NOT NULL THEN ws_item_sk ELSE ss_item_sk END)] hosts=2 instances=2
-Per-Instance Resources: mem-estimate=36.27MB mem-reservation=16.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=36.82MB mem-reservation=16.00MB thread-reservation=1
 16:TOP-N [LIMIT=100]
 |  order by: item_sk ASC, d_date ASC
 |  mem-estimate=8.20KB mem-reservation=0B thread-reservation=0
@@ -480,26 +480,26 @@ Per-Instance Resources: mem-estimate=36.27MB mem-reservation=16.00MB thread-rese
 |  in pipelines: 13(GETNEXT), 10(OPEN)
 |
 25:EXCHANGE [HASH(CASE WHEN ws_item_sk IS NOT NULL THEN ws_item_sk ELSE ss_item_sk END)]
-|  mem-estimate=10.27MB mem-reservation=0B thread-reservation=0
+|  mem-estimate=10.82MB mem-reservation=0B thread-reservation=0
 |  tuple-ids=22N,21N,17N,16N row-size=124B cardinality=3.60M
 |  in pipelines: 10(GETNEXT)
 |
-F06:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
+F06:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 Per-Instance Resources: mem-estimate=10.41MB mem-reservation=0B thread-reservation=1
 12:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
 |  hash-table-id=00
 |  hash predicates: ss_item_sk = ws_item_sk, d_date = d_date
 |  fk/pk conjuncts: d_date = d_date
-|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=22N,21N,17N,16N row-size=124B cardinality=3.60M
 |  in pipelines: 10(GETNEXT), 04(OPEN)
 |
-|--F09:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  |  Per-Instance Resources: mem-estimate=44.14MB mem-reservation=34.00MB thread-reservation=1
+|--F09:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+|  |  Per-Instance Resources: mem-estimate=18.64MB mem-reservation=8.50MB thread-reservation=1
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: ws_item_sk, d_date
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  |
 |  24:EXCHANGE [HASH(ws_item_sk,d_date)]
 |  |  mem-estimate=10.14MB mem-reservation=0B thread-reservation=0
@@ -675,11 +675,11 @@ Per-Instance Resources: mem-estimate=50.75MB mem-reservation=35.00MB thread-rese
 |     in pipelines: 07(GETNEXT)
 |
 06:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=201.02MB
+   HDFS partitions=1824/1824 files=1824 size=200.95MB
    predicates: ss_item_sk IS NOT NULL
    runtime filters: RF000[bloom] -> ss_sold_date_sk
    stored statistics:
-     table: rows=2.88M size=201.02MB
+     table: rows=2.88M size=200.95MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
