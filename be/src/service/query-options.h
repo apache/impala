@@ -47,7 +47,7 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
 // time we add or remove a query option to/from the enum TImpalaQueryOptions.
 #define QUERY_OPTS_TABLE\
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),\
-      TImpalaQueryOptions::CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS + 1);\
+      TImpalaQueryOptions::ENABLE_OUTER_JOIN_TO_INNER_TRANSFORMATION + 1);\
   REMOVED_QUERY_OPT_FN(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED)\
   QUERY_OPT_FN(abort_on_error, ABORT_ON_ERROR, TQueryOptionLevel::REGULAR)\
   REMOVED_QUERY_OPT_FN(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS)\
@@ -217,6 +217,8 @@ typedef std::unordered_map<string, beeswax::TQueryOptionLevel::type>
       USE_LOCAL_TZ_FOR_UNIX_TIMESTAMP_CONVERSIONS, TQueryOptionLevel::ADVANCED)\
   QUERY_OPT_FN(convert_legacy_hive_parquet_utc_timestamps,\
       CONVERT_LEGACY_HIVE_PARQUET_UTC_TIMESTAMPS, TQueryOptionLevel::ADVANCED)\
+  QUERY_OPT_FN(enable_outer_join_to_inner_transformation,\
+      ENABLE_OUTER_JOIN_TO_INNER_TRANSFORMATION, TQueryOptionLevel::ADVANCED)\
   ;
 
 /// Enforce practical limits on some query options to avoid undesired query state.

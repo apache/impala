@@ -316,6 +316,44 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       }
     };
 
+  public static final com.google.common.base.Predicate<Expr>
+    IS_CONDITIONAL_BUILTIN_FN_PREDICATE =
+    new com.google.common.base.Predicate<Expr>() {
+      @Override
+      public boolean apply(Expr arg) {
+        return arg instanceof FunctionCallExpr
+            && ((FunctionCallExpr) arg).isConditionalBuiltinFn();
+      }
+    };
+
+  public static final com.google.common.base.Predicate<Expr> IS_IS_NULL_PREDICATE =
+    new com.google.common.base.Predicate<Expr>() {
+      @Override
+      public boolean apply(Expr arg) {
+        return arg instanceof IsNullPredicate
+            && !((IsNullPredicate) arg).isNotNull();
+      }
+    };
+
+  public static final com.google.common.base.Predicate<Expr>
+    IS_DISTINCT_FROM_OR_NOT_DISTINCT_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof BinaryPredicate
+              && (((BinaryPredicate) arg).getOp() == Operator.DISTINCT_FROM
+              || ((BinaryPredicate) arg).getOp() == Operator.NOT_DISTINCT);
+        }
+      };
+
+  public static final com.google.common.base.Predicate<Expr> IS_CASE_EXPR_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof CaseExpr;
+        }
+      };
+
   // id that's unique across the entire query statement and is assigned by
   // Analyzer.registerConjuncts(); only assigned for the top-level terms of a
   // conjunction, and therefore null for most Exprs

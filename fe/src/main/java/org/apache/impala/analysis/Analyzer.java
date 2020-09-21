@@ -3233,4 +3233,330 @@ public class Analyzer {
   public String getServerName() {
     return isAuthzEnabled() ? getAuthzConfig().getServerName().intern() : null;
   }
+
+  /**
+   * Get the where or having conjuncts of the specified table from globalState_.conjuncts
+   */
+  private List<Expr> getTableConjuncts(TupleId id) {
+    List<Expr> result = new ArrayList<>();
+    for (Map.Entry<ExprId, Expr> conjunct : globalState_.conjuncts.entrySet()) {
+      Expr expr = conjunct.getValue();
+      if (expr != null && !expr.isOnClauseConjunct() && !expr.isAuxExpr()) {
+        List<TupleId> tids = new ArrayList<>();
+        expr.getIds(tids, null);
+        if (tids.contains(id)) {
+          result.add(expr);
+        }
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Collect the tuple id of the disjunctive conjunct's children which is not disjunctive
+   * eg. a > 10 and b > 10 or d < 20, one inner set is the tuple id of 'a > 10
+   * and b > 10' and another is the tuple id of 'd < 20'
+   */
+  private Set<Set<TupleId>> collectTupleIdForDisjunctiveConjuncts(Expr e) {
+    Set<Set<TupleId>> set = new HashSet<Set<TupleId>>();
+    if (Expr.IS_OR_PREDICATE.apply(e)) {
+      set.addAll(collectTupleIdForDisjunctiveConjuncts(e.getChild(0)));
+      set.addAll(collectTupleIdForDisjunctiveConjuncts(e.getChild(1)));
+    } else {
+      List<TupleId> tids = new ArrayList<>();
+      e.getIds(tids, null);
+      set.add(new HashSet<TupleId>(tids));
+    }
+    return set;
+  }
+
+  /**
+   * Return true if the result can have null values when apply e on tupleIds
+   */
+  private boolean isNullableConjunct(Expr e, List<TupleId> tupleIds) {
+    // A clause like "t1.v1 IS NOT NULL OR t2.v2 IS NOT NULL" and t1 in 'tupleIds' does
+    // not prove that t1.v1 can't be NULL, because when t2.v2 IS NOT NULL, t1.v1 can be
+    // null. But a clause like "t1.v1 IS NOT NULL OR t1.v2 IS NOT NULL" proves that the
+    // t1 row as a whole can't be all-NULL.
+    List<Expr> orConjuncts = new ArrayList<>();
+    e.collectAll(Expr.IS_OR_PREDICATE, orConjuncts);
+    for (Expr expr : orConjuncts) {
+      Set<Set<TupleId>> childrenTis = collectTupleIdForDisjunctiveConjuncts(expr);
+      for (Set<TupleId> tids : childrenTis) {
+        tids.retainAll(tupleIds);
+        if (tids.isEmpty()) {
+          return true;
+        }
+      }
+    }
+
+    // Simply assume that a conjunct contains a UDF, is distinct from/ is not distinct
+    // from operator or nondeterministic buitin functions, it is not null-rejecting
+    // predicate.
+    if (e.contains(Predicates.or(Expr.IS_DISTINCT_FROM_OR_NOT_DISTINCT_PREDICATE,
+        Expr.IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE,
+        Expr.IS_UDF_PREDICATE))) {
+      return true;
+    }
+
+    // For conditional function, is null expr or case expr, if the tuple id of the expr
+    // is a subset of 'tupleIds', the result may have null value
+    List<Expr> maybeNullableExprs = new ArrayList<>();
+    e.collectAll(Predicates.or(Expr.IS_CONDITIONAL_BUILTIN_FN_PREDICATE,
+        Expr.IS_IS_NULL_PREDICATE, Expr.IS_CASE_EXPR_PREDICATE), maybeNullableExprs);
+    for (Expr expr : maybeNullableExprs) {
+      List<TupleId> tids = new ArrayList<>();
+      expr.getIds(tids, null);
+      if (tupleIds.containsAll(tids)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Returns true if at least one of the conjuncts of the tuple 'tupleIds' evaluates to
+   * false when all its referenced slots are NULL, returns false otherwise.
+   * This method identifies null-rejecting predicates which are the requirements to
+   * convert an outer-join to an inner join.
+   * For example, t1 left join t2 on t1.id=t2.id where t2.v2>10, 't2.v2>10' is the
+   * null-rejecting predicate.
+   */
+  private boolean hasNullRejectingConjucts(List<TupleId> tupleIds) {
+    for (TupleId id : tupleIds) {
+      List<Expr> conjuncts = getTableConjuncts(id);
+      for (Expr e : conjuncts) {
+        // Skip not null-rejecting conjunct
+        if (isNullableConjunct(e, tupleIds)) continue;
+
+        try {
+          // Check whether 'e' evaluates to true when all its referenced slots are NULL,
+          // The false result indicates that 'e' is null-rejecting conjunct.
+          if (!isTrueWithNullSlots(e)) {
+            if (LOG.isTraceEnabled()) {
+              LOG.trace("Tuple " + id + " has null rejecting conjunct: "
+                  + e.debugString());
+            }
+            return true;
+          }
+        } catch (InternalException ex) {
+          // Expr evaluation failed in the backend. Skip 'e' since we cannot
+          // determine whether it is null-rejecting conjunct.
+          LOG.warn("Skipping to check whether the conjunct is null-rejecting because"
+              + "backend evaluation failed: " + e.toSql(), ex);
+        }
+      }
+    }
+    return false;
+  }
+
+  private void removeOuterJoinedTupleIds(List<TupleId> ids) {
+    for (TupleId id : ids) {
+      globalState_.outerJoinedTupleIds.remove(id);
+    }
+  }
+
+  /**
+   * When transforming an outer join to an inner join is feasible, we need to re-register
+   * conjunct to its containing join On clause.
+   */
+  private void ojToIjOnClauseConjucts(TableRef tblRef) {
+    List<ExprId> ojConjuncts = globalState_.conjunctsByOjClause.get(tblRef.getId());
+    for (ExprId eid : ojConjuncts) {
+      globalState_.ojClauseByConjunct.remove(eid);
+      globalState_.ijClauseByConjunct.put(eid, tblRef);
+    }
+    globalState_.conjunctsByOjClause.remove(tblRef.getId());
+  }
+
+  /**
+   * When transforming an outer join to a left/right/inner join is feasible,
+   * we need to remove outer joined tuple id from globalState_.fullOuterJoinedTupleIds
+   * and the conjunct of the last full outer join table from
+   * globalState_.fullOuterJoinedConjuncts.
+   */
+  private void removeFullOuterJoinedTupleIdsAndConjuncts(List<TupleId> ids) {
+    for (TupleId id : ids) {
+      TableRef ref = globalState_.fullOuterJoinedTupleIds.get(id);
+      Iterator<Map.Entry<ExprId, TableRef>> it =
+          globalState_.fullOuterJoinedConjuncts.entrySet().iterator();
+      while(it.hasNext()){
+          Map.Entry<ExprId, TableRef> entry = it.next();
+          if(entry.getValue() == ref) it.remove();
+      }
+      globalState_.fullOuterJoinedTupleIds.remove(id);
+    }
+  }
+
+  /**
+   * When transforming an outer join to an inner join is feasible, we need re-register
+   * !empty() predicates for CollectionTableRef.
+   * For more info see SelectStmt.registerIsNotEmptyPredicates().
+   */
+  private void reRegisterIsNotEmptyPredicates(TableRef tblRef) {
+    Preconditions.checkState(tblRef.getJoinOp().isInnerJoin());
+    if (hasWithClause()) return;
+    if (!(tblRef instanceof CollectionTableRef)) return;
+    CollectionTableRef ref = (CollectionTableRef) tblRef;
+    if (!ref.isRelative() || ref.isCorrelated()) return;
+    // Do not generate a predicate if the parent tuple is outer joined.
+    if (isOuterJoined(ref.getResolvedPath().getRootDesc().getId())) return;
+
+    try {
+      IsNotEmptyPredicate isNotEmptyPred =
+          new IsNotEmptyPredicate(ref.getCollectionExpr().clone());
+      isNotEmptyPred.analyze(this);
+      registerOnClauseConjuncts(Lists.<Expr>newArrayList(isNotEmptyPred), ref);
+    } catch (AnalysisException ex) {
+      LOG.warn("Re-register the !empty() predicates failed.", ex);
+    }
+  }
+
+  public boolean hasOuterJoined(List<TableRef> tableRefs) {
+    for (TableRef tblRef : tableRefs) {
+      if (tblRef.getJoinOp().isOuterJoin()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get the outer joined tuple ids that satisfy null-rejecting from the inner join on
+   * clause.
+   * TODO: Use value transfer graph to get the base table tuple id of the slot is not null
+   * and register in globalState_. We use this to simplify outer joins of inline view.
+   * eg: t1, (select t3.id c from t2 left join t3 on t1.id = t2.id) t4 where t1.id = t4.c
+   */
+  private void getNonnullableOjTidsFromIjOnClause(TableRef tblRef,
+      Set<TupleId> nonnullableTids) {
+    List<Expr> onConjuncts = new ArrayList<>();
+    for (Map.Entry<ExprId, TableRef> entry : globalState_.ijClauseByConjunct.entrySet()) {
+      if (entry.getValue() == tblRef) {
+        Expr e = globalState_.conjuncts.get(entry.getKey());
+        if (e.isOnClauseConjunct()) {
+          onConjuncts.add(e);
+        }
+      }
+    }
+    List<TupleId> tids = tblRef.getLeftTblRef().getAllTableRefIds();
+    for (Expr e : onConjuncts) {
+      if (isNullableConjunct(e, tids)) continue;
+      try {
+        // Check whether 'e' evaluates to true when all its referenced slots are NULL,
+        // The false result indicates that 'e' is null-rejecting conjunct.
+        if (!isTrueWithNullSlots(e)) {
+          List<TupleId> ids = new ArrayList<>();
+          e.getIds(ids, null);
+          for (TupleId id : ids) {
+            if (isOuterJoined(id)) nonnullableTids.add(id);
+          }
+        }
+      } catch (InternalException ex) {
+        LOG.warn("Skipping the conjunct of on clause because backend evaluation failed: "
+            + e.toSql(), ex);
+      }
+    }
+  }
+
+  /**
+   * Simplify outer join executing before inner joined table by inner join on clause.
+   * For example, t1 left join t2 on t1.id = t2.id join t3 on t2.id = t3.id, we can
+   * convert this as t1 join t2 on t1.id = t2.id join t3 on t2.id =  t3.id
+   */
+  private boolean simplifyOuterJoinsByIjOnClause(List<TableRef> tableRefs,
+      TableRef ijTableRef) {
+    Set<TupleId> nonnullableTidSet = new HashSet<>();
+    getNonnullableOjTidsFromIjOnClause(ijTableRef, nonnullableTidSet);
+    if (!nonnullableTidSet.isEmpty()) {
+      return simplifyOuterJoins(tableRefs, nonnullableTidSet);
+    }
+    return false;
+  }
+
+  /**
+   * Attempt to transform outer joins into inner joins.
+   * Return true, if has outer join simplification.
+   *
+   * As a general rule, an outer join can be converted to an inner join if there is a
+   * condition on the null-filling table that filters out non‑matching rows. In a left
+   * outer join, the right table is the null-filling table, while it is the left table
+   * in a right outer join.
+   * In a full outer join, both tables are null-filling tables. Conditions that are FALSE
+   * for nulls are referred to as null rejecting conditions, and these are the conditions
+   * that enable the outer‑to‑inner join conversion to be made.
+   *
+   * An outer join can be converted to an inner join if the WHERE clause contains at
+   * least one null rejecting condition on the inner table.
+   */
+  public boolean simplifyOuterJoins(List<TableRef> tableRefs,
+      Set<TupleId> nonnullableTids) {
+    boolean isSimplified = false;
+    List<TableRef> processedTblRefs = new ArrayList<>();
+    for (TableRef tableRef : tableRefs) {
+      switch (tableRef.getJoinOp()) {
+        case INNER_JOIN: {
+          if (tableRef.getLeftTblRef() != null) {
+            boolean ret = simplifyOuterJoinsByIjOnClause(processedTblRefs, tableRef);
+            isSimplified = isSimplified ? true : ret;
+          }
+          break;
+        }
+        case LEFT_OUTER_JOIN: {
+          TupleId id = tableRef.getId();
+          if (nonnullableTids.contains(id) || hasNullRejectingConjucts(id.asList())) {
+            tableRef.setJoinOp(JoinOperator.INNER_JOIN);
+            removeOuterJoinedTupleIds(id.asList());
+            ojToIjOnClauseConjucts(tableRef);
+            reRegisterIsNotEmptyPredicates(tableRef);
+            simplifyOuterJoinsByIjOnClause(processedTblRefs, tableRef);
+            isSimplified = true;
+          }
+          break;
+        }
+        case RIGHT_OUTER_JOIN: {
+          List<TupleId> ids = tableRef.getLeftTblRef().getAllTableRefIds();
+          if (TupleId.intersect(ids, nonnullableTids) || hasNullRejectingConjucts(ids)) {
+            tableRef.setJoinOp(JoinOperator.INNER_JOIN);
+            removeOuterJoinedTupleIds(ids);
+            ojToIjOnClauseConjucts(tableRef);
+            reRegisterIsNotEmptyPredicates(tableRef);
+            simplifyOuterJoinsByIjOnClause(processedTblRefs, tableRef);
+            isSimplified = true;
+          }
+          break;
+        }
+        case FULL_OUTER_JOIN: {
+          List<TupleId> ids = tableRef.getLeftTblRef().getAllTableRefIds();
+          if (TupleId.intersect(ids, nonnullableTids) || hasNullRejectingConjucts(ids)) {
+            removeFullOuterJoinedTupleIdsAndConjuncts(ids);
+            removeFullOuterJoinedTupleIdsAndConjuncts(tableRef.getId().asList());
+            if (nonnullableTids.contains(tableRef.getId()) ||
+                hasNullRejectingConjucts(tableRef.getId().asList())) {
+              tableRef.setJoinOp(JoinOperator.INNER_JOIN);
+              removeOuterJoinedTupleIds(ids);
+              removeOuterJoinedTupleIds(tableRef.getId().asList());
+              ojToIjOnClauseConjucts(tableRef);
+              reRegisterIsNotEmptyPredicates(tableRef);
+              simplifyOuterJoinsByIjOnClause(processedTblRefs, tableRef);
+            } else {
+              tableRef.setJoinOp(JoinOperator.LEFT_OUTER_JOIN);
+              removeOuterJoinedTupleIds(ids);
+            }
+            isSimplified = true;
+          } else if (nonnullableTids.contains(tableRef.getId()) ||
+              hasNullRejectingConjucts(tableRef.getId().asList())) {
+            tableRef.setJoinOp(JoinOperator.RIGHT_OUTER_JOIN);
+            removeOuterJoinedTupleIds(tableRef.getId().asList());
+            isSimplified = true;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+      processedTblRefs.add(tableRef);
+    }
+    return isSimplified;
+  }
 }

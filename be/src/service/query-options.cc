@@ -961,6 +961,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_convert_legacy_hive_parquet_utc_timestamps(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::ENABLE_OUTER_JOIN_TO_INNER_TRANSFORMATION: {
+         query_options->__set_enable_outer_join_to_inner_transformation(IsTrue(value));
+         break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

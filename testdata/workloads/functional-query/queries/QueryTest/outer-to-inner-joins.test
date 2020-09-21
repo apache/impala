@@ -1,0 +1,258 @@
+====
+---- QUERY
+# Tests disjunctive conjuncts in where clause.
+# t1.int_col < 10 or t2.int_col < 10 can't prove that t2 is nonnullable,
+# so we can't convert a left join to an inner join
+select count(*)
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where t1.int_col < 10 or t2.int_col < 10 or t2.tinyint_col < 5
+---- RESULTS
+7300
+---- TYPES
+bigint
+====
+---- QUERY
+# Tests where clause containing disjunctive conjuncts
+# When ti.int_col < 10, t2.tinyint_col can be null value, so this where conjunct is not
+# null-rejecting for t2 and we can't convert a left join to an inner join.
+select count(*)
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where case when t1.int_col < 10 or t2.tinyint_col < 5 then 10 else 20 end = 10
+---- RESULTS
+7300
+---- TYPES
+bigint
+====
+---- QUERY
+# Tests disjunctive conjuncts in where clause.
+# All disjunctive conjuncts children have t2's slot, we can simplify outer join.
+# For t1.int_col + t2.int_col < 10, it maybe true only t2.int_col is not null. At least
+# one of the t2's columns is not null the disjunctive conjunct is true, so this
+# is null-rejecting conjunct
+select count(*)
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where t1.int_col + t2.int_col < 10 or t2.tinyint_col < 5 or t2.smallint_col > 2
+---- RESULTS
+100
+---- TYPES
+bigint
+====
+---- QUERY
+# Simplify outer join by inner join on clause.
+# Inner join on conjunct t2.id = t3.test_id proves that t2.id can't be null.
+SELECT count(*)
+FROM functional.dimtbl t1
+  LEFT JOIN functional.dimtbl t2 ON t1.id = t2.id
+  JOIN functional.jointbl t3 ON t2.id = t3.test_id
+---- RESULTS
+11
+---- TYPES
+bigint
+====
+---- QUERY
+# Simplify outer join by inner join on clause.
+# Inner join on conjunct t1.id = t3.test_id proves that t1.id can't be null.
+SELECT count(*)
+FROM functional.dimtbl t1
+  RIGHT JOIN functional.dimtbl t2 ON t1.id = t2.id
+  JOIN functional.jointbl t3 ON t1.id = t3.test_id
+---- RESULTS
+11
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT count(*)
+FROM functional.dimtbl t1
+  FULL JOIN functional.jointbl t2 ON t1.id = t2.test_id
+  JOIN functional.jointbl t3 ON t2.test_name = t3.test_name
+---- RESULTS
+105
+---- TYPES
+bigint
+====
+---- QUERY
+# Simplify outer join by inner join on clause.
+# Same as above, t1.id can't be null, we can convert t1 full join t2 to t1 left join t2.
+SELECT count(*)
+FROM functional.dimtbl t1
+  FULL JOIN functional.jointbl t2 ON t1.id = t2.test_id
+  JOIN functional.jointbl t3 ON t1.id = t3.test_id
+---- RESULTS
+41
+---- TYPES
+bigint
+====
+---- QUERY
+# Simplify outer join by inner join on clause.
+# t1.id + t2.id = t3.test_id + 1001 is null-rejecting conjunct for t1 and t2
+SELECT count(*)
+FROM functional.dimtbl t1
+  FULL JOIN functional.jointbl t2 ON t1.id = t2.test_id
+  JOIN functional.jointbl t3 ON t1.id + t2.test_id = t3.test_id + 1001
+---- RESULTS
+3
+---- TYPES
+bigint
+====
+---- QUERY
+# 'is distinct from'/'is not distinct from' is not null-rejecting conjunct
+SELECT count(*)
+FROM functional.dimtbl t1
+  LEFT JOIN functional.jointbl t2 ON t1.id = t2.test_id
+  WHERE t2.test_name is distinct from 'Name1' OR t2.test_name is not distinct from 'Name2'
+---- RESULTS
+14
+---- TYPES
+bigint
+====
+---- QUERY
+# Tests the conjunct containing nondeterministic function
+SELECT count(*)
+FROM functional.dimtbl t1
+  LEFT JOIN functional.jointbl t2 ON t1.id = t2.test_id
+  WHERE CASE WHEN t2.test_zip = 2 THEN 0.2 ELSE 2 END > rand()
+---- RESULTS
+15
+---- TYPES
+bigint
+====
+---- QUERY
+# Expect no conversion
+select count(*) from functional.alltypes t1 left outer join functional.alltypessmall t2
+  on t1.id = t2.id where t1.int_col < 10;
+---- RESULTS
+7300
+---- TYPES
+bigint
+====
+---- QUERY
+# Expect no conversion
+select t2.tinyint_col, count(t2.id)
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+ group by t2.tinyint_col
+ having count(t2.id) > 0
+---- RESULTS
+0,12
+2,12
+9,8
+7,8
+5,8
+8,8
+6,8
+3,12
+1,12
+4,12
+---- TYPES
+tinyint,bigint
+====
+---- QUERY
+# Expect no conversion
+select count(*) from functional.alltypes t1 left outer join functional.alltypessmall t2
+  on t1.id = t2.id where zeroifnull(t2.int_col) < 10;
+---- RESULTS
+7300
+---- TYPES
+bigint
+====
+---- QUERY
+# Should be converted
+select count(*) from (values(1))x where 1 in
+(
+ select count(t2.id)
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where t2.int_col > 10
+)
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+# TODO: Should be converted
+select count(*)
+from functional.alltypes t0,
+(
+ select t2.id ct
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+) s
+where t0.int_col = s.ct
+---- RESULTS
+7300
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT count(*)
+FROM functional.dimtbl t1
+  LEFT JOIN functional.jointbl t2 ON t1.id = t2.test_id
+  LEFT JOIN functional.jointbl t3 ON t2.test_id = t3.test_id
+  WHERE ZEROIFNULL(t2.test_zip) < t3.test_zip
+---- RESULTS
+8
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT count(*)
+FROM functional.dimtbl t1
+  LEFT JOIN functional.jointbl t2 ON t1.id = t2.test_id
+  LEFT JOIN functional.jointbl t3 ON t2.test_id = t3.test_id + 1
+  WHERE ZEROIFNULL(t3.test_zip) < t2.test_zip
+---- RESULTS
+7
+---- TYPES
+bigint
+====
+---- QUERY
+# We can't simplify outer join executing after inner join by inner join on clause
+SELECT count(*)
+FROM functional.dimtbl t1
+  JOIN functional.jointbl t2 ON t1.id = t2.test_id
+  LEFT JOIN functional.jointbl t3 ON t2.test_id + 1 = t3.test_id
+---- RESULTS
+16
+---- TYPES
+bigint
+====
+---- QUERY
+# Tests complex types
+select a.id, b.item from functional_parquet.complextypestbl a full outer join a.int_array b
+where b.item % 2 = 0 and a.id < 10
+---- RESULTS
+1,2
+2,2
+---- TYPES
+bigint, int
+====
+---- QUERY
+select a.id, b.item from functional_parquet.complextypestbl a
+  full outer join a.int_array b on (a.id < b.item and a.id < 10)
+where b.item % 2 = 0
+---- RESULTS
+1,2
+NULL,2
+---- TYPES
+bigint, int
+====
+---- QUERY
+select straight_join id from functional_parquet.complextypestbl t1 left outer join t1.int_array t2
+where t1.id = t2.pos and t2.item = 2
+---- RESULTS
+1
+2
+---- TYPES
+bigint
+====
