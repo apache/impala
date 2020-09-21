@@ -1097,4 +1097,15 @@ public class PlannerTest extends PlannerTestBase {
   public void testLimitPushdownAnalytic() {
     runPlannerTestFile("limit-pushdown-analytic");
   }
+
+  /**
+   * Test outer join simplification.
+   */
+  @Test
+  public void testSimplifyOuterJoins() {
+    TQueryOptions options = new TQueryOptions();
+    options.setEnable_outer_join_to_inner_transformation(true);
+    runPlannerTestFile("outer-to-inner-joins", options,
+        ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
+  }
 }

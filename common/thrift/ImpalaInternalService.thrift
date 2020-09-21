@@ -453,6 +453,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   113: optional bool convert_legacy_hive_parquet_utc_timestamps = false;
+
+  // See comment in ImpalaService.thrift
+  114: optional bool enable_outer_join_to_inner_transformation = false;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

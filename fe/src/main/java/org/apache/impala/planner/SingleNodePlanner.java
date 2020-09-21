@@ -745,6 +745,21 @@ public class SingleNodePlanner {
       return createAggregationPlan(selectStmt, analyzer, emptySetNode);
     }
 
+    // Transform outer join into inner join whenever possible
+    if (!analyzer.isStraightJoin() &&
+        analyzer.getQueryOptions().isEnable_outer_join_to_inner_transformation() &&
+        analyzer.hasOuterJoined(selectStmt.getTableRefs())) {
+      Set<TupleId> nonnullableTidList = new HashSet<>();
+      if (analyzer.simplifyOuterJoins(selectStmt.getTableRefs(), nonnullableTidList)) {
+        // Recompute the graph since we may need to add value-transfer edges based on the
+        // registered equi-join conjuncts.
+        ctx_.getTimeline().markEvent("Recomputing value transfer graph");
+        analyzer.computeValueTransferGraph();
+        ctx_.getTimeline().markEvent("Value transfer graph computed");
+        valueTransferGraphNeedsUpdate_ = false;
+      }
+    }
+
     // Separate table refs into parent refs (uncorrelated or absolute) and
     // subplan refs (correlated or relative), and generate their plan.
     List<TableRef> parentRefs = new ArrayList<>();

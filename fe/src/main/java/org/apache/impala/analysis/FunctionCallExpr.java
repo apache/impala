@@ -301,11 +301,6 @@ public class FunctionCallExpr extends Expr {
   public void setIsAnalyticFnCall(boolean v) { isAnalyticFnCall_ = v; }
   public void setIsInternalFnCall(boolean v) { isInternalFnCall_ = v; }
 
-  static boolean isNondeterministicBuiltinFnName(String fnName) {
-    return fnName.equalsIgnoreCase("rand") || fnName.equalsIgnoreCase("random") ||
-           fnName.equalsIgnoreCase("uuid");
-  }
-
   /**
    * Returns true if function is a non-deterministic builtin function, i.e. for a fixed
    * input, it may not always produce the same output for every invocation.
@@ -314,8 +309,31 @@ public class FunctionCallExpr extends Expr {
    * about user defined functions.
    */
   public boolean isNondeterministicBuiltinFn() {
-    String fnName = fnName_.getFunction();
-    return isNondeterministicBuiltinFnName(fnName);
+    return functionNameEqualsBuiltin(fnName_, "rand") ||
+        functionNameEqualsBuiltin(fnName_, "random") ||
+        functionNameEqualsBuiltin(fnName_, "uuid");
+  }
+
+  /**
+   * Returns true if function is a conditional builtin function
+   */
+  public boolean isConditionalBuiltinFn() {
+    return functionNameEqualsBuiltin(fnName_, "coalesce") ||
+        functionNameEqualsBuiltin(fnName_, "decode") ||
+        functionNameEqualsBuiltin(fnName_, "if") ||
+        functionNameEqualsBuiltin(fnName_, "ifnull") ||
+        functionNameEqualsBuiltin(fnName_, "isfalse") ||
+        functionNameEqualsBuiltin(fnName_, "isnotfalse") ||
+        functionNameEqualsBuiltin(fnName_, "isnottrue") ||
+        functionNameEqualsBuiltin(fnName_, "isnull") ||
+        functionNameEqualsBuiltin(fnName_, "istrue") ||
+        functionNameEqualsBuiltin(fnName_, "nonnullvalue") ||
+        functionNameEqualsBuiltin(fnName_, "nullif") ||
+        functionNameEqualsBuiltin(fnName_, "nullifzero") ||
+        functionNameEqualsBuiltin(fnName_, "nullvalue") ||
+        functionNameEqualsBuiltin(fnName_, "nvl") ||
+        functionNameEqualsBuiltin(fnName_, "nvl2") ||
+        functionNameEqualsBuiltin(fnName_, "zeroifnull");
   }
 
   @Override
@@ -347,7 +365,7 @@ public class FunctionCallExpr extends Expr {
       fnName = path.get(path.size() - 1);
     }
     // Non-deterministic functions are never constant.
-    if (isNondeterministicBuiltinFnName(fnName)) {
+    if (isNondeterministicBuiltinFn()) {
       return false;
     }
     // Sleep is a special function for testing.

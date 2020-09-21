@@ -19,6 +19,9 @@ package org.apache.impala.common;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import com.google.common.base.Joiner;
 
@@ -67,5 +70,15 @@ public class Id<IdType extends Id<IdType>> implements Comparable<Id<IdType>> {
       l.add(id.toString());
     }
     return "(" + Joiner.on(" ").join(l) + ")";
+  }
+
+  /**
+   * Check whether l1 and l2 have intersect.
+   */
+  public static <C extends Id> boolean intersect(List<C> l1, Set<C> l2) {
+    for (C element: l1) {
+      if (l2.contains(element)) return true;
+    }
+    return false;
   }
 }

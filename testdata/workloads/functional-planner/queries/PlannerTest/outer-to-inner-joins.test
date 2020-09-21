@@ -1,0 +1,869 @@
+# Tests disjunctive conjuncts in where clause.
+# t1.int_col < 10 or t2.int_col < 10 can't prove that t2 is nonnullable,
+# so we can't convert a left join to an inner join
+select 1
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where t1.int_col < 10 or t2.int_col < 10 or t2.tinyint_col < 5
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: t1.int_col < 10 OR t2.int_col < 10 OR t2.tinyint_col < 5
+|  row-size=17B cardinality=7.30K
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=9B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
+====
+# Tests where clause containing disjunctive conjuncts
+# When ti.int_col < 10, t2.tinyint_col can be null value, so this where conjunct is not
+# null-rejecting for t2 and we can't convert a left join to an inner join.
+select 1
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where case when t1.int_col < 10 or t2.tinyint_col < 5 then 10 else 20 end = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: CASE WHEN t1.int_col < 10 OR t2.tinyint_col < 5 THEN 10 ELSE 20 END = 10
+|  row-size=13B cardinality=7.30K
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=5B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=8B cardinality=7.30K
+====
+# Tests disjunctive conjuncts in where clause.
+# All disjunctive conjuncts children have t2's slot, we can simplify outer join.
+# For t1.int_col + t2.int_col < 10, it maybe true only t2.int_col is not null. At least
+# one of the t2's columns is not null the disjunctive conjunct is true, so this
+# is null-rejecting conjunct
+select 1
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where t1.int_col + t2.int_col < 10 or t2.tinyint_col < 5 or t2.smallint_col > 2
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: t1.int_col + t2.int_col < 10 OR t2.tinyint_col < 5 OR t2.smallint_col > 2
+|  runtime filters: RF000 <- t2.id
+|  row-size=19B cardinality=99
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=11B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
+   row-size=8B cardinality=7.30K
+====
+# Simplify outer join by inner join on clause.
+# Inner join on conjunct t2.id = t3.test_id proves that t2.id can't be null.
+SELECT 1
+FROM functional.dimtbl t1
+  LEFT JOIN functional.testtbl t2 ON t1.id = t2.id
+  JOIN functional.jointbl t3 ON t2.id = t3.test_id
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=24B cardinality=19
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     HDFS partitions=1/1 files=0 size=0B
+|     row-size=8B cardinality=0
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t3.test_id = t1.id
+|  runtime filters: RF002 <- t1.id
+|  row-size=16B cardinality=19
+|
+|--00:SCAN HDFS [functional.dimtbl t1]
+|     HDFS partitions=1/1 files=1 size=171B
+|     runtime filters: RF000 -> t1.id
+|     row-size=8B cardinality=10
+|
+02:SCAN HDFS [functional.jointbl t3]
+   HDFS partitions=1/1 files=1 size=433B
+   runtime filters: RF000 -> t3.test_id, RF002 -> t3.test_id
+   row-size=8B cardinality=19
+====
+# Simplify outer join by inner join on clause.
+# Inner join on conjunct t1.id = t3.test_id proves that t1.id can't be null.
+SELECT 1
+FROM functional.dimtbl t1
+  RIGHT JOIN functional.testtbl t2 ON t1.id = t2.id
+  JOIN functional.jointbl t3 ON t1.id = t3.test_id
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=24B cardinality=19
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     HDFS partitions=1/1 files=0 size=0B
+|     row-size=8B cardinality=0
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t3.test_id = t1.id
+|  runtime filters: RF002 <- t1.id
+|  row-size=16B cardinality=19
+|
+|--00:SCAN HDFS [functional.dimtbl t1]
+|     HDFS partitions=1/1 files=1 size=171B
+|     runtime filters: RF000 -> t1.id
+|     row-size=8B cardinality=10
+|
+02:SCAN HDFS [functional.jointbl t3]
+   HDFS partitions=1/1 files=1 size=433B
+   runtime filters: RF000 -> t3.test_id, RF002 -> t3.test_id
+   row-size=8B cardinality=19
+====
+# Simplify outer join by inner join on clause.
+# Same as above, t2.id can't be null, we can convert t1 full join t2 to t1 right join t2.
+SELECT 1
+FROM functional.dimtbl t1
+  FULL JOIN functional.testtbl t2 ON t1.id = t2.id
+  JOIN functional.jointbl t3 ON t2.id = t3.test_id
+---- PLAN
+PLAN-ROOT SINK
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.id = t3.test_id
+|  runtime filters: RF000 <- t3.test_id
+|  row-size=24B cardinality=10
+|
+|--02:SCAN HDFS [functional.jointbl t3]
+|     HDFS partitions=1/1 files=1 size=433B
+|     row-size=8B cardinality=19
+|
+04:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF002 <- t2.id
+|  row-size=16B cardinality=10
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     HDFS partitions=1/1 files=0 size=0B
+|     runtime filters: RF000 -> t2.id
+|     row-size=8B cardinality=0
+|
+00:SCAN HDFS [functional.dimtbl t1]
+   HDFS partitions=1/1 files=1 size=171B
+   runtime filters: RF000 -> t1.id, RF002 -> t1.id
+   row-size=8B cardinality=10
+====
+# Simplify outer join by inner join on clause.
+# Same as above, t1.id can't be null, we can convert t1 full join t2 to t1 left join t2.
+SELECT 1
+FROM functional.dimtbl t1
+  FULL JOIN functional.testtbl t2 ON t1.id = t2.id
+  JOIN functional.jointbl t3 ON t1.id = t3.test_id
+---- PLAN
+PLAN-ROOT SINK
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t3.test_id
+|  runtime filters: RF000 <- t3.test_id
+|  row-size=24B cardinality=19
+|
+|--02:SCAN HDFS [functional.jointbl t3]
+|     HDFS partitions=1/1 files=1 size=433B
+|     row-size=8B cardinality=19
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  row-size=16B cardinality=10
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     HDFS partitions=1/1 files=0 size=0B
+|     runtime filters: RF000 -> t2.id
+|     row-size=8B cardinality=0
+|
+00:SCAN HDFS [functional.dimtbl t1]
+   HDFS partitions=1/1 files=1 size=171B
+   runtime filters: RF000 -> t1.id
+   row-size=8B cardinality=10
+====
+# Simplify outer join by inner join on clause.
+# t1.id + t2.id = t3.test_id is null-rejecting conjunct for t1 and t2
+SELECT 1
+FROM functional.dimtbl t1
+  FULL JOIN functional.testtbl t2 ON t1.id = t2.id
+  JOIN functional.jointbl t3 ON t1.id + t2.id = t3.test_id
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: t3.test_id = t1.id + t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=24B cardinality=0
+|
+|--03:NESTED LOOP JOIN [CROSS JOIN]
+|  |  row-size=16B cardinality=0
+|  |
+|  |--01:SCAN HDFS [functional.testtbl t2]
+|  |     HDFS partitions=1/1 files=0 size=0B
+|  |     row-size=8B cardinality=0
+|  |
+|  02:SCAN HDFS [functional.jointbl t3]
+|     HDFS partitions=1/1 files=1 size=433B
+|     row-size=8B cardinality=19
+|
+00:SCAN HDFS [functional.dimtbl t1]
+   HDFS partitions=1/1 files=1 size=171B
+   runtime filters: RF000 -> t1.id
+   row-size=8B cardinality=10
+====
+# 'is distinct from'/'is not distinct from' is not null-rejecting conjunct
+SELECT 1
+FROM functional.dimtbl t1
+  LEFT JOIN functional.testtbl t2 ON t1.id = t2.id
+  WHERE t2.name is distinct from 'Name1' AND t2.name is not distinct from 'Name2'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: t2.name IS DISTINCT FROM 'Name1', t2.name IS NOT DISTINCT FROM 'Name2'
+|  row-size=28B cardinality=10
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     HDFS partitions=1/1 files=0 size=0B
+|     predicates: t2.name IS NOT DISTINCT FROM 'Name2'
+|     row-size=20B cardinality=0
+|
+00:SCAN HDFS [functional.dimtbl t1]
+   HDFS partitions=1/1 files=1 size=171B
+   row-size=8B cardinality=10
+====
+# Tests the conjunct containing nondeterministic function
+SELECT 1
+FROM functional.dimtbl t1
+  LEFT JOIN functional.testtbl t2 ON t1.id = t2.id
+  WHERE CASE WHEN t2.zip = 2 THEN 0.2 ELSE 2 END > rand()
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: CASE WHEN t2.zip = 2 THEN 0.2 ELSE 2 END > rand()
+|  row-size=20B cardinality=10
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     HDFS partitions=1/1 files=0 size=0B
+|     row-size=12B cardinality=0
+|
+00:SCAN HDFS [functional.dimtbl t1]
+   HDFS partitions=1/1 files=1 size=171B
+   row-size=8B cardinality=10
+====
+# 1.Convert t2 left join t3 to t2 join t3 by ZEROIFNULL(t2.zip) < t3.test_zip, because
+# t2.zip can be null but t3.test_zip can't be null. This is null-rejecting predicate
+# for t3.
+# 2.Convert t1 left join t2 to t1 join t2 by inner join on clause t2.id = t3.test_id
+SELECT 1
+FROM functional.dimtbl t1
+  LEFT JOIN functional.testtbl t2 ON t1.id = t2.id
+  LEFT JOIN functional.jointbl t3 ON t2.id = t3.test_id
+  WHERE ZEROIFNULL(t2.zip) < t3.test_zip
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: t3.test_zip > zeroifnull(t2.zip)
+|  runtime filters: RF000 <- t2.id
+|  row-size=32B cardinality=19
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     HDFS partitions=1/1 files=0 size=0B
+|     row-size=12B cardinality=0
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t3.test_id = t1.id
+|  runtime filters: RF002 <- t1.id
+|  row-size=20B cardinality=19
+|
+|--00:SCAN HDFS [functional.dimtbl t1]
+|     HDFS partitions=1/1 files=1 size=171B
+|     runtime filters: RF000 -> t1.id
+|     row-size=8B cardinality=10
+|
+02:SCAN HDFS [functional.jointbl t3]
+   HDFS partitions=1/1 files=1 size=433B
+   runtime filters: RF000 -> t3.test_id, RF002 -> t3.test_id
+   row-size=12B cardinality=19
+====
+# 'ZEROIFNULL(t3.test_zip) < t2.zip' proves t2 is nonnullable, we can convert t1 left join
+# t2 to t1 join t2
+SELECT 1
+FROM functional.dimtbl t1
+  LEFT JOIN functional.testtbl t2 ON t1.id = t2.id
+  LEFT JOIN functional.jointbl t3 ON t2.id = t3.test_id
+  WHERE ZEROIFNULL(t3.test_zip) < t2.zip
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t3.test_id = t2.id
+|  other predicates: t2.zip > zeroifnull(t3.test_zip)
+|  runtime filters: RF000 <- t2.id
+|  row-size=32B cardinality=10
+|
+|--03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t1.id = t2.id
+|  |  runtime filters: RF002 <- t2.id
+|  |  row-size=20B cardinality=10
+|  |
+|  |--01:SCAN HDFS [functional.testtbl t2]
+|  |     HDFS partitions=1/1 files=0 size=0B
+|  |     row-size=12B cardinality=0
+|  |
+|  00:SCAN HDFS [functional.dimtbl t1]
+|     HDFS partitions=1/1 files=1 size=171B
+|     runtime filters: RF002 -> t1.id
+|     row-size=8B cardinality=10
+|
+02:SCAN HDFS [functional.jointbl t3]
+   HDFS partitions=1/1 files=1 size=433B
+   runtime filters: RF000 -> t3.test_id
+   row-size=12B cardinality=19
+====
+# We can't simplify outer join executing after inner join by inner join on clause
+SELECT 1
+FROM functional.dimtbl t1
+  JOIN functional.testtbl t2 ON t1.id = t2.id
+  LEFT JOIN functional.jointbl t3 ON t2.id = t3.test_id
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t2.id = t3.test_id
+|  row-size=24B cardinality=10
+|
+|--02:SCAN HDFS [functional.jointbl t3]
+|     HDFS partitions=1/1 files=1 size=433B
+|     row-size=8B cardinality=19
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=16B cardinality=10
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     HDFS partitions=1/1 files=0 size=0B
+|     row-size=8B cardinality=0
+|
+00:SCAN HDFS [functional.dimtbl t1]
+   HDFS partitions=1/1 files=1 size=171B
+   runtime filters: RF000 -> t1.id
+   row-size=8B cardinality=10
+====
+# Tests predicate containing condition functions.
+select 1
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where ZEROIFNULL(t2.int_col) < 5
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: zeroifnull(t2.int_col) < 5
+|  row-size=12B cardinality=7.30K
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=8B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
+====
+# Tests is distinct from operator
+SELECT 1
+FROM functional.dimtbl t1
+  LEFT JOIN functional.testtbl t2 ON t1.id = t2.id
+  where t2.name is distinct from 'Name1'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: t2.name IS DISTINCT FROM 'Name1'
+|  row-size=28B cardinality=10
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     HDFS partitions=1/1 files=0 size=0B
+|     row-size=20B cardinality=0
+|
+00:SCAN HDFS [functional.dimtbl t1]
+   HDFS partitions=1/1 files=1 size=171B
+   row-size=8B cardinality=10
+====
+# Tests is not distinct from operator
+SELECT 1
+FROM functional.dimtbl t1
+  LEFT JOIN functional.testtbl t2 ON t1.id = t2.id
+  where t2.name is not distinct from 'Name1'
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other predicates: t2.name IS NOT DISTINCT FROM 'Name1'
+|  row-size=28B cardinality=10
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     HDFS partitions=1/1 files=0 size=0B
+|     predicates: t2.name IS NOT DISTINCT FROM 'Name1'
+|     row-size=20B cardinality=0
+|
+00:SCAN HDFS [functional.dimtbl t1]
+   HDFS partitions=1/1 files=1 size=171B
+   row-size=8B cardinality=10
+====
+# Convert a left outer join to an inner join
+select 1
+from functional.alltypes t1
+left outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where t2.int_col = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=12B cardinality=10
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     predicates: t2.int_col = 10
+|     row-size=8B cardinality=10
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
+   row-size=4B cardinality=7.30K
+====
+# Convert a right outer join to an inner join
+select 1
+from functional.alltypes t1
+right outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where t1.int_col = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=12B cardinality=10
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=4B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: t1.int_col = 10
+   runtime filters: RF000 -> t1.id
+   row-size=8B cardinality=730
+====
+# Convert a full outer join to an inner join
+select 1
+from functional.alltypes t1
+full outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where t1.int_col = t2.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id, t1.int_col = t2.int_col
+|  runtime filters: RF000 <- t2.id, RF001 <- t2.int_col
+|  row-size=16B cardinality=99
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=8B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id, RF001 -> t1.int_col
+   row-size=8B cardinality=7.30K
+====
+# Convert a full outer join to a left join
+select 1
+from functional.alltypes t1
+full outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where t1.int_col = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  row-size=12B cardinality=730
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=4B cardinality=100
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   predicates: t1.int_col = 10
+   row-size=8B cardinality=730
+====
+# Convert a full outer join to a right join
+select 1
+from functional.alltypes t1
+full outer join functional.alltypessmall t2
+  on t1.id = t2.id
+where t2.int_col = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  runtime filters: RF000 <- t2.id
+|  row-size=12B cardinality=10
+|
+|--01:SCAN HDFS [functional.alltypessmall t2]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     predicates: t2.int_col = 10
+|     row-size=8B cardinality=10
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
+   row-size=4B cardinality=7.30K
+====
+# QUERY: TPCDS-Q49
+select
+ 'web' as channel
+ ,web.item
+ ,web.return_ratio
+ ,web.return_rank
+ ,web.currency_rank
+ from (
+  select
+   item
+  ,return_ratio
+  ,currency_ratio
+  ,rank() over (order by return_ratio) as return_rank
+  ,rank() over (order by currency_ratio) as currency_rank
+  from
+  ( select ws.ws_item_sk as item
+    ,(cast(sum(coalesce(wr.wr_return_quantity,0)) as decimal(15,4))/
+    cast(sum(coalesce(ws.ws_quantity,0)) as decimal(15,4) )) as return_ratio
+    ,(cast(sum(coalesce(wr.wr_return_amt,0)) as decimal(15,4))/
+    cast(sum(coalesce(ws.ws_net_paid,0)) as decimal(15,4) )) as currency_ratio
+    from
+     tpcds.web_sales ws left outer join tpcds.web_returns wr
+      on (ws.ws_order_number = wr.wr_order_number and
+      ws.ws_item_sk = wr.wr_item_sk)
+                 ,tpcds.date_dim
+    where
+      wr.wr_return_amt > 10000
+      and ws.ws_net_profit > 1
+                         and ws.ws_net_paid > 0
+                         and ws.ws_quantity > 0
+                         and ws_sold_date_sk = d_date_sk
+                         and d_year = 2002
+                         and d_moy = 12
+    group by ws.ws_item_sk
+  ) in_web
+ ) web
+ where
+ (
+ web.return_rank <= 10
+ or
+ web.currency_rank <= 10
+ )
+ union
+ select
+ 'catalog' as channel
+ ,catalog.item
+ ,catalog.return_ratio
+ ,catalog.return_rank
+ ,catalog.currency_rank
+ from (
+  select
+   item
+  ,return_ratio
+  ,currency_ratio
+  ,rank() over (order by return_ratio) as return_rank
+  ,rank() over (order by currency_ratio) as currency_rank
+  from
+  ( select
+    cs.cs_item_sk as item
+    ,(cast(sum(coalesce(cr.cr_return_quantity,0)) as decimal(15,4))/
+    cast(sum(coalesce(cs.cs_quantity,0)) as decimal(15,4) )) as return_ratio
+    ,(cast(sum(coalesce(cr.cr_return_amount,0)) as decimal(15,4))/
+    cast(sum(coalesce(cs.cs_net_paid,0)) as decimal(15,4) )) as currency_ratio
+    from
+    tpcds.catalog_sales cs left outer join tpcds.catalog_returns cr
+      on (cs.cs_order_number = cr.cr_order_number and
+      cs.cs_item_sk = cr.cr_item_sk)
+                ,tpcds.date_dim
+    where
+      cr.cr_return_amount > 10000
+      and cs.cs_net_profit > 1
+                         and cs.cs_net_paid > 0
+                         and cs.cs_quantity > 0
+                         and cs_sold_date_sk = d_date_sk
+                         and d_year = 2002
+                         and d_moy = 12
+                 group by cs.cs_item_sk
+  ) in_cat
+ ) catalog
+ where
+ (
+ catalog.return_rank <= 10
+ or
+ catalog.currency_rank <=10
+ )
+ union
+ select
+ 'store' as channel
+ ,store.item
+ ,store.return_ratio
+ ,store.return_rank
+ ,store.currency_rank
+ from (
+  select
+   item
+  ,return_ratio
+  ,currency_ratio
+  ,rank() over (order by return_ratio) as return_rank
+  ,rank() over (order by currency_ratio) as currency_rank
+  from
+  ( select sts.ss_item_sk as item
+    ,(cast(sum(coalesce(sr.sr_return_quantity,0)) as decimal(15,4))/cast(sum(coalesce(sts.ss_quantity,0)) as decimal(15,4) )) as return_ratio
+    ,(cast(sum(coalesce(sr.sr_return_amt,0)) as decimal(15,4))/cast(sum(coalesce(sts.ss_net_paid,0)) as decimal(15,4) )) as currency_ratio
+    from
+    tpcds.store_sales sts left outer join tpcds.store_returns sr
+      on (sts.ss_ticket_number = sr.sr_ticket_number and sts.ss_item_sk = sr.sr_item_sk)
+                ,tpcds.date_dim
+    where
+      sr.sr_return_amt > 10000
+      and sts.ss_net_profit > 1
+                         and sts.ss_net_paid > 0
+                         and sts.ss_quantity > 0
+                         and ss_sold_date_sk = d_date_sk
+                         and d_year = 2002
+                         and d_moy = 12
+    group by sts.ss_item_sk
+  ) in_store
+ ) store
+ where  (
+ store.return_rank <= 10
+ or
+ store.currency_rank <= 10
+ )
+ order by 1,4,5
+ limit 100;
+---- PLAN
+PLAN-ROOT SINK
+|
+35:AGGREGATE [FINALIZE]
+|  group by: channel, item, return_ratio, return_rank, currency_rank
+|  row-size=52B cardinality=181
+|
+00:UNION
+|  row-size=52B cardinality=181
+|
+|--34:TOP-N [LIMIT=100]
+|  |  order by: 'store' ASC, return_rank ASC, currency_rank ASC
+|  |  row-size=40B cardinality=100
+|  |
+|  33:SELECT
+|  |  predicates: (rank() <= 10 OR rank() <= 10)
+|  |  row-size=104B cardinality=126
+|  |
+|  32:ANALYTIC
+|  |  functions: rank()
+|  |  order by: (CAST(sum(coalesce(sr.sr_return_amt, 0)) AS DECIMAL(15,4)) / CAST(sum(coalesce(sts.ss_net_paid, 0)) AS DECIMAL(15,4))) ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=104B cardinality=1.25K
+|  |
+|  31:SORT
+|  |  order by: (CAST(sum(coalesce(sr.sr_return_amt, 0)) AS DECIMAL(15,4)) / CAST(sum(coalesce(sts.ss_net_paid, 0)) AS DECIMAL(15,4))) ASC
+|  |  row-size=96B cardinality=1.25K
+|  |
+|  30:ANALYTIC
+|  |  functions: rank()
+|  |  order by: (CAST(sum(coalesce(sr.sr_return_quantity, 0)) AS DECIMAL(15,4)) / CAST(sum(coalesce(sts.ss_quantity, 0)) AS DECIMAL(15,4))) ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=80B cardinality=1.25K
+|  |
+|  29:SORT
+|  |  order by: (CAST(sum(coalesce(sr.sr_return_quantity, 0)) AS DECIMAL(15,4)) / CAST(sum(coalesce(sts.ss_quantity, 0)) AS DECIMAL(15,4))) ASC
+|  |  row-size=72B cardinality=1.25K
+|  |
+|  28:AGGREGATE [FINALIZE]
+|  |  output: sum(coalesce(sr.sr_return_quantity, 0)), sum(coalesce(sts.ss_quantity, 0)), sum(coalesce(sr.sr_return_amt, 0)), sum(coalesce(sts.ss_net_paid, 0))
+|  |  group by: sts.ss_item_sk
+|  |  row-size=56B cardinality=1.25K
+|  |
+|  27:HASH JOIN [INNER JOIN]
+|  |  hash predicates: sts.ss_item_sk = sr.sr_item_sk, sts.ss_ticket_number = sr.sr_ticket_number
+|  |  runtime filters: RF012 <- sr.sr_item_sk, RF013 <- sr.sr_ticket_number
+|  |  row-size=68B cardinality=1.25K
+|  |
+|  |--24:SCAN HDFS [tpcds.store_returns sr]
+|  |     HDFS partitions=1/1 files=1 size=31.19MB
+|  |     predicates: sr.sr_return_amt > 10000
+|  |     row-size=24B cardinality=28.75K
+|  |
+|  26:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |  runtime filters: RF016 <- d_date_sk
+|  |  row-size=44B cardinality=17.05K
+|  |
+|  |--25:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year = 2002, d_moy = 12
+|  |     row-size=12B cardinality=108
+|  |
+|  23:SCAN HDFS [tpcds.store_sales sts]
+|     HDFS partitions=1824/1824 files=1824 size=346.60MB
+|     predicates: sts.ss_net_paid > 0, sts.ss_net_profit > 1, sts.ss_quantity > 0
+|     runtime filters: RF012 -> sts.ss_item_sk, RF013 -> sts.ss_ticket_number, RF016 -> ss_sold_date_sk
+|     row-size=32B cardinality=288.04K
+|
+|--22:SELECT
+|  |  predicates: (rank() <= 10 OR rank() <= 10)
+|  |  row-size=104B cardinality=50
+|  |
+|  21:ANALYTIC
+|  |  functions: rank()
+|  |  order by: (CAST(sum(coalesce(cr.cr_return_amount, 0)) AS DECIMAL(15,4)) / CAST(sum(coalesce(cs.cs_net_paid, 0)) AS DECIMAL(15,4))) ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=104B cardinality=503
+|  |
+|  20:SORT
+|  |  order by: (CAST(sum(coalesce(cr.cr_return_amount, 0)) AS DECIMAL(15,4)) / CAST(sum(coalesce(cs.cs_net_paid, 0)) AS DECIMAL(15,4))) ASC
+|  |  row-size=96B cardinality=503
+|  |
+|  19:ANALYTIC
+|  |  functions: rank()
+|  |  order by: (CAST(sum(coalesce(cr.cr_return_quantity, 0)) AS DECIMAL(15,4)) / CAST(sum(coalesce(cs.cs_quantity, 0)) AS DECIMAL(15,4))) ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |  row-size=80B cardinality=503
+|  |
+|  18:SORT
+|  |  order by: (CAST(sum(coalesce(cr.cr_return_quantity, 0)) AS DECIMAL(15,4)) / CAST(sum(coalesce(cs.cs_quantity, 0)) AS DECIMAL(15,4))) ASC
+|  |  row-size=72B cardinality=503
+|  |
+|  17:AGGREGATE [FINALIZE]
+|  |  output: sum(coalesce(cr.cr_return_quantity, 0)), sum(coalesce(cs.cs_quantity, 0)), sum(coalesce(cr.cr_return_amount, 0)), sum(coalesce(cs.cs_net_paid, 0))
+|  |  group by: cs.cs_item_sk
+|  |  row-size=56B cardinality=503
+|  |
+|  16:HASH JOIN [INNER JOIN]
+|  |  hash predicates: cs_sold_date_sk = d_date_sk
+|  |  runtime filters: RF006 <- d_date_sk
+|  |  row-size=68B cardinality=503
+|  |
+|  |--14:SCAN HDFS [tpcds.date_dim]
+|  |     HDFS partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year = 2002, d_moy = 12
+|  |     row-size=12B cardinality=108
+|  |
+|  15:HASH JOIN [INNER JOIN]
+|  |  hash predicates: cs.cs_item_sk = cr.cr_item_sk, cs.cs_order_number = cr.cr_order_number
+|  |  runtime filters: RF008 <- cr.cr_item_sk, RF009 <- cr.cr_order_number
+|  |  row-size=56B cardinality=8.49K
+|  |
+|  |--13:SCAN HDFS [tpcds.catalog_returns cr]
+|  |     HDFS partitions=1/1 files=1 size=20.39MB
+|  |     predicates: cr.cr_return_amount > 10000
+|  |     row-size=24B cardinality=14.41K
+|  |
+|  12:SCAN HDFS [tpcds.catalog_sales cs]
+|     HDFS partitions=1/1 files=1 size=282.20MB
+|     predicates: cs.cs_net_paid > 0, cs.cs_net_profit > 1, cs.cs_quantity > 0
+|     runtime filters: RF006 -> cs_sold_date_sk, RF008 -> cs.cs_item_sk, RF009 -> cs.cs_order_number
+|     row-size=32B cardinality=144.16K
+|
+11:SELECT
+|  predicates: (rank() <= 10 OR rank() <= 10)
+|  row-size=104B cardinality=31
+|
+10:ANALYTIC
+|  functions: rank()
+|  order by: (CAST(sum(coalesce(wr.wr_return_amt, 0)) AS DECIMAL(15,4)) / CAST(sum(coalesce(ws.ws_net_paid, 0)) AS DECIMAL(15,4))) ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=104B cardinality=312
+|
+09:SORT
+|  order by: (CAST(sum(coalesce(wr.wr_return_amt, 0)) AS DECIMAL(15,4)) / CAST(sum(coalesce(ws.ws_net_paid, 0)) AS DECIMAL(15,4))) ASC
+|  row-size=96B cardinality=312
+|
+08:ANALYTIC
+|  functions: rank()
+|  order by: (CAST(sum(coalesce(wr.wr_return_quantity, 0)) AS DECIMAL(15,4)) / CAST(sum(coalesce(ws.ws_quantity, 0)) AS DECIMAL(15,4))) ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=80B cardinality=312
+|
+07:SORT
+|  order by: (CAST(sum(coalesce(wr.wr_return_quantity, 0)) AS DECIMAL(15,4)) / CAST(sum(coalesce(ws.ws_quantity, 0)) AS DECIMAL(15,4))) ASC
+|  row-size=72B cardinality=312
+|
+06:AGGREGATE [FINALIZE]
+|  output: sum(coalesce(wr.wr_return_quantity, 0)), sum(coalesce(ws.ws_quantity, 0)), sum(coalesce(wr.wr_return_amt, 0)), sum(coalesce(ws.ws_net_paid, 0))
+|  group by: ws.ws_item_sk
+|  row-size=56B cardinality=312
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: ws.ws_item_sk = wr.wr_item_sk, ws.ws_order_number = wr.wr_order_number
+|  runtime filters: RF000 <- wr.wr_item_sk, RF001 <- wr.wr_order_number
+|  row-size=68B cardinality=312
+|
+|--02:SCAN HDFS [tpcds.web_returns wr]
+|     HDFS partitions=1/1 files=1 size=9.35MB
+|     predicates: wr.wr_return_amt > 10000
+|     row-size=24B cardinality=7.18K
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ws_sold_date_sk = d_date_sk
+|  runtime filters: RF004 <- d_date_sk
+|  row-size=44B cardinality=4.29K
+|
+|--03:SCAN HDFS [tpcds.date_dim]
+|     HDFS partitions=1/1 files=1 size=9.84MB
+|     predicates: d_year = 2002, d_moy = 12
+|     row-size=12B cardinality=108
+|
+01:SCAN HDFS [tpcds.web_sales ws]
+   HDFS partitions=1/1 files=1 size=140.07MB
+   predicates: ws.ws_net_paid > 0, ws.ws_net_profit > 1, ws.ws_quantity > 0
+   runtime filters: RF000 -> ws.ws_item_sk, RF001 -> ws.ws_order_number, RF004 -> ws_sold_date_sk
+   row-size=32B cardinality=71.94K
+====

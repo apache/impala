@@ -35,6 +35,7 @@ class TestJoinQueries(ImpalaTestSuite):
   MT_DOP_VALUES = [0, 4]
   # Additional values for exhaustive tests.
   MT_DOP_VALUES_EXHAUSTIVE = [1]
+  ENABLE_OUTER_JOIN_TO_INNER_TRANSFORMATION = ['false', 'true']
 
   @classmethod
   def get_workload(cls):
@@ -58,6 +59,10 @@ class TestJoinQueries(ImpalaTestSuite):
     if cls.exploration_strategy() != 'exhaustive':
       # Cut down on execution time when not running in exhaustive mode.
       cls.ImpalaTestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
+
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('enable_outer_join_to_inner_transformation',
+        *TestJoinQueries.ENABLE_OUTER_JOIN_TO_INNER_TRANSFORMATION))
 
   def test_basic_joins(self, vector):
     new_vector = deepcopy(vector)
@@ -90,6 +95,12 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     self.run_test_case('QueryTest/outer-joins', new_vector)
+
+  def test_outer_to_inner_joins(self, vector):
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['enable_outer_join_to_inner_transformation']\
+        = vector.get_value('enable_outer_join_to_inner_transformation')
+    self.run_test_case('QueryTest/outer-to-inner-joins', new_vector)
 
   def test_single_node_nested_loop_joins(self, vector):
     # Test the execution of nested-loops joins for join types that can only be
