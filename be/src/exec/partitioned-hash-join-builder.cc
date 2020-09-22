@@ -924,25 +924,11 @@ void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
   VLOG(3) << "Join builder (join_node_id_=" << join_node_id_ << ") publishing "
           << filter_ctxs_.size() << " filters.";
   int32_t num_enabled_filters = 0;
-  // Use 'num_build_rows' to estimate FP-rate of each Bloom filter, and publish
-  // 'always-true' filters if it's too high. Doing so saves CPU at the coordinator,
-  // serialisation time, and reduces the cost of applying the filter at the scan - most
-  // significantly for per-row filters. However, the number of build rows could be a very
-  // poor estimate of the NDV - particularly if the filter expression is a function of
-  // several columns.
-  // TODO: Better heuristic.
   for (const FilterContext& ctx : filter_ctxs_) {
-    // TODO: Consider checking actual number of bits set in filter to compute FP rate.
-    // TODO: Consider checking this every few batches or so.
     BloomFilter* bloom_filter = nullptr;
     if (ctx.local_bloom_filter != nullptr) {
-      if (runtime_state_->filter_bank()->FpRateTooHigh(
-              ctx.filter->filter_size(), num_build_rows)) {
-        bloom_filter = BloomFilter::ALWAYS_TRUE_FILTER;
-      } else {
-        bloom_filter = ctx.local_bloom_filter;
-        ++num_enabled_filters;
-      }
+      bloom_filter = ctx.local_bloom_filter;
+      ++num_enabled_filters;
     } else if (ctx.local_min_max_filter != nullptr
         && !ctx.local_min_max_filter->AlwaysTrue()) {
       ++num_enabled_filters;

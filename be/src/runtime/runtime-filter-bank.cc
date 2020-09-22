@@ -53,10 +53,9 @@ using kudu::rpc::RpcSidecar;
 using namespace impala;
 using namespace strings;
 
-DEFINE_double(max_filter_error_rate, 0.75, "(Advanced) The maximum probability of false "
-    "positives in a runtime bloom filter before it is disabled. Also, if not overridden "
-    "by the RUNTIME_FILTER_ERROR_RATE query option, the target false positive "
-    "probability used to determine the ideal size for each bloom filter size.");
+DEFINE_double(max_filter_error_rate, 0.75, "(Advanced) The target false positive "
+    "probability used to determine the ideal size for each bloom filter size. This value "
+    "can be overriden by the RUNTIME_FILTER_ERROR_RATE query option.");
 
 const int64_t RuntimeFilterBank::MIN_BLOOM_FILTER_SIZE;
 const int64_t RuntimeFilterBank::MAX_BLOOM_FILTER_SIZE;
@@ -408,12 +407,6 @@ MinMaxFilter* RuntimeFilterBank::AllocateScratchMinMaxFilter(
       MinMaxFilter::Create(type, &obj_pool_, filter_mem_tracker_);
   fs->min_max_filters.push_back(min_max_filter);
   return min_max_filter;
-}
-
-bool RuntimeFilterBank::FpRateTooHigh(int64_t filter_size, int64_t observed_ndv) {
-  double fpp =
-      BloomFilter::FalsePositiveProb(observed_ndv, BitUtil::Log2Ceiling64(filter_size));
-  return fpp > FLAGS_max_filter_error_rate;
 }
 
 vector<unique_lock<SpinLock>> RuntimeFilterBank::LockAllFilters() {
