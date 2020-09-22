@@ -38,6 +38,7 @@ import org.apache.impala.analysis.TableSampleClause;
 import org.apache.impala.analysis.AlterTableAddDropRangePartitionStmt.Operation;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionField;
+import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.RowFormat;
@@ -58,7 +59,6 @@ import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TTablePropertyType;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TSortingOrder;
-import org.apache.impala.thrift.TIcebergPartitionTransform;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.common.NotImplementedException;
@@ -495,7 +495,8 @@ nonterminal IcebergPartitionSpec iceberg_partition_spec_def;
 nonterminal List<IcebergPartitionField> iceberg_partition_field_list,
   iceberg_partition_field_defs;
 nonterminal IcebergPartitionField iceberg_partition_field_def;
-nonterminal TIcebergPartitionTransform iceberg_partition_transform;
+nonterminal IcebergPartitionTransform iceberg_partition_transform;
+nonterminal String iceberg_partition_transform_type;
 // Options for DDL commands - CREATE/DROP/ALTER
 nonterminal HdfsCachingOp cache_op_val, opt_cache_op_val;
 nonterminal BigDecimal opt_cache_op_replication;
@@ -1787,9 +1788,19 @@ iceberg_partition_field_def ::=
   ;
 
 iceberg_partition_transform ::=
-  IDENT:transfrom_type
+  iceberg_partition_transform_type:transfrom_type INTEGER_LITERAL:transform_param
+  {: RESULT = IcebergUtil.getPartitionTransform(transfrom_type,
+      transform_param.intValue()); :}
+  | IDENT:transfrom_type
   {: RESULT = IcebergUtil.getPartitionTransform(transfrom_type); :}
   ;
+
+iceberg_partition_transform_type ::=
+  IDENT:transform_type
+  {: RESULT = transform_type; :}
+  | KW_TRUNCATE
+  {: RESULT = "TRUNCATE"; :}
+;
 
 create_udf_stmt ::=
   KW_CREATE KW_FUNCTION if_not_exists_val:if_not_exists

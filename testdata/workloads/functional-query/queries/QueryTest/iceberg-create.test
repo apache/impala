@@ -12,8 +12,10 @@ CREATE TABLE iceberg_test1(
 PARTITION BY SPEC
 (
   level IDENTITY,
+  level TRUNCATE 10,
   event_time IDENTITY,
   event_time HOUR,
+  event_time BUCKET 1000,
   register_time DAY
 )
 STORED AS ICEBERG
@@ -38,9 +40,11 @@ STRING,STRING,STRING
 SHOW PARTITIONS iceberg_test1;
 ---- RESULTS
 0,1,1000,'level','IDENTITY'
-0,2,1001,'event_time','IDENTITY'
-0,2,1002,'event_time_hour','HOUR'
-0,3,1003,'register_time_day','DAY'
+0,1,1001,'level_trunc','TRUNCATE 10'
+0,2,1002,'event_time','IDENTITY'
+0,2,1003,'event_time_hour','HOUR'
+0,2,1004,'event_time_bucket','BUCKET 1000'
+0,3,1005,'register_time_day','DAY'
 ---- TYPES
 BIGINT,BIGINT,BIGINT,STRING,STRING
 ====
@@ -76,7 +80,9 @@ CREATE TABLE iceberg_test4(
 )
 PARTITION BY SPEC
 (
-  level IDENTITY
+  level IDENTITY,
+  level BUCKET 12345,
+  level TRUNCATE 15
 )
 STORED AS ICEBERG
 LOCATION '/$DATABASE.iceberg_test_with_location'
@@ -101,6 +107,8 @@ STRING,STRING,STRING
 SHOW PARTITIONS iceberg_test_external;
 ---- RESULTS
 0,1,1000,'level','IDENTITY'
+0,1,1001,'level_bucket','BUCKET 12345'
+0,1,1002,'level_trunc','TRUNCATE 15'
 ---- TYPES
 BIGINT,BIGINT,BIGINT,STRING,STRING
 ====
@@ -123,6 +131,8 @@ STRING,STRING,STRING
 SHOW PARTITIONS iceberg_test_external_empty_column;
 ---- RESULTS
 0,1,1000,'level','IDENTITY'
+0,1,1001,'level_bucket','BUCKET 12345'
+0,1,1002,'level_trunc','TRUNCATE 15'
 ---- TYPES
 BIGINT,BIGINT,BIGINT,STRING,STRING
 ====
@@ -146,8 +156,10 @@ CREATE TABLE iceberg_test5(
 PARTITION BY SPEC
 (
   level IDENTITY,
+  level TRUNCATE 10,
   event_time IDENTITY,
   event_time HOUR,
+  event_time BUCKET 1000,
   register_time DAY
 )
 STORED AS ICEBERG
@@ -173,9 +185,11 @@ STRING,STRING,STRING
 SHOW PARTITIONS iceberg_test5;
 ---- RESULTS
 0,1,1000,'level','IDENTITY'
-0,2,1001,'event_time','IDENTITY'
-0,2,1002,'event_time_hour','HOUR'
-0,3,1003,'register_time_day','DAY'
+0,1,1001,'level_trunc','TRUNCATE 10'
+0,2,1002,'event_time','IDENTITY'
+0,2,1003,'event_time_hour','HOUR'
+0,2,1004,'event_time_bucket','BUCKET 1000'
+0,3,1005,'register_time_day','DAY'
 ---- TYPES
 BIGINT,BIGINT,BIGINT,STRING,STRING
 ====
@@ -190,7 +204,9 @@ CREATE TABLE iceberg_test6(
 )
 PARTITION BY SPEC
 (
-  level IDENTITY
+  level IDENTITY,
+  level BUCKET 12345,
+  level TRUNCATE 10
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
@@ -215,6 +231,8 @@ STRING,STRING,STRING
 SHOW PARTITIONS iceberg_test6_external;
 ---- RESULTS
 0,1,1000,'level','IDENTITY'
+0,1,1001,'level_bucket','BUCKET 12345'
+0,1,1002,'level_trunc','TRUNCATE 10'
 ---- TYPES
 BIGINT,BIGINT,BIGINT,STRING,STRING
 ====

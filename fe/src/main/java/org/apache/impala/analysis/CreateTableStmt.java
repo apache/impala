@@ -271,7 +271,7 @@ public class CreateTableStmt extends StatementBase {
     }
 
     if (getFileFormat() == THdfsFileFormat.ICEBERG) {
-      analyzeIcebergFormat();
+      analyzeIcebergFormat(analyzer);
     }
 
     // If lineage logging is enabled, compute minimal lineage graph.
@@ -565,7 +565,7 @@ public class CreateTableStmt extends StatementBase {
   /**
    * For iceberg file format, add related storage handler
    */
-  private void analyzeIcebergFormat() throws AnalysisException {
+  private void analyzeIcebergFormat(Analyzer analyzer) throws AnalysisException {
     // A managed table cannot have 'external.table.purge' property set
     if (!isExternal() && Boolean.parseBoolean(
         getTblProperties().get(IcebergTable.TBL_PROP_EXTERNAL_TABLE_PURGE))) {
@@ -585,7 +585,7 @@ public class CreateTableStmt extends StatementBase {
       }
 
       // Check partition columns for managed iceberg table
-      checkPartitionColumns();
+      checkPartitionColumns(analyzer);
     }
 
     String handler = getTblProperties().get(IcebergTable.KEY_STORAGE_HANDLER);
@@ -627,13 +627,17 @@ public class CreateTableStmt extends StatementBase {
   /**
    * For iceberg table, partition column must be from source column
    */
-  private void checkPartitionColumns() throws AnalysisException {
+  private void checkPartitionColumns(Analyzer analyzer) throws AnalysisException {
     // This check is unnecessary for iceberg table without partition spec
     List<IcebergPartitionSpec> specs = tableDef_.getIcebergPartitionSpecs();
     if (specs == null || specs.isEmpty()) return;
 
     // Iceberg table only has one partition spec now
-    List<IcebergPartitionField> fields = specs.get(0).getIcebergPartitionFields();
+    IcebergPartitionSpec spec = specs.get(0);
+    // Analyzes the partition spec and the underlying partition fields.
+    spec.analyze(analyzer);
+
+    List<IcebergPartitionField> fields = spec.getIcebergPartitionFields();
     Preconditions.checkState(fields != null && !fields.isEmpty());
     for (IcebergPartitionField field : fields) {
       String fieldName = field.getFieldName();

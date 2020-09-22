@@ -4836,4 +4836,26 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
             + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
             + "but they return types 'NULL_TYPE' and 'STRING'.");
   }
+
+  @Test
+  public void testCreatePartitionedIcebergTable() throws ImpalaException {
+    String tblProperties = " TBLPROPERTIES ('iceberg.catalog'='hadoop.tables')";
+    AnalyzesOk("CREATE TABLE tbl1 (i int, p1 int, p2 timestamp) " +
+        "PARTITION BY SPEC (p1 BUCKET 10, p1 TRUNCATE 5, p2 DAY) STORED AS ICEBERG" +
+            tblProperties);
+    AnalysisError("CREATE TABLE tbl1 (i int, p1 int, p2 timestamp) " +
+        "PARTITION BY SPEC (p1 BUCKET, p2 DAY) STORED AS ICEBERG" + tblProperties,
+        "BUCKET and TRUNCATE partition transforms should have a parameter.");
+    AnalysisError("CREATE TABLE tbl1 (i int, p1 int, p2 timestamp) " +
+        "PARTITION BY SPEC (p1 BUCKET 0, p2 DAY) STORED AS ICEBERG" + tblProperties,
+        "The parameter of a partition transform should be greater than zero.");
+    AnalysisError("CREATE TABLE tbl1 (i int, p1 int, p2 timestamp) " +
+        "PARTITION BY SPEC (p1 TRUNCATE 0, p2 DAY) STORED AS ICEBERG" + tblProperties,
+        "The parameter of a partition transform should be greater than zero.");
+
+    AnalysisError("CREATE TABLE tbl1 (i int, p1 int, p2 timestamp) " +
+        "PARTITION BY SPEC (p1 BUCKET 10, p2 DAY 10) STORED AS ICEBERG" + tblProperties,
+        "Only BUCKET and TRUNCATE partition transforms accept a parameter.");
+  }
+
 }

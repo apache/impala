@@ -128,7 +128,7 @@ enum TAccessLevel {
   WRITE_ONLY = 3
 }
 
-enum TIcebergPartitionTransform {
+enum TIcebergPartitionTransformType {
   IDENTITY = 0
   HOUR = 1
   DAY = 2
@@ -522,12 +522,19 @@ struct TKuduTable {
   4: required list<TKuduPartitionParam> partition_by
 }
 
+struct TIcebergPartitionTransform {
+  1: required TIcebergPartitionTransformType transform_type
+
+  // Parameter for BUCKET and TRUNCATE transforms.
+  2: optional i32 transform_param
+}
+
 struct TIcebergPartitionField {
   1: required i32 source_id
   2: required i32 field_id
   3: required string orig_field_name
   4: required string field_name
-  5: required TIcebergPartitionTransform field_type
+  5: required TIcebergPartitionTransform transform
 }
 
 struct TIcebergPartitionSpec {
