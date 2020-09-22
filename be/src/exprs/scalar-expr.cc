@@ -335,39 +335,6 @@ int ScalarExpr::GetSlotIds(vector<SlotId>* slot_ids) const {
   return n;
 }
 
-llvm::Function* ScalarExpr::GetStaticGetValWrapper(
-    ColumnType type, LlvmCodeGen* codegen) {
-  switch (type.type) {
-    case TYPE_BOOLEAN:
-      return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_BOOLEAN_VAL, false);
-    case TYPE_TINYINT:
-      return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_TINYINT_VAL, false);
-    case TYPE_SMALLINT:
-      return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_SMALLINT_VAL, false);
-    case TYPE_INT:
-      return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_INT_VAL, false);
-    case TYPE_BIGINT:
-      return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_BIGINT_VAL, false);
-    case TYPE_FLOAT:
-      return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_FLOAT_VAL, false);
-    case TYPE_DOUBLE:
-      return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_DOUBLE_VAL, false);
-    case TYPE_STRING:
-    case TYPE_CHAR:
-    case TYPE_VARCHAR:
-      return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_STRING_VAL, false);
-    case TYPE_TIMESTAMP:
-      return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_TIMESTAMP_VAL, false);
-    case TYPE_DECIMAL:
-      return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_DECIMAL_VAL, false);
-    case TYPE_DATE:
-      return codegen->GetFunction(IRFunction::SCALAR_EXPR_GET_DATE_VAL, false);
-    default:
-      DCHECK(false) << "Invalid type: " << type.DebugString();
-      return NULL;
-  }
-}
-
 llvm::Function* ScalarExpr::CreateIrFunctionPrototype(
     const string& name, LlvmCodeGen* codegen, llvm::Value* (*args)[2]) {
   llvm::Type* return_type = CodegenAnyVal::GetLoweredType(codegen, type());

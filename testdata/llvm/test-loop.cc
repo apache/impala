@@ -19,14 +19,20 @@
 // which is used by the unit test to exercise loading precompiled
 // ir.
 #include <stdio.h>
+#include <cstdint>
 
-__attribute__ ((noinline)) void DefaultImplementation() {
-  printf("Default\n");
+/// The default implementation does nothing with the pointer argument. The codegen
+/// implementation that it will be replaced with will increment it.
+__attribute__ ((noinline)) void DefaultImplementation(int64_t* ptr) {
+  // We need to use 'ptr' otherwise clang marks it as 'readnone' and doesn't actually pass
+  // the value from the caller. We need the value to be passed because the codegen'd
+  // function this function will be replaced with does use the argument.
+  printf("Default, value is %ld.\n", *ptr);
 }
 
-void TestLoop(int n) {
+void TestLoop(int n, int64_t* counter) {
   for (int i = 0; i < n; ++i) {
-    DefaultImplementation();
+    DefaultImplementation(counter);
   }
 }
 

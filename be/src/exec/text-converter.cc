@@ -155,11 +155,11 @@ Status TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
       is_null = builder.CreateCall(
           is_null_string_fn, llvm::ArrayRef<llvm::Value*>({args[1], args[2]}));
     } else {
+      llvm::Value* const null_col_ir_str =
+          codegen->GetStringConstant(&builder, null_col_val, len);
       is_null = builder.CreateCall(is_null_string_fn,
           llvm::ArrayRef<llvm::Value*>(
-              {args[1], args[2], codegen->CastPtrToLlvmPtr(codegen->ptr_type(),
-                                     const_cast<char*>(null_col_val)),
-                  codegen->GetI32Constant(len)}));
+              {args[1], args[2], null_col_ir_str, codegen->GetI32Constant(len)}));
     }
   } else {
     // Constant FALSE as branch condition. We rely on later optimization passes

@@ -339,11 +339,6 @@ class ScalarExpr : public Expr {
   /// tree.
   llvm::Function* CreateIrFunctionPrototype(const std::string& name, LlvmCodeGen* codegen,
       llvm::Value* (*args)[2]);
-
-  /// Returns the cross-compiled IR function of the static Get*Val wrapper function for
-  /// return type 'type'. Must not be called for a type that doesn't have a wrapper
-  /// function in the built-in IR module. Never returns NULL.
-  llvm::Function* GetStaticGetValWrapper(ColumnType type, LlvmCodeGen* codegen);
  protected:
 
   /// Return true if we should codegen this expression node, based on query options

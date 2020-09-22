@@ -602,13 +602,6 @@ llvm::PointerType* LlvmCodeGen::GetNamedPtrPtrType(const string& name) {
   return llvm::PointerType::get(GetNamedPtrType(name), 0);
 }
 
-// Llvm doesn't let you create a PointerValue from a c-side ptr.  Instead
-// cast it to an int and then to 'type'.
-llvm::Value* LlvmCodeGen::CastPtrToLlvmPtr(llvm::Type* type, const void* ptr) {
-  llvm::Constant* const_int = GetI64Constant((int64_t)ptr);
-  return llvm::ConstantExpr::getIntToPtr(const_int, type);
-}
-
 llvm::Constant* LlvmCodeGen::GetIntConstant(
     int num_bytes, uint64_t low_bits, uint64_t high_bits) {
   DCHECK_GE(num_bytes, 1);
@@ -1366,19 +1359,15 @@ void LlvmCodeGen::CodegenDebugTrace(
     LlvmBuilder* builder, const char* str, llvm::Value* v1) {
   LOG(ERROR) << "Remove IR codegen debug traces before checking in.";
 
-  // Make a copy of str into memory owned by this object.  This is no guarantee that str is
-  // still around when the debug printf is executed.
-  debug_strings_.push_back(Substitute("LLVM Trace: $0", str));
-  str = debug_strings_.back().c_str();
+  // Call printf by embedding the string into the module and getting a pointer to it.
+  llvm::Value* const llvm_str =
+      GetStringConstant(builder, Substitute("LLVM Trace: $0", str));
 
   llvm::Function* printf = module_->getFunction("printf");
-  DCHECK(printf != NULL);
-
-  // Call printf by turning 'str' into a constant ptr value
-  llvm::Value* str_ptr = CastPtrToLlvmPtr(ptr_type_, const_cast<char*>(str));
+  DCHECK(printf != nullptr);
 
   vector<llvm::Value*> calling_args;
-  calling_args.push_back(str_ptr);
+  calling_args.push_back(llvm_str);
   if (v1 != NULL) calling_args.push_back(v1);
   builder->CreateCall(printf, calling_args);
 }
