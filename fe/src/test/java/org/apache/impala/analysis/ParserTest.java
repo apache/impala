@@ -2984,6 +2984,10 @@ public class ParserTest extends FrontendTestBase {
     ParserError("CREATE TABLE Foo(a int PRIMARY KEY, b int BLOCK_SIZE 1+1) " +
         "STORED AS KUDU");
     ParserError("CREATE TABLE Foo(a int PRIMARY KEY BLOCK_SIZE -1) STORED AS KUDU");
+
+    // Iceberg TRUNCATE partition transform without parameter results a parse error.
+    ParserError("CREATE TABLE tbl1 (i int, p1 int) PARTITION BY SPEC (p1 TRUNCATE) " +
+        "STORED AS ICEBERG TBLPROPERTIES ('iceberg.catalog'='hadoop.tables')");
   }
 
   @Test

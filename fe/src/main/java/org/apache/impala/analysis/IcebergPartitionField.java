@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TIcebergPartitionField;
-import org.apache.impala.thrift.TIcebergPartitionTransform;
 
 /**
  * Represents a PartitionField of iceberg
@@ -40,21 +39,21 @@ public class IcebergPartitionField extends StmtNode {
   // Holds the column name in the table.
   private String origFieldName_;
 
-  //Column partition type
-  private TIcebergPartitionTransform fieldType_;
+  // Partition transform type and transform param for this partition field.
+  private IcebergPartitionTransform transform_;
 
   public IcebergPartitionField(int sourceId, int fieldId, String origFieldName,
-      String fieldName, TIcebergPartitionTransform fieldType) {
+      String fieldName, IcebergPartitionTransform transform) {
     sourceId_ = sourceId;
     fieldId_ = fieldId;
     origFieldName_ = origFieldName;
     fieldName_ = fieldName;
-    fieldType_ = fieldType;
+    transform_ = transform;
   }
 
   // This constructor is called when creating a partitioned Iceberg table.
-  public IcebergPartitionField(String fieldName, TIcebergPartitionTransform fieldType) {
-    this(0, 0, fieldName, fieldName, fieldType);
+  public IcebergPartitionField(String fieldName, IcebergPartitionTransform transform) {
+    this(0, 0, fieldName, fieldName, transform);
   }
 
   public String getFieldName() {
@@ -67,7 +66,7 @@ public class IcebergPartitionField extends StmtNode {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    return;
+    transform_.analyze(analyzer);
   }
 
   @Override
@@ -78,7 +77,7 @@ public class IcebergPartitionField extends StmtNode {
   @Override
   public String toSql(ToSqlOptions options) {
     StringBuilder builder = new StringBuilder();
-    builder.append(origFieldName_+ " " + fieldType_.toString());
+    builder.append(origFieldName_+ " " + transform_.toSql());
     return builder.toString();
   }
 
@@ -88,7 +87,7 @@ public class IcebergPartitionField extends StmtNode {
     result.setSource_id(sourceId_);
     result.setOrig_field_name(origFieldName_);
     result.setField_name(fieldName_);
-    result.setField_type(fieldType_);
+    result.setTransform(transform_.toThrift());
     return result;
   }
 }

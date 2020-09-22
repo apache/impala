@@ -244,15 +244,17 @@ public interface FeIcebergTable extends FeFsTable {
 
       TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(table);
       if (!metadata.specs().isEmpty()) {
-        // Just show the latest PartitionSpec from iceberg table metadata
-        PartitionSpec latestSpec = metadata.specs().get(metadata.specs().size() - 1);
+        // Just show the current PartitionSpec from Iceberg table metadata
+        PartitionSpec latestSpec = metadata.spec();
+        HashMap<String, Integer> transformParams =
+            IcebergUtil.getPartitionTransformParams(latestSpec);
         for(PartitionField field : latestSpec.fields()) {
           TResultRowBuilder builder = new TResultRowBuilder();
           builder.add(latestSpec.specId());
           builder.add(field.sourceId());
           builder.add(field.fieldId());
           builder.add(field.name());
-          builder.add(IcebergUtil.getPartitionTransform(field).toString());
+          builder.add(IcebergUtil.getPartitionTransform(field, transformParams).toSql());
           result.addToRows(builder.get());
         }
       }
@@ -369,10 +371,12 @@ public interface FeIcebergTable extends FeFsTable {
       List<IcebergPartitionSpec> ret = new ArrayList<>();
       for (PartitionSpec spec : metadata.specs()) {
         List<IcebergPartitionField> fields = new ArrayList<>();;
+        HashMap<String, Integer> transformParams =
+            IcebergUtil.getPartitionTransformParams(spec);
         for (PartitionField field : spec.fields()) {
           fields.add(new IcebergPartitionField(field.sourceId(), field.fieldId(),
               spec.schema().findColumnName(field.sourceId()), field.name(),
-              IcebergUtil.getPartitionTransform(field)));
+              IcebergUtil.getPartitionTransform(field, transformParams)));
         }
         ret.add(new IcebergPartitionSpec(spec.specId(), fields));
       }

@@ -32,6 +32,7 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
+import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.THdfsFileDesc;
@@ -312,8 +313,14 @@ public class IcebergTable extends Table implements FeIcebergTable {
       if (param.getPartition_fields() != null) {
         List<IcebergPartitionField> fields = new ArrayList<>();
         for (TIcebergPartitionField field : param.getPartition_fields()) {
+          Integer transformParam = null;
+          if (field.getTransform().isSetTransform_param()) {
+            transformParam = field.getTransform().getTransform_param();
+          }
           fields.add(new IcebergPartitionField(field.getSource_id(), field.getField_id(),
-              field.getOrig_field_name(), field.getField_name(), field.getField_type()));
+              field.getOrig_field_name(), field.getField_name(),
+              new IcebergPartitionTransform(field.getTransform().getTransform_type(),
+                  transformParam)));
         }
         ret.add(new IcebergPartitionSpec(param.getPartition_id(),
             fields));

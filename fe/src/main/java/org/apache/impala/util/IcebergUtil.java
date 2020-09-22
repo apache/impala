@@ -18,10 +18,14 @@
 package org.apache.impala.util;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
+import com.google.common.collect.Maps;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
+
+import org.apache.impala.common.Pair;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.DataFile;
@@ -34,7 +38,10 @@ import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.transforms.PartitionSpecVisitor;
+import org.apache.iceberg.transforms.Transform;
 import org.apache.iceberg.types.Types;
+import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -54,6 +61,7 @@ import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionTransform;
+import org.apache.impala.thrift.TIcebergPartitionTransformType;
 
 public class IcebergUtil {
 
@@ -154,19 +162,27 @@ public class IcebergUtil {
     List<TIcebergPartitionField> partitionFields =
         params.getPartition_spec().getPartition_fields();
     for (TIcebergPartitionField partitionField : partitionFields) {
-      if (partitionField.getField_type() == TIcebergPartitionTransform.IDENTITY) {
+      TIcebergPartitionTransformType transformType =
+          partitionField.getTransform().getTransform_type();
+      if (transformType == TIcebergPartitionTransformType.IDENTITY) {
         builder.identity(partitionField.getField_name());
-      } else if (partitionField.getField_type() == TIcebergPartitionTransform.HOUR) {
+      } else if (transformType == TIcebergPartitionTransformType.HOUR) {
         builder.hour(partitionField.getField_name());
-      } else if (partitionField.getField_type() == TIcebergPartitionTransform.DAY) {
+      } else if (transformType == TIcebergPartitionTransformType.DAY) {
         builder.day(partitionField.getField_name());
-      } else if (partitionField.getField_type() == TIcebergPartitionTransform.MONTH) {
+      } else if (transformType == TIcebergPartitionTransformType.MONTH) {
         builder.month(partitionField.getField_name());
-      } else if (partitionField.getField_type() == TIcebergPartitionTransform.YEAR) {
+      } else if (transformType == TIcebergPartitionTransformType.YEAR) {
         builder.year(partitionField.getField_name());
+      } else if (transformType == TIcebergPartitionTransformType.BUCKET) {
+        builder.bucket(partitionField.getField_name(),
+            partitionField.getTransform().getTransform_param());
+      } else if (transformType == TIcebergPartitionTransformType.TRUNCATE) {
+        builder.truncate(partitionField.getField_name(),
+            partitionField.getTransform().getTransform_param());
       } else {
         throw new ImpalaRuntimeException(String.format("Skip partition: %s, %s",
-            partitionField.getField_name(), partitionField.getField_type()));
+            partitionField.getField_name(), transformType));
       }
     }
     return builder.build();
@@ -212,36 +228,126 @@ public class IcebergUtil {
     return null;
   }
 
-  /**
-   * Build TIcebergPartitionTransform by iceberg PartitionField
-   */
-  public static TIcebergPartitionTransform getPartitionTransform(PartitionField field)
+  public static IcebergPartitionTransform getPartitionTransform(
+      PartitionField field, HashMap<String, Integer> transformParams)
       throws TableLoadingException {
     String type = field.transform().toString();
-    return getPartitionTransform(type);
+    String transformMappingKey = getPartitonTransformMappingKey(field.sourceId(),
+        getPartitionTransformType(type));
+    return getPartitionTransform(type, transformParams.get(transformMappingKey));
   }
 
-  public static TIcebergPartitionTransform getPartitionTransform(String type)
+  public static IcebergPartitionTransform getPartitionTransform(String transformType,
+      Integer transformParam) throws TableLoadingException {
+    return new IcebergPartitionTransform(getPartitionTransformType(transformType),
+        transformParam);
+  }
+
+  public static IcebergPartitionTransform getPartitionTransform(String transformType)
       throws TableLoadingException {
-    type = type.toUpperCase();
-    if ("IDENTITY".equals(type)) {
-      return TIcebergPartitionTransform.IDENTITY;
-    } else if ("HOUR".equals(type)) {
-      return TIcebergPartitionTransform.HOUR;
-    } else if ("DAY".equals(type)) {
-      return TIcebergPartitionTransform.DAY;
-    } else if ("MONTH".equals(type)) {
-      return TIcebergPartitionTransform.MONTH;
-    } else if ("YEAR".equals(type)) {
-      return TIcebergPartitionTransform.YEAR;
-    } else if ("BUCKET".equals(type)) {
-      return TIcebergPartitionTransform.BUCKET;
-    } else if ("TRUNCATE".equals(type)) {
-      return TIcebergPartitionTransform.TRUNCATE;
+    return getPartitionTransform(transformType, null);
+  }
+
+  public static TIcebergPartitionTransformType getPartitionTransformType(
+      String transformType) throws TableLoadingException {
+    transformType = transformType.toUpperCase();
+    if ("IDENTITY".equals(transformType)) {
+      return TIcebergPartitionTransformType.IDENTITY;
+    } else if ("HOUR".equals(transformType)) {
+      return TIcebergPartitionTransformType.HOUR;
+    } else if ("DAY".equals(transformType)) {
+      return TIcebergPartitionTransformType.DAY;
+    } else if ("MONTH".equals(transformType)) {
+      return TIcebergPartitionTransformType.MONTH;
+    } else if ("YEAR".equals(transformType)) {
+      return TIcebergPartitionTransformType.YEAR;
+    } else if (transformType != null && transformType.startsWith("BUCKET")) {
+      return TIcebergPartitionTransformType.BUCKET;
+    } else if (transformType != null && transformType.startsWith("TRUNCATE")) {
+      return TIcebergPartitionTransformType.TRUNCATE;
     } else {
       throw new TableLoadingException("Unsupported iceberg partition type: " +
-          type);
+      transformType);
     }
+  }
+
+  private static String getPartitonTransformMappingKey(int sourceId,
+      TIcebergPartitionTransformType transformType) {
+    return sourceId + "_" + transformType.toString();
+  }
+
+  /**
+   * Gets a PartitionSpec object and returns a mapping between a field in the
+   * PartitionSpec and its transform's parameter. Only Bucket and Truncate transforms
+   * have a parameter, for other transforms this mapping will have a null.
+   * source ID and the transform type are needed together to uniquely identify a specific
+   * field in the PartitionSpec. (Unfortunaltely, fieldId is not available in the Visitor
+   * class below.)
+   * The reason for implementing the PartitionSpecVisitor below was that Iceberg doesn't
+   * expose the interface of the transform types outside of their package and the only
+   * way to get the transform's parameter is implementing this visitor class.
+   */
+  public static HashMap<String, Integer> getPartitionTransformParams(PartitionSpec spec)
+      throws TableLoadingException {
+    List<Pair<String, Integer>> transformParams = PartitionSpecVisitor.visit(
+        spec.schema(), spec, new PartitionSpecVisitor<Pair<String, Integer>>() {
+          @Override
+          public Pair<String, Integer> identity(String sourceName, int sourceId) {
+            String mappingKey = getPartitonTransformMappingKey(sourceId,
+                TIcebergPartitionTransformType.IDENTITY);
+            return new Pair<String, Integer>(mappingKey, null);
+          }
+
+          @Override
+          public Pair<String, Integer> bucket(String sourceName, int sourceId,
+              int numBuckets) {
+            String mappingKey = getPartitonTransformMappingKey(sourceId,
+                TIcebergPartitionTransformType.BUCKET);
+            return new Pair<String, Integer>(mappingKey, numBuckets);
+          }
+
+          @Override
+          public Pair<String, Integer> truncate(String sourceName, int sourceId,
+              int width) {
+            String mappingKey = getPartitonTransformMappingKey(sourceId,
+                TIcebergPartitionTransformType.TRUNCATE);
+            return new Pair<String, Integer>(mappingKey, width);
+          }
+
+          @Override
+          public Pair<String, Integer> year(String sourceName, int sourceId) {
+            String mappingKey = getPartitonTransformMappingKey(sourceId,
+                TIcebergPartitionTransformType.YEAR);
+            return new Pair<String, Integer>(mappingKey, null);
+          }
+
+          @Override
+          public Pair<String, Integer> month(String sourceName, int sourceId) {
+            String mappingKey = getPartitonTransformMappingKey(sourceId,
+                TIcebergPartitionTransformType.MONTH);
+            return new Pair<String, Integer>(mappingKey, null);
+          }
+
+          @Override
+          public Pair<String, Integer> day(String sourceName, int sourceId) {
+            String mappingKey = getPartitonTransformMappingKey(sourceId,
+                TIcebergPartitionTransformType.DAY);
+            return new Pair<String, Integer>(mappingKey, null);
+          }
+
+          @Override
+          public Pair<String, Integer> hour(String sourceName, int sourceId) {
+            String mappingKey = getPartitonTransformMappingKey(sourceId,
+                TIcebergPartitionTransformType.HOUR);
+            return new Pair<String, Integer>(mappingKey, null);
+          }
+        });
+    // Move the content of the List into a HashMap for faster querying in the future.
+    HashMap<String, Integer> result = Maps.newHashMap();
+    for (Pair<String, Integer> transformParam : transformParams) {
+      result.put(transformParam.first, transformParam.second);
+    }
+    return result;
   }
 
   /**

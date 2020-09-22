@@ -630,12 +630,17 @@ CREATE TABLE iceberg_test1_partitioned (
   level STRING,
   p1 DATE,
   p2 STRING,
-  p3 TIMESTAMP
+  p3 TIMESTAMP,
+  p4 INT
 )
 PARTITION BY SPEC (
   p1 YEAR,
   p2 IDENTITY,
-  p3 HOUR
+  p2 BUCKET 500,
+  p2 TRUNCATE 15,
+  p3 HOUR,
+  p4 BUCKET 10,
+  p4 TRUNCATE 5
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.file_format'='parquet',
@@ -645,13 +650,18 @@ CREATE TABLE show_create_table_test_db.iceberg_test1_partitioned (
   level STRING,
   p1 DATE,
   p2 STRING,
-  p3 TIMESTAMP
+  p3 TIMESTAMP,
+  p4 INT
 )
 PARTITION BY SPEC
 (
   p1 YEAR,
   p2 IDENTITY,
-  p3 HOUR
+  p2 BUCKET 500,
+  p2 TRUNCATE 15,
+  p3 HOUR,
+  p4 BUCKET 10,
+  p4 TRUNCATE 5
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.file_format'='parquet',
@@ -661,13 +671,18 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test1_partitioned (
   level STRING,
   p1 DATE,
   p2 STRING,
-  p3 TIMESTAMP
+  p3 TIMESTAMP,
+  p4 INT
 )
 PARTITION BY SPEC
 (
   p1 YEAR,
   p2 IDENTITY,
-  p3 HOUR
+  p2 BUCKET 500,
+  p2 TRUNCATE 15,
+  p3 HOUR,
+  p4 BUCKET 10,
+  p4 TRUNCATE 5,
 )
 STORED AS ICEBERG
 TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.catalog'='hadoop.catalog',
