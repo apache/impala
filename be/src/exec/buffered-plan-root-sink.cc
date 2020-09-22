@@ -78,9 +78,8 @@ Status BufferedPlanRootSink::Send(RuntimeState* state, RowBatch* batch) {
     while (!state->is_cancelled() && batch_queue_->IsFull()) {
       SCOPED_TIMER(profile()->inactive_timer());
       SCOPED_TIMER(row_batches_send_wait_timer_);
-      if (!all_results_spooled_.IsSet()) {
-        discard_result(all_results_spooled_.Set(true));
-      }
+      // Set this to true means the batch queue is full.
+      discard_result(all_results_spooled_.Set(true));
       batch_queue_has_capacity_.Wait(l);
     }
     RETURN_IF_CANCELLED(state);
@@ -105,9 +104,7 @@ Status BufferedPlanRootSink::FlushFinal(RuntimeState* state) {
   DCHECK(!closed_);
   unique_lock<mutex> l(lock_);
   sender_state_ = SenderState::EOS;
-  if (!all_results_spooled_.IsSet()) {
-    discard_result(all_results_spooled_.Set(false));
-  }
+  discard_result(all_results_spooled_.Set(false));
   // If no batches are ever added, wake up the consumer thread so it can check the
   // SenderState and return appropriately.
   rows_available_.NotifyAll();
@@ -129,9 +126,7 @@ void BufferedPlanRootSink::Close(RuntimeState* state) {
   if (sender_state_ == SenderState::ROWS_PENDING) {
     sender_state_ = SenderState::CLOSED_NOT_EOS;
   }
-  if (!all_results_spooled_.IsSet()) {
-    discard_result(all_results_spooled_.Set(false));
-  }
+  discard_result(all_results_spooled_.Set(false));
   if (current_batch_row_ != 0) {
     current_batch_->Reset();
   }
@@ -161,9 +156,7 @@ void BufferedPlanRootSink::Cancel(RuntimeState* state) {
   rows_available_.NotifyAll();
   consumer_eos_.NotifyAll();
   batch_queue_has_capacity_.NotifyAll();
-  if (!all_results_spooled_.IsSet()) {
-    discard_result(all_results_spooled_.Set(false));
-  }
+  discard_result(all_results_spooled_.Set(false));
 }
 
 Status BufferedPlanRootSink::GetNext(RuntimeState* state, QueryResultSet* results,
