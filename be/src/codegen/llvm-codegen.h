@@ -520,10 +520,6 @@ class LlvmCodeGen {
       llvm::BasicBlock** if_block, llvm::BasicBlock** else_block,
       llvm::BasicBlock* insert_before = NULL);
 
-  /// Create a llvm pointer value from 'ptr'.  This is used to pass pointers between
-  /// c-code and code-generated IR.  The resulting value will be of 'type'.
-  llvm::Value* CastPtrToLlvmPtr(llvm::Type* type, const void* ptr);
-
   /// Returns a constant int of 'byte_size' bytes based on 'low_bits' and 'high_bits'
   /// which stand for the lower and upper 64-bits of the constant respectively. For
   /// values less than or equal to 64-bits, 'high_bits' is not used. This function
@@ -895,10 +891,6 @@ class LlvmCodeGen {
 
   /// The vector of functions to automatically JIT compile after FinalizeModule().
   std::vector<std::pair<llvm::Function*, CodegenFnPtrBase*>> fns_to_jit_compile_;
-
-  /// Debug strings that will be outputted by jitted code.  This is a copy of all
-  /// strings passed to CodegenDebugTrace.
-  std::vector<std::string> debug_strings_;
 
   /// llvm representation of a few common types.  Owned by context.
   llvm::PointerType* ptr_type_;             // int8_t*

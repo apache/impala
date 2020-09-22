@@ -332,15 +332,7 @@ Status ScalarFnCall::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Functi
     llvm::Function* child_fn = NULL;
     vector<llvm::Value*> child_fn_args;
     // Set 'child_fn' to the codegen'd function, sets child_fn == NULL if codegen fails
-    Status status = children_[i]->GetCodegendComputeFn(codegen, false, &child_fn);
-    if (UNLIKELY(!status.ok())) {
-      DCHECK(child_fn == NULL);
-      // Set 'child_fn' to the interpreted function
-      child_fn = GetStaticGetValWrapper(children_[i]->type(), codegen);
-      // First argument to interpreted function is children_[i]
-      llvm::Type* expr_ptr_type = codegen->GetStructPtrType<ScalarExpr>();
-      child_fn_args.push_back(codegen->CastPtrToLlvmPtr(expr_ptr_type, children_[i]));
-    }
+    RETURN_IF_ERROR(children_[i]->GetCodegendComputeFn(codegen, false, &child_fn));
     child_fn_args.push_back(eval);
     child_fn_args.push_back(row);
 
