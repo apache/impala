@@ -146,9 +146,12 @@ class BufferedPlanRootSink : public PlanRootSink {
   /// 'GetNext'. If 'current_batch_' is nullptr, the value of 'current_batch_row_' is 0.
   int current_batch_row_ = 0;
 
-  /// Set when all results are spooled or we fail to do this due to batch_queue_ full or
-  /// any errors.
-  Promise<bool> all_results_spooled_;
+  /// Set when all results are spooled or we fail to do this due to batch_queue_ full,
+  /// cancellation or any errors. Set by either the fragment instance execution thread or
+  /// the cancellation thread. The boolean result is just used to decide whether to log
+  /// a warning. The result is true when batch_queue_ is full so we can't spool all
+  /// results. Coordinator will log a warning on this if it's waiting on this promise.
+  Promise<bool, PromiseMode::MULTIPLE_PRODUCER> all_results_spooled_;
 
   /// Returns true if the 'queue' (not the 'batch_queue_') is empty. 'queue' refers to
   /// the logical queue of RowBatches and thus includes any RowBatch that
