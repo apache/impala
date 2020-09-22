@@ -130,11 +130,6 @@ class RuntimeFilterBank {
   void PublishGlobalFilter(
       const PublishFilterParamsPB& params, kudu::rpc::RpcContext* context);
 
-  /// Returns true if, according to the observed NDV in 'observed_ndv', a filter of size
-  /// 'filter_size' would have an expected false-positive rate which would exceed
-  /// FLAGS_max_filter_error_rate.
-  bool FpRateTooHigh(int64_t filter_size, int64_t observed_ndv);
-
   /// Returns a bloom_filter that can be used by an operator to produce a local filter,
   /// which may then be used in UpdateFilterFromLocal(). The memory returned is owned by
   /// the RuntimeFilterBank and should not be deleted by the caller. The filter identified

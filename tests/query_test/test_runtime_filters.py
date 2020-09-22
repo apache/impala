@@ -192,16 +192,6 @@ class TestBloomFilters(ImpalaTestSuite):
       self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=BLOOM")
     self.run_test_case('QueryTest/bloom_filters', vector)
 
-  def test_bloom_wait_time(self, vector):
-    """Test that a query that has global filters does not wait for them if run in LOCAL
-    mode"""
-    now = time.time()
-    self.run_test_case('QueryTest/bloom_filters_wait', vector)
-    duration_s = time.time() - now
-    assert duration_s < (WAIT_TIME_MS / 1000), \
-        "Query took too long (%ss, possibly waiting for missing filters?)" \
-        % str(duration_s)
-
 
 @SkipIfLocal.multiple_impalad
 class TestMinMaxFilters(ImpalaTestSuite):

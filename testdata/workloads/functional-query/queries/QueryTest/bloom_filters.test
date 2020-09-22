@@ -4,22 +4,10 @@
 # Test case 1: bloom filters with high expected FP rate get disabled.
 # To trigger this path, we limit the size of the filter to a much lower value than
 # required to achieve the desired FP rate.
+#
+# IMPALA-10112: This test is removed because high FP rate check has been removed
 ####################################################
-
-SET RUNTIME_FILTER_WAIT_TIME_MS=30000;
-SET RUNTIME_FILTER_MODE=GLOBAL;
-SET RUNTIME_FILTER_MAX_SIZE=64K;
-with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
-select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
-    join (select * from l LIMIT 500000) b on a.l_orderkey = -b.l_orderkey;
----- RESULTS
-0
----- RUNTIME_PROFILE
-row_regex: .*0 of 1 Runtime Filter Published, 1 Disabled.*
-====
-
-
----- QUERY
+#
 ####################################################
 # Test case 2: Filter sizes change according to their NDV
 ####################################################
@@ -113,7 +101,6 @@ with l as (select * from tpch.lineitem UNION ALL select * from tpch.lineitem)
 select STRAIGHT_JOIN count(*) from (select * from tpch.lineitem a LIMIT 1) a
     join (select * from l LIMIT 1000000) b on a.l_orderkey = -b.l_orderkey;
 ---- RUNTIME_PROFILE
-row_regex: .*0 of 1 Runtime Filter Published.*
 row_regex: .*Filter 0 \(64.00 KB\).*
 ====
 
