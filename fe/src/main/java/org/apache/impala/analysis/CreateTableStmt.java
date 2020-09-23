@@ -142,7 +142,7 @@ public class CreateTableStmt extends StatementBase {
     return tableDef_.getPrimaryKeyColumnNames();
   }
 
-  List<IcebergPartitionSpec> getIcebergPartitionSpecs() {
+  public List<IcebergPartitionSpec> getIcebergPartitionSpecs() {
     return tableDef_.getIcebergPartitionSpecs();
   }
 

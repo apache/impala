@@ -86,12 +86,13 @@ public class ShowStatsStmt extends StatementBase {
       boolean partitioned = true;
       if (op_ == TShowStatsOp.PARTITIONS) {
         if (table_ instanceof FeIcebergTable) {
+          FeIcebergTable feIcebergTable = (FeIcebergTable) table_;
           // We only get latest partition spec from Iceberg now, so this list only
           // contains one partition spec member.
           // Iceberg snapshots chosen maybe supported in the future.
-          Preconditions.checkNotNull(((FeIcebergTable) table_).getPartitionSpec());
+          Preconditions.checkNotNull(feIcebergTable.getPartitionSpecs());
           // Partition spec without partition fields is non-partitioned.
-          if (!((FeIcebergTable) table_).getPartitionSpec().get(0).hasPartitionFields()) {
+          if (!(feIcebergTable.getDefaultPartitionSpec().hasPartitionFields())) {
             partitioned = false;
           }
         } else {

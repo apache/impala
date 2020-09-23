@@ -625,3 +625,52 @@ TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg_file_format'='parquet',
 'iceberg.catalog'='hadoop.catalog', 'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test',
 'iceberg.table_identifier'='org.my_db.my_table')
 ====
+---- CREATE_TABLE
+CREATE TABLE iceberg_test1_partitioned (
+  level STRING,
+  p1 DATE,
+  p2 STRING,
+  p3 TIMESTAMP
+)
+PARTITION BY SPEC (
+  p1 YEAR,
+  p2 IDENTITY,
+  p3 HOUR
+)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg_file_format'='parquet',
+    'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
+---- RESULTS-HIVE
+CREATE TABLE show_create_table_test_db.iceberg_test1_partitioned (
+  level STRING,
+  p1 DATE,
+  p2 STRING,
+  p3 TIMESTAMP
+)
+PARTITION BY SPEC
+(
+  p1 YEAR,
+  p2 IDENTITY,
+  p3 HOUR
+)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg_file_format'='parquet',
+    'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test1_partitioned (
+  level STRING,
+  p1 DATE,
+  p2 STRING,
+  p3 TIMESTAMP
+)
+PARTITION BY SPEC
+(
+  p1 YEAR,
+  p2 IDENTITY,
+  p3 HOUR
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.catalog'='hadoop.catalog',
+    'iceberg_file_format'='parquet',
+    'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
+====
