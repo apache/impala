@@ -525,8 +525,9 @@ struct TKuduTable {
 struct TIcebergPartitionField {
   1: required i32 source_id
   2: required i32 field_id
-  3: required string field_name
-  4: required TIcebergPartitionTransform field_type
+  3: required string orig_field_name
+  4: required string field_name
+  5: required TIcebergPartitionTransform field_type
 }
 
 struct TIcebergPartitionSpec {
@@ -538,8 +539,9 @@ struct TIcebergTable {
   // Iceberg file system table location
   1: required string table_location
   2: required list<TIcebergPartitionSpec> partition_spec
+  3: required i32 default_partition_spec_id
   // Data file path md5 and it's file descriptor
-  3: optional map<string,THdfsFileDesc> path_md5_to_file_descriptor
+  4: optional map<string,THdfsFileDesc> path_md5_to_file_descriptor
 }
 
 // Represents a table or view.

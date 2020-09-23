@@ -56,6 +56,8 @@ import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TResultRowBuilder;
 
+import com.google.common.base.Preconditions;
+
 /**
  * Frontend interface for interacting with an Iceberg-backed table.
  */
@@ -98,7 +100,17 @@ public interface FeIcebergTable extends FeFsTable {
   /**
    * Return the Iceberg partition spec info
    */
-  List<IcebergPartitionSpec> getPartitionSpec();
+  List<IcebergPartitionSpec> getPartitionSpecs();
+
+  /**
+   *  Return the latest partition spec.
+   */
+  IcebergPartitionSpec getDefaultPartitionSpec();
+
+  /**
+   *  Return the ID used for getting the default partititon spec.
+   */
+  int getDefaultPartitionSpecId();
 
   @Override
   default boolean isCacheable() {
@@ -285,9 +297,11 @@ public interface FeIcebergTable extends FeFsTable {
       TIcebergTable tIcebergTable = new TIcebergTable();
       tIcebergTable.setTable_location(icebergTable.getIcebergTableLocation());
 
-      for (IcebergPartitionSpec partitionSpec : icebergTable.getPartitionSpec()) {
+      for (IcebergPartitionSpec partitionSpec : icebergTable.getPartitionSpecs()) {
         tIcebergTable.addToPartition_spec(partitionSpec.toThrift());
       }
+      tIcebergTable.setDefault_partition_spec_id(
+          icebergTable.getDefaultPartitionSpecId());
 
       for (Map.Entry<String, HdfsPartition.FileDescriptor> entry :
           icebergTable.getPathMD5ToFileDescMap().entrySet()) {
@@ -357,11 +371,22 @@ public interface FeIcebergTable extends FeFsTable {
         List<IcebergPartitionField> fields = new ArrayList<>();;
         for (PartitionField field : spec.fields()) {
           fields.add(new IcebergPartitionField(field.sourceId(), field.fieldId(),
-              field.name(), IcebergUtil.getPartitionTransform(field)));
+              spec.schema().findColumnName(field.sourceId()), field.name(),
+              IcebergUtil.getPartitionTransform(field)));
         }
         ret.add(new IcebergPartitionSpec(spec.specId(), fields));
       }
       return ret;
+    }
+
+    public static IcebergPartitionSpec getDefaultPartitionSpec(
+        FeIcebergTable feIcebergTable) {
+      List<IcebergPartitionSpec> specs = feIcebergTable.getPartitionSpecs();
+      Preconditions.checkState(specs != null);
+      if (specs.isEmpty()) return null;
+      int defaultSpecId = feIcebergTable.getDefaultPartitionSpecId();
+      Preconditions.checkState(specs.size() > defaultSpecId);
+      return specs.get(defaultSpecId);
     }
 
     /**

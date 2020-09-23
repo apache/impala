@@ -92,6 +92,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // Partitioning schemes of this Iceberg table.
   private List<IcebergPartitionSpec> partitionSpecs_;
 
+  // Index for partitionSpecs_ to show the current item in the list. Not always the
+  // last item of the list is the latest.
+  private int defaultPartitionSpecId_;
+
   // Schema of the iceberg table.
   private org.apache.iceberg.Schema icebergSchema_;
 
@@ -176,10 +180,18 @@ public class IcebergTable extends Table implements FeIcebergTable {
   }
 
   @Override
-  public List<IcebergPartitionSpec> getPartitionSpec() {
+  public List<IcebergPartitionSpec> getPartitionSpecs() {
     Preconditions.checkState(partitionSpecs_ != null);
     return ImmutableList.copyOf(partitionSpecs_);
   }
+
+  @Override
+  public IcebergPartitionSpec getDefaultPartitionSpec() {
+    return Utils.getDefaultPartitionSpec(this);
+  }
+
+  @Override
+  public int getDefaultPartitionSpecId() { return defaultPartitionSpecId_; }
 
   @Override
   public Map<String, FileDescriptor> getPathMD5ToFileDescMap() {
@@ -255,6 +267,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     icebergSchema_ = metadata.schema();
     loadSchema();
     partitionSpecs_ = Utils.loadPartitionSpecByIceberg(metadata);
+    defaultPartitionSpecId_ = metadata.defaultSpecId();
   }
 
   /**
@@ -284,6 +297,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     TIcebergTable ticeberg = thriftTable.getIceberg_table();
     icebergTableLocation_ = ticeberg.getTable_location();
     partitionSpecs_ = loadPartitionBySpecsFromThrift(ticeberg.getPartition_spec());
+    defaultPartitionSpecId_ = ticeberg.getDefault_partition_spec_id();
     pathMD5ToFileDescMap_ = loadFileDescFromThrift(
         ticeberg.getPath_md5_to_file_descriptor());
     hdfsTable_.loadFromThrift(thriftTable);
@@ -299,7 +313,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         List<IcebergPartitionField> fields = new ArrayList<>();
         for (TIcebergPartitionField field : param.getPartition_fields()) {
           fields.add(new IcebergPartitionField(field.getSource_id(), field.getField_id(),
-              field.getField_name(), field.getField_type()));
+              field.getOrig_field_name(), field.getField_name(), field.getField_type()));
         }
         ret.add(new IcebergPartitionSpec(param.getPartition_id(),
             fields));

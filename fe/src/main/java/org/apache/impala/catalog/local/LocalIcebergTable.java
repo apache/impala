@@ -52,6 +52,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   private TableParams tableParams_;
   private TIcebergFileFormat icebergFileFormat_;
   private List<IcebergPartitionSpec> partitionSpecs_;
+  private int defaultPartitionSpecId_;
   private Map<String, FileDescriptor> pathMD5ToFileDescMap_;
   private LocalFsTable localFsTable_;
 
@@ -66,11 +67,8 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
           IcebergUtil.getIcebergTableMetadata(params.icebergCatalog_, tableName,
               params.icebergCatalogLocation_);
 
-      List<IcebergPartitionSpec> partitionSpecs =
-          Utils.loadPartitionSpecByIceberg(metadata);
-
       return new LocalIcebergTable(db, msTable, ref, ColumnMap.fromMsTable(msTable),
-          partitionSpecs);
+          metadata);
     } catch (Exception e) {
       String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
       throw new TableLoadingException(
@@ -80,11 +78,12 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   }
 
   private LocalIcebergTable(LocalDb db, Table msTable, MetaProvider.TableMetaRef ref,
-      ColumnMap cmap, List<IcebergPartitionSpec> partitionSpecs)
+      ColumnMap cmap, TableMetadata metadata)
       throws TableLoadingException {
     super(db, msTable, ref, cmap);
     tableParams_ = new TableParams(msTable);
-    partitionSpecs_ = partitionSpecs;
+    partitionSpecs_ = Utils.loadPartitionSpecByIceberg(metadata);
+    defaultPartitionSpecId_ = metadata.defaultSpecId();
     localFsTable_ = LocalFsTable.load(db, msTable, ref);
     try {
       pathMD5ToFileDescMap_ = Utils.loadAllPartition(this);
@@ -122,8 +121,16 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   }
 
   @Override
-  public List<IcebergPartitionSpec> getPartitionSpec() {
+  public List<IcebergPartitionSpec> getPartitionSpecs() {
     return partitionSpecs_;
+  }
+
+  @Override
+  public int getDefaultPartitionSpecId() { return defaultPartitionSpecId_; }
+
+  @Override
+  public IcebergPartitionSpec getDefaultPartitionSpec() {
+    return Utils.getDefaultPartitionSpec(this);
   }
 
   @Override

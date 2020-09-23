@@ -17,7 +17,10 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
+
+import com.google.common.base.Joiner;
 
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
@@ -76,12 +79,14 @@ public class IcebergPartitionSpec extends StmtNode {
     StringBuilder builder = new StringBuilder();
     builder.append("(");
     if (hasPartitionFields()) {
-      builder.append("\n");
+      builder.append("\n  ");
+      List<String> fieldsSql = new ArrayList<>();
       for (IcebergPartitionField field : icebergPartitionFields_) {
-        builder.append(String.format("  %s,\n", field.toSql()));
+        fieldsSql.add(field.toSql());
       }
+      builder.append(Joiner.on(",\n  ").join(fieldsSql));
     }
-    builder.append(")");
+    builder.append("\n)");
     return builder.toString();
   }
 

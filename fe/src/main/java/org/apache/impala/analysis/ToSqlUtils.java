@@ -249,6 +249,20 @@ public class ToSqlUtils {
   }
 
   /**
+   * Gets the single IcebergPartitionSpec from a CreateTableStmt and returns its
+   * toSql(). If there is no IcebergPartitionSpec in the statement then returns null.
+   */
+  private static String getIcebergPartitionSpecsSql(CreateTableStmt stmt) {
+    List<IcebergPartitionSpec> partitionSpecs = stmt.getIcebergPartitionSpecs();
+    // It's safe to get the first element from 'partitionSpecs' as in create table
+    // statement only one is allowed.
+    if (!partitionSpecs.isEmpty() && partitionSpecs.get(0).hasPartitionFields()) {
+      return partitionSpecs.get(0).toSql();
+    }
+    return null;
+  }
+
+  /**
    * Returns the "CREATE TABLE" SQL string corresponding to the given CreateTableStmt
    * statement.
    */
@@ -269,13 +283,14 @@ public class ToSqlUtils {
     removeHiddenKuduTableProperties(generatedProperties);
     properties.putAll(generatedProperties);
     String kuduParamsSql = getKuduPartitionByParams(stmt);
+    String icebergPartitionSpecs = getIcebergPartitionSpecsSql(stmt);
     // TODO: Pass the correct compression, if applicable.
     return getCreateTableSql(stmt.getDb(), stmt.getTbl(), stmt.getComment(), colsSql,
         partitionColsSql, stmt.getTblPrimaryKeyColumnNames(), stmt.getForeignKeysSql(),
         kuduParamsSql, new Pair<>(stmt.getSortColumns(), stmt.getSortingOrder()),
         properties, stmt.getSerdeProperties(), stmt.isExternal(), stmt.getIfNotExists(),
         stmt.getRowFormat(), HdfsFileFormat.fromThrift(stmt.getFileFormat()),
-        HdfsCompression.NONE, null, stmt.getLocation());
+        HdfsCompression.NONE, null, stmt.getLocation(), icebergPartitionSpecs);
   }
 
   /**
@@ -303,6 +318,7 @@ public class ToSqlUtils {
     removeHiddenKuduTableProperties(generatedProperties);
     properties.putAll(generatedProperties);
     String kuduParamsSql = getKuduPartitionByParams(innerStmt);
+    String icebergPartitionSpecs = getIcebergPartitionSpecsSql(innerStmt);
     // TODO: Pass the correct compression, if applicable.
     String createTableSql = getCreateTableSql(innerStmt.getDb(), innerStmt.getTbl(),
         innerStmt.getComment(), null, partitionColsSql,
@@ -311,7 +327,7 @@ public class ToSqlUtils {
         innerStmt.getSortingOrder()), properties, innerStmt.getSerdeProperties(),
         innerStmt.isExternal(), innerStmt.getIfNotExists(), innerStmt.getRowFormat(),
         HdfsFileFormat.fromThrift(innerStmt.getFileFormat()), HdfsCompression.NONE, null,
-        innerStmt.getLocation());
+        innerStmt.getLocation(), icebergPartitionSpecs);
     return createTableSql + " AS " + stmt.getQueryStmt().toSql(options);
   }
 
@@ -360,6 +376,7 @@ public class ToSqlUtils {
     List<String> primaryKeySql = new ArrayList<>();
     List<String> foreignKeySql = new ArrayList<>();
     String kuduPartitionByParams = null;
+    String icebergPartitions = null;
     if (table instanceof FeKuduTable) {
       FeKuduTable kuduTable = (FeKuduTable) table;
       // Kudu tables don't use LOCATION syntax
@@ -397,6 +414,16 @@ public class ToSqlUtils {
       if (table instanceof FeIcebergTable) {
         storageHandlerClassName = null;
         properties.remove(IcebergTable.KEY_STORAGE_HANDLER);
+
+        // Fill "PARTITION BY SPEC" part if the Iceberg table is partitioned.
+        FeIcebergTable feIcebergTable= (FeIcebergTable)table;
+        if (!feIcebergTable.getPartitionSpecs().isEmpty()) {
+          IcebergPartitionSpec latestPartitionSpec =
+              feIcebergTable.getDefaultPartitionSpec();
+          if (latestPartitionSpec.hasPartitionFields()) {
+            icebergPartitions = feIcebergTable.getDefaultPartitionSpec().toSql();
+          }
+        }
       }
 
       String inputFormat = msTable.getSd().getInputFormat();
@@ -415,7 +442,7 @@ public class ToSqlUtils {
         partitionColsSql, primaryKeySql, foreignKeySql, kuduPartitionByParams,
         new Pair<>(sortColsSql, sortingOrder), properties, serdeParameters,
         isExternal, false, rowFormat, format, compression,
-        storageHandlerClassName, tableLocation);
+        storageHandlerClassName, tableLocation, icebergPartitions);
   }
 
   /**
@@ -430,7 +457,7 @@ public class ToSqlUtils {
       Map<String, String> tblProperties, Map<String, String> serdeParameters,
       boolean isExternal, boolean ifNotExists, RowFormat rowFormat,
       HdfsFileFormat fileFormat, HdfsCompression compression,
-      String storageHandlerClass, HdfsUri location) {
+      String storageHandlerClass, HdfsUri location, String icebergPartitions) {
     Preconditions.checkNotNull(tableName);
     StringBuilder sb = new StringBuilder("CREATE ");
     if (isExternal) sb.append("EXTERNAL ");
@@ -470,6 +497,11 @@ public class ToSqlUtils {
     if (sortProperties.first != null) {
       sb.append(String.format("SORT BY %s (\n  %s\n)\n", sortProperties.second.toString(),
           Joiner.on(", \n  ").join(sortProperties.first)));
+    }
+    if (icebergPartitions != null && !icebergPartitions.isEmpty()) {
+      sb.append("PARTITION BY SPEC\n");
+      sb.append(icebergPartitions);
+      sb.append("\n");
     }
 
     if (tableComment != null) sb.append(" COMMENT '" + tableComment + "'\n");
