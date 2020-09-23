@@ -103,7 +103,8 @@ if kerberize:
 # Enable Tez and ACID for Hive 3
 if hive_major_version >= 3:
   CONFIG.update({
-   'hive.tez.container.size': '512',
+   'hive.tez.container.size': '2048',
+   'hive.tez.java.opts': '-Xmx1700m',
    'hive.txn.manager': 'org.apache.hadoop.hive.ql.lockmgr.DbTxnManager',
    # We run YARN with Tez on the classpath directly
    'tez.ignore.lib.uris': 'true',
