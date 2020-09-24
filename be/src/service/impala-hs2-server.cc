@@ -1017,8 +1017,15 @@ void ImpalaServer::GetExecSummary(TGetExecSummaryResp& return_val,
       SQLSTATE_GENERAL_ERROR);
 
   TExecSummary summary;
-  Status status = GetExecSummary(query_id, GetEffectiveUser(*session), &summary);
+  TExecSummary original_summary;
+  bool was_retried = false;
+  Status status = GetExecSummary(query_id, GetEffectiveUser(*session), &summary,
+      &original_summary, &was_retried);
   HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
+  if (request.include_query_attempts && was_retried) {
+    return_val.failed_summaries.emplace_back(original_summary);
+    return_val.__isset.failed_summaries = true;
+  }
   return_val.__set_summary(summary);
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }

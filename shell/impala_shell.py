@@ -103,13 +103,13 @@ class QueryOptionDisplayModes:
   ALL_OPTIONS = 2
 
 
-class QueryProfileDisplayModes:
-  """The display mode when runtime profiles are printed to the console. If the query has
-  not been retried, then the display mode does not change anything. The format is always
-  the same. If the query has been retried, then the ALL option will print both the
-  original and retried profiles. If the LATEST option is specified, then only the retried
-  profile will be printed. If the ORIGINAL option is specified, then only the original
-  profile will be printed."""
+class QueryAttemptDisplayModes:
+  """The display mode when runtime profiles or summaries are printed to the console.
+  If the query has not been retried, then the display mode does not change anything.
+  The format is always the same. If the query has been retried, then the ALL option will
+  print both the original and retried profiles/summaries. If the LATEST option is
+  specified, then only the retried profile/summary will be printed. If the ORIGINAL option
+  is specified, then only the original profile/summary will be printed."""
   ALL = "all"
   LATEST = "latest"
   ORIGINAL = "original"
@@ -692,13 +692,22 @@ class ImpalaShell(cmd.Cmd, object):
     return status
 
   def do_summary(self, args):
+    split_args = args.split()
+    if len(split_args) > 1:
+      print("'summary' only accepts 0 or 1 arguments", file=sys.stderr)
+      return CmdStatus.ERROR
     if not self.last_query_handle:
       print("Could not retrieve summary: no previous query.", file=sys.stderr)
       return CmdStatus.ERROR
 
-    summary = None
+    display_mode = QueryAttemptDisplayModes.LATEST
+    if len(split_args) == 1:
+      display_mode = self.get_query_attempt_display_mode(split_args[0])
+      if display_mode is None:
+        return CmdStatus.ERROR
+
     try:
-      summary = self.imp_client.get_summary(self.last_query_handle)
+      summary, failed_summary = self.imp_client.get_summary(self.last_query_handle)
     except RPCException as e:
       import re
       error_pattern = re.compile("ERROR: Query id \d+:\d+ not found.")
@@ -710,6 +719,30 @@ class ImpalaShell(cmd.Cmd, object):
     if summary.nodes is None:
       print("Summary not available", file=sys.stderr)
       return CmdStatus.SUCCESS
+
+    if display_mode == QueryAttemptDisplayModes.ALL:
+      print("Query Summary:")
+      self.print_exec_summary(summary)
+      if failed_summary:
+        print("Failed Query Summary:")
+        self.print_exec_summary(failed_summary)
+    elif display_mode == QueryAttemptDisplayModes.LATEST:
+      self.print_exec_summary(summary)
+    elif display_mode == QueryAttemptDisplayModes.ORIGINAL:
+      self.print_exec_summary(failed_summary)
+    else:
+      raise FatalShellException("Invalid value for query summary display mode")
+
+  @staticmethod
+  def get_query_attempt_display_mode(arg_mode):
+    arg_mode = str(arg_mode).lower()
+    if arg_mode not in [QueryAttemptDisplayModes.ALL,
+        QueryAttemptDisplayModes.LATEST, QueryAttemptDisplayModes.ORIGINAL]:
+      print("Invalid value for query attempt display mode: \'" +
+          arg_mode + "\'. Valid values are [ALL | LATEST | ORIGINAL]")
+    return arg_mode
+
+  def print_exec_summary(self, summary):
     output = []
     table = self._default_summary_table()
     self.imp_client.build_summary_table(summary, 0, False, 0, False, output)
@@ -994,7 +1027,7 @@ class ImpalaShell(cmd.Cmd, object):
       file_descriptor.flush()
 
   def print_runtime_profile(self, profile, failed_profile,
-          profile_display_mode=QueryProfileDisplayModes.LATEST, status=False):
+        profile_display_mode=QueryAttemptDisplayModes.LATEST, status=False):
     """Prints the given runtime profiles to the console. Optionally prints the failed
     profile if the query was retried. The format the profiles are printed is controlled
     by the option profile_display_mode, see QueryProfileDisplayModes docs above.
@@ -1002,13 +1035,13 @@ class ImpalaShell(cmd.Cmd, object):
     if self.show_profiles or status:
       if profile:
         query_profile_prefix = "Query Runtime Profile:\n"
-        if profile_display_mode == QueryProfileDisplayModes.ALL:
+        if profile_display_mode == QueryAttemptDisplayModes.ALL:
           print(query_profile_prefix + profile)
           if failed_profile:
             print("Failed Query Runtime Profile(s):\n" + failed_profile)
-        elif profile_display_mode == QueryProfileDisplayModes.LATEST:
+        elif profile_display_mode == QueryAttemptDisplayModes.LATEST:
           print(query_profile_prefix + profile)
-        elif profile_display_mode == QueryProfileDisplayModes.ORIGINAL:
+        elif profile_display_mode == QueryAttemptDisplayModes.ORIGINAL:
           print(query_profile_prefix + failed_profile if failed_profile else profile)
         else:
           raise FatalShellException("Invalid value for query profile display mode")
@@ -1063,13 +1096,10 @@ class ImpalaShell(cmd.Cmd, object):
       return CmdStatus.ERROR
 
     # Parse and validate the QueryProfileDisplayModes option.
-    profile_display_mode = QueryProfileDisplayModes.LATEST
+    profile_display_mode = QueryAttemptDisplayModes.LATEST
     if len(split_args) == 1:
-      profile_display_mode = str(split_args[0]).lower()
-      if profile_display_mode not in [QueryProfileDisplayModes.ALL,
-              QueryProfileDisplayModes.LATEST, QueryProfileDisplayModes.ORIGINAL]:
-        print("Invalid value for query profile display mode: \'" +
-                profile_display_mode + "\'. Valid values are [ALL | LATEST | ORIGINAL]")
+      profile_display_mode = self.get_query_attempt_display_mode(split_args[0])
+      if profile_display_mode is None:
         return CmdStatus.ERROR
 
     profile, failed_profile = self.imp_client.get_runtime_profile(
@@ -1119,7 +1149,7 @@ class ImpalaShell(cmd.Cmd, object):
 
     checkpoint = time.time()
     if checkpoint - self.last_summary > self.PROGRESS_UPDATE_INTERVAL:
-      summary = self.imp_client.get_summary(self.last_query_handle)
+      summary, failed_summary = self.imp_client.get_summary(self.last_query_handle)
       if not summary:
         return
 

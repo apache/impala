@@ -708,12 +708,21 @@ struct TGetExecSummaryReq {
   1: optional TCLIService.TOperationHandle operationHandle
 
   2: optional TCLIService.TSessionHandle sessionHandle
+
+  // If true, returns the summaries of all query attempts. A TGetExecSummaryResp
+  // always returns the profile for the most recent query attempt, regardless of the
+  // query id specified. Clients should set this to true if they want to retrieve the
+  // summaries of all query attempts (including the failed ones).
+  3: optional bool include_query_attempts = false
 }
 
 struct TGetExecSummaryResp {
   1: required TCLIService.TStatus status
 
   2: optional ExecStats.TExecSummary summary
+
+  // A list of all summaries of the failed query attempts.
+  3: optional list<ExecStats.TExecSummary> failed_summaries
 }
 
 struct TGetRuntimeProfileReq {
@@ -724,7 +733,7 @@ struct TGetRuntimeProfileReq {
   3: optional RuntimeProfile.TRuntimeProfileFormat format =
       RuntimeProfile.TRuntimeProfileFormat.STRING
 
-  // If true, returns the profiles of all query attempts. A TGetRuntimeProfileReq
+  // If true, returns the profiles of all query attempts. A TGetRuntimeProfileResp
   // always returns the profile for the most recent query attempt, regardless of the
   // query id specified. Clients should set this to true if they want to retrieve the
   // profiles of all query attempts (including the failed ones).
