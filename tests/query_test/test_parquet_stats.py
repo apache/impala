@@ -18,6 +18,7 @@
 import os
 import pytest
 import shlex
+from copy import deepcopy
 from subprocess import check_call
 
 from tests.common.file_utils import (
@@ -78,22 +79,27 @@ class TestParquetStats(ImpalaTestSuite):
     """Test that using the Parquet page index works well. The various test files
     contain queries that exercise the page selection and value-skipping logic against
     columns with different types and encodings."""
+    new_vector = deepcopy(vector)
+    del new_vector.get_value('exec_option')['abort_on_error']
     create_table_from_parquet(self.client, unique_database, 'decimals_1_10')
     create_table_from_parquet(self.client, unique_database, 'nested_decimals')
     create_table_from_parquet(self.client, unique_database, 'double_nested_decimals')
     create_table_from_parquet(self.client, unique_database, 'alltypes_tiny_pages')
     create_table_from_parquet(self.client, unique_database, 'alltypes_tiny_pages_plain')
+    create_table_from_parquet(self.client, unique_database, 'alltypes_empty_pages')
+    create_table_from_parquet(self.client, unique_database, 'alltypes_invalid_pages')
 
-    for batch_size in [0, 1]:
-      vector.get_value('exec_option')['batch_size'] = batch_size
-      self.run_test_case('QueryTest/parquet-page-index', vector, unique_database)
-      self.run_test_case('QueryTest/nested-types-parquet-page-index', vector,
+    for batch_size in [1]:
+      new_vector.get_value('exec_option')['batch_size'] = batch_size
+      self.run_test_case('QueryTest/parquet-page-index', new_vector, unique_database)
+      self.run_test_case('QueryTest/nested-types-parquet-page-index', new_vector,
                          unique_database)
-      self.run_test_case('QueryTest/parquet-page-index-alltypes-tiny-pages', vector,
+      self.run_test_case('QueryTest/parquet-page-index-alltypes-tiny-pages', new_vector,
                          unique_database)
-      self.run_test_case('QueryTest/parquet-page-index-alltypes-tiny-pages-plain', vector,
-                         unique_database)
+      self.run_test_case('QueryTest/parquet-page-index-alltypes-tiny-pages-plain',
+                         new_vector, unique_database)
 
     for batch_size in [0, 32]:
-      vector.get_value('exec_option')['batch_size'] = batch_size
-      self.run_test_case('QueryTest/parquet-page-index-large', vector, unique_database)
+      new_vector.get_value('exec_option')['batch_size'] = batch_size
+      self.run_test_case('QueryTest/parquet-page-index-large', new_vector,
+                         unique_database)

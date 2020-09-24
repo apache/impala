@@ -413,6 +413,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// pages in a column chunk.
   boost::scoped_ptr<MemPool> dictionary_pool_;
 
+  /// True, if we filter pages based on the Parquet page index.
+  bool filter_pages_ = false;
+
   /// Contains the leftover ranges after evaluating the page index.
   /// If all rows were eliminated, then the row group is skipped immediately after
   /// evaluating the page index.
@@ -515,18 +518,22 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// to be OK as well.
   Status NextRowGroup() WARN_UNUSED_RESULT;
 
+  /// Resets page index filtering state, i.e. clears 'candidate_ranges_' and resets
+  /// scalar readers' page filtering as well.
+  void ResetPageFiltering();
+
   /// High-level function for initializing page filtering for the scalar readers.
-  /// Sets 'filter_pages' to true if found any page to filter out.
-  Status ProcessPageIndex(bool* filter_pages);
+  /// Sets 'filter_pages_' to true if found any page to filter out.
+  Status ProcessPageIndex();
 
   /// Evaluates 'min_max_conjunct_evals_' against the column index and determines the row
   /// ranges that might contain data we are looking for.
-  /// Sets 'filter_pages' to true if found any page to filter out.
-  Status EvaluatePageIndex(bool* filter_pages);
+  /// Sets 'filter_pages_' to true if found any page to filter out.
+  Status EvaluatePageIndex();
 
   /// Based on 'candidate_ranges_' it determines the candidate pages for each
   /// scalar reader.
-  Status ComputeCandidatePagesForColumns(bool* filter_pages);
+  Status ComputeCandidatePagesForColumns();
 
   /// Check that the scalar readers agree on the top-level row being scanned.
   Status CheckPageFiltering();

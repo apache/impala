@@ -622,12 +622,11 @@ Status HdfsParquetScanner::NextRowGroup() {
     // Evaluate page index.
     if (!min_max_conjunct_evals_.empty() &&
         state_->query_options().parquet_read_page_index) {
-      bool filter_pages;
-      Status page_index_status = ProcessPageIndex(&filter_pages);
+      Status page_index_status = ProcessPageIndex();
       if (!page_index_status.ok()) {
         RETURN_IF_ERROR(state_->LogOrReturnError(page_index_status.msg()));
       }
-      if (filter_pages && candidate_ranges_.empty()) {
+      if (filter_pages_ && candidate_ranges_.empty()) {
         // Page level statistics filtered the whole row group. It can happen when there
         // is a gap in the data between the pages and the user's predicate hit that gap.
         // E.g. column chunk 'A' has two pages with statistics {min: 0, max: 5},
@@ -704,24 +703,28 @@ bool HdfsParquetScanner::ReadStatFromIndex(const ColumnStatsReader& stats_reader
   return false;
 }
 
-Status HdfsParquetScanner::ProcessPageIndex(bool* filter_pages) {
+void HdfsParquetScanner::ResetPageFiltering() {
+  filter_pages_ = false;
+  candidate_ranges_.clear();
+  for (auto& scalar_reader : scalar_readers_) scalar_reader->ResetPageFiltering();
+}
+
+Status HdfsParquetScanner::ProcessPageIndex() {
   MonotonicStopWatch single_process_page_index_timer;
   single_process_page_index_timer.Start();
-  candidate_ranges_.clear();
-  *filter_pages = false;
-  for (auto& scalar_reader : scalar_readers_) scalar_reader->ResetPageFiltering();
+  ResetPageFiltering();
   RETURN_IF_ERROR(page_index_.ReadAll(row_group_idx_));
   if (page_index_.IsEmpty()) return Status::OK();
   // We can release the raw page index buffer when we exit this function.
   const auto scope_exit = MakeScopeExitTrigger([this](){page_index_.Release();});
-  RETURN_IF_ERROR(EvaluatePageIndex(filter_pages));
-  RETURN_IF_ERROR(ComputeCandidatePagesForColumns(filter_pages));
+  RETURN_IF_ERROR(EvaluatePageIndex());
+  RETURN_IF_ERROR(ComputeCandidatePagesForColumns());
   single_process_page_index_timer.Stop();
   process_page_index_stats_->UpdateCounter(single_process_page_index_timer.ElapsedTime());
   return Status::OK();
 }
 
-Status HdfsParquetScanner::EvaluatePageIndex(bool* filter_pages) {
+Status HdfsParquetScanner::EvaluatePageIndex() {
   parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
   vector<RowRange> skip_ranges;
 
@@ -792,13 +795,16 @@ Status HdfsParquetScanner::EvaluatePageIndex(bool* filter_pages) {
     }
   }
   if (!ComputeCandidateRanges(row_group.num_rows, &skip_ranges, &candidate_ranges_)) {
-    return Status(Substitute("Invalid offset index in Parquet file $0.", filename()));
+    ResetPageFiltering();
+    return Status(Substitute(
+        "Invalid offset index in Parquet file $0. Page index filtering is disabled.",
+        filename()));
   }
-  *filter_pages = true;
+  filter_pages_ = true;
   return Status::OK();
 }
 
-Status HdfsParquetScanner::ComputeCandidatePagesForColumns(bool* filter_pages) {
+Status HdfsParquetScanner::ComputeCandidatePagesForColumns() {
   if (candidate_ranges_.empty()) return Status::OK();
 
   parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
@@ -806,8 +812,10 @@ Status HdfsParquetScanner::ComputeCandidatePagesForColumns(bool* filter_pages) {
     const auto& page_locations = scalar_reader->offset_index_.page_locations;
     if (!ComputeCandidatePages(page_locations, candidate_ranges_, row_group.num_rows,
         &scalar_reader->candidate_data_pages_)) {
-      *filter_pages = false;
-      return Status(Substitute("Invalid offset index in Parquet file $0.", filename()));
+      ResetPageFiltering();
+      return Status(Substitute(
+          "Invalid offset index in Parquet file $0. Page index filtering is disabled.",
+          filename()));
     }
   }
   for (BaseScalarColumnReader* scalar_reader : scalar_readers_) {
