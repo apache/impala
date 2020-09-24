@@ -72,6 +72,10 @@ void ValidatePages(const vector<int64_t>& first_row_indexes, const RangeVec& ran
   for (int64_t first_row_index : first_row_indexes) {
     parquet::PageLocation page_loc;
     page_loc.first_row_index = first_row_index;
+    if (first_row_index != -1) {
+      // first_row_index == -1 means empty page.
+      page_loc.compressed_page_size = 42;
+    }
     page_locations.push_back(page_loc);
   }
   vector<int> candidate_pages;
@@ -110,9 +114,13 @@ TEST(ParquetCommon, ComputeCandidatePages) {
       {{0LL, 9LL + INT_MAX}}, 100LL + INT_MAX, {0});
   ValidatePages({0LL, 10LL + UINT_MAX, 20LL + UINT_MAX, 50LL + UINT_MAX, 70LL + UINT_MAX},
         {{0LL, 9LL + UINT_MAX}}, 100LL + UINT_MAX, {0});
+  // Empty pages are ignored
+  ValidatePages({0, -1}, {{0, 10}}, 15, {0});
+  ValidatePages({-1, 0}, {{0, 10}}, 15, {1});
+  ValidatePages({-1, 0, -1, -1, 10, -1}, {{0, 10}}, 15, {1, 4});
   // Error cases:
   // Negative first row index.
-  ValidatePagesError({-1, 0, 10}, {{0, 10}}, 10, {0});
+  ValidatePagesError({-2, 0, 10}, {{0, 10}}, 15, {0});
   // First row index greater then number of rows.
   ValidatePagesError({5, 10, 15}, {{0, 10}}, 10, {0});
   // First row indexes are not in order.

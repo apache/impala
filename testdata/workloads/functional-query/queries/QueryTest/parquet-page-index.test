@@ -217,3 +217,86 @@ DECIMAL, DECIMAL
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumStatsFilteredRowGroups): 1
 ====
+---- QUERY
+# Query table with empty data pages
+select * from alltypes_empty_pages where id = 109
+---- RESULTS
+109,false,9,9,9,90,9.899999618530273,90.89999999999999,'01/11/09','9',2009-01-11 01:49:04.860000000,2009,1
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 186
+====
+---- QUERY
+# Query table with empty data pages
+select * from alltypes_empty_pages where id = 51
+---- RESULTS
+51,false,1,1,1,10,1.100000023841858,10.1,'01/06/09','1',2009-01-06 00:51:02.250000000,2009,1
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 186
+====
+---- QUERY
+# Query table with empty data pages
+select * from alltypes_empty_pages where id = 491
+---- RESULTS
+491,false,1,1,1,10,1.100000023841858,10.1,'02/19/09','1',2009-02-19 03:01:08.100000000,2009,2
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 203
+====
+---- QUERY
+# Query table with invalid offset index.
+set abort_on_error=1;
+select * from alltypes_invalid_pages where id = 109
+---- CATCH
+Invalid offset index in Parquet file
+====
+---- QUERY
+# Only query columns with valid offset index.
+set abort_on_error=1;
+select id, bool_col, tinyint_col from alltypes_invalid_pages where id > 51 and id < 55
+---- RESULTS
+52,true,2
+53,false,3
+54,true,4
+---- TYPES
+INT, BOOLEAN, TINYINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 60
+====
+---- QUERY
+# Query single column with invalid offset index.
+set abort_on_error=1;
+select sum(smallint_col) from alltypes_invalid_pages where smallint_col = 9;
+---- CATCH
+Invalid offset index in Parquet file
+====
+---- QUERY
+# Query table with invalid offset index.
+set abort_on_error=0;
+select * from alltypes_invalid_pages where id = 109
+---- ERRORS
+Invalid offset index in Parquet file __HDFS_FILENAME__ Page index filtering is disabled.
+---- RESULTS
+109,false,9,9,9,90,9.899999618530273,90.89999999999999,'01/11/09','9',2009-01-11 01:49:04.860000000,2009,1
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 0
+====
+---- QUERY
+# Query single column with invalid offset index.
+set abort_on_error=0;
+select sum(smallint_col) from alltypes_invalid_pages where smallint_col = 9;
+---- ERRORS
+Invalid offset index in Parquet file __HDFS_FILENAME__ Page index filtering is disabled.
+---- RESULTS
+450
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumStatsFilteredPages): 0
+====
