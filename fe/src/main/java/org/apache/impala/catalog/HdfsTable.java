@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -98,9 +99,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.codahale.metrics.Clock;
+import com.codahale.metrics.Counter;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Timer;
-import com.codahale.metrics.Counter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -480,11 +481,12 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
-   * @return true if whether there are any in-progress modifications on metadata of this
-   * partition.
+   * Marks partitions dirty by registering the partition builder for its new instance.
    */
-  public boolean isDirtyPartition(HdfsPartition partition) {
-    return dirtyPartitions_.containsKey(partition.getId());
+  public void markDirtyPartitions(Collection<HdfsPartition.Builder> partBuilders) {
+    for (HdfsPartition.Builder b : partBuilders) {
+      markDirtyPartition(b);
+    }
   }
 
   /**
@@ -1380,6 +1382,7 @@ public class HdfsTable extends Table implements FeFsTable {
       // always be reloaded (ignore the loadPartitionFileMetadata flag).
       loadTimeForFileMdNs_ = loadUpdatedPartitions(updatedPartitions);
       Preconditions.checkState(!hasInProgressModification());
+
       Set<String> addedPartitions = new HashSet<>();
       loadTimeForFileMdNs_ += loadNewPartitions(partitionNames, addedPartitions);
       // If a list of modified partitions (old and new) is specified, don't reload file

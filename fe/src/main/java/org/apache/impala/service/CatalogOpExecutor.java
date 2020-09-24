@@ -41,7 +41,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileSystem;
@@ -68,7 +68,6 @@ import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.TruncateTableRequest;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.impala.analysis.AlterTableSortByStmt;
@@ -173,7 +172,6 @@ import org.apache.impala.thrift.TGrantRevokePrivParams;
 import org.apache.impala.thrift.TGrantRevokeRoleParams;
 import org.apache.impala.thrift.THdfsCachingOp;
 import org.apache.impala.thrift.THdfsFileFormat;
-import org.apache.impala.thrift.TCopyTestCaseReq;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TPartitionDef;
 import org.apache.impala.thrift.TPartitionKeyValue;
@@ -1138,7 +1136,8 @@ public class CatalogOpExecutor {
     if (params.isSetPartition_stats() && table.getNumClusteringCols() > 0) {
       Preconditions.checkState(table instanceof HdfsTable);
       modifiedParts = updatePartitionStats(params, (HdfsTable) table);
-      bulkAlterPartitions(table, modifiedParts, tblTxn);
+      // TODO: IMPALA-10203: avoid reloading modified partitions when updating stats.
+      bulkAlterPartitions(table, modifiedParts, tblTxn, UpdatePartitionMethod.MARK_DIRTY);
     }
 
     if (params.isSetTable_stats()) {
@@ -1209,7 +1208,7 @@ public class CatalogOpExecutor {
       }
       HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
       PartitionStatsUtil.partStatsToPartition(partitionStats, partBuilder);
-      partBuilder.putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
+      partBuilder.setRowCountParam(numRows);
       // HMS requires this param for stats changes to take effect.
       partBuilder.putToParameters(MetastoreShim.statsGeneratedViaStatsTaskParam());
       partBuilder.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
@@ -1642,22 +1641,22 @@ public class CatalogOpExecutor {
       HdfsPartition part = (HdfsPartition) fePart;
       HdfsPartition.Builder partBuilder = null;
       if (part.getPartitionStatsCompressed() != null) {
-        partBuilder = new HdfsPartition.Builder(part)
-            .dropPartitionStats();
+        partBuilder = new HdfsPartition.Builder(part).dropPartitionStats();
       }
 
-      // Remove the ROW_COUNT parameter if it has been set.
+      // Remove the ROW_COUNT parameter if it has been set and set numRows to reflect
+      // the change.
       if (part.getParameters().containsKey(StatsSetupConst.ROW_COUNT)) {
         if (partBuilder == null) {
           partBuilder = new HdfsPartition.Builder(part);
         }
-        partBuilder.getParameters().remove(StatsSetupConst.ROW_COUNT);
+        partBuilder.removeRowCountParam();
       }
 
       if (partBuilder != null) modifiedParts.add(partBuilder);
     }
 
-    bulkAlterPartitions(table, modifiedParts, null);
+    bulkAlterPartitions(table, modifiedParts, null, UpdatePartitionMethod.IN_PLACE);
     return modifiedParts.size();
   }
 
@@ -3325,11 +3324,10 @@ public class CatalogOpExecutor {
           ((HdfsTable) tbl).getPartitionsFromPartitionSet(partitionSet);
       List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
       for(HdfsPartition partition: partitions) {
-        modifiedParts.add(
-            new HdfsPartition.Builder(partition)
-                .setFileFormat(HdfsFileFormat.fromThrift(fileFormat)));
+        modifiedParts.add(new HdfsPartition.Builder(partition).setFileFormat(
+            HdfsFileFormat.fromThrift(fileFormat)));
       }
-      bulkAlterPartitions(tbl, modifiedParts, null);
+      bulkAlterPartitions(tbl, modifiedParts, null, UpdatePartitionMethod.MARK_DIRTY);
       numUpdatedPartitions.setRef((long) modifiedParts.size());
     }
     return reloadFileMetadata;
@@ -3367,7 +3365,7 @@ public class CatalogOpExecutor {
         HiveStorageDescriptorFactory.setSerdeInfo(rowFormat, partBuilder.getSerdeInfo());
         modifiedParts.add(partBuilder);
       }
-      bulkAlterPartitions(tbl, modifiedParts, null);
+      bulkAlterPartitions(tbl, modifiedParts, null, UpdatePartitionMethod.MARK_DIRTY);
       numUpdatedPartitions.setRef((long) modifiedParts.size());
     }
     return reloadFileMetadata;
@@ -3446,11 +3444,10 @@ public class CatalogOpExecutor {
         modifiedParts.add(partBuilder);
       }
       try {
-        bulkAlterPartitions(tbl, modifiedParts, null);
+        // Do not mark the partitions dirty here since it's done in finally clause.
+        bulkAlterPartitions(tbl, modifiedParts, null, UpdatePartitionMethod.NONE);
       } finally {
-        for (HdfsPartition.Builder modifiedPart : modifiedParts) {
-          ((HdfsTable) tbl).markDirtyPartition(modifiedPart);
-        }
+        ((HdfsTable) tbl).markDirtyPartitions(modifiedParts);
       }
       numUpdatedPartitions.setRef((long) modifiedParts.size());
     } else {
@@ -3677,11 +3674,10 @@ public class CatalogOpExecutor {
       }
     }
     try {
-      bulkAlterPartitions(tbl, modifiedParts, null);
+      // Do not mark the partitions dirty here since it's done in finally clause.
+      bulkAlterPartitions(tbl, modifiedParts, null, UpdatePartitionMethod.NONE);
     } finally {
-      for (HdfsPartition.Builder modifiedPart : modifiedParts) {
-        ((HdfsTable) tbl).markDirtyPartition(modifiedPart);
-      }
+      ((HdfsTable) tbl).markDirtyPartitions(modifiedParts);
     }
     numUpdatedPartitions.setRef((long) modifiedParts.size());
   }
@@ -4111,13 +4107,27 @@ public class CatalogOpExecutor {
     addSummary(resp, "Privilege(s) have been revoked.");
   }
 
+  private static enum UpdatePartitionMethod {
+    // Do not apply updates to the partition. The caller is responsible for updating
+    // the state of any modified partitions to reflect changes applied.
+    NONE,
+    // Update the state of the Partition objects in place in the catalog.
+    IN_PLACE,
+    // Mark the partition dirty so that it will be later reloaded from scratch when
+    // the table is reloaded.
+    MARK_DIRTY,
+  }
+  ;
+
   /**
-   * Alters partitions in batches of size 'MAX_PARTITION_UPDATES_PER_RPC'. This
-   * reduces the time spent in a single update and helps avoid metastore client
+   * Alters partitions in the HMS in batches of size 'MAX_PARTITION_UPDATES_PER_RPC'.
+   * This reduces the time spent in a single update and helps avoid metastore client
    * timeouts.
+   * @param updateMethod controls how the same updates are applied to 'tbl' to reflect
+   *                     the changes written to the HMS.
    */
   private void bulkAlterPartitions(Table tbl, List<HdfsPartition.Builder> modifiedParts,
-      TblTransaction tblTxn) throws ImpalaException {
+      TblTransaction tblTxn, UpdatePartitionMethod updateMethod) throws ImpalaException {
     // Map from msPartitions to the partition builders. Use IdentityHashMap since
     // modifications will change hash codes of msPartitions.
     Map<Partition, HdfsPartition.Builder> msPartitionToBuilders =
@@ -4147,14 +4157,16 @@ public class CatalogOpExecutor {
                 msPartitionsSubList);
           }
           // Mark the corresponding HdfsPartition objects as dirty
-          for (Partition msPartition: msPartitionsSubList) {
+          for (Partition msPartition : msPartitionsSubList) {
             HdfsPartition.Builder partBuilder = msPartitionToBuilders.get(msPartition);
             Preconditions.checkNotNull(partBuilder);
-            // TODO(IMPALA-9779): Should we always mark this as dirty? It will trigger
-            //  file meta reload for this partition. Consider remove this and mark the
-            //  "dirty" flag in callers. For those don't need to reload file meta, the
-            //  caller can build and replace the partition directly.
-            ((HdfsTable) tbl).markDirtyPartition(partBuilder);
+            // The partition either needs to be reloaded or updated in place to apply
+            // the modifications.
+            if (updateMethod == UpdatePartitionMethod.MARK_DIRTY) {
+              ((HdfsTable) tbl).markDirtyPartition(partBuilder);
+            } else if (updateMethod == UpdatePartitionMethod.IN_PLACE) {
+              ((HdfsTable) tbl).updatePartition(partBuilder);
+            }
             // If event processing is turned on add the version number from partition
             // parameters to the HdfsPartition's list of in-flight events.
             addToInflightVersionsOfPartition(msPartition.getParameters(), partBuilder);

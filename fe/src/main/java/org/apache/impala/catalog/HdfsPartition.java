@@ -36,6 +36,7 @@ import javax.annotation.Nullable;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.LiteralExpr;
@@ -1289,10 +1290,36 @@ public class HdfsPartition extends CatalogObjectImpl
       return this;
     }
 
+    /**
+     * Set the number of rows for this partition. setRowCountParam() and
+     * removeRowCountParam() should generally be used instead of this, except
+     * for the single "partition" in an unpartitioned table.
+     */
     public Builder setNumRows(long numRows) {
       numRows_ = numRows;
       return this;
     }
+
+    /**
+     * Update the row count in the partitions parameters and update the numRows stat
+     * to match.
+     */
+    public Builder setRowCountParam(long numRows) {
+      numRows_ = numRows;
+      putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
+      return this;
+    }
+
+    /**
+     * Remove the row count in the partitions parameters and update the numRows stat
+     * to match.
+     */
+    public Builder removeRowCountParam() {
+      numRows_ = -1;
+      getParameters().remove(StatsSetupConst.ROW_COUNT);
+      return this;
+    }
+
     public Builder dropPartitionStats() { return setPartitionStatsBytes(null, false); }
     public Builder setPartitionStatsBytes(byte[] partitionStats, boolean hasIncrStats) {
       if (hasIncrStats) Preconditions.checkNotNull(partitionStats);
