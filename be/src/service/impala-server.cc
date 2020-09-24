@@ -813,7 +813,8 @@ Status ImpalaServer::DecompressToProfile(TRuntimeProfileFormat::type format,
 }
 
 Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& user,
-    TExecSummary* result) {
+    TExecSummary* result, TExecSummary* original_result, bool* was_retried) {
+  if (was_retried != nullptr) *was_retried = false;
   // Search for the query id in the active query map.
   {
     // QueryHandle of the current query.
@@ -858,6 +859,17 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
         result->error_logs.push_back(Substitute("Retrying query using query id: $0",
             PrintId(query_handle->query_id())));
         result->__isset.error_logs = true;
+        if (was_retried != nullptr) {
+          *was_retried = true;
+          DCHECK(original_result != nullptr);
+          // The original query could not in PENDING state because it already fails.
+          // Handle the other two cases as above.
+          if (original_query_handle->GetCoordinator() != nullptr) {
+            original_query_handle->GetCoordinator()->GetTExecSummary(original_result);
+          } else {
+            *original_result = TExecSummary();
+          }
+        }
       }
       return Status::OK();
     }
@@ -870,6 +882,7 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
     bool user_has_profile_access = false;
     bool is_query_missing = false;
     TExecSummary exec_summary;
+    TExecSummary retried_exec_summary;
     {
       lock_guard<mutex> l(query_log_lock_);
       QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
@@ -878,6 +891,16 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
         effective_user = query_record->second->effective_user;
         user_has_profile_access = query_record->second->user_has_profile_access;
         exec_summary = query_record->second->exec_summary;
+        if (query_record->second->was_retried) {
+          if (was_retried != nullptr) *was_retried = true;
+          DCHECK(query_record->second->retried_query_id != nullptr);
+          QueryLogIndex::const_iterator retried_query_record =
+              query_log_index_.find(*query_record->second->retried_query_id);
+          // The retried query ran later than the original query. We should be able to
+          // find it in the query log since we have found the original query.
+          DCHECK(retried_query_record != query_log_index_.end());
+          retried_exec_summary = retried_query_record->second->exec_summary;
+        }
       }
     }
     if (is_query_missing) {
@@ -888,7 +911,14 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, const string& use
       return Status::Expected(err);
     }
     RETURN_IF_ERROR(CheckProfileAccess(user, effective_user, user_has_profile_access));
-    *result = exec_summary;
+    if (was_retried != nullptr && *was_retried) {
+      DCHECK(original_result != nullptr);
+      // 'result' returns the latest summary so it's the retried one.
+      *result = retried_exec_summary;
+      *original_result = exec_summary;
+    } else {
+      *result = exec_summary;
+    }
   }
   return Status::OK();
 }

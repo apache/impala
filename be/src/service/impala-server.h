@@ -786,8 +786,14 @@ class ImpalaServer : public ImpalaServiceIf,
   /// summary is the same user that run the query and that user has access to the full
   /// query profile. Otherwise, an error status is returned to indicate an
   /// authorization error.
+  /// If 'original_result' and 'was_retried' are not null pointers, returns whether the
+  /// query is retried in '*was_retried'. If the query is retried, returns the exec
+  /// summary of the original query in '*original_result'. '*original_result' won't be
+  /// set if the query is not retried. 'original_result' and 'was_retried' should be both
+  /// valid pointers when any of them is used.
   Status GetExecSummary(const TUniqueId& query_id, const std::string& user,
-      TExecSummary* result) WARN_UNUSED_RESULT;
+      TExecSummary* result, TExecSummary* original_result = nullptr,
+      bool* was_retried = nullptr) WARN_UNUSED_RESULT;
 
   /// Collect ExecSummary and update it to the profile in request_state
   void UpdateExecSummary(const QueryHandle& query_handle) const;

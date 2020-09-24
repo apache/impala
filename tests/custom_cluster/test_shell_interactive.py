@@ -63,7 +63,7 @@ class TestShellInteractive(CustomClusterTestSuite):
   _query_retry_options = "set retry_failed_queries=true;"
 
   @pytest.mark.execute_serially
-  def test_query_retries_profile_cmd(self):
+  def test_query_retries_profile_and_summary_cmd(self):
     """Tests transparent query retries via impala-shell. Validates the output of the
     'profile [all | latest | original];' commands in impala-shell."""
     query = "select count(*) from functional.alltypes where bool_col = sleep(50)"
@@ -99,6 +99,27 @@ class TestShellInteractive(CustomClusterTestSuite):
     proc.expect("Retry Status: RETRIED")
     self.__proc_not_expect(proc, "Failed Query Runtime Profile\(s\):")
     self.__proc_not_expect(proc, "Query State: FINISHED")
+
+    # Check the output of 'summary all'
+    proc.sendline("summary all;")
+    proc.expect("Query Summary:")
+    # The retried query runs on 2 instances.
+    proc.expect("00:SCAN HDFS\w*| 2\w*| 2")
+    proc.expect("Failed Query Summary:")
+    # The original query runs on 3 instances.
+    proc.expect("00:SCAN HDFS\w*| 3\w*| 3")
+
+    # Check the output of 'summary latest' and 'summary'. The output of both cmds
+    # should be equivalent.
+    for summary_cmd in ["summary latest;", "summary;"]:
+      proc.sendline(summary_cmd)
+      # The retried query runs on 2 instances.
+      proc.expect("00:SCAN HDFS\w*| 2\w*| 2")
+
+    # Check the output of 'summary original'
+    proc.sendline("summary original")
+    # The original query runs on 3 instances.
+    proc.expect("00:SCAN HDFS\w*| 3\w*| 3")
 
   @pytest.mark.execute_serially
   def test_query_retries_show_profiles(self):
