@@ -21,7 +21,9 @@
 #include <vector>
 
 #include "gen-cpp/statestore_service.pb.h"
+#include "util/container-util.h"
 #include "util/network-util.h"
+#include "util/unique-id-hash.h"
 
 namespace impala {
 
@@ -131,16 +133,10 @@ class ExecutorBlacklist {
   /// passed the timeout.
   int64_t GetBlacklistTimeoutMs() const;
 
-  /// Predicate that returns true if the port number in 'be_desc' matches that in
-  /// 'existing.be_desc'. Assumes that they have the same 'ip_address'. Used to do find()
-  /// on the values of 'executor_list_'.
-  static bool eqBePort(const BackendDescriptorPB& be_desc, const Entry& exiting);
-
-  /// Map from node ip address to a list of executors for that node that have been
-  /// blacklisted. Note that in normal operation there will be a single impalad per node
-  /// all executor lists will be length one. Contains both executors that are blacklisted
-  /// ones that are on probation.
-  std::unordered_map<IpAddr, std::vector<Entry>> executor_list_;
+  /// Map from executor backend_id to executor entry for those nodes which have been
+  /// blacklisted. Note that the map contains executors that are either blacklisted or
+  /// on probation.
+  std::unordered_map<UniqueIdPB, Entry> executor_list_;
 
   /// The amount to multiply the blacklist timeout by for the probation timeout.
   static const int32_t PROBATION_TIMEOUT_MULTIPLIER;
