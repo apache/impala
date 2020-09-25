@@ -39,34 +39,35 @@ bool ExecutorBlacklist::BlacklistingEnabled() {
 void ExecutorBlacklist::Blacklist(
     const BackendDescriptorPB& be_desc, const Status& cause) {
   DCHECK(BlacklistingEnabled());
-  DCHECK(!be_desc.ip_address().empty());
-  vector<Entry>& be_descs = executor_list_[be_desc.ip_address()];
-  auto it = find_if(be_descs.begin(), be_descs.end(),
-      std::bind(eqBePort, be_desc, std::placeholders::_1));
-  if (it != be_descs.end()) {
+  DCHECK(be_desc.has_backend_id());
+  auto entry_it = executor_list_.find(be_desc.backend_id());
+  if (entry_it != executor_list_.end()) {
     // If this executor was already blacklisted, it must be that two different queries
     // tried to blacklist it at about the same time, so just leave it as is.
-    if (it->state == State::ON_PROBATION) {
+    Entry& entry = entry_it->second;
+    if (entry.state == State::ON_PROBATION) {
       // This executor was on probation, so re-blacklist it.
-      it->state = State::BLACKLISTED;
-      it->blacklist_time_ms = MonotonicMillis();
-      it->cause = cause;
-
       int64_t probation_timeout = GetBlacklistTimeoutMs() * PROBATION_TIMEOUT_MULTIPLIER;
-      int64_t elapsed = MonotonicMillis() - it->blacklist_time_ms;
+      int64_t current_time_ms = MonotonicMillis();
+      int64_t elapsed = current_time_ms - entry.blacklist_time_ms;
+      entry.state = State::BLACKLISTED;
+      entry.blacklist_time_ms = current_time_ms;
+      entry.cause = cause;
+
       // Since NeedsMaintenance() doesn't consider executors that can be removed from
       // probation, executors may stay on probation much longer than the timeout, so check
       // the timeout here.
-      if (elapsed > probation_timeout * it->num_consecutive_blacklistings) {
+      if (elapsed > probation_timeout * entry.num_consecutive_blacklistings) {
         // This executor should have already been taken off probation, so act like it was.
-        it->num_consecutive_blacklistings = 1;
+        entry.num_consecutive_blacklistings = 1;
       } else {
-        ++it->num_consecutive_blacklistings;
+        ++entry.num_consecutive_blacklistings;
       }
     }
   } else {
     // This executor was not already on the list, create a new Entry for it.
-    be_descs.emplace_back(be_desc, MonotonicMillis(), cause);
+    executor_list_.insert(
+        make_pair(be_desc.backend_id(), Entry(be_desc, MonotonicMillis(), cause)));
   }
   VLOG(2) << "Blacklisted " << be_desc.address() << ", current blacklist: "
           << DebugString();
@@ -74,37 +75,26 @@ void ExecutorBlacklist::Blacklist(
 
 ExecutorBlacklist::State ExecutorBlacklist::FindAndRemove(
     const BackendDescriptorPB& be_desc) {
-  auto be_descs_it = executor_list_.find(be_desc.ip_address());
-  if (be_descs_it == executor_list_.end()) {
+  auto remove_it = executor_list_.find(be_desc.backend_id());
+  if (remove_it == executor_list_.end()) {
     // Executor wasn't on the blacklist.
     return NOT_BLACKLISTED;
   }
-  vector<Entry>& be_descs = be_descs_it->second;
-  auto remove_it = find_if(be_descs.begin(), be_descs.end(),
-      std::bind(eqBePort, be_desc, std::placeholders::_1));
-  if (remove_it == be_descs.end()) {
-    // Executor wasn't on the blacklist.
-    return NOT_BLACKLISTED;
-  }
-  State removed_state = remove_it->state;
-  be_descs.erase(remove_it);
-  if (be_descs.empty()) {
-    executor_list_.erase(be_descs_it);
-  }
+  State removed_state = remove_it->second.state;
+  executor_list_.erase(remove_it);
   return removed_state;
 }
 
 bool ExecutorBlacklist::NeedsMaintenance() const {
   int64_t blacklist_timeout = GetBlacklistTimeoutMs();
   int64_t now = MonotonicMillis();
-  for (auto executor_it : executor_list_) {
-    for (auto entry_it : executor_it.second) {
-      if (entry_it.state == State::BLACKLISTED) {
-        int64_t elapsed = now - entry_it.blacklist_time_ms;
-        if (elapsed > blacklist_timeout * entry_it.num_consecutive_blacklistings) {
-          // This backend has passed the timeout and can be put on probation.
-          return true;
-        }
+  for (auto entry_it : executor_list_) {
+    const Entry& entry = entry_it.second;
+    if (entry.state == State::BLACKLISTED) {
+      int64_t elapsed = now - entry.blacklist_time_ms;
+      if (elapsed > blacklist_timeout * entry.num_consecutive_blacklistings) {
+        // This backend has passed the timeout and can be put on probation.
+        return true;
       }
     }
   }
@@ -115,33 +105,26 @@ void ExecutorBlacklist::Maintenance(std::list<BackendDescriptorPB>* probation_li
   int64_t blacklist_timeout = GetBlacklistTimeoutMs();
   int64_t probation_timeout = blacklist_timeout * PROBATION_TIMEOUT_MULTIPLIER;
   int64_t now = MonotonicMillis();
-  auto executor_it = executor_list_.begin();
-  while (executor_it != executor_list_.end()) {
-    auto entry_it = executor_it->second.begin();
-    while (entry_it != executor_it->second.end()) {
-      int64_t elapsed = now - entry_it->blacklist_time_ms;
-      if (entry_it->state == State::BLACKLISTED) {
-        // Check if we can take it off the blacklist and put it on probation.
-        if (elapsed > blacklist_timeout * entry_it->num_consecutive_blacklistings) {
-          LOG(INFO) << "Executor " << entry_it->be_desc.address()
-                    << " passed the timeout and will be taken off the blacklist.";
-          probation_list->push_back(entry_it->be_desc);
-          entry_it->state = State::ON_PROBATION;
-        }
-        ++entry_it;
-      } else {
-        // Check if we can take it off probation.
-        if (elapsed > probation_timeout * entry_it->num_consecutive_blacklistings) {
-          entry_it = executor_it->second.erase(entry_it);
-        } else {
-          ++entry_it;
-        }
+  auto entry_it = executor_list_.begin();
+  while (entry_it != executor_list_.end()) {
+    Entry& entry = entry_it->second;
+    int64_t elapsed = now - entry.blacklist_time_ms;
+    if (entry.state == State::BLACKLISTED) {
+      // Check if we can take it off the blacklist and put it on probation.
+      if (elapsed > blacklist_timeout * entry.num_consecutive_blacklistings) {
+        LOG(INFO) << "Executor " << entry.be_desc.address()
+                  << " passed the timeout and will be taken off the blacklist.";
+        probation_list->push_back(entry.be_desc);
+        entry.state = State::ON_PROBATION;
       }
-    }
-    if (executor_it->second.empty()) {
-      executor_it = executor_list_.erase(executor_it);
+      ++entry_it;
     } else {
-      ++executor_it;
+      // Check if we can take it off probation.
+      if (elapsed > probation_timeout * entry.num_consecutive_blacklistings) {
+        entry_it = executor_list_.erase(entry_it);
+      } else {
+        ++entry_it;
+      }
     }
   }
   VLOG(2) << "Completed blacklist maintenance. Current blacklist: " << DebugString();
@@ -149,19 +132,16 @@ void ExecutorBlacklist::Maintenance(std::list<BackendDescriptorPB>* probation_li
 
 bool ExecutorBlacklist::IsBlacklisted(
     const BackendDescriptorPB& be_desc, Status* cause, int64_t* time_remaining_ms) const {
-  for (auto executor_it : executor_list_) {
-    if (executor_it.first == be_desc.ip_address()) {
-      for (auto entry_it : executor_it.second) {
-        if (entry_it.be_desc.address().port() == be_desc.address().port()
-            && entry_it.state == State::BLACKLISTED) {
-          if (cause != nullptr) *cause = entry_it.cause;
-          int64_t elapsed_ms = MonotonicMillis() - entry_it.blacklist_time_ms;
-          int64_t total_timeout_ms =
-              GetBlacklistTimeoutMs() * entry_it.num_consecutive_blacklistings;
-          *time_remaining_ms = total_timeout_ms - elapsed_ms;
-          return true;
-        }
-      }
+  auto entry_it = executor_list_.find(be_desc.backend_id());
+  if (entry_it != executor_list_.end()) {
+    const Entry& entry = entry_it->second;
+    if (entry.state == State::BLACKLISTED) {
+      if (cause != nullptr) *cause = entry.cause;
+      int64_t elapsed_ms = MonotonicMillis() - entry.blacklist_time_ms;
+      int64_t total_timeout_ms =
+          GetBlacklistTimeoutMs() * entry.num_consecutive_blacklistings;
+      *time_remaining_ms = total_timeout_ms - elapsed_ms;
+      return true;
     }
   }
   return false;
@@ -169,12 +149,9 @@ bool ExecutorBlacklist::IsBlacklisted(
 
 std::string ExecutorBlacklist::BlacklistToString() const {
   std::stringstream ss;
-  for (auto executor_it : executor_list_) {
-    for (auto entry_it : executor_it.second) {
-      if (entry_it.state == State::BLACKLISTED) {
-        ss << entry_it.be_desc.address() << " ";
-      }
-    }
+  for (auto entry_it : executor_list_) {
+    const Entry& entry = entry_it.second;
+    if (entry.state == State::BLACKLISTED) ss << entry.be_desc.address() << " ";
   }
   return ss.str();
 }
@@ -182,11 +159,11 @@ std::string ExecutorBlacklist::BlacklistToString() const {
 std::string ExecutorBlacklist::DebugString() const {
   std::stringstream ss;
   ss << "ExecutorBlacklist[";
-  for (auto executor_it : executor_list_) {
-    for (auto entry_it : executor_it.second) {
-      ss << entry_it.be_desc.address() << " ("
-         << (entry_it.state == BLACKLISTED ? "blacklisted" : "on probation") << ") ";
-    }
+  for (auto entry_it : executor_list_) {
+    const Entry& entry = entry_it.second;
+    DCHECK(entry.state == BLACKLISTED || entry.state == ON_PROBATION);
+    ss << entry.be_desc.address() << " ("
+       << (entry.state == BLACKLISTED ? "blacklisted" : "on probation") << ") ";
   }
   ss << "]";
   return ss.str();
@@ -198,13 +175,6 @@ int64_t ExecutorBlacklist::GetBlacklistTimeoutMs() const {
   // is blacklisted, and then is put on probation and causes another failure right before
   // being removed from the cluster membership by a statestore update.
   return BLACKLIST_TIMEOUT_PADDING * Statestore::FailedExecutorDetectionTimeMs();
-}
-
-bool ExecutorBlacklist::eqBePort(
-    const BackendDescriptorPB& be_desc, const Entry& existing) {
-  // The IP addresses must already match, so it is sufficient to check the port.
-  DCHECK_EQ(existing.be_desc.ip_address(), be_desc.ip_address());
-  return existing.be_desc.address().port() == be_desc.address().port();
 }
 
 } // namespace impala
