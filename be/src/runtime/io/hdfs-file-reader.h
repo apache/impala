@@ -78,6 +78,11 @@ private:
   /// true, the statistics are logged.
   void GetHdfsStatistics(hdfsFile hdfs_file, bool log_stats);
 
+  /// Return a string that contains the block indexes and list of hosts where
+  /// each block resides. i.e. [0] { hdfshost1, hdfshost2, hdfshost3 }
+
+  std::string GetHostList(int64_t file_offset, int64_t bytes_to_read) const;
+
   /// Hadoop filesystem that contains the file being read.
   hdfsFS const hdfs_fs_;
 
