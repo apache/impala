@@ -42,6 +42,9 @@ DEFINE_int64(fs_slow_read_log_threshold_ms, 10L * 1000L,
     "Log diagnostics about I/Os issued via the HDFS client that take longer than this "
     "threshold.");
 
+DEFINE_bool(fs_trace_remote_reads, false,
+    "(Advanced) Log block locations for remote reads.");
+
 #ifndef NDEBUG
 DECLARE_int32(stress_disk_read_delay_ms);
 #endif
@@ -76,6 +79,30 @@ Status HdfsFileReader::Open(bool use_file_handle_cache) {
   }
   ImpaladMetrics::IO_MGR_NUM_OPEN_FILES->Increment(1L);
   return Status::OK();
+}
+
+std::string HdfsFileReader::GetHostList(int64_t file_offset,
+    int64_t bytes_to_read) const {
+  char*** hosts = hdfsGetHosts(hdfs_fs_, scan_range_->file_string()->c_str(),
+      file_offset, bytes_to_read);
+  if (hosts) {
+    std::ostringstream ostr;
+    int blockIndex = 0;
+    while (hosts[blockIndex]) {
+      ostr << " [" << blockIndex << "] { ";
+      int hostIndex = 0;
+      while (hosts[blockIndex][hostIndex]) {
+        if(hostIndex > 0) ostr << ", ";
+        ostr << hosts[blockIndex][hostIndex];
+        hostIndex++;
+      }
+      ostr << " }";
+      blockIndex++;
+    }
+    hdfsFreeHosts(hosts);
+    return ostr.str();
+  }
+  return "";
 }
 
 Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_t* buffer,
@@ -209,8 +236,20 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
       }
       *bytes_read += current_bytes_read;
 
+      bool is_first_read = (num_remote_bytes_ == 0);
       // Collect and accumulate statistics
       GetHdfsStatistics(hdfs_file, log_slow_read);
+      if (FLAGS_fs_trace_remote_reads && expected_local_ &&
+          num_remote_bytes_ > 0 && is_first_read) {
+        // Only log the first unexpected remote read for scan range
+        LOG(INFO)
+            << "First remote read of scan range on file "
+            << *scan_range_->file_string()
+            << " " << num_remote_bytes_
+            << " bytes. offsets " << file_offset
+            << "-" << file_offset+bytes_to_read-1
+            << GetHostList(file_offset, bytes_to_read);
+      }
     }
 
     int64_t cached_bytes_missed = *bytes_read - cached_read;
