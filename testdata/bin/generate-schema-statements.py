@@ -549,7 +549,7 @@ def eval_section(section_str):
 
 def generate_statements(output_name, test_vectors, sections,
                         schema_include_constraints, schema_exclude_constraints,
-                        schema_only_constraints):
+                        schema_only_constraints, convert_orc_to_full_acid):
   # TODO: This method has become very unwieldy. It has to be re-factored sooner than
   # later.
   # Parquet statements to be executed separately by Impala
@@ -656,7 +656,8 @@ def generate_statements(output_name, test_vectors, sections,
 
       tblproperties = parse_table_properties(create_file_format, table_properties)
       # ORC tables are full ACID by default.
-      if (HIVE_MAJOR_VERSION == 3 and
+      if (convert_orc_to_full_acid and
+          HIVE_MAJOR_VERSION == 3 and
           create_file_format == 'orc' and
           'transactional' not in tblproperties):
         tblproperties['transactional'] = 'true'
@@ -816,6 +817,10 @@ if __name__ == "__main__":
     test_vectors =\
         [TableFormatInfo.create_from_string(dataset, tf) for tf in table_formats]
 
+  # Hack to resolve IMPALA-9923.
+  # TODO: Try to remove it once we have HIVE-24145 in the dev environment.
+  convert_orc_to_full_acid = options.workload == 'functional-query'
+
   target_dataset = test_vectors[0].dataset
   print 'Target Dataset: ' + target_dataset
   dataset_load_dir = os.path.join(SQL_OUTPUT_DIR, target_dataset)
@@ -847,4 +852,5 @@ if __name__ == "__main__":
       parse_table_constraints(constraints_file)
   sections = parse_schema_template_file(schema_template_file)
   generate_statements('%s-%s' % (options.workload, options.exploration_strategy),
-      test_vectors, sections, include_constraints, exclude_constraints, only_constraints)
+      test_vectors, sections, include_constraints, exclude_constraints, only_constraints,
+      convert_orc_to_full_acid)
