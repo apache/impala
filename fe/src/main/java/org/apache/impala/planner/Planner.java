@@ -661,8 +661,7 @@ public class Planner {
   private void checkForSmallQueryOptimization(PlanNode singleNodePlan) {
     MaxRowsProcessedVisitor visitor = new MaxRowsProcessedVisitor();
     singleNodePlan.accept(visitor);
-    // TODO: IMPALA-3335: support the optimization for plans with joins.
-    if (!visitor.valid() || visitor.foundJoinNode()) return;
+    if (!visitor.valid()) return;
     // This optimization executes the plan on a single node so the threshold must
     // be based on the total number of rows processed.
     long maxRowsProcessed = visitor.getMaxRowsProcessed();
