@@ -220,8 +220,11 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
   public void testAuditsForColumnMasking() throws ImpalaException {
     String databaseName = "functional";
     String tableName = "alltypestiny";
-    String policyNames[] = {"col_mask_custom", "col_mask_null", "col_mask_none"};
-    String columnNames[] = {"string_col", "date_string_col", "id"};
+    String policyNames[] = {"col_mask_custom", "col_mask_null", "col_mask_none",
+        "col_mask_redact"};
+    String columnNames[] = {"string_col", "date_string_col", "id", "year"};
+    String users[] = {user_.getShortName(), user_.getShortName(), user_.getShortName(),
+        "non_owner_2"};
     String masks[] = {
         "  {\n" +
         "    \"dataMaskType\": \"CUSTOM\",\n" +
@@ -234,6 +237,12 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
         // the Ranger UI to verify the respective AuthzAuditEvent is removed.
         "  {\n" +
         "    \"dataMaskType\": \"MASK_NONE\"\n" +
+        "  }\n",
+        // We add a mask of type "MASK" that corresponds to a "Redact" policy in the
+        // Ranger UI for the user "non_owner_2" to verify the respective AuthzAuditEvent
+        // is removed.
+        "  {\n" +
+        "    \"dataMaskType\": \"MASK\"\n" +
         "  }\n"
     };
 
@@ -275,7 +284,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
           "    }\n" +
           "  ]\n" +
           "}", policyNames[i], RANGER_SERVICE_TYPE, RANGER_SERVICE_NAME, databaseName,
-          tableName, columnNames[i], user_.getShortName(), masks[i]);
+          tableName, columnNames[i], users[i], masks[i]);
       policies.add(json);
     }
 

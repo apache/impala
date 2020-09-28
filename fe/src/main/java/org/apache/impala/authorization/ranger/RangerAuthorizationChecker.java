@@ -305,6 +305,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       String columnName, AuthorizationContext rangerCtx) throws InternalException {
     RangerBufferAuditHandler auditHandler =
         ((RangerAuthorizationContext) rangerCtx).getAuditHandler();
+    int numAuthzAuditEventsBefore = auditHandler.getAuthzEvents().size();
     RangerAccessResult accessResult = evalColumnMask(user, dbName, tableName, columnName,
         auditHandler);
     // When a user adds an "Unmasked" policy for 'columnName' that retains the original
@@ -318,15 +319,30 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     // whereas this method will be called when there are policies of other types. If we
     // do not remove the event of the "Unmasked" policy, we will have one more logged
     // event in the latter case where there are policies other than "Unmasked".
+
+    // Moreover, notice that there will be an AuthzAuditEvent added to
+    // 'auditHandler.getAuthzEvents()' as long as there exists a column masking policy
+    // associated with 'dbName', 'tableName', and 'columnName', even though the policy
+    // does NOT apply to 'user'. In this case, accessResult.isMaskEnabled() would be
+    // false, and accessResult.getPolicyId() would be -1. In addition, the field of
+    // 'accessResult' would be 0 for that AuthzAuditEvent. An AuthzAuditEvent with
+    // 'accessResult' equal to 0 will be considered as an indication of a failed access
+    // request in RangerBufferAuditHandler#flush() even though there is no failed access
+    // request at all for the current query and thus we need to filter out this
+    // AuthzAuditEvent. If we did not filter it out, other AuthzAuditEvent's
+    // corresponding to successful/allowed access requests in the same query will not be
+    // logged since only the first AuthzAuditEvent with 'accessResult' equal to 0 is
+    // logged in RangerBufferAuditHandler#flush().
     List<AuthzAuditEvent> auditEvents = auditHandler.getAuthzEvents();
-    if (StringUtils.equalsIgnoreCase((accessResult.getMaskType()), "MASK_NONE")) {
+    Preconditions.checkState(auditEvents.size() - numAuthzAuditEventsBefore <= 1);
+    if (auditEvents.size() > numAuthzAuditEventsBefore &&
+        !accessResult.isMaskEnabled()) {
       // Recall that the same instance of RangerAuthorizationContext is passed to
       // createColumnMask() every time this method is called. Thus the same instance of
       // RangerBufferAuditHandler is provided for evalColumnMask() to log the event.
       // Since there will be exactly one event added to 'auditEvents' when there is a
-      // corresponding column masking policy, i.e., accessResult.isMaskEnabled() evaluates
-      // to true, we only need to process the last event on 'auditEvents'.
-      Preconditions.checkState(!auditEvents.isEmpty());
+      // corresponding column masking policy, i.e., accessResult.isMaskEnabled()
+      // evaluates to true, we only need to process the last event on 'auditEvents'.
       auditHandler.getAuthzEvents().remove(auditEvents.size() - 1);
     }
     // No column masking policies, return the original column.
@@ -376,6 +392,9 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   /**
    * Evaluate column masking policies on the given column and returns the result.
    * A RangerAccessResult contains the matched policy details and the masked column.
+   * Note that Ranger will add an AuthzAuditEvent to auditHandler.getAuthzEvents() as
+   * long as there exists a policy for the given column even though the policy does not
+   * apply to 'user'.
    */
   private RangerAccessResult evalColumnMask(User user, String dbName,
       String tableName, String columnName, RangerBufferAuditHandler auditHandler)
