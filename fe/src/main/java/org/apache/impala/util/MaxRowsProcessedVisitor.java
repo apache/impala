@@ -17,7 +17,6 @@
 
 package org.apache.impala.util;
 
-import org.apache.impala.planner.JoinNode;
 import org.apache.impala.planner.PlanFragment;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.planner.ScanNode;
@@ -32,7 +31,6 @@ public class MaxRowsProcessedVisitor implements Visitor<PlanNode> {
   // True if we should abort because we don't have valid estimates
   // for a plan node.
   private boolean valid_ = true;
-  private boolean foundJoinNode_ ;
 
   // Max number of rows processed across all instances of a plan node.
   private long maxRowsProcessed_ ;
@@ -43,7 +41,6 @@ public class MaxRowsProcessedVisitor implements Visitor<PlanNode> {
   @Override
   public void visit(PlanNode caller) {
     if (!valid_) return;
-    if (caller instanceof JoinNode) foundJoinNode_ = true;
 
     PlanFragment fragment = caller.getFragment();
     int numNodes = fragment == null ? 1 : fragment.getNumNodes();
@@ -86,11 +83,6 @@ public class MaxRowsProcessedVisitor implements Visitor<PlanNode> {
   public long getMaxRowsProcessedPerNode() {
     Preconditions.checkState(valid_);
     return maxRowsProcessedPerNode_;
-  }
-
-  public boolean foundJoinNode() {
-    Preconditions.checkState(valid_);
-    return foundJoinNode_;
   }
 
 }
