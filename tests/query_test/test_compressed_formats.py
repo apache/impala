@@ -55,12 +55,12 @@ class TestCompressedFormatsBase(ImpalaTestSuite):
     super(TestCompressedFormatsBase, cls).add_test_dimensions()
 
   def _copy_and_query_compressed_file(self, unique_database, table_name, db_suffix,
-      file_basename, src_extension, dest_extension, expected_error=None):
+      dest_extension, expected_error=None):
     """
     This is a utility function to test the behavior for compressed file formats
     with different file extensions. It creates a new table in the unique_database
     as a copy of the provided table_name from the functional schema with the
-    specified db_suffix. It copies file_basename + src_extension to the new
+    specified db_suffix. It copies the first file from the sourcce table to the new
     table as file_basename + dest_extension. It then runs a query on the
     new table. Unless expected_error is set, it expects the query to run successfully.
     """
@@ -68,7 +68,8 @@ class TestCompressedFormatsBase(ImpalaTestSuite):
     base_dir = '/test-warehouse'
     src_table = "functional{0}.{1}".format(db_suffix, table_name)
     src_table_dir = join(base_dir, table_name + db_suffix)
-    src_file = join(src_table_dir, file_basename + src_extension)
+    file_basename = self.filesystem_client.ls(src_table_dir)[0]
+    src_file = join(src_table_dir, file_basename)
 
     # Calculate locations for the destination table
     dest_table_dir = "/test-warehouse/{0}.db/{1}".format(unique_database, table_name)
@@ -136,10 +137,9 @@ class TestCompressedNonText(TestCompressedFormatsBase):
     wrong_extension = wrong_extensions[0]
     # Test with the "right" extension that matches the file's compression, one wrong
     # extension, and no extension. By default, Hive does not use a file extension.
-    src_extension = ""
     for ext in [right_extension, wrong_extension, ""]:
       self._copy_and_query_compressed_file(
-        unique_database, 'tinytable', db_suffix, '000000_0', src_extension, ext)
+        unique_database, 'tinytable', db_suffix, ext)
 
 
 class TestCompressedText(TestCompressedFormatsBase):
@@ -172,7 +172,7 @@ class TestCompressedText(TestCompressedFormatsBase):
     extension, suffix = vector.get_value('compression_format')
     db_suffix = '_{0}_{1}'.format(file_format, suffix)
     self._copy_and_query_compressed_file(
-      unique_database, 'tinytable', db_suffix, '000000_0', extension, extension)
+      unique_database, 'tinytable', db_suffix, extension)
 
 
 class TestUnsupportedTableWriters(ImpalaTestSuite):
