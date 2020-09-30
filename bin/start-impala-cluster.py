@@ -430,7 +430,7 @@ def build_kerberos_args(daemon):
 
 def compute_impalad_mem_limit(cluster_size):
   # Set mem_limit of each impalad to the smaller of 12GB or
-  # 1/cluster_size (typically 1/3) of 70% of system memory.
+  # 1/cluster_size (typically 1/3) of 70% of available memory.
   #
   # The default memory limit for an impalad is 80% of the total system memory. On a
   # mini-cluster with 3 impalads that means 240%. Since having an impalad be OOM killed
@@ -442,7 +442,9 @@ def compute_impalad_mem_limit(cluster_size):
   # memory choice here to max out at 12GB. This should be sufficient for tests.
   #
   # Beware that ASAN builds use more memory than regular builds.
-  mem_limit = int(0.7 * psutil.virtual_memory().total / cluster_size)
+  physical_mem_gb = psutil.virtual_memory().total / 1024 / 1024 / 1024
+  available_mem = int(os.getenv("IMPALA_CLUSTER_MAX_MEM_GB", str(physical_mem_gb)))
+  mem_limit = int(0.7 * available_mem * 1024 * 1024 * 1024 / cluster_size)
   return min(12 * 1024 * 1024 * 1024, mem_limit)
 
 class MiniClusterOperations(object):
