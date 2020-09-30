@@ -33,11 +33,12 @@ def _get_system_ram_mb():
 
 def _get_yarn_nm_ram_mb():
   sys_ram = _get_system_ram_mb()
+  available_ram_gb = int(os.getenv("IMPALA_CLUSTER_MAX_MEM_GB", str(sys_ram / 1024)))
   # Fit into the following envelope:
   # - need 4GB at a bare minimum
   # - leave at least 24G for other services
   # - don't need more than 48G
-  ret = min(max(sys_ram - 24 * 1024, 4096), 48 * 1024)
+  ret = min(max(available_ram_gb * 1024 - 24 * 1024, 4096), 48 * 1024)
   print >>sys.stderr, "Configuring Yarn NM to use {0}MB RAM".format(ret)
   return ret
 
