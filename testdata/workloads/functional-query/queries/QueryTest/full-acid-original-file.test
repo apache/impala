@@ -204,17 +204,17 @@ select * from functional_orc_def.alltypes_promoted where id = 3000;
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====
 ---- QUERY
-select row__id.originaltransaction, row__id.rowid, id
+select row__id.originaltransaction, id
 from functional_orc_def.alltypes_promoted
 where id < 5;
 ---- RESULTS
-0,0,0
-0,1,1
-0,2,2
-0,3,3
-0,4,4
+0,0
+0,1
+0,2
+0,3
+0,4
 ---- TYPES
-BIGINT, BIGINT, INT
+BIGINT,INT
 ====
 ---- QUERY
 select row__id.originaltransaction, row__id.currenttransaction
