@@ -202,9 +202,6 @@ struct THdfsFileSplit {
   // last modified time of the file
   7: required i64 mtime
 
-  // whether this file is erasure-coded
-  8: required bool is_erasure_coded
-
   // Hash of the partition's path. This must be hashed with a hash algorithm that is
   // consistent across different processes and machines. This is currently using
   // Java's String.hashCode(), which is consistent. For testing purposes, this can use

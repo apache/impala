@@ -133,7 +133,6 @@ Status Scheduler::GenerateScanRanges(const vector<TFileSplitGeneratorSpec>& spec
       hdfs_scan_range.__set_mtime(fb_desc->last_modification_time());
       hdfs_scan_range.__set_offset(scan_range_offset);
       hdfs_scan_range.__set_partition_id(spec.partition_id);
-      hdfs_scan_range.__set_is_erasure_coded(fb_desc->is_ec());
       hdfs_scan_range.__set_partition_path_hash(spec.partition_path_hash);
       TScanRange scan_range;
       scan_range.__set_hdfs_file_split(hdfs_scan_range);
@@ -1110,7 +1109,6 @@ void TScanRangeToScanRangePB(const TScanRange& tscan_range, ScanRangePB* scan_ra
     hdfs_file_split->set_file_compression(
         THdfsCompressionToProto(tscan_range.hdfs_file_split.file_compression));
     hdfs_file_split->set_mtime(tscan_range.hdfs_file_split.mtime);
-    hdfs_file_split->set_is_erasure_coded(tscan_range.hdfs_file_split.is_erasure_coded);
     hdfs_file_split->set_partition_path_hash(
         tscan_range.hdfs_file_split.partition_path_hash);
   }
