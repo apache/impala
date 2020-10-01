@@ -154,6 +154,10 @@ DEFINE_bool(cache_remote_file_handles, true, "Enable the file handle cache for "
 DEFINE_bool(cache_s3_file_handles, true, "Enable the file handle cache for "
     "S3 files.");
 
+// This parameter controls whether ABFS file handles are cached.
+DEFINE_bool(cache_abfs_file_handles, true, "Enable the file handle cache for "
+    "ABFS files.");
+
 DECLARE_int64(min_buffer_size);
 
 static const char* DEVICE_NAME_METRIC_KEY_TEMPLATE =

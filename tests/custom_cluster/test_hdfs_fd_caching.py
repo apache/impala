@@ -21,7 +21,6 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfLocal, SkipIfEC
 from tests.util.filesystem_utils import (
     IS_ISILON,
-    IS_ABFS,
     IS_ADLS)
 from time import sleep
 
@@ -130,9 +129,9 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
 
     cache_capacity = 16
 
-    # Caching applies to HDFS and S3 files. If this is HDFS or S3, then verify
-    # that caching works. Otherwise, verify that file handles are not cached.
-    if IS_ABFS or IS_ADLS or IS_ISILON:
+    # Caching applies to HDFS, S3, and ABFS files. If this is HDFS, S3, or ABFS, then
+    # verify that caching works. Otherwise, verify that file handles are not cached.
+    if IS_ADLS or IS_ISILON:
       caching_expected = False
     else:
       caching_expected = True
@@ -148,7 +147,7 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
     handle_timeout = 5
 
     # Only test eviction on platforms where caching is enabled.
-    if IS_ABFS or IS_ADLS or IS_ISILON:
+    if IS_ADLS or IS_ISILON:
       return
     caching_expected = True
     self.run_fd_caching_test(vector, caching_expected, cache_capacity, handle_timeout)

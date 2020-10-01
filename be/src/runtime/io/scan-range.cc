@@ -30,6 +30,7 @@ using namespace impala::io;
 
 DECLARE_bool(cache_remote_file_handles);
 DECLARE_bool(cache_s3_file_handles);
+DECLARE_bool(cache_abfs_file_handles);
 
 // Implementation of the ScanRange functionality. Each ScanRange contains a queue
 // of ready buffers. For each ScanRange, there is only a single producer and
@@ -200,7 +201,8 @@ ReadOutcome ScanRange::DoRead(DiskQueue* queue, int disk_id) {
   if (is_file_handle_caching_enabled() && !is_erasure_coded_ &&
       (expected_local_ ||
        (FLAGS_cache_remote_file_handles && disk_id_ == io_mgr_->RemoteDfsDiskId()) ||
-       (FLAGS_cache_s3_file_handles && disk_id_ == io_mgr_->RemoteS3DiskId()))) {
+       (FLAGS_cache_s3_file_handles && disk_id_ == io_mgr_->RemoteS3DiskId()) ||
+       (FLAGS_cache_abfs_file_handles && disk_id_ == io_mgr_->RemoteAbfsDiskId()))) {
     use_file_handle_cache = true;
   }
   Status read_status = file_reader_->Open(use_file_handle_cache);
