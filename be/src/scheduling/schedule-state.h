@@ -75,10 +75,10 @@ typedef std::unordered_map<NetworkAddressPB, BackendScheduleState>
 /// transferred to the corresponding BackendExecParamsPB in
 /// Scheduler::ComputeBackendExecParams().
 struct FInstanceScheduleState {
-  /// Thrift address of execution backend.
+  /// Address of execution backend: hostname + krpc_port.
   NetworkAddressPB host;
 
-  /// Krpc address of execution backend.
+  /// Krpc address of execution backend: ip_address + krpc_port.
   NetworkAddressPB krpc_host;
 
   /// Contains any info that needs to be sent back to the coordinator. Computed during

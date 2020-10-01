@@ -40,7 +40,7 @@ message BackendDescriptorPB {
   // Unique identifier for this impalad. Generated on startup.
   optional UniqueIdPB backend_id = 1;
 
-  // Network address of the thrift based ImpalaInternalService on this backend
+  // Hostname + port of the KRPC backend service on this backend.
   optional NetworkAddressPB address = 2;
 
   // IP address corresponding to address.hostname. Explicitly including this saves the
@@ -59,7 +59,7 @@ message BackendDescriptorPB {
   // True if the debug webserver is secured (for correctly generating links)
   optional bool secure_webserver = 7;
 
-  // IP address + port of KRPC based ImpalaInternalService on this backend
+  // IP address + port of the KRPC backend service on this backend.
   optional NetworkAddressPB krpc_address = 8;
 
   // The amount of memory that can be admitted to this backend (in bytes).

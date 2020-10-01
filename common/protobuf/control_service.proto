@@ -291,10 +291,10 @@ message PlanFragmentDestinationPB {
   // The globally unique fragment instance id.
   optional UniqueIdPB fragment_instance_id = 1;
 
-  // Hostname + port of the Thrift based ImpalaInteralService on the destination.
-  optional NetworkAddressPB thrift_backend = 2;
+  // Hostname + port of the KRPC backend service on the destination.
+  optional NetworkAddressPB address = 2;
 
-  // IP address + port of the KRPC based ImpalaInternalService on the destination.
+  // IP address + port of the KRPC backend service on the destination.
   optional NetworkAddressPB krpc_backend = 3;
 }
 

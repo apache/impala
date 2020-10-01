@@ -51,7 +51,6 @@ START_DAEMON_PATH = os.path.join(IMPALA_HOME, 'bin/start-daemon.sh')
 DEFAULT_BEESWAX_PORT = 21000
 DEFAULT_HS2_PORT = 21050
 DEFAULT_HS2_HTTP_PORT = 28000
-DEFAULT_BE_PORT = 22000
 DEFAULT_KRPC_PORT = 27000
 DEFAULT_CATALOG_SERVICE_PORT = 26000
 DEFAULT_STATE_STORE_SUBSCRIBER_PORT = 23000
@@ -456,7 +455,7 @@ class ImpaladProcess(BaseImpalaProcess):
   def __init__(self, cmd, container_id=None, port_map=None):
     super(ImpaladProcess, self).__init__(cmd, container_id, port_map)
     self.service = ImpaladService(self.hostname, self.webserver_interface,
-        self.get_webserver_port(), self.__get_beeswax_port(), self.__get_be_port(),
+        self.get_webserver_port(), self.__get_beeswax_port(),
         self.__get_krpc_port(), self.__get_hs2_port(), self.__get_hs2_http_port(),
         self._get_webserver_certificate_file())
 
@@ -465,9 +464,6 @@ class ImpaladProcess(BaseImpalaProcess):
 
   def __get_beeswax_port(self):
     return int(self._get_port('beeswax_port', DEFAULT_BEESWAX_PORT))
-
-  def __get_be_port(self):
-    return int(self._get_port('be_port', DEFAULT_BE_PORT))
 
   def __get_krpc_port(self):
     return int(self._get_port('krpc_port', DEFAULT_KRPC_PORT))

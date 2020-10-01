@@ -398,7 +398,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       hostname = socket.getfqdn()
       initial_impala_service = ImpaladService(hostname)
       target_impala_service = ImpaladService(hostname, webserver_port=25001,
-          beeswax_port=21001, be_port=22001, hs2_port=21051, hs2_http_port=28001)
+          beeswax_port=21001, hs2_port=21051, hs2_http_port=28001)
       protocol = vector.get_value("protocol").lower()
       if protocol == "hs2":
         target_port = 21051

@@ -38,8 +38,6 @@ DEFINE_string(hostname, "", "Hostname to use for this daemon, also used as part 
 DEFINE_bool(use_resolved_hostname, false, "If true, --hostname is resolved before use, "
               "so that the IP address will be used everywhere instead of the hostname.");
 
-DEFINE_int32(be_port, 22000,
-    "port on which thrift based ImpalaInternalService is exported");
 DEFINE_int32(krpc_port, 27000,
     "port on which KRPC based ImpalaInternalService is exported");
 
@@ -379,6 +377,7 @@ REMOVED_FLAG(abfs_read_chunk_size);
 REMOVED_FLAG(adls_read_chunk_size);
 REMOVED_FLAG(authorization_policy_file);
 REMOVED_FLAG(authorization_policy_provider_class);
+REMOVED_FLAG(be_port);
 REMOVED_FLAG(be_service_threads);
 REMOVED_FLAG(cgroup_hierarchy_path);
 REMOVED_FLAG(coordinator_rpc_threads);

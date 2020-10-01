@@ -336,9 +336,9 @@ class Coordinator::BackendState {
   /// Owned by coordinator object pool provided in the c'tor, created in Update().
   RuntimeProfile* host_profile_ = nullptr;
 
-  /// Thrift address of execution backend.
+  /// Address of execution backend: hostname + krpc_port.
   NetworkAddressPB host_;
-  /// Krpc address of execution backend.
+  /// Krpc address of execution backend: ip_address + krpc_port.
   NetworkAddressPB krpc_host_;
 
   /// The query context of the Coordinator that owns this BackendState.

@@ -74,7 +74,7 @@ using kudu::rpc::ResultTracker;
 using kudu::rpc::RpcContext;
 using kudu::rpc::ServiceIf;
 
-DEFINE_int32(port, 20001, "port on which to run Impala Thrift based test backend.");
+DEFINE_int32(port, 20001, "port on which to run Impala krpc based test backend.");
 DECLARE_int32(datastream_sender_timeout_ms);
 DECLARE_int32(datastream_service_num_deserialization_threads);
 DECLARE_int32(datastream_service_deserialization_queue_size);
@@ -320,7 +320,7 @@ class DataStreamTest : public testing::Test {
   void GetNextInstanceId(TUniqueId* instance_id) {
     PlanFragmentDestinationPB* dest = dest_.Add();
     *dest->mutable_fragment_instance_id() = next_instance_id_;
-    *dest->mutable_thrift_backend() = MakeNetworkAddressPB("localhost", FLAGS_port);
+    *dest->mutable_address() = MakeNetworkAddressPB("localhost", FLAGS_port);
     *dest->mutable_krpc_backend() = FromTNetworkAddress(krpc_address_);
     UniqueIdPBToTUniqueId(next_instance_id_, instance_id);
     next_instance_id_.set_lo(next_instance_id_.lo() + 1);

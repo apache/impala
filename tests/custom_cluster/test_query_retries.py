@@ -950,13 +950,13 @@ class TestQueryRetries(CustomClusterTestSuite):
     """Validate that the given profile indicates that the given impalad was not
     blacklisted during retried query execution"""
     assert not ("Blacklisted Executors: {0}:{1}".format(impalad.hostname,
-        impalad.service.be_port) in profile), profile
+        impalad.service.krpc_port) in profile), profile
 
   def __assert_executors_not_assigned_any_finstance(self, impalad, profile):
     """Validate that the given profile indicates that the given impalad was not
     assigned any fragment instance for query execution"""
     assert not ("host={0}:{1}".format(impalad.hostname,
-        impalad.service.be_port) in profile), profile
+        impalad.service.krpc_port) in profile), profile
 
   def __validate_client_log(self, handle, retried_query_id, use_hs2_client=False):
     """Validate the GetLog result contains query retry information"""
