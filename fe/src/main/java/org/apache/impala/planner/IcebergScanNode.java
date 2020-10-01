@@ -94,8 +94,8 @@ public class IcebergScanNode extends HdfsScanNode {
 
     List<FileDescriptor> fileDescList = new ArrayList<>();
     for (DataFile dataFile : dataFileList) {
-      FileDescriptor fileDesc = icebergTable_.getPathMD5ToFileDescMap()
-          .get(IcebergUtil.getDataFileMD5(dataFile));
+      FileDescriptor fileDesc = icebergTable_.getPathHashToFileDescMap()
+          .get(IcebergUtil.getDataFilePathHash(dataFile));
       fileDescList.add(fileDesc);
       //Todo: how to deal with iceberg metadata update, we need to invalidate manually now
       if (fileDesc == null) {

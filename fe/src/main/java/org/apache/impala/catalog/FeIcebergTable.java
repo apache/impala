@@ -66,7 +66,7 @@ public interface FeIcebergTable extends FeFsTable {
   /**
    * FileDescriptor map
    */
-  Map<String, HdfsPartition.FileDescriptor> getPathMD5ToFileDescMap();
+  Map<String, HdfsPartition.FileDescriptor> getPathHashToFileDescMap();
 
   /**
    * Return the hdfs table transformed from iceberg table
@@ -304,8 +304,8 @@ public interface FeIcebergTable extends FeFsTable {
           icebergTable.getDefaultPartitionSpecId());
 
       for (Map.Entry<String, HdfsPartition.FileDescriptor> entry :
-          icebergTable.getPathMD5ToFileDescMap().entrySet()) {
-        tIcebergTable.putToPath_md5_to_file_descriptor(entry.getKey(),
+          icebergTable.getPathHashToFileDescMap().entrySet()) {
+        tIcebergTable.putToPath_hash_to_file_descriptor(entry.getKey(),
           entry.getValue().toThrift());
       }
       return tIcebergTable;
@@ -356,7 +356,7 @@ public interface FeIcebergTable extends FeFsTable {
         HdfsPartition.FileDescriptor fileDesc = getFileDescriptor(
             new Path(file.path().toString()),
             new Path(table.getIcebergTableLocation()), table.getHostIndex());
-        fileDescMap.put(IcebergUtil.getDataFileMD5(file), fileDesc);
+        fileDescMap.put(IcebergUtil.getDataFilePathHash(file), fileDesc);
       }
       return fileDescMap;
     }

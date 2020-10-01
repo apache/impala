@@ -342,10 +342,10 @@ public class IcebergUtil {
   }
 
   /**
-   * Use DataFile path to construct md5 as map key, cached in memory
+   * Use DataFile path to generate 128-bit Murmur3 hash as map key, cached in memory
    */
-  public static String getDataFileMD5(DataFile dataFile) {
-    Hasher hasher = Hashing.md5().newHasher();
+  public static String getDataFilePathHash(DataFile dataFile) {
+    Hasher hasher = Hashing.murmur3_128().newHasher();
     hasher.putUnencodedChars(dataFile.path().toString());
     return hasher.hash().toString();
   }

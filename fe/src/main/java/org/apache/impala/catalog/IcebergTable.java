@@ -99,8 +99,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // Schema of the iceberg table.
   private org.apache.iceberg.Schema icebergSchema_;
 
-  // Key is the DataFile md5, value is FileDescriptor transformed from DataFile
-  private Map<String, FileDescriptor> pathMD5ToFileDescMap_;
+  // Key is the DataFile path hash, value is FileDescriptor transformed from DataFile
+  private Map<String, FileDescriptor> pathHashToFileDescMap_;
 
   // Treat iceberg table as a non-partitioned hdfs table in backend
   private HdfsTable hdfsTable_;
@@ -194,8 +194,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
   public int getDefaultPartitionSpecId() { return defaultPartitionSpecId_; }
 
   @Override
-  public Map<String, FileDescriptor> getPathMD5ToFileDescMap() {
-    return pathMD5ToFileDescMap_;
+  public Map<String, FileDescriptor> getPathHashToFileDescMap() {
+    return pathHashToFileDescMap_;
   }
 
   @Override
@@ -231,7 +231,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         // Loading hdfs table after loaded schema from Iceberg,
         // in case we create external Iceberg table skipping column info in sql.
         hdfsTable_.load(false, msClient, msTable_, true, true, false, null, reason);
-        pathMD5ToFileDescMap_ = Utils.loadAllPartition(this);
+        pathHashToFileDescMap_ = Utils.loadAllPartition(this);
         loadAllColumnStats(msClient);
       } catch (Exception e) {
         throw new TableLoadingException("Error loading metadata for Iceberg table " +
@@ -298,8 +298,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
     icebergTableLocation_ = ticeberg.getTable_location();
     partitionSpecs_ = loadPartitionBySpecsFromThrift(ticeberg.getPartition_spec());
     defaultPartitionSpecId_ = ticeberg.getDefault_partition_spec_id();
-    pathMD5ToFileDescMap_ = loadFileDescFromThrift(
-        ticeberg.getPath_md5_to_file_descriptor());
+    pathHashToFileDescMap_ = loadFileDescFromThrift(
+        ticeberg.getPath_hash_to_file_descriptor());
     hdfsTable_.loadFromThrift(thriftTable);
   }
 

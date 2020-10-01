@@ -540,8 +540,8 @@ struct TIcebergTable {
   1: required string table_location
   2: required list<TIcebergPartitionSpec> partition_spec
   3: required i32 default_partition_spec_id
-  // Data file path md5 and it's file descriptor
-  4: optional map<string,THdfsFileDesc> path_md5_to_file_descriptor
+  // Map from 128-bit Murmur3 hash of data file path to its file descriptor
+  4: optional map<string,THdfsFileDesc> path_hash_to_file_descriptor
 }
 
 // Represents a table or view.
