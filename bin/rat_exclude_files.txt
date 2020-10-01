@@ -21,7 +21,6 @@ ssh_keys/id_rsa_impala
 testdata/__init__.py
 tests/__init__.py
 bin/diagnostics/__init__.py
-www/index.html
 lib/python/impala_py_lib/__init__.py
 lib/python/impala_py_lib/jenkins/__init__.py
 shell/packaging/MANIFEST.in
