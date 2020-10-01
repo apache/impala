@@ -53,7 +53,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   private TIcebergFileFormat icebergFileFormat_;
   private List<IcebergPartitionSpec> partitionSpecs_;
   private int defaultPartitionSpecId_;
-  private Map<String, FileDescriptor> pathMD5ToFileDescMap_;
+  private Map<String, FileDescriptor> pathHashToFileDescMap_;
   private LocalFsTable localFsTable_;
 
   static LocalTable loadFromIceberg(LocalDb db, Table msTable,
@@ -86,7 +86,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     defaultPartitionSpecId_ = metadata.defaultSpecId();
     localFsTable_ = LocalFsTable.load(db, msTable, ref);
     try {
-      pathMD5ToFileDescMap_ = Utils.loadAllPartition(this);
+      pathHashToFileDescMap_ = Utils.loadAllPartition(this);
     } catch (IOException e) {
       throw new TableLoadingException(e.getMessage());
     }
@@ -134,8 +134,8 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   }
 
   @Override
-  public Map<String, FileDescriptor> getPathMD5ToFileDescMap() {
-    return pathMD5ToFileDescMap_;
+  public Map<String, FileDescriptor> getPathHashToFileDescMap() {
+    return pathHashToFileDescMap_;
   }
 
   @Override
