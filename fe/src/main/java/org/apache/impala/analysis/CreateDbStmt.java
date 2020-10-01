@@ -32,6 +32,7 @@ import org.apache.impala.util.CatalogBlacklistUtils;
 public class CreateDbStmt extends StatementBase {
   private final String dbName_;
   private final HdfsUri location_;
+  private final HdfsUri managedLocation_;
   private final String comment_;
   private final boolean ifNotExists_;
   // Database owner. Set during analysis.
@@ -44,7 +45,7 @@ public class CreateDbStmt extends StatementBase {
    * Creates a database with the given name.
    */
   public CreateDbStmt(String dbName) {
-    this(dbName, null, null, false);
+    this(dbName, null, null, null, false);
   }
 
   /**
@@ -54,10 +55,11 @@ public class CreateDbStmt extends StatementBase {
    * unless the ifNotExists is true.
    */
   public CreateDbStmt(String dbName, String comment, HdfsUri location,
-      boolean ifNotExists) {
+       HdfsUri managedlocation, boolean ifNotExists) {
     this.dbName_ = dbName;
     this.comment_ = comment;
     this.location_ = location;
+    this.managedLocation_ = managedlocation;
     this.ifNotExists_ = ifNotExists;
   }
 
@@ -72,6 +74,9 @@ public class CreateDbStmt extends StatementBase {
     sb.append(dbName_);
     if (comment_ != null) sb.append(" COMMENT '" + comment_ + "'");
     if (location_ != null) sb.append(" LOCATION '" + location_ + "'");
+    if (managedLocation_ != null) {
+      sb.append(" MANAGEDLOCATION '" + managedLocation_ + "'");
+    }
     return sb.toString();
   }
 
@@ -80,6 +85,8 @@ public class CreateDbStmt extends StatementBase {
     params.setDb(getDb());
     params.setComment(getComment());
     params.setLocation(location_ == null ? null : location_.toString());
+    params.setManaged_location(
+        managedLocation_ == null ? null : managedLocation_.toString());
     params.setIf_not_exists(getIfNotExists());
     params.setOwner(getOwner());
     params.setServer_name(serverName_);
@@ -105,6 +112,9 @@ public class CreateDbStmt extends StatementBase {
 
     if (location_ != null) {
       location_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
+    }
+    if (managedLocation_ != null) {
+      managedLocation_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
     }
     owner_ = analyzer.getUserShortName();
     // Set the servername here if authorization is enabled because analyzer_ is not

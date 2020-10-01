@@ -182,8 +182,12 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
                           "location '" + get_fs_path("/testdb") + "'")
       self.client.execute("create database impala_test_desc_db4 comment 'test comment' "
                           "location \"" + get_fs_path("/test2.db") + "\"")
+      self.client.execute("create database impala_test_desc_db5 comment 'test comment' "
+                          "managedlocation \"" + get_fs_path("/test2.db") + "\"")
       self.run_stmt_in_hive("create database hive_test_desc_db comment 'test comment' "
                            "with dbproperties('pi' = '3.14', 'e' = '2.82')")
+      self.run_stmt_in_hive("create database hive_test_desc_db2 comment 'test comment' "
+                           "managedlocation '" + get_fs_path("/test2.db") + "'")
       if cluster_properties.is_event_polling_enabled():
         # Using HMS event processor - wait until the database shows up.
         self.wait_for_db_to_appear("hive_test_desc_db", timeout_s=30)
@@ -198,7 +202,9 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
 
   def __test_describe_db_cleanup(self):
     self.cleanup_db('hive_test_desc_db')
+    self.cleanup_db('hive_test_desc_db2')
     self.cleanup_db('impala_test_desc_db1')
     self.cleanup_db('impala_test_desc_db2')
     self.cleanup_db('impala_test_desc_db3')
     self.cleanup_db('impala_test_desc_db4')
+    self.cleanup_db('impala_test_desc_db5')

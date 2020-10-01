@@ -44,11 +44,40 @@ describe database extended impala_test_desc_db4
 string, string, string
 ====
 ---- QUERY
-describe database formatted impala_test_desc_db4
+describe database impala_test_desc_db5
+---- RESULTS
+'impala_test_desc_db5','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db5.db','test comment'
+'managedlocation:','$NAMENODE/test2.db',''
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe database extended impala_test_desc_db5
 ---- RESULTS
 '','$USER','USER'
 'Owner: ','',''
-'impala_test_desc_db4','$NAMENODE/test2.db','test comment'
+'impala_test_desc_db5','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db5.db','test comment'
+'managedlocation:','$NAMENODE/test2.db',''
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe database extended impala_test_desc_db5
+---- RESULTS
+'','$USER','USER'
+'Owner: ','',''
+'impala_test_desc_db5','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db5.db','test comment'
+'managedlocation:','$NAMENODE/test2.db',''
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe database formatted impala_test_desc_db5
+---- RESULTS
+'','$USER','USER'
+'Owner: ','',''
+'impala_test_desc_db5','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db5.db','test comment'
+'managedlocation:','$NAMENODE/test2.db',''
 ---- TYPES
 string, string, string
 ====

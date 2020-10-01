@@ -1333,6 +1333,9 @@ public class CatalogOpExecutor {
     if (params.getLocation() != null) {
       db.setLocationUri(params.getLocation());
     }
+    if (params.getManaged_location() != null) {
+      db.setManagedLocationUri(params.getManaged_location());
+    }
     db.setOwnerName(params.getOwner());
     db.setOwnerType(PrincipalType.USER);
     if (LOG.isTraceEnabled()) LOG.trace("Creating database " + dbName);
