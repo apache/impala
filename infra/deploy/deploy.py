@@ -360,7 +360,6 @@ def transform_rcg_config(rcg):
         new_config.update(transform_path(rcg.name, full, "log_dir"))
         new_config.update(transform_path(rcg.name, full, "scratch_dirs"))
 
-        new_config.update(transform_port(rcg.name, full, "be_port"))
         new_config.update(transform_port(rcg.name, full, "beeswax_port"))
         new_config.update(transform_port(rcg.name, full, "hs2_port"))
         new_config.update(transform_port(rcg.name, full, "impalad_webserver_port"))

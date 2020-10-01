@@ -732,9 +732,9 @@ KrpcDataStreamSender::KrpcDataStreamSender(TDataSinkId sink_id, int sender_id,
       || sink.output_partition.type == TPartitionType::KUDU);
 
   for (const auto& destination : destinations) {
-    channels_.emplace_back(new Channel(this, row_desc_,
-        destination.thrift_backend().hostname(), destination.krpc_backend(),
-        destination.fragment_instance_id(), sink.dest_node_id, per_channel_buffer_size));
+    channels_.emplace_back(new Channel(this, row_desc_, destination.address().hostname(),
+        destination.krpc_backend(), destination.fragment_instance_id(), sink.dest_node_id,
+        per_channel_buffer_size));
   }
 
   if (partition_type_ == TPartitionType::UNPARTITIONED

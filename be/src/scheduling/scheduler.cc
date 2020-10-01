@@ -229,7 +229,7 @@ void Scheduler::ComputeFragmentExecParams(
         *dest->mutable_fragment_instance_id() =
             dest_state->instance_states[i].exec_params.instance_id();
         const NetworkAddressPB& host = dest_state->instance_states[i].host;
-        *dest->mutable_thrift_backend() = host;
+        *dest->mutable_address() = host;
         const BackendDescriptorPB& desc = LookUpBackendDesc(executor_config, host);
         DCHECK(desc.has_krpc_address());
         DCHECK(IsResolvedAddress(desc.krpc_address()));

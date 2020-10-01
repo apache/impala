@@ -124,7 +124,6 @@ DEFINE_int32_hidden(local_catalog_max_fetch_retries, 40,
 DECLARE_int32(state_store_port);
 DECLARE_int32(num_threads_per_core);
 DECLARE_int32(num_cores);
-DECLARE_int32(be_port);
 DECLARE_int32(krpc_port);
 DECLARE_string(mem_limit);
 DECLARE_bool(mem_limit_includes_jvm);
@@ -274,10 +273,10 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
   TNetworkAddress statestore_address =
       MakeNetworkAddress(statestore_host, statestore_port);
 
-  // Set StatestoreSubscriber::subscriber_id as hostname + be_port.
-  statestore_subscriber_.reset(
-      new StatestoreSubscriber(Substitute("impalad@$0:$1", FLAGS_hostname, FLAGS_be_port),
-          subscriber_address, statestore_address, metrics_.get()));
+  // Set StatestoreSubscriber::subscriber_id as hostname + krpc_port.
+  statestore_subscriber_.reset(new StatestoreSubscriber(
+      Substitute("impalad@$0:$1", FLAGS_hostname, FLAGS_krpc_port), subscriber_address,
+      statestore_address, metrics_.get()));
 
   if (FLAGS_is_coordinator) {
     hdfs_op_thread_pool_.reset(

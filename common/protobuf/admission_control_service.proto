@@ -58,10 +58,10 @@ message BackendExecParamsPB {
   // The id of this backend.
   optional UniqueIdPB backend_id = 1;
 
-  // The hostname + port of the Thrift ImpalaInternalService on this backend.
+  // The hostname + port of the KRPC backend service on this backend.
   optional NetworkAddressPB address = 8;
 
-  // The IP address + port of the KRPC ControlService on this backend.
+  // The IP address + port of the KRPC backend service on this backend.
   optional NetworkAddressPB krpc_address = 9;
 
   // The fragment instance params assigned to this backend. All instances of a

@@ -36,7 +36,7 @@ from subprocess import call, check_call
 from testdata.common import cgroups
 from tests.common.environ import build_flavor_timeout
 from tests.common.impala_cluster import (ImpalaCluster, DEFAULT_BEESWAX_PORT,
-    DEFAULT_HS2_PORT, DEFAULT_BE_PORT, DEFAULT_KRPC_PORT, DEFAULT_HS2_HTTP_PORT,
+    DEFAULT_HS2_PORT, DEFAULT_KRPC_PORT, DEFAULT_HS2_HTTP_PORT,
     DEFAULT_STATE_STORE_SUBSCRIBER_PORT, DEFAULT_IMPALAD_WEBSERVER_PORT,
     DEFAULT_STATESTORED_WEBSERVER_PORT, DEFAULT_CATALOGD_WEBSERVER_PORT,
     DEFAULT_CATALOGD_JVM_DEBUG_PORT, DEFAULT_IMPALAD_JVM_DEBUG_PORT,
@@ -221,7 +221,6 @@ def choose_impalad_ports(instance_num):
   return {'beeswax_port': DEFAULT_BEESWAX_PORT + instance_num,
           'hs2_port': DEFAULT_HS2_PORT + instance_num,
           'hs2_http_port': DEFAULT_HS2_HTTP_PORT + instance_num,
-          'be_port': DEFAULT_BE_PORT + instance_num,
           'krpc_port': DEFAULT_KRPC_PORT + instance_num,
           'state_store_subscriber_port':
               DEFAULT_STATE_STORE_SUBSCRIBER_PORT + instance_num,
@@ -233,7 +232,6 @@ def build_impalad_port_args(instance_num):
       "-beeswax_port={beeswax_port} "
       "-hs2_port={hs2_port} "
       "-hs2_http_port={hs2_http_port} "
-      "-be_port={be_port} "
       "-krpc_port={krpc_port} "
       "-state_store_subscriber_port={state_store_subscriber_port} "
       "-webserver_port={webserver_port}")
