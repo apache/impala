@@ -1937,6 +1937,15 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError("create database new_db location " +
         "'blah://bucket/test-warehouse/new_db'",
         "No FileSystem for scheme: blah");
+
+    // URIs for managedlocation.
+    AnalyzesOk("create database new_db managedlocation '/test-warehouse/new_db'");
+    AnalyzesOk("create database new_db location " +
+        "'/test-warehouse/new_db' managedlocation " +
+        "'/test-warehouse/new_db'");
+    AnalysisError("create database new_db managedlocation " +
+        "'blah://bucket/test-warehouse/new_db'",
+        "No FileSystem for scheme: blah");
   }
 
   @Test

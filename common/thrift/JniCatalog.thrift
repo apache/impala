@@ -135,6 +135,10 @@ struct TCreateDbParams {
   // The server name for security privileges when authorization is enabled.
   // TODO: Need to cleanup:IMPALA-7553
   6: optional string server_name
+
+  // Optional HDFS path for the database. Overrides location as the default location for
+  // all managed tables created in the database.
+  7: optional string managed_location
 }
 
 // Parameters of CREATE DATA SOURCE commands

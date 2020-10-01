@@ -73,9 +73,11 @@ public class DescribeResultFactory {
     org.apache.hadoop.hive.metastore.api.Database msDb = db.getMetaStoreDb();
     descResult.results = Lists.newArrayList();
     String location = null;
+    String managedLocation = null;
     String comment = null;
     if(msDb != null) {
       location = msDb.getLocationUri();
+      managedLocation = msDb.getManagedLocationUri();
       comment = msDb.getDescription();
     }
 
@@ -85,8 +87,17 @@ public class DescribeResultFactory {
     dbLocationCol.setString_val(Objects.toString(location, ""));
     TColumnValue commentCol = new TColumnValue();
     commentCol.setString_val(Objects.toString(comment, ""));
-    descResult.results.add(
-        new TResultRow(Lists.newArrayList(dbNameCol, dbLocationCol, commentCol)));
+    descResult.results.add(new TResultRow(
+        Lists.newArrayList(dbNameCol, dbLocationCol, commentCol)));
+
+    if (managedLocation != null) {
+      TColumnValue keyCol = new TColumnValue();
+      keyCol.setString_val("managedlocation:");
+      TColumnValue dbManagedLocationCol = new TColumnValue();
+      dbManagedLocationCol.setString_val(Objects.toString(managedLocation, ""));
+      descResult.results.add(new TResultRow(
+          Lists.newArrayList(keyCol, dbManagedLocationCol, EMPTY)));
+    }
     return descResult;
   }
 

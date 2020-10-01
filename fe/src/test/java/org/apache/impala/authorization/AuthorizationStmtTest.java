@@ -1537,20 +1537,22 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
 
     // Create a database with a specific location.
     String uri = "hdfs://localhost:20500/test-warehouse/new_location";
-    String stmt = "create database newdb location " + "'" + uri + "'";
-    authorize(stmt)
-        .ok(onServer(TPrivilegeLevel.ALL))
-        .ok(onServer(TPrivilegeLevel.OWNER))
-        .ok(onServer(TPrivilegeLevel.CREATE), onUri(uri, TPrivilegeLevel.ALL))
-        .ok(onServer(TPrivilegeLevel.CREATE), onUri(uri, TPrivilegeLevel.OWNER))
-        .error(createError("newdb"))
-        .error(createError("newdb"), onServer(allExcept(TPrivilegeLevel.ALL,
-            TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)),
-            onUri(uri, TPrivilegeLevel.ALL))
-        .error(createError("newdb"), onServer(allExcept(TPrivilegeLevel.ALL,
-            TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)),
-            onUri(uri, TPrivilegeLevel.OWNER))
-        .error(accessError(uri), onServer(TPrivilegeLevel.CREATE));
+    for (AuthzTest test: new AuthzTest[]{
+      authorize("create database newdb location " + "'" + uri + "'"),
+      authorize("create database newdb managedlocation " + "'" + uri + "'")}) {
+      test.ok(onServer(TPrivilegeLevel.ALL))
+          .ok(onServer(TPrivilegeLevel.OWNER))
+          .ok(onServer(TPrivilegeLevel.CREATE), onUri(uri, TPrivilegeLevel.ALL))
+          .ok(onServer(TPrivilegeLevel.CREATE), onUri(uri, TPrivilegeLevel.OWNER))
+          .error(createError("newdb"))
+          .error(createError("newdb"), onServer(allExcept(TPrivilegeLevel.ALL,
+              TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)),
+              onUri(uri, TPrivilegeLevel.ALL))
+          .error(createError("newdb"), onServer(allExcept(TPrivilegeLevel.ALL,
+              TPrivilegeLevel.OWNER, TPrivilegeLevel.CREATE)),
+              onUri(uri, TPrivilegeLevel.OWNER))
+          .error(accessError(uri), onServer(TPrivilegeLevel.CREATE));
+    }
 
     // Database already exists.
     for (AuthzTest test: new AuthzTest[]{
