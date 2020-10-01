@@ -36,7 +36,7 @@
 DEFINE_bool(use_hdfs_pread, false, "Enables using hdfsPread() instead of hdfsRead() "
     "when performing HDFS read operations. This is necessary to use HDFS hedged reads "
     "(assuming the HDFS client is configured to do so). Preads are always enabled for "
-    "S3A reads.");
+    "S3A and ABFS reads.");
 
 DEFINE_int64(fs_slow_read_log_threshold_ms, 10L * 1000L,
     "Log diagnostics about I/Os issued via the HDFS client that take longer than this "
@@ -221,7 +221,8 @@ Status HdfsFileReader::ReadFromPosInternal(hdfsFile hdfs_file, DiskQueue* queue,
   ScopedHistogramTimer read_timer(queue->read_latency());
   // For file handles from the cache, any of the below file operations may fail
   // due to a bad file handle.
-  if (FLAGS_use_hdfs_pread || IsS3APath(scan_range_->file_string()->c_str())) {
+  if (FLAGS_use_hdfs_pread || IsS3APath(scan_range_->file_string()->c_str())
+      || IsABFSPath(scan_range_->file_string()->c_str())) {
     if (hdfsPreadFully(
           hdfs_fs_, hdfs_file, position_in_file, buffer, bytes_to_read) == -1) {
       return Status(TErrorCode::DISK_IO_ERROR, GetBackendString(),
