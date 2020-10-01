@@ -64,8 +64,8 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNodeBase* scan_node,
         BufferOpts::NO_CACHING;
     ScanRange* header_range = scan_node->AllocateScanRange(files[i]->fs,
         files[i]->filename.c_str(), header_size, 0, metadata->partition_id, -1,
-        expected_local, files[i]->is_erasure_coded, files[i]->mtime,
-        BufferOpts(cache_options), metadata->original_split);
+        expected_local, files[i]->mtime, BufferOpts(cache_options),
+        metadata->original_split);
     ScanRangeMetadata* header_metadata =
             static_cast<ScanRangeMetadata*>(header_range->meta_data());
     header_metadata->is_sequence_header = true;

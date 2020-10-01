@@ -92,8 +92,7 @@ Status ParquetPageReader::InitColumnChunk(const HdfsFileDesc& file_desc,
   scan_range_ = parent_->scan_node_->AllocateScanRange(metadata_range->fs(),
       filename(), col_len, col_start, move(sub_ranges),
       partition_id, split_range->disk_id(),
-      col_range_local, split_range->is_erasure_coded(), file_desc.mtime,
-      BufferOpts(split_range->cache_options()));
+      col_range_local, file_desc.mtime, BufferOpts(split_range->cache_options()));
   page_headers_read_ = 0;
   dictionary_header_encountered_ = false;
   state_ = State::Initialized;

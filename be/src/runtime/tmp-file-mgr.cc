@@ -633,7 +633,7 @@ Status TmpFileGroup::ReadAsync(TmpWriteHandle* handle, MemRange buffer) {
   handle->read_range_ = scan_range_pool_.Add(new ScanRange);
   handle->read_range_->Reset(nullptr, handle->write_range_->file(),
       handle->write_range_->len(), handle->write_range_->offset(),
-      handle->write_range_->disk_id(), false, false, ScanRange::INVALID_MTIME,
+      handle->write_range_->disk_id(), false, ScanRange::INVALID_MTIME,
       BufferOpts::ReadInto(
           read_buffer.data(), read_buffer.len(), BufferOpts::NO_CACHING));
   read_counter_->Add(1);

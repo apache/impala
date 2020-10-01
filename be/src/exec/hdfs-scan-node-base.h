@@ -62,8 +62,7 @@ struct HdfsFileDesc {
       file_length(0),
       mtime(0),
       file_compression(THdfsCompression::NONE),
-      file_format(THdfsFileFormat::TEXT),
-      is_erasure_coded(false) {}
+      file_format(THdfsFileFormat::TEXT) {}
 
   /// Connection to the filesystem containing the file.
   hdfsFS fs;
@@ -80,9 +79,6 @@ struct HdfsFileDesc {
 
   THdfsCompression::type file_compression;
   THdfsFileFormat::type file_format;
-
-  /// is erasure coded
-  bool is_erasure_coded;
 
   /// Splits (i.e. raw byte ranges) for this file, assigned to this scan node.
   std::vector<io::ScanRange*> splits;
@@ -482,14 +478,13 @@ class HdfsScanNodeBase : public ScanNode {
   /// This is thread safe.
   io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
       int64_t offset, int64_t partition_id, int disk_id, bool expected_local,
-      bool is_erasure_coded, int64_t mtime,
-      const io::BufferOpts& buffer_opts,
+      int64_t mtime, const io::BufferOpts& buffer_opts,
       const io::ScanRange* original_split = nullptr);
 
   /// Same as the first overload, but it takes sub-ranges as well.
   io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
       int64_t offset, std::vector<io::ScanRange::SubRange>&& sub_ranges,
-      int64_t partition_id, int disk_id, bool expected_local, bool is_erasure_coded,
+      int64_t partition_id, int disk_id, bool expected_local,
       int64_t mtime, const io::BufferOpts& buffer_opts,
       const io::ScanRange* original_split = nullptr);
 
@@ -497,7 +492,7 @@ class HdfsScanNodeBase : public ScanNode {
   io::ScanRange* AllocateScanRange(hdfsFS fs, const char* file, int64_t len,
       int64_t offset, std::vector<io::ScanRange::SubRange>&& sub_ranges,
       ScanRangeMetadata* metadata, int disk_id, bool expected_local,
-      bool is_erasure_coded, int64_t mtime, const io::BufferOpts& buffer_opts);
+      int64_t mtime, const io::BufferOpts& buffer_opts);
 
   /// Adds ranges to be read later by scanners. Must not be called once
   /// remaining_scan_range_submissions_ is 0. The enqueue_location specifies whether the

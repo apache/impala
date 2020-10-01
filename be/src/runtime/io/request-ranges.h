@@ -252,8 +252,7 @@ class ScanRange : public RequestRange {
   /// with the rest of the input variables.
   static ScanRange* AllocateScanRange(ObjectPool* obj_pool, hdfsFS fs, const char* file,
       int64_t len, int64_t offset, std::vector<SubRange>&& sub_ranges, void* metadata,
-      int disk_id, bool expected_local, bool is_erasure_coded, int64_t mtime,
-      const BufferOpts& buffer_opts);
+      int disk_id, bool expected_local, int64_t mtime, const BufferOpts& buffer_opts);
 
   /// Resets this scan range object with the scan range description. The scan range
   /// is for bytes [offset, offset + len) in 'file' on 'fs' (which is nullptr for the
@@ -261,8 +260,7 @@ class ScanRange : public RequestRange {
   /// (len > 0 and offset >= 0 and offset + len <= file_length). 'disk_id' is the disk
   /// queue to add the range to. If 'expected_local' is true, a warning is generated if
   /// the read did not come from a local disk. 'mtime' is the last modification time for
-  /// 'file'; the mtime must change when the file changes. 'is_erasure_coded' is whether
-  /// 'file' is stored using HDFS erasure coding.
+  /// 'file'; the mtime must change when the file changes.
   /// 'buffer_opts' specifies buffer management options - see the DiskIoMgr class comment
   /// and the BufferOpts comments for details.
   /// 'meta_data' is an arbitrary client-provided pointer for any auxiliary data.
@@ -271,15 +269,14 @@ class ScanRange : public RequestRange {
   /// it is not generally safe to do so, but some unit tests reuse ranges after
   /// successfully reading to eos.
   void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
-      bool expected_local, bool is_erasure_coded, int64_t mtime,
-      const BufferOpts& buffer_opts, void* meta_data = nullptr);
+      bool expected_local, int64_t mtime, const BufferOpts& buffer_opts,
+      void* meta_data = nullptr);
 
   /// Same as above, but it also adds sub-ranges. No need to merge contiguous sub-ranges
   /// in advance, as this method will do the merge.
   void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
-      bool expected_local, bool is_erasure_coded, int64_t mtime,
-      const BufferOpts& buffer_opts, std::vector<SubRange>&& sub_ranges,
-      void* meta_data = nullptr);
+      bool expected_local, int64_t mtime, const BufferOpts& buffer_opts,
+      std::vector<SubRange>&& sub_ranges, void* meta_data = nullptr);
 
   void* meta_data() const { return meta_data_; }
   int cache_options() const { return cache_options_; }
@@ -287,7 +284,6 @@ class ScanRange : public RequestRange {
   bool UseDataCache() const { return (cache_options_ & BufferOpts::USE_DATA_CACHE) != 0; }
   bool read_in_flight() const { return read_in_flight_; }
   bool expected_local() const { return expected_local_; }
-  bool is_erasure_coded() const { return is_erasure_coded_; }
   int64_t bytes_to_read() const { return bytes_to_read_; }
 
   /// Returns the next buffer for this scan range. buffer is an output parameter.
@@ -474,9 +470,6 @@ class ScanRange : public RequestRange {
   /// local.
   /// TODO: we can do more with this
   bool expected_local_ = false;
-
-  /// If true, the file associated with the scan range is erasure coded. Set in Reset().
-  bool is_erasure_coded_ = false;
 
   /// Last modified time of the file associated with the scan range. Set in Reset().
   int64_t mtime_;
