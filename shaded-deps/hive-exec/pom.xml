@@ -36,6 +36,14 @@ the same dependencies
   <packaging>jar</packaging>
 
   <dependencies>
+    <!-- Pin json-smart dependency to version 2.3
+         (this is not included in the shaded jar) -->
+    <dependency>
+      <groupId>net.minidev</groupId>
+      <artifactId>json-smart</artifactId>
+      <version>2.3</version>
+    </dependency>
+
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-exec</artifactId>
@@ -44,6 +52,11 @@ the same dependencies
         <exclusion>
           <groupId>org.apache.hive.shims</groupId>
           <artifactId>hive-shims-0.20</artifactId>
+        </exclusion>
+        <!-- Exclude json-smart to pin the version -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

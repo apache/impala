@@ -35,6 +35,13 @@ under the License.
   <name>Apache Impala Query Engine Frontend</name>
 
   <dependencies>
+    <!-- Pin json-smart dependency to version 2.3 -->
+    <dependency>
+      <groupId>net.minidev</groupId>
+      <artifactId>json-smart</artifactId>
+      <version>2.3</version>
+    </dependency>
+
     <dependency>
       <groupId>org.apache.impala</groupId>
       <artifactId>query-event-hook-api</artifactId>
@@ -58,6 +65,11 @@ under the License.
       <artifactId>hadoop-common</artifactId>
       <version>${hadoop.version}</version>
       <exclusions>
+        <!-- Exclude json-smart to pin the version -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
         <exclusion>
           <groupId>org.eclipse.jetty</groupId>
           <artifactId>*</artifactId>
@@ -82,6 +94,13 @@ under the License.
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-auth</artifactId>
       <version>${hadoop.version}</version>
+      <exclusions>
+        <!-- Exclude json-smart to pin the version -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -120,6 +139,13 @@ under the License.
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-azure-datalake</artifactId>
       <version>${hadoop.version}</version>
+      <exclusions>
+        <!-- Exclude json-smart to pin the version -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -160,6 +186,13 @@ under the License.
       <groupId>org.apache.ranger</groupId>
       <artifactId>ranger-plugins-common</artifactId>
       <version>${ranger.version}</version>
+      <exclusions>
+        <!-- Exclude json-smart to pin the version -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -178,6 +211,11 @@ under the License.
         <exclusion>
           <groupId>org.eclipse.jetty</groupId>
           <artifactId>*</artifactId>
+        </exclusion>
+        <!-- Exclude json-smart to pin the version -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -243,12 +281,26 @@ under the License.
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-client</artifactId>
       <version>${hbase.version}</version>
+      <exclusions>
+        <!-- Exclude json-smart to pin the version -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-common</artifactId>
       <version>${hbase.version}</version>
+      <exclusions>
+        <!-- Exclude json-smart to pin the version -->
+        <exclusion>
+          <groupId>net.minidev</groupId>
+          <artifactId>json-smart</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -895,6 +947,11 @@ under the License.
               <groupId>io.netty</groupId>
               <artifactId>*</artifactId>
             </exclusion>
+            <!-- Exclude json-smart to pin the version -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
         <dependency>
@@ -910,6 +967,11 @@ under the License.
             <exclusion>
               <groupId>org.apache.logging.log4j</groupId>
               <artifactId>log4j-1.2-api</artifactId>
+            </exclusion>
+            <!-- Exclude json-smart to pin the version -->
+            <exclusion>
+              <groupId>net.minidev</groupId>
+              <artifactId>json-smart</artifactId>
             </exclusion>
             <exclusion>
               <groupId>org.apache.hive</groupId>
