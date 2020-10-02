@@ -533,7 +533,7 @@ TEST(Webserver, Options) {
   ASSERT_OK(webserver.Start());
   stringstream contents;
   ASSERT_OK(HttpGet("localhost", FLAGS_webserver_port, "/", &contents, 200, "OPTIONS"));
-  ASSERT_FALSE(contents.str().find("Allow: GET, POST, HEAD, OPTIONS, PROPFIND, MKCOL")
+  ASSERT_FALSE(contents.str().find("Allow: GET, POST, HEAD, OPTIONS")
       == string::npos);
 }
 
