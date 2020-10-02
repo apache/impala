@@ -196,6 +196,11 @@ class Webserver {
   sq_callback_result_t HandleSpnego(struct sq_connection* connection,
       struct sq_request_info* request_info, std::vector<std::string>* response_headers);
 
+  /// Checks and returns true if the connection originated from a trusted domain and has a
+  /// valid username set in the request's the Authorization header (using Basic Auth).
+  bool TrustedDomainCheck(const std::string& origin, struct sq_connection* connection,
+      struct sq_request_info* request_info);
+
   // Handle Basic authentication for this request. Returns an error if authentication was
   // unsuccessful.
   Status HandleBasic(struct sq_connection* connection,
@@ -258,6 +263,10 @@ class Webserver {
   /// If true and SPNEGO is in use, cookies will be used for authentication.
   bool use_cookies_;
 
+  /// If true and SPNEGO or LDAP is in use, checks whether an incoming connection can skip
+  /// auth if it originates from a trusted domain.
+  bool check_trusted_domain_;
+
   /// Used to validate usernames/passwords If LDAP authentication is in use.
   std::unique_ptr<ImpalaLdap> ldap_;
 
@@ -275,6 +284,10 @@ class Webserver {
   /// auth attempts.
   IntCounter* total_cookie_auth_success_ = nullptr;
   IntCounter* total_cookie_auth_failure_ = nullptr;
+
+  /// If 'use_cookies_' is true, metrics for the number of successful
+  /// attempts to authorize connections originating from a trusted domain.
+  IntCounter* total_trusted_domain_check_success_ = nullptr;
 };
 
 }

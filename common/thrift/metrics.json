@@ -1282,6 +1282,16 @@
     "key": "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-failure"
   },
   {
+    "description": "The number of HiveServer2 HTTP API connection requests to this Impala Daemon that skipped authentication as they originated from a trusted domain.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 HTTP API Connection Trusted Domain Check Success",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.hiveserver2-http-frontend.total-trusted-domain-check-success"
+  },
+  {
     "description": "The number of HiveServer2 HTTP API connection requests to this Impala Daemon that were successfully authenticated with Kerberos",
     "contexts": [
       "IMPALAD"
@@ -2712,6 +2722,18 @@
     "units": "NONE",
     "kind": "COUNTER",
     "key": "impala.webserver.total-cookie-auth-failure"
+  },
+    {
+    "description": "The number of HTTP connection requests to this daemon's webserver that originated from a trusted domain.",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Webserver HTTP Connection Trusted Domain Check Success",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.webserver.total-trusted-domain-check-success"
   },
   {
     "description": "The number of times the FAIL debug action returned an error. For testing only.",

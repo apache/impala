@@ -29,7 +29,7 @@ set_source_files_properties(${PLANNER_PROTO_SRCS} PROPERTIES GENERATED TRUE)
 add_library(Rpc
   authentication.cc
   ${COMMON_PROTO_SRCS}
-  cookie-util.cc
+  authentication-util.cc
   impala-service-pool.cc
   ${PLANNER_PROTO_SRCS}
   rpc-mgr.cc

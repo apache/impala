@@ -90,8 +90,8 @@ public class LdapHS2Test {
     TFetchResultsResp fetchResp = client.FetchResults(fetchReq);
     verifySuccess(fetchResp.getStatus());
     List<TColumn> columns = fetchResp.getResults().getColumns();
-    assertEquals(columns.size(), 1);
-    assertEquals(columns.get(0).getStringVal().getValues().get(0), expectedResult);
+    assertEquals(1, columns.size());
+    assertEquals(expectedResult, columns.get(0).getStringVal().getValues().get(0));
 
     return execResp.getOperationHandle();
   }
@@ -114,6 +114,13 @@ public class LdapHS2Test {
     long actualCookieAuthFailure = (long) metrics.getMetric(
         "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-failure");
     assertEquals(expectedCookieAuthFailure, actualCookieAuthFailure);
+  }
+
+  private void verifyTrustedDomainMetrics(long expectedAuthSuccess) throws Exception {
+    long actualAuthSuccess = (long) metrics
+        .getMetric("impala.thrift-server.hiveserver2-http-frontend."
+            + "total-trusted-domain-check-success");
+    assertEquals(expectedAuthSuccess, actualAuthSuccess);
   }
 
   /**
@@ -303,5 +310,98 @@ public class LdapHS2Test {
     config.put("impala.doas.user", TEST_USER_4);
     openResp = client.OpenSession(openReq);
     assertEquals(openResp.getStatus().getStatusCode(), TStatusCode.ERROR_STATUS);
+  }
+
+  /**
+   * Tests if authentication is skipped when connections to the HTTP hiveserver2
+   * endpoint originate from a trusted domain.
+   */
+  @Test
+  public void testHiveserver2TrustedDomainAuth() throws Exception {
+    setUp("--trusted_domain=localhost --trusted_domain_use_xff_header=true");
+    verifyMetrics(0, 0);
+    THttpClient transport = new THttpClient("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+
+    // Case 1: Authenticate as 'Test1Ldap' with the right password '12345'
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOjEyMzQ1");
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    // Open a session which will get username 'Test1Ldap'.
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    TOpenSessionResp openResp = client.OpenSession(openReq);
+    // One successful authentication.
+    verifyMetrics(0, 0);
+    verifyTrustedDomainMetrics(1);
+    // Running a query should succeed.
+    TOperationHandle operationHandle = execAndFetch(
+        client, openResp.getSessionHandle(), "select logged_in_user()", "Test1Ldap");
+    // Two more successful authentications - for the Exec() and the Fetch().
+    verifyMetrics(0, 0);
+    verifyTrustedDomainMetrics(3);
+
+    // Case 2: Authenticate as 'Test1Ldap' without password
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOg==");
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    openResp = client.OpenSession(openReq);
+    verifyMetrics(0, 0);
+    verifyTrustedDomainMetrics(4);
+    operationHandle = execAndFetch(client, openResp.getSessionHandle(),
+        "select logged_in_user()", "Test1Ldap");
+    verifyMetrics(0, 0);
+    verifyTrustedDomainMetrics(6);
+
+    // Case 3: Case 1: Authenticate as 'Test1Ldap' with the right password
+    // '12345' but with a non trusted address in X-Forwarded-For header
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOjEyMzQ1");
+    headers.put("X-Forwarded-For", "127.23.0.1");
+    transport.setCustomHeaders(headers);
+    openResp = client.OpenSession(openReq);
+    verifyMetrics(1, 0);
+    verifyTrustedDomainMetrics(6);
+    operationHandle = execAndFetch(client, openResp.getSessionHandle(),
+        "select logged_in_user()", "Test1Ldap");
+    verifyMetrics(3, 0);
+    verifyTrustedDomainMetrics(6);
+
+    // Case 4: No auth header, does not work
+    headers.remove("Authorization");
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    try {
+      openResp = client.OpenSession(openReq);
+      fail("Exception exception.");
+    } catch (Exception e) {
+      verifyTrustedDomainMetrics(6);
+      assertEquals(e.getMessage(), "HTTP Response code: 401");
+    }
+
+    // Case 5: Case 1: Authenticate as 'Test1Ldap' with the no password
+    // and a non trusted address in X-Forwarded-For header
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOg==");
+    headers.put("X-Forwarded-For", "127.23.0.1");
+    transport.setCustomHeaders(headers);
+    try {
+      openResp = client.OpenSession(openReq);
+      fail("Exception exception.");
+    } catch (Exception e) {
+      verifyMetrics(3, 1);
+      verifyTrustedDomainMetrics(6);
+      assertEquals(e.getMessage(), "HTTP Response code: 401");
+    }
+
+    // Case 6: Verify that there are no changes in metrics for trusted domain
+    // check if the X-Forwarded-For header is not present
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOjEyMzQ1");
+    headers.remove("X-Forwarded-For");
+    transport.setCustomHeaders(headers);
+    openResp = client.OpenSession(openReq);
+    // Account for 1 successful basic auth increment.
+    verifyMetrics(4, 1);
+    verifyTrustedDomainMetrics(6);
   }
 }
