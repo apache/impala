@@ -209,7 +209,7 @@ struct socket {
 };
 
 char* SAFE_HTTP_METHODS[] = {
-  "GET", "POST", "HEAD", "PROPFIND", "MKCOL", "OPTIONS" };
+  "GET", "POST", "HEAD", "OPTIONS" };
 
 // See https://www.owasp.org/index.php/Test_HTTP_Methods_(OTG-CONFIG-006) for details.
 #ifdef ALLOW_UNSAFE_HTTP_METHODS
@@ -870,7 +870,7 @@ int sq_get_bound_addresses(const struct sq_context *ctx, struct sockaddr_in ***a
   *addrs = addr_array;
 
   for (i = 0; i < n; i++) {
-    addr_array[i] = malloc(sizeof(*addr_array[i]));
+    addr_array[i] = malloc(sizeof(struct sockaddr_storage));
     if (addr_array[i] == NULL) {
       cry(fc(ctx), "%s: cannot allocate memory", __func__);
       goto cleanup;
@@ -3027,46 +3027,6 @@ static int put_dir(struct sq_connection *conn, const char *path) {
   return res;
 }
 
-static void mkcol(struct sq_connection *conn, const char *path) {
-  int rc, body_len;
-  struct de de;
-  memset(&de.file, 0, sizeof(de.file));
-  sq_stat(conn, path, &de.file);
-
-  if(de.file.modification_time) {
-      send_http_error(conn, 405, "Method Not Allowed",
-                      "mkcol(%s): %s", path, strerror(ERRNO));
-      return;
-  }
-
-  body_len = conn->data_len - conn->request_len;
-  if(body_len > 0) {
-      send_http_error(conn, 415, "Unsupported media type",
-                      "mkcol(%s): %s", path, strerror(ERRNO));
-      return;
-  }
-
-  rc = sq_mkdir(path, 0755);
-
-  if (rc == 0) {
-    conn->status_code = 201;
-    sq_printf(conn, "HTTP/1.1 %d Created\r\n\r\n", conn->status_code);
-  } else if (rc == -1) {
-      if(errno == EEXIST)
-        send_http_error(conn, 405, "Method Not Allowed",
-                      "mkcol(%s): %s", path, strerror(ERRNO));
-      else if(errno == EACCES)
-          send_http_error(conn, 403, "Forbidden",
-                        "mkcol(%s): %s", path, strerror(ERRNO));
-      else if(errno == ENOENT)
-          send_http_error(conn, 409, "Conflict",
-                        "mkcol(%s): %s", path, strerror(ERRNO));
-      else
-          send_http_error(conn, 500, http_500_error,
-                          "fopen(%s): %s", path, strerror(ERRNO));
-  }
-}
-
 static void put_file(struct sq_connection *conn, const char *path) {
   struct file file = STRUCT_FILE_INITIALIZER;
   const char *range;
@@ -3259,74 +3219,14 @@ static void send_options(struct sq_connection *conn) {
 
   #ifdef ALLOW_UNSAFE_HTTP_METHODS
   sq_printf(conn, "%s", "HTTP/1.1 200 OK\r\n"
-            "Allow: GET, POST, HEAD, CONNECT, PUT, DELETE, OPTIONS, PROPFIND, MKCOL\r\n"
+            "Allow: GET, POST, HEAD, CONNECT, PUT, DELETE, OPTIONS\r\n"
             "DAV: 1\r\n"
             "Content-Length: 0\r\n\r\n");
   #else
     sq_printf(conn, "%s", "HTTP/1.1 200 OK\r\n"
-            "Allow: GET, POST, HEAD, OPTIONS, PROPFIND, MKCOL\r\n"
+            "Allow: GET, POST, HEAD, OPTIONS\r\n"
             "Content-Length: 0\r\n\r\n");
   #endif
-}
-
-// Writes PROPFIND properties for a collection element
-static void print_props(struct sq_connection *conn, const char* uri,
-                        struct file *filep) {
-  char mtime[64];
-  gmt_time_string(mtime, sizeof(mtime), &filep->modification_time);
-  conn->num_bytes_sent += sq_printf(conn,
-      "<d:response>"
-       "<d:href>%s</d:href>"
-       "<d:propstat>"
-        "<d:prop>"
-         "<d:resourcetype>%s</d:resourcetype>"
-         "<d:getcontentlength>%" INT64_FMT "</d:getcontentlength>"
-         "<d:getlastmodified>%s</d:getlastmodified>"
-        "</d:prop>"
-        "<d:status>HTTP/1.1 200 OK</d:status>"
-       "</d:propstat>"
-      "</d:response>\n",
-      uri,
-      filep->is_directory ? "<d:collection/>" : "",
-      filep->size,
-      mtime);
-}
-
-static void print_dav_dir_entry(struct de *de, void *data) {
-  char href[PATH_MAX];
-  char href_encoded[PATH_MAX];
-  struct sq_connection *conn = (struct sq_connection *) data;
-  sq_snprintf(conn, href, sizeof(href), "%s%s",
-              conn->request_info.uri, de->file_name);
-  sq_url_encode(href, href_encoded, PATH_MAX-1);
-  print_props(conn, href_encoded, &de->file);
-}
-
-static void handle_propfind(struct sq_connection *conn, const char *path,
-                            struct file *filep) {
-  const char *depth = sq_get_header(conn, "Depth");
-
-  conn->must_close = 1;
-  conn->status_code = 207;
-  sq_printf(conn, "HTTP/1.1 207 Multi-Status\r\n"
-            "Connection: close\r\n"
-            "Content-Type: text/xml; charset=utf-8\r\n\r\n");
-
-  conn->num_bytes_sent += sq_printf(conn,
-      "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
-      "<d:multistatus xmlns:d='DAV:'>\n");
-
-  // Print properties for the requested resource itself
-  print_props(conn, conn->request_info.uri, filep);
-
-  // If it is a directory, print directory entries too if Depth is not 0
-  if (filep->is_directory &&
-      !sq_strcasecmp(conn->ctx->config[ENABLE_DIRECTORY_LISTING], "yes") &&
-      (depth == NULL || strcmp(depth, "0") != 0)) {
-    scan_directory(conn, path, conn, &print_dav_dir_entry);
-  }
-
-  conn->num_bytes_sent += sq_printf(conn, "%s\n", "</d:multistatus>");
 }
 
 #if defined(USE_WEBSOCKET)
@@ -3852,8 +3752,7 @@ int sq_upload(struct sq_connection *conn, const char *destination_dir) {
 static int is_put_or_delete_request(const struct sq_connection *conn) {
   const char *s = conn->request_info.request_method;
   return s != NULL && (!strcmp(s, "PUT") ||
-                       !strcmp(s, "DELETE") ||
-                       !strcmp(s, "MKCOL"));
+                       !strcmp(s, "DELETE"));
 }
 
 static int get_first_ssl_listener_index(const struct sq_context *ctx) {
@@ -3927,8 +3826,6 @@ static void handle_request(struct sq_connection *conn) {
     send_authorization_request(conn);
   } else if (!strcmp(ri->request_method, "PUT")) {
     put_file(conn, path);
-  } else if (!strcmp(ri->request_method, "MKCOL")) {
-    mkcol(conn, path);
   } else if (!strcmp(ri->request_method, "DELETE")) {
       struct de de;
       memset(&de.file, 0, sizeof(de.file));
@@ -3957,8 +3854,6 @@ static void handle_request(struct sq_connection *conn) {
   } else if (file.is_directory && ri->uri[uri_len - 1] != '/') {
     sq_printf(conn, "HTTP/1.1 301 Moved Permanently\r\n"
               "Location: %s/\r\n\r\n", ri->uri);
-  } else if (!strcmp(ri->request_method, "PROPFIND")) {
-    handle_propfind(conn, path, &file);
   } else if (file.is_directory &&
              !substitute_index_file(conn, path, sizeof(path), &file)) {
     if (!sq_strcasecmp(conn->ctx->config[ENABLE_DIRECTORY_LISTING], "yes")) {
