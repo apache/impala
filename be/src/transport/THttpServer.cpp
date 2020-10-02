@@ -33,6 +33,8 @@
 
 #include "util/metrics.h"
 
+DECLARE_bool(trusted_domain_use_xff_header);
+
 namespace apache {
 namespace thrift {
 namespace transport {
@@ -41,10 +43,12 @@ using namespace std;
 using strings::Substitute;
 
 THttpServerTransportFactory::THttpServerTransportFactory(const std::string server_name,
-    impala::MetricGroup* metrics, bool has_ldap, bool has_kerberos, bool use_cookies)
+    impala::MetricGroup* metrics, bool has_ldap, bool has_kerberos, bool use_cookies,
+    bool check_trusted_domain)
   : has_ldap_(has_ldap),
     has_kerberos_(has_kerberos),
     use_cookies_(use_cookies),
+    check_trusted_domain_(check_trusted_domain),
     metrics_enabled_(metrics != nullptr) {
   if (metrics_enabled_) {
     if (has_ldap_) {
@@ -65,15 +69,21 @@ THttpServerTransportFactory::THttpServerTransportFactory(const std::string serve
       http_metrics_.total_cookie_auth_failure_ =
           metrics->AddCounter(Substitute("$0.total-cookie-auth-failure", server_name), 0);
     }
+    if (check_trusted_domain_) {
+      http_metrics_.total_trusted_domain_check_success_ = metrics->AddCounter(
+          Substitute("$0.total-trusted-domain-check-success", server_name), 0);
+    }
   }
 }
 
 THttpServer::THttpServer(boost::shared_ptr<TTransport> transport, bool has_ldap,
-    bool has_kerberos, bool use_cookies, bool metrics_enabled, HttpMetrics* http_metrics)
+    bool has_kerberos, bool use_cookies, bool check_trusted_domain, bool metrics_enabled,
+    HttpMetrics* http_metrics)
   : THttpTransport(transport),
     has_ldap_(has_ldap),
     has_kerberos_(has_kerberos),
     use_cookies_(use_cookies),
+    check_trusted_domain_(check_trusted_domain),
     metrics_enabled_(metrics_enabled),
     http_metrics_(http_metrics) {}
 
@@ -188,6 +198,23 @@ void THttpServer::headersDone() {
         if (metrics_enabled_) http_metrics_->total_cookie_auth_success_->Increment(1);
       } else if (metrics_enabled_) {
         http_metrics_->total_cookie_auth_failure_->Increment(1);
+      }
+    }
+  }
+
+  // Bypass auth for connections from trusted domains. Returns a cookie on the first
+  // successful auth attempt. This check is performed after checking for cookie to avoid
+  // subsequent reverse DNS lookups which can be unpredictably costly.
+  if (!authorized && check_trusted_domain_) {
+    string origin =
+        FLAGS_trusted_domain_use_xff_header ? origin_ : transport_->getOrigin();
+    StripWhiteSpace(&origin);
+    if (!origin.empty()) {
+      if (callbacks_.trusted_domain_check_fn(origin, auth_value_)) {
+        authorized = true;
+        if (metrics_enabled_) {
+          http_metrics_->total_trusted_domain_check_success_->Increment(1);
+        }
       }
     }
   }

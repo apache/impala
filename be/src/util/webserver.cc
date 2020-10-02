@@ -42,7 +42,7 @@
 #include "kudu/util/logging.h"
 #include "kudu/util/net/sockaddr.h"
 #include "rpc/authentication.h"
-#include "rpc/cookie-util.h"
+#include "rpc/authentication-util.h"
 #include "rpc/thrift-util.h"
 #include "runtime/exec-env.h"
 #include "service/impala-server.h"
@@ -138,6 +138,8 @@ DECLARE_bool(ldap_passwords_in_clear_ok);
 DECLARE_int64(max_cookie_lifetime_s);
 DECLARE_string(ssl_minimum_version);
 DECLARE_string(ssl_cipher_list);
+DECLARE_string(trusted_domain);
+DECLARE_bool(trusted_domain_use_xff_header);
 
 static const char* DOC_FOLDER = "/www/";
 static const int DOC_FOLDER_LEN = strlen(DOC_FOLDER);
@@ -269,7 +271,8 @@ Webserver::Webserver(const string& interface, const int port, MetricGroup* metri
     context_(nullptr),
     error_handler_(UrlHandler(
         bind<void>(&Webserver::ErrorHandler, this, _1, _2), "error.tmpl", false)),
-    use_cookies_(FLAGS_max_cookie_lifetime_s > 0) {
+    use_cookies_(FLAGS_max_cookie_lifetime_s > 0),
+    check_trusted_domain_(!FLAGS_trusted_domain.empty()) {
   http_address_ = MakeNetworkAddress(interface.empty() ? "0.0.0.0" : interface, port);
   Init();
 
@@ -290,6 +293,11 @@ Webserver::Webserver(const string& interface, const int port, MetricGroup* metri
         metrics->AddCounter("impala.webserver.total-cookie-auth-success", 0);
     total_cookie_auth_failure_ =
         metrics->AddCounter("impala.webserver.total-cookie-auth-failure", 0);
+  }
+  if (check_trusted_domain_
+      && (auth_mode_ == AuthMode::SPNEGO || auth_mode_ == AuthMode::LDAP)) {
+    total_trusted_domain_check_success_ =
+        metrics->AddCounter("impala.webserver.total-trusted-domain-check-success", 0);
   }
 }
 
@@ -597,6 +605,26 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
     }
   }
 
+  // Connections originating from trusted domains should not require authentication.
+  // Returns a cookie on the first successful auth attempt. This check is performed after
+  // checking for cookie to avoid subsequent reverse DNS lookups which can be
+  // unpredictably costly.
+  if (!authenticated && check_trusted_domain_) {
+    const char* xff_origin = sq_get_header(connection, "X-Forwarded-For");
+    string xff_origin_string = !xff_origin ? "" : string(xff_origin);
+    string origin = FLAGS_trusted_domain_use_xff_header ?
+        xff_origin_string :
+        GetRemoteAddress(request_info).ToString();
+    StripWhiteSpace(&origin);
+    if (!origin.empty()) {
+      if (TrustedDomainCheck(origin, connection, request_info)) {
+        total_trusted_domain_check_success_->Increment(1);
+        authenticated = true;
+        AddCookie(request_info, &response_headers);
+      }
+    }
+  }
+
   if (!authenticated) {
     if (auth_mode_ == AuthMode::SPNEGO) {
       sq_callback_result_t spnego_result =
@@ -764,6 +792,31 @@ sq_callback_result_t Webserver::HandleSpnego(struct sq_connection* connection,
   return SQ_CONTINUE_HANDLING;
 }
 
+bool Webserver::TrustedDomainCheck(const string& origin, struct sq_connection* connection,
+    struct sq_request_info* request_info) {
+  if (!IsTrustedDomain(origin, FLAGS_trusted_domain)) return false;
+  const char* authz_header = sq_get_header(connection, "Authorization");
+  if (!authz_header) {
+    LOG(ERROR) << "Passed TrustedDomainCheck but no Authorization header provided.";
+    return false;
+  }
+
+  string base64;
+  if (!TryStripPrefixString(authz_header, "Basic ", &base64)) {
+    LOG(ERROR) << "Passed TrustedDomainCheck but No Basic authentication provided.";
+    return false;
+  }
+  string username, password;
+  Status status = BasicAuthExtractCredentials(base64, username, password);
+  if (!status.ok()) {
+    LOG(ERROR) << "Error parsing basic authentication token from: "
+               << GetRemoteAddress(request_info).ToString() << " Error: " << status;
+    return false;
+  }
+  request_info->remote_user = strdup(username.c_str());
+  return true;
+}
+
 Status Webserver::HandleBasic(struct sq_connection* connection,
     struct sq_request_info* request_info, vector<string>* response_headers) {
   const char* authz_header = sq_get_header(connection, "Authorization");
@@ -775,18 +828,13 @@ Status Webserver::HandleBasic(struct sq_connection* connection,
   if (!TryStripPrefixString(authz_header, "Basic ", &base64)) {
     return Status::Expected("No Basic authentication provided.");
   }
-
-  string decoded;
-  if (!Base64Unescape(base64, &decoded)) {
-    return Status::Expected("Failed to decode base64 basic authentication token.");
+  string username, password;
+  Status status = BasicAuthExtractCredentials(base64, username, password);
+  if (!status.ok()) {
+    LOG(ERROR) << "Error parsing basic authentication token from: "
+               << GetRemoteAddress(request_info).ToString() << " Error: " << status;
+    return status;
   }
-
-  std::size_t colon = decoded.find(':');
-  if (colon == std::string::npos) {
-    return Status::Expected("Invalid basic authentication token format, missing ':'.");
-  }
-  string username = decoded.substr(0, colon);
-  string password = decoded.substr(colon + 1);
   if (ldap_->LdapCheckPass(username.c_str(), password.c_str(), password.length())
       && ldap_->LdapCheckFilters(username)) {
     request_info->remote_user = strdup(username.c_str());

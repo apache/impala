@@ -44,7 +44,7 @@
 #include "kudu/security/gssapi.h"
 #include "kudu/security/init.h"
 #include "rpc/auth-provider.h"
-#include "rpc/cookie-util.h"
+#include "rpc/authentication-util.h"
 #include "rpc/thrift-server.h"
 #include "runtime/exec-env.h"
 #include "transport/THttpServer.h"
@@ -104,6 +104,18 @@ DEFINE_string(internal_principals_whitelist, "hdfs", "(Advanced) Comma-separated
     " additional usernames authorized to access Impala's internal APIs. Defaults to "
     "'hdfs' which is the system user that in certain deployments must access "
     "catalog server APIs.");
+
+DEFINE_string(trusted_domain, "",
+    "If set, Impala will skip authentication for connections originating from this "
+    "domain. Currently, only connections over HTTP support this. Note: It still requires "
+    "the client to specify a username via the Basic Authorization header in the format "
+    "<username>:<password> where the password is not used and can be left blank.");
+
+DEFINE_bool(trusted_domain_use_xff_header, false,
+    "If set to true, this uses the 'X-Forwarded-For' HTML header to check for origin "
+    "while attempting to verify if the connection request originated from a trusted "
+    "domain. Only used if '--trusted_domain' is specified. Warning: Only use this if you "
+    "trust the incoming connection to have this set correctly.");
 
 namespace impala {
 
@@ -446,28 +458,40 @@ bool CookieAuth(ThriftServer::ConnectionContext* connection_context,
   return false;
 }
 
+bool TrustedDomainCheck(ThriftServer::ConnectionContext* connection_context,
+    const AuthenticationHash& hash, const std::string& origin, string auth_header) {
+  if (!IsTrustedDomain(origin, FLAGS_trusted_domain)) return false;
+  string stripped_basic_auth_token;
+  StripWhiteSpace(&auth_header);
+  bool got_basic_auth =
+      TryStripPrefixString(auth_header, "Basic ", &stripped_basic_auth_token);
+  string basic_auth_token = got_basic_auth ? move(stripped_basic_auth_token) : "";
+  string username, password;
+  Status status = BasicAuthExtractCredentials(basic_auth_token, username, password);
+  if (!status.ok()) {
+    LOG(ERROR) << "Error parsing basic authentication token from: "
+               << TNetworkAddressToString(connection_context->network_address)
+               << " Error: " << status;
+    return false;
+  }
+  connection_context->username = username;
+  // Create a cookie to return.
+  connection_context->return_headers.push_back(
+      Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
+  return true;
+}
+
 bool BasicAuth(ThriftServer::ConnectionContext* connection_context,
-    const AuthenticationHash& hash, const std::string& base64) {
-  if (base64.empty()) {
+    const AuthenticationHash& hash, const string& base64) {
+  string username, password;
+  Status status = BasicAuthExtractCredentials(base64, username, password);
+  if (!status.ok()) {
+    LOG(ERROR) << "Error parsing basic authentication token from: "
+               << TNetworkAddressToString(connection_context->network_address)
+               << " Error: " << status;
     connection_context->return_headers.push_back("WWW-Authenticate: Basic");
     return false;
   }
-  string decoded;
-  if (!Base64Unescape(base64, &decoded)) {
-    LOG(ERROR) << "Failed to decode base64 auth string from: "
-               << TNetworkAddressToString(connection_context->network_address);
-    connection_context->return_headers.push_back("WWW-Authenticate: Basic");
-    return false;
-  }
-  std::size_t colon = decoded.find(':');
-  if (colon == std::string::npos) {
-    LOG(ERROR) << "Auth string must be in the form '<username>:<password>' from: "
-               << TNetworkAddressToString(connection_context->network_address);
-    connection_context->return_headers.push_back("WWW-Authenticate: Basic");
-    return false;
-  }
-  string username = decoded.substr(0, colon);
-  string password = decoded.substr(colon + 1);
   bool ret = DoLdapCheck(username.c_str(), password.c_str(), password.length());
   if (ret) {
     // Authenication was successful, so set the username on the connection.
@@ -905,8 +929,9 @@ Status SecureAuthProvider::GetServerTransportFactory(
   if (underlying_transport_type == ThriftServer::HTTP) {
     bool has_kerberos = !principal_.empty();
     bool use_cookies = FLAGS_max_cookie_lifetime_s > 0;
-    factory->reset(new THttpServerTransportFactory(
-        server_name, metrics, has_ldap_, has_kerberos, use_cookies));
+    bool check_trusted_domain = !FLAGS_trusted_domain.empty();
+    factory->reset(new THttpServerTransportFactory(server_name, metrics, has_ldap_,
+        has_kerberos, use_cookies, check_trusted_domain));
     return Status::OK();
   }
 
@@ -1000,6 +1025,8 @@ void SecureAuthProvider::SetupConnectionContext(
       callbacks.return_headers_fn = std::bind(ReturnHeaders, connection_ptr.get());
       callbacks.cookie_auth_fn =
           std::bind(CookieAuth, connection_ptr.get(), hash_, std::placeholders::_1);
+      callbacks.trusted_domain_check_fn = std::bind(TrustedDomainCheck,
+          connection_ptr.get(), hash_, std::placeholders::_1, std::placeholders::_2);
       if (has_ldap_) {
         callbacks.basic_auth_fn =
             std::bind(BasicAuth, connection_ptr.get(), hash_, std::placeholders::_1);

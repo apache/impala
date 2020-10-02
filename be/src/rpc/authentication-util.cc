@@ -15,13 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "rpc/cookie-util.h"
+#include "rpc/authentication-util.h"
 
 #include <gutil/strings/escaping.h>
+#include <gutil/strings/util.h>
 #include <gutil/strings/split.h>
 #include <gutil/strings/strcat.h>
 #include <gutil/strings/strip.h>
 
+#include "kudu/util/net/sockaddr.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/string-parser.h"
@@ -163,6 +165,49 @@ string GenerateCookie(const string& username, const AuthenticationHash& hash) {
 
 string GetDeleteCookie() {
   return Substitute("$0=;HttpOnly;Max-Age=0", COOKIE_NAME);
+}
+
+bool IsTrustedDomain(const std::string& origin, const std::string& trusted_domain) {
+  if (trusted_domain.empty()) return false;
+  vector<string> split = Split(origin, delimiter::Limit(",", 1));
+  if (split.empty()) return false;
+  kudu::Sockaddr sock_addr;
+  kudu::Status s = sock_addr.ParseString(split[0], 0);
+  string host_name;
+  if (!s.ok()) {
+    VLOG(2) << "Origin address did not parse as a valid IP address. Assuming it to be a "
+               "domain name. Reason: " << s.ToString();
+    // Remove port if its a part of the origin.
+    vector<string> host_n_port = Split(split[0], delimiter::Limit(":", 1));
+    host_name = host_n_port[0];
+  } else {
+    s = sock_addr.LookupHostname(&host_name);
+    if (!s.ok()) {
+      LOG(ERROR) << "DNS reverse-lookup failed for " << split[0]
+                 << " Error: " << s.ToString();
+      return false;
+    }
+  }
+  return HasSuffixString(host_name, trusted_domain);
+}
+
+Status BasicAuthExtractCredentials(
+    const string& token, string& username, string& password) {
+  if (token.empty()) {
+    return Status::Expected("Empty token");
+  }
+  string decoded;
+  if (!Base64Unescape(token, &decoded)) {
+    return Status::Expected("Failed to decode base64 basic authentication token.");
+  }
+  std::size_t colon = decoded.find(':');
+  if (colon == std::string::npos) {
+    return Status::Expected("Invalid basic authentication token format, must be in the "
+                            "form '<username>:<password>'");
+  }
+  username = decoded.substr(0, colon);
+  password = decoded.substr(colon + 1);
+  return Status::OK();
 }
 
 } // namespace impala

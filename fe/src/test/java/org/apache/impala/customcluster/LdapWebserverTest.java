@@ -21,9 +21,10 @@ import static org.apache.impala.testutil.LdapUtil.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,7 +38,6 @@ import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.impala.util.Metrics;
 import org.apache.log4j.Logger;
 import org.junit.After;
-import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 
@@ -95,6 +95,13 @@ public class LdapWebserverTest {
         (long) metrics_.getMetric("impala.webserver.total-cookie-auth-failure");
     assertTrue("Expected: " + expectedCookieFailure + ", Actual: " + actualCookieFailure,
         expectedCookieFailure.contains(actualCookieFailure));
+  }
+
+  private void verifyTrustedDomainMetrics(Range<Long> expectedSuccess) throws Exception {
+    long actualSuccess = (long) metrics_
+        .getMetric("impala.webserver.total-trusted-domain-check-success");
+    assertTrue("Expected: " + expectedSuccess + ", Actual: " + actualSuccess,
+        expectedSuccess.contains(actualSuccess));
   }
 
   @Test
@@ -193,5 +200,62 @@ public class LdapWebserverTest {
       result = noUsernameMetrics.readContent(endpoint);
       assertTrue(result, result.contains("No URI handler for"));
     }
+  }
+
+  @Test
+  public void testWebserverTrustedDomain() throws Exception {
+    setUp("--trusted_domain=localhost --trusted_domain_use_xff_header=true", "");
+
+    // Case 1: Authenticate as 'Test1Ldap' with the right password '12345'
+    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", "127.0.0.1");
+    verifyTrustedDomainMetrics(Range.closed(1L, 1L));
+
+    // Case 2: Authenticate as 'Test1Ldap' without password
+    attemptConnection("Basic VGVzdDFMZGFwOg==", "127.0.0.1");
+    verifyTrustedDomainMetrics(Range.closed(2L, 2L));
+
+    // Case 3: Authenticate as 'Test1Ldap' with the right password
+    // '12345' but with a non trusted address in X-Forwarded-For header
+    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", "127.0.23.1");
+    verifyTrustedDomainMetrics(Range.closed(2L, 2L));
+
+    // Case 4: No auth header, does not work
+    try {
+      attemptConnection(null, "127.0.0.1");
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Server returned HTTP response code: 401"));
+    }
+    verifyTrustedDomainMetrics(Range.closed(2L, 2L));
+
+    // Case 5: Authenticate as 'Test1Ldap' with the no password
+    // and a non trusted address in X-Forwarded-For header
+    try {
+      attemptConnection("Basic VGVzdDFMZGFwOg==", "127.0.23.1");
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Server returned HTTP response code: 401"));
+    }
+    verifyTrustedDomainMetrics(Range.closed(2L, 2L));
+
+    // Case 6: Verify that there are no changes in metrics for trusted domain
+    // check if the X-Forwarded-For header is not present
+    long successMetricBefore = (long) metrics_
+        .getMetric("impala.webserver.total-trusted-domain-check-success");
+    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", null);
+    verifyTrustedDomainMetrics(Range.closed(successMetricBefore, successMetricBefore));
+  }
+
+  // Helper method to make a get call to the webserver using the input basic
+  // auth token and x-forward-for token.
+  private void attemptConnection(String basic_auth_token, String xff_address)
+      throws Exception {
+    String url = "http://localhost:25000/?json";
+    URLConnection connection = new URL(url).openConnection();
+    if (basic_auth_token != null) {
+      connection.setRequestProperty("Authorization", basic_auth_token);
+    }
+    if (xff_address != null) {
+      connection.setRequestProperty("X-Forwarded-For", xff_address);
+    }
+    connection.getInputStream();
   }
 }

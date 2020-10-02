@@ -42,6 +42,10 @@ struct HttpMetrics {
   // auth attempts.
   impala::IntCounter* total_cookie_auth_success_ = nullptr;
   impala::IntCounter* total_cookie_auth_failure_ = nullptr;
+
+  // If 'check_trusted_domain_' is true, metrics for the number of successful
+  // attempts to authorize connections originating from a trusted domain.
+  impala::IntCounter* total_trusted_domain_check_success_ = nullptr;
 };
 
 /*
@@ -77,10 +81,18 @@ public:
     // authentication is successful.
     std::function<bool(const std::string&)> cookie_auth_fn =
         [&](const std::string&) { return false; };
+
+    // Function that takes the connection's origin ip/hostname, and 'Authorization: Basic'
+    // header respectively and returns true if it determines that the connection
+    // originated from a trusted domain and if the basic auth header contains a valid
+    // username.
+    std::function<bool(const std::string&, std::string)> trusted_domain_check_fn =
+        [&](const std::string&, std::string) { return false; };
   };
 
   THttpServer(boost::shared_ptr<TTransport> transport, bool has_ldap, bool has_kerberos,
-      bool use_cookies, bool metrics_enabled, HttpMetrics* http_metrics);
+      bool use_cookies, bool check_trusted_domain, bool metrics_enabled,
+      HttpMetrics* http_metrics);
 
   virtual ~THttpServer();
 
@@ -117,6 +129,10 @@ protected:
   // The value from the 'Cookie' header.
   std::string cookie_value_ = "";
 
+  // If true, checks whether an incoming connection can skip auth if it originates from a
+  // trusted domain.
+  bool check_trusted_domain_ = false;
+
   bool metrics_enabled_ = false;
   HttpMetrics* http_metrics_ = nullptr;
 };
@@ -129,19 +145,20 @@ public:
  THttpServerTransportFactory() {}
 
  THttpServerTransportFactory(const std::string server_name, impala::MetricGroup* metrics,
-     bool has_ldap, bool has_kerberos, bool use_cookies);
+     bool has_ldap, bool has_kerberos, bool use_cookies, bool check_trusted_domain);
 
  virtual ~THttpServerTransportFactory() {}
 
  virtual boost::shared_ptr<TTransport> getTransport(boost::shared_ptr<TTransport> trans) {
-   return boost::shared_ptr<TTransport>(new THttpServer(
-       trans, has_ldap_, has_kerberos_, use_cookies_, metrics_enabled_, &http_metrics_));
+   return boost::shared_ptr<TTransport>(new THttpServer(trans, has_ldap_, has_kerberos_,
+       use_cookies_, check_trusted_domain_, metrics_enabled_, &http_metrics_));
   }
 
  private:
   bool has_ldap_ = false;
   bool has_kerberos_ = false;
   bool use_cookies_ = false;
+  bool check_trusted_domain_ = false;
 
   // Metrics for every transport produced by this factory.
   bool metrics_enabled_ = false;
