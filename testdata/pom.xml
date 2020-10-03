@@ -44,24 +44,10 @@ under the License.
       <version>2.3</version>
     </dependency>
 
-    <!-- Force javax-el dependency -->
-    <dependency>
-      <groupId>org.glassfish</groupId>
-      <artifactId>javax.el</artifactId>
-      <version>3.0.1-b06</version>
-    </dependency>
-
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
       <version>${guava.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>${junit.version}</version>
-      <scope>test</scope>
     </dependency>
 
     <dependency>
@@ -74,74 +60,24 @@ under the License.
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
         </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-client</artifactId>
-      <version>${hbase.version}</version>
-      <exclusions>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
         <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-server</artifactId>
-      <version>${hbase.version}</version>
-      <exclusions>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
-        <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.glassfish</groupId>
-          <artifactId>javax.el</artifactId>
+          <!-- IMPALA-9468: Avoid pulling in netty for security reasons -->
+          <groupId>io.netty</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-common</artifactId>
-      <version>${hbase.version}</version>
-      <exclusions>
-        <!-- https://issues.apache.org/jira/browse/HADOOP-14903 -->
         <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-server</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>jersey-servlet</artifactId>
         </exclusion>
       </exclusions>
-    </dependency>
-
-   <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-protocol</artifactId>
-      <version>${hbase.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.cloudera.htrace</groupId>
-      <artifactId>htrace-core</artifactId>
-      <version>2.00</version>
-    </dependency>
-
-    <dependency>
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
-      <version>${commons-io.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>commons-logging</groupId>
-      <artifactId>commons-logging</artifactId>
-      <version>1.1.1</version>
     </dependency>
 
     <dependency>
@@ -166,6 +102,16 @@ under the License.
       <groupId>org.kitesdk</groupId>
       <artifactId>kite-data-core</artifactId>
       <version>${kite.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.avro</groupId>
+          <artifactId>avro</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.twitter</groupId>
+          <artifactId>parquet-avro</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
 

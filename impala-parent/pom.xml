@@ -151,14 +151,6 @@ under the License.
       <url>https://repository.cloudera.com/content/groups/cdh-releases-rcs</url>
       <name>CDH Releases Repository</name>
       <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
-    <repository>
-      <id>cdh.releases.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/releases</url>
-      <name>CDH Releases Repository</name>
-      <snapshots>
         <enabled>false</enabled>
       </snapshots>
     </repository>
@@ -172,18 +164,6 @@ under the License.
       <name>Impala CDP Repository</name>
       <snapshots>
         <enabled>false</enabled>
-      </snapshots>
-    </repository>
-    <repository>
-      <!--
-      The Maven repository for the CDH build identified by CDH_BUILD_NUMBER.
-      CDH uses maven SNAPSHOT versions for non-released versions of components.
-      -->
-      <id>impala.cdh.repo</id>
-      <url>${env.CDH_MAVEN_REPOSITORY}</url>
-      <name>Impala CDH Repository</name>
-      <snapshots>
-        <enabled>true</enabled>
       </snapshots>
     </repository>
     <repository>
@@ -208,10 +188,11 @@ under the License.
     <repository>
       <!--
       HWX Nexus is disabled. This is a tombstone to list out why:
-      1. Snapshots are disabled because HWX Nexus contains snapshots of CDH artifacts
-      that can conflict with the artifacts in the maven repository associated with
-      the CDH_BUILD_NUMBER. Maven can end up downloading a mix of artifacts that are
-      mutually incompatible. Snapshots are not necessary at this time.
+      1. Snapshots are disabled because HWX Nexus contains snapshots of artifacts
+      that can conflict with the artifacts in any of the other repositories with
+      SNAPSHOT versions. We don't want any conflicting sources for SNAPSHOT versions,
+      so it is better to keep this disabled. In the past, this was a particular
+      problem for CDH Hadoop components that used SNAPSHOT versions.
       2.  In a previous change, we depended on the hadoop-cloud-storage artifact from
       the impala.cdp.repo. This had the odd property that it referenced versions of
       artifacts that were not in the impala.cdp.repo. For example, artifact A at
