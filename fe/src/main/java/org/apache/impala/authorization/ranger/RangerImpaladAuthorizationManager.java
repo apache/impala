@@ -17,14 +17,16 @@
 
 package org.apache.impala.authorization.ranger;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.InternalException;
 import org.apache.impala.common.UnsupportedFeatureException;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TColumn;
@@ -50,7 +52,9 @@ import org.apache.ranger.plugin.policyengine.RangerAccessResourceImpl;
 import org.apache.ranger.plugin.policyengine.RangerPolicyEngine;
 import org.apache.ranger.plugin.policyengine.RangerResourceACLs;
 import org.apache.ranger.plugin.policyengine.RangerResourceACLs.AccessResult;
-import org.apache.ranger.plugin.service.RangerAuthContext;
+import org.apache.ranger.plugin.model.RangerRole;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -73,6 +77,8 @@ import java.util.stream.Collectors;
  * Operations not supported by Ranger will throw an {@link UnsupportedFeatureException}.
  */
 public class RangerImpaladAuthorizationManager implements AuthorizationManager {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      RangerImpaladAuthorizationManager.class);
   private static final String ANY = "*";
 
   private final Supplier<RangerImpalaPlugin> plugin_;
@@ -95,15 +101,62 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }
 
+  /**
+   * This method will be called for the statements of 1) SHOW ROLES,
+   * 2) SHOW CURRENT ROLES, or 3) SHOW ROLE GRANT GROUP <group_name>.
+   */
   @Override
   public TShowRolesResult getRoles(TShowRolesParams params) throws ImpalaException {
-    if (params.getGrant_group() != null) {
-      throw new UnsupportedFeatureException(
-          "SHOW ROLE GRANT GROUP is not supported by Ranger.");
+    try {
+      TShowRolesResult result = new TShowRolesResult();
+      Set<String> groups = RangerUtil.getGroups(params.getRequesting_user());
+
+      boolean adminOp =
+          !(groups.contains(params.getGrant_group()) || params.is_show_current_roles);
+
+      if (adminOp) {
+        RangerUtil.validateRangerAdmin(plugin_.get(), params.getRequesting_user());
+      }
+
+      // The branch for SHOW CURRENT ROLES and SHOW ROLE GRANT GROUP.
+      Set<String> roleNames;
+      if (params.isIs_show_current_roles() || params.isSetGrant_group()) {
+        Set<String> groupNames;
+        if (params.isIs_show_current_roles()) {
+          groupNames = groups;
+        } else {
+          Preconditions.checkState(params.isSetGrant_group());
+          groupNames = Sets.newHashSet(params.getGrant_group());
+        }
+        roleNames = plugin_.get().getRolesFromUserAndGroups(null, groupNames);
+      } else {
+        // The branch for SHOW ROLES.
+        Preconditions.checkState(!params.isIs_show_current_roles());
+        Set<RangerRole> roles = plugin_.get().getRoles().getRangerRoles();
+        roleNames = roles.stream().map(RangerRole::getName).collect(Collectors.toSet());
+      }
+
+      // Need to instantiate the field of 'role_names' in 'result' since its field of
+      // 'role_names' was initialized as null by default.
+      result.setRole_names(Lists.newArrayList(roleNames));
+      Collections.sort(result.getRole_names());
+      return result;
+    } catch (Exception e) {
+      if (params.is_show_current_roles) {
+        LOG.error("Error executing SHOW CURRENT ROLES.", e);
+        throw new InternalException("Error executing SHOW CURRENT ROLES."
+            + " Ranger error message: " + e.getMessage());
+      } else if (params.isSetGrant_group()) {
+        LOG.error("Error executing SHOW ROLE GRANT GROUP " + params.getGrant_group() +
+            ".");
+        throw new InternalException("Error executing SHOW ROLE GRANT GROUP "
+            + params.getGrant_group() + ". Ranger error message: " + e.getMessage());
+      } else {
+        LOG.error("Error executing SHOW ROLES.");
+        throw new InternalException("Error executing SHOW ROLES."
+            + " Ranger error message: " + e.getMessage());
+      }
     }
-    throw new UnsupportedFeatureException(
-        String.format("SHOW %sROLES is not supported by Ranger.",
-            params.is_show_current_roles ? "CURRENT " : ""));
   }
 
   @Override
@@ -162,11 +215,6 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
         "%s is not supported in Impalad", ClassUtil.getMethodName()));
   }
 
-  private static Set<String> getGroups(String principal) {
-    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(principal);
-    return Sets.newHashSet(ugi.getGroupNames());
-  }
-
   private static Optional<String> getResourceName(String resourceType,
       String resourceName, AccessResult accessResult) {
     RangerPolicy.RangerPolicyResource rangerPolicyResource =
@@ -193,6 +241,11 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
           break;
         case GROUP:
           if (item.getGroups().contains(principal)) {
+            return item.getDelegateAdmin();
+          }
+          break;
+        case ROLE:
+          if (item.getRoles().contains(principal)) {
             return item.getDelegateAdmin();
           }
           break;
@@ -286,11 +339,6 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
   @Override
   public TResultSet getPrivileges(TShowGrantPrincipalParams params)
       throws ImpalaException {
-    if (params.principal_type == TPrincipalType.ROLE) {
-      throw new UnsupportedFeatureException(
-          "SHOW GRANT ROLE is not supported by Ranger.");
-    }
-
     List<RangerAccessRequest> requests = buildAccessRequests(params.privilege);
     Set<TResultRow> resultSet = new TreeSet<>();
     TResultSet result = new TResultSet();
@@ -307,7 +355,7 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
           resultRows = new ArrayList<>(aclToPrivilege(
               acls.getUserACLs().getOrDefault(params.name, Collections.emptyMap()),
               params.name, params.privilege, TPrincipalType.USER));
-          for (String group : getGroups(params.name)) {
+          for (String group : RangerUtil.getGroups(params.name)) {
             resultRows.addAll(aclToPrivilege(
                 acls.getGroupACLs().getOrDefault(group, Collections.emptyMap()),
                 params.name, params.privilege, TPrincipalType.GROUP));
@@ -317,6 +365,11 @@ public class RangerImpaladAuthorizationManager implements AuthorizationManager {
           resultRows = new ArrayList<>(aclToPrivilege(
               acls.getGroupACLs().getOrDefault(params.name, Collections.emptyMap()),
               params.name, params.privilege, TPrincipalType.GROUP));
+          break;
+        case ROLE:
+          resultRows = new ArrayList<>(aclToPrivilege(
+              acls.getRoleACLs().getOrDefault(params.name, Collections.emptyMap()),
+              params.name, params.privilege, TPrincipalType.ROLE));
           break;
         default:
           throw new UnsupportedOperationException(String.format("Unsupported principal " +

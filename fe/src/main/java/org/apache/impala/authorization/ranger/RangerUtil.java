@@ -17,10 +17,15 @@
 
 package org.apache.impala.authorization.ranger;
 
+import com.google.common.collect.Sets;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.impala.common.RuntimeEnv;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TPrivilege;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Collection of static functions to support Apache Ranger implementation
@@ -69,5 +74,37 @@ public class RangerUtil {
 
   private static String getOrAll(String resource) {
     return (resource == null) ? "*" : resource;
+  }
+
+  /**
+   * This method returns the groups that 'user' belongs to. By starting impalad and
+   * catalogd with the argument of "use_customized_user_groups_mapper_for_ranger",
+   * the customized user-to-groups mapper would be provided, which is useful in the
+   * testing environment.
+   */
+  public static Set<String> getGroups(String user) {
+    UserGroupInformation ugi;
+    if (RuntimeEnv.INSTANCE.isTestEnv() ||
+        BackendConfig.INSTANCE.useCustomizedUserGroupsMapperForRanger()) {
+      ugi = UserGroupInformation.createUserForTesting(user,
+          new String[]{user});
+    } else {
+      ugi = UserGroupInformation.createRemoteUser(user);
+    }
+    return Sets.newHashSet(ugi.getGroupNames());
+  }
+
+  /**
+   * For now there is no dedicated REST API that allows Impala to determine whether
+   * 'user' is a Ranger administrator. In this regard, we call
+   * RangerBasePlugin#getAllRoles(), whose server side method,
+   * RoleREST#getAllRoleNames(), will call RoleREST#ensureAdminAccess() on 'user' to make
+   * sure 'user' is a Ranger administrator. An Exception will be thrown if it is not the
+   * case.
+   * RANGER-3127 has been created to keep track of the issue.
+   */
+  public static void validateRangerAdmin(RangerImpalaPlugin plugin, String user)
+      throws Exception {
+    plugin.getAllRoles(user, null);
   }
 }
