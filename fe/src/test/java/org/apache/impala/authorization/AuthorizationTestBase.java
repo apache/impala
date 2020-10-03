@@ -204,7 +204,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
           // to whether or not we test the query with the requesting user that is the
           // owner of the resource.
           getName(),
-          Collections.emptyList(),
+          Collections.emptyList(), Collections.emptyList(),
           rangerImpalaPlugin_.getClusterName(), "127.0.0.1", privileges);
     }
   }
@@ -217,7 +217,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
           // We provide the name of the grantee, which is a group in this case, according
           // to whether or not we test the query with the requesting user that is the
           // owner of the resource.
-          (as_owner_ ? OWNER_GROUPS : GROUPS),
+          (as_owner_ ? OWNER_GROUPS : GROUPS), Collections.emptyList(),
           // groups,
           rangerImpalaPlugin_.getClusterName(), "127.0.0.1", privileges);
     }

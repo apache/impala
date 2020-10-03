@@ -115,6 +115,7 @@ class TestRanger(CustomClusterTestSuite):
           admin_client.execute("drop database if exists {0} cascade"
                                .format(unique_database), user=ADMIN)
 
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_grant_option(self, unique_name):
@@ -182,6 +183,7 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute("drop database if exists {0} cascade".format(unique_database),
                            user=ADMIN)
 
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_show_grant(self, unique_name):
@@ -468,7 +470,7 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute("revoke all on table {0}.{1} from {2} {3}"
                            .format(unique_database, unique_table, kw, id))
 
-
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_grant_revoke_ranger_api(self, unique_name):
@@ -529,6 +531,13 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute("drop database if exists {0} cascade".format(unique_db),
                            user=ADMIN)
 
+  # TODO(IMPALA-10399, IMPALA-10401): We found that if this test is run after
+  # test_grant_revoke_with_role() in the exhaustive tests, the test could fail due to an
+  # empty list returned from the first call to _get_ranger_privileges_db() although a
+  # list consisting of "lock" and "select" is expected. We suspect there might be
+  # something wrong with the underlying Ranger API but it requires more thorough
+  # investigation.
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_show_grant_hive_privilege(self, unique_name):
@@ -726,27 +735,20 @@ class TestRanger(CustomClusterTestSuite):
           impala_client, query, user=username, query_options={'sync_ddl': 1})
     return self.execute_query_expect_failure(impala_client, query, user=username)
 
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_unsupported_sql(self):
     """Tests unsupported SQL statements when running with Ranger."""
     user = "admin"
     impala_client = self.create_impala_client()
-    error_msg = "UnsupportedFeatureException: {0} is not supported by Ranger."
-    for statement in [("show roles", error_msg.format("SHOW ROLES")),
-                      ("show current roles", error_msg.format("SHOW CURRENT ROLES")),
-                      ("create role foo", error_msg.format("CREATE ROLE")),
-                      ("drop role foo", error_msg.format("DROP ROLE")),
-                      ("grant select on database functional to role foo",
-                       error_msg.format("GRANT <privilege> TO ROLE")),
-                      ("revoke select on database functional from role foo",
-                       error_msg.format("REVOKE <privilege> FROM ROLE")),
-                      ("show grant role foo", error_msg.format("SHOW GRANT ROLE")),
-                      ("show role grant group foo",
-                       error_msg.format("SHOW ROLE GRANT GROUP"))]:
-      result = self.execute_query_expect_failure(impala_client, statement[0], user=user)
-      assert statement[1] in str(result)
+    error_msg = "UnsupportedOperationException: SHOW GRANT is not supported without a " \
+        "defined resource in Ranger."
+    statement = "show grant role foo"
+    result = self.execute_query_expect_failure(impala_client, statement, user=user)
+    assert error_msg in str(result)
 
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_grant_revoke_invalid_principal(self):
@@ -801,11 +803,13 @@ class TestRanger(CustomClusterTestSuite):
         assert "Error revoking a privilege in Ranger. Ranger error message: " \
                "HTTP 403 Error: Grantee group invalid_group doesn't exist" in str(result)
 
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_legacy_catalog_ownership(self):
       self._test_ownership()
 
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=LOCAL_CATALOG_IMPALAD_ARGS,
     catalogd_args=LOCAL_CATALOG_CATALOGD_ARGS)
   def test_local_catalog_ownership(self):
@@ -815,6 +819,7 @@ class TestRanger(CustomClusterTestSuite):
       pytest.xfail("getTableIfCached() faulty behavior, known issue")
       self._test_ownership()
 
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_show_functions(self, unique_name):
@@ -916,6 +921,7 @@ class TestRanger(CustomClusterTestSuite):
     finally:
       self._run_query_as_user("drop database {0} cascade".format(test_db), ADMIN, True)
 
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_column_masking(self, vector, unique_name):
@@ -988,6 +994,7 @@ class TestRanger(CustomClusterTestSuite):
       for i in range(policy_cnt):
         TestRanger._remove_column_masking_policy(unique_name + str(i))
 
+  @pytest.mark.execute_serially
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -1011,6 +1018,87 @@ class TestRanger(CustomClusterTestSuite):
       check_call([script])
       TestRanger._remove_column_masking_policy("col_mask_for_hive")
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    # We additionally provide impalad and catalogd with the customized user-to-groups
+    # mapper since some test cases in grant_revoke.test require Impala to retrieve the
+    # groups a given user belongs to and such users might not exist in the underlying
+    # OS in the testing environment, e.g., the user 'non_owner'.
+    impalad_args="{0} {1}".format(IMPALAD_ARGS,
+                                  "--use_customized_user_groups_mapper_for_ranger"),
+    catalogd_args="{0} {1}".format(CATALOGD_ARGS,
+                                   "--use_customized_user_groups_mapper_for_ranger"))
+  def test_grant_revoke_with_role(self, vector):
+    """Test grant/revoke with role."""
+    admin_client = self.create_impala_client()
+    try:
+      self.run_test_case('QueryTest/grant_revoke', vector, use_db="default")
+    finally:
+      # Below are the statements that need to be executed in order to clean up the
+      # privileges granted to the test roles as well as the test roles themselves.
+      # Note that we need to revoke those previously granted privileges so that each role
+      # is not referenced by any policy before we delete those roles.
+      # Moreover, we need to revoke the privilege on the database 'grant_rev_db' before
+      # dropping 'grant_rev_db'. Otherwise, the revocation would fail due to an
+      # AnalysisException thrown because 'grant_rev_db' does not exist.
+      cleanup_statements = [
+        "revoke all on database grant_rev_db from grant_revoke_test_ALL_TEST_DB",
+        "revoke all on server from grant_revoke_test_ALL_SERVER",
+        "revoke all on table functional.alltypes from grant_revoke_test_NON_OWNER",
+        "revoke grant option for all on database functional "
+        "from grant_revoke_test_NON_OWNER",
+        "REVOKE SELECT (a, b, c, d, e, x, y) ON TABLE grant_rev_db.test_tbl3 "
+        "FROM grant_revoke_test_ALL_SERVER",
+        "REVOKE ALL ON DATABASE functional FROM grant_revoke_test_NON_OWNER",
+        "REVOKE SELECT ON TABLE grant_rev_db.test_tbl3 FROM grant_revoke_test_NON_OWNER",
+        "REVOKE GRANT OPTION FOR SELECT (a, c) ON TABLE grant_rev_db.test_tbl3 "
+        "FROM grant_revoke_test_ALL_SERVER",
+        "REVOKE SELECT ON TABLE grant_rev_db.test_tbl1 "
+        "FROM grant_revoke_test_SELECT_INSERT_TEST_TBL",
+        "REVOKE INSERT ON TABLE grant_rev_db.test_tbl1 "
+        "FROM grant_revoke_test_SELECT_INSERT_TEST_TBL",
+        "REVOKE SELECT ON TABLE grant_rev_db.test_tbl3 "
+        "FROM grant_revoke_test_NON_OWNER",
+        "REVOKE SELECT (a) ON TABLE grant_rev_db.test_tbl3 "
+        "FROM grant_revoke_test_NON_OWNER",
+        "REVOKE SELECT (a, c, e) ON TABLE grant_rev_db.test_tbl3 "
+        "FROM grant_revoke_test_ALL_SERVER",
+        "revoke all on server server1 from grant_revoke_test_ALL_SERVER1",
+        "revoke select(col1) on table grant_rev_db.test_tbl4 "
+        "from role grant_revoke_test_COLUMN_PRIV",
+        "{0}{1}{2}".format("revoke all on uri '",
+                           os.getenv("FILESYSTEM_PREFIX"),
+                           "/test-warehouse/grant_rev_test_tbl2'"
+                           "from grant_revoke_test_ALL_URI"),
+        "{0}{1}{2}".format("revoke all on uri '",
+                           os.getenv("FILESYSTEM_PREFIX"),
+                           "/test-warehouse/GRANT_REV_TEST_TBL3'"
+                           "from grant_revoke_test_ALL_URI"),
+        "{0}{1}{2}".format("revoke all on uri '",
+                           os.getenv("FILESYSTEM_PREFIX"),
+                           "/test-warehouse/grant_rev_test_prt'"
+                           "from grant_revoke_test_ALL_URI"),
+        "drop role grant_revoke_test_ALL_TEST_DB",
+        "drop role grant_revoke_test_ALL_SERVER",
+        "drop role grant_revoke_test_SELECT_INSERT_TEST_TBL",
+        "drop role grant_revoke_test_ALL_URI",
+        "drop role grant_revoke_test_NON_OWNER",
+        "drop role grant_revoke_test_ALL_SERVER1",
+        "drop role grant_revoke_test_COLUMN_PRIV",
+        "drop database grant_rev_db cascade"
+      ]
+
+      for statement in cleanup_statements:
+        try:
+          admin_client.execute(statement, user=ADMIN)
+        except Exception:
+          # There could be an exception thrown due to the non-existence of the role or
+          # resource involved in a statement that aims to revoke the privilege on a
+          # resource from a role, but we do not have to handle such an exception. We only
+          # need to make sure in the case when the role and the corresponding resource
+          # exist, the granted privilege is revoked. The same applies to the case when we
+          # drop a role.
+          pass
 
 class TestRangerColumnMaskingTpchNested(CustomClusterTestSuite):
   """
@@ -1028,6 +1116,7 @@ class TestRangerColumnMaskingTpchNested(CustomClusterTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
 
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
     impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
   def test_tpch_nested_column_masking(self, vector):

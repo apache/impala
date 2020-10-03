@@ -235,6 +235,23 @@ cp -f "${RANGER_TEST_CONF_DIR}/ranger-admin-env-logdir.sh" "${RANGER_SERVER_CONF
 cp -f "${RANGER_TEST_CONF_DIR}/ranger-admin-env-piddir.sh" "${RANGER_SERVER_CONF_DIR}"
 cp -f "${RANGER_SERVER_CONFDIST_DIR}/security-applicationContext.xml" \
     "${RANGER_SERVER_CONF_DIR}"
+
+# Prepend the following 5 URL's to the line starting with "<intercept-url pattern="/**"".
+# Before the end-to-end tests could be performed in a Kerberized environment
+# automatically, we need to allow the requests for the following links so that the
+# statements like CREATE/DROP ROLE <role_name>,
+# GRANT/REVOKE ROLE <role_name> TO/FROM GROUP <group_name>, and SHOW ROLES could work in a
+# non-Kerberized environment. It is better to add the allowed links using sed than to use
+# a hardcoded configuration file consisting of those links since some other configurations
+# could change after CDP_BUILD_NUMBER is bumped up, e.g., the version of jquery.
+sed -i '/<intercept-url pattern="\/\*\*"/i \
+    <intercept-url pattern="/service/public/v2/api/roles/*" access="permitAll"/> \
+    <intercept-url pattern="/service/public/v2/api/roles/name/*" access="permitAll"/> \
+    <intercept-url pattern="/service/public/v2/api/roles/grant/*" access="permitAll"/> \
+    <intercept-url pattern="/service/public/v2/api/roles/revoke/*" access="permitAll"/> \
+    <intercept-url pattern="/service/public/v2/api/roles/names/*" access="permitAll"/>' \
+"${RANGER_SERVER_CONF_DIR}/security-applicationContext.xml"
+
 if [[ -f "${POSTGRES_JDBC_DRIVER}" ]]; then
   cp -f "${POSTGRES_JDBC_DRIVER}" "${RANGER_SERVER_LIB_DIR}"
 else
