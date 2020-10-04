@@ -911,7 +911,7 @@ public class MetastoreEventsProcessorTest {
       }
       List<String> filesCopied = new ArrayList<>();
       RemoteIterator<? extends FileStatus> it = FileSystemUtil
-          .listStatus(srcFs, src, true);
+          .listStatus(srcFs, src, true, null);
       while (it.hasNext()) {
         FileStatus status = it.next();
         if (status.isDirectory()) continue;

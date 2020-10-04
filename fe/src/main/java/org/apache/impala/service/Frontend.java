@@ -667,11 +667,21 @@ public class Frontend {
           clientRequest.getRedacted_stmt() : clientRequest.getStmt());
       ddl.getDdl_params().setHeader(header);
       ddl.getDdl_params().setSync_ddl(ddl.isSync_ddl());
+      // forward debug_actions to the catalogd
+      if (result.getQuery_options().isSetDebug_action()) {
+        ddl.getDdl_params()
+            .setDebug_action(result.getQuery_options().getDebug_action());
+      }
     }
     if (ddl.getOp_type() == TCatalogOpType.RESET_METADATA) {
       ddl.getReset_metadata_params().setSync_ddl(ddl.isSync_ddl());
       ddl.getReset_metadata_params().setRefresh_updated_hms_partitions(
           result.getQuery_options().isRefresh_updated_hms_partitions());
+      // forward debug_actions to the catalogd
+      if (result.getQuery_options().isSetDebug_action()) {
+        ddl.getReset_metadata_params()
+            .setDebug_action(result.getQuery_options().getDebug_action());
+      }
     }
   }
 

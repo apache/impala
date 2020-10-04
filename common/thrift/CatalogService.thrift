@@ -156,6 +156,9 @@ struct TDdlExecRequest {
 
   // Parameters for replaying an exported testcase.
   25: optional JniCatalog.TCopyTestCaseReq copy_test_case_params
+
+  // Passes the debug actions to catalogd if the query option is set.
+  26: optional string debug_action
 }
 
 // Response from executing a TDdlExecRequest
@@ -256,6 +259,9 @@ struct TResetMetadataRequest {
   // If set, refreshes partition objects which are modified externally.
   // Applicable only when refreshing the table.
   9: optional bool refresh_updated_hms_partitions
+
+  // debug_action is set from the query_option when available.
+  10: optional string debug_action
 }
 
 // Response from TResetMetadataRequest

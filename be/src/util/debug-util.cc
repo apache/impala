@@ -352,6 +352,10 @@ static bool ParseProbability(const string& prob_str, bool* should_execute) {
   return true;
 }
 
+/// The catalog java code also implements a equivalent method for processing the debug
+/// actions in the Java code. See DebugUtils.java for more details. Any changes to the
+/// implementation logic here like adding a new type of action, should make changes in
+/// the DebugUtils.java too.
 Status DebugActionImpl(
     const string& debug_action, const char* label, const std::vector<string>& args) {
   const DebugActionTokens& action_list = TokenizeDebugActions(debug_action);

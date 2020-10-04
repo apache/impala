@@ -34,6 +34,7 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -87,6 +88,7 @@ import org.apache.impala.thrift.TTableType;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AvroSchemaConverter;
 import org.apache.impala.util.AvroSchemaUtils;
+import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.FsPermissionCache;
 import org.apache.impala.util.FsPermissionChecker;
 import org.apache.impala.util.HdfsCachingUtil;
@@ -684,6 +686,17 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
+   * Similar to
+   * {@link #loadFileMetadataForPartitions(IMetaStoreClient, Collection, boolean)}
+   * but without any injecting the debug actions.
+   */
+  private long loadFileMetadataForPartitions(IMetaStoreClient client,
+      Collection<HdfsPartition.Builder> partBuilders, boolean isRefresh)
+      throws CatalogException {
+    return loadFileMetadataForPartitions(client, partBuilders, isRefresh, null);
+  }
+
+  /**
    * Helper method to load the block locations for each partition in 'parts'.
    * New file descriptor lists are loaded and the partitions are updated in place.
    *
@@ -692,8 +705,8 @@ public class HdfsTable extends Table implements FeFsTable {
    * @return time in nanoseconds spent in loading file metadata.
    */
   private long loadFileMetadataForPartitions(IMetaStoreClient client,
-      Collection<HdfsPartition.Builder> partBuilders, boolean isRefresh)
-      throws CatalogException {
+      Collection<HdfsPartition.Builder> partBuilders, boolean isRefresh,
+      String debugActions) throws CatalogException {
     final Clock clock = Clock.defaultClock();
     long startTime = clock.getTick();
 
@@ -714,9 +727,9 @@ public class HdfsTable extends Table implements FeFsTable {
     // we'll throw an exception here and end up bailing out of whatever catalog operation
     // we're in the middle of. This could cause a partial metadata update -- eg we may
     // have refreshed the top-level table properties without refreshing the files.
-    new ParallelFileMetadataLoader(
-        this, partBuilders, validWriteIds_, validTxnList, logPrefix)
-        .load();
+    ParallelFileMetadataLoader loader = new ParallelFileMetadataLoader(
+        this, partBuilders, validWriteIds_, validTxnList, debugActions, logPrefix);
+    loader.load();
 
     // TODO(todd): would be good to log a summary of the loading process:
     // - how many block locations did we reuse/load individually/load via batch
@@ -1059,7 +1072,7 @@ public class HdfsTable extends Table implements FeFsTable {
       throws TableLoadingException {
     load(reuseMetadata, client, msTbl, /* loadPartitionFileMetadata */
         true, /* loadTableSchema*/true, false,
-        /* partitionsToUpdate*/null, reason);
+        /* partitionsToUpdate*/null, null, reason);
   }
 
   public void load(boolean reuseMetadata, IMetaStoreClient client,
@@ -1067,7 +1080,16 @@ public class HdfsTable extends Table implements FeFsTable {
       String reason) throws TableLoadingException {
     load(reuseMetadata, client, msTbl, /* loadPartitionFileMetadata */
         true, /* loadTableSchema*/true, refreshUpdatedPartitions,
-        /* partitionsToUpdate*/null, reason);
+        /* partitionsToUpdate*/null, null, reason);
+  }
+
+  public void load(boolean reuseMetadata, IMetaStoreClient hiveClient,
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      boolean refreshUpdatedPartitions, String debugAction, String reason)
+      throws CatalogException {
+    load(reuseMetadata, hiveClient, msTbl, /* loadPartitionFileMetadata */
+        true, /* loadTableSchema*/true, refreshUpdatedPartitions,
+        /* partitionsToUpdate*/null, debugAction, reason);
   }
 
   /**
@@ -1097,8 +1119,8 @@ public class HdfsTable extends Table implements FeFsTable {
   public void load(boolean reuseMetadata, IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl,
       boolean loadParitionFileMetadata, boolean loadTableSchema,
-      boolean refreshUpdatedPartitions, Set<String> partitionsToUpdate, String reason)
-      throws TableLoadingException {
+      boolean refreshUpdatedPartitions, Set<String> partitionsToUpdate,
+      @Nullable String debugAction, String reason) throws TableLoadingException {
     final Timer.Context context =
         getMetrics().getTimer(Table.LOAD_DURATION_METRIC).time();
     String annotation = String.format("%s metadata for %s%s partition(s) of %s.%s (%s)",
@@ -1133,14 +1155,15 @@ public class HdfsTable extends Table implements FeFsTable {
           storageMetadataLoadTime_ += updateMdFromHmsTable(msTbl);
           if (msTbl.getPartitionKeysSize() == 0) {
             if (loadParitionFileMetadata) {
-              storageMetadataLoadTime_ += updateUnpartitionedTableFileMd(client);
+              storageMetadataLoadTime_ += updateUnpartitionedTableFileMd(client,
+                  debugAction);
             } else {  // Update the single partition stats in case table stats changes.
               updateUnpartitionedTableStats();
             }
           } else {
             storageMetadataLoadTime_ += updatePartitionsFromHms(
                 client, partitionsToUpdate, loadParitionFileMetadata,
-                refreshUpdatedPartitions);
+                refreshUpdatedPartitions, debugAction);
           }
           LOG.info("Incrementally loaded table metadata for: " + getFullName());
         } else {
@@ -1223,7 +1246,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * This is optimized for the case where few files have changed. See
    * {@link FileMetadataLoader#load} for details.
    */
-  private long updateUnpartitionedTableFileMd(IMetaStoreClient client)
+  private long updateUnpartitionedTableFileMd(IMetaStoreClient client, String debugAction)
       throws CatalogException {
     Preconditions.checkState(getNumClusteringCols() == 0);
     if (LOG.isTraceEnabled()) {
@@ -1245,7 +1268,7 @@ public class HdfsTable extends Table implements FeFsTable {
     // partition instance to local catalog coordinators.
     partBuilder.setPrevId(oldPartition.getId());
     long fileMdLoadTime = loadFileMetadataForPartitions(client,
-        ImmutableList.of(partBuilder), /*isRefresh=*/true);
+        ImmutableList.of(partBuilder), /*isRefresh=*/true, debugAction);
     setUnpartitionedTableStats(partBuilder);
     addPartition(partBuilder.build());
     return fileMdLoadTime;
@@ -1277,7 +1300,7 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   private long updatePartitionsFromHms(IMetaStoreClient client,
       Set<String> partitionsToUpdate, boolean loadPartitionFileMetadata,
-      boolean refreshUpdatedPartitions) throws Exception {
+      boolean refreshUpdatedPartitions, String debugAction) throws Exception {
     if (LOG.isTraceEnabled()) LOG.trace("Sync table partitions: " + getFullName());
     org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable();
     Preconditions.checkNotNull(msTbl);
@@ -1285,9 +1308,9 @@ public class HdfsTable extends Table implements FeFsTable {
     Preconditions.checkState(loadPartitionFileMetadata || partitionsToUpdate == null);
     PartitionDeltaUpdater deltaUpdater =
         refreshUpdatedPartitions ? new PartBasedDeltaUpdater(client,
-            loadPartitionFileMetadata, partitionsToUpdate)
+            loadPartitionFileMetadata, partitionsToUpdate, debugAction)
             : new PartNameBasedDeltaUpdater(client, loadPartitionFileMetadata,
-                partitionsToUpdate);
+                partitionsToUpdate, debugAction);
     deltaUpdater.apply();
     return deltaUpdater.loadTimeForFileMdNs_;
   }
@@ -1310,12 +1333,14 @@ public class HdfsTable extends Table implements FeFsTable {
     // if loadFileMd_ flag is set, files for these partitions will also be
     // reloaded.
     private final Set<String> partitionsToUpdate_;
+    private final String debugAction_;
 
     PartitionDeltaUpdater(IMetaStoreClient client, boolean loadPartitionFileMetadata,
-        Set<String> partitionsToUpdate) {
+        Set<String> partitionsToUpdate, String debugAction) {
       this.client_ = client;
       this.loadFileMd_ = loadPartitionFileMetadata;
       this.partitionsToUpdate_ = partitionsToUpdate;
+      this.debugAction_ = debugAction;
     }
 
     /**
@@ -1407,7 +1432,7 @@ public class HdfsTable extends Table implements FeFsTable {
               .collect(Collectors.toList());
         }
         loadTimeForFileMdNs_ += loadFileMetadataForPartitions(client_,
-            partitionsToLoadFiles,/* isRefresh=*/true);
+            partitionsToLoadFiles,/* isRefresh=*/true, debugAction_);
         updatePartitions(partitionsToLoadFiles);
       }
     }
@@ -1434,8 +1459,8 @@ public class HdfsTable extends Table implements FeFsTable {
 
     public PartBasedDeltaUpdater(
         IMetaStoreClient client, boolean loadPartitionFileMetadata,
-        Set<String> partitionsToUpdate) throws Exception {
-      super(client, loadPartitionFileMetadata, partitionsToUpdate);
+        Set<String> partitionsToUpdate, String debugAction) throws Exception {
+      super(client, loadPartitionFileMetadata, partitionsToUpdate, debugAction);
       Stopwatch sw = Stopwatch.createStarted();
       List<Partition> partitionList;
       if (partitionsToUpdate != null) {
@@ -1533,8 +1558,8 @@ public class HdfsTable extends Table implements FeFsTable {
 
     public PartNameBasedDeltaUpdater(
         IMetaStoreClient client, boolean loadPartitionFileMetadata,
-        Set<String> partitionsToUpdate) throws Exception {
-      super(client, loadPartitionFileMetadata, partitionsToUpdate);
+        Set<String> partitionsToUpdate, String debugAction) throws Exception {
+      super(client, loadPartitionFileMetadata, partitionsToUpdate, debugAction);
       // Retrieve all the partition names from the Hive Metastore. We need this to
       // identify the delta between partitions of the local HdfsTable and the table entry
       // in the Hive Metastore. Note: This is a relatively "cheap" operation
@@ -2230,8 +2255,10 @@ public class HdfsTable extends Table implements FeFsTable {
    * Returns the HDFS paths corresponding to HdfsTable partitions that don't exist in
    * the Hive Metastore. An HDFS path is represented as a list of strings values, one per
    * partition key column.
+   * @param debugAction
    */
-  public List<List<String>> getPathsWithoutPartitions() throws CatalogException {
+  public List<List<String>> getPathsWithoutPartitions(@Nullable String debugAction)
+      throws CatalogException {
     Set<List<LiteralExpr>> existingPartitions = new HashSet<>();
     // Get the list of partition values of existing partitions in Hive Metastore.
     for (HdfsPartition partition: partitionMap_.values()) {
@@ -2247,6 +2274,7 @@ public class HdfsTable extends Table implements FeFsTable {
     try {
       getAllPartitionsNotInHms(basePath, partitionKeys, existingPartitions,
           partitionsNotInHms);
+      DebugUtils.executeDebugAction(debugAction, DebugUtils.RECOVER_PARTITIONS_DELAY);
     } catch (Exception e) {
       throw new CatalogException(String.format("Failed to recover partitions for %s " +
           "with exception:%s.", getFullName(), e));
