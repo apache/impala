@@ -33,19 +33,14 @@ import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.impala.catalog.FeFsTable.Utils;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
-import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
-import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.ThreadNameAnnotator;
-import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.MoreExecutors;
 
 
@@ -76,8 +71,8 @@ public class ParallelFileMetadataLoader {
 
   public ParallelFileMetadataLoader(HdfsTable table,
       Collection<HdfsPartition.Builder> partBuilders,
-      ValidWriteIdList writeIdList, ValidTxnList validTxnList, String logPrefix)
-      throws CatalogException {
+      ValidWriteIdList writeIdList, ValidTxnList validTxnList, String debugAction,
+      String logPrefix) throws CatalogException {
     if (writeIdList != null || validTxnList != null) {
       // make sure that both either both writeIdList and validTxnList are set or both
       // of them are not.
@@ -104,6 +99,7 @@ public class ParallelFileMetadataLoader {
       boolean hasCachedPartition = Iterables.any(e.getValue(),
           HdfsPartition.Builder::isMarkedCached);
       loader.setForceRefreshBlockLocations(hasCachedPartition);
+      loader.setDebugAction(debugAction);
       loaders_.put(e.getKey(), loader);
     }
     this.logPrefix_ = logPrefix;

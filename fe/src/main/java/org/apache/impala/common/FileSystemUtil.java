@@ -37,6 +37,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
 import org.apache.impala.catalog.HdfsCompression;
+import org.apache.impala.util.DebugUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +54,7 @@ import java.util.UUID;
  * Common utility functions for operating on FileSystem objects.
  */
 public class FileSystemUtil {
+
   private static final Configuration CONF = new Configuration();
   private static final Logger LOG = LoggerFactory.getLogger(FileSystemUtil.class);
 
@@ -564,7 +566,7 @@ public class FileSystemUtil {
    * Note that the order (breadth-first vs depth-first, sorted vs not) is undefined.
    */
   public static RemoteIterator<? extends FileStatus> listStatus(FileSystem fs, Path p,
-      boolean recursive) throws IOException {
+      boolean recursive, String debugAction) throws IOException {
     try {
       if (recursive) {
         // The Hadoop FileSystem API doesn't provide a recursive listStatus call that
@@ -584,12 +586,12 @@ public class FileSystemUtil {
         // even though it returns LocatedFileStatus objects with "fake" blocks which we
         // will ignore.
         if (isS3AFileSystem(fs)) {
-          return listFiles(fs, p, true);
+          return listFiles(fs, p, true, debugAction);
         }
-
+        DebugUtils.executeDebugAction(debugAction, DebugUtils.REFRESH_HDFS_LISTING_DELAY);
         return new FilterIterator(p, new RecursingIterator(fs, p));
       }
-
+      DebugUtils.executeDebugAction(debugAction, DebugUtils.REFRESH_HDFS_LISTING_DELAY);
       return new FilterIterator(p, fs.listStatusIterator(p));
     } catch (FileNotFoundException e) {
       if (LOG.isWarnEnabled()) LOG.warn("Path does not exist: " + p.toString(), e);
@@ -601,8 +603,9 @@ public class FileSystemUtil {
    * Wrapper around FileSystem.listFiles(), similar to the listStatus() wrapper above.
    */
   public static RemoteIterator<? extends FileStatus> listFiles(FileSystem fs, Path p,
-      boolean recursive) throws IOException {
+      boolean recursive, String debugAction) throws IOException {
     try {
+      DebugUtils.executeDebugAction(debugAction, DebugUtils.REFRESH_HDFS_LISTING_DELAY);
       return new FilterIterator(p, fs.listFiles(p, recursive));
     } catch (FileNotFoundException e) {
       if (LOG.isWarnEnabled()) LOG.warn("Path does not exist: " + p.toString(), e);

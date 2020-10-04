@@ -132,6 +132,7 @@ Status CatalogOpExecutor::ExecComputeStats(
   TDdlExecRequest& update_stats_req = catalog_op_req.ddl_params;
   update_stats_req.__set_ddl_type(TDdlType::ALTER_TABLE);
   update_stats_req.__set_sync_ddl(compute_stats_request.sync_ddl);
+  update_stats_req.__set_debug_action(compute_stats_request.ddl_params.debug_action);
 
   const TComputeStatsParams& compute_stats_params =
       compute_stats_request.ddl_params.compute_stats_params;

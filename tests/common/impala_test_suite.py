@@ -842,6 +842,17 @@ class ImpalaTestSuite(BaseTestSuite):
   def execute_query(self, query, query_options=None):
     return self.__execute_query(self.client, query, query_options)
 
+  def exec_and_time(self, query, query_options=None, impalad=0):
+    """Executes a given query on the given impalad and returns the time taken in
+    millisecondsas seen by the client."""
+    client = self.create_client_for_nth_impalad(impalad)
+    if query_options is not None:
+      client.set_configuration(query_options)
+    start_time = int(round(time.time() * 1000))
+    client.execute(query)
+    end_time = int(round(time.time() * 1000))
+    return end_time - start_time
+
   def execute_query_using_client(self, client, query, vector):
     self.change_database(client, vector.get_value('table_format'))
     query_options = vector.get_value('exec_option')

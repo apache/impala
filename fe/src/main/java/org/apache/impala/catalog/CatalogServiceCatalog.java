@@ -95,6 +95,7 @@ import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
+import org.apache.impala.thrift.TResetMetadataRequest;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTableType;
@@ -2275,7 +2276,7 @@ public class CatalogServiceCatalog extends Catalog {
    * {@code refreshUpdatedPartitions} argument.
    */
   public TCatalogObject reloadTable(Table tbl, String reason) throws CatalogException {
-    return reloadTable(tbl, false, reason);
+    return reloadTable(tbl, new TResetMetadataRequest(), reason);
   }
 
   /**
@@ -2287,8 +2288,8 @@ public class CatalogServiceCatalog extends Catalog {
    * If {@code refreshUpdatedParts} is true, the refresh logic detects updated
    * partitions in metastore and reloads them too.
    */
-  public TCatalogObject reloadTable(Table tbl, boolean refreshUpdatedParts, String reason)
-      throws CatalogException {
+  public TCatalogObject reloadTable(Table tbl, TResetMetadataRequest request,
+      String reason) throws CatalogException {
     LOG.info(String.format("Refreshing table metadata: %s", tbl.getFullName()));
     Preconditions.checkState(!(tbl instanceof IncompleteTable));
     String dbName = tbl.getDb().getName();
@@ -2312,7 +2313,8 @@ public class CatalogServiceCatalog extends Catalog {
         }
         if (tbl instanceof HdfsTable) {
           ((HdfsTable) tbl)
-              .load(true, msClient.getHiveClient(), msTbl, refreshUpdatedParts, reason);
+              .load(true, msClient.getHiveClient(), msTbl,
+                  request.refresh_updated_hms_partitions, request.debug_action, reason);
         } else {
           tbl.load(true, msClient.getHiveClient(), msTbl, reason);
         }
@@ -3305,7 +3307,7 @@ public class CatalogServiceCatalog extends Catalog {
           .map(HdfsPartition.Builder::new)
           .collect(Collectors.toList());
       new ParallelFileMetadataLoader(
-          table, partBuilders, reqWriteIdList, validTxnList, logPrefix).load();
+          table, partBuilders, reqWriteIdList, validTxnList, null, logPrefix).load();
       for (HdfsPartition.Builder builder : partBuilders) {
         // Let's retrieve the original partition instance from builder because this is
         // stored in the keys of 'partToPartialInfoMap'.

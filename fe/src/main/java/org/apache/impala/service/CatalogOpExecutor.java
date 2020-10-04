@@ -42,6 +42,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import javax.annotation.Nullable;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileSystem;
@@ -197,6 +198,7 @@ import org.apache.impala.thrift.TUpdateCatalogResponse;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.impala.util.CompressionUtil;
+import org.apache.impala.util.DebugUtils;
 import org.apache.impala.util.FunctionUtils;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.IcebergUtil;
@@ -358,7 +360,7 @@ public class CatalogOpExecutor {
           TAlterTableParams alter_table_params = ddlRequest.getAlter_table_params();
           tTableName = Optional.of(alter_table_params.getTable_name());
           catalogOpMetric_.increment(ddl_type, tTableName);
-          alterTable(alter_table_params, response);
+          alterTable(alter_table_params, ddlRequest.getDebug_action(), response);
           break;
         case ALTER_VIEW:
           TCreateOrAlterViewParams alter_view_params = ddlRequest.getAlter_view_params();
@@ -632,7 +634,8 @@ public class CatalogOpExecutor {
    * table metadata, except for RENAME, ADD PARTITION and DROP PARTITION. This call is
    * thread-safe, i.e. concurrent operations on the same table are serialized.
    */
-  private void alterTable(TAlterTableParams params, TDdlExecResponse response)
+  private void alterTable(TAlterTableParams params, @Nullable String debugAction,
+      TDdlExecResponse response)
       throws ImpalaException {
     // When true, loads the file/block metadata.
     boolean reloadFileMetadata = false;
@@ -813,7 +816,7 @@ public class CatalogOpExecutor {
           Preconditions.checkState(params.isSetUpdate_stats_params());
           Reference<Long> numUpdatedColumns = new Reference<>(0L);
           alterTableUpdateStats(tbl, params.getUpdate_stats_params(),
-              numUpdatedPartitions, numUpdatedColumns);
+              numUpdatedPartitions, numUpdatedColumns, debugAction);
           reloadTableSchema = true;
           addSummary(response, "Updated " + numUpdatedPartitions.getRef() +
               " partition(s) and " + numUpdatedColumns.getRef() + " column(s).");
@@ -834,7 +837,7 @@ public class CatalogOpExecutor {
           }
           break;
         case RECOVER_PARTITIONS:
-          alterTableRecoverPartitions(tbl);
+          alterTableRecoverPartitions(tbl, debugAction);
           addSummary(response, "Partitions have been recovered.");
           break;
         case SET_OWNER:
@@ -942,7 +945,8 @@ public class CatalogOpExecutor {
           getMetaStoreTable(msClient, tbl);
       if (tbl instanceof HdfsTable) {
         ((HdfsTable) tbl).load(true, msClient.getHiveClient(), msTbl,
-            reloadFileMetadata, reloadTableSchema, false, partitionsToUpdate, reason);
+            reloadFileMetadata, reloadTableSchema, false, partitionsToUpdate, null,
+            reason);
       } else {
         tbl.load(true, msClient.getHiveClient(), msTbl, reason);
       }
@@ -1059,7 +1063,8 @@ public class CatalogOpExecutor {
    * and 'numUpdatedColumns', respectively.
    */
   private void alterTableUpdateStats(Table table, TAlterTableUpdateStatsParams params,
-      Reference<Long> numUpdatedPartitions, Reference<Long> numUpdatedColumns)
+      Reference<Long> numUpdatedPartitions, Reference<Long> numUpdatedColumns,
+      @Nullable String debugAction)
       throws ImpalaException {
     Preconditions.checkState(table.getLock().isHeldByCurrentThread());
     Preconditions.checkState(params.isSetTable_stats() || params.isSetColumn_stats());
@@ -1104,6 +1109,7 @@ public class CatalogOpExecutor {
         throw ex;
       }
     }
+    DebugUtils.executeDebugAction(debugAction, DebugUtils.UPDATE_STATS_DELAY);
   }
 
   private void alterTableUpdateStatsInner(Table table,
@@ -3701,13 +3707,15 @@ public class CatalogOpExecutor {
    * Recover partitions of specified table.
    * Add partitions to metastore which exist in HDFS but not in metastore.
    */
-  private void alterTableRecoverPartitions(Table tbl) throws ImpalaException {
+  private void alterTableRecoverPartitions(Table tbl, @Nullable String debugAction)
+      throws ImpalaException {
     Preconditions.checkArgument(tbl.getLock().isHeldByCurrentThread());
     if (!(tbl instanceof HdfsTable)) {
       throw new CatalogException("Table " + tbl.getFullName() + " is not an HDFS table");
     }
     HdfsTable hdfsTable = (HdfsTable) tbl;
-    List<List<String>> partitionsNotInHms = hdfsTable.getPathsWithoutPartitions();
+    List<List<String>> partitionsNotInHms = hdfsTable
+        .getPathsWithoutPartitions(debugAction);
     if (partitionsNotInHms.isEmpty()) return;
 
     List<Partition> hmsPartitions = Lists.newArrayList();
@@ -4327,7 +4335,7 @@ public class CatalogOpExecutor {
                 //   2: If no need for a full table reload then fetch partition level
                 //     writeIds and reload only the ones that changed.
                 updatedThriftTable = catalog_
-                    .reloadTable(tbl, req.refresh_updated_hms_partitions, cmdString);
+                    .reloadTable(tbl, req, cmdString);
               }
             } else {
               // Table was loaded from scratch, so it's already "refreshed".

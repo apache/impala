@@ -30,7 +30,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
@@ -73,6 +72,7 @@ public class FileMetadataLoader {
   private List<FileDescriptor> loadedInsertDeltaFds_;
   private List<FileDescriptor> loadedDeleteDeltaFds_;
   private LoadStats loadStats_;
+  private String debugAction_;
 
   /**
    * @param partDir the dir for which to fetch file metadata
@@ -177,16 +177,17 @@ public class FileMetadataLoader {
         (oldFdsByRelPath_.isEmpty() || forceRefreshLocations);
 
     String msg = String.format("%s file metadata%s from path %s",
-          oldFdsByRelPath_.isEmpty() ? "Loading" : "Refreshing",
-          listWithLocations ? " with eager location-fetching" : "",
-          partDir_);
+        oldFdsByRelPath_.isEmpty() ? "Loading" : "Refreshing",
+        listWithLocations ? " with eager location-fetching" : "", partDir_);
     LOG.trace(msg);
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(msg)) {
       RemoteIterator<? extends FileStatus> fileStatuses;
       if (listWithLocations) {
-        fileStatuses = FileSystemUtil.listFiles(fs, partDir_, recursive_);
+        fileStatuses = FileSystemUtil
+            .listFiles(fs, partDir_, recursive_, debugAction_);
       } else {
-        fileStatuses = FileSystemUtil.listStatus(fs, partDir_, recursive_);
+        fileStatuses = FileSystemUtil
+            .listStatus(fs, partDir_, recursive_, debugAction_);
 
         // TODO(todd): we could look at the result of listing without locations, and if
         // we see that a substantial number of the files have changed, it may be better
@@ -278,6 +279,14 @@ public class FileMetadataLoader {
   private static boolean hasFileChanged(FileDescriptor fd, FileStatus status) {
     return (fd == null) || (fd.getFileLength() != status.getLen()) ||
       (fd.getModificationTime() != status.getModificationTime());
+  }
+
+  /**
+   * Enables injection of a debug actions to introduce delays in HDFS listStatus or
+   * listFiles call during the file-metadata loading.
+   */
+  public void setDebugAction(String debugAction) {
+    this.debugAction_ = debugAction;
   }
 
   // File/Block metadata loading stats for a single HDFS path.
