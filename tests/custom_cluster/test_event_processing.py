@@ -352,7 +352,7 @@ class TestEventProcessing(CustomClusterTestSuite):
       if src_db is not None and src_db.managedLocationUri is not None:
         self.filesystem_client.delete_file_dir(src_db.managedLocationUri, True)
       if target_db_obj is not None and target_db_obj.managedLocationUri is not None:
-        self.filesystem_client.delete_file_dir(target_db.src_db.managedLocationUri, True)
+        self.filesystem_client.delete_file_dir(target_db_obj.managedLocationUri, True)
 
   def __get_db_nothrow(self, name):
     try:
