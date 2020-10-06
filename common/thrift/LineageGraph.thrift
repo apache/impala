@@ -59,7 +59,7 @@ struct TLineageGraph {
   // Input SQL query
   1: required string query_text
 
-  // md5 hash of the query string
+  // 128-bit Murmur3 hash of the query string
   2: required string hash
 
   // Name of the user who issued this query

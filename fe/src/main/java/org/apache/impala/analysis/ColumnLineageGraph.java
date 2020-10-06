@@ -761,7 +761,7 @@ public class ColumnLineageGraph {
   }
 
   private String getQueryHash(String queryStr) {
-    Hasher hasher = Hashing.md5().newHasher();
+    Hasher hasher = Hashing.murmur3_128().newHasher();
     hasher.putUnencodedChars(queryStr);
     return hasher.hash().toString();
   }
