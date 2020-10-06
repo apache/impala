@@ -30,7 +30,7 @@ setup_report_build_error
 "${MAKE_CMD:-make}" clean || :
 
 # clean the external data source project
-pushd "${IMPALA_HOME}/ext-data-source"
+pushd "${IMPALA_HOME}/java/ext-data-source"
 rm -rf api/generated-sources/*
 ${IMPALA_HOME}/bin/mvn-quiet.sh clean
 popd

@@ -479,7 +479,7 @@ function load-custom-data {
 
 function build-and-copy-hive-udfs {
   # Build the test Hive UDFs
-  pushd ${IMPALA_HOME}/tests/test-hive-udfs
+  pushd ${IMPALA_HOME}/java/test-hive-udfs
   ${IMPALA_HOME}/bin/mvn-quiet.sh clean
   ${IMPALA_HOME}/bin/mvn-quiet.sh package
   popd

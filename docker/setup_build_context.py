@@ -137,7 +137,7 @@ for jar in glob.glob(
 
 # Impala Executor dependencies.
 dep_classpath = file(os.path.join(IMPALA_HOME,
-    "mvn-deps/executor-deps/target/build-executor-deps-classpath.txt")).read()
+    "java/executor-deps/target/build-executor-deps-classpath.txt")).read()
 for jar in dep_classpath.split(":"):
   assert os.path.exists(jar), "missing jar from classpath: {0}".format(jar)
   symlink_file_into_dir(jar, EXEC_LIB_DIR)

@@ -145,7 +145,7 @@ class TestCoordinators(CustomClusterTestSuite):
     old_src_path = os.path.join(
         os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs.jar')
     new_src_path = os.path.join(
-        os.environ['IMPALA_HOME'], 'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
+        os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs-modified.jar')
     tgt_dir = get_fs_path('/test-warehouse/{0}.db'.format(db_name))
     tgt_path = tgt_dir + "/tmp.jar"
 

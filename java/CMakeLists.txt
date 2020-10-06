@@ -15,9 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# The dependency on shaded-deps is only added to avoid parallel downloads
-# of dependencies. For more details see IMPALA-7051, which was a similar issue.
-add_custom_target(ext-data-source ALL DEPENDS gen-deps impala-parent
-    shaded-deps-hive-exec shaded-deps-s3a-aws-sdk
+add_custom_target(java ALL DEPENDS gen-deps function-registry
   COMMAND $ENV{IMPALA_HOME}/bin/mvn-quiet.sh -B install -DskipTests
 )

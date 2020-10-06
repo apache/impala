@@ -219,4 +219,17 @@ under the License.
     </pluginRepository>
   </pluginRepositories>
 
+  <modules>
+    <module>datagenerator</module>
+    <module>executor-deps</module>
+    <module>ext-data-source</module>
+    <module>../fe</module>
+    <module>query-event-hook-api</module>
+    <module>shaded-deps/hive-exec</module>
+    <module>shaded-deps/s3a-aws-sdk</module>
+    <module>TableFlattener</module>
+    <module>test-hive-udfs</module>
+    <module>yarn-extras</module>
+  </modules>
+
 </project>

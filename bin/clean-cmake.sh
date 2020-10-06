@@ -29,8 +29,8 @@ if [[ -z "${IMPALA_HOME}" || ! -d "${IMPALA_HOME}" ]]; then
 fi
 # Remove trailing /
 ROOT_DIR=${IMPALA_HOME%%/}
-for loc in "${ROOT_DIR}/ -maxdepth 1" "${ROOT_DIR}/be/" "${ROOT_DIR}/fe/" "${ROOT_DIR}/common/"\
-           "${ROOT_DIR}/ext-data-source/"; do
+for loc in "${ROOT_DIR}/ -maxdepth 1" "${ROOT_DIR}/be/" "${ROOT_DIR}/java/" \
+           "${ROOT_DIR}/common/" ; do
   find ${loc} \( -iname CMakeCache.txt -o -iname CMakeFiles \
        -o -iname CTestTestfile.cmake -o -iname cmake_install.cmake \) -exec rm -Rf {} +
 done

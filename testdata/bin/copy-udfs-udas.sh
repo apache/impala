@@ -51,7 +51,7 @@ then
   pushd "${IMPALA_HOME}"
   "${MAKE_CMD:-make}" ${IMPALA_MAKE_FLAGS} "-j${IMPALA_BUILD_THREADS:-4}" \
       TestUdas TestUdfs test-udfs-ir udfsample udasample udf-sample-ir uda-sample-ir
-  cd "${IMPALA_HOME}/tests/test-hive-udfs"
+  cd "${IMPALA_HOME}/java/test-hive-udfs"
   "${IMPALA_HOME}/bin/mvn-quiet.sh" package
   cp target/test-hive-udfs-1.0.jar "${IMPALA_HOME}/testdata/udfs/impala-hive-udfs.jar"
   # Change one of the Java files to make a new jar for testing purposes, then change it
@@ -64,9 +64,13 @@ then
        bash -c "sed s/'ReplaceStringUdf'/'NewReplaceStringUdf'/g '{}'" \; \
        > src/main/java/org/apache/impala/NewReplaceStringUdf.java
   "${IMPALA_HOME}/bin/mvn-quiet.sh" package
+  cp target/test-hive-udfs-1.0.jar \
+      "${IMPALA_HOME}/testdata/udfs/impala-hive-udfs-modified.jar"
   find . -type f -name 'TestUpdateUdf.java' -execdir \
        bash -c "sed -i s/'Text(\"New UDF\")'/'Text(\"Old UDF\")'/g '{}'" \;
   rm src/main/java/org/apache/impala/NewReplaceStringUdf.java
+  # Rebuild with the original version
+  "${IMPALA_HOME}/bin/mvn-quiet.sh" package
   popd
 fi
 
@@ -91,7 +95,7 @@ ln -s "${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so" \
 mkdir "${UDF_TMP_DIR}/udf_test"
 ln -s "${IMPALA_HOME}/be/build/latest/testutil/libTestUdfs.so" "${UDF_TMP_DIR}/udf_test"
 ln -s "${HIVE_HOME}/lib/hive-exec-"*.jar "${UDF_TMP_DIR}/hive-exec.jar"
-ln -s "${IMPALA_HOME}/tests/test-hive-udfs/target/test-hive-udfs-1.0.jar" \
+ln -s "${IMPALA_HOME}/testdata/udfs/impala-hive-udfs.jar" \
   "${UDF_TMP_DIR}/impala-hive-udfs.jar"
 ln -s "${IMPALA_HOME}/be/build/latest/testutil/test-udfs.ll" "${UDF_TMP_DIR}"
 ln -s "${IMPALA_HOME}/be/build/latest/udf_samples/libudfsample.so" "${UDF_TMP_DIR}"

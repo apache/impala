@@ -35,7 +35,6 @@ under the License.
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-parent</artifactId>
     <version>0.1-SNAPSHOT</version>
-    <relativePath>../../impala-parent/pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.impala</groupId>
@@ -107,6 +106,12 @@ under the License.
       <groupId>org.apache.impala</groupId>
       <artifactId>impala-minimal-s3a-aws-sdk</artifactId>
       <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>*</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>
@@ -159,6 +164,12 @@ under the License.
       <groupId>org.apache.impala</groupId>
       <artifactId>impala-minimal-hive-exec</artifactId>
       <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>*</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <!-- IMPALA-8766: Include Knox jars on the classpath -->

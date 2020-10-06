@@ -424,7 +424,7 @@ bootstrap_dependencies() {
 # Build the Impala frontend and its dependencies.
 build_fe() {
   generate_cmake_files $CMAKE_BUILD_TYPE
-  ${MAKE_CMD} ${IMPALA_MAKE_FLAGS} fe
+  ${MAKE_CMD} ${IMPALA_MAKE_FLAGS} java
 }
 
 # Build all components. The build type is specified as the first argument, and the
@@ -449,7 +449,7 @@ build_all_components() {
     MAKE_TARGETS="impalad statestored catalogd fesupport loggingsupport ImpalaUdf \
         udasample udfsample"
     if (( build_independent_targets )); then
-      MAKE_TARGETS+=" cscope fe tarballs"
+      MAKE_TARGETS+=" cscope java tarballs"
     fi
   fi
   ${MAKE_CMD} -j${IMPALA_BUILD_THREADS:-4} ${IMPALA_MAKE_FLAGS} ${MAKE_TARGETS}
