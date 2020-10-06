@@ -81,6 +81,9 @@ using namespace strings;
 DEFINE_string(catalog_service_host, "localhost",
     "hostname where CatalogService is running");
 DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
+DEFINE_bool(ping_expose_webserver_url, true,
+    "If true, debug webserver url is exposed via PingImpalaService/PingImpalaHS2Service "
+    "RPC calls");
 DEFINE_string(state_store_host, "localhost",
     "hostname where StatestoreService is running");
 DEFINE_int32(state_store_subscriber_port, 23000,

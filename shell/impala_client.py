@@ -334,12 +334,13 @@ class ImpalaClient(object):
 
   def _append_retried_query_link(self, get_log_result):
     """Append the retried query link if the original query has been retried"""
-    query_id_search = re.search("Query has been retried using query id: (.*)\n",
-                                get_log_result)
-    if query_id_search and len(query_id_search.groups()) >= 1:
-      retried_query_id = query_id_search.group(1)
-      get_log_result += "Retried query link: %s" % \
-                        self.get_query_link(retried_query_id)
+    if self.webserver_address:
+      query_id_search = re.search("Query has been retried using query id: (.*)\n",
+                                  get_log_result)
+      if query_id_search and len(query_id_search.groups()) >= 1:
+        retried_query_id = query_id_search.group(1)
+        get_log_result += "Retried query link: %s" % \
+                          self.get_query_link(retried_query_id)
     return get_log_result
 
   def _get_http_transport(self, connect_timeout_ms):

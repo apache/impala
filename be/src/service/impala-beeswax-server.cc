@@ -49,6 +49,8 @@ using namespace beeswax;
     }                                                           \
   } while (false)
 
+DECLARE_bool(ping_expose_webserver_url);
+
 namespace impala {
 
 void ImpalaServer::query(beeswax::QueryHandle& beeswax_handle, const Query& query) {
@@ -473,7 +475,11 @@ void ImpalaServer::PingImpalaService(TPingImpalaServiceResp& return_val) {
 
   VLOG_RPC << "PingImpalaService()";
   return_val.version = GetVersionString(true);
-  return_val.webserver_address = ExecEnv::GetInstance()->webserver()->url();
+  if (ExecEnv::GetInstance()->get_enable_webserver() && FLAGS_ping_expose_webserver_url) {
+    return_val.webserver_address = ExecEnv::GetInstance()->webserver()->url();
+  } else {
+    return_val.webserver_address = "";
+  }
   VLOG_RPC << "PingImpalaService(): return_val=" << ThriftDebugString(return_val);
 }
 
