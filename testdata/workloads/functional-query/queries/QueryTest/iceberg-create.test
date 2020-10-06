@@ -248,7 +248,7 @@ DESCRIBE FORMATTED iceberg_test8;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test/$DATABASE/iceberg_test8','NULL'
 '','iceberg.catalog_location','/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
-'','iceberg_file_format ','parquet             '
+'','iceberg.file_format ','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
 ---- TYPES
 string, string, string
@@ -265,7 +265,7 @@ DESCRIBE FORMATTED iceberg_test9;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test/org/db/tbl','NULL'
 '','iceberg.catalog_location','/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
-'','iceberg_file_format ','parquet             '
+'','iceberg.file_format ','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
 ---- TYPES
 string, string, string

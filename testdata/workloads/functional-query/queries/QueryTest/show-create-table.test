@@ -561,21 +561,21 @@ CREATE TABLE iceberg_test1 (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg_file_format'='parquet', 'iceberg.catalog'='hadoop.tables')
+TBLPROPERTIES('iceberg.file_format'='parquet', 'iceberg.catalog'='hadoop.tables')
 ---- RESULTS-HIVE
 CREATE TABLE show_create_table_test_db.iceberg_test1 (
   level STRING
 )
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES('iceberg_file_format'='parquet', 'iceberg.catalog'='hadoop.tables')
+TBLPROPERTIES('iceberg.file_format'='parquet', 'iceberg.catalog'='hadoop.tables')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test1 (
   level STRING
 )
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg_file_format'='parquet',
+TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='parquet',
 'iceberg.catalog'='hadoop.tables')
 ====
 ---- CREATE_TABLE
@@ -583,21 +583,21 @@ CREATE TABLE iceberg_test2 (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg_file_format'='parquet', 'iceberg.catalog'='hadoop.catalog',
+TBLPROPERTIES('iceberg.file_format'='parquet', 'iceberg.catalog'='hadoop.catalog',
 'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
 ---- RESULTS-HIVE
 CREATE TABLE show_create_table_test_db.iceberg_test2 (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg_file_format'='parquet', 'iceberg.catalog'='hadoop.catalog',
+TBLPROPERTIES('iceberg.file_format'='parquet', 'iceberg.catalog'='hadoop.catalog',
 'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test2 (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg_file_format'='parquet',
+TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='parquet',
 'iceberg.catalog'='hadoop.catalog', 'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
 ====
 ---- CREATE_TABLE
@@ -605,7 +605,7 @@ CREATE TABLE iceberg_test3 (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg_file_format'='parquet', 'iceberg.catalog'='hadoop.catalog',
+TBLPROPERTIES('iceberg.file_format'='parquet', 'iceberg.catalog'='hadoop.catalog',
 'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test',
 'iceberg.table_identifier'='org.my_db.my_table')
 ---- RESULTS-HIVE
@@ -613,7 +613,7 @@ CREATE TABLE show_create_table_test_db.iceberg_test3 (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg_file_format'='parquet', 'iceberg.catalog'='hadoop.catalog',
+TBLPROPERTIES('iceberg.file_format'='parquet', 'iceberg.catalog'='hadoop.catalog',
 'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test',
 'iceberg.table_identifier'='org.my_db.my_table')
 ---- RESULTS-HIVE-3
@@ -621,7 +621,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test3 (
   level STRING
 )
 STORED AS ICEBERG
-TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg_file_format'='parquet',
+TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='parquet',
 'iceberg.catalog'='hadoop.catalog', 'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test',
 'iceberg.table_identifier'='org.my_db.my_table')
 ====
@@ -638,7 +638,7 @@ PARTITION BY SPEC (
   p3 HOUR
 )
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg_file_format'='parquet',
+TBLPROPERTIES('iceberg.file_format'='parquet',
     'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
 ---- RESULTS-HIVE
 CREATE TABLE show_create_table_test_db.iceberg_test1_partitioned (
@@ -654,7 +654,7 @@ PARTITION BY SPEC
   p3 HOUR
 )
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg_file_format'='parquet',
+TBLPROPERTIES('iceberg.file_format'='parquet',
     'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test1_partitioned (
@@ -671,6 +671,6 @@ PARTITION BY SPEC
 )
 STORED AS ICEBERG
 TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.catalog'='hadoop.catalog',
-    'iceberg_file_format'='parquet',
+    'iceberg.file_format'='parquet',
     'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
 ====
