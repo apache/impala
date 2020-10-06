@@ -28,5 +28,5 @@ setup_report_build_error
 hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/data-sources/
 
 hadoop fs -put -f \
-  ${IMPALA_HOME}/ext-data-source/test/target/impala-data-source-test-*.jar \
+  ${IMPALA_HOME}/java/ext-data-source/test/target/impala-data-source-test-*.jar \
   ${FILESYSTEM_PREFIX}/test-warehouse/data-sources/test-data-source.jar

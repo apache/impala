@@ -24,7 +24,6 @@ under the License.
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-parent</artifactId>
     <version>0.1-SNAPSHOT</version>
-    <relativePath>../impala-parent/pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 

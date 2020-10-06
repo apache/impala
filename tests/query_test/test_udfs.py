@@ -517,7 +517,7 @@ class TestUdfTargeted(TestUdfBase):
     old_udf = os.path.join(
         os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs.jar')
     new_udf = os.path.join(
-        os.environ['IMPALA_HOME'], 'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
+        os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs-modified.jar')
     udf_dst = get_fs_path(
         '/test-warehouse/{0}.db/impala-hive-udfs.jar'.format(unique_database))
 
@@ -550,7 +550,7 @@ class TestUdfTargeted(TestUdfBase):
     old_udf = os.path.join(
         os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs.jar')
     new_udf = os.path.join(
-        os.environ['IMPALA_HOME'], 'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
+        os.environ['IMPALA_HOME'], 'testdata/udfs/impala-hive-udfs-modified.jar')
     udf_dst = get_fs_path(
         '/test-warehouse/{0}.db/impala-hive-udfs.jar'.format(unique_database))
     old_function_name = "udf_update_test_create1"

@@ -23,31 +23,16 @@
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-parent</artifactId>
     <version>0.1-SNAPSHOT</version>
-    <relativePath>../impala-parent/pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.impala</groupId>
-  <artifactId>query-event-hook-api</artifactId>
-  <name>Apache Impala Query Event Hook API</name>
+  <artifactId>nested-table-flattener</artifactId>
+  <name>Impala Nested Table Flattener</name>
   <version>1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
-  <url>.</url>
 
   <build>
     <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-source-plugin</artifactId>
-        <version>2.4</version>
-        <executions>
-          <execution>
-            <id>attach-sources</id>
-            <goals>
-              <goal>jar</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -59,4 +44,37 @@
       </plugin>
     </plugins>
   </build>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client</artifactId>
+      <version>${hadoop.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro</artifactId>
+      <version>${avro.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.parquet</groupId>
+      <artifactId>parquet-avro</artifactId>
+      <version>${parquet.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.kitesdk</groupId>
+      <artifactId>kite-data-core</artifactId>
+      <version>${kite.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.avro</groupId>
+          <artifactId>avro</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.twitter</groupId>
+          <artifactId>parquet-avro</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+  </dependencies>
 </project>

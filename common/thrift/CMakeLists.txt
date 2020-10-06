@@ -177,7 +177,7 @@ set(THRIFT_INCLUDE_DIR_OPTION -I ${THRIFT_CONTRIB_DIR} -I $ENV{HIVE_METASTORE_TH
 set(BE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/be/generated-sources)
 set(FE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/fe/generated-sources)
 # TODO: avoid duplicating generated java classes
-set(EXT_DS_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/ext-data-source/api/generated-sources)
+set(EXT_DS_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/java/ext-data-source/api/generated-sources)
 set(PYTHON_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/shell/)
 set(THRIFT11_PYTHON_OUTPUT_DIR ${PYTHON_OUTPUT_DIR}/build/thrift-11-gen)
 MESSAGE("Found output dir: " ${PYTHON_OUTPUT_DIR})

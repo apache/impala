@@ -55,7 +55,7 @@ while getopts ":n:e:i:f" OPTION; do
 done
 
 if $FLATTEN; then
-  mvn $IMPALA_MAVEN_OPTIONS -f "${IMPALA_HOME}/testdata/TableFlattener/pom.xml" package
+  mvn $IMPALA_MAVEN_OPTIONS -f "${IMPALA_HOME}/java/TableFlattener/pom.xml" package
 fi
 
 RANDOM_SCHEMA_GENERATOR=${IMPALA_HOME}/testdata/bin/random_avro_schema.py;
@@ -79,12 +79,12 @@ do
   do
     FILE_NAME=$(basename ${AVRO_SCHEMA_PATH})
     TABLE_NAME="${FILE_NAME%.*}"
-    mvn $IMPALA_MAVEN_OPTIONS -f "${IMPALA_HOME}/testdata/pom.xml" exec:java \
+    mvn $IMPALA_MAVEN_OPTIONS -f "${IMPALA_HOME}/java/datagenerator/pom.xml" exec:java \
       -Dexec.mainClass="org.apache.impala.datagenerator.RandomNestedDataGenerator" \
       -Dexec.args="${AVRO_SCHEMA_PATH} ${NUM_ELEMENTS} ${NUM_FIELDS} ${DB_DIR}/${TABLE_NAME}/${TABLE_NAME}.parquet";
 
     if $FLATTEN; then
-      mvn $IMPALA_MAVEN_OPTIONS -f "${IMPALA_HOME}/testdata/TableFlattener/pom.xml" \
+      mvn $IMPALA_MAVEN_OPTIONS -f "${IMPALA_HOME}/java/TableFlattener/pom.xml" \
         exec:java -Dexec.mainClass=org.apache.impala.infra.tableflattener.Main \
         -Dexec.arguments="file://${DB_DIR}/${TABLE_NAME}/${TABLE_NAME}.parquet,file://${DB_DIR}/${TABLE_NAME}_flat,-sfile://${AVRO_SCHEMA_PATH}";
     fi

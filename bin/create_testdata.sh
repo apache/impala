@@ -29,13 +29,13 @@ bin=`cd "$bin"; pwd`
 DATALOC=$IMPALA_HOME/testdata/target
 
 # regenerate the test data generator
-cd $IMPALA_HOME/testdata
+cd $IMPALA_HOME/java/datagenerator
 ${IMPALA_HOME}/bin/mvn-quiet.sh clean
 ${IMPALA_HOME}/bin/mvn-quiet.sh package
 
 # find jars
 CP=""
-JARS=`find target/*.jar 2> /dev/null || true`
+JARS=`find ${IMPALA_HOME}/java/datagenerator/target/*.jar 2> /dev/null || true`
 for i in $JARS; do
     if [ -n "$CP" ]; then
         CP=${CP}:${i}
@@ -47,6 +47,8 @@ done
 # run test data generator
 echo $DATALOC
 mkdir -p $DATALOC
+pushd $IMPALA_HOME/testdata
 "$JAVA" -cp $CP org.apache.impala.datagenerator.TestDataGenerator $DATALOC
 "$JAVA" -cp $CP org.apache.impala.datagenerator.CsvToHBaseConverter
 echo "SUCCESS, data generated into $DATALOC"
+popd

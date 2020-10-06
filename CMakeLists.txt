@@ -425,17 +425,10 @@ endif()
 add_subdirectory(common/function-registry)
 add_subdirectory(common/thrift)
 add_subdirectory(common/fbs)
-add_subdirectory(common/yarn-extras)
 add_subdirectory(common/protobuf)
 add_subdirectory(be)
 add_subdirectory(docker)
-add_subdirectory(mvn-deps/shaded-deps/hive-exec)
-add_subdirectory(mvn-deps/shaded-deps/s3a-aws-sdk)
-add_subdirectory(mvn-deps/executor-deps)
-add_subdirectory(fe)
-add_subdirectory(impala-parent)
-add_subdirectory(ext-data-source)
-add_subdirectory(query-event-hook-api)
+add_subdirectory(java)
 
 # Build target for all generated files which most backend code depends on
 add_custom_target(gen-deps ALL DEPENDS thrift-deps proto-deps fb-deps

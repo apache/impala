@@ -48,7 +48,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
     # with symlinks
     add_custom_target(impala_base_build_context_${build_type}
       COMMAND ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py ${build_context_args}
-      DEPENDS daemons fe ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py
+      DEPENDS daemons java ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py
       COMMENT "Creating impala base build context build_type=${build_type}."
       VERBATIM
     )
