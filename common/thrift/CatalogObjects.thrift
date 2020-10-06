@@ -87,7 +87,7 @@ enum THdfsCompression {
   LZ4_BLOCKED = 12
 }
 
-// Iceberg table file format identitied by table property 'iceberg_file_format'
+// Iceberg table file format identitied by table property 'iceberg.file_format'
 enum TIcebergFileFormat {
   PARQUET = 0
   ORC = 1

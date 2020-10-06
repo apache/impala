@@ -285,7 +285,7 @@ STRING,STRING,STRING
 describe formatted iceberg_partitioned;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/iceberg_test/iceberg_partitioned','NULL'
-'','iceberg_file_format ','parquet             '
+'','iceberg.file_format ','parquet             '
 '','iceberg.catalog     ','hadoop.tables       '
 ---- TYPES
 string, string, string
@@ -294,7 +294,7 @@ string, string, string
 describe formatted iceberg_non_partitioned;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/iceberg_test/iceberg_non_partitioned','NULL'
-'','iceberg_file_format ','parquet             '
+'','iceberg.file_format ','parquet             '
 '','iceberg.catalog     ','hadoop.tables       '
 ---- TYPES
 string, string, string
@@ -305,7 +305,7 @@ describe formatted hadoop_catalog_test_external;
 'Location:           ','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test/functional_parquet/hadoop_catalog_test','NULL'
 '','iceberg.catalog_location','/test-warehouse/iceberg_test/hadoop_catalog/hadoop_catalog_test'
 '','iceberg.table_identifier','functional_parquet.hadoop_catalog_test'
-'','iceberg_file_format ','parquet             '
+'','iceberg.file_format ','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
 ---- TYPES
 string, string, string
