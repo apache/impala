@@ -19,7 +19,7 @@ create table lineage_test_db.alltypesinsert like functional.alltypesinsert
 ====
 ---- LINEAGE
 {
-  "hash": "b0d53e4deafb2467c4108c17667653b5",
+  "hash": "d4c603c171ccad77991279cc4d643625",
   "timestamp": 1571508467,
   "vertices": [],
   "edges": [],
@@ -34,7 +34,7 @@ create table lineage_test_db.foo (id int)
 ====
 ---- LINEAGE
 {
-  "hash": "6e50d3f5f3b80dd14c5daf6797302f4d",
+  "hash": "ce2d65d4f720533b497fad12de070058",
   "timestamp": 1571508472,
   "vertices": [],
   "edges": [],
@@ -51,7 +51,7 @@ create external table lineage_test_db.ext_tbl_loc (id int) location
 ====
 ---- LINEAGE
 {
-  "hash": "ba35824e6e53501ffd80d9f63e25bfd8",
+  "hash": "8a07e4a2c8adb0ec4b11276bc0914848",
   "timestamp": 1571508478,
   "vertices": [],
   "edges": [],
@@ -67,7 +67,7 @@ create external table lineage_test_db.ext_tbl (id int)
 ====
 ---- LINEAGE
 {
-  "hash": "2560798c9dd478ee73cf5fae27ebb17f",
+  "hash": "43a8b8b9355ae5b918c880af6f94bb3e",
   "timestamp": 1571508483,
   "vertices": [
     {
@@ -439,7 +439,7 @@ create view lineage_test_db.alltypes_view as select * from lineage_test_db.allty
 ====
 ---- LINEAGE
 {
-  "hash": "aba4b39bf3c34b5a9ce8fd782acc0a26",
+  "hash": "3968bd65781e9e856eaca799f4501513",
   "timestamp": 1571508491,
   "vertices": [
     {
@@ -503,7 +503,7 @@ select * from (
 ====
 ---- LINEAGE
 {
-  "hash": "2540c828f7397099c11558544485e97c",
+  "hash": "0158d41c97236fb9d6b56f5f6fe3d2e6",
   "timestamp": 1571508497,
   "vertices": [
     {
@@ -690,7 +690,7 @@ order by b.bigint_col limit 10
 ====
 ---- LINEAGE
 {
-  "hash": "b9d4145e873d7ee55e485690a6465421",
+  "hash": "ad70ea47a7772f9d59c60ebd4e9c1ac8",
   "timestamp": 1571508503,
   "vertices": [
     {
@@ -761,7 +761,7 @@ create table lineage_test_db.lineage_test_tbl1 as select int_col, tinyint_col fr
 ====
 ---- LINEAGE
 {
-  "hash": "bbd2400879f7304bba4182220c138651",
+  "hash": "3d7db666c62b0c19ad8e0dd87fa628b0",
   "timestamp": 1571508509,
   "vertices": [
     {
@@ -883,7 +883,7 @@ where a.year = 2009 and b.month = 2
 ====
 ---- LINEAGE
 {
-  "hash": "8f43e2adb3da2eac5d00d1eba96bb553",
+  "hash": "04f29ab8b0aec034def6173b0c36c588",
   "timestamp": 1571508515,
   "vertices": [
     {
@@ -929,7 +929,7 @@ select * from
 ====
 ---- LINEAGE
 {
-  "hash": "502d2de3774289b12a705777da61baae",
+  "hash": "07232504cc67447abf639eed1c6c2411",
   "timestamp": 1571508521,
   "vertices": [
     {
@@ -1297,7 +1297,7 @@ create table lineage_test_db.lineage_test_tbl4 as select * from functional_hbase
 ====
 ---- LINEAGE
 {
-  "hash": "2fa5d0ab4e1c38a9d7abde595f4c60c8",
+  "hash": "861e5f5d91ce0e9e23db6e7f7f451fac",
   "timestamp": 1571508526,
   "vertices": [
     {
@@ -1525,7 +1525,7 @@ lineage_test_db.alltypes
 ====
 ---- LINEAGE
 {
-  "hash": "e3af61c7dc3e8cd9ab632c3c935df032",
+  "hash": "8b1ddbc13665ae532868598c025d1668",
   "timestamp": 1571508531,
   "vertices": [
     {
@@ -1752,7 +1752,7 @@ from functional.alltypes
 ====
 ---- LINEAGE
 {
-  "hash": "453abb733b2b21ba827f80897fe3b579",
+  "hash": "e7c1630d4593c64d0372e32c28484667",
   "timestamp": 1571508537,
   "vertices": [
     {
@@ -2042,7 +2042,7 @@ where year=2009 and month=05
 ====
 ---- LINEAGE
 {
-  "hash": "b6bcec64b3eace721772f4b1d4e2cb57",
+  "hash": "727d89dd58676c0d36995a90e625607e",
   "timestamp": 1571508543,
   "vertices": [
     {
@@ -2347,7 +2347,7 @@ where year=2009 and month>10
 ====
 ---- LINEAGE
 {
-  "hash": "2b82f76becf76311633c26498d9f57d8",
+  "hash": "516fa0d094aca2d64042484a84e19208",
   "timestamp": 1571508549,
   "vertices": [
     {
@@ -2743,7 +2743,7 @@ having min(id) > 10
 ====
 ---- LINEAGE
 {
-  "hash": "33162d783545a2bdc1e8a3a95553971f",
+  "hash": "c82935c5165916f6c56db043120b1b45",
   "timestamp": 1571508554,
   "vertices": [
     {
@@ -2804,7 +2804,7 @@ group by int_col, tinyint_col
 ====
 ---- LINEAGE
 {
-  "hash": "4f1ecaaed571d2ed9f09f091f399c311",
+  "hash": "6c646de10e62d1155b5216ae8589ff6d",
   "timestamp": 1571508560,
   "vertices": [
     {
@@ -2864,7 +2864,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
 ====
 ---- LINEAGE
 {
-  "hash": "83067b3ed65f566ee2a7c97259b3f485",
+  "hash": "3c1677d7fcf4b2db27e84f30f5b3e96f",
   "timestamp": 1571508565,
   "vertices": [
     {
@@ -2992,7 +2992,7 @@ order by a.tinyint_col, a.int_col
 ====
 ---- LINEAGE
 {
-  "hash": "7bda479e44e923018a8e83435a4e7567",
+  "hash": "547ead4bd734c7e6720ba5df3f7da88c",
   "timestamp": 1571508571,
   "vertices": [
     {
@@ -3143,7 +3143,7 @@ order by 2, 3, 4
 ====
 ---- LINEAGE
 {
-  "hash": "f91d8724a1537af46652415e14f0067e",
+  "hash": "952f8a7042ff661ed34fbc8167349899",
   "timestamp": 1571508576,
   "vertices": [
     {
@@ -3293,7 +3293,7 @@ order by 2, 3, 4
 ====
 ---- LINEAGE
 {
-  "hash": "43098e753e37a70f008726178e10dadf",
+  "hash": "7b677a184cce15efd15f3033b9b2feeb",
   "timestamp": 1571508581,
   "vertices": [
     {
@@ -3417,7 +3417,7 @@ where b.month = 1
 ====
 ---- LINEAGE
 {
-  "hash": "20cdd5a4921f1d865bcc1f8b984839ae",
+  "hash": "2f2aab8dd7a5ca2112311dc4bc676e5d",
   "timestamp": 1571508587,
   "vertices": [
     {
@@ -3536,7 +3536,7 @@ where month = 1
 ====
 ---- LINEAGE
 {
-  "hash": "1b739655724090be8f3dd8bb018fe536",
+  "hash": "d86f371388b5a5024bca2b7fc487d8f7",
   "timestamp": 1571508592,
   "vertices": [
     {
@@ -3750,7 +3750,7 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
 ====
 ---- LINEAGE
 {
-  "hash": "b91dd6944864a3c14ecefb697ca95459",
+  "hash": "38cda699ddffba2fa5bab14c8a9c4fb4",
   "timestamp": 1571508598,
   "vertices": [
     {
@@ -3847,7 +3847,7 @@ from
 ====
 ---- LINEAGE
 {
-  "hash": "e59cf0e0de9015036a15df76e9e61c85",
+  "hash": "4e0d48d11ef88837d0267a212fb67716",
   "timestamp": 1571508604,
   "vertices": [
     {
@@ -3936,7 +3936,7 @@ limit 0
 ====
 ---- LINEAGE
 {
-  "hash": "cf15009df42b7aea0f6abaeea3381b85",
+  "hash": "073a1917cdbbb2b53ac89c62d0852270",
   "timestamp": 1571508609,
   "vertices": [
     {
@@ -3976,7 +3976,7 @@ select id from functional.view_view
 ====
 ---- LINEAGE
 {
-  "hash": "5dc06563b62b39278652242034a2a70d",
+  "hash": "b0ebbaee6fd5fcc500e03aa8dbb08707",
   "timestamp": 1571508614,
   "vertices": [
     {
@@ -4025,7 +4025,7 @@ where t.id < 10
 ====
 ---- LINEAGE
 {
-  "hash": "c9e45730cafb6910b54eaa5c53dc44b1",
+  "hash": "70664c8c26f6a2da7c7f53c4b97b8892",
   "timestamp": 1571508619,
   "vertices": [
     {
@@ -4144,7 +4144,7 @@ where id in
 ====
 ---- LINEAGE
 {
-  "hash": "1d2fa8025e9279488af58b5b8dd614d9",
+  "hash": "97267ebbbeae23fa3bb8ddeb8375e7b9",
   "timestamp": 1571508625,
   "vertices": [
     {
@@ -4207,7 +4207,7 @@ and tinyint_col < 10
 ====
 ---- LINEAGE
 {
-  "hash": "7e678cde53c9d120a6f79134551a8c41",
+  "hash": "b59cc1541d8583e3f1359e9f48c0963d",
   "timestamp": 1571508630,
   "vertices": [
     {
@@ -4313,7 +4313,7 @@ and a.bigint_col > 10
 ====
 ---- LINEAGE
 {
-  "hash": "a7ab58d90540f28a8dfd69703632ad7a",
+  "hash": "ff421b2c2b249764028350613be74fb8",
   "timestamp": 1571508636,
   "vertices": [
     {
@@ -4376,7 +4376,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
 ====
 ---- LINEAGE
 {
-  "hash": "59c56529d835660a4f776c0edc60ecc1",
+  "hash": "b2519388c17a48c91e5bb32948bce1c0",
   "timestamp": 1571508641,
   "vertices": [
     {
@@ -4657,7 +4657,7 @@ select id, int_col, string_col, year, month from t1
 ====
 ---- LINEAGE
 {
-  "hash": "36f0326d13fc4d2bd03196549624a15a",
+  "hash": "b4d1a3120fe9c4e63e9a50e2bcf0ff22",
   "timestamp": 1571508646,
   "vertices": [
     {
@@ -4761,7 +4761,7 @@ from
 ====
 ---- LINEAGE
 {
-  "hash": "f6683b020d20b90902603bbe7f6635e8",
+  "hash": "bc19b44ea5cab4531beb8a1dc0779df6",
   "timestamp": 1571508652,
   "vertices": [
     {
@@ -4805,7 +4805,7 @@ create view lineage_test_db.lineage_test_view1 as select id from functional.allt
 ====
 ---- LINEAGE
 {
-  "hash": "d1217e5cde0f930466e6ccfe7c261a53",
+  "hash": "4e9912a672b341c75a234945ac3a63d8",
   "timestamp": 1571508657,
   "vertices": [
     {
@@ -4903,7 +4903,7 @@ limit 0
 ====
 ---- LINEAGE
 {
-  "hash": "7fbb84397e7103b32ee785085027ffcf",
+  "hash": "fb45884e3b8668e1239a677983ffc706",
   "timestamp": 1571508663,
   "vertices": [
     {
@@ -5153,7 +5153,7 @@ create view lineage_test_db.lineage_test_view3 (a1, a2, a3, a4, a5, a6, a7) as
 ====
 ---- LINEAGE
 {
-  "hash": "80ed48e4969ac7e03d08d5eb6600f4bf",
+  "hash": "51e5187935df610408fd670895640190",
   "timestamp": 1571508668,
   "vertices": [
     {
@@ -5352,7 +5352,7 @@ create view lineage_test_db.lineage_test_view4 as
 ====
 ---- LINEAGE
 {
-  "hash": "561916b21b73cf61397e1ca9aa2fb682",
+  "hash": "47f1c5e1dc11a2764f9ed27f9f2ef1ce",
   "timestamp": 1571508674,
   "vertices": [
     {
@@ -5396,7 +5396,7 @@ alter view lineage_test_db.alltypes_view as select id from functional.alltypesti
 ====
 ---- LINEAGE
 {
-  "hash": "e771fd2a8795e5aaad3e86c266b9a039",
+  "hash": "b187fe7a4a6b47249f3084d3890b2c74",
   "timestamp": 1571508679,
   "vertices": [
     {
@@ -5491,7 +5491,7 @@ select * from (
 ====
 ---- LINEAGE
 {
-  "hash": "63df7e3a395b2f9d56928ccd655edef5",
+  "hash": "43303560d034d3c1b8fa72962da76f62",
   "timestamp": 1571508684,
   "vertices": [
     {
@@ -5615,7 +5615,7 @@ select * from functional.allcomplextypes.int_array_col a inner join
 ====
 ---- LINEAGE
 {
-  "hash": "6df49e42edeccad1139432ad33ad037a",
+  "hash": "d34d7d50b599df3912e4265f15706810",
   "timestamp": 1571508690,
   "vertices": [
     {
@@ -5831,7 +5831,7 @@ select * from functional.allcomplextypes t, t.int_array_col a, t.struct_map_col 
 ====
 ---- LINEAGE
 {
-  "hash": "f6e042b9788a1583e212cf90c616dfd3",
+  "hash": "e1684998c49aeacac122c78e7b47867f",
   "timestamp": 1571508695,
   "vertices": [
     {
@@ -6010,7 +6010,7 @@ select a + b as ab, c, d, e from functional.allcomplextypes t,
 ====
 ---- LINEAGE
 {
-  "hash": "a0b32156f73829f9d72d35d5e6091684",
+  "hash": "5b43652748f22f00515ddf6ed699aec0",
   "timestamp": 1571508700,
   "vertices": [
     {
