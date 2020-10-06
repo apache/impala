@@ -1133,12 +1133,13 @@ class ImpalaShell(cmd.Cmd, object):
       if summary.error_logs:
         for error_line in summary.error_logs:
           data += error_line + "\n"
-          query_id_search = re.search("Retrying query using query id: (.*)",
-                                      error_line)
-          if query_id_search and len(query_id_search.groups()) == 1:
-            retried_query_id = query_id_search.group(1)
-            data += "Retried query link: %s\n"\
-                    % self.imp_client.get_query_link(retried_query_id)
+          if self.webserver_address:
+            query_id_search = re.search("Retrying query using query id: (.*)",
+                                        error_line)
+            if query_id_search and len(query_id_search.groups()) == 1:
+              retried_query_id = query_id_search.group(1)
+              data += "Retried query link: %s\n"\
+                      % self.imp_client.get_query_link(retried_query_id)
 
       if summary.progress:
         progress = summary.progress

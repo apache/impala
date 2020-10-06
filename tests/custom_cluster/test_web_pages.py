@@ -23,6 +23,7 @@ import psutil
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.shell.util import run_impala_shell_cmd
 
 
 class TestWebPage(CustomClusterTestSuite):
@@ -138,3 +139,33 @@ class TestWebPage(CustomClusterTestSuite):
     response = requests.get("http://localhost:25000/queries?json")
     response_json = response.text
     assert expected in response_json, "No matching statement found in the queries site."
+
+  # Checks if 'messages' exists/does not exist in 'result_stderr' based on the value of
+  # 'should_exist'
+  def _validate_shell_messages(self, result_stderr, messages, should_exist=True):
+    for msg in messages:
+      if should_exist:
+        assert msg in result_stderr, result_stderr
+      else:
+        assert msg not in result_stderr, result_stderr
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--ping_expose_webserver_url=false"
+  )
+  def test_webserver_url_not_exposed(self, vector):
+    if vector.get_value('table_format').file_format != 'text':
+      pytest.skip('runs only for text table_format')
+    # If webserver url is not exposed, debug web urls shouldn't be printed out.
+    shell_messages = ["Query submitted at: ", "(Coordinator: ",
+        "Query progress can be monitored at: "]
+    query_shell_arg = '--query=select * from functional.alltypes'
+    # hs2
+    results = run_impala_shell_cmd(vector, [query_shell_arg])
+    self._validate_shell_messages(results.stderr, shell_messages, should_exist=False)
+    # beeswax
+    results = run_impala_shell_cmd(vector, ['--protocol=beeswax', query_shell_arg])
+    self._validate_shell_messages(results.stderr, shell_messages, should_exist=False)
+    # Even though webserver url is not exposed, it is still accessible.
+    page = requests.get('http://localhost:25000')
+    assert page.status_code == requests.codes.ok

@@ -95,6 +95,7 @@ DECLARE_string(hostname);
 DECLARE_int32(webserver_port);
 DECLARE_int32(idle_session_timeout);
 DECLARE_int32(disconnected_session_timeout);
+DECLARE_bool(ping_expose_webserver_url);
 
 namespace impala {
 
@@ -1200,7 +1201,11 @@ void ImpalaServer::PingImpalaHS2Service(TPingImpalaHS2ServiceResp& return_val,
   }
 
   return_val.__set_version(GetVersionString(true));
-  return_val.__set_webserver_address(ExecEnv::GetInstance()->webserver()->url());
+  if (ExecEnv::GetInstance()->get_enable_webserver() && FLAGS_ping_expose_webserver_url) {
+    return_val.__set_webserver_address(ExecEnv::GetInstance()->webserver()->url());
+  } else {
+    return_val.__set_webserver_address("");
+  }
   VLOG_RPC << "PingImpalaHS2Service(): return_val=" << ThriftDebugString(return_val);
 }
 }

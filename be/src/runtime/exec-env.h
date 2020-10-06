@@ -137,7 +137,7 @@ class ExecEnv {
   BufferPool* buffer_pool() { return buffer_pool_.get(); }
   SystemStateInfo* system_state_info() { return system_state_info_.get(); }
 
-  void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
+  bool get_enable_webserver() const { return enable_webserver_; }
 
   ClusterMembershipMgr* cluster_membership_mgr() { return cluster_membership_mgr_.get(); }
   Scheduler* scheduler() { return scheduler_.get(); }
