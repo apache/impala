@@ -390,12 +390,12 @@ void KrpcDataStreamSender::Channel::MarkDone(const Status& status) {
 template <typename ResponsePBType>
 void KrpcDataStreamSender::Channel::LogSlowRpc(
     const char* rpc_name, int64_t total_time_ns, const ResponsePBType& resp) {
-  int64_t network_time_ns = total_time_ns - resp_.receiver_latency_ns();
+  int64_t network_time_ns = total_time_ns - resp.receiver_latency_ns();
   LOG(INFO) << "Slow " << rpc_name << " RPC to " << address_
             << " (fragment_instance_id=" << PrintId(fragment_instance_id_) << "): "
             << "took " << PrettyPrinter::Print(total_time_ns, TUnit::TIME_NS) << ". "
             << "Receiver time: "
-            << PrettyPrinter::Print(resp_.receiver_latency_ns(), TUnit::TIME_NS)
+            << PrettyPrinter::Print(resp.receiver_latency_ns(), TUnit::TIME_NS)
             << " Network time: " << PrettyPrinter::Print(network_time_ns, TUnit::TIME_NS);
 }
 
@@ -489,15 +489,16 @@ void KrpcDataStreamSender::Channel::HandleFailedRPC(const DoRpcFn& rpc_fn,
 }
 
 void KrpcDataStreamSender::Channel::TransmitDataCompleteCb() {
-  DCHECK_NE(rpc_start_time_ns_, 0);
-  int64_t total_time = MonotonicNanos() - rpc_start_time_ns_;
   std::unique_lock<SpinLock> l(lock_);
   DCHECK(rpc_in_flight_);
+  DCHECK_NE(rpc_start_time_ns_, 0);
+  int64_t total_time = MonotonicNanos() - rpc_start_time_ns_;
   const kudu::Status controller_status = rpc_controller_.status();
   if (LIKELY(controller_status.ok())) {
     DCHECK(rpc_in_flight_batch_ != nullptr);
     // 'receiver_latency_ns' is calculated with MonoTime, so it must be non-negative.
     DCHECK_GE(resp_.receiver_latency_ns(), 0);
+    DCHECK_GE(total_time, resp_.receiver_latency_ns());
     int64_t row_batch_size = RowBatch::GetSerializedSize(*rpc_in_flight_batch_);
     int64_t network_time = total_time - resp_.receiver_latency_ns();
     COUNTER_ADD(parent_->bytes_sent_counter_, row_batch_size);
@@ -631,8 +632,9 @@ void KrpcDataStreamSender::Channel::EndDataStreamCompleteCb() {
   const kudu::Status controller_status = rpc_controller_.status();
   if (LIKELY(controller_status.ok())) {
     // 'receiver_latency_ns' is calculated with MonoTime, so it must be non-negative.
-    DCHECK_GE(resp_.receiver_latency_ns(), 0);
-    int64_t network_time_ns = total_time_ns - resp_.receiver_latency_ns();
+    DCHECK_GE(eos_resp_.receiver_latency_ns(), 0);
+    DCHECK_GE(total_time_ns, eos_resp_.receiver_latency_ns());
+    int64_t network_time_ns = total_time_ns - eos_resp_.receiver_latency_ns();
     parent_->network_time_stats_->UpdateCounter(network_time_ns);
     parent_->recvr_time_stats_->UpdateCounter(eos_resp_.receiver_latency_ns());
     if (IsSlowRpc(total_time_ns)) LogSlowRpc("EndDataStream", total_time_ns, eos_resp_);
