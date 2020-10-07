@@ -88,8 +88,48 @@ for CONFIG in "${CONFIGS[@]}"; do
   cat logs/mvn/mvn.log >> "${TMP_DIR}/mvn_accumulated.log"
 done
 
+# It is useful to be able to use "mvn versions:set" to modify the jar
+# versions produced by Impala. This tests that Impala continues to build
+# after running that command.
+NEW_MAVEN_VERSION=4.0.0-$(date +%Y%m%d)
+DESCRIPTION="Options: mvn versions:set -DnewVersion=${NEW_MAVEN_VERSION}"
+
+if [[ $# == 1 && $1 == "--dryrun" ]]; then
+  echo $DESCRIPTION
+else
+  # Note: this command modifies files in the git checkout
+  pushd java
+  mvn versions:set -DnewVersion=${NEW_MAVEN_VERSION}
+  popd
+
+  if ! ./bin/clean.sh; then
+    echo "Clean failed"
+    exit 1
+  fi
+
+  echo "Building with OPTIONS: $DESCRIPTION"
+  if ! time -p ./buildall.sh -skiptests -noclean ; then
+    echo "Build failed: $DESCRIPTION"
+    FAILED="${FAILED}:${DESCRIPTION}"
+  fi
+
+  # Reset the files changed by mvn versions:set
+  git reset --hard HEAD
+
+  ccache -s
+  bin/jenkins/get_maven_statistics.sh logs/mvn/mvn.log
+
+  # Keep each maven log from each round of the build
+  cp logs/mvn/mvn.log "${TMP_DIR}/mvn.$(date +%s.%N).log"
+  # Append the maven log to the accumulated maven log
+  cat logs/mvn/mvn.log >> "${TMP_DIR}/mvn_accumulated.log"
+fi
+
 # Restore the maven logs (these don't interfere with existing mvn.log)
-cp ${TMP_DIR}/mvn* logs/mvn
+# These files may not exist if this is doing a dryrun.
+if ls ${TMP_DIR}/mvn* > /dev/null 2>&1 ; then
+  cp ${TMP_DIR}/mvn* logs/mvn
+fi
 
 if [[ "$FAILED" != "" ]]
 then

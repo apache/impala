@@ -23,16 +23,14 @@ under the License.
   <parent>
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-parent</artifactId>
-    <version>0.1-SNAPSHOT</version>
+    <version>4.0.0-SNAPSHOT</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>org.apache.impala</groupId>
-  <artifactId>impala-testdata</artifactId>
-  <version>0.1-SNAPSHOT</version>
+  <artifactId>impala-data-generator</artifactId>
   <packaging>jar</packaging>
 
-  <name>Build some test data</name>
+  <name>Test Data Generator</name>
 
   <dependencies>
     <!-- Force json-smart dependency.
