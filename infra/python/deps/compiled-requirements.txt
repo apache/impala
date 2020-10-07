@@ -19,7 +19,7 @@
 # after the toolchain is bootstrapped. Installed after requirements.txt
 
 argparse == 1.4.0
-impyla == 0.16.2
+impyla == 0.17a1
   bitarray == 1.2.1
   sasl == 0.2.1
   six == 1.14.0

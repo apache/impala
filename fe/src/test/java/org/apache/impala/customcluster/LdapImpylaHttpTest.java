@@ -96,10 +96,12 @@ public class LdapImpylaHttpTest {
     RunShellCommand.Run(validCmd, /*shouldSucceed*/ true, testUser_, "");
     // 2. Invalid username password combination. Should fail.
     String[] invalidCmd = buildCommand("foo", "bar", null);
-    RunShellCommand.Run(invalidCmd, /*shouldSucceed*/ false, "", "EOFError");
+    RunShellCommand.Run(
+        invalidCmd, /*shouldSucceed*/ false, "", "HTTP code 401: Unauthorized");
     // 3. Without username and password. Should fail.
     String[] noAuthCmd = {"impala-python", helper_, "--query", query_};
-    RunShellCommand.Run(noAuthCmd, /*shouldSucceed*/ false, "", "EOFError");
+    RunShellCommand.Run(
+        noAuthCmd, /*shouldSucceed*/ false, "", "HTTP code 401: Unauthorized");
   }
 
   private String[] buildCommand(String user, String password, String httpPath) {
