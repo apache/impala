@@ -1710,8 +1710,7 @@ public class CatalogOpExecutor {
         partBuilder = new HdfsPartition.Builder(part).dropPartitionStats();
       }
 
-      // Remove the ROW_COUNT parameter if it has been set and set numRows to reflect
-      // the change.
+      // We need to update the partition if it has a ROW_COUNT parameter.
       if (part.getParameters().containsKey(StatsSetupConst.ROW_COUNT)) {
         if (partBuilder == null) {
           partBuilder = new HdfsPartition.Builder(part);
