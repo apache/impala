@@ -25,11 +25,10 @@ though some of them might not be necessary. The exclusions are sorted alphabetic
   <parent>
     <groupId>org.apache.impala</groupId>
     <artifactId>impala-parent</artifactId>
-    <version>0.1-SNAPSHOT</version>
+    <version>4.0.0-SNAPSHOT</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.apache.impala</groupId>
   <artifactId>impala-minimal-s3a-aws-sdk</artifactId>
   <packaging>jar</packaging>
 

@@ -131,9 +131,15 @@ for jar in dep_classpath.split(":"):
   symlink_file_into_dir(jar, LIB_DIR)
 
 # Impala Coordinator jars.
-for jar in glob.glob(
-    os.path.join(IMPALA_HOME, "fe/target/impala-frontend-*-SNAPSHOT.jar")):
+num_frontend_jars = 0
+for jar in glob.glob(os.path.join(IMPALA_HOME, "fe/target/impala-frontend-*.jar")):
+  # Ignore the tests jar
+  if jar.find("-tests") != -1:
+    continue
   symlink_file_into_dir(jar, LIB_DIR)
+  num_frontend_jars += 1
+# There must be exactly one impala-frontend jar.
+assert num_frontend_jars == 1
 
 # Impala Executor dependencies.
 dep_classpath = file(os.path.join(IMPALA_HOME,
