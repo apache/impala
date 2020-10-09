@@ -608,7 +608,7 @@ public class CreateTableStmt extends StatementBase {
 
     // Some constraints for Iceberg table with 'hadoop.catalog'
     if (catalog == null || catalog.isEmpty() ||
-        IcebergUtil.getIcebergCatalog(catalog) == TIcebergCatalog.HADOOP_CATALOG) {
+        IcebergUtil.getTIcebergCatalog(catalog) == TIcebergCatalog.HADOOP_CATALOG) {
       // Table location cannot be set in SQL when using 'hadoop.catalog'
       if (getLocation() != null) {
         throw new AnalysisException(String.format("Location cannot be set for Iceberg " +

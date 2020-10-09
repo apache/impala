@@ -32,11 +32,10 @@ import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.expressions.UnboundPredicate;
-import org.apache.iceberg.hadoop.HadoopCatalog;
-import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
 import org.apache.iceberg.transforms.Transform;
@@ -53,7 +52,9 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.common.FileSystemUtil;
+import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
+import org.apache.impala.catalog.iceberg.IcebergHadoopTables;
+import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsFileFormat;
@@ -64,89 +65,95 @@ import org.apache.impala.thrift.TIcebergPartitionTransform;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 
 public class IcebergUtil {
-
   /**
-   * Get HadoopTables by impala cluster related config
+   * Returns the corresponding catalog implementation for 'feTable'.
    */
-  public static HadoopTables getHadoopTables() {
-    return new HadoopTables(FileSystemUtil.getConfiguration());
+  public static IcebergCatalog getIcebergCatalog(FeIcebergTable feTable)
+      throws ImpalaRuntimeException {
+    return getIcebergCatalog(feTable.getIcebergCatalog(),
+        feTable.getIcebergCatalogLocation());
   }
 
   /**
-   * Get HadoopCatalog by impala cluster related config
+   * Returns the corresponding catalog implementation.
    */
-  public static HadoopCatalog getHadoopCatalog(String location) {
-    return new HadoopCatalog(FileSystemUtil.getConfiguration(), location);
-  }
-
-  /**
-   * Get BaseTable from FeIcebergTable
-   */
-  public static BaseTable getBaseTable(FeIcebergTable table) {
-    return getBaseTable(table.getIcebergCatalog(), getIcebergTableIdentifier(table),
-        table.getIcebergCatalogLocation());
-  }
-
-  /**
-   * Get BaseTable from each parameters
-   */
-  public static BaseTable getBaseTable(TIcebergCatalog catalog, String tableName,
-      String location) {
-    if (catalog == TIcebergCatalog.HADOOP_CATALOG) {
-      return getBaseTableByHadoopCatalog(tableName, location);
-    } else {
-      // We use HadoopTables as default Iceberg catalog type
-      HadoopTables hadoopTables = IcebergUtil.getHadoopTables();
-      return (BaseTable) hadoopTables.load(location);
+  public static IcebergCatalog getIcebergCatalog(TIcebergCatalog catalog, String location)
+      throws ImpalaRuntimeException {
+    switch (catalog) {
+      case HADOOP_TABLES: return IcebergHadoopTables.getInstance();
+      case HADOOP_CATALOG: return new IcebergHadoopCatalog(location);
+      default: throw new ImpalaRuntimeException (
+          "Unexpected catalog type: " + catalog.toString());
     }
   }
 
   /**
-   * Use location, namespace(database) and name(table) to get BaseTable by HadoopCatalog
+   * Helper method to load native Iceberg table for 'feTable'.
    */
-  private static BaseTable getBaseTableByHadoopCatalog(String tableName,
-      String catalogLoc) {
-    HadoopCatalog hadoopCatalog = IcebergUtil.getHadoopCatalog(catalogLoc);
-    return (BaseTable) hadoopCatalog.loadTable(TableIdentifier.parse(tableName));
+  public static Table loadTable(FeIcebergTable feTable) throws TableLoadingException {
+    try {
+      IcebergCatalog cat = getIcebergCatalog(feTable);
+      return cat.loadTable(feTable);
+    } catch (ImpalaRuntimeException e) {
+      throw new TableLoadingException(String.format(
+          "Failed to load Iceberg table: %s", feTable.getFullName()), e);
+    }
+  }
+
+  /**
+   * Helper method to load native Iceberg table.
+   */
+  private static Table loadTable(TIcebergCatalog catalog, TableIdentifier tableId,
+      String location) throws TableLoadingException {
+    try {
+      IcebergCatalog cat = getIcebergCatalog(catalog, location);
+      return cat.loadTable(tableId, location);
+    } catch (ImpalaRuntimeException e) {
+      throw new TableLoadingException(String.format(
+          "Failed to load Iceberg table: %s at location: %s",
+          tableId, location), e);
+    }
   }
 
   /**
    * Get TableMetadata by FeIcebergTable
    */
-  public static TableMetadata getIcebergTableMetadata(FeIcebergTable table) {
-    return getIcebergTableMetadata(table.getIcebergCatalog(),
-        getIcebergTableIdentifier(table), table.getIcebergCatalogLocation());
+  public static TableMetadata getIcebergTableMetadata(FeIcebergTable table)
+      throws TableLoadingException {
+    BaseTable iceTable = (BaseTable)IcebergUtil.loadTable(table);
+    return iceTable.operations().current();
   }
 
   /**
-   * Get TableMetadata by related info
-   * tableName is table full name, usually database.table
+   * Get TableMetadata by related info tableName is table full name, usually
+   * database.table
    */
   public static TableMetadata getIcebergTableMetadata(TIcebergCatalog catalog,
-      String tableName, String location) {
-    BaseTable baseTable = getBaseTable(catalog, tableName, location);
+      TableIdentifier tableId, String location) throws TableLoadingException {
+    BaseTable baseTable = (BaseTable)IcebergUtil.loadTable(catalog,
+        tableId, location);
     return baseTable.operations().current();
   }
 
   /**
    * Get Iceberg table identifier by table property
    */
-  public static String getIcebergTableIdentifier(FeIcebergTable table) {
+  public static TableIdentifier getIcebergTableIdentifier(FeIcebergTable table) {
     return getIcebergTableIdentifier(table.getMetaStoreTable());
   }
 
-  public static String getIcebergTableIdentifier(
+  public static TableIdentifier getIcebergTableIdentifier(
       org.apache.hadoop.hive.metastore.api.Table msTable) {
     String name = msTable.getParameters().get(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
     if (name == null || name.isEmpty()) {
-      return msTable.getDbName() + "." + msTable.getTableName();
+      return TableIdentifier.of(msTable.getDbName(), msTable.getTableName());
     }
 
     // If database not been specified in property, use default
     if (!name.contains(".")) {
-      return Catalog.DEFAULT_DB + "." + name;
+      return TableIdentifier.of(Catalog.DEFAULT_DB, name);
     }
-    return name;
+    return TableIdentifier.parse(name);
   }
 
   /**
@@ -192,9 +199,9 @@ public class IcebergUtil {
    * Get iceberg table catalog type from hms table properties
    * use HadoopCatalog as default
    */
-  public static TIcebergCatalog getIcebergCatalog(
+  public static TIcebergCatalog getTIcebergCatalog(
       org.apache.hadoop.hive.metastore.api.Table msTable) {
-    TIcebergCatalog catalog = getIcebergCatalog(
+    TIcebergCatalog catalog = getTIcebergCatalog(
         msTable.getParameters().get(IcebergTable.ICEBERG_CATALOG));
     return catalog == null ? TIcebergCatalog.HADOOP_CATALOG : catalog;
   }
@@ -202,7 +209,7 @@ public class IcebergUtil {
   /**
    * Get TIcebergCatalog from a string, usually from table properties
    */
-  public static TIcebergCatalog getIcebergCatalog(String catalog){
+  public static TIcebergCatalog getTIcebergCatalog(String catalog){
     if ("hadoop.tables".equalsIgnoreCase(catalog)) {
       return TIcebergCatalog.HADOOP_TABLES;
     } else if ("hadoop.catalog".equalsIgnoreCase(catalog)) {
@@ -437,8 +444,8 @@ public class IcebergUtil {
    * Get iceberg data file by file system table location and iceberg predicates
    */
   public static List<DataFile> getIcebergDataFiles(FeIcebergTable table,
-      List<UnboundPredicate> predicates) {
-    BaseTable baseTable = IcebergUtil.getBaseTable(table);
+      List<UnboundPredicate> predicates) throws TableLoadingException {
+    BaseTable baseTable = (BaseTable)IcebergUtil.loadTable(table);
     TableScan scan = baseTable.newScan();
     for (UnboundPredicate predicate : predicates) {
       scan = scan.filter(predicate);

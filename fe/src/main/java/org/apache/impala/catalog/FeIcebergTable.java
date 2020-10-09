@@ -348,7 +348,7 @@ public interface FeIcebergTable extends FeFsTable {
      * Get all FileDescriptor from iceberg table without any predicates.
      */
     public static Map<String, HdfsPartition.FileDescriptor> loadAllPartition(
-        FeIcebergTable table) throws IOException {
+        FeIcebergTable table) throws IOException, TableLoadingException {
       // Empty predicates
       List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(table,
           new ArrayList<>());

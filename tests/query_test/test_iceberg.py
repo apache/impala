@@ -16,7 +16,7 @@
 # under the License.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
-
+from tests.common.skip import SkipIf
 
 class TestCreatingIcebergTable(ImpalaTestSuite):
   """Test creating iceberg managed and external table"""
@@ -33,3 +33,15 @@ class TestCreatingIcebergTable(ImpalaTestSuite):
 
   def test_create_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-create', vector, use_db=unique_database)
+
+  @SkipIf.not_hdfs
+  def test_drop_incomplete_table(self, vector, unique_database):
+    """Test DROP TABLE when the underlying directory is deleted. In that case table
+    loading fails, but we should be still able to drop the table from Impala."""
+    tbl_name = unique_database + ".synchronized_iceberg_tbl"
+    cat_location = "/test-warehouse/" + unique_database
+    self.client.execute("""create table {0} (i int) stored as iceberg
+        tblproperties('iceberg.catalog'='hadoop.catalog',
+                      'iceberg.catalog_location'='{1}')""".format(tbl_name, cat_location))
+    self.hdfs_client.delete_file_dir(cat_location, True)
+    self.execute_query_expect_success(self.client, """drop table {0}""".format(tbl_name))

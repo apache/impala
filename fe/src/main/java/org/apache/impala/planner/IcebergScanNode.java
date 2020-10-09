@@ -42,6 +42,7 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -89,8 +90,14 @@ public class IcebergScanNode extends HdfsScanNode {
    */
   public List<FileDescriptor> getFileDescriptorByIcebergPredicates()
       throws ImpalaRuntimeException{
-    List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(icebergTable_,
-        icebergPredicates_);
+    List<DataFile> dataFileList;
+    try {
+      dataFileList = IcebergUtil.getIcebergDataFiles(icebergTable_, icebergPredicates_);
+    } catch (TableLoadingException e) {
+      throw new ImpalaRuntimeException(String.format(
+          "Failed to load data files for Iceberg table: %s", icebergTable_.getFullName()),
+          e);
+    }
 
     List<FileDescriptor> fileDescList = new ArrayList<>();
     for (DataFile dataFile : dataFileList) {

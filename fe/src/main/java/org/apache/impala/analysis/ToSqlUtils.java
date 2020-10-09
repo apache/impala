@@ -552,7 +552,7 @@ public class ToSqlUtils {
     // Iceberg table with 'hadoop.catalog' do not display table LOCATION when using
     // 'show create table', user can use 'describe formatted/extended' to get location
     TIcebergCatalog icebergCatalog =
-        IcebergUtil.getIcebergCatalog(tblProperties.get(IcebergTable.ICEBERG_CATALOG));
+        IcebergUtil.getTIcebergCatalog(tblProperties.get(IcebergTable.ICEBERG_CATALOG));
     boolean isHadoopCatalog = fileFormat == HdfsFileFormat.ICEBERG &&
         icebergCatalog == TIcebergCatalog.HADOOP_CATALOG;
     if (location != null && !isHadoopCatalog) {
