@@ -210,7 +210,8 @@ PLAN-ROOT SINK
    row-size=14B cardinality=11.00K
 ====
 # No predicate after the analytic function.
-# Limit pushdown should be applied
+# Limit pushdown should not be applied because the order of smallint_col
+# does not match.
 select * from (
   select int_col, bigint_col, smallint_col,
     rank() over (partition by int_col, bigint_col
@@ -230,11 +231,11 @@ PLAN-ROOT SINK
 |  partition by: int_col, bigint_col
 |  order by: smallint_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=11.00K
 |
-01:TOP-N [LIMIT=10]
+01:SORT
 |  order by: int_col ASC NULLS LAST, bigint_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  row-size=14B cardinality=11.00K
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -242,7 +243,7 @@ PLAN-ROOT SINK
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-06:MERGING-EXCHANGE [UNPARTITIONED]
+05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
 |  limit: 10
 |
@@ -255,17 +256,13 @@ PLAN-ROOT SINK
 |  partition by: int_col, bigint_col
 |  order by: smallint_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=11.00K
 |
-05:TOP-N [LIMIT=10]
+01:SORT
 |  order by: int_col ASC NULLS LAST, bigint_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  row-size=14B cardinality=11.00K
 |
 04:EXCHANGE [HASH(int_col,bigint_col)]
-|
-01:TOP-N [LIMIT=10]
-|  order by: int_col ASC NULLS LAST, bigint_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -779,4 +776,166 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
    row-size=14B cardinality=11.00K
+====
+# IMPALA-10229: limit cannot be pushed through analytic with no predicates
+# unless the sort orders of OVER clause and ORDER BY clause match exactly.
+select *
+from (
+    select month, id, rank() over (partition by month order by id desc) rnk
+    from functional_parquet.alltypes
+    WHERE month >= 11) v
+order by month, id limit 3
+---- PLAN
+PLAN-ROOT SINK
+|
+03:TOP-N [LIMIT=3]
+|  order by: month ASC, id ASC
+|  row-size=16B cardinality=3
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: `month`
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=16B cardinality=2.17K
+|
+01:SORT
+|  order by: month ASC NULLS LAST, id DESC
+|  row-size=8B cardinality=2.17K
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partition predicates: `month` >= 11
+   HDFS partitions=4/24 files=4 size=34.10KB
+   row-size=8B cardinality=2.17K
+====
+# IMPALA-10229: limit can be pushed through analytic with no predicates
+# when sort orders of ORDER BY clause and OVER clause match exactly.
+select *
+from (
+    select month, id, rank() over (partition by month order by id) rnk
+    from functional_parquet.alltypes
+    WHERE month >= 11) v
+order by month, id
+limit 3
+---- PLAN
+PLAN-ROOT SINK
+|
+03:TOP-N [LIMIT=3]
+|  order by: month ASC, id ASC
+|  row-size=16B cardinality=3
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: `month`
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=16B cardinality=3
+|
+01:TOP-N [LIMIT=3]
+|  order by: month ASC NULLS LAST, id ASC
+|  row-size=8B cardinality=3
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partition predicates: `month` >= 11
+   HDFS partitions=4/24 files=4 size=34.10KB
+   row-size=8B cardinality=2.17K
+====
+# IMPALA-10229: limit can be pushed through analytic with no predicates
+# when sort orders of ORDER BY clause is a prefix of the OVER clause and
+# the sort order matches exactly.
+select *
+from (
+    select month, id, int_col, rank() over (partition by month order by id) rnk
+    from functional_parquet.alltypes
+    WHERE month >= 11) v
+order by month, id, int_col desc
+limit 3
+---- PLAN
+PLAN-ROOT SINK
+|
+03:TOP-N [LIMIT=3]
+|  order by: month ASC, id ASC, int_col DESC
+|  row-size=20B cardinality=3
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: `month`
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=20B cardinality=3
+|
+01:TOP-N [LIMIT=3]
+|  order by: month ASC NULLS LAST, id ASC
+|  row-size=12B cardinality=3
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partition predicates: `month` >= 11
+   HDFS partitions=4/24 files=4 size=34.10KB
+   row-size=12B cardinality=2.17K
+====
+# Limit pushdown compares equality of non-trivial order by expressions, including
+# constants and non-trivial expressions, so can push down limit in some cases.
+select *
+from (
+    select month, id, int_col, string_col,
+      rank() over (partition by 'hello', month order by id, int_col * 2) rnk
+    from functional_parquet.alltypes
+    WHERE month >= 11) v
+order by 'hello', month, id, int_col * 2, int_col desc
+limit 3
+---- PLAN
+PLAN-ROOT SINK
+|
+03:TOP-N [LIMIT=3]
+|  order by: 'hello' ASC, month ASC, id ASC, int_col * 2 ASC, int_col DESC
+|  row-size=32B cardinality=3
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: 'hello', `month`
+|  order by: id ASC, int_col * 2 ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=32B cardinality=3
+|
+01:TOP-N [LIMIT=3]
+|  order by: 'hello' ASC NULLS LAST, month ASC NULLS LAST, id ASC, int_col * 2 ASC
+|  row-size=24B cardinality=3
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partition predicates: `month` >= 11
+   HDFS partitions=4/24 files=4 size=34.10KB
+   row-size=24B cardinality=2.17K
+====
+# Non-trivial order by expressions may not compare equal if the expression was
+# materialized before the sort - lower(string_col) in this case.
+select *
+from (
+    select month, id, int_col, string_col,
+      rank() over (partition by 'hello', month order by id, lower(string_col)) rnk
+    from functional_parquet.alltypes
+    WHERE month >= 11) v
+order by 'hello', month, id, lower(string_col)
+limit 3
+---- PLAN
+PLAN-ROOT SINK
+|
+03:TOP-N [LIMIT=3]
+|  order by: 'hello' ASC, month ASC, id ASC, lower(string_col) ASC
+|  row-size=44B cardinality=3
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: 'hello', `month`
+|  order by: id ASC, lower(string_col) ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=44B cardinality=2.17K
+|
+01:SORT
+|  order by: 'hello' ASC NULLS LAST, month ASC NULLS LAST, id ASC, lower(string_col) ASC
+|  row-size=36B cardinality=2.17K
+|
+00:SCAN HDFS [functional_parquet.alltypes]
+   partition predicates: `month` >= 11
+   HDFS partitions=4/24 files=4 size=34.10KB
+   row-size=24B cardinality=2.17K
 ====

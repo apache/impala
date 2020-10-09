@@ -20,33 +20,33 @@ package org.apache.impala.planner;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.impala.common.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.impala.analysis.AnalyticExpr;
 import org.apache.impala.analysis.AnalyticWindow;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.BoolLiteral;
 import org.apache.impala.analysis.CompoundPredicate;
+import org.apache.impala.analysis.CompoundPredicate.Operator;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.IsNullPredicate;
+import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.OrderByElement;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.SortInfo;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
-import org.apache.impala.analysis.CompoundPredicate.Operator;
-import org.apache.impala.analysis.NumericLiteral;
-import org.apache.impala.analysis.SortInfo;
+import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TAnalyticNode;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
@@ -420,31 +420,21 @@ public class AnalyticEvalNode extends PlanNode {
       return false;
     }
 
-    if (sortExprs.size() > 0 && pbExprs.size() > sortExprs.size()) return false;
-
     Preconditions.checkArgument(analyticSortSortExprs.size() >= pbExprs.size());
     // Check if pby exprs are a prefix of the top level sort exprs
+    // TODO: also check if subsequent expressions match. Need to check ASC and NULLS FIRST
+    // compatibility more explicitly in the case.
     if (sortExprs.size() == 0) {
       sortExprsForPartitioning.addAll(pbExprs);
     } else {
-      for (int i = 0; i < pbExprs.size(); i++) {
-        Expr pbExpr = pbExprs.get(i);
-        Expr sortExpr = sortExprs.get(i);
-        if (!(pbExpr instanceof SlotRef && sortExpr instanceof SlotRef)) return false;
-
-        if (!((SlotRef) pbExpr).equals(((SlotRef) sortExpr))) {
-          // pby exprs are not a prefix of the top level sort exprs
-          return false;
-        } else {
-          // get the corresponding sort expr from the analytic sort
-          // since that's what will eventually be used for hash partitioning
-          sortExprsForPartitioning.add(analyticSortSortExprs.get(i));
-        }
-        // check the ASC/DESC and NULLS FIRST/LAST compatibility.
-        if (!sortInfo.getIsAscOrder().get(i) || sortInfo.getNullsFirst().get(i)) {
-          return false;
-        }
+      if (!analyticSortExprsArePrefix(
+              sortInfo, sortExprs, analyticNodeSort.getSortInfo(), pbExprs)) {
+        return false;
       }
+
+      // get the corresponding sort exprs from the analytic sort
+      // since that's what will eventually be used for hash partitioning
+      sortExprsForPartitioning.addAll(analyticSortSortExprs.subList(0, pbExprs.size()));
     }
 
     // check that the window frame is UNBOUNDED PRECEDING to CURRENT ROW
@@ -456,7 +446,11 @@ public class AnalyticEvalNode extends PlanNode {
     }
 
     if (selectNode == null) {
-      return true;
+      // Limit pushdown is valid if the pre-analytic sort puts rows into the same order
+      // as sortExprs. We check the prefix match, since extra analytic sort exprs do not
+      // affect the compatibility of the ordering with sortExprs.
+      return analyticSortExprsArePrefix(sortInfo, sortExprs,
+              analyticNodeSort.getSortInfo(), analyticSortSortExprs);
     } else {
       Pair<Boolean, Double> status =
               isPredEligibleForLimitPushdown(selectNode.getConjuncts(), limit);
@@ -469,8 +463,37 @@ public class AnalyticEvalNode extends PlanNode {
   }
 
   /**
+   * Checks if 'analyticSortExprs' is a prefix of the 'sortExprs' from an outer sort.
+   * @param sortInfo sort info from the outer sort
+   * @param sortExprs sort exprs from the outer sort. Must be a prefix of the full
+   *                sort exprs from sortInfo.
+   * @param analyticSortInfo sort info from the analytic sort
+   * @param analyticSortExprs sort expressions from the analytic sort. Must be a prefix
+   *                of the full sort exprs from analyticSortInfo.
+   */
+  private boolean analyticSortExprsArePrefix(SortInfo sortInfo, List<Expr> sortExprs,
+          SortInfo analyticSortInfo, List<Expr> analyticSortExprs) {
+    if (analyticSortExprs.size() > sortExprs.size()) return false;
+    for (int i = 0; i < analyticSortExprs.size(); i++) {
+      if (!analyticSortExprs.get(i).equals(sortExprs.get(i))) return false;
+      // check the ASC/DESC and NULLS FIRST/LAST compatibility.
+      if (!sortInfo.getIsAscOrder().get(i).equals(
+              analyticSortInfo.getIsAscOrder().get(i))) {
+        return false;
+      }
+      if (!sortInfo.getNullsFirst().get(i).equals(
+              analyticSortInfo.getNullsFirst().get(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * Check eligibility of a predicate (provided as list of conjuncts) for limit
    * pushdown optimization.
+   * TODO: IMPALA-10296: this check is not strict enough to allow limit pushdown to
+   * be safe in all circumstances.
    * @param conjuncts list of conjuncts from the predicate
    * @param limit limit from outer sort
    * @return a Pair whose first value is True if the conjuncts+limit allows pushdown,

@@ -72,3 +72,20 @@ limit 10
 ---- TYPES
 BIGINT, DECIMAL, BIGINT, BIGINT
 ====
+---- QUERY
+# IMPALA-10299: the limit pushdown optimization should not be applied because
+# the sort orders do not match exactly.
+select *
+from (
+  select month, id, rank() over (partition by month order by id desc) rnk
+  from functional_parquet.alltypes
+  WHERE month >= 11) v
+order by month, id
+limit 3
+---- RESULTS
+11,3040,600
+11,3041,599
+11,3042,598
+---- TYPES
+INT, INT, BIGINT
+====
