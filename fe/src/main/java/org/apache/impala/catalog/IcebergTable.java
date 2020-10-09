@@ -110,16 +110,17 @@ public class IcebergTable extends Table implements FeIcebergTable {
       Db db, String name, String owner) {
     super(msTable, db, name, owner);
     icebergTableLocation_ = msTable.getSd().getLocation();
-    icebergCatalog_ = IcebergUtil.getIcebergCatalog(msTable);
+    icebergCatalog_ = IcebergUtil.getTIcebergCatalog(msTable);
     icebergFileFormat_ = Utils.getIcebergFileFormat(msTable);
     hdfsTable_ = new HdfsTable(msTable, db, name, owner);
   }
 
   /**
-   * If managed table or external purge table , we create table by iceberg api,
-   * or we just create hms table.
+   * A table is synchronized table if its Managed table or if its a external table with
+   * <code>external.table.purge</code> property set to true.
+   * We need to create/drop/etc. synchronized tables through the Iceberg APIs as well.
    */
-  public static boolean needsCreateInIceberg(
+  public static boolean isSynchronizedTable(
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
     Preconditions.checkState(isIcebergTable(msTbl));
     return isManagedTable(msTbl) || isExternalPurgeTable(msTbl);
@@ -128,7 +129,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
   /**
    * Returns if this metastore table has managed table type
    */
-  private static boolean isManagedTable(
+  public static boolean isManagedTable(
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
     return msTbl.getTableType().equalsIgnoreCase(TableType.MANAGED_TABLE.toString());
   }

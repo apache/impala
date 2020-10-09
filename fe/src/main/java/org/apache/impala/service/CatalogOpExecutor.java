@@ -70,6 +70,7 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.TableName;
@@ -85,6 +86,7 @@ import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeCatalogUtils;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
@@ -1898,6 +1900,14 @@ public class CatalogOpExecutor {
         KuduCatalogOpExecutor.dropTable(msTbl, /* if exists */ true);
       }
 
+      if (msTbl != null &&
+          !(existingTbl instanceof IncompleteTable) &&
+          IcebergTable.isIcebergTable(msTbl) &&
+          IcebergTable.isSynchronizedTable(msTbl)) {
+        Preconditions.checkState(existingTbl instanceof IcebergTable);
+        IcebergCatalogOpExecutor.dropTable((IcebergTable)existingTbl, params.if_exists);
+      }
+
       // Check to make sure we don't drop a view with "drop table" statement and
       // vice versa. is_table field is marked optional in TDropTableOrViewParams to
       // maintain catalog api compatibility.
@@ -2616,10 +2626,10 @@ public class CatalogOpExecutor {
               msClient.getHiveClient().tableExists(newTable.getDbName(),
                   newTable.getTableName());
           if (!tableInMetastore) {
-            TIcebergCatalog catalog = IcebergUtil.getIcebergCatalog(newTable);
+            TIcebergCatalog catalog = IcebergUtil.getTIcebergCatalog(newTable);
             String location = newTable.getSd().getLocation();
             //Create table in iceberg if necessary
-            if (IcebergTable.needsCreateInIceberg(newTable)) {
+            if (IcebergTable.isSynchronizedTable(newTable)) {
               //Set location here if not been specified in sql
               if (location == null) {
                 if (catalog == TIcebergCatalog.HADOOP_CATALOG) {
@@ -2635,17 +2645,19 @@ public class CatalogOpExecutor {
                 }
               }
               String tableLoc = IcebergCatalogOpExecutor.createTable(catalog,
-                  IcebergUtil.getIcebergTableIdentifier(newTable), location, params);
+                  IcebergUtil.getIcebergTableIdentifier(newTable), location, params)
+                  .location();
               newTable.getSd().setLocation(tableLoc);
             } else {
               if (location == null) {
                 if (catalog == TIcebergCatalog.HADOOP_CATALOG) {
                   // When creating external Iceberg table with 'hadoop.catalog'
                   // We use catalog location and table identifier as location
-                  String identifier = IcebergUtil.getIcebergTableIdentifier(newTable);
+                  TableIdentifier identifier =
+                      IcebergUtil.getIcebergTableIdentifier(newTable);
                   newTable.getSd().setLocation(String.format("%s/%s/%s",
                       IcebergUtil.getIcebergCatalogLocation(newTable),
-                      identifier.split("\\.")[0], identifier.split("\\.")[1]));
+                      identifier.namespace().level(0), identifier.name()));
                 } else {
                   addSummary(response,
                       "Location is necessary for external iceberg table.");

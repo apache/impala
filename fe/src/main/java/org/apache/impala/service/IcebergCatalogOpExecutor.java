@@ -20,19 +20,21 @@ package org.apache.impala.service;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.hadoop.HadoopCatalog;
-import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Types;
 import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateTableParams;
@@ -56,39 +58,35 @@ public class IcebergCatalogOpExecutor {
    * Create Iceberg table by Iceberg api
    * Return value is table location from Iceberg
    */
-  public static String createTable(TIcebergCatalog catalog, String identifier,
+  public static Table createTable(TIcebergCatalog catalog, TableIdentifier identifier,
       String location, TCreateTableParams params) throws ImpalaRuntimeException {
     // Each table id increase from zero
     iThreadLocal.set(0);
     Schema schema = createIcebergSchema(params);
     PartitionSpec spec = IcebergUtil.createIcebergPartition(schema, params);
-    String tableLoc = null;
-    if (catalog == TIcebergCatalog.HADOOP_CATALOG) {
-      tableLoc = createTableByHadoopCatalog(location, schema, spec, identifier);
-    } else {
-      Preconditions.checkArgument(catalog == TIcebergCatalog.HADOOP_TABLES);
-      tableLoc = createTableByHadoopTables(location, schema, spec);
-    }
+    IcebergCatalog icebergCatalog = IcebergUtil.getIcebergCatalog(catalog, location);
+    Table iceTable = icebergCatalog.createTable(identifier, schema, spec, location, null);
     LOG.info("Create iceberg table successful.");
-    return tableLoc;
+    return iceTable;
   }
 
-  // Create Iceberg table by HadoopTables
-  private static String createTableByHadoopTables(String metadataLoc, Schema schema,
-      PartitionSpec spec) {
-    HadoopTables tables = IcebergUtil.getHadoopTables();
-    BaseTable table = (BaseTable) tables.create(schema, spec, null, metadataLoc);
-    return table.location();
-  }
-
-  // Create Iceberg table by HadoopCatalog
-  private static String createTableByHadoopCatalog(String catalogLoc, Schema schema,
-      PartitionSpec spec, String identifier) {
-    // Each table id increase from zero
-    HadoopCatalog catalog = IcebergUtil.getHadoopCatalog(catalogLoc);
-    BaseTable table = (BaseTable) catalog.createTable(TableIdentifier.parse(identifier),
-        schema, spec, null);
-    return table.location();
+  /**
+   * Drops Iceberg table from Iceberg's catalog.
+   * Throws TableNotFoundException if table is not found and 'ifExists' is false.
+   */
+  public static void dropTable(FeIcebergTable feTable, boolean ifExists)
+      throws TableNotFoundException, ImpalaRuntimeException {
+    Preconditions.checkState(
+        IcebergTable.isSynchronizedTable(feTable.getMetaStoreTable()));
+    IcebergCatalog iceCatalog = IcebergUtil.getIcebergCatalog(feTable);
+    if (!iceCatalog.dropTable(feTable,
+        IcebergTable.isSynchronizedTable(feTable.getMetaStoreTable()))) {
+      // The table didn't exist.
+      if (!ifExists) {
+        throw new TableNotFoundException(String.format(
+            "Table '%s' does not exist in Iceberg catalog.", feTable.getFullName()));
+      }
+    }
   }
 
   /**

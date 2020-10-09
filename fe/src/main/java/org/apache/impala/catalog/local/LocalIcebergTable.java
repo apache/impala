@@ -62,9 +62,9 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     Preconditions.checkNotNull(msTable);
     try {
       TableParams params = new TableParams(msTable);
-      String tableName = IcebergUtil.getIcebergTableIdentifier(msTable);
       TableMetadata metadata =
-          IcebergUtil.getIcebergTableMetadata(params.icebergCatalog_, tableName,
+          IcebergUtil.getIcebergTableMetadata(params.icebergCatalog_,
+              IcebergUtil.getIcebergTableIdentifier(msTable),
               params.icebergCatalogLocation_);
 
       return new LocalIcebergTable(db, msTable, ref, ColumnMap.fromMsTable(msTable),
@@ -191,7 +191,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
         throw new LocalCatalogException("Cannot find iceberg table location for table "
             + fullTableName);
       }
-      icebergCatalog_ = IcebergUtil.getIcebergCatalog(msTable);
+      icebergCatalog_ = IcebergUtil.getTIcebergCatalog(msTable);
 
       if (icebergCatalog_ == TIcebergCatalog.HADOOP_CATALOG) {
         icebergCatalogLocation_ = Utils.getIcebergCatalogLocation(msTable);
