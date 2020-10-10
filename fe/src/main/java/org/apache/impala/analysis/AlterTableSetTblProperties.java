@@ -27,8 +27,10 @@ import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
@@ -93,7 +95,11 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
           hive_metastoreConstants.META_TABLE_STORAGE));
     }
 
-    if (getTargetTable() instanceof FeKuduTable) analyzeKuduTable(analyzer);
+    if (getTargetTable() instanceof FeKuduTable) {
+      analyzeKuduTable(analyzer);
+    } else if (getTargetTable() instanceof FeIcebergTable) {
+      analyzeIcebergTable(analyzer);
+    }
 
     // Check avro schema when it is set in avro.schema.url or avro.schema.literal to
     // avoid potential metadata corruption (see IMPALA-2042).
@@ -136,6 +142,21 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
         Preconditions.checkNotNull(authzServer);
         analyzer.registerPrivReq(builder -> builder.onServer(authzServer).all().build());
       }
+    }
+  }
+
+  private void analyzeIcebergTable(Analyzer analyzer) throws AnalysisException {
+    //Cannot set these properties related to metadata
+    icebergPropertyCheck(IcebergTable.ICEBERG_FILE_FORMAT);
+    icebergPropertyCheck(IcebergTable.ICEBERG_CATALOG);
+    icebergPropertyCheck(IcebergTable.ICEBERG_CATALOG_LOCATION);
+    icebergPropertyCheck(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
+  }
+
+  private void icebergPropertyCheck(String property) throws AnalysisException {
+    if (tblProperties_.containsKey(property)) {
+      throw new AnalysisException(String.format("Changing the '%s' table property is " +
+          "not supported for Iceberg table.", property));
     }
   }
 

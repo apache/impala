@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsPartition;
@@ -77,6 +78,11 @@ public class AlterTableSetLocationStmt extends AlterTableSetStmt {
 
     FeTable table = getTargetTable();
     Preconditions.checkNotNull(table);
+    if (table instanceof FeIcebergTable) {
+      throw new AnalysisException("ALTER TABLE SET LOCATION is not supported on Iceberg "
+          + "tables: " + table.getFullName());
+    }
+
     if (table instanceof FeFsTable) {
       FeFsTable hdfsTable = (FeFsTable) table;
       if (getPartitionSet() != null) {

@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
@@ -59,6 +60,11 @@ public class AlterTableSetFileFormatStmt extends AlterTableSetStmt {
     if (tbl instanceof FeKuduTable) {
       throw new AnalysisException("ALTER TABLE SET FILEFORMAT is not supported " +
           "on Kudu tables: " + tbl.getFullName());
+    }
+
+    if (tbl instanceof FeIcebergTable) {
+      throw new AnalysisException("ALTER TABLE SET FILEFORMAT is not supported " +
+          "on Iceberg tables: " + tbl.getFullName());
     }
   }
 }

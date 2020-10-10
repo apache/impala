@@ -25,6 +25,7 @@ import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
@@ -96,6 +97,67 @@ public class IcebergCatalogOpExecutor {
             "Table '%s' does not exist in Iceberg catalog.", feTable.getFullName()));
       }
     }
+  }
+
+  /**
+   * Adds a column to an existing Iceberg table.
+   */
+  public static void addColumn(FeIcebergTable feTable, List<TColumn> columns)
+      throws TableLoadingException, ImpalaRuntimeException {
+    UpdateSchema schema = IcebergUtil.getIcebergUpdateSchema(feTable);
+    for (TColumn column : columns) {
+      org.apache.iceberg.types.Type type =
+          IcebergUtil.fromImpalaColumnType(column.getColumnType());
+      schema.addColumn(column.getColumnName(), type, column.getComment());
+    }
+    schema.commit();
+  }
+
+  /**
+   * Updates the column from Iceberg table.
+   * Iceberg only supports these type conversions:
+   *   INTEGER -> LONG
+   *   FLOAT -> DOUBLE
+   *   DECIMAL(s1,p1) -> DECIMAL(s1,p2), same scale, p1<=p2
+   */
+  public static void alterColumn(FeIcebergTable feTable, String colName, TColumn newCol)
+      throws TableLoadingException, ImpalaRuntimeException {
+    UpdateSchema schema = IcebergUtil.getIcebergUpdateSchema(feTable);
+    org.apache.iceberg.types.Type type =
+        IcebergUtil.fromImpalaColumnType(newCol.getColumnType());
+    // Cannot change a column to complex type
+    Preconditions.checkState(type.isPrimitiveType());
+    schema.updateColumn(colName, type.asPrimitiveType());
+
+    // Rename column if newCol name and oldCol name are different
+    if (!colName.equals(newCol.getColumnName())) {
+      schema.renameColumn(colName, newCol.getColumnName());
+    }
+
+    // Update column comment if not empty
+    if (newCol.getComment() != null && !newCol.getComment().isEmpty()) {
+      schema.updateColumnDoc(colName, newCol.getComment());
+    }
+    schema.commit();
+  }
+
+  /**
+   * Drops a column from a Iceberg table.
+   */
+  public static void dropColumn(FeIcebergTable feTable, String colName)
+      throws TableLoadingException, ImpalaRuntimeException {
+    UpdateSchema schema = IcebergUtil.getIcebergUpdateSchema(feTable);
+    schema.deleteColumn(colName);
+    schema.commit();
+  }
+
+  /**
+   * Rename Iceberg table
+   */
+  public static void renameTable(FeIcebergTable feTable, TableIdentifier tableId)
+      throws ImpalaRuntimeException{
+    IcebergCatalog catalog = IcebergUtil.getIcebergCatalog(feTable);
+    catalog.renameTable(feTable, tableId);
   }
 
   /**

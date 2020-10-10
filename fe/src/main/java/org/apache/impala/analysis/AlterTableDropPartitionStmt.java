@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
@@ -78,6 +79,9 @@ public class AlterTableDropPartitionStmt extends AlterTableStmt {
     if (table instanceof FeKuduTable) {
       throw new AnalysisException("ALTER TABLE DROP PARTITION is not supported for " +
           "Kudu tables: " + partitionSet_.toSql());
+    } else if (table instanceof FeIcebergTable) {
+      throw new AnalysisException("ALTER TABLE DROP PARTITION is not supported for " +
+          "Iceberg tables: " + table.getFullName());
     }
     if (!ifExists_) partitionSet_.setPartitionShouldExist();
     partitionSet_.setPrivilegeRequirement(Privilege.ALTER);

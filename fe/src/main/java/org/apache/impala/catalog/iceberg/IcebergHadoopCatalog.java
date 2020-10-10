@@ -107,4 +107,15 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
     TableIdentifier tableId = IcebergUtil.getIcebergTableIdentifier(feTable);
     return hadoopCatalog.dropTable(tableId, purge);
   }
+
+  @Override
+  public void renameTable(FeIcebergTable feTable, TableIdentifier newTableId) {
+    TableIdentifier oldTableId = IcebergUtil.getIcebergTableIdentifier(feTable);
+    try {
+      hadoopCatalog.renameTable(oldTableId, newTableId);
+    } catch (UnsupportedOperationException e) {
+      throw new UnsupportedOperationException(
+          "Cannot rename Iceberg tables that use 'hadoop.catalog' as catalog.");
+    }
+  }
 }

@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableType;
@@ -46,6 +47,11 @@ public class AlterTableRecoverPartitionsStmt extends AlterTableStmt {
     if (!(table_ instanceof FeFsTable)) {
       throw new AnalysisException("ALTER TABLE RECOVER PARTITIONS " +
           "must target an HDFS table: " + tableName_);
+    }
+
+    if (table_ instanceof FeIcebergTable) {
+      throw new AnalysisException("ALTER TABLE RECOVER PARTITIONS is not supported " +
+          "on Iceberg tables: " + table_.getFullName());
     }
 
     // Make sure the target table is partitioned.

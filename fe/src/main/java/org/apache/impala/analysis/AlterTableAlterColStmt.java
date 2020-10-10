@@ -22,6 +22,7 @@ import java.util.Map;
 
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.KuduColumn;
@@ -172,6 +173,16 @@ public class AlterTableAlterColStmt extends AlterTableStmt {
       if (newColDef_.isNullabilitySet()) {
         throw new AnalysisException(
             "Altering the nullability of a column is not supported.");
+      }
+    }
+
+    if (t instanceof FeIcebergTable) {
+      // We cannot update column from primitive type to complex type or
+      // from complex type to primitive type
+      if (t.getColumn(colName_).getType().isComplexType() ||
+          newColDef_.getType().isComplexType()) {
+        throw new AnalysisException(String.format("ALTER TABLE CHANGE COLUMN " +
+            "is not supported for complex types in Iceberg tables."));
       }
     }
   }
