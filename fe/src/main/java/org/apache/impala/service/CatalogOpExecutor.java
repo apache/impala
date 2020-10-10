@@ -685,6 +685,10 @@ public class CatalogOpExecutor {
       if (tbl instanceof KuduTable && altersKuduTable(params.getAlter_type())) {
         alterKuduTable(params, response, (KuduTable) tbl, newCatalogVersion);
         return;
+      } else if (tbl instanceof IcebergTable &&
+          altersIcebergTable(params.getAlter_type())) {
+        alterIcebergTable(params, response, (IcebergTable) tbl, newCatalogVersion);
+        return;
       }
       switch (params.getAlter_type()) {
         case ADD_COLUMNS:
@@ -927,6 +931,56 @@ public class CatalogOpExecutor {
     }
 
     loadTableMetadata(tbl, newCatalogVersion, true, true, null, "ALTER KUDU TABLE " +
+        params.getAlter_type().name());
+    addTableToCatalogUpdate(tbl, response.result);
+  }
+
+  /**
+   * Returns true if the given alteration type changes the underlying table stored in
+   * Iceberg in addition to the HMS table.
+   */
+  private boolean altersIcebergTable(TAlterTableType type) {
+    return type == TAlterTableType.ADD_COLUMNS
+        || type == TAlterTableType.REPLACE_COLUMNS
+        || type == TAlterTableType.DROP_COLUMN
+        || type == TAlterTableType.ALTER_COLUMN;
+  }
+
+  /**
+   * Executes the ALTER TABLE command for a Iceberg table and reloads its metadata.
+   */
+  private void alterIcebergTable(TAlterTableParams params, TDdlExecResponse response,
+      IcebergTable tbl, long newCatalogVersion) throws ImpalaException {
+    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    switch (params.getAlter_type()) {
+      case ADD_COLUMNS:
+        TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
+        IcebergCatalogOpExecutor.addColumn(tbl, addColParams.getColumns());
+        addSummary(response, "Column(s) have been added.");
+        break;
+      case REPLACE_COLUMNS:
+        //TODO: we need support resolve column by field id at first, and then
+        // support this statement
+      case DROP_COLUMN:
+        //TODO: we need support resolve column by field id at first, and then
+        // support this statement
+        //TAlterTableDropColParams dropColParams = params.getDrop_col_params();
+        //IcebergCatalogOpExecutor.dropColumn(tbl, dropColParams.getCol_name());
+        //addSummary(response, "Column has been dropped.");
+      case ALTER_COLUMN:
+        //TODO: we need support resolve column by field id at first, and then
+        // support this statement
+        //TAlterTableAlterColParams alterColParams = params.getAlter_col_params();
+        //IcebergCatalogOpExecutor.alterColumn(tbl, alterColParams.getCol_name(),
+        //    alterColParams.getNew_col_def());
+        //addSummary(response, "Column has been altered.");
+      default:
+        throw new UnsupportedOperationException(
+            "Unsupported ALTER TABLE operation for Iceberg tables: " +
+            params.getAlter_type());
+    }
+
+    loadTableMetadata(tbl, newCatalogVersion, true, true, null, "ALTER Iceberg TABLE " +
         params.getAlter_type().name());
     addTableToCatalogUpdate(tbl, response.result);
   }
@@ -3265,6 +3319,13 @@ public class CatalogOpExecutor {
           isKuduHmsIntegrationEnabled);
     }
 
+    // If oldTbl is a synchronized Iceberg table, rename the underlying Iceberg table.
+    boolean isSynchronizedIcebergTable = (oldTbl instanceof IcebergTable) &&
+        IcebergTable.isSynchronizedTable(msTbl);
+    if (isSynchronizedIcebergTable) {
+      renameManagedIcebergTable((IcebergTable) oldTbl, msTbl, newTableName);
+    }
+
     // Always updates the HMS metadata for non-Kudu tables. For Kudu tables, when
     // Kudu is not integrated with the Hive Metastore or if this is an external table,
     // Kudu will not automatically update the HMS metadata, we have to do it
@@ -3318,6 +3379,24 @@ public class CatalogOpExecutor {
 
     // Add the name of the new Kudu table to the HMS table parameters
     oldMsTbl.getParameters().put(KuduTable.KEY_TABLE_NAME, newKuduTableName);
+  }
+
+  /**
+   * Renames the underlying Iceberg table for the given managed table. If the new Iceberg
+   * table name is the same as the old Iceberg table name, this method does nothing.
+   */
+  private void renameManagedIcebergTable(IcebergTable oldTbl,
+      org.apache.hadoop.hive.metastore.api.Table msTbl,
+      TableName newTableName) throws ImpalaRuntimeException {
+    TableIdentifier tableId = TableIdentifier.of(newTableName.getDb(),
+        newTableName.getTbl());
+    IcebergCatalogOpExecutor.renameTable(oldTbl, tableId);
+
+    if (msTbl.getParameters().get(IcebergTable.ICEBERG_TABLE_IDENTIFIER) != null) {
+      // We need update table identifier for HadoopCatalog managed table if exists.
+      msTbl.getParameters().put(IcebergTable.ICEBERG_TABLE_IDENTIFIER,
+          tableId.toString());
+    }
   }
 
   /**

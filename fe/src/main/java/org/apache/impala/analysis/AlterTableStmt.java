@@ -21,7 +21,6 @@ import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeDataSourceTable;
-import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TAlterTableParams;
@@ -88,10 +87,6 @@ public abstract class AlterTableStmt extends StatementBase {
     if (tableRef instanceof CollectionTableRef) {
       throw new AnalysisException(String.format(
           "ALTER TABLE not allowed on a nested collection: %s", tableName_));
-    }
-    if (tableRef.getTable() instanceof FeIcebergTable) {
-      throw new AnalysisException(String.format(
-          "ALTER TABLE not allowed on iceberg table: %s", tableName_));
     }
     Preconditions.checkState(tableRef instanceof BaseTableRef);
     table_ = tableRef.getTable();

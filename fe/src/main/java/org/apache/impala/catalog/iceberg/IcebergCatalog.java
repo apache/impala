@@ -62,4 +62,11 @@ public interface IcebergCatalog {
    * Return true if the table was dropped, false if the table did not exist
    */
   boolean dropTable(FeIcebergTable feTable, boolean purge);
+
+  /**
+   * Renames Iceberg table.
+   * For HadoopTables, Iceberg does not supported 'renameTable' method
+   * For HadoopCatalog, Iceberg implement 'renameTable' method with Exception threw
+   */
+  void renameTable(FeIcebergTable feTable, TableIdentifier newTableId);
 }

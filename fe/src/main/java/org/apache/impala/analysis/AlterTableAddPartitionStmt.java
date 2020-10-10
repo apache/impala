@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Joiner;
 
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
@@ -84,6 +85,9 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
     if (table instanceof FeKuduTable) {
       throw new AnalysisException("ALTER TABLE ADD PARTITION is not supported for " +
           "Kudu tables: " + table.getTableName());
+    } else if (table instanceof FeIcebergTable) {
+      throw new AnalysisException("ALTER TABLE ADD PARTITION is not supported for " +
+          "Iceberg tables: " + table.getTableName());
     }
     Set<String> partitionSpecs = new HashSet<>();
     for (PartitionDef p: partitions_) {

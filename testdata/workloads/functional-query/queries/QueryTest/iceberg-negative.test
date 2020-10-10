@@ -1,12 +1,12 @@
 ====
 ---- QUERY
-CREATE TABLE iceberg_test1
+CREATE TABLE iceberg_test
 STORED AS ICEBERG;
 ---- CATCH
 AnalysisException: Table requires at least 1 column for managed iceberg table.
 ====
 ---- QUERY
-CREATE TABLE iceberg_test2(
+CREATE TABLE iceberg_test(
   level STRING
 )
 PARTITION BY SPEC
@@ -19,21 +19,16 @@ STORED AS ICEBERG;
 AnalysisException: Cannot find source column: event_time
 ====
 ---- QUERY
-CREATE TABLE iceberg_test3(
+CREATE TABLE iceberg_table_hadoop_tables(
   level STRING
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 ====
 ---- QUERY
-TRUNCATE iceberg_test3
+TRUNCATE iceberg_table_hadoop_tables
 ---- CATCH
-AnalysisException: TRUNCATE TABLE not supported on iceberg table: $DATABASE.iceberg_test3
-====
----- QUERY
-ALTER TABLE iceberg_test3 ADD COLUMN event_time TIMESTAMP
----- CATCH
-AnalysisException: ALTER TABLE not allowed on iceberg table: iceberg_test3
+AnalysisException: TRUNCATE TABLE not supported on iceberg table: $DATABASE.iceberg_table_hadoop_tables
 ====
 ---- QUERY
 # iceberg_non_partitioned is not partitioned
@@ -42,7 +37,7 @@ SHOW PARTITIONS functional_parquet.iceberg_non_partitioned
 AnalysisException: Table is not partitioned: functional_parquet.iceberg_non_partitioned
 ====
 ---- QUERY
-CREATE TABLE iceberg_test4(
+CREATE TABLE iceberg_table_hadoop_catalog(
   level STRING
 )
 STORED AS ICEBERG
@@ -52,7 +47,7 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog');
 AnalysisException: Location cannot be set for Iceberg table with 'hadoop.catalog'.
 ====
 ---- QUERY
-CREATE TABLE iceberg_test5(
+CREATE TABLE iceberg_table_hadoop_catalog(
   level STRING
 )
 STORED AS ICEBERG
@@ -61,7 +56,7 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.catalog');
 AnalysisException: Table property 'iceberg.catalog_location' is necessary for Iceberg table with 'hadoop.catalog'.
 ====
 ---- QUERY
-CREATE EXTERNAL TABLE iceberg_test6
+CREATE EXTERNAL TABLE iceberg_external_table_hadoop_catalog
 STORED AS ICEBERG
 LOCATION '/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
 TBLPROPERTIES('iceberg.catalog_location'='/test-warehouse/fake_table', 'iceberg.table_identifier'='fake_db.fake_table');
@@ -69,17 +64,17 @@ TBLPROPERTIES('iceberg.catalog_location'='/test-warehouse/fake_table', 'iceberg.
 AnalysisException: Location cannot be set for Iceberg table with 'hadoop.catalog'.
 ====
 ---- QUERY
-CREATE EXTERNAL TABLE iceberg_test7
+CREATE EXTERNAL TABLE iceberg_table_hadoop_catalog
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.table_identifier'='fake_db.fake_table');
 ---- CATCH
 AnalysisException: Table property 'iceberg.catalog_location' is necessary for Iceberg table with 'hadoop.catalog'.
 ====
 ---- QUERY
-CREATE EXTERNAL TABLE iceberg_test8
+CREATE EXTERNAL TABLE fake_iceberg_table_hadoop_catalog
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog_location'='/test-warehouse/fake_table', 'iceberg.table_identifier'='fake_db.fake_table');
-SHOW CREATE TABLE iceberg_test8;
+SHOW CREATE TABLE fake_iceberg_table_hadoop_catalog;
 ---- CATCH
 row_regex:.*CAUSED BY: TableLoadingException: Table does not exist: fake_db.fake_table*
 ====
@@ -117,4 +112,86 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 INSERT INTO iceberg_partitioned_insert SELECT * FROM iceberg_partitioned_insert;
 ---- CATCH
 AnalysisException: Impala cannot write partitioned Iceberg tables.
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_tables RENAME TO iceberg_table_hadoop_tables_new;
+---- CATCH
+UnsupportedOperationException: Cannot rename Iceberg tables that use 'hadoop.tables' as catalog.
+====
+---- QUERY
+CREATE TABLE iceberg_table_hadoop_catalog(
+  level STRING,
+  event_time TIMESTAMP
+)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+'iceberg.catalog_location'='/$DATABASE/hadoop_catalog_test');
+ALTER TABLE iceberg_table_hadoop_catalog RENAME TO iceberg_table_hadoop_catalog_new;
+---- CATCH
+UnsupportedOperationException: Cannot rename Iceberg tables that use 'hadoop.catalog' as catalog.
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.file_format'='orc');
+---- CATCH
+AnalysisException: Changing the 'iceberg.file_format' table property is not supported for Iceberg table.
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
+---- CATCH
+AnalysisException: Changing the 'iceberg.catalog' table property is not supported for Iceberg table.
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.catalog_location'='/fake_location');
+---- CATCH
+AnalysisException: Changing the 'iceberg.catalog_location' table property is not supported for Iceberg table.
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.table_identifier'='fake_db.fake_table');
+---- CATCH
+AnalysisException: Changing the 'iceberg.table_identifier' table property is not supported for Iceberg table.
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog set FILEFORMAT PARQUET;
+---- CATCH
+AnalysisException: ALTER TABLE SET FILEFORMAT is not supported on Iceberg tables: $DATABASE.iceberg_table_hadoop_catalog
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog SET ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';
+---- CATCH
+AnalysisException: ALTER TABLE SET ROWFORMAT is not supported on Iceberg tables: $DATABASE.iceberg_table_hadoop_catalog
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog SET LOCATION '/fake_location';
+---- CATCH
+AnalysisException: ALTER TABLE SET LOCATION is not supported on Iceberg tables: $DATABASE.iceberg_table_hadoop_catalog
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog ADD PARTITION(fake_col='fake_value');
+---- CATCH
+AnalysisException: ALTER TABLE ADD PARTITION is not supported for Iceberg tables: $DATABASE.iceberg_table_hadoop_catalog
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog DROP PARTITION(fake_col='fake_value');
+---- CATCH
+AnalysisException: ALTER TABLE DROP PARTITION is not supported for Iceberg tables: $DATABASE.iceberg_table_hadoop_catalog
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog RECOVER PARTITIONS;
+---- CATCH
+AnalysisException: ALTER TABLE RECOVER PARTITIONS is not supported on Iceberg tables: $DATABASE.iceberg_table_hadoop_catalog
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog DROP COLUMN level;
+---- CATCH
+UnsupportedOperationException: Unsupported ALTER TABLE operation for Iceberg tables: DROP_COLUMN
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog CHANGE COLUMN level level1 STRING;
+---- CATCH
+UnsupportedOperationException: Unsupported ALTER TABLE operation for Iceberg tables: ALTER_COLUMN
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog REPLACE COLUMNS(level INT, register_time DATE);
+---- CATCH
+UnsupportedOperationException: Unsupported ALTER TABLE operation for Iceberg tables: REPLACE_COLUMNS
 ====

@@ -121,4 +121,11 @@ public class IcebergHadoopTables implements IcebergCatalog {
     }
     return true;
   }
+
+  @Override
+  public void renameTable(FeIcebergTable feTable, TableIdentifier newTableId) {
+    // HadoopTables no renameTable method in Iceberg
+    throw new UnsupportedOperationException(
+        "Cannot rename Iceberg tables that use 'hadoop.tables' as catalog.");
+  }
 }
