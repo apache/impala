@@ -317,7 +317,7 @@ function update_krpc_conn_metrics_datatable(json) {
 
 function update_krpc_inbound_conn_metrics_datatable(json) {
   var table = $('#inbound_per_conn_metrics').DataTable();
-  var rows = $.map(json["inbounad_per_conn_metrics"], function(row) {
+  var rows = $.map(json["inbound_per_conn_metrics"], function(row) {
     return [[row["remote_ip"], row["num_calls_in_flight"],
              row["socket_stats"]["rtt"]],
              row["socket_stats"]["rttvar"]],
