@@ -338,15 +338,23 @@ Status ExecEnv::Init() {
     // The JVM max heap size is static and therefore known at this point. Other categories
     // of JVM memory consumption are much smaller and dynamic so it is simpler not to
     // include them here.
-    admit_mem_limit_ -= JvmMemoryMetric::HEAP_MAX_USAGE->GetValue();
+    int64_t jvm_max_heap_size = JvmMemoryMetric::HEAP_MAX_USAGE->GetValue();
+    admit_mem_limit_ -= jvm_max_heap_size;
+    if (admit_mem_limit_ <= 0) {
+      return Status(
+          Substitute("Invalid combination of --mem_limit_includes_jvm and JVM max heap "
+                     "size $0, which must be smaller than process memory limit $1",
+              jvm_max_heap_size, bytes_limit));
+    }
   }
 
   bool is_percent;
   int64_t buffer_pool_limit = ParseUtil::ParseMemSpec(FLAGS_buffer_pool_limit,
       &is_percent, admit_mem_limit_);
   if (buffer_pool_limit <= 0) {
-    return Status(Substitute("Invalid --buffer_pool_limit value, must be a percentage or "
-          "positive bytes value or percentage: $0", FLAGS_buffer_pool_limit));
+    return Status(Substitute("Invalid --buffer_pool_limit value, must be a "
+                             "positive bytes value or percentage: $0",
+        FLAGS_buffer_pool_limit));
   }
   buffer_pool_limit = BitUtil::RoundDown(buffer_pool_limit, FLAGS_min_buffer_size);
   LOG(INFO) << "Buffer pool limit: "
@@ -356,7 +364,7 @@ Status ExecEnv::Init() {
       &is_percent, buffer_pool_limit);
   if (clean_pages_limit <= 0) {
     return Status(Substitute("Invalid --buffer_pool_clean_pages_limit value, must be a "
-        "percentage or positive bytes value or percentage: $0",
+                             "positive bytes value or percentage: $0",
         FLAGS_buffer_pool_clean_pages_limit));
   }
   InitBufferPool(FLAGS_min_buffer_size, buffer_pool_limit, clean_pages_limit);
