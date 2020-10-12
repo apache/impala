@@ -55,7 +55,8 @@ public class TopicUpdateLog {
   // associated with a catalog object and stores information about the last topic update
   // that processed that object.
   public static class Entry {
-    // Number of times the entry has skipped a topic update.
+    // Number of times the entry has skipped a topic update because the table version
+    // was out of the requested update version window.
     private final int numSkippedUpdates_;
     // Last version of the corresponding catalog object that was added to a topic
     // update. -1 if the object was never added to a topic update.
@@ -63,22 +64,31 @@ public class TopicUpdateLog {
     // Version of the last topic update to include the corresponding catalog object.
     // -1 if the object was never added to a topic update.
     private final long lastSentTopicUpdate_;
+    // number of time the topic update skipped this table due to lock contention
+    private final int numSkippedUpdatesLockContention_;
 
     Entry() {
       numSkippedUpdates_ = 0;
       lastSentVersion_ = -1;
       lastSentTopicUpdate_ = -1;
+      numSkippedUpdatesLockContention_ = 0;
     }
 
-    Entry(int numSkippedUpdates, long lastSentVersion, long lastSentCatalogUpdate) {
+    Entry(int numSkippedUpdates, long lastSentVersion, long lastSentCatalogUpdate,
+        int numSkippedUpdatesLockContention) {
       numSkippedUpdates_ = numSkippedUpdates;
       lastSentVersion_ = lastSentVersion;
       lastSentTopicUpdate_ = lastSentCatalogUpdate;
+      numSkippedUpdatesLockContention_ = numSkippedUpdatesLockContention;
     }
 
     public int getNumSkippedTopicUpdates() { return numSkippedUpdates_; }
     public long getLastSentVersion() { return lastSentVersion_; }
     public long getLastSentCatalogUpdate() { return lastSentTopicUpdate_; }
+
+    public int getNumSkippedUpdatesLockContention() {
+      return numSkippedUpdatesLockContention_;
+    }
 
     @Override
     public boolean equals(Object other) {
@@ -86,7 +96,9 @@ public class TopicUpdateLog {
       Entry entry = (Entry) other;
       return numSkippedUpdates_ == entry.getNumSkippedTopicUpdates()
           && lastSentVersion_ == entry.getLastSentVersion()
-          && lastSentTopicUpdate_ == entry.getLastSentCatalogUpdate();
+          && lastSentTopicUpdate_ == entry.getLastSentCatalogUpdate()
+          && numSkippedUpdatesLockContention_ == entry
+          .getNumSkippedUpdatesLockContention();
     }
   }
 

@@ -173,11 +173,11 @@ public class CopyTestCaseStmt extends StatementBase {
     }
     for (FeTable table: referencedTbls) {
       Preconditions.checkState(table instanceof FeTable);
-      ((Table) table).getLock().lock();
+      ((Table) table).takeReadLock();
       try {
         result.addToTables_and_views(((Table) table).toThrift());
       } finally {
-        ((Table) table).getLock().unlock();
+        ((Table) table).releaseReadLock();
       }
     }
     return result;

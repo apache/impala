@@ -85,6 +85,8 @@ DECLARE_bool(use_customized_user_groups_mapper_for_ranger);
 DECLARE_bool(enable_column_masking);
 DECLARE_bool(compact_catalog_topic);
 DECLARE_bool(enable_incremental_metadata_updates);
+DECLARE_int64(topic_update_tbl_max_wait_time_ms);
+DECLARE_int32(catalog_max_lock_skipped_topic_updates);
 
 namespace impala {
 
@@ -173,6 +175,9 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_compact_catalog_topic(FLAGS_compact_catalog_topic);
   cfg.__set_enable_incremental_metadata_updates(
       FLAGS_enable_incremental_metadata_updates);
+  cfg.__set_topic_update_tbl_max_wait_time_ms(FLAGS_topic_update_tbl_max_wait_time_ms);
+  cfg.__set_catalog_max_lock_skipped_topic_updates(
+      FLAGS_catalog_max_lock_skipped_topic_updates);
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }

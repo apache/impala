@@ -161,4 +161,8 @@ struct TBackendGflags {
   68: required bool compact_catalog_topic
 
   69: required bool enable_incremental_metadata_updates
+
+  70: required i64 topic_update_tbl_max_wait_time_ms
+
+  71: required i32 catalog_max_lock_skipped_topic_updates
 }

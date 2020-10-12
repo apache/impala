@@ -295,6 +295,21 @@ public class HdfsTable extends Table implements FeFsTable {
   // in coordinator's cache if there are no updates on them.
   private final Set<HdfsPartition> droppedPartitions_ = new HashSet<>();
 
+  // pendingVersionNumber indicates a version number allocated to this HdfsTable for a
+  // ongoing DDL operation. This is mainly used by the topic update thread to skip a
+  // table from the topic updates if it cannot acquire lock on this table. The topic
+  // update thread bumps up this to a higher value outside the topic window so that
+  // the table is considered in the next update. The setCatalogVersion() makes use of this
+  // to eventually assign the catalogVersion to the table.
+  private long pendingVersionNumber_ = -1;
+  // lock protecting access to pendingVersionNumber
+  private final Object pendingVersionLock_ = new Object();
+
+  // this field is used to keep track of the last table version which is seen by the
+  // topic update thread. It is primarily used to identify distinct locking operations
+  // to determine if we can skip the table from the topic update.
+  private long lastVersionSeenByTopicUpdate_ = -1;
+
   // Represents a set of storage-related statistics aggregated at the table or partition
   // level.
   public final static class FileMetadataStats {
@@ -2646,5 +2661,64 @@ public class HdfsTable extends Table implements FeFsTable {
   @Override
   public ValidWriteIdList getValidWriteIds() {
     return validWriteIds_;
+  }
+
+  /**
+   * Updates the pending version of this table if the tbl version matches with the
+   * expectedTblVersion.
+   * @return true if the pending version was updated. Else, false.
+   */
+  public boolean updatePendingVersion(long expectedTblVersion, long newPendingVersion) {
+    synchronized (pendingVersionLock_) {
+      if (expectedTblVersion == getCatalogVersion()) {
+        pendingVersionNumber_ = newPendingVersion;
+        return true;
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Sets the version of this table. This makes sure that if there is a
+   * pendingVersionNumber which is higher than the given version, it uses the
+   * pendingVersionNumber. A pendingVersionNumber which is higher than given version
+   * represents that the topic update thread tried to add this table to a update but
+   * couldn't. Hence it needs the ongoing update operation (represented by the given
+   * version) to use a higher version number so that this table falls within the next
+   * topic update window.
+   */
+  @Override
+  public void setCatalogVersion(long version) {
+    synchronized (pendingVersionLock_) {
+      long versionToBeSet = version;
+      if (pendingVersionNumber_ > version) {
+        LOG.trace("Pending table version {} is higher than requested version {}",
+            pendingVersionNumber_, version);
+        versionToBeSet = pendingVersionNumber_;
+      }
+      LOG.trace("Setting the hdfs table {} version {}", getFullName(), versionToBeSet);
+      super.setCatalogVersion(versionToBeSet);
+    }
+  }
+
+  /**
+   * Returns the last version of this table which was seen by the topic update thread
+   * when it could not acquire the table lock. This is used to determine if the topic
+   * update thread has skipped this table enough number of times that we should now
+   * block the topic updates until we add this table. Note that
+   * this method is not thread-safe and assumes that this only called from the
+   * topic-update thread.
+   */
+  public long getLastVersionSeenByTopicUpdate() {
+    return lastVersionSeenByTopicUpdate_;
+  }
+
+  /**
+   * Sets the version as seen by the topic update thread if it skips the table. Note that
+   * this method is not thread-safe and assumes that this only called from the
+   * topic-update thread.
+   */
+  public void setLastVersionSeenByTopicUpdate(long version) {
+    lastVersionSeenByTopicUpdate_ = version;
   }
 }
