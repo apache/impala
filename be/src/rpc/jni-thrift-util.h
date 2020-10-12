@@ -35,6 +35,14 @@ Status SerializeThriftMsg(JNIEnv* env, T* msg, jbyteArray* serialized_msg) {
   uint32_t size = 0;
   RETURN_IF_ERROR(serializer.SerializeToBuffer(msg, &size, &buffer));
 
+  // Make sure that 'size' is within the limit of INT_MAX as the use of
+  // 'size' below takes int.
+  if (size > INT_MAX) {
+    return Status(strings::Substitute(
+        "The length of the serialization buffer ($0 bytes) exceeds the limit of $1 bytes",
+        size, INT_MAX));
+  }
+
   /// create jbyteArray given buffer
   *serialized_msg = env->NewByteArray(size);
   RETURN_ERROR_IF_EXC(env);
