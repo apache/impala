@@ -98,7 +98,6 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.HiveStorageDescriptorFactory;
-import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
@@ -594,11 +593,11 @@ public class CatalogOpExecutor {
         // The table lock is needed here since toTCatalogObject() calls Table#toThrift()
         // which expects the current thread to hold this lock. For more details refer
         // to IMPALA-4092.
-        t.getLock().lock();
+        t.takeReadLock();
         try {
           response.result.addToUpdated_catalog_objects(t.toTCatalogObject());
         } finally {
-          t.getLock().unlock();
+          t.releaseReadLock();
         }
       }
     }
@@ -666,7 +665,7 @@ public class CatalogOpExecutor {
           String.format("Can't rename to blacklisted table name: %s. %s", newTableName,
               BLACKLISTED_DBS_INCONSISTENT_ERR_STR));
     }
-    tryLock(tbl);
+    tryWriteLock(tbl);
     // Get a new catalog version to assign to the table being altered.
     long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
     addCatalogServiceIdentifiers(tbl, catalog_.getCatalogServiceId(), newCatalogVersion);
@@ -884,7 +883,7 @@ public class CatalogOpExecutor {
       UnlockWriteLockIfErronouslyLocked();
       // Clear in-progress modifications in case of exceptions.
       tbl.resetInProgressModification();
-      tbl.getLock().unlock();
+      tbl.releaseWriteLock();
     }
   }
 
@@ -906,7 +905,7 @@ public class CatalogOpExecutor {
   private void alterKuduTable(TAlterTableParams params, TDdlExecResponse response,
       KuduTable tbl, long newCatalogVersion, boolean wantMinimalResult)
       throws ImpalaException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     switch (params.getAlter_type()) {
       case ADD_COLUMNS:
         TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
@@ -965,7 +964,7 @@ public class CatalogOpExecutor {
   private void alterIcebergTable(TAlterTableParams params, TDdlExecResponse response,
       IcebergTable tbl, long newCatalogVersion, boolean wantMinimalResult)
       throws ImpalaException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     switch (params.getAlter_type()) {
       case ADD_COLUMNS:
         TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
@@ -1008,7 +1007,7 @@ public class CatalogOpExecutor {
   private void loadTableMetadata(Table tbl, long newCatalogVersion,
       boolean reloadFileMetadata, boolean reloadTableSchema,
       Set<String> partitionsToUpdate, String reason) throws CatalogException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
           getMetaStoreTable(msClient, tbl);
@@ -1071,7 +1070,7 @@ public class CatalogOpExecutor {
         "Load for ALTER VIEW");
     Preconditions.checkState(tbl instanceof View, "Expected view: %s",
         tableName);
-    tryLock(tbl);
+    tryWriteLock(tbl);
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
@@ -1102,7 +1101,7 @@ public class CatalogOpExecutor {
       addTableToCatalogUpdate(tbl, wantMinimalResult, resp.result);
     } finally {
       UnlockWriteLockIfErronouslyLocked();
-      tbl.getLock().unlock();
+      tbl.releaseWriteLock();
     }
   }
 
@@ -1136,7 +1135,7 @@ public class CatalogOpExecutor {
       Reference<Long> numUpdatedPartitions, Reference<Long> numUpdatedColumns,
       @Nullable String debugAction)
       throws ImpalaException {
-    Preconditions.checkState(table.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(table.isWriteLockedByCurrentThread());
     Preconditions.checkState(params.isSetTable_stats() || params.isSetColumn_stats());
 
     TableName tableName = table.getTableName();
@@ -1610,7 +1609,7 @@ public class CatalogOpExecutor {
     Preconditions.checkState(!AcidUtils.isTransactionalTable(
         table.getMetaStoreTable().getParameters()));
 
-    tryLock(table, "dropping stats");
+    tryWriteLock(table, "dropping stats");
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
@@ -1643,7 +1642,7 @@ public class CatalogOpExecutor {
       addSummary(resp, "Stats have been dropped.");
     } finally {
       UnlockWriteLockIfErronouslyLocked();
-      table.getLock().unlock();
+      table.releaseWriteLock();
     }
   }
 
@@ -1652,7 +1651,7 @@ public class CatalogOpExecutor {
    * that were updated as part of this operation.
    */
   private int dropColumnStats(Table table) throws ImpalaRuntimeException {
-    Preconditions.checkState(table.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(table.isWriteLockedByCurrentThread());
     int numColsUpdated = 0;
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       for (Column col: table.getColumns()) {
@@ -1684,7 +1683,7 @@ public class CatalogOpExecutor {
    * is unpartitioned.
    */
   private int dropTableStats(Table table) throws ImpalaException {
-    Preconditions.checkState(table.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(table.isWriteLockedByCurrentThread());
     // Delete the ROW_COUNT from the table (if it was set).
     org.apache.hadoop.hive.metastore.api.Table msTbl = table.getMetaStoreTable();
     int numTargetedPartitions = 0;
@@ -2130,7 +2129,7 @@ public class CatalogOpExecutor {
     // If transactional, the lock will be released for some time to acquire the HMS Acid
     // lock. It's safe because transactional -> non-transactional conversion is not
     // allowed.
-    tryLock(table, "truncating");
+    tryWriteLock(table, "truncating");
     try {
       long newCatalogVersion = 0;
       try {
@@ -2150,8 +2149,8 @@ public class CatalogOpExecutor {
       addTableToCatalogUpdate(table, wantMinimalResult, resp.result);
     } finally {
       UnlockWriteLockIfErronouslyLocked();
-      if (table.getLock().isHeldByCurrentThread()) {
-        table.getLock().unlock();
+      if (table.isWriteLockedByCurrentThread()) {
+        table.releaseWriteLock();
       }
     }
   }
@@ -2166,7 +2165,7 @@ public class CatalogOpExecutor {
    */
   private long truncateTransactionalTable(TTruncateParams params, Table table)
       throws ImpalaException {
-    Preconditions.checkState(table.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(table.isWriteLockedByCurrentThread());
     Preconditions.checkState(catalog_.getLock().isWriteLockedByCurrentThread());
     catalog_.getLock().writeLock().unlock();
     TableName tblName = TableName.fromThrift(params.getTable_name());
@@ -2180,11 +2179,11 @@ public class CatalogOpExecutor {
         Preconditions.checkState(txn.getId() > 0);
         // We need to release catalog table lock here, because HMS Acid table lock
         // must be locked in advance to avoid dead lock.
-        table.getLock().unlock();
+        table.releaseWriteLock();
         //TODO: if possible, set DataOperationType to something better than NO_TXN.
         catalog_.lockTableInTransaction(tblName.getDb(), tblName.getTbl(), txn,
             DataOperationType.NO_TXN, ctx);
-        tryLock(table, "truncating");
+        tryWriteLock(table, "truncating");
         newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
         catalog_.getLock().writeLock().unlock();
         TblTransaction tblTxn = MetastoreShim.createTblTransaction(hmsClient,
@@ -2244,7 +2243,7 @@ public class CatalogOpExecutor {
    */
   private boolean isTableBeingReplicated(IMetaStoreClient metastoreClient,
       HdfsTable tbl) throws CatalogException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     String dbName = tbl.getDb().getName();
     try {
       Database db = metastoreClient.getDatabase(dbName);
@@ -2260,7 +2259,7 @@ public class CatalogOpExecutor {
 
   private long truncateNonTransactionalTable(TTruncateParams params, Table table)
       throws Exception {
-    Preconditions.checkState(table.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(table.isWriteLockedByCurrentThread());
     Preconditions.checkState(catalog_.getLock().isWriteLockedByCurrentThread());
     long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
     catalog_.getLock().writeLock().unlock();
@@ -2399,7 +2398,7 @@ public class CatalogOpExecutor {
       addSummary(response, "Table already exists.");
       LOG.trace("Skipping table creation because {} already exists and " +
           "IF NOT EXISTS was specified.", tableName);
-      tryLock(existingTbl);
+      tryWriteLock(existingTbl);
       try {
         if (syncDdl) {
           // When SYNC_DDL is enabled and the table already exists, we force a version
@@ -2421,7 +2420,7 @@ public class CatalogOpExecutor {
       } finally {
         // Release the locks held in tryLock().
         catalog_.getLock().writeLock().unlock();
-        existingTbl.getLock().unlock();
+        existingTbl.releaseWriteLock();
       }
       return false;
     }
@@ -2838,7 +2837,7 @@ public class CatalogOpExecutor {
       addSummary(response, "Table already exists.");
       LOG.trace(String.format("Skipping table creation because %s already exists and " +
           "IF NOT EXISTS was specified.", tblName));
-      tryLock(existingTbl);
+      tryWriteLock(existingTbl);
       try {
         if (syncDdl) {
           // When SYNC_DDL is enabled and the table already exists, we force a version
@@ -2860,7 +2859,7 @@ public class CatalogOpExecutor {
       } finally {
         // Release the locks held in tryLock().
         catalog_.getLock().writeLock().unlock();
-        existingTbl.getLock().unlock();
+        existingTbl.releaseWriteLock();
       }
       return;
     }
@@ -3000,7 +2999,7 @@ public class CatalogOpExecutor {
    */
   private boolean alterTableAddCols(Table tbl, List<TColumn> columns, boolean ifNotExists)
       throws ImpalaException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
     List<TColumn> colsToAdd = new ArrayList<>();
     for (TColumn column: columns) {
@@ -3028,7 +3027,7 @@ public class CatalogOpExecutor {
    */
   private void alterTableReplaceCols(Table tbl, List<TColumn> columns)
       throws ImpalaException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
     List<FieldSchema> newColumns = buildFieldSchemaList(columns);
     msTbl.getSd().setCols(newColumns);
@@ -3048,7 +3047,7 @@ public class CatalogOpExecutor {
    */
   private void alterTableAlterCol(Table tbl, String colName,
       TColumn newCol) throws ImpalaException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
     // Find the matching column name and change it.
     Iterator<FieldSchema> iterator = msTbl.getSd().getColsIterator();
@@ -3096,7 +3095,7 @@ public class CatalogOpExecutor {
    */
   private Table alterTableAddPartitions(Table tbl,
       TAlterTableAddPartitionParams addPartParams) throws ImpalaException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
 
     TableName tableName = tbl.getTableName();
     org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
@@ -3269,7 +3268,7 @@ public class CatalogOpExecutor {
       List<List<TPartitionKeyValue>> partitionSet,
       boolean ifExists, boolean purge, Reference<Long> numUpdatedPartitions)
       throws ImpalaException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     Preconditions.checkNotNull(partitionSet);
 
     TableName tableName = tbl.getTableName();
@@ -3323,7 +3322,7 @@ public class CatalogOpExecutor {
    * Removes a column from the given table.
    */
   private void alterTableDropCol(Table tbl, String colName) throws ImpalaException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     org.apache.hadoop.hive.metastore.api.Table msTbl = tbl.getMetaStoreTable().deepCopy();
     // Find the matching column name and remove it.
     Iterator<FieldSchema> iterator = msTbl.getSd().getColsIterator();
@@ -3355,7 +3354,7 @@ public class CatalogOpExecutor {
   private void alterTableOrViewRename(Table oldTbl, TableName newTableName,
       long newCatalogVersion, boolean wantMinimalResult, TDdlExecResponse response)
       throws ImpalaException {
-    Preconditions.checkState(oldTbl.getLock().isHeldByCurrentThread()
+    Preconditions.checkState(oldTbl.isWriteLockedByCurrentThread()
         && catalog_.getLock().isWriteLockedByCurrentThread());
     TableName tableName = oldTbl.getTableName();
     org.apache.hadoop.hive.metastore.api.Table msTbl =
@@ -3466,7 +3465,7 @@ public class CatalogOpExecutor {
       List<List<TPartitionKeyValue>> partitionSet, THdfsFileFormat fileFormat,
       Reference<Long> numUpdatedPartitions)
       throws ImpalaException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     boolean reloadFileMetadata = false;
     if (partitionSet == null) {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
@@ -3501,7 +3500,7 @@ public class CatalogOpExecutor {
       List<List<TPartitionKeyValue>> partitionSet, TTableRowFormat tRowFormat,
       Reference<Long> numUpdatedPartitions)
       throws ImpalaException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     Preconditions.checkArgument(tbl instanceof HdfsTable);
     boolean reloadFileMetadata = false;
     RowFormat rowFormat = RowFormat.fromThrift(tRowFormat);
@@ -3548,7 +3547,7 @@ public class CatalogOpExecutor {
    */
   private boolean alterTableSetLocation(Table tbl,
       List<TPartitionKeyValue> partitionSpec, String location) throws ImpalaException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     boolean reloadFileMetadata = false;
     if (partitionSpec == null) {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
@@ -3578,7 +3577,7 @@ public class CatalogOpExecutor {
   private void alterTableSetTblProperties(Table tbl,
       TAlterTableSetTblPropertiesParams params, Reference<Long> numUpdatedPartitions)
       throws ImpalaException {
-    Preconditions.checkState(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
     Map<String, String> properties = params.getProperties();
     Preconditions.checkNotNull(properties);
     if (params.isSetPartition_set()) {
@@ -3657,7 +3656,7 @@ public class CatalogOpExecutor {
    */
   private boolean alterTableSetCached(Table tbl, TAlterTableSetCachedParams params)
       throws ImpalaException {
-    Preconditions.checkArgument(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkArgument(tbl.isWriteLockedByCurrentThread());
     THdfsCachingOp cacheOp = params.getCache_op();
     Preconditions.checkNotNull(cacheOp);
     // Alter table params.
@@ -3785,7 +3784,7 @@ public class CatalogOpExecutor {
   private void alterPartitionSetCached(Table tbl,
       TAlterTableSetCachedParams params, Reference<Long> numUpdatedPartitions)
       throws ImpalaException {
-    Preconditions.checkArgument(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkArgument(tbl.isWriteLockedByCurrentThread());
     THdfsCachingOp cacheOp = params.getCache_op();
     Preconditions.checkNotNull(cacheOp);
     Preconditions.checkNotNull(params.getPartition_set());
@@ -3847,7 +3846,7 @@ public class CatalogOpExecutor {
    */
   private void alterTableRecoverPartitions(Table tbl, @Nullable String debugAction)
       throws ImpalaException {
-    Preconditions.checkArgument(tbl.getLock().isHeldByCurrentThread());
+    Preconditions.checkArgument(tbl.isWriteLockedByCurrentThread());
     if (!(tbl instanceof HdfsTable)) {
       throw new CatalogException("Table " + tbl.getFullName() + " is not an HDFS table");
     }
@@ -4493,11 +4492,11 @@ public class CatalogOpExecutor {
             }
           } else {
             // Table was loaded from scratch, so it's already "refreshed".
-            tbl.getLock().lock();
+            tbl.takeReadLock();
             try {
               updatedThriftTable = tbl.toTCatalogObject(resultType);
             } finally {
-              tbl.getLock().unlock();
+              tbl.releaseReadLock();
             }
           }
         }
@@ -4572,7 +4571,7 @@ public class CatalogOpExecutor {
           update.getTarget_table());
     }
 
-    tryLock(table, "updating the catalog");
+    tryWriteLock(table, "updating the catalog");
     final Timer.Context context
         = table.getMetrics().getTimer(HdfsTable.CATALOG_UPDATE_DURATION_METRIC).time();
 
@@ -4809,7 +4808,7 @@ public class CatalogOpExecutor {
     } finally {
       context.stop();
       UnlockWriteLockIfErronouslyLocked();
-      table.getLock().unlock();
+      table.releaseWriteLock();
     }
 
     if (update.isSync_ddl()) {
@@ -5175,7 +5174,7 @@ public class CatalogOpExecutor {
       throws CatalogException, InternalException, ImpalaRuntimeException {
     Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl(),
         "Load for ALTER COMMENT");
-    tryLock(tbl);
+    tryWriteLock(tbl);
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
@@ -5195,7 +5194,7 @@ public class CatalogOpExecutor {
       addTableToCatalogUpdate(tbl, wantMinimalResult, response.result);
       addSummary(response, String.format("Updated %s.", (isView) ? "view" : "table"));
     } finally {
-      tbl.getLock().unlock();
+      tbl.releaseWriteLock();
     }
   }
 
@@ -5204,7 +5203,7 @@ public class CatalogOpExecutor {
       throws CatalogException, InternalException, ImpalaRuntimeException {
     Table tbl = getExistingTable(tableName.getDb(), tableName.getTbl(),
         "Load for ALTER COLUMN COMMENT");
-    tryLock(tbl);
+    tryWriteLock(tbl);
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
@@ -5230,7 +5229,7 @@ public class CatalogOpExecutor {
       addTableToCatalogUpdate(tbl, wantMinimalResult, response.result);
       addSummary(response, "Column has been altered.");
     } finally {
-      tbl.getLock().unlock();
+      tbl.releaseWriteLock();
     }
   }
 
@@ -5251,20 +5250,20 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Try to lock a table in the catalog. Throw an InternalException if the catalog is
-   * unable to lock the given table.
+   * Tries to take the write lock of the table in the catalog. Throws an InternalException
+   * if the catalog is unable to lock the given table.
    */
-  private void tryLock(Table tbl) throws InternalException {
-    tryLock(tbl, "altering");
+  private void tryWriteLock(Table tbl) throws InternalException {
+    tryWriteLock(tbl, "altering");
   }
 
   /**
    * Try to lock a table in the catalog for a given operation. Throw an InternalException
    * if the catalog is unable to lock the given table.
    */
-  private void tryLock(Table tbl, String operation) throws InternalException {
+  private void tryWriteLock(Table tbl, String operation) throws InternalException {
     String type = tbl instanceof View ? "view" : "table";
-    if (!catalog_.tryLockTable(tbl)) {
+    if (!catalog_.tryWriteLock(tbl)) {
       throw new InternalException(String.format("Error %s (for) %s %s due to " +
           "lock contention.", operation, type, tbl.getFullName()));
     }

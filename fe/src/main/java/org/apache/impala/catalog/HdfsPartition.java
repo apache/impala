@@ -841,7 +841,7 @@ public class HdfsPartition extends CatalogObjectImpl
    */
   public boolean removeFromVersionsForInflightEvents(
       boolean isInsertEvent, long versionNumber) {
-    Preconditions.checkState(table_.getLock().isHeldByCurrentThread(),
+    Preconditions.checkState(table_.isWriteLockedByCurrentThread(),
         "removeFromVersionsForInflightEvents called without holding the table lock on "
             + "partition " + getPartitionName() + " of table " + table_.getFullName());
     return inFlightEvents_.remove(isInsertEvent, versionNumber);
@@ -855,7 +855,7 @@ public class HdfsPartition extends CatalogObjectImpl
    *                      when isInsertEvent is false, it's version number to add
    */
   public void addToVersionsForInflightEvents(boolean isInsertEvent, long versionNumber) {
-    Preconditions.checkState(table_.getLock().isHeldByCurrentThread(),
+    Preconditions.checkState(table_.isWriteLockedByCurrentThread(),
         "addToVersionsForInflightEvents called without holding the table lock on "
             + "partition " + getPartitionName() + " of table " + table_.getFullName());
     if (!inFlightEvents_.add(isInsertEvent, versionNumber)) {
@@ -1452,7 +1452,7 @@ public class HdfsPartition extends CatalogObjectImpl
      */
     public void addToVersionsForInflightEvents(boolean isInsertEvent,
         long versionNumber) {
-      Preconditions.checkState(table_.getLock().isHeldByCurrentThread(),
+      Preconditions.checkState(table_.isWriteLockedByCurrentThread(),
           "addToVersionsForInflightEvents called without holding the table lock on "
               + "partition " + getPartitionName() + " of table " + table_.getFullName());
       if (!inFlightEvents_.add(isInsertEvent, versionNumber)) {

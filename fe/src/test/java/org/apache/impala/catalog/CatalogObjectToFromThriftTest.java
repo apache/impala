@@ -264,11 +264,11 @@ public class CatalogObjectToFromThriftTest {
 
   private TTable getThriftTable(Table table) {
     TTable thriftTable = null;
-    table.getLock().lock();
+    table.takeReadLock();
     try {
       thriftTable = table.toThrift();
     } finally {
-      table.getLock().unlock();
+      table.releaseReadLock();
     }
     return thriftTable;
   }

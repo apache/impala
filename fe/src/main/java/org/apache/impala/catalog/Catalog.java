@@ -505,13 +505,13 @@ public abstract class Catalog implements AutoCloseable {
           throw new CatalogException("Table not found: " +
               objectDesc.getTable().getTbl_name());
         }
-        table.getLock().lock();
+        table.takeReadLock();
         try {
           result.setType(table.getCatalogObjectType());
           result.setCatalog_version(table.getCatalogVersion());
           result.setTable(table.toThrift());
         } finally {
-          table.getLock().unlock();
+          table.releaseReadLock();
         }
         break;
       }
