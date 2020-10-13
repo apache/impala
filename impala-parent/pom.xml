@@ -143,7 +143,7 @@ under the License.
     </repository>
     <repository>
       <id>cdh.rcs.releases.repo</id>
-      <url>https://repository.cloudera.com/content/groups/cdh-releases-rcs</url>
+      <url>https://repository.cloudera.com/artifactory/cdh-releases-rcs</url>
       <name>CDH Releases Repository</name>
       <snapshots>
         <enabled>true</enabled>
@@ -193,14 +193,6 @@ under the License.
       </snapshots>
     </repository>
     <repository>
-      <id>cloudera.thirdparty.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/third-party</url>
-      <name>Cloudera Third Party Repository</name>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-    <repository>
       <!--
       HWX Nexus is disabled. This is a tombstone to list out why:
       1. Snapshots are disabled because HWX Nexus contains snapshots of CDH artifacts
@@ -232,9 +224,9 @@ under the License.
   </repositories>
   <pluginRepositories>
     <pluginRepository>
-      <id>cloudera.thirdparty.repo</id>
-      <url>https://repository.cloudera.com/content/repositories/third-party</url>
-      <name>Cloudera Third Party Repository</name>
+      <id>cdh.rcs.releases.repo</id>
+      <url>https://repository.cloudera.com/artifactory/cdh-releases-rcs</url>
+      <name>CDH Releases Repository</name>
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
