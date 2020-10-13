@@ -233,6 +233,7 @@ under the License.
           <topicref rev="2.7.0" href="topics/impala_replica_preference.xml"/>
           <topicref href="topics/impala_request_pool.xml"/>
           <topicref href="topics/impala_resource_trace_ratio.xml"/>
+          <topicref rev="4.0.0" href="topics/impala_retry_failed_queries.xml"/>
           <topicref rev="2.5.0" href="topics/impala_runtime_bloom_filter_size.xml"/>
           <topicref rev="2.6.0" href="topics/impala_runtime_filter_max_size.xml"/>
           <topicref rev="2.6.0" href="topics/impala_runtime_filter_min_size.xml"/>
@@ -338,6 +339,10 @@ under the License.
     <topicref href="topics/impala_odbc.xml"/>
     <topicref href="topics/impala_jdbc.xml"/>
     <topicref href="topics/impala_query_results_spooling.xml"/>
+  </topicref>
+  <topicref href="topics/impala_fault_tolerance.xml">
+    <topicref href="topics/impala_transparent_query_retries.xml"/>
+    <topicref href="topics/impala_node_blacklisting.xml"/>
   </topicref>
   <topicref href="topics/impala_troubleshooting.xml">
     <topicref href="topics/impala_webui.xml"/>

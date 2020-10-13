@@ -10521,6 +10521,7 @@ under the License.
   <keydef href="https://issues.apache.org/jira/browse/IMPALA-9999" scope="external" format="html" keys="IMPALA-9999"/>
 
 <!-- Short form of mapping from Impala release to vendor-specific releases, for use in headings. -->
+  <keydef keys="impala40"><topicmeta><keywords><keyword>Impala 4.0</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala34"><topicmeta><keywords><keyword>Impala 3.4</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala33"><topicmeta><keywords><keyword>Impala 3.3</keyword></keywords></topicmeta></keydef>
   <keydef keys="impala32"><topicmeta><keywords><keyword>Impala 3.2</keyword></keywords></topicmeta></keydef>
