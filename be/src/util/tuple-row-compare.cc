@@ -42,6 +42,7 @@ TupleRowComparatorConfig::TupleRowComparatorConfig(
     const TSortInfo& tsort_info, const std::vector<ScalarExpr*>& ordering_exprs)
   : sorting_order_(tsort_info.sorting_order),
     ordering_exprs_(ordering_exprs),
+    num_lexical_keys_(tsort_info.num_lexical_keys_in_zorder),
     is_asc_(tsort_info.is_asc_order) {
   if (sorting_order_ == TSortingOrder::ZORDER) return;
   for (bool null_first : tsort_info.nulls_first) {
@@ -353,17 +354,26 @@ int TupleRowZOrderComparator::CompareInterpreted(const TupleRow* lhs,
   DCHECK_EQ(ordering_exprs_.size(), ordering_expr_evals_lhs_.size());
   DCHECK_EQ(ordering_expr_evals_lhs_.size(), ordering_expr_evals_rhs_.size());
 
-  // The algorithm requires all values having a common type, without loss of data.
-  // This means we have to find the biggest type.
-  int max_size = ordering_exprs_[0]->type().GetByteSize();
-  for (int i = 1; i < ordering_exprs_.size(); ++i) {
-    if (ordering_exprs_[i]->type().GetByteSize() > max_size) {
-      max_size = ordering_exprs_[i]->type().GetByteSize();
-    }
+  // Sort the partition keys lexically. The PreInsert SortNode uses ASC order and NULLS
+  // LAST. See Planner.createPreInsertSort() in FE.
+  for (int i = 0; i < num_lexical_keys_; ++i) {
+    void* lhs_value = ordering_expr_evals_lhs_[i]->GetValue(lhs);
+    void* rhs_value = ordering_expr_evals_rhs_[i]->GetValue(rhs);
+
+    // The sort order of NULLs is independent of asc/desc.
+    if (lhs_value == NULL && rhs_value == NULL) continue;
+    if (lhs_value == NULL) return 1;
+    if (rhs_value == NULL) return -1;
+
+    int result = RawValue::Compare(lhs_value, rhs_value, ordering_exprs_[i]->type());
+    if (result != 0) return result;
+    // Otherwise, try the next Expr
   }
-  if (max_size <= 4) {
+
+  // Sort the remaining keys in Z-order.
+  if (max_col_size_ <= 4) {
     return CompareBasedOnSize<uint32_t>(lhs, rhs);
-  } else if (max_size <= 8) {
+  } else if (max_col_size_ <= 8) {
     return CompareBasedOnSize<uint64_t>(lhs, rhs);
   } else {
     return CompareBasedOnSize<uint128_t>(lhs, rhs);
@@ -374,13 +384,13 @@ template<typename U>
 int TupleRowZOrderComparator::CompareBasedOnSize(const TupleRow* lhs,
     const TupleRow* rhs) const {
   auto less_msb = [](U x, U y) { return x < y && x < (x ^ y); };
-  ColumnType type = ordering_exprs_[0]->type();
+  ColumnType type = ordering_exprs_[num_lexical_keys_]->type();
   // Values of the most significant dimension from both sides.
-  U msd_lhs = GetSharedRepresentation<U>(ordering_expr_evals_lhs_[0]->GetValue(lhs),
-      type);
-  U msd_rhs = GetSharedRepresentation<U>(ordering_expr_evals_rhs_[0]->GetValue(rhs),
-      type);
-  for (int i = 1; i < ordering_exprs_.size(); ++i) {
+  U msd_lhs = GetSharedRepresentation<U>(
+      ordering_expr_evals_lhs_[num_lexical_keys_]->GetValue(lhs), type);
+  U msd_rhs = GetSharedRepresentation<U>(
+      ordering_expr_evals_rhs_[num_lexical_keys_]->GetValue(rhs), type);
+  for (int i = num_lexical_keys_ + 1; i < ordering_exprs_.size(); ++i) {
     type = ordering_exprs_[i]->type();
     void* lhs_v = ordering_expr_evals_lhs_[i]->GetValue(lhs);
     void* rhs_v = ordering_expr_evals_rhs_[i]->GetValue(rhs);

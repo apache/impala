@@ -7,7 +7,7 @@ WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(year,mont
 |  partitions=24
 |
 01:SORT
-|  order by: ZORDER: year, month, int_col, bool_col
+|  order by: LEXICAL: year ASC NULLS LAST, month ASC NULLS LAST, ZORDER: int_col, bool_col
 |  row-size=17B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
@@ -18,7 +18,7 @@ WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(year,mont
 |  partitions=24
 |
 02:SORT
-|  order by: ZORDER: year, month, int_col, bool_col
+|  order by: LEXICAL: year ASC NULLS LAST, month ASC NULLS LAST, ZORDER: int_col, bool_col
 |  row-size=17B cardinality=7.30K
 |
 01:EXCHANGE [HASH(`year`,`month`)]
@@ -36,7 +36,7 @@ WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(year,mont
 |  partitions=24
 |
 01:SORT
-|  order by: ZORDER: year, month, int_col, bool_col
+|  order by: LEXICAL: year ASC NULLS LAST, month ASC NULLS LAST, ZORDER: int_col, bool_col
 |  row-size=17B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
@@ -47,7 +47,7 @@ WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(year,mont
 |  partitions=24
 |
 01:SORT
-|  order by: ZORDER: year, month, int_col, bool_col
+|  order by: LEXICAL: year ASC NULLS LAST, month ASC NULLS LAST, ZORDER: int_col, bool_col
 |  row-size=17B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
@@ -64,7 +64,7 @@ WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(year,mont
 |  partitions=24
 |
 01:SORT
-|  order by: ZORDER: year, month, int_col, bool_col
+|  order by: LEXICAL: year ASC NULLS LAST, month ASC NULLS LAST, ZORDER: int_col, bool_col
 |  row-size=17B cardinality=7.30K
 |
 00:SCAN HDFS [functional.alltypes]
@@ -75,7 +75,7 @@ WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(year,mont
 |  partitions=24
 |
 02:SORT
-|  order by: ZORDER: year, month, int_col, bool_col
+|  order by: LEXICAL: year ASC NULLS LAST, month ASC NULLS LAST, ZORDER: int_col, bool_col
 |  row-size=17B cardinality=7.30K
 |
 01:EXCHANGE [HASH(`year`,`month`)]
@@ -83,6 +83,66 @@ WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(year,mont
 00:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
    row-size=17B cardinality=7.30K
+====
+# IMPALA-10233: INSERT statement sorted by ZORDER using both static and dynamic
+# partitioning. We only need to lexically sort the dynamic partition columns.
+insert into table test_sort_by_zorder.t partition(year=2010, month)
+select id, int_col, bool_col, month from functional.alltypes where year = 2010;
+---- PLAN
+WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(2010,month)]
+|  partitions=12
+|
+01:SORT
+|  order by: LEXICAL: month ASC NULLS LAST, ZORDER: int_col, bool_col
+|  row-size=13B cardinality=3.65K
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2010
+   HDFS partitions=12/24 files=12 size=239.77KB
+   row-size=13B cardinality=3.65K
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(2010,month)]
+|  partitions=12
+|
+02:SORT
+|  order by: LEXICAL: month ASC NULLS LAST, ZORDER: int_col, bool_col
+|  row-size=13B cardinality=3.65K
+|
+01:EXCHANGE [HASH(`month`)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2010
+   HDFS partitions=12/24 files=12 size=239.77KB
+   row-size=13B cardinality=3.65K
+====
+# IMPALA-10233: Test static partition INSERTs sorted by ZORDER. In this case we don't
+# need sort expressions for the partition columns.
+insert into table test_sort_by_zorder.t partition(year=2010, month=1)
+select id, int_col, bool_col from functional.alltypes where year = 2010 and month = 1;
+---- PLAN
+WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(2010,1)]
+|  partitions=1
+|
+01:SORT
+|  order by: ZORDER: int_col, bool_col
+|  row-size=9B cardinality=310
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2010, `month` = 1
+   HDFS partitions=1/24 files=1 size=20.36KB
+   row-size=9B cardinality=310
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(2010,1)]
+|  partitions=1
+|
+01:SORT
+|  order by: ZORDER: int_col, bool_col
+|  row-size=9B cardinality=310
+|
+00:SCAN HDFS [functional.alltypes]
+   partition predicates: `year` = 2010, `month` = 1
+   HDFS partitions=1/24 files=1 size=20.36KB
+   row-size=9B cardinality=310
 ====
 # IMPALA-4166: insert into tables with sort.columns property adds sort node.
 insert into table test_sort_by_zorder.t_nopart /*+ shuffle */
@@ -205,7 +265,7 @@ WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(year,mont
 |  partitions=24
 |
 04:SORT
-|  order by: ZORDER: year, month, int_col, bool_col
+|  order by: LEXICAL: year ASC NULLS LAST, month ASC NULLS LAST, ZORDER: int_col, bool_col
 |  row-size=17B cardinality=10
 |
 03:TOP-N [LIMIT=10]
@@ -230,7 +290,7 @@ WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(year,mont
 |  partitions=24
 |
 07:SORT
-|  order by: ZORDER: year, month, int_col, bool_col
+|  order by: LEXICAL: year ASC NULLS LAST, month ASC NULLS LAST, ZORDER: int_col, bool_col
 |  row-size=17B cardinality=10
 |
 06:MERGING-EXCHANGE [UNPARTITIONED]
@@ -269,7 +329,7 @@ WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(b.`year`,
 |  partitions=24
 |
 04:SORT
-|  order by: ZORDER: b.`year`, a.`month`, max(b.int_col), min(a.bool_col)
+|  order by: LEXICAL: b.`year` ASC NULLS LAST, a.`month` ASC NULLS LAST, ZORDER: max(b.int_col), min(a.bool_col)
 |  row-size=17B cardinality=7.30K
 |
 03:AGGREGATE [FINALIZE]
@@ -295,7 +355,7 @@ WRITE TO HDFS [test_sort_by_zorder.t, OVERWRITE=false, PARTITION-KEYS=(b.`year`,
 |  partitions=24
 |
 09:SORT
-|  order by: ZORDER: b.`year`, a.`month`, max(b.int_col), min(a.bool_col)
+|  order by: LEXICAL: b.`year` ASC NULLS LAST, a.`month` ASC NULLS LAST, ZORDER: max(b.int_col), min(a.bool_col)
 |  row-size=17B cardinality=7.30K
 |
 08:EXCHANGE [HASH(b.`year`,a.`month`)]

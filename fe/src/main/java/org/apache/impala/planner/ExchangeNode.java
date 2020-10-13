@@ -134,7 +134,7 @@ public class ExchangeNode extends PlanNode {
       output.append(detailPrefix + "order by: ");
       output.append(getSortingOrderExplainString(mergeInfo_.getSortExprs(),
           mergeInfo_.getIsAscOrder(), mergeInfo_.getNullsFirstParams(),
-          mergeInfo_.getSortingOrder()));
+          mergeInfo_.getSortingOrder(), mergeInfo_.getNumLexicalKeysInZOrder()));
     }
     return output.toString();
   }
