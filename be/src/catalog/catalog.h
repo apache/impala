@@ -72,6 +72,11 @@ class Catalog {
   /// information on the error will be returned.
   Status GetCatalogObject(const TCatalogObject& request, TCatalogObject* response);
 
+  /// Like the above method but get the json string of the catalog object. The json
+  /// string can't be deserialized to Thrift objects so can only be used in showing debug
+  /// infos.
+  Status GetJsonCatalogObject(const TCatalogObject& req, std::string* res);
+
   /// Return partial information about a Catalog object.
   /// Returns OK if the operation was successful, otherwise a Status object with
   /// information on the error will be returned.
@@ -141,6 +146,7 @@ class Catalog {
   jmethodID exec_ddl_id_;  // JniCatalog.execDdl()
   jmethodID reset_metadata_id_;  // JniCatalog.resetMetdata()
   jmethodID get_catalog_object_id_;  // JniCatalog.getCatalogObject()
+  jmethodID get_json_catalog_object_id_;  // JniCatalog.getJsonCatalogObject()
   jmethodID get_partial_catalog_object_id_;  // JniCatalog.getPartialCatalogObject()
   jmethodID get_catalog_delta_id_;  // JniCatalog.getCatalogDelta()
   jmethodID get_catalog_version_id_;  // JniCatalog.getCatalogVersion()

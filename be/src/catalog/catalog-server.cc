@@ -19,6 +19,7 @@
 
 #include <gutil/strings/substitute.h>
 #include <thrift/protocol/TDebugProtocol.h>
+#include <thrift/protocol/TJSONProtocol.h>
 
 #include "catalog/catalog-util.h"
 #include "exec/read-write-util.h"
@@ -621,6 +622,7 @@ void CatalogServer::CatalogObjectsUrlCallback(const Webserver::WebRequest& req,
   const auto& args = req.parsed_args;
   Webserver::ArgumentMap::const_iterator object_type_arg = args.find("object_type");
   Webserver::ArgumentMap::const_iterator object_name_arg = args.find("object_name");
+  Webserver::ArgumentMap::const_iterator json_arg = args.find("json");
   if (object_type_arg != args.end() && object_name_arg != args.end()) {
     TCatalogObjectType::type object_type =
         TCatalogObjectTypeFromName(object_type_arg->second);
@@ -630,13 +632,27 @@ void CatalogServer::CatalogObjectsUrlCallback(const Webserver::WebRequest& req,
     Status status =
         TCatalogObjectFromObjectName(object_type, object_name_arg->second, &request);
 
-    // Get the object and dump its contents.
-    TCatalogObject result;
-    if (status.ok()) status = catalog_->GetCatalogObject(request, &result);
-    if (status.ok()) {
-      Value debug_string(ThriftDebugString(result).c_str(), document->GetAllocator());
-      document->AddMember("thrift_string", debug_string, document->GetAllocator());
+    if (json_arg != args.end()) {
+      // Get the JSON string from FE since Thrift doesn't have a cpp implementation for
+      // SimpleJsonProtocol (THRIFT-2476), so we use it's java implementation.
+      // TODO: switch to use cpp implementation of SimpleJsonProtocol after THRIFT-2476
+      //  is resolved.
+      string json_str;
+      if (status.ok()) status = catalog_->GetJsonCatalogObject(request, &json_str);
+      if (status.ok()) {
+        Value debug_string(json_str.c_str(), document->GetAllocator());
+        document->AddMember("json_string", debug_string, document->GetAllocator());
+      }
     } else {
+      // Get the object and dump its contents.
+      TCatalogObject result;
+      if (status.ok()) status = catalog_->GetCatalogObject(request, &result);
+      if (status.ok()) {
+        Value debug_string(ThriftDebugString(result).c_str(), document->GetAllocator());
+        document->AddMember("thrift_string", debug_string, document->GetAllocator());
+      }
+    }
+    if (!status.ok()) {
       Value error(status.GetDetail().c_str(), document->GetAllocator());
       document->AddMember("error", error, document->GetAllocator());
     }

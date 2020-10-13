@@ -299,6 +299,10 @@ class TestWebPage(ImpalaTestSuite):
     self.__test_catalog_object(unique_database, "foo_kudu", cluster_properties)
     self.__test_catalog_object(unique_database, "foo_part_parquet", cluster_properties)
     self.__test_catalog_object(unique_database, "foo", cluster_properties)
+    self.__test_json_db_object(unique_database)
+    self.__test_json_table_object(unique_database, "foo")
+    self.__test_json_table_object(unique_database, "foo_part")
+    self.__test_json_table_object(unique_database, "foo_part_parquet")
     self.__test_table_metrics(unique_database, "foo_part", "total-file-size-bytes")
     self.__test_table_metrics(unique_database, "foo_part", "num-files")
     self.__test_table_metrics(unique_database, "foo_part", "alter-duration")
@@ -334,6 +338,52 @@ class TestWebPage(ImpalaTestSuite):
       self.get_and_check_status(obj_url, tbl_name, ports_to_test=self.CATALOG_TEST_PORT)
       self.get_and_check_status(obj_url, impalad_expected_str,
           ports_to_test=self.IMPALAD_TEST_PORT)
+
+  def __test_json_db_object(self, db_name):
+    """Tests the /catalog_object?json endpoint of catalogd for the given db."""
+    obj_url = self.CATALOG_OBJECT_URL + \
+              "?json&object_type=DATABASE&object_name={0}".format(db_name)
+    responses = self.get_and_check_status(obj_url, ports_to_test=self.CATALOG_TEST_PORT)
+    obj = json.loads(json.loads(responses[0].text)["json_string"])
+    assert obj["type"] == 2, "type should be DATABASE"
+    assert "catalog_version" in obj, "TCatalogObject should have catalog_version"
+    db_obj = obj["db"]
+    assert db_obj["db_name"] == db_name
+    assert "metastore_db" in db_obj, "Loaded database should have metastore_db"
+
+  def __test_json_table_object(self, db_name, tbl_name):
+    """Tests the /catalog_object?json endpoint of catalogd for the given db/table. Runs
+    against an unloaded as well as a loaded table."""
+    obj_url = self.CATALOG_OBJECT_URL + \
+              "?json&object_type=TABLE&object_name={0}.{1}".format(db_name, tbl_name)
+    self.client.execute("invalidate metadata %s.%s" % (db_name, tbl_name))
+    responses = self.get_and_check_status(obj_url, ports_to_test=self.CATALOG_TEST_PORT)
+    obj = json.loads(json.loads(responses[0].text)["json_string"])
+    assert obj["type"] == 3, "type should be TABLE"
+    assert "catalog_version" in obj, "TCatalogObject should have catalog_version"
+    tbl_obj = obj["table"]
+    assert tbl_obj["db_name"] == db_name
+    assert tbl_obj["tbl_name"] == tbl_name
+    assert "hdfs_table" not in tbl_obj, "Unloaded table should not have hdfs_table"
+
+    self.client.execute("refresh %s.%s" % (db_name, tbl_name))
+    responses = self.get_and_check_status(obj_url, ports_to_test=self.CATALOG_TEST_PORT)
+    obj = json.loads(json.loads(responses[0].text)["json_string"])
+    assert obj["type"] == 3, "type should be TABLE"
+    assert "catalog_version" in obj, "TCatalogObject should have catalog_version"
+    tbl_obj = obj["table"]
+    assert tbl_obj["db_name"] == db_name
+    assert tbl_obj["tbl_name"] == tbl_name
+    assert "columns" in tbl_obj, "Loaded TTable should have columns"
+    assert tbl_obj["table_type"] == 0, "table_type should be HDFS_TABLE"
+    assert "metastore_table" in tbl_obj
+    hdfs_tbl_obj = tbl_obj["hdfs_table"]
+    assert "hdfsBaseDir" in hdfs_tbl_obj
+    assert "colNames" in hdfs_tbl_obj
+    assert "nullPartitionKeyValue" in hdfs_tbl_obj
+    assert "nullColumnValue" in hdfs_tbl_obj
+    assert "partitions" in hdfs_tbl_obj
+    assert "prototype_partition" in hdfs_tbl_obj
 
   def check_endpoint_is_disabled(self, url, string_to_search="", ports_to_test=None):
     """Helper method that verifies the given url does not exist."""

@@ -72,6 +72,7 @@ import org.apache.impala.util.PatternMatcher;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TSimpleJSONProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -243,6 +244,18 @@ public class JniCatalog {
     JniUtil.deserializeThrift(protocolFactory_, objectDescription, thriftParams);
     TSerializer serializer = new TSerializer(protocolFactory_);
     return serializer.serialize(catalog_.getTCatalogObject(objectDescription));
+  }
+
+  /**
+   * Gets the json string of a catalog object. It can only be used in showing debug
+   * messages and can't be deserialized to a thrift object.
+   */
+  public String getJsonCatalogObject(byte[] thriftParams) throws ImpalaException,
+      TException {
+    TCatalogObject objectDescription = new TCatalogObject();
+    JniUtil.deserializeThrift(protocolFactory_, objectDescription, thriftParams);
+    TSerializer jsonSerializer = new TSerializer(new TSimpleJSONProtocol.Factory());
+    return jsonSerializer.toString(catalog_.getTCatalogObject(objectDescription));
   }
 
   public byte[] getPartialCatalogObject(byte[] thriftParams) throws ImpalaException,
