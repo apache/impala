@@ -52,7 +52,7 @@ under the License.
             results.</p></li>
       </ul></p>
     <p><b>Type:</b>
-      <codeph>INT</codeph></p>
+      <codeph>BOOLEAN</codeph></p>
     <p><b>Default:</b>
       <codeph>FALSE</codeph></p>
     <p><b>Added in:</b>
