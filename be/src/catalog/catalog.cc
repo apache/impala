@@ -57,6 +57,7 @@ Catalog::Catalog() {
     {"getDbs", "([B)[B", &get_dbs_id_},
     {"getFunctions", "([B)[B", &get_functions_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
+    {"getJsonCatalogObject", "([B)Ljava/lang/String;", &get_json_catalog_object_id_},
     {"getPartialCatalogObject", "([B)[B", &get_partial_catalog_object_id_},
     {"getCatalogDelta", "([B)[B", &get_catalog_delta_id_},
     {"getCatalogUsage", "()[B", &get_catalog_usage_id_},
@@ -90,6 +91,10 @@ Catalog::Catalog() {
 Status Catalog::GetCatalogObject(const TCatalogObject& req,
     TCatalogObject* resp) {
   return JniUtil::CallJniMethod(catalog_, get_catalog_object_id_, req, resp);
+}
+
+Status Catalog::GetJsonCatalogObject(const TCatalogObject& req, string* res) {
+  return JniUtil::CallJniMethod(catalog_, get_json_catalog_object_id_, req, res);
 }
 
 Status Catalog::GetPartialCatalogObject(const TGetPartialCatalogObjectRequest& req,
