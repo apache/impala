@@ -212,6 +212,10 @@ public class HdfsScanNode extends ScanNode {
   private Map<FileSystemUtil.FsType, Long> totalFilesPerFs_ = new TreeMap<>();
   private Map<FileSystemUtil.FsType, Long> totalBytesPerFs_ = new TreeMap<>();
 
+  // Number of erasure coded files and bytes scanned, groupped by the FsType.
+  private Map<FileSystemUtil.FsType, Long> totalFilesPerFsEC_ = new TreeMap<>();
+  private Map<FileSystemUtil.FsType, Long> totalBytesPerFsEC_ = new TreeMap<>();
+
   // File formats scanned. Set in computeScanRangeLocations().
   private Set<HdfsFileFormat> fileFormats_;
 
@@ -833,6 +837,8 @@ public class HdfsScanNode extends ScanNode {
 
     totalFilesPerFs_ = new TreeMap<>();
     totalBytesPerFs_ = new TreeMap<>();
+    totalFilesPerFsEC_ = new TreeMap<>();
+    totalBytesPerFsEC_ = new TreeMap<>();
     largestScanRangeBytes_ = 0;
     maxScanRangeNumRows_ = -1;
     fileFormats_ = new HashSet<>();
@@ -883,6 +889,7 @@ public class HdfsScanNode extends ScanNode {
       boolean partitionMissingDiskIds = false;
       totalBytesPerFs_.merge(partition.getFsType(), partitionBytes, Long::sum);
       totalFilesPerFs_.merge(partition.getFsType(), (long) fileDescs.size(), Long::sum);
+
       for (FileDescriptor fileDesc: fileDescs) {
         if (!analyzer.getQueryOptions().isAllow_erasure_coded_files() &&
             fileDesc.getIsEc()) {
@@ -890,6 +897,14 @@ public class HdfsScanNode extends ScanNode {
               "Scanning of HDFS erasure-coded file (%s/%s) is not supported",
               partition.getLocation(), fileDesc.getRelativePath()));
         }
+
+        // Accumulate on the number of EC files and the total size of such files.
+        if (fileDesc.getIsEc()) {
+          totalFilesPerFsEC_.merge(partition.getFsType(), 1L, Long::sum);
+          totalBytesPerFsEC_.merge(
+              partition.getFsType(), fileDesc.getFileLength(), Long::sum);
+        }
+
         if (!fsHasBlocks) {
           Preconditions.checkState(fileDesc.getNumFileBlocks() == 0);
           generateScanRangeSpecs(partition, fileDesc, scanRangeBytesLimit);
@@ -1471,6 +1486,7 @@ public class HdfsScanNode extends ScanNode {
               Expr.getExplainString(partitionConjuncts_, detailLevel)));
       }
       String partMetaTemplate = "partitions=%d/%d files=%d size=%s\n";
+      String erasureCodeTemplate = "erasure coded: files=%d size=%s\n";
       if (!numPartitionsPerFs_.isEmpty()) {
         // The table is partitioned; print a line for each filesystem we are reading
         // partitions from
@@ -1482,16 +1498,26 @@ public class HdfsScanNode extends ScanNode {
           output.append(String.format(partMetaTemplate, partsPerFs.getValue(),
               table.getPartitions().size(), totalFilesPerFs_.get(fsType),
               PrintUtils.printBytes(totalBytesPerFs_.get(fsType))));
+
+          // Report the total number of erasure coded files and total bytes, if any.
+          if (totalFilesPerFsEC_.containsKey(fsType)) {
+            long totalNumECFiles = totalFilesPerFsEC_.get(fsType);
+            long totalECSize = totalBytesPerFsEC_.get(fsType);
+            output.append(String.format("%s", detailPrefix))
+                .append(String.format(erasureCodeTemplate, totalNumECFiles,
+                    PrintUtils.printBytes(totalECSize)));
+          }
         }
       } else if (tbl_.getNumClusteringCols() == 0) {
-        // There are no partitions so we use the FsType of the base table
+        // There are no partitions so we use the FsType of the base table. No report
+        // on EC related info.
         output.append(detailPrefix);
         output.append(table.getFsType()).append(" ");
         output.append(String.format(partMetaTemplate, 1, table.getPartitions().size(),
             0, PrintUtils.printBytes(0)));
       } else {
         // The table is partitioned, but no partitions are selected; in this case we
-        // exclude the FsType completely
+        // exclude the FsType completely. No report on EC related info.
         output.append(detailPrefix);
         output.append(String.format(partMetaTemplate, 0, table.getPartitions().size(),
             0, PrintUtils.printBytes(0)));
