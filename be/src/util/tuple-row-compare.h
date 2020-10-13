@@ -64,6 +64,10 @@ class TupleRowComparatorConfig {
   /// TupleRowComparatorConfig.
   const std::vector<ScalarExpr*>& ordering_exprs_;
 
+  /// Number of leading keys in the ordering exprs that should be sorted lexically.
+  /// Only used in Z-order pre-insert sort node to sort rows lexically on partition keys.
+  int num_lexical_keys_;
+
   /// Indicates, for each ordering expr, whether it enforces an ascending order or not.
   /// Not Owned.
   const std::vector<bool>& is_asc_;
@@ -198,13 +202,26 @@ class TupleRowLexicalComparator : public TupleRowComparator {
   int CompareInterpreted(const TupleRow* lhs, const TupleRow* rhs) const override;
 };
 
-/// Compares two TupleRows based on a set of exprs, in Z-order.
+/// Compares two TupleRows based on a set of exprs. The fisrt 'num_lexical_keys' exprs
+/// are compared lexically, while the remaining exprs are compared in Z-order.
 class TupleRowZOrderComparator : public TupleRowComparator {
  public:
   /// 'ordering_exprs': the ordering expressions for tuple comparison.
   TupleRowZOrderComparator(const TupleRowComparatorConfig& config)
-    : TupleRowComparator(config) {
+    : TupleRowComparator(config),
+      num_lexical_keys_(config.num_lexical_keys_) {
     DCHECK(config.sorting_order_ == TSortingOrder::ZORDER);
+    DCHECK_GE(num_lexical_keys_, 0);
+    DCHECK_LT(num_lexical_keys_, ordering_exprs_.size());
+
+    // The algorithm requires all values having a common type, without loss of data.
+    // This means we have to find the biggest type.
+    max_col_size_ = ordering_exprs_[num_lexical_keys_]->type().GetByteSize();
+    for (int i = num_lexical_keys_ + 1; i < ordering_exprs_.size(); ++i) {
+      if (ordering_exprs_[i]->type().GetByteSize() > max_col_size_) {
+        max_col_size_ = ordering_exprs_[i]->type().GetByteSize();
+      }
+    }
   }
 
  private:
@@ -242,6 +259,11 @@ class TupleRowZOrderComparator : public TupleRowComparator {
   U inline GetSharedIntRepresentation(const T val, U mask) const;
   template <typename U, typename T>
   U inline GetSharedFloatRepresentation(void* val, U mask) const;
+
+  /// Number of leading keys that should be sorted lexically.
+  int num_lexical_keys_;
+  /// The biggest type size of the ordering slots.
+  int max_col_size_;
 };
 
 /// Compares the equality of two Tuples, going slot by slot.

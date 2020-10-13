@@ -666,7 +666,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   protected String getSortingOrderExplainString(List<? extends Expr> exprs,
       List<Boolean> isAscOrder, List<Boolean> nullsFirstParams,
-      TSortingOrder sortingOrder) {
+      TSortingOrder sortingOrder, int numLexicalKeysInZOrder) {
     StringBuilder output = new StringBuilder();
     switch (sortingOrder) {
     case LEXICAL:
@@ -682,9 +682,20 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       }
       break;
     case ZORDER:
+      if (numLexicalKeysInZOrder > 0) {
+        Preconditions.checkElementIndex(numLexicalKeysInZOrder, exprs.size());
+        output.append("LEXICAL: ");
+        for (int i = 0; i < numLexicalKeysInZOrder; ++i) {
+          if (i > 0) output.append(", ");
+          // Pre-insert sorting uses ASC and NULLS LAST. See more in
+          // Planner.createPreInsertSort().
+          output.append(exprs.get(i).toSql()).append(" ASC NULLS LAST");
+        }
+        output.append(", ");
+      }
       output.append("ZORDER: ");
-      for (int i = 0; i < exprs.size(); ++i) {
-        if (i > 0) output.append(", ");
+      for (int i = numLexicalKeysInZOrder; i < exprs.size(); ++i) {
+        if (i > numLexicalKeysInZOrder) output.append(", ");
         output.append(exprs.get(i).toSql());
       }
       break;

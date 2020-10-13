@@ -913,3 +913,62 @@ where v.id = 0
 ---- RESULTS
 year=0/month=1/: 1
 ====
+---- QUERY
+# IMPALA-10233: Inserting to a partitioned table with zorder should work.
+create table partitioned_zorder_tbl sort by zorder (id, string_col) like functional.alltypes;
+insert into partitioned_zorder_tbl partition (year, month) select * from functional.alltypes;
+---- RESULTS
+year=2009/month=1/: 310
+year=2009/month=10/: 310
+year=2009/month=11/: 300
+year=2009/month=12/: 310
+year=2009/month=2/: 280
+year=2009/month=3/: 310
+year=2009/month=4/: 300
+year=2009/month=5/: 310
+year=2009/month=6/: 300
+year=2009/month=7/: 310
+year=2009/month=8/: 310
+year=2009/month=9/: 300
+year=2010/month=1/: 310
+year=2010/month=10/: 310
+year=2010/month=11/: 300
+year=2010/month=12/: 310
+year=2010/month=2/: 280
+year=2010/month=3/: 310
+year=2010/month=4/: 300
+year=2010/month=5/: 310
+year=2010/month=6/: 300
+year=2010/month=7/: 310
+year=2010/month=8/: 310
+year=2010/month=9/: 300
+====
+---- QUERY
+# IMPALA-10233: Inserting to a partitioned table with zorder should work.
+insert overwrite partitioned_zorder_tbl partition(year=2010, month)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, month
+from functional.alltypes
+where year = 2010
+---- RESULTS
+year=2010/month=1/: 310
+year=2010/month=10/: 310
+year=2010/month=11/: 300
+year=2010/month=12/: 310
+year=2010/month=2/: 280
+year=2010/month=3/: 310
+year=2010/month=4/: 300
+year=2010/month=5/: 310
+year=2010/month=6/: 300
+year=2010/month=7/: 310
+year=2010/month=8/: 310
+year=2010/month=9/: 300
+====
+---- QUERY
+# IMPALA-10233: Inserting to a partitioned table with zorder should work.
+insert overwrite partitioned_zorder_tbl partition(year=2010, month=1)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+from functional.alltypes
+where year = 2010 and month = 1
+---- RESULTS
+year=2010/month=1/: 310
+====

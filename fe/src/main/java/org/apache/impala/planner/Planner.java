@@ -711,6 +711,7 @@ public class Planner {
     List<Expr> orderingExprs = new ArrayList<>();
 
     boolean partialSort = false;
+    int numPartitionKeys = 0;
     if (insertStmt.getTargetTable() instanceof FeKuduTable) {
       // Always sort if the 'clustered' hint is present. Otherwise, don't sort if either
       // the 'noclustered' hint is present, or this is a single node exec, or if the
@@ -723,7 +724,11 @@ public class Planner {
         partialSort = true;
       }
     } else if (insertStmt.requiresClustering()) {
-      orderingExprs.addAll(insertStmt.getPartitionKeyExprs());
+      List<Expr> partKeys = insertStmt.getPartitionKeyExprs();
+      orderingExprs.addAll(partKeys);
+      // Ignore constants. Only dynamic partition inserts have non constant keys.
+      Expr.removeConstants(orderingExprs);
+      numPartitionKeys = orderingExprs.size();
     }
     orderingExprs.addAll(insertStmt.getSortExprs());
     // Ignore constants for the sake of clustering.
@@ -736,6 +741,7 @@ public class Planner {
     List<Boolean> nullsFirstParams = Collections.nCopies(orderingExprs.size(), false);
     SortInfo sortInfo = new SortInfo(orderingExprs, isAscOrder, nullsFirstParams,
         insertStmt.getSortingOrder());
+    sortInfo.setNumLexicalKeysInZOrder(numPartitionKeys);
     sortInfo.createSortTupleInfo(insertStmt.getResultExprs(), analyzer);
     sortInfo.getSortTupleDescriptor().materializeSlots();
     insertStmt.substituteResultExprs(sortInfo.getOutputSmap(), analyzer);

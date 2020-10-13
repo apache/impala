@@ -429,7 +429,8 @@ void DmlExecState::ToTDmlResult(TDmlResult* dml_result) {
 void DmlExecState::AddPartition(
     const string& name, int64_t id, const string* base_dir) {
   lock_guard<mutex> l(lock_);
-  DCHECK(per_partition_status_.find(name) == per_partition_status_.end());
+  DCHECK(per_partition_status_.find(name) == per_partition_status_.end())
+      << "Partition status of " << name << " already exists";
   DmlPartitionStatusPB status;
   status.set_num_modified_rows(0L);
   status.set_id(id);

@@ -232,6 +232,7 @@ public class SortNode extends PlanNode {
     msg.node_type = TPlanNodeType.SORT_NODE;
     TSortInfo sort_info = new TSortInfo(Expr.treesToThrift(info_.getSortExprs()),
         info_.getIsAscOrder(), info_.getNullsFirst(), info_.getSortingOrder());
+    sort_info.setNum_lexical_keys_in_zorder(info_.getNumLexicalKeysInZOrder());
     Preconditions.checkState(tupleIds_.size() == 1,
         "Incorrect size for tupleIds_ in SortNode");
     sort_info.setSort_tuple_slot_exprs(Expr.treesToThrift(resolvedTupleExprs_));
@@ -250,7 +251,8 @@ public class SortNode extends PlanNode {
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
       output.append(detailPrefix + "order by: ");
       output.append(getSortingOrderExplainString(info_.getSortExprs(),
-          info_.getIsAscOrder(), info_.getNullsFirstParams(), info_.getSortingOrder()));
+          info_.getIsAscOrder(), info_.getNullsFirstParams(), info_.getSortingOrder(),
+          info_.getNumLexicalKeysInZOrder()));
     }
 
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {

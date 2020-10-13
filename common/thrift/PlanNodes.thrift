@@ -452,6 +452,10 @@ struct TSortInfo {
   4: optional list<Exprs.TExpr> sort_tuple_slot_exprs
   // The sorting order used in SORT BY clauses.
   5: required Types.TSortingOrder sorting_order
+  // Number of the leading lexical keys in the ordering exprs. Only used in Z-order
+  // for the pre-insert sort node to sort rows lexically on partition keys first, and
+  // sort the remaining columns in Z-order.
+  6: optional i32 num_lexical_keys_in_zorder
 }
 
 enum TSortType {

@@ -62,7 +62,11 @@ public class SortInfo {
   private final List<Expr> materializedExprs_;
   // Maps from exprs materialized into the sort tuple to their corresponding SlotRefs.
   private final ExprSubstitutionMap outputSmap_;
-  private TSortingOrder sortingOrder_;
+  private final TSortingOrder sortingOrder_;
+  // Number of leading keys that should be sorted lexically in sortExprs_. Only used in
+  // pre-insert sort node that uses Z-order. So the Z-order sort node can sort rows
+  // lexically on partition keys, and sort the remaining keys in Z-order.
+  private int numLexicalKeysInZOrder_ = 0;
 
   public SortInfo(List<Expr> sortExprs, List<Boolean> isAscOrder,
       List<Boolean> nullsFirstParams) {
@@ -93,6 +97,7 @@ public class SortInfo {
     sortTupleDesc_ = other.sortTupleDesc_;
     outputSmap_ = other.outputSmap_.clone();
     sortingOrder_ = other.sortingOrder_;
+    numLexicalKeysInZOrder_ = other.numLexicalKeysInZOrder_;
   }
 
   public List<Expr> getSortExprs() { return sortExprs_; }
@@ -103,6 +108,10 @@ public class SortInfo {
   public TupleDescriptor getSortTupleDescriptor() { return sortTupleDesc_; }
   public ExprSubstitutionMap getOutputSmap() { return outputSmap_; }
   public TSortingOrder getSortingOrder() { return sortingOrder_; }
+  public int getNumLexicalKeysInZOrder() { return numLexicalKeysInZOrder_; }
+  public void setNumLexicalKeysInZOrder(int numLexicalKeysInZOrder) {
+    numLexicalKeysInZOrder_ = numLexicalKeysInZOrder;
+  }
 
   /**
    * Gets the list of booleans indicating whether nulls come first or last, independent
