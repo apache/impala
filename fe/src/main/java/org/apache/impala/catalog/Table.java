@@ -502,7 +502,11 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       }
     }
 
-    table.setMetastore_table(getMetaStoreTable());
+    org.apache.hadoop.hive.metastore.api.Table msTable = getMetaStoreTable();
+    // IMPALA-10243: We should get our own copy of the metastore table, otherwise other
+    // threads might modify it when the table lock is not held.
+    if (msTable != null) msTable = msTable.deepCopy();
+    table.setMetastore_table(msTable);
     table.setTable_stats(tableStats_);
     return table;
   }
