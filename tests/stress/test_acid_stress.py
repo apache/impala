@@ -18,37 +18,16 @@
 import pytest
 import random
 import time
-import traceback
 
 from multiprocessing import Value
-from multiprocessing.pool import ThreadPool
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import SkipIfHive2, SkipIfS3
+from tests.stress.stress_util import Task, run_tasks
 
 NUM_OVERWRITES = 2
 NUM_INSERTS_PER_OVERWRITE = 4
-
-
-class Task:
-  """Helper class for parallel execution."""
-  def __init__(self, func, *args, **kwargs):
-    self.func = func
-    self.args = args
-    self.kwargs = kwargs
-
-  def run(self):
-    try:
-      return self.func(*self.args, **self.kwargs)
-    except Exception:
-      traceback.print_exc()
-      raise
-
-
-def run_tasks(tasks):
-  pool = ThreadPool(processes=len(tasks))
-  pool.map_async(Task.run, tasks).get(600)
 
 
 class TestAcidStress(ImpalaTestSuite):
