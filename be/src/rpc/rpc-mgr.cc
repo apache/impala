@@ -153,12 +153,13 @@ Status RpcMgr::Init(const TNetworkAddress& address) {
 }
 
 Status RpcMgr::RegisterService(int32_t num_service_threads, int32_t service_queue_depth,
-    GeneratedServiceIf* service_ptr, MemTracker* service_mem_tracker) {
+    GeneratedServiceIf* service_ptr, MemTracker* service_mem_tracker,
+    MetricGroup* rpc_metrics) {
   DCHECK(is_inited()) << "Must call Init() before RegisterService()";
   DCHECK(!services_started_) << "Cannot call RegisterService() after StartServices()";
   scoped_refptr<ImpalaServicePool> service_pool =
       new ImpalaServicePool(messenger_->metric_entity(), service_queue_depth, service_ptr,
-          service_mem_tracker, address_);
+          service_mem_tracker, address_, rpc_metrics);
   // Start the thread pool first before registering the service in case the startup fails.
   RETURN_IF_ERROR(service_pool->Init(num_service_threads));
   KUDU_RETURN_IF_ERROR(

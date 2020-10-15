@@ -602,11 +602,14 @@ void AdmissionController::AppendHeavyMemoryQueriesForAPoolInHostAtIndices(
 // the Scheduler has (coming from the StatestoreSubscriber)?
 AdmissionController::AdmissionController(ClusterMembershipMgr* cluster_membership_mgr,
     StatestoreSubscriber* subscriber, RequestPoolService* request_pool_service,
-    MetricGroup* metrics, const TNetworkAddress& host_addr)
+    MetricGroup* metrics, Scheduler* scheduler, PoolMemTrackerRegistry* pool_mem_trackers,
+    const TNetworkAddress& host_addr)
   : cluster_membership_mgr_(cluster_membership_mgr),
     subscriber_(subscriber),
     request_pool_service_(request_pool_service),
     metrics_group_(metrics->GetOrCreateChildGroup("admission-controller")),
+    scheduler_(scheduler),
+    pool_mem_trackers_(pool_mem_trackers),
     host_id_(TNetworkAddressToString(host_addr)),
     thrift_serializer_(false),
     done_(false) {
@@ -1638,8 +1641,7 @@ Status AdmissionController::ComputeGroupScheduleStates(
     VLOG(3) << "Scheduling for executor group: " << group_name << " with "
             << executor_group->NumExecutors() << " executors";
     const Scheduler::ExecutorConfig group_config = {*executor_group, coord_desc};
-    RETURN_IF_ERROR(
-        ExecEnv::GetInstance()->scheduler()->Schedule(group_config, group_state.get()));
+    RETURN_IF_ERROR(scheduler_->Schedule(group_config, group_state.get()));
     DCHECK(!group_state->executor_group().empty());
     output_schedules->emplace_back(std::move(group_state), *orig_executor_group);
   }
@@ -1726,7 +1728,7 @@ void AdmissionController::PoolStats::UpdateMemTrackerStats() {
   // May be NULL if no queries have ever executed in this pool on this node but another
   // node sent stats for this pool.
   MemTracker* tracker =
-      ExecEnv::GetInstance()->pool_mem_trackers()->GetRequestPoolMemTracker(name_, false);
+      parent_->pool_mem_trackers_->GetRequestPoolMemTracker(name_, false);
 
   if (tracker) {
     // Update local_stats_ with the query Ids of the top 5 queries, plus the min, the max,
@@ -2235,7 +2237,7 @@ vector<const ExecutorGroup*> AdmissionController::GetExecutorGroupsForQuery(
     const ClusterMembershipMgr::ExecutorGroups& all_groups,
     const AdmissionRequest& request) {
   vector<const ExecutorGroup*> matching_groups;
-  if (ExecEnv::GetInstance()->scheduler()->IsCoordinatorOnlyQuery(request.request)) {
+  if (scheduler_->IsCoordinatorOnlyQuery(request.request)) {
     // Coordinator only queries can run regardless of the presence of exec groups. This
     // empty group works as a proxy to schedule coordinator only queries.
     matching_groups.push_back(cluster_membership_mgr_->GetEmptyExecutorGroup());

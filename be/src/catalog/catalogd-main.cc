@@ -18,44 +18,35 @@
 // This file contains the main() function for the catalog daemon process,
 
 #include <jni.h>
-#include <boost/scoped_ptr.hpp>
 
 #include "catalog/catalog-server.h"
+#include "common/daemon-env.h"
 #include "common/init.h"
 #include "common/status.h"
 #include "rpc/authentication.h"
 #include "rpc/rpc-trace.h"
 #include "rpc/thrift-server.h"
 #include "service/fe-support.h"
-#include "util/common-metrics.h"
 #include "util/debug-util.h"
-#include "util/default-path-handlers.h"
 #include "util/event-metrics.h"
 #include "util/jni-util.h"
 #include "util/memory-metrics.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
-#include "util/webserver.h"
 
-DECLARE_string(classpath);
-DECLARE_string(principal);
 DECLARE_int32(catalog_service_port);
 DECLARE_int32(webserver_port);
-DECLARE_bool(enable_webserver);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
 DECLARE_string(ssl_private_key_password_cmd);
 DECLARE_string(ssl_cipher_list);
 DECLARE_string(ssl_minimum_version);
-DECLARE_string(metrics_webserver_interface);
-DECLARE_int32(metrics_webserver_port);
 
 #include "common/names.h"
 
 using namespace impala;
-using namespace apache::thrift;
 using namespace apache::thrift;
 
 int CatalogdMain(int argc, char** argv) {
@@ -64,42 +55,17 @@ int CatalogdMain(int argc, char** argv) {
   InitCommonRuntime(argc, argv, true);
   InitFeSupport();
 
-  scoped_ptr<MetricGroup> metrics(new MetricGroup("catalog"));
-  scoped_ptr<Webserver> webserver(new Webserver(metrics.get()));
+  DaemonEnv daemon_env("catalog");
+  ABORT_IF_ERROR(daemon_env.Init(/* init_jvm */ true));
+  MetastoreEventMetrics::InitMetastoreEventMetrics(daemon_env.metrics());
 
-  if (FLAGS_enable_webserver) {
-    AddDefaultUrlCallbacks(webserver.get(), metrics.get());
-    ABORT_IF_ERROR(metrics->RegisterHttpHandlers(webserver.get()));
-    ABORT_IF_ERROR(webserver->Start());
-  } else {
-    LOG(INFO) << "Not starting webserver";
-  }
-
-  scoped_ptr<Webserver> metrics_webserver;
-  if (FLAGS_metrics_webserver_port > 0) {
-    metrics_webserver.reset(new Webserver(FLAGS_metrics_webserver_interface,
-        FLAGS_metrics_webserver_port, metrics.get(), Webserver::AuthMode::NONE));
-    ABORT_IF_ERROR(metrics->RegisterHttpHandlers(metrics_webserver.get()));
-    ABORT_IF_ERROR(metrics_webserver->Start());
-  }
-
-  ABORT_IF_ERROR(RegisterMemoryMetrics(metrics.get(), true, nullptr, nullptr));
-  ABORT_IF_ERROR(StartMemoryMaintenanceThread());
-  ABORT_IF_ERROR(StartThreadInstrumentation(metrics.get(), webserver.get(), true));
-
-  InitRpcEventTracing(webserver.get());
-  metrics->AddProperty<string>("catalog.version", GetVersionString(true));
-
-  CommonMetrics::InitCommonMetrics(metrics.get());
-  MetastoreEventMetrics::InitMetastoreEventMetrics(metrics.get());
-
-  CatalogServer catalog_server(metrics.get());
+  CatalogServer catalog_server(daemon_env.metrics());
   ABORT_IF_ERROR(catalog_server.Start());
-  catalog_server.RegisterWebpages(webserver.get());
+  catalog_server.RegisterWebpages(daemon_env.webserver());
   boost::shared_ptr<TProcessor> processor(
       new CatalogServiceProcessor(catalog_server.thrift_iface()));
   boost::shared_ptr<TProcessorEventHandler> event_handler(
-      new RpcEventHandler("catalog-server", metrics.get()));
+      new RpcEventHandler("catalog-server", daemon_env.metrics()));
   processor->setEventHandler(event_handler);
 
   ThriftServer* server;
@@ -115,7 +81,7 @@ int CatalogdMain(int argc, char** argv) {
         .ssl_version(ssl_version)
         .cipher_list(FLAGS_ssl_cipher_list);
   }
-  ABORT_IF_ERROR(builder.metrics(metrics.get()).Build(&server));
+  ABORT_IF_ERROR(builder.metrics(daemon_env.metrics()).Build(&server));
   ABORT_IF_ERROR(server->Start());
   catalog_server.MarkServiceAsStarted();
   LOG(INFO) << "CatalogService started on port: " << FLAGS_catalog_service_port;

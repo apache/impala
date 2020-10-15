@@ -99,9 +99,11 @@ TEST_F(RpcMgrKerberizedTest, AuthorizationFail) {
   const int num_service_threads = 10;
   const int queue_size = 10;
   ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size, ping_impl,
-      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker()));
+      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker(),
+      ExecEnv::GetInstance()->rpc_metrics()));
   ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size, scan_mem_impl,
-      static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker()));
+      static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker(),
+      ExecEnv::GetInstance()->rpc_metrics()));
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;
   ASSERT_OK(rpc_mgr_.StartServices());
@@ -253,7 +255,8 @@ TEST_F(RpcMgrKerberizedTest, InternalAuthorizationSkip) {
   const int num_service_threads = 10;
   const int queue_size = 10;
   ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size, ping_impl,
-      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker()));
+      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker(),
+      ExecEnv::GetInstance()->rpc_metrics()));
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;
   ASSERT_OK(rpc_mgr_.StartServices());

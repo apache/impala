@@ -130,8 +130,8 @@ class RpcMgr {
   ///
   /// It is an error to call this after StartServices() has been called.
   Status RegisterService(int32_t num_service_threads, int32_t service_queue_depth,
-      kudu::rpc::GeneratedServiceIf* service_ptr, MemTracker* service_mem_tracker)
-      WARN_UNUSED_RESULT;
+      kudu::rpc::GeneratedServiceIf* service_ptr, MemTracker* service_mem_tracker,
+      MetricGroup* rpc_metrics) WARN_UNUSED_RESULT;
 
   /// Returns true if the given 'remote_user' in RpcContext 'context' is authorized to
   /// access 'service_name' registered with this RpcMgr. Authorization is only enforced

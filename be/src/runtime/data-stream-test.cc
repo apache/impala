@@ -108,7 +108,8 @@ class ImpalaKRPCTestBackend : public DataStreamServiceIf {
   virtual ~ImpalaKRPCTestBackend() {}
 
   Status Init() {
-    return rpc_mgr_->RegisterService(CpuInfo::num_cores(), 1024, this, mem_tracker());
+    return rpc_mgr_->RegisterService(CpuInfo::num_cores(), 1024, this, mem_tracker(),
+        ExecEnv::GetInstance()->rpc_metrics());
   }
 
   virtual bool Authorize(const google::protobuf::Message* req,
