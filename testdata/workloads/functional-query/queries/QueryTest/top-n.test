@@ -784,7 +784,7 @@ int,int,int,int
 ---- QUERY
 # Test limit 0 from sub query
 select sum(a.int_col) from
-  (select int_col from functional.alltypes order by int_col limit 0) a
+  (select int_col from alltypes order by int_col limit 0) a
 ---- RESULTS
 NULL
 ---- TYPES
@@ -883,7 +883,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 ---- QUERY
 # Taken from limit.test
 # With an offset that reduces the result size (limit is much bigger than number of rows)
-select id from functional.alltypessmall order by 1 limit 10000 offset 99;
+select id from alltypessmall order by 1 limit 10000 offset 99;
 ---- RESULTS
 99
 ---- TYPES
@@ -892,7 +892,7 @@ int
 ---- QUERY
 # Taken from limit.test
 # With an offset that is bigger than the number of rows
-select id from functional.alltypessmall order by 1 limit 1 offset 1000;
+select id from alltypessmall order by 1 limit 1 offset 1000;
 ---- RESULTS
 ---- TYPES
 int
@@ -931,7 +931,7 @@ int, int
 ---- QUERY
 # Taken from joins.test
 # cross join with nulls and constant table
-select id, tinyint_col, t1.c from functional.alltypesagg
+select id, tinyint_col, t1.c from alltypesagg
 cross join (values(NULL c, 1, 2)) as t1
 order by tinyint_col nulls first, id, t1.c
 limit 6
@@ -1316,7 +1316,7 @@ BIGINT, STRING
 ---- QUERY
 # Multiple views in with-clause. All views are used in a union.
 # Taken from with-clause.test
-with t1 as (select int_col x, bigint_col y from functional.alltypestiny),
+with t1 as (select int_col x, bigint_col y from alltypestiny),
 t2 as (select 1 x , 10 y), t3 as (values(2 x , 20 y), (3, 30))
 select * from t1 union all select * from t2 union all (select * from t3) order by x limit 20
 ---- RESULTS
@@ -1338,7 +1338,7 @@ INT, BIGINT
 # Self-join of with-clause table to make sure the join op is properly set
 # in the cloned inline-view instances.
 # Taken from with-clause.test
-with t as (select int_col x, bigint_col y from functional.alltypestiny order by id limit 2)
+with t as (select int_col x, bigint_col y from alltypestiny order by id limit 2)
 select * from t t1 left outer join t t2 on t1.y = t2.x full outer join t t3 on t2.y = t3.x
 order by t1.x limit 10
 ---- RESULTS

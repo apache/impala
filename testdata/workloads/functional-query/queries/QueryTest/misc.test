@@ -122,7 +122,7 @@ int, string, bigint
 ====
 ---- QUERY
 # where clause is a SlotRef
-SELECT count(*) from functional.alltypes where bool_col
+SELECT count(*) from alltypes where bool_col
 ---- RESULTS
 3650
 ---- TYPES
@@ -130,7 +130,7 @@ bigint
 ====
 ---- QUERY
 # having clause is a SlotRef
-SELECT count(*) from functional.alltypes group by bool_col having bool_col
+SELECT count(*) from alltypes group by bool_col having bool_col
 ---- RESULTS
 3650
 ---- TYPES

@@ -324,7 +324,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 ====
 ---- QUERY
 # With an offset that reduces the result size (limit is much bigger than number of rows)
-select id from functional.alltypessmall order by 1 limit 10000 offset 99;
+select id from alltypessmall order by 1 limit 10000 offset 99;
 ---- RESULTS
 99
 ---- TYPES
@@ -332,7 +332,7 @@ int
 ====
 ---- QUERY
 # With an offset that is bigger than the number of rows
-select id from functional.alltypessmall order by 1 limit 1 offset 1000;
+select id from alltypessmall order by 1 limit 1 offset 1000;
 ---- RESULTS
 ---- TYPES
 int

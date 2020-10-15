@@ -4094,7 +4094,7 @@ INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIM
 ====
 ---- QUERY
 # Regression test for IMPALA-1148.
-select 1 from functional.alltypestiny order by 1
+select 1 from alltypestiny order by 1
 ---- RESULTS
 1
 1
@@ -4110,7 +4110,7 @@ TINYINT
 ---- QUERY
 # Test for corner case: fixed length data but only NULL var-len slots.
 select id, cast(NULL as string) str
-from functional.alltypestiny
+from alltypestiny
 order by 2, 1
 ---- RESULTS
 0,'NULL'
@@ -4127,7 +4127,7 @@ INT, STRING
 ---- QUERY
 # Test for corner case: fixed length data but only zero-length var len data.
 select id, ''
-from functional.alltypestiny
+from alltypestiny
 order by 2 desc, 1 desc
 ---- RESULTS
 7,''

@@ -1133,6 +1133,9 @@ bigint
 # IMPALA-4883: The second union operand references a char column, which causes codegen
 # to fail and be disabled for that operand and all operands that follow it. For this query
 # codegen is enabled only for the first operand.
+#
+# Qualify table chars_tiny with functional database below as the same table is not
+# defined in other databases.
 select count(s) from (
   select cast(id as string) as s from alltypestiny
   union all

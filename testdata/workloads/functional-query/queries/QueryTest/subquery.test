@@ -2,8 +2,8 @@
 ---- QUERY
 # Uncorrelated IN subquery
 select a.id, a.int_col, a.string_col
-from functional.alltypessmall a
-where a.id in (select id from functional.alltypestiny where bool_col = false)
+from alltypessmall a
+where a.id in (select id from alltypestiny where bool_col = false)
 and a.id < 5
 ---- RESULTS
 1,1,'1'
@@ -14,8 +14,8 @@ INT, INT, STRING
 ---- QUERY
 # Uncorrelated IN subquery with IS NOT NULL predicate
 select a.id, a.int_col, a.string_col
-from functional.alltypes a
-where a.int_col in (select int_col from functional.alltypesagg where int_col is not null)
+from alltypes a
+where a.int_col in (select int_col from alltypesagg where int_col is not null)
 and a.id < 5
 ---- RESULTS
 1,1,'1'
@@ -28,8 +28,8 @@ INT, INT, STRING
 ---- QUERY
 # Uncorrelated IN subquery with IS NULL predicate (empty result)
 select a.id, a.int_col, a.string_col
-from functional.alltypes a
-where a.id in (select int_col from functional.alltypesagg where int_col is null)
+from alltypes a
+where a.id in (select int_col from alltypesagg where int_col is null)
 and a.id < 5
 ---- RESULTS
 ---- TYPES
@@ -38,8 +38,8 @@ INT, INT, STRING
 ---- QUERY
 # Uncorrelated NOT IN subquery
 select id, year, month
-from functional.alltypessmall
-where id not in (select id from functional.alltypestiny where bool_col = false)
+from alltypessmall
+where id not in (select id from alltypestiny where bool_col = false)
 and id < 5
 ---- RESULTS
 0,2009,1
@@ -51,8 +51,8 @@ INT, INT, INT
 ---- QUERY
 # Uncorrelated NOT IN subquery that returns only null values
 select id
-from functional.alltypestiny
-where int_col not in (select int_col from functional.alltypesagg where int_col is null)
+from alltypestiny
+where int_col not in (select int_col from alltypesagg where int_col is null)
 and id < 10
 ---- RESULTS
 ---- TYPES
@@ -61,8 +61,8 @@ INT
 ---- QUERY
 # Uncorrelated NOT IN subquery that returns null and non-null values
 select id
-from functional.alltypestiny
-where int_col not in (select int_col from functional.alltypesagg)
+from alltypestiny
+where int_col not in (select int_col from alltypesagg)
 ---- RESULTS
 ---- TYPES
 INT
@@ -71,8 +71,8 @@ INT
 # Uncorrelated NOT IN subquery that returns an empty set
 # (result should include all the tuples of the outer)
 select id, int_col
-from functional.alltypestiny
-where int_col not in (select int_col from functional.alltypesagg where id < 0)
+from alltypestiny
+where int_col not in (select int_col from alltypesagg where id < 0)
 order by id
 ---- RESULTS
 0,0
@@ -90,8 +90,8 @@ INT, INT
 # Outer with nulls and an uncorrelated NOT IN subquery that returns an empty set
 # (result should include NULLs in int_col)
 select id, int_col
-from functional.alltypesagg
-where int_col not in (select int_col from functional.alltypestiny where id < 0)
+from alltypesagg
+where int_col not in (select int_col from alltypestiny where id < 0)
 and id < 5
 order by id
 ---- RESULTS
@@ -107,9 +107,9 @@ INT, INT
 ---- QUERY
 # Outer with NULLS and an uncorrelated NOT IN
 select id
-from functional.alltypesagg
+from alltypesagg
 where int_col is null and
-int_col not in (select int_col from functional.alltypestiny)
+int_col not in (select int_col from alltypestiny)
 ---- RESULTS
 ---- TYPES
 INT
@@ -117,9 +117,9 @@ INT
 ---- QUERY
 # Outer with NULLS and an uncorrelated NOT IN subquery that returns an empty set
 select id, int_col
-from functional.alltypesagg
+from alltypesagg
 where int_col is null and
-int_col not in (select int_col from functional.alltypestiny where id < 0)
+int_col not in (select int_col from alltypestiny where id < 0)
 and id < 10
 order by id
 ---- RESULTS
@@ -131,8 +131,8 @@ INT, INT
 ---- QUERY
 # Correlated IN subquery
 select s.id, s.bool_col, s.int_col, s.date_string_col
-from functional.alltypessmall s
-where s.id in (select id from functional.alltypestiny t where t.int_col = s.int_col)
+from alltypessmall s
+where s.id in (select id from alltypestiny t where t.int_col = s.int_col)
 and s.bool_col = false
 ---- RESULTS
 1,false,1,'01/01/09'
@@ -142,10 +142,10 @@ INT, BOOLEAN, INT, STRING
 ---- QUERY
 # Correlated NOT IN subquery
 select s.id, s.bool_col, s.int_col
-from functional.alltypessmall s
+from alltypessmall s
 where s.id not in
   (select id
-   from functional.alltypestiny t
+   from alltypestiny t
    where s.int_col = t.int_col and t.bool_col = false)
 and s.id < 5
 order by s.id
@@ -162,9 +162,9 @@ INT, BOOLEAN, INT
 # (results should include all the tuples of the outer that pass
 # the remaining predicates)
 select id, int_col
-from functional.alltypestiny t
+from alltypestiny t
 where t.int_col not in
-  (select int_col from functional.alltypes a where t.id = a.id and a.bigint_col < 0)
+  (select int_col from alltypes a where t.id = a.id and a.bigint_col < 0)
 and id < 5
 order by id
 ---- RESULTS
@@ -179,9 +179,9 @@ INT, INT
 ---- QUERY
 # Correlated NOT IN subquery that returns nulls
 select id, int_col
-from functional.alltypestiny t
+from alltypestiny t
 where t.int_col not in
-  (select int_col from functional.alltypesagg a where int_col is null and a.id = t.id)
+  (select int_col from alltypesagg a where int_col is null and a.id = t.id)
 order by id
 ---- RESULTS
 1,1
@@ -198,9 +198,9 @@ INT, INT
 # Outer with nulls and a correlated NOT IN subquery that returns null and
 # non-null values
 select id, int_col
-from functional.alltypesagg a
+from alltypesagg a
 where a.int_col not in
-  (select int_col from functional.alltypesagg b where a.id = b.id)
+  (select int_col from alltypesagg b where a.id = b.id)
 and id < 10
 ---- RESULTS
 ---- TYPES
@@ -209,9 +209,9 @@ INT, INT
 ---- QUERY
 # Outer with nulls and a correlated NOT IN subquery that does not return nulls
 select id, int_col
-from functional.alltypesagg a
+from alltypesagg a
 where int_col not in
-  (select int_col from functional.alltypestiny t where a.id = t.id)
+  (select int_col from alltypestiny t where a.id = t.id)
 and bigint_col = 10
 order by id
 ---- RESULTS
@@ -230,7 +230,7 @@ INT, INT
 ---- QUERY
 # Correlated NOT IN subquery that returns an empty set
 select id, int_col, bigint_col
-from functional.alltypesagg a
+from alltypesagg a
 where int_col not in
   (select int_col from alltypestiny t where a.id = t.id and t.bigint_col < 0)
 and bigint_col = 10
@@ -275,8 +275,8 @@ BIGINT
 ---- QUERY
 # Correlated EXISTS subquery
 select count(*)
-from functional.alltypestiny t
-where exists (select * from functional.alltypessmall s where t.int_col = s.int_col)
+from alltypestiny t
+where exists (select * from alltypessmall s where t.int_col = s.int_col)
 and id < 4
 ---- RESULTS
 4
@@ -286,8 +286,8 @@ BIGINT
 ---- QUERY
 # Correlated NOT EXISTS subquery
 select id, int_col
-from functional.alltypessmall t
-where not exists (select 1 from functional.alltypestiny s where t.id = s.id)
+from alltypessmall t
+where not exists (select 1 from alltypestiny s where t.id = s.id)
 and month = 1 and int_col < 5
 order by id
 ---- RESULTS
@@ -307,8 +307,8 @@ INT, INT
 ---- QUERY
 # Uncorrelated EXISTS
 select id
-from functional.alltypestiny t
-where exists (select 1 from functional.alltypessmall where bool_col = false)
+from alltypestiny t
+where exists (select 1 from alltypessmall where bool_col = false)
 and bool_col = true
 order by id
 ---- RESULTS
@@ -322,8 +322,8 @@ INT
 ---- QUERY
 # Uncorrelated EXISTS that returns an empty set
 select 1
-from functional.alltypestiny t
-where exists (select null from functional.alltypessmall where id < 0)
+from alltypestiny t
+where exists (select null from alltypessmall where id < 0)
 and t.id > 0
 ---- RESULTS
 ---- TYPES
@@ -332,8 +332,8 @@ TINYINT
 ---- QUERY
 # Uncorrelated NOT EXISTS
 select id
-from functional.alltypestiny t
-where not exists (select 1 from functional.alltypessmall where bool_col = false)
+from alltypestiny t
+where not exists (select 1 from alltypessmall where bool_col = false)
 and bool_col = true
 ---- RESULTS
 ---- TYPES
@@ -342,8 +342,8 @@ INT
 ---- QUERY
 # Uncorrelated NOT EXISTS that returns an empty set
 select 1
-from functional.alltypestiny t
-where not exists (select null from functional.alltypessmall where id < 0)
+from alltypestiny t
+where not exists (select null from alltypessmall where id < 0)
 and t.id > 0
 ---- RESULTS
 1
@@ -359,8 +359,8 @@ TINYINT
 ---- QUERY
 # Uncorrelated aggregate subquery
 select count(*) from
-functional.alltypessmall t
-where t.id < (select max(id) from functional.alltypestiny)
+alltypessmall t
+where t.id < (select max(id) from alltypestiny)
 and t.bool_col = true
 ---- RESULTS
 4
@@ -370,8 +370,8 @@ BIGINT
 ---- QUERY
 # Uncorrelated aggregate subquery with count
 select id, int_col, year, month
-from functional.alltypessmall
-where int_col = (select count(*) from functional.alltypestiny)
+from alltypessmall
+where int_col = (select count(*) from alltypestiny)
 order by id
 ---- RESULTS
 8,8,2009,1
@@ -387,6 +387,8 @@ INT, INT, INT, INT
 ====
 ---- QUERY
 # Correlated aggregate subquery
+# Remove functional database qualification in the query below after IMPALA-10252 is
+# addressed.
 select id, int_col, year, month
 from functional.alltypessmall s
 where s.int_col = (select count(*) from functional.alltypestiny t where s.id = t.id)
@@ -410,13 +412,13 @@ INT, INT, INT, INT
 ---- QUERY
 # Multiple subquery predicates
 select id, bool_col, int_col, date_string_col
-from functional.alltypessmall s
-where s.id in (select id from functional.alltypestiny where bool_col = true)
+from alltypessmall s
+where s.id in (select id from alltypestiny where bool_col = true)
 and exists
   (select *
-   from functional.alltypesagg g
+   from alltypesagg g
    where s.int_col = g.int_col and g.bigint_col < 100)
-and s.int_col < (select count(*) from functional.alltypes where month = 1)
+and s.int_col < (select count(*) from alltypes where month = 1)
 ---- RESULTS
 2,true,2,'01/01/09'
 4,true,4,'01/01/09'
@@ -427,15 +429,15 @@ INT, BOOLEAN, INT, STRING
 ---- QUERY
 # Multiple nesting levels
 select month, count(*)
-from functional.alltypessmall s
+from alltypessmall s
 where id in
   (select id
-   from functional.alltypestiny t
+   from alltypestiny t
    where t.int_col <
      (select min(int_col)
-      from functional.alltypesagg a
+      from alltypesagg a
       where a.bool_col = false and exists
-      (select * from functional.alltypes b where b.id = a.id)))
+      (select * from alltypes b where b.id = a.id)))
 group by month
 ---- RESULTS
 1,4
@@ -445,11 +447,11 @@ INT, BIGINT
 ---- QUERY
 # Multiple tables in outer select block and in subqueries
 select t.id, t.month, t.year
-from functional.alltypestiny t left outer join functional.alltypessmall s
+from alltypestiny t left outer join alltypessmall s
 on s.id = t.id
 where t.int_col <
   (select avg(a.int_col) * 2
-   from functional.alltypesagg a left outer join functional.alltypes b
+   from alltypesagg a left outer join alltypes b
    on a.bigint_col = b.bigint_col
    where a.id = t.id and b.int_col < 10)
 order by t.id
@@ -468,13 +470,13 @@ INT, INT, INT
 # Subquery in the WITH clause
 with t as
   (select *
-   from functional.alltypessmall
+   from alltypessmall
    where id in
      (select id
-      from functional.alltypestiny
+      from alltypestiny
       where bool_col = false))
 select id, month, year from t where t.int_col =
-  (select count(*) from functional.alltypestiny where id < 5)
+  (select count(*) from alltypestiny where id < 5)
 ---- RESULTS
 5,1,2009
 ---- TYPES
@@ -483,12 +485,12 @@ INT, INT, INT
 ---- QUERY
 # Subquery in an inline view
 select s.id, s.year
-from functional.alltypessmall s left outer join
+from alltypessmall s left outer join
   (select *
-   from functional.alltypestiny t
-   where t.id in (select id from functional.alltypesagg)) b
+   from alltypestiny t
+   where t.id in (select id from alltypesagg)) b
 on (s.id = b.id)
-where s.int_col < (select max(int_col) from functional.alltypes) and s.id < 10
+where s.int_col < (select max(int_col) from alltypes) and s.id < 10
 order by s.id
 ---- RESULTS
 0,2009
@@ -506,7 +508,7 @@ INT, INT
 ---- QUERY
 # Subquery returning a decimal
 select id, double_col
-from functional.alltypestiny
+from alltypestiny
 where double_col < (select min(d3) from functional.decimal_tbl)
 order by id
 ---- RESULTS
@@ -521,7 +523,7 @@ INT, DOUBLE
 # Compare a decimal with the result of a subquery
 select d1, d2, d3
 from functional.decimal_tbl
-where d3 < (select max(double_col) from functional.alltypestiny)
+where d3 < (select max(double_col) from alltypestiny)
 ---- RESULTS
 1234,2222,1.2345678900
 ---- TYPES
@@ -530,7 +532,7 @@ DECIMAL, DECIMAL, DECIMAL
 ---- QUERY
 # Subquery returning a date
 select id, timestamp_col
-from functional.alltypestiny
+from alltypestiny
 where timestamp_col <= (select max(date_col)
   from functional.date_tbl)
 order by id;
@@ -551,7 +553,7 @@ INT, TIMESTAMP
 select date_col
 from functional.date_tbl
 where date_col >= DATE '1400-01-01' AND date_col >= (select max(timestamp_col)
-  from functional.alltypestiny);
+  from alltypestiny);
 ---- RESULTS
 2017-11-28
 2018-12-31
@@ -566,8 +568,8 @@ DATE
 ---- QUERY
 # Distinct in the outer select block
 select distinct bool_col
-from functional.alltypestiny t
-where 1 < (select count(*) from functional.alltypessmall)
+from alltypestiny t
+where 1 < (select count(*) from alltypessmall)
 ---- RESULTS
 false
 true
@@ -577,8 +579,8 @@ BOOLEAN
 ---- QUERY
 # Distinct with an unqualified star in the outer select block
 select distinct *
-from functional.alltypestiny t
-where 1 < (select avg(distinct id) from functional.alltypessmall)
+from alltypestiny t
+where 1 < (select avg(distinct id) from alltypessmall)
 and id < 2
 ---- RESULTS
 0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
@@ -589,8 +591,8 @@ INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIM
 ---- QUERY
 # Aggregate subquery in an IS NULL predicate
 select count(*)
-from functional.alltypestiny
-where (select max(int_col) from functional.alltypesagg where int_col is null) is null
+from alltypestiny
+where (select max(int_col) from alltypesagg where int_col is null) is null
 ---- RESULTS
 8
 ---- TYPES
@@ -599,8 +601,8 @@ BIGINT
 ---- QUERY
 # Aggregate subquery in an IS NOT NULL predicate
 select count(*)
-from functional.alltypestiny
-where (select max(int_col) from functional.alltypesagg where int_col is null) is not null
+from alltypestiny
+where (select max(int_col) from alltypesagg where int_col is null) is not null
 ---- RESULTS
 0
 ---- TYPES
@@ -609,8 +611,8 @@ BIGINT
 ---- QUERY
 # Correlated aggregate subquery in an IS NULL predicate
 select id, bool_col
-from functional.alltypestiny t
-where (select sum(int_col) from functional.alltypesagg g where t.id = g.id) is null
+from alltypestiny t
+where (select sum(int_col) from alltypesagg g where t.id = g.id) is null
 order by id
 ---- RESULTS
 0,true
@@ -620,8 +622,8 @@ INT, BOOLEAN
 ---- QUERY
 # Correlated aggregate subquery in an IS NOT NULL predicate
 select id, bool_col
-from functional.alltypestiny t
-where (select sum(int_col) from functional.alltypesagg g where t.id = g.id) is not null
+from alltypestiny t
+where (select sum(int_col) from alltypesagg g where t.id = g.id) is not null
 order by id
 ---- RESULTS
 1,false
@@ -637,9 +639,9 @@ INT, BOOLEAN
 ---- QUERY
 # Function with a scalar subquery
 select count(*)
-from functional.alltypestiny t
+from alltypestiny t
 where
- zeroifnull((select max(int_col) from functional.alltypesagg where int_col is null)) = 0
+ zeroifnull((select max(int_col) from alltypesagg where int_col is null)) = 0
 ---- RESULTS
 8
 ---- TYPES
@@ -648,9 +650,9 @@ BIGINT
 ---- QUERY
 # Function with a scalar subquery
 select id
-from functional.alltypestiny t
+from alltypestiny t
 where
-  nullifzero((select min(id) from functional.alltypesagg where int_col is null)) is null
+  nullifzero((select min(id) from alltypesagg where int_col is null)) is null
 and id < 5
 order by id
 ---- RESULTS
@@ -664,10 +666,10 @@ INT
 ====
 ---- QUERY
 # Between predicate with subqueries
-select id from functional.alltypessmall
+select id from alltypessmall
 where id between
-  (select min(bigint_col) from functional.alltypestiny) and
-  (select max(bigint_col) from functional.alltypestiny)
+  (select min(bigint_col) from alltypestiny) and
+  (select max(bigint_col) from alltypestiny)
 order by id
 ---- RESULTS
 0
@@ -687,10 +689,10 @@ INT
 ---- QUERY
 # Correlated EXISTS subquery with an analytic function and a group by clause
 select id, int_col
-from functional.alltypesagg a
+from alltypesagg a
 where exists
   (select id, sum(int_col) over (partition by bool_col)
-   from functional.alltypes b
+   from alltypes b
    where a.id = b.id and b.bigint_col < 100
    group by id, int_col, bool_col
    order by id)
@@ -768,9 +770,9 @@ BIGINT
 ---- QUERY
 # Regression test for IMPALA-1318.
 select count(t1.c) over () from
-  (select max(int_col) c from functional.alltypestiny) t1
+  (select max(int_col) c from alltypestiny) t1
 where t1.c not in
-  (select sum(t1.smallint_col) from functional.alltypes t1)
+  (select sum(t1.smallint_col) from alltypes t1)
 ---- RESULTS
 1
 ---- TYPES
@@ -875,10 +877,10 @@ TINYINT
 ---- QUERY
 # EXISTS subquery containing ORDER BY, LIMIT, and OFFSET (IMPALA-6934)
 SELECT count(*)
-FROM functional.alltypestiny t
+FROM alltypestiny t
 WHERE EXISTS
   (SELECT id
-   FROM functional.alltypestiny
+   FROM alltypestiny
    WHERE id < 5
    ORDER BY id LIMIT 10 OFFSET 6)
 ---- RESULTS
@@ -886,10 +888,10 @@ WHERE EXISTS
 ====
 ---- QUERY
 # Uncorrelated subquery in binary predicate that returns scalar value at runtime
-SELECT id FROM functional.alltypessmall
+SELECT id FROM alltypessmall
 WHERE int_col =
   (SELECT int_col
-   FROM functional.alltypessmall
+   FROM alltypessmall
    WHERE id = 1)
 ORDER BY id
 ---- RESULTS
@@ -910,10 +912,10 @@ INT
 ====
 ---- QUERY
 # Uncorrelated subquery in arithmetic expr that returns scalar value at runtime
-SELECT id FROM functional.alltypessmall
+SELECT id FROM alltypessmall
 WHERE int_col =
   3 * (SELECT int_col
-       FROM functional.alltypessmall
+       FROM alltypessmall
        WHERE id = 1)
 ORDER BY id
 ---- RESULTS
@@ -934,10 +936,10 @@ INT
 ====
 ---- QUERY
 # Uncorrelated subquery in binary predicate that returns no rows.
-SELECT id FROM functional.alltypessmall
+SELECT id FROM alltypessmall
 WHERE int_col =
   (SELECT int_col
-   FROM functional.alltypessmall
+   FROM alltypessmall
    WHERE id = -123)
 ORDER BY id
 ---- RESULTS
@@ -946,10 +948,10 @@ INT
 ====
 ---- QUERY
 # Uncorrelated subquery in arithmetic expr that returns no rows.
-SELECT id FROM functional.alltypessmall
+SELECT id FROM alltypessmall
 WHERE int_col =
   3 * (SELECT int_col
-       FROM functional.alltypessmall
+       FROM alltypessmall
        WHERE id = -123)
 ORDER BY id
 ---- RESULTS
@@ -958,10 +960,10 @@ INT
 ====
 ---- QUERY
 # Uncorrelated subquery in binary predicate that returns multiple rows
-SELECT id FROM functional.alltypessmall
+SELECT id FROM alltypessmall
 WHERE int_col =
   (SELECT int_col
-   FROM functional.alltypessmall)
+   FROM alltypessmall)
 ORDER BY id
 ---- RESULTS
 ---- CATCH
@@ -969,10 +971,10 @@ Subquery must not return more than one row:
 ====
 ---- QUERY
 # Uncorrelated subquery in arithmetic expr that returns multiple rows
-SELECT id FROM functional.alltypessmall
+SELECT id FROM alltypessmall
 WHERE int_col =
   3 * (SELECT int_col
-       FROM functional.alltypessmall)
+       FROM alltypessmall)
 ORDER BY id
 ---- RESULTS
 ---- CATCH
@@ -980,10 +982,10 @@ Subquery must not return more than one row:
 ====
 ---- QUERY
 # Uncorrelated subquery in binary predicate that returns scalar value at runtime
-SELECT count(id) FROM functional.alltypes
+SELECT count(id) FROM alltypes
 WHERE int_col =
   (SELECT int_col
-   FROM functional.alltypessmall
+   FROM alltypessmall
    WHERE id = 1)
 ---- RESULTS
 730
@@ -992,10 +994,10 @@ BIGINT
 ====
 ---- QUERY
 # Uncorrelated subquery in arithmetic expr that returns scalar value at runtime
-SELECT count(id) FROM functional.alltypes
+SELECT count(id) FROM alltypes
 WHERE int_col =
   3 * (SELECT int_col
-       FROM functional.alltypessmall
+       FROM alltypessmall
        WHERE id = 1)
 ---- RESULTS
 730
@@ -1013,7 +1015,7 @@ Subquery must not return more than one row:
 ---- QUERY
 # Subquery that returns more than one row
 # The error message must not reveal the definition of functional.alltypes_view
-SELECT id FROM functional.alltypes
+SELECT id FROM alltypes
 WHERE id = (SELECT bigint_col FROM functional.alltypes_view)
 ---- RESULTS
 ---- CATCH
@@ -1021,8 +1023,8 @@ Subquery must not return more than one row: SELECT bigint_col FROM functional.al
 ====
 ---- QUERY
 # Runtime scalar subquery with offset.
-select count(*) from functional.alltypes
-where 7 = (select id from functional.alltypestiny
+select count(*) from alltypes
+where 7 = (select id from alltypestiny
            order by id limit 8 offset 7)
 ---- RESULTS
 7300
@@ -1031,9 +1033,9 @@ BIGINT
 ====
 ---- QUERY
 # IMPALA-7108: Select from an inline view that returns a single row.
-select count(*) from functional.alltypes
+select count(*) from alltypes
 where int_col = (select f.id from (
-                 select * from functional.alltypes order by 1 limit 1) f)
+                 select * from alltypes order by 1 limit 1) f)
 ---- RESULTS
 730
 ---- TYPES
@@ -1041,8 +1043,8 @@ BIGINT
 ====
 ---- QUERY
 # Basic scalar in select list
-select id, 1+(select min(id) from functional.alltypessmall)
-  from functional.alltypestiny
+select id, 1+(select min(id) from alltypessmall)
+  from alltypestiny
 order by id
 ---- RESULTS
 0,1
@@ -1058,8 +1060,8 @@ INT, BIGINT
 ====
 ---- QUERY
 # No aggregate however limit 1
-select id, 1+(select id from functional.alltypessmall where id=0 group by id limit 1)
-  from functional.alltypestiny
+select id, 1+(select id from alltypessmall where id=0 group by id limit 1)
+  from alltypestiny
 order by id
 ---- RESULTS
 0,1
@@ -1088,8 +1090,8 @@ INT, BIGINT
 ====
 ---- QUERY
 # correlated scalar currently unsupported
-select id, (select count(id) from functional.alltypessmall where id=t.id)
-  from functional.alltypestiny t
+select id, (select count(id) from alltypessmall where id=t.id)
+  from alltypestiny t
 order by id
 ---- RESULTS
 ---- CATCH
@@ -1099,9 +1101,9 @@ A correlated scalar subquery is not supported in the expression:
 # Uncorrelated Scalar Aggregate in select list combined with aggregation in parent query
 select
 max(a.id),
-(select max(id) from functional.alltypestiny),
-(select min(id) from functional.alltypestiny)
-from functional.alltypessmall a
+(select max(id) from alltypestiny),
+(select min(id) from alltypestiny)
+from alltypessmall a
 ---- RESULTS
 99,7,0
 ---- TYPES
@@ -1111,9 +1113,9 @@ INT, INT, INT
 # Empty tables or false predicate should result in NULLs
 # Count aggregates on empty return 0
 select id,
-  (select sum(f2) from functional.emptytable),
-  (select count(id) from functional.alltypestiny where id > 100)
-from functional.alltypestiny
+  (select sum(f2) from emptytable),
+  (select count(id) from alltypestiny where id > 100)
+from alltypestiny
 order by id
 ---- RESULTS
 0,NULL,0
@@ -1131,8 +1133,8 @@ INT, BIGINT, BIGINT
 # nested subquery over a view with an outer predicate on the subquery column
 select count(id) from
   (select id,
-    (select count(*) as cnt from functional.alltypestiny where int_col
-    <= (select max(int_col) from functional.alltypes_view)) as c from functional.dimtbl) T
+    (select count(*) as cnt from alltypestiny where int_col
+    <= (select max(int_col) from functional.alltypes_view)) as c from dimtbl) T
   where t.c <10
 ---- RESULTS
 10
@@ -1141,8 +1143,8 @@ BIGINT
 ====
 ---- QUERY
 # Empty tables should result in NULLs
-select id, id in (select min(id) from functional.alltypessmall)
-  from functional.alltypestiny
+select id, id in (select min(id) from alltypessmall)
+  from alltypestiny
 order by id
 ---- RESULTS
 0,true
@@ -1159,8 +1161,8 @@ INT, BOOLEAN
 ---- QUERY
 # With a join in the subquery
 select id,
-  (select count(*) from functional.alltypessmall join functional.alltypestiny using (id))
-  from functional.alltypestiny
+  (select count(*) from alltypessmall join alltypestiny using (id))
+  from alltypestiny
 order by id
 ---- RESULTS
 0,8
@@ -1178,7 +1180,7 @@ INT, BIGINT
 # EXISTS predicates are handled at plantime so we need to special case their rewrites
 select id,
   exists (select max(id) from dimtbl)
-  from functional.alltypestiny
+  from alltypestiny
 order by id
 ---- RESULTS
 0,true
@@ -1410,9 +1412,9 @@ INT
 ---- QUERY
 # Subquery that only returns NULL values. The IN predicate should always
 # evaluate to false in this case, because the hand-picked values have a null 'int_col'.
-select id, int_col from functional.alltypes t
+select id, int_col from alltypes t
 where t.id = 42 or t.int_col IN (
-  select int_col from functional.alltypesagg where id in (1000,2000,3000,4000))
+  select int_col from alltypesagg where id in (1000,2000,3000,4000))
 ---- TYPES
 INT, INT
 ---- RESULTS
@@ -1420,8 +1422,8 @@ INT, INT
 ====
 ---- QUERY
 # IMPALA-9949: subquery in select list that returns 0 rows results in NULLs.
-select id, (select min(int_col) from functional.alltypes having min(int_col) < 0)
-from functional.alltypestiny
+select id, (select min(int_col) from alltypes having min(int_col) < 0)
+from alltypestiny
 ---- RESULTS
 0,NULL
 1,NULL
