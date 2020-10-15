@@ -77,7 +77,8 @@ Status DataStreamService::Init() {
   // The maximum queue length is set to maximum 32-bit value. Its actual capacity is
   // bound by memory consumption against 'mem_tracker_'.
   RETURN_IF_ERROR(ExecEnv::GetInstance()->rpc_mgr()->RegisterService(num_svc_threads,
-      std::numeric_limits<int32_t>::max(), this, mem_tracker()));
+      std::numeric_limits<int32_t>::max(), this, mem_tracker(),
+      ExecEnv::GetInstance()->rpc_metrics()));
   return Status::OK();
 }
 

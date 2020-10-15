@@ -184,7 +184,8 @@ TEST_F(RpcMgrTest, SlowCallback) {
   const int num_service_threads = 1;
   const int queue_size = 3;
   ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size, ping_impl,
-      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker()));
+      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker(),
+      ExecEnv::GetInstance()->rpc_metrics()));
 
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;
@@ -210,7 +211,8 @@ TEST_F(RpcMgrTest, AsyncCall) {
   GeneratedServiceIf* scan_mem_impl =
       TakeOverService(make_unique<ScanMemServiceImpl>(&rpc_mgr_));
   ASSERT_OK(rpc_mgr_.RegisterService(10, 10, scan_mem_impl,
-      static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker()));
+      static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker(),
+      ExecEnv::GetInstance()->rpc_metrics()));
 
   unique_ptr<ScanMemServiceProxy> scan_mem_proxy;
   ASSERT_OK(static_cast<ScanMemServiceImpl*>(scan_mem_impl)->GetProxy(krpc_address_,
@@ -298,7 +300,8 @@ TEST_F(RpcMgrTest, BusyService) {
   const int num_service_threads = 4;
   const int queue_size = 25;
   ASSERT_OK(rpc_mgr_.RegisterService(num_service_threads, queue_size, ping_impl,
-      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker()));
+      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker(),
+      ExecEnv::GetInstance()->rpc_metrics()));
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;
   ASSERT_OK(rpc_mgr_.StartServices());

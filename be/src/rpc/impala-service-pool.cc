@@ -59,7 +59,8 @@ const char * ImpalaServicePool::RPC_QUEUE_OVERFLOW_METRIC_KEY =
 
 ImpalaServicePool::ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& entity,
     int service_queue_length, kudu::rpc::GeneratedServiceIf* service,
-    MemTracker* service_mem_tracker, const TNetworkAddress& address)
+    MemTracker* service_mem_tracker, const TNetworkAddress& address,
+    MetricGroup* rpc_metrics)
   : service_mem_tracker_(service_mem_tracker),
     service_(service),
     service_queue_(service_queue_length),
@@ -69,8 +70,8 @@ ImpalaServicePool::ImpalaServicePool(const scoped_refptr<kudu::MetricEntity>& en
   DCHECK(service_mem_tracker_ != nullptr);
   const TMetricDef& overflow_metric_def =
       MetricDefs::Get(RPC_QUEUE_OVERFLOW_METRIC_KEY, service_->service_name());
-  rpcs_queue_overflow_ = ExecEnv::GetInstance()->rpc_metrics()->RegisterMetric(
-      new IntCounter(overflow_metric_def, 0L));
+  rpcs_queue_overflow_ =
+      rpc_metrics->RegisterMetric(new IntCounter(overflow_metric_def, 0L));
   // Initialize additional histograms for each method of the service.
   // TODO: Retrieve these from KRPC once KUDU-2313 has been implemented.
   for (const auto& method : service_->methods_by_name()) {

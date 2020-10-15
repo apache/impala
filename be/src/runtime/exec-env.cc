@@ -297,9 +297,9 @@ ExecEnv::ExecEnv(int krpc_port, int subscriber_port, int webserver_port,
       PrintId(backend_id_), statestore_subscriber_.get(), metrics_.get()));
 
   // TODO: Consider removing AdmissionController from executor only impalads.
-  admission_controller_.reset(
-      new AdmissionController(cluster_membership_mgr_.get(), statestore_subscriber_.get(),
-          request_pool_service_.get(), metrics_.get(), configured_backend_address_));
+  admission_controller_.reset(new AdmissionController(cluster_membership_mgr_.get(),
+      statestore_subscriber_.get(), request_pool_service_.get(), metrics_.get(),
+      scheduler_.get(), pool_mem_trackers_.get(), configured_backend_address_));
 
   if (FLAGS_metrics_webserver_port > 0) {
     metrics_webserver_.reset(new Webserver(FLAGS_metrics_webserver_interface,

@@ -39,6 +39,8 @@
 namespace impala {
 
 class ExecEnv;
+class PoolMemTrackerRegistry;
+class Scheduler;
 class Thread;
 
 /// Represents the admission outcome of a query. It is stored in the 'admit_outcome'
@@ -309,7 +311,8 @@ class AdmissionController {
 
   AdmissionController(ClusterMembershipMgr* cluster_membership_mgr,
       StatestoreSubscriber* subscriber, RequestPoolService* request_pool_service,
-      MetricGroup* metrics, const TNetworkAddress& host_addr);
+      MetricGroup* metrics, Scheduler* scheduler,
+      PoolMemTrackerRegistry* pool_mem_trackers, const TNetworkAddress& host_addr);
   ~AdmissionController();
 
   /// This struct contains all information needed to create a schedule and try to
@@ -430,6 +433,10 @@ class AdmissionController {
 
   /// Metrics subsystem access
   MetricGroup* metrics_group_;
+
+  Scheduler* scheduler_;
+
+  PoolMemTrackerRegistry* pool_mem_trackers_;
 
   /// Maps names of executor groups to their respective query load metric.
   std::unordered_map<std::string, IntGauge*> exec_group_query_load_map_;

@@ -289,7 +289,8 @@ Status RpcMgrTest::RunMultipleServicesTest(
   GeneratedServiceIf* ping_impl = TakeOverService(
       make_unique<PingServiceImpl>(rpc_mgr));
   RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10, ping_impl,
-      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker()));
+      static_cast<PingServiceImpl*>(ping_impl)->mem_tracker(),
+      ExecEnv::GetInstance()->rpc_metrics()));
 
   // Test that a second service, that verifies the RPC payload is not corrupted,
   // can be started.
@@ -297,7 +298,8 @@ Status RpcMgrTest::RunMultipleServicesTest(
       TakeOverService(make_unique<ScanMemServiceImpl>(rpc_mgr));
 
   RETURN_IF_ERROR(rpc_mgr->RegisterService(10, 10, scan_mem_impl,
-      static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker()));
+      static_cast<ScanMemServiceImpl*>(scan_mem_impl)->mem_tracker(),
+      ExecEnv::GetInstance()->rpc_metrics()));
 
   FLAGS_num_acceptor_threads = 2;
   FLAGS_num_reactor_threads = 10;

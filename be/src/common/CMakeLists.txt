@@ -28,6 +28,7 @@ set(VERSION_CC_GEN_OUTPUT
 )
 
 add_library(Common
+  daemon-env.cc
   init.cc
   logging.cc
   status.cc

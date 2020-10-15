@@ -286,8 +286,9 @@ class AdmissionControllerTest : public testing::Test {
     addr->__set_port(25000);
     ClusterMembershipMgr* cmm =
         pool_.Add(new ClusterMembershipMgr("", nullptr, metric_group));
-    return pool_.Add(
-        new AdmissionController(cmm, nullptr, request_pool_service, metric_group, *addr));
+    return pool_.Add(new AdmissionController(cmm, nullptr, request_pool_service,
+        metric_group, ExecEnv::GetInstance()->scheduler(),
+        ExecEnv::GetInstance()->pool_mem_trackers(), *addr));
   }
 
   static void checkPoolDisabled(
