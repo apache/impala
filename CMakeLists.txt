@@ -448,6 +448,17 @@ add_custom_target(cscope ALL DEPENDS gen-deps
   COMMAND "${CMAKE_SOURCE_DIR}/bin/gen-cscope.sh"
 )
 
+add_custom_target(notests_independent_targets DEPENDS
+  java cscope tarballs
+)
+add_custom_target(notests_regular_targets DEPENDS
+  impalad statestored catalogd fesupport loggingsupport ImpalaUdf udasample udfsample
+)
+
+add_custom_target(notests_all_targets DEPENDS
+  notests_independent_targets notests_regular_targets
+)
+
 # Dump include paths to a file
 if (DUMP_INCLUDE_PATHS)
   file(REMOVE "${DUMP_INCLUDE_PATHS}")

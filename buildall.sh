@@ -445,11 +445,10 @@ build_all_components() {
   # If we skip specifying targets, everything we need gets built.
   local MAKE_TARGETS=""
   if [[ $BUILD_TESTS -eq 0 ]]; then
-    # Specify all the non-test targets
-    MAKE_TARGETS="impalad statestored catalogd fesupport loggingsupport ImpalaUdf \
-        udasample udfsample"
     if (( build_independent_targets )); then
-      MAKE_TARGETS+=" cscope java tarballs"
+      MAKE_TARGETS="notests_all_targets"
+    else
+      MAKE_TARGETS="notests_regular_targets"
     fi
   fi
   ${MAKE_CMD} -j${IMPALA_BUILD_THREADS:-4} ${IMPALA_MAKE_FLAGS} ${MAKE_TARGETS}
