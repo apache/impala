@@ -207,7 +207,8 @@ def download_toolchain_python():
         "$IMPALA_TOOLCHAIN_PACKAGES_HOME is set.")
 
   package = ToolchainPackage("python")
-  if not (os.environ.get(SKIP_TOOLCHAIN_BOOTSTRAP) == 'true'):
+  if package.needs_download() and \
+     not (os.environ.get(SKIP_TOOLCHAIN_BOOTSTRAP) == 'true'):
     package.download()
   python_cmd = os.path.join(package.pkg_directory(), "bin/python")
   if not os.path.exists(python_cmd):
