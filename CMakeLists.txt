@@ -448,8 +448,12 @@ add_custom_target(cscope ALL DEPENDS gen-deps
   COMMAND "${CMAKE_SOURCE_DIR}/bin/gen-cscope.sh"
 )
 
+add_custom_target(impala_python ALL
+  COMMAND "${CMAKE_SOURCE_DIR}/bin/init-impala-python.sh"
+)
+
 add_custom_target(notests_independent_targets DEPENDS
-  java cscope tarballs
+  java cscope tarballs impala_python
 )
 add_custom_target(notests_regular_targets DEPENDS
   impalad statestored catalogd admissiond fesupport loggingsupport ImpalaUdf udasample udfsample
