@@ -36,7 +36,7 @@ import re
 import textwrap
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, date
 from pytz import utc
 
 from tests.common.environ import ImpalaTestClusterProperties, HIVE_MAJOR_VERSION
@@ -471,7 +471,7 @@ class TestKuduOperations(KuduTestSuite):
         cursor.execute("select * from %s where id = %s" % (table_name, i))
         assert cursor.fetchall() == \
             [(i, True, 0, 0, 0, 0, 0.0, 0.0, '0', datetime(2009, 1, 1, 0, 0), 0,
-                '2010-01-01', '')]
+                date(2010, 1, 1), '')]
         i += 1
     cursor.execute("select count(*) from %s" % table_name)
     print cursor.fetchall() == [(i, )]
