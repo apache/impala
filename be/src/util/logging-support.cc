@@ -173,6 +173,7 @@ void SetJavaLogLevelCallback(const Webserver::WebRequest& req, Document* documen
         "is empty.", "error", document);
     return;
   }
+  VLOG(1) << "New Java log level set: " << result;
   AddDocumentMember(result, "set_java_loglevel_result", document);
 }
 
@@ -214,6 +215,7 @@ void SetGlogLevelCallback(const Webserver::WebRequest& req, Document* document) 
         "range [0-3].", "error", document);
     return;
   }
+  VLOG(1) << "New glog level set: " << new_log_level;
   AddDocumentMember(new_log_level, "set_glog_level_result", document);
 }
 
@@ -221,6 +223,7 @@ void SetGlogLevelCallback(const Webserver::WebRequest& req, Document* document) 
 void ResetGlogLevelCallback(const Webserver::WebRequest& req, Document* document) {
   string new_log_level = google::SetCommandLineOption("v",
       to_string(FLAGS_v_original_value).data());
+  VLOG(1) << "New glog level set: " << new_log_level;
   AddDocumentMember(new_log_level, "reset_glog_level_result", document);
 }
 
