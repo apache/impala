@@ -257,8 +257,9 @@ string PrintPath(const TableDescriptor& tbl_desc, const SchemaPath& path) {
         type = &type->children[path[i]];
         break;
       default:
-        DCHECK(false) << PrintNumericPath(path) << " " << i << " " << type->DebugString();
-        return PrintNumericPath(path);
+        DCHECK_EQ(path.size() - 1, i) << PrintNumericPath(path) << " "
+                                      << i <<" " << type->DebugString();
+        ss << "(" << type->DebugString() << ")";
     }
   }
   return ss.str();
