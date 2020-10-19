@@ -915,7 +915,7 @@ year=0/month=1/: 1
 ====
 ---- QUERY
 # IMPALA-10233: Inserting to a partitioned table with zorder should work.
-create table partitioned_zorder_tbl sort by zorder (id, string_col) like functional.alltypes;
+create table partitioned_zorder_tbl sort by zorder (id, string_col) like $ORIGINAL_DB.alltypes;
 insert into partitioned_zorder_tbl partition (year, month) select * from functional.alltypes;
 ---- RESULTS
 year=2009/month=1/: 310
