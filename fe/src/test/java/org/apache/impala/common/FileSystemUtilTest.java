@@ -24,9 +24,12 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.Test;
 import org.mockito.Mockito;
+
+import java.io.IOException;
 
 /**
  * Tests for the various util methods in FileSystemUtil class
@@ -86,10 +89,80 @@ public class FileSystemUtilTest {
   }
 
   @Test
-  public void testAlluxioFsType() {
-    Path path = new Path("alluxio://zk@zk-1:2181,zk-2:2181,zk-3:2181/path/");
-    assertEquals(FileSystemUtil.FsType.ALLUXIO,
-        FileSystemUtil.FsType.getFsType(path.toUri().getScheme()));
+  public void testFsType() throws IOException {
+    testFsType(mockLocation(FileSystemUtil.SCHEME_ABFS), FileSystemUtil.FsType.ADLS);
+    testFsType(mockLocation(FileSystemUtil.SCHEME_ABFSS), FileSystemUtil.FsType.ADLS);
+    testFsType(mockLocation(FileSystemUtil.SCHEME_ADL), FileSystemUtil.FsType.ADLS);
+    testFsType(mockLocation(FileSystemUtil.SCHEME_FILE), FileSystemUtil.FsType.LOCAL);
+    testFsType(mockLocation(FileSystemUtil.SCHEME_HDFS), FileSystemUtil.FsType.HDFS);
+    testFsType(mockLocation(FileSystemUtil.SCHEME_S3A), FileSystemUtil.FsType.S3);
+    testFsType(mockLocation(FileSystemUtil.SCHEME_O3FS), FileSystemUtil.FsType.OZONE);
+    testFsType(
+        mockLocation(FileSystemUtil.SCHEME_ALLUXIO), FileSystemUtil.FsType.ALLUXIO);
+  }
+
+  @Test
+  public void testSupportStorageIds() throws IOException {
+    testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ABFS), false);
+    testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ABFSS), false);
+    testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ADL), false);
+    testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_FILE), false);
+    testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_S3A), false);
+
+    testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_HDFS), true);
+
+    // The following tests are disabled because the underlying systems is not included
+    // in impala mini cluster.
+    // TODO: enable following tests if we add them into impala mini cluster.
+    // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_O3FS), true);
+    // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ALLUXIO), true);
+  }
+
+  @Test
+  public void testWriteableByImpala() throws IOException {
+    testIsWritableByImpala(mockLocation(FileSystemUtil.SCHEME_ALLUXIO), false);
+
+    testIsWritableByImpala(mockLocation(FileSystemUtil.SCHEME_ABFS), true);
+    testIsWritableByImpala(mockLocation(FileSystemUtil.SCHEME_ABFSS), true);
+    testIsWritableByImpala(mockLocation(FileSystemUtil.SCHEME_ADL), true);
+    testIsWritableByImpala(mockLocation(FileSystemUtil.SCHEME_FILE), true);
+    testIsWritableByImpala(mockLocation(FileSystemUtil.SCHEME_HDFS), true);
+    testIsWritableByImpala(mockLocation(FileSystemUtil.SCHEME_S3A), true);
+    testIsWritableByImpala(mockLocation(FileSystemUtil.SCHEME_O3FS), true);
+  }
+
+  @Test
+  public void testSupportedDefaultFs() throws IOException {
+    testIsSupportedDefaultFs(mockLocation(FileSystemUtil.SCHEME_ABFS), true);
+    testIsSupportedDefaultFs(mockLocation(FileSystemUtil.SCHEME_ABFSS), true);
+    testIsSupportedDefaultFs(mockLocation(FileSystemUtil.SCHEME_ADL), true);
+    testIsSupportedDefaultFs(mockLocation(FileSystemUtil.SCHEME_HDFS), true);
+    testIsSupportedDefaultFs(mockLocation(FileSystemUtil.SCHEME_S3A), true);
+
+    testIsSupportedDefaultFs(mockLocation(FileSystemUtil.SCHEME_FILE), false);
+
+    // The following tests are disabled because the underlying systems is not included
+    // in impala mini cluster.
+    // TODO: enable following tests if we add them into impala mini cluster.
+    // testIsSupportedDefaultFs(mockLocation(FileSystemUtil.SCHEME_O3FS), false);
+    // testIsSupportedDefaultFs(mockLocation(FileSystemUtil.SCHEME_ALLUXIO), false);
+  }
+
+  @Test
+  public void testValidLoadDataInpath() throws IOException {
+    testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_ABFS), true);
+    testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_ABFSS), true);
+    testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_ADL), true);
+    testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_HDFS), true);
+    testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_S3A), true);
+
+    testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_FILE), false);
+
+    // The following tests are disabled because the underlying systems is not included
+    // in impala mini cluster.
+    // TODO: enable following tests if we add them into impala mini cluster.
+    // testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_O3FS), true);
+    // testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_ALLUXIO), false);
   }
 
   private boolean testIsInIgnoredDirectory(Path input) {
@@ -101,5 +174,61 @@ public class FileSystemUtilTest {
     Mockito.when(mockFileStatus.getPath()).thenReturn(input);
     Mockito.when(mockFileStatus.isDirectory()).thenReturn(isDir);
     return FileSystemUtil.isInIgnoredDirectory(TEST_TABLE_PATH, mockFileStatus);
+  }
+
+  private String mockLocation(String scheme) throws IOException {
+    switch (scheme) {
+      case FileSystemUtil.SCHEME_ABFS:
+        return "abfs://dummy-fs@dummy-account.dfs.core.windows.net/dummy-part-1";
+      case FileSystemUtil.SCHEME_ABFSS:
+        return "abfss://dummy-fs@dummy-account.dfs.core.windows.net/dummy-part-2";
+      case FileSystemUtil.SCHEME_ADL:
+        return "adl://dummy-account.azuredatalakestore.net/dummy-part-3";
+      case FileSystemUtil.SCHEME_FILE:
+        return "file://tmp/dummy-part-4";
+      case FileSystemUtil.SCHEME_HDFS:
+        return "hdfs://localhost:20500/dummy-part-5";
+      case FileSystemUtil.SCHEME_S3A:
+        return "s3a://dummy-bucket/dummy-part-6";
+      case FileSystemUtil.SCHEME_O3FS:
+        return "o3fs://bucket.volume/key";
+      case FileSystemUtil.SCHEME_ALLUXIO:
+        return "alluxio://zk@zk-1:2181,zk-2:2181,zk-3:2181/path/";
+      default:
+        throw new IOException("FileSystem scheme is not supported!");
+    }
+  }
+
+  private void testFsType(String location, FileSystemUtil.FsType expected) {
+    Path path = new Path(location);
+    FileSystemUtil.FsType type =
+        FileSystemUtil.FsType.getFsType(path.toUri().getScheme());
+    assertEquals(type, expected);
+  }
+
+  private void testIsSupportStorageIds(String location, boolean expected)
+      throws IOException {
+    Path path = new Path(location);
+    FileSystem fs = FileSystemUtil.getFileSystemForPath(path);
+    assertEquals(FileSystemUtil.supportsStorageIds(fs), expected);
+  }
+
+  private void testIsWritableByImpala(String location, boolean expected)
+      throws IOException {
+    assertEquals(FileSystemUtil.isImpalaWritableFilesystem(location), expected);
+  }
+
+  private void testIsSupportedDefaultFs(String location, boolean expected)
+      throws IOException {
+    Path path = new Path(location);
+    FileSystem fs = FileSystemUtil.getFileSystemForPath(path);
+    assertEquals(FileSystemUtil.isValidDefaultFileSystem(fs), expected);
+  }
+
+  private void testValidLoadDataInpath(String location, boolean expected)
+      throws IOException {
+    Path path = new Path(location);
+    FileSystem fs = FileSystemUtil.getFileSystemForPath(path);
+    assertEquals(FileSystemUtil.isValidLoadDataInpath(fs), expected);
   }
 }

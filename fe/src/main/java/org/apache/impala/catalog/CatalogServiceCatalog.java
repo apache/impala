@@ -321,7 +321,7 @@ public class CatalogServiceCatalog extends Catalog {
     try {
       // We want only 'true' HDFS filesystems to poll the HDFS cache (i.e not S3,
       // local, etc.)
-      if (FileSystemUtil.getDefaultFileSystem() instanceof DistributedFileSystem) {
+      if (FileSystemUtil.isDistributedFileSystem(FileSystemUtil.getDefaultFileSystem())) {
         cachePoolReader_.scheduleAtFixedRate(
             new CachePoolReader(false), 0, 1, TimeUnit.MINUTES);
       }
@@ -1732,7 +1732,7 @@ public class CatalogServiceCatalog extends Catalog {
     try {
       // We want only 'true' HDFS filesystems to poll the HDFS cache (i.e not S3,
       // local, etc.)
-      if (FileSystemUtil.getDefaultFileSystem() instanceof DistributedFileSystem) {
+      if (FileSystemUtil.isDistributedFileSystem(FileSystemUtil.getDefaultFileSystem())) {
         CachePoolReader reader = new CachePoolReader(true);
         reader.run();
       }

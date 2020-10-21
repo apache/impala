@@ -23,13 +23,7 @@ import java.util.List;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.adl.AdlFileSystem;
-import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
-import org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem;
-import org.apache.hadoop.fs.ozone.OzoneFileSystem;
 import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
@@ -147,14 +141,10 @@ public class LoadDataStmt extends StatementBase {
     try {
       Path source = sourceDataPath_.getPath();
       FileSystem fs = source.getFileSystem(FileSystemUtil.getConfiguration());
-      if (!(fs instanceof DistributedFileSystem) && !(fs instanceof S3AFileSystem) &&
-          !(fs instanceof AzureBlobFileSystem) &&
-          !(fs instanceof SecureAzureBlobFileSystem) &&
-          !(fs instanceof AdlFileSystem) &&
-          !(fs instanceof OzoneFileSystem)) {
+      if (!FileSystemUtil.isValidLoadDataInpath(fs)) {
         throw new AnalysisException(String.format("INPATH location '%s' "
-                + "must point to an HDFS, S3A, ADL, ABFS, or Ozone filesystem.",
-            sourceDataPath_));
+                + "must point to one of the supported filesystem URI scheme (%s).",
+            sourceDataPath_, FileSystemUtil.getValidLoadDataInpathSchemes()));
       }
       if (!fs.exists(source)) {
         throw new AnalysisException(String.format(
@@ -166,8 +156,8 @@ public class LoadDataStmt extends StatementBase {
       // its parent directory (in order to delete the file as part of the move operation).
       FsPermissionChecker checker = FsPermissionChecker.getInstance();
       // TODO: Disable permission checking for S3A as well (HADOOP-13892)
-      boolean shouldCheckPerms = !(fs instanceof AdlFileSystem ||
-        fs instanceof AzureBlobFileSystem || fs instanceof SecureAzureBlobFileSystem);
+      boolean shouldCheckPerms =
+          FileSystemUtil.FsType.getFsType(fs.getScheme()) != FileSystemUtil.FsType.ADLS;
 
       if (fs.isDirectory(source)) {
         if (FileSystemUtil.getTotalNumVisibleFiles(source) == 0) {

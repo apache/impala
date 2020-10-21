@@ -35,6 +35,7 @@ import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.junit.Assert;
@@ -3875,8 +3876,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       // Source must be HDFS or S3A.
       AnalysisError(String.format("load data inpath '%s' %s into table " +
           "tpch.lineitem", "file:///test-warehouse/test.out", overwrite),
-          "INPATH location 'file:/test-warehouse/test.out' must point to an " +
-          "HDFS, S3A, ADL, ABFS, or Ozone filesystem.");
+          "INPATH location 'file:/test-warehouse/test.out' must point to one of the " +
+          "supported filesystem URI scheme (" +
+          FileSystemUtil.getValidLoadDataInpathSchemes() + ").");
 
       // File type / table type mismatch.
       AnalyzesOk(String.format("load data inpath '%s' %s into table " +
