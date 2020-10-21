@@ -20,19 +20,17 @@ package org.apache.impala.common;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.adl.AdlFileSystem;
 import org.apache.hadoop.fs.azurebfs.AzureBlobFileSystem;
 import org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem;
-import org.apache.hadoop.fs.ozone.OzoneFileSystem;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.client.HdfsAdmin;
 import org.apache.hadoop.hdfs.protocol.EncryptionZone;
@@ -47,6 +45,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.Stack;
 import java.util.UUID;
 
@@ -57,6 +56,65 @@ public class FileSystemUtil {
 
   private static final Configuration CONF = new Configuration();
   private static final Logger LOG = LoggerFactory.getLogger(FileSystemUtil.class);
+
+  public static final String SCHEME_ABFS = "abfs";
+  public static final String SCHEME_ABFSS = "abfss";
+  public static final String SCHEME_ADL = "adl";
+  public static final String SCHEME_FILE = "file";
+  public static final String SCHEME_HDFS = "hdfs";
+  public static final String SCHEME_S3A = "s3a";
+  public static final String SCHEME_O3FS = "o3fs";
+  public static final String SCHEME_ALLUXIO = "alluxio";
+
+  /**
+   * Set containing all FileSystem scheme that known to supports storage UUIDs in
+   * BlockLocation calls.
+   */
+  private static final Set<String> SCHEME_SUPPORT_STORAGE_IDS =
+      ImmutableSet.<String>builder()
+          .add(SCHEME_HDFS)
+          .add(SCHEME_O3FS)
+          .add(SCHEME_ALLUXIO)
+          .build();
+
+  /**
+   * Set containing all FileSystem scheme that is writeable by Impala.
+   */
+  private static final Set<String> SCHEME_WRITEABLE_BY_IMPALA =
+      ImmutableSet.<String>builder()
+          .add(SCHEME_ABFS)
+          .add(SCHEME_ABFSS)
+          .add(SCHEME_ADL)
+          .add(SCHEME_FILE)
+          .add(SCHEME_HDFS)
+          .add(SCHEME_S3A)
+          .add(SCHEME_O3FS)
+          .build();
+
+  /**
+   * Set containing all FileSystem scheme that is supported as Impala default FileSystem.
+   */
+  private static final Set<String> SCHEME_SUPPORTED_AS_DEFAULT_FS =
+      ImmutableSet.<String>builder()
+          .add(SCHEME_ABFS)
+          .add(SCHEME_ABFSS)
+          .add(SCHEME_ADL)
+          .add(SCHEME_HDFS)
+          .add(SCHEME_S3A)
+          .build();
+
+  /**
+   * Set containing all FileSystem scheme that is valid as INPATH for LOAD DATA statement.
+   */
+  private static final Set<String> SCHEME_VALID_FOR_LOAD_INPATH =
+      ImmutableSet.<String>builder()
+          .add(SCHEME_ABFS)
+          .add(SCHEME_ABFSS)
+          .add(SCHEME_ADL)
+          .add(SCHEME_HDFS)
+          .add(SCHEME_S3A)
+          .add(SCHEME_O3FS)
+          .build();
 
   /**
    * Performs a non-recursive delete of all visible (non-hidden) files in a given
@@ -309,40 +367,35 @@ public class FileSystemUtil {
    * Returns true if the filesystem supports storage UUIDs in BlockLocation calls.
    */
   public static boolean supportsStorageIds(FileSystem fs) {
-    // Common case.
-    if (isDistributedFileSystem(fs)) return true;
-    // Blacklist FileSystems that are known to not to include storage UUIDs.
-    return !(fs instanceof S3AFileSystem || fs instanceof LocalFileSystem ||
-        fs instanceof AzureBlobFileSystem || fs instanceof SecureAzureBlobFileSystem ||
-        fs instanceof AdlFileSystem);
+    return SCHEME_SUPPORT_STORAGE_IDS.contains(fs.getScheme());
   }
 
   /**
    * Returns true iff the filesystem is a S3AFileSystem.
    */
   public static boolean isS3AFileSystem(FileSystem fs) {
-    return fs instanceof S3AFileSystem;
+    return hasScheme(fs, SCHEME_S3A);
   }
 
   /**
    * Returns true iff the path is on a S3AFileSystem.
    */
   public static boolean isS3AFileSystem(Path path) throws IOException {
-    return isS3AFileSystem(path.getFileSystem(CONF));
+    return hasScheme(path, SCHEME_S3A);
   }
 
   /**
    * Returns true iff the filesystem is AdlFileSystem.
    */
   public static boolean isADLFileSystem(FileSystem fs) {
-    return fs instanceof AdlFileSystem;
+    return hasScheme(fs, SCHEME_ADL);
   }
 
   /**
    * Returns true iff the path is on AdlFileSystem.
    */
   public static boolean isADLFileSystem(Path path) throws IOException {
-    return isADLFileSystem(path.getFileSystem(CONF));
+    return hasScheme(path, SCHEME_ADL);
   }
 
   /**
@@ -353,8 +406,7 @@ public class FileSystemUtil {
    * wire encryption but that does not matter in usages of this function.
    */
   public static boolean isABFSFileSystem(FileSystem fs) {
-    return fs instanceof AzureBlobFileSystem
-        || fs instanceof SecureAzureBlobFileSystem;
+    return hasScheme(fs, SCHEME_ABFS) || hasScheme(fs, SCHEME_ABFSS);
   }
 
   /**
@@ -362,49 +414,63 @@ public class FileSystemUtil {
    * SecureAzureBlobFileSystem.
    */
   public static boolean isABFSFileSystem(Path path) throws IOException {
-    return isABFSFileSystem(path.getFileSystem(CONF));
+    return hasScheme(path, SCHEME_ABFS) || hasScheme(path, SCHEME_ABFSS);
   }
 
   /**
    * Returns true iff the filesystem is an instance of LocalFileSystem.
    */
   public static boolean isLocalFileSystem(FileSystem fs) {
-    return fs instanceof LocalFileSystem;
+    return hasScheme(fs, SCHEME_FILE);
   }
 
   /**
    * Return true iff path is on a local filesystem.
    */
   public static boolean isLocalFileSystem(Path path) throws IOException {
-    return isLocalFileSystem(path.getFileSystem(CONF));
+    return hasScheme(path, SCHEME_FILE);
   }
 
   /**
    * Returns true iff the filesystem is a DistributedFileSystem.
    */
   public static boolean isDistributedFileSystem(FileSystem fs) {
-    return fs instanceof DistributedFileSystem;
+    return hasScheme(fs, SCHEME_HDFS);
   }
 
   /**
    * Return true iff path is on a DFS filesystem.
    */
   public static boolean isDistributedFileSystem(Path path) throws IOException {
-    return isDistributedFileSystem(path.getFileSystem(CONF));
+    return hasScheme(path, SCHEME_HDFS);
   }
 
   /**
    * Returns true iff the filesystem is a OzoneFileSystem.
    */
   public static boolean isOzoneFileSystem(FileSystem fs) {
-    return fs instanceof OzoneFileSystem;
+    return hasScheme(fs, SCHEME_O3FS);
   }
 
   /**
    * Returns true iff the path is on OzoneFileSystem.
    */
   public static boolean isOzoneFileSystem(Path path) throws IOException {
-    return isOzoneFileSystem(path.getFileSystem(CONF));
+    return hasScheme(path, SCHEME_O3FS);
+  }
+
+  /**
+   * Returns true if the filesystem protocol match the scheme.
+   */
+  private static boolean hasScheme(FileSystem fs, String scheme) {
+    return scheme.equals(fs.getScheme());
+  }
+
+  /**
+   * Returns true if the given path match the scheme.
+   */
+  private static boolean hasScheme(Path path, String scheme) {
+    return scheme.equals(path.toUri().getScheme());
   }
 
   /**
@@ -429,14 +495,14 @@ public class FileSystemUtil {
 
     private static final Map<String, FsType> SCHEME_TO_FS_MAPPING =
         ImmutableMap.<String, FsType>builder()
-            .put("abfs", ADLS)
-            .put("abfss", ADLS)
-            .put("adl", ADLS)
-            .put("file", LOCAL)
-            .put("hdfs", HDFS)
-            .put("s3a", S3)
-            .put("o3fs", OZONE)
-            .put("alluxio", ALLUXIO)
+            .put(SCHEME_ABFS, ADLS)
+            .put(SCHEME_ABFSS, ADLS)
+            .put(SCHEME_ADL, ADLS)
+            .put(SCHEME_FILE, LOCAL)
+            .put(SCHEME_HDFS, HDFS)
+            .put(SCHEME_S3A, S3)
+            .put(SCHEME_O3FS, OZONE)
+            .put(SCHEME_ALLUXIO, ALLUXIO)
             .build();
 
     /**
@@ -548,12 +614,30 @@ public class FileSystemUtil {
   public static boolean isImpalaWritableFilesystem(String location)
       throws IOException {
     Path path = new Path(location);
-    return (FileSystemUtil.isDistributedFileSystem(path) ||
-        FileSystemUtil.isLocalFileSystem(path) ||
-        FileSystemUtil.isS3AFileSystem(path) ||
-        FileSystemUtil.isABFSFileSystem(path) ||
-        FileSystemUtil.isADLFileSystem(path) ||
-        FileSystemUtil.isOzoneFileSystem(path));
+    String scheme = path.toUri().getScheme();
+    return SCHEME_WRITEABLE_BY_IMPALA.contains(scheme);
+  }
+
+  /**
+   * Returns true iff the given filesystem is supported as Impala default filesystem.
+   */
+  public static boolean isValidDefaultFileSystem(FileSystem fs) {
+    return SCHEME_SUPPORTED_AS_DEFAULT_FS.contains(fs.getScheme());
+  }
+
+  /**
+   * Returns true iff the given filesystem is valid as INPATH for LOAD DATA statement.
+   */
+  public static boolean isValidLoadDataInpath(FileSystem fs) {
+    return SCHEME_VALID_FOR_LOAD_INPATH.contains(fs.getScheme());
+  }
+
+  /**
+   * Return list of FileSystem protocol scheme that is valid as INPATH for LOAD DATA
+   * statement, delimited by comma.
+   */
+  public static String getValidLoadDataInpathSchemes() {
+    return String.join(", ", SCHEME_VALID_FOR_LOAD_INPATH);
   }
 
   /**
