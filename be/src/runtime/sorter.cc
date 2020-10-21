@@ -20,10 +20,12 @@
 #include <boost/bind.hpp>
 #include <gutil/strings/substitute.h>
 
+#include "codegen/llvm-codegen.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/bufferpool/reservation-tracker.h"
 #include "runtime/bufferpool/reservation-util.h"
 #include "runtime/exec-env.h"
+#include "runtime/fragment-state.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
 #include "runtime/runtime-state.h"
@@ -751,7 +753,13 @@ Status Sorter::TupleSorter::Sort(Run* run) {
   DCHECK(run->is_finalized());
   DCHECK(!run->is_sorted());
   run_ = run;
-  RETURN_IF_ERROR(SortHelper(TupleIterator::Begin(run_), TupleIterator::End(run_)));
+  const SortHelperFn sort_helper_fn = parent_->codegend_sort_helper_fn_.load();
+  if (sort_helper_fn != nullptr) {
+    RETURN_IF_ERROR(
+        sort_helper_fn(this, TupleIterator::Begin(run_), TupleIterator::End(run_)));
+  } else {
+    RETURN_IF_ERROR(SortHelper(TupleIterator::Begin(run_), TupleIterator::End(run_)));
+  }
   run_->set_sorted();
   return Status::OK();
 }
@@ -760,13 +768,16 @@ Sorter::Sorter(const TupleRowComparatorConfig& tuple_row_comparator_config,
     const vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
     MemTracker* mem_tracker, BufferPool::ClientHandle* buffer_pool_client,
     int64_t page_len, RuntimeProfile* profile, RuntimeState* state,
-    const string& node_label, bool enable_spilling, int64_t estimated_input_size)
+    const string& node_label, bool enable_spilling,
+    const CodegenFnPtr<SortHelperFn>& codegend_sort_helper_fn,
+    int64_t estimated_input_size)
   : node_label_(node_label),
     state_(state),
     expr_perm_pool_(mem_tracker),
     expr_results_pool_(mem_tracker),
     compare_less_than_(nullptr),
     in_mem_tuple_sorter_(nullptr),
+    codegend_sort_helper_fn_(codegend_sort_helper_fn),
     buffer_pool_client_(buffer_pool_client),
     page_len_(page_len),
     has_var_len_slots_(false),
@@ -1192,4 +1203,37 @@ bool Sorter::HasSpilledRuns() const {
   return !merging_runs_.empty() || sorted_runs_.size() > 1 ||
       (sorted_runs_.size() == 1 && !sorted_runs_.back()->is_pinned());
 }
+
+const char* Sorter::TupleSorter::SORTER_HELPER_SYMBOL =
+    "_ZN6impala6Sorter11TupleSorter10SortHelperENS0_13TupleIteratorES2_";
+
+const char* Sorter::TupleSorter::LLVM_CLASS_NAME = "class.impala::Sorter::TupleSorter";
+
+// A method to code-gen for TupleSorter::SortHelper().
+Status Sorter::TupleSorter::Codegen(FragmentState* state, llvm::Function* compare_fn,
+    CodegenFnPtr<SortHelperFn>* codegened_fn) {
+  LlvmCodeGen* codegen = state->codegen();
+  DCHECK(codegen != nullptr);
+
+  llvm::Function* fn = codegen->GetFunction(IRFunction::TUPLE_SORTER_SORT_HELPER, true);
+  DCHECK(fn != NULL);
+
+  // There are 6 calls to Less() which calls comparator_.Less() once in each.
+  int replaced =
+      codegen->ReplaceCallSites(fn, compare_fn, TupleRowComparator::COMPARE_SYMBOL);
+  DCHECK_REPLACE_COUNT(replaced, 6) << LlvmCodeGen::Print(fn);
+
+  // There are 2 recursive calls within SorterHelper() to replace with.
+  replaced = codegen->ReplaceCallSites(fn, fn, SORTER_HELPER_SYMBOL);
+  DCHECK_REPLACE_COUNT(replaced, 2) << LlvmCodeGen::Print(fn);
+
+  fn = codegen->FinalizeFunction(fn);
+  if (fn == nullptr) {
+    return Status("Sorter::TupleSorter::Codegen(): failed to finalize function");
+  }
+  codegen->AddFunctionToJit(fn, codegened_fn);
+
+  return Status::OK();
+}
+
 } // namespace impala

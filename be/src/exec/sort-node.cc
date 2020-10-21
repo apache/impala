@@ -17,11 +17,13 @@
 
 #include "exec/sort-node.h"
 
+#include "codegen/llvm-codegen.h"
 #include "exec/exec-node-util.h"
 #include "runtime/fragment-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/sorted-run-merger.h"
+#include "runtime/sorter-internal.h"
 #include "util/pretty-printer.h"
 #include "util/runtime-profile-counters.h"
 
@@ -75,10 +77,11 @@ SortNode::~SortNode() {
 Status SortNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  sorter_.reset(
-      new Sorter(tuple_row_comparator_config_, sort_tuple_exprs_, &row_descriptor_,
-          mem_tracker(), buffer_pool_client(), resource_profile_.spillable_buffer_size,
-          runtime_profile(), state, label(), true, ComputeInputSizeEstimate()));
+  const SortPlanNode& pnode = static_cast<const SortPlanNode&>(plan_node_);
+  sorter_.reset(new Sorter(tuple_row_comparator_config_, sort_tuple_exprs_,
+      &row_descriptor_, mem_tracker(), buffer_pool_client(),
+      resource_profile_.spillable_buffer_size, runtime_profile(), state, label(), true,
+      pnode.codegend_sort_helper_fn_, ComputeInputSizeEstimate()));
   RETURN_IF_ERROR(sorter_->Prepare(pool_));
   DCHECK_GE(resource_profile_.min_reservation, sorter_->ComputeMinReservation());
   return Status::OK();
@@ -104,7 +107,13 @@ void SortPlanNode::Codegen(FragmentState* state) {
   DCHECK(state->ShouldCodegen());
   PlanNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  AddCodegenStatus(row_comparator_config_->Codegen(state));
+  llvm::Function* compare_fn = nullptr;
+  Status codegen_status = row_comparator_config_->Codegen(state, &compare_fn);
+  if (codegen_status.ok()) {
+    codegen_status =
+        Sorter::TupleSorter::Codegen(state, compare_fn, &codegend_sort_helper_fn_);
+  }
+  AddCodegenStatus(codegen_status);
 }
 
 Status SortNode::Open(RuntimeState* state) {

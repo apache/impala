@@ -378,27 +378,27 @@ class Sorter::TupleIterator {
   /// valid to dereference 'tuple_' in that case. 'run' and 'tuple_size' are passed as
   /// arguments to avoid redundantly storing the same values in multiple iterators in
   /// perf-critical algorithms.
-  void Next(Sorter::Run* run, int tuple_size);
+  void IR_ALWAYS_INLINE Next(Sorter::Run* run, int tuple_size);
 
   /// The reverse of Next(). Can advance one before the first tuple in the run, but it
   /// is invalid to dereference 'tuple_' in that case.
-  void Prev(Sorter::Run* run, int tuple_size);
+  void IR_ALWAYS_INLINE Prev(Sorter::Run* run, int tuple_size);
 
-  int64_t index() const { return index_; }
-  Tuple* tuple() const { return reinterpret_cast<Tuple*>(tuple_); }
+  int64_t IR_ALWAYS_INLINE index() const { return index_; }
+  Tuple* IR_ALWAYS_INLINE tuple() const { return reinterpret_cast<Tuple*>(tuple_); }
   /// Returns current tuple in TupleRow format. The caller should not modify the row.
-  const TupleRow* row() const {
+  const TupleRow* IR_ALWAYS_INLINE row() const {
     return reinterpret_cast<const TupleRow*>(&tuple_);
   }
 
  private:
   /// Move to the next page in the run (or do nothing if at end of run).
   /// This is the slow path for Next();
-  void NextPage(Sorter::Run* run);
+  void IR_ALWAYS_INLINE NextPage(Sorter::Run* run);
 
   /// Move to the previous page in the run (or do nothing if at beginning of run).
   /// This is the slow path for Prev();
-  void PrevPage(Sorter::Run* run);
+  void IR_ALWAYS_INLINE PrevPage(Sorter::Run* run);
 
   /// Index of the current tuple in the run.
   /// Can be -1 or run->num_rows() if Next() or Prev() moves iterator outside of run.
@@ -437,6 +437,21 @@ class Sorter::TupleSorter {
   /// query is cancelled.
   Status Sort(Run* run);
 
+  /// Makes an attempt to codegen for method SortHelper(). Stores the resulting
+  /// function in codegend_fn and returns Status::OK() if codegen was successful.
+  /// Otherwise, a Status("Sorter::TupleSorter::Codegen(): failed to finalize function")
+  /// object is returned.
+  /// 'compare_fn' is the pointer to the code-gen version of the compare method with
+  /// which to replace all non-code-gen versions.
+  static Status Codegen(FragmentState* state, llvm::Function* compare_fn,
+      CodegenFnPtr<SortHelperFn>* codegend_fn);
+
+  /// Mangled name of SorterHelper().
+  static const char* SORTER_HELPER_SYMBOL;
+
+  /// Class name in LLVM IR.
+  static const char* LLVM_CLASS_NAME;
+
  private:
   static const int INSERTION_THRESHOLD = 16;
 
@@ -471,11 +486,12 @@ class Sorter::TupleSorter {
   /// Wrapper around comparator_.Less(). Also call expr_results_pool_.Clear()
   /// on every 'state_->batch_size()' invocations of comparator_.Less(). Returns true
   /// if 'lhs' is less than 'rhs'.
-  bool Less(const TupleRow* lhs, const TupleRow* rhs);
+  bool IR_ALWAYS_INLINE Less(const TupleRow* lhs, const TupleRow* rhs);
 
   /// Perform an insertion sort for rows in the range [begin, end) in a run.
   /// Only valid to call for ranges of size at least 1.
-  Status InsertionSort(const TupleIterator& begin, const TupleIterator& end);
+  Status IR_ALWAYS_INLINE InsertionSort(
+      const TupleIterator& begin, const TupleIterator& end);
 
   /// Partitions the sequence of tuples in the range [begin, end) in a run into two
   /// groups around the pivot tuple - i.e. tuples in first group are <= the pivot, and
@@ -483,7 +499,7 @@ class Sorter::TupleSorter {
   /// groups and the index to the first element in the second group is returned in
   /// 'cut'. Return an error status if any error is encountered or if the query is
   /// cancelled.
-  Status Partition(TupleIterator begin, TupleIterator end,
+  Status IR_ALWAYS_INLINE Partition(TupleIterator begin, TupleIterator end,
       const Tuple* pivot, TupleIterator* cut);
 
   /// Performs a quicksort of rows in the range [begin, end) followed by insertion sort
@@ -492,13 +508,13 @@ class Sorter::TupleSorter {
   Status SortHelper(TupleIterator begin, TupleIterator end);
 
   /// Select a pivot to partition [begin, end).
-  Tuple* SelectPivot(TupleIterator begin, TupleIterator end);
+  Tuple* IR_ALWAYS_INLINE SelectPivot(TupleIterator begin, TupleIterator end);
 
   /// Return median of three tuples according to the sort comparator.
-  Tuple* MedianOfThree(Tuple* t1, Tuple* t2, Tuple* t3);
+  Tuple* IR_ALWAYS_INLINE MedianOfThree(Tuple* t1, Tuple* t2, Tuple* t3);
 
   /// Swaps tuples pointed to by left and right using 'swap_tuple'.
-  static inline void Swap(Tuple* RESTRICT left, Tuple* RESTRICT right,
+  static void IR_ALWAYS_INLINE Swap(Tuple* RESTRICT left, Tuple* RESTRICT right,
       Tuple* RESTRICT swap_tuple, int tuple_size);
 };
 

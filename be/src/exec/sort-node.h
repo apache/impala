@@ -44,6 +44,9 @@ class SortPlanNode : public PlanNode {
 
   /// Number of backend nodes executing the same sort node plan.
   int32_t num_backends_;
+
+  /// Codegened version of Sort::TupelSorter::SortHelper().
+  CodegenFnPtr<Sorter::SortHelperFn> codegend_sort_helper_fn_;
 };
 
 /// Node that implements a full sort of its input with a fixed memory budget, spilling
