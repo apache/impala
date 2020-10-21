@@ -42,7 +42,7 @@ class TestShellClient(ImpalaTestSuite):
     handle = None
     num_rows = 100
     batch_size = 10
-    query_options = {'batch_size': str(batch_size)}
+    query_options = {'batch_size': str(batch_size), 'spool_query_results': 'false'}
     client = self.__get_shell_client(vector)
 
     try:

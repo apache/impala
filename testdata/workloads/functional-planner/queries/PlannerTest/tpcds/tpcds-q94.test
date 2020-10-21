@@ -32,7 +32,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=409.81MB mem-reservation=30.25MB thread-reservation=7 runtime-filters-memory=4.00MB
 PLAN-ROOT SINK
 |  output exprs: count(ws_order_number), sum(ws_ext_ship_cost), sum(ws_net_profit)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 13:TOP-N [LIMIT=100]
 |  order by: count(ws_order_number) ASC
@@ -162,13 +162,13 @@ PLAN-ROOT SINK
    tuple-ids=6 row-size=8B cardinality=71.76K
    in pipelines: 05(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=37.39MB Threads=15
+Max Per-Host Resource Reservation: Memory=41.39MB Threads=15
 Per-Host Resource Estimates: Memory=442MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(ws_order_number), sum(ws_ext_ship_cost), sum(ws_net_profit)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 13:TOP-N [LIMIT=100]
 |  order by: count(ws_order_number) ASC
@@ -360,13 +360,13 @@ Per-Host Resources: mem-estimate=65.00MB mem-reservation=3.00MB thread-reservati
    tuple-ids=4 row-size=12B cardinality=719.38K
    in pipelines: 04(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=43.27MB Threads=14
+Max Per-Host Resource Reservation: Memory=47.27MB Threads=14
 Per-Host Resource Estimates: Memory=181MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(ws_order_number), sum(ws_ext_ship_cost), sum(ws_net_profit)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 13:TOP-N [LIMIT=100]
 |  order by: count(ws_order_number) ASC

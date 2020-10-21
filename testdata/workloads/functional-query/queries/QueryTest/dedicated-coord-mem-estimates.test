@@ -31,25 +31,25 @@ row_regex: .*Cluster Memory Admitted: 132.00 MB.*
 # SELECT with merging exchange (i.e. order by).
 select * from functional.alltypes order by int_col;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=28MB.*
-row_regex: .*Dedicated Coordinator Resource Estimate: Memory=100MB.*
-row_regex: .*Cluster Memory Admitted: 157.47 MB.*
+row_regex: .*Per-Host Resource Estimates: Memory=32MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=104MB.*
+row_regex: .*Cluster Memory Admitted: 169.47 MB.*
 ====
 ---- QUERY
 # SELECT with non-merging exchange.
 select * from functional.alltypes;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=16MB.*
-row_regex: .*Dedicated Coordinator Resource Estimate: Memory=100MB.*
-row_regex: .*Cluster Memory Admitted: 133.47 MB.*
+row_regex: .*Per-Host Resource Estimates: Memory=20MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=104MB.*
+row_regex: .*Cluster Memory Admitted: 145.47 MB.*
 ====
 ---- QUERY
 # SELECT with a non-grouping aggregate in the coordinator fragment.
 select avg(int_col) from functional.alltypes;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=36MB.*
-row_regex: .*Dedicated Coordinator Resource Estimate: Memory=110MB.*
-row_regex: .*Cluster Memory Admitted: 182.05 MB.*
+row_regex: .*Per-Host Resource Estimates: Memory=40MB.*
+row_regex: .*Dedicated Coordinator Resource Estimate: Memory=114MB.*
+row_regex: .*Cluster Memory Admitted: 194.00 MB.*
 ====
 ---- QUERY
 # SELECT with num_nodes=1 and a complex plan in the coordinator.

@@ -71,12 +71,12 @@ WHERE ss1.d_qoy = 1
 ORDER BY ss1.ca_county;
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=153.50MB Threads=19
-Per-Host Resource Estimates: Memory=240.18GB
+Per-Host Resource Estimates: Memory=240.21GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=240.18GB mem-reservation=153.50MB thread-reservation=19 runtime-filters-memory=10.00MB
+|  Per-Host Resources: mem-estimate=240.21GB mem-reservation=153.50MB thread-reservation=19 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: ca_county, d_year, (web_sales * CAST(1.0000 AS DECIMAL(5,4))) / web_sales, (store_sales * CAST(1.0000 AS DECIMAL(5,4))) / store_sales, (web_sales * CAST(1.0000 AS DECIMAL(5,4))) / web_sales, (store_sales * CAST(1.0000 AS DECIMAL(5,4))) / store_sales
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 41:SORT
 |  order by: ca_county ASC
@@ -476,13 +476,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=12B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=174.56MB Threads=47
-Per-Host Resource Estimates: Memory=241.19GB
+Max Per-Host Resource Reservation: Memory=178.56MB Threads=47
+Per-Host Resource Estimates: Memory=241.29GB
 F28:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=30.38MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=130.38MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: ca_county, d_year, (web_sales * CAST(1.0000 AS DECIMAL(5,4))) / web_sales, (store_sales * CAST(1.0000 AS DECIMAL(5,4))) / store_sales, (web_sales * CAST(1.0000 AS DECIMAL(5,4))) / web_sales, (store_sales * CAST(1.0000 AS DECIMAL(5,4))) / store_sales
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 75:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: ca_county ASC
@@ -1121,13 +1121,13 @@ Per-Host Resources: mem-estimate=50.29MB mem-reservation=16.81MB thread-reservat
    tuple-ids=0 row-size=12B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=227.81MB Threads=58
-Per-Host Resource Estimates: Memory=480.99GB
+Max Per-Host Resource Reservation: Memory=231.81MB Threads=58
+Per-Host Resource Estimates: Memory=481.09GB
 F28:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=60.76MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=160.76MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: ca_county, d_year, (web_sales * CAST(1.0000 AS DECIMAL(5,4))) / web_sales, (store_sales * CAST(1.0000 AS DECIMAL(5,4))) / store_sales, (web_sales * CAST(1.0000 AS DECIMAL(5,4))) / web_sales, (store_sales * CAST(1.0000 AS DECIMAL(5,4))) / store_sales
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 75:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: ca_county ASC

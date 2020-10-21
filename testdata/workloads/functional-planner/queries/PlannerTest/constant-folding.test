@@ -9,10 +9,10 @@ c.c_orders o, o.o_lineitems WHERE c_custkey > CAST(10 AS BIGINT) AND o_orderkey
 = CAST(4 AS BIGINT) AND CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) <
 CAST(0 AS BIGINT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=264.00MB mem-reservation=16.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=326.94MB mem-reservation=20.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: CAST(1 AS TINYINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=62.94MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -84,10 +84,10 @@ where string_col = cast(4 as string) and 2 + 3 = tinyint_col
 Analyzed query: SELECT * FROM functional_hbase.stringids WHERE string_col = '4'
 AND tinyint_col = CAST(5 AS TINYINT) AND id >= '10' AND id <= '20'
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=4.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: functional_hbase.stringids.id, functional_hbase.stringids.bigint_col, functional_hbase.stringids.bool_col, functional_hbase.stringids.date_string_col, functional_hbase.stringids.day, functional_hbase.stringids.double_col, functional_hbase.stringids.float_col, functional_hbase.stringids.int_col, functional_hbase.stringids.month, functional_hbase.stringids.smallint_col, functional_hbase.stringids.string_col, functional_hbase.stringids.timestamp_col, functional_hbase.stringids.tinyint_col, functional_hbase.stringids.year
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HBASE [functional_hbase.stringids]
    key predicates: id >= '10', id <= '20'
@@ -110,10 +110,10 @@ Analyzed query: SELECT * FROM functional.alltypes_datasource WHERE
 CAST(tinyint_col AS DOUBLE) < CAST(256 AS DOUBLE) AND float_col != CAST(0 AS
 FLOAT) AND int_col < CAST(2 AS INT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=1.00GB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=1.00GB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: functional.alltypes_datasource.id, functional.alltypes_datasource.bool_col, functional.alltypes_datasource.tinyint_col, functional.alltypes_datasource.smallint_col, functional.alltypes_datasource.int_col, functional.alltypes_datasource.bigint_col, functional.alltypes_datasource.float_col, functional.alltypes_datasource.double_col, functional.alltypes_datasource.timestamp_col, functional.alltypes_datasource.string_col, functional.alltypes_datasource.dec_col1, functional.alltypes_datasource.dec_col2, functional.alltypes_datasource.dec_col3, functional.alltypes_datasource.dec_col4, functional.alltypes_datasource.dec_col5, functional.alltypes_datasource.date_col
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN DATA SOURCE [functional.alltypes_datasource]
 data source predicates: CAST(tinyint_col AS DOUBLE) < CAST(256 AS DOUBLE), int_col < CAST(2 AS INT)
@@ -137,10 +137,10 @@ BIGINT) AND sum(CAST(2 AS BIGINT) + CAST(id AS BIGINT)) > CAST(1 AS BIGINT) AND
 sum(CAST(2 AS BIGINT) + CAST(id AS BIGINT)) >= CAST(5 AS BIGINT) AND sum(CAST(2
 AS BIGINT) + CAST(id AS BIGINT)) <= CAST(10 AS BIGINT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.97MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=5.94MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: sum(2 + id)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(CAST(2 AS BIGINT) + CAST(id AS BIGINT)), count(*)
@@ -175,10 +175,10 @@ AS BIGINT) + b.bigint_col AND CAST(a.int_col AS BIGINT) <= b.bigint_col +
 CAST(97 AS BIGINT)) WHERE CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1 AS
 DECIMAL(6,1))
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=257.94MB mem-reservation=2.00MB thread-reservation=3
+|  Per-Host Resources: mem-estimate=257.94MB mem-reservation=5.97MB thread-reservation=3
 PLAN-ROOT SINK
 |  output exprs: CAST(1 AS TINYINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: 2 + a.id = b.id - 2
@@ -228,10 +228,10 @@ CAST(b.id AS BIGINT) - CAST(2 AS BIGINT) OR CAST(a.int_col AS BIGINT) >= CAST(0
 AS BIGINT) + b.bigint_col WHERE CAST(b.double_col AS DECIMAL(3,2)) > CAST(11.1
 AS DECIMAL(6,1))
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=256.01MB mem-reservation=64.00KB thread-reservation=3
+|  Per-Host Resources: mem-estimate=260.01MB mem-reservation=4.06MB thread-reservation=3
 PLAN-ROOT SINK
 |  output exprs: CAST(1 AS TINYINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  join predicates: CAST(2 AS BIGINT) + CAST(a.id AS BIGINT) = CAST(b.id AS BIGINT) - CAST(2 AS BIGINT) OR CAST(a.int_col AS BIGINT) <= b.bigint_col + CAST(97 AS BIGINT), CAST(2 AS BIGINT) + CAST(a.id AS BIGINT) = CAST(b.id AS BIGINT) - CAST(2 AS BIGINT) OR CAST(a.int_col AS BIGINT) >= CAST(0 AS BIGINT) + b.bigint_col
@@ -274,10 +274,10 @@ functional.alltypes GROUP BY timestamp_col = TIMESTAMP '2016-11-15 00:00:00'
 HAVING CAST(1048576 AS BIGINT) * count(*) % CAST(2 AS BIGINT) = CAST(0 AS
 BIGINT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=3.88MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=5.94MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: sum(2 + id)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:AGGREGATE [FINALIZE]
 |  output: sum(2 + id), count:merge(*)
@@ -314,10 +314,10 @@ Analyzed query: SELECT sum(DISTINCT CAST(2 AS BIGINT) + CAST(id AS BIGINT)) FROM
 functional.alltypes HAVING CAST(1048576 AS BIGINT) * count(*) % CAST(2 AS
 BIGINT) = CAST(0 AS BIGINT)
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=1.97MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=4.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: sum(2 + id)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:AGGREGATE [FINALIZE]
 |  output: sum(2 + id), count:merge(*)
@@ -354,10 +354,10 @@ Analyzed query: SELECT first_value(1 + 1 + int_col - (1 - 1)) OVER (PARTITION BY
 concat(concat('a', 'b'), string_col) ORDER BY greatest(greatest(10, 20),
 bigint_col) ASC) FROM functional.alltypes
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=16.03MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=20.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: first_value(2 + int_col - 0)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:ANALYTIC
 |  functions: first_value(2 + int_col - 0)
@@ -393,10 +393,10 @@ order by id * abs((factorial(5) / power(2, 4)))
 Analyzed query: SELECT int_col FROM functional.alltypes ORDER BY id * CAST(7.5
 AS DOUBLE) ASC
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=134.00MB mem-reservation=6.03MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=134.00MB mem-reservation=10.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: int_col
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:SORT
 |  order by: id * 7.5 ASC
@@ -460,10 +460,10 @@ id, CAST(10 AS INT) + CAST(c2 AS INT) c3 FROM (SELECT id, CAST(20 AS SMALLINT) +
 CAST(c1 AS SMALLINT) c2 FROM (SELECT id, CAST(30 AS TINYINT) c1 FROM
 functional.alltypes LIMIT CAST(2 AS TINYINT)) v1) v2) v3
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=32.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=4.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: sum(id + c3)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(CAST(id AS BIGINT) + CAST(CAST(10 AS INT) + CAST(CAST(20 AS SMALLINT) + CAST(30 AS SMALLINT) AS INT) AS BIGINT))

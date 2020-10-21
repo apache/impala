@@ -365,7 +365,7 @@ struct TQueryOptions {
   85: optional string default_hints_insert_statement;
 
   // See comment in ImpalaService.thrift
-  86: optional bool spool_query_results = false;
+  86: optional bool spool_query_results = true;
 
   // See comment in ImpalaService.thrift
   87: optional TTransactionalType default_transactional_type = TTransactionalType.NONE;

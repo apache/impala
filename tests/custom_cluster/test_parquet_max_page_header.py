@@ -107,6 +107,9 @@ class TestParquetMaxPageHeader(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("-max_page_header_size=31457280")
   def test_large_page_header_config(self, vector):
+    # IMPALA-9856: Since this test expect to read a row up to 10 MB in size, we
+    # explicitly set 11 MB MAX_ROW_SIZE here so that it can fit in BufferedPlanRootSink.
+    self.client.set_configuration_option("max_row_size", "11mb")
     result = self.client.execute("select length(max(col)) from {0}"\
         .format(self.PARQUET_TABLE_NAME))
     assert result.data == [str(self.MAX_STRING_LENGTH)]

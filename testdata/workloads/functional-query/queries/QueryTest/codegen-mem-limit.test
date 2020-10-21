@@ -1,5 +1,8 @@
 ====
 ---- QUERY
+# IMPALA-9856: We disable query result spooling here because this test expect query to hit
+# memory limit during codegen.
+SET spool_query_results=false;
 set mem_limit=100k;
 with t as (values(1), (2), (3), (4)) select min(t1.`1` + t2.`1`) from t t1 join t t2;
 ---- CATCH

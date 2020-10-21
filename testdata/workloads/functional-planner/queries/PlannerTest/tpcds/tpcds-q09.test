@@ -53,7 +53,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=566.00MB mem-reservation=10.63MB thread-reservation=17
 PLAN-ROOT SINK
 |  output exprs: CASE WHEN count(*) > CAST(74129 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END, CASE WHEN count(*) > CAST(122840 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END, CASE WHEN count(*) > CAST(56580 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END, CASE WHEN count(*) > CAST(10097 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END, CASE WHEN count(*) > CAST(165306 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 45:NESTED LOOP JOIN [CROSS JOIN]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
@@ -443,13 +443,13 @@ PLAN-ROOT SINK
    tuple-ids=1 row-size=4B cardinality=288.04K
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=10.63MB Threads=47
-Per-Host Resource Estimates: Memory=716MB
+Max Per-Host Resource Reservation: Memory=14.63MB Threads=47
+Per-Host Resource Estimates: Memory=720MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.25MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=14.23MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: CASE WHEN count(*) > CAST(74129 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END, CASE WHEN count(*) > CAST(122840 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END, CASE WHEN count(*) > CAST(56580 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END, CASE WHEN count(*) > CAST(10097 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END, CASE WHEN count(*) > CAST(165306 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 45:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
 |  mem-estimate=8B mem-reservation=0B thread-reservation=0
@@ -1139,13 +1139,13 @@ Per-Host Resources: mem-estimate=26.00MB mem-reservation=128.00KB thread-reserva
    tuple-ids=1 row-size=4B cardinality=288.04K
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=21.26MB Threads=61
-Per-Host Resource Estimates: Memory=946MB
+Max Per-Host Resource Reservation: Memory=25.26MB Threads=61
+Per-Host Resource Estimates: Memory=950MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=14.00MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: CASE WHEN count(*) > CAST(74129 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END, CASE WHEN count(*) > CAST(122840 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END, CASE WHEN count(*) > CAST(56580 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END, CASE WHEN count(*) > CAST(10097 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END, CASE WHEN count(*) > CAST(165306 AS BIGINT) THEN avg(ss_ext_discount_amt) ELSE avg(ss_net_profit) END
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 45:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
 |  join table id: 00

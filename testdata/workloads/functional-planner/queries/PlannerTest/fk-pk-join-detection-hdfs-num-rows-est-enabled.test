@@ -13,7 +13,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=178.94MB mem-reservation=18.94MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: CAST(1 AS TINYINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=21.98MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_customer_sk = c_customer_sk
@@ -54,7 +54,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=178.94MB mem-reservation=18.94MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: CAST(1 AS TINYINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=61.64MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_customer_sk = c_customer_sk

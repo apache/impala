@@ -107,7 +107,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=1.19GB mem-reservation=130.75MB thread-reservation=16 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: CASE valid_tid(104,105,106,107,108) WHEN 104 THEN channel WHEN 105 THEN channel WHEN 106 THEN channel WHEN 107 THEN channel WHEN 108 THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_brand_id WHEN 105 THEN i_brand_id WHEN 106 THEN i_brand_id WHEN 107 THEN NULL WHEN 108 THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_class_id WHEN 105 THEN i_class_id WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_category_id WHEN 105 THEN NULL WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END, aggif(valid_tid(104,105,106,107,108) IN (104, 105, 106, 107, 108), CASE valid_tid(104,105,106,107,108) WHEN 104 THEN sum(sales) WHEN 105 THEN sum(sales) WHEN 106 THEN sum(sales) WHEN 107 THEN sum(sales) WHEN 108 THEN sum(sales) END), aggif(valid_tid(104,105,106,107,108) IN (104, 105, 106, 107, 108), CASE valid_tid(104,105,106,107,108) WHEN 104 THEN sum(number_sales) WHEN 105 THEN sum(number_sales) WHEN 106 THEN sum(number_sales) WHEN 107 THEN sum(number_sales) WHEN 108 THEN sum(number_sales) END)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 129:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(104,105,106,107,108) WHEN 104 THEN channel WHEN 105 THEN channel WHEN 106 THEN channel WHEN 107 THEN channel WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_brand_id WHEN 105 THEN i_brand_id WHEN 106 THEN i_brand_id WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_class_id WHEN 105 THEN i_class_id WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_category_id WHEN 105 THEN NULL WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC
@@ -1295,13 +1295,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=20B cardinality=2.88M
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=391.06MB Threads=120
+Max Per-Host Resource Reservation: Memory=395.06MB Threads=120
 Per-Host Resource Estimates: Memory=3.66GB
 F80:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.80KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: CASE valid_tid(104,105,106,107,108) WHEN 104 THEN channel WHEN 105 THEN channel WHEN 106 THEN channel WHEN 107 THEN channel WHEN 108 THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_brand_id WHEN 105 THEN i_brand_id WHEN 106 THEN i_brand_id WHEN 107 THEN NULL WHEN 108 THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_class_id WHEN 105 THEN i_class_id WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_category_id WHEN 105 THEN NULL WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END, aggif(valid_tid(104,105,106,107,108) IN (104, 105, 106, 107, 108), CASE valid_tid(104,105,106,107,108) WHEN 104 THEN sum(sales) WHEN 105 THEN sum(sales) WHEN 106 THEN sum(sales) WHEN 107 THEN sum(sales) WHEN 108 THEN sum(sales) END), aggif(valid_tid(104,105,106,107,108) IN (104, 105, 106, 107, 108), CASE valid_tid(104,105,106,107,108) WHEN 104 THEN sum(number_sales) WHEN 105 THEN sum(number_sales) WHEN 106 THEN sum(number_sales) WHEN 107 THEN sum(number_sales) WHEN 108 THEN sum(number_sales) END)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 216:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: CASE valid_tid(104,105,106,107,108) WHEN 104 THEN channel WHEN 105 THEN channel WHEN 106 THEN channel WHEN 107 THEN channel WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_brand_id WHEN 105 THEN i_brand_id WHEN 106 THEN i_brand_id WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_class_id WHEN 105 THEN i_class_id WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_category_id WHEN 105 THEN NULL WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC
@@ -3098,13 +3098,13 @@ Per-Host Resources: mem-estimate=67.37MB mem-reservation=14.81MB thread-reservat
    tuple-ids=0 row-size=20B cardinality=2.88M
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=624.75MB Threads=141
+Max Per-Host Resource Reservation: Memory=628.75MB Threads=141
 Per-Host Resource Estimates: Memory=2.35GB
 F80:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.03KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: CASE valid_tid(104,105,106,107,108) WHEN 104 THEN channel WHEN 105 THEN channel WHEN 106 THEN channel WHEN 107 THEN channel WHEN 108 THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_brand_id WHEN 105 THEN i_brand_id WHEN 106 THEN i_brand_id WHEN 107 THEN NULL WHEN 108 THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_class_id WHEN 105 THEN i_class_id WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_category_id WHEN 105 THEN NULL WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END, aggif(valid_tid(104,105,106,107,108) IN (104, 105, 106, 107, 108), CASE valid_tid(104,105,106,107,108) WHEN 104 THEN sum(sales) WHEN 105 THEN sum(sales) WHEN 106 THEN sum(sales) WHEN 107 THEN sum(sales) WHEN 108 THEN sum(sales) END), aggif(valid_tid(104,105,106,107,108) IN (104, 105, 106, 107, 108), CASE valid_tid(104,105,106,107,108) WHEN 104 THEN sum(number_sales) WHEN 105 THEN sum(number_sales) WHEN 106 THEN sum(number_sales) WHEN 107 THEN sum(number_sales) WHEN 108 THEN sum(number_sales) END)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 216:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: CASE valid_tid(104,105,106,107,108) WHEN 104 THEN channel WHEN 105 THEN channel WHEN 106 THEN channel WHEN 107 THEN channel WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_brand_id WHEN 105 THEN i_brand_id WHEN 106 THEN i_brand_id WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_class_id WHEN 105 THEN i_class_id WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_category_id WHEN 105 THEN NULL WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC

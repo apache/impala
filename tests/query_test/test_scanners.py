@@ -270,6 +270,8 @@ class TestWideRow(ImpalaTestSuite):
     # query succeeded for all file formats -- I don't know exactly why we need this much.
     # TODO: figure out exact breakdown of memory usage (IMPALA-681)
     new_vector.get_value('exec_option')['mem_limit'] = 100 * 1024 * 1024
+    # Specify that the query should able to handle 10 MB MAX_ROW_SIZE.
+    new_vector.get_value('exec_option')['max_row_size'] = 10 * 1024 * 1024
     self.run_test_case('QueryTest/wide-row', new_vector)
 
 class TestWideTable(ImpalaTestSuite):
@@ -1237,8 +1239,11 @@ class TestTextSplitDelimiters(ImpalaTestSuite):
     max_scan_range_length = DEFAULT_IO_BUFFER_SIZE * 2
     expected_result = data.split("\r\n")
 
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['max_row_size'] = 9 * 1024 * 1024
+
     self._create_and_query_test_table(
-      vector, unique_database, data, max_scan_range_length, expected_result)
+      new_vector, unique_database, data, max_scan_range_length, expected_result)
 
   def _create_and_query_test_table(self, vector, unique_database, data,
         max_scan_range_length, expected_result):

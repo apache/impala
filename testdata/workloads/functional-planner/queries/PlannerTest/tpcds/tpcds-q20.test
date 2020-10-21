@@ -35,7 +35,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=281.88MB mem-reservation=52.00MB thread-reservation=4 runtime-filters-memory=2.00MB
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, i_category, i_class, i_current_price, sum(cs_ext_sales_price), sum(cs_ext_sales_price) * CAST(100.0000 AS DECIMAL(7,4)) / sum(sum(cs_ext_sales_price))
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 08:TOP-N [LIMIT=100]
 |  order by: i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, sum(cs_ext_sales_price) * 100.0000 / sum(sum(cs_ext_sales_price)) ASC
@@ -116,13 +116,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=16B cardinality=1.44M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=100.88MB Threads=8
-Per-Host Resource Estimates: Memory=385MB
+Max Per-Host Resource Reservation: Memory=104.88MB Threads=8
+Per-Host Resource Estimates: Memory=389MB
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=70.87KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.07MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, i_category, i_class, i_current_price, sum(cs_ext_sales_price), sum(cs_ext_sales_price) * CAST(100.0000 AS DECIMAL(7,4)) / sum(sum(cs_ext_sales_price))
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 13:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, sum(cs_ext_sales_price) * 100.0000 / sum(sum(cs_ext_sales_price)) ASC
@@ -240,13 +240,13 @@ Per-Host Resources: mem-estimate=196.19MB mem-reservation=47.88MB thread-reserva
    tuple-ids=0 row-size=16B cardinality=1.44M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=106.75MB Threads=7
-Per-Host Resource Estimates: Memory=199MB
+Max Per-Host Resource Reservation: Memory=110.75MB Threads=7
+Per-Host Resource Estimates: Memory=203MB
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=70.87KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.07MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, i_category, i_class, i_current_price, sum(cs_ext_sales_price), sum(cs_ext_sales_price) * CAST(100.0000 AS DECIMAL(7,4)) / sum(sum(cs_ext_sales_price))
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 13:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, sum(cs_ext_sales_price) * 100.0000 / sum(sum(cs_ext_sales_price)) ASC

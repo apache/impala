@@ -47,7 +47,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=342.69MB mem-reservation=27.38MB thread-reservation=7 runtime-filters-memory=4.00MB
 PLAN-ROOT SINK
 |  output exprs: ca_zip, ca_city, sum(ws_sales_price)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 13:TOP-N [LIMIT=100]
 |  order by: ca_zip ASC, ca_city ASC
@@ -176,13 +176,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=20B cardinality=719.38K
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=40.38MB Threads=16
-Per-Host Resource Estimates: Memory=383MB
+Max Per-Host Resource Reservation: Memory=44.38MB Threads=16
+Per-Host Resource Estimates: Memory=387MB
 F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: ca_zip, ca_city, sum(ws_sales_price)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 24:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: ca_zip ASC, ca_city ASC
@@ -389,13 +389,13 @@ Per-Host Resources: mem-estimate=135.67MB mem-reservation=14.88MB thread-reserva
    tuple-ids=0 row-size=20B cardinality=719.38K
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=50.12MB Threads=15
-Per-Host Resource Estimates: Memory=184MB
+Max Per-Host Resource Reservation: Memory=54.12MB Threads=15
+Per-Host Resource Estimates: Memory=188MB
 F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: ca_zip, ca_city, sum(ws_sales_price)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 24:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: ca_zip ASC, ca_city ASC

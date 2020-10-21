@@ -46,7 +46,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=591.31MB mem-reservation=39.38MB thread-reservation=14 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: promotions, total, CAST(promotions AS DECIMAL(15,4)) / CAST(total AS DECIMAL(15,4)) * CAST(100 AS DECIMAL(3,0))
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 27:SORT
 |  order by: promotions ASC, total ASC
@@ -320,13 +320,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=28B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=49.38MB Threads=30
+Max Per-Host Resource Reservation: Memory=53.38MB Threads=30
 Per-Host Resource Estimates: Memory=643MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.02MB mem-reservation=6.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=16.02MB mem-reservation=10.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: promotions, total, CAST(promotions AS DECIMAL(15,4)) / CAST(total AS DECIMAL(15,4)) * CAST(100 AS DECIMAL(3,0))
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 27:SORT
 |  order by: promotions ASC, total ASC
@@ -724,13 +724,13 @@ Per-Host Resources: mem-estimate=92.88MB mem-reservation=14.75MB thread-reservat
    tuple-ids=0 row-size=28B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=82.69MB Threads=35
+Max Per-Host Resource Reservation: Memory=86.69MB Threads=35
 Per-Host Resource Estimates: Memory=379MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=6.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=10.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: promotions, total, CAST(promotions AS DECIMAL(15,4)) / CAST(total AS DECIMAL(15,4)) * CAST(100 AS DECIMAL(3,0))
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 27:SORT
 |  order by: promotions ASC, total ASC

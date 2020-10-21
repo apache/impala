@@ -1332,6 +1332,9 @@ class TestKuduMemLimits(KuduTestSuite):
     exec_options = dict((k, str(v)) for k, v
                         in vector.get_value('exec_option').iteritems())
     exec_options['mem_limit'] = "{0}m".format(mem_limit)
+    # IMPALA-9856: We disable query result spooling so that this test can run queries
+    # with low mem_limit.
+    exec_options['spool_query_results'] = "0"
     for i, q in enumerate(self.QUERIES):
       try:
         cursor.execute(q, configuration=exec_options)

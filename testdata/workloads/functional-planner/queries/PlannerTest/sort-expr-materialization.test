@@ -2,10 +2,10 @@
 select * from functional.alltypes order by random()
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=16.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:SORT
 |  order by: random() ASC
@@ -29,10 +29,10 @@ PLAN-ROOT SINK
 select * from functional.alltypes order by abs(id) + abs(id)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=16.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:SORT
 |  order by: abs(id) + abs(id) ASC
@@ -56,10 +56,10 @@ PLAN-ROOT SINK
 select * from functional.alltypes order by tinyint_col + 1
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=16.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:SORT
 |  order by: tinyint_col + 1 ASC
@@ -83,10 +83,10 @@ select * from functional.alltypes
 order by dayofweek(timestamp_col), true, id + 1, string_col = date_string_col, id = tinyint_col
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=16.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:SORT
 |  order by: dayofweek(timestamp_col) ASC, TRUE ASC, id + 1 ASC, string_col = date_string_col ASC, id = tinyint_col ASC
@@ -111,10 +111,10 @@ select last_value(id) over (order by to_date(timestamp_col), bool_col is null)
 from functional.alltypes
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=16.03MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=144.00MB mem-reservation=20.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: last_value(id)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:ANALYTIC
 |  functions: last_value(id)
@@ -147,10 +147,10 @@ select id from functional.alltypes order by string_col like 'a.*b', id * bigint_
 regexp_replace(string_col, 'a.*b', 'c') limit 10
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=128.00MB mem-reservation=32.00KB thread-reservation=2
+|  Per-Host Resources: mem-estimate=128.00MB mem-reservation=4.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: id
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:TOP-N [LIMIT=10]
 |  order by: string_col LIKE 'a.*b' ASC, id * bigint_col ASC, regexp_replace(string_col, 'a.*b', 'c') ASC
@@ -174,10 +174,10 @@ PLAN-ROOT SINK
 select * from functional.alltypes order by TestFn(double_col)
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=16.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:SORT
 |  order by: default.testfn(double_col) /* NATIVE UDF */ ASC
@@ -201,10 +201,10 @@ PLAN-ROOT SINK
 select concat(date_string_col, string_col) c from functional.alltypes order by c
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.03MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=16.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: concat(date_string_col, string_col)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:SORT
 |  order by: concat(date_string_col, string_col) ASC
@@ -235,7 +235,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=42.00MB mem-reservation=16.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: id, row_number()
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:SORT
 |  order by: id ASC
@@ -294,7 +294,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=422.00MB mem-reservation=32.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: l_orderkey, l_partkey, l_linenumber, l_quantity, evt_ts, rn
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=22.89MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:SORT
 |  order by: rn ASC
@@ -357,7 +357,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=422.00MB mem-reservation=32.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: l_orderkey, l_partkey, lno_f, l_quantity, evt_ts, rn
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=22.89MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:SORT
 |  order by: rn ASC
@@ -419,7 +419,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=422.00MB mem-reservation=32.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: l_orderkey, l_partkey, l_linenumber, l_quantity, evt_ts, rn
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=33.19MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:SORT
 |  order by: rn ASC

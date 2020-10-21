@@ -131,7 +131,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=2.17GB mem-reservation=154.39MB thread-reservation=39 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: product_name, store_name, store_zip, b_street_number, b_street_name, b_city, b_zip, c_street_number, c_street_name, c_city, c_zip, syear, cnt, s1, s2, s3, s1, s2, s3, syear, cnt
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=90.78MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 79:SORT
 |  order by: product_name ASC, store_name ASC, cnt ASC, s1 ASC, s1 ASC
@@ -884,13 +884,13 @@ PLAN-ROOT SINK
    tuple-ids=17 row-size=78B cardinality=50.00K
    in pipelines: 17(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=436.52MB Threads=98
-Per-Host Resource Estimates: Memory=2.68GB
+Max Per-Host Resource Reservation: Memory=440.52MB Threads=98
+Per-Host Resource Estimates: Memory=2.76GB
 F59:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=30.98MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=121.76MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: product_name, store_name, store_zip, b_street_number, b_street_name, b_city, b_zip, c_street_number, c_street_name, c_city, c_zip, syear, cnt, s1, s2, s3, s1, s2, s3, syear, cnt
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=90.78MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 142:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: product_name ASC, store_name ASC, cnt ASC, s1 ASC, s1 ASC
@@ -2079,13 +2079,13 @@ Per-Host Resources: mem-estimate=135.93MB mem-reservation=15.88MB thread-reserva
    tuple-ids=0 row-size=56B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=672.52MB Threads=135
-Per-Host Resource Estimates: Memory=1.64GB
+Max Per-Host Resource Reservation: Memory=676.52MB Threads=135
+Per-Host Resource Estimates: Memory=1.73GB
 F59:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=32.22MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=123.00MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: product_name, store_name, store_zip, b_street_number, b_street_name, b_city, b_zip, c_street_number, c_street_name, c_city, c_zip, syear, cnt, s1, s2, s3, s1, s2, s3, syear, cnt
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=90.78MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 142:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: product_name ASC, store_name ASC, cnt ASC, s1 ASC, s1 ASC

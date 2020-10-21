@@ -673,10 +673,10 @@ ENABLED_RUNTIME_FILTER_TYPES=BLOOM
 EXPLAIN_LEVEL=2
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=13.69MB mem-reservation=2.94MB thread-reservation=3 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=15.00MB mem-reservation=5.00MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
@@ -712,10 +712,10 @@ ENABLED_RUNTIME_FILTER_TYPES=MIN_MAX
 EXPLAIN_LEVEL=2
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=12.69MB mem-reservation=1.94MB thread-reservation=3
+|  Per-Host Resources: mem-estimate=14.00MB mem-reservation=4.00MB thread-reservation=3
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
@@ -751,10 +751,10 @@ ENABLED_RUNTIME_FILTER_TYPES=ALL
 EXPLAIN_LEVEL=2
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=13.69MB mem-reservation=2.94MB thread-reservation=3 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=15.00MB mem-reservation=5.00MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)

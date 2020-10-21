@@ -77,7 +77,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=606.25MB mem-reservation=47.06MB thread-reservation=16 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: item_id, sr_item_qty, (CAST(sr_item_qty AS DECIMAL(19,0)) * CAST(1.0000 AS DECIMAL(5,4))) / CAST((sr_item_qty + cr_item_qty + wr_item_qty) AS DECIMAL(19,0)) / CAST(3.0000 AS DECIMAL(5,4)) * CAST(100 AS DECIMAL(3,0)), cr_item_qty, (CAST(cr_item_qty AS DECIMAL(19,0)) * CAST(1.0000 AS DECIMAL(5,4))) / CAST((sr_item_qty + cr_item_qty + wr_item_qty) AS DECIMAL(19,0)) / CAST(3.0000 AS DECIMAL(5,4)) * CAST(100 AS DECIMAL(3,0)), wr_item_qty, (CAST(wr_item_qty AS DECIMAL(19,0)) * CAST(1.0000 AS DECIMAL(5,4))) / CAST((sr_item_qty + cr_item_qty + wr_item_qty) AS DECIMAL(19,0)) / CAST(3.0000 AS DECIMAL(5,4)) * CAST(100 AS DECIMAL(3,0)), CAST((sr_item_qty + cr_item_qty + wr_item_qty) AS DECIMAL(19,0)) / CAST(3.0 AS DECIMAL(2,1))
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 32:TOP-N [LIMIT=100]
 |  order by: item_id ASC, sr_item_qty ASC
@@ -382,13 +382,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=16B cardinality=287.51K
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=68.75MB Threads=32
-Per-Host Resource Estimates: Memory=686MB
+Max Per-Host Resource Reservation: Memory=72.75MB Threads=32
+Per-Host Resource Estimates: Memory=690MB
 F18:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: item_id, sr_item_qty, (CAST(sr_item_qty AS DECIMAL(19,0)) * CAST(1.0000 AS DECIMAL(5,4))) / CAST((sr_item_qty + cr_item_qty + wr_item_qty) AS DECIMAL(19,0)) / CAST(3.0000 AS DECIMAL(5,4)) * CAST(100 AS DECIMAL(3,0)), cr_item_qty, (CAST(cr_item_qty AS DECIMAL(19,0)) * CAST(1.0000 AS DECIMAL(5,4))) / CAST((sr_item_qty + cr_item_qty + wr_item_qty) AS DECIMAL(19,0)) / CAST(3.0000 AS DECIMAL(5,4)) * CAST(100 AS DECIMAL(3,0)), wr_item_qty, (CAST(wr_item_qty AS DECIMAL(19,0)) * CAST(1.0000 AS DECIMAL(5,4))) / CAST((sr_item_qty + cr_item_qty + wr_item_qty) AS DECIMAL(19,0)) / CAST(3.0000 AS DECIMAL(5,4)) * CAST(100 AS DECIMAL(3,0)), CAST((sr_item_qty + cr_item_qty + wr_item_qty) AS DECIMAL(19,0)) / CAST(3.0 AS DECIMAL(2,1))
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 51:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: item_id ASC, sr_item_qty ASC
@@ -828,13 +828,13 @@ Per-Host Resources: mem-estimate=94.26MB mem-reservation=13.75MB thread-reservat
    tuple-ids=0 row-size=16B cardinality=287.51K
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=101.81MB Threads=31
-Per-Host Resource Estimates: Memory=399MB
+Max Per-Host Resource Reservation: Memory=105.81MB Threads=31
+Per-Host Resource Estimates: Memory=403MB
 F18:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: item_id, sr_item_qty, (CAST(sr_item_qty AS DECIMAL(19,0)) * CAST(1.0000 AS DECIMAL(5,4))) / CAST((sr_item_qty + cr_item_qty + wr_item_qty) AS DECIMAL(19,0)) / CAST(3.0000 AS DECIMAL(5,4)) * CAST(100 AS DECIMAL(3,0)), cr_item_qty, (CAST(cr_item_qty AS DECIMAL(19,0)) * CAST(1.0000 AS DECIMAL(5,4))) / CAST((sr_item_qty + cr_item_qty + wr_item_qty) AS DECIMAL(19,0)) / CAST(3.0000 AS DECIMAL(5,4)) * CAST(100 AS DECIMAL(3,0)), wr_item_qty, (CAST(wr_item_qty AS DECIMAL(19,0)) * CAST(1.0000 AS DECIMAL(5,4))) / CAST((sr_item_qty + cr_item_qty + wr_item_qty) AS DECIMAL(19,0)) / CAST(3.0000 AS DECIMAL(5,4)) * CAST(100 AS DECIMAL(3,0)), CAST((sr_item_qty + cr_item_qty + wr_item_qty) AS DECIMAL(19,0)) / CAST(3.0 AS DECIMAL(2,1))
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 51:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: item_id ASC, sr_item_qty ASC

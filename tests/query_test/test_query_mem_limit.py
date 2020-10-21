@@ -96,6 +96,10 @@ class TestQueryMemLimit(ImpalaTestSuite):
     exec_options['mem_limit'] = mem_limit
     # Send to the no-limits pool so that no memory limits apply.
     exec_options['request_pool'] = "root.no-limits"
+    # IMPALA-9856: For the group_concat query, this test expect a resulting row up to
+    # 17.17 MB in size.Therefore, we explicitly set 18 MB MAX_ROW_SIZE here so that it
+    # can fit in BufferedPlanRootSink.
+    exec_options['max_row_size'] = '18M'
     query = vector.get_value('query')
     table_format = vector.get_value('table_format')
     if mem_limit in["0", "-1"] or self.PASS_REGEX.match(mem_limit):

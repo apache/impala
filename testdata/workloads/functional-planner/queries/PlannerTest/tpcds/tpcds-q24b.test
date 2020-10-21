@@ -58,7 +58,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=936.44MB mem-reservation=91.81MB thread-reservation=13 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: $c$1, $c$2, $c$3, $c$4
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 27:SORT
 |  order by: $c$1 ASC, $c$2 ASC, $c$3 ASC
@@ -320,13 +320,13 @@ PLAN-ROOT SINK
    tuple-ids=5 row-size=60B cardinality=50.00K
    in pipelines: 05(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=165.45MB Threads=32
-Per-Host Resource Estimates: Memory=1.14GB
+Max Per-Host Resource Reservation: Memory=169.45MB Threads=32
+Per-Host Resource Estimates: Memory=1.15GB
 F19:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=387.40KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.38MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: $c$1, $c$2, $c$3, $c$4
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 50:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: $c$1 ASC, $c$2 ASC, $c$3 ASC
@@ -749,13 +749,13 @@ Per-Host Resources: mem-estimate=88.92MB mem-reservation=12.88MB thread-reservat
    tuple-ids=0 row-size=28B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=305.70MB Threads=42
-Per-Host Resource Estimates: Memory=667MB
+Max Per-Host Resource Reservation: Memory=309.70MB Threads=42
+Per-Host Resource Estimates: Memory=671MB
 F19:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=604.05KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.59MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: $c$1, $c$2, $c$3, $c$4
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 50:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: $c$1 ASC, $c$2 ASC, $c$3 ASC

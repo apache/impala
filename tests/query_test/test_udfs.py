@@ -356,7 +356,7 @@ class TestUdfExecution(TestUdfBase):
     # admission control and a simple scan can run.
     vector = copy(vector)
     vector.get_value('exec_option')['mem_limit'] = '1mb'
-    vector.get_value('exec_option')['buffer_pool_limit'] = '32kb'
+    vector.get_value('exec_option')['buffer_pool_limit'] = '4.04mb'
     try:
       self.run_test_case('QueryTest/udf-mem-limit', vector, use_db=unique_database)
       assert False, "Query was expected to fail"

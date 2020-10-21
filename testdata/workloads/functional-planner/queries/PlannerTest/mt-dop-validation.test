@@ -7,7 +7,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=2.04GB mem-reservation=16.00KB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
@@ -46,7 +46,7 @@ F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
@@ -118,7 +118,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=2.03GB mem-reservation=35.02MB thread-reservation=1 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
@@ -161,7 +161,7 @@ F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(*)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
@@ -331,7 +331,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=144.00MB mem-reservation=34.02MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(int_col)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:TOP-N [LIMIT=10]
 |  order by: count(int_col) ASC, bigint_col ASC
@@ -364,7 +364,7 @@ F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(int_col)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(int_col) ASC, bigint_col ASC
@@ -425,7 +425,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=26.00MB mem-reservation=10.02MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: row_number()
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 02:ANALYTIC
 |  functions: row_number()
@@ -460,7 +460,7 @@ F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=216.00KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: row_number()
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=216.00KB mem-reservation=0B thread-reservation=0
@@ -514,7 +514,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=104.00MB mem-reservation=104.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment, o.item.o_orderkey, o.item.o_orderstatus, o.item.o_totalprice, o.item.o_orderdate, o.item.o_orderpriority, o.item.o_clerk, o.item.o_shippriority, o.item.o_comment, o_lineitems.item.l_partkey, o_lineitems.item.l_suppkey, o_lineitems.item.l_linenumber, o_lineitems.item.l_quantity, o_lineitems.item.l_extendedprice, o_lineitems.item.l_discount, o_lineitems.item.l_tax, o_lineitems.item.l_returnflag, o_lineitems.item.l_linestatus, o_lineitems.item.l_shipdate, o_lineitems.item.l_commitdate, o_lineitems.item.l_receiptdate, o_lineitems.item.l_shipinstruct, o_lineitems.item.l_shipmode, o_lineitems.item.l_comment
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -583,7 +583,7 @@ F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=11.93MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment, o.item.o_orderkey, o.item.o_orderstatus, o.item.o_totalprice, o.item.o_orderdate, o.item.o_orderpriority, o.item.o_clerk, o.item.o_shippriority, o.item.o_comment, o_lineitems.item.l_partkey, o_lineitems.item.l_suppkey, o_lineitems.item.l_linenumber, o_lineitems.item.l_quantity, o_lineitems.item.l_extendedprice, o_lineitems.item.l_discount, o_lineitems.item.l_tax, o_lineitems.item.l_returnflag, o_lineitems.item.l_linestatus, o_lineitems.item.l_shipdate, o_lineitems.item.l_commitdate, o_lineitems.item.l_receiptdate, o_lineitems.item.l_shipinstruct, o_lineitems.item.l_shipmode, o_lineitems.item.l_comment
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 09:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=11.93MB mem-reservation=0B thread-reservation=0
@@ -664,7 +664,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=89.94MB mem-reservation=17.94MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:SUBPLAN
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -719,7 +719,7 @@ F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=11.05MB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c.c_custkey, c.c_name, c.c_address, c.c_nationkey, c.c_phone, c.c_acctbal, c.c_mktsegment, c.c_comment
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 07:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=11.05MB mem-reservation=0B thread-reservation=0

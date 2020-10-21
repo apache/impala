@@ -71,7 +71,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=689.94MB mem-reservation=167.56MB thread-reservation=13 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: customer_id, customer_first_name, customer_last_name
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 31:TOP-N [LIMIT=100]
 |  order by: customer_id ASC
@@ -360,13 +360,13 @@ PLAN-ROOT SINK
    tuple-ids=11 row-size=12B cardinality=2.88M
    in pipelines: 09(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=300.94MB Threads=33
-Per-Host Resource Estimates: Memory=984MB
+Max Per-Host Resource Reservation: Memory=304.94MB Threads=33
+Per-Host Resource Estimates: Memory=988MB
 F24:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=22.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: customer_id, customer_first_name, customer_last_name
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 55:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: customer_id ASC
@@ -824,13 +824,13 @@ Per-Host Resources: mem-estimate=35.95MB mem-reservation=4.94MB thread-reservati
    tuple-ids=11 row-size=12B cardinality=2.88M
    in pipelines: 09(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=333.88MB Threads=40
-Per-Host Resource Estimates: Memory=674MB
+Max Per-Host Resource Reservation: Memory=337.88MB Threads=40
+Per-Host Resource Estimates: Memory=678MB
 F24:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=41.91KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.04MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: customer_id, customer_first_name, customer_last_name
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 55:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: customer_id ASC

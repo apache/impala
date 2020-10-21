@@ -46,7 +46,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=249.81MB mem-reservation=21.77MB thread-reservation=6 runtime-filters-memory=4.00MB
 PLAN-ROOT SINK
 |  output exprs: sum(ss_quantity)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 09:AGGREGATE [FINALIZE]
 |  output: sum(CAST(ss_quantity AS BIGINT))
@@ -150,13 +150,13 @@ PLAN-ROOT SINK
    tuple-ids=2 row-size=39B cardinality=181.75K
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=27.33MB Threads=12
-Per-Host Resource Estimates: Memory=278MB
+Max Per-Host Resource Reservation: Memory=31.33MB Threads=12
+Per-Host Resource Estimates: Memory=282MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=14.00MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: sum(ss_quantity)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 16:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_quantity)
@@ -307,13 +307,13 @@ Per-Host Resources: mem-estimate=104.30MB mem-reservation=9.88MB thread-reservat
    tuple-ids=0 row-size=28B cardinality=288.04K
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=39.14MB Threads=14
-Per-Host Resource Estimates: Memory=168MB
+Max Per-Host Resource Reservation: Memory=43.14MB Threads=14
+Per-Host Resource Estimates: Memory=172MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=14.00MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: sum(ss_quantity)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 16:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_quantity)

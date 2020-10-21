@@ -47,7 +47,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=633.75MB mem-reservation=49.27MB thread-reservation=9 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, s_store_id, s_store_name, sum(ss_quantity), sum(sr_return_quantity), sum(cs_quantity)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 16:TOP-N [LIMIT=100]
 |  order by: i_item_id ASC, i_item_desc ASC, s_store_id ASC, s_store_name ASC
@@ -212,13 +212,13 @@ PLAN-ROOT SINK
    tuple-ids=7 row-size=148B cardinality=18.00K
    in pipelines: 07(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=61.84MB Threads=20
-Per-Host Resource Estimates: Memory=686MB
+Max Per-Host Resource Reservation: Memory=65.84MB Threads=20
+Per-Host Resource Estimates: Memory=690MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=69.10KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.07MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, s_store_id, s_store_name, sum(ss_quantity), sum(sr_return_quantity), sum(cs_quantity)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 28:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_item_id ASC, i_item_desc ASC, s_store_id ASC, s_store_name ASC
@@ -468,13 +468,13 @@ Per-Host Resources: mem-estimate=203.74MB mem-reservation=18.81MB thread-reserva
    tuple-ids=2 row-size=20B cardinality=1.44M
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=83.52MB Threads=22
-Per-Host Resource Estimates: Memory=283MB
+Max Per-Host Resource Reservation: Memory=87.52MB Threads=22
+Per-Host Resource Estimates: Memory=287MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=69.10KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.07MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, s_store_id, s_store_name, sum(ss_quantity), sum(sr_return_quantity), sum(cs_quantity)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 28:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_item_id ASC, i_item_desc ASC, s_store_id ASC, s_store_name ASC

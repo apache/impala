@@ -21,7 +21,7 @@ order by
   l_returnflag,
   l_linestatus
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=13.94MB Threads=2
+Max Per-Host Resource Reservation: Memory=16.00MB Threads=2
 Per-Host Resource Estimates: Memory=22MB
 PLAN-ROOT SINK
 |
@@ -92,7 +92,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=58.88MB mem-reservation=26.31MB thread-reservation=10 runtime-filters-memory=8.00MB
 PLAN-ROOT SINK
 |  output exprs: round(s_acctbal, CAST(2 AS TINYINT)), s_name, n_name, p_partkey, p_mfgr, s_address, s_phone, s_comment
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 18:TOP-N [LIMIT=100]
 |  order by: s_acctbal DESC, n_name ASC, s_name ASC, p_partkey ASC
@@ -310,7 +310,7 @@ group by
 order by
   o_orderpriority
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=14.94MB Threads=3
+Max Per-Host Resource Reservation: Memory=17.00MB Threads=3
 Per-Host Resource Estimates: Memory=44MB
 PLAN-ROOT SINK
 |
@@ -363,7 +363,7 @@ group by
 order by
   revenue desc
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=21.38MB Threads=7
+Max Per-Host Resource Reservation: Memory=22.00MB Threads=7
 Per-Host Resource Estimates: Memory=40MB
 PLAN-ROOT SINK
 |
@@ -437,7 +437,7 @@ where
   and l_discount between 0.05 and 0.07
   and l_quantity < 24
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=0B Threads=2
+Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
 Per-Host Resource Estimates: Memory=16MB
 PLAN-ROOT SINK
 |
@@ -879,7 +879,7 @@ where
 order by
   value desc
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=13.69MB Threads=7
+Max Per-Host Resource Reservation: Memory=14.00MB Threads=7
 Per-Host Resource Estimates: Memory=42MB
 PLAN-ROOT SINK
 |
@@ -1122,7 +1122,7 @@ where
 order by
   s_suppkey
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=16.88MB Threads=4
+Max Per-Host Resource Reservation: Memory=17.00MB Threads=4
 Per-Host Resource Estimates: Memory=43MB
 PLAN-ROOT SINK
 |
@@ -1197,7 +1197,7 @@ order by
   p_type,
   p_size
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=15.88MB Threads=4
+Max Per-Host Resource Reservation: Memory=17.00MB Threads=4
 Per-Host Resource Estimates: Memory=23MB
 PLAN-ROOT SINK
 |
@@ -1412,7 +1412,7 @@ where
     )
   )
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=2.94MB Threads=3
+Max Per-Host Resource Reservation: Memory=5.00MB Threads=3
 Per-Host Resource Estimates: Memory=22MB
 PLAN-ROOT SINK
 |
@@ -1676,7 +1676,7 @@ group by
 order by
   cntrycode
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=13.94MB Threads=4
+Max Per-Host Resource Reservation: Memory=16.00MB Threads=4
 Per-Host Resource Estimates: Memory=41MB
 PLAN-ROOT SINK
 |

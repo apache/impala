@@ -28,7 +28,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=262.88MB mem-reservation=40.94MB thread-reservation=5 runtime-filters-memory=3.00MB
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, i_current_price
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 08:TOP-N [LIMIT=100]
 |  order by: i_item_id ASC
@@ -117,13 +117,13 @@ PLAN-ROOT SINK
    tuple-ids=3 row-size=8B cardinality=1.44M
    in pipelines: 03(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=64.81MB Threads=11
-Per-Host Resource Estimates: Memory=307MB
+Max Per-Host Resource Reservation: Memory=68.81MB Threads=11
+Per-Host Resource Estimates: Memory=311MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=48.19KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, i_current_price
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 15:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_item_id ASC
@@ -262,13 +262,13 @@ Per-Host Resources: mem-estimate=68.64MB mem-reservation=21.94MB thread-reservat
    tuple-ids=3 row-size=8B cardinality=1.44M
    in pipelines: 03(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=70.69MB Threads=10
-Per-Host Resource Estimates: Memory=169MB
+Max Per-Host Resource Reservation: Memory=74.69MB Threads=10
+Per-Host Resource Estimates: Memory=173MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=48.19KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: i_item_id, i_item_desc, i_current_price
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 15:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: i_item_id ASC

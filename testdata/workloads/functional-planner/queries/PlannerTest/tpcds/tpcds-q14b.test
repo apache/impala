@@ -135,7 +135,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=1.85GB mem-reservation=99.88MB thread-reservation=33 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: channel, i_brand_id, i_class_id, i_category_id, sales, number_sales, channel, i_brand_id, i_class_id, i_category_id, sales, number_sales
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 91:TOP-N [LIMIT=100]
 |  order by: channel ASC, i_brand_id ASC, i_class_id ASC, i_category_id ASC
@@ -966,13 +966,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=20B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=157.06MB Threads=86
+Max Per-Host Resource Reservation: Memory=161.06MB Threads=86
 Per-Host Resource Estimates: Memory=2.23GB
 F56:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: channel, i_brand_id, i_class_id, i_category_id, sales, number_sales, channel, i_brand_id, i_class_id, i_category_id, sales, number_sales
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 152:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: channel ASC, i_brand_id ASC, i_class_id ASC, i_category_id ASC
@@ -2224,13 +2224,13 @@ Per-Host Resources: mem-estimate=70.87MB mem-reservation=14.75MB thread-reservat
    tuple-ids=0 row-size=20B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=273.38MB Threads=103
+Max Per-Host Resource Reservation: Memory=277.38MB Threads=103
 Per-Host Resource Estimates: Memory=1.42GB
 F56:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: channel, i_brand_id, i_class_id, i_category_id, sales, number_sales, channel, i_brand_id, i_class_id, i_category_id, sales, number_sales
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 152:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: channel ASC, i_brand_id ASC, i_class_id ASC, i_category_id ASC

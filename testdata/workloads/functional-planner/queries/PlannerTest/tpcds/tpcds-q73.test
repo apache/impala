@@ -43,7 +43,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=265.81MB mem-reservation=17.56MB thread-reservation=6 runtime-filters-memory=4.00MB
 PLAN-ROOT SINK
 |  output exprs: c_last_name, c_first_name, c_salutation, c_preferred_cust_flag, ss_ticket_number, cnt
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 10:TOP-N [LIMIT=1000]
 |  order by: cnt DESC
@@ -150,13 +150,13 @@ PLAN-ROOT SINK
    tuple-ids=6 row-size=68B cardinality=100.00K
    in pipelines: 08(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=25.02MB Threads=13
-Per-Host Resource Estimates: Memory=300MB
+Max Per-Host Resource Reservation: Memory=29.02MB Threads=13
+Per-Host Resource Estimates: Memory=304MB
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=272.81KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.27MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c_last_name, c_first_name, c_salutation, c_preferred_cust_flag, ss_ticket_number, cnt
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: cnt DESC
@@ -320,13 +320,13 @@ Per-Host Resources: mem-estimate=84.14MB mem-reservation=14.81MB thread-reservat
    tuple-ids=0 row-size=24B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=39.83MB Threads=16
-Per-Host Resource Estimates: Memory=179MB
+Max Per-Host Resource Reservation: Memory=43.83MB Threads=16
+Per-Host Resource Estimates: Memory=183MB
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=519.50KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.51MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c_last_name, c_first_name, c_salutation, c_preferred_cust_flag, ss_ticket_number, cnt
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: cnt DESC

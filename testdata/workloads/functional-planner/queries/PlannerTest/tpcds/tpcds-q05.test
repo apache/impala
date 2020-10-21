@@ -131,7 +131,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=297.88MB mem-reservation=31.38MB thread-reservation=5 runtime-filters-memory=8.00MB
 PLAN-ROOT SINK
 |  output exprs: CASE valid_tid(27,28,29) WHEN 27 THEN channel WHEN 28 THEN channel WHEN 29 THEN NULL END, CASE valid_tid(27,28,29) WHEN 27 THEN id WHEN 28 THEN NULL WHEN 29 THEN NULL END, aggif(valid_tid(27,28,29) IN (27, 28, 29), CASE valid_tid(27,28,29) WHEN 27 THEN sum(sales) WHEN 28 THEN sum(sales) WHEN 29 THEN sum(sales) END), aggif(valid_tid(27,28,29) IN (27, 28, 29), CASE valid_tid(27,28,29) WHEN 27 THEN sum(`returns`) WHEN 28 THEN sum(`returns`) WHEN 29 THEN sum(`returns`) END), aggif(valid_tid(27,28,29) IN (27, 28, 29), CASE valid_tid(27,28,29) WHEN 27 THEN sum(profit) WHEN 28 THEN sum(profit) WHEN 29 THEN sum(profit) END)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 29:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(27,28,29) WHEN 27 THEN channel WHEN 28 THEN channel WHEN 29 THEN NULL END ASC, CASE valid_tid(27,28,29) WHEN 27 THEN id WHEN 28 THEN NULL WHEN 29 THEN NULL END ASC
@@ -404,13 +404,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=16B cardinality=2.88M
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=77.53MB Threads=25
-Per-Host Resource Estimates: Memory=919MB
+Max Per-Host Resource Reservation: Memory=81.53MB Threads=25
+Per-Host Resource Estimates: Memory=923MB
 F22:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=24.61KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: CASE valid_tid(27,28,29) WHEN 27 THEN channel WHEN 28 THEN channel WHEN 29 THEN NULL END, CASE valid_tid(27,28,29) WHEN 27 THEN id WHEN 28 THEN NULL WHEN 29 THEN NULL END, aggif(valid_tid(27,28,29) IN (27, 28, 29), CASE valid_tid(27,28,29) WHEN 27 THEN sum(sales) WHEN 28 THEN sum(sales) WHEN 29 THEN sum(sales) END), aggif(valid_tid(27,28,29) IN (27, 28, 29), CASE valid_tid(27,28,29) WHEN 27 THEN sum(`returns`) WHEN 28 THEN sum(`returns`) WHEN 29 THEN sum(`returns`) END), aggif(valid_tid(27,28,29) IN (27, 28, 29), CASE valid_tid(27,28,29) WHEN 27 THEN sum(profit) WHEN 28 THEN sum(profit) WHEN 29 THEN sum(profit) END)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 46:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: CASE valid_tid(27,28,29) WHEN 27 THEN channel WHEN 28 THEN channel WHEN 29 THEN NULL END ASC, CASE valid_tid(27,28,29) WHEN 27 THEN id WHEN 28 THEN NULL WHEN 29 THEN NULL END ASC
@@ -811,13 +811,13 @@ Per-Host Resources: mem-estimate=112.10MB mem-reservation=11.88MB thread-reserva
    tuple-ids=0 row-size=16B cardinality=2.88M
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=116.84MB Threads=24
-Per-Host Resource Estimates: Memory=519MB
+Max Per-Host Resource Reservation: Memory=120.84MB Threads=24
+Per-Host Resource Estimates: Memory=523MB
 F22:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=46.88KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: CASE valid_tid(27,28,29) WHEN 27 THEN channel WHEN 28 THEN channel WHEN 29 THEN NULL END, CASE valid_tid(27,28,29) WHEN 27 THEN id WHEN 28 THEN NULL WHEN 29 THEN NULL END, aggif(valid_tid(27,28,29) IN (27, 28, 29), CASE valid_tid(27,28,29) WHEN 27 THEN sum(sales) WHEN 28 THEN sum(sales) WHEN 29 THEN sum(sales) END), aggif(valid_tid(27,28,29) IN (27, 28, 29), CASE valid_tid(27,28,29) WHEN 27 THEN sum(`returns`) WHEN 28 THEN sum(`returns`) WHEN 29 THEN sum(`returns`) END), aggif(valid_tid(27,28,29) IN (27, 28, 29), CASE valid_tid(27,28,29) WHEN 27 THEN sum(profit) WHEN 28 THEN sum(profit) WHEN 29 THEN sum(profit) END)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 46:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: CASE valid_tid(27,28,29) WHEN 27 THEN channel WHEN 28 THEN channel WHEN 29 THEN NULL END ASC, CASE valid_tid(27,28,29) WHEN 27 THEN id WHEN 28 THEN NULL WHEN 29 THEN NULL END ASC

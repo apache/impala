@@ -62,7 +62,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=296.94MB mem-reservation=33.69MB thread-reservation=4 runtime-filters-memory=6.00MB
 PLAN-ROOT SINK
 |  output exprs: channel, col_name, d_year, d_qoy, i_category, count(*), sum(ext_sales_price)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 17:TOP-N [LIMIT=100]
 |  order by: channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC
@@ -229,13 +229,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=20B cardinality=130.03K
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=45.69MB Threads=19
-Per-Host Resource Estimates: Memory=618MB
+Max Per-Host Resource Reservation: Memory=49.69MB Threads=19
+Per-Host Resource Estimates: Memory=622MB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=25.23KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: channel, col_name, d_year, d_qoy, i_category, count(*), sum(ext_sales_price)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 28:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC
@@ -480,13 +480,13 @@ Per-Host Resources: mem-estimate=67.20MB mem-reservation=17.88MB thread-reservat
    tuple-ids=0 row-size=20B cardinality=130.03K
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=68.19MB Threads=20
-Per-Host Resource Estimates: Memory=277MB
+Max Per-Host Resource Reservation: Memory=72.19MB Threads=20
+Per-Host Resource Estimates: Memory=281MB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=48.05KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: channel, col_name, d_year, d_qoy, i_category, count(*), sum(ext_sales_price)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 28:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC

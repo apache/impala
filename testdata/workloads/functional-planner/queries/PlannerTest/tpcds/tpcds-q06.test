@@ -31,7 +31,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=289.75MB mem-reservation=24.50MB thread-reservation=8 runtime-filters-memory=6.00MB
 PLAN-ROOT SINK
 |  output exprs: a.ca_state, count(*)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 16:TOP-N [LIMIT=100]
 |  order by: count(*) ASC
@@ -186,13 +186,13 @@ PLAN-ROOT SINK
    tuple-ids=2 row-size=16B cardinality=2.88M
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=35.81MB Threads=19
-Per-Host Resource Estimates: Memory=340MB
+Max Per-Host Resource Reservation: Memory=39.81MB Threads=19
+Per-Host Resource Estimates: Memory=344MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: a.ca_state, count(*)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(*) ASC
@@ -447,13 +447,13 @@ Per-Host Resources: mem-estimate=62.43MB mem-reservation=20.62MB thread-reservat
    tuple-ids=2 row-size=16B cardinality=2.88M
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=55.38MB Threads=20
-Per-Host Resource Estimates: Memory=246MB
+Max Per-Host Resource Reservation: Memory=59.38MB Threads=20
+Per-Host Resource Estimates: Memory=250MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: a.ca_state, count(*)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: count(*) ASC

@@ -4,16 +4,16 @@ select straight_join *
 from tpch_parquet.customer
     inner join tpch_parquet.nation on c_nationkey = n_nationkey
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=33.97MB Threads=5
-Per-Host Resource Estimates: Memory=68MB
+Max Per-Host Resource Reservation: Memory=49.97MB Threads=5
+Per-Host Resource Estimates: Memory=115MB
 Analyzed query: SELECT /* +straight_join */ * FROM tpch_parquet.customer INNER
 JOIN tpch_parquet.nation ON c_nationkey = n_nationkey
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.33MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=57.09MB mem-reservation=16.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: tpch_parquet.customer.c_custkey, tpch_parquet.customer.c_name, tpch_parquet.customer.c_address, tpch_parquet.customer.c_nationkey, tpch_parquet.customer.c_phone, tpch_parquet.customer.c_acctbal, tpch_parquet.customer.c_mktsegment, tpch_parquet.customer.c_comment, tpch_parquet.nation.n_nationkey, tpch_parquet.nation.n_name, tpch_parquet.nation.n_regionkey, tpch_parquet.nation.n_comment
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=46.77MB mem-reservation=16.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=10.33MB mem-reservation=0B thread-reservation=0
@@ -64,16 +64,16 @@ select straight_join *
 from tpch_parquet.lineitem
     left join tpch_parquet.orders on l_orderkey = o_orderkey
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=110.00MB Threads=5
-Per-Host Resource Estimates: Memory=410MB
+Max Per-Host Resource Reservation: Memory=126.00MB Threads=5
+Per-Host Resource Estimates: Memory=510MB
 Analyzed query: SELECT /* +straight_join */ * FROM tpch_parquet.lineitem LEFT
 OUTER JOIN tpch_parquet.orders ON l_orderkey = o_orderkey
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=11.20MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=111.20MB mem-reservation=16.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment, tpch_parquet.orders.o_orderkey, tpch_parquet.orders.o_custkey, tpch_parquet.orders.o_orderstatus, tpch_parquet.orders.o_totalprice, tpch_parquet.orders.o_orderdate, tpch_parquet.orders.o_orderpriority, tpch_parquet.orders.o_clerk, tpch_parquet.orders.o_shippriority, tpch_parquet.orders.o_comment
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00MB mem-reservation=16.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=11.20MB mem-reservation=0B thread-reservation=0
@@ -121,17 +121,17 @@ Per-Host Resources: mem-estimate=359.29MB mem-reservation=86.00MB thread-reserva
 select * from tpch_parquet.lineitem
 where l_orderkey not in (select o_orderkey from tpch_parquet.orders)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=78.00MB Threads=5
-Per-Host Resource Estimates: Memory=175MB
+Max Per-Host Resource Reservation: Memory=94.00MB Threads=5
+Per-Host Resource Estimates: Memory=275MB
 Analyzed query: SELECT * FROM tpch_parquet.lineitem NULL AWARE LEFT ANTI JOIN
 (SELECT o_orderkey FROM tpch_parquet.orders) `$a$1` (`$c$1`) ON l_orderkey =
 `$a$1`.`$c$1`
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.69MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=110.69MB mem-reservation=16.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00MB mem-reservation=16.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=10.69MB mem-reservation=0B thread-reservation=0
@@ -181,18 +181,18 @@ from tpch_parquet.lineitem
 group by 1, 2
 having count(*) = 1
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=110.00MB Threads=7
-Per-Host Resource Estimates: Memory=272MB
+Max Per-Host Resource Reservation: Memory=126.00MB Threads=7
+Per-Host Resource Estimates: Memory=372MB
 Analyzed query: SELECT /* +straight_join */ l_orderkey, o_orderstatus, count(*)
 FROM tpch_parquet.lineitem INNER JOIN tpch_parquet.orders ON o_orderkey =
 l_orderkey GROUP BY l_orderkey, o_orderstatus HAVING count(*) = CAST(1 AS
 BIGINT)
 
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.10MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=110.10MB mem-reservation=16.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: l_orderkey, o_orderstatus, count(*)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00MB mem-reservation=16.00MB spill-buffer=2.00MB thread-reservation=0
 |
 08:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=10.10MB mem-reservation=0B thread-reservation=0
@@ -271,15 +271,15 @@ Per-Host Resources: mem-estimate=81.00MB mem-reservation=5.00MB thread-reservati
 select distinct *
 from tpch_parquet.lineitem
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=120.00MB Threads=4
-Per-Host Resource Estimates: Memory=1.52GB
+Max Per-Host Resource Reservation: Memory=136.00MB Threads=4
+Per-Host Resource Estimates: Memory=1.62GB
 Analyzed query: SELECT DISTINCT * FROM tpch_parquet.lineitem
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.69MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=110.69MB mem-reservation=16.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: tpch_parquet.lineitem.l_orderkey, tpch_parquet.lineitem.l_partkey, tpch_parquet.lineitem.l_suppkey, tpch_parquet.lineitem.l_linenumber, tpch_parquet.lineitem.l_quantity, tpch_parquet.lineitem.l_extendedprice, tpch_parquet.lineitem.l_discount, tpch_parquet.lineitem.l_tax, tpch_parquet.lineitem.l_returnflag, tpch_parquet.lineitem.l_linestatus, tpch_parquet.lineitem.l_shipdate, tpch_parquet.lineitem.l_commitdate, tpch_parquet.lineitem.l_receiptdate, tpch_parquet.lineitem.l_shipinstruct, tpch_parquet.lineitem.l_shipmode, tpch_parquet.lineitem.l_comment
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00MB mem-reservation=16.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=10.69MB mem-reservation=0B thread-reservation=0
@@ -323,16 +323,16 @@ select l_orderkey, l_partkey, group_concat(l_linestatus, ",")
 from tpch_parquet.lineitem
 group by 1, 2
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=98.00MB Threads=4
-Per-Host Resource Estimates: Memory=276MB
+Max Per-Host Resource Reservation: Memory=114.00MB Threads=4
+Per-Host Resource Estimates: Memory=376MB
 Analyzed query: SELECT l_orderkey, l_partkey, group_concat(l_linestatus, ',')
 FROM tpch_parquet.lineitem GROUP BY l_orderkey, l_partkey
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.09MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=110.09MB mem-reservation=16.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: l_orderkey, l_partkey, group_concat(l_linestatus, ',')
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=100.00MB mem-reservation=16.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=10.09MB mem-reservation=0B thread-reservation=0
@@ -377,17 +377,17 @@ Per-Host Resources: mem-estimate=168.14MB mem-reservation=50.00MB thread-reserva
 select max(tinyint_col) over(partition by int_col)
 from functional.alltypes
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=40.03MB Threads=4
-Per-Host Resource Estimates: Memory=56MB
+Max Per-Host Resource Reservation: Memory=56.03MB Threads=4
+Per-Host Resource Estimates: Memory=72MB
 Codegen disabled by planner
 Analyzed query: SELECT max(tinyint_col) OVER (PARTITION BY int_col) FROM
 functional.alltypes
 
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=56.26KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=16.05MB mem-reservation=16.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: max(tinyint_col)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=16.00MB mem-reservation=16.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=56.26KB mem-reservation=0B thread-reservation=0

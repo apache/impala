@@ -63,7 +63,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=554.44MB mem-reservation=91.02MB thread-reservation=11 runtime-filters-memory=8.00MB
 PLAN-ROOT SINK
 |  output exprs: SEGMENT, count(*), CAST(SEGMENT AS BIGINT) * CAST(50 AS BIGINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 28:TOP-N [LIMIT=100]
 |  order by: SEGMENT ASC, count(*) ASC
@@ -319,13 +319,13 @@ PLAN-ROOT SINK
    tuple-ids=9 row-size=12B cardinality=2.88M
    in pipelines: 10(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=93.95MB Threads=30
-Per-Host Resource Estimates: Memory=688MB
+Max Per-Host Resource Reservation: Memory=97.95MB Threads=30
+Per-Host Resource Estimates: Memory=692MB
 F21:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: SEGMENT, count(*), CAST(SEGMENT AS BIGINT) * CAST(50 AS BIGINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 52:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: SEGMENT ASC, count(*) ASC
@@ -750,13 +750,13 @@ Per-Host Resources: mem-estimate=34.00MB mem-reservation=3.00MB thread-reservati
    tuple-ids=9 row-size=12B cardinality=2.88M
    in pipelines: 10(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=123.27MB Threads=36
-Per-Host Resource Estimates: Memory=463MB
+Max Per-Host Resource Reservation: Memory=127.27MB Threads=36
+Per-Host Resource Estimates: Memory=467MB
 F21:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: SEGMENT, count(*), CAST(SEGMENT AS BIGINT) * CAST(50 AS BIGINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 52:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: SEGMENT ASC, count(*) ASC
