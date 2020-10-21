@@ -41,6 +41,9 @@ class PartialSortPlanNode : public PlanNode {
 
   /// Config used to create a TupleRowComparator instance.
   TupleRowComparatorConfig* row_comparator_config_ = nullptr;
+
+  /// Codegened version of Sort::TupleSorter::SortHelper().
+  CodegenFnPtr<Sorter::SortHelperFn> codegend_sort_helper_fn_;
 };
 
 /// Node that implements a partial sort, where its input is divided up into runs, each

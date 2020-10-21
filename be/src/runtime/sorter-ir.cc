@@ -25,7 +25,7 @@
 
 namespace  impala {
 
-void Sorter::TupleIterator::NextPage(Sorter::Run* run) {
+void IR_ALWAYS_INLINE Sorter::TupleIterator::NextPage(Sorter::Run* run) {
   // When moving after the last tuple, stay at the last page.
   if (index_ >= run->num_tuples()) return;
   ++page_index_;
@@ -36,7 +36,7 @@ void Sorter::TupleIterator::NextPage(Sorter::Run* run) {
   tuple_ = run->fixed_len_pages_[page_index_].data();
 }
 
-void Sorter::TupleIterator::PrevPage(Sorter::Run* run) {
+void IR_ALWAYS_INLINE Sorter::TupleIterator::PrevPage(Sorter::Run* run) {
   // When moving before the first tuple, stay at the first page.
   if (index_ < 0) return;
   --page_index_;
@@ -48,24 +48,25 @@ void Sorter::TupleIterator::PrevPage(Sorter::Run* run) {
   tuple_ = run->fixed_len_pages_[page_index_].data() + last_tuple_page_offset;
 }
 
-// IMPALA-9956: Function is not inlined into Partition() without inline hint.
-inline void Sorter::TupleIterator::Next(Sorter::Run* run, int tuple_size) {
+// IMPALA-3816: Function is not inlined into Partition() without IR_ALWAYS_INLINE hint.
+void IR_ALWAYS_INLINE Sorter::TupleIterator::Next(Sorter::Run* run, int tuple_size) {
   DCHECK_LT(index_, run->num_tuples()) << "Can only advance one past end of run";
   tuple_ += tuple_size;
   ++index_;
   if (UNLIKELY(index_ >= buffer_end_index_)) NextPage(run);
 }
 
-// IMPALA-9956: Function is not inlined into Partition() without inline hint.
-inline void Sorter::TupleIterator::Prev(Sorter::Run* run, int tuple_size) {
+// IMPALA-3816: Function is not inlined into Partition() without IR_ALWAYS_INLINE hint.
+void IR_ALWAYS_INLINE Sorter::TupleIterator::Prev(Sorter::Run* run, int tuple_size) {
   DCHECK_GE(index_, 0) << "Can only advance one before start of run";
   tuple_ -= tuple_size;
   --index_;
   if (UNLIKELY(index_ < buffer_start_index_)) PrevPage(run);
 }
 
-// IMPALA-9956: Function is not inlined into Partition() without inline hint.
-inline bool Sorter::TupleSorter::Less(const TupleRow* lhs, const TupleRow* rhs) {
+// IMPALA-3816: Function is not inlined into Partition() without IR_ALWAYS_INLINE hint.
+bool IR_ALWAYS_INLINE Sorter::TupleSorter::Less(
+    const TupleRow* lhs, const TupleRow* rhs) {
   --num_comparisons_till_free_;
   DCHECK_GE(num_comparisons_till_free_, 0);
   if (UNLIKELY(num_comparisons_till_free_ == 0)) {
@@ -75,7 +76,7 @@ inline bool Sorter::TupleSorter::Less(const TupleRow* lhs, const TupleRow* rhs) 
   return comparator_.Less(lhs, rhs);
 }
 
-Status Sorter::TupleSorter::Partition(TupleIterator begin,
+Status IR_ALWAYS_INLINE Sorter::TupleSorter::Partition(TupleIterator begin,
     TupleIterator end, const Tuple* pivot, TupleIterator* cut) {
   // Hoist member variable lookups out of loop to avoid extra loads inside loop.
   Run* run = run_;
@@ -119,7 +120,7 @@ Status Sorter::TupleSorter::Partition(TupleIterator begin,
 // the sorted sequence by comparing it to each element of the sorted sequence
 // (reverse order) to find its correct place in the sorted sequence, copying tuples
 // along the way.
-Status Sorter::TupleSorter::InsertionSort(const TupleIterator& begin,
+Status IR_ALWAYS_INLINE Sorter::TupleSorter::InsertionSort(const TupleIterator& begin,
     const TupleIterator& end) {
   DCHECK_LT(begin.index(), end.index());
 
@@ -185,7 +186,8 @@ Status Sorter::TupleSorter::SortHelper(TupleIterator begin, TupleIterator end) {
   return Status::OK();
 }
 
-Tuple* Sorter::TupleSorter::SelectPivot(TupleIterator begin, TupleIterator end) {
+Tuple* IR_ALWAYS_INLINE Sorter::TupleSorter::SelectPivot(
+    TupleIterator begin, TupleIterator end) {
   // Select the median of three random tuples. The random selection avoids pathological
   // behaviour associated with techniques that pick a fixed element (e.g. picking
   // first/last/middle element) and taking the median tends to help us select better
@@ -209,7 +211,8 @@ Tuple* Sorter::TupleSorter::SelectPivot(TupleIterator begin, TupleIterator end) 
   return MedianOfThree(tuples[0], tuples[1], tuples[2]);
 }
 
-Tuple* Sorter::TupleSorter::MedianOfThree(Tuple* t1, Tuple* t2, Tuple* t3) {
+Tuple* IR_ALWAYS_INLINE Sorter::TupleSorter::MedianOfThree(
+    Tuple* t1, Tuple* t2, Tuple* t3) {
   TupleRow* tr1 = reinterpret_cast<TupleRow*>(&t1);
   TupleRow* tr2 = reinterpret_cast<TupleRow*>(&t2);
   TupleRow* tr3 = reinterpret_cast<TupleRow*>(&t3);
@@ -245,12 +248,11 @@ Tuple* Sorter::TupleSorter::MedianOfThree(Tuple* t1, Tuple* t2, Tuple* t3) {
   }
 }
 
-// IMPALA-9956: Function is not inlined into Partition() without inline hint.
-inline void Sorter::TupleSorter::Swap(Tuple* RESTRICT left, Tuple* RESTRICT right,
-    Tuple* RESTRICT swap_tuple, int tuple_size) {
+// IMPALA-3816: Function is not inlined into Partition() without IR_ALWAYS_INLINE hint.
+void IR_ALWAYS_INLINE Sorter::TupleSorter::Swap(Tuple* RESTRICT left,
+    Tuple* RESTRICT right, Tuple* RESTRICT swap_tuple, int tuple_size) {
   memcpy(swap_tuple, left, tuple_size);
   memcpy(left, right, tuple_size);
   memcpy(right, swap_tuple, tuple_size);
 }
-
 }

@@ -92,12 +92,19 @@ class RowBatch;
 /// tuples in place.
 class Sorter {
  public:
+
+  class TupleSorter;
+  class TupleIterator;
+  typedef Status (*SortHelperFn)(TupleSorter*, TupleIterator, TupleIterator);
+
   /// 'sort_tuple_exprs' are the slot exprs used to materialize the tuples to be
   /// sorted.
   /// 'tuple_row_comparator_config' is used to create the comparator for the sort tuples.
   /// 'node_label' is the label of the exec node using the sorter for error reporting.
   /// 'enable_spilling' should be set to false to reduce the number of requested buffers
   /// if the caller will use AddBatchNoSpill().
+  /// 'codegend_sort_helper_fn' is a reference to the codegen version of
+  /// the Sorter::TupleSorter::SortHelp() method.
   /// 'estimated_input_size' is the total rows in bytes that are estimated to get added
   /// into this sorter. This is used to decide if sorter needs to proactively spill for
   /// the first run. -1 value means estimate is unavailable.
@@ -110,7 +117,9 @@ class Sorter {
       const std::vector<ScalarExpr*>& sort_tuple_exprs, RowDescriptor* output_row_desc,
       MemTracker* mem_tracker, BufferPool::ClientHandle* client, int64_t page_len,
       RuntimeProfile* profile, RuntimeState* state, const std::string& node_label,
-      bool enable_spilling, int64_t estimated_input_size = -1);
+      bool enable_spilling,
+      const CodegenFnPtr<SortHelperFn>& codegend_sort_helper_fn,
+      int64_t estimated_input_size = -1);
   ~Sorter();
 
   /// Initial set-up of the sorter for execution.
@@ -157,8 +166,6 @@ class Sorter {
  private:
   class Page;
   class Run;
-  class TupleIterator;
-  class TupleSorter;
 
   /// Minimum value for sot_run_bytes_limit query option.
   static const int64_t MIN_SORT_RUN_BYTES_LIMIT = 32 << 20; // 32 MB
@@ -246,6 +253,10 @@ class Sorter {
   /// In memory sorter and less-than comparator.
   boost::scoped_ptr<TupleRowComparator> compare_less_than_;
   boost::scoped_ptr<TupleSorter> in_mem_tuple_sorter_;
+
+  /// A reference to the codegened version of TupleSorter::SortHelper() that is stored
+  /// inside SortPlanNode and PartialSortPlanNode.
+  const CodegenFnPtr<SortHelperFn>& codegend_sort_helper_fn_;
 
   /// Client used to allocate pages from the buffer pool. Not owned.
   BufferPool::ClientHandle* const buffer_pool_client_;
