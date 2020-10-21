@@ -109,7 +109,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=456.88MB mem-reservation=37.31MB thread-reservation=4 runtime-filters-memory=3.00MB
 PLAN-ROOT SINK
 |  output exprs: channel, item, return_ratio, return_rank, currency_rank
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 35:TOP-N [LIMIT=100]
 |  order by: channel ASC, return_rank ASC, currency_rank ASC, item ASC
@@ -432,7 +432,7 @@ F15:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=24.61MB mem-reservation=15.94MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: channel, item, return_ratio, return_rank, currency_rank
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 35:TOP-N [LIMIT=100]
 |  order by: channel ASC, return_rank ASC, currency_rank ASC, item ASC
@@ -863,7 +863,7 @@ F15:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=24.84MB mem-reservation=15.94MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: channel, item, return_ratio, return_rank, currency_rank
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 35:TOP-N [LIMIT=100]
 |  order by: channel ASC, return_rank ASC, currency_rank ASC, item ASC

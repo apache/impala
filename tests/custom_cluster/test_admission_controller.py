@@ -220,7 +220,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     confs_set = set([x.lower() for x in confs])
     assert expected_set.issubset(confs_set)
 
-  def __check_hs2_query_opts(self, pool_name, mem_limit=None, expected_options=None):
+  def __check_hs2_query_opts(self, pool_name, mem_limit=None, spool_query_results=None,
+      expected_options=None):
     """ Submits a query via HS2 (optionally with a mem_limit in the confOverlay)
         into pool_name and checks that the expected_query_options are set in the
         profile."""
@@ -228,6 +229,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     execute_statement_req.sessionHandle = self.session_handle
     execute_statement_req.confOverlay = {'request_pool': pool_name}
     if mem_limit is not None: execute_statement_req.confOverlay['mem_limit'] = mem_limit
+    if spool_query_results is not None:
+      execute_statement_req.confOverlay['spool_query_results'] = spool_query_results
     execute_statement_req.statement = "select 1"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
@@ -336,6 +339,10 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
           [queueA_mem_limit, 'QUERY_TIMEOUT_S=5', 'REQUEST_POOL=root.queueA'])
       client.close_query(handle)
 
+      # IMPALA-9856: We disable query result spooling so that this test can run queries
+      # with low mem_limit.
+      client.execute("set spool_query_results=0")
+
       # Should be able to set query options via the set command (overriding defaults if
       # applicable). mem_limit overrides the pool default. abort_on_error has no
       # proc/pool default.
@@ -375,13 +382,13 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     batch_size = "BATCH_SIZE=100"
 
     # Check HS2 query in queueA gets the correct query options for the pool.
-    self.__check_hs2_query_opts("root.queueA", None,
+    self.__check_hs2_query_opts("root.queueA", None, 'false',
         [queueA_mem_limit, 'QUERY_TIMEOUT_S=5', 'REQUEST_POOL=root.queueA', batch_size])
     # Check overriding the mem limit sent in the confOverlay with the query.
-    self.__check_hs2_query_opts("root.queueA", '12345',
+    self.__check_hs2_query_opts("root.queueA", '12345', 'false',
         ['MEM_LIMIT=12345', 'QUERY_TIMEOUT_S=5', 'REQUEST_POOL=root.queueA', batch_size])
     # Check HS2 query in queueB gets the process-wide default query options
-    self.__check_hs2_query_opts("root.queueB", None,
+    self.__check_hs2_query_opts("root.queueB", None, 'false',
         ['MEM_LIMIT=200000000', 'REQUEST_POOL=root.queueB', batch_size])
 
   @pytest.mark.execute_serially
@@ -870,8 +877,10 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
         "available in pool default-pool with max mem resources 10.00 MB. Needed 9.00 MB" \
         " but only 1.00 MB was available."
     NUM_QUERIES = 5
+    # IMPALA-9856: Disable query result spooling so that we can run queries with low
+    # mem_limit.
     profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
-        TIMEOUT_S, {'mem_limit': '9mb'})
+        TIMEOUT_S, {'mem_limit': '9mb', 'spool_query_results': '0'})
 
     num_reasons = len([profile for profile in profiles if EXPECTED_REASON in profile])
     assert num_reasons == NUM_QUERIES - 1, \
@@ -908,8 +917,10 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     STMT = "select sleep(100)"
     TIMEOUT_S = 20
     NUM_QUERIES = 5
+    # IMPALA-9856: Disable query result spooling so that we can run queries with low
+    # mem_limit.
     profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
-        TIMEOUT_S, {'mem_limit': '2mb'}, True)
+        TIMEOUT_S, {'mem_limit': '2mb', 'spool_query_results': '0'}, True)
 
     EXPECTED_REASON = """.*Admission for query exceeded timeout 1000ms in pool """\
              """default-pool.*"""\
@@ -938,8 +949,10 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     STMT = "select sleep(100)"
     TIMEOUT_S = 20
     NUM_QUERIES = 5
+    # IMPALA-9856: Disable query result spooling so that we can run queries with low
+    # mem_limit.
     profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
-        TIMEOUT_S, {'mem_limit': '2mb'}, True)
+        TIMEOUT_S, {'mem_limit': '2mb', 'spool_query_results': '0'}, True)
 
     EXPECTED_REASON = """.*Admission for query exceeded timeout 1000ms in pool """\
             """default-pool.*"""\
@@ -1077,6 +1090,11 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
   def test_pool_config_change_while_queued(self, vector):
     """Tests that the invalid checks work even if the query is queued. Makes sure that a
     queued query is dequeued and rejected if the config is invalid."""
+    # IMPALA-9856: This test modify request pool max-query-mem-limit. Therefore, we
+    # disable query result spooling so that min reservation of queries being run stay low
+    # by not involving BufferedPlanRootSink.
+    self.client.set_configuration_option('spool_query_results', 'false')
+
     pool_name = "invalidTestPool"
     config_str = "max-query-mem-limit"
     self.client.set_configuration_option('request_pool', pool_name)

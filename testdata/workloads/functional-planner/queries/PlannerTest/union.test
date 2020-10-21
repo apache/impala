@@ -4119,10 +4119,10 @@ select int_col from functional.alltypes
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=33.50KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: f2
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=33.50KB mem-reservation=0B thread-reservation=0
@@ -4168,10 +4168,10 @@ select f2 from functional.emptytable
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=33.50KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: int_col
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=33.50KB mem-reservation=0B thread-reservation=0
@@ -4218,10 +4218,10 @@ FROM base_10k b1;
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=8.00MB mem-reservation=8.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: row_number()
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:ANALYTIC
 |  functions: row_number()
@@ -4244,10 +4244,10 @@ SELECT c1 FROM (SELECT 1 c1 UNION ALL SELECT 1 c1) a ORDER BY a.c1;
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=6.00MB mem-reservation=6.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=10.00MB mem-reservation=10.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c1
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:SORT
 |  order by: c1 ASC
@@ -4268,10 +4268,10 @@ SELECT c1 FROM (SELECT 1 c1 FROM functional.alltypestiny UNION ALL SELECT 1 c1 F
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: c1
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: c1 ASC
@@ -4321,10 +4321,10 @@ SELECT 1 FROM (SELECT int_col FROM functional.alltypestiny UNION ALL SELECT int_
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: CAST(1 AS TINYINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC
@@ -4375,10 +4375,10 @@ SELECT 1 FROM (SELECT 1 c1 FROM functional.alltypestiny UNION ALL SELECT 1 c1 FR
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: CAST(1 AS TINYINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: c1 ASC
@@ -4428,10 +4428,10 @@ SELECT 1 FROM (SELECT int_col c1 FROM functional.alltypestiny UNION ALL SELECT i
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: CAST(1 AS TINYINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -4479,10 +4479,10 @@ select month from (
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: month
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -4530,10 +4530,10 @@ select month from (
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F03:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: month
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
@@ -4579,10 +4579,10 @@ select year, month from (
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=38.32KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.04MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: `year`, CAST(1 AS TINYINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=38.32KB mem-reservation=0B thread-reservation=0
@@ -4610,10 +4610,10 @@ select year, month from (
 explain_level=2
 ---- DISTRIBUTEDPLAN
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=38.32KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.04MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: `year`, CAST(1 AS TINYINT)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=38.32KB mem-reservation=0B thread-reservation=0

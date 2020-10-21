@@ -126,7 +126,7 @@ row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 # Merge aggregation requires 17 buffers and preaggregation requires 16 buffers
 # plus 1mb of hash tables. The buffer size is 256k for this test. The scan needs 24MB.
 set max_row_size=256k;
-set buffer_pool_limit="33.25M";
+set buffer_pool_limit="33.75M";
 select count(*)
 from (select distinct * from orders) t
 ---- TYPES

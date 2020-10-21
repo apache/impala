@@ -31,7 +31,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=437.56MB mem-reservation=25.08MB thread-reservation=6 runtime-filters-memory=3.00MB
 PLAN-ROOT SINK
 |  output exprs: w_state, i_item_id, sum(CASE WHEN (CAST(d_date AS DATE) < DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, 0) ELSE 0 END), sum(CASE WHEN (CAST(d_date AS DATE) >= DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, 0) ELSE 0 END)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 10:TOP-N [LIMIT=100]
 |  order by: w_state ASC, i_item_id ASC
@@ -135,13 +135,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=28B cardinality=1.44M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=30.02MB Threads=12
-Per-Host Resource Estimates: Memory=462MB
+Max Per-Host Resource Reservation: Memory=34.02MB Threads=12
+Per-Host Resource Estimates: Memory=466MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=25.26KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: w_state, i_item_id, sum(CASE WHEN (CAST(d_date AS DATE) < DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, 0) ELSE 0 END), sum(CASE WHEN (CAST(d_date AS DATE) >= DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, 0) ELSE 0 END)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: w_state ASC, i_item_id ASC
@@ -296,13 +296,13 @@ Per-Host Resources: mem-estimate=266.67MB mem-reservation=23.56MB thread-reserva
    tuple-ids=0 row-size=28B cardinality=1.44M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=43.58MB Threads=11
-Per-Host Resource Estimates: Memory=172MB
+Max Per-Host Resource Reservation: Memory=47.58MB Threads=11
+Per-Host Resource Estimates: Memory=176MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=25.26KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: w_state, i_item_id, sum(CASE WHEN (CAST(d_date AS DATE) < DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, 0) ELSE 0 END), sum(CASE WHEN (CAST(d_date AS DATE) >= DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, 0) ELSE 0 END)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: w_state ASC, i_item_id ASC

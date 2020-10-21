@@ -3,7 +3,7 @@
 # Test that we can spill with a buffer size larger than the default I/O size (8mb).
 # buffer_pool_limit is tuned for a 3-node HDFS minicluster.
 set default_spillable_buffer_size=16m;
-set buffer_pool_limit=120m;
+set buffer_pool_limit=152m;
 select l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
 from tpch_parquet.lineitem
 order by 1, 2, 3, 4, 5

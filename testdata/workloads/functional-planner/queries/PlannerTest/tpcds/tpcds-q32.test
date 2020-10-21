@@ -22,7 +22,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=391.88MB mem-reservation=28.75MB thread-reservation=6 runtime-filters-memory=4.00MB
 PLAN-ROOT SINK
 |  output exprs: sum(cs_ext_discount_amt)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 10:AGGREGATE [FINALIZE]
 |  output: sum(cs_ext_discount_amt)
@@ -132,13 +132,13 @@ PLAN-ROOT SINK
    tuple-ids=3 row-size=16B cardinality=1.44M
    in pipelines: 03(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=35.94MB Threads=13
-Per-Host Resource Estimates: Memory=438MB
+Max Per-Host Resource Reservation: Memory=39.94MB Threads=13
+Per-Host Resource Estimates: Memory=442MB
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=14.00MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: sum(cs_ext_discount_amt)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 19:AGGREGATE [FINALIZE]
 |  output: sum:merge(cs_ext_discount_amt)
@@ -309,13 +309,13 @@ Per-Host Resources: mem-estimate=158.15MB mem-reservation=13.94MB thread-reserva
    tuple-ids=3 row-size=16B cardinality=1.44M
    in pipelines: 03(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=41.81MB Threads=12
-Per-Host Resource Estimates: Memory=204MB
+Max Per-Host Resource Reservation: Memory=45.81MB Threads=12
+Per-Host Resource Estimates: Memory=208MB
 F07:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=14.00MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: sum(cs_ext_discount_amt)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 19:AGGREGATE [FINALIZE]
 |  output: sum:merge(cs_ext_discount_amt)

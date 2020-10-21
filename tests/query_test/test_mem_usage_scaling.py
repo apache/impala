@@ -355,9 +355,14 @@ class TestScanMemLimit(ImpalaTestSuite):
   def test_kudu_scan_mem_usage(self, vector):
     """Test that Kudu scans can stay within a low memory limit. Before IMPALA-7096 they
     were not aware of mem_limit and would start up too many scanner threads."""
+    new_vector = copy(vector)
     # .test file overrides disable_codegen.
-    del vector.get_value('exec_option')['disable_codegen']
-    self.run_test_case('QueryTest/kudu-scan-mem-usage', vector)
+    del new_vector.get_value('exec_option')['disable_codegen']
+    # IMPALA-9856: We disable query result spooling here because this test exercise low
+    # memory limit functionality. Enabling result spooling will require retuning mem_limit
+    # and other query options. Otherwise, the expected result will not be achieved.
+    new_vector.get_value('exec_option')['spool_query_results'] = '0'
+    self.run_test_case('QueryTest/kudu-scan-mem-usage', new_vector)
 
   def test_hdfs_scanner_thread_mem_scaling(self, vector):
     """Test that HDFS scans can stay within a low memory limit. Before IMPALA-7096 they

@@ -88,6 +88,7 @@ class TestInsertQueries(ImpalaTestSuite):
     table_name = unique_database + ".insert_largestring"
 
     self.client.set_configuration_option("mem_limit", "4gb")
+    self.client.set_configuration_option("max_row_size", "257mb")
     file_format = vector.get_value('table_format').file_format
     if file_format == "parquet":
       stored_as = file_format
@@ -114,6 +115,9 @@ class TestInsertQueries(ImpalaTestSuite):
 
     # IMPALA-7648: test that we gracefully fail when there is not enough memory
     # to fit the scanned string in memory.
+    # IMPALA-9856: Disable result spooling for this query since it is intended to test
+    # for OOM.
+    self.client.set_configuration_option("spool_query_results", "0")
     self.client.set_configuration_option("mem_limit", "50M")
     try:
       self.client.execute("select s from {0}".format(table_name))

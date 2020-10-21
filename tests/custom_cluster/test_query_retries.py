@@ -477,8 +477,12 @@ class TestQueryRetries(CustomClusterTestSuite):
     fetched. Run a query, fetch some rows from it, kill one of the impalads that is
     running the query, and the validate that another fetch request fails."""
     query = "select * from functional.alltypes where bool_col = sleep(500)"
-    handle = self.execute_query_async(query,
-        query_options={'retry_failed_queries': 'true', 'batch_size': '1'})
+    # IMPALA-9856: The retry behavior that is being exercised in this test only applies
+    # for query without result spooling enabled. Thus, we explicitly set
+    # spool_query_results as false.
+    query_options = {'retry_failed_queries': 'true', 'batch_size': '1',
+        'spool_query_results': 'false'}
+    handle = self.execute_query_async(query, query_options)
     self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
 
     self.client.fetch(query, handle, max_rows=1)
@@ -652,8 +656,12 @@ class TestQueryRetries(CustomClusterTestSuite):
     any rows. Sets batch_size to 1 so results will be available as soon as possible.
     The query state becomes FINISHED when results are available."""
     query = "select * from functional.alltypes where bool_col = sleep(50)"
-    handle = self.execute_query_async(query,
-        query_options={'retry_failed_queries': 'true', 'batch_size': '1'})
+    # IMPALA-9856: The retry behavior that is being exercised in this test only applies
+    # for query without result spooling enabled. Thus, we explicitly set
+    # spool_query_results as false.
+    query_options = {'retry_failed_queries': 'true', 'batch_size': '1',
+        'spool_query_results': 'false'}
+    handle = self.execute_query_async(query, query_options)
     self.wait_for_state(handle, self.client.QUERY_STATES['FINISHED'], 60)
 
     self.__kill_random_impalad()

@@ -64,7 +64,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=401.62MB mem-reservation=43.50MB thread-reservation=8 runtime-filters-memory=7.00MB
 PLAN-ROOT SINK
 |  output exprs: ca_state, cd_gender, cd_marital_status, cd_dep_count, count(*), min(cd_dep_count), max(cd_dep_count), avg(cd_dep_count), cd_dep_employed_count, count(*), min(cd_dep_employed_count), max(cd_dep_employed_count), avg(cd_dep_employed_count), cd_dep_college_count, count(*), min(cd_dep_college_count), max(cd_dep_college_count), avg(cd_dep_college_count)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 18:TOP-N [LIMIT=100]
 |  order by: ca_state ASC, cd_gender ASC, cd_marital_status ASC, cd_dep_count ASC, cd_dep_employed_count ASC, cd_dep_college_count ASC
@@ -243,13 +243,13 @@ PLAN-ROOT SINK
    tuple-ids=2 row-size=42B cardinality=1.92M
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=53.56MB Threads=19
-Per-Host Resource Estimates: Memory=492MB
+Max Per-Host Resource Reservation: Memory=57.56MB Threads=19
+Per-Host Resource Estimates: Memory=496MB
 F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=36.33KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.04MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: ca_state, cd_gender, cd_marital_status, cd_dep_count, count(*), min(cd_dep_count), max(cd_dep_count), avg(cd_dep_count), cd_dep_employed_count, count(*), min(cd_dep_employed_count), max(cd_dep_employed_count), avg(cd_dep_employed_count), cd_dep_college_count, count(*), min(cd_dep_college_count), max(cd_dep_college_count), avg(cd_dep_college_count)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 29:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: ca_state ASC, cd_gender ASC, cd_marital_status ASC, cd_dep_count ASC, cd_dep_employed_count ASC, cd_dep_college_count ASC
@@ -507,13 +507,13 @@ Per-Host Resources: mem-estimate=20.95MB mem-reservation=5.44MB thread-reservati
    tuple-ids=3 row-size=8B cardinality=2.88M
    in pipelines: 03(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=78.50MB Threads=23
-Per-Host Resource Estimates: Memory=291MB
+Max Per-Host Resource Reservation: Memory=82.50MB Threads=23
+Per-Host Resource Estimates: Memory=295MB
 F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=69.14KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.07MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: ca_state, cd_gender, cd_marital_status, cd_dep_count, count(*), min(cd_dep_count), max(cd_dep_count), avg(cd_dep_count), cd_dep_employed_count, count(*), min(cd_dep_employed_count), max(cd_dep_employed_count), avg(cd_dep_employed_count), cd_dep_college_count, count(*), min(cd_dep_college_count), max(cd_dep_college_count), avg(cd_dep_college_count)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 29:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: ca_state ASC, cd_gender ASC, cd_marital_status ASC, cd_dep_count ASC, cd_dep_employed_count ASC, cd_dep_college_count ASC

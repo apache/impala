@@ -114,6 +114,9 @@ class TestScratchDir(CustomClusterTestSuite):
         "Running without spill to disk: no scratch directories provided\.")
     exec_option = vector.get_value('exec_option')
     exec_option['buffer_pool_limit'] = self.buffer_pool_limit
+    # IMPALA-9856: Disable query result spooling so that in_mem_query does not spill to
+    # disk.
+    exec_option['spool_query_results'] = '0'
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     # Expect spill to disk to fail
@@ -135,6 +138,9 @@ class TestScratchDir(CustomClusterTestSuite):
             + ".*: cannot use it for scratch\. Error was: .*", expected_count=5)
     exec_option = vector.get_value('exec_option')
     exec_option['buffer_pool_limit'] = self.buffer_pool_limit
+    # IMPALA-9856: Disable query result spooling so that in_mem_query does not spill to
+    # disk.
+    exec_option['spool_query_results'] = '0'
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     # Expect spill to disk to fail
@@ -158,6 +164,9 @@ class TestScratchDir(CustomClusterTestSuite):
         expected_count=5)
     exec_option = vector.get_value('exec_option')
     exec_option['buffer_pool_limit'] = self.buffer_pool_limit
+    # IMPALA-9856: Disable query result spooling so that in_mem_query does not spill to
+    # disk.
+    exec_option['spool_query_results'] = '0'
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     # Expect spill to disk to fail

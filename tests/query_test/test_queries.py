@@ -262,7 +262,11 @@ class TestQueriesParquetTables(ImpalaTestSuite):
   def test_very_large_strings(self, vector):
     """Regression test for IMPALA-1619. Doesn't need to be run on all file formats.
        Executes serially to avoid large random spikes in mem usage."""
-    self.run_test_case('QueryTest/large_strings', vector)
+    # IMPALA-9856: Disable query result spooling so that we don't need to deal with extra
+    # memory reservation required by BufferedPlanRootSink.
+    new_vector = deepcopy(vector)
+    new_vector.get_value('exec_option')['spool_query_results'] = "0"
+    self.run_test_case('QueryTest/large_strings', new_vector)
 
   def test_single_node_large_sorts(self, vector):
     if self.exploration_strategy() != 'exhaustive':

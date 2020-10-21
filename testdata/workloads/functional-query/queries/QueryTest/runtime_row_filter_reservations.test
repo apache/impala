@@ -23,13 +23,13 @@ SET RUNTIME_FILTER_MAX_SIZE=500MB;
 # Disable the estimation of cardinality for an hdfs table withot stats.
 SET DISABLE_HDFS_NUM_ROWS_ESTIMATE=1;
 # Query would have been admitted if memory for runtime filters was not accounted for.
-SET BUFFER_POOL_LIMIT=290MB;
+SET BUFFER_POOL_LIMIT=294MB;
 select STRAIGHT_JOIN * from alltypes a join [SHUFFLE] alltypes b
     on a.month = b.id and b.int_col = -3
 ---- RESULTS
 ---- CATCH
 row_regex:.*minimum memory reservation on backend '.*' is greater than memory available to
- the query for buffer reservations\. Increase the buffer_pool_limit to 290.17 MB\. See
+ the query for buffer reservations\. Increase the buffer_pool_limit to 294.17 MB\. See
  the query profile for more information about the per-node memory requirements\.
 ====
 ---- QUERY

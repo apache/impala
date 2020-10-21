@@ -10,8 +10,8 @@ set num_scanner_threads=2;
 select * from (select * from functional_parquet.alltypes limit 10) A,
  (select * from functional_parquet.alltypes limit 10) B;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=64MB.*
-row_regex: .*Cluster Memory Admitted: 64.00 MB.*
+row_regex: .*Per-Host Resource Estimates: Memory=68MB.*
+row_regex: .*Cluster Memory Admitted: 68.00 MB.*
 ====
 ---- QUERY
 # No mem_limit set
@@ -19,8 +19,8 @@ row_regex: .*Cluster Memory Admitted: 64.00 MB.*
 set request_pool=poolLowMinLimit;
 select * from functional_parquet.alltypes limit 1;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=16MB.*
-row_regex: .*Cluster Memory Admitted: 32.09 MB.*
+row_regex: .*Per-Host Resource Estimates: Memory=20MB.*
+row_regex: .*Cluster Memory Admitted: 36.09 MB.*
 ====
 ---- QUERY
 # No mem_limit set
@@ -32,9 +32,9 @@ select * from functional_parquet.alltypes limit 1;
 ---- CATCH
 Rejected query from pool root.poolLowMaxLimit: minimum memory reservation is greater than
  memory available to the query for buffer reservations. Memory reservation needed given
- the current plan: 88.00 KB. Adjust either the mem_limit or the pool config
+ the current plan: 4.09 MB. Adjust either the mem_limit or the pool config
  (max-query-mem-limit, min-query-mem-limit) for the query to allow the query
- memory limit to be at least 32.09 MB. Note that changing the mem_limit may also change
+ memory limit to be at least 36.09 MB. Note that changing the mem_limit may also change
  the plan. See the query profile for more information about the per-node memory
  requirements.
 ====
@@ -85,16 +85,16 @@ row_regex: .*Cluster Memory Admitted: 200.00 MB.*
 ====
 ---- QUERY
 # mem_limit is set
-# No lower bound enforced based on largest min_reservation (32.09 MB for this query)
+# No lower bound enforced based on largest min_reservation (36.09 MB for this query)
 set request_pool=poolLowMinLimit;
 set mem_limit=27mb;
 select * from functional_parquet.alltypes limit 1;
 ---- CATCH
 Rejected query from pool root.poolLowMinLimit: minimum memory reservation is greater than
  memory available to the query for buffer reservations. Memory reservation needed given
- the current plan: 88.00 KB. Adjust either the mem_limit or the pool config
+ the current plan: 4.09 MB. Adjust either the mem_limit or the pool config
  (max-query-mem-limit, min-query-mem-limit) for the query to allow the query
- memory limit to be at least 32.09 MB. Note that changing the mem_limit may also change
+ memory limit to be at least 36.09 MB. Note that changing the mem_limit may also change
  the plan. See the query profile for more information about the per-node memory
  requirements.
 ====

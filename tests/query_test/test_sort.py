@@ -100,12 +100,14 @@ class TestQueryFullSort(ImpalaTestSuite):
     exec_option['default_spillable_buffer_size'] = '8M'
 
     # Minimum memory for different parts of the plan.
+    buffered_plan_root_sink_reservation_mb = 16
     sort_reservation_mb = 48
     if table_format.file_format == 'parquet':
       scan_reservation_mb = 24
     else:
       scan_reservation_mb = 8
-    total_reservation_mb = sort_reservation_mb + scan_reservation_mb
+    total_reservation_mb = sort_reservation_mb + scan_reservation_mb \
+                           + buffered_plan_root_sink_reservation_mb
 
     # The below memory value assume 8M pages.
     # Test with unlimited and minimum memory for all file formats.

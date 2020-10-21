@@ -59,7 +59,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=332.87MB mem-reservation=106.00MB thread-reservation=5 runtime-filters-memory=2.00MB
 PLAN-ROOT SINK
 |  output exprs: item_sk, d_date, web_sales, store_sales, web_cumulative, store_cumulative
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 16:TOP-N [LIMIT=100]
 |  order by: item_sk ASC, d_date ASC
@@ -208,13 +208,13 @@ PLAN-ROOT SINK
    tuple-ids=5 row-size=16B cardinality=2.88M
    in pipelines: 06(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=215.88MB Threads=13
-Per-Host Resource Estimates: Memory=543MB
+Max Per-Host Resource Reservation: Memory=219.88MB Threads=13
+Per-Host Resource Estimates: Memory=547MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=21.29KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: item_sk, d_date, web_sales, store_sales, web_cumulative, store_cumulative
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 26:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: item_sk ASC, d_date ASC
@@ -435,13 +435,13 @@ Per-Host Resources: mem-estimate=104.68MB mem-reservation=37.94MB thread-reserva
    tuple-ids=5 row-size=16B cardinality=2.88M
    in pipelines: 06(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=306.75MB Threads=16
-Per-Host Resource Estimates: Memory=458MB
+Max Per-Host Resource Reservation: Memory=310.75MB Threads=16
+Per-Host Resource Estimates: Memory=462MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=21.29KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: item_sk, d_date, web_sales, store_sales, web_cumulative, store_cumulative
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 26:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: item_sk ASC, d_date ASC

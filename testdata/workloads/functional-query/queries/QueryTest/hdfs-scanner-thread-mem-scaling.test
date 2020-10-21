@@ -20,7 +20,7 @@ aggregation(SUM, NumScannerThreadsStarted): 1
 ---- QUERY
 # IMPALA-7076: check that the Parquet scanner also limits memory consumption.
 set num_nodes=1;
-set mem_limit=50m;
+set mem_limit=52m;
 select l_orderkey, l_shipmode from tpch_parquet.lineitem
 where l_comment = 'telets. quickly ';
 ---- TYPES

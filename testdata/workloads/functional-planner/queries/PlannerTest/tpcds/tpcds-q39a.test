@@ -64,7 +64,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=832.27MB mem-reservation=131.81MB thread-reservation=9 runtime-filters-memory=8.00MB
 PLAN-ROOT SINK
 |  output exprs: w_warehouse_sk, i_item_sk, d_moy, mean, cov, w_warehouse_sk, i_item_sk, d_moy, mean, cov
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=26.33MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 17:SORT
 |  order by: w_warehouse_sk ASC, i_item_sk ASC, d_moy ASC, mean ASC, cov ASC, d_moy ASC, mean ASC, cov ASC
@@ -234,13 +234,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=20B cardinality=11.74M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=182.16MB Threads=20
-Per-Host Resource Estimates: Memory=1.02GB
+Max Per-Host Resource Reservation: Memory=186.16MB Threads=20
+Per-Host Resource Estimates: Memory=1.04GB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=13.30MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=39.63MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: w_warehouse_sk, i_item_sk, d_moy, mean, cov, w_warehouse_sk, i_item_sk, d_moy, mean, cov
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=26.33MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: w_warehouse_sk ASC, i_item_sk ASC, d_moy ASC, mean ASC, cov ASC, d_moy ASC, mean ASC, cov ASC
@@ -502,13 +502,13 @@ Per-Host Resources: mem-estimate=372.37MB mem-reservation=60.81MB thread-reserva
    tuple-ids=0 row-size=20B cardinality=11.74M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=199.78MB Threads=19
-Per-Host Resource Estimates: Memory=781MB
+Max Per-Host Resource Reservation: Memory=203.78MB Threads=19
+Per-Host Resource Estimates: Memory=807MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=13.30MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=39.63MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: w_warehouse_sk, i_item_sk, d_moy, mean, cov, w_warehouse_sk, i_item_sk, d_moy, mean, cov
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=26.33MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 30:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: w_warehouse_sk ASC, i_item_sk ASC, d_moy ASC, mean ASC, cov ASC, d_moy ASC, mean ASC, cov ASC

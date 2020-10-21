@@ -85,7 +85,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=366.62MB mem-reservation=28.88MB thread-reservation=7 runtime-filters-memory=5.00MB
 PLAN-ROOT SINK
 |  output exprs: d_week_seq1, round(sun_sales1 / sun_sales2, CAST(2 AS TINYINT)), round(mon_sales1 / mon_sales2, CAST(2 AS TINYINT)), round(tue_sales1 / tue_sales2, CAST(2 AS TINYINT)), round(wed_sales1 / wed_sales2, CAST(2 AS TINYINT)), round(thu_sales1 / thu_sales2, CAST(2 AS TINYINT)), round(fri_sales1 / fri_sales2, CAST(2 AS TINYINT)), round(sat_sales1 / sat_sales2, CAST(2 AS TINYINT))
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 17:SORT
 |  order by: d_week_seq1 ASC
@@ -252,13 +252,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=8B cardinality=719.38K
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=45.94MB Threads=15
-Per-Host Resource Estimates: Memory=424MB
+Max Per-Host Resource Reservation: Memory=49.94MB Threads=15
+Per-Host Resource Estimates: Memory=428MB
 F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=886.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.87MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: d_week_seq1, round(sun_sales1 / sun_sales2, CAST(2 AS TINYINT)), round(mon_sales1 / mon_sales2, CAST(2 AS TINYINT)), round(tue_sales1 / tue_sales2, CAST(2 AS TINYINT)), round(wed_sales1 / wed_sales2, CAST(2 AS TINYINT)), round(thu_sales1 / thu_sales2, CAST(2 AS TINYINT)), round(fri_sales1 / fri_sales2, CAST(2 AS TINYINT)), round(sat_sales1 / sat_sales2, CAST(2 AS TINYINT))
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 27:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: d_week_seq1 ASC
@@ -496,13 +496,13 @@ Per-Host Resources: mem-estimate=111.80MB mem-reservation=10.88MB thread-reserva
    tuple-ids=0 row-size=8B cardinality=719.38K
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=53.69MB Threads=14
-Per-Host Resource Estimates: Memory=240MB
+Max Per-Host Resource Reservation: Memory=57.69MB Threads=14
+Per-Host Resource Estimates: Memory=244MB
 F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=886.00KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.87MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: d_week_seq1, round(sun_sales1 / sun_sales2, CAST(2 AS TINYINT)), round(mon_sales1 / mon_sales2, CAST(2 AS TINYINT)), round(tue_sales1 / tue_sales2, CAST(2 AS TINYINT)), round(wed_sales1 / wed_sales2, CAST(2 AS TINYINT)), round(thu_sales1 / thu_sales2, CAST(2 AS TINYINT)), round(fri_sales1 / fri_sales2, CAST(2 AS TINYINT)), round(sat_sales1 / sat_sales2, CAST(2 AS TINYINT))
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 27:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: d_week_seq1 ASC

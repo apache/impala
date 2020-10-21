@@ -57,7 +57,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=444.00MB mem-reservation=23.62MB thread-reservation=7
 PLAN-ROOT SINK
 |  output exprs: avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 22:NESTED LOOP JOIN [CROSS JOIN]
 |  limit: 100
@@ -247,13 +247,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=16B cardinality=288.04K
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=35.62MB Threads=24
-Per-Host Resource Estimates: Memory=624MB
+Max Per-Host Resource Reservation: Memory=39.62MB Threads=24
+Per-Host Resource Estimates: Memory=628MB
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.09MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=14.08MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 22:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
 |  limit: 100
@@ -640,13 +640,13 @@ Per-Host Resources: mem-estimate=74.00MB mem-reservation=4.00MB thread-reservati
    tuple-ids=0 row-size=16B cardinality=288.04K
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=71.25MB Threads=35
-Per-Host Resource Estimates: Memory=612MB
+Max Per-Host Resource Reservation: Memory=75.25MB Threads=35
+Per-Host Resource Estimates: Memory=616MB
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=14.00MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 22:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
 |  join table id: 00

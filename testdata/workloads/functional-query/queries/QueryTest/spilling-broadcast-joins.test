@@ -40,7 +40,7 @@ row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ---- QUERY
 # Spilling broadcast join that will repartition.
 # Force a bushy plan where join of customer and orders feeds into the broadcast join.
-set buffer_pool_limit=58m;
+set buffer_pool_limit=59m;
 select straight_join o_orderkey, o_custkey, o_orderstatus, o_totalprice, o_orderdate,
     o_orderpriority, o_clerk, o_shippriority, c_name, c_nationkey, c_address, c_comment
 from lineitem join /*+broadcast*/

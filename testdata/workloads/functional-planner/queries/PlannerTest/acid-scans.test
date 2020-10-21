@@ -266,7 +266,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=228.88MB mem-reservation=6.98MB thread-reservation=5 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: dd.id, dd.bool_col, dd.tinyint_col, dd.smallint_col, dd.int_col, dd.bigint_col, dd.float_col, dd.double_col, dd.date_string_col, dd.string_col, dd.timestamp_col, dd.year, dd.month
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 07:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: id = max(id)
@@ -343,7 +343,7 @@ F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=424.01KB mem-reservation=0B thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: dd.id, dd.bool_col, dd.tinyint_col, dd.smallint_col, dd.int_col, dd.bigint_col, dd.float_col, dd.double_col, dd.date_string_col, dd.string_col, dd.timestamp_col, dd.year, dd.month
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 13:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=424.01KB mem-reservation=0B thread-reservation=0
@@ -470,7 +470,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=212.88MB mem-reservation=6.89MB thread-reservation=5 runtime-filters-memory=1.00MB
   PLAN-ROOT SINK
   |  output exprs: t1.id, t2.`month`
-  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
   |
   06:HASH JOIN [INNER JOIN]
   |  hash predicates: t1.id % 12 = t2.`month`
@@ -545,7 +545,7 @@ F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 Per-Host Resources: mem-estimate=271.21KB mem-reservation=0B thread-reservation=1
   PLAN-ROOT SINK
   |  output exprs: t1.id, t2.`month`
-  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
+  |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
   |
   11:EXCHANGE [UNPARTITIONED]
      mem-estimate=271.21KB mem-reservation=0B thread-reservation=0

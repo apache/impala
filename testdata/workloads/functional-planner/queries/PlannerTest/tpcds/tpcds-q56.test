@@ -80,7 +80,7 @@ F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=361.81MB mem-reservation=28.44MB thread-reservation=6 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: i_item_id, sum(total_sales)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 32:TOP-N [LIMIT=100]
 |  order by: sum(total_sales) ASC, i_item_id ASC
@@ -398,13 +398,13 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=20B cardinality=2.88M
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=71.62MB Threads=36
-Per-Host Resource Estimates: Memory=901MB
+Max Per-Host Resource Reservation: Memory=75.62MB Threads=36
+Per-Host Resource Estimates: Memory=905MB
 F23:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.00KB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: i_item_id, sum(total_sales)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 56:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(total_sales) ASC, i_item_id ASC
@@ -892,13 +892,13 @@ Per-Host Resources: mem-estimate=54.97MB mem-reservation=8.88MB thread-reservati
    tuple-ids=0 row-size=20B cardinality=2.88M
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=107.88MB Threads=38
-Per-Host Resource Estimates: Memory=474MB
+Max Per-Host Resource Reservation: Memory=111.88MB Threads=38
+Per-Host Resource Estimates: Memory=478MB
 F23:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=29.56KB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: i_item_id, sum(total_sales)
-|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 56:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum(total_sales) ASC, i_item_id ASC
