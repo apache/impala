@@ -387,11 +387,9 @@ INT, INT, INT, INT
 ====
 ---- QUERY
 # Correlated aggregate subquery
-# Remove functional database qualification in the query below after IMPALA-10252 is
-# addressed.
 select id, int_col, year, month
-from functional.alltypessmall s
-where s.int_col = (select count(*) from functional.alltypestiny t where s.id = t.id)
+from alltypessmall s
+where s.int_col = (select count(*) from alltypestiny t where s.id = t.id)
 order by id
 ---- RESULTS
 1,1,2009,1

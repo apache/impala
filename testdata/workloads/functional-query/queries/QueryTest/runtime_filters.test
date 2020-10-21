@@ -386,3 +386,36 @@ where a.int_col = b.int_col and a.int_col = c.smallint_col * 2 and c.id < 100
 ---- RESULTS
 26645000
 ====
+---- QUERY
+####################################################
+# Test case 17: IMPALA-10252: non-null-preserving expressions in the WHERE clause
+# that are placed at an outer join must be handled correctly. These predicates are
+# eligible for runtime filters, but are not safe because the non-null-preserving
+# predicate - e.g. zeroifnull() - would require special handling to insert that
+# value - zeroifnull(NULL) in this case - into the runtime filter.
+# In this example, we use alltypestiny.id in the expression because it is non-nullable
+# on Kudu tables and allows us to test that special case.
+####################################################
+set RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set RUNTIME_FILTER_MODE=GLOBAL;
+SELECT s.id, s.int_col % 2, v.id, zeroifnull(v.id + 1)
+FROM alltypessmall s LEFT OUTER JOIN (
+    SELECT id, int_col
+    FROM alltypestiny t) v ON s.id = v.id
+WHERE s.int_col % 2 = zeroifnull(v.id + 1)
+ORDER BY s.id ASC
+LIMIT 10
+---- TYPES
+INT, INT, INT, BIGINT
+---- RESULTS
+8,0,NULL,0
+10,0,NULL,0
+12,0,NULL,0
+14,0,NULL,0
+16,0,NULL,0
+18,0,NULL,0
+20,0,NULL,0
+22,0,NULL,0
+24,0,NULL,0
+25,0,NULL,0
+====

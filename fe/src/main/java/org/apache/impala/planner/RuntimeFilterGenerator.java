@@ -35,6 +35,8 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.IsNullPredicate;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.Predicate;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
@@ -367,6 +369,35 @@ public final class RuntimeFilterGenerator {
       Map<TupleId, List<SlotId>> targetSlots = getTargetSlots(analyzer, targetExpr);
       Preconditions.checkNotNull(targetSlots);
       if (targetSlots.isEmpty()) return null;
+
+      if (filterSrcNode.getJoinOp().isLeftOuterJoin() ||
+              filterSrcNode.getJoinOp().isFullOuterJoin()) {
+        try {
+          LiteralExpr nullSlotVal = analyzer.evalWithNullSlots(srcExpr);
+          if (!(nullSlotVal instanceof NullLiteral)) {
+            // IMPALA-10252: if the source expression returns a non-NULL value for a NULL
+            // input then it is not safe to generate a runtime filter from a LEFT OUTER
+            // JOIN or FULL OUTER JOIN because the generated filter would be missing a
+            // possible non-NULL value of the expression.
+            // E.g. If the source expression is zeroifnull(y), column y has values
+            // [1, 2, 3], and y comes from the right input of a left outer join , then
+            // the generated runtime filter would only contain the values [1, 2, 3] but
+            // not the value zeroifnull(NULL) = 0 that would be present for an unmatched
+            // row. For now we avoid the problem by skipping this filter. In future we
+            // could generate valid runtime filters for these join types by adding
+            // backend support to calculate and insert the missing value.
+            if (LOG.isTraceEnabled()) {
+              LOG.trace("Skipping runtime filter because source expression returns " +
+                      "non-null after null substitution: " + srcExpr.toSql());
+            }
+            return null;
+          }
+        } catch (AnalysisException e) {
+          LOG.warn("Skipping runtime filter because analysis after null substitution " +
+              "failed: " + srcExpr.toSql(), e);
+          return null;
+        }
+      }
 
       if (LOG.isTraceEnabled()) {
         LOG.trace("Generating runtime filter from predicate " + joinPredicate);

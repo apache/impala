@@ -2301,6 +2301,25 @@ public class Analyzer {
    * returns false otherwise. Throws if backend expression evaluation fails.
    */
   public boolean isTrueWithNullSlots(Expr p) throws InternalException {
+    Expr nullTuplePred = substituteNullSlots(p);
+    return FeSupport.EvalPredicate(nullTuplePred, getQueryCtx());
+  }
+
+  /**
+   * Try to evaluate 'p' with all NULL slots into a literal.
+   * @return null if it could not be evaluated successfully, the literal otherwise.
+   * @throws AnalysisException
+   */
+  public LiteralExpr evalWithNullSlots(Expr p) throws AnalysisException {
+    Expr nullTuplePred = substituteNullSlots(p);
+    return LiteralExpr.createBounded(
+            nullTuplePred, getQueryCtx(), StringLiteral.MAX_STRING_LEN);
+  }
+
+  /**
+   * Replace all the SlotRefs in 'p' with null literals
+   */
+  private Expr substituteNullSlots(Expr p) {
     // Construct predicate with all SlotRefs substituted by NullLiterals.
     List<SlotRef> slotRefs = new ArrayList<>();
     p.collect(Predicates.instanceOf(SlotRef.class), slotRefs);
@@ -2313,8 +2332,7 @@ public class Analyzer {
         // function signature as in the original predicate.
         nullSmap.put(slotRef.clone(), NullLiteral.create(slotRef.getType()));
     }
-    Expr nullTuplePred = p.substitute(nullSmap, this, false);
-    return FeSupport.EvalPredicate(nullTuplePred, getQueryCtx());
+    return p.substitute(nullSmap, this, false);
   }
 
   public TupleId getTupleId(SlotId slotId) {

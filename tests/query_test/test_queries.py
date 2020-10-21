@@ -146,8 +146,6 @@ class TestQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/inline-view-limit', vector)
 
   def test_subquery(self, vector):
-    if vector.get_value('table_format').file_format == 'parquet':
-     pytest.xfail("IMPALA-10252: Query returns less number of rows.")
     if vector.get_value('table_format').file_format == 'hbase':
         pytest.xfail("Table alltypesagg is populated differently in database "
                 "functional and functional_hbase: there are nulls in column "
