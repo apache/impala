@@ -711,3 +711,41 @@ where l_partkey < 10
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+#IMPALA-10257: test when the 'top level row' ordinal differs in the column readers.
+# 'o_orderpriority' and the 'l_*' columns are both nested columns, but they are
+# nested at different levels and being read via different strategies.
+select l_shipmode, o_orderpriority, count(*)
+from tpch_nested_parquet.customer.c_orders o, o.o_lineitems l
+where l_receiptdate < '1992-01-10'
+group by l_shipmode, o_orderpriority
+---- RESULTS
+'AIR','1-URGENT',4
+'AIR','2-HIGH',3
+'AIR','3-MEDIUM',4
+'AIR','4-NOT SPECIFIED',2
+'AIR','5-LOW',1
+'FOB','1-URGENT',3
+'FOB','2-HIGH',1
+'FOB','3-MEDIUM',2
+'FOB','4-NOT SPECIFIED',3
+'FOB','5-LOW',2
+'MAIL','2-HIGH',3
+'MAIL','3-MEDIUM',3
+'MAIL','4-NOT SPECIFIED',3
+'MAIL','5-LOW',1
+'RAIL','2-HIGH',1
+'RAIL','3-MEDIUM',2
+'RAIL','4-NOT SPECIFIED',1
+'RAIL','5-LOW',1
+'REG AIR','2-HIGH',4
+'REG AIR','3-MEDIUM',2
+'REG AIR','5-LOW',2
+'SHIP','1-URGENT',4
+'SHIP','2-HIGH',2
+'SHIP','4-NOT SPECIFIED',2
+'TRUCK','3-MEDIUM',2
+'TRUCK','5-LOW',3
+---- TYPES
+STRING, STRING, BIGINT
+====

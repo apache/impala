@@ -1157,10 +1157,30 @@ Status HdfsParquetScanner::CheckPageFiltering() {
 
   int64_t current_row = scalar_readers_[0]->LastProcessedRow();
   for (int i = 1; i < scalar_readers_.size(); ++i) {
-    if (current_row != scalar_readers_[i]->LastProcessedRow()) {
-      DCHECK(false);
-      return Status(Substitute(
-          "Top level rows aren't in sync during page filtering in file $0.", filename()));
+    int64_t scalar_reader_row = scalar_readers_[i]->LastProcessedRow();
+    if (current_row != scalar_reader_row) {
+      // Column readers have two strategy to read a column:
+      // 1: Initialize the reader with NextLevels(), then in a loop call ReadValue() then
+      //    NextLevels(). NextLevels() increments 'current_row_' if the repetition level
+      //    is zero. Because we invoke NextLevels() last, 'current_row_' might correspond
+      //    to the row we are going to read next.
+      // 2: Use the ReadValueBatch() to read a batch of values. In that case we
+      //    simultaneously read the levels and values, so there is no readahead.
+      //    'current_row_' always corresponds to the row that we have completely read.
+      // Because in case 1 'current_row_' might correspond to the next row, or the row
+      // currently being read, we might have a difference of one here.
+      if (abs(current_row - scalar_reader_row ) > 1) {
+        return Status(Substitute(
+            "Top level rows aren't in sync during page filtering. "
+            "Current row of $0: $1. Current row of $2: $3. Encountered it when "
+            "processing file $4. For a workaround page filtering can be turned off by "
+            "setting query option 'parquet_read_page_index' to FALSE.",
+            scalar_readers_[0]->node_.element->name,
+            current_row,
+            scalar_readers_[i]->node_.element->name,
+            scalar_reader_row,
+            filename()));
+      }
     }
   }
   return Status::OK();
