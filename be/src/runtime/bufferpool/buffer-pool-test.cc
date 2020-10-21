@@ -19,6 +19,7 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -49,6 +50,7 @@
 
 #include "common/names.h"
 
+using boost::algorithm::join;
 using boost::filesystem::directory_iterator;
 using std::mt19937;
 using std::uniform_int_distribution;
@@ -362,6 +364,27 @@ class BufferPoolTest : public ::testing::Test {
   static string TmpFilePath(PageHandle* page) {
     return page->page_->write_handle->TmpFilePath();
   }
+
+  // Return a comma-separated string with the paths of the temporary file backing the
+  // pages.
+  static string TmpFilePaths(vector<PageHandle>& pages) {
+    vector<string> paths;
+    for (PageHandle& page : pages) {
+      paths.push_back(TmpFilePath(&page));
+    }
+    return join(paths, ",");
+  }
+
+  // Return a string with the name of the directory and a comma-separated list of scratch
+  // files under the specified scratch directory.
+  string DumpScratchDir(const string& tmp_dir_path) {
+    string scratch_dir_path = tmp_dir_path + SCRATCH_SUFFIX;
+    vector<string> entries;
+    EXPECT_OK(
+        FileSystemUtil::Directory::GetEntryNames(scratch_dir_path, &entries));
+    return "Directory " + scratch_dir_path + ": " + join(entries, ",");
+  }
+
   // Check that the file backing the page has dir as a prefix of its path.
   static bool PageInDir(PageHandle* page, const string& dir) {
     return TmpFilePath(page).find(dir) == 0;
@@ -1712,7 +1735,8 @@ void BufferPoolTest::TestWriteErrorBlacklist(
   const string& good_dir = tmp_dirs[1];
   // Delete one file from first scratch dir for first query to trigger an error.
   PageHandle* error_page = FindPageInDir(pages[ERROR_QUERY], error_dir);
-  ASSERT_TRUE(error_page != NULL) << "Expected a tmp file in dir " << error_dir;
+  ASSERT_TRUE(error_page != NULL)
+      << TmpFilePaths(pages[ERROR_QUERY]) << " not in " << DumpScratchDir(error_dir);
   const string& error_file_path = TmpFilePath(error_page);
   for (int i = 0; i < INITIAL_QUERIES; ++i) {
     ASSERT_OK(PinAll(&pool, &clients[i], &pages[i]));
@@ -1749,19 +1773,24 @@ void BufferPoolTest::TestWriteErrorBlacklist(
       &pool, &clients[ERROR_QUERY], TEST_BUFFER_LEN, MEM_PER_QUERY, &error_new_pages);
   UnpinAll(&pool, &clients[ERROR_QUERY], &error_new_pages);
   WaitForAllWrites(&clients[ERROR_QUERY]);
-  EXPECT_TRUE(FindPageInDir(error_new_pages, good_dir) != NULL);
-  EXPECT_TRUE(FindPageInDir(error_new_pages, error_dir) == NULL);
+  EXPECT_TRUE(FindPageInDir(error_new_pages, good_dir) != NULL)
+      << TmpFilePaths(error_new_pages) << " not in " << DumpScratchDir(good_dir);
+  EXPECT_TRUE(FindPageInDir(error_new_pages, error_dir) == NULL)
+      << TmpFilePaths(error_new_pages) << " in " << DumpScratchDir(error_dir);
   for (PageHandle& error_new_page : error_new_pages) {
     LOG(INFO) << "Newly created page backed by file " << TmpFilePath(&error_new_page);
-    EXPECT_TRUE(PageInDir(&error_new_page, good_dir));
+    EXPECT_TRUE(PageInDir(&error_new_page, good_dir))
+        << TmpFilePath(&error_new_page) << " not in " << DumpScratchDir(good_dir);
   }
   DestroyAll(&pool, &clients[ERROR_QUERY], &error_new_pages);
 
   ASSERT_OK(PinAll(&pool, &clients[NO_ERROR_QUERY], &pages[NO_ERROR_QUERY]));
   UnpinAll(&pool, &clients[NO_ERROR_QUERY], &pages[NO_ERROR_QUERY]);
   WaitForAllWrites(&clients[NO_ERROR_QUERY]);
-  EXPECT_TRUE(FindPageInDir(pages[NO_ERROR_QUERY], good_dir) != NULL);
-  EXPECT_TRUE(FindPageInDir(pages[NO_ERROR_QUERY], error_dir) != NULL);
+  EXPECT_TRUE(FindPageInDir(pages[NO_ERROR_QUERY], good_dir) != NULL)
+      << TmpFilePaths(pages[NO_ERROR_QUERY]) << " not in " << DumpScratchDir(good_dir);
+  EXPECT_TRUE(FindPageInDir(pages[NO_ERROR_QUERY], error_dir) != NULL)
+      << TmpFilePaths(pages[NO_ERROR_QUERY]) << " not in " << DumpScratchDir(error_dir);
 
   // The second client should use the bad directory for new pages since
   // blacklisting is per-query, not global.
@@ -1770,8 +1799,10 @@ void BufferPoolTest::TestWriteErrorBlacklist(
       &no_error_new_pages);
   UnpinAll(&pool, &clients[NO_ERROR_QUERY], &no_error_new_pages);
   WaitForAllWrites(&clients[NO_ERROR_QUERY]);
-  EXPECT_TRUE(FindPageInDir(no_error_new_pages, good_dir) != NULL);
-  EXPECT_TRUE(FindPageInDir(no_error_new_pages, error_dir) != NULL);
+  EXPECT_TRUE(FindPageInDir(no_error_new_pages, good_dir) != NULL)
+      << TmpFilePaths(no_error_new_pages) << " not in " << DumpScratchDir(good_dir);
+  EXPECT_TRUE(FindPageInDir(no_error_new_pages, error_dir) != NULL)
+      << TmpFilePaths(no_error_new_pages) << " not in " << DumpScratchDir(error_dir);
   DestroyAll(&pool, &clients[NO_ERROR_QUERY], &no_error_new_pages);
 
   // A new query should use the both dirs for backing storage.
@@ -1783,8 +1814,10 @@ void BufferPoolTest::TestWriteErrorBlacklist(
       &pool, &clients[NEW_QUERY], TEST_BUFFER_LEN, MEM_PER_QUERY, &pages[NEW_QUERY]);
   UnpinAll(&pool, &clients[NEW_QUERY], &pages[NEW_QUERY]);
   WaitForAllWrites(&clients[NEW_QUERY]);
-  EXPECT_TRUE(FindPageInDir(pages[NEW_QUERY], good_dir) != NULL);
-  EXPECT_TRUE(FindPageInDir(pages[NEW_QUERY], error_dir) != NULL);
+  EXPECT_TRUE(FindPageInDir(pages[NEW_QUERY], good_dir) != NULL)
+      << TmpFilePaths(pages[NEW_QUERY]) << " not in " << DumpScratchDir(good_dir);
+  EXPECT_TRUE(FindPageInDir(pages[NEW_QUERY], error_dir) != NULL)
+      << TmpFilePaths(pages[NEW_QUERY]) << " not in " << DumpScratchDir(error_dir);
 
   for (int i = 0; i < TOTAL_QUERIES; ++i) {
     DestroyAll(&pool, &clients[i], &pages[i]);
