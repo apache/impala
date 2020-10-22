@@ -38,6 +38,30 @@ BigIntVal DataSketchesFunctions::DsHllEstimate(FunctionContext* ctx,
   return sketch.get_estimate();
 }
 
+StringVal DataSketchesFunctions::DsHllEstimateBoundsAsString(
+    FunctionContext* ctx, const StringVal& serialized_sketch) {
+  return DsHllEstimateBoundsAsString(ctx, serialized_sketch, DS_DEFAULT_KAPPA);
+}
+
+StringVal DataSketchesFunctions::DsHllEstimateBoundsAsString(
+    FunctionContext* ctx, const StringVal& serialized_sketch, const IntVal& kappa) {
+  if (serialized_sketch.is_null || serialized_sketch.len == 0 || kappa.is_null)
+    return StringVal::null();
+  if (UNLIKELY(kappa.val < 1 || kappa.val > 3)) {
+    ctx->SetError("Kappa must be 1, 2 or 3");
+    return StringVal::null();
+  }
+  datasketches::hll_sketch sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
+  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
+    LogSketchDeserializationError(ctx);
+    return StringVal::null();
+  }
+  std::stringstream buffer;
+  buffer << sketch.get_estimate() << "," << sketch.get_lower_bound(kappa.val) << ","
+         << sketch.get_upper_bound(kappa.val);
+  return StringStreamToStringVal(ctx, buffer);
+}
+
 StringVal DataSketchesFunctions::DsHllStringify(FunctionContext* ctx,
     const StringVal& serialized_sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return StringVal::null();

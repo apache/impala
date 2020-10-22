@@ -39,6 +39,9 @@ const datasketches::target_hll_type DS_HLL_TYPE = datasketches::target_hll_type:
 /// buckets equals 2^DS_SKETCH_CONFIG.
 const int DS_SKETCH_CONFIG = 12;
 
+/// 'kappa' is a number of standard deviations from the mean: 1, 2 or 3 (default 2).
+const int DS_DEFAULT_KAPPA = 2;
+
 /// Logs a common error message saying that sketch deserialization failed.
 void LogSketchDeserializationError(FunctionContext* ctx);
 
