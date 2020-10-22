@@ -23,13 +23,10 @@
 #include "runtime/bufferpool/reservation-util.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
-#include "runtime/runtime-state.h"
 #include "runtime/test-env.h"
 #include "scheduling/schedule-state.h"
-#include "service/fe-support.h"
 #include "service/impala-server.h"
 #include "testutil/gtest-util.h"
-#include "testutil/scoped-flag-setter.h"
 #include "util/metrics.h"
 #include <regex>
 
@@ -145,6 +142,7 @@ class AdmissionControllerTest : public testing::Test {
         // Add first element as the coordinator.
         backend_schedule_state.exec_params->set_is_coord_backend(true);
         backend_schedule_state.be_desc.set_is_executor(!is_dedicated_coord);
+        backend_schedule_state.be_desc.set_is_coordinator(is_dedicated_coord);
       }
     }
   }
@@ -332,18 +330,21 @@ TEST_F(AdmissionControllerTest, Simple) {
 
   // Check that the query can be admitted.
   string not_admitted_reason;
-  ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *schedule_state, config_c, true, &not_admitted_reason, nullptr));
+  bool coordinator_resource_limited = false;
+  ASSERT_TRUE(admission_controller->CanAdmitRequest(*schedule_state, config_c, true,
+      &not_admitted_reason, nullptr, coordinator_resource_limited));
+  ASSERT_FALSE(coordinator_resource_limited);
 
   // Create a ScheduleState just like 'schedule_state' to run on 3 hosts which can't be
   // admitted.
   ScheduleState* schedule_state_3_hosts =
       MakeScheduleState(QUEUE_C, config_c, 3, 64L * MEGABYTE);
-  ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *schedule_state_3_hosts, config_c, true, &not_admitted_reason, nullptr));
+  ASSERT_FALSE(admission_controller->CanAdmitRequest(*schedule_state_3_hosts, config_c,
+      true, &not_admitted_reason, nullptr, coordinator_resource_limited));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough aggregate memory available in pool root.queueC with max mem "
       "resources 128.00 MB. Needed 192.00 MB but only 128.00 MB was available.");
+  ASSERT_FALSE(coordinator_resource_limited);
 
   // Make a TopicDeltaMap describing some activity on host1 and host2.
   TTopicDelta membership = MakeTopicDelta(false);
@@ -370,10 +371,11 @@ TEST_F(AdmissionControllerTest, Simple) {
   ASSERT_EQ(11, pool_stats->agg_num_running_);
 
   // Test that the query cannot be admitted now.
-  ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *schedule_state, config_c, true, &not_admitted_reason, nullptr));
+  ASSERT_FALSE(admission_controller->CanAdmitRequest(*schedule_state, config_c, true,
+      &not_admitted_reason, nullptr, coordinator_resource_limited));
   EXPECT_STR_CONTAINS(
       not_admitted_reason, "number of running queries 11 is at or over limit 10.");
+  ASSERT_FALSE(coordinator_resource_limited);
 }
 
 /// Test CanAdmitRequest in the context of aggregated memory required to admit a query.
@@ -401,8 +403,10 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestMemory) {
 
   // Check that the query can be admitted.
   string not_admitted_reason;
-  ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *schedule_state, config_d, true, &not_admitted_reason, nullptr));
+  bool coordinator_resource_limited = false;
+  ASSERT_TRUE(admission_controller->CanAdmitRequest(*schedule_state, config_d, true,
+      &not_admitted_reason, nullptr, coordinator_resource_limited));
+  ASSERT_FALSE(coordinator_resource_limited);
 
   // Tests that this query cannot be admitted.
   // Increasing the number of hosts pushes the aggregate memory required to admit this
@@ -410,11 +414,12 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestMemory) {
   host_count = 15;
   ScheduleState* schedule_state15 =
       MakeScheduleState(QUEUE_D, config_d, host_count, 30L * MEGABYTE);
-  ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *schedule_state15, config_d, true, &not_admitted_reason, nullptr));
+  ASSERT_FALSE(admission_controller->CanAdmitRequest(*schedule_state15, config_d, true,
+      &not_admitted_reason, nullptr, coordinator_resource_limited));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough aggregate memory available in pool root.queueD with max mem resources "
       "400.00 MB. Needed 480.00 MB but only 400.00 MB was available.");
+  ASSERT_FALSE(coordinator_resource_limited);
 
   // Create a ScheduleState to run on QUEUE_D with per_host_mem_estimate of 50MB.
   // which is going to be too much memory.
@@ -422,11 +427,12 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestMemory) {
   ScheduleState* schedule_state_10_fail =
       MakeScheduleState(QUEUE_D, config_d, host_count, 50L * MEGABYTE);
 
-  ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *schedule_state_10_fail, config_d, true, &not_admitted_reason, nullptr));
+  ASSERT_FALSE(admission_controller->CanAdmitRequest(*schedule_state_10_fail, config_d,
+      true, &not_admitted_reason, nullptr, coordinator_resource_limited));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough aggregate memory available in pool root.queueD with max mem resources "
       "400.00 MB. Needed 500.00 MB but only 400.00 MB was available.");
+  ASSERT_FALSE(coordinator_resource_limited);
 }
 
 /// Test CanAdmitRequest in the context of max running queries allowed.
@@ -457,20 +463,24 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestCount) {
   pool_stats->local_stats_.num_queued = 2;
 
   // Query can be admitted from queue...
-  ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *schedule_state, config_d, true, &not_admitted_reason, nullptr));
+  bool coordinator_resource_limited = false;
+  ASSERT_TRUE(admission_controller->CanAdmitRequest(*schedule_state, config_d, true,
+      &not_admitted_reason, nullptr, coordinator_resource_limited));
+  ASSERT_FALSE(coordinator_resource_limited);
   // ... but same Query cannot be admitted directly.
-  ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *schedule_state, config_d, false, &not_admitted_reason, nullptr));
+  ASSERT_FALSE(admission_controller->CanAdmitRequest(*schedule_state, config_d, false,
+      &not_admitted_reason, nullptr, coordinator_resource_limited));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "queue is not empty (size 2); queued queries are executed first");
+  ASSERT_FALSE(coordinator_resource_limited);
 
   // Simulate that there are 7 queries already running.
   pool_stats->agg_num_running_ = 7;
-  ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *schedule_state, config_d, true, &not_admitted_reason, nullptr));
+  ASSERT_FALSE(admission_controller->CanAdmitRequest(*schedule_state, config_d, true,
+      &not_admitted_reason, nullptr, coordinator_resource_limited));
   EXPECT_STR_CONTAINS(
       not_admitted_reason, "number of running queries 7 is at or over limit 6");
+  ASSERT_FALSE(coordinator_resource_limited);
 }
 
 /// Test CanAdmitRequest() using the slots mechanism that is enabled with non-default
@@ -502,30 +512,35 @@ TEST_F(AdmissionControllerTest, CanAdmitRequestSlots) {
   }
   vector<NetworkAddressPB> host_addrs = GetHostAddrs(*default_group_schedule);
   string not_admitted_reason;
+  bool coordinator_resource_limited = false;
 
   // Simulate that there are just enough slots free for the query on all hosts.
   SetSlotsInUse(admission_controller, host_addrs, slots_per_host - slots_per_query);
 
   // Enough slots are available so it can be admitted in both cases.
-  ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *default_group_schedule, config_d, true, &not_admitted_reason, nullptr))
+  ASSERT_TRUE(admission_controller->CanAdmitRequest(*default_group_schedule, config_d,
+      true, &not_admitted_reason, nullptr, coordinator_resource_limited))
       << not_admitted_reason;
-  ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *other_group_schedule, config_d, true, &not_admitted_reason, nullptr))
+  ASSERT_FALSE(coordinator_resource_limited);
+  ASSERT_TRUE(admission_controller->CanAdmitRequest(*other_group_schedule, config_d, true,
+      &not_admitted_reason, nullptr, coordinator_resource_limited))
       << not_admitted_reason;
+  ASSERT_FALSE(coordinator_resource_limited);
 
   // Simulate that almost all the slots are in use, which prevents admission in the
   // non-default group.
   SetSlotsInUse(admission_controller, host_addrs, slots_per_host - 1);
 
-  ASSERT_TRUE(admission_controller->CanAdmitRequest(
-      *default_group_schedule, config_d, true, &not_admitted_reason, nullptr))
+  ASSERT_TRUE(admission_controller->CanAdmitRequest(*default_group_schedule, config_d,
+      true, &not_admitted_reason, nullptr, coordinator_resource_limited))
       << not_admitted_reason;
-  ASSERT_FALSE(admission_controller->CanAdmitRequest(
-      *other_group_schedule, config_d, true, &not_admitted_reason, nullptr));
+  ASSERT_FALSE(coordinator_resource_limited);
+  ASSERT_FALSE(admission_controller->CanAdmitRequest(*other_group_schedule, config_d,
+      true, &not_admitted_reason, nullptr, coordinator_resource_limited));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough admission control slots available on host host1:25000. Needed 4 "
       "slots but 15/16 are already in use.");
+  ASSERT_FALSE(coordinator_resource_limited);
 }
 
 /// Tests that query rejection works as expected by calling RejectForSchedule() and
@@ -855,8 +870,11 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
       schedule_state->GetOrCreateBackendScheduleState(coord_addr);
   coord_exec_params.exec_params->set_is_coord_backend(true);
   coord_exec_params.exec_params->set_thread_reservation(1);
+  coord_exec_params.exec_params->set_slots_to_use(2);
   coord_exec_params.be_desc.set_admit_mem_limit(512 * MEGABYTE);
+  coord_exec_params.be_desc.set_admission_slots(8);
   coord_exec_params.be_desc.set_is_executor(false);
+  coord_exec_params.be_desc.set_is_coordinator(true);
   // Add executor backend.
   const string exec_host_name = Substitute("host$0", 2);
   NetworkAddressPB exec_addr = MakeNetworkAddressPB(exec_host_name, 25000);
@@ -864,9 +882,12 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   BackendScheduleState& backend_schedule_state =
       schedule_state->GetOrCreateBackendScheduleState(exec_addr);
   backend_schedule_state.exec_params->set_thread_reservation(1);
+  backend_schedule_state.exec_params->set_slots_to_use(2);
   backend_schedule_state.be_desc.set_admit_mem_limit(GIGABYTE);
+  backend_schedule_state.be_desc.set_admission_slots(8);
   backend_schedule_state.be_desc.set_is_executor(true);
   string not_admitted_reason;
+  bool coordinator_resource_limited = false;
   // Test 1: coord's admit_mem_limit < executor's admit_mem_limit. Query should not
   // be rejected because query fits on both executor and coordinator. It should be
   // queued if there is not enough capacity.
@@ -874,30 +895,35 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
   ASSERT_FALSE(admission_controller->RejectForSchedule(
       *schedule_state, pool_config, &not_admitted_reason));
   ASSERT_TRUE(admission_controller->HasAvailableMemResources(
-      *schedule_state, pool_config, &not_admitted_reason));
+      *schedule_state, pool_config, &not_admitted_reason, coordinator_resource_limited));
+  ASSERT_FALSE(coordinator_resource_limited);
   // Coord does not have enough available memory.
   admission_controller->host_stats_[coord_host].mem_reserved = 500 * MEGABYTE;
   ASSERT_FALSE(admission_controller->HasAvailableMemResources(
-      *schedule_state, pool_config, &not_admitted_reason));
+      *schedule_state, pool_config, &not_admitted_reason, coordinator_resource_limited));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough memory available on host host1:25000. Needed 150.00 MB but only "
       "12.00 MB out of 512.00 MB was available.");
+  ASSERT_TRUE(coordinator_resource_limited);
+  coordinator_resource_limited = false;
   not_admitted_reason.clear();
   // Neither coordinator or executor has enough available memory.
   admission_controller->host_stats_[exec_host].mem_reserved = 500 * MEGABYTE;
   ASSERT_FALSE(admission_controller->HasAvailableMemResources(
-      *schedule_state, pool_config, &not_admitted_reason));
+      *schedule_state, pool_config, &not_admitted_reason, coordinator_resource_limited));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough memory available on host host2:25000. Needed 1.00 GB but only "
       "524.00 MB out of 1.00 GB was available.");
+  ASSERT_FALSE(coordinator_resource_limited);
   not_admitted_reason.clear();
   // Executor does not have enough available memory.
   admission_controller->host_stats_[coord_host].mem_reserved = 0;
   ASSERT_FALSE(admission_controller->HasAvailableMemResources(
-      *schedule_state, pool_config, &not_admitted_reason));
+      *schedule_state, pool_config, &not_admitted_reason, coordinator_resource_limited));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough memory available on host host2:25000. Needed 1.00 GB but only "
       "524.00 MB out of 1.00 GB was available.");
+  ASSERT_FALSE(coordinator_resource_limited);
   not_admitted_reason.clear();
   admission_controller->host_stats_[exec_host].mem_reserved = 0;
 
@@ -911,13 +937,41 @@ TEST_F(AdmissionControllerTest, DedicatedCoordAdmissionChecks) {
       "request memory needed 150.00 MB is greater than memory available for "
       "admission 100.00 MB of host1:25000");
   ASSERT_FALSE(admission_controller->HasAvailableMemResources(
-      *schedule_state, pool_config, &not_admitted_reason));
+      *schedule_state, pool_config, &not_admitted_reason, coordinator_resource_limited));
   EXPECT_STR_CONTAINS(not_admitted_reason,
       "Not enough memory available on host host1:25000. Needed 150.00 MB but only "
       "100.00 MB out of 100.00 MB was available.");
+  ASSERT_TRUE(coordinator_resource_limited);
+  coordinator_resource_limited = false;
   not_admitted_reason.clear();
 
-  // Test 3: Make sure that coord and executors have separate checks on for whether their
+  // Test 3: Check HasAvailableSlots by simulating slots being in use.
+  ASSERT_TRUE(admission_controller->HasAvailableSlots(
+      *schedule_state, pool_config, &not_admitted_reason, coordinator_resource_limited));
+  ASSERT_FALSE(coordinator_resource_limited);
+
+  // Set the number of slots in use on the coordinator high enough to prohibit further
+  // queries.
+  admission_controller->host_stats_["host1:25000"].slots_in_use = 7;
+  ASSERT_FALSE(admission_controller->HasAvailableSlots(
+      *schedule_state, pool_config, &not_admitted_reason, coordinator_resource_limited));
+  EXPECT_STR_CONTAINS(not_admitted_reason,
+      "Not enough admission control slots available "
+      "on host host1:25000. Needed 2 slots but 7/8 are already in use.");
+  ASSERT_TRUE(coordinator_resource_limited);
+  coordinator_resource_limited = false;
+
+  // Now instead set the executor to have too many slots in use
+  admission_controller->host_stats_["host2:25000"].slots_in_use = 7;
+  admission_controller->host_stats_["host1:25000"].slots_in_use = 0;
+  ASSERT_FALSE(admission_controller->HasAvailableSlots(
+      *schedule_state, pool_config, &not_admitted_reason, coordinator_resource_limited));
+  EXPECT_STR_CONTAINS(not_admitted_reason,
+                      "Not enough admission control slots available "
+                      "on host host2:25000. Needed 2 slots but 7/8 are already in use.");
+  ASSERT_FALSE(coordinator_resource_limited);
+
+  // Test 4: Make sure that coord and executors have separate checks on for whether their
   // mem limits can accommodate their respective initial reservations.
   schedule_state = MakeScheduleState(
       "default", 0, pool_config, 2, PER_EXEC_MEM_ESTIMATE, COORD_MEM_ESTIMATE, true);
@@ -1019,8 +1073,10 @@ TEST_F(AdmissionControllerTest, TopNQueryCheck) {
       schedule_state->UpdateMemoryRequirements(pool_config);
       // Admit the query to the pool.
       string not_admitted_reason;
-      ASSERT_TRUE(admission_controller->CanAdmitRequest(
-          *schedule_state, pool_config, true, &not_admitted_reason, nullptr));
+      bool coordinator_resource_limited = false;
+      ASSERT_TRUE(admission_controller->CanAdmitRequest(*schedule_state, pool_config,
+          true, &not_admitted_reason, nullptr, coordinator_resource_limited));
+      ASSERT_FALSE(coordinator_resource_limited);
       // Create a query memory tracker for the query and set the memory consumption
       // as per_host_mem_estimate.
       int64_t mem_consumed = per_host_mem_estimate;

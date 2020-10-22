@@ -960,6 +960,9 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     EXPECTED_REASON = "Latest admission queue reason: Not enough admission control " +\
                       "slots available on host"
     NUM_QUERIES = 5
+    coordinator_limited_metric = \
+      "admission-controller.total-dequeue-failed-coordinator-limited"
+    original_metric_value = self.get_metric(coordinator_limited_metric)
     profiles = self._execute_and_collect_profiles([STMT for i in xrange(NUM_QUERIES)],
         TIMEOUT_S, config_options={"mt_dop": 4})
 
@@ -983,6 +986,12 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     for impalad in self.cluster.impalads:
       verifier = MetricVerifier(impalad.service)
       verifier.wait_for_backend_admission_control_state()
+
+    # The number of admission control slots on the coordinator is limited
+    # so the failures to dequeue should trigger a bump in the coordinator_limited_metric.
+    later_metric_value = self.get_metric(coordinator_limited_metric)
+    assert later_metric_value > original_metric_value, \
+      "Metric %s did not change" % coordinator_limited_metric
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

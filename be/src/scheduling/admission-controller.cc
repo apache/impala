@@ -84,6 +84,9 @@ const char POOL_GROUP_DELIMITER = '-';
 const string EXEC_GROUP_QUERY_LOAD_KEY_FORMAT =
   "admission-controller.executor-group.num-queries-executing.$0";
 
+const string TOTAL_DEQUEUE_FAILED_COORDINATOR_LIMITED =
+  "admission-controller.total-dequeue-failed-coordinator-limited";
+
 // Define metric key format strings for metrics in PoolMetrics
 // '$0' is replaced with the pool name by strings::Substitute
 const string TOTAL_ADMITTED_METRIC_KEY_FORMAT =
@@ -615,6 +618,8 @@ AdmissionController::AdmissionController(ClusterMembershipMgr* cluster_membershi
       [this](ClusterMembershipMgr::SnapshotPtr snapshot) {
         this->UpdateExecGroupMetricMap(snapshot);
       });
+  total_dequeue_failed_coordinator_limited_ =
+      metrics_group_->AddCounter(TOTAL_DEQUEUE_FAILED_COORDINATOR_LIMITED, 0);
 }
 
 AdmissionController::~AdmissionController() {
@@ -803,7 +808,7 @@ bool AdmissionController::CanAccommodateMaxInitialReservation(const ScheduleStat
 
 bool AdmissionController::HasAvailableMemResources(const ScheduleState& state,
     const TPoolConfig& pool_cfg, string* mem_unavailable_reason,
-    string* not_admitted_details) {
+    bool& coordinator_resource_limited, string* not_admitted_details) {
   const string& pool_name = state.request_pool();
   const int64_t pool_max_mem = GetMaxMemForPool(pool_cfg);
   // If the pool doesn't have memory resources configured, always true.
@@ -861,6 +866,9 @@ bool AdmissionController::HasAvailableMemResources(const ScheduleState& state,
       if ( not_admitted_details ) {
         *not_admitted_details = GetLogStringForTopNQueriesOnHost(host_id);
       }
+      if (entry.second.be_desc.is_coordinator()) {
+        coordinator_resource_limited = true;
+      }
       return false;
     }
   }
@@ -874,8 +882,9 @@ bool AdmissionController::HasAvailableMemResources(const ScheduleState& state,
   return true;
 }
 
-bool AdmissionController::HasAvailableSlots(
-    const ScheduleState& state, const TPoolConfig& pool_cfg, string* unavailable_reason) {
+bool AdmissionController::HasAvailableSlots(const ScheduleState& state,
+    const TPoolConfig& pool_cfg, string* unavailable_reason,
+    bool& coordinator_resource_limited) {
   for (const auto& entry : state.per_backend_schedule_states()) {
     const NetworkAddressPB& host = entry.first;
     const string host_id = NetworkAddressPBToString(host);
@@ -888,6 +897,9 @@ bool AdmissionController::HasAvailableSlots(
     if (slots_in_use + entry.second.exec_params->slots_to_use() > admission_slots) {
       *unavailable_reason = Substitute(HOST_SLOT_NOT_AVAILABLE, host_id,
           entry.second.exec_params->slots_to_use(), slots_in_use, admission_slots);
+      if (entry.second.be_desc.is_coordinator()) {
+        coordinator_resource_limited = true;
+      }
       return false;
     }
   }
@@ -895,8 +907,8 @@ bool AdmissionController::HasAvailableSlots(
 }
 
 bool AdmissionController::CanAdmitRequest(const ScheduleState& state,
-    const TPoolConfig& pool_cfg, bool admit_from_queue,
-    string* not_admitted_reason, string* not_admitted_details) {
+    const TPoolConfig& pool_cfg, bool admit_from_queue, string* not_admitted_reason,
+    string* not_admitted_details, bool& coordinator_resource_limited) {
   // Can't admit if:
   //  (a) There are already queued requests (and this is not admitting from the queue).
   //  (b) The resource pool is already at the maximum number of requests.
@@ -920,14 +932,16 @@ bool AdmissionController::CanAdmitRequest(const ScheduleState& state,
         max_requests, GetStalenessDetailLocked(" "));
     return false;
   }
-  if (!default_group && !HasAvailableSlots(state, pool_cfg, not_admitted_reason)) {
+  if (!default_group
+      && !HasAvailableSlots(
+          state, pool_cfg, not_admitted_reason, coordinator_resource_limited)) {
     // All non-default executor groups are also limited by the number of running queries
     // per executor.
     // TODO(IMPALA-8757): Extend slot based admission to default executor group
     return false;
   }
-  if (!HasAvailableMemResources(
-          state, pool_cfg, not_admitted_reason, not_admitted_details)) {
+  if (!HasAvailableMemResources(state, pool_cfg, not_admitted_reason,
+          coordinator_resource_limited, not_admitted_details)) {
     return false;
   }
   return true;
@@ -1151,8 +1165,9 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
     PoolStats* stats = GetPoolStats(pool_name);
     stats->UpdateConfigMetrics(pool_cfg);
 
-    bool must_reject = !FindGroupToAdmitOrReject(
-        membership_snapshot, pool_cfg, /* admit_from_queue=*/false, stats, &queue_node);
+    bool unused_bool;
+    bool must_reject = !FindGroupToAdmitOrReject(membership_snapshot, pool_cfg,
+        /* admit_from_queue=*/false, stats, &queue_node, unused_bool);
     if (must_reject) {
       AdmissionOutcome outcome = admit_outcome->Set(AdmissionOutcome::REJECTED);
       if (outcome != AdmissionOutcome::REJECTED) {
@@ -1592,7 +1607,8 @@ Status AdmissionController::ComputeGroupScheduleStates(
 
 bool AdmissionController::FindGroupToAdmitOrReject(
     ClusterMembershipMgr::SnapshotPtr membership_snapshot, const TPoolConfig& pool_config,
-    bool admit_from_queue, PoolStats* pool_stats, QueueNode* queue_node) {
+    bool admit_from_queue, PoolStats* pool_stats, QueueNode* queue_node,
+    bool& coordinator_resource_limited) {
   // Check for rejection based on current cluster size
   const string& pool_name = pool_stats->name();
   string rejection_reason;
@@ -1645,7 +1661,8 @@ bool AdmissionController::FindGroupToAdmitOrReject(
     }
 
     if (CanAdmitRequest(*state, pool_config, admit_from_queue,
-            &queue_node->not_admitted_reason, &queue_node->not_admitted_details)) {
+            &queue_node->not_admitted_reason, &queue_node->not_admitted_details,
+            coordinator_resource_limited)) {
       queue_node->admitted_schedule = std::move(group_state.state);
       return true;
     } else {
@@ -1749,9 +1766,11 @@ void AdmissionController::DequeueLoop() {
         bool is_cancelled = queue_node->admit_outcome->IsSet()
             && queue_node->admit_outcome->Get() == AdmissionOutcome::CANCELLED;
 
+        bool coordinator_resource_limited = false;
         bool is_rejected = !is_cancelled
             && !FindGroupToAdmitOrReject(membership_snapshot, pool_config,
-                   /* admit_from_queue=*/true, stats, queue_node);
+                /* admit_from_queue=*/true, stats, queue_node,
+                coordinator_resource_limited);
 
         if (!is_cancelled && !is_rejected
             && queue_node->admitted_schedule.get() == nullptr) {
@@ -1759,6 +1778,12 @@ void AdmissionController::DequeueLoop() {
           // TODO(IMPALA-2968): Requests further in the queue may be blocked
           // unnecessarily. Consider a better policy once we have better test scenarios.
           LogDequeueFailed(queue_node, queue_node->not_admitted_reason);
+          if (coordinator_resource_limited) {
+            // Dequeue failed because of a resource issue that can't be solved by adding
+            // more executor groups. The common reason for this is that we are hitting a
+            // limit on the coordinator.
+            total_dequeue_failed_coordinator_limited_->Increment(1);
+          }
           break;
         }
 

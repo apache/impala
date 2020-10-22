@@ -2722,5 +2722,15 @@
     "units": "NONE",
     "kind": "COUNTER",
     "key": "impala.debug_action.fail"
+  },
+  {
+    "description": "The number of times queries cannot be dequeued because of a resource limit on the coordinator.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Query dequeue failed because of a coordinator resource limit",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "admission-controller.total-dequeue-failed-coordinator-limited"
   }
 ]
