@@ -32,7 +32,7 @@ class TestDebugActions(ImpalaTestSuite):
     self.__run_debug_action("refresh tpcds.store_sales",
       debug_action="catalogd_refresh_hdfs_listing_delay:SLEEP@50", delta=2000)
     self.__run_debug_action("refresh tpcds.store_sales",
-      debug_action="catalogd_refresh_hdfs_listing_delay:JITTER@50@0.5", delta=2000)
+      debug_action="catalogd_refresh_hdfs_listing_delay:JITTER@50@0.75", delta=1000)
     self.__run_debug_action(
       "alter table {0}.test recover partitions".format(unique_database),
       debug_action="catalogd_table_recover_delay:SLEEP@3000", delta=2000)
