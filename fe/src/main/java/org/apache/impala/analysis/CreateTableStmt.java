@@ -601,26 +601,63 @@ public class CreateTableStmt extends StatementBase {
       putGeneratedKuduProperty(IcebergTable.ICEBERG_FILE_FORMAT, "parquet");
     }
 
-    String catalog = getTblProperties().get(IcebergTable.ICEBERG_CATALOG);
-    if (catalog == null || catalog.isEmpty()) {
-      putGeneratedKuduProperty(IcebergTable.ICEBERG_CATALOG, "hadoop.catalog");
+    // Determine the Iceberg catalog being used. The default catalog is HiveCatalog.
+    String catalogStr = getTblProperties().get(IcebergTable.ICEBERG_CATALOG);
+    TIcebergCatalog catalog;
+    if (catalogStr == null || catalogStr.isEmpty()) {
+      catalog = TIcebergCatalog.HIVE_CATALOG;
+      putGeneratedKuduProperty(IcebergTable.ICEBERG_CATALOG, "hive.catalog");
+    } else {
+      catalog = IcebergUtil.getTIcebergCatalog(catalogStr);
     }
+    validateIcebergTableProperties(catalog);
+  }
 
-    // Some constraints for Iceberg table with 'hadoop.catalog'
-    if (catalog == null || catalog.isEmpty() ||
-        IcebergUtil.getTIcebergCatalog(catalog) == TIcebergCatalog.HADOOP_CATALOG) {
-      // Table location cannot be set in SQL when using 'hadoop.catalog'
-      if (getLocation() != null) {
-        throw new AnalysisException(String.format("Location cannot be set for Iceberg " +
-            "table with 'hadoop.catalog'."));
-      }
+  private void validateIcebergTableProperties(TIcebergCatalog catalog)
+      throws AnalysisException {
+    // Metadata location is only used by HiveCatalog, but we shouldn't allow setting this
+    // for any catalogs to avoid confusion.
+    if (getTblProperties().get(IcebergTable.METADATA_LOCATION) != null) {
+      throw new AnalysisException(String.format("%s cannot be set for Iceberg tables",
+          IcebergTable.METADATA_LOCATION));
+    }
+    switch(catalog) {
+      case HIVE_CATALOG: validateTableInHiveCatalog();
+      break;
+      case HADOOP_CATALOG: validateTableInHadoopCatalog();
+      break;
+      case HADOOP_TABLES: validateTableInHadoopTables();
+      break;
+      default: throw new AnalysisException(String.format(
+          "Unknown Iceberg catalog type: %s", catalog));
+    }
+  }
 
-      String catalogLoc = getTblProperties().get(IcebergTable.ICEBERG_CATALOG_LOCATION);
-      if (catalogLoc == null || catalogLoc.isEmpty()) {
-        throw new AnalysisException(String.format("Table property '%s' is necessary " +
-            "for Iceberg table with 'hadoop.catalog'.",
-            IcebergTable.ICEBERG_CATALOG_LOCATION));
-      }
+  private void validateTableInHiveCatalog() throws AnalysisException {
+    if (getTblProperties().get(IcebergTable.ICEBERG_CATALOG_LOCATION) != null) {
+      throw new AnalysisException(String.format("%s cannot be set for Iceberg table " +
+          "stored in hive.catalog", IcebergTable.ICEBERG_CATALOG_LOCATION));
+    }
+  }
+
+  private void validateTableInHadoopCatalog() throws AnalysisException {
+    // Table location cannot be set in SQL when using 'hadoop.catalog'
+    if (getLocation() != null) {
+      throw new AnalysisException(String.format("Location cannot be set for Iceberg " +
+          "table with 'hadoop.catalog'."));
+    }
+    String catalogLoc = getTblProperties().get(IcebergTable.ICEBERG_CATALOG_LOCATION);
+    if (catalogLoc == null || catalogLoc.isEmpty()) {
+      throw new AnalysisException(String.format("Table property '%s' is necessary " +
+          "for Iceberg table with 'hadoop.catalog'.",
+          IcebergTable.ICEBERG_CATALOG_LOCATION));
+    }
+  }
+
+  private void validateTableInHadoopTables() throws AnalysisException {
+    if (getTblProperties().get(IcebergTable.ICEBERG_CATALOG_LOCATION) != null) {
+      throw new AnalysisException(String.format("%s cannot be set for Iceberg table " +
+          "stored in hadoop.tables", IcebergTable.ICEBERG_CATALOG_LOCATION));
     }
   }
 

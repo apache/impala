@@ -97,6 +97,7 @@ enum TIcebergFileFormat {
 enum TIcebergCatalog {
   HADOOP_TABLES = 0
   HADOOP_CATALOG = 1
+  HIVE_CATALOG = 2
 }
 
 enum TColumnEncoding {

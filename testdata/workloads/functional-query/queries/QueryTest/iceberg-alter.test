@@ -94,3 +94,20 @@ DESCRIBE FORMATTED iceberg_hadoop_catalog;
 ---- TYPES
 string, string, string
 ====
+---- QUERY
+CREATE TABLE iceberg_rename (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hive.catalog');
+INSERT INTO iceberg_rename values (42);
+ALTER TABLE iceberg_rename RENAME TO iceberg_rename2;
+SELECT * FROM iceberg_rename2;
+---- RESULTS
+42
+---- TYPES
+INT
+====
+---- QUERY
+SELECT * FROM iceberg_rename;
+---- CATCH
+Could not resolve table reference: 'iceberg_rename'
+====

@@ -368,7 +368,7 @@ under the License.
 
     <dependency>
       <groupId>org.apache.iceberg</groupId>
-      <artifactId>iceberg-core</artifactId>
+      <artifactId>iceberg-hive-runtime</artifactId>
       <version>${iceberg.version}</version>
     </dependency>
 

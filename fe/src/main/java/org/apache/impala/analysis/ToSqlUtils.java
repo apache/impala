@@ -413,7 +413,10 @@ public class ToSqlUtils {
     } else if (table instanceof FeFsTable) {
       if (table instanceof FeIcebergTable) {
         storageHandlerClassName = null;
+        // Internal properties, should not be exposed to the user.
         properties.remove(IcebergTable.KEY_STORAGE_HANDLER);
+        properties.remove(StatsSetupConst.DO_NOT_UPDATE_STATS);
+        properties.remove(IcebergTable.METADATA_LOCATION);
 
         // Fill "PARTITION BY SPEC" part if the Iceberg table is partitioned.
         FeIcebergTable feIcebergTable= (FeIcebergTable)table;

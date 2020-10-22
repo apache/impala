@@ -151,6 +151,7 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     icebergPropertyCheck(IcebergTable.ICEBERG_CATALOG);
     icebergPropertyCheck(IcebergTable.ICEBERG_CATALOG_LOCATION);
     icebergPropertyCheck(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
+    icebergPropertyCheck(IcebergTable.METADATA_LOCATION);
   }
 
   private void icebergPropertyCheck(String property) throws AnalysisException {
