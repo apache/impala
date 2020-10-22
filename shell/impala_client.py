@@ -117,7 +117,8 @@ class ImpalaClient(object):
   def __init__(self, impalad, fetch_size, kerberos_host_fqdn, use_kerberos=False,
                kerberos_service_name="impala", use_ssl=False, ca_cert=None, user=None,
                ldap_password=None, use_ldap=False, client_connect_timeout_ms=60000,
-               verbose=True, use_http_base_transport=False, http_path=None):
+               verbose=True, use_http_base_transport=False, http_path=None,
+               auth_cookie_names=None):
     self.connected = False
     self.impalad_host = impalad[0]
     self.impalad_port = int(impalad[1])
@@ -136,6 +137,7 @@ class ImpalaClient(object):
     self.fetch_size = fetch_size
     self.use_http_base_transport = use_http_base_transport
     self.http_path = http_path
+    self.auth_cookie_names = auth_cookie_names
     # This is set from ImpalaShell's signal handler when a query is cancelled
     # from command line via CTRL+C. It is used to suppress error messages of
     # query cancellation.
@@ -383,10 +385,12 @@ class ImpalaClient(object):
       else:
         ssl_ctx.check_hostname = False  # Mandated by the SSL lib for CERT_NONE mode.
         ssl_ctx.verify_mode = ssl.CERT_NONE
-      transport = ImpalaHttpClient(
-          "https://{0}/{1}".format(host_and_port, self.http_path), ssl_context=ssl_ctx)
+      url = "https://{0}/{1}".format(host_and_port, self.http_path)
+      transport = ImpalaHttpClient(url, ssl_context=ssl_ctx,
+                                   auth_cookie_names=self.auth_cookie_names)
     else:
-      transport = ImpalaHttpClient("http://{0}/{1}".format(host_and_port, self.http_path))
+      url = "http://{0}/{1}".format(host_and_port, self.http_path)
+      transport = ImpalaHttpClient(url, auth_cookie_names=self.auth_cookie_names)
 
     if self.use_ldap:
       # Set the BASIC auth header

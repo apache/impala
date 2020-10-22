@@ -61,6 +61,7 @@ assemble_package_files() {
   cp "${SHELL_HOME}/TSSLSocketWithWildcardSAN.py" "${MODULE_LIB_DIR}"
   cp "${SHELL_HOME}/ImpalaHttpClient.py" "${MODULE_LIB_DIR}"
   cp "${SHELL_HOME}/shell_exceptions.py" "${MODULE_LIB_DIR}"
+  cp "${SHELL_HOME}/cookie_util.py" "${MODULE_LIB_DIR}"
 
   cp "${SHELL_HOME}/packaging/README.md" "${PACKAGE_DIR}"
   cp "${SHELL_HOME}/packaging/MANIFEST.in" "${PACKAGE_DIR}"
