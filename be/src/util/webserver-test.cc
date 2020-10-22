@@ -21,6 +21,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <gutil/strings/substitute.h>
+#include <openssl/crypto.h>
 #include <openssl/ssl.h>
 
 #include "common/init.h"
@@ -442,15 +443,20 @@ TEST(Webserver, StartWithPasswordFileTest) {
 
   MetricGroup metrics("webserver-test");
   Webserver webserver("", FLAGS_webserver_port, &metrics);
-  ASSERT_OK(webserver.Start());
+  if (FIPS_mode()) {
+    ASSERT_FALSE(webserver.Start().ok());
+  } else {
+    ASSERT_OK(webserver.Start());
 
-  // Don't expect HTTP requests to work without a password
-  stringstream contents;
-  ASSERT_ERROR_MSG(HttpGet("localhost", FLAGS_webserver_port, "/", &contents),
-      "Unexpected status code: 401");
+    // Don't expect HTTP requests to work without a password
+    stringstream contents;
+    ASSERT_ERROR_MSG(HttpGet("localhost", FLAGS_webserver_port, "/", &contents),
+        "Unexpected status code: 401");
+  }
 }
 
 TEST(Webserver, StartWithMissingPasswordFileTest) {
+  if (FIPS_mode()) return;
   stringstream password_file;
   password_file << getenv("IMPALA_HOME") << "/be/src/testutil/doesntexist";
   auto password =
