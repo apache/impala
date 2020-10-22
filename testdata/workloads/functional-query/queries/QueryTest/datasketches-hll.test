@@ -286,3 +286,59 @@ row_regex: .*### HLL sketch summary:.*Log Config K.*Hll Target.*Current Mode.*LB
 ---- TYPES
 STRING
 ====
+---- QUERY
+# Check that ds_hll_estimate_bounds_as_string() returns error for strings that are not
+# serialized sketches.
+select ds_hll_estimate_bounds_as_string(date_string_col) from functional_parquet.alltypestiny;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# Check that ds_hll_estimate_bounds_as_string() returns error for kappa is not 1, 2, 3.
+select ds_hll_estimate_bounds_as_string(date_string_col, 4) from functional_parquet.alltypestiny;
+---- CATCH
+UDF ERROR: Kappa must be 1, 2 or 3
+====
+---- QUERY
+select ds_hll_estimate_bounds_as_string(date_string_col, 1.5) from functional_parquet.alltypestiny;
+---- CATCH
+AnalysisException: No matching function with signature: ds_hll_estimate_bounds_as_string(STRING, DECIMAL(2,1)).
+====
+---- QUERY
+# Check that ds_hll_estimate_bounds_as_string() works on sketches created by Hive.
+select ds_hll_estimate_bounds_as_string(f) from hll_sketches_from_hive;
+---- RESULTS
+'5,5,5.0005'
+---- TYPES
+STRING
+====
+---- QUERY
+select ds_hll_estimate_bounds_as_string(f, 2) from hll_sketches_from_hive;
+---- RESULTS
+'5,5,5.0005'
+---- TYPES
+STRING
+====
+---- QUERY
+select ds_hll_estimate_bounds_as_string(f, 1) from hll_sketches_from_hive;
+---- RESULTS
+'5,5,5.00025'
+---- TYPES
+STRING
+====
+---- QUERY
+select ds_hll_estimate_bounds_as_string(ds_hll_sketch(float_col))
+from functional_parquet.alltypestiny;
+---- RESULTS
+'2,2,2.0002'
+---- TYPES
+STRING
+====
+---- QUERY
+select ds_hll_estimate_bounds_as_string(ds_hll_sketch(float_col), 3)
+from functional_parquet.alltypestiny;
+---- RESULTS
+'2,2,2.0003'
+---- TYPES
+STRING
+====

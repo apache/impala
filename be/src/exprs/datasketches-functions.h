@@ -21,6 +21,7 @@
 
 namespace impala {
 
+using impala_udf::IntVal;
 using impala_udf::BigIntVal;
 using impala_udf::DoubleVal;
 using impala_udf::FloatVal;
@@ -34,6 +35,21 @@ public:
   /// from the sketch.
   static BigIntVal DsHllEstimate(FunctionContext* ctx,
       const StringVal& serialized_sketch);
+
+  /// 'serialized_sketch' is expected as a serialized Apache DataSketches HLL sketch. If
+  /// it is not, then the query fails. Otherwise, returns an estimate of distinct count
+  /// and bounds from the sketch.
+  /// The result is three values: estimate, lower bound and upper bound.
+  /// Note, this function is meant to return an Array of doubles as the result but with
+  /// that we have to wait for the complex type support. Tracking Jira is IMPALA-9520.
+  static StringVal DsHllEstimateBoundsAsString(
+      FunctionContext* ctx, const StringVal& serialized_sketch);
+
+  /// utilizing the kappa value indirectly specified through the 2nd argument in
+  /// ds_hll_estimate_bounds_as_string()
+  ///'kappa' is a number of standard deviations from the mean: 1, 2 or 3 (default 2).
+  static StringVal DsHllEstimateBoundsAsString(FunctionContext* ctx,
+      const StringVal& serialized_sketch, const IntVal& kappa);
 
   /// 'serialized_sketch' is expected as a serialized Apache DataSketches HLL sketch. If
   /// it is not, then the query fails. This function returns the stringified format of
