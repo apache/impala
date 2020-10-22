@@ -560,13 +560,15 @@ class ImpalaShell(cmd.Cmd, object):
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
                           self.ca_cert, self.user, self.ldap_password, self.use_ldap,
                           self.client_connect_timeout_ms, self.verbose,
-                          use_http_base_transport=False, http_path=self.http_path)
+                          use_http_base_transport=False, http_path=self.http_path,
+                          auth_cookie_names=None)
     elif protocol == 'hs2-http':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
                           self.ca_cert, self.user, self.ldap_password, self.use_ldap,
                           self.client_connect_timeout_ms, self.verbose,
-                          use_http_base_transport=True, http_path=self.http_path)
+                          use_http_base_transport=True, http_path=self.http_path,
+                          auth_cookie_names='impala.auth')
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,

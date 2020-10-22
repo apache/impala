@@ -33,6 +33,8 @@ import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
 import org.apache.impala.testutil.ImpalaJdbcClient;
+import org.apache.impala.util.Metrics;
+import com.google.common.collect.Range;
 import org.junit.AfterClass;
 import org.junit.Assume;
 import org.junit.Before;
@@ -58,6 +60,8 @@ public class LdapImpalaShellTest {
   // Includes a special character to test HTTP path encoding.
   private static final String delegateUser_ = "proxyUser$";
 
+  Metrics metrics = new Metrics();
+
   public void setUp(String extraArgs) throws Exception {
     String uri =
         String.format("ldap://localhost:%s", serverRule.getLdapServer().getPort());
@@ -68,6 +72,7 @@ public class LdapImpalaShellTest {
             uri, dn, extraArgs);
     int ret = CustomClusterRunner.StartImpalaCluster(ldapArgs);
     assertEquals(ret, 0);
+    verifyMetrics(zero, zero, zero, zero);
   }
 
   /**
@@ -82,6 +87,31 @@ public class LdapImpalaShellTest {
         {"python", "-c", "import ssl; print hasattr(ssl, 'create_default_context')"};
     return Boolean.parseBoolean(RunShellCommand.Run(cmd, true, "", "").replace("\n", ""));
   }
+
+  private void verifyMetrics(Range<Long> expectedBasicSuccess,
+      Range<Long> expectedBasicFailure, Range<Long> expectedCookieSuccess,
+      Range<Long> expectedCookieFailure) throws Exception {
+    long actualBasicSuccess = (long) metrics.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-success");
+    assertTrue("Expected: " + expectedBasicSuccess + ", Actual: " + actualBasicSuccess,
+        expectedBasicSuccess.contains(actualBasicSuccess));
+    long actualBasicFailure = (long) metrics.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-basic-auth-failure");
+    assertTrue("Expected: " + expectedBasicFailure + ", Actual: " + actualBasicFailure,
+        expectedBasicFailure.contains(actualBasicFailure));
+
+    long actualCookieSuccess = (long) metrics.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-success");
+    assertTrue("Expected: " + expectedCookieSuccess + ", Actual: " + actualCookieSuccess,
+        expectedCookieSuccess.contains(actualCookieSuccess));
+    long actualCookieFailure = (long) metrics.getMetric(
+        "impala.thrift-server.hiveserver2-http-frontend.total-cookie-auth-failure");
+    assertTrue("Expected: " + expectedCookieFailure + ", Actual: " + actualCookieFailure,
+        expectedCookieFailure.contains(actualCookieFailure));
+  }
+
+  private static final Range<Long> zero = Range.closed(0L, 0L);
+  private static final Range<Long> one = Range.closed(1L, 1L);
 
   /**
    * Tests ldap authentication using impala-shell.
@@ -110,11 +140,15 @@ public class LdapImpalaShellTest {
       protocolsToTest = Arrays.asList("beeswax", "hs2", "hs2-http");
     }
 
-    for (String protocol: protocolsToTest) {
-      protocol = String.format(protocolTemplate, protocol);
+    for (String p: protocolsToTest) {
+      String protocol = String.format(protocolTemplate, p);
       validCommand[1] = protocol;
       RunShellCommand.Run(validCommand, /*shouldSucceed*/ true, TEST_USER_1,
           "Starting Impala Shell with LDAP-based authentication");
+      if (p.equals("hs2-http")) {
+        // Check that cookies are being used.
+        verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);
+      }
       invalidCommand[1] = protocol;
       RunShellCommand.Run(
           invalidCommand, /*shouldSucceed*/ false, "", "Not connected to Impala");

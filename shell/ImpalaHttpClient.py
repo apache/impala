@@ -19,16 +19,19 @@
 
 from io import BytesIO
 import os
+import os.path
 import ssl
 import sys
 import warnings
 import base64
+import datetime
 
-from six.moves import urllib
-from six.moves import http_client
+from six.moves import urllib, http_client
 
 from thrift.transport.TTransport import TTransportBase
 from shell_exceptions import HttpError
+from cookie_util import get_first_matching_cookie, get_cookie_expiry
+
 import six
 
 
@@ -46,17 +49,20 @@ class ImpalaHttpClient(TTransportBase):
   MIN_REQUEST_SIZE_FOR_EXPECT = 1024
 
   def __init__(self, uri_or_host, port=None, path=None, cafile=None, cert_file=None,
-      key_file=None, ssl_context=None):
+      key_file=None, ssl_context=None, auth_cookie_names=None):
     """ImpalaHttpClient supports two different types of construction:
 
     ImpalaHttpClient(host, port, path) - deprecated
     ImpalaHttpClient(uri, [port=<n>, path=<s>, cafile=<filename>, cert_file=<filename>,
-        key_file=<filename>, ssl_context=<context>])
+        key_file=<filename>, ssl_context=<context>], auth_cookie_names=<cookienamelist>])
 
     Only the second supports https.  To properly authenticate against the server,
     provide the client's identity by specifying cert_file and key_file.  To properly
     authenticate the server, specify either cafile or ssl_context with a CA defined.
     NOTE: if both cafile and ssl_context are defined, ssl_context will override cafile.
+    auth_cookie_names is used to specify the list of possible cookie names used for
+    cookie-based authentication. If there's only one name in the cookie name list, a str
+    value can be specified instead of the list.
     """
     if port is not None:
       warnings.warn(
@@ -100,6 +106,9 @@ class ImpalaHttpClient(TTransportBase):
       self.proxy_auth = self.basic_proxy_auth_header(parsed)
     else:
       self.realhost = self.realport = self.proxy_auth = None
+    self.__auth_cookie_names = auth_cookie_names
+    self.__auth_cookie = None
+    self.__auth_cookie_expiry = None
     self.__wbuf = BytesIO()
     self.__http = None
     self.__http_response = None
@@ -149,6 +158,27 @@ class ImpalaHttpClient(TTransportBase):
   def setCustomHeaders(self, headers):
     self.__custom_headers = headers
 
+  def updateAuthCookie(self, headers):
+    if self.__auth_cookie_names:
+      c = get_first_matching_cookie(self.__auth_cookie_names, self.path, headers)
+      if c:
+        self.__auth_cookie = c
+        self.__auth_cookie_expiry = get_cookie_expiry(c)
+
+  def getAuthCookie(self):
+    if self.__auth_cookie and self.__auth_cookie_expiry and \
+        self.__auth_cookie_expiry <= datetime.datetime.now():
+      self.__auth_cookie = None
+      self.__auth_cookie_expiry = None
+    return self.__auth_cookie
+
+  def addAuthCookieToRequestHeaders(self):
+    auth_cookie = self.getAuthCookie()
+    if auth_cookie:
+      cookie_header = auth_cookie.output(attrs=['value'], header='').strip()
+      if cookie_header:
+        self.__http.putheader('Cookie', cookie_header)
+
   def read(self, sz):
     return self.__http_response.read(sz)
 
@@ -180,8 +210,8 @@ class ImpalaHttpClient(TTransportBase):
     data_len = len(data)
     self.__http.putheader('Content-Length', str(data_len))
     if data_len > ImpalaHttpClient.MIN_REQUEST_SIZE_FOR_EXPECT:
-      # Add the 'Expect' header to large requests. Note that we do not explicitly wait for
-      # the '100 continue' response before sending the data - HTTPConnection simply
+      # Add the 'Expect' header to large requests. Note that we do not explicitly wait
+      # for the '100 continue' response before sending the data - HTTPConnection simply
       # ignores these types of responses, but we'll get the right behavior anyways.
       self.__http.putheader("Expect", "100-continue")
     if self.using_proxy() and self.scheme == "http" and self.proxy_auth is not None:
@@ -198,6 +228,7 @@ class ImpalaHttpClient(TTransportBase):
       for key, val in six.iteritems(self.__custom_headers):
         self.__http.putheader(key, val)
 
+    self.addAuthCookieToRequestHeaders()
     self.__http.endheaders()
 
     # Write payload
@@ -208,6 +239,7 @@ class ImpalaHttpClient(TTransportBase):
     self.code = self.__http_response.status
     self.message = self.__http_response.reason
     self.headers = self.__http_response.msg
+    self.updateAuthCookie(self.headers)
 
     if self.code >= 300:
       # Report any http response code that is not 1XX (informational response) or
