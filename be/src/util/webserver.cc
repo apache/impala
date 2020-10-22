@@ -397,16 +397,21 @@ Status Webserver::Start() {
   }
 
   if (!FLAGS_webserver_password_file.empty()) {
-    // Squeasel doesn't log anything if it can't stat the password file (but will if it
-    // can't open it, which it tries to do during a request)
-    if (!exists(FLAGS_webserver_password_file)) {
-      stringstream ss;
-      ss << "Webserver: Password file does not exist: " << FLAGS_webserver_password_file;
-      return Status(ss.str());
+    if (FIPS_mode()) {
+      return Status("HTTP digest authorization is not supported in FIPS approved mode.");
+    } else {
+      // Squeasel doesn't log anything if it can't stat the password file (but will if it
+      // can't open it, which it tries to do during a request)
+      if (!exists(FLAGS_webserver_password_file)) {
+        stringstream ss;
+        ss << "Webserver: Password file does not exist: "
+           << FLAGS_webserver_password_file;
+        return Status(ss.str());
+      }
+      LOG(INFO) << "Webserver: Password file is " << FLAGS_webserver_password_file;
+      options.push_back("global_auth_file");
+      options.push_back(FLAGS_webserver_password_file.c_str());
     }
-    LOG(INFO) << "Webserver: Password file is " << FLAGS_webserver_password_file;
-    options.push_back("global_auth_file");
-    options.push_back(FLAGS_webserver_password_file.c_str());
   }
 
   if (auth_mode_ == AuthMode::SPNEGO) {
