@@ -1497,10 +1497,13 @@ class TestKuduReadTokenSplit(KuduTestSuite):
     add_exec_option_dimension(cls, "kudu_read_mode", "READ_AT_SNAPSHOT")
 
   @SkipIfKudu.no_hybrid_clock
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
   def test_kudu_scanner(self, vector, unique_database):
     """This runs explain query with variations of mt_dop and
     targeted_kudu_scan_range_length to verify targeted_kudu_scan_range_length's
-    functionality."""
+    functionality.
+    Test disabled for EC since the erasure coded files when loaded in kudu
+    during data load cause the expected behaviour to change"""
     explain_query = "explain select * from tpch_kudu.lineitem "
     plans = []
 
@@ -1539,6 +1542,6 @@ class TestKuduReadTokenSplit(KuduTestSuite):
     plan = "\n".join(result.data)
     plans.append(plan)
     matches = re.search(regex, plan)
-    assert len(matches.groups()) == 1
+    assert len(matches.groups()) == 1, plan
     self.client.clear_configuration()
     return int(matches.group(1))
