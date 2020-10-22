@@ -37,6 +37,14 @@ SHOW PARTITIONS functional_parquet.iceberg_non_partitioned
 AnalysisException: Table is not partitioned: functional_parquet.iceberg_non_partitioned
 ====
 ---- QUERY
+CREATE TABLE iceberg_table_hadoop_tables_cat_loc(i INT)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.tables',
+              'iceberg.catalog_location'='/test-warehouse/cat_loc')
+---- CATCH
+iceberg.catalog_location cannot be set for Iceberg table stored in hadoop.tables
+====
+---- QUERY
 CREATE TABLE iceberg_table_hadoop_catalog(
   level STRING
 )
@@ -59,21 +67,26 @@ AnalysisException: Table property 'iceberg.catalog_location' is necessary for Ic
 CREATE EXTERNAL TABLE iceberg_external_table_hadoop_catalog
 STORED AS ICEBERG
 LOCATION '/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
-TBLPROPERTIES('iceberg.catalog_location'='/test-warehouse/fake_table', 'iceberg.table_identifier'='fake_db.fake_table');
+TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+    'iceberg.catalog_location'='/test-warehouse/fake_table',
+    'iceberg.table_identifier'='fake_db.fake_table');
 ---- CATCH
 AnalysisException: Location cannot be set for Iceberg table with 'hadoop.catalog'.
 ====
 ---- QUERY
 CREATE EXTERNAL TABLE iceberg_table_hadoop_catalog
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg.table_identifier'='fake_db.fake_table');
+TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+    'iceberg.table_identifier'='fake_db.fake_table');
 ---- CATCH
 AnalysisException: Table property 'iceberg.catalog_location' is necessary for Iceberg table with 'hadoop.catalog'.
 ====
 ---- QUERY
 CREATE EXTERNAL TABLE fake_iceberg_table_hadoop_catalog
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg.catalog_location'='/test-warehouse/fake_table', 'iceberg.table_identifier'='fake_db.fake_table');
+TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+    'iceberg.catalog_location'='/test-warehouse/fake_table',
+    'iceberg.table_identifier'='fake_db.fake_table');
 SHOW CREATE TABLE fake_iceberg_table_hadoop_catalog;
 ---- CATCH
 row_regex:.*CAUSED BY: TableLoadingException: Table does not exist: fake_db.fake_table*
@@ -93,6 +106,39 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 INSERT OVERWRITE iceberg_overwrite VALUES (1), (2), (3);
 ---- CATCH
 AnalysisException: INSERT OVERWRITE not supported for Iceberg tables.
+====
+---- QUERY
+CREATE TABLE iceberg_hive_cat_with_cat_locaction (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hive.catalog',
+    'iceberg.catalog_location'='/test-warehouse/catalog_loc')
+---- CATCH
+iceberg.catalog_location cannot be set for Iceberg table stored in hive.catalog
+====
+---- QUERY
+CREATE TABLE iceberg_hadoop_tables_with_metdata_locaction (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.tables',
+    'metadata_location'='/test-warehouse/catalog/metadata_loc')
+---- CATCH
+metadata_location cannot be set for Iceberg tables
+====
+---- QUERY
+CREATE TABLE iceberg_hadoop_cat_with_metadata_locaction (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
+    'iceberg.catalog_location'='/test-warehouse/catalog',
+    'metadata_location'='/test-warehouse/catalog/metadata_loc')
+---- CATCH
+metadata_location cannot be set for Iceberg tables
+====
+---- QUERY
+CREATE TABLE iceberg_hive_cat_with_metadata_locaction (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hive.catalog',
+    'metadata_location'='/test-warehouse/catalog/metadata_loc')
+---- CATCH
+metadata_location cannot be set for Iceberg tables
 ====
 ---- QUERY
 CREATE TABLE iceberg_partitioned_insert(
@@ -117,6 +163,11 @@ AnalysisException: Impala cannot write partitioned Iceberg tables.
 ALTER TABLE iceberg_table_hadoop_tables RENAME TO iceberg_table_hadoop_tables_new;
 ---- CATCH
 UnsupportedOperationException: Cannot rename Iceberg tables that use 'hadoop.tables' as catalog.
+====
+---- QUERY
+CREATE TABLE iceberg_table_hive_catalog (level STRING)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hive.catalog')
 ====
 ---- QUERY
 CREATE TABLE iceberg_table_hadoop_catalog(
@@ -149,6 +200,16 @@ AnalysisException: Changing the 'iceberg.catalog_location' table property is not
 ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.table_identifier'='fake_db.fake_table');
 ---- CATCH
 AnalysisException: Changing the 'iceberg.table_identifier' table property is not supported for Iceberg table.
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('metadata_location'='/test-warehouse/metadata_loc');
+---- CATCH
+AnalysisException: Changing the 'metadata_location' table property is not supported for Iceberg table.
+====
+---- QUERY
+ALTER TABLE iceberg_table_hive_catalog set TBLPROPERTIES('metadata_location'='/test-warehouse/metadata_loc');
+---- CATCH
+AnalysisException: Changing the 'metadata_location' table property is not supported for Iceberg table.
 ====
 ---- QUERY
 ALTER TABLE iceberg_table_hadoop_catalog set FILEFORMAT PARQUET;

@@ -306,7 +306,7 @@ PARTITION BY SPEC
   register_time DAY
 )
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg.file_format'='orc','iceberg_catalog'='hadoop.tables',
+TBLPROPERTIES('iceberg.file_format'='orc','iceberg.catalog'='hadoop.catalog',
 'iceberg.catalog_location'='/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test');
 ---- RESULTS
 'Table has been created.'
@@ -355,4 +355,49 @@ describe formatted iceberg_default_trans
 '','transactional_properties','insert_only         '
 ---- TYPES
 STRING, STRING, STRING
+====
+---- QUERY
+CREATE TABLE iceberg_part_hive_cat(
+  level STRING,
+  event_time TIMESTAMP,
+  register_time DATE,
+  message STRING,
+  price DECIMAL(8,1),
+  map_test MAP <STRING, array <STRING>>,
+  struct_test STRUCT <f1: BIGINT, f2: BIGINT>
+)
+PARTITION BY SPEC
+(
+  level IDENTITY,
+  event_time IDENTITY,
+  event_time HOUR,
+  register_time DAY
+)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hive.catalog')
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+DESCRIBE iceberg_part_hive_cat;
+---- RESULTS
+'level','string',''
+'event_time','timestamp',''
+'register_time','date',''
+'message','string',''
+'price','decimal(8,1)',''
+'map_test','map<string,array<string>>',''
+'struct_test','struct<\n  f1:bigint,\n  f2:bigint\n>',''
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+DESCRIBE FORMATTED iceberg_part_hive_cat;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/iceberg_part_hive_cat','NULL'
+row_regex:'','metadata_location   ','$NAMENODE/test-warehouse/$DATABASE.db/iceberg_part_hive_cat/metadata/.*.metadata.json'
+'','table_type          ','ICEBERG             '
+'','iceberg.catalog     ','hive.catalog        '
+---- TYPES
+string, string, string
 ====

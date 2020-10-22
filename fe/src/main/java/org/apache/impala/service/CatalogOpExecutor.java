@@ -1843,15 +1843,35 @@ public class CatalogOpExecutor {
     }
   }
 
+  private boolean isHmsIntegrationAutomatic(
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws ImpalaRuntimeException {
+    if (KuduTable.isKuduTable(msTbl)) {
+      return isKuduHmsIntegrationEnabled(msTbl);
+    }
+    if (IcebergTable.isIcebergTable(msTbl)) {
+      return isIcebergHmsIntegrationEnabled(msTbl);
+    }
+    return false;
+  }
+
   private boolean isKuduHmsIntegrationEnabled(
-      org.apache.hadoop.hive.metastore.api.Table msTbl)
-          throws ImpalaRuntimeException {
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws ImpalaRuntimeException {
     // Check if Kudu's integration with the Hive Metastore is enabled, and validate
     // the configuration.
     Preconditions.checkState(KuduTable.isKuduTable(msTbl));
     String masterHosts = msTbl.getParameters().get(KuduTable.KEY_MASTER_HOSTS);
     String hmsUris = MetaStoreUtil.getHiveMetastoreUris();
     return KuduTable.isHMSIntegrationEnabledAndValidate(masterHosts, hmsUris);
+  }
+
+  private boolean isIcebergHmsIntegrationEnabled(
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws ImpalaRuntimeException {
+    // Check if Iceberg's integration with the Hive Metastore is enabled, and validate
+    // the configuration.
+    Preconditions.checkState(IcebergTable.isIcebergTable(msTbl));
+    // Only synchronized tables can be integrated.
+    if (!IcebergTable.isSynchronizedTable(msTbl)) return false;
+    return IcebergUtil.getTIcebergCatalog(msTbl) == TIcebergCatalog.HIVE_CATALOG;
   }
 
   /**
@@ -1938,36 +1958,6 @@ public class CatalogOpExecutor {
         throw new CatalogException("Table/View does not exist.");
       }
 
-      // Retrieve the HMS table to determine if this is a Kudu table.
-      org.apache.hadoop.hive.metastore.api.Table msTbl = existingTbl.getMetaStoreTable();
-      if (msTbl == null) {
-        Preconditions.checkState(existingTbl instanceof IncompleteTable);
-        Stopwatch hmsLoadSW = Stopwatch.createStarted();
-        long hmsLoadTime;
-        try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-          msTbl = msClient.getHiveClient().getTable(tableName.getDb(),
-              tableName.getTbl());
-        } catch (TException e) {
-          LOG.error(String.format(HMS_RPC_ERROR_FORMAT_STR, "getTable") + e.getMessage());
-        } finally {
-          hmsLoadTime = hmsLoadSW.elapsed(TimeUnit.NANOSECONDS);
-        }
-        existingTbl.updateHMSLoadTableSchemaTime(hmsLoadTime);
-      }
-      boolean isSynchronizedTable = msTbl != null &&
-              KuduTable.isKuduTable(msTbl) && KuduTable.isSynchronizedTable(msTbl);
-      if (isSynchronizedTable) {
-        KuduCatalogOpExecutor.dropTable(msTbl, /* if exists */ true);
-      }
-
-      if (msTbl != null &&
-          !(existingTbl instanceof IncompleteTable) &&
-          IcebergTable.isIcebergTable(msTbl) &&
-          IcebergTable.isSynchronizedTable(msTbl)) {
-        Preconditions.checkState(existingTbl instanceof IcebergTable);
-        IcebergCatalogOpExecutor.dropTable((IcebergTable)existingTbl, params.if_exists);
-      }
-
       // Check to make sure we don't drop a view with "drop table" statement and
       // vice versa. is_table field is marked optional in TDropTableOrViewParams to
       // maintain catalog api compatibility.
@@ -1985,10 +1975,44 @@ public class CatalogOpExecutor {
         throw new CatalogException(errorMsg);
       }
 
-      // When Kudu's HMS integration is enabled, Kudu will drop the managed table
-      // entries automatically. In all other cases, we need to drop the HMS table
-      // entry ourselves.
-      if (!isSynchronizedTable || !isKuduHmsIntegrationEnabled(msTbl)) {
+      // Retrieve the HMS table to determine if this is a Kudu or Iceberg table.
+      org.apache.hadoop.hive.metastore.api.Table msTbl = existingTbl.getMetaStoreTable();
+      if (msTbl == null) {
+        Preconditions.checkState(existingTbl instanceof IncompleteTable);
+        Stopwatch hmsLoadSW = Stopwatch.createStarted();
+        long hmsLoadTime;
+        try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+          msTbl = msClient.getHiveClient().getTable(tableName.getDb(),
+              tableName.getTbl());
+        } catch (TException e) {
+          LOG.error(String.format(HMS_RPC_ERROR_FORMAT_STR, "getTable") + e.getMessage());
+        } finally {
+          hmsLoadTime = hmsLoadSW.elapsed(TimeUnit.NANOSECONDS);
+        }
+        existingTbl.updateHMSLoadTableSchemaTime(hmsLoadTime);
+      }
+      boolean isSynchronizedKuduTable = msTbl != null &&
+              KuduTable.isKuduTable(msTbl) && KuduTable.isSynchronizedTable(msTbl);
+      if (isSynchronizedKuduTable) {
+        KuduCatalogOpExecutor.dropTable(msTbl, /* if exists */ true);
+      }
+
+      boolean isSynchronizedIcebergTable = msTbl != null &&
+          IcebergTable.isIcebergTable(msTbl) &&
+          IcebergTable.isSynchronizedTable(msTbl);
+      if (!(existingTbl instanceof IncompleteTable) && isSynchronizedIcebergTable) {
+        Preconditions.checkState(existingTbl instanceof IcebergTable);
+        IcebergCatalogOpExecutor.dropTable((IcebergTable)existingTbl, params.if_exists);
+      }
+
+      // When HMS integration is automatic, the table is dropped automatically. In all
+      // other cases, we need to drop the HMS table entry ourselves.
+      boolean isSynchronizedTable = isSynchronizedKuduTable || isSynchronizedIcebergTable;
+      boolean needsHmsDropTable =
+          (existingTbl instanceof IncompleteTable && isSynchronizedIcebergTable) ||
+          !isSynchronizedTable ||
+          !isHmsIntegrationAutomatic(msTbl);
+      if (needsHmsDropTable) {
         try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
           msClient.getHiveClient().dropTable(
               tableName.getDb(), tableName.getTbl(), true,
@@ -2731,7 +2755,23 @@ public class CatalogOpExecutor {
             // include one or more of the table columns
             Preconditions.checkState(newTable.getPartitionKeys() == null ||
                 newTable.getPartitionKeys().isEmpty());
-            msClient.getHiveClient().createTable(newTable);
+            if (!isIcebergHmsIntegrationEnabled(newTable)) {
+              msClient.getHiveClient().createTable(newTable);
+            } else {
+              // Currently HiveCatalog doesn't set the table property
+              // 'external.table.purge' during createTable().
+              org.apache.hadoop.hive.metastore.api.Table msTbl =
+                  msClient.getHiveClient().getTable(
+                      newTable.getDbName(), newTable.getTableName());
+              msTbl.putToParameters("external.table.purge", "TRUE");
+              // HiveCatalog also doesn't set the table properties either.
+              for (Map.Entry<String, String> entry :
+                  params.getTable_properties().entrySet()) {
+                msTbl.putToParameters(entry.getKey(), entry.getValue());
+              }
+              msClient.getHiveClient().alter_table(
+                  newTable.getDbName(), newTable.getTableName(), msTbl);
+            }
           } else {
             addSummary(response, "Table already exists.");
             return false;
@@ -3307,15 +3347,12 @@ public class CatalogOpExecutor {
     msTbl.setTableName(newTableName.getTbl());
 
     // If oldTbl is a synchronized Kudu table, rename the underlying Kudu table.
-    boolean isSynchronizedTable = (oldTbl instanceof KuduTable) &&
+    boolean isSynchronizedKuduTable = (oldTbl instanceof KuduTable) &&
                                  KuduTable.isSynchronizedTable(msTbl);
-    boolean altersHMSTable = true;
-    if (isSynchronizedTable) {
+    boolean integratedHmsTable = isHmsIntegrationAutomatic(msTbl);
+    if (isSynchronizedKuduTable) {
       Preconditions.checkState(KuduTable.isKuduTable(msTbl));
-      boolean isKuduHmsIntegrationEnabled = isKuduHmsIntegrationEnabled(msTbl);
-      altersHMSTable = !isKuduHmsIntegrationEnabled;
-      renameManagedKuduTable((KuduTable) oldTbl, msTbl, newTableName,
-          isKuduHmsIntegrationEnabled);
+      renameManagedKuduTable((KuduTable) oldTbl, msTbl, newTableName, integratedHmsTable);
     }
 
     // If oldTbl is a synchronized Iceberg table, rename the underlying Iceberg table.
@@ -3325,11 +3362,11 @@ public class CatalogOpExecutor {
       renameManagedIcebergTable((IcebergTable) oldTbl, msTbl, newTableName);
     }
 
-    // Always updates the HMS metadata for non-Kudu tables. For Kudu tables, when
-    // Kudu is not integrated with the Hive Metastore or if this is an external table,
-    // Kudu will not automatically update the HMS metadata, we have to do it
-    // manually.
-    if (altersHMSTable) {
+    boolean isSynchronizedTable = isSynchronizedKuduTable || isSynchronizedIcebergTable;
+    // Update the HMS table, unless the table is synchronized and the HMS integration
+    // is automatic.
+    boolean needsHmsAlterTable = !isSynchronizedTable || !integratedHmsTable;
+    if (needsHmsAlterTable) {
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         msClient.getHiveClient().alter_table(
             tableName.getDb(), tableName.getTbl(), msTbl);

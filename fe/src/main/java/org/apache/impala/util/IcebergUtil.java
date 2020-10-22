@@ -56,6 +56,7 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
 import org.apache.impala.catalog.iceberg.IcebergHadoopTables;
+import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TColumnType;
@@ -84,6 +85,7 @@ public class IcebergUtil {
       throws ImpalaRuntimeException {
     switch (catalog) {
       case HADOOP_TABLES: return IcebergHadoopTables.getInstance();
+      case HIVE_CATALOG: return IcebergHiveCatalog.getInstance();
       case HADOOP_CATALOG: return new IcebergHadoopCatalog(location);
       default: throw new ImpalaRuntimeException (
           "Unexpected catalog type: " + catalog.toString());
@@ -204,13 +206,13 @@ public class IcebergUtil {
 
   /**
    * Get iceberg table catalog type from hms table properties
-   * use HadoopCatalog as default
+   * use HiveCatalog as default
    */
   public static TIcebergCatalog getTIcebergCatalog(
       org.apache.hadoop.hive.metastore.api.Table msTable) {
     TIcebergCatalog catalog = getTIcebergCatalog(
         msTable.getParameters().get(IcebergTable.ICEBERG_CATALOG));
-    return catalog == null ? TIcebergCatalog.HADOOP_CATALOG : catalog;
+    return catalog == null ? TIcebergCatalog.HIVE_CATALOG : catalog;
   }
 
   /**
@@ -221,6 +223,8 @@ public class IcebergUtil {
       return TIcebergCatalog.HADOOP_TABLES;
     } else if ("hadoop.catalog".equalsIgnoreCase(catalog)) {
       return TIcebergCatalog.HADOOP_CATALOG;
+    } else if ("hive.catalog".equalsIgnoreCase(catalog)) {
+      return TIcebergCatalog.HIVE_CATALOG;
     }
     return null;
   }
@@ -235,10 +239,11 @@ public class IcebergUtil {
   }
 
   /**
-   * Get TIcebergFileFormat from a string, usually from table properties
+   * Get TIcebergFileFormat from a string, usually from table properties.
+   * Returns PARQUET when 'format' is null. Returns null for invalid formats.
    */
-  public static TIcebergFileFormat getIcebergFileFormat(String format){
-    if ("PARQUET".equalsIgnoreCase(format)) {
+  public static TIcebergFileFormat getIcebergFileFormat(String format) {
+    if ("PARQUET".equalsIgnoreCase(format) || format == null) {
       return TIcebergFileFormat.PARQUET;
     } else if ("ORC".equalsIgnoreCase(format)) {
       return TIcebergFileFormat.ORC;

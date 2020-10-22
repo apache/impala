@@ -75,7 +75,8 @@ public class IcebergCatalogOpExecutor {
     Schema schema = createIcebergSchema(params);
     PartitionSpec spec = IcebergUtil.createIcebergPartition(schema, params);
     IcebergCatalog icebergCatalog = IcebergUtil.getIcebergCatalog(catalog, location);
-    Table iceTable = icebergCatalog.createTable(identifier, schema, spec, location, null);
+    Table iceTable = icebergCatalog.createTable(identifier, schema, spec, location,
+        params.getTable_properties());
     LOG.info("Create iceberg table successful.");
     return iceTable;
   }

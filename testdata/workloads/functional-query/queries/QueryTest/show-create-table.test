@@ -644,6 +644,7 @@ PARTITION BY SPEC (
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.file_format'='parquet',
+    'iceberg.catalog'='hadoop.catalog',
     'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
 ---- RESULTS-HIVE
 CREATE TABLE show_create_table_test_db.iceberg_test1_partitioned (
@@ -665,6 +666,7 @@ PARTITION BY SPEC
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.file_format'='parquet',
+    'iceberg.catalog'='hadoop.catalog',
     'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test1_partitioned (
@@ -687,6 +689,7 @@ PARTITION BY SPEC
 STORED AS ICEBERG
 TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.catalog'='hadoop.catalog',
     'iceberg.file_format'='parquet',
+    'iceberg.catalog'='hadoop.catalog',
     'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
 ====
 ---- CREATE_TABLE
@@ -710,4 +713,51 @@ STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='orc',
 'iceberg.catalog'='hadoop.tables')
+====
+---- CREATE_TABLE
+# Default Iceberg table
+CREATE TABLE iceberg_default_tbl (
+  level STRING
+)
+STORED AS ICEBERG;
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_default_tbl (
+  level STRING
+)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('iceberg.file_format'='parquet', 'iceberg.catalog'='hive.catalog',
+'external.table.purge'='TRUE', 'table_type'='ICEBERG')
+====
+---- CREATE_TABLE
+# Default Iceberg table with ORC format
+CREATE TABLE iceberg_default_tbl_orc (
+  level STRING
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('iceberg.file_format'='orc');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_default_tbl_orc (
+  level STRING
+)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('iceberg.file_format'='orc', 'iceberg.catalog'='hive.catalog',
+'external.table.purge'='TRUE', 'table_type'='ICEBERG')
+====
+---- CREATE_TABLE
+# Iceberg table in HiveCatalog
+CREATE TABLE iceberg_hive_cat_explicit (
+  level STRING
+)
+STORED AS ICEBERG
+TBLPROPERTIES ('iceberg.catalog'='hive.catalog');
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_hive_cat_explicit (
+  level STRING
+)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('iceberg.file_format'='parquet', 'iceberg.catalog'='hive.catalog',
+'external.table.purge'='TRUE', 'table_type'='ICEBERG')
 ====

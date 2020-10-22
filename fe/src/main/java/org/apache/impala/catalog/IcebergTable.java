@@ -81,6 +81,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // We use database.table instead if this property not been set in SQL
   public static final String ICEBERG_TABLE_IDENTIFIER = "iceberg.table_identifier";
 
+  // Internal Iceberg table property that specifies the absolute path of the current
+  // table metadata. This property is only valid for tables in 'hive.catalog'.
+  public static final String METADATA_LOCATION = "metadata_location";
+
   // Iceberg catalog type dependend on table properties
   private TIcebergCatalog icebergCatalog_;
 
