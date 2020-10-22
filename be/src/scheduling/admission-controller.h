@@ -447,6 +447,11 @@ class AdmissionController {
 
   PerHostStats host_stats_;
 
+  /// Counter of the number of times dequeuing a query failed because of a resource
+  /// issue on the coordinator (which therefore cannot be resolved by adding more
+  /// executor groups).
+  IntCounter* total_dequeue_failed_coordinator_limited_ = nullptr;
+
   /// Contains all per-pool statistics and metrics. Accessed via GetPoolStats().
   class PoolStats {
    public:
@@ -856,7 +861,7 @@ class AdmissionController {
   /// method returns false and sets queue_node->not_admitted_reason.
   bool FindGroupToAdmitOrReject(ClusterMembershipMgr::SnapshotPtr membership_snapshot,
       const TPoolConfig& pool_config, bool admit_from_queue, PoolStats* pool_stats,
-      QueueNode* queue_node);
+      QueueNode* queue_node, bool& coordinator_resource_limited);
 
   /// Dequeues the queued queries when notified by dequeue_cv_ and admits them if they
   /// have not been cancelled yet.
@@ -870,8 +875,8 @@ class AdmissionController {
   /// enough memory resources available for the query. Caller owns not_admitted_reason and
   /// not_admitted_details. Must hold admission_ctrl_lock_.
   bool CanAdmitRequest(const ScheduleState& state, const TPoolConfig& pool_cfg,
-      bool admit_from_queue, std::string* not_admitted_reason,
-      std::string* not_admitted_details = nullptr);
+      bool admit_from_queue, string* not_admitted_reason, string* not_admitted_details,
+      bool& coordinator_resource_limited);
 
   /// Returns true if all executors can accommodate the largest initial reservation of
   /// any executor and the backend running the coordinator fragment can accommodate its
@@ -895,7 +900,8 @@ class AdmissionController {
   /// 'mem_unavailable_reason'.
   /// Must hold admission_ctrl_lock_.
   bool HasAvailableMemResources(const ScheduleState& state, const TPoolConfig& pool_cfg,
-      std::string* mem_unavailable_reason, std::string* topN_queries = nullptr);
+      std::string* mem_unavailable_reason, bool& coordinator_resource_limited,
+      string* topN_queries = nullptr);
 
   /// Returns true if there are enough available slots on all executors in the schedule to
   /// fit the query schedule. The number of slots per executors does not change with the
@@ -903,7 +909,7 @@ class AdmissionController {
   /// not have a free slot, this returns false and sets 'unavailable_reason'.
   /// Must hold admission_ctrl_lock_.
   bool HasAvailableSlots(const ScheduleState& state, const TPoolConfig& pool_cfg,
-      string* unavailable_reason);
+      string* unavailable_reason, bool& coordinator_resource_limited);
 
   /// Updates the memory admitted and the num of queries running for each backend in
   /// 'state'. Also updates the stats of its associated resource pool. Used only when
