@@ -18,8 +18,10 @@
 ARG BASE_IMAGE=impala_base
 FROM ${BASE_IMAGE}
 
-# Only copy library dependencies required to run Impala executors.
-COPY --chown=impala exec-lib /opt/impala/lib
+# IMPALA-10278: Temporarily switch back to including all the same libraries
+# as the coordinator. This will require further changes to exec-lib to be
+# able to use it here.
+COPY --chown=impala lib /opt/impala/lib
 
 # Externally-facing ports
 # Debug webserver
