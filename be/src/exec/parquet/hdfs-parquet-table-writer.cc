@@ -86,6 +86,9 @@ using namespace apache::thrift;
 // the columns and run that function over row batches.
 // TODO: we need to pass in the compression from the FE/metadata
 
+static const string PARQUET_MEM_LIMIT_EXCEEDED =
+    "HdfsParquetTableWriter::$0() failed to allocate $1 bytes for $2.";
+
 namespace impala {
 
 // Base class for column writers. This contains most of the logic except for
@@ -759,8 +762,14 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
     header.__set_dictionary_page_header(dict_header);
 
     // Write the dictionary page data, compressing it if necessary.
-    uint8_t* dict_buffer = parent_->per_file_mem_pool_->Allocate(
-        header.uncompressed_page_size);
+    uint8_t* dict_buffer =
+        parent_->per_file_mem_pool_->TryAllocate(header.uncompressed_page_size);
+    if (UNLIKELY(dict_buffer == nullptr)) {
+      string details = (Substitute(PARQUET_MEM_LIMIT_EXCEEDED, "BaseColumnWriter::Flush",
+          header.uncompressed_page_size, "dictionary page"));
+      return parent_->per_file_mem_pool_->mem_tracker()->MemLimitExceeded(
+          parent_->state_, details, header.uncompressed_page_size);
+    }
     dict_encoder_base_->WriteDict(dict_buffer);
     if (compressor_.get() != nullptr) {
       SCOPED_TIMER(parent_->parent_->compress_timer());
@@ -768,7 +777,14 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
           compressor_->MaxOutputLen(header.uncompressed_page_size);
       DCHECK_GT(max_compressed_size, 0);
       uint8_t* compressed_data =
-          parent_->per_file_mem_pool_->Allocate(max_compressed_size);
+          parent_->per_file_mem_pool_->TryAllocate(max_compressed_size);
+      if (UNLIKELY(compressed_data == nullptr)) {
+        string details =
+            (Substitute(PARQUET_MEM_LIMIT_EXCEEDED, "BaseColumnWriter::Flush",
+                max_compressed_size, "compressed dictionary page"));
+        return parent_->per_file_mem_pool_->mem_tracker()->MemLimitExceeded(
+            parent_->state_, details, max_compressed_size);
+      }
       header.compressed_page_size = max_compressed_size;
       const Status& status =
           compressor_->ProcessBlock32(true, header.uncompressed_page_size, dict_buffer,
