@@ -16,6 +16,8 @@
 // under the License.
 
 #include "thirdparty/datasketches/hll.hpp"
+#include "thirdparty/datasketches/cpc_sketch.hpp"
+#include "thirdparty/datasketches/cpc_union.hpp"
 #include "thirdparty/datasketches/kll_sketch.hpp"
 
 #include <sstream>
@@ -70,6 +72,49 @@ TEST(TestDataSketchesHll, UseDataSketchesInterface) {
   }
 }
 
+// This test is meant to cover that the CPC algorithm from the DataSketches library can
+// be imported into Impala, builds without errors and the basic functionality is
+// available to use.
+// The below code is mostly a copy-paste from the example code found on the official
+// DataSketches web page:
+// https://datasketches.apache.org/docs/CPC/CpcCppExample.html
+// The purpose is to create 2 CPC sketches that have overlap in their data, serialize
+// them, deserialize them and give a cardinality estimate combining the 2 sketches.
+TEST(TestDataSketchesCpc, UseDataSketchesInterface) {
+  const int lg_k = 10;
+  std::stringstream sketch_stream1;
+  std::stringstream sketch_stream2;
+  // this section generates two sketches with some overlap and serializes them into files
+  {
+    // 100000 distinct keys
+    datasketches::cpc_sketch sketch1(lg_k);
+    for (int key = 0; key < 100000; key++) sketch1.update(key);
+    sketch1.serialize(sketch_stream1);
+
+    // 100000 distinct keys
+    datasketches::cpc_sketch sketch2(lg_k);
+    for (int key = 50000; key < 150000; key++) sketch2.update(key);
+    sketch2.serialize(sketch_stream2);
+  }
+
+  // this section deserializes the sketches, produces union
+  {
+    datasketches::cpc_sketch sketch1 =
+        datasketches::cpc_sketch::deserialize(sketch_stream1);
+
+    datasketches::cpc_sketch sketch2 =
+        datasketches::cpc_sketch::deserialize(sketch_stream2);
+
+    datasketches::cpc_union u(lg_k);
+    u.update(sketch1);
+    u.update(sketch2);
+    datasketches::cpc_sketch sketch = u.get_result();
+
+    // Like HLL, the order of the inputs fed to the sketches is fix here so we get the
+    // same estimate every time we run this test.
+    EXPECT_EQ(149796, (int)sketch.get_estimate());
+  }
+}
 
 // This test is meant to cover that the KLL algorithm from the DataSketches library can
 // be imported into Impala, builds without errors and the basic functionality is

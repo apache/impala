@@ -33,13 +33,13 @@ namespace datasketches {
 // serialize and deserialize
 template<typename T, typename Enable = void> struct serde {
   // stream serialization
-  void serialize(std::ostream& os, const T* items, unsigned num);
-  void deserialize(std::istream& is, T* items, unsigned num); // items allocated but not initialized
+  void serialize(std::ostream& os, const T* items, unsigned num) const;
+  void deserialize(std::istream& is, T* items, unsigned num) const; // items allocated but not initialized
 
   // raw bytes serialization
-  size_t size_of_item(const T& item);
-  size_t serialize(void* ptr, size_t capacity, const T* items, unsigned num);
-  size_t deserialize(const void* ptr, size_t capacity, T* items, unsigned num); // items allocated but not initialized
+  size_t size_of_item(const T& item) const;
+  size_t serialize(void* ptr, size_t capacity, const T* items, unsigned num) const;
+  size_t deserialize(const void* ptr, size_t capacity, T* items, unsigned num) const; // items allocated but not initialized
 };
 
 // serde for all fixed-size arithmetic types (int and float of different sizes)
@@ -47,7 +47,7 @@ template<typename T, typename Enable = void> struct serde {
 // with LongsSketch and ItemsSketch<Long> with ArrayOfLongsSerDe in Java
 template<typename T>
 struct serde<T, typename std::enable_if<std::is_arithmetic<T>::value>::type> {
-  void serialize(std::ostream& os, const T* items, unsigned num) {
+  void serialize(std::ostream& os, const T* items, unsigned num) const {
     bool failure = false;
     try {
       os.write(reinterpret_cast<const char*>(items), sizeof(T) * num);
@@ -58,7 +58,7 @@ struct serde<T, typename std::enable_if<std::is_arithmetic<T>::value>::type> {
       throw std::runtime_error("error writing to std::ostream with " + std::to_string(num) + " items");
     }
   }
-  void deserialize(std::istream& is, T* items, unsigned num) {
+  void deserialize(std::istream& is, T* items, unsigned num) const {
     bool failure = false;
     try {
       is.read((char*)items, sizeof(T) * num);
@@ -70,16 +70,16 @@ struct serde<T, typename std::enable_if<std::is_arithmetic<T>::value>::type> {
     }
   }
 
-  size_t size_of_item(const T&) {
+  size_t size_of_item(const T&) const {
     return sizeof(T);
   }
-  size_t serialize(void* ptr, size_t capacity, const T* items, unsigned num) {
+  size_t serialize(void* ptr, size_t capacity, const T* items, unsigned num) const {
     const size_t bytes_written = sizeof(T) * num;
     check_memory_size(bytes_written, capacity);
     memcpy(ptr, items, bytes_written);
     return bytes_written;
   }
-  size_t deserialize(const void* ptr, size_t capacity, T* items, unsigned num) {
+  size_t deserialize(const void* ptr, size_t capacity, T* items, unsigned num) const {
     const size_t bytes_read = sizeof(T) * num;
     check_memory_size(bytes_read, capacity);
     memcpy(items, ptr, bytes_read);
@@ -94,7 +94,7 @@ struct serde<T, typename std::enable_if<std::is_arithmetic<T>::value>::type> {
 // which may be too wasteful. Treat this as an example.
 template<>
 struct serde<std::string> {
-  void serialize(std::ostream& os, const std::string* items, unsigned num) {
+  void serialize(std::ostream& os, const std::string* items, unsigned num) const {
     unsigned i = 0;
     bool failure = false;
     try {
@@ -110,7 +110,7 @@ struct serde<std::string> {
       throw std::runtime_error("error writing to std::ostream at item " + std::to_string(i));
     }
   }
-  void deserialize(std::istream& is, std::string* items, unsigned num) {
+  void deserialize(std::istream& is, std::string* items, unsigned num) const {
     unsigned i = 0;
     bool failure = false;
     try {
@@ -137,10 +137,10 @@ struct serde<std::string> {
       throw std::runtime_error("error reading from std::istream at item " + std::to_string(i)); 
     }
   }
-  size_t size_of_item(const std::string& item) {
+  size_t size_of_item(const std::string& item) const {
     return sizeof(uint32_t) + item.size();
   }
-  size_t serialize(void* ptr, size_t capacity, const std::string* items, unsigned num) {
+  size_t serialize(void* ptr, size_t capacity, const std::string* items, unsigned num) const {
     size_t bytes_written = 0;
     for (unsigned i = 0; i < num; ++i) {
       const uint32_t length = items[i].size();
@@ -154,7 +154,7 @@ struct serde<std::string> {
     }
     return bytes_written;
   }
-  size_t deserialize(const void* ptr, size_t capacity, std::string* items, unsigned num) {
+  size_t deserialize(const void* ptr, size_t capacity, std::string* items, unsigned num) const {
     size_t bytes_read = 0;
     unsigned i = 0;
     bool failure = false;
