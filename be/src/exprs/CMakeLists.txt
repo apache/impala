@@ -83,7 +83,8 @@ add_library(ExprsTests STATIC
 )
 add_dependencies(ExprsTests gen-deps)
 
-ADD_UNIFIED_BE_LSAN_TEST(datasketches-test "TestDataSketchesHll.*:TestDataSketchesKll.*")
+ADD_UNIFIED_BE_LSAN_TEST(datasketches-test
+ "TestDataSketchesHll.*:TestDataSketchesKll.*:TestDataSketchesCpc.*")
 ADD_UNIFIED_BE_LSAN_TEST(expr-test "Instantiations/ExprTest.*")
 # Exception to unified be tests: custom main initiailizes LLVM
 ADD_BE_LSAN_TEST(expr-codegen-test)

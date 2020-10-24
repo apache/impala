@@ -24,6 +24,7 @@
 #include "RelativeErrorTables.hpp"
 #include "count_zeros.hpp"
 #include "common_defs.hpp"
+#include "ceiling_power_of_2.hpp"
 
 #include <cmath>
 #include <stdexcept>
@@ -212,19 +213,6 @@ inline double HllUtil<A>::invPow2(const int e) {
   return conv.doubleVal;
 }
 
-// compute the next highest power of 2 of 32-bit n
-// taken from https://graphics.stanford.edu/~seander/bithacks.html
-template<typename A>
-inline uint32_t HllUtil<A>::ceilingPowerOf2(uint32_t n) {
-  --n;
-  n |= n >> 1;
-  n |= n >> 2;
-  n |= n >> 4;
-  n |= n >> 8;
-  n |= n >> 16;
-  return ++n;
-}
-
 template<typename A>
 inline uint32_t HllUtil<A>::simpleIntLog2(uint32_t n) {
   if (n == 0) {
@@ -237,7 +225,7 @@ template<typename A>
 inline int HllUtil<A>::computeLgArrInts(hll_mode mode, int count, int lgConfigK) {
   // assume value missing and recompute
   if (mode == LIST) { return HllUtil<A>::LG_INIT_LIST_SIZE; }
-  int ceilPwr2 = HllUtil<A>::ceilingPowerOf2(count);
+  int ceilPwr2 = ceiling_power_of_2(count);
   if ((HllUtil<A>::RESIZE_DENOM * count) > (HllUtil<A>::RESIZE_NUMER * ceilPwr2)) { ceilPwr2 <<= 1;}
   if (mode == SET) {
     return fmax(HllUtil<A>::LG_INIT_SET_SIZE, HllUtil<A>::simpleIntLog2(ceilPwr2));

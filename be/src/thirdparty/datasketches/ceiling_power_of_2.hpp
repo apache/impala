@@ -17,35 +17,25 @@
  * under the License.
  */
 
-#ifndef _COMMON_DEFS_HPP_
-#define _COMMON_DEFS_HPP_
+#ifndef CEILING_POWER_OF_2_HPP_
+#define CEILING_POWER_OF_2_HPP_
 
 #include <cstdint>
-#include <string>
-#include <memory>
 
 namespace datasketches {
 
-static const uint64_t DEFAULT_SEED = 9001;
-
-template<typename A> using AllocChar = typename std::allocator_traits<A>::template rebind_alloc<char>;
-template<typename A> using string = std::basic_string<char, std::char_traits<char>, AllocChar<A>>;
-
-// utility function to hide unused compiler warning
-// usually has no additional cost
-template<typename T> void unused(T&&...) {}
-
-// common helping functions
-// TODO: find a better place for them
-
-constexpr uint8_t log2(uint32_t n) {
-  return (n > 1) ? 1 + log2(n >> 1) : 0;
+// compute the next highest power of 2 of 32-bit n
+// taken from https://graphics.stanford.edu/~seander/bithacks.html
+static inline uint32_t ceiling_power_of_2(uint32_t n) {
+  --n;
+  n |= n >> 1;
+  n |= n >> 2;
+  n |= n >> 4;
+  n |= n >> 8;
+  n |= n >> 16;
+  return ++n;
 }
 
-constexpr uint8_t lg_size_from_count(uint32_t n, double load_factor) {
-  return log2(n) + ((n > static_cast<uint32_t>((1 << (log2(n) + 1)) * load_factor)) ? 2 : 1);
-}
+} /* namespace datasketches */
 
-} // namespace
-
-#endif // _COMMON_DEFS_HPP_
+#endif // CEILING_POWER_OF_2_HPP_
