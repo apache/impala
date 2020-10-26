@@ -509,10 +509,23 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
         //  should already have a corresponding deletion so won't get here.
         Preconditions.checkState(tHdfsTable.partitions.containsKey(tPart.id),
             "Received stale partition in a statestore update: " + tPart);
+        // The existing table could have a newer version than the last sent table version
+        // in catalogd, so some partition instances may already exist here. This happens
+        // when we have executed DDL/DMLs on this table on this coordinator since the last
+        // catalog update. (IMPALA-10283)
+        if (newHdfsTable.getPartitionMap().containsKey(tPart.id)) {
+          LOG.info("Skip adding existing partition (id:{}, name:{}) to table {}",
+              tPart.id, tPart.partition_name, newHdfsTable.getFullName());
+          continue;
+        }
         HdfsPartition part = new HdfsPartition.Builder(newHdfsTable, tPart.id)
             .fromThrift(tPart)
             .build();
-        Preconditions.checkState(newHdfsTable.addPartitionNoThrow(part));
+        Preconditions.checkState(newHdfsTable.addPartitionNoThrow(part),
+            "Failed adding new partition (id:{}, name:{}) to table {}",
+            tPart.id, tPart.partition_name, newHdfsTable.getFullName());
+        LOG.trace("Added partition (id:{}, name:{}) to table {}",
+            tPart.id, tPart.partition_name, newHdfsTable.getFullName());
         numNewParts++;
       }
       // Validate that all partitions are set.

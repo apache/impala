@@ -877,8 +877,8 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
-   * Adds the partition to the HdfsTable. Skips if a partition with the same partition id
-   * already exists.
+   * Adds the partition to the HdfsTable. Returns false if a partition with the same
+   * partition id already exists.
    */
   public boolean addPartitionNoThrow(HdfsPartition partition) {
     if (partitionMap_.containsKey(partition.getId())) return false;
