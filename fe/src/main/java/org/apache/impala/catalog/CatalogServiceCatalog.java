@@ -64,7 +64,9 @@ import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.events.SelfEventContext;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.catalog.monitor.CatalogTableMetrics;
+import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.catalog.metastore.CatalogMetastoreServer;
+import org.apache.impala.catalog.metastore.HmsApiNameEnum;
 import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
 import org.apache.impala.catalog.metastore.NoOpCatalogMetastoreServer;
 import org.apache.impala.common.FileSystemUtil;
@@ -78,6 +80,7 @@ import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.CatalogServiceConstants;
 import org.apache.impala.thrift.TCatalog;
+import org.apache.impala.thrift.TCatalogdHmsCacheMetrics;
 import org.apache.impala.thrift.TCatalogInfoSelector;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -2209,7 +2212,29 @@ public class CatalogServiceCatalog extends Catalog {
       // the ValidWriteIdList only when the table id matches.
       if (tbl instanceof HdfsTable
           && AcidUtils.compare((HdfsTable) tbl, validWriteIdList, tableId) >= 0) {
+        CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
+            .getCounter(CatalogMetastoreServer.CATALOGD_CACHE_HIT_METRIC)
+            .inc();
+        // Update the cache stats for a HMS API from which the current method got invoked.
+        if (HmsApiNameEnum.contains(reason)) {
+          CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
+              .getCounter(String
+                  .format(CatalogMetastoreServer.CATALOGD_CACHE_API_HIT_METRIC, reason))
+              .inc();
+        }
         return tbl;
+      }
+      CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
+          .getCounter(CatalogMetastoreServer.CATALOGD_CACHE_MISS_METRIC)
+          .inc();
+      // Update the cache stats for a HMS API from which the current method got invoked.
+      if (HmsApiNameEnum.contains(reason)) {
+        // Update the cache miss metric, as the valid write id list did not match and we
+        // have to reload the table.
+        CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
+            .getCounter(String
+                .format(CatalogMetastoreServer.CATALOGD_CACHE_API_MISS_METRIC, reason))
+            .inc();
       }
       previousCatalogVersion = tbl.getCatalogVersion();
       loadReq = tableLoadingMgr_.loadAsync(tableName, reason);
@@ -3300,6 +3325,13 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public TEventProcessorMetrics getEventProcessorMetrics() {
     return metastoreEventProcessor_.getEventProcessorMetrics();
+  }
+
+  /**
+   * Gets the Catalogd HMS cache metrics. Used for publishing metrics on the webUI.
+   */
+  public TCatalogdHmsCacheMetrics getCatalogdHmsCacheMetrics() {
+    return catalogMetastoreServer_.getCatalogdHmsCacheMetrics();
   }
 
   /**

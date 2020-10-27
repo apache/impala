@@ -2864,5 +2864,55 @@
     "units": "NONE",
     "kind": "PROPERTY",
     "key": "admissiond.version"
+  },
+  {
+    "description": "Catalogd HMS cache hit ratio.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Catalogd HMS cache hit ratio",
+    "units": "NONE",
+    "kind" : "GAUGE",
+    "key" : "catalogd.hms.cache.cache.hit.ratio"
+  },
+  {
+    "description": "Catalogd HMS cache API requests.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Status of Catalogd HMS cache",
+    "units": "NONE",
+    "kind" : "COUNTER",
+    "key" : "catalogd.hms.cache.api.requests"
+  },
+  {
+    "description": "Catalogd HMS cache API requests rate for last 1 min.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Catalogd HMS cache API requests rate for last 1 minute",
+    "units": "NONE",
+    "kind" : "GAUGE",
+    "key" : "catalogd.hms.cache.status.api.requests.1min"
+  },
+  {
+    "description": "Catalogd HMS cache API requests rate for last 5 min.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Catalogd HMS cache API requests rate for last 5 minutes",
+    "units": "NONE",
+    "kind" : "GAUGE",
+    "key" : "catalogd.hms.cache.status.api.requests.5min"
+  },
+  {
+    "description": "Catalogd HMS cache API requests rate for last 15 min.",
+    "contexts": [
+      "CATALOGSERVER"
+    ],
+    "label": "Catalogd HMS cache API requests rate for last 15 minutes",
+    "units": "NONE",
+    "kind" : "GAUGE",
+    "key" : "catalogd.hms.cache.status.api.requests.15min"
   }
 ]

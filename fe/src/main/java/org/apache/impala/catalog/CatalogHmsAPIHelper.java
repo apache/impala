@@ -63,6 +63,7 @@ import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.metastore.CatalogMetastoreServiceHandler;
+import org.apache.impala.catalog.metastore.HmsApiNameEnum;
 import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.CatalogLookupStatus;
@@ -145,7 +146,8 @@ public class CatalogHmsAPIHelper {
     //TODO add table id in the request when client passes it. Also, looks like
     // when HIVE-24662 is resolved, we may not need the table id in this request.
     TGetPartialCatalogObjectResponse response = getPartialCatalogObjResponse(
-        catalog, reqBuilder.build(), dbName, tblName, "processing get_table_req");
+        catalog, reqBuilder.build(), dbName, tblName,
+        HmsApiNameEnum.GET_TABLE_REQ.apiName());
     // As of writing this code, we know that the table which is returned in the response
     // is a copy of table stored in the catalogd. Should this assumption change in the
     // future, we must make sure that we take a deepCopy() of the table before modifying
@@ -255,7 +257,7 @@ public class CatalogHmsAPIHelper {
     }
     TGetPartialCatalogObjectResponse response = getPartialCatalogObjResponse(catalog,
         catalogReq.build(), dbName, tblName,
-        "processing " + CatalogMetastoreServiceHandler.GET_PARTITION_BY_EXPR);
+        HmsApiNameEnum.GET_PARTITION_BY_EXPR.apiName());
     checkCondition(response.table_info.hms_table.getPartitionKeys() != null,
         "%s is not a partitioned table", tableName);
     // create a mapping of the Partition name to the Partition so that we can return the
@@ -377,7 +379,7 @@ public class CatalogHmsAPIHelper {
     // when HIVE-24662 is resolved, we may not need the table id in this request.
     TGetPartialCatalogObjectResponse response = getPartialCatalogObjResponse(catalog,
         requestBuilder.build(), dbName, tblName,
-        "processing " + CatalogMetastoreServiceHandler.GET_PARTITION_BY_NAMES);
+        HmsApiNameEnum.GET_PARTITION_BY_NAMES.apiName());
     checkCondition(response.table_info.hms_table.getPartitionKeys() != null,
         "%s.%s is not a partitioned table", dbName, tblName);
     checkCondition(

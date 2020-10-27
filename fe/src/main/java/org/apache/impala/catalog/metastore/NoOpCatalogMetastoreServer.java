@@ -18,6 +18,7 @@
 package org.apache.impala.catalog.metastore;
 
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.thrift.TCatalogdHmsCacheMetrics;
 
 /**
  * NoOpCatalogMetastoreServer which is used when metastore service is not configured.
@@ -38,7 +39,7 @@ public class NoOpCatalogMetastoreServer implements ICatalogMetastoreServer {
   }
 
   @Override
-  public String getMetrics() {
-    return EMPTY;
+  public TCatalogdHmsCacheMetrics getCatalogdHmsCacheMetrics() {
+    return new TCatalogdHmsCacheMetrics();
   }
 }

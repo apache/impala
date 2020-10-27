@@ -17,31 +17,31 @@
 
 package org.apache.impala.catalog.metastore;
 
-import org.apache.impala.catalog.CatalogException;
-import org.apache.impala.thrift.TCatalogdHmsCacheMetrics;
-
 /**
- * This is the main Interface which a CatalogMetastore service should implement. It
- * provides lifecycle and monitoring methods which are called from
- * CatalogServiceCatalog to instantiate a Metastore service.
+ * HmsApiNameEnum has list of names of HMS APIs that will be served from CatalogD HMS
+ * cache, if CatalogD caching is enabled.
  */
-public interface ICatalogMetastoreServer {
+public enum HmsApiNameEnum {
+  GET_TABLE_REQ("get_table_req"),
+  GET_PARTITION_BY_EXPR("get_partitions_by_expr"),
+  GET_PARTITION_BY_NAMES("get_partitions_by_names_req");
 
-  /**
-   * Starts the metastore service
-   * @throws CatalogException
-   */
-  void start() throws CatalogException;
+  private final String apiName;
 
-  /**
-   * Stop the metastore service.
-   * @throws CatalogException
-   */
-  void stop() throws CatalogException;
+  HmsApiNameEnum(String apiName) {
+    this.apiName = apiName;
+  }
 
-  /**
-   * Returns the metrics for this CatalogD HMS Cache.
-   * @return TCatalogdHmsCacheMetrics.
-   */
-  TCatalogdHmsCacheMetrics getCatalogdHmsCacheMetrics();
+  public String apiName() {
+    return apiName;
+  }
+
+  public static boolean contains(String apiName) {
+    for (HmsApiNameEnum api : HmsApiNameEnum.values()) {
+      if (api.name().equals(apiName)) {
+        return true;
+      }
+    }
+    return false;
+  }
 }

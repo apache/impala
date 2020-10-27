@@ -262,7 +262,6 @@ import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.impala.catalog.CatalogHmsAPIHelper;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import org.apache.impala.common.Metrics;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.util.AcidUtils;
 import org.apache.thrift.TException;
@@ -293,20 +292,16 @@ public abstract class MetastoreServiceHandler implements Iface {
       + "table %s to the backing HiveMetastore service";
 
   // constant used for logging error messages
-  public static final String GET_PARTITION_BY_EXPR = "get_partitions_by_expr";
-  public static final String GET_PARTITION_BY_NAMES = "get_partitions_by_names_req";
   protected final CatalogServiceCatalog catalog_;
   protected final boolean fallBackToHMSOnErrors_;
-  protected final Metrics metrics_;
   // TODO handle session configuration
   protected Configuration serverConf_;
   protected PartitionExpressionProxy expressionProxy_;
   protected final String defaultCatalogName_;
 
-  public MetastoreServiceHandler(CatalogServiceCatalog catalog, Metrics metrics,
+  public MetastoreServiceHandler(CatalogServiceCatalog catalog,
       boolean fallBackToHMSOnErrors) {
     catalog_ = Preconditions.checkNotNull(catalog);
-    metrics_ = Preconditions.checkNotNull(metrics);
     fallBackToHMSOnErrors_ = fallBackToHMSOnErrors;
     LOG.info("Fallback to hive metastore service on errors is {}",
         fallBackToHMSOnErrors_);
@@ -1306,7 +1301,9 @@ public abstract class MetastoreServiceHandler implements Iface {
     String tblName =
         getPartitionsByNamesRequest.getDb_name() + "." + getPartitionsByNamesRequest
             .getTbl_name();
-    LOG.info(String.format(HMS_FALLBACK_MSG_FORMAT, GET_PARTITION_BY_NAMES, tblName));
+    LOG.info(String
+        .format(HMS_FALLBACK_MSG_FORMAT, HmsApiNameEnum.GET_PARTITION_BY_NAMES.apiName(),
+            tblName));
     boolean getFileMetadata = getPartitionsByNamesRequest.isGetFileMetadata();
     GetPartitionsByNamesResult result;
     ValidWriteIdList validWriteIdList = null;

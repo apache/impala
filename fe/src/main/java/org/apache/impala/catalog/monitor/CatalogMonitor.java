@@ -17,6 +17,8 @@
 
 package org.apache.impala.catalog.monitor;
 
+import org.apache.impala.common.Metrics;
+
 /**
  * Singleton class that helps monitor catalog, monitoring classes can be
  * accessed through the CatalogMonitor.
@@ -28,6 +30,8 @@ public final class CatalogMonitor {
 
   private final CatalogOperationMetrics catalogOperationUsage_;
 
+  private final Metrics catalogdHmsCacheMetrics_ = new Metrics();
+
   private CatalogMonitor() {
     catalogTableMetrics_ = CatalogTableMetrics.INSTANCE;
     catalogOperationUsage_ = CatalogOperationMetrics.INSTANCE;
@@ -37,5 +41,9 @@ public final class CatalogMonitor {
 
   public CatalogOperationMetrics getCatalogOperationMetrics() {
     return catalogOperationUsage_;
+  }
+
+  public Metrics getCatalogdHmsCacheMetrics() {
+    return catalogdHmsCacheMetrics_;
   }
 }
