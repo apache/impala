@@ -68,7 +68,7 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=55-dcf54c8601
+export IMPALA_TOOLCHAIN_BUILD_ID=59-78fc9e6092
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
@@ -199,7 +199,6 @@ unset IMPALA_HBASE_URL
 unset IMPALA_HIVE_URL
 unset IMPALA_KUDU_URL
 unset IMPALA_KUDU_VERSION
-unset IMPALA_KUDU_JAVA_VERSION
 
 export IMPALA_KERBERIZE=false
 
@@ -646,8 +645,7 @@ fi
 # overall build type) and does not apply when using a local Kudu build.
 export USE_KUDU_DEBUG_BUILD=${USE_KUDU_DEBUG_BUILD-false}
 
-export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"5ad5d3d66"}
-export IMPALA_KUDU_JAVA_VERSION=${IMPALA_KUDU_JAVA_VERSION-"1.13.0-SNAPSHOT"}
+export IMPALA_KUDU_VERSION=${IMPALA_KUDU_VERSION-"2f5605dfc"}
 export IMPALA_KUDU_HOME=${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-$IMPALA_KUDU_VERSION
 export IMPALA_KUDU_JAVA_HOME=\
 ${IMPALA_TOOLCHAIN_PACKAGES_HOME}/kudu-${IMPALA_KUDU_VERSION}/java
@@ -727,7 +725,6 @@ echo "IMPALA_HIVE_VERSION     = $IMPALA_HIVE_VERSION"
 echo "IMPALA_HBASE_VERSION    = $IMPALA_HBASE_VERSION"
 echo "IMPALA_HUDI_VERSION     = $IMPALA_HUDI_VERSION"
 echo "IMPALA_KUDU_VERSION     = $IMPALA_KUDU_VERSION"
-echo "IMPALA_KUDU_JAVA_VERSION= $IMPALA_KUDU_JAVA_VERSION"
 echo "IMPALA_RANGER_VERSION   = $IMPALA_RANGER_VERSION"
 echo "IMPALA_ICEBERG_VERSION  = $IMPALA_ICEBERG_VERSION"
 

@@ -48,7 +48,7 @@ under the License.
     <impala.extdatasrc.api.version>${project.version}</impala.extdatasrc.api.version>
     <impala.query.event.hook.api.version>${project.version}</impala.query.event.hook.api.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <kudu.version>${env.IMPALA_KUDU_JAVA_VERSION}</kudu.version>
+    <kudu.version>${env.IMPALA_KUDU_VERSION}</kudu.version>
     <commons-io.version>2.6</commons-io.version>
     <slf4j.version>1.7.25</slf4j.version>
     <junit.version>4.12</junit.version>
@@ -173,8 +173,11 @@ under the License.
       <releases>
         <enabled>${env.IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED}</enabled>
       </releases>
+      <!--
+      This repository now uses explicit versions, so snapshots are no longer required.
+      -->
       <snapshots>
-        <enabled>${env.IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED}</enabled>
+        <enabled>false</enabled>
       </snapshots>
     </repository>
     <repository>
