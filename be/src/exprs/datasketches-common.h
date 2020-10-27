@@ -41,6 +41,10 @@ const datasketches::target_hll_type DS_HLL_TYPE = datasketches::target_hll_type:
 /// buckets equals 2^DS_SKETCH_CONFIG.
 const int DS_SKETCH_CONFIG = 12;
 
+/// Similar to DS_SKETCH_CONFIG, the value must be between 4 and 21. Note that CPC is
+/// configured as 11 because it is comparable to an HLL sketch of 12.
+const int DS_CPC_SKETCH_CONFIG = 11;
+
 /// 'kappa' is a number of standard deviations from the mean: 1, 2 or 3 (default 2).
 const int DS_DEFAULT_KAPPA = 2;
 

@@ -20,6 +20,7 @@
 #include "exprs/datasketches-common.h"
 #include "gutil/strings/substitute.h"
 #include "thirdparty/datasketches/hll.hpp"
+#include "thirdparty/datasketches/cpc_sketch.hpp"
 #include "thirdparty/datasketches/theta_sketch.hpp"
 #include "thirdparty/datasketches/theta_union.hpp"
 #include "thirdparty/datasketches/theta_intersection.hpp"
@@ -106,6 +107,17 @@ StringVal DataSketchesFunctions::DsHllStringify(FunctionContext* ctx,
   StringVal dst(ctx, str.size());
   memcpy(dst.ptr, str.c_str(), str.size());
   return dst;
+}
+
+BigIntVal DataSketchesFunctions::DsCpcEstimate(
+    FunctionContext* ctx, const StringVal& serialized_sketch) {
+  if (serialized_sketch.is_null || serialized_sketch.len == 0) return BigIntVal::null();
+  datasketches::cpc_sketch sketch(DS_CPC_SKETCH_CONFIG);
+  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
+    LogSketchDeserializationError(ctx);
+    return BigIntVal::null();
+  }
+  return sketch.get_estimate();
 }
 
 BigIntVal DataSketchesFunctions::DsThetaEstimate(

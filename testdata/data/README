@@ -509,6 +509,12 @@ hll_sketches_from_impala.parquet:
 This holds the same sketches as hll_sketches_from_hive.parquet but these sketches were
 created by Impala instead of Hive.
 
+cpc_sketches_from_hive.parquet:
+This file contains a table that has some string columns to store serialized Apache
+DataSketches CPC sketches created by Hive. Each column contains a sketch for a
+specific data type. Covers the following types: TINYINT, INT, BIGINT, FLOAT, DOUBLE,
+STRING, CHAR and VARCHAR. Has an additional column for NULL values.
+
 theta_sketches_from_hive.parquet:
 This file contains a table that has some string columns to store serialized Apache
 DataSketches Theta sketches created by Hive. Each column contains a sketch for a

@@ -19,12 +19,14 @@
 
 #include "common/logging.h"
 #include "udf/udf-internal.h"
+#include "thirdparty/datasketches/cpc_sketch.hpp"
 #include "thirdparty/datasketches/kll_sketch.hpp"
 #include "thirdparty/datasketches/theta_sketch.hpp"
 
 namespace impala {
 
 using datasketches::hll_sketch;
+using datasketches::cpc_sketch;
 using datasketches::kll_sketch;
 using datasketches::theta_sketch;
 using datasketches::compact_theta_sketch;
@@ -70,6 +72,8 @@ bool DeserializeDsSketch(const StringVal& serialized_sketch,
 
 template bool DeserializeDsSketch(const StringVal& serialized_sketch,
     hll_sketch* sketch);
+template bool DeserializeDsSketch(const StringVal& serialized_sketch,
+    cpc_sketch* sketch);
 template bool DeserializeDsSketch(const StringVal& serialized_sketch,
     kll_sketch<float>* sketch);
 

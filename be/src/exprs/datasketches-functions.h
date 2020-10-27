@@ -64,6 +64,12 @@ public:
   static StringVal DsHllStringify(FunctionContext* ctx,
       const StringVal& serialized_sketch);
 
+  /// 'serialized_sketch' is expected as a serialized Apache DataSketches CPC sketch. If
+  /// it is not, then the query fails. Otherwise, returns the count(distinct) estimate
+  /// from the sketch.
+  static BigIntVal DsCpcEstimate(
+      FunctionContext* ctx, const StringVal& serialized_sketch);
+
   /// 'serialized_sketch' is expected as a serialized Apache DataSketches Theta sketch.
   /// If it is not, then the query fails. Otherwise, returns the count(distinct) estimate
   /// from the sketch.

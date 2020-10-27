@@ -40,6 +40,8 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "thirdparty/datasketches/hll.hpp"
+#include "thirdparty/datasketches/cpc_sketch.hpp"
+#include "thirdparty/datasketches/cpc_union.hpp"
 #include "thirdparty/datasketches/theta_sketch.hpp"
 #include "thirdparty/datasketches/theta_union.hpp"
 #include "thirdparty/datasketches/theta_intersection.hpp"
@@ -1640,6 +1642,17 @@ StringVal SerializeDsHllUnion(FunctionContext* ctx,
   return SerializeCompactDsHllSketch(ctx, sketch);
 }
 
+/// Auxiliary function that receives a cpc_sketch and returns the serialized version of
+/// it wrapped into a StringVal.
+/// Introducing this function in the .cc to avoid including the whole DataSketches CPC
+/// functionality into the header.
+StringVal SerializeDsCpcSketch(
+    FunctionContext* ctx, const datasketches::cpc_sketch& sketch) {
+  std::stringstream serialized_input;
+  sketch.serialize(serialized_input);
+  return StringStreamToStringVal(ctx, serialized_input);
+}
+
 /// Auxiliary function that receives a theta_sketch and returns the serialized version of
 /// it wrapped into a StringVal.
 /// Introducing this function in the .cc to avoid including the whole DataSketches Theta
@@ -1850,6 +1863,97 @@ StringVal AggregateFunctions::DsHllUnionFinalize(FunctionContext* ctx,
   StringVal result = SerializeCompactDsHllSketch(ctx, sketch);
   ctx->Free(src.ptr);
   return result;
+}
+
+void AggregateFunctions::DsCpcInit(FunctionContext* ctx, StringVal* dst) {
+  AllocBuffer(ctx, dst, sizeof(datasketches::cpc_sketch));
+  if (UNLIKELY(dst->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
+  // Note, that cpc_sketch will always have the same size regardless of the amount of data
+  // it keeps track. This is because it's a wrapper class that holds all the inserted data
+  // on heap. Here, we put only the wrapper class into a StringVal.
+  datasketches::cpc_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::cpc_sketch*>(dst->ptr);
+  *sketch_ptr = datasketches::cpc_sketch(DS_CPC_SKETCH_CONFIG);
+}
+
+template <typename T>
+void AggregateFunctions::DsCpcUpdate(FunctionContext* ctx, const T& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::cpc_sketch));
+  datasketches::cpc_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::cpc_sketch*>(dst->ptr);
+  sketch_ptr->update(src.val);
+}
+
+// Specialize for StringVal
+template <>
+void AggregateFunctions::DsCpcUpdate(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  if (src.is_null || src.len == 0) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::cpc_sketch));
+  datasketches::cpc_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::cpc_sketch*>(dst->ptr);
+  sketch_ptr->update(reinterpret_cast<char*>(src.ptr), src.len);
+}
+
+StringVal AggregateFunctions::DsCpcSerialize(FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::cpc_sketch));
+  datasketches::cpc_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::cpc_sketch*>(src.ptr);
+  StringVal dst = SerializeDsCpcSketch(ctx, *sketch_ptr);
+  ctx->Free(src.ptr);
+  return dst;
+}
+
+void AggregateFunctions::DsCpcMerge(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  DCHECK(!src.is_null);
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::cpc_sketch));
+  datasketches::cpc_sketch src_sketch;
+  if (!DeserializeDsSketch(src, &src_sketch)) {
+    LogSketchDeserializationError(ctx);
+    return;
+  }
+
+  datasketches::cpc_sketch* dst_sketch_ptr =
+      reinterpret_cast<datasketches::cpc_sketch*>(dst->ptr);
+
+  datasketches::cpc_union union_sketch(DS_CPC_SKETCH_CONFIG);
+  union_sketch.update(src_sketch);
+  union_sketch.update(*dst_sketch_ptr);
+
+  *dst_sketch_ptr = union_sketch.get_result();
+}
+
+BigIntVal AggregateFunctions::DsCpcFinalize(FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::cpc_sketch));
+  datasketches::cpc_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::cpc_sketch*>(src.ptr);
+  BigIntVal estimate = sketch_ptr->get_estimate();
+  ctx->Free(src.ptr);
+  return (estimate == 0) ? BigIntVal::null() : estimate;
+}
+
+StringVal AggregateFunctions::DsCpcFinalizeSketch(
+    FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::cpc_sketch));
+  datasketches::cpc_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::cpc_sketch*>(src.ptr);
+  StringVal result_str = StringVal::null();
+  if (sketch_ptr->get_estimate() > 0.0) {
+    result_str = SerializeDsCpcSketch(ctx, *sketch_ptr);
+  }
+  ctx->Free(src.ptr);
+  return result_str;
 }
 
 void AggregateFunctions::DsThetaInit(FunctionContext* ctx, StringVal* dst) {
@@ -3214,6 +3318,23 @@ template void AggregateFunctions::DsHllUpdate(
 template void AggregateFunctions::DsHllUpdate(
     FunctionContext*, const DoubleVal&, StringVal*);
 template void AggregateFunctions::DsHllUpdate(
+    FunctionContext*, const DateVal&, StringVal*);
+
+template void AggregateFunctions::DsCpcUpdate(
+    FunctionContext*, const BooleanVal&, StringVal*);
+template void AggregateFunctions::DsCpcUpdate(
+    FunctionContext*, const TinyIntVal&, StringVal*);
+template void AggregateFunctions::DsCpcUpdate(
+    FunctionContext*, const SmallIntVal&, StringVal*);
+template void AggregateFunctions::DsCpcUpdate(
+    FunctionContext*, const IntVal&, StringVal*);
+template void AggregateFunctions::DsCpcUpdate(
+    FunctionContext*, const BigIntVal&, StringVal*);
+template void AggregateFunctions::DsCpcUpdate(
+    FunctionContext*, const FloatVal&, StringVal*);
+template void AggregateFunctions::DsCpcUpdate(
+    FunctionContext*, const DoubleVal&, StringVal*);
+template void AggregateFunctions::DsCpcUpdate(
     FunctionContext*, const DateVal&, StringVal*);
 
 template void AggregateFunctions::DsThetaUpdate(

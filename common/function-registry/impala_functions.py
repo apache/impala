@@ -1003,6 +1003,8 @@ visible_functions = [
       '_ZN6impala21DataSketchesFunctions11DsHllUnionFEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
   [['ds_hll_stringify'], 'STRING', ['STRING'],
       '_ZN6impala21DataSketchesFunctions14DsHllStringifyEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+  [['ds_cpc_estimate'], 'BIGINT', ['STRING'],
+      '_ZN6impala21DataSketchesFunctions13DsCpcEstimateEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
   [['ds_theta_estimate'], 'BIGINT', ['STRING'],
      '_ZN6impala21DataSketchesFunctions15DsThetaEstimateEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
   [['ds_theta_exclude'], 'STRING', ['STRING', 'STRING'],
