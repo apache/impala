@@ -29,6 +29,8 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
 
+#include <openssl/crypto.h>
+
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "common/object-pool.h"
@@ -10481,12 +10483,24 @@ TEST_P(ExprTest, MaskTest) {
 }
 
 TEST_P(ExprTest, MaskHashTest) {
-  TestStringValue("mask_hash('TestString-123')",
-      "8b44d559dc5d60e4453c9b4edf2a455fbce054bb8504cd3eb9b5f391bd239c90");
-  TestStringValue("mask_hash(cast('TestString-123' as varchar(24)))",
-      "8b44d559dc5d60e4453c9b4edf2a455fbce054bb8504cd3eb9b5f391bd239c90");
-  TestStringValue("mask_hash(cast('TestString-123' as char(24)))",
-      "30a88603135d3a6f7a66b4f9193da1ab4423aed45fb8fe736c2f2a08977f2bdd");
+  if (FIPS_mode()) {
+    TestStringValue("mask_hash('TestString-123')",
+        "f3a58111be6ecec11449ac44654e72376b7759883ea11723b6e51354d50436de"
+        "645bd061cb5c2b07b68e15b7a7c342cac41f69b9c4efe19e810bbd7abf639a1c");
+    TestStringValue("mask_hash(cast('TestString-123' as varchar(24)))",
+        "f3a58111be6ecec11449ac44654e72376b7759883ea11723b6e51354d50436de"
+        "645bd061cb5c2b07b68e15b7a7c342cac41f69b9c4efe19e810bbd7abf639a1c");
+    TestStringValue("mask_hash(cast('TestString-123' as char(24)))",
+        "8eb5cfb29df20ccb1142aab8700ef4649c3b26304c35263c9bbc7db0d20e1098"
+        "47a728afe0dccdfbbb3d876a5cb3ceb0bd34b5104dd62af1feb234d705bfb193");
+  } else {
+    TestStringValue("mask_hash('TestString-123')",
+        "8b44d559dc5d60e4453c9b4edf2a455fbce054bb8504cd3eb9b5f391bd239c90");
+    TestStringValue("mask_hash(cast('TestString-123' as varchar(24)))",
+        "8b44d559dc5d60e4453c9b4edf2a455fbce054bb8504cd3eb9b5f391bd239c90");
+    TestStringValue("mask_hash(cast('TestString-123' as char(24)))",
+        "30a88603135d3a6f7a66b4f9193da1ab4423aed45fb8fe736c2f2a08977f2bdd");
+  }
   TestIsNull("mask_hash(cast(123 as tinyint))", TYPE_BIGINT);
   TestIsNull("mask_hash(cast(12345 as smallint))", TYPE_BIGINT);
   TestIsNull("mask_hash(cast(12345 as int))", TYPE_BIGINT);

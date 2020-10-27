@@ -18,6 +18,7 @@
 #include "exprs/mask-functions.h"
 
 #include <gutil/strings/substitute.h>
+#include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/sha.h>
 
@@ -702,11 +703,19 @@ BigIntVal MaskFunctions::Mask(FunctionContext* ctx, const BigIntVal& val,
 }
 
 StringVal MaskFunctions::MaskHash(FunctionContext* ctx, const StringVal& val) {
-  // Hive hash the value by sha256 and encoding it into a lower case hex string.
-  StringVal sha256_hash(ctx, SHA256_DIGEST_LENGTH);
-  if (UNLIKELY(sha256_hash.is_null)) return StringVal::null();
-  discard_result(SHA256(val.ptr, val.len, sha256_hash.ptr));
-  return StringFunctions::Lower(ctx, MathFunctions::HexString(ctx, sha256_hash));
+  // Hive hash the value by sha256 and encoding it into a lower case hex string in
+  // non FIPS mode. In FIPS enabled mode, it's required to use sha512 for mask hash.
+  if (FIPS_mode()) {
+    StringVal sha512_hash(ctx, SHA512_DIGEST_LENGTH);
+    if (UNLIKELY(sha512_hash.is_null)) return StringVal::null();
+    discard_result(SHA512(val.ptr, val.len, sha512_hash.ptr));
+    return StringFunctions::Lower(ctx, MathFunctions::HexString(ctx, sha512_hash));
+  } else {
+    StringVal sha256_hash(ctx, SHA256_DIGEST_LENGTH);
+    if (UNLIKELY(sha256_hash.is_null)) return StringVal::null();
+    discard_result(SHA256(val.ptr, val.len, sha256_hash.ptr));
+    return StringFunctions::Lower(ctx, MathFunctions::HexString(ctx, sha256_hash));
+  }
 }
 // For other types, the hash values are always NULL.
 BigIntVal MaskFunctions::MaskHash(FunctionContext* ctx, const BigIntVal& val) {
