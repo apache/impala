@@ -546,6 +546,7 @@ Status HdfsAvroScanner::ProcessRange(RowBatch* row_batch) {
       Tuple* tuple = tuple_;
       TupleRow* tuple_row = row_batch->GetRow(row_batch->AddRow());
       int max_tuples = row_batch->capacity() - row_batch->num_rows();
+      DCHECK_GT(num_records_in_block_, record_pos_);
       max_tuples = min<int64_t>(max_tuples, num_records_in_block_ - record_pos_);
       int num_to_commit;
       if (scan_node_->materialized_slots().empty()) {
