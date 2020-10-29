@@ -17,6 +17,7 @@
 
 from copy import copy
 import itertools
+import logging
 import math
 import os
 import pytest
@@ -27,9 +28,12 @@ import time
 from subprocess import check_call
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.test_dimensions import create_exec_option_dimension_from_dict
-from tests.common.impala_test_suite import ImpalaTestSuite, LOG
+from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.util.filesystem_utils import IS_HDFS, WAREHOUSE, get_fs_path
 from tests.util.test_file_parser import QueryTestSectionReader
+
+LOG = logging.getLogger(__name__)
+LOG.setLevel(level=logging.INFO)
 
 # Random fuzz testing of HDFS scanners. Existing tables for any HDFS file format
 # are corrupted in random ways to flush out bugs with handling of corrupted data.
@@ -236,7 +240,7 @@ class TestScannersFuzzing(ImpalaTestSuite):
       query_options['disable_codegen_rows_threshold'] = 0
       try:
         result = self.execute_query(query, query_options = query_options)
-        LOG.info('\n'.join(result.log))
+        LOG.info(result.log)
       except Exception as e:
         # We should only test queries that parse succesfully.
         assert "AnalysisException" not in str(e)
