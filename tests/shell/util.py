@@ -37,7 +37,6 @@ from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import (IMPALAD_BEESWAX_HOST_PORT,
     IMPALAD_HS2_HOST_PORT, IMPALAD_HS2_HTTP_HOST_PORT)
 
-logging.basicConfig()
 LOG = logging.getLogger('tests/shell/util.py')
 LOG.addHandler(logging.StreamHandler())
 

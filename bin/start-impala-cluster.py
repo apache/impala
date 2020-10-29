@@ -42,8 +42,6 @@ from tests.common.impala_cluster import (ImpalaCluster, DEFAULT_BEESWAX_PORT,
     DEFAULT_CATALOGD_JVM_DEBUG_PORT, DEFAULT_IMPALAD_JVM_DEBUG_PORT,
     find_user_processes, run_daemon)
 
-logging.basicConfig(level=logging.ERROR, format="%(asctime)s %(threadName)s: %(message)s",
-    datefmt="%H:%M:%S")
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 LOG.setLevel(level=logging.DEBUG)
 
@@ -718,6 +716,8 @@ def validate_options():
 
 
 if __name__ == "__main__":
+  logging.basicConfig(level=logging.ERROR, format="%(asctime)s %(threadName)s: %(message)s",
+    datefmt="%H:%M:%S")
   validate_options()
   if options.docker_network is None:
     cluster_ops = MiniClusterOperations()

@@ -21,7 +21,6 @@ import os
 import re
 import subprocess
 
-logging.basicConfig()
 LOG = logging.getLogger('impala_lib_python_helpers')
 
 
