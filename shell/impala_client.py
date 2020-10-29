@@ -360,7 +360,7 @@ class ImpalaClient(object):
     # connect timeout does not achieve the desirable result as the subsequent open() could
     # block similary in case of problematic remote end points.
     # TODO: Investigate connection reuse in ImpalaHttpClient and revisit this.
-    if connect_timeout_ms > 0:
+    if connect_timeout_ms > 0 and self.verbose:
       print("Warning: --connect_timeout_ms is currently ignored with HTTP transport.",
             file=sys.stderr)
 

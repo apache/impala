@@ -1019,3 +1019,11 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(vector, ['-q', query_options + query, '-B'])
     result_rows = result.stdout.strip().split('\n')
     assert len(result_rows) == 2
+
+  def test_quiet_mode(self, vector):
+    """Checks that extraneous output isn't included when --quiet is set."""
+    args = ['--quiet', '-q', 'select 1']
+    result = run_impala_shell_cmd(vector, args)
+    expected_result = """+---+\n| 1 |\n+---+\n| 1 |\n+---+\n"""
+    assert result.stdout == expected_result
+    assert result.stderr == ""

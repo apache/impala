@@ -2001,9 +2001,11 @@ def impala_shell_main():
   # Non-interactive mode
   if options.query or options.query_file:
     # Impala shell will disable live_progress if non-interactive mode is detected.
-    options.live_progress = False
-    print("Warning: live_progress only applies to interactive shell sessions, "
-          "and is being skipped for now.", file=sys.stderr)
+    if options.live_progress:
+      if options.verbose:
+        print("Warning: live_progress only applies to interactive shell sessions, "
+              "and is being skipped for now.", file=sys.stderr)
+      options.live_progress = False
     if options.live_summary:
       print("Error: live_summary is available for interactive mode only.",
             file=sys.stderr)
