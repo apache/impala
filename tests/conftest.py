@@ -68,7 +68,16 @@ def configure_logging():
   # Use a "--" since most of our tests output SQL commands, and it's nice to
   # be able to copy-paste directly from the test output back into a shell to
   # try to reproduce a failure.
+  #
+  # This call only takes effect if it is the first call to logging.basicConfig().
+  # For example, if some other library calls logging.basicConfig() at the global
+  # level, then importing that library can render this call ineffective.
   logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+
+  # Verify that the logging level is set to the correct value.
+  rootLoggerLevel = logging.getLogger().getEffectiveLevel()
+  print("rootLoggerLevel = {0}".format(logging.getLevelName(rootLoggerLevel)))
+  assert(rootLoggerLevel == logging.INFO)
 
 
 def pytest_addoption(parser):

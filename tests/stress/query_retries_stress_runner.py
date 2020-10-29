@@ -44,7 +44,6 @@ from tests.util.test_file_parser import load_tpc_queries
 
 IMPALA_HOME = os.environ["IMPALA_HOME"]
 
-logging.basicConfig(level=logging.INFO, format='[%(name)s][%(threadName)s]: %(message)s')
 LOG = logging.getLogger('query_retries_stress_test')
 
 
@@ -293,6 +292,7 @@ def parse_args(parser):
 
 
 def main():
+  logging.basicConfig(level=logging.INFO, format='[%(name)s][%(threadName)s]: %(message)s')
   # Parse the command line args.
   parser = ArgumentParser(description="""
 Runs a stress test for transparent query retries. Starts an impala cluster with a

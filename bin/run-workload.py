@@ -119,7 +119,6 @@ if options.get_password:
   options.password = getpass.getpass()
   options.get_password = None
 
-logging.basicConfig(level=logging.INFO, format='[%(name)s]: %(message)s')
 LOG = logging.getLogger('run-workload')
 
 
@@ -239,6 +238,7 @@ def _validate_options():
       raise RuntimeError("Impalads must be of the form host:port or host.")
 
 if __name__ == "__main__":
+  logging.basicConfig(level=logging.INFO, format='[%(name)s]: %(message)s')
   # Check for badly formed user options.
   _validate_options()
 

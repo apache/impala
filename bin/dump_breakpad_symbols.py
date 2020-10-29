@@ -66,8 +66,6 @@ import tempfile
 from argparse import ArgumentParser
 from collections import namedtuple
 
-logging.basicConfig(level=logging.INFO)
-
 BinarySymbolInfo = namedtuple('BinarySymbolInfo', 'path, debug_path')
 
 
@@ -283,6 +281,7 @@ def process_binary(dump_syms, binary, out_dir):
 
 
 def main():
+  logging.basicConfig(level=logging.INFO)
   args = parse_args()
   dump_syms = args.dump_syms or find_dump_syms_binary()
   assert dump_syms
