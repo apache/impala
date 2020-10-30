@@ -21,8 +21,8 @@
 #include <limits.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <cstdlib>
-#include <cstring>
 #include <limits>
 #include <map>
 #include <memory>
@@ -51,6 +51,7 @@
 #include "kudu/gutil/walltime.h"
 #include "kudu/util/env.h"
 #include "kudu/util/faststring.h"
+#include "kudu/util/flags.h"
 #include "kudu/util/path_util.h"
 #include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/slice.h"
@@ -76,6 +77,7 @@ namespace kudu {
 
 const char* kInvalidPath = "/dev/invalid-path-for-kudu-tests";
 static const char* const kSlowTestsEnvVar = "KUDU_ALLOW_SLOW_TESTS";
+static const char* const kLargeKeysEnvVar = "KUDU_USE_LARGE_KEYS_IN_TESTS";
 
 static const uint64_t kTestBeganAtMicros = Env::Default()->NowMicros();
 
@@ -100,21 +102,26 @@ KuduTest::KuduTest()
     {"never_fsync", "true"},
     // Disable redaction.
     {"redact", "none"},
-    // Reduce default RSA key length for faster tests. We are using strong/high
-    // TLS v1.2 cipher suites, so minimum possible for TLS-related RSA keys is
-    // 768 bits. However, for the external mini cluster we use 1024 bits because
-    // Java default security policies require at least 1024 bits for RSA keys
-    // used in certificates. For uniformity, here 1024 RSA bit keys are used
-    // as well. As for the TSK keys, 512 bits is the minimum since the SHA256
-    // digest is used for token signing/verification.
-    {"ipki_server_key_size", "1024"},
-    {"ipki_ca_key_size", "1024"},
-    {"tsk_num_rsa_bits", "512"},
     // For a generic Kudu test, the local wall-clock time is good enough even
     // if it's not synchronized by NTP. All test components are run at the same
     // node, so there aren't multiple time sources to synchronize.
     {"time_source", "system_unsync"},
   };
+  if (!UseLargeKeys()) {
+    // Reduce default RSA key length for faster tests. We are using strong/high
+    // TLS v1.2 cipher suites, so minimum possible for TLS-related RSA keys is
+    // 768 bits. Java security policies in tests tweaked appropriately to allow
+    // for using smaller RSA keys in certificates. As for the TSK keys, 512 bits
+    // is the minimum since the SHA256 digest is used for token
+    // signing/verification.
+    flags_for_tests.emplace("ipki_server_key_size", "768");
+    flags_for_tests.emplace("ipki_ca_key_size", "768");
+    flags_for_tests.emplace("tsk_num_rsa_bits", "512");
+    // Some OS distros set the default security level higher than 0, so it's
+    // necessary to override it to use the key length specified above (which are
+    // considered lax and don't work in case of security level 2 or higher).
+    flags_for_tests.emplace("openssl_security_level_override", "0");
+  }
   for (const auto& e : flags_for_tests) {
     // We don't check for errors here, because we have some default flags that
     // only apply to certain tests. If a flag is defined in a library which
@@ -177,31 +184,9 @@ void KuduTest::OverrideKrb5Environment() {
 // Test utility functions
 ///////////////////////////////////////////////////
 
-namespace {
-// Get the value of an environment variable that has boolean semantics.
-bool GetBooleanEnvironmentVariable(const char* env_var_name) {
-  const char* const e = getenv(env_var_name);
-  if ((e == nullptr) ||
-      (strlen(e) == 0) ||
-      (strcasecmp(e, "false") == 0) ||
-      (strcasecmp(e, "0") == 0) ||
-      (strcasecmp(e, "no") == 0)) {
-    return false;
-  }
-  if ((strcasecmp(e, "true") == 0) ||
-      (strcasecmp(e, "1") == 0) ||
-      (strcasecmp(e, "yes") == 0)) {
-    return true;
-  }
-  LOG(FATAL) << Substitute("$0: invalid value for environment variable $0",
-                           e, env_var_name);
-  return false;  // unreachable
-}
-} // anonymous namespace
+bool AllowSlowTests() { return GetBooleanEnvironmentVariable(kSlowTestsEnvVar); }
 
-bool AllowSlowTests() {
-  return GetBooleanEnvironmentVariable(kSlowTestsEnvVar);
-}
+bool UseLargeKeys() { return GetBooleanEnvironmentVariable(kLargeKeysEnvVar); }
 
 void OverrideFlagForSlowTests(const std::string& flag_name,
                               const std::string& new_value) {
