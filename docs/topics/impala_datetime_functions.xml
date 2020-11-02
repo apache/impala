@@ -1241,26 +1241,19 @@ select date_sub(cast('2016-05-31' as timestamp), interval 1 months) as 'april_31
         </dt>
 
         <dd>
-          <b>Purpose:</b> Converts the number of seconds from the Unix epoch to the specified
-          time into a string in the local time zone.
-          <p>
-            <b>Return type:</b> <codeph>STRING</codeph>
+          <b>Purpose:</b> Converts the number of seconds from the Unix epoch to the specified time
+          into a string in the local time zone. <p>
+            <b>Return type:</b>
+            <codeph>STRING</codeph>
           </p>
-          <p rev="1.3.0">
-            The <varname>pattern</varname> string supports the following subset of Java
-            SimpleDateFormat.
-          </p>
-          <table frame="all"
-            rowsep="1" colsep="1" id="table_dzg_zpm_1jb">
+          <p rev="1.3.0"> The <varname>pattern</varname> string supports the following subset of
+            Java SimpleDateFormat. </p>
+          <table frame="all" rowsep="1" colsep="1" id="table_dzg_zpm_1jb">
             <tgroup cols="2" align="left">
               <thead>
                 <row>
-                  <entry>
-                    Pattern
-                  </entry>
-                  <entry>
-                    Description
-                  </entry>
+                  <entry> Pattern </entry>
+                  <entry> Description </entry>
                 </row>
               </thead>
               <tbody>
@@ -1268,152 +1261,92 @@ select date_sub(cast('2016-05-31' as timestamp), interval 1 months) as 'april_31
                   <entry>
                     <codeph>y</codeph>
                   </entry>
-                  <entry>
-                    Year
-                  </entry>
+                  <entry> Year </entry>
                 </row>
                 <row>
                   <entry>
                     <codeph>M</codeph>
                   </entry>
-                  <entry>
-                    Month
-                  </entry>
+                  <entry> Month </entry>
                 </row>
                 <row>
                   <entry>
                     <codeph>d</codeph>
                   </entry>
-                  <entry>
-                    Day
-                  </entry>
+                  <entry> Day </entry>
                 </row>
                 <row>
                   <entry>
                     <codeph>H</codeph>
                   </entry>
-                  <entry>
-                    Hour
-                  </entry>
+                  <entry> Hour </entry>
                 </row>
                 <row>
                   <entry>
                     <codeph>m</codeph>
                   </entry>
-                  <entry>
-                    Minute
-                  </entry>
+                  <entry> Minute </entry>
                 </row>
                 <row>
                   <entry>
                     <codeph>s</codeph>
                   </entry>
-                  <entry>
-                    Second
-                  </entry>
+                  <entry> Second </entry>
                 </row>
                 <row>
                   <entry>
                     <codeph>S</codeph>
                   </entry>
-                  <entry>
-                    Fractional second
-                  </entry>
-                </row>
-                <row>
-                  <entry>
-                    <codeph>+/-hh:mm</codeph>
-                  </entry>
-                  <entry>
-                    Time zone offset
-                  </entry>
-                </row>
-                <row>
-                  <entry>
-                    <codeph>+/-hhmm</codeph>
-                  </entry>
-                  <entry>
-                    Time zone offset
-                  </entry>
-                </row>
-                <row>
-                  <entry>
-                    <codeph>+/-hh</codeph>
-                  </entry>
-                  <entry>
-                    Time zone offset
-                  </entry>
+                  <entry> Fractional second </entry>
                 </row>
               </tbody>
             </tgroup>
           </table>
-          <p>
-            The following rules apply to the <varname>pattern</varname> string:
-          </p>
+          <p> The following rules apply to the <varname>pattern</varname> string: </p>
           <ul>
-            <li>
-              The <varname>pattern</varname> string is case-sensitive.
-            </li>
-
-            <li>
-              All fields are variable length, and thus must use separators to specify the
-              boundaries of the fields, with the exception of the time zone values.
-            </li>
-
-            <li>
-              Time zone offset formats must be at the end of the <varname>pattern</varname>
-              string.
-            </li>
-
-            <li>
-              Formatting character groups can appear in any order along with any separators
-              except for the time zone offset. For example:
-              <ul>
+            <li> The <varname>pattern</varname> string is case-sensitive. </li>
+            <li> All fields are variable length, and thus must use separators to specify the
+              boundaries of the fields, with the exception of the time zone values.</li>
+            <li>Time zone offsets will be disregarded. The FROM_UNIXTIME() function accepts a bigint
+              number as input (seconds from Unix epoch) but will not hold the timezone related
+              information and will be excluded in the output.</li>
+            <li> Formatting character groups can appear in any order along with any separators. For
+              example: <ul>
                 <li>
                   <codeph>yyyy/MM/dd</codeph>
                 </li>
-
                 <li>
                   <codeph>dd-MMM-yy</codeph>
                 </li>
-
                 <li>
                   <codeph>(dd)(MM)(yyyy) HH:mm:ss</codeph>
                 </li>
-
                 <li>
-                  <codeph>yyyy-MM-dd HH:mm:ss+hh:mm</codeph>
+                  <codeph>yyyy-MM-dd HH:mm:ss</codeph>
                 </li>
               </ul>
             </li>
           </ul>
-          <p rev="1.3.0">
-            In Impala 1.3 and later, you can switch the order of elements, use alternative
-            separator characters, and use a different number of placeholders for each unit.
-            Adding more instances of <codeph>y</codeph>, <codeph>d</codeph>, <codeph>H</codeph>,
-            and so on produces output strings zero-padded to the requested number of characters.
-            The exception is <codeph>M</codeph> for months, where <codeph>M</codeph> produces a
-            non-padded value such as <codeph>3</codeph>, <codeph>MM</codeph> produces a
-            zero-padded value such as <codeph>03</codeph>, <codeph>MMM</codeph> produces an
-            abbreviated month name such as <codeph>Mar</codeph>, and sequences of 4 or more
-            <codeph>M</codeph> are not allowed.
-          </p>
-          <p rev="1.3.0">
-            A date string including all fields could be <codeph>'yyyy-MM-dd
-            HH:mm:ss.SSSSSS'</codeph>, <codeph>'dd/MM/yyyy HH:mm:ss.SSSSSS'</codeph>,
-            <codeph>'MMM dd, yyyy HH.mm.ss (SSSSSS)'</codeph> or other combinations of
-            placeholders and separator characters.
-          </p>
-          <p
-            conref="../shared/impala_common.xml#common/y2k38"/>
-          <p
-            conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
-          <p
-            conref="../shared/impala_common.xml#common/timezone_conversion_caveat"
-          />
+          <p rev="1.3.0"> In Impala 1.3 and later, you can switch the order of elements, use
+            alternative separator characters, and use a different number of placeholders for each
+            unit. Adding more instances of <codeph>y</codeph>, <codeph>d</codeph>,
+              <codeph>H</codeph>, and so on produces output strings zero-padded to the requested
+            number of characters. The exception is <codeph>M</codeph> for months, where
+              <codeph>M</codeph> produces a non-padded value such as <codeph>3</codeph>,
+              <codeph>MM</codeph> produces a zero-padded value such as <codeph>03</codeph>,
+              <codeph>MMM</codeph> produces an abbreviated month name such as <codeph>Mar</codeph>,
+            and sequences of 4 or more <codeph>M</codeph> are not allowed. </p>
+          <p rev="1.3.0"> A date string including all fields could be <codeph>'yyyy-MM-dd
+              HH:mm:ss.SSSSSS'</codeph>, <codeph>'dd/MM/yyyy HH:mm:ss.SSSSSS'</codeph>, <codeph>'MMM
+              dd, yyyy HH.mm.ss (SSSSSS)'</codeph> or other combinations of placeholders and
+            separator characters. </p>
+          <p conref="../shared/impala_common.xml#common/y2k38"/>
+          <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
+          <p conref="../shared/impala_common.xml#common/timezone_conversion_caveat"/>
         </dd>
 
       </dlentry>
+      
 
       <dlentry id="from_utc_timestamp">
 
