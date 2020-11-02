@@ -48,7 +48,7 @@ from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.Thrift import TApplicationException, TException
 from shell_exceptions import (RPCException, QueryStateException, DisconnectedException,
-    QueryCancelledByShellException, MissingThriftMethodException)
+    QueryCancelledByShellException, MissingThriftMethodException, HttpError)
 
 
 # Helpers to extract and convert HS2's representation of values to the display version.
@@ -951,8 +951,12 @@ class ImpalaHS2Client(ImpalaClient):
     while num_tries <= max_tries:
       raise_error = (num_tries == max_tries)
       # Generate a retry message, only if retries and supported.
+      will_retry = False
+      retry_secs = None
       if retry_on_error and self.max_tries > 1:
         retry_msg = 'Num remaining tries: {0}'.format(max_tries - num_tries)
+        if num_tries < max_tries:
+          will_retry = True
       else:
         retry_msg = ''
       try:
@@ -971,12 +975,32 @@ class ImpalaHS2Client(ImpalaClient):
           raise MissingThriftMethodException(t.message)
         raise RPCException("Application Exception : {0}".format(t),
           RPC_EXCEPTION_TAPPLICATION)
+      except HttpError as h:
+        if will_retry:
+          retry_after = h.http_headers.get('Retry-After', None)
+          if retry_after:
+            try:
+              retry_secs = int(retry_after)
+            except ValueError:
+              retry_secs = None
+        if retry_secs:
+          print('Caught exception {0}, type={1} in {2}. {3}, retry after {4} secs'
+                .format(str(h), type(h), rpc.__name__, retry_msg, retry_secs),
+                file=sys.stderr)
+        else:
+          print('Caught exception {0}, type={1} in {2}. {3}'
+                .format(str(h), type(h), rpc.__name__, retry_msg), file=sys.stderr)
+        if raise_error:
+          raise
       except Exception as e:
         print('Caught exception {0}, type={1} in {2}. {3}'
           .format(str(e), type(e), rpc.__name__, retry_msg), file=sys.stderr)
         if raise_error:
           raise
-      time.sleep(self._get_sleep_interval_for_retries(num_tries))
+      if retry_secs:
+        time.sleep(retry_secs)
+      else:
+        time.sleep(self._get_sleep_interval_for_retries(num_tries))
       num_tries += 1
 
   def _check_hs2_rpc_status(self, status):

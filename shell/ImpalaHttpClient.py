@@ -28,7 +28,7 @@ from six.moves import urllib
 from six.moves import http_client
 
 from thrift.transport.TTransport import TTransportBase
-from shell_exceptions import RPCException
+from shell_exceptions import HttpError
 import six
 
 
@@ -213,7 +213,4 @@ class ImpalaHttpClient(TTransportBase):
       # Report any http response code that is not 1XX (informational response) or
       # 2XX (successful).
       body = self.readBody()
-      if not body:
-        raise RPCException("HTTP code {}: {}".format(self.code, self.message))
-      else:
-        raise RPCException("HTTP code {}: {} [{}]".format(self.code, self.message, body))
+      raise HttpError(self.code, self.message, body, self.headers)

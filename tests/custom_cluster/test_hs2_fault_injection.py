@@ -22,6 +22,7 @@ import requests
 
 from shell.ImpalaHttpClient import ImpalaHttpClient
 from shell.impala_client import ImpalaHS2Client
+from shell.shell_exceptions import HttpError
 from tests.common.impala_test_suite import IMPALAD_HS2_HTTP_HOST_PORT
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from time import sleep
@@ -40,16 +41,21 @@ class FaultInjectingHttpClient(ImpalaHttpClient, object):
     self.fault_frequency = 0
     self.fault_enabled = False
 
-  def enable_fault(self, http_code, http_message, fault_frequency):
+  def enable_fault(self, http_code, http_message, fault_frequency, fault_body=None,
+                   fault_headers=None):
     """Inject fault with given code and message at the given frequency.
     As an example, if frequency is 20% then inject fault for 1 out of every 5
     requests."""
+    if fault_headers is None:
+      fault_headers = {}
     self.fault_enabled = True
     self.fault_code = http_code
     self.fault_message = http_message
     self.fault_frequency = fault_frequency
     assert fault_frequency > 0 and fault_frequency <= 1
     self.num_requests = 0
+    self.fault_body = fault_body
+    self.fault_headers = fault_headers
 
   def disable_fault(self):
     self.fault_enabled = False
@@ -58,7 +64,7 @@ class FaultInjectingHttpClient(ImpalaHttpClient, object):
     if self.code >= 300:
       # Report any http response code that is not 1XX (informational response) or
       # 2XX (successful).
-      raise Exception("HTTP code {}: {}".format(self.code, self.message))
+      raise HttpError(self.code, self.message, self.body, self.headers)
 
   def _inject_fault(self):
     if not self.fault_enabled:
@@ -76,6 +82,8 @@ class FaultInjectingHttpClient(ImpalaHttpClient, object):
     if self.fault_code is not None and self._inject_fault():
       self.code = self.fault_code
       self.message = self.fault_message
+      self.body = self.fault_body
+      self.headers = self.fault_headers
       self._check_code()
 
 
@@ -125,24 +133,111 @@ class TestHS2FaultInjection(CustomClusterTestSuite):
   def __expect_msg_retry(self, impala_rpc_name):
     """Returns expected log message for rpcs which can be retried"""
     return ("Caught exception HTTP code 502: Injected Fault, "
-      "type=<type 'exceptions.Exception'> in {0}. "
+      "type=<class 'shell.shell_exceptions.HttpError'> in {0}. "
       "Num remaining tries: 3".format(impala_rpc_name))
+
+  def __expect_msg_retry_with_extra(self, impala_rpc_name):
+    """Returns expected log message for rpcs which can be retried and where the http
+    message has a message body"""
+    return ("Caught exception HTTP code 503: Injected Fault [EXTRA], "
+      "type=<class 'shell.shell_exceptions.HttpError'> in {0}. "
+      "Num remaining tries: 3".format(impala_rpc_name))
+
+  def __expect_msg_retry_with_retry_after(self, impala_rpc_name):
+    """Returns expected log message for rpcs which can be retried and the http
+    message has a body and a Retry-After header that can be correctly decoded"""
+    return ("Caught exception HTTP code 503: Injected Fault [EXTRA], "
+      "type=<class 'shell.shell_exceptions.HttpError'> in {0}. "
+      "Num remaining tries: 3, retry after 1 secs".format(impala_rpc_name))
+
+  def __expect_msg_retry_with_retry_after_no_extra(self, impala_rpc_name):
+    """Returns expected log message for rpcs which can be retried and the http
+    message has a Retry-After header that can be correctly decoded"""
+    return ("Caught exception HTTP code 503: Injected Fault, "
+      "type=<class 'shell.shell_exceptions.HttpError'> in {0}. "
+      "Num remaining tries: 3, retry after 1 secs".format(impala_rpc_name))
 
   def __expect_msg_no_retry(self, impala_rpc_name):
     """Returns expected log message for rpcs which can not be retried"""
     return ("Caught exception HTTP code 502: Injected Fault, "
-      "type=<type 'exceptions.Exception'> in {0}. ".format(impala_rpc_name))
+      "type=<class 'shell.shell_exceptions.HttpError'> in {0}. ".format(impala_rpc_name))
 
   @pytest.mark.execute_serially
   def test_connect(self, capsys):
     """Tests fault injection in ImpalaHS2Client's connect().
     OpenSession and CloseImpalaOperation rpcs fail.
-    Retries results in a successfull connection."""
+    Retries results in a successful connection."""
     self.transport.enable_fault(502, "Injected Fault", 0.20)
     self.connect()
     output = capsys.readouterr()[1].splitlines()
     assert output[1] == self.__expect_msg_retry("OpenSession")
     assert output[2] == self.__expect_msg_retry("CloseImpalaOperation")
+
+  @pytest.mark.execute_serially
+  def test_connect_proxy(self, capsys):
+    """Tests fault injection in ImpalaHS2Client's connect().
+    The injected error has a message body.
+    OpenSession and CloseImpalaOperation rpcs fail.
+    Retries results in a successful connection."""
+    self.transport.enable_fault(503, "Injected Fault", 0.20, 'EXTRA')
+    self.connect()
+    output = capsys.readouterr()[1].splitlines()
+    assert output[1] == self.__expect_msg_retry_with_extra("OpenSession")
+    assert output[2] == self.__expect_msg_retry_with_extra("CloseImpalaOperation")
+
+  @pytest.mark.execute_serially
+  def test_connect_proxy_no_retry(self, capsys):
+    """Tests fault injection in ImpalaHS2Client's connect().
+    The injected error contains headers but no Retry-After header.
+    OpenSession and CloseImpalaOperation rpcs fail.
+    Retries results in a successful connection."""
+    self.transport.enable_fault(503, "Injected Fault", 0.20, 'EXTRA',
+                                {"header1": "value1"})
+    self.connect()
+    output = capsys.readouterr()[1].splitlines()
+    assert output[1] == self.__expect_msg_retry_with_extra("OpenSession")
+    assert output[2] == self.__expect_msg_retry_with_extra("CloseImpalaOperation")
+
+  @pytest.mark.execute_serially
+  def test_connect_proxy_bad_retry(self, capsys):
+    """Tests fault injection in ImpalaHS2Client's connect().
+    The injected error contains a body and a junk Retry-After header.
+    OpenSession and CloseImpalaOperation rpcs fail.
+    Retries results in a successful connection."""
+    self.transport.enable_fault(503, "Injected Fault", 0.20, 'EXTRA',
+                                {"header1": "value1",
+                                 "Retry-After": "junk"})
+    self.connect()
+    output = capsys.readouterr()[1].splitlines()
+    assert output[1] == self.__expect_msg_retry_with_extra("OpenSession")
+    assert output[2] == self.__expect_msg_retry_with_extra("CloseImpalaOperation")
+
+  @pytest.mark.execute_serially
+  def test_connect_proxy_retry(self, capsys):
+    """Tests fault injection in ImpalaHS2Client's connect().
+    The injected error contains a body and a Retry-After header that can be decoded.
+    Retries results in a successful connection."""
+    self.transport.enable_fault(503, "Injected Fault", 0.20, 'EXTRA',
+                                {"header1": "value1",
+                                  "Retry-After": "1"})
+    self.connect()
+    output = capsys.readouterr()[1].splitlines()
+    assert output[1] == self.__expect_msg_retry_with_retry_after("OpenSession")
+    assert output[2] == self.__expect_msg_retry_with_retry_after("CloseImpalaOperation")
+
+  @pytest.mark.execute_serially
+  def test_connect_proxy_retry_no_body(self, capsys):
+    """Tests fault injection in ImpalaHS2Client's connect().
+    The injected error has no body but does have a Retry-After header that can be decoded.
+    Retries results in a successful connection."""
+    self.transport.enable_fault(503, "Injected Fault", 0.20, None,
+                                {"header1": "value1",
+                                  "Retry-After": "1"})
+    self.connect()
+    output = capsys.readouterr()[1].splitlines()
+    assert output[1] == self.__expect_msg_retry_with_retry_after_no_extra("OpenSession")
+    assert output[2] == self.\
+      __expect_msg_retry_with_retry_after_no_extra("CloseImpalaOperation")
 
   @pytest.mark.execute_serially
   def test_close_connection(self, capsys):

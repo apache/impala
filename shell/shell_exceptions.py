@@ -51,3 +51,18 @@ class MissingThriftMethodException(Exception):
 
   def __str__(self):
       return self.value
+
+
+class HttpError(Exception):
+  """An error containing an http response code and a possible message body"""
+  def __init__(self, code, message, body, http_headers):
+    self.code = code
+    self.message = message
+    self.body = body
+    self.http_headers = http_headers
+
+  def __str__(self):
+    if not self.body:
+      return "HTTP code {}: {}".format(self.code, self.message)
+    else:
+      return "HTTP code {}: {} [{}]".format(self.code, self.message, self.body)
