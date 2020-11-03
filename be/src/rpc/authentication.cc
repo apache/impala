@@ -43,6 +43,7 @@
 #include "kudu/rpc/sasl_common.h"
 #include "kudu/security/gssapi.h"
 #include "kudu/security/init.h"
+#include "kudu/security/openssl_util.h"
 #include "rpc/auth-provider.h"
 #include "rpc/authentication-util.h"
 #include "rpc/thrift-server.h"
@@ -1112,7 +1113,10 @@ AuthManager::AuthManager() {}
 AuthManager::~AuthManager() {}
 
 Status AuthManager::Init() {
-  ssl_socket_factory_.reset(new TSSLSocketFactory(TLSv1_0));
+  // Tell Thrift not to initialize SSL for us, as we use Kudu's SSL initializtion.
+  TSSLSocketFactory::setManualOpenSSLInitialization(true);
+  kudu::security::InitializeOpenSSL();
+  LOG(INFO) << "Initialized " << OPENSSL_VERSION_TEXT;
 
   bool use_ldap = false;
 

@@ -310,6 +310,11 @@ class ImpalaSslSocketFactory : public TSSLSocketFactory {
     : TSSLSocketFactory(version), password_(password) {}
 
   void ciphers(const string& enable) override {
+    if (ctx_.get() == nullptr) {
+      throw new TSSLException("ImpalaSslSocketFactory was not properly initialized.");
+    }
+    LOG(INFO) << "Enabling the following ciphers for the ImpalaSslSocketFactory: "
+              << enable;
     SCOPED_OPENSSL_NO_PENDING_ERRORS;
     TSSLSocketFactory::ciphers(enable);
 
