@@ -52,7 +52,7 @@ class AuthManager {
   ~AuthManager();
 
   /// Set up internal and external AuthProvider classes. This also initializes SSL (via
-  /// the creation of ssl_socket_factory_).
+  /// kudu::security::InitializeOpenSSL()).
   Status Init();
 
   /// Returns the authentication provider to use for "external" communication
@@ -80,14 +80,6 @@ class AuthManager {
   /// don't have to check the auth flags to figure out which auth provider to use.
   boost::scoped_ptr<AuthProvider> internal_auth_provider_;
   boost::scoped_ptr<AuthProvider> external_auth_provider_;
-
-  /// A thrift SSL socket factory must be created and live the lifetime of the process to
-  /// ensure that the thrift OpenSSL initialization code runs at Init(), and is not
-  /// unregistered (which thrift will do when the refcount of TSSLSocketFactory objects
-  /// reach 0), see IMPALA-4933. For simplicity, and because Kudu will expect SSL to be
-  /// initialized, this will be created regardless of whether or not SSL credentials are
-  /// specified. This factory isn't otherwise used.
-  boost::scoped_ptr<TSSLSocketFactory> ssl_socket_factory_;
 
   /// Used to authenticate usernames and passwords to LDAP.
   std::unique_ptr<ImpalaLdap> ldap_;
