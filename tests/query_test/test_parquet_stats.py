@@ -88,6 +88,8 @@ class TestParquetStats(ImpalaTestSuite):
     create_table_from_parquet(self.client, unique_database, 'alltypes_tiny_pages_plain')
     create_table_from_parquet(self.client, unique_database, 'alltypes_empty_pages')
     create_table_from_parquet(self.client, unique_database, 'alltypes_invalid_pages')
+    create_table_from_parquet(self.client, unique_database,
+                              'customer_multiblock_page_index')
 
     for batch_size in [1]:
       new_vector.get_value('exec_option')['batch_size'] = batch_size
