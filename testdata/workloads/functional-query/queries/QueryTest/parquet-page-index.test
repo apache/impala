@@ -300,3 +300,19 @@ BIGINT
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumStatsFilteredPages): 0
 ====
+---- QUERY
+# Query table with multi blocks in a single file
+select c_birth_country,count(distinct c_customer_id) from customer_multiblock_page_index
+where c_current_cdemo_sk < 100 group by c_birth_country;
+---- RESULTS
+'SLOVAKIA',1
+'BRUNEI DARUSSALAM',1
+'BURKINA FASO',1
+'SIERRA LEONE',1
+'PORTUGAL',1
+---- TYPES
+STRING, BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumPages): 30
+aggregation(SUM, NumStatsFilteredPages): 27
+====

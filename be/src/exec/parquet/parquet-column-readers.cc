@@ -1228,6 +1228,7 @@ void BaseScalarColumnReader::ResetPageFiltering() {
   candidate_page_idx_ = -1;
   current_row_ = -1;
   levels_readahead_ = false;
+  current_row_range_ = 0;
 }
 
 Status BaseScalarColumnReader::StartPageFiltering() {
