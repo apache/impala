@@ -467,6 +467,16 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 'UnicodeDecodeError' not in result.stderr
     assert RUSSIAN_CHARS.encode('utf-8') in result.stdout
 
+  def test_utf8_decoding_error_handling(self, vector):
+    """IMPALA-10145,IMPALA-10299: Regression tests for elegantly handling malformed utf-8
+    characters."""
+    result = run_impala_shell_cmd(vector, ['-B', '-q', "select substr('引擎', 1, 4)"])
+    assert 'UnicodeDecodeError' not in result.stderr
+    assert '引�' in result.stdout
+    result = run_impala_shell_cmd(vector, ['-B', '-q', "select unhex('aa')"])
+    assert 'UnicodeDecodeError' not in result.stderr
+    assert '�' in result.stdout
+
   def test_global_config_file(self, vector):
     """Test global and user configuration files."""
     args = []
