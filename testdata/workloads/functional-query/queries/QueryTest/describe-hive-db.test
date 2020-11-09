@@ -4,6 +4,7 @@
 describe database default
 ---- RESULTS
 'default','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR','Default Hive database'
+'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR',''
 ---- TYPES
 string, string, string
 ====
@@ -12,6 +13,7 @@ string, string, string
 describe database hive_test_desc_db
 ---- RESULTS
 'hive_test_desc_db','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/hive_test_desc_db.db','test comment'
+'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/hive_test_desc_db.db',''
 ---- TYPES
 string, string, string
 ====
@@ -20,6 +22,7 @@ string, string, string
 describe database extended hive_test_desc_db
 ---- RESULTS
 'hive_test_desc_db','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/hive_test_desc_db.db','test comment'
+'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/hive_test_desc_db.db',''
 'Parameter: ','',''
 '','$USER','USER'
 'Owner: ','',''
@@ -30,10 +33,13 @@ string, string, string
 ====
 ---- QUERY
 # Test printing of database with managedlocation.
+# TODO: Currently Hive ignores the specified managedlocation due to HIVE-24175,
+# so we are using the default locations in the checks. Restore the specified
+# location once HIVE-24175 is resolved.
 describe database hive_test_desc_db2
 ---- RESULTS
 'hive_test_desc_db2','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/hive_test_desc_db2.db','test comment'
-'managedlocation:','$NAMENODE/test2.db',''
+'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/hive_test_desc_db2.db',''
 ---- TYPES
 string, string, string
 ====
@@ -41,7 +47,7 @@ string, string, string
 describe database extended hive_test_desc_db2
 ---- RESULTS
 'hive_test_desc_db2','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/hive_test_desc_db2.db','test comment'
-'managedlocation:','$NAMENODE/test2.db',''
+'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/hive_test_desc_db2.db',''
 '','$USER','USER'
 'Owner: ','',''
 ---- TYPES
