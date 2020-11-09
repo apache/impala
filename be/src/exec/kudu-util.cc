@@ -46,6 +46,7 @@ using DataType = kudu::client::KuduColumnSchema::DataType;
 
 DECLARE_bool(disable_kudu);
 DECLARE_int32(kudu_client_rpc_timeout_ms);
+DECLARE_int32(kudu_client_connection_negotiation_timeout_ms);
 
 namespace impala {
 
@@ -80,6 +81,8 @@ Status CreateKuduClient(const vector<string>& master_addrs,
     b.default_rpc_timeout(
         kudu::MonoDelta::FromMilliseconds(FLAGS_kudu_client_rpc_timeout_ms));
   }
+  b.connection_negotiation_timeout(kudu::MonoDelta::FromMilliseconds(
+      FLAGS_kudu_client_connection_negotiation_timeout_ms));
   KUDU_RETURN_IF_ERROR(b.Build(client), "Unable to create Kudu client");
   return Status::OK();
 }

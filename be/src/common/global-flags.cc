@@ -198,6 +198,13 @@ DEFINE_int32(kudu_client_rpc_timeout_ms, default_kudu_client_rpc_timeout_ms,
     "kudu_operation_timeout_ms. This must be a positive value or it will be ignored and "
     "Kudu's default of 10s will be used. There is no way to disable timeouts.");
 
+// Timeout for connection negotiation between Kudu client in the BE and Kudu
+// servers, in milliseconds. For details on connection negotiation, see
+// https://github.com/apache/kudu/blob/master/docs/design-docs/rpc.md#negotiation
+DEFINE_int32(kudu_client_connection_negotiation_timeout_ms, 3000,
+    "(Advanced) Timeout for connection negotiation between Kudu client and "
+    "Kudu masters and tablet servers, in milliseconds");
+
 DEFINE_int64(inc_stats_size_limit_bytes, 200 * (1LL<<20), "Maximum size of "
     "incremental stats the catalog is allowed to serialize per table. "
     "This limit is set as a safety check, to prevent the JVM from "
