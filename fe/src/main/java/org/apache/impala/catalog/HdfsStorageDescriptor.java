@@ -72,7 +72,7 @@ public class HdfsStorageDescriptor {
       // TODO: Verify the following Parquet SerDe works with Impala and add
       // support for the new input/output format classes. See IMPALA-4214.
       "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", // (parquet)
-      "com.expediagroup.hiveberg.IcebergSerDe"); // (iceberg)
+      "org.apache.iceberg.mr.hive.HiveIcebergSerDe"); // (iceberg)
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsStorageDescriptor.class);
 

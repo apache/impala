@@ -64,7 +64,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // Iceberg specific value for the storage handler table property keyed by
   // KEY_STORAGE_HANDLER.
   public static final String ICEBERG_STORAGE_HANDLER =
-      "com.expediagroup.hiveberg.IcebergStorageHandler";
+      "org.apache.iceberg.mr.hive.HiveIcebergStorageHandler";
 
   // Iceberg file format key in tblproperties
   public static final String ICEBERG_FILE_FORMAT = "iceberg.file_format";
