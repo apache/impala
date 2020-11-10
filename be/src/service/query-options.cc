@@ -1006,6 +1006,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_broadcast_to_partition_factor(val);
         break;
       }
+      case TImpalaQueryOptions::JOIN_ROWS_PRODUCED_LIMIT: {
+        StringParser::ParseResult result;
+        const int64_t join_rows_produced_limit =
+            StringParser::StringToInt<int64_t>(value.c_str(), value.length(), &result);
+        if (result != StringParser::PARSE_SUCCESS || join_rows_produced_limit < 0) {
+          return Status(Substitute("Invalid join rows produced limit: '$0'. "
+                                   "Only non-negative numbers are allowed.", value));
+        }
+        query_options->__set_join_rows_produced_limit(join_rows_produced_limit);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

@@ -500,6 +500,10 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
   backend_utilization_.bytes_read = backend_exec_status.bytes_read();
   backend_utilization_.exchange_bytes_sent = backend_exec_status.exchange_bytes_sent();
   backend_utilization_.scan_bytes_sent = backend_exec_status.scan_bytes_sent();
+  std::map<int32_t, int64_t> per_join_rows_produced(
+      backend_exec_status.per_join_rows_produced().begin(),
+      backend_exec_status.per_join_rows_produced().end());
+  backend_utilization_.per_join_rows_produced = per_join_rows_produced;
 
   // Only merge fragment stats if they are newer than that last report received.
   if (backend_exec_status.backend_report_seq_no() <= last_backend_report_seq_no_) {

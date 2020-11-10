@@ -305,6 +305,7 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
   int64_t bytes_read = 0;
   int64_t scan_ranges_complete = 0;
   int64_t total_bytes_sent = 0;
+  std::map<int32_t, int64_t> per_join_rows_produced;
   for (RuntimeProfileBase* node : nodes) {
     RuntimeProfile::Counter* c = node->GetCounter(PROFILE_BytesRead.name());
     if (c != nullptr) bytes_read += c->value();
@@ -325,7 +326,16 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
       }
       RuntimeProfile::Counter* rows_counter = node->GetCounter("RowsReturned");
       RuntimeProfile::Counter* mem_counter = node->GetCounter("PeakMemoryUsage");
-      if (rows_counter != nullptr) summary_data->set_rows_returned(rows_counter->value());
+      if (rows_counter != nullptr) {
+        summary_data->set_rows_returned(rows_counter->value());
+        // row count stats for a join node
+        string hash_type = PrintThriftEnum(TPlanNodeType::HASH_JOIN_NODE);
+        string nested_loop_type = PrintThriftEnum(TPlanNodeType::NESTED_LOOP_JOIN_NODE);
+        if (node->name().rfind(hash_type, 0) == 0
+            || node->name().rfind(nested_loop_type, 0) == 0) {
+          per_join_rows_produced[node->metadata().plan_node_id] = rows_counter->value();
+        }
+      }
       if (mem_counter != nullptr) summary_data->set_peak_mem_usage(mem_counter->value());
       summary_data->set_local_time_ns(node->local_time());
     }
@@ -333,6 +343,7 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
   bytes_read_ = bytes_read;
   scan_ranges_complete_ = scan_ranges_complete;
   total_bytes_sent_  = total_bytes_sent;
+  per_join_rows_produced_ = per_join_rows_produced;
 
   // Send the DML stats if this is the final report.
   if (done) {

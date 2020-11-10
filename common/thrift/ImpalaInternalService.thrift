@@ -475,6 +475,8 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift
   119: optional double broadcast_to_partition_factor = 1.0;
 
+  // See comment in ImpalaService.thrift
+  120: optional i64 join_rows_produced_limit = 0;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

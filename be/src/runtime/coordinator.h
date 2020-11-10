@@ -37,6 +37,7 @@
 #include "util/promise.h"
 #include "util/runtime-profile-counters.h"
 #include "util/spinlock.h"
+#include "util/container-util.h"
 
 namespace kudu {
 namespace rpc {
@@ -226,6 +227,9 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
     /// Total system cpu consumed.
     int64_t cpu_sys_ns = 0;
 
+    /// Total num rows produced by each join node. The key is join node id.
+    std::map<int32_t, int64_t> per_join_rows_produced;
+
     /// Merge utilization from 'other' into this.
     void Merge(const ResourceUtilization& other) {
       peak_per_host_mem_consumption =
@@ -235,6 +239,17 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
       scan_bytes_sent += other.scan_bytes_sent;
       cpu_user_ns += other.cpu_user_ns;
       cpu_sys_ns += other.cpu_sys_ns;
+      MergeMapValues(other.per_join_rows_produced, &per_join_rows_produced);
+    }
+
+    /// Max join rows produced across join nodes
+    const std::pair<int32_t, int64_t> MaxJoinNodeRowsProduced() const {
+      std::pair<int32_t, int64_t> entryWithMaxValue = std::make_pair(0, 0);
+      for (const auto& entry : per_join_rows_produced) {
+        if (entry.second > entryWithMaxValue.second)
+          entryWithMaxValue = std::make_pair(entry.first, entry.second);
+      }
+      return entryWithMaxValue;
     }
   };
 

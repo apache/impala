@@ -256,6 +256,9 @@ message ReportExecStatusRequestPB {
   // disregarded if the sequence number of this report is less than or equal to
   // the previous report received.
   optional int64 backend_report_seq_no = 15;
+
+  // For each join node, sum of RowsReturned counters on this backend.
+  map<int32, int64> per_join_rows_produced = 16;
 }
 
 message ReportExecStatusResponsePB {

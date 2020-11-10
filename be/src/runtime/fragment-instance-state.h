@@ -149,6 +149,9 @@ class FragmentInstanceState {
   int64_t cpu_sys_ns() const { return cpu_sys_ns_; }
   int64_t bytes_read() const { return bytes_read_; }
   int64_t total_bytes_sent() const { return total_bytes_sent_; }
+  const std::map<int32_t, int64_t>& per_join_rows_produced() const {
+    return per_join_rows_produced_;
+  }
 
   /// Returns true if the current thread is a thread executing the whole or part of
   /// a fragment instance.
@@ -212,6 +215,10 @@ class FragmentInstanceState {
 
   /// Total bytes sent on exchanges in this backend. Set in GetStatusReport().
   int64_t total_bytes_sent_ = 0;
+
+  /// For each join node, sum of RowsReturned counters on this backend.
+  /// Set in GetStatusReport().
+  std::map<int32_t, int64_t> per_join_rows_produced_;
 
   /// Profile for timings for each stage of the plan fragment instance's lifecycle.
   /// Lives in obj_pool().
