@@ -1274,8 +1274,10 @@ Status ImpalaServer::SetQueryInflight(
   int32_t exec_time_limit_s = query_handle->query_options().exec_time_limit_s;
   int64_t cpu_limit_s = query_handle->query_options().cpu_limit_s;
   int64_t scan_bytes_limit = query_handle->query_options().scan_bytes_limit;
-  if (idle_timeout_s > 0 || exec_time_limit_s > 0 ||
-        cpu_limit_s > 0 || scan_bytes_limit > 0) {
+  int64_t join_rows_produced_limit =
+      query_handle->query_options().join_rows_produced_limit;
+  if (idle_timeout_s > 0 || exec_time_limit_s > 0 || cpu_limit_s > 0
+      || scan_bytes_limit > 0 || join_rows_produced_limit > 0) {
     lock_guard<mutex> l2(query_expiration_lock_);
     int64_t now = UnixMillis();
     if (idle_timeout_s > 0) {
@@ -1290,7 +1292,7 @@ Status ImpalaServer::SetQueryInflight(
       queries_by_timestamp_.emplace(ExpirationEvent{
           now + (1000L * exec_time_limit_s), query_id, ExpirationKind::EXEC_TIME_LIMIT});
     }
-    if (cpu_limit_s > 0 || scan_bytes_limit > 0) {
+    if (cpu_limit_s > 0 || scan_bytes_limit > 0 || join_rows_produced_limit > 0) {
       if (cpu_limit_s > 0) {
         VLOG_QUERY << "Query " << PrintId(query_id) << " has CPU limit of "
                    << PrettyPrinter::Print(cpu_limit_s, TUnit::TIME_S);
@@ -1298,6 +1300,10 @@ Status ImpalaServer::SetQueryInflight(
       if (scan_bytes_limit > 0) {
         VLOG_QUERY << "Query " << PrintId(query_id) << " has scan bytes limit of "
                    << PrettyPrinter::Print(scan_bytes_limit, TUnit::BYTES);
+      }
+      if (join_rows_produced_limit > 0) {
+        VLOG_QUERY << "Query " << PrintId(query_id) << " has join rows produced limit of "
+                   << PrettyPrinter::Print(join_rows_produced_limit, TUnit::UNIT);
       }
       queries_by_timestamp_.emplace(ExpirationEvent{
           now + EXPIRATION_CHECK_INTERVAL_MS, query_id, ExpirationKind::RESOURCE_LIMIT});
@@ -2670,6 +2676,18 @@ Status ImpalaServer::CheckResourceLimits(ClientRequestState* crs) {
   if (scan_bytes_limit > 0 && scan_bytes > scan_bytes_limit) {
     Status err = Status::Expected(TErrorCode::SCAN_BYTES_LIMIT_EXCEEDED,
         PrintId(crs->query_id()), PrettyPrinter::Print(scan_bytes_limit, TUnit::BYTES));
+    VLOG_QUERY << err.msg().msg();
+    return err;
+  }
+
+  auto& max_join_node_entry = utilization.MaxJoinNodeRowsProduced();
+  int32_t join_node_id = max_join_node_entry.first;
+  int64_t join_rows_produced = max_join_node_entry.second;
+  int64_t join_rows_produced_limit = crs->query_options().join_rows_produced_limit;
+  if (join_rows_produced_limit > 0 && join_rows_produced > join_rows_produced_limit) {
+    Status err = Status::Expected(TErrorCode::JOIN_ROWS_PRODUCED_LIMIT_EXCEEDED,
+        PrintId(crs->query_id()),
+        PrettyPrinter::Print(join_rows_produced_limit, TUnit::UNIT), join_node_id);
     VLOG_QUERY << err.msg().msg();
     return err;
   }

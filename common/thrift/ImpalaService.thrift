@@ -613,6 +613,10 @@ enum TImpalaQueryOptions {
   // favor partition distribution.
   BROADCAST_TO_PARTITION_FACTOR = 118
 
+  // A limit on the number of join rows produced by the query. The query will be
+  // canceled if the query is still executing after this limit is hit. A value
+  // of 0 means there is no limit on the number of join rows produced.
+  JOIN_ROWS_PRODUCED_LIMIT = 119
 }
 
 // The summary of a DML statement.

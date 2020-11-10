@@ -463,6 +463,11 @@ error_codes = (
   # Note: impala_shell uses a regex to search for this specific error message, so
   # changing it may break older shell version.
   ("INVALID_QUERY_HANDLE", 150, "Invalid or unknown query handle: $0."),
+
+  ("JOIN_ROWS_PRODUCED_LIMIT_EXCEEDED", 151,
+   "Query $0 terminated due to join rows produced exceeds the limit of $1 "
+   "at node with id $2. Unset or increase JOIN_ROWS_PRODUCED_LIMIT query option "
+   "to produce more rows."),
 )
 
 import sys

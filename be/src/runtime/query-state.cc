@@ -540,6 +540,7 @@ void QueryState::ConstructReport(bool instances_started,
     int64_t scan_ranges_complete = 0;
     int64_t exchange_bytes_sent = 0;
     int64_t scan_bytes_sent = 0;
+    std::map<int32_t, int64_t> per_join_rows_produced;
 
     for (const auto& entry : fis_map_) {
       FragmentInstanceState* fis = entry.second;
@@ -580,6 +581,7 @@ void QueryState::ConstructReport(bool instances_started,
       } else {
         exchange_bytes_sent += fis->total_bytes_sent();
       }
+      MergeMapValues(fis->per_join_rows_produced(), &per_join_rows_produced);
     }
 
     // Construct the per-fragment status reports, including runtime profiles.
@@ -604,6 +606,9 @@ void QueryState::ConstructReport(bool instances_started,
     report->set_scan_ranges_complete(scan_ranges_complete);
     report->set_exchange_bytes_sent(exchange_bytes_sent);
     report->set_scan_bytes_sent(scan_bytes_sent);
+    for (const auto& entry : per_join_rows_produced) {
+      (*report->mutable_per_join_rows_produced())[entry.first] = entry.second;
+    }
   }
 }
 

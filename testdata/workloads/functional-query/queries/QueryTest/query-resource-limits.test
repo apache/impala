@@ -68,3 +68,77 @@ STRING,STRING
 'ccccc','dddd'
 'eeeeeeee','f'
 ====
+---- QUERY
+# Query should fail due to exceeding hash join rows produced limit.
+# Added a sleep to make sure it runs long enough to get a non-zero update from the
+# fragment instances on the num of join rows produced.
+set JOIN_ROWS_PRODUCED_LIMIT = 1000;
+select sleep(10000) union select count(*) from tpch.lineitem l1,tpch.lineitem l2,
+tpch.lineitem l3 where l1.l_suppkey = l2.l_linenumber and l1.l_orderkey = l2.l_orderkey
+and l1.l_orderkey = l3.l_orderkey group by l1.l_comment, l2.l_comment having count(*) = 99
+---- CATCH
+row_regex:.*terminated due to join rows produced exceeds the limit of 1.00K.*
+====
+---- QUERY
+# Query should fail due to exceeding nested loop join rows produced limit.
+# Added a sleep to make sure it runs long enough to get a non-zero update from the
+# fragment instances on the num of join rows produced.
+set JOIN_ROWS_PRODUCED_LIMIT = 500;
+select sleep(10000) union select count(*) from functional.alltypestiny t1 left outer join
+functional.alltypessmall t2 on t1.int_col < t2.int_col;
+---- CATCH
+row_regex:.*terminated due to join rows produced exceeds the limit of 500.*
+====
+---- QUERY
+# If one of the mixed joins exceeds the row produced limit, the query should fail.
+# Added a sleep to make sure it runs long enough to get a non-zero update from the
+# fragment instances on the num of join rows produced.
+set JOIN_ROWS_PRODUCED_LIMIT = 10000;
+select sleep(10000) union select count(*) from (
+select
+  *
+from (
+  select
+    ps_partkey,
+    sum(ps_supplycost * ps_availqty) as value
+  from
+    tpch_parquet.partsupp,
+    tpch_parquet.supplier,
+    tpch_parquet.nation
+  where
+    ps_suppkey = s_suppkey
+    and s_nationkey = n_nationkey
+    and n_name = 'GERMANY'
+  group by
+    ps_partkey
+) as inner_query
+where
+  value > (
+    select
+      sum(ps_supplycost * ps_availqty) * 0.0001
+    from
+      tpch_parquet.partsupp,
+      tpch_parquet.supplier,
+      tpch_parquet.nation
+    where
+      ps_suppkey = s_suppkey
+      and s_nationkey = n_nationkey
+      and n_name = 'GERMANY'
+  )
+order by
+  value desc
+) t;
+---- CATCH
+row_regex:.*terminated due to join rows produced exceeds the limit of 10.00k*
+====
+---- QUERY
+# The query should succeed when it doesn't exceed the join rows produced limit.
+set JOIN_ROWS_PRODUCED_LIMIT = 10000;
+select count(*) from alltypessmall a inner join alltypessmall b
+on (a.timestamp_col = b.timestamp_col)
+where a.year=2009 and a.month=1 and b.year=2009 and b.month=1;
+---- TYPES
+BIGINT
+---- RESULTS
+25
+====
