@@ -77,9 +77,9 @@ public enum HdfsFileFormat {
   HUDI_PARQUET("org.apache.hudi.hadoop.HoodieParquetInputFormat",
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
       "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe", true, true, true),
-  ICEBERG("com.expediagroup.hiveberg.IcebergInputFormat",
-      "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
-      "com.expediagroup.hiveberg.IcebergSerDe", false, false, false);
+  ICEBERG("org.apache.iceberg.mr.hive.HiveIcebergInputFormat",
+      "org.apache.iceberg.mr.hive.HiveIcebergOutputFormat",
+      "org.apache.iceberg.mr.hive.HiveIcebergSerDe", false, false, false);
 
   private final String inputFormat_;
   private final String outputFormat_;
