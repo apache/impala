@@ -322,7 +322,7 @@ public class ComputeStatsStmt extends StatementBase {
    *
    * 2. COMPUTE STATS with TABLESAMPLE
    * 2.1 Row counts:
-   * SELECT ROUND(COUNT(*) / <effective_sample_perc>)
+   * SELECT CAST(ROUND(COUNT(*) / <effective_sample_perc>) AS BIGINT)
    * FROM tbl TABLESAMPLE SYSTEM(<sample_perc>) REPEATABLE (<random_seed>)
    *
    * 2.1 Column stats:
@@ -544,8 +544,10 @@ public class ComputeStatsStmt extends StatementBase {
     StringBuilder tableStatsQueryBuilder = new StringBuilder("SELECT ");
     String countSql = "COUNT(*)";
     if (isSampling()) {
-      // Extrapolate the count based on the effective sampling rate.
-      countSql = String.format("ROUND(COUNT(*) / %.10f)", effectiveSamplePerc_);
+      // Extrapolate the count based on the effective sampling rate. Add an explicit CAST
+      // to BIGINT, which is the expected data type for row count.
+      countSql = String.format("CAST(ROUND(COUNT(*) / %.10f) AS BIGINT)",
+        effectiveSamplePerc_);
     }
     List<String> tableStatsSelectList = Lists.newArrayList(countSql);
     // Add group by columns for incremental stats or with extrapolation disabled.

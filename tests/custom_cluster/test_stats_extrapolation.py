@@ -48,8 +48,17 @@ class TestStatsExtrapolation(CustomClusterTestSuite):
     # Test COMPUTE STATS TABLESAMPLE
     part_test_tbl = unique_database + ".alltypes"
     self.clone_table("functional.alltypes", part_test_tbl, True, vector)
+    # Since our test tables are small, set the minimum sample size to 0 to make sure
+    # we exercise the sampling code paths.
+    self.client.execute("set COMPUTE_STATS_MIN_SAMPLE_SIZE=0")
     self.client.execute(
         "compute stats {0} tablesample system (13)".format(part_test_tbl))
+    # Check that table stats were set.
+    table_stats = self.client.execute("show table stats {0}".format(part_test_tbl))
+    col_names = [fs.name.upper() for fs in table_stats.schema.fieldSchemas]
+    extrap_rows_idx = col_names.index("EXTRAP #ROWS")
+    for row in table_stats.data:
+      assert int(row.split("\t")[extrap_rows_idx]) >= 0
     # Check that column stats were set.
     col_stats = self.client.execute("show column stats {0}".format(part_test_tbl))
     col_names = [fs.name.upper() for fs in col_stats.schema.fieldSchemas]
