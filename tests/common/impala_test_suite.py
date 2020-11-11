@@ -930,7 +930,7 @@ class ImpalaTestSuite(BaseTestSuite):
     """Returns True if 'a' and 'b' are within 'diff_perc' percent of each other,
     False otherwise. 'diff_perc' must be a float in [0,1]."""
     if a == b: return True # Avoid division by 0
-    assert abs(a - b) / float(max(a,b)) <= diff_perc
+    assert abs(a - b) / float(max(abs(a), abs(b))) <= diff_perc
 
   def _get_table_location(self, table_name, vector):
     """ Returns the HDFS location of the table """

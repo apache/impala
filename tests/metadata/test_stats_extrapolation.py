@@ -130,7 +130,7 @@ class TestStatsExtrapolation(ImpalaTestSuite):
     self.client.execute("compute stats {0}{1} tablesample system ({2}) repeatable ({3})"\
       .format(tbl, cols, perc, seed))
     self.__check_table_stats(tbl, expected_tbl)
-    self.__check_column_stats(tbl, expected_tbl)
+    self.__check_column_stats(cols, tbl, expected_tbl)
 
   def __check_table_stats(self, tbl, expected_tbl):
     """Checks that the row counts reported in SHOW TABLE STATS on 'tbl' are within 2x
@@ -147,18 +147,20 @@ class TestStatsExtrapolation(ImpalaTestSuite):
       act_cols = actual.data[i].split("\t")
       exp_cols = expected.data[i].split("\t")
       assert int(exp_cols[rows_col_idx]) >= 0
+      # The expected_tbl is expected to have valid extrapolated #rows for every partition.
+      assert int(act_cols[extrap_rows_col_idx]) >= 0
       self.appx_equals(\
-        int(act_cols[extrap_rows_col_idx]), int(exp_cols[rows_col_idx]), 2)
+        int(act_cols[extrap_rows_col_idx]), int(exp_cols[rows_col_idx]), 1.0)
       # Only the table-level row count is stored. The partition row counts
       # are extrapolated.
       if act_cols[0] == "Total":
         self.appx_equals(
-          int(act_cols[rows_col_idx]), int(exp_cols[rows_col_idx]), 2)
+          int(act_cols[rows_col_idx]), int(exp_cols[rows_col_idx]), 1.0)
       elif len(actual.data) > 1:
         # Partition row count is expected to not be set.
         assert int(act_cols[rows_col_idx]) == -1
 
-  def __check_column_stats(self, tbl, expected_tbl):
+  def __check_column_stats(self, cols, tbl, expected_tbl):
     """Checks that the NDVs in SHOW COLUMNS STATS on 'tbl' are within 2x of those
     reported for 'expected_tbl'. Assumes that COMPUTE STATS was previously run
     on 'expected_table' and that COMPUTE STATS TABLESAMPLE was run on 'tbl'."""
@@ -172,4 +174,9 @@ class TestStatsExtrapolation(ImpalaTestSuite):
       act_cols = actual.data[i].split("\t")
       exp_cols = expected.data[i].split("\t")
       assert int(exp_cols[ndv_col_idx]) >= 0
-      self.appx_equals(int(act_cols[ndv_col_idx]), int(exp_cols[ndv_col_idx]), 2)
+      # Only compare the NDVs for columns which were included in the COMPUTE STATS.
+      # The other non partitioning columns are expected to have NDV not set, since the
+      # caller drops the stats before calling COMPUTE STATS.
+      if cols == "" or act_cols[0] in cols:
+        assert int(act_cols[ndv_col_idx]) >= 0
+        self.appx_equals(int(act_cols[ndv_col_idx]), int(exp_cols[ndv_col_idx]), 1.0)
