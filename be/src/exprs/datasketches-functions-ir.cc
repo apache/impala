@@ -62,6 +62,34 @@ StringVal DataSketchesFunctions::DsHllEstimateBoundsAsString(
   return StringStreamToStringVal(ctx, buffer);
 }
 
+StringVal DataSketchesFunctions::DsHllUnionF(FunctionContext* ctx,
+    const StringVal& first_serialized_sketch, const StringVal& second_serialized_sketch) {
+  // Union
+  datasketches::hll_union union_sketch(DS_SKETCH_CONFIG);
+  // Deserialize two sketch
+  if (!first_serialized_sketch.is_null && first_serialized_sketch.len > 0) {
+    datasketches::hll_sketch first_sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
+    if (!DeserializeDsSketch(first_serialized_sketch, &first_sketch)) {
+      LogSketchDeserializationError(ctx);
+      return StringVal::null();
+    }
+    union_sketch.update(first_sketch);
+  }
+  if (!second_serialized_sketch.is_null && second_serialized_sketch.len > 0) {
+    datasketches::hll_sketch second_sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
+    if (!DeserializeDsSketch(second_serialized_sketch, &second_sketch)) {
+      LogSketchDeserializationError(ctx);
+      return StringVal::null();
+    }
+    union_sketch.update(second_sketch);
+  }
+  //  Result
+  datasketches::hll_sketch sketch = union_sketch.get_result(DS_HLL_TYPE);
+  std::stringstream serialized_input;
+  sketch.serialize_compact(serialized_input);
+  return StringStreamToStringVal(ctx, serialized_input);
+}
+
 StringVal DataSketchesFunctions::DsHllStringify(FunctionContext* ctx,
     const StringVal& serialized_sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return StringVal::null();

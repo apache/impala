@@ -52,6 +52,13 @@ public:
       const StringVal& serialized_sketch, const IntVal& kappa);
 
   /// 'serialized_sketch' is expected as a serialized Apache DataSketches HLL sketch. If
+  /// it is not, then the query fails. Union two sketches and returns the resulting
+  /// sketch of union.
+  static StringVal DsHllUnionF(FunctionContext* ctx,
+      const StringVal& first_serialized_sketch,
+      const StringVal& second_serialized_sketch);
+
+  /// 'serialized_sketch' is expected as a serialized Apache DataSketches HLL sketch. If
   /// it is not, then the query fails. This function returns the stringified format of
   /// an Apache DataSketches HLL sketch.
   static StringVal DsHllStringify(FunctionContext* ctx,

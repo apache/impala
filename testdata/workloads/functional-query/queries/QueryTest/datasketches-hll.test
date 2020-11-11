@@ -342,3 +342,81 @@ from functional_parquet.alltypestiny;
 ---- TYPES
 STRING
 ====
+---- QUERY
+# Checks that unioning a valid sketch with a null value result the valid sketch being returned.
+select
+    ds_hll_estimate(ds_hll_union_f(date_sketch, null)),
+    ds_hll_estimate(ds_hll_union_f(null, float_sketch))
+from sketch_store;
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+3,10
+3,10
+3,10
+3,10
+====
+---- QUERY
+# Check that ds_hll_union_f() returns an empty sketch for an empty sketch.
+select ds_hll_estimate(ds_hll_union_f(ds_hll_sketch(cast(f2 as float)), null))
+from functional_parquet.emptytable;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# Checks that ds_hll_union_f() returns an empty sketch for NULL inputs.
+select ds_hll_estimate(ds_hll_union_f(null_str, some_nulls)) from functional_parquet.nullrows
+where id='b';
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# ds_hll_union_f() returns an error if it receives an invalid serialized sketch.
+select ds_hll_union_f(null, date_string_col) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# ds_hll_union_f() returns an error if it receives an invalid serialized sketch.
+select ds_hll_union_f(date_string_col, null) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# Get the same sketches from Impala and Hive and put them into the same table (different
+# column prefix). When we get the estimates from the unions of these sketches the expectation
+# is to get the same results as if these sketches were used separately to get the estimates.
+# However, for string types (STRING, CHAR, VARCHAR) we see the numbers doubling up because
+# of the difference between how Impala and Hive uses these types. See IMPALA-9939 for further
+# details.
+create table hll_sketches_impala_hive2 (
+i_ti string,i_i string,i_bi string,i_f string,i_d string,i_s string,i_c string,i_v string,
+i_nc string,
+h_ti string,h_i string,h_bi string,h_f string,h_d string,h_s string,h_c string,h_v string,
+h_nc string) stored as parquet;
+insert overwrite hll_sketches_impala_hive2 select
+i.ti i_ti, i.i i_i, i.bi i_bi, i.f i_f, i.d i_d, i.s i_s, i.c i_c, i.v i_v,i.nc i_nc,
+h.ti h_ti, h.i h_i, h.bi h_bi, h.f h_f, h.d h_d, h.s h_s, h.c h_c, h.v h_v,h.nc h_nc
+from hll_sketches_from_impala i, hll_sketches_from_hive h;
+select
+    ds_hll_estimate(ds_hll_union_f(i_ti, h_ti)) as ti,
+    ds_hll_estimate(ds_hll_union_f(i_i, h_i)) as i,
+    ds_hll_estimate(ds_hll_union_f(i_bi, h_bi)) as bi,
+    ds_hll_estimate(ds_hll_union_f(i_f, h_f)) as f,
+    ds_hll_estimate(ds_hll_union_f(i_d, h_d)) as d,
+    ds_hll_estimate(ds_hll_union_f(i_s, h_s)) as s,
+    ds_hll_estimate(ds_hll_union_f(i_c, h_c)) as c,
+    ds_hll_estimate(ds_hll_union_f(i_v, h_v)) as v,
+    ds_hll_estimate(ds_hll_union_f(i_nc, h_nc)) as nc
+from hll_sketches_impala_hive2;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+5,7,6,5,6,8,6,6,0
+====
