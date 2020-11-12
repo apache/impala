@@ -354,6 +354,15 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         }
       };
 
+  public static final com.google.common.base.Predicate<Expr> IS_ALWAYS_TRUE_PREDICATE =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof Predicate
+              && ((Predicate) arg).hasAlwaysTrueHint();
+        }
+      };
+
   // id that's unique across the entire query statement and is assigned by
   // Analyzer.registerConjuncts(); only assigned for the top-level terms of a
   // conjunction, and therefore null for most Exprs
@@ -401,6 +410,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // True if this has already been counted towards the number of statement expressions
   private boolean isCountedForNumStmtExprs_ = false;
 
+  // For exprs of type Predicate, this keeps track of predicate hints
+  protected List<PlanHint> predicateHints_;
+
   protected Expr() {
     type_ = Type.INVALID;
     selectivity_ = -1.0;
@@ -425,6 +437,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     fn_ = other.fn_;
     isCountedForNumStmtExprs_ = other.isCountedForNumStmtExprs_;
     children_ = Expr.cloneList(other.children_);
+    if (other.predicateHints_ != null) {
+      predicateHints_ = new ArrayList<>();
+      predicateHints_.addAll(other.predicateHints_);
+    }
   }
 
   public boolean isAnalyzed() { return isAnalyzed_; }
@@ -487,6 +503,22 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     analyzeImpl(analyzer);
     evalCost_ = computeEvalCost();
     analysisDone();
+  }
+
+  protected void analyzeHints(Analyzer analyzer) throws AnalysisException {
+    if (predicateHints_ != null && !predicateHints_.isEmpty()) {
+      if (!(this instanceof Predicate)) {
+        throw new AnalysisException("Expr hints are only supported for predicates");
+      }
+      for (PlanHint hint : predicateHints_) {
+        if (hint.is("ALWAYS_TRUE")) {
+          ((Predicate) this).setHasAlwaysTrueHint(true);
+          analyzer.setHasPlanHints();
+        } else {
+          analyzer.addWarning("Predicate hint not recognized: " + hint);
+        }
+      }
+    }
   }
 
   /**
@@ -1765,4 +1797,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
     return value;
   }
+
+  public void setPredicateHints(List<PlanHint> hints) {
+    Preconditions.checkNotNull(hints);
+    predicateHints_ = hints;
+  }
+
+  public List<PlanHint> getPredicateHints() { return predicateHints_; }
+
 }

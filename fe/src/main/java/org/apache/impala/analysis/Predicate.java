@@ -24,10 +24,13 @@ import org.apache.impala.common.Reference;
 
 public abstract class Predicate extends Expr {
   protected boolean isEqJoinConjunct_;
+  // true if this predicate has an always_true hint
+  protected boolean hasAlwaysTrueHint_;
 
   public Predicate() {
     super();
     isEqJoinConjunct_ = false;
+    hasAlwaysTrueHint_ = false;
   }
 
   /**
@@ -36,15 +39,18 @@ public abstract class Predicate extends Expr {
   protected Predicate(Predicate other) {
     super(other);
     isEqJoinConjunct_ = other.isEqJoinConjunct_;
+    hasAlwaysTrueHint_ = other.hasAlwaysTrueHint_;
   }
 
   public void setIsEqJoinConjunct(boolean v) { isEqJoinConjunct_ = v; }
+  public void setHasAlwaysTrueHint(boolean v) { hasAlwaysTrueHint_ = v; }
 
   @Override
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     type_ = Type.BOOLEAN;
     // values: true/false/null
     numDistinctValues_ = 3;
+    analyzeHints(analyzer);
   }
 
   /**
@@ -91,4 +97,7 @@ public abstract class Predicate extends Expr {
    * Returns the SlotRef bound by this Predicate.
    */
   public SlotRef getBoundSlot() { return null; }
+
+  public boolean hasAlwaysTrueHint() { return hasAlwaysTrueHint_; }
+
 }

@@ -1,0 +1,258 @@
+# IMPALA-10314
+# Basic simple limit optimization
+select * from functional.alltypes_date_partition limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=10/55 files=10 size=3.97KB
+   limit: 10
+   row-size=65B cardinality=10
+====
+# Sanity check with simple limit optimization disabled
+select * from functional.alltypes_date_partition limit 10;
+---- QUERYOPTIONS
+OPTIMIZE_SIMPLE_LIMIT=false
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=55/55 files=55 size=27.27KB
+   limit: 10
+   row-size=65B cardinality=10
+====
+# limit on both sides of a union all
+select * from functional.alltypes_date_partition limit 10
+union all
+select * from functional.alltypes_date_partition limit 5
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=65B cardinality=15
+|
+|--02:SCAN HDFS [functional.alltypes_date_partition]
+|     HDFS partitions=5/55 files=5 size=1.29KB
+|     limit: 5
+|     row-size=65B cardinality=5
+|
+01:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=10/55 files=10 size=3.97KB
+   limit: 10
+   row-size=65B cardinality=10
+====
+# limit in outer block, WHERE clause in inline view
+# along with an explicit hint
+with dp_view as
+(select * from functional.alltypes_date_partition
+where /* +always_true */ date_col = cast(timestamp_col as date))
+select * from dp_view limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=10/55 files=10 size=3.97KB
+   predicates: date_col = CAST(timestamp_col AS DATE)
+   limit: 10
+   row-size=65B cardinality=8
+====
+# limit and WHERE with a wrongly specified hint (missing
+# underscore)
+select * from functional.alltypes_date_partition
+where /* +alwaystrue */ date_col = cast(timestamp_col as date)
+limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=55/55 files=55 size=27.27KB
+   predicates: date_col = CAST(timestamp_col AS DATE)
+   limit: 10
+   row-size=65B cardinality=10
+====
+# WHERE with hint in alternative format '[]' and uppercase
+select * from functional.alltypes_date_partition
+where [ALWAYS_TRUE] date_col = cast(timestamp_col as date)
+limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=10/55 files=10 size=3.97KB
+   predicates: date_col = CAST(timestamp_col AS DATE)
+   limit: 10
+   row-size=65B cardinality=8
+====
+# WHERE with more conjuncts
+select * from functional.alltypes_date_partition
+where [ALWAYS_TRUE] date_col = cast(timestamp_col as date)
+and int_col >= 0
+limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=10/55 files=10 size=3.97KB
+   predicates: int_col >= 0, date_col = CAST(timestamp_col AS DATE)
+   limit: 10
+   row-size=65B cardinality=8
+====
+# WHERE with subquery; should not apply optimization
+# since the subquery is converted to a join
+select * from functional.alltypes_date_partition
+where [ALWAYS_TRUE] int_col in (select int_col from functional.alltypes)
+limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: int_col = functional.alltypes.int_col
+|  runtime filters: RF000 <- functional.alltypes.int_col
+|  limit: 10
+|  row-size=65B cardinality=10
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: functional.alltypes.int_col
+|  |  row-size=4B cardinality=10
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=55/55 files=55 size=27.27KB
+   runtime filters: RF000 -> int_col
+   row-size=65B cardinality=500
+====
+# limit in outer block, WHERE clause in inline view
+# but without the hint: should not apply optimization
+with dp_view as
+(select * from functional.alltypes_date_partition
+where date_col = cast(timestamp_col as date))
+select * from dp_view limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=55/55 files=55 size=27.27KB
+   predicates: date_col = CAST(timestamp_col AS DATE)
+   limit: 10
+   row-size=65B cardinality=10
+====
+# limit and partition pruning via range constant propagation:
+# should not apply optimization since outer query predicate
+# is not always true
+with dp_view as
+(select * from functional.alltypes_date_partition
+where /* +always_true */ date_col = cast(timestamp_col as date))
+select * from dp_view
+where timestamp_col between '2009-01-01' and '2009-02-01'
+limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   partition predicates: date_col >= DATE '2009-01-01' AND date_col <= DATE '2009-02-01'
+   HDFS partitions=32/55 files=32 size=15.99KB
+   predicates: functional.alltypes_date_partition.timestamp_col <= TIMESTAMP '2009-02-01 00:00:00', functional.alltypes_date_partition.timestamp_col >= TIMESTAMP '2009-01-01 00:00:00', date_col = CAST(timestamp_col AS DATE)
+   limit: 10
+   row-size=65B cardinality=10
+====
+# limit in outer block, WHERE and LIMIT clause in
+# inline view
+with dp_view as
+(select * from functional.alltypes_date_partition
+where /* +always_true */ date_col = cast(timestamp_col as date) limit 20)
+select * from dp_view limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=20/55 files=20 size=9.42KB
+   predicates: date_col = CAST(timestamp_col AS DATE)
+   limit: 10
+   row-size=65B cardinality=10
+====
+# Join with limit: optimization should not be applied
+select * from functional.alltypes_date_partition t1
+inner join functional.alltypes t2
+on t1.bigint_col = t2.bigint_col
+limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.bigint_col = t1.bigint_col
+|  runtime filters: RF000 <- t1.bigint_col
+|  limit: 10
+|  row-size=154B cardinality=10
+|
+|--00:SCAN HDFS [functional.alltypes_date_partition t1]
+|     HDFS partitions=55/55 files=55 size=27.27KB
+|     row-size=65B cardinality=500
+|
+01:SCAN HDFS [functional.alltypes t2]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t2.bigint_col
+   row-size=89B cardinality=7.30K
+====
+# Order-by with limit: optimization should not be applied
+select * from functional.alltypes_date_partition
+order by bigint_col limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:TOP-N [LIMIT=10]
+|  order by: bigint_col ASC
+|  row-size=65B cardinality=10
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=55/55 files=55 size=27.27KB
+   row-size=65B cardinality=500
+====
+# Order-by with limit in outer query, limit also present in
+# from clause subquery: optimization should be applied
+select * from (select * from functional.alltypes_date_partition limit 10) t
+order by int_col limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:TOP-N [LIMIT=10]
+|  order by: int_col ASC
+|  row-size=65B cardinality=10
+|
+00:SCAN HDFS [functional.alltypes_date_partition]
+   HDFS partitions=10/55 files=10 size=3.97KB
+   limit: 10
+   row-size=65B cardinality=10
+====
+# limit query on table with multiple files per partition
+select * from functional.alltypesaggmultifiles limit 10;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional.alltypesaggmultifiles]
+   HDFS partitions=3/11 files=10 size=183.75KB
+   limit: 10
+   row-size=84B cardinality=10
+====
+# Special case of EXISTS subquery that gets transformed to have a
+# limit 1 and then simple limit optimization should be applied
+select * from functional.alltypestiny
+where exists (select int_col from functional.alltypes_date_partition)
+---- PLAN
+PLAN-ROOT SINK
+|
+02:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  row-size=89B cardinality=8
+|
+|--01:SCAN HDFS [functional.alltypes_date_partition]
+|     HDFS partitions=1/55 files=1 size=257B
+|     limit: 1
+|     row-size=0B cardinality=1
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=89B cardinality=8
+====

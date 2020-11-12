@@ -86,7 +86,8 @@ public class PartitionSet extends PartitionSpecBase {
 
     try {
       HdfsPartitionPruner pruner = new HdfsPartitionPruner(desc);
-      partitions_ = pruner.prunePartitions(analyzer, transformedConjuncts, true).first;
+      partitions_ = pruner.prunePartitions(analyzer, transformedConjuncts, true,
+          null).first;
     } catch (ImpalaException e) {
       if (e instanceof AnalysisException) throw (AnalysisException) e;
       throw new AnalysisException("Partition expr evaluation failed in the backend.", e);

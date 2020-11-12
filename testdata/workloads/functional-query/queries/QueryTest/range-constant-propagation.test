@@ -23,3 +23,17 @@ and timestamp_col <= '2009-02-01';
 ---- TYPES
 BIGINT, BIGINT
 ====
+---- QUERY
+# IMPALA-10314
+# Simple limit in outer query referencing a with clause subquery.
+# WHERE clause has an always_true hint.
+set optimize_simple_limit=true;
+with dp_view as
+(select * from alltypes_date_partition
+where /* +always_true */ date_col = cast(timestamp_col as date))
+select count(*) from (select * from dp_view limit 10) t;
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====

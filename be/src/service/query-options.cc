@@ -329,6 +329,9 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::OPTIMIZE_PARTITION_KEY_SCANS:
         query_options->__set_optimize_partition_key_scans(IsTrue(value));
         break;
+      case TImpalaQueryOptions::OPTIMIZE_SIMPLE_LIMIT:
+        query_options->__set_optimize_simple_limit(IsTrue(value));
+        break;
       case TImpalaQueryOptions::REPLICA_PREFERENCE: {
         map<int, const char *> valid_enums_values = {
             {0, "CACHE_LOCAL"},
