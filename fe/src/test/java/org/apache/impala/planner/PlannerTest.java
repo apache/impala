@@ -1100,4 +1100,15 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("outer-to-inner-joins", options,
         ImmutableSet.of(PlannerTestOption.VALIDATE_CARDINALITY));
   }
+
+  /**
+   * Test simple limit optimization
+   */
+  @Test
+  public void testSimpleLimitOptimization() {
+    TQueryOptions options = new TQueryOptions();
+    options.setOptimize_simple_limit(true);
+    runPlannerTestFile("optimize-simple-limit", options);
+  }
+
 }

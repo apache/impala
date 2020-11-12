@@ -68,8 +68,6 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
-import org.apache.impala.catalog.HdfsPartition;
-import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
@@ -1182,6 +1180,8 @@ public class SingleNodePlanner {
     // On-clause of an outer join may be pushed into the inline view as well.
     migrateConjunctsToInlineView(analyzer, inlineViewRef);
 
+    migrateSimpleLimitToInlineView(analyzer, inlineViewRef);
+
     // Turn a constant select into a UnionNode that materializes the exprs.
     // TODO: unify this with createConstantSelectPlan(), this is basically the
     // same thing
@@ -1308,6 +1308,23 @@ public class SingleNodePlanner {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Can evaluate {} in inline view {}", e.debugString(), alias);
       }
+    }
+  }
+
+  public void migrateSimpleLimitToInlineView(final Analyzer analyzer,
+    final InlineViewRef inlineViewRef) {
+    Pair<Boolean, Long> outerStatus = analyzer.getSimpleLimitStatus();
+    if (outerStatus == null || !outerStatus.first
+        || inlineViewRef.isTableMaskingView()) {
+      return;
+    }
+    Pair<Boolean, Long> viewStatus =
+        inlineViewRef.getAnalyzer().getSimpleLimitStatus();
+    // if the view already has a limit, we leave it as-is otherwise we
+    // apply the outer limit
+    if (viewStatus != null && !viewStatus.first) {
+      inlineViewRef.getAnalyzer().setSimpleLimitStatus(new Pair<>(new Boolean(true),
+          outerStatus.second));
     }
   }
 
@@ -1470,7 +1487,7 @@ public class SingleNodePlanner {
     // end up removing some predicates.
     HdfsPartitionPruner pruner = new HdfsPartitionPruner(tupleDesc);
     Pair<List<? extends FeFsPartition>, List<Expr>> pair =
-        pruner.prunePartitions(analyzer, conjuncts, false);
+        pruner.prunePartitions(analyzer, conjuncts, false, hdfsTblRef);
     List<? extends FeFsPartition> partitions = pair.first;
 
     // Mark all slots referenced by the remaining conjuncts as materialized.

@@ -32,6 +32,7 @@ import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ColumnAliasGenerator;
+import org.apache.impala.common.Pair;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.common.TableAliasGenerator;
 import org.apache.impala.common.TreeNode;
@@ -176,6 +177,38 @@ public class SelectStmt extends QueryStmt {
   public ExprSubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
 
   /**
+   * A simple limit statement has a limit but no order-by,
+   * group-by, aggregates, joins or analytic functions. It can
+   * have a WHERE clause only if it is tagged as always true.
+   * This method does not explicitly check for subqueries. If the
+   * subquery occurs in the WHERE, the initial check for simple
+   * limit may succeed. Subsequently, in the planning process
+   * the statement rewriter may transform it to a join or an
+   * equivalent plan and analyze will be called again and this time
+   * it may or may not satisfy the simple limit criteria.
+   * Note that FROM clause subquery is generally ok since it is
+   * a table ref.
+   */
+  public Pair<Boolean, Long> checkSimpleLimitStmt() {
+    if (getTableRefs().size() == 1
+        && !hasGroupByClause() && !hasOrderByClause()
+        && !hasMultiAggInfo() && !hasAnalyticInfo()) {
+      if (hasWhereClause() && !Expr.IS_ALWAYS_TRUE_PREDICATE.apply(getWhereClause())) {
+        return null;
+      }
+      if (hasLimit()) {
+        return new Pair<>(new Boolean(true), getLimit());
+      } else {
+        // even if this SELECT statement does not have a LIMIT, it is a
+        // simple select which may be an inline view and eligible for a
+        // limit pushdown from an outer block, so we return a non-null value
+        return new Pair<>(new Boolean(false), null);
+      }
+    }
+    return null;
+  }
+
+  /**
    * Append additional grouping expressions to the select list. Used by StmtRewriter.
    */
   protected void addGroupingExprs(List<Expr> addtlGroupingExprs) {
@@ -286,6 +319,7 @@ public class SelectStmt extends QueryStmt {
       }
 
       buildColumnLineageGraph();
+      analyzer_.setSimpleLimitStatus(checkSimpleLimitStmt());
     }
 
     private void analyzeSelectClause() throws AnalysisException {
@@ -1173,6 +1207,11 @@ public class SelectStmt extends QueryStmt {
     // Where clause
     if (whereClause_ != null) {
       strBuilder.append(" WHERE ");
+      List<PlanHint> predHints = whereClause_.getPredicateHints();
+      if (predHints != null && predHints.size() > 0) {
+        strBuilder.append(ToSqlUtils.getPlanHintsSql(options,
+            predHints)).append(" ");
+      }
       strBuilder.append(whereClause_.toSql(options));
     }
     // Group By clause

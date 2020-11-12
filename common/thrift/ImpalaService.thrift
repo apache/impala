@@ -594,6 +594,14 @@ enum TImpalaQueryOptions {
   // Enable (>=0) or disable(<0) reporting of skews for a query in runtime profile.
   // When enabled, used as the CoV threshold value in the skew detection formula.
   REPORT_SKEW_LIMIT = 115
+
+  // If true, for simple limit queries (limit with no order-by, group-by, aggregates,
+  // joins, analytic functions but does allow where predicates) optimize the planning
+  // time by only considering a small number of partitions. The number of files within
+  // a partition is used as an approximation to number of rows (1 row per file).
+  // This option is opt-in by default as this optimization may in some cases produce
+  // fewer (but correct) rows than the limit value in the query.
+  OPTIMIZE_SIMPLE_LIMIT = 116
 }
 
 // The summary of a DML statement.

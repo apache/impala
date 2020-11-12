@@ -181,6 +181,15 @@ public class Analyzer {
   // Flag indicating if this analyzer instance belongs to a subquery.
   private boolean isSubquery_ = false;
 
+  // Tracks the simple LIMIT status of this query block. First item of the
+  // pair indicates whether a simple limit exists or not, second item is
+  // the actual limit value if it does exist. We use a pair instead of just
+  // a single nullable field because a query block may not have a LIMIT but
+  // if it is an inline view it may be eligible for limit pushdown from an
+  // outer query, so for such case the simpleLimitStatus_ will be non-null
+  // but the pair will be <false, null>.
+  private Pair<Boolean, Long>  simpleLimitStatus_ = null;
+
   // Flag indicating whether this analyzer belongs to a WITH clause view.
   private boolean hasWithClause_ = false;
 
@@ -213,6 +222,14 @@ public class Analyzer {
   public void setIsSubquery() {
     isSubquery_ = true;
     globalState_.containsSubquery = true;
+  }
+
+  public void setSimpleLimitStatus(Pair<Boolean, Long> simpleLimitStatus) {
+    simpleLimitStatus_ = simpleLimitStatus;
+  }
+
+  public Pair<Boolean, Long> getSimpleLimitStatus() {
+    return simpleLimitStatus_;
   }
 
   public void setHasTopLevelAcidCollectionTableRef() {

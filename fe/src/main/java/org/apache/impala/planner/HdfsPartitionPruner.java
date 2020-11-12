@@ -39,6 +39,7 @@ import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.NullLiteral;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
@@ -110,7 +111,8 @@ public class HdfsPartitionPruner {
    * If 'allowEmpty' is False, empty partitions are not returned.
    */
   public Pair<List<? extends FeFsPartition>, List<Expr>> prunePartitions(
-      Analyzer analyzer, List<Expr> conjuncts, boolean allowEmpty)
+      Analyzer analyzer, List<Expr> conjuncts, boolean allowEmpty,
+      TableRef hdfsTblRef)
       throws ImpalaException {
     // Start with creating a collection of partition filters for the applicable conjuncts.
     List<HdfsPartitionFilter> partitionFilters = new ArrayList<>();
@@ -179,7 +181,43 @@ public class HdfsPartitionPruner {
             }
           }));
     }
+    if (hdfsTblRef != null) {
+      // check and apply pruning for simple limit
+      results = pruneForSimpleLimit(hdfsTblRef, analyzer, results);
+    }
     return new Pair<>(results, partitionConjuncts);
+  }
+
+  /**
+   * Prune partitions based on eligibility of simple limit optimization:
+   *  - table ref should not already have a TABLESAMPLE clause
+   *  - OPTIMIZE_SIMPLE_LIMIT is enabled and the query block satisfies
+   *    simple limit criteria
+   */
+  private List<? extends FeFsPartition> pruneForSimpleLimit(TableRef tblRef,
+    Analyzer analyzer, List<? extends FeFsPartition> partitions) {
+    if (tblRef.getSampleParams() == null
+        && analyzer.getQueryCtx().client_request.getQuery_options()
+        .isOptimize_simple_limit()
+        && analyzer.getSimpleLimitStatus() != null
+        && analyzer.getSimpleLimitStatus().first) {
+      List<FeFsPartition> prunedPartitions = new ArrayList<>();
+      long numRows = 0;
+      // Instead of using the partitions num rows statistic which may be stale,
+      // we use a conservative estimate of number of files within a partition and
+      // 1 row per file
+      for (FeFsPartition p : partitions) {
+        numRows += p.getNumFileDescriptors();
+        prunedPartitions.add(p);
+        if (numRows >= analyzer.getSimpleLimitStatus().second) {
+          // here we only limit the partitions; later in HdfsScanNode we will
+          // limit the file descriptors within a partition
+          break;
+        }
+      }
+      return prunedPartitions;
+    }
+    return partitions;
   }
 
   /**

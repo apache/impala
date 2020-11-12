@@ -842,12 +842,43 @@ public class HdfsScanNode extends ScanNode {
     largestScanRangeBytes_ = 0;
     maxScanRangeNumRows_ = -1;
     fileFormats_ = new HashSet<>();
+    long simpleLimitNumRows = 0; // only used for the simple limit case
+    boolean isSimpleLimit =
+        (analyzer.getQueryCtx().client_request.getQuery_options()
+            .isOptimize_simple_limit()
+        && analyzer.getSimpleLimitStatus() != null
+        && analyzer.getSimpleLimitStatus().first);
     for (FeFsPartition partition: partitions_) {
+      // Missing disk id accounting is only done for file systems that support the notion
+      // of disk/storage ids.
+      FileSystem partitionFs;
+      try {
+        partitionFs = partition.getLocationPath().getFileSystem(CONF);
+      } catch (IOException e) {
+        throw new ImpalaRuntimeException("Error determining partition fs type", e);
+      }
+      boolean fsHasBlocks = FileSystemUtil.supportsStorageIds(partitionFs);
       List<FileDescriptor> fileDescs;
       if (this instanceof IcebergScanNode) {
         fileDescs = ((IcebergScanNode) this).getFileDescriptorByIcebergPredicates();
       } else {
-        fileDescs = partition.getFileDescriptors();
+        if (isSimpleLimit) {
+          fileDescs = new ArrayList<>();
+          for (FileDescriptor fd : partition.getFileDescriptors()) {
+            // skip empty files
+            if ((fsHasBlocks && fd.getNumFileBlocks() == 0)
+                || (!fsHasBlocks && fd.getFileLength() <= 0)) {
+              continue;
+            }
+            simpleLimitNumRows++;  // conservatively estimate 1 row per file
+            fileDescs.add(fd);
+            if (simpleLimitNumRows == analyzer.getSimpleLimitStatus().second) {
+              break;
+            }
+          }
+        } else {
+          fileDescs = partition.getFileDescriptors();
+        }
       }
 
       if (sampledFiles != null) {
@@ -861,15 +892,7 @@ public class HdfsScanNode extends ScanNode {
       analyzer.getDescTbl().addReferencedPartition(tbl_, partition.getId());
       fileFormats_.add(partition.getFileFormat());
       Preconditions.checkState(partition.getId() >= 0);
-      // Missing disk id accounting is only done for file systems that support the notion
-      // of disk/storage ids.
-      FileSystem partitionFs;
-      try {
-        partitionFs = partition.getLocationPath().getFileSystem(CONF);
-      } catch (IOException e) {
-        throw new ImpalaRuntimeException("Error determining partition fs type", e);
-      }
-      boolean fsHasBlocks = FileSystemUtil.supportsStorageIds(partitionFs);
+
       if (!fsHasBlocks) {
         // Limit the scan range length if generating scan ranges (and we're not
         // short-circuiting the scan for a partition key scan).
@@ -922,6 +945,12 @@ public class HdfsScanNode extends ScanNode {
       if (partitionMaxScanRangeBytes > 0 && partitionNumRows >= 0) {
         updateMaxScanRangeNumRows(
             partitionNumRows, partitionBytes, partitionMaxScanRangeBytes);
+      }
+      if (isSimpleLimit && simpleLimitNumRows ==
+          analyzer.getSimpleLimitStatus().second) {
+        // for the simple limit case if the estimated rows has already reached the limit
+        // there's no need to process more partitions
+        break;
       }
     }
     if (totalFilesPerFs_.isEmpty() || sumValues(totalFilesPerFs_) == 0) {

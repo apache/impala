@@ -3114,9 +3114,17 @@ expr_list ::=
   :}
   ;
 
+// Currently, we allow predicate hints for the top level WHERE
+// clause. An attempt was made to set this for individual exprs
+// (as part of the 'expr' grammar) but that generated quite a
+// few Shift/Reduce conflicts.
+// TODO: Revisit the possibility of setting the hint per expr
 where_clause ::=
-  KW_WHERE expr:e
-  {: RESULT = e; :}
+  KW_WHERE opt_plan_hints:pred_hints expr:e
+  {:
+    e.setPredicateHints(pred_hints);
+    RESULT = e;
+  :}
   | /* empty */
   {: RESULT = null; :}
   ;
