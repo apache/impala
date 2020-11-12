@@ -238,8 +238,9 @@ public class ExprCardinalityTest {
     // Note that the constant NULL has an NDV = 1, but
     // Null-only columns have an NDV=0...
     // See IMPALA-8058
-    verifySelectExpr("alltypes", "NULL", 1, -1);
-    verifySelectExpr("alltypes", "true", 1, -1);
+    verifySelectExpr("alltypes", "NULL", 1, 0);
+    verifySelectExpr("alltypes", "true", 1, 1);
+    verifySelectExpr("alltypes", "false", 1, 0);
   }
 
   // Expression selectivity
@@ -540,6 +541,10 @@ public class ExprCardinalityTest {
         3, 1.0/2 + 1.0/10 - 1.0/2 * 1.0/10);
     // Chain of OR rewritten to IN
     verifySelectExpr("alltypes", "int_col = 10 or int_col = 20", 3, 2.0/10);
+    // Or with literals
+    verifySelectExpr("alltypes", "int_col = 10 or true", 3, 1.0);
+    verifySelectExpr("alltypes", "int_col = 10 or false", 3, 0.1);
+    verifySelectExpr("alltypes", "int_col = 10 or null", 3, 0.1);
   }
 
   /**

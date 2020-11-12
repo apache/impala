@@ -28,6 +28,7 @@ public class NullLiteral extends LiteralExpr {
 
   public NullLiteral() {
     type_ = Type.NULL;
+    this.selectivity_ = 0;
   }
 
   /**

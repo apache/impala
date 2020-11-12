@@ -30,6 +30,7 @@ public class BoolLiteral extends LiteralExpr {
 
   public BoolLiteral(boolean value) {
     this.value_ = value;
+    this.selectivity_ = value ? 1 : 0;
     type_ = Type.BOOLEAN;
   }
 
@@ -37,8 +38,10 @@ public class BoolLiteral extends LiteralExpr {
     type_ = Type.BOOLEAN;
     if (value.toLowerCase().equals("true")) {
       this.value_ = true;
+      this.selectivity_ = 1;
     } else if (value.toLowerCase().equals("false")) {
       this.value_ = false;
+      this.selectivity_ = 0;
     } else {
       throw new AnalysisException("invalid BOOLEAN literal: " + value);
     }
