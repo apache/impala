@@ -23,7 +23,7 @@
 
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/lexical_cast.hpp>
+#include <gutil/strings/numbers.h>
 #include <gutil/strings/substitute.h>
 
 #include "exprs/anyval-util.h"
@@ -46,6 +46,18 @@ using namespace datetime_parse_util;
 // double) as a string. 24 = 17 (maximum significant digits) + 1 (decimal point) + 1 ('E')
 // + 3 (exponent digits) + 2 (negative signs) (see http://stackoverflow.com/a/1701085)
 const int MAX_FLOAT_CHARS = 24;
+// bigint max length is 20, give 22 as gutil required
+const int MAX_EXACT_NUMERIC_CHARS = 22;
+// -9.2e18 or unsigned 2^64=1.8e19
+const int MAX_BIGINT_CHARS = 20;
+// -2^31=-2.1e9
+const int MAX_INT_CHARS = 11;
+// -2^15=-32768
+const int MAX_SMALLINT_CHARS = 6;
+// -128~127 or unsigned 0~255
+const int MAX_TINYINT_CHARS = 4;
+// 1 0
+const int MAX_BOOLEAN_CHARS = 1;
 
 #define CAST_FUNCTION(from_type, to_type) \
   to_type CastFunctions::CastTo##to_type(FunctionContext* ctx, const from_type& val) { \
@@ -120,18 +132,33 @@ CAST_FROM_STRING(BigIntVal, int64_t, StringToInt)
 CAST_FROM_STRING(FloatVal, float, StringToFloat)
 CAST_FROM_STRING(DoubleVal, double, StringToFloat)
 
-#define CAST_TO_STRING(num_type) \
+
+#define CAST_EXACT_NUMERIC_TO_STRING(num_type, max_char_size, to_string_method) \
   StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const num_type& val) { \
     if (val.is_null) return StringVal::null(); \
-    StringVal sv = AnyValUtil::FromString(ctx, lexical_cast<string>(val.val)); \
+    DCHECK_LE(max_char_size, MAX_EXACT_NUMERIC_CHARS); \
+    char char_buffer[MAX_EXACT_NUMERIC_CHARS];\
+    char* end_position = to_string_method(val.val, char_buffer); \
+    size_t len = end_position - char_buffer; \
+    DCHECK_GT(len, 0); \
+    DCHECK_LE(len, max_char_size); \
+    StringVal sv = StringVal::CopyFrom(ctx,\
+       reinterpret_cast<const uint8_t *> (char_buffer), len); \
+    if (UNLIKELY(sv.is_null)) { \
+      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok()); \
+      return sv; \
+    } \
     AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv); \
     return sv; \
   }
 
-CAST_TO_STRING(BooleanVal);
-CAST_TO_STRING(SmallIntVal);
-CAST_TO_STRING(IntVal);
-CAST_TO_STRING(BigIntVal);
+// boolean, tinyint, smallint will be casted to int here via one of the gutil methods.
+CAST_EXACT_NUMERIC_TO_STRING(BooleanVal, MAX_BOOLEAN_CHARS, FastInt32ToBufferLeft);
+CAST_EXACT_NUMERIC_TO_STRING(TinyIntVal, MAX_TINYINT_CHARS, FastInt32ToBufferLeft);
+CAST_EXACT_NUMERIC_TO_STRING(SmallIntVal, MAX_SMALLINT_CHARS, FastInt32ToBufferLeft);
+CAST_EXACT_NUMERIC_TO_STRING(IntVal, MAX_INT_CHARS, FastInt32ToBufferLeft);
+CAST_EXACT_NUMERIC_TO_STRING(BigIntVal, MAX_BIGINT_CHARS, FastInt64ToBufferLeft);
+
 
 #define CAST_FLOAT_TO_STRING(float_type, format) \
   StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const float_type& val) { \
@@ -157,15 +184,6 @@ CAST_TO_STRING(BigIntVal);
 CAST_FLOAT_TO_STRING(FloatVal, "%.9g");
 CAST_FLOAT_TO_STRING(DoubleVal, "%.17g");
 
-// Special-case tinyint because boost thinks it's a char and handles it differently.
-// e.g. '0' is written as an empty string.
-StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const TinyIntVal& val) {
-  if (val.is_null) return StringVal::null();
-  int64_t tmp_val = val.val;
-  StringVal sv = AnyValUtil::FromString(ctx, lexical_cast<string>(tmp_val));
-  AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv);
-  return sv;
-}
 
 StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const TimestampVal& val) {
   DCHECK(ctx != nullptr);
