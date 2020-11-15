@@ -93,7 +93,10 @@ SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -DCALLONCEHACK")
 # For any gcc builds:
 #   -g: Enable symbols for profiler tools
 #   -Wno-unused-local-typedefs: Do not warn for local typedefs that are unused.
-SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs")
+#   -gdwarf-4: Set the appropriate DWARF version. Later versions of DWARF have better
+#    support for newer C++ language features and better compression, but require newer
+#    versions of GDB. DWARF 4 requires GDB 7.0 or above.
+SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs -gdwarf-4")
 if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   # We need to add additional arguments for GCC 7+. We go down this branch if building
   # with a non-GCC compiler of version 7+, but in that case CXX_GCC_FLAGS is not used,
@@ -111,13 +114,11 @@ endif()
 # For CMAKE_BUILD_TYPE=Release
 #   -O3: Enable all compiler optimizations
 #   -DNDEBUG: Turn off dchecks/asserts/debug only code.
-#
-# Debug information is stored as dwarf2 to be as compatible as possible
-SET(CXX_FLAGS_DEBUG "${CXX_GCC_FLAGS} -ggdb -gdwarf-2")
+SET(CXX_FLAGS_DEBUG "${CXX_GCC_FLAGS} -ggdb")
 # -Werror: compile warnings should be errors when using the toolchain compiler.
 #   Enabled for DEBUG, ASAN, TSAN and UBSAN builds which are built pre-commit.
 SET(CXX_FLAGS_DEBUG "${CXX_FLAGS_DEBUG} -Werror")
-SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG -gdwarf-2")
+SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG")
 SET(CXX_FLAGS_ADDRESS_SANITIZER
   "${CXX_CLANG_FLAGS} -Werror -O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
 
