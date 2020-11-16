@@ -82,12 +82,6 @@ DEFINE_int32(ipki_server_key_size, 2048,
              "is used for TLS connections to and from clients and other servers.");
 TAG_FLAG(ipki_server_key_size, experimental);
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-namespace {
-kudu::security::OpenSSLMutex mutex;
-}  // anonymous namespace
-#endif
-
 namespace kudu {
 namespace security {
 
@@ -433,10 +427,6 @@ boost::optional<CertSignRequest> TlsContext::GetCsrIfNecessary() const {
 
 Status TlsContext::AdoptSignedCert(const Cert& cert) {
   SCOPED_OPENSSL_NO_PENDING_ERRORS;
-
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-  unique_lock<OpenSSLMutex> lock_global(mutex);
-#endif
   unique_lock<RWMutex> lock(lock_);
 
   if (!csr_) {
