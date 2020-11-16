@@ -28,10 +28,8 @@
 #include <string>
 #include <vector>
 
-#include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include "kudu/gutil/macros.h"
 #include "kudu/gutil/strings/split.h"
 #include "kudu/gutil/strings/strip.h"
 #include "kudu/gutil/strings/substitute.h"
@@ -39,7 +37,6 @@
 #include "kudu/util/debug/leakcheck_disabler.h"
 #endif
 #include "kudu/util/errno.h"
-#include "kudu/util/flag_tags.h"
 #include "kudu/util/flags.h"
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 #include "kudu/util/mutex.h"
@@ -47,15 +44,9 @@
 #include "kudu/util/scoped_cleanup.h"
 #include "kudu/util/status.h"
 #include "kudu/util/subprocess.h"
-
-DEFINE_bool(openssl_defensive_locking,
-            false,
-            "If enabled, cryptographic methods lock more defensively to work around thread safety "
-            "issues in certain OpenSSL versions. This makes Kudu servers or clients more stable "
-            "when running on an affected OpenSSL version, sacrificing some performance.");
-TAG_FLAG(openssl_defensive_locking, unsafe);
-TAG_FLAG(openssl_defensive_locking, hidden);
-TAG_FLAG(openssl_defensive_locking, runtime);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#include "kudu/util/thread.h"
+#endif
 
 using std::ostringstream;
 using std::string;
@@ -96,6 +87,10 @@ void LockingCB(int mode, int type, const char* /*file*/, int /*line*/) {
   } else {
     m->unlock();
   }
+}
+
+void ThreadIdCB(CRYPTO_THREADID* tid) {
+  CRYPTO_THREADID_set_numeric(tid, Thread::UniqueThreadId());
 }
 #endif
 
@@ -209,6 +204,8 @@ void DoInitializeOpenSSL() {
 
     // Callbacks used by OpenSSL required in a multi-threaded setting.
     CRYPTO_set_locking_callback(LockingCB);
+
+    CRYPTO_THREADID_set_callback(ThreadIdCB);
   }
 #endif
   CheckFIPSMode();
@@ -368,27 +365,6 @@ Status GetPasswordFromShellCommand(const string& cmd, string* password) {
   StripTrailingWhitespace(&stdout);
   *password = stdout;
   return Status::OK();
-}
-
-OpenSSLMutex::OpenSSLMutex() : locking_enabled_(FLAGS_openssl_defensive_locking) {}
-
-void OpenSSLMutex::lock() {
-  if (locking_enabled_) {
-    mutex_.lock();
-  }
-}
-
-bool OpenSSLMutex::try_lock() {
-  if (locking_enabled_) {
-    return mutex_.try_lock();
-  }
-  return true;
-}
-
-void OpenSSLMutex::unlock() {
-  if (locking_enabled_) {
-    mutex_.unlock();
-  }
 }
 
 } // namespace security
