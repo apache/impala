@@ -493,6 +493,7 @@ Per-Host Resources: mem-estimate=212.88MB mem-reservation=6.89MB thread-reservat
   |  |       partitions: 0/6 rows=413
   |  |       columns: all
   |  |     extrapolated-rows=disabled max-scan-range-rows=unavailable
+  |  |     file formats: [ORC]
   |  |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
   |  |     tuple-ids=3 row-size=28B cardinality=419
   |  |     in pipelines: 04(GETNEXT)
@@ -504,6 +505,7 @@ Per-Host Resources: mem-estimate=212.88MB mem-reservation=6.89MB thread-reservat
   |       partitions: 0/24 rows=3.42K
   |       columns: all
   |     extrapolated-rows=disabled max-scan-range-rows=unavailable
+  |     file formats: [ORC]
   |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
   |     tuple-ids=1 row-size=28B cardinality=3.44K
   |     in pipelines: 03(GETNEXT)
@@ -521,6 +523,7 @@ Per-Host Resources: mem-estimate=212.88MB mem-reservation=6.89MB thread-reservat
   |       partitions: 0/6 rows=413
   |       columns: all
   |     extrapolated-rows=disabled max-scan-range-rows=unavailable
+  |     file formats: [ORC]
   |     mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
   |     tuple-ids=2 row-size=28B cardinality=419
   |     in pipelines: 01(GETNEXT)
@@ -533,6 +536,7 @@ Per-Host Resources: mem-estimate=212.88MB mem-reservation=6.89MB thread-reservat
        partitions: 0/24 rows=3.42K
        columns missing stats: id
      extrapolated-rows=disabled max-scan-range-rows=unavailable
+     file formats: [ORC]
      mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
      tuple-ids=0 row-size=32B cardinality=3.44K
      in pipelines: 00(GETNEXT)
@@ -593,6 +597,7 @@ Per-Host Resources: mem-estimate=66.99MB mem-reservation=2.97MB thread-reservati
        partitions: 0/24 rows=3.42K
        columns missing stats: id
      extrapolated-rows=disabled max-scan-range-rows=unavailable
+     file formats: [ORC]
      mem-estimate=64.00MB mem-reservation=32.00KB thread-reservation=1
      tuple-ids=0 row-size=32B cardinality=3.44K
      in pipelines: 00(GETNEXT)
@@ -608,6 +613,7 @@ Per-Host Resources: mem-estimate=48.00MB mem-reservation=24.00KB thread-reservat
        partitions: 0/6 rows=413
        columns: all
      extrapolated-rows=disabled max-scan-range-rows=unavailable
+     file formats: [ORC]
      mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
      tuple-ids=2 row-size=28B cardinality=419
      in pipelines: 01(GETNEXT)
@@ -634,6 +640,7 @@ Per-Host Resources: mem-estimate=49.99MB mem-reservation=1.96MB thread-reservati
        partitions: 0/24 rows=3.42K
        columns: all
      extrapolated-rows=disabled max-scan-range-rows=unavailable
+     file formats: [ORC]
      mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
      tuple-ids=1 row-size=28B cardinality=3.44K
      in pipelines: 03(GETNEXT)
@@ -649,6 +656,7 @@ Per-Host Resources: mem-estimate=48.00MB mem-reservation=24.00KB thread-reservat
        partitions: 0/6 rows=413
        columns: all
      extrapolated-rows=disabled max-scan-range-rows=unavailable
+     file formats: [ORC]
      mem-estimate=48.00MB mem-reservation=24.00KB thread-reservation=1
      tuple-ids=3 row-size=28B cardinality=419
      in pipelines: 04(GETNEXT)

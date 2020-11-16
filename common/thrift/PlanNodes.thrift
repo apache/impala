@@ -293,6 +293,12 @@ struct THdfsScanNode {
 
   // If true, the backend only needs to return one row per partition.
   11: optional bool is_partition_key_scan
+
+  // The list of file formats that this scan node may need to process. It is possible that
+  // in some fragment instances not all will actually occur. This list can be used to
+  // codegen code remotely for other impalad's as it contains all file formats that may be
+  // needed for this scan node.
+  12: required set<CatalogObjects.THdfsFileFormat> file_formats;
 }
 
 struct TDataSourceScanNode {

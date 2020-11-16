@@ -1428,7 +1428,7 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
-    msg.hdfs_scan_node = new THdfsScanNode(desc_.getId().asInt());
+    msg.hdfs_scan_node = new THdfsScanNode(desc_.getId().asInt(), new HashSet<>());
     if (replicaPreference_ != null) {
       msg.hdfs_scan_node.setReplica_preference(replicaPreference_);
     }
@@ -1465,6 +1465,10 @@ public class HdfsScanNode extends ScanNode {
     }
     msg.hdfs_scan_node.setDictionary_filter_conjuncts(dictMap);
     msg.hdfs_scan_node.setIs_partition_key_scan(isPartitionKeyScan_);
+
+    for (HdfsFileFormat format : fileFormats_) {
+      msg.hdfs_scan_node.addToFile_formats(format.toThrift());
+    }
   }
 
   @Override
@@ -1571,6 +1575,18 @@ public class HdfsScanNode extends ScanNode {
       output.append(getMinMaxOriginalConjunctsExplainString(detailPrefix, detailLevel));
       // Groups the dictionary filterable conjuncts by tuple descriptor.
       output.append(getDictionaryConjunctsExplainString(detailPrefix, detailLevel));
+
+    }
+    if (detailLevel.ordinal() >= TExplainLevel.VERBOSE.ordinal()) {
+      // Add file formats after sorting so their order is deterministic in the explain
+      // string.
+      List<String> formats = fileFormats_.stream()
+          .map(Object::toString).collect(Collectors.toList());
+      Collections.sort(formats);
+      output.append(detailPrefix)
+          .append("file formats: ")
+          .append(formats.toString())
+          .append("\n");
     }
     return output.toString();
   }

@@ -45,6 +45,7 @@ row_regex:.*partitions=1/1 files=1 size=.*
 row_regex:.*table: rows=[0-9.]*[A-Z]* size=.*
 '       columns: all'
 row_regex:.*extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
+'     file formats: [TEXT]'
 row_regex:.*mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=1.*
 '     tuple-ids=0 row-size=231B cardinality=6.00M'
 '     in pipelines: 00(GETNEXT)'
@@ -59,6 +60,7 @@ row_regex:.*partitions=1/1 files=1 size=.*
 row_regex:.*table: rows=[0-9.]*[A-Z]* size=.*
 '       columns: all'
 row_regex:.*   extrapolated-rows=disabled max-scan-range-rows=[0-9]*.*
+'     file formats: [TEXT]'
 row_regex:.*     mem-estimate=[0-9.]*[A-Z]*B mem-reservation=[0-9.]*[A-Z]*B thread-reservation=.*
 '     tuple-ids=1 row-size=171B cardinality=1.50M'
 '     in pipelines: 01(GETNEXT)'
@@ -73,4 +75,16 @@ where t1.month = 1 and t2.year = 2009 and t3.bool_col = false
 ---- RESULTS: VERIFY_IS_SUBSET
 'WARNING: The following tables are missing relevant table and/or column statistics.'
 'functional_avro.alltypes, functional_parquet.alltypessmall'
+====
+---- QUERY
+# Tests whether all file formats are present in the explain string.
+explain select * from  functional.alltypesmixedformat;
+---- RESULTS: VERIFY_IS_SUBSET
+'     file formats: [PARQUET, RC_FILE, SEQUENCE_FILE, TEXT]'
+====
+---- QUERY
+# Tests whether file formats are present in the explain string in case of Iceberg tables.
+explain select * from functional_parquet.iceberg_partitioned;
+---- RESULTS: VERIFY_IS_SUBSET
+'     file formats: [PARQUET]'
 ====
