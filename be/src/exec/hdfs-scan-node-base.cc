@@ -474,10 +474,10 @@ void HdfsScanPlanNode::Codegen(FragmentState* state) {
   DCHECK(state->ShouldCodegen());
   PlanNode::Codegen(state);
   if (IsNodeCodegenDisabled()) return;
-  for (auto& elem: shared_state_.per_type_files_) {
+  for (const THdfsFileFormat::type format : tnode_->hdfs_scan_node.file_formats) {
     llvm::Function* fn;
     Status status;
-    switch (elem.first) {
+    switch (format) {
       case THdfsFileFormat::TEXT:
         status = HdfsTextScanner::Codegen(this, state, &fn);
         break;
@@ -493,16 +493,16 @@ void HdfsScanPlanNode::Codegen(FragmentState* state) {
         break;
       default:
         // No codegen for this format
-        fn = NULL;
+        fn = nullptr;
         status = Status::Expected("Not implemented for this format.");
     }
-    DCHECK(fn != NULL || !status.ok());
-    const char* format_name = _THdfsFileFormat_VALUES_TO_NAMES.find(elem.first)->second;
+    DCHECK(fn != nullptr || !status.ok());
+    const char* format_name = _THdfsFileFormat_VALUES_TO_NAMES.find(format)->second;
     if (status.ok()) {
       LlvmCodeGen* codegen = state->codegen();
-      DCHECK(codegen != NULL);
+      DCHECK(codegen != nullptr);
       codegen->AddFunctionToJit(
-          fn, &codegend_fn_map_[static_cast<THdfsFileFormat::type>(elem.first)]);
+          fn, &codegend_fn_map_[static_cast<THdfsFileFormat::type>(format)]);
     }
     AddCodegenStatus(status, format_name);
   }
