@@ -58,7 +58,7 @@ public class HBaseTestDataRegionAssignment {
   private final List<ServerName> sortedRS; // sorted list of region server name
   private final String[] splitPoints = { "1", "3", "5", "7", "9"};
 
-  private final static int REGION_MOVE_TIMEOUT_MILLIS = 60000;
+  private final static int REGION_MOVE_TIMEOUT_MILLIS = 120000;
 
   public HBaseTestDataRegionAssignment() throws IOException {
     conf = new Configuration();
