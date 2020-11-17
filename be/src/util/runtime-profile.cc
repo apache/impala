@@ -162,8 +162,20 @@ const char* ProfileEntryPrototype::SignificanceDescription(
   }
 }
 
-RuntimeProfileBase::RuntimeProfileBase(ObjectPool* pool, const string& name)
-  : pool_(pool), name_(name) {}
+RuntimeProfileBase::RuntimeProfileBase(ObjectPool* pool, const string& name,
+    Counter* total_time_counter, Counter* inactive_timer)
+  : pool_(pool),
+    name_(name),
+    total_time_counter_(total_time_counter),
+    inactive_timer_(inactive_timer) {
+  DCHECK(total_time_counter != nullptr);
+  DCHECK(inactive_timer != nullptr);
+  set<string>& root_counters = child_counter_map_[ROOT_COUNTER];
+  counter_map_[TOTAL_TIME_COUNTER_NAME] = total_time_counter;
+  root_counters.emplace(TOTAL_TIME_COUNTER_NAME);
+  counter_map_[INACTIVE_TIME_COUNTER_NAME] = inactive_timer;
+  root_counters.emplace(INACTIVE_TIME_COUNTER_NAME);
+}
 
 RuntimeProfileBase::~RuntimeProfileBase() {}
 
@@ -172,13 +184,8 @@ RuntimeProfile* RuntimeProfile::Create(ObjectPool* pool, const string& name) {
 }
 
 RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name)
-  : RuntimeProfileBase(pool, name) {
-  set<string>& root_counters = child_counter_map_[ROOT_COUNTER];
-  counter_map_[TOTAL_TIME_COUNTER_NAME] = &counter_total_time_;
-  root_counters.emplace(TOTAL_TIME_COUNTER_NAME);
-  counter_map_[INACTIVE_TIME_COUNTER_NAME] = &inactive_timer_;
-  root_counters.emplace(INACTIVE_TIME_COUNTER_NAME);
-}
+  : RuntimeProfileBase(
+        pool, name, &builtin_counter_total_time_, &builtin_inactive_timer_) {}
 
 RuntimeProfile::~RuntimeProfile() {
   DCHECK(!has_active_periodic_counters_);
@@ -2151,18 +2158,12 @@ void RuntimeProfile::EventSequence::ToJson(Document& document, Value* value) {
 
 AggregatedRuntimeProfile::AggregatedRuntimeProfile(
     ObjectPool* pool, const string& name, int num_input_profiles, bool is_root)
-  : RuntimeProfileBase(pool, name), num_input_profiles_(num_input_profiles) {
+  : RuntimeProfileBase(pool, name,
+        pool->Add(new AveragedCounter(TUnit::TIME_NS, num_input_profiles)),
+        pool->Add(new AveragedCounter(TUnit::TIME_NS, num_input_profiles))),
+    num_input_profiles_(num_input_profiles) {
   DCHECK_GE(num_input_profiles, 0);
   if (is_root) input_profile_names_.resize(num_input_profiles);
-  set<string>& root_counters = child_counter_map_[ROOT_COUNTER];
-  Counter* total_time_counter =
-      pool->Add(new AveragedCounter(TUnit::TIME_NS, num_input_profiles));
-  Counter* inactive_timer =
-      pool->Add(new AveragedCounter(TUnit::TIME_NS, num_input_profiles));
-  counter_map_[TOTAL_TIME_COUNTER_NAME] = total_time_counter;
-  root_counters.emplace(TOTAL_TIME_COUNTER_NAME);
-  counter_map_[INACTIVE_TIME_COUNTER_NAME] = inactive_timer;
-  root_counters.emplace(INACTIVE_TIME_COUNTER_NAME);
 }
 
 AggregatedRuntimeProfile* AggregatedRuntimeProfile::Create(

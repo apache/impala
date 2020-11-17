@@ -176,19 +176,9 @@ class RuntimeProfileBase {
   const TRuntimeProfileNodeMetadata& metadata() const { return metadata_; }
 
   /// Returns the counter for the total elapsed time.
-  Counter* total_time_counter() const {
-    auto it = counter_map_.find(TOTAL_TIME_COUNTER_NAME);
-    DCHECK(it != counter_map_.end());
-    return it->second;
-  }
-
+  Counter* total_time_counter() const { return total_time_counter_; }
   /// Returns the counter for the inactive time.
-  Counter* inactive_timer() const {
-    auto it = counter_map_.find(INACTIVE_TIME_COUNTER_NAME);
-    DCHECK(it != counter_map_.end());
-    return it->second;
-  }
-
+  Counter* inactive_timer() const { return inactive_timer_; }
   int64_t local_time() const { return local_time_ns_.Load(); }
   int64_t total_time() const { return total_time_ns_.Load(); }
 
@@ -241,6 +231,14 @@ class RuntimeProfileBase {
   /// RuntimeProfile::has_active_periodic_counters_.
   mutable SpinLock counter_map_lock_;
 
+  /// Reference to counter_map_[TOTAL_TIME_COUNTER_NAME] for thread-safe access without
+  /// acquiring 'counter_map_lock_'.
+  Counter* const total_time_counter_;
+
+  /// Reference to counter_map_[INACTIVE_TIME_COUNTER_NAME] for thread-safe access without
+  /// acquiring 'counter_map_lock_'.
+  Counter* const inactive_timer_;
+
   /// TODO: IMPALA-9382: info strings can be moved to RuntimeProfile once we remove
   /// callsites for this function on AggregatedRuntimeProfile.
   typedef std::map<std::string, std::string> InfoStrings;
@@ -283,7 +281,8 @@ class RuntimeProfileBase {
   /// ComputeTimeInProfile() executing.
   AtomicInt64 total_time_ns_{0};
 
-  RuntimeProfileBase(ObjectPool* pool, const std::string& name);
+  RuntimeProfileBase(ObjectPool* pool, const std::string& name,
+      Counter* total_time_counter, Counter* inactive_timer);
 
   ///  Inserts 'child' before the iterator 'insert_pos' in 'children_'.
   /// 'children_lock_' must be held by the caller.
@@ -702,12 +701,12 @@ class RuntimeProfile : public RuntimeProfileBase {
   /// Protects summary_stats_map_.
   mutable SpinLock summary_stats_map_lock_;
 
-  Counter counter_total_time_{TUnit::TIME_NS};
+  Counter builtin_counter_total_time_{TUnit::TIME_NS};
 
   /// Total time spent waiting (on non-children) that should not be counted when
   /// computing local_time_frac_. This is updated for example in the exchange
   /// node when waiting on the sender from another fragment.
-  Counter inactive_timer_{TUnit::TIME_NS};
+  Counter builtin_inactive_timer_{TUnit::TIME_NS};
 
   /// The Exec Summary
   TExecSummary t_exec_summary_;
