@@ -338,5 +338,75 @@ TEST(BitUtil, CpuInfoIsSupportedHoist) {
 }
 #endif
 
+template<typename T>
+void RunIntToByteArrayTest(const T& input, const std::vector<char>& expected) {
+  std::string result = BitUtil::IntToByteBuffer(input);
+  EXPECT_EQ(expected.size(), result.size()) << input;
+  for (int i = 0; i < std::min(expected.size(), result.size()); ++i) {
+    EXPECT_EQ(expected[i], result[i]) << input;
+  }
+}
+
+// __int128_t has no support for << operator. This is a specialized function for this
+// type where in case of an EXPECT check failing we don't print the original input.
+template<>
+void RunIntToByteArrayTest(const __int128_t& input, const std::vector<char>& expected) {
+  std::string result = BitUtil::IntToByteBuffer(input);
+  EXPECT_EQ(expected.size(), result.size());
+  for (int i = 0; i < std::min(expected.size(), result.size()); ++i) {
+    EXPECT_EQ(expected[i], result[i]);
+  }
+}
+
+// The expected results come from running Java's BigInteger.toByteArray().
+TEST(BitUtil, IntToByteArray) {
+  // Test int32 inputs.
+  RunIntToByteArrayTest(0, {0});
+  RunIntToByteArrayTest(127, {127});
+  RunIntToByteArrayTest(128, {0, -128});
+  RunIntToByteArrayTest(255, {0, -1});
+  RunIntToByteArrayTest(256, {1, 0});
+  RunIntToByteArrayTest(65500, {0, -1, -36});
+  RunIntToByteArrayTest(123456123, {7, 91, -54, 123});
+  RunIntToByteArrayTest(2147483647, {127, -1, -1, -1});
+  RunIntToByteArrayTest(-1, {-1});
+  RunIntToByteArrayTest(-128, {-128});
+  RunIntToByteArrayTest(-129, {-1, 127});
+  RunIntToByteArrayTest(-1024, {-4, 0});
+  RunIntToByteArrayTest(-1025, {-5, -1});
+  RunIntToByteArrayTest(-40000, {-1, 99, -64});
+  RunIntToByteArrayTest(-68000, {-2, -10, 96});
+  RunIntToByteArrayTest(-654321321, {-40, -1, -39, 87});
+  RunIntToByteArrayTest(-2147483647, {-128, 0, 0, 1});
+  RunIntToByteArrayTest(-2147483648, {-128, 0, 0, 0});
+
+  // Test int64 inputs.
+  RunIntToByteArrayTest(2147483648, {0, -128, 0, 0, 0});
+  RunIntToByteArrayTest(2147489999, {0, -128, 0, 24, -49});
+  RunIntToByteArrayTest(123498764226421, {112, 82, 75, -8, -49, 117});
+  RunIntToByteArrayTest(45935528764226421, {0, -93, 50, 30, -70, -113, -69, 117});
+  RunIntToByteArrayTest(9223372036854775807, {127, -1, -1, -1, -1, -1, -1, -1});
+  RunIntToByteArrayTest(-2147483649, {-1, 127, -1, -1, -1});
+  RunIntToByteArrayTest(-2147483650, {-1, 127, -1, -1, -2});
+  RunIntToByteArrayTest(-226103951038195, {-1, 50, 92, 18, 80, -23, 13});
+  RunIntToByteArrayTest(-18237603371852591, {-65, 52, -1, 17, 119, 92, -47});
+  RunIntToByteArrayTest(-48227503771052199, {-1, 84, -87, 87, 65, 82, -105, 89});
+  RunIntToByteArrayTest(-9223372036854775807, {-128, 0, 0, 0, 0, 0, 0, 1});
+  // C++ compiler doesn't accept -9223372036854775808 (int64_t min) as a valid constant.
+  RunIntToByteArrayTest(-9223372036854775807 - 1, {-128, 0, 0, 0, 0, 0, 0, 0});
+
+  // Test int128 inputs.
+  RunIntToByteArrayTest(__int128_t(9223372036854775807) + 1,
+      {0, -128, 0, 0, 0, 0, 0, 0, 0});
+  RunIntToByteArrayTest(__int128_t(9223372036854775807) + 2,
+      {0, -128, 0, 0, 0, 0, 0, 0, 1});
+  RunIntToByteArrayTest(__int128_t(123321456654789987) * 1000,
+      {6, -81, 109, -45, 113, 68, 125, 74, -72});
+  RunIntToByteArrayTest(__int128_t(7255211462147863907) * 120000,
+      {0, -72, 92, -78, 56, 127, -30, 94, 113, 6, 64});
+  RunIntToByteArrayTest(__int128_t(7255211462147863907) * 180000,
+      {1, 20, -117, 11, 84, -65, -45, -115, -87, -119, 96});
+}
+
 }
 

@@ -22,6 +22,8 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs")
 
+set(MURMURHASH_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/thirdparty/murmurhash")
+
 add_library(Exprs
   agg-fn.cc
   agg-fn-evaluator.cc
@@ -44,6 +46,7 @@ add_library(Exprs
   expr.cc
   hive-udf-call.cc
   hive-udf-call-ir.cc
+  iceberg-functions-ir.cc
   in-predicate-ir.cc
   is-not-empty-predicate.cc
   is-null-predicate-ir.cc
@@ -54,6 +57,7 @@ add_library(Exprs
   literal.cc
   mask-functions-ir.cc
   math-functions-ir.cc
+  ${MURMURHASH_SRC_DIR}/MurmurHash3.cpp
   null-literal.cc
   operators-ir.cc
   scalar-expr.cc
@@ -79,12 +83,14 @@ add_dependencies(Exprs gen-deps gen_ir_descriptions)
 add_library(ExprsTests STATIC
   datasketches-test.cc
   expr-test.cc
+  iceberg-functions-test.cc
   timezone_db-test.cc
 )
 add_dependencies(ExprsTests gen-deps)
 
 ADD_UNIFIED_BE_LSAN_TEST(datasketches-test
  "TestDataSketchesHll.*:TestDataSketchesKll.*:TestDataSketchesCpc.*")
+ADD_UNIFIED_BE_LSAN_TEST(iceberg-functions-test "TestIcebergFunctions.*")
 ADD_UNIFIED_BE_LSAN_TEST(expr-test "Instantiations/ExprTest.*")
 # Exception to unified be tests: custom main initiailizes LLVM
 ADD_BE_LSAN_TEST(expr-codegen-test)
