@@ -364,7 +364,7 @@ class TestImpalaShell(ImpalaTestSuite):
     sleep(5)
     assert 1 == impalad_service.get_num_in_flight_queries()
     assert p.get_result().rc == 0
-    assert 0 == impalad_service.get_num_in_flight_queries()
+    assert impalad_service.wait_for_num_in_flight_queries(0)
 
   def test_cancellation(self, vector):
     """Test cancellation (Ctrl+C event). Run a query that sleeps 10ms per row so will run
