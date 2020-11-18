@@ -782,6 +782,14 @@ class TableDef {
       return;
     }
 
+    if (options_.fileFormat == THdfsFileFormat.ICEBERG) {
+      if (AcidUtils.isTransactionalTable(options_.tblProperties)) {
+        throw new AnalysisException(
+            "Iceberg tables cannot have Hive ACID table properties.");
+      }
+      return;
+    }
+
     AcidUtils.setTransactionalProperties(options_.tblProperties,
           analyzer.getQueryOptions().getDefault_transactional_type());
   }

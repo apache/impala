@@ -195,3 +195,19 @@ ALTER TABLE iceberg_table_hadoop_catalog REPLACE COLUMNS(level INT, register_tim
 ---- CATCH
 UnsupportedOperationException: Unsupported ALTER TABLE operation for Iceberg tables: REPLACE_COLUMNS
 ====
+---- QUERY
+CREATE TABLE iceberg_transactional(i int)
+STORED AS ICEBERG
+tblproperties('iceberg.catalog'='hadoop.tables', 'transactional'='true');
+---- CATCH
+Iceberg tables cannot have Hive ACID table properties.
+====
+---- QUERY
+CREATE TABLE iceberg_insert_only(i int)
+STORED AS ICEBERG
+tblproperties('iceberg.catalog'='hadoop.catalog',
+'iceberg.catalog_location'='/$EXTERNAL_WAREHOUSE_DIR/specified_location',
+'transactional'='true', 'transactional_properties'='insert_only');
+---- CATCH
+Iceberg tables cannot have Hive ACID table properties.
+====
