@@ -23,9 +23,11 @@
 #include <endian.h>
 #endif
 
+#include <algorithm>
 #include <climits>
 #include <cstdint>
 #include <limits>
+#include <vector>
 
 #include "common/compiler-util.h"
 #include "common/logging.h"
@@ -340,6 +342,33 @@ class BitUtil {
     } else {
       return floor + 1;
     }
+  }
+
+  /// The purpose of this function is to replicate Java's BigInteger.toByteArray()
+  /// function. Receives an int input (it can be any size) and returns a buffer that
+  /// represents the byte sequence representation of this number where the most
+  /// significant byte is in the zeroth element.
+  /// Note, the return value is stored in a string instead of in a vector of chars for
+  /// potential optimisations with small strings.
+  /// E.g. 520 = [2, 8]
+  /// E.g. 12065530 = [0, -72, 26, -6]
+  /// E.g. -129 = [-1, 127]
+  template<typename T>
+  static std::string IntToByteBuffer(T input) {
+    std::string buffer;
+    T value = input;
+    for (int i = 0; i < sizeof(value); ++i) {
+      // Applies a mask for a byte range on the input.
+      char value_to_save = value & 0XFF;
+      buffer.push_back(value_to_save);
+      // Remove the just processed part from the input so that we can exit early if there
+      // is nothing left to process.
+      value >>= 8;
+      if (value == 0 && value_to_save >= 0) break;
+      if (value == -1 && value_to_save < 0) break;
+    }
+    std::reverse(buffer.begin(), buffer.end());
+    return buffer;
   }
 };
 

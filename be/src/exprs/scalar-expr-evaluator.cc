@@ -28,11 +28,12 @@
 #include "exprs/cast-functions.h"
 #include "exprs/compound-predicates.h"
 #include "exprs/conditional-functions.h"
-#include "datasketches-functions.h"
+#include "exprs/datasketches-functions.h"
 #include "exprs/date-functions.h"
 #include "exprs/decimal-functions.h"
 #include "exprs/decimal-operators.h"
 #include "exprs/hive-udf-call.h"
+#include "exprs/iceberg-functions.h"
 #include "exprs/in-predicate.h"
 #include "exprs/is-not-empty-predicate.h"
 #include "exprs/is-null-predicate.h"
@@ -435,6 +436,7 @@ void ScalarExprEvaluator::InitBuiltinsDummy() {
   DataSketchesFunctions::DsHllEstimate(nullptr, StringVal::null());
   DecimalFunctions::Precision(nullptr, DecimalVal::null());
   DecimalOperators::CastToDecimalVal(nullptr, DecimalVal::null());
+  IcebergFunctions::TruncatePartitionTransform(nullptr, IntVal::null(), IntVal::null());
   InPredicate::InIterate(nullptr, BigIntVal::null(), 0, nullptr);
   IsNullPredicate::IsNull(nullptr, BooleanVal::null());
   LikePredicate::Like(nullptr, StringVal::null(), StringVal::null());

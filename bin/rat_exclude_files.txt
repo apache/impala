@@ -30,6 +30,7 @@ testdata/cluster/node_templates/cdh7/etc/init.d/kms
 # See $IMPALA_HOME/LICENSE.txt
 be/src/gutil/*
 be/src/thirdparty/datasketches/*
+be/src/thirdparty/murmurhash/*
 be/src/thirdparty/mpfit/*
 be/src/kudu/gutil
 www/highlight/*
