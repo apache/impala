@@ -738,7 +738,9 @@ echo "IMPALA_ICEBERG_VERSION  = $IMPALA_ICEBERG_VERSION"
 # kerberized cluster is created, it will have to be sourced again
 # *after* the cluster is created in order to pick up these settings.
 export MINIKDC_ENV="${IMPALA_HOME}/testdata/bin/minikdc_env.sh"
-if "${CLUSTER_DIR}/admin" is_kerberized; then
+if "${CLUSTER_DIR}/admin" is_kerberized ||
+  ( ! "${CLUSTER_DIR}/admin" cluster_exists && [[ "$IMPALA_KERBERIZE" == "true" ]] ); then
+
   . "${MINIKDC_ENV}"
   echo " *** This cluster is kerberized ***"
   echo "KRB5_KTNAME            = $KRB5_KTNAME"
