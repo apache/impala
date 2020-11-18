@@ -339,3 +339,20 @@ DROP TABLE iceberg_test10;
 ---- RESULTS
 'Table has been dropped.'
 ====
+---- QUERY
+# Default transactional property doesn't affect Iceberg tables.
+set default_transactional_type=insert_only;
+create table iceberg_default_trans (i int)
+stored as iceberg
+tblproperties('iceberg.catalog'='hadoop.tables');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+describe formatted iceberg_default_trans
+---- RESULTS: VERIFY_IS_NOT_IN
+'','transactional       ','true               '
+'','transactional_properties','insert_only         '
+---- TYPES
+STRING, STRING, STRING
+====
