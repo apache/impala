@@ -63,6 +63,8 @@ class SkipIfS3:
       reason="Flakiness on account of S3 eventual consistency.")
   iceberg = pytest.mark.skipif(IS_S3,
       reason="Currently Iceberg is only supported on HDFS.")
+  variable_listing_times = pytest.mark.skipif(IS_S3,
+      reason="Flakiness due to unpredictable listing times on S3.")
 
 
 class SkipIfABFS:
