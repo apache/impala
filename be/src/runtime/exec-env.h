@@ -27,6 +27,7 @@
 #include "common/global-types.h"
 #include "common/status.h"
 #include "runtime/client-cache-types.h"
+#include "testutil/gtest-util.h"
 #include "util/hdfs-bulk-ops-defs.h" // For declaration of HdfsOpThreadPool
 #include "util/network-util.h"
 #include "util/spinlock.h"
@@ -226,6 +227,9 @@ class ExecEnv {
   friend class TestEnv;
   friend class DataStreamTest;
 
+  // For access to InitHadoopConfig().
+  FRIEND_TEST(HdfsUtilTest, CheckFilesystemsMatch);
+
   static ExecEnv* exec_env_;
   bool is_fe_tests_ = false;
 
@@ -271,6 +275,9 @@ class ExecEnv {
   /// The number of slots limits the number of queries that can run concurrently on
   /// this backend. Queries take up multiple slots only when mt_dop > 1.
   int64_t admission_slots_;
+
+  /// Initialize ExecEnv based on Hadoop config from frontend.
+  Status InitHadoopConfig();
 
   /// Choose a memory limit (returned in *bytes_limit) based on the --mem_limit flag and
   /// the memory available to the daemon process. Returns an error if the memory limit is

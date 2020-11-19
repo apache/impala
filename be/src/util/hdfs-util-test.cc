@@ -24,18 +24,13 @@
 #include "runtime/exec-env.h"
 #include "service/fe-support.h"
 
-using namespace impala;
-
-DECLARE_bool(enable_webserver);
+namespace impala {
 
 TEST(HdfsUtilTest, CheckFilesystemsMatch) {
-  // We do not want to start the webserver.
-  FLAGS_enable_webserver = false;
-  ExecEnv* exec_env = new ExecEnv();
-
-  // We do this to retrieve the default FS from the frontend.
-  // It doesn't matter if initializing the ExecEnv fails.
-  discard_result(exec_env->Init());
+  // We do this to retrieve the default FS from the frontend without starting the rest
+  // of the ExecEnv services.
+  ExecEnv exec_env;
+  ASSERT_OK(exec_env.InitHadoopConfig());
 
   // Tests with both paths qualified.
   EXPECT_TRUE(FilesystemsMatch("s3a://dummybucket/temp_dir/temp_path",
@@ -65,7 +60,7 @@ TEST(HdfsUtilTest, CheckFilesystemsMatch) {
   EXPECT_TRUE(FilesystemsMatch("tempdir/temppath", "tempdir2/temppath2"));
 
   // Tests with one path qualified and the other unqualified.
-  const char* default_fs = exec_env->default_fs().c_str();
+  const char* default_fs = exec_env.default_fs().c_str();
   EXPECT_TRUE(FilesystemsMatch(default_fs, "temp_dir/temp_path"));
   EXPECT_TRUE(FilesystemsMatch("temp_dir/temp_path", default_fs));
   EXPECT_FALSE(FilesystemsMatch("badscheme://namenode/temp_dir/temp_path",
@@ -75,9 +70,6 @@ TEST(HdfsUtilTest, CheckFilesystemsMatch) {
 }
 
 TEST(HdfsUtilTest, CheckGetBaseName) {
-  // We do not want to start the webserver.
-  FLAGS_enable_webserver = false;
-
   EXPECT_EQ(".", GetBaseName("s3a://"));
   EXPECT_EQ(".", GetBaseName("s3a://dummybucket"));
   EXPECT_EQ(".", GetBaseName("s3a://dummybucket/"));
@@ -111,3 +103,4 @@ TEST(HdfsUtilTest, CheckGetBaseName) {
   EXPECT_EQ("c", GetBaseName("/c"));
   EXPECT_EQ("c", GetBaseName("/a//b/c/"));
 }
+};

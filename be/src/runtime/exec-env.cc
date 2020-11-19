@@ -461,7 +461,11 @@ Status ExecEnv::Init() {
   }
 
   RETURN_IF_ERROR(admission_controller_->Init());
+  RETURN_IF_ERROR(InitHadoopConfig());
+  return Status::OK();
+}
 
+Status ExecEnv::InitHadoopConfig() {
   // Get the fs.defaultFS value set in core-site.xml and assign it to configured_defaultFs
   TGetHadoopConfigRequest config_request;
   config_request.__set_name(DEFAULT_FS);
@@ -472,7 +476,6 @@ Status ExecEnv::Init() {
   } else {
     default_fs_ = "hdfs://";
   }
-
   return Status::OK();
 }
 
