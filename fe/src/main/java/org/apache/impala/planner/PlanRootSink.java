@@ -76,8 +76,9 @@ public class PlanRootSink extends DataSink {
    * estimated number of input rows into the sink and multiplying it by the estimated
    * average row size. The estimated number of input rows is derived from the cardinality
    * of the associated fragment's root node. If the cardinality or the average row size
-   * are not available, a default value is used. The minimum reservation is set 2x the
-   * default spillable buffer size to account for the read and write page in the
+   * are not available, a default value is used. The minimum reservation is set as 2x of
+   * the maximum between default spillable buffer size and MAX_ROW_SIZE (rounded up to
+   * nearest power of 2) to account for the read and write pages in the
    * BufferedTupleStream used by the backend plan-root-sink. The maximum reservation is
    * set to the query-level config MAX_PINNED_RESULT_SPOOLING_MEMORY.
    */
@@ -87,7 +88,7 @@ public class PlanRootSink extends DataSink {
       long bufferSize = queryOptions.getDefault_spillable_buffer_size();
       long maxRowBufferSize = PlanNode.computeMaxSpillableBufferSize(
           bufferSize, queryOptions.getMax_row_size());
-      long minMemReservationBytes = 2 * bufferSize;
+      long minMemReservationBytes = 2 * maxRowBufferSize;
       long maxMemReservationBytes = Math.max(
           queryOptions.getMax_result_spooling_mem(), minMemReservationBytes);
 

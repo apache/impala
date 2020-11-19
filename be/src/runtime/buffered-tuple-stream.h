@@ -551,6 +551,11 @@ class BufferedTupleStream {
     }
   };
 
+  /// Returns the total additional bytes that this row will consume in write_page_ if
+  /// appended to the page. This includes the row's null indicators, the fixed length
+  /// part of the row and the data for inlined_string_slots_ and inlined_coll_slots_.
+  int64_t ComputeRowSize(TupleRow* row) const noexcept;
+
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferedTupleStream);
   friend class ArrayTupleStreamTest_TestArrayDeepCopy_Test;
@@ -748,11 +753,6 @@ class BufferedTupleStream {
   /// been read, because that would leave the stream in limbo where it still has pages
   /// but it is invalid to read or write from in future.
   void InvalidateReadIterator();
-
-  /// Returns the total additional bytes that this row will consume in write_page_ if
-  /// appended to the page. This includes the row's null indicators, the fixed length
-  /// part of the row and the data for inlined_string_slots_ and inlined_coll_slots_.
-  int64_t ComputeRowSize(TupleRow* row) const noexcept;
 
   /// Pins page and updates tracking stats.
   Status PinPage(Page* page);

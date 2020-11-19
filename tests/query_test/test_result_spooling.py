@@ -65,6 +65,7 @@ class TestResultSpooling(ImpalaTestSuite):
     exec_options['min_spillable_buffer_size'] = 8 * 1024
     exec_options['default_spillable_buffer_size'] = 8 * 1024
     exec_options['max_result_spooling_mem'] = 32 * 1024
+    exec_options['max_row_size'] = 16 * 1024
 
     # Execute the query without result spooling and save the results for later validation
     base_result = self.execute_query(query, exec_options)
@@ -83,6 +84,8 @@ class TestResultSpooling(ImpalaTestSuite):
     unpinned_bytes_regex = "PLAN_ROOT_SINK[\s\S]*?PeakUnpinnedBytes.*\([1-9][0-9]*\)"
     # The PLAN_ROOT_SINK should have 'Spilled' in the 'ExecOption' info string.
     spilled_exec_option_regex = "ExecOption:.*Spilled"
+    # PLAN_ROOT_SINK's reservation limit should be set at MAX_RESULT_SPOOLING_MEM = 32 KB.
+    plan_root_sink_reservation_limit = "PLAN_ROOT_SINK[\s\S]*?ReservationLimit: 32.00 KB"
 
     # Fetch the runtime profile every 0.5 seconds until either the timeout is hit, or
     # PeakUnpinnedBytes shows up in the profile.
@@ -99,6 +102,8 @@ class TestResultSpooling(ImpalaTestSuite):
       # At this point PLAN_ROOT_SINK must have spilled, so spilled_exec_option_regex
       # should be in the profile as well.
       assert re.search(spilled_exec_option_regex, profile)
+      # Check that PLAN_ROOT_SINK reservation limit is set accordingly.
+      assert re.search(plan_root_sink_reservation_limit, profile)
       result = self.client.fetch(query, handle)
       assert result.data == base_result.data
     finally:
@@ -408,3 +413,94 @@ class TestResultSpoolingFailpoints(ImpalaTestSuite):
     vector.get_value('exec_option')['debug_action'] = vector.get_value('debug_action')
     vector.get_value('exec_option')['spool_query_results'] = 'true'
     execute_query_expect_debug_action_failure(self, self._query, vector)
+
+
+class TestResultSpoolingMaxReservation(ImpalaTestSuite):
+  """These tests verify that while calculating max_reservation for spooling these query
+  options are taken into account: MAX_ROW_SIZE, MAX_RESULT_SPOOLING_MEM and
+  DEFAULT_SPILLABLE_BUFFER_SIZE."""
+
+  # Test with denial of reservations at varying frequency.
+  # Always test with the minimal amount of spilling and running with the absolute minimum
+  # memory requirement.
+  DEBUG_ACTION_VALUES = [None, '-1:OPEN:SET_DENY_RESERVATION_PROBABILITY@1.0']
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestResultSpoolingMaxReservation, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(ImpalaTestDimension('debug_action',
+        *cls.DEBUG_ACTION_VALUES))
+
+    # Result spooling should be independent of file format, so only testing for
+    # table_format=parquet/none in order to avoid a test dimension explosion.
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'parquet' and
+        v.get_value('table_format').compression_codec == 'none')
+
+  def test_high_max_row_size(self, vector):
+    """Test that when MAX_ROW_SIZE is set, PLAN_ROOT_SINK can adjust its max_reservation
+    even though MAX_RESULT_SPOOLING_MEM is set lower."""
+    exec_options = vector.get_value('exec_option')
+    exec_options['debug_action'] = vector.get_value('debug_action')
+    exec_options['spool_query_results'] = 'true'
+    exec_options['max_row_size'] = 10 * 1024 * 1024
+    exec_options['max_result_spooling_mem'] = 2 * 1024 * 1024
+    exec_options['default_spillable_buffer_size'] = 2 * 1024 * 1024
+
+    # Select 3 wide rows, each with size of 10MB.
+    query = "select string_col from functional.widerow " \
+        "join functional.tinyinttable where int_col < 3"
+    result = self.execute_query(query, exec_options)
+    assert result.success, "Failed to run {0} when result spooling is enabled" \
+        .format(query)
+
+    # The PLAN_ROOT_SINK should have 'Spilled' in the 'ExecOption' info string.
+    spilled_exec_option_regex = "ExecOption:.*Spilled"
+    assert re.search(spilled_exec_option_regex, result.runtime_profile)
+
+    # PLAN_ROOT_SINK's reservation limit should be set at 2 * MAX_ROW_SIZE.
+    plan_root_sink_reservation_limit = "PLAN_ROOT_SINK[\s\S]*?ReservationLimit: 32.00 MB"
+    assert re.search(plan_root_sink_reservation_limit, result.runtime_profile)
+
+  def test_high_default_spillable_buffer(self, vector):
+    """Test that high DEFAULT_SPILLABLE_BUFFER_SIZE wins the calculation for
+    PLAN_ROOT_SINK's max_reservation"""
+    exec_options = vector.get_value('exec_option')
+    exec_options['debug_action'] = vector.get_value('debug_action')
+    exec_options['spool_query_results'] = 'true'
+    exec_options['max_row_size'] = 8 * 1024
+    exec_options['max_result_spooling_mem'] = 8 * 1024
+    exec_options['default_spillable_buffer_size'] = 32 * 1024
+    self.__run_small_spilling_query(exec_options, "64.00 KB")
+
+  def test_high_max_result_spooling_mem(self, vector):
+    """Test that high MAX_RESULT_SPOOLING_MEM wins the calculation for
+    PLAN_ROOT_SINK's max_reservation"""
+    exec_options = vector.get_value('exec_option')
+    exec_options['debug_action'] = vector.get_value('debug_action')
+    exec_options['spool_query_results'] = 'true'
+    exec_options['max_row_size'] = 8 * 1024
+    exec_options['max_result_spooling_mem'] = 70 * 1024
+    exec_options['default_spillable_buffer_size'] = 8 * 1024
+    self.__run_small_spilling_query(exec_options, "70.00 KB")
+
+  def __run_small_spilling_query(self, exec_options, expected_limit):
+    """Given an exec_options, test that simple query below spills and PLAN_ROOT_SINK's
+    ReservationLimit match with the expected_limit"""
+    query = "select * from functional.alltypes order by id limit 1500"
+    result = self.execute_query(query, exec_options)
+    assert result.success, "Failed to run {0} when result spooling is enabled" \
+        .format(query)
+
+    # The PLAN_ROOT_SINK should have 'Spilled' in the 'ExecOption' info string.
+    spilled_exec_option_regex = "ExecOption:.*Spilled"
+    assert re.search(spilled_exec_option_regex, result.runtime_profile)
+
+    # Check that PLAN_ROOT_SINK's reservation limit match.
+    plan_root_sink_reservation_limit = "PLAN_ROOT_SINK[\s\S]*?ReservationLimit: {0}" \
+        .format(expected_limit)
+    assert re.search(plan_root_sink_reservation_limit, result.runtime_profile)
