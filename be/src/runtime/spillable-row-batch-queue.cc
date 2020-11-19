@@ -20,6 +20,7 @@
 #include "runtime/query-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "util/pretty-printer.h"
 
 #include "common/names.h"
 
@@ -94,7 +95,11 @@ Status SpillableRowBatchQueue::AddBatch(RowBatch* batch) {
         RETURN_IF_ERROR(status);
         // If the row could not be added after the stream was unpinned, an error should
         // have been set.
-        DCHECK(false) << "Rows should be added in unpinned mode unless an error occurred";
+        DCHECK(false) << Substitute("Row with a size of $0 should be added successfully "
+                                    "in unpinned mode unless an error occurred. "
+                                    "batch_queue_: $1",
+            PrettyPrinter::PrintBytes(batch_queue_->ComputeRowSize(batch_itr.Get())),
+            batch_queue_->DebugString());
       }
     }
   }

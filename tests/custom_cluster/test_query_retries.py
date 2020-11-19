@@ -586,11 +586,18 @@ class TestQueryRetries(CustomClusterTestSuite):
         'min_spillable_buffer_size': 8 * 1024,
         'default_spillable_buffer_size': 8 * 1024,
         'max_result_spooling_mem': 8 * 1024,
+        'max_row_size': 8 * 1024,
         'max_spilled_result_spooling_mem': 8 * 1024})
 
     # Wait until we can fetch some results
     results = self.client.fetch(query, handle, max_rows=1)
     assert len(results.data) == 1
+
+    # PLAN_ROOT_SINK's reservation limit should be set at
+    # 2 * DEFAULT_SPILLABLE_BUFFER_SIZE = 16 KB.
+    plan_root_sink_reservation_limit = "PLAN_ROOT_SINK[\s\S]*?ReservationLimit: 16.00 KB"
+    profile = self.client.get_runtime_profile(handle)
+    assert re.search(plan_root_sink_reservation_limit, profile)
 
     # Assert that the query is still executing
     summary = self.client.get_exec_summary(handle)
