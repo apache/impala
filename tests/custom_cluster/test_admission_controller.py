@@ -324,6 +324,8 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       # second concurrent query should time out quickly.
       client.set_configuration({'request_pool': 'root.queueA'})
       handle = client.execute_async("select sleep(1000)")
+      # Wait for query to clear admission control and get accounted for
+      client.wait_for_admission_control(handle)
       self.__check_pool_rejected(client, 'root.queueA', "exceeded timeout")
       assert client.get_state(handle) == client.QUERY_STATES['FINISHED']
       # queueA has default query options mem_limit=128m,query_timeout_s=5
