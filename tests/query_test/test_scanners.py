@@ -198,40 +198,37 @@ class TestUnmatchedSchema(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_constraint(
         lambda v: v.get_value('table_format').file_format != 'avro')
 
-  def _create_test_table(self, vector):
+  def _create_test_table(self, vector, unique_database):
     """
     Creates the test table
 
     Cannot be done in a setup method because we need access to the current test vector
     """
-    self._drop_test_table(vector)
     file_format = vector.get_value('table_format').file_format
     if file_format == 'orc':
       # TODO: Enable this test on non-HDFS filesystems once IMPALA-9365 is resolved.
       if not IS_HDFS: pytest.skip()
-      db_name = "functional" + vector.get_value('table_format').db_suffix()
       self.run_stmt_in_hive(
-          "create table %s.jointbl_test like functional.jointbl "
-          "stored as orc" % db_name)
+          "create table {0}.jointbl_test like functional.jointbl "
+          "stored as orc".format(unique_database))
       self.run_stmt_in_hive(
-          'insert into functional_orc_def.jointbl_test '
-          'select * from functional_orc_def.jointbl')
-      self.execute_query_using_client(self.client, 'invalidate metadata jointbl_test',
+          'insert into {0}.jointbl_test '
+          'select * from functional_orc_def.jointbl'.format(unique_database))
+      self.execute_query_using_client(self.client,
+          'invalidate metadata {0}.jointbl_test'.format(unique_database),
           vector)
     else:
       self.execute_query_using_client(self.client,
-          "create external table jointbl_test like jointbl", vector)
+          "create external table {0}.jointbl_test like jointbl".format(
+              unique_database), vector)
 
       # Update the location of the new table to point the same location as the old table
       location = self._get_table_location('jointbl', vector)
       self.execute_query_using_client(self.client,
-          "alter table jointbl_test set location '%s'" % location, vector)
+          "alter table {0}.jointbl_test set location '{1}'".format(
+              unique_database, location), vector)
 
-  def _drop_test_table(self, vector):
-    self.execute_query_using_client(self.client,
-        "drop table if exists jointbl_test", vector)
-
-  def test_unmatched_schema(self, vector):
+  def test_unmatched_schema(self, vector, unique_database):
     if vector.get_value('table_format').file_format == 'kudu':
       pytest.xfail("IMPALA-2890: Missing Kudu DDL support")
 
@@ -240,9 +237,8 @@ class TestUnmatchedSchema(ImpalaTestSuite):
     # different, as hbase collapses duplicates.
     if table_format.file_format == 'hbase':
       pytest.skip()
-    self._create_test_table(vector)
-    self.run_test_case('QueryTest/test-unmatched-schema', vector)
-    self._drop_test_table(vector)
+    self._create_test_table(vector, unique_database)
+    self.run_test_case('QueryTest/test-unmatched-schema', vector, use_db=unique_database)
 
 
 # Tests that scanners can read a single-column, single-row, 10MB table
