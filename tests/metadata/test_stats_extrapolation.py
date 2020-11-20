@@ -17,6 +17,7 @@
 
 from os import path
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfEC
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_single_exec_option_dimension,
@@ -38,6 +39,7 @@ class TestStatsExtrapolation(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
+  @SkipIfEC.contain_full_explain
   def test_stats_extrapolation(self, vector, unique_database):
     vector.get_value('exec_option')['num_nodes'] = 1
     vector.get_value('exec_option')['explain_level'] = 2
