@@ -1,14 +1,14 @@
 ====
 ---- QUERY
-CREATE TABLE iceberg_test1(
+CREATE TABLE iceberg_hadoop_tables(
   level STRING
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
-ALTER TABLE iceberg_test1 ADD COLUMNS(event_time TIMESTAMP, register_time DATE);
-ALTER TABLE iceberg_test1 ADD COLUMNS(message STRING, price DECIMAL(8,1));
-ALTER TABLE iceberg_test1 ADD COLUMNS(map_test MAP <STRING, array <STRING>>, struct_test STRUCT <f1: BIGINT, f2: BIGINT>);
-DESCRIBE iceberg_test1;
+ALTER TABLE iceberg_hadoop_tables ADD COLUMNS(event_time TIMESTAMP, register_time DATE);
+ALTER TABLE iceberg_hadoop_tables ADD COLUMNS(message STRING, price DECIMAL(8,1));
+ALTER TABLE iceberg_hadoop_tables ADD COLUMNS(map_test MAP <STRING, array <STRING>>, struct_test STRUCT <f1: BIGINT, f2: BIGINT>);
+DESCRIBE iceberg_hadoop_tables;
 ---- RESULTS
 'level','string',''
 'event_time','timestamp',''
@@ -21,16 +21,16 @@ DESCRIBE iceberg_test1;
 STRING,STRING,STRING
 ====
 ---- QUERY
-ALTER TABLE iceberg_test1 set TBLPROPERTIES('fake_key'='fake_value');
-DESCRIBE FORMATTED iceberg_test1;
+ALTER TABLE iceberg_hadoop_tables set TBLPROPERTIES('fake_key'='fake_value');
+DESCRIBE FORMATTED iceberg_hadoop_tables;
 ---- RESULTS: VERIFY_IS_SUBSET
 '','fake_key            ','fake_value          '
 ---- TYPES
 string, string, string
 ====
 ---- QUERY
-ALTER TABLE iceberg_test1 set OWNER USER fake_user;
-DESCRIBE FORMATTED iceberg_test1;
+ALTER TABLE iceberg_hadoop_tables set OWNER USER fake_user;
+DESCRIBE FORMATTED iceberg_hadoop_tables;
 ---- RESULTS: VERIFY_IS_SUBSET
 'OwnerType:          ','USER                ','NULL'
 'Owner:              ','fake_user           ','NULL'
@@ -38,8 +38,8 @@ DESCRIBE FORMATTED iceberg_test1;
 string, string, string
 ====
 ---- QUERY
-ALTER TABLE iceberg_test1 set OWNER ROLE fake_role;
-DESCRIBE FORMATTED iceberg_test1;
+ALTER TABLE iceberg_hadoop_tables set OWNER ROLE fake_role;
+DESCRIBE FORMATTED iceberg_hadoop_tables;
 ---- RESULTS: VERIFY_IS_SUBSET
 'OwnerType:          ','ROLE                ','NULL'
 'Owner:              ','fake_role           ','NULL'
@@ -47,16 +47,16 @@ DESCRIBE FORMATTED iceberg_test1;
 string, string, string
 ====
 ---- QUERY
-CREATE TABLE iceberg_test2(
+CREATE TABLE iceberg_hadoop_catalog(
   level STRING
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
 'iceberg.catalog_location'='/$DATABASE/hadoop_catalog_test');
-ALTER TABLE iceberg_test2 ADD COLUMNS(event_time TIMESTAMP, register_time DATE);
-ALTER TABLE iceberg_test2 ADD COLUMNS(message STRING, price DECIMAL(8,1));
-ALTER TABLE iceberg_test2 ADD COLUMNS(map_test MAP <STRING, array <STRING>>, struct_test STRUCT <f1: BIGINT, f2: BIGINT>);
-DESCRIBE iceberg_test2;
+ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(event_time TIMESTAMP, register_time DATE);
+ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(message STRING, price DECIMAL(8,1));
+ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(map_test MAP <STRING, array <STRING>>, struct_test STRUCT <f1: BIGINT, f2: BIGINT>);
+DESCRIBE iceberg_hadoop_catalog;
 ---- RESULTS
 'level','string',''
 'event_time','timestamp',''
@@ -69,16 +69,16 @@ DESCRIBE iceberg_test2;
 STRING,STRING,STRING
 ====
 ---- QUERY
-ALTER TABLE iceberg_test2 set TBLPROPERTIES('test_key'='test_value');
-DESCRIBE FORMATTED iceberg_test2;
+ALTER TABLE iceberg_hadoop_catalog set TBLPROPERTIES('test_key'='test_value');
+DESCRIBE FORMATTED iceberg_hadoop_catalog;
 ---- RESULTS: VERIFY_IS_SUBSET
 '','test_key            ','test_value          '
 ---- TYPES
 string, string, string
 ====
 ---- QUERY
-ALTER TABLE iceberg_test2 set OWNER USER fake_user;
-DESCRIBE FORMATTED iceberg_test2;
+ALTER TABLE iceberg_hadoop_catalog set OWNER USER fake_user;
+DESCRIBE FORMATTED iceberg_hadoop_catalog;
 ---- RESULTS: VERIFY_IS_SUBSET
 'OwnerType:          ','USER                ','NULL'
 'Owner:              ','fake_user           ','NULL'
@@ -86,8 +86,8 @@ DESCRIBE FORMATTED iceberg_test2;
 string, string, string
 ====
 ---- QUERY
-ALTER TABLE iceberg_test2 set OWNER ROLE fake_role;
-DESCRIBE FORMATTED iceberg_test2;
+ALTER TABLE iceberg_hadoop_catalog set OWNER ROLE fake_role;
+DESCRIBE FORMATTED iceberg_hadoop_catalog;
 ---- RESULTS: VERIFY_IS_SUBSET
 'OwnerType:          ','ROLE                ','NULL'
 'Owner:              ','fake_role           ','NULL'
