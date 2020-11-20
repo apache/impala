@@ -196,7 +196,7 @@ function notindocker {
 # Note that yum has its own retries; see yum.conf(5).
 REAL_APT_GET=$(ubuntu which apt-get)
 function apt-get {
-  for ITER in $(seq 1 20); do
+  for ITER in $(seq 1 30); do
     echo "ATTEMPT: ${ITER}"
     if sudo -E "${REAL_APT_GET}" "$@"
     then
@@ -209,6 +209,11 @@ function apt-get {
 }
 
 echo ">>> Installing build tools"
+if [[ "$UBUNTU" == true ]]; then
+  while sudo fuser /var/lib/dpkg/lock-frontend; do
+    sleep 1
+  done
+fi
 ubuntu apt-get update
 ubuntu apt-get --yes install ccache curl gawk g++ gcc libffi-dev \
         libkrb5-dev krb5-admin-server krb5-kdc krb5-user libsasl2-dev \
