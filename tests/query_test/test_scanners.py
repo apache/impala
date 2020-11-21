@@ -1045,6 +1045,9 @@ class TestScanRangeLengths(ImpalaTestSuite):
     super(TestScanRangeLengths, cls).add_test_dimensions()
     cls.ImpalaTestMatrix.add_dimension(
         ImpalaTestDimension('max_scan_range_length', *MAX_SCAN_RANGE_LENGTHS))
+    # Test doesn't need to be run for non-HDFS table formats.
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: not v.get_value('table_format').file_format in ('kudu', 'hbase'))
 
   def test_scan_ranges(self, vector):
     vector.get_value('exec_option')['max_scan_range_length'] =\
