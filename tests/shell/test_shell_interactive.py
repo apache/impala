@@ -443,6 +443,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     webpage to confirm that they've been closed.
     TODO: Add every statement type.
     """
+    # IMPALA-10312: deflake the test by increasing timeout above the default
+    TIMEOUT_S = 30
     # Disconnect existing clients so there are no open sessions.
     self.close_impala_clients()
 
@@ -460,14 +462,14 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       p.send_cmd('create database if not exists %s' % TMP_DB)
       p.send_cmd('use %s' % TMP_DB)
       impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 2)
-      assert impalad.wait_for_num_in_flight_queries(0), MSG % 'use'
+      assert impalad.wait_for_num_in_flight_queries(0, TIMEOUT_S), MSG % 'use'
       p.send_cmd('create table %s(i int)' % TMP_TBL)
       p.send_cmd('alter table %s add columns (j int)' % TMP_TBL)
       impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 4)
-      assert impalad.wait_for_num_in_flight_queries(0), MSG % 'alter'
+      assert impalad.wait_for_num_in_flight_queries(0, TIMEOUT_S), MSG % 'alter'
       p.send_cmd('drop table %s' % TMP_TBL)
       impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 5)
-      assert impalad.wait_for_num_in_flight_queries(0), MSG % 'drop'
+      assert impalad.wait_for_num_in_flight_queries(0, TIMEOUT_S), MSG % 'drop'
     finally:
       # get_result() must be called to exit the shell.
       p.get_result()
