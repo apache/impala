@@ -16,6 +16,7 @@
 # under the License.
 #
 
+import json
 import logging
 import os
 import pytest
@@ -95,10 +96,14 @@ class TestClientSsl(CustomClusterTestSuite):
     # Test cancelling a query
     impalad = ImpaladService(socket.getfqdn())
     assert impalad.wait_for_num_in_flight_queries(0)
+    impalad.wait_for_metric_value('impala-server.backend-num-queries-executing', 0)
     p = ImpalaShell(vector, args=["--ssl"])
     p.send_cmd("SET DEBUG_ACTION=0:OPEN:WAIT")
     p.send_cmd("select count(*) from functional.alltypes")
-    assert impalad.wait_for_num_in_flight_queries(1)
+    # Wait until the query has been planned and started executing, at which point it
+    # should be cancellable.
+    impalad.wait_for_metric_value('impala-server.backend-num-queries-executing', 1,
+            timeout=60)
 
     LOG = logging.getLogger('test_client_ssl')
     LOG.info("Cancelling query")
@@ -111,7 +116,8 @@ class TestClientSsl(CustomClusterTestSuite):
       LOG.info("Sending signal...")
       os.kill(p.pid(), signal.SIGINT)
       num_tries += 1
-      assert num_tries < 30, "SIGINT was not caught by shell within 30s"
+      assert num_tries < 30, ("SIGINT was not caught by shell within 30s. Queries: " +
+              json.dumps(impalad.get_queries_json(), indent=2))
 
     p.send_cmd("profile")
     result = p.get_result()
