@@ -118,7 +118,7 @@ struct TBackendGflags {
 
   47: required string authorization_factory_class
 
-  48: required bool unlock_mt_dop
+  // REMOVED: 48: required bool unlock_mt_dop
 
   49: required string ranger_service_type
 
@@ -146,7 +146,7 @@ struct TBackendGflags {
 
   61: required string min_privilege_set_for_show_stmts
 
-  62: required bool mt_dop_auto_fallback
+  // REMOVED: 62: required bool mt_dop_auto_fallback
 
   63: required i32 num_expected_executors
 

@@ -46,26 +46,7 @@ class TestMtDopFlags(CustomClusterTestSuite):
   def add_test_dimensions(cls):
     super(TestMtDopFlags, cls).add_test_dimensions()
 
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args="--mt_dop_auto_fallback=true")
-  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
-  def test_mt_dop_fallback(self, vector, unique_database):
-    """Test inserts fall back to non-mt_dop correctly.
-    TODO: IMPALA-8966: remove this test when mt_dop is enabled across the board.
-    """
-    vector = deepcopy(vector)
-    vector.get_value('exec_option')['mt_dop'] = 4
-    # Targeted test case that verifies that the fallback actually switches to the
-    # non-mt-dop plans.
-    self.run_test_case('QueryTest/mt-dop-auto-fallback', vector, use_db=unique_database)
-
-    # Check that the join and insert plans work as expected.
-    self.run_test_case('QueryTest/joins', vector, use_db="functional_parquet")
-    self.run_test_case('QueryTest/insert', vector, unique_database,
-        test_file_vars={'$ORIGINAL_DB': CustomClusterTestSuite
-        .get_db_name_from_format(vector.get_value('table_format'))})
-
-  @CustomClusterTestSuite.with_args(impalad_args="--unlock_mt_dop=true", cluster_size=1)
+  @CustomClusterTestSuite.with_args(cluster_size=1)
   def test_mt_dop_runtime_filters_one_node(self, vector):
     """Runtime filter tests, which assume 3 fragment instances, can also be run on a single
     node cluster to test multiple filter sources/destinations per backend."""

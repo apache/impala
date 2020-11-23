@@ -229,7 +229,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=8.00KB thread-reser
    tuple-ids=0 row-size=4B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ====
-# Insert not allowed.
+# Insert is allowed.
 insert into functional_parquet.alltypes partition(year,month)
 select * from functional_parquet.alltypessmall
 ---- PLAN
@@ -257,9 +257,31 @@ WRITE TO HDFS [functional_parquet.alltypes, OVERWRITE=false, PARTITION-KEYS=(yea
    tuple-ids=0 row-size=80B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-NotImplementedException: MT_DOP not supported for DML statements.
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=4
+|  Per-Instance Resources: mem-estimate=1.01GB mem-reservation=12.09MB thread-reservation=1
+WRITE TO HDFS [functional_parquet.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,month)]
+|  partitions=4
+|  output exprs: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+|  mem-estimate=1.00GB mem-reservation=0B thread-reservation=0
+|
+01:SORT
+|  order by: year ASC NULLS LAST, month ASC NULLS LAST
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=2 row-size=80B cardinality=unavailable
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [functional_parquet.alltypessmall, RANDOM]
+   HDFS partitions=4/4 files=4 size=14.76KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/4 rows=unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
 ====
-# CTAS not allowed.
+# CTAS is allowed.
 create table ctas_mt_dop_test as select * from functional_parquet.alltypes
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
@@ -270,7 +292,7 @@ WRITE TO HDFS [default.ctas_mt_dop_test, OVERWRITE=false]
 |  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=203.33KB
+   HDFS partitions=24/24 files=24 size=202.34KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -280,7 +302,23 @@ WRITE TO HDFS [default.ctas_mt_dop_test, OVERWRITE=false]
    tuple-ids=0 row-size=80B cardinality=unavailable
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-NotImplementedException: MT_DOP not supported for DML statements.
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
+|  Per-Instance Resources: mem-estimate=16.10MB mem-reservation=88.00KB thread-reservation=1
+WRITE TO HDFS [default.ctas_mt_dop_test, OVERWRITE=false]
+|  partitions=1
+|  output exprs: functional_parquet.alltypes.id, functional_parquet.alltypes.bool_col, functional_parquet.alltypes.tinyint_col, functional_parquet.alltypes.smallint_col, functional_parquet.alltypes.int_col, functional_parquet.alltypes.bigint_col, functional_parquet.alltypes.float_col, functional_parquet.alltypes.double_col, functional_parquet.alltypes.date_string_col, functional_parquet.alltypes.string_col, functional_parquet.alltypes.timestamp_col, functional_parquet.alltypes.year, functional_parquet.alltypes.month
+|  mem-estimate=100.00KB mem-reservation=0B thread-reservation=0
+|
+00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
+   HDFS partitions=24/24 files=24 size=202.34KB
+   stored statistics:
+     table: rows=unavailable size=unavailable
+     partitions: 0/24 rows=unavailable
+     columns missing stats: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
+   extrapolated-rows=disabled max-scan-range-rows=unavailable
+   mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=0
+   tuple-ids=0 row-size=80B cardinality=unavailable
+   in pipelines: 00(GETNEXT)
 ====
 # Single-table scan/filter/agg/topn should work.
 select count(int_col) cnt from functional_parquet.alltypes
@@ -309,7 +347,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=203.33KB
+   HDFS partitions=24/24 files=24 size=202.34KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -365,7 +403,7 @@ Per-Instance Resources: mem-estimate=144.00MB mem-reservation=34.02MB thread-res
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=203.33KB
+   HDFS partitions=24/24 files=24 size=202.34KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -405,7 +443,7 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=203.33KB
+   HDFS partitions=24/24 files=24 size=202.34KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -454,7 +492,7 @@ Per-Instance Resources: mem-estimate=10.11MB mem-reservation=10.00MB thread-rese
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=9
 Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=203.33KB
+   HDFS partitions=24/24 files=24 size=202.34KB
    predicates: id < CAST(10 AS INT)
    stored statistics:
      table: rows=unavailable size=unavailable
@@ -523,14 +561,14 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.02MB
+   HDFS partitions=1/1 files=4 size=289.05MB
    predicates: c_custkey < CAST(10 AS BIGINT), !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < CAST(5 AS BIGINT)
    predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
    stored statistics:
-     table: rows=150.00K size=289.02MB
+     table: rows=150.00K size=289.05MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.42K
+   extrapolated-rows=disabled max-scan-range-rows=50.72K
    parquet statistics predicates: c_custkey < CAST(10 AS BIGINT)
    parquet statistics predicates on o: o_orderkey < CAST(5 AS BIGINT)
    parquet statistics predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
@@ -599,14 +637,14 @@ Per-Instance Resources: mem-estimate=104.00MB mem-reservation=104.00MB thread-re
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
-   HDFS partitions=1/1 files=4 size=289.02MB
+   HDFS partitions=1/1 files=4 size=289.05MB
    predicates: c_custkey < CAST(10 AS BIGINT), !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey < CAST(5 AS BIGINT)
    predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
    stored statistics:
-     table: rows=150.00K size=289.02MB
+     table: rows=150.00K size=289.05MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.42K
+   extrapolated-rows=disabled max-scan-range-rows=50.72K
    parquet statistics predicates: c_custkey < CAST(10 AS BIGINT)
    parquet statistics predicates on o: o_orderkey < CAST(5 AS BIGINT)
    parquet statistics predicates on o_lineitems: l_linenumber < CAST(3 AS INT)
@@ -664,13 +702,13 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.02MB
+   HDFS partitions=1/1 files=4 size=289.05MB
    predicates: !empty(c.c_orders), !empty(c.c_orders)
    predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    stored statistics:
-     table: rows=150.00K size=289.02MB
+     table: rows=150.00K size=289.05MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.42K
+   extrapolated-rows=disabled max-scan-range-rows=50.72K
    parquet statistics predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    parquet dictionary predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=0
@@ -726,13 +764,13 @@ Per-Instance Resources: mem-estimate=89.94MB mem-reservation=17.94MB thread-rese
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
-   HDFS partitions=1/1 files=4 size=289.02MB
+   HDFS partitions=1/1 files=4 size=289.05MB
    predicates: !empty(c.c_orders), !empty(c.c_orders)
    predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    stored statistics:
-     table: rows=150.00K size=289.02MB
+     table: rows=150.00K size=289.05MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.42K
+   extrapolated-rows=disabled max-scan-range-rows=50.72K
    parquet statistics predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    parquet dictionary predicates on o1: o1.o_orderkey < CAST(5 AS BIGINT)
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=0
