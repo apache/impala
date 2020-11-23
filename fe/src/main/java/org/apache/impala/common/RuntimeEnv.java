@@ -30,10 +30,6 @@ public class RuntimeEnv {
   // Indicates whether this is an environment for testing.
   private boolean isTestEnv_;
 
-  // Whether we should do the same mt_dop validation in frontend tests as in the Impala
-  // service.
-  private boolean enableMtDopValidation_;
-
   public RuntimeEnv() {
     reset();
   }
@@ -44,13 +40,10 @@ public class RuntimeEnv {
   public void reset() {
     numCores_ = Runtime.getRuntime().availableProcessors();
     isTestEnv_ = false;
-    enableMtDopValidation_ = false;
   }
 
   public int getNumCores() { return numCores_; }
   public void setNumCores(int numCores) { this.numCores_ = numCores; }
   public void setTestEnv(boolean v) { isTestEnv_ = v; }
   public boolean isTestEnv() { return isTestEnv_; }
-  public boolean isMtDopValidationEnabled() { return enableMtDopValidation_; }
-  public void setEnableMtDopValidation(boolean v) { enableMtDopValidation_ = v; }
 }

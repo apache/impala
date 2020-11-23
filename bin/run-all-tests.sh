@@ -169,11 +169,10 @@ TEST_RET_CODE=0
 
 # Helper function to start Impala cluster.
 start_impala_cluster() {
-  # TODO: IMPALA-9812: remove --unlock_mt_dop when it is no longer needed.
   run-step "Starting Impala cluster" start-impala-cluster.log \
       "${IMPALA_HOME}/bin/start-impala-cluster.py" \
       --log_dir="${IMPALA_EE_TEST_LOGS_DIR}" \
-      ${TEST_START_CLUSTER_ARGS} --impalad_args=--unlock_mt_dop=true
+      ${TEST_START_CLUSTER_ARGS}
 }
 
 run_ee_tests() {

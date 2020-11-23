@@ -28,7 +28,6 @@ import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.HBaseColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaException;
-import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.datagenerator.HBaseTestDataRegionAssignment;
 import org.apache.impala.service.Frontend.PlanCtx;
 import org.apache.impala.testutil.TestUtils;
@@ -41,7 +40,6 @@ import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.junit.Assert;
-import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -682,20 +680,14 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testMtDopValidation() {
-    // Tests that queries supported with mt_dop > 0 produce a parallel plan, or
-    // throw a NotImplementedException otherwise (e.g. plan has a distributed join).
+    // Tests that queries planned with mt_dop > 0 produce a parallel plan.
+    // Since IMPALA-9812 was fixed all plans are supported. Previously some plans
+    // were rejected.
     TQueryOptions options = defaultQueryOptions();
     options.setMt_dop(3);
     options.setDisable_hdfs_num_rows_estimate(true);
     options.setExplain_level(TExplainLevel.EXTENDED);
-    try {
-      // Temporarily unset the test env such that unsupported queries with mt_dop > 0
-      // throw an exception. Those are otherwise allowed for testing parallel plans.
-      RuntimeEnv.INSTANCE.setEnableMtDopValidation(true);
-      runPlannerTestFile("mt-dop-validation", options);
-    } finally {
-      RuntimeEnv.INSTANCE.setEnableMtDopValidation(false);
-    }
+    runPlannerTestFile("mt-dop-validation", options);
   }
 
   @Test

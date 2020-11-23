@@ -290,13 +290,6 @@ DEFINE_double_hidden(invalidate_tables_fraction_on_memory_pressure, 0.1,
     "The fraction of tables to invalidate when CatalogdTableInvalidator considers the "
     "old GC generation to be almost full.");
 
-DEFINE_bool_hidden(unlock_mt_dop, false,
-    "(Experimental) If true, allow specifying mt_dop for all queries.");
-
-DEFINE_bool_hidden(mt_dop_auto_fallback, false,
-    "(Experimental) If true, fall back to non-mt_dop if mt_dop query option is set and "
-    "a query does not support it. Has no effect if --unlock_mt_dop is true.");
-
 DEFINE_bool_hidden(recursively_list_partitions, true,
     "If true, recursively list the content of partition directories.");
 
@@ -399,6 +392,7 @@ REMOVED_FLAG(llama_registration_timeout_secs);
 REMOVED_FLAG(llama_registration_wait_secs);
 REMOVED_FLAG(local_nodemanager_url);
 REMOVED_FLAG(max_free_io_buffers);
+REMOVED_FLAG(mt_dop_auto_fallback);
 REMOVED_FLAG(pull_incremental_statistics);
 REMOVED_FLAG(report_status_retry_interval_ms);
 REMOVED_FLAG(resource_broker_cnxn_attempts);
@@ -417,6 +411,7 @@ REMOVED_FLAG(staging_cgroup);
 REMOVED_FLAG(status_report_interval);
 REMOVED_FLAG(status_report_max_retries);
 REMOVED_FLAG(suppress_unknown_disk_id_warnings);
+REMOVED_FLAG(unlock_mt_dop);
 REMOVED_FLAG(use_krpc);
 REMOVED_FLAG(use_kudu_kinit);
 REMOVED_FLAG(use_statestore);
