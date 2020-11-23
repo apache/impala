@@ -472,10 +472,20 @@ class TestImpalaShell(ImpalaTestSuite):
     characters."""
     result = run_impala_shell_cmd(vector, ['-B', '-q', "select substr('引擎', 1, 4)"])
     assert 'UnicodeDecodeError' not in result.stderr
-    assert '引�' in result.stdout
+    # Thrift changes its internal strings representation from bytes to unicodes since
+    # 0.10.0. The results differ when impala-shell uses different versions of Thrift.
+    # The UTF-8 encoded bytes of "引擎" are \xe5\xbc\x95\xe6\x93\x8e. The substr result
+    # gets the first 4 bytes. In thrift-0.9.3-p8, it will be raw bytes, i.e. "引\xe6".
+    # In thrift-0.11.0-p4, it will be decoded to utf-8 strings. The last byte can't be
+    # decoded correctly so it will be replaced to \xef\xbf\xbd, i.e. U+FFFD. The result
+    # is "引\xef\xbf\xbd". To make this test robust in all branches, here we just check
+    # the existense of "引".
+    assert '引' in result.stdout
     result = run_impala_shell_cmd(vector, ['-B', '-q', "select unhex('aa')"])
     assert 'UnicodeDecodeError' not in result.stderr
-    assert '�' in result.stdout
+    # Same as above, the result using thrift <0.10.0 is '\xaa'. The result using
+    # thrift >=0.10.0 is '\xef\xbf\xbd'.
+    assert '\xef\xbf\xbd' in result.stdout or '\xaa' in result.stdout
 
   def test_global_config_file(self, vector):
     """Test global and user configuration files."""
