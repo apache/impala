@@ -123,7 +123,7 @@ PROFILE_QUERY_OPTIONS_KEY = "Query Options (set by configuration): "
 QUERY_END_BEHAVIORS = ['EOS', 'CLIENT_CANCEL', 'QUERY_TIMEOUT', 'CLIENT_CLOSE']
 
 # The timeout used for the QUERY_TIMEOUT end behaviour
-QUERY_END_TIMEOUT_S = 1
+QUERY_END_TIMEOUT_S = 3
 
 # Value used for --admission_control_stale_topic_threshold_ms in tests.
 STALE_TOPIC_THRESHOLD_MS = 500
@@ -1620,7 +1620,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
             # The query has released admission control resources
             self.query_state = 'COMPLETED'
             self.query_handle = None
-          sleep(QUERY_END_TIMEOUT_S * 0.5)
+          sleep(QUERY_END_TIMEOUT_S / 6)
       except Exception as e:
         LOG.exception(e)
         # Unknown errors will be raised later
