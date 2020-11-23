@@ -91,7 +91,7 @@ class TestParquetStats(ImpalaTestSuite):
     create_table_from_parquet(self.client, unique_database,
                               'customer_multiblock_page_index')
 
-    for batch_size in [1]:
+    for batch_size in [0, 1]:
       new_vector.get_value('exec_option')['batch_size'] = batch_size
       self.run_test_case('QueryTest/parquet-page-index', new_vector, unique_database)
       self.run_test_case('QueryTest/nested-types-parquet-page-index', new_vector,

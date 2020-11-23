@@ -316,3 +316,24 @@ STRING, BIGINT
 aggregation(SUM, NumPages): 30
 aggregation(SUM, NumStatsFilteredPages): 27
 ====
+---- QUERY
+# IMPALA-10345: Impala hits DCHECK in parquet-column-stats.inline.h
+# Impala could hit a DCHECK when the row batch spanned over multiple pages and
+# they had the same min or max string values.
+set parquet_page_row_count_limit=5;
+create table lineitem_comment (s string) stored as parquet;
+insert into lineitem_comment select l_comment from tpch_parquet.lineitem
+                             order by l_comment
+                             limit 100;
+insert into lineitem_comment select * from lineitem_comment;
+select count(*) from lineitem_comment;
+---- RESULTS
+200
+---- TYPES
+BIGINT
+====
+---- QUERY
+drop table lineitem_comment;
+---- RESULTS
+'Table has been dropped.'
+====

@@ -936,6 +936,7 @@ Status HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
 
   // Update row group statistics from page statistics.
   DCHECK(row_group_stats_base_ != nullptr);
+  RETURN_IF_ERROR(row_group_stats_base_->MaterializeStringValuesToInternalBuffers());
   row_group_stats_base_->Merge(*page_stats_base_);
 
   // Add the size of the data page header
