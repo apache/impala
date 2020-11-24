@@ -75,6 +75,7 @@ BUILD_UBSAN=0
 BUILD_UBSAN_FULL=0
 BUILD_TSAN=0
 BUILD_TSAN_FULL=0
+BUILD_DEBUG_NOOPT=0
 BUILD_SHARED_LIBS=0
 # Export MAKE_CMD so it is visible in scripts that invoke make, e.g. copy-udfs-udas.sh
 export MAKE_CMD=make
@@ -145,8 +146,11 @@ do
     -tsan)
       BUILD_TSAN=1
       ;;
-     -full_tsan)
+    -full_tsan)
       BUILD_TSAN_FULL=1
+      ;;
+    -debug_noopt)
+      BUILD_DEBUG_NOOPT=1
       ;;
     -testpairwise)
       EXPLORATION_STRATEGY=pairwise
@@ -225,6 +229,10 @@ do
       echo "[-ubsan] : Undefined behavior sanitizer build [Default: False]"
       echo "[-full_ubsan] : Undefined behavior sanitizer build, including code generated"\
            "by cross-compilation to LLVM IR. Much slower queries than plain -ubsan"\
+           "[Default: False]"
+      echo "[-debug_noopt] : Debug build without optimizations applied. The regular"\
+           "debug build applies basic optimizations, but even these optimizations may"\
+           "impact debuggability, so this is an option to omit the optimizations."\
            "[Default: False]"
       echo "[-skiptests] : Skips execution of all tests"
       echo "[-notests] : Skips building and execution of all tests"
@@ -324,6 +332,10 @@ fi
 if [[ ${BUILD_TSAN_FULL} -eq 1 ]]; then
   CMAKE_BUILD_TYPE_LIST+=(TSAN_FULL)
   export TSAN_FULL=1
+fi
+if [[ ${BUILD_DEBUG_NOOPT} -eq 1 ]]; then
+  CMAKE_BUILD_TYPE_LIST+=(DEBUG_NOOPT)
+  export DEBUG_NOOPT=1
 fi
 if [[ -n "${CMAKE_BUILD_TYPE_LIST:+1}" ]]; then
   if [[ ${#CMAKE_BUILD_TYPE_LIST[@]} -gt 1 ]]; then

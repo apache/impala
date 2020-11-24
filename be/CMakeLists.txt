@@ -96,7 +96,8 @@ SET(CXX_CLANG_FLAGS "${CXX_CLANG_FLAGS} -DCALLONCEHACK")
 #   -gdwarf-4: Set the appropriate DWARF version. Later versions of DWARF have better
 #    support for newer C++ language features and better compression, but require newer
 #    versions of GDB. DWARF 4 requires GDB 7.0 or above.
-SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs -gdwarf-4")
+#   -Wno-maybe-unitialized: Do not warn for variables that might be uninitialized
+SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs -gdwarf-4 -Wno-maybe-uninitialized")
 if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   # We need to add additional arguments for GCC 7+. We go down this branch if building
   # with a non-GCC compiler of version 7+, but in that case CXX_GCC_FLAGS is not used,
@@ -109,15 +110,23 @@ if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
 endif()
 
 # compiler flags for different build types (run 'cmake -DCMAKE_BUILD_TYPE=<type> .')
-# For CMAKE_BUILD_TYPE=Debug
+# For CMAKE_BUILD_TYPE=DEBUG_NOOPT
 #   -ggdb: Enable gdb debugging
+# For CMAKE_BUILD_TYPE=Debug
+#   (Same as CMAKE_BUILD_TYPE=DEBUG_NOOPT) +
+#   -Og: Enable basic optimizations
 # For CMAKE_BUILD_TYPE=Release
 #   -O3: Enable all compiler optimizations
 #   -DNDEBUG: Turn off dchecks/asserts/debug only code.
-SET(CXX_FLAGS_DEBUG "${CXX_GCC_FLAGS} -ggdb")
+SET(CXX_FLAGS_DEBUG_NOOPT "${CXX_GCC_FLAGS} -ggdb")
 # -Werror: compile warnings should be errors when using the toolchain compiler.
 #   Enabled for DEBUG, ASAN, TSAN and UBSAN builds which are built pre-commit.
-SET(CXX_FLAGS_DEBUG "${CXX_FLAGS_DEBUG} -Werror")
+SET(CXX_FLAGS_DEBUG_NOOPT "${CXX_FLAGS_DEBUG_NOOPT} -Werror")
+# The legacy debug mode built without optimizations, as optimizations can interfere with
+# debuggability. The DEBUG_NOOPT mode maintains this old behavior, while the default
+# Debug mode now applies basic optimizations (-Og) to speed up test runs.
+SET(CXX_FLAGS_DEBUG "${CXX_FLAGS_DEBUG_NOOPT} -Og")
+
 SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG")
 SET(CXX_FLAGS_ADDRESS_SANITIZER
   "${CXX_CLANG_FLAGS} -Werror -O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
@@ -165,6 +174,8 @@ SET(CXX_FLAGS_TIDY "${CXX_FLAGS_TIDY} -fno-color-diagnostics")
 # Set compile flags based on the build type.
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
   SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_DEBUG})
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG_NOOPT")
+  SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_DEBUG_NOOPT})
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RELEASE")
   SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_RELEASE})
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
