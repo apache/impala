@@ -1785,6 +1785,8 @@ void BufferPoolTest::TestWriteErrorBlacklist(
   DestroyAll(&pool, &clients[ERROR_QUERY], &error_new_pages);
 
   ASSERT_OK(PinAll(&pool, &clients[NO_ERROR_QUERY], &pages[NO_ERROR_QUERY]));
+  // IMPALA-10216: Verify data to force Pin to complete before unpinning.
+  VerifyData(pages[NO_ERROR_QUERY], 0);
   UnpinAll(&pool, &clients[NO_ERROR_QUERY], &pages[NO_ERROR_QUERY]);
   WaitForAllWrites(&clients[NO_ERROR_QUERY]);
   EXPECT_TRUE(FindPageInDir(pages[NO_ERROR_QUERY], good_dir) != NULL)
