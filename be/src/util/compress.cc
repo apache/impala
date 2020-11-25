@@ -25,7 +25,6 @@
 #include <bzlib.h>
 #include <zlib.h>
 #include <boost/crc.hpp>
-#undef DISALLOW_COPY_AND_ASSIGN // Snappy redefines this.
 #include <lz4.h>
 #include <snappy.h>
 #include <zconf.h>

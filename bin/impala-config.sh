@@ -68,7 +68,7 @@ fi
 # moving to a different build of the toolchain, e.g. when a version is bumped or a
 # compile option is changed. The build id can be found in the output of the toolchain
 # build jobs, it is constructed from the build number and toolchain git hash prefix.
-export IMPALA_TOOLCHAIN_BUILD_ID=75-4ad03513e3
+export IMPALA_TOOLCHAIN_BUILD_ID=10-425e7fd862
 # Versions of toolchain dependencies.
 # -----------------------------------
 export IMPALA_AVRO_VERSION=1.7.4-p5
@@ -79,7 +79,7 @@ export IMPALA_BOOST_VERSION=1.61.0-p2
 unset IMPALA_BOOST_URL
 export IMPALA_BREAKPAD_VERSION=97a98836768f8f0154f8f86e5e14c2bb7e74132e-p2
 unset IMPALA_BREAKPAD_URL
-export IMPALA_BZIP2_VERSION=1.0.6-p2
+export IMPALA_BZIP2_VERSION=1.0.8-p2
 unset IMPALA_BZIP2_URL
 export IMPALA_CCTZ_VERSION=2.2
 unset IMPALA_CCTZ_URL
@@ -124,9 +124,9 @@ export IMPALA_LLVM_UBSAN_BASE_VERSION=5.0.1
 # Don't use the LLVM debug build because the binaries are too large to distribute.
 export IMPALA_LLVM_DEBUG_VERSION=5.0.1-asserts-p3
 unset IMPALA_LLVM_DEBUG_URL
-export IMPALA_LZ4_VERSION=1.7.5
+export IMPALA_LZ4_VERSION=1.9.3
 unset IMPALA_LZ4_URL
-export IMPALA_ZSTD_VERSION=1.4.0
+export IMPALA_ZSTD_VERSION=1.4.9
 unset IMPALA_ZSTD_URL
 export IMPALA_OPENLDAP_VERSION=2.4.47
 unset IMPALA_OPENLDAP_URL
@@ -144,7 +144,7 @@ export IMPALA_RAPIDJSON_VERSION=1.1.0
 unset IMPALA_RAPIDJSON_URL
 export IMPALA_RE2_VERSION=20190301
 unset IMPALA_RE2_URL
-export IMPALA_SNAPPY_VERSION=1.1.4
+export IMPALA_SNAPPY_VERSION=1.1.8
 unset IMPALA_SNAPPY_URL
 export IMPALA_SQUEASEL_VERSION=3.3
 unset IMPALA_SQUEASEL_URL
@@ -157,7 +157,7 @@ export IMPALA_THRIFT_VERSION=0.9.3-p8
 unset IMPALA_THRIFT_URL
 export IMPALA_THRIFT11_VERSION=0.11.0-p4
 unset IMPALA_THRIFT11_URL
-export IMPALA_ZLIB_VERSION=1.2.8
+export IMPALA_ZLIB_VERSION=1.2.11
 unset IMPALA_ZLIB_URL
 
 if [[ $OSTYPE == "darwin"* ]]; then
