@@ -66,6 +66,7 @@ ColumnType::ColumnType(const std::vector<TTypeNode>& types, int* idx)
         ++(*idx);
         children.push_back(ColumnType(types, idx));
         field_names.push_back(node.struct_fields[i].name);
+        field_ids.push_back(node.struct_fields[i].field_id);
       }
       break;
     case TTypeNodeType::ARRAY:
@@ -211,9 +212,11 @@ void ColumnType::ToThrift(TColumnType* thrift_type) const {
       DCHECK_EQ(type, TYPE_STRUCT);
       node.type = TTypeNodeType::STRUCT;
       node.__set_struct_fields(vector<TStructField>());
-      for (const string& field_name: field_names) {
+      DCHECK_EQ(field_names.size(), field_ids.size());
+      for (int i=0; i<field_names.size(); i++) {
         node.struct_fields.push_back(TStructField());
-        node.struct_fields.back().name = field_name;
+        node.struct_fields.back().name = field_names[i];
+        node.struct_fields.back().field_id = field_ids[i];
       }
     }
     for (const ColumnType& child: children) {
@@ -362,14 +365,17 @@ llvm::ConstantStruct* ColumnType::ToIR(LlvmCodeGen* codegen) const {
   // Create empty 'children' and 'field_names' vectors
   DCHECK(children.empty()) << "Nested types NYI";
   DCHECK(field_names.empty()) << "Nested types NYI";
+  DCHECK(field_ids.empty()) << "Nested types NYI";
   llvm::Constant* children_field =
       llvm::Constant::getNullValue(column_type_type->getElementType(4));
   llvm::Constant* field_names_field =
       llvm::Constant::getNullValue(column_type_type->getElementType(5));
+  llvm::Constant* field_ids_field =
+      llvm::Constant::getNullValue(column_type_type->getElementType(6));
 
   return llvm::cast<llvm::ConstantStruct>(
       llvm::ConstantStruct::get(column_type_type, type_field, len_field, precision_field,
-          scale_field, children_field, field_names_field));
+          scale_field, children_field, field_names_field, field_ids_field));
 }
 
 }

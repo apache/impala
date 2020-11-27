@@ -151,6 +151,9 @@ public class IcebergScanNode extends HdfsScanNode {
     if (!(predicate.getChild(1) instanceof LiteralExpr)) return false;
     LiteralExpr literal = (LiteralExpr) predicate.getChild(1);
 
+    // If predicate contains map/struct, this column would be null
+    if (ref.getDesc().getColumn() == null) return false;
+
     String colName = ref.getDesc().getColumn().getName();
     UnboundPredicate unboundPredicate = null;
     switch (literal.getType().getPrimitiveType()) {

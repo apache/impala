@@ -469,10 +469,13 @@ TEST_F(RowBatchSerializeTest, StringArray) {
   struct_type.type = TYPE_STRUCT;
   struct_type.children.push_back(TYPE_INT);
   struct_type.field_names.push_back("int1");
+  struct_type.field_ids.push_back(-1);
   struct_type.children.push_back(TYPE_STRING);
   struct_type.field_names.push_back("string1");
+  struct_type.field_ids.push_back(-1);
   struct_type.children.push_back(TYPE_STRING);
   struct_type.field_names.push_back("string2");
+  struct_type.field_ids.push_back(-1);
 
   ColumnType array_type;
   array_type.type = TYPE_ARRAY;
@@ -501,8 +504,10 @@ TEST_F(RowBatchSerializeTest, NestedArrays) {
   inner_struct_type.type = TYPE_STRUCT;
   inner_struct_type.children.push_back(TYPE_STRING);
   inner_struct_type.field_names.push_back("string1");
+  inner_struct_type.field_ids.push_back(-1);
   inner_struct_type.children.push_back(TYPE_STRING);
   inner_struct_type.field_names.push_back("string2");
+  inner_struct_type.field_ids.push_back(-1);
 
   ColumnType inner_array_type2;
   inner_array_type2.type = TYPE_ARRAY;
@@ -512,8 +517,10 @@ TEST_F(RowBatchSerializeTest, NestedArrays) {
   struct_type.type = TYPE_STRUCT;
   struct_type.children.push_back(inner_array_type1);
   struct_type.field_names.push_back("array1");
+  struct_type.field_ids.push_back(-1);
   struct_type.children.push_back(inner_array_type2);
   struct_type.field_names.push_back("array2");
+  struct_type.field_ids.push_back(-1);
 
   ColumnType array_type;
   array_type.type = TYPE_ARRAY;

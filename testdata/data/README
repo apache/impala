@@ -606,3 +606,9 @@ In order to generate this file, execute the following instruments:
    AS SELECT * FROM tpcds.customer
    WHERE c_current_cdemo_sk IS NOT NULL ORDER BY c_current_cdemo_sk LIMIT 2000;
 generated file will contains multi blocks, multi pages per block.
+
+IMPALA-10361: Use field id to resolve columns for Iceberg tables
+We generated data by spark-shell, version is 2.4.x, and table data is in
+testdata/data/iceberg_test/hadoop_catalog/iceberg_resolution_test, this table
+are generated with HadoopCatalog and Parquet fileformat. We use this table to
+test complex types for field id resolving.

@@ -470,7 +470,13 @@ public abstract class Type {
           if (thriftField.isSetComment()) comment = thriftField.getComment();
           Pair<Type, Integer> res = fromThrift(col, nodeIdx);
           nodeIdx = res.second.intValue();
-          structFields.add(new StructField(name, res.first, comment));
+          if (thriftField.isSetField_id()) {
+            // We create 'IcebergStructField' for Iceberg tables which have field id.
+            structFields.add(new IcebergStructField(name, res.first, comment,
+                thriftField.getField_id()));
+          } else {
+            structFields.add(new StructField(name, res.first, comment));
+          }
         }
         type = new StructType(structFields);
         break;

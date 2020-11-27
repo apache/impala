@@ -110,7 +110,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   protected final ArrayList<Column> colsByPos_ = new ArrayList<>();
 
   // map from lowercase column name to Column object.
-  private final Map<String, Column> colsByName_ = new HashMap<>();
+  protected final Map<String, Column> colsByName_ = new HashMap<>();
 
   // List of SQL constraints associated with the table.
   private final SqlConstraints sqlConstraints_ = new SqlConstraints(new ArrayList<>(),
@@ -436,8 +436,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
         Column col = Column.fromThrift(columns.get(i));
         colsByPos_.add(col.getPosition(), col);
         colsByName_.put(col.getName().toLowerCase(), col);
-        ((StructType) type_.getItemType()).addField(
-            new StructField(col.getName(), col.getType(), col.getComment()));
+        ((StructType) type_.getItemType()).addField(getStructFieldFromColumn(col));
       }
     } catch (ImpalaRuntimeException e) {
       throw new TableLoadingException(String.format("Error loading schema for " +
@@ -454,6 +453,20 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     storageMetadataLoadTime_ = thriftTable.getStorage_metadata_load_time_ns();
 
     storedInImpaladCatalogCache_ = true;
+  }
+
+  /**
+   * If column is 'IcebergColumn', we return 'IcebergStructField', otherwise, we
+   * just return 'StructField'.
+   */
+  private StructField getStructFieldFromColumn(Column col) {
+    if (col instanceof IcebergColumn) {
+      IcebergColumn iCol = (IcebergColumn) col;
+      return new IcebergStructField(iCol.getName(), iCol.getType(),
+          iCol.getComment(), iCol.getFieldId());
+    } else {
+      return new StructField(col.getName(), col.getType(), col.getComment());
+    }
   }
 
   /**

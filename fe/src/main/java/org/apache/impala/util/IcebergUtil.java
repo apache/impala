@@ -26,6 +26,7 @@ import com.google.common.collect.Maps;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 
+import org.apache.impala.catalog.IcebergStructField;
 import org.apache.impala.common.Pair;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.UpdateSchema;
@@ -506,8 +507,10 @@ public class IcebergUtil {
         List<StructField> structFields = new ArrayList<>();
         List<Types.NestedField> nestedFields = structType.fields();
         for (Types.NestedField nestedField : nestedFields) {
-          structFields.add(new StructField(nestedField.name(),
-              toImpalaType(nestedField.type())));
+          // Get field id from 'NestedField'.
+          structFields.add(new IcebergStructField(nestedField.name(),
+              toImpalaType(nestedField.type()), nestedField.doc(),
+              nestedField.fieldId()));
         }
         return new StructType(structFields);
       }

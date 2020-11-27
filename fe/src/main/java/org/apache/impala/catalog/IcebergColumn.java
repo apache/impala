@@ -33,11 +33,20 @@ import org.apache.impala.thrift.TColumnDescriptor;
  */
 public class IcebergColumn extends Column {
   private final int fieldId_;
+  // Keep key and value field id for column with Map type.
+  private final int fieldMapKeyId_;
+  private final int fieldMapValueId_;
 
   public IcebergColumn(String name, Type type, String comment, int position,
-      int fieldId) {
+      int fieldId, int fieldMapKeyId, int fieldMapValueId) {
     super(name, type, comment, position);
     fieldId_ = fieldId;
+    fieldMapKeyId_ = fieldMapKeyId;
+    fieldMapValueId_ = fieldMapValueId;
+  }
+
+  public int getFieldId() {
+    return fieldId_;
   }
 
   @Override
@@ -45,6 +54,8 @@ public class IcebergColumn extends Column {
     TColumn tcol = super.toThrift();
     tcol.setIs_iceberg_column(true);
     tcol.setIceberg_field_id(fieldId_);
+    tcol.setIceberg_field_map_key_id(fieldMapKeyId_);
+    tcol.setIceberg_field_map_value_id(fieldMapValueId_);
     return tcol;
   }
 
@@ -52,6 +63,8 @@ public class IcebergColumn extends Column {
   public TColumnDescriptor toDescriptor() {
     TColumnDescriptor desc = super.toDescriptor();
     desc.setIcebergFieldId(fieldId_);
+    desc.setIcebergFieldMapKeyId(fieldMapKeyId_);
+    desc.setIcebergFieldMapValueId(fieldMapValueId_);
     return desc;
   }
 }
