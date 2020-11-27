@@ -84,6 +84,17 @@ public class StructType extends Type {
     fieldMap_.clear();
   }
 
+  /**
+   * Update field by parameter, currently we use this method to update Iceberg
+   * tables' field.
+   */
+  public void updateFields(int pos, StructField field) {
+    if (fields_.size() >= pos) {
+      fieldMap_.put(field.getName(), field);
+      fields_.set(pos, field);
+    }
+  }
+
   @Override
   public boolean equals(Object other) {
     if (!(other instanceof StructType)) return false;

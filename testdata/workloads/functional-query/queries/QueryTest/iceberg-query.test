@@ -404,3 +404,106 @@ describe formatted iceberg_partitioned_orc_external;
 ---- TYPES
 string, string, string
 ====
+---- QUERY
+SELECT count(*) from iceberg_resolution_test_external;
+---- TYPES
+bigint
+---- RESULTS
+20
+====
+---- QUERY
+SELECT phone.pos,phone.item
+FROM iceberg_resolution_test_external,iceberg_resolution_test_external.phone
+WHERE id=1 ORDER BY phone.pos;
+---- TYPES
+bigint,string
+---- RESULTS
+0,'1-212-100-1111'
+1,'1-212-100-1112'
+====
+---- QUERY
+SELECT favorites.key,favorites.value
+FROM iceberg_resolution_test_external,iceberg_resolution_test_external.favorites
+WHERE id=1 AND favorites.key='sport';
+---- TYPES
+string,string
+---- RESULTS
+'sport','swimming'
+====
+---- QUERY
+SELECT favorites.value,count(1)
+FROM iceberg_resolution_test_external.favorites
+WHERE favorites.key='food'
+GROUP BY favorites.value ORDER BY favorites.value;
+---- TYPES
+string,bigint
+---- RESULTS
+'beef',10
+'chicken',4
+'pumpkin',6
+====
+---- QUERY
+SELECT current_address.street_address.street_number,
+current_address.street_address.street_name,
+current_address.street_address.street_type,
+current_address.country,
+current_address.postal_code
+FROM iceberg_resolution_test_external WHERE id=1;
+---- TYPES
+int,string,string,string,string
+---- RESULTS
+100,'Wall Street','Street','US','10005'
+====
+---- QUERY
+SELECT count(distinct current_address.street_address.street_number),
+count(distinct current_address.country)
+FROM iceberg_resolution_test_external;
+---- TYPES
+bigint,bigint
+---- RESULTS
+3,1
+====
+---- QUERY
+describe formatted iceberg_resolution_test_external;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test','NULL'
+'','iceberg.catalog_location','/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test'
+'','iceberg.table_identifier','functional_parquet.iceberg_resolution_test'
+'','iceberg.file_format ','parquet             '
+'','iceberg.catalog     ','hadoop.catalog      '
+---- TYPES
+string, string, string
+====
+---- QUERY
+SHOW FILES in iceberg_resolution_test_external;
+---- LABELS
+Path,Size,Partition
+---- RESULTS
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-08/action=view/00001-1-13d79bd6-4b97-4680-b4e1-52e93b6ce04e-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-08/action=view/00006-6-305c9b7a-f42d-4245-b806-dfa7a792593f-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-08/action=view/00009-9-224fe2d6-b0d9-42d6-bc95-15f52ecb29ad-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-08/action=view/00017-17-1a38e294-5992-48d9-a18e-08e129bb418c-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-08/action=view/00023-23-74cfcf22-3de2-489a-b1ec-d5141e75a8e8-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-08/action=view/00027-27-5f91dc85-b8f3-4cc2-a5c6-38b7fee49709-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-08/action=view/00030-30-dc3510cc-e765-43bc-be03-c5561a8d50a3-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-08/action=view/00031-31-364afc4a-b718-406d-a532-58fab5c8f85d-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-09/action=click/00004-4-7a1a8e89-8aeb-4405-be64-76557432cf21-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-09/action=click/00014-14-765d552a-fddc-42f3-adfd-ecba20a01d80-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-09/action=click/00015-15-9957db43-3b9a-4a50-9946-d003cc1d461c-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-09/action=click/00019-19-1e1895d0-1f42-4c30-989f-968802831077-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-09/action=click/00020-20-bb59ac6d-aeee-4c35-9f8a-1a03127d33b8-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-09/action=click/00028-28-44ba3ad9-737c-4416-a32c-501cc9a4aa90-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-10/action=download/00003-3-31478795-ff6a-4a20-9fff-8dc4907c1ba7-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-10/action=download/00007-7-3b4a35cb-22b5-4a5d-932b-89f222b0b2c7-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-10/action=download/00011-11-a40c4c8c-de16-487a-89b3-ee8e58b4fd07-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-10/action=download/00012-12-ed4ba706-2ace-4d41-b475-6bda3ba72306-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-10/action=download/00022-22-57f5e226-5f8f-49b9-b998-039b8362b7a0-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/data/event_time_hour=2020-01-01-10/action=download/00025-25-5fec3538-052d-493e-9479-b59fc8aece0f-00000.parquet',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/metadata/4ceee3ab-8653-423c-b8ac-0ad5f7b0579b-m0.avro',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/metadata/snap-8063525763252762178-1-4ceee3ab-8653-423c-b8ac-0ad5f7b0579b.avro',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/metadata/v1.metadata.json',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/metadata/v2.metadata.json',regex:.*,''
+'$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test/functional_parquet/iceberg_resolution_test/metadata/version-hint.text',regex:.*,''
+---- TYPES
+STRING,STRING,STRING
+====

@@ -146,6 +146,10 @@ class ParquetSchemaResolver {
       fallback_schema_resolution_(fallback_schema_resolution),
       array_resolution_(array_resolution),
       filename_(NULL) {
+    // We set FIELD_ID for Iceberg tables.
+    if (tbl_desc_.IsIcebergTable()) {
+      fallback_schema_resolution_ = TParquetFallbackSchemaResolution::type::FIELD_ID;
+    }
   }
 
   /// Parses the schema of the given file metadata into an internal schema
@@ -217,6 +221,8 @@ class ParquetSchemaResolver {
   /// db/table/column/field names. If there are several matches with different casing,
   /// then the index of the first match is returned.
   int FindChildWithName(SchemaNode* node, const std::string& name) const;
+  /// Returns the index of 'node's child with 'field id' for Iceberg tables.
+  int FindChildWithFieldId(SchemaNode* node, const int& field_id) const;
 
   /// The ResolvePathHelper() logic for arrays.
   Status ResolveArray(ArrayEncoding array_encoding, const SchemaPath& path, int idx,
@@ -232,7 +238,7 @@ class ParquetSchemaResolver {
       const SchemaPath& path, int idx) const;
 
   const HdfsTableDescriptor& tbl_desc_;
-  const TParquetFallbackSchemaResolution::type fallback_schema_resolution_;
+  TParquetFallbackSchemaResolution::type fallback_schema_resolution_;
   const TParquetArrayResolution::type array_resolution_;
   const char* filename_;
 

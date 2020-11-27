@@ -743,6 +743,39 @@ SchemaNode* ParquetSchemaResolver::NextSchemaNode(
         file_idx = table_idx;
       }
     }
+  } else if (fallback_schema_resolution_ ==
+        TParquetFallbackSchemaResolution::type::FIELD_ID) {
+    // Resolution by field id for Iceberg table.
+    if (next_idx == 0) {
+      // Resolve top-level table column by field id.
+      DCHECK_LT(table_idx, tbl_desc_.col_descs().size());
+      const int& field_id = tbl_desc_.col_descs()[table_idx].field_id();
+      file_idx = FindChildWithFieldId(node, field_id);
+    } else if (col_type->type == TYPE_STRUCT) {
+      // Resolve struct field by field id.
+      DCHECK_LT(table_idx, col_type->field_ids.size());
+      const int& field_id = col_type->field_ids[table_idx];
+      file_idx = FindChildWithFieldId(node, field_id);
+    } else if (col_type->type == TYPE_ARRAY) {
+      // Arrays have only one child in the file.
+      DCHECK_EQ(table_idx, SchemaPathConstants::ARRAY_ITEM);
+      file_idx = table_idx;
+    } else {
+      DCHECK_EQ(col_type->type, TYPE_MAP);
+      DCHECK(table_idx == SchemaPathConstants::MAP_KEY ||
+             table_idx == SchemaPathConstants::MAP_VALUE);
+      int field_id = -1;
+      if (table_idx == SchemaPathConstants::MAP_KEY) {
+        field_id = tbl_desc_.col_descs()[table_idx - 1].field_map_key_id();
+      } else {
+        field_id = tbl_desc_.col_descs()[table_idx - 1].field_map_value_id();
+      }
+      file_idx = FindChildWithFieldId(node, field_id);
+      if (file_idx >= node->children.size()) {
+        // Couldn't resolve by field id, fall back to resolution by position.
+        file_idx = table_idx;
+      }
+    }
   } else {
     // Resolution by position.
     DCHECK_EQ(fallback_schema_resolution_,
@@ -777,6 +810,15 @@ int ParquetSchemaResolver::FindChildWithName(SchemaNode* node,
   int idx;
   for (idx = 0; idx < node->children.size(); ++idx) {
     if (strcasecmp(node->children[idx].element->name.c_str(), name.c_str()) == 0) break;
+  }
+  return idx;
+}
+
+int ParquetSchemaResolver::FindChildWithFieldId(SchemaNode* node,
+    const int& field_id) const {
+  int idx;
+  for (idx = 0; idx < node->children.size(); ++idx) {
+    if (node->children[idx].element->field_id == field_id) break;
   }
   return idx;
 }

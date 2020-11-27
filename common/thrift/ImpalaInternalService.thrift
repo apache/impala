@@ -45,6 +45,8 @@ const i32 INVALID_PLAN_NODE_ID = -1
 enum TParquetFallbackSchemaResolution {
   POSITION = 0
   NAME = 1
+  // Valid for Iceberg tables
+  FIELD_ID = 2
 }
 
 // The order of the enum values needs to be kept in sync with

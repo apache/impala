@@ -99,7 +99,8 @@ public class Column {
     if (columnDesc.isIs_iceberg_column()) {
       Preconditions.checkState(columnDesc.isSetIceberg_field_id());
       col = new IcebergColumn(columnDesc.getColumnName(), type, comment, position,
-          columnDesc.getIceberg_field_id());
+          columnDesc.getIceberg_field_id(), columnDesc.getIceberg_field_map_key_id(),
+          columnDesc.getIceberg_field_map_value_id());
     } else if (columnDesc.isIs_hbase_column()) {
       // HBase table column. The HBase column qualifier (column name) is not be set for
       // the HBase row key, so it being set in the thrift struct is not a precondition.
@@ -152,7 +153,14 @@ public class Column {
   public static StructType columnsToStruct(List<Column> columns) {
     List<StructField> fields = Lists.newArrayListWithCapacity(columns.size());
     for (Column col: columns) {
-      fields.add(new StructField(col.getName(), col.getType(), col.getComment()));
+      if (col instanceof IcebergColumn) {
+        // Create 'IcebergStructField' for Iceberg tables.
+        IcebergColumn iCol = (IcebergColumn) col;
+        fields.add(new IcebergStructField(iCol.getName(), iCol.getType(),
+            iCol.getComment(), iCol.getFieldId()));
+      } else {
+        fields.add(new StructField(col.getName(), col.getType(), col.getComment()));
+      }
     }
     return new StructType(fields);
   }

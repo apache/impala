@@ -219,7 +219,7 @@ TEST(QueryOptions, SetEnumOptions) {
   TestEnumCase(options, CASE(explain_level, TExplainLevel,
       (MINIMAL, STANDARD, EXTENDED, VERBOSE)), true);
   TestEnumCase(options, CASE(parquet_fallback_schema_resolution,
-      TParquetFallbackSchemaResolution, (POSITION, NAME)), true);
+      TParquetFallbackSchemaResolution, (POSITION, NAME, FIELD_ID)), true);
   TestEnumCase(options, CASE(parquet_array_resolution, TParquetArrayResolution,
       (THREE_LEVEL, TWO_LEVEL, TWO_LEVEL_THEN_THREE_LEVEL)), true);
   TestEnumCase(options, CASE(default_file_format, THdfsFileFormat,

@@ -310,10 +310,29 @@ public class IcebergTable extends Table implements FeIcebergTable {
       // Update sd cols by iceberg NestedField
       cols.add(new FieldSchema(column.name(), colType.toSql().toLowerCase(),
           column.doc()));
-      // Update impala Table columns by iceberg NestedField
+
+      int keyId = -1, valueId = -1;
+      if (colType.isMapType()) {
+        // Get real map key and value field id if this column is Map type.
+        Types.MapType mapType = (Types.MapType) column.type();
+        keyId = mapType.keyId();
+        valueId = mapType.valueId();
+      }
+      // Update impala Table columns by iceberg NestedField.
       addColumn(new IcebergColumn(column.name(), colType, column.doc(), pos++,
-          column.fieldId()));
+          column.fieldId(), keyId, valueId));
     }
+  }
+
+  @Override
+  public void addColumn(Column col) {
+    Preconditions.checkState(col instanceof IcebergColumn);
+    IcebergColumn iCol = (IcebergColumn) col;
+    colsByPos_.add(iCol);
+    colsByName_.put(iCol.getName().toLowerCase(), col);
+    ((StructType) type_.getItemType()).addField(
+        new IcebergStructField(col.getName(), col.getType(), col.getComment(),
+            iCol.getFieldId()));
   }
 
   @Override

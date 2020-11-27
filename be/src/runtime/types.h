@@ -92,6 +92,8 @@ struct ColumnType {
 
   /// Only set if type == TYPE_STRUCT. The field name of each child.
   std::vector<std::string> field_names;
+  /// Only set if type == TYPE_STRUCT. The field id of each child for Iceberg tables.
+  std::vector<int> field_ids;
 
   static const char* LLVM_CLASS_NAME;
 

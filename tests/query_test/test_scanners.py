@@ -348,6 +348,8 @@ class TestIceberg(ImpalaTestSuite):
         create_exec_option_dimension(debug_action_options=DEBUG_ACTION_DIMS))
     cls.ImpalaTestMatrix.add_constraint(
       lambda v: v.get_value('table_format').file_format == 'parquet')
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('PARQUET_FALLBACK_SCHEMA_RESOLUTION', 2))
 
   def test_iceberg_query(self, vector):
     self.run_test_case('QueryTest/iceberg-query', vector)

@@ -269,6 +269,9 @@ struct TColumn {
   // Here come the Iceberg-specific fields.
   18: optional bool is_iceberg_column
   19: optional i32 iceberg_field_id
+  // Key and value field id for Iceberg column with Map type.
+  20: optional i32 iceberg_field_map_key_id
+  21: optional i32 iceberg_field_map_value_id
 }
 
 // Represents an HDFS file in a partition.

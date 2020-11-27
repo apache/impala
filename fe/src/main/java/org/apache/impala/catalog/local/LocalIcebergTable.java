@@ -33,7 +33,6 @@ import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
-import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
@@ -69,8 +68,8 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
               IcebergUtil.getIcebergTableIdentifier(msTable),
               params.icebergCatalogLocation_);
 
-      return new LocalIcebergTable(db, msTable, ref, ColumnMap.fromMsTable(msTable),
-          metadata);
+      return new LocalIcebergTable(db, msTable, ref,
+          ColumnMap.fromMsTable(msTable, metadata), metadata);
     } catch (Exception e) {
       String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
       throw new TableLoadingException(

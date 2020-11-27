@@ -2988,6 +2988,20 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/icebe
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+iceberg_resolution_test_external
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.file_format'='parquet', 'iceberg.catalog'='hadoop.catalog',
+'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog/iceberg_resolution_test',
+'iceberg.table_identifier'='functional_parquet.iceberg_resolution_test');
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/iceberg_resolution_test /test-warehouse/iceberg_test/hadoop_catalog/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 alltypes_date_partition_2
 ---- PARTITION_COLUMNS
 date_col date

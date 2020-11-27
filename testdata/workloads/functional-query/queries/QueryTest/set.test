@@ -117,7 +117,7 @@ Invalid replica memory distance preference: 'bar'. Valid values are CACHE_LOCAL(
 ---- QUERY
 set parquet_fallback_schema_resolution=bar
 ---- CATCH
-Invalid parquet fallback schema resolution: 'bar'. Valid values are POSITION(0), NAME(1).
+Invalid parquet fallback schema resolution: 'bar'. Valid values are POSITION(0), NAME(1), FIELD_ID(2).
 ====
 ---- QUERY
 set parquet_array_resolution=bar

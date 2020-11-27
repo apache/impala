@@ -221,5 +221,5 @@ required int32 value [i:0 d:1 r:1]
 # Check that we handle bad options gracefully
 set parquet_fallback_schema_resolution="FOO"
 ---- CATCH
-Invalid parquet fallback schema resolution: 'FOO'. Valid values are POSITION(0), NAME(1).
+Invalid parquet fallback schema resolution: 'FOO'. Valid values are POSITION(0), NAME(1), FIELD_ID(2).
 ====

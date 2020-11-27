@@ -161,6 +161,9 @@ ColumnDescriptor::ColumnDescriptor(const TColumnDescriptor& tdesc)
     type_(ColumnType::FromThrift(tdesc.type)) {
   if (tdesc.__isset.icebergFieldId) {
     field_id_ = tdesc.icebergFieldId;
+    // Get key and value field_id for Iceberg table column with Map type.
+    field_map_key_id_ = tdesc.icebergFieldMapKeyId;
+    field_map_value_id_ = tdesc.icebergFieldMapValueId;
   }
 }
 
