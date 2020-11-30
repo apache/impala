@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsTable;
@@ -98,6 +97,9 @@ public class TableRef extends StmtNode {
   protected List<PlanHint> tableHints_ = new ArrayList<>();
   protected TReplicaPreference replicaPreference_;
   protected boolean randomReplica_;
+  // A sampling percent if convert_limit_to_sample hint is supplied. Valid range
+  // is 1-100. -1 indicates no hint.
+  protected int convertLimitToSampleHintPercent_;
 
   // Hinted distribution mode for this table ref; set after analyzeJoinHints()
   // TODO: Move join-specific members out of TableRef.
@@ -185,6 +187,7 @@ public class TableRef extends StmtNode {
     isAnalyzed_ = false;
     replicaPreference_ = null;
     randomReplica_ = false;
+    convertLimitToSampleHintPercent_ = -1;
   }
 
   /**
@@ -206,6 +209,7 @@ public class TableRef extends StmtNode {
     allowEmptyOn_ = other.allowEmptyOn_;
     tableHints_ = Lists.newArrayList(other.tableHints_);
     replicaPreference_ = other.replicaPreference_;
+    convertLimitToSampleHintPercent_ = other.convertLimitToSampleHintPercent_;
     randomReplica_ = other.randomReplica_;
     distrMode_ = other.distrMode_;
     // The table ref links are created at the statement level, so cloning a set of linked
@@ -261,6 +265,12 @@ public class TableRef extends StmtNode {
 
   public TReplicaPreference getReplicaPreference() { return replicaPreference_; }
   public boolean getRandomReplica() { return randomReplica_; }
+  public boolean hasConvertLimitToSampleHint() {
+    return convertLimitToSampleHintPercent_ != -1;
+  }
+  public int getConvertLimitToSampleHintPercent() {
+    return convertLimitToSampleHintPercent_;
+  }
 
   /**
    * Returns true if this table ref has a resolved path that is rooted at a registered
@@ -334,6 +344,10 @@ public class TableRef extends StmtNode {
   public void setTableHints(List<PlanHint> hints) {
     Preconditions.checkNotNull(hints);
     tableHints_ = hints;
+  }
+
+  public void setTableSampleClause(TableSampleClause sampleParams) {
+    sampleParams_ = sampleParams;
   }
 
   public boolean isBroadcastJoin() { return distrMode_ == DistributionMode.BROADCAST; }
@@ -435,12 +449,34 @@ public class TableRef extends StmtNode {
       } else if (hint.is("SCHEDULE_RANDOM_REPLICA")) {
         analyzer.setHasPlanHints();
         randomReplica_ = true;
+      } else if (hint.is("CONVERT_LIMIT_TO_SAMPLE")) {
+        List<String> args = hint.getArgs();
+        if (args == null || args.size() != 1) {
+          addHintWarning(hint, analyzer);
+          return;
+        } else {
+          try {
+            int samplePercent = Integer.parseInt(args.get(0));
+            if (samplePercent < 1 || samplePercent > 100) {
+              addHintWarning(hint, analyzer);
+              return;
+            }
+            analyzer.setHasPlanHints();
+            convertLimitToSampleHintPercent_ = samplePercent;
+          } catch (NumberFormatException e) {
+            addHintWarning(hint, analyzer);
+          }
+        }
       } else {
-        Preconditions.checkState(getAliases() != null && getAliases().length > 0);
-        analyzer.addWarning("Table hint not recognized for table " + getUniqueAlias() +
-            ": " + hint);
+        addHintWarning(hint, analyzer);
       }
     }
+  }
+
+  private void addHintWarning(PlanHint hint, Analyzer analyzer) {
+    Preconditions.checkState(getAliases() != null && getAliases().length > 0);
+    analyzer.addWarning("Table hint not recognized for table " + getUniqueAlias() +
+        ": " + hint);
   }
 
   private void analyzeJoinHints(Analyzer analyzer) throws AnalysisException {

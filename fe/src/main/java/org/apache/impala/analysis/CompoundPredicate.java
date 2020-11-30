@@ -74,7 +74,16 @@ public class CompoundPredicate extends Predicate {
     children_.add(e1);
     Preconditions.checkArgument(op == Operator.NOT && e2 == null
         || op != Operator.NOT && e2 != null);
-    if (e2 != null) children_.add(e2);
+    if (e2 != null) {
+      children_.add(e2);
+      if ((op == Operator.AND &&
+          (Expr.IS_ALWAYS_TRUE_PREDICATE.apply(e1) &&
+              Expr.IS_ALWAYS_TRUE_PREDICATE.apply(e2))) ||
+          ((op == Operator.OR && (Expr.IS_ALWAYS_TRUE_PREDICATE.apply(e1) ||
+              Expr.IS_ALWAYS_TRUE_PREDICATE.apply(e2))))) {
+        setHasAlwaysTrueHint(true);
+      }
+    }
   }
 
   /**

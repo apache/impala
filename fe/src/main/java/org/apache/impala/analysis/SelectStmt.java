@@ -33,7 +33,6 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ColumnAliasGenerator;
 import org.apache.impala.common.Pair;
-import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.common.TableAliasGenerator;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -178,8 +177,10 @@ public class SelectStmt extends QueryStmt {
 
   /**
    * A simple limit statement has a limit but no order-by,
-   * group-by, aggregates, joins or analytic functions. It can
-   * have a WHERE clause only if it is tagged as always true.
+   * group-by, aggregates or analytic functions. Joins are
+   * allowed if one of the table refs has a limit_to_sample
+   * hint. The statement can have a WHERE clause if it has an
+   * always_true hint.
    * This method does not explicitly check for subqueries. If the
    * subquery occurs in the WHERE, the initial check for simple
    * limit may succeed. Subsequently, in the planning process
@@ -190,7 +191,7 @@ public class SelectStmt extends QueryStmt {
    * a table ref.
    */
   public Pair<Boolean, Long> checkSimpleLimitStmt() {
-    if (getTableRefs().size() == 1
+    if (hasSimpleLimitEligibleTableRefs()
         && !hasGroupByClause() && !hasOrderByClause()
         && !hasMultiAggInfo() && !hasAnalyticInfo()) {
       if (hasWhereClause() && !Expr.IS_ALWAYS_TRUE_PREDICATE.apply(getWhereClause())) {
@@ -218,6 +219,18 @@ public class SelectStmt extends QueryStmt {
       groupingExprs_ = new ArrayList<>();
     }
     groupingExprs_.addAll(addtlGroupingExprs);
+  }
+
+  private boolean hasSimpleLimitEligibleTableRefs() {
+    // for single table query blocks, limit pushdown can be considered
+    // even if no table hint is present
+    if (getTableRefs().size() == 1) return true;
+    // if there are multiple table refs, at least 1 should have the hint
+    // for limit to sample
+    for (TableRef ref : getTableRefs()) {
+      if (ref.hasConvertLimitToSampleHint()) return true;
+    }
+    return false;
   }
 
   /**
