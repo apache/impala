@@ -103,7 +103,7 @@ public class IcebergUtil {
   /**
    * Helper method to load native Iceberg table.
    */
-  private static Table loadTable(TIcebergCatalog catalog, TableIdentifier tableId,
+  public static Table loadTable(TIcebergCatalog catalog, TableIdentifier tableId,
       String location) throws TableLoadingException {
     try {
       IcebergCatalog cat = getIcebergCatalog(catalog, location);

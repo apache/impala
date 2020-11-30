@@ -2735,13 +2735,15 @@ public class CatalogOpExecutor {
             } else {
               if (location == null) {
                 if (catalog == TIcebergCatalog.HADOOP_CATALOG) {
-                  // When creating external Iceberg table with 'hadoop.catalog'
-                  // We use catalog location and table identifier as location
+                  // When creating external Iceberg table with 'hadoop.catalog' we load
+                  // the Iceberg table using catalog location and table identifier to get
+                  // the actual location of the table. This way we can also get the
+                  // correct location for tables stored in nested namespaces.
                   TableIdentifier identifier =
                       IcebergUtil.getIcebergTableIdentifier(newTable);
-                  newTable.getSd().setLocation(String.format("%s/%s/%s",
-                      IcebergUtil.getIcebergCatalogLocation(newTable),
-                      identifier.namespace().level(0), identifier.name()));
+                  newTable.getSd().setLocation(IcebergUtil.loadTable(
+                      TIcebergCatalog.HADOOP_CATALOG, identifier,
+                      IcebergUtil.getIcebergCatalogLocation(newTable)).location());
                 } else {
                   addSummary(response,
                       "Location is necessary for external iceberg table.");
