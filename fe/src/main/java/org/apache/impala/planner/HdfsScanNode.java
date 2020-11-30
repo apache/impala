@@ -843,7 +843,7 @@ public class HdfsScanNode extends ScanNode {
     maxScanRangeNumRows_ = -1;
     fileFormats_ = new HashSet<>();
     long simpleLimitNumRows = 0; // only used for the simple limit case
-    boolean isSimpleLimit =
+    boolean isSimpleLimit = sampleParams_ == null &&
         (analyzer.getQueryCtx().client_request.getQuery_options()
             .isOptimize_simple_limit()
         && analyzer.getSimpleLimitStatus() != null

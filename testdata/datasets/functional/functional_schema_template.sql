@@ -2985,3 +2985,59 @@ TBLPROPERTIES('iceberg.file_format'='orc', 'iceberg.catalog'='hadoop.catalog', '
 `hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog && \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/iceberg_partitioned_orc /test-warehouse/iceberg_test/hadoop_catalog/
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+alltypes_date_partition_2
+---- PARTITION_COLUMNS
+date_col date
+---- COLUMNS
+id int COMMENT 'Add a comment'
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+string_col string
+timestamp_col timestamp
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (date_col)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, string_col, timestamp_col,
+cast(timestamp_col as date) date_col
+FROM {db_name}{db_suffix}.alltypes where id < 500;
+---- LOAD
+SET hive.exec.dynamic.partition.mode=nonstrict;
+SET hive.exec.dynamic.partition=true;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} PARTITION (date_col)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+float_col, double_col, string_col, timestamp_col,
+cast(timestamp_col as date) date_col
+FROM {db_name}{db_suffix}.alltypes where id < 500;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+alltypes_dp_2_view_1
+---- CREATE
+DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
+-- view which references a WHERE clause with hint
+CREATE VIEW {db_name}{db_suffix}.{table_name}
+AS SELECT * FROM {db_name}{db_suffix}.alltypes_date_partition_2 where [always_true] date_col = cast(timestamp_col as date);
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+alltypes_dp_2_view_2
+---- CREATE
+DROP VIEW IF EXISTS {db_name}{db_suffix}.{table_name};
+-- view which references a table with hint and a WHERE clause with hint.
+-- WHERE clause has a compound predicate.
+CREATE VIEW {db_name}{db_suffix}.{table_name}
+AS SELECT * FROM {db_name}{db_suffix}.alltypes_date_partition_2 [convert_limit_to_sample(5)]
+where [always_true] date_col = cast(timestamp_col as date) and int_col in (select int_col from {db_name}{db_suffix}.alltypessmall);
+---- LOAD
+====

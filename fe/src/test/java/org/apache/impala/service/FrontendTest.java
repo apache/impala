@@ -130,6 +130,8 @@ public class FrontendTest extends FrontendTestBase {
     AnalyzesOk("select * from functional.alltypes_parens");
     AnalyzesOk("select * from functional.alltypes_view");
     AnalyzesOk("select * from functional.alltypes_view_sub");
+    AnalyzesOk("select * from functional.alltypes_dp_2_view_1");
+    AnalyzesOk("select * from functional.alltypes_dp_2_view_2");
 
     TMetadataOpRequest req = new TMetadataOpRequest();
     req.opcode = TMetadataOpcode.GET_TABLES;
@@ -141,11 +143,13 @@ public class FrontendTest extends FrontendTestBase {
     // HiveServer2 GetTables has 5 columns.
     assertEquals(5, resp.schema.columns.size());
     assertEquals(5, resp.rows.get(0).colVals.size());
-    assertEquals(2, resp.rows.size());
+    assertEquals(3, resp.rows.size());
     assertEquals("alltypes_datasource",
         resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
     assertEquals("alltypes_date_partition",
         resp.rows.get(1).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_date_partition_2",
+        resp.rows.get(2).colVals.get(2).string_val.toLowerCase());
   }
 
   @Test
@@ -155,6 +159,8 @@ public class FrontendTest extends FrontendTestBase {
     AnalyzesOk("select * from functional.alltypes_parens");
     AnalyzesOk("select * from functional.alltypes_view");
     AnalyzesOk("select * from functional.alltypes_view_sub");
+    AnalyzesOk("select * from functional.alltypes_dp_2_view_1");
+    AnalyzesOk("select * from functional.alltypes_dp_2_view_2");
 
     TMetadataOpRequest req = new TMetadataOpRequest();
     req.opcode = TMetadataOpcode.GET_TABLES;
@@ -166,15 +172,19 @@ public class FrontendTest extends FrontendTestBase {
     // HiveServer2 GetTables has 5 columns.
     assertEquals(5, resp.schema.columns.size());
     assertEquals(5, resp.rows.get(0).colVals.size());
-    assertEquals(4, resp.rows.size());
-    assertEquals("alltypes_hive_view",
+    assertEquals(6, resp.rows.size());
+    assertEquals("alltypes_dp_2_view_1",
         resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
-    assertEquals("alltypes_parens",
+    assertEquals("alltypes_dp_2_view_2",
         resp.rows.get(1).colVals.get(2).string_val.toLowerCase());
-    assertEquals("alltypes_view",
+    assertEquals("alltypes_hive_view",
         resp.rows.get(2).colVals.get(2).string_val.toLowerCase());
-    assertEquals("alltypes_view_sub",
+    assertEquals("alltypes_parens",
         resp.rows.get(3).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_view",
+        resp.rows.get(4).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_view_sub",
+        resp.rows.get(5).colVals.get(2).string_val.toLowerCase());
   }
 
   @Test

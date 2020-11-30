@@ -29,9 +29,20 @@ BIGINT, BIGINT
 # WHERE clause has an always_true hint.
 set optimize_simple_limit=true;
 with dp_view as
-(select * from alltypes_date_partition
+(select * from alltypes_date_partition_2
 where /* +always_true */ date_col = cast(timestamp_col as date))
 select count(*) from (select * from dp_view limit 10) t;
+---- RESULTS
+10
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-10360
+# Query against a view that has hints for table sampling
+# and WHERE clause.
+set optimize_simple_limit=true;
+select count(*) from (select * from alltypes_dp_2_view_2 limit 10) t;
 ---- RESULTS
 10
 ---- TYPES

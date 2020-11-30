@@ -513,6 +513,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       for (PlanHint hint : predicateHints_) {
         if (hint.is("ALWAYS_TRUE")) {
           ((Predicate) this).setHasAlwaysTrueHint(true);
+          // If the top level expr has always_true hint, its conjuncts must
+          // also have the same hint (note that there's a TODO in the parser
+          // grammar to allow hints on a per expr basis).
+          List<Expr> conjuncts = getConjuncts();
+          if (conjuncts.size() > 1) {
+            for (Expr e : conjuncts) ((Predicate) e).setHasAlwaysTrueHint(true);
+          }
           analyzer.setHasPlanHints();
         } else {
           analyzer.addWarning("Predicate hint not recognized: " + hint);
