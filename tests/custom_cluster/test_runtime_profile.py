@@ -17,6 +17,7 @@
 
 import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.common.skip import SkipIfEC
 
 
 class TestRuntimeProfile(CustomClusterTestSuite):
@@ -28,6 +29,7 @@ class TestRuntimeProfile(CustomClusterTestSuite):
 
   PERIODIC_COUNTER_UPDATE_FLAG = '--periodic_counter_update_period_ms=50'
 
+  @SkipIfEC.different_schedule
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args('--gen_experimental_profile=true ' +
       PERIODIC_COUNTER_UPDATE_FLAG)

@@ -195,6 +195,7 @@ class SkipIfEC:
   fix_later = pytest.mark.skipif(IS_EC, reason="It should work but doesn't.")
   contain_full_explain = pytest.mark.skipif(IS_EC, reason="Contain full explain output "
               "for hdfs tables.")
+  different_schedule = pytest.mark.skipif(IS_EC, reason="Query is scheduled differently.")
 
 
 class SkipIfDockerizedCluster:
