@@ -28,7 +28,7 @@ RUN apt-get update && \
 
 # Use a non-privileged impala user to run the daemons in the container.
 # That user should own everything in the /opt/impala subdirectory.
-RUN groupadd -r impala && useradd --no-log-init -r -g impala impala && \
+RUN groupadd -r impala -g 1000 && useradd --no-log-init -r -u 1000 -g 1000 impala && \
     mkdir -p /opt/impala && chown impala /opt/impala && \
     chmod ugo+w /etc/passwd
 USER impala
