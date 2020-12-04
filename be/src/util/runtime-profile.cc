@@ -1585,6 +1585,14 @@ Status RuntimeProfile::DeserializeFromArchiveString(
   return DecompressToThrift(decoded_buffer, out);
 }
 
+Status RuntimeProfile::CreateFromArchiveString(
+      const string& archive_str, ObjectPool* pool, RuntimeProfile** out) {
+  TRuntimeProfileTree tree;
+  RETURN_IF_ERROR(DeserializeFromArchiveString(archive_str, &tree));
+  *out = RuntimeProfile::CreateFromThrift(pool, tree);
+  return Status::OK();
+}
+
 void RuntimeProfile::SetTExecSummary(const TExecSummary& summary) {
   lock_guard<SpinLock> l(t_exec_summary_lock_);
   t_exec_summary_ = summary;
