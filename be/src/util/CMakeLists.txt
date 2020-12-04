@@ -163,8 +163,10 @@ add_library(loggingsupport SHARED
 )
 
 add_executable(parquet-reader parquet-reader.cc)
+add_executable(impala-profile-tool impala-profile-tool.cc)
 
 target_link_libraries(parquet-reader ${IMPALA_LINK_LIBS})
+target_link_libraries(impala-profile-tool ${IMPALA_LINK_LIBS})
 
 target_link_libraries(loggingsupport ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS})
 

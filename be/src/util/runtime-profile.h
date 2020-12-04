@@ -668,6 +668,10 @@ class RuntimeProfile : public RuntimeProfileBase {
   static Status DeserializeFromArchiveString(
       const std::string& archive_str, TRuntimeProfileTree* out);
 
+  /// Creates a profile from an 'archive_str' created by SerializeToArchiveString().
+  static Status CreateFromArchiveString(
+      const std::string& archive_str, ObjectPool* pool, RuntimeProfile** out);
+
   /// Set ExecSummary
   void SetTExecSummary(const TExecSummary& summary);
 
