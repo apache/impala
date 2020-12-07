@@ -28,7 +28,10 @@
 #include "util/openssl-util.h"
 #include "util/string-parser.h"
 
-DECLARE_bool(ldap_passwords_in_clear_ok);
+DEFINE_bool(cookie_require_secure, true,
+    "(Advanced) If true, authentication cookies will include the 'Secure' attribute, "
+    "indicating to clients that they should only be returned over SSL connections. For "
+    "testing only.");
 DEFINE_int64(max_cookie_lifetime_s, 24 * 60 * 60,
     "Maximum amount of time in seconds that an authentication cookie will remain valid. "
     "Setting to 0 disables use of cookies. Defaults to 1 day.");
@@ -153,10 +156,7 @@ string GenerateCookie(const string& username, const AuthenticationHash& hash) {
   base64_signature[SHA256_BASE64_LEN] = '\0';
 
   const char* secure_flag = ";Secure";
-  if (FLAGS_ldap_passwords_in_clear_ok) {
-    // If the user specified password can be sent without TLS/SSL, don't include the
-    // 'Secure' flag, which indicates the cookie should only be returned over secured
-    // connections. This is for testing only.
+  if (!FLAGS_cookie_require_secure) {
     secure_flag = "";
   }
   return Substitute("$0=$1$2$3;HttpOnly;Max-Age=$4$5", COOKIE_NAME, base64_signature,

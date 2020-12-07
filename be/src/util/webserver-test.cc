@@ -45,7 +45,8 @@ DECLARE_string(webserver_private_key_password_cmd);
 DECLARE_string(webserver_x_frame_options);
 DECLARE_string(ssl_cipher_list);
 DECLARE_string(ssl_minimum_version);
-DECLARE_bool(ldap_passwords_in_clear_ok);
+DECLARE_bool(webserver_ldap_passwords_in_clear_ok);
+DECLARE_bool(cookie_require_secure);
 
 #include "common/names.h"
 
@@ -376,7 +377,8 @@ TEST(Webserver, TestWithSpnego) {
 
   gflags::FlagSaver saver;
   FLAGS_webserver_require_spnego = true;
-  FLAGS_ldap_passwords_in_clear_ok = true;
+  FLAGS_webserver_ldap_passwords_in_clear_ok = true;
+  FLAGS_cookie_require_secure = false;
 
   MetricGroup metrics("webserver-test");
   Webserver webserver("", FLAGS_webserver_port, &metrics);

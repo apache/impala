@@ -130,11 +130,13 @@ DEFINE_string(webserver_ldap_user_filter, "",
 DEFINE_string(webserver_ldap_group_filter, "",
     "Comma separated list of groups. If specified, users must belong to one of these "
     "groups for LDAP authentication to the webserver to succeed.");
+DEFINE_bool(webserver_ldap_passwords_in_clear_ok, false,
+    "(Advanced) If true, allows the webserver to start with LDAP authentication even if "
+    "SSL is not enabled, a potentially insecure configuration.");
 
 DECLARE_bool(enable_ldap_auth);
 DECLARE_string(hostname);
 DECLARE_bool(is_coordinator);
-DECLARE_bool(ldap_passwords_in_clear_ok);
 DECLARE_int64(max_cookie_lifetime_s);
 DECLARE_string(ssl_minimum_version);
 DECLARE_string(ssl_cipher_list);
@@ -433,9 +435,9 @@ Status Webserver::Start() {
       return Status("Unable to secure web server with LDAP: LDAP authentication must be "
                     "configured for this daemon.");
     }
-    if (!IsSecure() && !FLAGS_ldap_passwords_in_clear_ok) {
+    if (!IsSecure() && !FLAGS_webserver_ldap_passwords_in_clear_ok) {
       return Status("Unable to secure web server with LDAP: must either enable SSL or "
-                    "set --ldap_passwords_in_clear_ok=true");
+                    "set --webserver_ldap_passwords_in_clear_ok=true");
     }
 
     ldap_.reset(new ImpalaLdap());
