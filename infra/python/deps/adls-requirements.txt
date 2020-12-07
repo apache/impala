@@ -21,6 +21,6 @@
 
 pycparser == 2.17
 cffi==1.10.0
-cryptography==1.8.1
+cryptography==3.2
   scandir == 1.5
 azure-datalake-store == 0.0.9
