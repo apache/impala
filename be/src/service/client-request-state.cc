@@ -1241,8 +1241,6 @@ vector<string> createIcebergDataFilesVector(DmlExecState& dml_exec_state) {
   dml_exec_state.ToProto(&exec_state_pb);
   typedef google::protobuf::Map<string, DmlPartitionStatusPB> PerPartitionStatusPBMap;
   const PerPartitionStatusPBMap& per_part_map = exec_state_pb.per_partition_status();
-  // Iceberg tables only have a single partition.
-  if (per_part_map.size() != 1) return ret;
   const PerPartitionStatusPBMap::value_type& part = *per_part_map.begin();
   int64_t num_data_files = part.second.iceberg_data_files_fb_size();
   ret.reserve(num_data_files);
@@ -1295,9 +1293,11 @@ Status ClientRequestState::UpdateCatalog() {
         catalog_update.__set_transaction_id(finalize_params.transaction_id);
         catalog_update.__set_write_id(finalize_params.write_id);
       }
-      vector<string> iceberg_data_files = createIcebergDataFilesVector(*dml_exec_state);
-      if (!iceberg_data_files.empty()) {
-        catalog_update.__set_iceberg_data_files_fb(iceberg_data_files);
+      if (finalize_params.__isset.spec_id) {
+        catalog_update.__isset.iceberg_operation = true;
+        TIcebergOperationParam& ice_op = catalog_update.iceberg_operation;
+        ice_op.__set_spec_id(finalize_params.spec_id);
+        ice_op.__set_iceberg_data_files_fb(createIcebergDataFilesVector(*dml_exec_state));
       }
 
       Status cnxn_status;

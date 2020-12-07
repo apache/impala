@@ -1793,7 +1793,8 @@ public class Frontend {
         finalizeParams.setTransaction_id(queryCtx.getTransaction_id());
         finalizeParams.setWrite_id(insertStmt.getWriteId());
       } else if (targetTable instanceof FeIcebergTable) {
-        // No-op. There is no need to set additional params for Iceberg tables.
+        FeIcebergTable iceTable = (FeIcebergTable)targetTable;
+        finalizeParams.setSpec_id(iceTable.getDefaultPartitionSpecId());
       } else {
         // TODO: Currently this flag only controls the removal of the query-level staging
         // directory. HdfsTableSink (that creates the staging dir) calculates the path

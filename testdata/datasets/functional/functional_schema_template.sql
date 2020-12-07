@@ -3002,6 +3002,15 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/icebe
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+iceberg_int_partitioned
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (i INT, j INT, k INT)
+PARTITION BY SPEC (i identity, j identity)
+STORED AS ICEBERG;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 alltypes_date_partition_2
 ---- PARTITION_COLUMNS
 date_col date

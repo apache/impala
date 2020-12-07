@@ -1,0 +1,252 @@
+====
+---- QUERY
+# Test partitioned INSERTs with single column that is also
+# the partitioned column.
+create table ice_only_part (i int)
+partition by spec (i identity)
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_only_part values (1), (2), (3);
+insert into ice_only_part values (cast(4 as tinyint));
+select * from ice_only_part;
+---- RESULTS
+1
+2
+3
+4
+---- TYPES
+INT
+====
+---- QUERY
+show files in ice_only_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=2/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=3/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_only_part/data/i=4/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from ice_only_part
+where i = 1;
+---- RESULTS
+1
+---- TYPES
+INT
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+====
+---- QUERY
+# Test inserts with multple partition columns.
+create table ice_multi_part (i int, d date, s string)
+partition by spec(i identity, d identity)
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_multi_part
+values (1, '2020-12-07', 'first'), (2, '2020-12-08', 'second');
+select * from ice_multi_part;
+---- RESULTS
+1,2020-12-07,'first'
+2,2020-12-08,'second'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+select * from ice_multi_part
+where d = '2020-12-08';
+---- RESULTS
+2,2020-12-08,'second'
+---- TYPES
+INT, DATE, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+====
+---- QUERY
+# Test that Impala only writes one file per partitions.
+create table ice_bigints (i BIGINT, j BIGINT, k BIGINT)
+partition by spec (i identity, j identity)
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_bigints select id % 2, id % 3, id from functional.alltypes;
+select count(*) from ice_bigints;
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 6
+====
+---- QUERY
+select count(*) from ice_bigints
+where i = 0 and j = 0;
+---- RESULTS
+1217
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 1217
+====
+---- QUERY
+# Test partitioning with all supported types.
+# Only timestamp-based partitions are not supported.
+# Also test partition pruning with all of the supported types.
+create table alltypes_part (
+  id INT,
+  bool_col BOOLEAN,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_col DATE,
+  string_col STRING,
+  timestamp_col TIMESTAMP)
+partition by spec (
+  id identity,
+  bool_col identity,
+  int_col identity,
+  bigint_col identity,
+  float_col identity,
+  double_col identity,
+  date_col identity,
+  string_col identity)
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into alltypes_part
+select id, bool_col, int_col, bigint_col, float_col, double_col,
+       CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+from functional.alltypestiny;
+select count(*) from alltypes_part;
+---- RESULTS
+8
+---- TYPES
+BIGINT
+====
+---- QUERY
+show files in alltypes_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/alltypes_part/data/id=0/bool_col=true/int_col=0/bigint_col=0/float_col=0/double_col=0/date_col=2009-01-01/string_col=0/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# INSERTs with wrong value orderings are rejected.
+insert into alltypes_part
+select bool_col, id, int_col, bigint_col, float_col, double_col,
+       CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+from functional.alltypestiny;
+select count(*) from alltypes_part;
+---- CATCH
+Expression 'id' (type: INT) would need to be cast to BOOLEAN for column 'bool_col'
+====
+---- QUERY
+insert into alltypes_part
+select id, bool_col, int_col, bigint_col, float_col, double_col,
+       CAST(date_string_col as date FORMAT 'MM/DD/YY'), timestamp_col, string_col
+from functional.alltypestiny;
+select count(*) from alltypes_part;
+---- CATCH
+Expression 'timestamp_col' (type: TIMESTAMP) would need to be cast to STRING for column 'string_col'
+====
+---- QUERY
+select count(*) from alltypes_part
+where bool_col = true;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+====
+---- QUERY
+select count(*) from alltypes_part
+where float_col = 0;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+====
+---- QUERY
+select count(*) from alltypes_part
+where double_col = 0;
+---- RESULTS
+4
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+====
+---- QUERY
+select count(*) from alltypes_part
+where date_col = '2009-01-01';
+---- RESULTS
+2
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+select count(*) from alltypes_part
+where string_col = '0';
+---- RESULTS
+4
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 4
+====
+---- QUERY
+# 'timestamp_col' is not a partitioning column.
+select count(*) from alltypes_part
+where timestamp_col = now();
+---- RESULTS
+0
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 8
+====
+---- QUERY
+# Iceberg partitions independent of column order
+---- QUERY
+# Test inserts with multple partition columns.
+create table ice_part_non_order (i int, d date, s string)
+partition by spec(s identity, d identity)
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_part_non_order
+values (1, '2020-12-07', 'first'), (2, '2020-12-08', 'second');
+select * from ice_part_non_order where s='second';
+---- RESULTS
+2,2020-12-08,'second'
+---- TYPES
+INT, DATE, STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+show files in ice_part_non_order;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_non_order/data/s=first/d=2020-12-07/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_non_order/data/s=second/d=2020-12-08/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====

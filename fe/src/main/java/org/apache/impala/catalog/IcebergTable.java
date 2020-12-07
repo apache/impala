@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
@@ -306,28 +305,9 @@ public class IcebergTable extends Table implements FeIcebergTable {
    */
   private void loadSchema() throws TableLoadingException {
     clearColumns();
-
-    List<FieldSchema> cols = msTable_.getSd().getCols();
-    cols.clear();
-
-    int pos = 0;
-    for (Types.NestedField column : icebergSchema_.columns()) {
-      Preconditions.checkNotNull(column);
-      Type colType = IcebergSchemaConverter.toImpalaType(column.type());
-      // Update sd cols by iceberg NestedField
-      cols.add(new FieldSchema(column.name(), colType.toSql().toLowerCase(),
-          column.doc()));
-
-      int keyId = -1, valueId = -1;
-      if (colType.isMapType()) {
-        // Get real map key and value field id if this column is Map type.
-        Types.MapType mapType = (Types.MapType) column.type();
-        keyId = mapType.keyId();
-        valueId = mapType.valueId();
-      }
-      // Update impala Table columns by iceberg NestedField.
-      addColumn(new IcebergColumn(column.name(), colType, column.doc(), pos++,
-          column.fieldId(), keyId, valueId));
+    msTable_.getSd().setCols(IcebergSchemaConverter.convertToHiveSchema(icebergSchema_));
+    for (Column col : IcebergSchemaConverter.convertToImpalaSchema(icebergSchema_)) {
+      addColumn(col);
     }
   }
 

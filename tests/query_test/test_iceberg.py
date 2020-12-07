@@ -62,8 +62,12 @@ class TestIcebergTable(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, """drop table {0}""".format(tbl_name))
 
   @SkipIf.not_hdfs
-  def test_insert_into_iceberg_table(self, vector, unique_database):
+  def test_insert(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-insert', vector, use_db=unique_database)
+
+  def test_partitioned_insert(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-partitioned-insert', vector,
+        use_db=unique_database)
 
   def test_describe_history(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-table-history', vector, use_db=unique_database)

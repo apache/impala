@@ -19,6 +19,7 @@ package org.apache.impala.analysis;
 
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TIcebergPartitionField;
+import org.apache.impala.thrift.TIcebergPartitionTransformType;
 
 /**
  * Represents a PartitionField of iceberg
@@ -62,6 +63,10 @@ public class IcebergPartitionField extends StmtNode {
 
   public int getSourceId() {
     return sourceId_;
+  }
+
+  public TIcebergPartitionTransformType getTransformType() {
+    return transform_.getTransformType();
   }
 
   @Override

@@ -32,6 +32,7 @@ import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
@@ -41,6 +42,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.TableSink;
 import org.apache.impala.rewrite.ExprRewriter;
+import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.IcebergUtil;
 
@@ -494,8 +496,11 @@ public class InsertStmt extends StatementBase {
       if (isHBaseTable) {
         throw new AnalysisException("PARTITION clause is not valid for INSERT into " +
             "HBase tables. '" + targetTableName_ + "' is an HBase table");
-
       } else {
+        if (table_ instanceof FeIcebergTable) {
+          throw new AnalysisException("PARTITION clause cannot be used for Iceberg " +
+              "tables.");
+        }
         // Unpartitioned table, but INSERT has PARTITION clause
         throw new AnalysisException("PARTITION clause is only valid for INSERT into " +
             "partitioned table. '" + targetTableName_ + "' is not partitioned");
@@ -547,8 +552,15 @@ public class InsertStmt extends StatementBase {
         throw new AnalysisException("INSERT OVERWRITE not supported for Iceberg tables.");
       }
       FeIcebergTable iceTable = (FeIcebergTable)table_;
-      if (iceTable.getDefaultPartitionSpec().hasPartitionFields()) {
-        throw new AnalysisException("Impala cannot write partitioned Iceberg tables.");
+      IcebergPartitionSpec icebergPartSpec = iceTable.getDefaultPartitionSpec();
+      if (icebergPartSpec.hasPartitionFields()) {
+        for (IcebergPartitionField partField :
+            icebergPartSpec.getIcebergPartitionFields()) {
+          if (partField.getTransformType() != TIcebergPartitionTransformType.IDENTITY) {
+            throw new AnalysisException("Impala can only insert data into Iceberg " +
+                "tables that only use identity partition transforms.");
+          }
+        }
       }
       validateIcebergColumnsForInsert(iceTable);
     }
@@ -735,6 +747,11 @@ public class InsertStmt extends StatementBase {
     if (isKuduTable) {
       kuduPartitionColumnNames = getKuduPartitionColumnNames((FeKuduTable) table_);
     }
+    boolean isIcebergTable = table_ instanceof FeIcebergTable;
+    IcebergPartitionSpec icebergPartSpec = null;
+    if (isIcebergTable) {
+      icebergPartSpec = ((FeIcebergTable)table_).getDefaultPartitionSpec();
+    }
 
     SetOperationStmt unionStmt =
         (queryStmt_ instanceof SetOperationStmt) ? (SetOperationStmt) queryStmt_ : null;
@@ -781,24 +798,38 @@ public class InsertStmt extends StatementBase {
       }
     }
 
-    // Reorder the partition key exprs and names to be consistent with the target table
-    // declaration, and store their column positions.  We need those exprs in the original
-    // order to create the corresponding Hdfs folder structure correctly, or the indexes
-    // to construct rows to pass to the Kudu partitioning API.
-    for (int i = 0; i < table_.getColumns().size(); ++i) {
-      Column c = table_.getColumns().get(i);
-      for (int j = 0; j < tmpPartitionKeyNames.size(); ++j) {
-        if (c.getName().equals(tmpPartitionKeyNames.get(j))) {
-          partitionKeyExprs_.add(tmpPartitionKeyExprs.get(j));
-          partitionColPos_.add(i);
-          break;
+    if (isIcebergTable) {
+      // Add partition key expressions in the order of the Iceberg partition fields.
+      addIcebergPartExprs(analyzer, widestTypeExprList, selectExprTargetColumns,
+          selectListExprs, icebergPartSpec);
+    } else {
+      // Reorder the partition key exprs and names to be consistent with the target table
+      // declaration, and store their column positions.  We need those exprs in the
+      // original order to create the corresponding Hdfs folder structure correctly, or
+      // the indexes to construct rows to pass to the Kudu partitioning API.
+      for (int i = 0; i < table_.getColumns().size(); ++i) {
+        Column c = table_.getColumns().get(i);
+        for (int j = 0; j < tmpPartitionKeyNames.size(); ++j) {
+          if (c.getName().equals(tmpPartitionKeyNames.get(j))) {
+            partitionKeyExprs_.add(tmpPartitionKeyExprs.get(j));
+            partitionColPos_.add(i);
+            break;
+          }
         }
       }
     }
 
-    Preconditions.checkState(
-        (isKuduTable && partitionKeyExprs_.size() == kuduPartitionColumnNames.size())
-        || partitionKeyExprs_.size() == numClusteringCols);
+    if (isIcebergTable) {
+      Preconditions.checkState(
+          partitionKeyExprs_.size() == icebergPartSpec.getIcebergPartitionFieldsSize());
+    }
+    else if (isKuduTable) {
+      Preconditions.checkState(
+          partitionKeyExprs_.size() == kuduPartitionColumnNames.size());
+    } else {
+      Preconditions.checkState(partitionKeyExprs_.size() == numClusteringCols);
+    }
+
     // Make sure we have stats for partitionKeyExprs
     for (Expr expr: partitionKeyExprs_) {
       expr.analyze(analyzer);
@@ -860,6 +891,31 @@ public class InsertStmt extends StatementBase {
       SelectList selectList = new SelectList(selectListItems);
       queryStmt_ = new SelectStmt(selectList, null, null, null, null, null, null);
       queryStmt_.analyze(analyzer);
+    }
+  }
+
+  /**
+   * Adds partition key expressions in the order of Iceberg partition spec fields.
+   */
+  private void addIcebergPartExprs(Analyzer analyzer, List<Expr> widestTypeExprList,
+      List<Column> selectExprTargetColumns, List<Expr> selectListExprs,
+      IcebergPartitionSpec icebergPartSpec) throws AnalysisException {
+    if (!icebergPartSpec.hasPartitionFields()) return;
+    for (IcebergPartitionField partField : icebergPartSpec.getIcebergPartitionFields()) {
+      for (int i = 0; i < selectListExprs.size(); ++i) {
+        IcebergColumn targetColumn = (IcebergColumn)selectExprTargetColumns.get(i);
+        if (targetColumn.getFieldId() != partField.getSourceId()) continue;
+        // widestTypeExpr is widest type expression for column i
+        Expr widestTypeExpr =
+            (widestTypeExprList != null) ? widestTypeExprList.get(i) : null;
+        Expr compatibleExpr = checkTypeCompatibility(targetTableName_.toString(),
+            targetColumn, selectListExprs.get(i),
+            analyzer.getQueryOptions().isDecimal_v2(),
+            widestTypeExpr);
+        partitionKeyExprs_.add(compatibleExpr);
+        partitionColPos_.add(targetColumn.getPosition());
+        break;
+      }
     }
   }
 

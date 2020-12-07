@@ -20,9 +20,12 @@ package org.apache.impala.util;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Types;
 import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergStructField;
 import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.ScalarType;
@@ -101,6 +104,43 @@ public class IcebergSchemaConverter {
         throw new TableLoadingException(String.format(
             "Iceberg type '%s' is not supported in Impala", t.typeId()));
     }
+  }
+
+  /**
+   * Converts Iceberg schema to a Hive schema.
+   */
+  public static List<FieldSchema> convertToHiveSchema(Schema schema)
+      throws TableLoadingException {
+    List<FieldSchema> ret = new ArrayList<>();
+    for (Types.NestedField column : schema.columns()) {
+      Type colType = toImpalaType(column.type());
+      // Update sd cols by iceberg NestedField
+      ret.add(new FieldSchema(column.name(), colType.toSql().toLowerCase(),
+          column.doc()));
+    }
+    return ret;
+  }
+
+  /**
+   * Converts Iceberg schema to an Impala schema.
+   */
+  public static List<Column> convertToImpalaSchema(Schema schema)
+      throws TableLoadingException {
+    List<Column> ret = new ArrayList<>();
+    int pos = 0;
+    for (Types.NestedField column : schema.columns()) {
+      Type colType = toImpalaType(column.type());
+      int keyId = -1, valueId = -1;
+      if (colType.isMapType()) {
+        // Get real map key and value field id if this column is Map type.
+        Types.MapType mapType = (Types.MapType) column.type();
+        keyId = mapType.keyId();
+        valueId = mapType.valueId();
+      }
+      ret.add(new IcebergColumn(column.name(), colType, column.doc(), pos++,
+          column.fieldId(), keyId, valueId));
+    }
+    return ret;
   }
 
   /**

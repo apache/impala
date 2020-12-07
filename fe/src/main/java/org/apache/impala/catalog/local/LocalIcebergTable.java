@@ -18,29 +18,36 @@
 package org.apache.impala.catalog.local;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.catalog.CatalogObject;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
 
 import com.google.common.base.Preconditions;
@@ -69,9 +76,15 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
           IcebergUtil.getIcebergTableMetadata(params.icebergCatalog_,
               IcebergUtil.getIcebergTableIdentifier(msTable),
               params.icebergCatalogLocation_);
+      List<Column> iceColumns =
+          IcebergSchemaConverter.convertToImpalaSchema(metadata.schema());
+      validateColumns(iceColumns, msTable.getSd().getCols());
+      ColumnMap colMap = new ColumnMap(iceColumns,
+          /*numClusteringCols=*/ 0,
+          db.getName() + "." + msTable.getTableName(),
+          /*isFullAcidSchema=*/false);
 
-      return new LocalIcebergTable(db, msTable, ref,
-          ColumnMap.fromMsTable(msTable, metadata), metadata);
+      return new LocalIcebergTable(db, msTable, ref, colMap, metadata);
     } catch (Exception e) {
       String fullTableName = msTable.getDbName() + "." + msTable.getTableName();
       throw new TableLoadingException(
@@ -99,6 +112,14 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
           (Exception)e);
     }
     icebergFileFormat_ = Utils.getIcebergFileFormat(msTable);
+  }
+
+  static void validateColumns(List<Column> impalaCols, List<FieldSchema> hmsCols) {
+    Preconditions.checkState(impalaCols.size() == hmsCols.size());
+    for (int i = 0; i < impalaCols.size(); ++i) {
+      Preconditions.checkState(
+          impalaCols.get(i).getName().equalsIgnoreCase(hmsCols.get(i).getName()));
+    }
   }
 
   @Override

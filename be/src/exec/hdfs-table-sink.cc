@@ -126,8 +126,10 @@ Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracke
   // Sanity check.
   DCHECK_LE(partition_key_expr_evals_.size(), table_desc_->num_cols())
       << DebugString();
-  DCHECK_EQ(partition_key_expr_evals_.size(), table_desc_->num_clustering_cols())
-      << DebugString();
+  if (!IsIceberg()) {
+    DCHECK_EQ(partition_key_expr_evals_.size(), table_desc_->num_clustering_cols())
+        << DebugString();
+  }
   DCHECK_GE(output_expr_evals_.size(),
       table_desc_->num_cols() - table_desc_->num_clustering_cols()) << DebugString();
 
@@ -142,14 +144,7 @@ Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracke
   return Status::OK();
 }
 
-Status HdfsTableSink::Open(RuntimeState* state) {
-  RETURN_IF_ERROR(DataSink::Open(state));
-  DCHECK_EQ(partition_key_exprs_.size(), partition_key_expr_evals_.size());
-  RETURN_IF_ERROR(ScalarExprEvaluator::Open(partition_key_expr_evals_, state));
-
-  // Build a map from partition key values to partition descriptor for multiple output
-  // format support. The map is keyed on the concatenation of the non-constant keys of
-  // the PARTITION clause of the INSERT statement.
+void HdfsTableSink::BuildPartitionDescMap() {
   for (const HdfsTableDescriptor::PartitionIdToDescriptorMap::value_type& id_to_desc:
        table_desc_->partition_descriptors()) {
     // Build a map whose key is computed from the value of dynamic partition keys for a
@@ -207,6 +202,13 @@ Status HdfsTableSink::Open(RuntimeState* state) {
       partition_descriptor_map_[key] = partition;
     }
   }
+}
+
+Status HdfsTableSink::Open(RuntimeState* state) {
+  RETURN_IF_ERROR(DataSink::Open(state));
+  DCHECK_EQ(partition_key_exprs_.size(), partition_key_expr_evals_.size());
+  RETURN_IF_ERROR(ScalarExprEvaluator::Open(partition_key_expr_evals_, state));
+  if (!IsIceberg()) BuildPartitionDescMap();
   prototype_partition_ = CHECK_NOTNULL(table_desc_->prototype_partition_descriptor());
   return Status::OK();
 }
@@ -257,7 +259,8 @@ void HdfsTableSink::BuildHdfsFileNames(
   if (IsIceberg()) {
     //TODO: implement LocationProviders.
     output_partition->final_hdfs_file_name_prefix =
-        table_desc_->IcebergTableLocation() + "/data/";
+        Substitute("$0/data/$1/", table_desc_->IcebergTableLocation(),
+            output_partition->partition_name);
   }
   output_partition->final_hdfs_file_name_prefix += query_suffix;
 
@@ -443,6 +446,16 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   return status;
 }
 
+string HdfsTableSink::GetPartitionName(int i) {
+  if (IsIceberg()) {
+    DCHECK_LT(i, partition_key_expr_evals_.size());
+    return table_desc_->IcebergPartitionNames()[i];
+  } else {
+    DCHECK_LT(i, table_desc_->num_clustering_cols());
+    return table_desc_->col_descs()[i].name();
+  }
+}
+
 Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
     const HdfsPartitionDescriptor& partition_descriptor, const TupleRow* row,
     OutputPartition* output_partition, bool empty_partition) {
@@ -450,7 +463,7 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
   // etc.
   stringstream partition_name_ss;
   for (int j = 0; j < partition_key_expr_evals_.size(); ++j) {
-    partition_name_ss << table_desc_->col_descs()[j].name() << "=";
+    partition_name_ss << GetPartitionName(j) << "=";
     void* value = partition_key_expr_evals_[j]->GetValue(row);
     // nullptr partition keys get a special value to be compatible with Hive.
     if (value == nullptr) {
@@ -557,6 +570,15 @@ void HdfsTableSink::GetHashTblKey(const TupleRow* row,
   *key = hash_table_key.str();
 }
 
+inline const HdfsPartitionDescriptor* HdfsTableSink::GetPartitionDescriptor(
+    const string& key) {
+  if (IsIceberg()) return table_desc_->partition_descriptors().begin()->second;
+  const HdfsPartitionDescriptor* ret = prototype_partition_;
+  PartitionDescriptorMap::const_iterator it = partition_descriptor_map_.find(key);
+  if (it != partition_descriptor_map_.end()) ret = it->second;
+  return ret;
+}
+
 inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state, const TupleRow* row,
     const string& key, PartitionPair** partition_pair, bool no_more_rows) {
   DCHECK(row != nullptr || key == ROOT_PARTITION_KEY);
@@ -564,12 +586,7 @@ inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state, const Tuple
   existing_partition = partition_keys_to_output_partitions_.find(key);
   if (existing_partition == partition_keys_to_output_partitions_.end()) {
     // Create a new OutputPartition, and add it to partition_keys_to_output_partitions.
-    const HdfsPartitionDescriptor* partition_descriptor = prototype_partition_;
-    PartitionDescriptorMap::const_iterator it = partition_descriptor_map_.find(key);
-    if (it != partition_descriptor_map_.end()) {
-      partition_descriptor = it->second;
-    }
-
+    const HdfsPartitionDescriptor* partition_descriptor = GetPartitionDescriptor(key);
     std::unique_ptr<OutputPartition> partition(new OutputPartition());
     Status status =
         InitOutputPartition(state, *partition_descriptor, row, partition.get(),

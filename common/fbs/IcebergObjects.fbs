@@ -23,9 +23,10 @@ enum FbFileFormat: byte {
 }
 
 table FbIcebergDataFile {
-  path: string (id: 0);
-  format: FbFileFormat = PARQUET (id: 1);
-  record_count: long = 0 (id: 2);
-  file_size_in_bytes: long = 0 (id: 3);
+  path: string;
+  format: FbFileFormat = PARQUET;
+  record_count: long = 0;
+  file_size_in_bytes: long = 0;
+  partition_path: string;
 }
 

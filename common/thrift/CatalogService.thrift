@@ -194,6 +194,15 @@ struct TDdlExecResponse {
   6: optional string table_location
 }
 
+// Parameters for the Iceberg operation.
+struct TIcebergOperationParam {
+  // Iceberg partition spec used by this operation
+  1: optional i32 spec_id;
+
+  // Iceberg data files to append to the table, encoded in FlatBuffers.
+  2: required list<binary> iceberg_data_files_fb;
+}
+
 // Updates the metastore with new partition information and returns a response
 // with details on the result of the operation. Used to add partitions after executing
 // DML operations, and could potentially be used in the future to update column stats
@@ -227,8 +236,8 @@ struct TUpdateCatalogRequest {
   // ACID write ID for transactional inserts.
   9: optional i64 write_id
 
-  // Iceberg data files to append to the table, encoded in FlatBuffers.
-  10: required list<binary> iceberg_data_files_fb
+  // Descriptor object about the Iceberg operation.
+  10: optional TIcebergOperationParam iceberg_operation
 }
 
 // Response from a TUpdateCatalogRequest

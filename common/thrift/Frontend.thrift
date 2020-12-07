@@ -382,6 +382,9 @@ struct TFinalizeParams {
 
   // Stores the ACID write id of the target table for transactional INSERTs.
   8: optional i64 write_id;
+
+  // Stores the Iceberg spec id of the partition spec used for this INSERT.
+  9: optional i32 spec_id;
 }
 
 // Request for a LOAD DATA statement. LOAD DATA is only supported for HDFS backed tables.

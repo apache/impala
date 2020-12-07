@@ -765,6 +765,7 @@ Status Coordinator::FinalizeHdfsDml() {
   DCHECK(has_called_wait_.Load());
   DCHECK(finalize_params() != nullptr);
   bool is_hive_acid = finalize_params()->__isset.write_id;
+  bool is_iceberg_table = finalize_params()->__isset.spec_id;
 
   VLOG_QUERY << "Finalizing query: " << PrintId(query_id());
   SCOPED_TIMER(finalization_timer_);
@@ -778,7 +779,7 @@ Status Coordinator::FinalizeHdfsDml() {
     DCHECK(hdfs_table != nullptr)
         << "INSERT target table not known in descriptor table: "
         << finalize_params()->table_id;
-    if (hdfs_table->IsIcebergTable()) {
+    if (is_iceberg_table) {
       // No-op. The data files are written by the table sink operators to their final
       // places. We append them to the table in UpdateCatalog().
     }
@@ -795,7 +796,7 @@ Status Coordinator::FinalizeHdfsDml() {
     parent_request_state_->AbortTransaction();
   }
   // Cleanup after DML operation.
-  if (is_hive_acid || (hdfs_table && hdfs_table->IsIcebergTable())) {
+  if (is_hive_acid || is_iceberg_table) {
     DCHECK(!finalize_params()->__isset.staging_dir);
   } else {
     RETURN_IF_ERROR(DeleteQueryLevelStagingDir());

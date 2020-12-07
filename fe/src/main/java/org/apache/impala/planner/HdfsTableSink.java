@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.common.Pair;
@@ -229,8 +230,8 @@ public class HdfsTableSink extends TableSink {
 
   @Override
   public void collectExprs(List<Expr> exprs) {
-    exprs.addAll(partitionKeyExprs_);
     // Avoid adding any partition exprs redundantly.
+    if (!(targetTable_ instanceof FeIcebergTable)) exprs.addAll(partitionKeyExprs_);
     exprs.addAll(outputExprs_.subList(0, targetTable_.getNonClusteringColumns().size()));
   }
 

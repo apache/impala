@@ -161,9 +161,42 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 'Table has been created.'
 ====
 ---- QUERY
-INSERT INTO iceberg_partitioned_insert SELECT * FROM iceberg_partitioned_insert;
+INSERT INTO iceberg_partitioned_insert PARTITION(level='level') VALUES(now());
 ---- CATCH
-AnalysisException: Impala cannot write partitioned Iceberg tables.
+AnalysisException: PARTITION clause cannot be used for Iceberg tables.
+====
+---- QUERY
+CREATE TABLE iceberg_partitioned_transform(
+  level STRING,
+  event_time TIMESTAMP,
+  i int
+)
+PARTITION BY SPEC
+(
+  level IDENTITY,
+  event_time HOUR
+)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+INSERT INTO iceberg_partitioned_transform VALUES('level', now(), 42);
+---- CATCH
+AnalysisException: Impala can only insert data into Iceberg tables that only use identity partition transforms.
+====
+---- QUERY
+CREATE TABLE all_colss_needed_for_insert (i int, j int, k int)
+partition by spec (j identity, k identity)
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into all_colss_needed_for_insert values (1);
+---- CATCH
+has more columns (3) than the SELECT / VALUES clause returns
 ====
 ---- QUERY
 ALTER TABLE iceberg_table_hadoop_tables RENAME TO iceberg_table_hadoop_tables_new;

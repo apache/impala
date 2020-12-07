@@ -124,6 +124,11 @@ class HdfsTableSink : public DataSink {
   std::string DebugString() const;
 
  private:
+  /// Build a map from partition key values to partition descriptor for multiple output
+  /// format support. The map is keyed on the concatenation of the non-constant keys of
+  /// the PARTITION clause of the INSERT statement.
+  void BuildPartitionDescMap();
+
   /// Initialises the filenames of a given output partition, and opens the temporary file.
   /// The partition key is derived from 'row'. If the partition will not have any rows
   /// added to it, empty_partition must be true.
@@ -155,6 +160,9 @@ class HdfsTableSink : public DataSink {
   /// file name.
   void GetHashTblKey(const TupleRow* row,
       const std::vector<ScalarExprEvaluator*>& evals, std::string* key);
+
+  /// Returns partition descriptor object for the given key.
+  const HdfsPartitionDescriptor* GetPartitionDescriptor(const std::string& key);
 
   /// Given a hashed partition key, get the output partition structure from
   /// the 'partition_keys_to_output_partitions_'. 'no_more_rows' indicates that no more
@@ -188,6 +196,9 @@ class HdfsTableSink : public DataSink {
   /// Closes the hdfs file for this partition as well as the writer.
   Status ClosePartitionFile(RuntimeState* state, OutputPartition* partition)
       WARN_UNUSED_RESULT;
+
+  /// Returns the ith partition name of the table.
+  std::string GetPartitionName(int i);
 
   // Returns TRUE if the staging step should be skipped for this partition. This allows
   // for faster INSERT query completion time for the S3A filesystem as the coordinator
