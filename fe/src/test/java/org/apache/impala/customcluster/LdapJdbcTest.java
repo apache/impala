@@ -70,7 +70,9 @@ public class LdapJdbcTest extends JdbcTestBase {
         String.format("ldap://localhost:%s", serverRule.getLdapServer().getPort());
     String dn = "cn=#UID,ou=Users,dc=myorg,dc=com";
     String impalaArgs = String.format("--enable_ldap_auth --ldap_uri='%s' "
-        + "--ldap_bind_pattern='%s' --ldap_passwords_in_clear_ok %s", uri, dn, extraArgs);
+            + "--ldap_bind_pattern='%s' --ldap_passwords_in_clear_ok "
+            + "--cookie_require_secure=false %s",
+        uri, dn, extraArgs);
     int ret = CustomClusterRunner.StartImpalaCluster(impalaArgs);
     assertEquals(ret, 0);
 

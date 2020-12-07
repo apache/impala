@@ -61,7 +61,8 @@ public class LdapWebserverTest {
     String dn = "cn=#UID,ou=Users,dc=myorg,dc=com";
     String impalaArgs = String.format("--enable_ldap_auth --ldap_uri='%s' "
             + "--ldap_bind_pattern='%s' --ldap_passwords_in_clear_ok "
-            + "--webserver_require_ldap=true %s",
+            + "--webserver_require_ldap=true --webserver_ldap_passwords_in_clear_ok "
+            + "--cookie_require_secure=false %s",
         uri, dn, extraArgs);
     Map<String, String> env = new HashMap<>();
     env.put("IMPALA_WEBSERVER_USERNAME", TEST_USER_1);
