@@ -44,6 +44,7 @@ import org.apache.impala.fb.FbIcebergDataFile;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TIcebergCatalog;
+import org.apache.impala.thrift.TIcebergOperationParam;
 import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.log4j.Logger;
@@ -166,17 +167,21 @@ public class IcebergCatalogOpExecutor {
    * API.
    */
   public static void appendFiles(FeIcebergTable feIcebergTable,
-      List<ByteBuffer> dataFilesFb) throws ImpalaRuntimeException, TableLoadingException {
+      TIcebergOperationParam icebergOp) throws ImpalaRuntimeException,
+      TableLoadingException {
     org.apache.iceberg.Table nativeIcebergTable =
         IcebergUtil.loadTable(feIcebergTable);
+    List<ByteBuffer> dataFilesFb = icebergOp.getIceberg_data_files_fb();
     AppendFiles append = nativeIcebergTable.newAppend();
     for (ByteBuffer buf : dataFilesFb) {
       FbIcebergDataFile dataFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
-      DataFiles.Builder builder = DataFiles.builder(nativeIcebergTable.spec())
+      DataFiles.Builder builder =
+          DataFiles.builder(nativeIcebergTable.specs().get(icebergOp.getSpec_id()))
           .withPath(dataFile.path())
           .withFormat(IcebergUtil.fbFileFormatToIcebergFileFormat(dataFile.format()))
           .withRecordCount(dataFile.recordCount())
-          .withFileSizeInBytes(dataFile.fileSizeInBytes());
+          .withFileSizeInBytes(dataFile.fileSizeInBytes())
+          .withPartitionPath(dataFile.partitionPath());
       append.appendFile(builder.build());
     }
     append.commit();

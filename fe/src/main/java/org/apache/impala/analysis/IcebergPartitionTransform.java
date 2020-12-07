@@ -45,6 +45,10 @@ public class IcebergPartitionTransform extends StmtNode {
       transformParam_ = transformParam;
     }
 
+    public TIcebergPartitionTransformType getTransformType() {
+      return transformType_;
+    }
+
     @Override
     public void analyze(Analyzer analyzer) throws AnalysisException {
       if (transformType_ == TIcebergPartitionTransformType.BUCKET ||

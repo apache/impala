@@ -61,6 +61,11 @@ public class IcebergPartitionSpec extends StmtNode {
     return icebergPartitionFields_ != null && (!icebergPartitionFields_.isEmpty());
   }
 
+  public int getIcebergPartitionFieldsSize() {
+    if (!hasPartitionFields()) return 0;
+    return getIcebergPartitionFields().size();
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (!hasPartitionFields()) return;

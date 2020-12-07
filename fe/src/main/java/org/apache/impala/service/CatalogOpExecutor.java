@@ -4777,9 +4777,9 @@ public class CatalogOpExecutor {
         }
       }
 
-      if (table instanceof FeIcebergTable && update.isSetIceberg_data_files_fb()) {
+      if (table instanceof FeIcebergTable && update.isSetIceberg_operation()) {
         IcebergCatalogOpExecutor.appendFiles((FeIcebergTable)table,
-            update.getIceberg_data_files_fb());
+            update.getIceberg_operation());
       }
 
       // the load operation below changes the partitions in-place (this was later

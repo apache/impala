@@ -467,7 +467,8 @@ void DmlExecState::AddIcebergDataFile(const OutputPartition& partition) {
       fbb.CreateString(partition.current_file_name),
       FbFileFormat::FbFileFormat_PARQUET,
       partition.num_rows,
-      partition.bytes_written);
+      partition.bytes_written,
+      fbb.CreateString(partition.partition_name));
   fbb.Finish(data_file);
   string data_file_str(reinterpret_cast<char*>(fbb.GetBufferPointer()), fbb.GetSize());
   entry->second.add_iceberg_data_files_fb(std::move(data_file_str));

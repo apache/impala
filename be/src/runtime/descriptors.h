@@ -336,11 +336,13 @@ class HdfsTableDescriptor : public TableDescriptor {
   }
 
   bool IsTableFullAcid() const { return is_full_acid_; }
-  bool IsIcebergTable() const { return is_iceberg_; }
-
   const TValidWriteIdList& ValidWriteIdList() const { return valid_write_id_list_; }
 
-  const std::string& IcebergTableLocation() const { return iceberg_table_location; }
+  bool IsIcebergTable() const { return is_iceberg_; }
+  const std::string& IcebergTableLocation() const { return iceberg_table_location_; }
+  const std::vector<std::string>& IcebergPartitionNames() const {
+    return iceberg_partition_names_;
+  }
 
   virtual std::string DebugString() const;
 
@@ -356,7 +358,8 @@ class HdfsTableDescriptor : public TableDescriptor {
   bool is_full_acid_;
   TValidWriteIdList valid_write_id_list_;
   bool is_iceberg_ = false;
-  std::string iceberg_table_location;
+  std::string iceberg_table_location_;
+  std::vector<std::string> iceberg_partition_names_;
 };
 
 class HBaseTableDescriptor : public TableDescriptor {
