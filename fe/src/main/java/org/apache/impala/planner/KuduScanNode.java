@@ -19,9 +19,11 @@ package org.apache.impala.planner;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.analysis.Analyzer;
@@ -54,6 +56,7 @@ import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TScanRangeSpec;
 import org.apache.impala.util.KuduUtil;
+import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.kudu.ColumnSchema;
 import org.apache.kudu.Schema;
 import org.apache.kudu.client.KuduClient;
@@ -277,16 +280,81 @@ public class KuduScanNode extends ScanNode {
     return computeCombinedSelectivity(allConjuncts);
   }
 
+  /**
+   * Estimate the number of impalad nodes that this scan node will execute on (which is
+   * ultimately determined by the scheduling done by the backend's Scheduler).
+   * Assume that scan ranges that can be scheduled locally will be, and that scan
+   * ranges that cannot will be round-robined across the cluster.
+   */
+  protected void computeNumNodes(Analyzer analyzer) {
+    ExecutorMembershipSnapshot cluster = ExecutorMembershipSnapshot.getCluster();
+    final int maxInstancesPerNode = getMaxInstancesPerNode(analyzer);
+    final int maxPossibleInstances = cluster.numExecutors() * maxInstancesPerNode;
+    int totalNodes = 0;
+    int totalInstances = 0;
+    int numLocalRanges = 0;
+    int numRemoteRanges = 0;
+    // Counts the number of local ranges, capped at maxInstancesPerNode.
+    Map<TNetworkAddress, Integer> localRangeCounts = new HashMap<>();
+    // Sum of the counter values in localRangeCounts.
+    int totalLocalParallelism = 0;
+    if (scanRangeSpecs_.isSetConcrete_ranges()) {
+      for (TScanRangeLocationList range : scanRangeSpecs_.concrete_ranges) {
+        boolean anyLocal = false;
+        if (range.isSetLocations()) {
+          for (TScanRangeLocation loc : range.locations) {
+            TNetworkAddress address =
+                analyzer.getHostIndex().getEntry(loc.getHost_idx());
+            if (cluster.contains(address)) {
+              anyLocal = true;
+              // Use the full tserver address (including port) to account for the test
+              // minicluster where there are multiple tservers and impalads on a single
+              // host.  This assumes that when an impalad is colocated with a tserver,
+              // there are the same number of impalads as tservers on this host in this
+              // cluster.
+              int count = localRangeCounts.getOrDefault(address, 0);
+              if (count < maxInstancesPerNode) {
+                ++totalLocalParallelism;
+                localRangeCounts.put(address, count + 1);
+              }
+            }
+          }
+        }
+        // This range has at least one replica with a colocated impalad, so assume it
+        // will be scheduled on one of those nodes.
+        if (anyLocal) {
+          ++numLocalRanges;
+        } else {
+          ++numRemoteRanges;
+        }
+        // Approximate the number of nodes that will execute locally assigned ranges to
+        // be the smaller of the number of locally assigned ranges and the number of
+        // hosts that hold replica for those ranges.
+        int numLocalNodes = Math.min(numLocalRanges, localRangeCounts.size());
+        // The remote ranges are round-robined across all the impalads.
+        int numRemoteNodes = Math.min(numRemoteRanges, cluster.numExecutors());
+        // The local and remote assignments may overlap, but we don't know by how much
+        // so conservatively assume no overlap.
+        totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numExecutors());
+
+        int numLocalInstances = Math.min(numLocalRanges, totalLocalParallelism);
+        totalInstances = Math.min(numLocalInstances + numRemoteRanges,
+            totalNodes * maxInstancesPerNode);
+
+        // Exit early if we have maxed out our estimate of hosts/instances, to avoid
+        // extraneous work in case the number of scan ranges dominates the number of
+        // nodes.
+        if (totalInstances == maxPossibleInstances) break;
+      }
+    }
+    numNodes_ = Math.max(totalNodes, 1);
+    numInstances_ = Math.max(totalInstances, 1);
+  }
+
   @Override
   protected void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    // Update the number of nodes to reflect the hosts that have relevant data.
-    numNodes_ = Math.max(1, hostIndexSet_.size());
-    // Estimate the total number of instances, based on two upper bounds:
-    // * The number of scan ranges to process.
-    // * The maximum parallelism allowed across all the hosts.
-    numInstances_ = Math.min(scanRangeSpecs_.getConcrete_rangesSize(),
-        numNodes_ * getMaxInstancesPerNode(analyzer));
+    computeNumNodes(analyzer);
 
     // Update the cardinality
     inputCardinality_ = cardinality_ = kuduTable_.getNumRows();

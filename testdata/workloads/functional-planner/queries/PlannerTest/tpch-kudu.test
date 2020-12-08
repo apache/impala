@@ -87,9 +87,9 @@ limit 100
 EXPLAIN_LEVEL=2
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=26.31MB Threads=10
-Per-Host Resource Estimates: Memory=57MB
+Per-Host Resource Estimates: Memory=59MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=57.00MB mem-reservation=26.31MB thread-reservation=10 runtime-filters-memory=8.00MB
+|  Per-Host Resources: mem-estimate=58.88MB mem-reservation=26.31MB thread-reservation=10 runtime-filters-memory=8.00MB
 PLAN-ROOT SINK
 |  output exprs: round(s_acctbal, CAST(2 AS TINYINT)), s_name, n_name, p_partkey, p_mfgr, s_address, s_phone, s_comment
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
@@ -117,7 +117,7 @@ PLAN-ROOT SINK
 |  |
 |  |--04:SCAN KUDU [tpch_kudu.region]
 |  |     kudu predicates: r_name = 'EUROPE'
-|  |     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+|  |     mem-estimate=1.50MB mem-reservation=0B thread-reservation=1
 |  |     tuple-ids=4 row-size=2B cardinality=1
 |  |     in pipelines: 04(GETNEXT)
 |  |
@@ -131,7 +131,7 @@ PLAN-ROOT SINK
 |  |
 |  |--03:SCAN KUDU [tpch_kudu.nation]
 |  |     runtime filters: RF010[bloom] -> n_regionkey, RF011[min_max] -> n_regionkey
-|  |     mem-estimate=1.12MB mem-reservation=0B thread-reservation=1
+|  |     mem-estimate=2.25MB mem-reservation=0B thread-reservation=1
 |  |     tuple-ids=3 row-size=27B cardinality=25
 |  |     in pipelines: 03(GETNEXT)
 |  |
@@ -187,7 +187,7 @@ PLAN-ROOT SINK
 |
 |--08:SCAN KUDU [tpch_kudu.region]
 |     kudu predicates: r_name = 'EUROPE'
-|     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+|     mem-estimate=1.50MB mem-reservation=0B thread-reservation=1
 |     tuple-ids=8 row-size=2B cardinality=1
 |     in pipelines: 08(GETNEXT)
 |
@@ -201,7 +201,7 @@ PLAN-ROOT SINK
 |
 |--07:SCAN KUDU [tpch_kudu.nation]
 |     runtime filters: RF004[bloom] -> n_regionkey, RF005[min_max] -> n_regionkey
-|     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
+|     mem-estimate=1.50MB mem-reservation=0B thread-reservation=1
 |     tuple-ids=7 row-size=4B cardinality=25
 |     in pipelines: 07(GETNEXT)
 |
@@ -364,7 +364,7 @@ order by
   revenue desc
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=21.38MB Threads=7
-Per-Host Resource Estimates: Memory=38MB
+Per-Host Resource Estimates: Memory=40MB
 PLAN-ROOT SINK
 |
 12:SORT
@@ -490,7 +490,7 @@ order by
   l_year
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=49.62MB Threads=7
-Per-Host Resource Estimates: Memory=66MB
+Per-Host Resource Estimates: Memory=67MB
 PLAN-ROOT SINK
 |
 12:SORT
@@ -593,7 +593,7 @@ order by
   o_year
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=19.56MB Threads=9
-Per-Host Resource Estimates: Memory=40MB
+Per-Host Resource Estimates: Memory=42MB
 PLAN-ROOT SINK
 |
 16:SORT
@@ -1577,7 +1577,7 @@ order by
 limit 100
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=14.56MB Threads=7
-Per-Host Resource Estimates: Memory=75MB
+Per-Host Resource Estimates: Memory=76MB
 PLAN-ROOT SINK
 |
 12:TOP-N [LIMIT=100]
