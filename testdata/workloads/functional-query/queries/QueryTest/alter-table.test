@@ -382,18 +382,18 @@ location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/part_data/'
 ---- QUERY
 insert overwrite table t_part partition(j=1, s='2012') select 2 from functional.alltypes limit 2
 ---- RESULTS
-j=1/s=2012/: 2
+j=1/s=2012: 2
 ====
 ---- QUERY
 insert overwrite table t_part partition(j=1, s='2013') select 3 from functional.alltypes limit 3
 ---- RESULTS
-j=1/s=2013/: 3
+j=1/s=2013: 3
 ====
 ---- QUERY
 insert overwrite table t_part partition(j=1, s='2012/withslash')
 select 1 from functional.alltypes limit 1
 ---- RESULTS
-j=1/s=2012%2Fwithslash/: 1
+j=1/s=2012%2Fwithslash: 1
 ====
 ---- QUERY
 # Refresh the table to ensure all partitions have up-to-date list of file and block
@@ -446,7 +446,7 @@ string
 insert overwrite table t_part partition(j=NULL, s=NULL)
 select 4 from functional.alltypes limit 5
 ---- RESULTS
-j=__HIVE_DEFAULT_PARTITION__/s=__HIVE_DEFAULT_PARTITION__/: 5
+j=__HIVE_DEFAULT_PARTITION__/s=__HIVE_DEFAULT_PARTITION__: 5
 ====
 ---- QUERY
 select i, j, s from t_part
@@ -469,7 +469,7 @@ int,int,string
 insert overwrite table t_part partition(j=NULL, s='2013')
 select 5 from functional.alltypes limit 5
 ---- RESULTS
-j=__HIVE_DEFAULT_PARTITION__/s=2013/: 5
+j=__HIVE_DEFAULT_PARTITION__/s=2013: 5
 ====
 ---- QUERY
 select i, j, s from t_part
@@ -573,7 +573,7 @@ int,int,string
 insert into table t_part partition(j=2, s='')
 select 1 from functional.alltypes limit 1
 ---- RESULTS
-j=2/s=__HIVE_DEFAULT_PARTITION__/: 1
+j=2/s=__HIVE_DEFAULT_PARTITION__: 1
 ====
 ---- QUERY
 # Test that empty string as partition column maps onto NULL
@@ -581,7 +581,7 @@ j=2/s=__HIVE_DEFAULT_PARTITION__/: 1
 insert into table t_part partition(j=2, s)
 select 10, '' from functional.alltypes limit 1
 ---- RESULTS
-j=2/s=__HIVE_DEFAULT_PARTITION__/: 1
+j=2/s=__HIVE_DEFAULT_PARTITION__: 1
 ====
 ---- QUERY
 # Validate the previous inserts

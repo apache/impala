@@ -236,12 +236,12 @@ void HdfsTableSink::BuildHdfsFileNames(
 
   output_partition->tmp_hdfs_dir_name =
       Substitute("$0/.$1_$2_dir/", staging_dir_, unique_id_str_, rand());
-  output_partition->tmp_hdfs_file_name_prefix = Substitute("$0$1$2",
+  output_partition->tmp_hdfs_file_name_prefix = Substitute("$0$1/$2",
       output_partition->tmp_hdfs_dir_name, output_partition->partition_name,
       query_suffix);
 
   if (partition_descriptor.location().empty()) {
-    output_partition->final_hdfs_file_name_prefix = Substitute("$0/$1",
+    output_partition->final_hdfs_file_name_prefix = Substitute("$0/$1/",
         table_desc_->hdfs_base_dir(), output_partition->partition_name);
   } else {
     // If the partition descriptor has a location (as set by alter table add partition
@@ -472,7 +472,7 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
       partition_name_ss << (encoded_str.empty() ?
                         table_desc_->null_partition_key_value() : encoded_str);
     }
-    partition_name_ss << "/";
+    if (j < partition_key_expr_evals_.size() - 1) partition_name_ss << "/";
   }
 
   // partition_name_ss now holds the unique descriptor for this partition,

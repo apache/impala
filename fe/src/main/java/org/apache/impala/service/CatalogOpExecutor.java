@@ -4626,10 +4626,7 @@ public class CatalogOpExecutor {
             Sets.newHashSet(update.getCreated_partitions());
         partsToLoadMetadata = Sets.newHashSet(partsToCreate);
         for (FeFsPartition partition: parts) {
-          // TODO: In the BE we build partition names without a trailing char. In FE
-          // we build partition name with a trailing char. We should make this
-          // consistent.
-          String partName = partition.getPartitionName() + "/";
+          String partName = partition.getPartitionName();
           // Attempt to remove this partition name from partsToCreate. If remove
           // returns true, it indicates the partition already exists.
           if (partsToCreate.remove(partName)) {
@@ -4674,8 +4671,7 @@ public class CatalogOpExecutor {
               partition.setParameters(new HashMap<String, String>());
               partition.setSd(msTbl.getSd().deepCopy());
               partition.getSd().setSerdeInfo(msTbl.getSd().getSerdeInfo().deepCopy());
-              partition.getSd().setLocation(msTbl.getSd().getLocation() + "/" +
-                  partName.substring(0, partName.length() - 1));
+              partition.getSd().setLocation(msTbl.getSd().getLocation() + "/" + partName);
               addCatalogServiceIdentifiers(msTbl, partition);
               MetastoreShim.updatePartitionStatsFast(partition, msTbl, warehouse);
             }
@@ -4867,7 +4863,7 @@ public class CatalogOpExecutor {
       // newFiles keeps track of newly added files by this insert operation.
       Set<String> newFiles;
       List<String> partVals = null;
-      String partitionName = hdfsPartition.getPartitionName() + "/";
+      String partitionName = hdfsPartition.getPartitionName();
       Set<String> filesPostInsert =
           partitionFilesMapPostInsert.get(partitionName);
       Set<String> filesBeforeInsert =
@@ -4982,7 +4978,7 @@ public class CatalogOpExecutor {
       extends FeFsPartition> partitions) {
     Map<String, Set<String>> partitionFilePaths = new HashMap<>();
     for (FeFsPartition partition : partitions) {
-      String key = partition.getPartitionName() + "/";
+      String key = partition.getPartitionName();
       Set<String> filenames = ((HdfsPartition) partition).getFileNames();
       partitionFilePaths.putIfAbsent(key, new HashSet<>(filenames.size()));
       partitionFilePaths.get(key).addAll(filenames);

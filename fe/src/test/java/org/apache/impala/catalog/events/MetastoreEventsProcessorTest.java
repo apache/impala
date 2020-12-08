@@ -845,8 +845,8 @@ public class MetastoreEventsProcessorTest {
     insertFromImpala(tableToInsertPart, true, "year=2009", "month=2", overwrite);
     // insert into multiple partition
     Set<String> created_partitions = new HashSet<String>();
-    String partition1 = "year=2009/month=1/";
-    String partition2 = "year=2009/month=2/";
+    String partition1 = "year=2009/month=1";
+    String partition2 = "year=2009/month=2";
     created_partitions.add(partition1);
     created_partitions.add(partition2);
     insertMulPartFromImpala(tableToInsertMulPart, tableToInsertPart, created_partitions,
@@ -2970,7 +2970,7 @@ public class MetastoreEventsProcessorTest {
         tblName, isPartitioned ? partition : "");
     Set<String> created_partitions = new HashSet<>();
     String created_part_str =
-        isPartitioned ? String.format("%s/%s/", p1val, p2val) : "";
+        isPartitioned ? String.format("%s/%s", p1val, p2val) : "";
     created_partitions.add(created_part_str);
     TUpdateCatalogRequest testInsertRequest = createTestTUpdateCatalogRequest(
         TEST_DB_NAME, tblName, test_insert_tbl, created_partitions, isOverwrite);

@@ -775,9 +775,9 @@ cast(day as varchar(13))
 from functional.alltypesagg
 where day is null or day in (3, 7);
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-year=2010 /day=7/: 1000
-year=2010 /day=3/: 1000
-year=2010 /day=__HIVE_DEFAULT_PARTITION__/: 1000
+year=2010 /day=7: 1000
+year=2010 /day=3: 1000
+year=2010 /day=__HIVE_DEFAULT_PARTITION__: 1000
 ====
 ---- QUERY
 compute stats chars_tbl

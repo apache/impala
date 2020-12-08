@@ -37,16 +37,16 @@ SELECT id, tinyint_col, smallint_col, int_col, bigint_col,
 FROM functional.alltypes
 WHERE id >= 0 and id < 10;
 ---- RESULTS
-tinyint_col=8/smallint_col=8/int_col=8/bigint_col=80/float_col=0/double_col=1.1/string_col=8/: 1
-tinyint_col=9/smallint_col=9/int_col=9/bigint_col=90/float_col=0/double_col=1.1/string_col=9/: 1
-tinyint_col=2/smallint_col=2/int_col=2/bigint_col=20/float_col=0/double_col=1.1/string_col=2/: 1
-tinyint_col=3/smallint_col=3/int_col=3/bigint_col=30/float_col=0/double_col=1.1/string_col=3/: 1
-tinyint_col=5/smallint_col=5/int_col=5/bigint_col=50/float_col=0/double_col=1.1/string_col=5/: 1
-tinyint_col=6/smallint_col=6/int_col=6/bigint_col=60/float_col=0/double_col=1.1/string_col=6/: 1
-tinyint_col=4/smallint_col=4/int_col=4/bigint_col=40/float_col=0/double_col=1.1/string_col=4/: 1
-tinyint_col=7/smallint_col=7/int_col=7/bigint_col=70/float_col=0/double_col=1.1/string_col=7/: 1
-tinyint_col=0/smallint_col=0/int_col=0/bigint_col=0/float_col=0/double_col=1.1/string_col=0/: 1
-tinyint_col=1/smallint_col=1/int_col=1/bigint_col=10/float_col=0/double_col=1.1/string_col=1/: 1
+tinyint_col=8/smallint_col=8/int_col=8/bigint_col=80/float_col=0/double_col=1.1/string_col=8: 1
+tinyint_col=9/smallint_col=9/int_col=9/bigint_col=90/float_col=0/double_col=1.1/string_col=9: 1
+tinyint_col=2/smallint_col=2/int_col=2/bigint_col=20/float_col=0/double_col=1.1/string_col=2: 1
+tinyint_col=3/smallint_col=3/int_col=3/bigint_col=30/float_col=0/double_col=1.1/string_col=3: 1
+tinyint_col=5/smallint_col=5/int_col=5/bigint_col=50/float_col=0/double_col=1.1/string_col=5: 1
+tinyint_col=6/smallint_col=6/int_col=6/bigint_col=60/float_col=0/double_col=1.1/string_col=6: 1
+tinyint_col=4/smallint_col=4/int_col=4/bigint_col=40/float_col=0/double_col=1.1/string_col=4: 1
+tinyint_col=7/smallint_col=7/int_col=7/bigint_col=70/float_col=0/double_col=1.1/string_col=7: 1
+tinyint_col=0/smallint_col=0/int_col=0/bigint_col=0/float_col=0/double_col=1.1/string_col=0: 1
+tinyint_col=1/smallint_col=1/int_col=1/bigint_col=10/float_col=0/double_col=1.1/string_col=1: 1
 ====
 ---- QUERY
 # Add another partition that contains different float/double values.
@@ -55,7 +55,7 @@ PARTITION (tinyint_col=11, smallint_col=11, int_col=11, bigint_col=110,
 float_col=2, double_col=3.1, string_col='11')
 SELECT 11;
 ---- RESULTS
-tinyint_col=11/smallint_col=11/int_col=11/bigint_col=110/float_col=2/double_col=3.1/string_col=11/: 1
+tinyint_col=11/smallint_col=11/int_col=11/bigint_col=110/float_col=2/double_col=3.1/string_col=11: 1
 ====
 ---- QUERY
 SELECT * FROM all_insert_partition_col_types

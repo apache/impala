@@ -300,7 +300,7 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypes where year = 2009 and month = 1
 ---- RESULTS
-year=2009/month=1/: 310
+year=2009/month=1: 310
 ====
 ---- QUERY
 # ADD PARTITION on the default filesystem.
@@ -315,7 +315,7 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypes where year = 2009 and month = 2
 ---- RESULTS
-year=2009/month=2/: 280
+year=2009/month=2: 280
 ====
 ---- QUERY
 select * from alltypes_multipart_insert where id%100=0 order by id;
