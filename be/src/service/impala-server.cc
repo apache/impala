@@ -2821,7 +2821,7 @@ Status ImpalaServer::Start(
 
       RETURN_IF_ERROR(
           http_builder
-              .auth_provider(AuthManager::GetInstance()->GetExternalAuthProvider())
+              .auth_provider(AuthManager::GetInstance()->GetExternalHttpAuthProvider())
               .transport_type(ThriftServer::TransportType::HTTP)
               .metrics(exec_env_->metrics())
               .max_concurrent_connections(FLAGS_fe_service_threads)

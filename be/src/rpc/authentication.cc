@@ -29,7 +29,9 @@
 #include <gutil/strings/split.h>
 #include <gutil/strings/strip.h>
 #include <gutil/strings/substitute.h>
-#include <random>
+#include <algorithm>
+#include <map>
+#include <vector>
 #include <string>
 #include <vector>
 #include <thrift/Thrift.h>
@@ -48,6 +50,7 @@
 #include "rpc/authentication-util.h"
 #include "rpc/thrift-server.h"
 #include "runtime/exec-env.h"
+#include "service/frontend.h"
 #include "transport/THttpServer.h"
 #include "transport/TSaslClientTransport.h"
 #include "util/auth-util.h"
@@ -90,6 +93,8 @@ DECLARE_bool(use_system_auth_to_local);
 
 DECLARE_int64(max_cookie_lifetime_s);
 
+DECLARE_int32(hs2_http_port);
+
 DEFINE_string(sasl_path, "", "Colon separated list of paths to look for SASL "
     "security library plugins.");
 DEFINE_bool(enable_ldap_auth, false,
@@ -117,6 +122,12 @@ DEFINE_bool(trusted_domain_use_xff_header, false,
     "while attempting to verify if the connection request originated from a trusted "
     "domain. Only used if '--trusted_domain' is specified. Warning: Only use this if you "
     "trust the incoming connection to have this set correctly.");
+
+DEFINE_bool_hidden(saml2_allow_without_tls_debug_only, false,
+    "When this configuration is set to true, Impala allows SAML2 authentication "
+    "on unsecure channel. This should be only enabled for development / testing.");
+
+DECLARE_string(saml2_sp_callback_url);
 
 namespace impala {
 
@@ -561,29 +572,146 @@ vector<string> ReturnHeaders(ThriftServer::ConnectionContext* connection_context
   return std::move(connection_context->return_headers);
 }
 
-// Takes the path component of an HTTP request and parses it. For now, we only care about
-// the 'doAs' parameter.
-bool HttpPathFn(ThriftServer::ConnectionContext* connection_context, const string& path,
-    string* err_msg) {
-  // 'path' should be of the form '/.*[?<key=value>[&<key=value>...]]'
-  vector<string> split = Split(path, delimiter::Limit("?", 1));
-  if (split.size() == 2) {
-    for (auto pair : Split(split[1], "&")) {
-      vector<string> key_value = Split(pair, delimiter::Limit("=", 1));
-      if (key_value.size() == 2 && key_value[0] == "doAs") {
-        string decoded;
-        if (!UrlDecode(key_value[1], &decoded)) {
-          *err_msg = Substitute(
-              "Could not decode 'doAs' parameter from HTTP request with path: $0", path);
-          return false;
-        } else {
-          connection_context->do_as_user = decoded;
-        }
-        break;
+// Parses a param string.
+//  params_to_check: map from the name of params that should be parsed to pointers where
+//                   the value should be written
+//  original: the full http path (used only in error message)
+//  params_string: & delimited param string to parse
+//  err_msg: write detailed message here in case of error
+bool ParseParams(std::map<string, string*>& params_to_check,
+   const string& original, const string& params_string, string* err_msg) {
+  for (auto pair : Split(params_string, "&")) {
+    vector<string> key_value = Split(pair, delimiter::Limit("=", 1));
+    if (key_value.size() == 2) {
+      auto it = params_to_check.find(key_value[0]);
+      if (it == params_to_check.end()) continue;
+      string decoded;
+      if (!UrlDecode(key_value[1], &decoded)) {
+        *err_msg = Substitute(
+            "Could not decode '$0' parameter from HTTP request with path: $1",
+                key_value[0], original);
+        return false;
+      } else {
+        *it->second = decoded;
       }
     }
   }
   return true;
+}
+
+// Takes the path component of an HTTP request and parses it.
+// The followings are inspected in the path:
+// - the 'doAs' parameter if it exists
+// - if SAML auth is enabled then the path is checked whether it matches
+//   the SP callback URL, if yes, then the whole body has to be read for,
+//   authentication purposes, not just the headers
+bool HttpPathFn(ThriftServer::ConnectionContext* connection_context,
+     const string& saml_path, const string& path, string* err_msg,
+     bool* read_whole_body) {
+  TWrappedHttpRequest* request = connection_context->request.get();
+  // 'path' should be of the form '/.*[?<key=value>[&<key=value>...]]'
+  vector<string> split = Split(path, delimiter::Limit("?", 1));
+  bool is_saml_response = !saml_path.empty() && split[0] == saml_path;
+  *read_whole_body = is_saml_response;
+
+  if (request) request->path = split[0];
+
+  if (split.size() != 2) return true;
+
+  std::map<string, string*> params_to_check;
+  params_to_check["doAs"] = &connection_context->do_as_user;
+
+  return ParseParams(params_to_check, path, split[1], err_msg);
+}
+
+TWrappedHttpResponse* GetSaml2Redirect(
+    ThriftServer::ConnectionContext* connection_context) {
+  TWrappedHttpRequest* request = connection_context->request.get();
+  TWrappedHttpResponse* response = connection_context->response.get();
+  DCHECK(request != nullptr);
+  DCHECK(response == nullptr);
+  response = new TWrappedHttpResponse();
+  connection_context->response.reset(response);
+  Status status =
+      ExecEnv::GetInstance()->frontend()->GetSaml2Redirect(*request, response);
+  if (!status.ok()) return nullptr;
+
+  return response;
+}
+
+TWrappedHttpResponse* ValidateSaml2AuthnResponse(
+    ThriftServer::ConnectionContext* connection_context,
+    const AuthenticationHash& hash) {
+  TWrappedHttpRequest* request = connection_context->request.get();
+  TWrappedHttpResponse* response = connection_context->response.get();
+  DCHECK(request != nullptr);
+  DCHECK(response == nullptr);
+  response = new TWrappedHttpResponse();
+  connection_context->response.reset(response);
+  // Parse the body.
+  std::map<string, string*> params_to_check;
+  string saml_relay_state;
+  params_to_check["RelayState"] =  &saml_relay_state;
+  string error_msg;
+  const string& content = request->content;
+  if(!ParseParams(params_to_check, content, content, &error_msg)) {
+    LOG(ERROR) << "failed to parse SAML response params: " << error_msg;
+    return nullptr;
+  }
+  StripWhiteSpace(&saml_relay_state);
+  request->params["RelayState"] = saml_relay_state;
+  // We return some html in case of auth error. TODO: Should handle other
+  // errors where no response is generated.
+  Status status =
+      ExecEnv::GetInstance()->frontend()->ValidateSaml2Response(*request, response);
+  return response;
+}
+
+bool ValidateSaml2Bearer(ThriftServer::ConnectionContext* connection_context,
+    const AuthenticationHash& hash) {
+  TWrappedHttpRequest* request = connection_context->request.get();
+  string username;
+  Status status =
+      ExecEnv::GetInstance()->frontend()->ValidateSaml2Bearer(*request, &username);
+
+  if (!status.ok()) return false;
+
+  connection_context->username = username;
+  // Create a cookie to return.
+  connection_context->return_headers.push_back(
+      Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
+  return true;
+}
+
+TWrappedHttpRequest* InitWrappedHttpRequest(
+      ThriftServer::ConnectionContext* connection_context) {
+  TWrappedHttpRequest* request = new TWrappedHttpRequest();
+  request->remote_ip = connection_context->network_address.hostname;
+  request->server_name = connection_context->server_name;
+  // Intentionally lying to the pac4j lib  in the frontend to ensure that non-secure
+  // test setups work similarly to secure production systems. SAML must use TLS if
+  // FLAGS_saml2_allow_without_tls_debug_only is not true.
+  request->secure = true;
+  connection_context->request.reset(request);
+  return request;
+}
+
+// Parses and validates FLAGS_saml2_sp_callback_url.
+// Sets saml_sp_path to the path part if successful.
+Status ParseSamlSpUrl(string* saml_sp_path) {
+  vector<string> split =
+      Split(FLAGS_saml2_sp_callback_url, delimiter::Limit("/", 3));
+  if (split.size() != 4 || (split[0] != "http:" && split[0] != "https:")) {
+    return Status(
+        Substitute("Bad saml2_sp_callback_url: $0", FLAGS_saml2_sp_callback_url));
+  }
+  vector<string> host_parts = Split(split[2], delimiter::Limit(":", 1));
+  if (host_parts.size() != 2 || atoi(host_parts[1].c_str()) != FLAGS_hs2_http_port) {
+    return Status(
+        "Port in saml2_sp_callback_url must be the same as FLAGS_hs2_http_port");
+  }
+  if (saml_sp_path != nullptr) *saml_sp_path = "/" + split[3];
+  return Status::OK();
 }
 
 namespace {
@@ -925,18 +1053,21 @@ Status SecureAuthProvider::Start() {
 Status SecureAuthProvider::GetServerTransportFactory(
     ThriftServer::TransportType underlying_transport_type, const std::string& server_name,
     MetricGroup* metrics, boost::shared_ptr<TTransportFactory>* factory) {
-  DCHECK(!principal_.empty() || has_ldap_);
+  DCHECK(!principal_.empty() || has_ldap_ || has_saml_);
 
   if (underlying_transport_type == ThriftServer::HTTP) {
     bool has_kerberos = !principal_.empty();
     bool use_cookies = FLAGS_max_cookie_lifetime_s > 0;
     bool check_trusted_domain = !FLAGS_trusted_domain.empty();
     factory->reset(new THttpServerTransportFactory(server_name, metrics, has_ldap_,
-        has_kerberos, use_cookies, check_trusted_domain));
+        has_kerberos, use_cookies, check_trusted_domain, has_saml_));
     return Status::OK();
   }
 
   DCHECK(underlying_transport_type == ThriftServer::BINARY);
+
+  DCHECK(!principal_.empty() || has_ldap_);
+
   // This is the heart of the link between this file and thrift.  Here we
   // associate a Sasl mechanism with our callbacks.
   try {
@@ -1003,8 +1134,8 @@ Status SecureAuthProvider::WrapClientTransport(const string& hostname,
 
 void SecureAuthProvider::SetupConnectionContext(
     const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
-    ThriftServer::TransportType underlying_transport_type, TTransport* input_transport,
-    TTransport* output_transport) {
+    ThriftServer::TransportType underlying_transport_type,
+    TTransport* input_transport, TTransport* output_transport) {
   TSocket* socket = nullptr;
   switch (underlying_transport_type) {
     case ThriftServer::BINARY: {
@@ -1021,8 +1152,15 @@ void SecureAuthProvider::SetupConnectionContext(
       THttpServer* http_input_transport = down_cast<THttpServer*>(input_transport);
       THttpServer* http_output_transport = down_cast<THttpServer*>(output_transport);
       THttpServer::HttpCallbacks callbacks;
+
+      string saml_path;
+      if (has_saml_) {
+        Status parse_status = ParseSamlSpUrl(&saml_path);
+        DCHECK(parse_status.ok());
+      }
       callbacks.path_fn = std::bind(
-          HttpPathFn, connection_ptr.get(), std::placeholders::_1, std::placeholders::_2);
+          HttpPathFn, connection_ptr.get(), saml_path, std::placeholders::_1,
+          std::placeholders::_2, std::placeholders::_3);
       callbacks.return_headers_fn = std::bind(ReturnHeaders, connection_ptr.get());
       callbacks.cookie_auth_fn =
           std::bind(CookieAuth, connection_ptr.get(), hash_, std::placeholders::_1);
@@ -1035,6 +1173,16 @@ void SecureAuthProvider::SetupConnectionContext(
       if (!principal_.empty()) {
         callbacks.negotiate_auth_fn = std::bind(NegotiateAuth, connection_ptr.get(),
             hash_, std::placeholders::_1, std::placeholders::_2);
+      }
+      if (has_saml_) {
+        callbacks.init_wrapped_http_request_fn = std::bind(
+            InitWrappedHttpRequest, connection_ptr.get());
+        callbacks.get_saml_redirect_fn =
+            std::bind(GetSaml2Redirect, connection_ptr.get());
+        callbacks.validate_saml2_authn_response_fn =
+            std::bind(ValidateSaml2AuthnResponse, connection_ptr.get(), hash_);
+        callbacks.validate_saml2_bearer_fn =
+            std::bind(ValidateSaml2Bearer, connection_ptr.get(), hash_);
       }
       http_input_transport->setCallbacks(callbacks);
       http_output_transport->setCallbacks(callbacks);
@@ -1075,8 +1223,8 @@ Status NoAuthProvider::WrapClientTransport(const string& hostname,
 
 void NoAuthProvider::SetupConnectionContext(
     const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
-    ThriftServer::TransportType underlying_transport_type, TTransport* input_transport,
-    TTransport* output_transport) {
+    ThriftServer::TransportType underlying_transport_type,
+    TTransport* input_transport, TTransport* output_transport) {
   connection_ptr->username = "";
   connection_ptr->do_as_user = "";
   TSocket* socket = nullptr;
@@ -1094,7 +1242,8 @@ void NoAuthProvider::SetupConnectionContext(
       // Even though there's no security, we set up some callbacks, eg. to allow
       // impersonation over unsecured connections for testing purposes.
       callbacks.path_fn = std::bind(
-          HttpPathFn, connection_ptr.get(), std::placeholders::_1, std::placeholders::_2);
+          HttpPathFn, connection_ptr.get(), "", std::placeholders::_1,
+          std::placeholders::_2, std::placeholders::_3);
       callbacks.return_headers_fn = std::bind(ReturnHeaders, connection_ptr.get());
       http_input_transport->setCallbacks(callbacks);
       http_output_transport->setCallbacks(callbacks);
@@ -1119,6 +1268,17 @@ Status AuthManager::Init() {
   LOG(INFO) << "Initialized " << OPENSSL_VERSION_TEXT;
 
   bool use_ldap = false;
+  // Could use any other requiered flag for SAML
+  bool use_saml = !FLAGS_saml2_sp_callback_url.empty();
+  if (use_saml) {
+    RETURN_IF_ERROR(ParseSamlSpUrl(nullptr));
+    if (!IsExternalTlsConfigured()) {
+      if (!FLAGS_saml2_allow_without_tls_debug_only) {
+        return Status("SAML SSO authentication should be only used with TLS enabled.");
+      }
+      LOG(WARNING) << "SAML SSO authentication is used without TLS.";
+    }
+  }
 
   // Get all of the flag validation out of the way
   if (FLAGS_enable_ldap_auth) {
@@ -1198,9 +1358,22 @@ Status AuthManager::Init() {
       sap->InitLdap();
       LOG(INFO) << "External communication is authenticated with LDAP";
     }
+    if (use_saml) {
+      LOG(INFO) << "External communication can be also authenticated with SAML2 SSO";
+      sap->InitSaml();
+    }
   } else {
     external_auth_provider_.reset(new NoAuthProvider());
-    LOG(INFO) << "External communication is not authenticated";
+    LOG(INFO) << "External communication is not authenticated for binary protocols";
+    if (use_saml) {
+      SecureAuthProvider* sap = NULL;
+      external_http_auth_provider_.reset(sap = new SecureAuthProvider(false));
+      sap->InitSaml();
+      LOG(INFO) <<
+          "External communication is authenticated for hs2-http protocol with SAML2 SSO";
+    } else {
+      LOG(INFO) << "External communication is not authenticated for hs2-http protocol";
+    }
   }
 
   // Acquire a kerberos ticket and start the background renewal thread before starting
@@ -1234,6 +1407,11 @@ AuthProvider* AuthManager::GetExternalAuthProvider() {
 AuthProvider* AuthManager::GetInternalAuthProvider() {
   DCHECK(internal_auth_provider_.get() != NULL);
   return internal_auth_provider_.get();
+}
+
+AuthProvider* AuthManager::GetExternalHttpAuthProvider() {
+  return external_http_auth_provider_.get() != nullptr ?
+      external_http_auth_provider_.get() : GetExternalAuthProvider();
 }
 
 }

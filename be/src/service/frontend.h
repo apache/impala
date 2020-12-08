@@ -198,6 +198,20 @@ class Frontend {
   // Call FE post-query execution hook
   Status CallQueryCompleteHooks(const TQueryCompleteContext& context);
 
+  // Call FE to create a http response that redirects to the SSO service.
+  Status GetSaml2Redirect(const TWrappedHttpRequest& request,
+      TWrappedHttpResponse* response);
+
+  // Call FE to validate the SAML2 AuthNResponse.
+  // The response is an HTML form that contains a bearer token or an error
+  // message.
+  Status ValidateSaml2Response(
+      const TWrappedHttpRequest& request, TWrappedHttpResponse* response);
+
+  // Call FE to validate the bearer token.
+  // Fills "user" if the validation was successful.
+  Status ValidateSaml2Bearer(const TWrappedHttpRequest& request, string* user);
+
  private:
   jobject fe_;  // instance of org.apache.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
@@ -230,6 +244,9 @@ class Frontend {
   jmethodID call_query_complete_hooks_id_; // JniFrontend.callQueryCompleteHooks
   jmethodID abort_txn_; // JniFrontend.abortTransaction()
   jmethodID unregister_txn_; // JniFrontend.abortTransaction()
+  jmethodID get_saml2_redirect_id_; // JniFrontend.getSaml2Redirect()
+  jmethodID validate_saml2_response_id_; // JniFrontend.validateSaml2Response()
+  jmethodID validate_saml2_bearer_id_; // JniFrontend.validateSaml2Bearer()
 
   // Only used for testing.
   jmethodID build_test_descriptor_table_id_; // JniFrontend.buildTestDescriptorTable()

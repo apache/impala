@@ -165,4 +165,28 @@ struct TBackendGflags {
   70: required i64 topic_update_tbl_max_wait_time_ms
 
   71: required i32 catalog_max_lock_skipped_topic_updates
+
+  72: required string saml2_keystore_path
+
+  73: required string saml2_keystore_password
+
+  74: required string saml2_private_key_password
+
+  75: required string saml2_idp_metadata
+
+  76: required string saml2_sp_entity_id
+
+  77: required string saml2_sp_callback_url
+
+  78: required bool saml2_want_assertations_signed
+
+  79: required bool saml2_sign_requests
+
+  80: required i32 saml2_callback_token_ttl
+
+  81: required string saml2_group_attribute_name
+
+  82: required string saml2_group_filter
+
+  83: required bool saml2_ee_test_mode
 }

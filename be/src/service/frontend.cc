@@ -112,6 +112,9 @@ Frontend::Frontend() {
     {"callQueryCompleteHooks", "([B)V", &call_query_complete_hooks_id_},
     {"abortTransaction", "(J)V", &abort_txn_},
     {"unregisterTransaction", "(J)V", &unregister_txn_},
+    {"getSaml2Redirect", "([B)[B", &get_saml2_redirect_id_},
+    {"validateSaml2Response", "([B)[B", &validate_saml2_response_id_},
+    {"validateSaml2Bearer", "([B)Ljava/lang/String;", &validate_saml2_bearer_id_}
   };
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
@@ -316,4 +319,22 @@ Status Frontend::BuildTestDescriptorTable(const TBuildTestDescriptorTableParams&
 // Call FE post-query execution hook
 Status Frontend::CallQueryCompleteHooks(const TQueryCompleteContext& context) {
   return JniUtil::CallJniMethod(fe_, call_query_complete_hooks_id_, context);
+}
+
+Status Frontend::GetSaml2Redirect( const TWrappedHttpRequest& request,
+    TWrappedHttpResponse* response)  {
+  return JniUtil::CallJniMethod(
+      fe_, get_saml2_redirect_id_, request, response);
+}
+
+Status Frontend::ValidateSaml2Response(
+    const TWrappedHttpRequest& request, TWrappedHttpResponse* response) {
+  return JniUtil::CallJniMethod(
+      fe_, validate_saml2_response_id_, request, response);
+}
+
+Status Frontend::ValidateSaml2Bearer(
+  const TWrappedHttpRequest& request, string* user) {
+  return JniUtil::CallJniMethod(
+      fe_, validate_saml2_bearer_id_, request, user);
 }

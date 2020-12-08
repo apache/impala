@@ -34,6 +34,7 @@ import org.apache.hadoop.security.ShellBasedUnixGroupsMapping;
 import org.apache.hadoop.security.ShellBasedUnixGroupsNetgroupMapping;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.ToSqlUtils;
+import org.apache.impala.authentication.saml.WrappedWebContext;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.ImpalaInternalAdminUser;
 import org.apache.impala.authorization.User;
@@ -91,6 +92,8 @@ import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
+import org.apache.impala.thrift.TWrappedHttpRequest;
+import org.apache.impala.thrift.TWrappedHttpResponse;
 import org.apache.impala.util.AuthorizationUtil;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.GlogAppender;
@@ -701,6 +704,49 @@ public class JniFrontend {
   public void unregisterTransaction(long transactionId) {
     Preconditions.checkNotNull(frontend_);
     this.frontend_.unregisterTransaction(transactionId);
+  }
+
+  public byte[] getSaml2Redirect(byte[] serializedRequest) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
+    Preconditions.checkNotNull(frontend_.getSaml2Client());
+    final TWrappedHttpRequest request = new TWrappedHttpRequest();
+    final TWrappedHttpResponse response = new TWrappedHttpResponse();
+    JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
+    WrappedWebContext webContext = new WrappedWebContext(request, response);
+    frontend_.getSaml2Client().setRedirect(webContext);
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(response);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  public byte[] validateSaml2Response(byte[] serializedRequest) throws ImpalaException {
+    Preconditions.checkNotNull(frontend_);
+    Preconditions.checkNotNull(frontend_.getSaml2Client());
+    final TWrappedHttpRequest request = new TWrappedHttpRequest();
+    final TWrappedHttpResponse response = new TWrappedHttpResponse();
+    JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
+    WrappedWebContext webContext = new WrappedWebContext(request, response);
+    frontend_.getSaml2Client().validateAuthnResponse(webContext);
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(response);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  public String validateSaml2Bearer(byte[] serializedRequest) throws ImpalaException{
+    Preconditions.checkNotNull(frontend_);
+    Preconditions.checkNotNull(frontend_.getSaml2Client());
+    final TWrappedHttpRequest request = new TWrappedHttpRequest();
+    // The responsee won't be used but it is needed to create a WebContext.
+    final TWrappedHttpResponse dummyResponse = new TWrappedHttpResponse();
+    JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
+    WrappedWebContext webContext = new WrappedWebContext(request, dummyResponse);
+    return frontend_.getSaml2Client().validateBearer(webContext);
   }
 
   /**

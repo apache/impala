@@ -37,6 +37,7 @@ THttpTransport::THttpTransport(boost::shared_ptr<TTransport> transport)
   : transport_(transport),
     origin_(""),
     readHeaders_(true),
+    readWholeBodyForAuth_(false),
     chunked_(false),
     chunkedDone_(false),
     chunkSize_(0),
@@ -98,6 +99,13 @@ uint32_t THttpTransport::readMoreData() {
   } else {
     size = readContent(contentLength_);
     readHeaders_ = true;
+  }
+
+  if (readWholeBodyForAuth_) {
+    readWholeBodyForAuth_ = false;
+    bodyDone(size);
+    // Do not return any bytes to Thrift, as whole body was consumed by authentication.
+    size = 0;
   }
 
   return size;
