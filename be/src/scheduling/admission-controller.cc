@@ -1152,7 +1152,10 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
   }
 
   const auto queue_node_deleter = MakeScopeExitTrigger([&]() {
-    if (!queued) queue_nodes_.erase(request.query_id);
+    if (!queued) {
+      lock_guard<mutex> lock(queue_nodes_lock_);
+      queue_nodes_.erase(request.query_id);
+    }
   });
 
   // Re-resolve the pool name to propagate any resolution errors now that this request is
@@ -1274,8 +1277,10 @@ Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
     return Status::OK();
   }
 
-  const auto queue_node_deleter =
-      MakeScopeExitTrigger([&]() { queue_nodes_.erase(query_id); });
+  const auto queue_node_deleter = MakeScopeExitTrigger([&]() {
+    lock_guard<mutex> lock(queue_nodes_lock_);
+    queue_nodes_.erase(query_id);
+  });
 
   // Disallow the FAIL action here. It would leave the queue in an inconsistent state.
   DebugActionNoFail(
