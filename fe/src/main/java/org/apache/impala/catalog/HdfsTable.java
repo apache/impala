@@ -1607,10 +1607,7 @@ public class HdfsTable extends Table implements FeFsTable {
     List<HdfsPartition> parts = Lists.newArrayListWithCapacity(partitionNames.size());
     for (String partitionName: partitionNames) {
       String partName = DEFAULT_PARTITION_NAME;
-      if (partitionName.length() > 0) {
-        // Trim the last trailing char '/' from each partition name
-        partName = partitionName.substring(0, partitionName.length()-1);
-      }
+      if (partitionName.length() > 0) partName = partitionName;
       HdfsPartition partition = nameToPartitionMap_.get(partName);
       Preconditions.checkNotNull(partition, "Invalid partition name: " + partName);
       parts.add(partition);

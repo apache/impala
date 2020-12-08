@@ -26,28 +26,28 @@ AnalysisException: Partition spec already exists: (p=DATE '1300-01-01').
 # Date partition formatted differently in insert
 insert into $DATABASE.dtbl partition (p='1300-1-01') values ('1300-1-1');
 ---- RESULTS
-p=1300-01-01/: 1
+p=1300-01-01: 1
 ====
 ---- QUERY
 insert into $DATABASE.dtbl partition (p='1300-01-1') values ('1300-1-02');
 ---- RESULTS
-p=1300-01-01/: 1
+p=1300-01-01: 1
 ====
 ---- QUERY
 insert into $DATABASE.dtbl partition (p=DATE '1300-1-1') values ('1300-1-03');
 ---- RESULTS
-p=1300-01-01/: 1
+p=1300-01-01: 1
 ====
 ---- QUERY
 # Insert into a new partition
 insert into $DATABASE.dtbl partition (p=DATE '1400-01-1') values ('1400-1-1');
 ---- RESULTS
-p=1400-01-01/: 1
+p=1400-01-01: 1
 ====
 ---- QUERY
 insert into $DATABASE.dtbl partition (p='1400-1-01') values ('1400-1-2');
 ---- RESULTS
-p=1400-01-01/: 1
+p=1400-01-01: 1
 ====
 ---- QUERY
 select p, c from $DATABASE.dtbl;
@@ -87,8 +87,8 @@ UDF ERROR: String to Date parse failed. Invalid string val: '1400-01-'
 insert into $DATABASE.dtbl partition(p) select * from $DATABASE.stbl
 where p in ('1400-1-1', '1400-1-01', '1500-01-1');
 ---- RESULTS
-p=1400-01-01/: 2
-p=1500-01-01/: 1
+p=1400-01-01: 2
+p=1500-01-01: 1
 ====
 ---- QUERY
 select p, c from $DATABASE.dtbl;

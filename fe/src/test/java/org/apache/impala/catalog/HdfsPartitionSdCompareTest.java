@@ -66,7 +66,7 @@ public class HdfsPartitionSdCompareTest {
     HdfsTable tbl = (HdfsTable) catalog_
         .getOrLoadTable("functional", "alltypes", "test", null);
     HdfsPartition hdfsPartition = tbl
-        .getPartitionsForNames(Arrays.asList("year=2009/month=1/")).get(0);
+        .getPartitionsForNames(Arrays.asList("year=2009/month=1")).get(0);
     // make sure that the sd in HMS without any change matches with the sd in catalog.
     assertTrue(hdfsPartition.compareSd(hmsSd));
 

@@ -148,8 +148,8 @@ STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 # dynamic partition insert inherits table properties
 insert into cached_tbl_part partition(j) values(3, 3), (4, 4);
 ---- RESULTS
-j=3/: 1
-j=4/: 1
+j=3: 1
+j=4: 1
 ====
 ---- QUERY
 # Modify partition cache replication

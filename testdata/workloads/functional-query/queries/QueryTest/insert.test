@@ -78,7 +78,7 @@ float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypessmall
 where year=2009 and month=4
 ---- RESULTS
-year=2009/month=4/: 25
+year=2009/month=4: 25
 ====
 ---- QUERY
 # search the overwritten partition to verify the results
@@ -125,7 +125,7 @@ float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypessmall
 where year=2009 and month=4
 ---- RESULTS
-year=2009/month=4/: 25
+year=2009/month=4: 25
 ====
 ---- QUERY
 # search the partition to verify it contains all 25 rows
@@ -146,9 +146,9 @@ float_col, double_col, date_string_col, string_col, timestamp_col, month
 from functional.alltypessmall
 where year=2009 and month>1 and month<=4
 ---- RESULTS
-year=2009/month=2/: 25
-year=2009/month=3/: 25
-year=2009/month=4/: 25
+year=2009/month=2: 25
+year=2009/month=3: 25
+year=2009/month=4: 25
 ====
 ---- QUERY
 # search the overwritten partition to verify the results
@@ -245,9 +245,9 @@ float_col, double_col, date_string_col, string_col, timestamp_col, month
 from functional.alltypessmall
 where year=2009 and month>=1 and month<4
 ---- RESULTS
-year=2009/month=1/: 25
-year=2009/month=2/: 25
-year=2009/month=3/: 25
+year=2009/month=1: 25
+year=2009/month=2: 25
+year=2009/month=3: 25
 ====
 ---- QUERY
 # search the partitions to verify they contain all 75 rows
@@ -266,10 +266,10 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from functional.alltypessmall
 ---- RESULTS
-year=2009/month=1/: 25
-year=2009/month=2/: 25
-year=2009/month=3/: 25
-year=2009/month=4/: 25
+year=2009/month=1: 25
+year=2009/month=2: 25
+year=2009/month=3: 25
+year=2009/month=4: 25
 ====
 ---- QUERY
 # search the overwritten partition to verify the results
@@ -390,10 +390,10 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from functional.alltypessmall
 ---- RESULTS
-year=2009/month=1/: 25
-year=2009/month=2/: 25
-year=2009/month=3/: 25
-year=2009/month=4/: 25
+year=2009/month=1: 25
+year=2009/month=2: 25
+year=2009/month=3: 25
+year=2009/month=4: 25
 ====
 ---- QUERY
 # search the partitions to verify they contain all 100 rows
@@ -409,10 +409,10 @@ bigint
 truncate alltypesinsert;
 insert into alltypesinsert partition(year, month) select * from functional.alltypessmall
 ---- RESULTS
-year=2009/month=1/: 25
-year=2009/month=2/: 25
-year=2009/month=3/: 25
-year=2009/month=4/: 25
+year=2009/month=1: 25
+year=2009/month=2: 25
+year=2009/month=3: 25
+year=2009/month=4: 25
 ====
 ---- QUERY
 # check size of alltypesinsert to ensure previous insert worked
@@ -427,7 +427,7 @@ bigint
 truncate insert_string_partitioned;
 INSERT INTO TABLE insert_string_partitioned PARTITION(s2="/\%.") SELECT "value" FROM functional.alltypessmall LIMIT 1;
 ---- RESULTS
-s2=%2F%5C%25./: 1
+s2=%2F%5C%25.: 1
 ====
 ---- QUERY
 # select with unencoded partition key
@@ -452,7 +452,7 @@ truncate insert_string_partitioned;
 INSERT INTO TABLE insert_string_partitioned PARTITION(s2="_.~ +")
 SELECT "value" FROM functional.alltypessmall LIMIT 1;
 ---- RESULTS
-s2=_.~ +/: 1
+s2=_.~ +: 1
 ====
 ---- QUERY
 # select with unencoded partition key
@@ -468,28 +468,28 @@ truncate insert_string_partitioned;
 INSERT INTO TABLE insert_string_partitioned PARTITION(s2='')
 SELECT "value1" FROM functional.alltypessmall LIMIT 1;
 ---- RESULTS
-s2=__HIVE_DEFAULT_PARTITION__/: 1
+s2=__HIVE_DEFAULT_PARTITION__: 1
 ====
 ---- QUERY
 # dynamic partition insert into string-partitioned table with empty partition key
 INSERT INTO TABLE insert_string_partitioned PARTITION(s2)
 SELECT "value2","" FROM functional.alltypessmall LIMIT 1;
 ---- RESULTS
-s2=__HIVE_DEFAULT_PARTITION__/: 1
+s2=__HIVE_DEFAULT_PARTITION__: 1
 ====
 ---- QUERY
 # static partition insert into string-partitioned table with NULL partition key
 INSERT INTO TABLE insert_string_partitioned PARTITION(s2=NULL)
 SELECT "value3" FROM functional.alltypessmall LIMIT 1;
 ---- RESULTS
-s2=__HIVE_DEFAULT_PARTITION__/: 1
+s2=__HIVE_DEFAULT_PARTITION__: 1
 ====
 ---- QUERY
 # dynamic partition insert into string-partitioned table with NULL partition key
 INSERT INTO TABLE insert_string_partitioned PARTITION(s2)
 SELECT "value4",NULL FROM functional.alltypessmall LIMIT 1;
 ---- RESULTS
-s2=__HIVE_DEFAULT_PARTITION__/: 1
+s2=__HIVE_DEFAULT_PARTITION__: 1
 ====
 ---- QUERY
 # select with empty partition key as predicate should return nothing, because "" is
@@ -518,7 +518,7 @@ insert into alltypesinsert partition(year=cast(100*20+10 as int), month=cast(2*2
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col, timestamp_col from functional.alltypessmall where month = 4
 ---- RESULTS
-year=2010/month=4/: 25
+year=2010/month=4: 25
 ====
 ---- QUERY
 # static partition insert from a constant select
@@ -528,7 +528,7 @@ partition(year=2010, month=4)
 select 100, false, 1, 1, 1, 10,
 10.0, 10.0, "02/01/09", "1", cast("2009-02-01 00:01:00" as timestamp)
 ---- RESULTS
-year=2010/month=4/: 1
+year=2010/month=4: 1
 ====
 ---- QUERY
 # dynamic partition insert from a constant select
@@ -537,7 +537,7 @@ partition (year, month)
 select 200, true, 2, 2, 2, 20,
 20.0, 20.0, "02/01/09", "1", cast("2009-02-01 00:02:00" as timestamp), 2010, 4
 ---- RESULTS
-year=2010/month=4/: 1
+year=2010/month=4: 1
 ====
 ---- QUERY
 # verify contents of alltypesinsert
@@ -557,7 +557,7 @@ partition(year=2010, month=4) values
 (2, true, 2, NULL, 2, 20, 20.0, 20.0, "02/02/09", "2", NULL),
 (3, false, 3, 3, 3, 30, 30.0, 30.0, "02/03/09", NULL, cast("2009-02-03 00:01:00" as timestamp))
 ---- RESULTS
-year=2010/month=4/: 3
+year=2010/month=4: 3
 ====
 ---- QUERY
 # dynamic partition insert from values statement
@@ -567,8 +567,8 @@ partition (year, month) values
 (5, false, 5, NULL, 5, 50, 50.0, 50.0, "02/05/09", "5", NULL, 2010, 8),
 (6, true, 6, 6, 6, 60, 60.0, 60.0, "02/06/09", NULL, cast("2009-02-06 00:01:00" as timestamp), 2010, 8)
 ---- RESULTS
-year=2010/month=4/: 1
-year=2010/month=8/: 2
+year=2010/month=4: 1
+year=2010/month=8: 2
 ====
 ---- QUERY
 # verify contents of alltypesinsert
@@ -589,10 +589,10 @@ truncate alltypesinsert;
 with t1 as (select * from functional.alltypestiny)
 insert into alltypesinsert partition(year, month) select * from t1
 ---- RESULTS
-year=2009/month=1/: 2
-year=2009/month=2/: 2
-year=2009/month=3/: 2
-year=2009/month=4/: 2
+year=2009/month=1: 2
+year=2009/month=2: 2
+year=2009/month=3: 2
+year=2009/month=4: 2
 ====
 ---- QUERY
 # Test with clause in an insert statement and in its query statement.
@@ -602,10 +602,10 @@ insert into alltypesinsert partition(year, month)
 with t2 as (select * from functional.alltypestiny)
 select * from t1 union all select * from t2
 ---- RESULTS
-year=2009/month=1/: 4
-year=2009/month=2/: 4
-year=2009/month=3/: 4
-year=2009/month=4/: 4
+year=2009/month=1: 4
+year=2009/month=2: 4
+year=2009/month=3: 4
+year=2009/month=4: 4
 ====
 ---- QUERY
 # Test inserting NULLs for all types
@@ -696,14 +696,14 @@ float_col, double_col, date_string_col, string_col, timestamp_col,
 int_col, month
 from functional.alltypestiny
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-year=0/month=1/: 1
-year=0/month=2/: 1
-year=0/month=3/: 1
-year=0/month=4/: 1
-year=1/month=1/: 1
-year=1/month=2/: 1
-year=1/month=3/: 1
-year=1/month=4/: 1
+year=0/month=1: 1
+year=0/month=2: 1
+year=0/month=3: 1
+year=0/month=4: 1
+year=1/month=1: 1
+year=1/month=2: 1
+year=1/month=3: 1
+year=1/month=4: 1
 ====
 ---- QUERY
 # IMPALA-2203: Test insert from a select statement that has outer-joined inline views with
@@ -722,7 +722,7 @@ full outer join
  from functional.alltypestiny where id between 1 and 3) b
 on (a.id = b.id)
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-year=2015/month=8/: 4
+year=2015/month=8: 4
 ====
 ---- QUERY
 select * from alltypesinsert
@@ -763,7 +763,7 @@ float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypessmall
 where year=2009 and month=4
 ---- RESULTS
-year=2009/month=4/: 25
+year=2009/month=4: 25
 ====
 ---- QUERY
 # search the overwritten partition to verify the results
@@ -810,10 +810,10 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from functional.alltypessmall
 ---- RESULTS
-year=2009/month=1/: 25
-year=2009/month=2/: 25
-year=2009/month=3/: 25
-year=2009/month=4/: 25
+year=2009/month=1: 25
+year=2009/month=2: 25
+year=2009/month=3: 25
+year=2009/month=4: 25
 ====
 ---- QUERY
 # search the partitions to verify they contain all 100 rows
@@ -831,30 +831,30 @@ insert into table alltypesinsert
 partition (year, month) /*+ noclustered,shuffle */
 select * from functional.alltypes;
 ---- RESULTS
-year=2009/month=1/: 310
-year=2009/month=10/: 310
-year=2009/month=11/: 300
-year=2009/month=12/: 310
-year=2009/month=2/: 280
-year=2009/month=3/: 310
-year=2009/month=4/: 300
-year=2009/month=5/: 310
-year=2009/month=6/: 300
-year=2009/month=7/: 310
-year=2009/month=8/: 310
-year=2009/month=9/: 300
-year=2010/month=1/: 310
-year=2010/month=10/: 310
-year=2010/month=11/: 300
-year=2010/month=12/: 310
-year=2010/month=2/: 280
-year=2010/month=3/: 310
-year=2010/month=4/: 300
-year=2010/month=5/: 310
-year=2010/month=6/: 300
-year=2010/month=7/: 310
-year=2010/month=8/: 310
-year=2010/month=9/: 300
+year=2009/month=1: 310
+year=2009/month=10: 310
+year=2009/month=11: 300
+year=2009/month=12: 310
+year=2009/month=2: 280
+year=2009/month=3: 310
+year=2009/month=4: 300
+year=2009/month=5: 310
+year=2009/month=6: 300
+year=2009/month=7: 310
+year=2009/month=8: 310
+year=2009/month=9: 300
+year=2010/month=1: 310
+year=2010/month=10: 310
+year=2010/month=11: 300
+year=2010/month=12: 310
+year=2010/month=2: 280
+year=2010/month=3: 310
+year=2010/month=4: 300
+year=2010/month=5: 310
+year=2010/month=6: 300
+year=2010/month=7: 310
+year=2010/month=8: 310
+year=2010/month=9: 300
 ====
 ---- QUERY
 # IMPALA-5293: noclustered insert into table
@@ -863,10 +863,10 @@ insert into table alltypesinsert
 partition (year, month) /*+ noclustered,shuffle */
 select * from functional.alltypestiny;
 ---- RESULTS
-year=2009/month=1/: 2
-year=2009/month=2/: 2
-year=2009/month=3/: 2
-year=2009/month=4/: 2
+year=2009/month=1: 2
+year=2009/month=2: 2
+year=2009/month=3: 2
+year=2009/month=4: 2
 ====
 ---- QUERY
 # IMPALA-5293: noclustered insert into table
@@ -875,10 +875,10 @@ insert into table alltypesinsert
 partition (year, month) /*+ noclustered,noshuffle */
 select * from functional.alltypestiny;
 ---- RESULTS
-year=2009/month=1/: 2
-year=2009/month=2/: 2
-year=2009/month=3/: 2
-year=2009/month=4/: 2
+year=2009/month=1: 2
+year=2009/month=2: 2
+year=2009/month=3: 2
+year=2009/month=4: 2
 ====
 ---- QUERY
 # IMPALA-5293: noclustered insert into table
@@ -887,10 +887,10 @@ insert into table alltypesinsert
 partition (year, month) /*+ noclustered,shuffle */
 select * from functional.alltypestiny where int_col = 0;
 ---- RESULTS
-year=2009/month=1/: 1
-year=2009/month=2/: 1
-year=2009/month=3/: 1
-year=2009/month=4/: 1
+year=2009/month=1: 1
+year=2009/month=2: 1
+year=2009/month=3: 1
+year=2009/month=4: 1
 ====
 ---- QUERY
 # IMPALA-5293: noclustered, unpartitioned insert into table
@@ -911,37 +911,37 @@ select v.id, t1.id, t1.month from
 right outer join functional.alltypestiny t1 on t1.id = v.id
 where v.id = 0
 ---- RESULTS
-year=0/month=1/: 1
+year=0/month=1: 1
 ====
 ---- QUERY
 # IMPALA-10233: Inserting to a partitioned table with zorder should work.
 create table partitioned_zorder_tbl sort by zorder (id, string_col) like $ORIGINAL_DB.alltypes;
 insert into partitioned_zorder_tbl partition (year, month) select * from functional.alltypes;
 ---- RESULTS
-year=2009/month=1/: 310
-year=2009/month=10/: 310
-year=2009/month=11/: 300
-year=2009/month=12/: 310
-year=2009/month=2/: 280
-year=2009/month=3/: 310
-year=2009/month=4/: 300
-year=2009/month=5/: 310
-year=2009/month=6/: 300
-year=2009/month=7/: 310
-year=2009/month=8/: 310
-year=2009/month=9/: 300
-year=2010/month=1/: 310
-year=2010/month=10/: 310
-year=2010/month=11/: 300
-year=2010/month=12/: 310
-year=2010/month=2/: 280
-year=2010/month=3/: 310
-year=2010/month=4/: 300
-year=2010/month=5/: 310
-year=2010/month=6/: 300
-year=2010/month=7/: 310
-year=2010/month=8/: 310
-year=2010/month=9/: 300
+year=2009/month=1: 310
+year=2009/month=10: 310
+year=2009/month=11: 300
+year=2009/month=12: 310
+year=2009/month=2: 280
+year=2009/month=3: 310
+year=2009/month=4: 300
+year=2009/month=5: 310
+year=2009/month=6: 300
+year=2009/month=7: 310
+year=2009/month=8: 310
+year=2009/month=9: 300
+year=2010/month=1: 310
+year=2010/month=10: 310
+year=2010/month=11: 300
+year=2010/month=12: 310
+year=2010/month=2: 280
+year=2010/month=3: 310
+year=2010/month=4: 300
+year=2010/month=5: 310
+year=2010/month=6: 300
+year=2010/month=7: 310
+year=2010/month=8: 310
+year=2010/month=9: 300
 ====
 ---- QUERY
 # IMPALA-10233: Inserting to a partitioned table with zorder should work.
@@ -950,18 +950,18 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, 
 from functional.alltypes
 where year = 2010
 ---- RESULTS
-year=2010/month=1/: 310
-year=2010/month=10/: 310
-year=2010/month=11/: 300
-year=2010/month=12/: 310
-year=2010/month=2/: 280
-year=2010/month=3/: 310
-year=2010/month=4/: 300
-year=2010/month=5/: 310
-year=2010/month=6/: 300
-year=2010/month=7/: 310
-year=2010/month=8/: 310
-year=2010/month=9/: 300
+year=2010/month=1: 310
+year=2010/month=10: 310
+year=2010/month=11: 300
+year=2010/month=12: 310
+year=2010/month=2: 280
+year=2010/month=3: 310
+year=2010/month=4: 300
+year=2010/month=5: 310
+year=2010/month=6: 300
+year=2010/month=7: 310
+year=2010/month=8: 310
+year=2010/month=9: 300
 ====
 ---- QUERY
 # IMPALA-10233: Inserting to a partitioned table with zorder should work.
@@ -970,5 +970,5 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, 
 from functional.alltypes
 where year = 2010 and month = 1
 ---- RESULTS
-year=2010/month=1/: 310
+year=2010/month=1: 310
 ====

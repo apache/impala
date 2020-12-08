@@ -72,13 +72,13 @@ STRING, STRING, STRING
 insert overwrite table $DATABASE.testtbl_part partition(id=1)
 select 10, 'Ten' from functional.alltypes limit 1
 ---- RESULTS
-id=1/: 1
+id=1: 1
 ====
 ---- QUERY
 insert overwrite table $DATABASE.testtbl_part partition(id=2)
 select 20, 'Twenty' from functional.alltypes limit 2
 ---- RESULTS
-id=2/: 2
+id=2: 2
 ====
 ---- QUERY
 select * from $DATABASE.testtbl_part

@@ -48,7 +48,7 @@ float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypessmall
 where year=2009 and month=4
 ---- RESULTS
-year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__/: 25
+year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__: 25
 ====
 ---- QUERY
 # Verify contents of alltypesinsert.
@@ -76,7 +76,7 @@ float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypessmall
 where year=2009 and month=4
 ---- RESULTS
-year=__HIVE_DEFAULT_PARTITION__/month=10/: 25
+year=__HIVE_DEFAULT_PARTITION__/month=10: 25
 ====
 ---- QUERY
 # Verify contents of alltypesinsert.
@@ -96,7 +96,7 @@ float_col, double_col, date_string_col, string_col, timestamp_col
 from functional.alltypessmall
 where year=2009 and month=4
 ---- RESULTS
-year=2008/month=__HIVE_DEFAULT_PARTITION__/: 25
+year=2008/month=__HIVE_DEFAULT_PARTITION__: 25
 ====
 ---- QUERY
 # Verify contents of alltypesinsert.
@@ -116,10 +116,10 @@ cast(if(bool_col, NULL, 2007) as int) as year, cast(if(tinyint_col % 3 = 0, NULL
 from functional.alltypessmall
 where year=2009 and month=4
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-year=2007/month=6/: 8
-year=2007/month=__HIVE_DEFAULT_PARTITION__/: 5
-year=__HIVE_DEFAULT_PARTITION__/month=6/: 7
-year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__/: 5
+year=2007/month=6: 8
+year=2007/month=__HIVE_DEFAULT_PARTITION__: 5
+year=__HIVE_DEFAULT_PARTITION__/month=6: 7
+year=__HIVE_DEFAULT_PARTITION__/month=__HIVE_DEFAULT_PARTITION__: 5
 ====
 ---- QUERY
 # Verify contents of each new partition in alltypesinsert.
