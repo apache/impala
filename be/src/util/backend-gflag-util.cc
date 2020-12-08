@@ -19,9 +19,12 @@
 
 #include "common/version.h"
 #include "gen-cpp/BackendGflags_types.h"
+#include "gutil/strings/substitute.h"
+#include "kudu/util/flag_tags.h"
 #include "rpc/jni-thrift-util.h"
 #include "util/backend-gflag-util.h"
 #include "util/logging-support.h"
+#include "util/os-util.h"
 
 
 // Configs for the Frontend and the Catalog.
@@ -88,7 +91,77 @@ DECLARE_bool(enable_incremental_metadata_updates);
 DECLARE_int64(topic_update_tbl_max_wait_time_ms);
 DECLARE_int32(catalog_max_lock_skipped_topic_updates);
 
+// HS2 SAML2.0 configuration
+// Defined here because TAG_FLAG caused issues in global-flags.cc
+DEFINE_string(saml2_keystore_path, "",
+    "Keystore path to the saml2 client. This keystore is used to store the "
+    "key pair used to sign the authentication requests when saml2_sign_requests "
+    "is set to true. If the path doesn't exist, HiveServer2 will attempt to "
+    "create a keystore using the default configurations otherwise it will use "
+    "the one provided. Setting this is required for SAML authentication.");
+
+DEFINE_string(saml2_keystore_password_cmd, "",
+    "Command that outputs the password to the keystore used to sign the authentication "
+    "requests. Setting this is required for SAML authentication.");
+TAG_FLAG(saml2_keystore_password_cmd, sensitive);
+
+DEFINE_string(saml2_private_key_password_cmd, "",
+    "Command that outputs the password for the private key which is stored in the "
+    "keystore pointed by saml2_keystore_path. This key is used to sign the "
+    "authentication request if saml2_sign_requests is set to true.");
+TAG_FLAG(saml2_private_key_password_cmd, sensitive);
+
+DEFINE_string(saml2_idp_metadata, "",
+    "IDP metadata file for the SAML configuration. This metadata file must be "
+    "exported from the external identity provider. This is used to validate the SAML "
+    "assertions received. Setting this is required for SAML authentication");
+
+DEFINE_string(saml2_sp_entity_id, "",
+    "Service provider entity id for this impalad. This must match with the "
+    "SP id on the external identity provider. If this is not set, saml2_sp_callback_url "
+    "will be used as the SP id.");
+
+DEFINE_string(saml2_sp_callback_url, "",
+    "Callback URL where SAML responses should be posted. Currently this must be "
+    "configured at the same port number as the --hs2_http_port flag.");
+
+DEFINE_bool(saml2_want_assertations_signed, true,
+    "When this configuration is set to true, Impala will validate the signature "
+    "of the assertions received at the callback url. 'False' should be only used "
+    "for testing as it makes the protocol unsecure.");
+
+DEFINE_bool(saml2_sign_requests, false,
+    "When this configuration is set to true, Impala will sign the SAML requests "
+    "which can be validated by the IDP provider.");
+
+DEFINE_int32(saml2_callback_token_ttl, 30,
+    "Time (in seconds) for which the token issued by service provider is valid.");
+
+DEFINE_string(saml2_group_attribute_name, "",
+    "The attribute name in the SAML assertion which would "
+    "be used to compare for the group name matching. By default it is empty "
+    "which would allow any authenticated user. If this value is set then "
+    "saml2_group_filter must be set to a non-empty value.");
+
+DEFINE_string(saml2_group_filter, "",
+    "Comma separated list of group names which will be allowed when SAML "
+    "authentication is enabled.");
+
+DEFINE_bool_hidden(saml2_ee_test_mode, false,
+    "If true, no signature is checked and bearer token validation returns "
+    "401 Unauthorized to allow checking cookies dealing with Thrift protocol. "
+    "Should be only used in test environments." );
+
 namespace impala {
+
+Status GetConfigFromCommand(const string& flag_cmd, string& result) {
+  result.clear();
+  if (flag_cmd.empty()) return Status::OK();
+  if (!RunShellProcess(flag_cmd, &result, true, {"JAVA_TOOL_OPTIONS"})) {
+    return Status(strings::Substitute("$0 failed with output: '$1'", flag_cmd, result));
+  }
+  return Status::OK();
+}
 
 Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   TBackendGflags cfg;
@@ -178,7 +251,26 @@ Status GetThriftBackendGflags(JNIEnv* jni_env, jbyteArray* cfg_bytes) {
   cfg.__set_topic_update_tbl_max_wait_time_ms(FLAGS_topic_update_tbl_max_wait_time_ms);
   cfg.__set_catalog_max_lock_skipped_topic_updates(
       FLAGS_catalog_max_lock_skipped_topic_updates);
+  cfg.__set_saml2_keystore_path(FLAGS_saml2_keystore_path);
+  string saml2_keystore_password;
+  RETURN_IF_ERROR(GetConfigFromCommand(
+      FLAGS_saml2_keystore_password_cmd, saml2_keystore_password));
+  cfg.__set_saml2_keystore_password(saml2_keystore_password);
+  string saml2_private_key_password;
+  RETURN_IF_ERROR(GetConfigFromCommand(
+      FLAGS_saml2_private_key_password_cmd,saml2_private_key_password));
+  cfg.__set_saml2_private_key_password(saml2_private_key_password);
+  cfg.__set_saml2_idp_metadata(FLAGS_saml2_idp_metadata);
+  cfg.__set_saml2_sp_entity_id(FLAGS_saml2_sp_entity_id);
+  cfg.__set_saml2_sp_callback_url(FLAGS_saml2_sp_callback_url);
+  cfg.__set_saml2_want_assertations_signed(FLAGS_saml2_want_assertations_signed);
+  cfg.__set_saml2_sign_requests(FLAGS_saml2_sign_requests);
+  cfg.__set_saml2_callback_token_ttl(FLAGS_saml2_callback_token_ttl);
+  cfg.__set_saml2_group_attribute_name(FLAGS_saml2_group_attribute_name);
+  cfg.__set_saml2_group_filter(FLAGS_saml2_group_filter);
+  cfg.__set_saml2_ee_test_mode(FLAGS_saml2_ee_test_mode);
   RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &cfg, cfg_bytes));
   return Status::OK();
 }
+
 }

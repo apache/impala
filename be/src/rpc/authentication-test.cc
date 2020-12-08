@@ -110,6 +110,7 @@ TEST(Auth, AuthorizeInternalPrincipals) {
 TEST(Auth, ValidAuthProviders) {
   ASSERT_OK(AuthManager::GetInstance()->Init());
   ASSERT_TRUE(AuthManager::GetInstance()->GetExternalAuthProvider() != NULL);
+  ASSERT_TRUE(AuthManager::GetInstance()->GetExternalHttpAuthProvider() != NULL);
   ASSERT_TRUE(AuthManager::GetInstance()->GetInternalAuthProvider() != NULL);
 }
 
@@ -126,6 +127,12 @@ TEST(Auth, LdapAuth) {
 
   // External auth provider is sasl, ldap, but not kerberos
   ap = AuthManager::GetInstance()->GetExternalAuthProvider();
+  ASSERT_TRUE(ap->is_secure());
+  sa = dynamic_cast<SecureAuthProvider*>(ap);
+  ASSERT_TRUE(sa->has_ldap());
+  ASSERT_EQ("", sa->principal());
+
+  ap = AuthManager::GetInstance()->GetExternalHttpAuthProvider();
   ASSERT_TRUE(ap->is_secure());
   sa = dynamic_cast<SecureAuthProvider*>(ap);
   ASSERT_TRUE(sa->has_ldap());
@@ -154,6 +161,12 @@ TEST(Auth, LdapKerbAuth) {
 
   // External auth provider is sasl, ldap, and kerberos
   ap = AuthManager::GetInstance()->GetExternalAuthProvider();
+  ASSERT_TRUE(ap->is_secure());
+  sa = dynamic_cast<SecureAuthProvider*>(ap);
+  ASSERT_TRUE(sa->has_ldap());
+  ASSERT_EQ(FLAGS_principal, sa->principal());
+
+  ap = AuthManager::GetInstance()->GetExternalHttpAuthProvider();
   ASSERT_TRUE(ap->is_secure());
   sa = dynamic_cast<SecureAuthProvider*>(ap);
   ASSERT_TRUE(sa->has_ldap());

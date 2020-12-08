@@ -208,6 +208,38 @@ public class BackendConfig {
     return backendCfg_.enable_incremental_metadata_updates;
   }
 
+  public String getSaml2KeystorePath() { return backendCfg_.saml2_keystore_path; }
+
+  public String getSaml2KeystorePassword() {
+    return backendCfg_.saml2_keystore_password;
+  }
+
+  public String getSaml2PrivateKeyPassword() {
+    return backendCfg_.saml2_private_key_password;
+  }
+
+  public String getSaml2IdpMetadata() { return backendCfg_.saml2_idp_metadata; }
+
+  public String getSaml2SpEntityId() { return backendCfg_.saml2_sp_entity_id; }
+
+  public String getSaml2SpCallbackUrl() { return backendCfg_.saml2_sp_callback_url; }
+
+  public boolean getSaml2WantAsserationsSigned() {
+    return backendCfg_.saml2_want_assertations_signed;
+  }
+
+  public boolean getSaml2SignRequest() { return backendCfg_.saml2_sign_requests; }
+
+  public int getSaml2CallbackTokenTtl() {
+    return backendCfg_.saml2_callback_token_ttl;
+  }
+
+  public String getSaml2GroupAttibuteName() { return backendCfg_.saml2_group_attribute_name; }
+
+  public String getSaml2GroupFilter() { return backendCfg_.saml2_group_filter; }
+
+  public boolean getSaml2EETestMode() { return backendCfg_.saml2_ee_test_mode; }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local

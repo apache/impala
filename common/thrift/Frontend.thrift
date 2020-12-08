@@ -984,3 +984,34 @@ struct TQueryCompleteContext {
   // in a future version
   1: required string lineage_string
 }
+
+// Contains all information from a HTTP request.
+// Currently used to pass from BE to FE to do SAML authentication in Java.
+struct TWrappedHttpRequest {
+  1: required string method // Currently only POST is used.
+  // The following members come from parsing the URL:
+  // server_name:server_port/path?params...
+  2: required string server_name
+  3: required i32 server_port
+  4: required string path
+  5: required map<string, string> params
+  // Headers and cookies come from parsing the HTTP header.
+  6: required map<string, string> headers
+  7: required map<string, string> cookies
+  // Filling the content is optional to allow inspecting the header in FE and
+  // continue processing the request in BE.
+  8: optional string content
+  9: required string remote_ip
+  10: required bool secure // True if TLS/SSL was used.
+}
+
+// Contains all information needed to respond to a HTTP request.
+// Currently used to pass from FE to BE to do SAML authentication in Java.
+struct TWrappedHttpResponse {
+  1: required i16 status_code
+  2: required string status_text
+  3: required map<string, string> headers
+  4: required map<string, string> cookies
+  5: optional string content
+  6: optional string content_type
+}

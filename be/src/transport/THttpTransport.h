@@ -68,6 +68,7 @@ protected:
   TMemoryBuffer readBuffer_;
 
   bool readHeaders_;
+  bool readWholeBodyForAuth_;
   bool chunked_;
   bool chunkedDone_;
   uint32_t chunkSize_;
@@ -94,6 +95,7 @@ protected:
   // Called each time we finish reading a set of headers. Allows subclasses to do
   // verification, eg. of authorization, before proceeding.
   virtual void headersDone() {}
+  virtual void bodyDone(uint32_t size) {}
 
   uint32_t readChunked();
   void readChunkedFooters();

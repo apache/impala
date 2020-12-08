@@ -55,6 +55,12 @@ class AuthManager {
   /// kudu::security::InitializeOpenSSL()).
   Status Init();
 
+  /// Returns the authentication provider to use for "external" communication with
+  /// hs2-http protocol. Generally the same as GetExternalAuthProvider(), but can
+  /// be different in case of SAML SSO is enabled but LDAP/Kerberos is not, as SAML
+  /// can be only used during http authentication.
+  AuthProvider* GetExternalHttpAuthProvider();
+
   /// Returns the authentication provider to use for "external" communication
   /// such as the impala shell, jdbc, odbc, etc. This only applies to the server
   /// side of a connection; the client side of said connection is never an
@@ -78,8 +84,11 @@ class AuthManager {
 
   /// These are provided for convenience, so that demon<->demon and client<->demon services
   /// don't have to check the auth flags to figure out which auth provider to use.
+  /// external_http_auth_provider_ overrides external_auth_provider_ for http requests if
+  /// the auth mechanism only supports http requests.
   boost::scoped_ptr<AuthProvider> internal_auth_provider_;
   boost::scoped_ptr<AuthProvider> external_auth_provider_;
+  boost::scoped_ptr<AuthProvider> external_http_auth_provider_;
 
   /// Used to authenticate usernames and passwords to LDAP.
   std::unique_ptr<ImpalaLdap> ldap_;

@@ -80,6 +80,7 @@ import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.analysis.TruncateStmt;
+import org.apache.impala.authentication.saml.ImpalaSamlClient;
 import org.apache.impala.authorization.Authorizable;
 import org.apache.impala.authorization.AuthorizableTable;
 import org.apache.impala.authorization.AuthorizationChecker;
@@ -296,6 +297,8 @@ public class Frontend {
 
   private static ExecutorService checkAuthorizationPool_;
 
+  private final ImpalaSamlClient saml2Client_;
+
   public Frontend(AuthorizationFactory authzFactory, boolean isBackendTest)
       throws ImpalaException {
     this(authzFactory, FeCatalogManager.createFromBackendConfig(), isBackendTest);
@@ -352,6 +355,11 @@ public class Frontend {
       metaStoreClientPool_ = null;
       transactionKeepalive_ = null;
     }
+    if (!BackendConfig.INSTANCE.getSaml2IdpMetadata().isEmpty()) {
+      saml2Client_ =  ImpalaSamlClient.get();
+    } else {
+      saml2Client_ = null;
+    }
   }
 
   /**
@@ -381,6 +389,8 @@ public class Frontend {
   public ImpaladTableUsageTracker getImpaladTableUsageTracker() {
     return impaladTableUsageTracker_;
   }
+
+  public ImpalaSamlClient getSaml2Client() { return saml2Client_; }
 
   public TUpdateCatalogCacheResponse updateCatalogCache(
       TUpdateCatalogCacheRequest req) throws ImpalaException, TException {

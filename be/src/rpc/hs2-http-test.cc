@@ -148,7 +148,7 @@ TEST(Hs2HttpTest, TestSpnego) {
   int port = FindUnusedEphemeralPort();
   ThriftServer* http_server;
   ThriftServerBuilder http_builder("test-http-server", hs2_http_processor, port);
-  ASSERT_OK(http_builder.auth_provider(auth_manager.GetExternalAuthProvider())
+  ASSERT_OK(http_builder.auth_provider(auth_manager.GetExternalHttpAuthProvider())
                 .transport_type(ThriftServer::TransportType::HTTP)
                 .Build(&http_server));
   ASSERT_OK(http_server->Start());
