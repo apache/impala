@@ -59,6 +59,7 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.LocalKuduTable;
 import org.apache.impala.common.AnalysisException;
+import org.apache.impala.common.Id;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -3326,25 +3327,53 @@ public class Analyzer {
     }
 
     // Simply assume that a conjunct contains a UDF, is distinct from/ is not distinct
-    // from operator or nondeterministic buitin functions, it is not null-rejecting
-    // predicate.
+    // from operator, nondeterministic buitin functions or is null operator, it is not
+    // null-rejecting predicate.
     if (e.contains(Predicates.or(Expr.IS_DISTINCT_FROM_OR_NOT_DISTINCT_PREDICATE,
         Expr.IS_NONDETERMINISTIC_BUILTIN_FN_PREDICATE,
-        Expr.IS_UDF_PREDICATE))) {
+        Expr.IS_UDF_PREDICATE, Expr.IS_IS_NULL_PREDICATE))) {
       return true;
     }
 
-    // For conditional function, is null expr or case expr, if the tuple id of the expr
-    // is a subset of 'tupleIds', the result may have null value
+    // Predicate contains conditional function, case expr may not null-rejecting.
     List<Expr> maybeNullableExprs = new ArrayList<>();
     e.collectAll(Predicates.or(Expr.IS_CONDITIONAL_BUILTIN_FN_PREDICATE,
-        Expr.IS_IS_NULL_PREDICATE, Expr.IS_CASE_EXPR_PREDICATE), maybeNullableExprs);
-    for (Expr expr : maybeNullableExprs) {
-      List<TupleId> tids = new ArrayList<>();
-      expr.getIds(tids, null);
-      if (tupleIds.containsAll(tids)) {
-        return true;
+        Expr.IS_CASE_EXPR_PREDICATE), maybeNullableExprs);
+    if (!maybeNullableExprs.isEmpty()) {
+      if (!Expr.IS_BINARY_PREDICATE.apply(e)) return true;
+      // For t1 left join t2 on t1.a = t2.a where t2.b > coalesce(t1.c, t2.c) can
+      // simplify to an inner join. Simply support the case that one child does not
+      // contain conditional builtin function or case expr and has tuple id in outer
+      // joined tuples.
+      for (Expr operand : e.getChildren()) {
+        if (operand instanceof ArithmeticExpr) {
+          // 't1.id + coalesce(t1.c, t2.c) > coalesce(t2.c, t1.c)' is null-rejecting
+          // predicate for t1
+          for (Expr expr : operand.getChildren()) {
+            if (noConditionalBuiltinFnOrCaseExpr(expr, tupleIds)) return false;
+          }
+        } else {
+          if (noConditionalBuiltinFnOrCaseExpr(operand, tupleIds)) return false;
+        }
       }
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * If the 'e' does not contain conditional builtin function or case expr and has
+   * tupleId in 'tupleIds', return true, return false otherwise.
+   */
+  private boolean noConditionalBuiltinFnOrCaseExpr(Expr e, List<TupleId> tupleIds) {
+    List<Expr> nullableExprs = new ArrayList<>();
+    e.collectAll(Predicates.or(Expr.IS_CONDITIONAL_BUILTIN_FN_PREDICATE,
+        Expr.IS_CASE_EXPR_PREDICATE), nullableExprs);
+    if (!nullableExprs.isEmpty()) return false;
+    List<TupleId> tids = new ArrayList<>();
+    e.getIds(tids, null);
+    if (TupleId.intersect(tupleIds, new HashSet<>(tids))) {
+      return true;
     }
     return false;
   }
