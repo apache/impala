@@ -867,3 +867,159 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> ws.ws_item_sk, RF001 -> ws.ws_order_number, RF004 -> ws_sold_date_sk
    row-size=32B cardinality=71.94K
 ====
+# IMPALA-10382: outer join should not be simplified if the predicate with case expr or
+# conditional builtin functions on both sides of outer join is not NULL filtering.
+# t1.tinyint_col >= coalesce(t1.int_col, t2.int_col) is not null-rejecting predicate for t2
+SELECT t1.int_col
+FROM functional.alltypestiny t1
+LEFT JOIN functional.alltypesagg t2 ON t1.tinyint_col = t2.tinyint_col
+  LEFT JOIN functional.alltypes t3 ON t1.int_col = t3.int_col
+WHERE t1.tinyint_col >= coalesce(t1.int_col, t2.int_col);
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.int_col = t3.int_col
+|  row-size=14B cardinality=7.14M
+|
+|--02:SCAN HDFS [functional.alltypes t3]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+03:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t2.tinyint_col = t1.tinyint_col
+|  other predicates: t1.tinyint_col >= coalesce(t1.int_col, t2.int_col)
+|  runtime filters: RF000 <- t1.tinyint_col
+|  row-size=10B cardinality=9.78K
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=5B cardinality=8
+|
+01:SCAN HDFS [functional.alltypesagg t2]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t2.tinyint_col
+   row-size=5B cardinality=11.00K
+====
+# IMPALA-10382: outer join should not be simplified if the predicate with case expr or
+# conditional builtin functions on both sides of outer join is not NULL filtering.
+# t2.tinyint_col >= coalesce(t1.int_col, t2.int_col) is null-rejecting predicate for t2
+SELECT t1.int_col
+FROM functional.alltypestiny t1
+LEFT JOIN functional.alltypesagg t2 ON t1.tinyint_col = t2.tinyint_col
+  LEFT JOIN functional.alltypes t3 ON t1.int_col = t3.int_col
+WHERE t2.tinyint_col >= coalesce(t1.int_col, t2.int_col);
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.int_col = t3.int_col
+|  row-size=14B cardinality=7.14M
+|
+|--02:SCAN HDFS [functional.alltypes t3]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.tinyint_col = t1.tinyint_col
+|  other predicates: t2.tinyint_col >= coalesce(t1.int_col, t2.int_col)
+|  runtime filters: RF000 <- t1.tinyint_col
+|  row-size=10B cardinality=9.78K
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=5B cardinality=8
+|
+01:SCAN HDFS [functional.alltypesagg t2]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t2.tinyint_col
+   row-size=5B cardinality=11.00K
+====
+# IMPALA-10382: outer join should not be simplified if the predicate with case expr or
+# conditional builtin functions on both sides of outer join is not NULL filtering.
+# The predicate is only null-rejecting for t2, so convert t1 full join t2 to t1 right join t2
+SELECT t1.int_col
+FROM functional.alltypestiny t1
+    FULL JOIN functional.alltypesagg t2 ON t1.tinyint_col = t2.tinyint_col
+WHERE t2.tinyint_col + CASE
+    WHEN t1.int_col IS NOT NULL THEN t1.int_col
+    ELSE t2.int_col
+END >= CASE
+    WHEN t1.int_col IS NOT NULL THEN t1.int_col
+    ELSE t2.int_col
+END
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t2.tinyint_col = t1.tinyint_col
+|  other predicates: t2.tinyint_col + CASE WHEN t1.int_col IS NOT NULL THEN t1.int_col ELSE t2.int_col END >= CASE WHEN t1.int_col IS NOT NULL THEN t1.int_col ELSE t2.int_col END
+|  row-size=10B cardinality=11.00K
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=5B cardinality=8
+|
+01:SCAN HDFS [functional.alltypesagg t2]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=5B cardinality=11.00K
+====
+# IMPALA-10382: outer join should not be simplified if the predicate with case expr or
+# conditional builtin functions on both sides of outer join is not NULL filtering.
+SELECT t1.int_col
+FROM functional.alltypestiny t1
+LEFT JOIN functional.alltypesagg t2 ON t1.tinyint_col = t2.tinyint_col
+  LEFT JOIN functional.alltypes t3 ON t1.int_col = t3.int_col
+WHERE t2.tinyint_col + coalesce(t2.int_col, t1.int_col) >= coalesce(t1.int_col, t2.int_col);
+---- PLAN
+PLAN-ROOT SINK
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.int_col = t3.int_col
+|  row-size=14B cardinality=7.14M
+|
+|--02:SCAN HDFS [functional.alltypes t3]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.tinyint_col = t1.tinyint_col
+|  other predicates: t2.tinyint_col + coalesce(t2.int_col, t1.int_col) >= coalesce(t1.int_col, t2.int_col)
+|  runtime filters: RF000 <- t1.tinyint_col
+|  row-size=10B cardinality=9.78K
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=5B cardinality=8
+|
+01:SCAN HDFS [functional.alltypesagg t2]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t2.tinyint_col
+   row-size=5B cardinality=11.00K
+====
+# IMPALA-10382: outer join should not be simplified if the predicate with case expr or
+# conditional builtin functions on both sides of outer join is not NULL filtering.
+# t2.tinyint_col + t1.int_col + coalesce(t2.int_col, t1.int_col) >= coalesce(t1.int_col, t2.int_col)
+# is null-rejecting for t1 and t2
+SELECT t1.int_col
+FROM functional.alltypestiny t1
+  FULL JOIN functional.alltypesagg t2 ON t1.tinyint_col = t2.tinyint_col
+WHERE t2.tinyint_col + t1.int_col + coalesce(t2.int_col, t1.int_col) >= coalesce(t1.int_col, t2.int_col);
+---- PLAN
+PLAN-ROOT SINK
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.tinyint_col = t1.tinyint_col
+|  other predicates: t2.tinyint_col + t1.int_col + coalesce(t2.int_col, t1.int_col) >= coalesce(t1.int_col, t2.int_col)
+|  runtime filters: RF000 <- t1.tinyint_col
+|  row-size=10B cardinality=9.78K
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=5B cardinality=8
+|
+01:SCAN HDFS [functional.alltypesagg t2]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   runtime filters: RF000 -> t2.tinyint_col
+   row-size=5B cardinality=11.00K
+====

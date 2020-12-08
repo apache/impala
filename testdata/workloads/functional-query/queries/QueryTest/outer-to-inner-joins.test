@@ -256,3 +256,30 @@ where t1.id = t2.pos and t2.item = 2
 ---- TYPES
 bigint
 ====
+---- QUERY
+SELECT count(*)
+FROM functional.alltypestiny t1
+LEFT JOIN functional.alltypesagg t2 ON t1.tinyint_col = t2.tinyint_col
+  LEFT JOIN functional.alltypes t3 ON t1.int_col = t3.int_col
+WHERE t1.tinyint_col >= coalesce(t1.int_col, t2.int_col)
+---- RESULTS
+2922920
+---- TYPES
+bigint
+====
+---- QUERY
+SELECT count(*)
+FROM functional.alltypestiny t1
+    FULL JOIN functional.alltypesagg t2 ON t1.tinyint_col = t2.tinyint_col
+WHERE t2.tinyint_col + CASE
+    WHEN t1.int_col IS NOT NULL THEN t1.int_col
+    ELSE t2.int_col
+END >= CASE
+    WHEN t1.int_col IS NOT NULL THEN t1.int_col
+    ELSE t2.int_col
+END
+---- RESULTS
+12000
+---- TYPES
+bigint
+====
