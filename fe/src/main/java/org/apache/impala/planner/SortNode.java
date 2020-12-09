@@ -495,14 +495,10 @@ public class SortNode extends PlanNode {
     } else {
       Preconditions.checkState(type_ == TSortType.TOTAL ||
           type_ == TSortType.PARTITIONED_TOPN);
-      // For an external sort, set the memory cost to be what is required for a 2-phase
-      // sort. If the input to be sorted would take up N blocks in memory, then the
-      // memory required for a 2-phase sort is sqrt(N) blocks. A single run would be of
-      // size sqrt(N) blocks, and we could merge sqrt(N) such runs with sqrt(N) blocks
-      // of memory.
-      double numInputBlocks = Math.ceil(fullInputSize / (bufferSize * pageMultiplier));
-      perInstanceMemEstimate =
-          bufferSize * (long) Math.ceil(Math.sqrt(numInputBlocks));
+      long numInstances = fragment_.getNumInstances();
+      // Data takes up most of the memory
+      perInstanceMemEstimate = fullInputSize < 0 ?
+          PARTIAL_SORT_MEM_LIMIT : (long) Math.ceil(fullInputSize / numInstances);
       perInstanceMinMemReservation = 3 * bufferSize * pageMultiplier;
 
       if (type_ == TSortType.PARTITIONED_TOPN) {

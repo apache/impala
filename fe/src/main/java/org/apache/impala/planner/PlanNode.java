@@ -1043,4 +1043,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   public boolean allowPartitioned() { return !hasLimit(); }
+
+  public int getNumMaterializedSlots(TupleDescriptor desc) {
+    int numCols = 0;
+    for (SlotDescriptor slot: desc.getSlots()) {
+      // Columns used in this query
+      if (slot.isMaterialized()) {
+        ++numCols;
+      }
+    }
+    return numCols;
+  }
 }

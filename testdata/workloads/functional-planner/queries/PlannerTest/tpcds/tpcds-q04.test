@@ -119,10 +119,10 @@ ORDER BY t_s_secyear.customer_id,
          t_s_secyear.customer_preferred_cust_flag
 LIMIT 100;
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=377.94MB Threads=19
-Per-Host Resource Estimates: Memory=2.12GB
+Max Per-Host Resource Reservation: Memory=495.00MB Threads=19
+Per-Host Resource Estimates: Memory=2.19GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=2.12GB mem-reservation=377.94MB thread-reservation=19 runtime-filters-memory=10.00MB
+|  Per-Host Resources: mem-estimate=2.19GB mem-reservation=495.00MB thread-reservation=19 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: customer_id, customer_first_name, customer_last_name, customer_preferred_cust_flag
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -138,7 +138,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: assumed fk/pk
 |  other predicates: CASE WHEN year_total > CAST(0 AS DECIMAL(3,0)) THEN year_total / year_total ELSE NULL END > CASE WHEN year_total > CAST(0 AS DECIMAL(3,0)) THEN year_total / year_total ELSE NULL END
 |  runtime filters: RF000[bloom] <- customer_id, RF001[min_max] <- customer_id
-|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=26,12,40,54,68,82 row-size=313B cardinality=589.03K
 |  in pipelines: 13(GETNEXT), 41(OPEN)
 |
@@ -158,7 +158,7 @@ PLAN-ROOT SINK
 |  |  hash predicates: c_customer_sk = ws_bill_customer_sk
 |  |  fk/pk conjuncts: c_customer_sk = ws_bill_customer_sk
 |  |  runtime filters: RF031[min_max] <- ws_bill_customer_sk
-|  |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=78,79,80 row-size=185B cardinality=148.00K
 |  |  in pipelines: 36(GETNEXT), 37(OPEN)
 |  |
@@ -209,7 +209,7 @@ PLAN-ROOT SINK
 |  hash predicates: customer_id = customer_id
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF002[bloom] <- customer_id, RF003[min_max] <- customer_id
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=26,12,40,54,68 row-size=269B cardinality=589.03K
 |  in pipelines: 13(GETNEXT), 34(OPEN)
 |
@@ -230,7 +230,7 @@ PLAN-ROOT SINK
 |  |  hash predicates: c_customer_sk = ws_bill_customer_sk
 |  |  fk/pk conjuncts: c_customer_sk = ws_bill_customer_sk
 |  |  runtime filters: RF027[min_max] <- ws_bill_customer_sk
-|  |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=64,65,66 row-size=185B cardinality=148.00K
 |  |  in pipelines: 29(GETNEXT), 30(OPEN)
 |  |
@@ -282,7 +282,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: assumed fk/pk
 |  other predicates: CASE WHEN year_total > CAST(0 AS DECIMAL(3,0)) THEN year_total / year_total ELSE NULL END > CASE WHEN year_total > CAST(0 AS DECIMAL(3,0)) THEN year_total / year_total ELSE NULL END
 |  runtime filters: RF004[bloom] <- customer_id, RF005[min_max] <- customer_id
-|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=26,12,40,54 row-size=225B cardinality=589.03K
 |  in pipelines: 13(GETNEXT), 27(OPEN)
 |
@@ -294,7 +294,7 @@ PLAN-ROOT SINK
 |  27:AGGREGATE [FINALIZE]
 |  |  output: sum((((cs_ext_list_price - cs_ext_wholesale_cost - cs_ext_discount_amt) + cs_ext_sales_price) / CAST(2 AS DECIMAL(3,0))))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=52.27MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=52.01MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=49 row-size=169B cardinality=294.63K
 |  |  in pipelines: 27(GETNEXT), 22(OPEN)
 |  |
@@ -302,7 +302,7 @@ PLAN-ROOT SINK
 |  |  hash predicates: c_customer_sk = cs_bill_customer_sk
 |  |  fk/pk conjuncts: c_customer_sk = cs_bill_customer_sk
 |  |  runtime filters: RF023[min_max] <- cs_bill_customer_sk
-|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=46,47,48 row-size=185B cardinality=294.63K
 |  |  in pipelines: 22(GETNEXT), 23(OPEN)
 |  |
@@ -353,7 +353,7 @@ PLAN-ROOT SINK
 |  hash predicates: customer_id = customer_id
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF006[bloom] <- customer_id, RF007[min_max] <- customer_id
-|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=26,12,40 row-size=181B cardinality=589.03K
 |  in pipelines: 13(GETNEXT), 20(OPEN)
 |
@@ -366,7 +366,7 @@ PLAN-ROOT SINK
 |  |  output: sum((((cs_ext_list_price - cs_ext_wholesale_cost - cs_ext_discount_amt) + cs_ext_sales_price) / CAST(2 AS DECIMAL(3,0))))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
 |  |  having: sum((((cs_ext_list_price - cs_ext_wholesale_cost - cs_ext_discount_amt) + cs_ext_sales_price) / 2)) > CAST(0 AS DECIMAL(3,0))
-|  |  mem-estimate=52.27MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=52.01MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=35 row-size=169B cardinality=29.46K
 |  |  in pipelines: 20(GETNEXT), 15(OPEN)
 |  |
@@ -374,7 +374,7 @@ PLAN-ROOT SINK
 |  |  hash predicates: c_customer_sk = cs_bill_customer_sk
 |  |  fk/pk conjuncts: c_customer_sk = cs_bill_customer_sk
 |  |  runtime filters: RF019[min_max] <- cs_bill_customer_sk
-|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=32,33,34 row-size=185B cardinality=294.63K
 |  |  in pipelines: 15(GETNEXT), 16(OPEN)
 |  |
@@ -425,7 +425,7 @@ PLAN-ROOT SINK
 |  hash predicates: customer_id = customer_id
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF009[min_max] <- customer_id
-|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=26,12 row-size=137B cardinality=589.03K
 |  in pipelines: 13(GETNEXT), 06(OPEN)
 |
@@ -438,7 +438,7 @@ PLAN-ROOT SINK
 |  |  output: sum(((ss_ext_list_price - ss_ext_wholesale_cost - ss_ext_discount_amt) + ss_ext_sales_price) / CAST(2 AS DECIMAL(3,0)))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
 |  |  having: sum(((ss_ext_list_price - ss_ext_wholesale_cost - ss_ext_discount_amt) + ss_ext_sales_price) / 2) > CAST(0 AS DECIMAL(3,0))
-|  |  mem-estimate=104.50MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=103.99MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=3 row-size=169B cardinality=58.90K
 |  |  in pipelines: 06(GETNEXT), 02(OPEN)
 |  |
@@ -446,7 +446,7 @@ PLAN-ROOT SINK
 |  |  hash predicates: ss_customer_sk = c_customer_sk
 |  |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  |  runtime filters: RF015[min_max] <- c_customer_sk
-|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=1,2,0 row-size=185B cardinality=589.03K
 |  |  in pipelines: 02(GETNEXT), 01(OPEN)
 |  |
@@ -502,7 +502,7 @@ PLAN-ROOT SINK
 13:AGGREGATE [FINALIZE]
 |  output: sum(((ss_ext_list_price - ss_ext_wholesale_cost - ss_ext_discount_amt) + ss_ext_sales_price) / CAST(2 AS DECIMAL(3,0)))
 |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  mem-estimate=104.50MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=103.99MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=17 row-size=169B cardinality=589.03K
 |  in pipelines: 13(GETNEXT), 09(OPEN)
 |
@@ -510,7 +510,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  runtime filters: RF011[min_max] <- c_customer_sk
-|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=15,16,14 row-size=185B cardinality=589.03K
 |  in pipelines: 09(GETNEXT), 08(OPEN)
 |
@@ -558,8 +558,8 @@ PLAN-ROOT SINK
    tuple-ids=15 row-size=24B cardinality=2.88M
    in pipelines: 09(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=656.69MB Threads=49
-Per-Host Resource Estimates: Memory=2.79GB
+Max Per-Host Resource Reservation: Memory=603.75MB Threads=49
+Per-Host Resource Estimates: Memory=2.67GB
 F36:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -574,7 +574,7 @@ PLAN-ROOT SINK
 |  in pipelines: 47(GETNEXT)
 |
 F05:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reservation=1 runtime-filters-memory=4.00MB
+Per-Host Resources: mem-estimate=137.44MB mem-reservation=105.12MB thread-reservation=1 runtime-filters-memory=4.00MB
 47:TOP-N [LIMIT=100]
 |  order by: customer_id ASC, customer_first_name ASC, customer_last_name ASC, customer_preferred_cust_flag ASC
 |  mem-estimate=7.52KB mem-reservation=0B thread-reservation=0
@@ -586,7 +586,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  fk/pk conjuncts: assumed fk/pk
 |  other predicates: CASE WHEN year_total > CAST(0 AS DECIMAL(3,0)) THEN year_total / year_total ELSE NULL END > CASE WHEN year_total > CAST(0 AS DECIMAL(3,0)) THEN year_total / year_total ELSE NULL END
 |  runtime filters: RF000[bloom] <- customer_id, RF001[min_max] <- customer_id
-|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=26,12,40,54,68,82 row-size=313B cardinality=589.03K
 |  in pipelines: 52(GETNEXT), 81(OPEN)
 |
@@ -596,7 +596,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  |  in pipelines: 81(GETNEXT)
 |  |
 |  F35:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=44.34MB mem-reservation=34.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=27.34MB mem-reservation=17.00MB thread-reservation=1
 |  35:UNION
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=82 row-size=44B cardinality=148.00K
@@ -605,7 +605,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  81:AGGREGATE [FINALIZE]
 |  |  output: sum:merge((((ws_ext_list_price - ws_ext_wholesale_cost - ws_ext_discount_amt) + ws_ext_sales_price) / 2))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=81 row-size=169B cardinality=148.00K
 |  |  in pipelines: 81(GETNEXT), 37(OPEN)
 |  |
@@ -615,11 +615,11 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  |  in pipelines: 37(GETNEXT)
 |  |
 |  F33:PLAN FRAGMENT [HASH(ws_bill_customer_sk)] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=54.99MB mem-reservation=42.50MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=46.49MB mem-reservation=34.00MB thread-reservation=1
 |  41:AGGREGATE [STREAMING]
 |  |  output: sum((((ws_ext_list_price - ws_ext_wholesale_cost - ws_ext_discount_amt) + ws_ext_sales_price) / CAST(2 AS DECIMAL(3,0))))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=81 row-size=169B cardinality=148.00K
 |  |  in pipelines: 37(GETNEXT)
 |  |
@@ -627,7 +627,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  |  hash predicates: ws_bill_customer_sk = c_customer_sk
 |  |  fk/pk conjuncts: ws_bill_customer_sk = c_customer_sk
 |  |  runtime filters: RF031[min_max] <- c_customer_sk
-|  |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=79,80,78 row-size=185B cardinality=148.00K
 |  |  in pipelines: 37(GETNEXT), 36(OPEN)
 |  |
@@ -698,7 +698,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  hash predicates: customer_id = customer_id
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF002[bloom] <- customer_id, RF003[min_max] <- customer_id
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=26,12,40,54,68 row-size=269B cardinality=589.03K
 |  in pipelines: 52(GETNEXT), 75(OPEN)
 |
@@ -708,7 +708,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  |  in pipelines: 75(GETNEXT)
 |  |
 |  F29:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=44.34MB mem-reservation=34.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=27.34MB mem-reservation=17.00MB thread-reservation=1
 |  28:UNION
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=68 row-size=44B cardinality=14.80K
@@ -718,7 +718,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  |  output: sum:merge((((ws_ext_list_price - ws_ext_wholesale_cost - ws_ext_discount_amt) + ws_ext_sales_price) / 2))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
 |  |  having: sum((((ws_ext_list_price - ws_ext_wholesale_cost - ws_ext_discount_amt) + ws_ext_sales_price) / 2)) > CAST(0 AS DECIMAL(3,0))
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=67 row-size=169B cardinality=14.80K
 |  |  in pipelines: 75(GETNEXT), 30(OPEN)
 |  |
@@ -728,11 +728,11 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  F27:PLAN FRAGMENT [HASH(ws_bill_customer_sk)] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=54.99MB mem-reservation=42.50MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=46.49MB mem-reservation=34.00MB thread-reservation=1
 |  34:AGGREGATE [STREAMING]
 |  |  output: sum((((ws_ext_list_price - ws_ext_wholesale_cost - ws_ext_discount_amt) + ws_ext_sales_price) / CAST(2 AS DECIMAL(3,0))))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=67 row-size=169B cardinality=148.00K
 |  |  in pipelines: 30(GETNEXT)
 |  |
@@ -740,7 +740,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  |  hash predicates: ws_bill_customer_sk = c_customer_sk
 |  |  fk/pk conjuncts: ws_bill_customer_sk = c_customer_sk
 |  |  runtime filters: RF027[min_max] <- c_customer_sk
-|  |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=65,66,64 row-size=185B cardinality=148.00K
 |  |  in pipelines: 30(GETNEXT), 29(OPEN)
 |  |
@@ -813,7 +813,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  fk/pk conjuncts: assumed fk/pk
 |  other predicates: CASE WHEN year_total > CAST(0 AS DECIMAL(3,0)) THEN year_total / year_total ELSE NULL END > CASE WHEN year_total > CAST(0 AS DECIMAL(3,0)) THEN year_total / year_total ELSE NULL END
 |  runtime filters: RF004[bloom] <- customer_id, RF005[min_max] <- customer_id
-|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=26,12,40,54 row-size=225B cardinality=589.03K
 |  in pipelines: 52(GETNEXT), 69(OPEN)
 |
@@ -842,11 +842,11 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  F21:PLAN FRAGMENT [HASH(cs_bill_customer_sk)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=55.77MB mem-reservation=42.50MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=38.77MB mem-reservation=25.50MB thread-reservation=1
 |  27:AGGREGATE [STREAMING]
 |  |  output: sum((((cs_ext_list_price - cs_ext_wholesale_cost - cs_ext_discount_amt) + cs_ext_sales_price) / CAST(2 AS DECIMAL(3,0))))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=49 row-size=169B cardinality=294.63K
 |  |  in pipelines: 23(GETNEXT)
 |  |
@@ -926,7 +926,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  hash predicates: customer_id = customer_id
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF006[bloom] <- customer_id, RF007[min_max] <- customer_id
-|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=26,12,40 row-size=181B cardinality=589.03K
 |  in pipelines: 52(GETNEXT), 63(OPEN)
 |
@@ -956,11 +956,11 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  |  in pipelines: 16(GETNEXT)
 |  |
 |  F15:PLAN FRAGMENT [HASH(cs_bill_customer_sk)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=55.77MB mem-reservation=42.50MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=38.77MB mem-reservation=25.50MB thread-reservation=1
 |  20:AGGREGATE [STREAMING]
 |  |  output: sum((((cs_ext_list_price - cs_ext_wholesale_cost - cs_ext_discount_amt) + cs_ext_sales_price) / CAST(2 AS DECIMAL(3,0))))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=35 row-size=169B cardinality=294.63K
 |  |  in pipelines: 16(GETNEXT)
 |  |
@@ -1040,7 +1040,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  hash predicates: customer_id = customer_id
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF009[min_max] <- customer_id
-|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=26,12 row-size=137B cardinality=589.03K
 |  in pipelines: 52(GETNEXT), 57(OPEN)
 |
@@ -1050,7 +1050,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  |  in pipelines: 57(GETNEXT)
 |  |
 |  F11:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=62.76MB mem-reservation=34.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=45.17MB mem-reservation=34.00MB thread-reservation=1
 |  00:UNION
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=12 row-size=44B cardinality=58.90K
@@ -1060,7 +1060,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  |  output: sum:merge(((ss_ext_list_price - ss_ext_wholesale_cost - ss_ext_discount_amt) + ss_ext_sales_price) / 2)
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
 |  |  having: sum(((ss_ext_list_price - ss_ext_wholesale_cost - ss_ext_discount_amt) + ss_ext_sales_price) / 2) > CAST(0 AS DECIMAL(3,0))
-|  |  mem-estimate=52.25MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=34.66MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=3 row-size=169B cardinality=58.90K
 |  |  in pipelines: 57(GETNEXT), 02(OPEN)
 |  |
@@ -1070,11 +1070,11 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=77.01MB mem-reservation=42.50MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=58.76MB mem-reservation=42.50MB thread-reservation=1
 |  06:AGGREGATE [STREAMING]
 |  |  output: sum(((ss_ext_list_price - ss_ext_wholesale_cost - ss_ext_discount_amt) + ss_ext_sales_price) / CAST(2 AS DECIMAL(3,0)))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=52.25MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=3 row-size=169B cardinality=589.03K
 |  |  in pipelines: 02(GETNEXT)
 |  |
@@ -1159,7 +1159,7 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 52:AGGREGATE [FINALIZE]
 |  output: sum:merge(((ss_ext_list_price - ss_ext_wholesale_cost - ss_ext_discount_amt) + ss_ext_sales_price) / 2)
 |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  mem-estimate=52.25MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=34.66MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=17 row-size=169B cardinality=589.03K
 |  in pipelines: 52(GETNEXT), 09(OPEN)
 |
@@ -1169,11 +1169,11 @@ Per-Host Resources: mem-estimate=122.97MB mem-reservation=73.06MB thread-reserva
 |  in pipelines: 09(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=77.01MB mem-reservation=42.50MB thread-reservation=1
+Per-Host Resources: mem-estimate=58.76MB mem-reservation=42.50MB thread-reservation=1
 13:AGGREGATE [STREAMING]
 |  output: sum(((ss_ext_list_price - ss_ext_wholesale_cost - ss_ext_discount_amt) + ss_ext_sales_price) / CAST(2 AS DECIMAL(3,0)))
 |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  mem-estimate=52.25MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=17 row-size=169B cardinality=589.03K
 |  in pipelines: 09(GETNEXT)
 |
@@ -1250,8 +1250,8 @@ Per-Host Resources: mem-estimate=82.95MB mem-reservation=6.94MB thread-reservati
    tuple-ids=15 row-size=24B cardinality=2.88M
    in pipelines: 09(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=855.38MB Threads=56
-Per-Host Resource Estimates: Memory=1.33GB
+Max Per-Host Resource Reservation: Memory=766.50MB Threads=56
+Per-Host Resource Estimates: Memory=1.25GB
 F36:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -1278,17 +1278,17 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  hash predicates: customer_id = customer_id
 |  fk/pk conjuncts: assumed fk/pk
 |  other predicates: CASE WHEN year_total > CAST(0 AS DECIMAL(3,0)) THEN year_total / year_total ELSE NULL END > CASE WHEN year_total > CAST(0 AS DECIMAL(3,0)) THEN year_total / year_total ELSE NULL END
-|  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=26,12,40,54,68,82 row-size=313B cardinality=589.03K
 |  in pipelines: 52(GETNEXT), 81(OPEN)
 |
 |--F37:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=24.30MB mem-reservation=18.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=41.30MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: customer_id
 |  |  runtime filters: RF000[bloom] <- customer_id, RF001[min_max] <- customer_id
-|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=512.00KB thread-reservation=0
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=1.00MB thread-reservation=0
 |  |
 |  82:EXCHANGE [BROADCAST]
 |  |  mem-estimate=6.30MB mem-reservation=0B thread-reservation=0
@@ -1296,7 +1296,7 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  |  in pipelines: 81(GETNEXT)
 |  |
 |  F35:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Instance Resources: mem-estimate=44.34MB mem-reservation=34.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=27.34MB mem-reservation=17.00MB thread-reservation=1
 |  35:UNION
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=82 row-size=44B cardinality=148.00K
@@ -1305,7 +1305,7 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  81:AGGREGATE [FINALIZE]
 |  |  output: sum:merge((((ws_ext_list_price - ws_ext_wholesale_cost - ws_ext_discount_amt) + ws_ext_sales_price) / 2))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=81 row-size=169B cardinality=148.00K
 |  |  in pipelines: 81(GETNEXT), 37(OPEN)
 |  |
@@ -1315,11 +1315,11 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  |  in pipelines: 37(GETNEXT)
 |  |
 |  F33:PLAN FRAGMENT [HASH(ws_bill_customer_sk)] hosts=2 instances=2
-|  Per-Instance Resources: mem-estimate=36.34MB mem-reservation=34.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=19.34MB mem-reservation=17.00MB thread-reservation=1
 |  41:AGGREGATE [STREAMING]
 |  |  output: sum((((ws_ext_list_price - ws_ext_wholesale_cost - ws_ext_discount_amt) + ws_ext_sales_price) / CAST(2 AS DECIMAL(3,0))))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=81 row-size=169B cardinality=148.00K
 |  |  in pipelines: 37(GETNEXT)
 |  |
@@ -1327,17 +1327,17 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  |  hash-table-id=01
 |  |  hash predicates: ws_bill_customer_sk = c_customer_sk
 |  |  fk/pk conjuncts: ws_bill_customer_sk = c_customer_sk
-|  |  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
+|  |  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=79,80,78 row-size=185B cardinality=148.00K
 |  |  in pipelines: 37(GETNEXT), 36(OPEN)
 |  |
 |  |--F38:PLAN FRAGMENT [HASH(ws_bill_customer_sk)] hosts=2 instances=2
-|  |  |  Per-Instance Resources: mem-estimate=18.65MB mem-reservation=8.50MB thread-reservation=1
+|  |  |  Per-Instance Resources: mem-estimate=27.15MB mem-reservation=17.00MB thread-reservation=1
 |  |  JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: c_customer_sk
 |  |  |  runtime filters: RF031[min_max] <- c_customer_sk
-|  |  |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  |  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  |
 |  |  79:EXCHANGE [HASH(c_customer_sk)]
 |  |  |  mem-estimate=10.15MB mem-reservation=0B thread-reservation=0
@@ -1415,17 +1415,17 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  hash-table-id=03
 |  hash predicates: customer_id = customer_id
 |  fk/pk conjuncts: assumed fk/pk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=26,12,40,54,68 row-size=269B cardinality=589.03K
 |  in pipelines: 52(GETNEXT), 75(OPEN)
 |
 |--F40:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=5.59MB mem-reservation=4.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=7.46MB mem-reservation=6.75MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: customer_id
 |  |  runtime filters: RF002[bloom] <- customer_id, RF003[min_max] <- customer_id
-|  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=5.75MB mem-reservation=5.75MB spill-buffer=128.00KB thread-reservation=0
 |  |
 |  76:EXCHANGE [BROADCAST]
 |  |  mem-estimate=731.94KB mem-reservation=0B thread-reservation=0
@@ -1433,7 +1433,7 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  |  in pipelines: 75(GETNEXT)
 |  |
 |  F29:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Instance Resources: mem-estimate=44.34MB mem-reservation=34.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=27.34MB mem-reservation=17.00MB thread-reservation=1
 |  28:UNION
 |  |  mem-estimate=0B mem-reservation=0B thread-reservation=0
 |  |  tuple-ids=68 row-size=44B cardinality=14.80K
@@ -1443,7 +1443,7 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  |  output: sum:merge((((ws_ext_list_price - ws_ext_wholesale_cost - ws_ext_discount_amt) + ws_ext_sales_price) / 2))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
 |  |  having: sum((((ws_ext_list_price - ws_ext_wholesale_cost - ws_ext_discount_amt) + ws_ext_sales_price) / 2)) > CAST(0 AS DECIMAL(3,0))
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=67 row-size=169B cardinality=14.80K
 |  |  in pipelines: 75(GETNEXT), 30(OPEN)
 |  |
@@ -1453,11 +1453,11 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  F27:PLAN FRAGMENT [HASH(ws_bill_customer_sk)] hosts=2 instances=2
-|  Per-Instance Resources: mem-estimate=36.34MB mem-reservation=34.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=19.34MB mem-reservation=17.00MB thread-reservation=1
 |  34:AGGREGATE [STREAMING]
 |  |  output: sum((((ws_ext_list_price - ws_ext_wholesale_cost - ws_ext_discount_amt) + ws_ext_sales_price) / CAST(2 AS DECIMAL(3,0))))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=67 row-size=169B cardinality=148.00K
 |  |  in pipelines: 30(GETNEXT)
 |  |
@@ -1465,17 +1465,17 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  |  hash-table-id=04
 |  |  hash predicates: ws_bill_customer_sk = c_customer_sk
 |  |  fk/pk conjuncts: ws_bill_customer_sk = c_customer_sk
-|  |  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
+|  |  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=65,66,64 row-size=185B cardinality=148.00K
 |  |  in pipelines: 30(GETNEXT), 29(OPEN)
 |  |
 |  |--F41:PLAN FRAGMENT [HASH(ws_bill_customer_sk)] hosts=2 instances=2
-|  |  |  Per-Instance Resources: mem-estimate=18.65MB mem-reservation=8.50MB thread-reservation=1
+|  |  |  Per-Instance Resources: mem-estimate=27.15MB mem-reservation=17.00MB thread-reservation=1
 |  |  JOIN BUILD
 |  |  |  join-table-id=04 plan-id=05 cohort-id=03
 |  |  |  build expressions: c_customer_sk
 |  |  |  runtime filters: RF027[min_max] <- c_customer_sk
-|  |  |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  |  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  |
 |  |  73:EXCHANGE [HASH(c_customer_sk)]
 |  |  |  mem-estimate=10.15MB mem-reservation=0B thread-reservation=0
@@ -1556,17 +1556,17 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  hash predicates: customer_id = customer_id
 |  fk/pk conjuncts: assumed fk/pk
 |  other predicates: CASE WHEN year_total > CAST(0 AS DECIMAL(3,0)) THEN year_total / year_total ELSE NULL END > CASE WHEN year_total > CAST(0 AS DECIMAL(3,0)) THEN year_total / year_total ELSE NULL END
-|  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=26,12,40,54 row-size=225B cardinality=589.03K
 |  in pipelines: 52(GETNEXT), 69(OPEN)
 |
 |--F43:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=45.14MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=79.14MB mem-reservation=69.00MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: customer_id
 |  |  runtime filters: RF004[bloom] <- customer_id, RF005[min_max] <- customer_id
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  mem-estimate=68.00MB mem-reservation=68.00MB spill-buffer=2.00MB thread-reservation=0
 |  |
 |  70:EXCHANGE [BROADCAST]
 |  |  mem-estimate=10.14MB mem-reservation=0B thread-reservation=0
@@ -1593,11 +1593,11 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  |  in pipelines: 23(GETNEXT)
 |  |
 |  F21:PLAN FRAGMENT [HASH(cs_bill_customer_sk)] hosts=3 instances=3
-|  Per-Instance Resources: mem-estimate=37.11MB mem-reservation=34.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=20.11MB mem-reservation=17.00MB thread-reservation=1
 |  27:AGGREGATE [STREAMING]
 |  |  output: sum((((cs_ext_list_price - cs_ext_wholesale_cost - cs_ext_discount_amt) + cs_ext_sales_price) / CAST(2 AS DECIMAL(3,0))))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=49 row-size=169B cardinality=294.63K
 |  |  in pipelines: 23(GETNEXT)
 |  |
@@ -1695,17 +1695,17 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  hash-table-id=09
 |  hash predicates: customer_id = customer_id
 |  fk/pk conjuncts: assumed fk/pk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=26,12,40 row-size=181B cardinality=589.03K
 |  in pipelines: 52(GETNEXT), 63(OPEN)
 |
 |--F46:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=8.13MB mem-reservation=6.75MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=11.88MB mem-reservation=10.50MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=09 plan-id=10 cohort-id=01
 |  |  build expressions: customer_id
 |  |  runtime filters: RF006[bloom] <- customer_id, RF007[min_max] <- customer_id
-|  |  mem-estimate=5.75MB mem-reservation=5.75MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=9.50MB mem-reservation=9.50MB spill-buffer=256.00KB thread-reservation=0
 |  |
 |  64:EXCHANGE [BROADCAST]
 |  |  mem-estimate=1.38MB mem-reservation=0B thread-reservation=0
@@ -1733,11 +1733,11 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  |  in pipelines: 16(GETNEXT)
 |  |
 |  F15:PLAN FRAGMENT [HASH(cs_bill_customer_sk)] hosts=3 instances=3
-|  Per-Instance Resources: mem-estimate=37.11MB mem-reservation=34.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=20.11MB mem-reservation=17.00MB thread-reservation=1
 |  20:AGGREGATE [STREAMING]
 |  |  output: sum((((cs_ext_list_price - cs_ext_wholesale_cost - cs_ext_discount_amt) + cs_ext_sales_price) / CAST(2 AS DECIMAL(3,0))))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=35 row-size=169B cardinality=294.63K
 |  |  in pipelines: 16(GETNEXT)
 |  |
@@ -1835,17 +1835,17 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  hash-table-id=12
 |  hash predicates: customer_id = customer_id
 |  fk/pk conjuncts: assumed fk/pk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=26,12 row-size=137B cardinality=589.03K
 |  in pipelines: 52(GETNEXT), 57(OPEN)
 |
 |--F49:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=12.25MB mem-reservation=9.50MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=19.75MB mem-reservation=17.00MB thread-reservation=1
 |  JOIN BUILD
 |  |  join-table-id=12 plan-id=13 cohort-id=01
 |  |  build expressions: customer_id
 |  |  runtime filters: RF009[min_max] <- customer_id
-|  |  mem-estimate=9.50MB mem-reservation=9.50MB spill-buffer=256.00KB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=512.00KB thread-reservation=0
 |  |
 |  58:EXCHANGE [BROADCAST]
 |  |  mem-estimate=2.75MB mem-reservation=0B thread-reservation=0
@@ -1873,11 +1873,11 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=3 instances=6
-|  Per-Instance Resources: mem-estimate=40.23MB mem-reservation=34.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=23.23MB mem-reservation=17.00MB thread-reservation=1
 |  06:AGGREGATE [STREAMING]
 |  |  output: sum(((ss_ext_list_price - ss_ext_wholesale_cost - ss_ext_discount_amt) + ss_ext_sales_price) / CAST(2 AS DECIMAL(3,0)))
 |  |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |  tuple-ids=3 row-size=169B cardinality=589.03K
 |  |  in pipelines: 02(GETNEXT)
 |  |
@@ -1990,11 +1990,11 @@ Per-Instance Resources: mem-estimate=45.02MB mem-reservation=34.00MB thread-rese
 |  in pipelines: 09(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=40.23MB mem-reservation=34.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=23.23MB mem-reservation=17.00MB thread-reservation=1
 13:AGGREGATE [STREAMING]
 |  output: sum(((ss_ext_list_price - ss_ext_wholesale_cost - ss_ext_discount_amt) + ss_ext_sales_price) / CAST(2 AS DECIMAL(3,0)))
 |  group by: c_customer_id, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_country, c_login, c_email_address, d_year
-|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=17 row-size=169B cardinality=589.03K
 |  in pipelines: 09(GETNEXT)
 |

@@ -184,7 +184,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_sold_date_sk = d_date_sk
 |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
 |  runtime filters: RF000[bloom] <- d_date_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=0,1,2 row-size=58B cardinality=130.03K
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
@@ -229,8 +229,8 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=20B cardinality=130.03K
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=49.69MB Threads=19
-Per-Host Resource Estimates: Memory=622MB
+Max Per-Host Resource Reservation: Memory=51.31MB Threads=19
+Per-Host Resource Estimates: Memory=624MB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -245,7 +245,7 @@ PLAN-ROOT SINK
 |  in pipelines: 17(GETNEXT)
 |
 F12:PLAN FRAGMENT [HASH(channel,col_name,d_year,d_qoy,i_category)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=13.46MB mem-reservation=1.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=13.46MB mem-reservation=4.75MB thread-reservation=1
 17:TOP-N [LIMIT=100]
 |  order by: channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC
 |  mem-estimate=7.22KB mem-reservation=0B thread-reservation=0
@@ -255,7 +255,7 @@ Per-Host Resources: mem-estimate=13.46MB mem-reservation=1.94MB thread-reservati
 27:AGGREGATE [FINALIZE]
 |  output: count:merge(*), sum:merge(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
-|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=11 row-size=74B cardinality=137.37K
 |  in pipelines: 27(GETNEXT), 01(OPEN), 07(OPEN), 11(OPEN)
 |
@@ -265,11 +265,11 @@ Per-Host Resources: mem-estimate=13.46MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
 F11:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=67.20MB mem-reservation=17.88MB thread-reservation=2 runtime-filters-memory=4.00MB
+Per-Host Resources: mem-estimate=70.01MB mem-reservation=16.69MB thread-reservation=2 runtime-filters-memory=4.00MB
 16:AGGREGATE [STREAMING]
 |  output: count(*), sum(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
-|  mem-estimate=10.00MB mem-reservation=9.00MB spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=11 row-size=74B cardinality=137.37K
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
@@ -421,7 +421,7 @@ Per-Host Resources: mem-estimate=67.20MB mem-reservation=17.88MB thread-reservat
 |  hash predicates: ss_sold_date_sk = d_date_sk
 |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
 |  runtime filters: RF000[bloom] <- d_date_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=0,1,2 row-size=58B cardinality=130.03K
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
@@ -480,8 +480,8 @@ Per-Host Resources: mem-estimate=67.20MB mem-reservation=17.88MB thread-reservat
    tuple-ids=0 row-size=20B cardinality=130.03K
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=72.19MB Threads=20
-Per-Host Resource Estimates: Memory=281MB
+Max Per-Host Resource Reservation: Memory=75.69MB Threads=20
+Per-Host Resource Estimates: Memory=287MB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -496,7 +496,7 @@ PLAN-ROOT SINK
 |  in pipelines: 17(GETNEXT)
 |
 F12:PLAN FRAGMENT [HASH(channel,col_name,d_year,d_qoy,i_category)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=13.68MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=13.68MB mem-reservation=2.88MB thread-reservation=1
 17:TOP-N [LIMIT=100]
 |  order by: channel ASC, col_name ASC, d_year ASC, d_qoy ASC, i_category ASC
 |  mem-estimate=7.22KB mem-reservation=0B thread-reservation=0
@@ -506,7 +506,7 @@ Per-Instance Resources: mem-estimate=13.68MB mem-reservation=1.94MB thread-reser
 27:AGGREGATE [FINALIZE]
 |  output: count:merge(*), sum:merge(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
-|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=11 row-size=74B cardinality=137.37K
 |  in pipelines: 27(GETNEXT), 01(OPEN), 07(OPEN), 11(OPEN)
 |
@@ -517,11 +517,11 @@ Per-Instance Resources: mem-estimate=13.68MB mem-reservation=1.94MB thread-reser
 |
 F11:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
-Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=26.00MB mem-reservation=4.00MB thread-reservation=1
 16:AGGREGATE [STREAMING]
 |  output: count(*), sum(ext_sales_price)
 |  group by: channel, col_name, d_year, d_qoy, i_category
-|  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=11 row-size=74B cardinality=137.37K
 |  in pipelines: 01(GETNEXT), 07(GETNEXT), 11(GETNEXT)
 |
@@ -707,17 +707,17 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reser
 |  hash-table-id=00
 |  hash predicates: ss_sold_date_sk = d_date_sk
 |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=0,1,2 row-size=58B cardinality=130.03K
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
 |--F14:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=5.73MB mem-reservation=4.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=11.35MB mem-reservation=10.50MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: d_date_sk
 |  |  runtime filters: RF000[bloom] <- d_date_sk
-|  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=9.50MB mem-reservation=9.50MB spill-buffer=256.00KB thread-reservation=0
 |  |
 |  19:EXCHANGE [BROADCAST]
 |  |  mem-estimate=872.04KB mem-reservation=0B thread-reservation=0

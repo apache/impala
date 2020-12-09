@@ -291,14 +291,14 @@ WHERE
 ORDER BY rn
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=422.00MB mem-reservation=32.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=713.05MB mem-reservation=32.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: l_orderkey, l_partkey, l_linenumber, l_quantity, evt_ts, rn
 |  mem-estimate=22.89MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:SORT
 |  order by: rn ASC
-|  mem-estimate=8.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=22.89MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=40B cardinality=600.12K
 |  in pipelines: 04(GETNEXT), 01(OPEN)
 |
@@ -319,7 +319,7 @@ PLAN-ROOT SINK
 01:SORT
 |  order by: CAST(l_shipdate AS DATE) DESC
 |  materialized: CAST(l_shipdate AS DATE)
-|  mem-estimate=18.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=309.05MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=7 row-size=54B cardinality=6.00M
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
@@ -354,14 +354,14 @@ WHERE
 ORDER BY rn
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=422.00MB mem-reservation=32.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=690.16MB mem-reservation=32.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: l_orderkey, l_partkey, lno_f, l_quantity, evt_ts, rn
 |  mem-estimate=22.89MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:SORT
 |  order by: rn ASC
-|  mem-estimate=8.00MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=22.89MB mem-reservation=6.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=40B cardinality=600.12K
 |  in pipelines: 04(GETNEXT), 01(OPEN)
 |
@@ -381,7 +381,7 @@ PLAN-ROOT SINK
 |
 01:SORT
 |  order by: CAST(l_linenumber AS FLOAT) DESC
-|  mem-estimate=18.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=286.16MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=7 row-size=50B cardinality=6.00M
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
@@ -416,14 +416,14 @@ WHERE
 ORDER BY rn
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=422.00MB mem-reservation=32.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=690.16MB mem-reservation=32.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: l_orderkey, l_partkey, l_linenumber, l_quantity, evt_ts, rn
 |  mem-estimate=33.19MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 04:SORT
 |  order by: rn ASC
-|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=33.19MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=58B cardinality=600.12K
 |  in pipelines: 04(GETNEXT), 01(OPEN)
 |
@@ -443,7 +443,7 @@ PLAN-ROOT SINK
 |
 01:SORT
 |  order by: CAST(l_shipdate AS VARCHAR(20)) DESC
-|  mem-estimate=18.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=286.16MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=7 row-size=50B cardinality=6.00M
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |

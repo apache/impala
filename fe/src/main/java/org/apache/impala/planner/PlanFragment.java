@@ -423,6 +423,7 @@ public class PlanFragment extends TreeNode<PlanFragment> {
     Preconditions.checkState(numInstances >= 0);
     // The number of nodes is zero for empty tables.
     if (numInstances == 0) return 0;
+    boolean partition = false;
     for (Expr expr: exprs) {
       long numDistinct = expr.getNumDistinctValues();
       if (numDistinct == -1) {
@@ -430,9 +431,12 @@ public class PlanFragment extends TreeNode<PlanFragment> {
         break;
       }
       if (dataPartition_.getPartitionExprs().contains(expr)) {
-        numDistinct = (long)Math.max((double) numDistinct / (double) numInstances, 1L);
+        partition = true;
       }
       result = PlanNode.checkedMultiply(result, numDistinct);
+    }
+    if (partition) {
+      result = (long)Math.max((double) result / (double) numInstances, 1L);
     }
     return result;
   }

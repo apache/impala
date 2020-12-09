@@ -216,6 +216,11 @@ public class HashJoinNode extends JoinNode {
     return output.toString();
   }
 
+  /**
+   * Helper method to compute the resource requirements for the join that can be
+   * called from the builder or the join node. Returns a pair of the probe
+   * resource requirements and the build resource requirements.
+   */
   @Override
   public Pair<ResourceProfile, ResourceProfile> computeJoinResourceProfile(
       TQueryOptions queryOptions) {
@@ -227,14 +232,31 @@ public class HashJoinNode extends JoinNode {
       perBuildInstanceMemEstimate = DEFAULT_PER_INSTANCE_MEM;
       perBuildInstanceDataBytes = -1;
     } else {
-      perBuildInstanceDataBytes = (long) Math.ceil(getChild(1).cardinality_
-          * getChild(1).avgRowSize_);
+      long rhsCard = getChild(1).getCardinality();
+      long rhsNdv = 1;
+      // Calculate the ndv of the right child, which is the multiplication of
+      // the ndv of the right child column
+      for (Expr eqJoinPredicate: eqJoinConjuncts_) {
+        long rhsPdNdv = getNdv(eqJoinPredicate.getChild(1));
+        rhsPdNdv = Math.min(rhsPdNdv, rhsCard);
+        if (rhsPdNdv != -1) {
+          rhsNdv = PlanNode.checkedMultiply(rhsNdv, rhsPdNdv);
+        }
+      }
+      // The memory of the data stored in hash table and
+      // the memory of the hash table‘s structure
+      perBuildInstanceDataBytes = (long) Math.ceil(rhsCard * getChild(1).getAvgRowSize() +
+          BitUtil.roundUpToPowerOf2((long) Math.ceil(3 * rhsCard / 2)) *
+          PlannerContext.SIZE_OF_BUCKET);
+      if (rhsNdv > 1 && rhsNdv < rhsCard) {
+        perBuildInstanceDataBytes += (rhsCard - rhsNdv) *
+            PlannerContext.SIZE_OF_DUPLICATENODE;
+      }
       // Assume the rows are evenly divided among instances.
       if (distrMode_ == DistributionMode.PARTITIONED) {
         perBuildInstanceDataBytes /= numInstances;
       }
-      perBuildInstanceMemEstimate = (long) Math.ceil(
-          perBuildInstanceDataBytes * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
+      perBuildInstanceMemEstimate = perBuildInstanceDataBytes;
     }
 
     // Must be kept in sync with PartitionedHashJoinBuilder::MinReservation() in be.

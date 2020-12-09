@@ -25,10 +25,10 @@ select
    rank_within_parent
  limit 100
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=23.69MB Threads=4
-Per-Host Resource Estimates: Memory=186MB
+Max Per-Host Resource Reservation: Memory=24.62MB Threads=4
+Per-Host Resource Estimates: Memory=187MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=185.88MB mem-reservation=23.69MB thread-reservation=4 runtime-filters-memory=2.00MB
+|  Per-Host Resources: mem-estimate=186.81MB mem-reservation=24.62MB thread-reservation=4 runtime-filters-memory=2.00MB
 PLAN-ROOT SINK
 |  output exprs: aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN sum(ws_net_paid) WHEN 4 THEN sum(ws_net_paid) WHEN 5 THEN sum(ws_net_paid) END), CASE valid_tid(3,4,5) WHEN 3 THEN i_category WHEN 4 THEN i_category WHEN 5 THEN NULL END, CASE valid_tid(3,4,5) WHEN 3 THEN i_class WHEN 4 THEN NULL WHEN 5 THEN NULL END, CAST(aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 0 WHEN 5 THEN 1 END) AS SMALLINT) + CAST(aggif(valid_tid(3,4,5) IN (3, 4, 5), CASE valid_tid(3,4,5) WHEN 3 THEN 0 WHEN 4 THEN 1 WHEN 5 THEN 1 END) AS SMALLINT), rank()
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -79,7 +79,7 @@ PLAN-ROOT SINK
 |  hash predicates: ws_item_sk = i_item_sk
 |  fk/pk conjuncts: ws_item_sk = i_item_sk
 |  runtime filters: RF000[bloom] <- i_item_sk, RF001[min_max] <- i_item_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=0,1,2 row-size=70B cardinality=719.38K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
@@ -125,8 +125,8 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=16B cardinality=719.38K
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=48.38MB Threads=9
-Per-Host Resource Estimates: Memory=273MB
+Max Per-Host Resource Reservation: Memory=49.31MB Threads=9
+Per-Host Resource Estimates: Memory=274MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -197,7 +197,7 @@ Per-Host Resources: mem-estimate=40.00MB mem-reservation=7.75MB thread-reservati
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-Per-Host Resources: mem-estimate=132.77MB mem-reservation=19.88MB thread-reservation=2 runtime-filters-memory=2.00MB
+Per-Host Resources: mem-estimate=133.71MB mem-reservation=20.81MB thread-reservation=2 runtime-filters-memory=2.00MB
 05:AGGREGATE [STREAMING]
 |  Class 0
 |    output: sum(ws_net_paid)
@@ -216,7 +216,7 @@ Per-Host Resources: mem-estimate=132.77MB mem-reservation=19.88MB thread-reserva
 |  hash predicates: ws_item_sk = i_item_sk
 |  fk/pk conjuncts: ws_item_sk = i_item_sk
 |  runtime filters: RF000[bloom] <- i_item_sk, RF001[min_max] <- i_item_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=0,1,2 row-size=70B cardinality=719.38K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
@@ -276,8 +276,8 @@ Per-Host Resources: mem-estimate=132.77MB mem-reservation=19.88MB thread-reserva
    tuple-ids=0 row-size=16B cardinality=719.38K
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=54.25MB Threads=8
-Per-Host Resource Estimates: Memory=167MB
+Max Per-Host Resource Reservation: Memory=56.12MB Threads=8
+Per-Host Resource Estimates: Memory=169MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -368,17 +368,17 @@ Per-Instance Resources: mem-estimate=62.00MB mem-reservation=14.00MB thread-rese
 |  hash-table-id=00
 |  hash predicates: ws_item_sk = i_item_sk
 |  fk/pk conjuncts: ws_item_sk = i_item_sk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=0,1,2 row-size=70B cardinality=719.38K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--F06:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  |  Per-Instance Resources: mem-estimate=5.71MB mem-reservation=4.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=7.58MB mem-reservation=6.75MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: i_item_sk
 |  |  runtime filters: RF000[bloom] <- i_item_sk, RF001[min_max] <- i_item_sk
-|  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=5.75MB mem-reservation=5.75MB spill-buffer=128.00KB thread-reservation=0
 |  |
 |  11:EXCHANGE [BROADCAST]
 |  |  mem-estimate=852.50KB mem-reservation=0B thread-reservation=0

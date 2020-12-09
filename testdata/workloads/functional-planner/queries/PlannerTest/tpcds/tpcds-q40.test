@@ -25,10 +25,10 @@ ORDER BY w_state,
          i_item_id
 LIMIT 100;
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=25.08MB Threads=6
-Per-Host Resource Estimates: Memory=438MB
+Max Per-Host Resource Reservation: Memory=28.83MB Threads=6
+Per-Host Resource Estimates: Memory=441MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=437.56MB mem-reservation=25.08MB thread-reservation=6 runtime-filters-memory=3.00MB
+|  Per-Host Resources: mem-estimate=441.31MB mem-reservation=28.83MB thread-reservation=6 runtime-filters-memory=3.00MB
 PLAN-ROOT SINK
 |  output exprs: w_state, i_item_id, sum(CASE WHEN (CAST(d_date AS DATE) < DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, 0) ELSE 0 END), sum(CASE WHEN (CAST(d_date AS DATE) >= DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, 0) ELSE 0 END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -109,7 +109,7 @@ PLAN-ROOT SINK
 05:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
 |  fk/pk conjuncts: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
-|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=0,1N row-size=48B cardinality=1.44M
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
@@ -135,8 +135,8 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=28B cardinality=1.44M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=34.02MB Threads=12
-Per-Host Resource Estimates: Memory=466MB
+Max Per-Host Resource Reservation: Memory=37.77MB Threads=12
+Per-Host Resource Estimates: Memory=470MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -171,7 +171,7 @@ Per-Host Resources: mem-estimate=10.44MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=266.67MB mem-reservation=23.56MB thread-reservation=2 runtime-filters-memory=3.00MB
+Per-Host Resources: mem-estimate=270.42MB mem-reservation=27.31MB thread-reservation=2 runtime-filters-memory=3.00MB
 09:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN (CAST(d_date AS DATE) < DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, CAST(0 AS DECIMAL(7,2))) ELSE CAST(0 AS DECIMAL(8,2)) END), sum(CASE WHEN (CAST(d_date AS DATE) >= DATE '2000-03-11') THEN cs_sales_price - coalesce(cr_refunded_cash, CAST(0 AS DECIMAL(7,2))) ELSE CAST(0 AS DECIMAL(8,2)) END)
 |  group by: w_state, i_item_id
@@ -263,7 +263,7 @@ Per-Host Resources: mem-estimate=266.67MB mem-reservation=23.56MB thread-reserva
 05:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash predicates: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
 |  fk/pk conjuncts: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
-|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=0,1N row-size=48B cardinality=1.44M
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
@@ -296,8 +296,8 @@ Per-Host Resources: mem-estimate=266.67MB mem-reservation=23.56MB thread-reserva
    tuple-ids=0 row-size=28B cardinality=1.44M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=47.58MB Threads=11
-Per-Host Resource Estimates: Memory=176MB
+Max Per-Host Resource Reservation: Memory=55.08MB Threads=11
+Per-Host Resource Estimates: Memory=183MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -450,16 +450,16 @@ Per-Instance Resources: mem-estimate=58.00MB mem-reservation=10.00MB thread-rese
 |  hash-table-id=03
 |  hash predicates: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
 |  fk/pk conjuncts: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
-|  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=0,1N row-size=48B cardinality=1.44M
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--F10:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=12.27MB mem-reservation=9.50MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=19.77MB mem-reservation=17.00MB thread-reservation=1
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: cr_item_sk, cr_order_number
-|  |  mem-estimate=9.50MB mem-reservation=9.50MB spill-buffer=256.00KB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=512.00KB thread-reservation=0
 |  |
 |  11:EXCHANGE [BROADCAST]
 |  |  mem-estimate=2.77MB mem-reservation=0B thread-reservation=0

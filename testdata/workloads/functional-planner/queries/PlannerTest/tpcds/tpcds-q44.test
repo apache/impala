@@ -260,10 +260,10 @@ PLAN-ROOT SINK
    tuple-ids=27 row-size=38B cardinality=18.00K
    in pipelines: 19(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=34.56MB Threads=20
-Per-Host Resource Estimates: Memory=352MB
+Max Per-Host Resource Reservation: Memory=36.44MB Threads=20
+Per-Host Resource Estimates: Memory=354MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=11.23MB mem-reservation=9.81MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=13.11MB mem-reservation=11.69MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: rnk, i_product_name, i_product_name
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -277,7 +277,7 @@ PLAN-ROOT SINK
 22:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i2.i_item_sk
 |  fk/pk conjuncts: ss_item_sk = i2.i_item_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=33,32,26,39,38,27 row-size=148B cardinality=10
 |  in pipelines: 31(GETNEXT), 19(OPEN)
 |
@@ -449,7 +449,7 @@ PLAN-ROOT SINK
 20:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i1.i_item_sk
 |  fk/pk conjuncts: none
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=33,32,26 row-size=74B cardinality=10
 |  in pipelines: 31(GETNEXT), 18(OPEN)
 |
@@ -604,8 +604,8 @@ Per-Host Resources: mem-estimate=58.00MB mem-reservation=3.00MB thread-reservati
    tuple-ids=0 row-size=16B cardinality=480.07K
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=60.12MB Threads=27
-Per-Host Resource Estimates: Memory=342MB
+Max Per-Host Resource Reservation: Memory=63.88MB Threads=27
+Per-Host Resource Estimates: Memory=346MB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -622,16 +622,16 @@ PLAN-ROOT SINK
 |  hash-table-id=00
 |  hash predicates: ss_item_sk = i2.i_item_sk
 |  fk/pk conjuncts: ss_item_sk = i2.i_item_sk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=33,32,26,39,38,27 row-size=148B cardinality=10
 |  in pipelines: 31(GETNEXT), 19(OPEN)
 |
 |--F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=4.57MB mem-reservation=3.88MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=6.44MB mem-reservation=5.75MB thread-reservation=1
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: i2.i_item_sk
-|  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=5.75MB mem-reservation=5.75MB spill-buffer=128.00KB thread-reservation=0
 |  |
 |  42:EXCHANGE [UNPARTITIONED]
 |  |  mem-estimate=710.69KB mem-reservation=0B thread-reservation=0
@@ -817,16 +817,16 @@ PLAN-ROOT SINK
 |  hash-table-id=03
 |  hash predicates: ss_item_sk = i1.i_item_sk
 |  fk/pk conjuncts: none
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=33,32,26 row-size=74B cardinality=10
 |  in pipelines: 31(GETNEXT), 18(OPEN)
 |
 |--F17:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=4.57MB mem-reservation=3.88MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=6.44MB mem-reservation=5.75MB thread-reservation=1
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: i1.i_item_sk
-|  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=5.75MB mem-reservation=5.75MB spill-buffer=128.00KB thread-reservation=0
 |  |
 |  32:EXCHANGE [UNPARTITIONED]
 |  |  mem-estimate=710.69KB mem-reservation=0B thread-reservation=0

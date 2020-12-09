@@ -38,10 +38,10 @@ ORDER BY total_cnt DESC,
          d1.d_week_seq
 LIMIT 100;
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=123.56MB Threads=12
-Per-Host Resource Estimates: Memory=932MB
+Max Per-Host Resource Reservation: Memory=157.50MB Threads=12
+Per-Host Resource Estimates: Memory=1.00GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=932.05MB mem-reservation=123.56MB thread-reservation=12 runtime-filters-memory=9.00MB
+|  Per-Host Resources: mem-estimate=1.00GB mem-reservation=157.50MB thread-reservation=12 runtime-filters-memory=9.00MB
 PLAN-ROOT SINK
 |  output exprs: i_item_desc, w_warehouse_name, d1.d_week_seq, sum(CASE WHEN p_promo_sk IS NULL THEN 1 ELSE 0 END), sum(CASE WHEN p_promo_sk IS NOT NULL THEN 1 ELSE 0 END), count(*)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -55,14 +55,14 @@ PLAN-ROOT SINK
 21:AGGREGATE [FINALIZE]
 |  output: sum(CAST(CASE WHEN p_promo_sk IS NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN p_promo_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), count(*)
 |  group by: i_item_desc, w_warehouse_name, d1.d_week_seq
-|  mem-estimate=235.61MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=234.36MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=11 row-size=170B cardinality=1.32M
 |  in pipelines: 21(GETNEXT), 01(OPEN)
 |
 20:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
 |  fk/pk conjuncts: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
-|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=1,2,3,7,6,0,5,4,8,9N,10N row-size=342B cardinality=1.32M
 |  in pipelines: 01(GETNEXT), 10(OPEN)
 |
@@ -98,7 +98,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: cs_ship_date_sk = d3.d_date_sk
 |  other predicates: CAST(d3.d_date AS TIMESTAMP) > (CAST(d1.d_date AS TIMESTAMP) + INTERVAL CAST(5 AS INT) days)
 |  runtime filters: RF000[bloom] <- d3.d_date_sk, RF001[min_max] <- d3.d_date_sk
-|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=1,2,3,7,6,0,5,4,8 row-size=322B cardinality=1.32M
 |  in pipelines: 01(GETNEXT), 08(OPEN)
 |
@@ -116,7 +116,7 @@ PLAN-ROOT SINK
 |  hash predicates: cs_bill_cdemo_sk = cd_demo_sk
 |  fk/pk conjuncts: cs_bill_cdemo_sk = cd_demo_sk
 |  runtime filters: RF002[bloom] <- cd_demo_sk, RF003[min_max] <- cd_demo_sk
-|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=1,2,3,7,6,0,5,4 row-size=296B cardinality=1.32M
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |
@@ -159,7 +159,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: none
 |  other predicates: inv_quantity_on_hand < cs_quantity
 |  runtime filters: RF006[bloom] <- cs_sold_date_sk, RF007[bloom] <- cs_item_sk, RF008[min_max] <- cs_sold_date_sk, RF009[min_max] <- cs_item_sk
-|  mem-estimate=60.49MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=118.99MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=1,2,3,7,6,0 row-size=256B cardinality=8.12M
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
@@ -200,7 +200,7 @@ PLAN-ROOT SINK
 |  hash predicates: inv_date_sk = d2.d_date_sk
 |  fk/pk conjuncts: inv_date_sk = d2.d_date_sk
 |  runtime filters: RF012[bloom] <- d2.d_date_sk, RF013[min_max] <- d2.d_date_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=1,2,3,7 row-size=182B cardinality=11.74M
 |  in pipelines: 01(GETNEXT), 07(OPEN)
 |
@@ -263,8 +263,8 @@ PLAN-ROOT SINK
    tuple-ids=1 row-size=20B cardinality=11.74M
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=199.17MB Threads=25
-Per-Host Resource Estimates: Memory=1.17GB
+Max Per-Host Resource Reservation: Memory=233.11MB Threads=25
+Per-Host Resource Estimates: Memory=1.10GB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.06MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -279,7 +279,7 @@ PLAN-ROOT SINK
 |  in pipelines: 22(GETNEXT)
 |
 F12:PLAN FRAGMENT [HASH(i_item_desc,w_warehouse_name,d1.d_week_seq)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=128.31MB mem-reservation=34.00MB thread-reservation=1
+Per-Host Resources: mem-estimate=88.63MB mem-reservation=34.00MB thread-reservation=1
 22:TOP-N [LIMIT=100]
 |  order by: count(*) DESC, i_item_desc ASC, w_warehouse_name ASC, d1.d_week_seq ASC
 |  mem-estimate=16.60KB mem-reservation=0B thread-reservation=0
@@ -289,7 +289,7 @@ Per-Host Resources: mem-estimate=128.31MB mem-reservation=34.00MB thread-reserva
 35:AGGREGATE [FINALIZE]
 |  output: sum:merge(CASE WHEN p_promo_sk IS NULL THEN 1 ELSE 0 END), sum:merge(CASE WHEN p_promo_sk IS NOT NULL THEN 1 ELSE 0 END), count:merge(*)
 |  group by: i_item_desc, w_warehouse_name, d1.d_week_seq
-|  mem-estimate=117.80MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=78.12MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=11 row-size=170B cardinality=1.32M
 |  in pipelines: 35(GETNEXT), 00(OPEN)
 |
@@ -299,18 +299,18 @@ Per-Host Resources: mem-estimate=128.31MB mem-reservation=34.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 F06:PLAN FRAGMENT [HASH(cs_sold_date_sk,cs_item_sk)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=207.77MB mem-reservation=93.00MB thread-reservation=1 runtime-filters-memory=5.00MB
+Per-Host Resources: mem-estimate=179.68MB mem-reservation=124.12MB thread-reservation=1 runtime-filters-memory=5.00MB
 21:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN p_promo_sk IS NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN p_promo_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), count(*)
 |  group by: i_item_desc, w_warehouse_name, d1.d_week_seq
-|  mem-estimate=117.80MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=58.59MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=11 row-size=170B cardinality=1.32M
 |  in pipelines: 00(GETNEXT)
 |
 20:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash predicates: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
 |  fk/pk conjuncts: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
-|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=0,1,2,3,7,6,5,4,8,9N,10N row-size=342B cardinality=1.32M
 |  in pipelines: 00(GETNEXT), 10(OPEN)
 |
@@ -360,7 +360,7 @@ Per-Host Resources: mem-estimate=207.77MB mem-reservation=93.00MB thread-reserva
 |  fk/pk conjuncts: cs_ship_date_sk = d3.d_date_sk
 |  other predicates: CAST(d3.d_date AS TIMESTAMP) > (CAST(d1.d_date AS TIMESTAMP) + INTERVAL CAST(5 AS INT) days)
 |  runtime filters: RF000[bloom] <- d3.d_date_sk, RF001[min_max] <- d3.d_date_sk
-|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=0,1,2,3,7,6,5,4,8 row-size=322B cardinality=1.32M
 |  in pipelines: 00(GETNEXT), 08(OPEN)
 |
@@ -385,7 +385,7 @@ Per-Host Resources: mem-estimate=207.77MB mem-reservation=93.00MB thread-reserva
 |  hash predicates: cs_bill_cdemo_sk = cd_demo_sk
 |  fk/pk conjuncts: cs_bill_cdemo_sk = cd_demo_sk
 |  runtime filters: RF002[bloom] <- cd_demo_sk, RF003[min_max] <- cd_demo_sk
-|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=0,1,2,3,7,6,5,4 row-size=296B cardinality=1.32M
 |  in pipelines: 00(GETNEXT), 04(OPEN)
 |
@@ -452,7 +452,7 @@ Per-Host Resources: mem-estimate=207.77MB mem-reservation=93.00MB thread-reserva
 |  |  in pipelines: 01(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=145.36MB mem-reservation=30.56MB thread-reservation=2 runtime-filters-memory=4.00MB
+|  Per-Host Resources: mem-estimate=148.17MB mem-reservation=33.38MB thread-reservation=2 runtime-filters-memory=4.00MB
 |  14:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: d2.d_week_seq = d1.d_week_seq
 |  |  fk/pk conjuncts: none
@@ -485,7 +485,7 @@ Per-Host Resources: mem-estimate=207.77MB mem-reservation=93.00MB thread-reserva
 |  |  hash predicates: inv_date_sk = d2.d_date_sk
 |  |  fk/pk conjuncts: inv_date_sk = d2.d_date_sk
 |  |  runtime filters: RF012[bloom] <- d2.d_date_sk, RF013[min_max] <- d2.d_date_sk
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  |  tuple-ids=1,2,3,7 row-size=182B cardinality=11.74M
 |  |  in pipelines: 01(GETNEXT), 07(OPEN)
 |  |
@@ -586,8 +586,8 @@ Per-Host Resources: mem-estimate=389.00MB mem-reservation=21.00MB thread-reserva
    tuple-ids=0 row-size=40B cardinality=1.44M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=232.73MB Threads=24
-Per-Host Resource Estimates: Memory=629MB
+Max Per-Host Resource Reservation: Memory=300.61MB Threads=24
+Per-Host Resource Estimates: Memory=598MB
 F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.06MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -602,7 +602,7 @@ PLAN-ROOT SINK
 |  in pipelines: 22(GETNEXT)
 |
 F12:PLAN FRAGMENT [HASH(i_item_desc,w_warehouse_name,d1.d_week_seq)] hosts=3 instances=3
-Per-Instance Resources: mem-estimate=128.31MB mem-reservation=34.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=88.63MB mem-reservation=34.00MB thread-reservation=1
 22:TOP-N [LIMIT=100]
 |  order by: count(*) DESC, i_item_desc ASC, w_warehouse_name ASC, d1.d_week_seq ASC
 |  mem-estimate=16.60KB mem-reservation=0B thread-reservation=0
@@ -612,7 +612,7 @@ Per-Instance Resources: mem-estimate=128.31MB mem-reservation=34.00MB thread-res
 35:AGGREGATE [FINALIZE]
 |  output: sum:merge(CASE WHEN p_promo_sk IS NULL THEN 1 ELSE 0 END), sum:merge(CASE WHEN p_promo_sk IS NOT NULL THEN 1 ELSE 0 END), count:merge(*)
 |  group by: i_item_desc, w_warehouse_name, d1.d_week_seq
-|  mem-estimate=117.80MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=78.12MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=11 row-size=170B cardinality=1.32M
 |  in pipelines: 35(GETNEXT), 00(OPEN)
 |
@@ -622,11 +622,11 @@ Per-Instance Resources: mem-estimate=128.31MB mem-reservation=34.00MB thread-res
 |  in pipelines: 00(GETNEXT)
 |
 F06:PLAN FRAGMENT [HASH(cs_sold_date_sk,cs_item_sk)] hosts=3 instances=3
-Per-Instance Resources: mem-estimate=127.93MB mem-reservation=34.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=68.72MB mem-reservation=34.00MB thread-reservation=1
 21:AGGREGATE [STREAMING]
 |  output: sum(CAST(CASE WHEN p_promo_sk IS NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), sum(CAST(CASE WHEN p_promo_sk IS NOT NULL THEN CAST(1 AS TINYINT) ELSE CAST(0 AS TINYINT) END AS BIGINT)), count(*)
 |  group by: i_item_desc, w_warehouse_name, d1.d_week_seq
-|  mem-estimate=117.80MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=58.59MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=11 row-size=170B cardinality=1.32M
 |  in pipelines: 00(GETNEXT)
 |
@@ -634,16 +634,16 @@ Per-Instance Resources: mem-estimate=127.93MB mem-reservation=34.00MB thread-res
 |  hash-table-id=00
 |  hash predicates: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
 |  fk/pk conjuncts: cs_item_sk = cr_item_sk, cs_order_number = cr_order_number
-|  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=0,1,2,3,7,6,5,4,8,9N,10N row-size=342B cardinality=1.32M
 |  in pipelines: 00(GETNEXT), 10(OPEN)
 |
 |--F14:PLAN FRAGMENT [HASH(cs_sold_date_sk,cs_item_sk)] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=11.72MB mem-reservation=9.50MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=19.22MB mem-reservation=17.00MB thread-reservation=1
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: cr_item_sk, cr_order_number
-|  |  mem-estimate=9.50MB mem-reservation=9.50MB spill-buffer=256.00KB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=512.00KB thread-reservation=0
 |  |
 |  33:EXCHANGE [BROADCAST]
 |  |  mem-estimate=2.22MB mem-reservation=0B thread-reservation=0
@@ -699,17 +699,17 @@ Per-Instance Resources: mem-estimate=127.93MB mem-reservation=34.00MB thread-res
 |  hash predicates: cs_ship_date_sk = d3.d_date_sk
 |  fk/pk conjuncts: cs_ship_date_sk = d3.d_date_sk
 |  other predicates: CAST(d3.d_date AS TIMESTAMP) > (CAST(d1.d_date AS TIMESTAMP) + INTERVAL CAST(5 AS INT) days)
-|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=0,1,2,3,7,6,5,4,8 row-size=322B cardinality=1.32M
 |  in pipelines: 00(GETNEXT), 08(OPEN)
 |
 |--F16:PLAN FRAGMENT [HASH(cs_sold_date_sk,cs_item_sk)] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=8.59MB mem-reservation=6.75MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=12.34MB mem-reservation=10.50MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: d3.d_date_sk
 |  |  runtime filters: RF000[bloom] <- d3.d_date_sk, RF001[min_max] <- d3.d_date_sk
-|  |  mem-estimate=5.75MB mem-reservation=5.75MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=9.50MB mem-reservation=9.50MB spill-buffer=256.00KB thread-reservation=0
 |  |
 |  31:EXCHANGE [BROADCAST]
 |  |  mem-estimate=1.84MB mem-reservation=0B thread-reservation=0
@@ -732,17 +732,17 @@ Per-Instance Resources: mem-estimate=127.93MB mem-reservation=34.00MB thread-res
 |  hash-table-id=03
 |  hash predicates: cs_bill_cdemo_sk = cd_demo_sk
 |  fk/pk conjuncts: cs_bill_cdemo_sk = cd_demo_sk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=0,1,2,3,7,6,5,4 row-size=296B cardinality=1.32M
 |  in pipelines: 00(GETNEXT), 04(OPEN)
 |
 |--F17:PLAN FRAGMENT [HASH(cs_sold_date_sk,cs_item_sk)] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=24.25MB mem-reservation=18.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=75.25MB mem-reservation=69.00MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: cd_demo_sk
 |  |  runtime filters: RF002[bloom] <- cd_demo_sk, RF003[min_max] <- cd_demo_sk
-|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=512.00KB thread-reservation=0
+|  |  mem-estimate=68.00MB mem-reservation=68.00MB spill-buffer=2.00MB thread-reservation=0
 |  |
 |  30:EXCHANGE [BROADCAST]
 |  |  mem-estimate=6.25MB mem-reservation=0B thread-reservation=0
@@ -865,17 +865,17 @@ Per-Instance Resources: mem-estimate=127.93MB mem-reservation=34.00MB thread-res
 |  |  hash-table-id=07
 |  |  hash predicates: inv_date_sk = d2.d_date_sk
 |  |  fk/pk conjuncts: inv_date_sk = d2.d_date_sk
-|  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
 |  |  tuple-ids=1,2,3,7 row-size=182B cardinality=11.74M
 |  |  in pipelines: 01(GETNEXT), 07(OPEN)
 |  |
 |  |--F21:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  |  |  Per-Instance Resources: mem-estimate=5.44MB mem-reservation=4.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=11.07MB mem-reservation=10.50MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  JOIN BUILD
 |  |  |  join-table-id=07 plan-id=08 cohort-id=02
 |  |  |  build expressions: d2.d_date_sk
 |  |  |  runtime filters: RF012[bloom] <- d2.d_date_sk, RF013[min_max] <- d2.d_date_sk
-|  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
+|  |  |  mem-estimate=9.50MB mem-reservation=9.50MB spill-buffer=256.00KB thread-reservation=0
 |  |  |
 |  |  25:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=582.70KB mem-reservation=0B thread-reservation=0

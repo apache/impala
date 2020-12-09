@@ -14,7 +14,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=8B cardinality=1
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
@@ -58,14 +58,14 @@ ENABLED_RUNTIME_FILTER_TYPES=BLOOM
 EXPLAIN_LEVEL=2
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=13.69MB mem-reservation=2.94MB thread-reservation=3 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=4.44MB mem-reservation=2.94MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=8B cardinality=1
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
@@ -97,14 +97,14 @@ ENABLED_RUNTIME_FILTER_TYPES=BLOOM
 EXPLAIN_LEVEL=2
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=28.94MB mem-reservation=2.95MB thread-reservation=3 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=19.69MB mem-reservation=2.95MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=8B cardinality=1
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
@@ -149,7 +149,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=8B cardinality=1
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
@@ -187,14 +187,14 @@ ENABLED_RUNTIME_FILTER_TYPES=BLOOM
 EXPLAIN_LEVEL=2
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=28.94MB mem-reservation=2.95MB thread-reservation=3 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=19.69MB mem-reservation=2.95MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=8B cardinality=1
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
@@ -239,7 +239,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=8B cardinality=1
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
@@ -284,7 +284,7 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=8B cardinality=1
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |
@@ -355,7 +355,7 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=8B cardinality=1
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |
@@ -425,7 +425,7 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=8B cardinality=1
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |
@@ -489,14 +489,14 @@ ENABLED_RUNTIME_FILTER_TYPES=BLOOM
 EXPLAIN_LEVEL=2
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=32.88MB mem-reservation=6.89MB thread-reservation=4 runtime-filters-memory=3.00MB
+|  Per-Host Resources: mem-estimate=24.38MB mem-reservation=6.89MB thread-reservation=4 runtime-filters-memory=3.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=100.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=8B cardinality=1
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |
@@ -510,7 +510,7 @@ PLAN-ROOT SINK
 |
 |--02:SCAN KUDU [functional_kudu.alltypes c]
 |     kudu predicates: c.id < CAST(100 AS INT)
-|     mem-estimate=1.50MB mem-reservation=0B thread-reservation=1
+|     mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
 |     tuple-ids=2 row-size=16B cardinality=730
 |     in pipelines: 02(GETNEXT)
 |
