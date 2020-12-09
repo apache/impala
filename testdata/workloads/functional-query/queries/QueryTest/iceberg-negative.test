@@ -19,6 +19,12 @@ STORED AS ICEBERG;
 AnalysisException: Cannot find source column: event_time
 ====
 ---- QUERY
+CREATE TABLE non_iceberg_table_with_spec (i INT)
+PARTITION BY SPEC (i identity);
+---- CATCH
+AnalysisException: PARTITION BY SPEC is only valid for Iceberg tables.
+====
+---- QUERY
 CREATE TABLE iceberg_table_hadoop_tables(
   level STRING
 )

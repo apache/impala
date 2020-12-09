@@ -272,6 +272,12 @@ public class CreateTableStmt extends StatementBase {
 
     if (getFileFormat() == THdfsFileFormat.ICEBERG) {
       analyzeIcebergFormat(analyzer);
+    } else {
+      List<IcebergPartitionSpec> iceSpec = tableDef_.getIcebergPartitionSpecs();
+      if (iceSpec != null && !iceSpec.isEmpty()) {
+        throw new AnalysisException(
+            "PARTITION BY SPEC is only valid for Iceberg tables.");
+      }
     }
 
     // If lineage logging is enabled, compute minimal lineage graph.
