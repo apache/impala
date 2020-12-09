@@ -418,6 +418,9 @@ class Coordinator::BackendState {
   /// True if a CancelQueryFInstances RPC was already sent to this backend.
   bool sent_cancel_rpc_ = false;
 
+  /// True if Exec() RPC is cancelled.
+  bool cancel_exec_rpc_ = false;
+
   /// Total scan ranges complete across all scan nodes. Set in ApplyExecStatusReport().
   int64_t total_ranges_complete_ = 0;
 
