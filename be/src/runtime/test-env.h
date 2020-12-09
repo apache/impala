@@ -96,7 +96,9 @@ class TestEnv {
   int64_t buffer_pool_capacity_;
 
   /// Arguments for process memory tracker, used in Init().
-  int64_t process_mem_limit_ = -1;
+  /// Default to 8GB, which should be enough for any tests that are not deliberately
+  /// allocating large amounts of memory.
+  int64_t process_mem_limit_ = 8L * 1024L * 1024L * 1024L;
   bool process_mem_tracker_use_metrics_ = false;
 
   /// Global state for test environment.
