@@ -40,10 +40,10 @@ from
    and   d_moy  = 11) all_sales
 order by promotions, total
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=39.38MB Threads=14
-Per-Host Resource Estimates: Memory=591MB
+Max Per-Host Resource Reservation: Memory=52.50MB Threads=14
+Per-Host Resource Estimates: Memory=604MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=591.31MB mem-reservation=39.38MB thread-reservation=14 runtime-filters-memory=10.00MB
+|  Per-Host Resources: mem-estimate=604.44MB mem-reservation=52.50MB thread-reservation=14 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: promotions, total, CAST(promotions AS DECIMAL(15,4)) / CAST(total AS DECIMAL(15,4)) * CAST(100 AS DECIMAL(3,0))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -61,7 +61,7 @@ PLAN-ROOT SINK
 |
 |--25:AGGREGATE [FINALIZE]
 |  |  output: sum(ss_ext_sales_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=15 row-size=16B cardinality=1
 |  |  in pipelines: 25(GETNEXT), 14(OPEN)
 |  |
@@ -90,7 +90,7 @@ PLAN-ROOT SINK
 |  |  hash predicates: ss_customer_sk = c_customer_sk
 |  |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  |  runtime filters: RF014[bloom] <- c_customer_sk, RF015[min_max] <- c_customer_sk
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  |  tuple-ids=9,11,14,10,12 row-size=78B cardinality=17.06K
 |  |  in pipelines: 14(GETNEXT), 17(OPEN)
 |  |
@@ -182,7 +182,7 @@ PLAN-ROOT SINK
 |
 13:AGGREGATE [FINALIZE]
 |  output: sum(ss_ext_sales_price)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=7 row-size=16B cardinality=1
 |  in pipelines: 13(GETNEXT), 00(OPEN)
 |
@@ -211,7 +211,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  runtime filters: RF002[bloom] <- c_customer_sk, RF003[min_max] <- c_customer_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=0,3,6,2,1,4 row-size=125B cardinality=16.94K
 |  in pipelines: 00(GETNEXT), 04(OPEN)
 |
@@ -320,10 +320,10 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=28B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=53.38MB Threads=30
-Per-Host Resource Estimates: Memory=643MB
+Max Per-Host Resource Reservation: Memory=55.25MB Threads=30
+Per-Host Resource Estimates: Memory=611MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.02MB mem-reservation=10.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=10.00MB mem-reservation=10.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: promotions, total, CAST(promotions AS DECIMAL(15,4)) / CAST(total AS DECIMAL(15,4)) * CAST(100 AS DECIMAL(3,0))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -345,10 +345,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 44(GETNEXT)
 |  |
 |  F16:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  44:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ss_ext_sales_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=15 row-size=16B cardinality=1
 |  |  in pipelines: 44(GETNEXT), 25(OPEN)
 |  |
@@ -358,10 +358,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 25(GETNEXT)
 |  |
 |  F14:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=16.51MB mem-reservation=5.88MB thread-reservation=1 runtime-filters-memory=2.00MB
+|  Per-Host Resources: mem-estimate=8.29MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=2.00MB
 |  25:AGGREGATE
 |  |  output: sum(ss_ext_sales_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=15 row-size=16B cardinality=1
 |  |  in pipelines: 25(GETNEXT), 14(OPEN)
 |  |
@@ -397,7 +397,7 @@ PLAN-ROOT SINK
 |  |  hash predicates: ss_customer_sk = c_customer_sk
 |  |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  |  runtime filters: RF014[bloom] <- c_customer_sk, RF015[min_max] <- c_customer_sk
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=9,11,14,10,12 row-size=78B cardinality=17.06K
 |  |  in pipelines: 14(GETNEXT), 17(OPEN)
 |  |
@@ -524,7 +524,7 @@ PLAN-ROOT SINK
 |
 36:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_ext_sales_price)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=7 row-size=16B cardinality=1
 |  in pipelines: 36(GETNEXT), 13(OPEN)
 |
@@ -534,10 +534,10 @@ PLAN-ROOT SINK
 |  in pipelines: 13(GETNEXT)
 |
 F06:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=16.91MB mem-reservation=5.88MB thread-reservation=1 runtime-filters-memory=2.00MB
+Per-Host Resources: mem-estimate=8.69MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=2.00MB
 13:AGGREGATE
 |  output: sum(ss_ext_sales_price)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=7 row-size=16B cardinality=1
 |  in pipelines: 13(GETNEXT), 00(OPEN)
 |
@@ -573,7 +573,7 @@ Per-Host Resources: mem-estimate=16.91MB mem-reservation=5.88MB thread-reservati
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  runtime filters: RF002[bloom] <- c_customer_sk, RF003[min_max] <- c_customer_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=0,3,6,2,1,4 row-size=125B cardinality=16.94K
 |  in pipelines: 00(GETNEXT), 04(OPEN)
 |
@@ -725,9 +725,9 @@ Per-Host Resources: mem-estimate=92.88MB mem-reservation=14.75MB thread-reservat
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=86.69MB Threads=35
-Per-Host Resource Estimates: Memory=379MB
+Per-Host Resource Estimates: Memory=323MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=10.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.00MB mem-reservation=10.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: promotions, total, CAST(promotions AS DECIMAL(15,4)) / CAST(total AS DECIMAL(15,4)) * CAST(100 AS DECIMAL(3,0))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -756,10 +756,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 44(GETNEXT)
 |  |
 |  F16:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  44:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ss_ext_sales_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=15 row-size=16B cardinality=1
 |  |  in pipelines: 44(GETNEXT), 25(OPEN)
 |  |
@@ -769,10 +769,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 25(GETNEXT)
 |  |
 |  F14:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=3 instances=6
-|  Per-Instance Resources: mem-estimate=10.88MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=919.43KB mem-reservation=0B thread-reservation=1
 |  25:AGGREGATE
 |  |  output: sum(ss_ext_sales_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=15 row-size=16B cardinality=1
 |  |  in pipelines: 25(GETNEXT), 14(OPEN)
 |  |
@@ -977,7 +977,7 @@ PLAN-ROOT SINK
 |
 36:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_ext_sales_price)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=7 row-size=16B cardinality=1
 |  in pipelines: 36(GETNEXT), 13(OPEN)
 |
@@ -987,10 +987,10 @@ PLAN-ROOT SINK
 |  in pipelines: 13(GETNEXT)
 |
 F06:PLAN FRAGMENT [HASH(ss_customer_sk)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=11.43MB mem-reservation=0B thread-reservation=1
+Per-Instance Resources: mem-estimate=1.45MB mem-reservation=0B thread-reservation=1
 13:AGGREGATE
 |  output: sum(ss_ext_sales_price)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=7 row-size=16B cardinality=1
 |  in pipelines: 13(GETNEXT), 00(OPEN)
 |

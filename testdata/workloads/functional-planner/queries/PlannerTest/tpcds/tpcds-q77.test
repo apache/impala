@@ -273,7 +273,7 @@ PLAN-ROOT SINK
 |  |
 |  |--21:AGGREGATE [FINALIZE]
 |  |  |  output: sum(cr_return_amount), sum(cr_net_loss)
-|  |  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  |  tuple-ids=16 row-size=32B cardinality=1
 |  |  |  in pipelines: 21(GETNEXT), 18(OPEN)
 |  |  |
@@ -471,7 +471,7 @@ PLAN-ROOT SINK
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=93.98MB Threads=36
-Per-Host Resource Estimates: Memory=1.03GB
+Per-Host Resource Estimates: Memory=1.01GB
 F24:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -728,10 +728,10 @@ Per-Host Resources: mem-estimate=51.95MB mem-reservation=11.81MB thread-reservat
 |  |  |  in pipelines: 52(GETNEXT)
 |  |  |
 |  |  F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  |  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  |  52:AGGREGATE [FINALIZE]
 |  |  |  output: sum:merge(cr_return_amount), sum:merge(cr_net_loss)
-|  |  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  |  tuple-ids=16 row-size=32B cardinality=1
 |  |  |  in pipelines: 52(GETNEXT), 21(OPEN)
 |  |  |
@@ -741,10 +741,10 @@ Per-Host Resources: mem-estimate=51.95MB mem-reservation=11.81MB thread-reservat
 |  |  |  in pipelines: 21(GETNEXT)
 |  |  |
 |  |  F11:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=84.94MB mem-reservation=4.94MB thread-reservation=2 runtime-filters-memory=1.00MB
+|  |  Per-Host Resources: mem-estimate=75.15MB mem-reservation=4.94MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  |  21:AGGREGATE
 |  |  |  output: sum(cr_return_amount), sum(cr_net_loss)
-|  |  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  |  tuple-ids=16 row-size=32B cardinality=1
 |  |  |  in pipelines: 21(GETNEXT), 18(OPEN)
 |  |  |
@@ -1026,7 +1026,7 @@ Per-Host Resources: mem-estimate=64.10MB mem-reservation=9.88MB thread-reservati
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=154.67MB Threads=38
-Per-Host Resource Estimates: Memory=688MB
+Per-Host Resource Estimates: Memory=668MB
 F24:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -1332,10 +1332,10 @@ Per-Instance Resources: mem-estimate=40.02MB mem-reservation=7.94MB thread-reser
 |  |  |  in pipelines: 52(GETNEXT)
 |  |  |
 |  |  F13:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  |  52:AGGREGATE [FINALIZE]
 |  |  |  output: sum:merge(cr_return_amount), sum:merge(cr_net_loss)
-|  |  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  |  tuple-ids=16 row-size=32B cardinality=1
 |  |  |  in pipelines: 52(GETNEXT), 21(OPEN)
 |  |  |
@@ -1346,10 +1346,10 @@ Per-Instance Resources: mem-estimate=40.02MB mem-reservation=7.94MB thread-reser
 |  |  |
 |  |  F11:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  |  Per-Instance Resources: mem-estimate=34.00MB mem-reservation=2.00MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=24.02MB mem-reservation=2.00MB thread-reservation=1
 |  |  21:AGGREGATE
 |  |  |  output: sum(cr_return_amount), sum(cr_net_loss)
-|  |  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  |  tuple-ids=16 row-size=32B cardinality=1
 |  |  |  in pipelines: 21(GETNEXT), 18(OPEN)
 |  |  |

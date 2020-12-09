@@ -59,10 +59,10 @@ select
           cd_dep_college_count
 limit 100;
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=31.69MB Threads=8
-Per-Host Resource Estimates: Memory=432MB
+Max Per-Host Resource Reservation: Memory=37.31MB Threads=8
+Per-Host Resource Estimates: Memory=437MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=431.69MB mem-reservation=31.69MB thread-reservation=8 runtime-filters-memory=7.00MB
+|  Per-Host Resources: mem-estimate=437.31MB mem-reservation=37.31MB thread-reservation=8 runtime-filters-memory=7.00MB
 PLAN-ROOT SINK
 |  output exprs: cd_gender, cd_marital_status, cd_education_status, count(*), cd_purchase_estimate, count(*), cd_credit_rating, count(*), cd_dep_count, count(*), cd_dep_employed_count, count(*), cd_dep_college_count, count(*)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -119,7 +119,7 @@ PLAN-ROOT SINK
 |  |  |  hash predicates: cd_demo_sk = c.c_current_cdemo_sk
 |  |  |  fk/pk conjuncts: none
 |  |  |  runtime filters: RF012[bloom] <- c.c_current_cdemo_sk, RF013[min_max] <- c.c_current_cdemo_sk
-|  |  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  |  |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  |  |  tuple-ids=2,0 row-size=99B cardinality=100.00K
 |  |  |  in pipelines: 02(GETNEXT), 00(OPEN)
 |  |  |
@@ -247,8 +247,8 @@ PLAN-ROOT SINK
    tuple-ids=6 row-size=8B cardinality=719.38K
    in pipelines: 07(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=47.00MB Threads=19
-Per-Host Resource Estimates: Memory=513MB
+Max Per-Host Resource Reservation: Memory=52.62MB Threads=19
+Per-Host Resource Estimates: Memory=519MB
 F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -311,7 +311,7 @@ Per-Host Resources: mem-estimate=17.34MB mem-reservation=7.88MB thread-reservati
 |  |  |  in pipelines: 02(GETNEXT)
 |  |  |
 |  |  F07:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=135.99MB mem-reservation=14.81MB thread-reservation=2 runtime-filters-memory=2.00MB
+|  |  Per-Host Resources: mem-estimate=141.61MB mem-reservation=20.44MB thread-reservation=2 runtime-filters-memory=2.00MB
 |  |  14:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash predicates: c.c_current_addr_sk = ca.ca_address_sk
 |  |  |  fk/pk conjuncts: c.c_current_addr_sk = ca.ca_address_sk
@@ -344,7 +344,7 @@ Per-Host Resources: mem-estimate=17.34MB mem-reservation=7.88MB thread-reservati
 |  |  |  hash predicates: cd_demo_sk = c.c_current_cdemo_sk
 |  |  |  fk/pk conjuncts: none
 |  |  |  runtime filters: RF012[bloom] <- c.c_current_cdemo_sk, RF013[min_max] <- c.c_current_cdemo_sk
-|  |  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  |  |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  |  |  tuple-ids=2,0 row-size=99B cardinality=100.00K
 |  |  |  in pipelines: 02(GETNEXT), 00(OPEN)
 |  |  |
@@ -514,8 +514,8 @@ Per-Host Resources: mem-estimate=100.95MB mem-reservation=8.94MB thread-reservat
    tuple-ids=6 row-size=8B cardinality=719.38K
    in pipelines: 07(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=64.06MB Threads=19
-Per-Host Resource Estimates: Memory=242MB
+Max Per-Host Resource Reservation: Memory=75.31MB Threads=19
+Per-Host Resource Estimates: Memory=253MB
 F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -636,17 +636,17 @@ Per-Instance Resources: mem-estimate=10.20MB mem-reservation=2.00MB thread-reser
 |  |  |  hash-table-id=03
 |  |  |  hash predicates: cd_demo_sk = c.c_current_cdemo_sk
 |  |  |  fk/pk conjuncts: none
-|  |  |  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  |  |  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
 |  |  |  tuple-ids=2,0 row-size=99B cardinality=100.00K
 |  |  |  in pipelines: 02(GETNEXT), 00(OPEN)
 |  |  |
 |  |  |--F16:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  |  Per-Instance Resources: mem-estimate=7.91MB mem-reservation=6.75MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  |  Per-Instance Resources: mem-estimate=19.16MB mem-reservation=18.00MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  JOIN BUILD
 |  |  |  |  join-table-id=03 plan-id=04 cohort-id=03
 |  |  |  |  build expressions: c.c_current_cdemo_sk
 |  |  |  |  runtime filters: RF012[bloom] <- c.c_current_cdemo_sk, RF013[min_max] <- c.c_current_cdemo_sk
-|  |  |  |  mem-estimate=5.75MB mem-reservation=5.75MB spill-buffer=128.00KB thread-reservation=0
+|  |  |  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=512.00KB thread-reservation=0
 |  |  |  |
 |  |  |  22:EXCHANGE [BROADCAST]
 |  |  |  |  mem-estimate=1.16MB mem-reservation=0B thread-reservation=0

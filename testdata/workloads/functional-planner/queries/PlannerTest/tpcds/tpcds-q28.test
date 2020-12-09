@@ -67,7 +67,7 @@ PLAN-ROOT SINK
 |
 |--17:AGGREGATE [FINALIZE]
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=34 row-size=24B cardinality=1
 |  |  in pipelines: 17(GETNEXT), 16(OPEN)
 |  |
@@ -99,7 +99,7 @@ PLAN-ROOT SINK
 |
 |--14:AGGREGATE [FINALIZE]
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=28 row-size=24B cardinality=1
 |  |  in pipelines: 14(GETNEXT), 13(OPEN)
 |  |
@@ -131,7 +131,7 @@ PLAN-ROOT SINK
 |
 |--11:AGGREGATE [FINALIZE]
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=22 row-size=24B cardinality=1
 |  |  in pipelines: 11(GETNEXT), 10(OPEN)
 |  |
@@ -163,7 +163,7 @@ PLAN-ROOT SINK
 |
 |--08:AGGREGATE [FINALIZE]
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=16 row-size=24B cardinality=1
 |  |  in pipelines: 08(GETNEXT), 07(OPEN)
 |  |
@@ -195,7 +195,7 @@ PLAN-ROOT SINK
 |
 |--05:AGGREGATE [FINALIZE]
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=10 row-size=24B cardinality=1
 |  |  in pipelines: 05(GETNEXT), 04(OPEN)
 |  |
@@ -222,7 +222,7 @@ PLAN-ROOT SINK
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=24B cardinality=1
 |  in pipelines: 02(GETNEXT), 01(OPEN)
 |
@@ -248,9 +248,9 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=39.62MB Threads=24
-Per-Host Resource Estimates: Memory=628MB
+Per-Host Resource Estimates: Memory=509MB
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=14.08MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.09MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -267,10 +267,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 50(GETNEXT)
 |  |
 |  F17:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  50:AGGREGATE [FINALIZE]
 |  |  output: count:merge(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=34 row-size=24B cardinality=1
 |  |  in pipelines: 50(GETNEXT), 17(OPEN)
 |  |
@@ -280,10 +280,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 17(GETNEXT)
 |  |
 |  F16:PLAN FRAGMENT [HASH(ss_list_price)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=10.20MB mem-reservation=1.94MB thread-reservation=1
 |  17:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=33 row-size=24B cardinality=1
 |  |  in pipelines: 17(GETNEXT), 48(OPEN)
 |  |
@@ -333,10 +333,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 45(GETNEXT)
 |  |
 |  F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  45:AGGREGATE [FINALIZE]
 |  |  output: count:merge(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=28 row-size=24B cardinality=1
 |  |  in pipelines: 45(GETNEXT), 14(OPEN)
 |  |
@@ -346,10 +346,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 14(GETNEXT)
 |  |
 |  F13:PLAN FRAGMENT [HASH(ss_list_price)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=10.20MB mem-reservation=1.94MB thread-reservation=1
 |  14:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=27 row-size=24B cardinality=1
 |  |  in pipelines: 14(GETNEXT), 43(OPEN)
 |  |
@@ -399,10 +399,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 40(GETNEXT)
 |  |
 |  F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  40:AGGREGATE [FINALIZE]
 |  |  output: count:merge(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=22 row-size=24B cardinality=1
 |  |  in pipelines: 40(GETNEXT), 11(OPEN)
 |  |
@@ -412,10 +412,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  F10:PLAN FRAGMENT [HASH(ss_list_price)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=10.20MB mem-reservation=1.94MB thread-reservation=1
 |  11:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=21 row-size=24B cardinality=1
 |  |  in pipelines: 11(GETNEXT), 38(OPEN)
 |  |
@@ -465,10 +465,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 35(GETNEXT)
 |  |
 |  F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  35:AGGREGATE [FINALIZE]
 |  |  output: count:merge(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=16 row-size=24B cardinality=1
 |  |  in pipelines: 35(GETNEXT), 08(OPEN)
 |  |
@@ -478,10 +478,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 08(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [HASH(ss_list_price)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=10.20MB mem-reservation=1.94MB thread-reservation=1
 |  08:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=15 row-size=24B cardinality=1
 |  |  in pipelines: 08(GETNEXT), 33(OPEN)
 |  |
@@ -531,10 +531,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Host Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  30:AGGREGATE [FINALIZE]
 |  |  output: count:merge(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=10 row-size=24B cardinality=1
 |  |  in pipelines: 30(GETNEXT), 05(OPEN)
 |  |
@@ -544,10 +544,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 05(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [HASH(ss_list_price)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=10.20MB mem-reservation=1.94MB thread-reservation=1
 |  05:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=9 row-size=24B cardinality=1
 |  |  in pipelines: 05(GETNEXT), 28(OPEN)
 |  |
@@ -588,7 +588,7 @@ PLAN-ROOT SINK
 |
 26:AGGREGATE [FINALIZE]
 |  output: count:merge(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=24B cardinality=1
 |  in pipelines: 26(GETNEXT), 02(OPEN)
 |
@@ -598,10 +598,10 @@ PLAN-ROOT SINK
 |  in pipelines: 02(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(ss_list_price)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+Per-Host Resources: mem-estimate=10.20MB mem-reservation=1.94MB thread-reservation=1
 02:AGGREGATE
 |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=24B cardinality=1
 |  in pipelines: 02(GETNEXT), 24(OPEN)
 |
@@ -641,9 +641,9 @@ Per-Host Resources: mem-estimate=74.00MB mem-reservation=4.00MB thread-reservati
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=75.25MB Threads=35
-Per-Host Resource Estimates: Memory=616MB
+Per-Host Resource Estimates: Memory=439MB
 F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=14.00MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price), avg(ss_list_price), zeroifnull(count(ss_list_price)), count(ss_list_price)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -667,10 +667,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 50(GETNEXT)
 |  |
 |  F17:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  50:AGGREGATE [FINALIZE]
 |  |  output: count:merge(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=34 row-size=24B cardinality=1
 |  |  in pipelines: 50(GETNEXT), 17(OPEN)
 |  |
@@ -680,10 +680,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 17(GETNEXT)
 |  |
 |  F16:PLAN FRAGMENT [HASH(ss_list_price)] hosts=3 instances=6
-|  Per-Instance Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.27MB mem-reservation=1.94MB thread-reservation=1
 |  17:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=33 row-size=24B cardinality=1
 |  |  in pipelines: 17(GETNEXT), 48(OPEN)
 |  |
@@ -740,10 +740,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 45(GETNEXT)
 |  |
 |  F14:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  45:AGGREGATE [FINALIZE]
 |  |  output: count:merge(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=28 row-size=24B cardinality=1
 |  |  in pipelines: 45(GETNEXT), 14(OPEN)
 |  |
@@ -753,10 +753,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 14(GETNEXT)
 |  |
 |  F13:PLAN FRAGMENT [HASH(ss_list_price)] hosts=3 instances=6
-|  Per-Instance Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.27MB mem-reservation=1.94MB thread-reservation=1
 |  14:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=27 row-size=24B cardinality=1
 |  |  in pipelines: 14(GETNEXT), 43(OPEN)
 |  |
@@ -813,10 +813,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 40(GETNEXT)
 |  |
 |  F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  40:AGGREGATE [FINALIZE]
 |  |  output: count:merge(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=22 row-size=24B cardinality=1
 |  |  in pipelines: 40(GETNEXT), 11(OPEN)
 |  |
@@ -826,10 +826,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  F10:PLAN FRAGMENT [HASH(ss_list_price)] hosts=3 instances=6
-|  Per-Instance Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.27MB mem-reservation=1.94MB thread-reservation=1
 |  11:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=21 row-size=24B cardinality=1
 |  |  in pipelines: 11(GETNEXT), 38(OPEN)
 |  |
@@ -886,10 +886,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 35(GETNEXT)
 |  |
 |  F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  35:AGGREGATE [FINALIZE]
 |  |  output: count:merge(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=16 row-size=24B cardinality=1
 |  |  in pipelines: 35(GETNEXT), 08(OPEN)
 |  |
@@ -899,10 +899,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 08(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [HASH(ss_list_price)] hosts=3 instances=6
-|  Per-Instance Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.27MB mem-reservation=1.94MB thread-reservation=1
 |  08:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=15 row-size=24B cardinality=1
 |  |  in pipelines: 08(GETNEXT), 33(OPEN)
 |  |
@@ -959,10 +959,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 30(GETNEXT)
 |  |
 |  F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=0B thread-reservation=1
+|  Per-Instance Resources: mem-estimate=32.00KB mem-reservation=0B thread-reservation=1
 |  30:AGGREGATE [FINALIZE]
 |  |  output: count:merge(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=10 row-size=24B cardinality=1
 |  |  in pipelines: 30(GETNEXT), 05(OPEN)
 |  |
@@ -972,10 +972,10 @@ PLAN-ROOT SINK
 |  |  in pipelines: 05(GETNEXT)
 |  |
 |  F04:PLAN FRAGMENT [HASH(ss_list_price)] hosts=3 instances=6
-|  Per-Instance Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.27MB mem-reservation=1.94MB thread-reservation=1
 |  05:AGGREGATE
 |  |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  |  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=9 row-size=24B cardinality=1
 |  |  in pipelines: 05(GETNEXT), 28(OPEN)
 |  |
@@ -1016,7 +1016,7 @@ PLAN-ROOT SINK
 |
 26:AGGREGATE [FINALIZE]
 |  output: count:merge(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=24B cardinality=1
 |  in pipelines: 26(GETNEXT), 02(OPEN)
 |
@@ -1026,10 +1026,10 @@ PLAN-ROOT SINK
 |  in pipelines: 02(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(ss_list_price)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=10.27MB mem-reservation=1.94MB thread-reservation=1
 02:AGGREGATE
 |  output: count(ss_list_price), avg:merge(ss_list_price), count:merge(ss_list_price)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=24B cardinality=1
 |  in pipelines: 02(GETNEXT), 24(OPEN)
 |

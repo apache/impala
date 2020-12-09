@@ -40,17 +40,17 @@ WHERE s_store_sk = ss_store_sk
            AND ss_net_profit BETWEEN 50 AND 25000)) ;
 
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=21.77MB Threads=6
+Max Per-Host Resource Reservation: Memory=22.70MB Threads=6
 Per-Host Resource Estimates: Memory=250MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=249.81MB mem-reservation=21.77MB thread-reservation=6 runtime-filters-memory=4.00MB
+|  Per-Host Resources: mem-estimate=249.81MB mem-reservation=22.70MB thread-reservation=6 runtime-filters-memory=4.00MB
 PLAN-ROOT SINK
 |  output exprs: sum(ss_quantity)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 09:AGGREGATE [FINALIZE]
 |  output: sum(CAST(ss_quantity AS BIGINT))
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=8B cardinality=1
 |  in pipelines: 09(GETNEXT), 02(OPEN)
 |
@@ -77,7 +77,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: cd_demo_sk = ss_cdemo_sk
 |  other predicates: cd_marital_status = 'M' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'M' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_marital_status = 'M' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'M' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'S', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'S', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'S', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'S', cd_marital_status = 'M' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'S', cd_marital_status = 'M' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'S', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR cd_marital_status = 'S', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR cd_marital_status = 'S', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'College', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = 'College', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'College', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = 'College', cd_marital_status = 'M' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'College', cd_marital_status = 'M' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = 'College', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR cd_education_status = 'College', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR cd_education_status = 'College', cd_education_status = '4 yr Degree' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'S', cd_education_status = '4 yr Degree' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'S', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR cd_marital_status = 'S', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR cd_marital_status = 'S', cd_marital_status = 'M' OR cd_marital_status = 'D' AND cd_education_status = '2 yr Degree' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'M' OR cd_marital_status = 'D' AND cd_education_status = '2 yr Degree' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'College', cd_education_status = '4 yr Degree' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = 'College', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR cd_education_status = 'College', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR cd_education_status = 'College', cd_education_status = '4 yr Degree' OR cd_marital_status = 'D' AND cd_education_status = '2 yr Degree' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR cd_marital_status = 'D' AND cd_education_status = '2 yr Degree' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
 |  runtime filters: RF002[bloom] <- ss_cdemo_sk, RF003[min_max] <- ss_cdemo_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=2,0,3,4 row-size=118B cardinality=8.70K
 |  in pipelines: 02(GETNEXT), 00(OPEN)
 |
@@ -150,17 +150,17 @@ PLAN-ROOT SINK
    tuple-ids=2 row-size=39B cardinality=181.75K
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=31.33MB Threads=12
-Per-Host Resource Estimates: Memory=282MB
+Max Per-Host Resource Reservation: Memory=35.08MB Threads=12
+Per-Host Resource Estimates: Memory=272MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=14.00MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: sum(ss_quantity)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 16:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_quantity)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=8B cardinality=1
 |  in pipelines: 16(GETNEXT), 09(OPEN)
 |
@@ -170,10 +170,10 @@ PLAN-ROOT SINK
 |  in pipelines: 09(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(ss_cdemo_sk)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=19.22MB mem-reservation=8.69MB thread-reservation=1 runtime-filters-memory=2.00MB
+Per-Host Resources: mem-estimate=19.71MB mem-reservation=12.44MB thread-reservation=1 runtime-filters-memory=2.00MB
 09:AGGREGATE
 |  output: sum(CAST(ss_quantity AS BIGINT))
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=8B cardinality=1
 |  in pipelines: 09(GETNEXT), 00(OPEN)
 |
@@ -207,7 +207,7 @@ Per-Host Resources: mem-estimate=19.22MB mem-reservation=8.69MB thread-reservati
 |  fk/pk conjuncts: ss_cdemo_sk = cd_demo_sk
 |  other predicates: cd_marital_status = 'M' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'M' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_marital_status = 'M' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'M' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'S', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'S', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'S', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'S', cd_marital_status = 'M' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'S', cd_marital_status = 'M' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'S', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR cd_marital_status = 'S', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR cd_marital_status = 'S', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'College', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = 'College', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'College', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = 'College', cd_marital_status = 'M' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'College', cd_marital_status = 'M' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = 'College', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR cd_education_status = 'College', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR cd_education_status = 'College', cd_education_status = '4 yr Degree' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'S', cd_education_status = '4 yr Degree' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'S', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR cd_marital_status = 'S', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR cd_marital_status = 'S', cd_marital_status = 'M' OR cd_marital_status = 'D' AND cd_education_status = '2 yr Degree' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'M' OR cd_marital_status = 'D' AND cd_education_status = '2 yr Degree' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'College', cd_education_status = '4 yr Degree' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = 'College', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR cd_education_status = 'College', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR cd_education_status = 'College', cd_education_status = '4 yr Degree' OR cd_marital_status = 'D' AND cd_education_status = '2 yr Degree' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR cd_marital_status = 'D' AND cd_education_status = '2 yr Degree' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
 |  runtime filters: RF002[bloom] <- cd_demo_sk, RF003[min_max] <- cd_demo_sk
-|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=0,3,4,2 row-size=118B cardinality=8.70K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
@@ -307,17 +307,17 @@ Per-Host Resources: mem-estimate=104.30MB mem-reservation=9.88MB thread-reservat
    tuple-ids=0 row-size=28B cardinality=288.04K
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=43.14MB Threads=14
-Per-Host Resource Estimates: Memory=172MB
+Max Per-Host Resource Reservation: Memory=46.89MB Threads=14
+Per-Host Resource Estimates: Memory=146MB
 F06:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=14.00MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: sum(ss_quantity)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 16:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_quantity)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=8B cardinality=1
 |  in pipelines: 16(GETNEXT), 09(OPEN)
 |
@@ -327,10 +327,10 @@ PLAN-ROOT SINK
 |  in pipelines: 09(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(ss_cdemo_sk)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=10.80MB mem-reservation=0B thread-reservation=1
+Per-Instance Resources: mem-estimate=830.09KB mem-reservation=0B thread-reservation=1
 09:AGGREGATE
 |  output: sum(CAST(ss_quantity AS BIGINT))
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=8B cardinality=1
 |  in pipelines: 09(GETNEXT), 00(OPEN)
 |
@@ -372,17 +372,17 @@ Per-Instance Resources: mem-estimate=10.80MB mem-reservation=0B thread-reservati
 |  hash predicates: ss_cdemo_sk = cd_demo_sk
 |  fk/pk conjuncts: ss_cdemo_sk = cd_demo_sk
 |  other predicates: cd_marital_status = 'M' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'M' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_marital_status = 'M' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'M' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'S', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'S', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'S', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'S', cd_marital_status = 'M' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'S', cd_marital_status = 'M' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'S', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR cd_marital_status = 'S', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR cd_marital_status = 'S', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'College', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = 'College', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'College', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = 'College', cd_marital_status = 'M' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'College', cd_marital_status = 'M' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = 'College', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR cd_education_status = 'College', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'D' OR cd_education_status = 'College', cd_education_status = '4 yr Degree' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_marital_status = 'S', cd_education_status = '4 yr Degree' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_marital_status = 'S', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR cd_marital_status = 'S', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR cd_marital_status = 'S', cd_marital_status = 'M' OR cd_marital_status = 'D' AND cd_education_status = '2 yr Degree' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_marital_status = 'M' OR cd_marital_status = 'D' AND cd_education_status = '2 yr Degree' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR ss_sales_price <= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = 'College', cd_education_status = '4 yr Degree' OR ss_sales_price >= CAST(50.00 AS DECIMAL(4,2)) OR cd_education_status = 'College', ss_sales_price <= CAST(150.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR cd_education_status = 'College', ss_sales_price >= CAST(100.00 AS DECIMAL(5,2)) OR cd_education_status = '2 yr Degree' OR cd_education_status = 'College', cd_education_status = '4 yr Degree' OR cd_marital_status = 'D' AND cd_education_status = '2 yr Degree' OR ss_sales_price <= CAST(200.00 AS DECIMAL(5,2)), cd_education_status = '4 yr Degree' OR cd_marital_status = 'D' AND cd_education_status = '2 yr Degree' OR ss_sales_price >= CAST(150.00 AS DECIMAL(5,2))
-|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=0,3,4,2 row-size=118B cardinality=8.70K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--F08:PLAN FRAGMENT [HASH(ss_cdemo_sk)] hosts=3 instances=6
-|  |  Per-Instance Resources: mem-estimate=10.60MB mem-reservation=3.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=12.48MB mem-reservation=5.75MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: cd_demo_sk
 |  |  runtime filters: RF002[bloom] <- cd_demo_sk, RF003[min_max] <- cd_demo_sk
-|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  |
 |  13:EXCHANGE [HASH(cd_demo_sk)]
 |  |  mem-estimate=6.73MB mem-reservation=0B thread-reservation=0

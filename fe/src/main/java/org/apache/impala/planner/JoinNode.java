@@ -565,7 +565,7 @@ public abstract class JoinNode extends PlanNode {
    * Unwraps the SlotRef in expr and returns the NDVs of it.
    * Returns -1 if the NDVs are unknown or if expr is not a SlotRef.
    */
-  private long getNdv(Expr expr) {
+  protected long getNdv(Expr expr) {
     SlotRef slotRef = expr.unwrapSlotRef(false);
     if (slotRef == null) return -1;
     SlotDescriptor slotDesc = slotRef.getDesc();

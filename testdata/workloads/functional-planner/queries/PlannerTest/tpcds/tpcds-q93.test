@@ -20,10 +20,10 @@ ORDER BY sumsales,
 LIMIT 100;
 
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=19.45MB Threads=4
-Per-Host Resource Estimates: Memory=219MB
+Max Per-Host Resource Reservation: Memory=28.69MB Threads=4
+Per-Host Resource Estimates: Memory=228MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=219.44MB mem-reservation=19.45MB thread-reservation=4 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=227.94MB mem-reservation=28.69MB thread-reservation=4 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: ss_customer_sk, sum(act_sales)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -37,7 +37,7 @@ PLAN-ROOT SINK
 05:AGGREGATE [FINALIZE]
 |  output: sum(CASE WHEN sr_return_quantity IS NOT NULL THEN CAST((CAST(ss_quantity AS BIGINT) - CAST(sr_return_quantity AS BIGINT)) AS DECIMAL(19,0)) * ss_sales_price ELSE CAST((CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price) AS DECIMAL(27,2)) END)
 |  group by: ss_customer_sk
-|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=4 row-size=20B cardinality=82.30K
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |
@@ -65,7 +65,7 @@ PLAN-ROOT SINK
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
 |  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
-|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=0,1N row-size=52B cardinality=2.88M
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
@@ -91,8 +91,8 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=28B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=28.39MB Threads=8
-Per-Host Resource Estimates: Memory=252MB
+Max Per-Host Resource Reservation: Memory=36.89MB Threads=8
+Per-Host Resource Estimates: Memory=260MB
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -127,7 +127,7 @@ Per-Host Resources: mem-estimate=10.59MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=108.06MB mem-reservation=17.44MB thread-reservation=2 runtime-filters-memory=1.00MB
+Per-Host Resources: mem-estimate=116.56MB mem-reservation=25.94MB thread-reservation=2 runtime-filters-memory=1.00MB
 05:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN sr_return_quantity IS NOT NULL THEN CAST((CAST(ss_quantity AS BIGINT) - CAST(sr_return_quantity AS BIGINT)) AS DECIMAL(19,0)) * ss_sales_price ELSE CAST((CAST(ss_quantity AS DECIMAL(10,0)) * ss_sales_price) AS DECIMAL(27,2)) END)
 |  group by: ss_customer_sk
@@ -166,7 +166,7 @@ Per-Host Resources: mem-estimate=108.06MB mem-reservation=17.44MB thread-reserva
 03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
 |  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
-|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=0,1N row-size=52B cardinality=2.88M
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
@@ -199,8 +199,8 @@ Per-Host Resources: mem-estimate=108.06MB mem-reservation=17.44MB thread-reserva
    tuple-ids=0 row-size=28B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=46.77MB Threads=9
-Per-Host Resource Estimates: Memory=147MB
+Max Per-Host Resource Reservation: Memory=63.77MB Threads=9
+Per-Host Resource Estimates: Memory=164MB
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -283,16 +283,16 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reser
 |  hash-table-id=01
 |  hash predicates: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
 |  fk/pk conjuncts: ss_item_sk = sr_item_sk, ss_ticket_number = sr_ticket_number
-|  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=0,1N row-size=52B cardinality=2.88M
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--F06:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=23.61MB mem-reservation=17.00MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=40.61MB mem-reservation=34.00MB thread-reservation=1
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: sr_item_sk, sr_ticket_number
-|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=512.00KB thread-reservation=0
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=1.00MB thread-reservation=0
 |  |
 |  07:EXCHANGE [BROADCAST]
 |  |  mem-estimate=6.61MB mem-reservation=0B thread-reservation=0

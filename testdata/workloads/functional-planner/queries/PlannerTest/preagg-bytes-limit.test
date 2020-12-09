@@ -13,10 +13,10 @@ PLAN-ROOT SINK
 |  in pipelines: 03(GETNEXT)
 |
 F01:PLAN FRAGMENT [HASH(l_orderkey,l_partkey,l_suppkey)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=85.63MB mem-reservation=34.00MB thread-reservation=1
+Per-Host Resources: mem-estimate=86.39MB mem-reservation=34.00MB thread-reservation=1
 03:AGGREGATE [FINALIZE]
 |  group by: l_orderkey, l_partkey, l_suppkey
-|  mem-estimate=75.55MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=76.31MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=1 row-size=24B cardinality=6.00M
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |
@@ -26,10 +26,10 @@ Per-Host Resources: mem-estimate=85.63MB mem-reservation=34.00MB thread-reservat
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=304.00MB mem-reservation=50.00MB thread-reservation=2
+Per-Host Resources: mem-estimate=297.23MB mem-reservation=50.00MB thread-reservation=2
 01:AGGREGATE [STREAMING]
 |  group by: l_orderkey, l_partkey, l_suppkey
-|  mem-estimate=64.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=57.23MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=1 row-size=24B cardinality=6.00M
 |  in pipelines: 00(GETNEXT)
 |
@@ -118,10 +118,10 @@ Per-Host Resources: mem-estimate=146.08MB mem-reservation=136.00MB thread-reserv
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=376.00MB mem-reservation=152.00MB thread-reservation=2
+Per-Host Resources: mem-estimate=308.00MB mem-reservation=84.00MB thread-reservation=2
 01:AGGREGATE [STREAMING]
 |  group by: l_orderkey, l_partkey, l_suppkey
-|  mem-estimate=136.00MB mem-reservation=136.00MB spill-buffer=8.00MB thread-reservation=0
+|  mem-estimate=68.00MB mem-reservation=68.00MB spill-buffer=4.00MB thread-reservation=0
 |  tuple-ids=1 row-size=24B cardinality=6.00M
 |  in pipelines: 00(GETNEXT)
 |

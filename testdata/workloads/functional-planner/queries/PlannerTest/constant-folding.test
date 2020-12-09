@@ -59,14 +59,14 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.14MB
+   HDFS partitions=1/1 files=4 size=289.07MB
    predicates: c_custkey > CAST(10 AS BIGINT), !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey = CAST(4 AS BIGINT)
    predicates on o_lineitems: CAST(20 AS BIGINT) + CAST(l_linenumber AS BIGINT) < CAST(0 AS BIGINT)
    stored statistics:
-     table: rows=150.00K size=289.14MB
+     table: rows=150.00K size=289.07MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.03K
+   extrapolated-rows=disabled max-scan-range-rows=50.61K
    parquet statistics predicates: c_custkey > CAST(10 AS BIGINT)
    parquet statistics predicates on o: o_orderkey = CAST(4 AS BIGINT)
    parquet dictionary predicates: c_custkey > CAST(10 AS BIGINT)
@@ -322,7 +322,7 @@ PLAN-ROOT SINK
 02:AGGREGATE [FINALIZE]
 |  output: sum(2 + id), count:merge(*)
 |  having: CAST(1048576 AS BIGINT) * zeroifnull(count(*)) % CAST(2 AS BIGINT) = CAST(0 AS BIGINT)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=16B cardinality=1
 |  in pipelines: 02(GETNEXT), 01(OPEN)
 |
@@ -460,14 +460,14 @@ id, CAST(10 AS INT) + CAST(c2 AS INT) c3 FROM (SELECT id, CAST(20 AS SMALLINT) +
 CAST(c1 AS SMALLINT) c2 FROM (SELECT id, CAST(30 AS TINYINT) c1 FROM
 functional.alltypes LIMIT CAST(2 AS TINYINT)) v1) v2) v3
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=138.00MB mem-reservation=4.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=128.02MB mem-reservation=4.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: sum(id + c3)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 01:AGGREGATE [FINALIZE]
 |  output: sum(CAST(id AS BIGINT) + CAST(CAST(10 AS INT) + CAST(CAST(20 AS SMALLINT) + CAST(30 AS SMALLINT) AS INT) AS BIGINT))
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=8B cardinality=1
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |

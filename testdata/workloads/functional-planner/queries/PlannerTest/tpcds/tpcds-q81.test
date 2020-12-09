@@ -56,10 +56,10 @@ ORDER BY c_customer_id,
 LIMIT 100;
 
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=27.12MB Threads=9
+Max Per-Host Resource Reservation: Memory=29.00MB Threads=9
 Per-Host Resource Estimates: Memory=557MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=556.81MB mem-reservation=27.12MB thread-reservation=9 runtime-filters-memory=7.00MB
+|  Per-Host Resources: mem-estimate=556.81MB mem-reservation=29.00MB thread-reservation=9 runtime-filters-memory=7.00MB
 PLAN-ROOT SINK
 |  output exprs: c_customer_id, c_salutation, c_first_name, c_last_name, ca_street_number, ca_street_name, ca_street_type, ca_suite_number, ca_city, ca_county, ca_state, ca_zip, ca_country, ca_gmt_offset, ca_location_type, ctr_total_return
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -88,7 +88,7 @@ PLAN-ROOT SINK
 |  13:AGGREGATE [FINALIZE]
 |  |  output: sum(cr_return_amt_inc_tax)
 |  |  group by: cr_returning_customer_sk, ca_state
-|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=10 row-size=34B cardinality=26.27K
 |  |  in pipelines: 13(GETNEXT), 10(OPEN)
 |  |
@@ -96,7 +96,7 @@ PLAN-ROOT SINK
 |  |  hash predicates: ca_address_sk = cr_returning_addr_sk
 |  |  fk/pk conjuncts: ca_address_sk = cr_returning_addr_sk
 |  |  runtime filters: RF010[bloom] <- cr_returning_addr_sk, RF011[min_max] <- cr_returning_addr_sk
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=9,7,8 row-size=42B cardinality=26.27K
 |  |  in pipelines: 10(GETNEXT), 08(OPEN)
 |  |
@@ -186,7 +186,7 @@ PLAN-ROOT SINK
 05:AGGREGATE [FINALIZE]
 |  output: sum(cr_return_amt_inc_tax)
 |  group by: cr_returning_customer_sk, ca_state
-|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=3 row-size=34B cardinality=26.27K
 |  in pipelines: 05(GETNEXT), 02(OPEN)
 |
@@ -194,7 +194,7 @@ PLAN-ROOT SINK
 |  hash predicates: ca_address_sk = cr_returning_addr_sk
 |  fk/pk conjuncts: ca_address_sk = cr_returning_addr_sk
 |  runtime filters: RF004[bloom] <- cr_returning_addr_sk, RF005[min_max] <- cr_returning_addr_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=2,0,1 row-size=42B cardinality=26.27K
 |  in pipelines: 02(GETNEXT), 00(OPEN)
 |
@@ -241,8 +241,8 @@ PLAN-ROOT SINK
    tuple-ids=2 row-size=18B cardinality=50.00K
    in pipelines: 02(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=48.88MB Threads=20
-Per-Host Resource Estimates: Memory=635MB
+Max Per-Host Resource Reservation: Memory=52.62MB Threads=20
+Per-Host Resource Estimates: Memory=637MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.06MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -257,7 +257,7 @@ PLAN-ROOT SINK
 |  in pipelines: 18(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(cr_returning_customer_sk,ca_state)] hosts=1 instances=1
-Per-Host Resources: mem-estimate=17.70MB mem-reservation=7.81MB thread-reservation=1 runtime-filters-memory=2.00MB
+Per-Host Resources: mem-estimate=17.70MB mem-reservation=8.75MB thread-reservation=1 runtime-filters-memory=2.00MB
 18:TOP-N [LIMIT=100]
 |  order by: c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, ca_street_number ASC, ca_street_name ASC, ca_street_type ASC, ca_suite_number ASC, ca_city ASC, ca_county ASC, ca_state ASC, ca_zip ASC, ca_country ASC, ca_gmt_offset ASC, ca_location_type ASC, ctr_total_return ASC
 |  mem-estimate=28.79KB mem-reservation=0B thread-reservation=0
@@ -292,7 +292,7 @@ Per-Host Resources: mem-estimate=17.70MB mem-reservation=7.81MB thread-reservati
 |  |  in pipelines: 28(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [HASH(cr_returning_customer_sk,ca_state)] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=20.89MB mem-reservation=3.94MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=20.89MB mem-reservation=4.88MB thread-reservation=1
 |  14:AGGREGATE [STREAMING]
 |  |  output: avg(sum(cr_return_amt_inc_tax))
 |  |  group by: ca_state
@@ -303,7 +303,7 @@ Per-Host Resources: mem-estimate=17.70MB mem-reservation=7.81MB thread-reservati
 |  28:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(cr_return_amt_inc_tax)
 |  |  group by: cr_returning_customer_sk, ca_state
-|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=10 row-size=34B cardinality=26.27K
 |  |  in pipelines: 28(GETNEXT), 10(OPEN)
 |  |
@@ -313,7 +313,7 @@ Per-Host Resources: mem-estimate=17.70MB mem-reservation=7.81MB thread-reservati
 |  |  in pipelines: 10(GETNEXT)
 |  |
 |  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=45.57MB mem-reservation=5.19MB thread-reservation=2 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=46.51MB mem-reservation=6.12MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  13:AGGREGATE [STREAMING]
 |  |  output: sum(cr_return_amt_inc_tax)
 |  |  group by: cr_returning_customer_sk, ca_state
@@ -325,7 +325,7 @@ Per-Host Resources: mem-estimate=17.70MB mem-reservation=7.81MB thread-reservati
 |  |  hash predicates: ca_address_sk = cr_returning_addr_sk
 |  |  fk/pk conjuncts: ca_address_sk = cr_returning_addr_sk
 |  |  runtime filters: RF010[bloom] <- cr_returning_addr_sk, RF011[min_max] <- cr_returning_addr_sk
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=9,7,8 row-size=42B cardinality=26.27K
 |  |  in pipelines: 10(GETNEXT), 08(OPEN)
 |  |
@@ -443,7 +443,7 @@ Per-Host Resources: mem-estimate=17.70MB mem-reservation=7.81MB thread-reservati
 22:AGGREGATE [FINALIZE]
 |  output: sum:merge(cr_return_amt_inc_tax)
 |  group by: cr_returning_customer_sk, ca_state
-|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=3 row-size=34B cardinality=26.27K
 |  in pipelines: 22(GETNEXT), 02(OPEN)
 |
@@ -453,7 +453,7 @@ Per-Host Resources: mem-estimate=17.70MB mem-reservation=7.81MB thread-reservati
 |  in pipelines: 02(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-Per-Host Resources: mem-estimate=46.57MB mem-reservation=6.19MB thread-reservation=2 runtime-filters-memory=2.00MB
+Per-Host Resources: mem-estimate=47.51MB mem-reservation=7.12MB thread-reservation=2 runtime-filters-memory=2.00MB
 05:AGGREGATE [STREAMING]
 |  output: sum(cr_return_amt_inc_tax)
 |  group by: cr_returning_customer_sk, ca_state
@@ -465,7 +465,7 @@ Per-Host Resources: mem-estimate=46.57MB mem-reservation=6.19MB thread-reservati
 |  hash predicates: ca_address_sk = cr_returning_addr_sk
 |  fk/pk conjuncts: ca_address_sk = cr_returning_addr_sk
 |  runtime filters: RF004[bloom] <- cr_returning_addr_sk, RF005[min_max] <- cr_returning_addr_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=2,0,1 row-size=42B cardinality=26.27K
 |  in pipelines: 02(GETNEXT), 00(OPEN)
 |
@@ -526,8 +526,8 @@ Per-Host Resources: mem-estimate=46.57MB mem-reservation=6.19MB thread-reservati
    tuple-ids=2 row-size=18B cardinality=50.00K
    in pipelines: 02(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=67.44MB Threads=19
-Per-Host Resource Estimates: Memory=254MB
+Max Per-Host Resource Reservation: Memory=73.06MB Threads=19
+Per-Host Resource Estimates: Memory=257MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.06MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -542,7 +542,7 @@ PLAN-ROOT SINK
 |  in pipelines: 18(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(cr_returning_customer_sk,ca_state)] hosts=1 instances=1
-Per-Instance Resources: mem-estimate=10.89MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=10.89MB mem-reservation=2.88MB thread-reservation=1
 18:TOP-N [LIMIT=100]
 |  order by: c_customer_id ASC, c_salutation ASC, c_first_name ASC, c_last_name ASC, ca_street_number ASC, ca_street_name ASC, ca_street_type ASC, ca_suite_number ASC, ca_city ASC, ca_county ASC, ca_state ASC, ca_zip ASC, ca_country ASC, ca_gmt_offset ASC, ca_location_type ASC, ctr_total_return ASC
 |  mem-estimate=28.79KB mem-reservation=0B thread-reservation=0
@@ -585,7 +585,7 @@ Per-Instance Resources: mem-estimate=10.89MB mem-reservation=1.94MB thread-reser
 |  |  in pipelines: 28(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [HASH(cr_returning_customer_sk,ca_state)] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=20.89MB mem-reservation=3.94MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=20.89MB mem-reservation=4.88MB thread-reservation=1
 |  14:AGGREGATE [STREAMING]
 |  |  output: avg(sum(cr_return_amt_inc_tax))
 |  |  group by: ca_state
@@ -596,7 +596,7 @@ Per-Instance Resources: mem-estimate=10.89MB mem-reservation=1.94MB thread-reser
 |  28:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(cr_return_amt_inc_tax)
 |  |  group by: cr_returning_customer_sk, ca_state
-|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=10 row-size=34B cardinality=26.27K
 |  |  in pipelines: 28(GETNEXT), 10(OPEN)
 |  |
@@ -619,17 +619,17 @@ Per-Instance Resources: mem-estimate=10.89MB mem-reservation=1.94MB thread-reser
 |  |  hash-table-id=01
 |  |  hash predicates: ca_address_sk = cr_returning_addr_sk
 |  |  fk/pk conjuncts: ca_address_sk = cr_returning_addr_sk
-|  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=9,7,8 row-size=42B cardinality=26.27K
 |  |  in pipelines: 10(GETNEXT), 08(OPEN)
 |  |
 |  |--F13:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  Per-Instance Resources: mem-estimate=5.51MB mem-reservation=4.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=7.38MB mem-reservation=6.75MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: cr_returning_addr_sk
 |  |  |  runtime filters: RF010[bloom] <- cr_returning_addr_sk, RF011[min_max] <- cr_returning_addr_sk
-|  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
+|  |  |  mem-estimate=5.75MB mem-reservation=5.75MB spill-buffer=128.00KB thread-reservation=0
 |  |  |
 |  |  26:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=647.59KB mem-reservation=0B thread-reservation=0
@@ -771,7 +771,7 @@ Per-Instance Resources: mem-estimate=10.89MB mem-reservation=1.94MB thread-reser
 22:AGGREGATE [FINALIZE]
 |  output: sum:merge(cr_return_amt_inc_tax)
 |  group by: cr_returning_customer_sk, ca_state
-|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=3 row-size=34B cardinality=26.27K
 |  in pipelines: 22(GETNEXT), 02(OPEN)
 |
@@ -794,17 +794,17 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.25MB thread-reser
 |  hash-table-id=05
 |  hash predicates: ca_address_sk = cr_returning_addr_sk
 |  fk/pk conjuncts: ca_address_sk = cr_returning_addr_sk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=2,0,1 row-size=42B cardinality=26.27K
 |  in pipelines: 02(GETNEXT), 00(OPEN)
 |
 |--F17:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Instance Resources: mem-estimate=5.51MB mem-reservation=4.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=7.38MB mem-reservation=6.75MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=05 plan-id=06 cohort-id=01
 |  |  build expressions: cr_returning_addr_sk
 |  |  runtime filters: RF004[bloom] <- cr_returning_addr_sk, RF005[min_max] <- cr_returning_addr_sk
-|  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=5.75MB mem-reservation=5.75MB spill-buffer=128.00KB thread-reservation=0
 |  |
 |  20:EXCHANGE [BROADCAST]
 |  |  mem-estimate=647.59KB mem-reservation=0B thread-reservation=0

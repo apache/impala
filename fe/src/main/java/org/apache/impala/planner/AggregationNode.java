@@ -58,9 +58,6 @@ public class AggregationNode extends PlanNode {
   // TODO: Come up with a more useful heuristic.
   private final static long DEFAULT_PER_INSTANCE_MEM = 128L * 1024L * 1024L;
 
-  // Conservative minimum size of hash table for low-cardinality aggregations.
-  private final static long MIN_HASH_TBL_MEM = 10L * 1024L * 1024L;
-
   // Default skew factor to account for data skew among fragment instances.
   private final static double DEFAULT_SKEW_FACTOR = 1.5;
 
@@ -81,6 +78,14 @@ public class AggregationNode extends PlanNode {
 
   // Resource profiles for each aggregation class.
   private List<ResourceProfile> resourceProfiles_;
+
+  // Conservative minimum size of hash table for low-cardinality aggregations.
+  protected final static long MIN_HASH_TBL_MEM = 10L * 1024L * 1024L;
+
+  // If the group clause is empty ( aggInfo.getGroupingExprs() is empty ),
+  // the hash table will not be created.
+  // Peak memory is at least 16k, which is an empirical value
+  protected final static long MIN_PLAIN_AGG_MEM = 16L * 1024L;
 
   public AggregationNode(
       PlanNodeId id, PlanNode input, MultiAggregateInfo multiAggInfo, AggPhase aggPhase) {
@@ -530,19 +535,44 @@ public class AggregationNode extends PlanNode {
         long numInstances = fragment_.getNumInstances();
         long perInstanceInputCardinality;
         if (numInstances > 1) {
-          perInstanceInputCardinality =
+          if (useStreamingPreagg_) {
+            // A skew factor was added to account for data skew among
+            // multiple fragment instances.
+            // This number was derived using empirical analysis of real-world
+            // and benchmark (tpch, tpcds) queries.
+            perInstanceInputCardinality =
               (long) Math.ceil((inputCardinality / numInstances) * DEFAULT_SKEW_FACTOR);
+          } else {
+            // The data is distributed through hash, it will be more balanced.
+            perInstanceInputCardinality =
+              (long) Math.ceil(inputCardinality / numInstances);
+          }
         } else {
           // When numInstances is 1 or unknown(-1), perInstanceInputCardinality is the
           // same as inputCardinality.
           perInstanceInputCardinality = inputCardinality;
         }
-        perInstanceCardinality =
-            Math.min(perInstanceCardinality, perInstanceInputCardinality);
+
+        if (useStreamingPreagg_) {
+          // A reduction factor of 2 (input rows divided by output rows) was
+          // added to grow hash tables. If the reduction factor is lower than 2,
+          // only part of the data will be inserted into the hash table.
+          perInstanceCardinality =
+              Math.min(perInstanceCardinality, perInstanceInputCardinality / 2);
+        } else {
+          perInstanceCardinality =
+              Math.min(perInstanceCardinality, perInstanceInputCardinality);
+        }
       }
-      perInstanceDataBytes = (long)Math.ceil(perInstanceCardinality * avgRowSize_);
-      perInstanceMemEstimate = (long)Math.max(perInstanceDataBytes *
-          PlannerContext.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
+      // The memory of the data stored in hash table and the memory of the
+      // hash table‘s structure
+      perInstanceDataBytes = (long)Math.ceil(perInstanceCardinality *
+                                  (avgRowSize_ + PlannerContext.SIZE_OF_BUCKET));
+      if (aggInfo.getGroupingExprs().isEmpty()) {
+        perInstanceMemEstimate = MIN_PLAIN_AGG_MEM;
+      } else {
+        perInstanceMemEstimate = (long)Math.max(perInstanceDataBytes, MIN_HASH_TBL_MEM);
+      }
     }
 
     // Must be kept in sync with GroupingAggregator::MinReservation() in backend.

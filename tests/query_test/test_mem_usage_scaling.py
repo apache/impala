@@ -390,7 +390,7 @@ class TestHashJoinMemLimit(ImpalaTestSuite):
   def test_low_mem_limit_selective_scan_hash_join(self, vector):
     """Selective scan with hash join and aggregate above it. Regression test for
     IMPALA-9712 - before the fix this ran out of memory."""
-    OPTS = {'mem_limit': "60MB", 'mt_dop': 1}
+    OPTS = {'mem_limit': "80MB", 'mt_dop': 1}
     self.change_database(self.client, vector.get_value('table_format'))
     result = self.execute_query_expect_success(self.client,
         """select sum(l_extendedprice * (1 - l_discount)) as revenue

@@ -75,7 +75,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=32.00KB thread-rese
 select * from tpch.lineitem order by l_orderkey
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=24.00MB Threads=3
-Per-Host Resource Estimates: Memory=257MB
+Per-Host Resource Estimates: Memory=659MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=130.69MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -89,10 +89,10 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=126.00MB mem-reservation=20.00MB thread-reservation=2
+Per-Host Resources: mem-estimate=528.26MB mem-reservation=20.00MB thread-reservation=2
 01:SORT
 |  order by: l_orderkey ASC
-|  mem-estimate=38.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=440.26MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=1 row-size=231B cardinality=6.00M
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
@@ -107,7 +107,7 @@ Per-Host Resources: mem-estimate=126.00MB mem-reservation=20.00MB thread-reserva
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=44.00MB Threads=3
-Per-Host Resource Estimates: Memory=413MB
+Per-Host Resource Estimates: Memory=778MB
 F01:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=161.38MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -121,10 +121,10 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=126.00MB mem-reservation=20.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=308.13MB mem-reservation=20.00MB thread-reservation=1
 01:SORT
 |  order by: l_orderkey ASC
-|  mem-estimate=38.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=220.13MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=1 row-size=231B cardinality=6.00M
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |

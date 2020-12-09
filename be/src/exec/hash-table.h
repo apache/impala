@@ -645,6 +645,9 @@ class HashTable {
     Tuple* tuple;
   };
 
+  /// struct DuplicateNode is referenced by SIZE_OF_DUPLICATENODE of
+  /// planner/PlannerContext.java. If struct DuplicateNode is modified, please modify
+  /// SIZE_OF_DUPLICATENODE synchronously.
   /// Linked list of entries used for duplicates.
   struct DuplicateNode {
     /// Used for full outer and right {outer, anti, semi} joins. Indicates whether the
@@ -659,6 +662,8 @@ class HashTable {
     HtData htdata;
   };
 
+  /// struct Bucket is referenced by SIZE_OF_BUCKET of planner/PlannerContext.java.
+  /// If struct Bucket is modified, please modify SIZE_OF_BUCKET synchronously.
   struct Bucket {
     /// Whether this bucket contains a vaild entry, or it is empty.
     bool filled;

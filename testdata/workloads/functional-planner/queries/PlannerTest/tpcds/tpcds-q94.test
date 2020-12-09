@@ -42,7 +42,7 @@ PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
 |  output: count(ws_order_number), sum:merge(ws_ext_ship_cost), sum:merge(ws_net_profit)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=9 row-size=40B cardinality=1
 |  in pipelines: 12(GETNEXT), 11(OPEN)
 |
@@ -162,10 +162,10 @@ PLAN-ROOT SINK
    tuple-ids=6 row-size=8B cardinality=71.76K
    in pipelines: 05(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=41.39MB Threads=15
-Per-Host Resource Estimates: Memory=442MB
+Max Per-Host Resource Reservation: Memory=42.33MB Threads=15
+Per-Host Resource Estimates: Memory=435MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=10.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(ws_order_number), sum(ws_ext_ship_cost), sum(ws_net_profit)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -178,7 +178,7 @@ PLAN-ROOT SINK
 |
 22:AGGREGATE [FINALIZE]
 |  output: count:merge(ws_order_number), sum:merge(ws_ext_ship_cost), sum:merge(ws_net_profit)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=9 row-size=40B cardinality=1
 |  in pipelines: 22(GETNEXT), 12(OPEN)
 |
@@ -188,10 +188,10 @@ PLAN-ROOT SINK
 |  in pipelines: 12(GETNEXT)
 |
 F06:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=2 instances=2
-Per-Host Resources: mem-estimate=21.00MB mem-reservation=6.81MB thread-reservation=1 runtime-filters-memory=1.00MB
+Per-Host Resources: mem-estimate=19.96MB mem-reservation=7.75MB thread-reservation=1 runtime-filters-memory=1.00MB
 12:AGGREGATE
 |  output: count(ws_order_number), sum:merge(ws_ext_ship_cost), sum:merge(ws_net_profit)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=9 row-size=40B cardinality=1
 |  in pipelines: 12(GETNEXT), 11(OPEN)
 |
@@ -204,7 +204,7 @@ Per-Host Resources: mem-estimate=21.00MB mem-reservation=6.81MB thread-reservati
 |
 10:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
 |  hash predicates: ws1.ws_order_number = wr1.wr_order_number
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=0,2,3,1 row-size=96B cardinality=3.25K
 |  in pipelines: 04(GETNEXT), 05(OPEN)
 |
@@ -360,10 +360,10 @@ Per-Host Resources: mem-estimate=65.00MB mem-reservation=3.00MB thread-reservati
    tuple-ids=4 row-size=12B cardinality=719.38K
    in pipelines: 04(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=47.27MB Threads=14
-Per-Host Resource Estimates: Memory=181MB
+Max Per-Host Resource Reservation: Memory=48.20MB Threads=14
+Per-Host Resource Estimates: Memory=170MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=10.02MB mem-reservation=4.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
 |  output exprs: count(ws_order_number), sum(ws_ext_ship_cost), sum(ws_net_profit)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -376,7 +376,7 @@ PLAN-ROOT SINK
 |
 22:AGGREGATE [FINALIZE]
 |  output: count:merge(ws_order_number), sum:merge(ws_ext_ship_cost), sum:merge(ws_net_profit)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=9 row-size=40B cardinality=1
 |  in pipelines: 22(GETNEXT), 12(OPEN)
 |
@@ -386,10 +386,10 @@ PLAN-ROOT SINK
 |  in pipelines: 12(GETNEXT)
 |
 F06:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=2 instances=2
-Per-Instance Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reservation=1
+Per-Instance Resources: mem-estimate=14.15MB mem-reservation=1.94MB thread-reservation=1
 12:AGGREGATE
 |  output: count(ws_order_number), sum:merge(ws_ext_ship_cost), sum:merge(ws_net_profit)
-|  mem-estimate=10.00MB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=9 row-size=40B cardinality=1
 |  in pipelines: 12(GETNEXT), 11(OPEN)
 |
@@ -403,16 +403,16 @@ Per-Instance Resources: mem-estimate=20.00MB mem-reservation=1.94MB thread-reser
 10:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
 |  hash-table-id=00
 |  hash predicates: ws1.ws_order_number = wr1.wr_order_number
-|  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=0,2,3,1 row-size=96B cardinality=3.25K
 |  in pipelines: 04(GETNEXT), 05(OPEN)
 |
 |--F09:PLAN FRAGMENT [HASH(ws1.ws_order_number)] hosts=2 instances=2
-|  |  Per-Instance Resources: mem-estimate=2.50MB mem-reservation=1.94MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=3.43MB mem-reservation=2.88MB thread-reservation=1
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: wr1.wr_order_number
-|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |
 |  20:EXCHANGE [HASH(wr1.wr_order_number)]
 |  |  mem-estimate=572.65KB mem-reservation=0B thread-reservation=0

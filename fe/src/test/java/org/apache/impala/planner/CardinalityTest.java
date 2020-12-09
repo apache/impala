@@ -862,6 +862,147 @@ public class CardinalityTest extends PlannerTestBase {
         path, UnnestNode.class);
   }
 
+  @Test
+  public void testAggregationNodeMemoryEstimate() {
+    // Create the paths to the AggregationNode's of interest
+    // in a distributed plan involving GROUP BY.
+    // Since there are two resulting AggregationNode's, we create two paths.
+    List<Integer> pathToFirstAggregationNode = Arrays.asList(0);
+    List<Integer> pathToSecondAggregationNode = Arrays.asList(0, 0, 0);
+    // Single node execution plan, there is only one AggregationNode
+    List<Integer> pathToAggregationNode = Arrays.asList();
+
+    // There is available statistics in functional.alltypes.
+    // True cardinality of functional.alltypes is 7300.
+    // Ndv of int_col is 10;
+    // MIN_HASH_TBL_MEM is 10M
+    verifyApproxMemoryEstimate("SELECT COUNT(int_col) FROM functional.alltypes "
+        + "GROUP BY int_col", AggregationNode.MIN_HASH_TBL_MEM, true, false,
+        ImmutableSet.of(), pathToFirstAggregationNode, AggregationNode.class);
+    // create a single node plan.
+    verifyApproxMemoryEstimate("SELECT COUNT(int_col) FROM functional.alltypes "
+        + "GROUP BY int_col", AggregationNode.MIN_HASH_TBL_MEM, false, false,
+        ImmutableSet.of(), pathToAggregationNode, AggregationNode.class);
+
+    // FUNCTIONAL.ALLTYPES.ID's Ndv is 7300 and avgRowSize is 4
+    // FUNCTIONAL.ALLTYPESSMALL.TIMESTAMP_COL's Ndv is 100 and avgRowSize is 16
+    // FUNCTIONAL.NULLROWS.BOOL_NULLS's Ndv is 3 and avgRowSize is 1
+    // COUNT(*)'s avgRowSize is 8 and MAX(B.BIGINT_COL) avgRowSize is 8
+    // 2190000 = 7300*100*3
+    verifyApproxMemoryEstimate("SELECT COUNT(*),MAX(B.BIGINT_COL) FROM " +
+        "FUNCTIONAL.ALLTYPES A , FUNCTIONAL.ALLTYPESSMALL B, " +
+        "FUNCTIONAL.NULLROWS C GROUP BY A.ID, B.TIMESTAMP_COL,C.BOOL_NULLS",
+        2190000*(4+16+1+8+8+16), true, true, ImmutableSet.of(),
+        pathToFirstAggregationNode, AggregationNode.class);
+    verifyApproxMemoryEstimate("SELECT COUNT(*),MAX(B.BIGINT_COL) FROM " +
+        "FUNCTIONAL.ALLTYPES A , FUNCTIONAL.ALLTYPESSMALL B, " +
+        "FUNCTIONAL.NULLROWS C GROUP BY A.ID, B.TIMESTAMP_COL,C.BOOL_NULLS",
+        2190000*(4+16+1+8+8+16), true, false, ImmutableSet.of(),
+        pathToSecondAggregationNode, AggregationNode.class);
+    // create a single node plan.
+    verifyApproxMemoryEstimate("SELECT COUNT(*),MAX(B.BIGINT_COL) FROM " +
+        "FUNCTIONAL.ALLTYPES A , FUNCTIONAL.ALLTYPESSMALL B, " +
+        "FUNCTIONAL.NULLROWS C GROUP BY A.ID, B.TIMESTAMP_COL,C.BOOL_NULLS",
+        2190000*(4+16+1+8+8+16), false, false, ImmutableSet.of(),
+        pathToAggregationNode, AggregationNode.class);
+
+    List<Integer> countFirstAggregationNode = Arrays.asList();
+    List<Integer> countSecondAggregationNode = Arrays.asList();
+    // Query has no Group by Clause
+    verifyApproxMemoryEstimate("SELECT COUNT(*) FROM FUNCTIONAL.ALLTYPES A ",
+        AggregationNode.MIN_PLAIN_AGG_MEM, true, false, ImmutableSet.of(),
+        countFirstAggregationNode, AggregationNode.class);
+    verifyApproxMemoryEstimate("SELECT COUNT(*) FROM FUNCTIONAL.ALLTYPES A ",
+        AggregationNode.MIN_PLAIN_AGG_MEM, true, false, ImmutableSet.of(),
+        countSecondAggregationNode, AggregationNode.class);
+    // create a single node plan.
+    verifyApproxMemoryEstimate("SELECT COUNT(*) FROM FUNCTIONAL.ALLTYPES A ",
+        AggregationNode.MIN_PLAIN_AGG_MEM, false, false, ImmutableSet.of(),
+        pathToAggregationNode, AggregationNode.class);
+  }
+
+  @Test
+  public void testSortNodeMemoryEstimate() {
+    List<Integer> pathToSortNode = Arrays.asList(0);
+
+    List<Integer> pathToSortNodeSg = Arrays.asList();
+
+    // FUNCTIONAL.ALLTYPES.ID's Ndv is 7300 and avgRowSize is 4
+    // FUNCTIONAL.ALLTYPESSMALL.TIMESTAMP_COL's Ndv is 100 and avgRowSize is 16
+    verifyApproxMemoryEstimate("SELECT A.TIMESTAMP_COL,B.TIMESTAMP_COL FROM " +
+        "FUNCTIONAL.ALLTYPES A , FUNCTIONAL.ALLTYPESSMALL B " +
+        "ORDER BY A.TIMESTAMP_COL,B.TIMESTAMP_COL",
+        7300*100*(16+16), true, true, ImmutableSet.of(),
+        pathToSortNode, SortNode.class);
+    // create a single node plan.
+    verifyApproxMemoryEstimate("SELECT A.TIMESTAMP_COL,B.TIMESTAMP_COL FROM " +
+        "FUNCTIONAL.ALLTYPES A , FUNCTIONAL.ALLTYPESSMALL B " +
+        "ORDER BY A.TIMESTAMP_COL,B.TIMESTAMP_COL",
+        7300*100*(16+16), false, false, ImmutableSet.of(),
+        pathToSortNodeSg, SortNode.class);
+  }
+
+  @Test
+  public void testHashJoinNodeMemoryEstimate() {
+    List<Integer> pathToJoinNode = Arrays.asList(0);
+    List<Integer> pathToJoinNodeSg = Arrays.asList();
+
+    // FUNCTIONAL.ALLTYPES.ID's Ndv is 7300 and avgRowSize is 4
+    // FUNCTIONAL.ALLTYPES.DATE_STRING_COL's Ndv is 736 and avgRowSize is 8
+    // Cardinality estimate of subquery is 5372800
+    // BitUtil.roundUpToPowerOf2((long) Math.ceil(3 * Cardinality / 2)) is 8388608
+    // Size of Bucket is 16.
+    verifyApproxMemoryEstimate("SELECT A.ID FROM (SELECT A1.ID,B1.DATE_STRING_COL " +
+        "IDB FROM FUNCTIONAL.ALLTYPES A1 , FUNCTIONAL.ALLTYPES B1 GROUP BY A1.ID," +
+        "B1.DATE_STRING_COL) A JOIN (SELECT A1.ID,B1.DATE_STRING_COL IDB FROM " +
+        "FUNCTIONAL.ALLTYPES A1,FUNCTIONAL.ALLTYPES B1 GROUP BY " +
+        "A1.ID,B1.DATE_STRING_COL) B ON A.ID = B.ID AND A.IDB=B.IDB",
+        5372800*(4+8+4+8) + 8388608*16, true, true, ImmutableSet.of(),
+        pathToJoinNode, HashJoinNode.class);
+    // create a single node plan.
+    verifyApproxMemoryEstimate("SELECT A.ID FROM (SELECT A1.ID,B1.DATE_STRING_COL " +
+        "IDB FROM FUNCTIONAL.ALLTYPES A1 , FUNCTIONAL.ALLTYPES B1 GROUP BY A1.ID," +
+        "B1.DATE_STRING_COL) A JOIN (SELECT A1.ID,B1.DATE_STRING_COL IDB FROM " +
+        "FUNCTIONAL.ALLTYPES A1,FUNCTIONAL.ALLTYPES B1 GROUP BY " +
+        "A1.ID,B1.DATE_STRING_COL) B ON A.ID = B.ID AND A.IDB=B.IDB",
+        5372800*(4+8+4+8) + 8388608*16, false, false, ImmutableSet.of(),
+        pathToJoinNodeSg, HashJoinNode.class);
+
+    // FUNCTIONAL.ALLTYPES.ID's Ndv is 7300 and avgRowSize is 4
+    // FUNCTIONAL.ALLTYPES.DATE_STRING_COL's Ndv is 736 and avgRowSize is 8
+    // Cardinality estimate of subquery is 53290000
+    // BitUtil.roundUpToPowerOf2((long) Math.ceil(3 * Cardinality / 2)) is 134217728
+    // Size of Bucket is 16. Size of Duplicatenode is 24
+    // Ndv estimate of subquery is 5372800
+    verifyApproxMemoryEstimate("SELECT A.ID FROM (SELECT A1.ID,B1.DATE_STRING_COL " +
+        "IDB FROM FUNCTIONAL.ALLTYPES A1 , FUNCTIONAL.ALLTYPES B1) A JOIN " +
+        "(SELECT A1.ID,B1.DATE_STRING_COL IDB FROM FUNCTIONAL.ALLTYPES A1," +
+        "FUNCTIONAL.ALLTYPES B1) B ON A.ID = B.ID AND A.IDB=B.IDB",
+        53290000L*(4L+8L+4L+8L)+134217728L*16L+(53290000L-5372800L)*24L, true, true,
+        ImmutableSet.of(), pathToJoinNode, HashJoinNode.class);
+    // create a single node plan.
+    verifyApproxMemoryEstimate("SELECT A.ID FROM (SELECT A1.ID,B1.DATE_STRING_COL " +
+        "IDB FROM FUNCTIONAL.ALLTYPES A1 , FUNCTIONAL.ALLTYPES B1) A JOIN " +
+        "(SELECT A1.ID,B1.DATE_STRING_COL IDB FROM FUNCTIONAL.ALLTYPES A1," +
+        "FUNCTIONAL.ALLTYPES B1) B ON A.ID = B.ID AND A.IDB=B.IDB",
+        53290000L*(4L+8L+4L+8L)+134217728L*16L+(53290000L-5372800L)*24L, false, false,
+        ImmutableSet.of(), pathToJoinNodeSg, HashJoinNode.class);
+  }
+
+  @Test
+  public void testKuduScanNodeMemoryEstimate() {
+    List<Integer> pathToKuduScanNode = Arrays.asList(0);
+    List<Integer> pathToKuduScanNodeSg = Arrays.asList();
+    // Scan 1 column.
+    verifyApproxMemoryEstimate("SELECT ID FROM FUNCTIONAL_KUDU.ALLTYPESSMALL",
+        393216*1*2, true, false,
+        ImmutableSet.of(), pathToKuduScanNode, KuduScanNode.class);
+    // create a single node plan.
+    verifyApproxMemoryEstimate("SELECT ID FROM FUNCTIONAL_KUDU.ALLTYPESSMALL",
+        393216*1*2, false, false,
+        ImmutableSet.of(), pathToKuduScanNodeSg, KuduScanNode.class);
+  }
+
   /**
    * Given a query and an expected cardinality, checks that the root
    * node of the single-fragment plan has the expected cardinality.
@@ -1033,6 +1174,61 @@ public class CardinalityTest extends PlannerTestBase {
       fail(e.getMessage());
     }
     return planCtx.getPlan();
+  }
+
+  /**
+  * This method allows us to get a PlanNode located by
+  * path with respect to the root of the retrieved query plan. The class of
+  * the located PlanNode by path will also be checked against cl, the class of
+  * the PlanNode of interest.
+  *
+  * @param query query to test
+  * @param isDistributedPlan set to true if we would like to generate
+  * a distributed plan
+  * @param testOptions specified test options
+  * @param path path to the PlanNode of interest
+  * @param cl class of the PlanNode of interest
+  */
+  protected PlanNode getPlanNode(String query, boolean isDistributedPlan,
+      Set<PlannerTestOption> testOptions, List<Integer> path, Class<?> cl) {
+    List<PlanFragment> plan = getPlan(query, isDistributedPlan, testOptions);
+    // We use the last element on the List of PlanFragment
+    // because this PlanFragment encloses all the PlanNode's
+    // in the query plan (either the single node plan or
+    // the distributed plan).
+    PlanNode currentNode = plan.get(plan.size() - 1).getPlanRoot();
+    for (Integer currentChildIndex: path) {
+      currentNode = currentNode.getChild(currentChildIndex);
+    }
+    assertEquals("PlanNode class not matched: ", cl.getName(),
+        currentNode.getClass().getName());
+    return currentNode;
+  }
+
+  /**
+  * This method allows us to inspect the Memory Estimate of a PlanNode located by
+  * path with respect to the root of the retrieved query plan. The class of
+  * the located PlanNode by path will also be checked against cl, the class of
+  * the PlanNode of interest.
+  *
+  * @param query query to test
+  * @param expected expected Memory at the PlanNode of interest
+  * @param isDistributedPlan set to true if we would like to generate
+  * a distributed plan
+  * @param testOptions specified test options
+  * @param path path to the PlanNode of interest
+  * @param cl class of the PlanNode of interest
+  */
+  protected void verifyApproxMemoryEstimate(String query, long expected,
+      boolean isDistributedPlan, boolean isMultiNodes,
+      Set<PlannerTestOption> testOptions, List<Integer> path, Class<?> cl) {
+    PlanNode pNode = getPlanNode(query, isDistributedPlan, testOptions, path, cl);
+    long result = pNode.getNodeResourceProfile().getMemEstimateBytes();
+    if (isMultiNodes) {
+      result = (long)Math.ceil(result * pNode.getFragment().getNumInstances());
+    }
+    assertEquals("Memory Estimate error for: " + query, expected, result,
+        expected * CARDINALITY_TOLERANCE);
   }
 
 }

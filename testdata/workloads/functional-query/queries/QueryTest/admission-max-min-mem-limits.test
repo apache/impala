@@ -47,8 +47,8 @@ set num_scanner_threads=2;
 select * from functional_parquet.alltypes A, functional_parquet.alltypes B where
  A.int_col = B.int_col limit 1;
 ---- RUNTIME_PROFILE
-row_regex: .*Per-Host Resource Estimates: Memory=67MB.*
-row_regex: .*Cluster Memory Admitted: 66.94 MB.*
+row_regex: .*Per-Host Resource Estimates: Memory=68MB.*
+row_regex: .*Cluster Memory Admitted: 67.88 MB.*
 ====
 ---- QUERY
 # No mem_limit set

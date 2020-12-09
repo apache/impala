@@ -17,9 +17,9 @@ where a.int_col1 = 10 and a.int_col2 = a.int_col1 + 1 and a.int_col3 = a.int_col
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.widetable_250_cols a]
-   partitions=1/1 files=1 size=28.69KB
+   HDFS partitions=1/1 files=1 size=28.69KB
    predicates: a.int_col1 = 10, a.int_col2 = 11, a.int_col3 = 55, a.int_col4 = 110
-   row-size=1.21KB cardinality=unavailable
+   row-size=1.21KB cardinality=2
 ====
 # Test multiple forward propagation
 select * from functional.widetable_250_cols a
@@ -29,9 +29,9 @@ where a.int_col1 = 10 and a.int_col2 = a.int_col1 + 1 and a.int_col3 = a.int_col
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.widetable_250_cols a]
-   partitions=1/1 files=1 size=28.69KB
+   HDFS partitions=1/1 files=1 size=28.69KB
    predicates: a.int_col1 = 10, a.int_col2 = 11, a.int_col3 = 55, a.int_col4 = -385
-   row-size=1.21KB cardinality=unavailable
+   row-size=1.21KB cardinality=2
 ====
 # Test multiple forward propagation
 select * from functional.widetable_250_cols a
@@ -41,9 +41,9 @@ where a.int_col1 = 10 and a.int_col2 = a.int_col1 + 1 and a.int_col2 * 5 = a.int
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.widetable_250_cols a]
-   partitions=1/1 files=1 size=28.69KB
+   HDFS partitions=1/1 files=1 size=28.69KB
    predicates: a.int_col1 = 10, a.int_col2 = 11, a.int_col3 = 55, a.int_col4 = -495
-   row-size=1.21KB cardinality=unavailable
+   row-size=1.21KB cardinality=2
 ====
 # Test multiple forward propagation, and a reversed propagation
 # (which fails as we can't rewrite 55 = a.int_col4 / 10)
@@ -54,9 +54,9 @@ where a.int_col1 = 10 and a.int_col2 = a.int_col1 + 1 and a.int_col3 = a.int_col
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.widetable_250_cols a]
-   partitions=1/1 files=1 size=28.69KB
+   HDFS partitions=1/1 files=1 size=28.69KB
    predicates: a.int_col1 = 10, a.int_col2 = 11, a.int_col3 = 55, a.int_col4 / 10 = 55
-   row-size=1.21KB cardinality=unavailable
+   row-size=1.21KB cardinality=2
 ====
 # Another impossibility (a.int_col3 = a.int_col2 * 5 = a.int_col2 * -7)
 select * from functional.widetable_250_cols a
@@ -76,7 +76,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 00:EMPTYSET
 ====
@@ -89,7 +89,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 00:EMPTYSET
 ====
@@ -100,7 +100,7 @@ where cast(a.int_col as string) = 'abc' and cast(int_col as string) > 'xyz'
 PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: CAST(a.int_col AS STRING) = 'abc', CAST(int_col AS STRING) > 'xyz'
    row-size=89B cardinality=231
 ====
@@ -122,11 +122,11 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 02:SELECT
 |  predicates: int_col = 12, int_col > 1
-|  row-size=4B cardinality=0
+|  row-size=4B cardinality=1
 |
 01:AGGREGATE [FINALIZE]
 |  group by: int_col
@@ -134,7 +134,7 @@ PLAN-ROOT SINK
 |  row-size=4B cardinality=10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: int_col = 10
    row-size=4B cardinality=730
 ====
@@ -151,7 +151,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: int_col = 10
    row-size=4B cardinality=730
 ====
@@ -167,7 +167,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    row-size=0B cardinality=7.30K
 ====
 # Many redundant / duplicate predicates
@@ -222,7 +222,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: int_col = 10
    row-size=4B cardinality=730
 ====
@@ -236,7 +236,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 00:EMPTYSET
 ====
@@ -254,7 +254,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: int_col = 10
    row-size=4B cardinality=730
 ====
@@ -272,7 +272,7 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: int_col = 10, TRUE OR 10 + random() * functional.alltypes.tinyint_col = 100
    row-size=5B cardinality=231
 ====
@@ -308,7 +308,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: c.c_nationkey = 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o_orderkey = 4
    predicates on o_lineitems: l_partkey < 10, l_suppkey = 10
@@ -348,7 +348,7 @@ PLAN-ROOT SINK
 |     row-size=0B cardinality=10
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   partitions=1/1 files=4 size=288.99MB
+   HDFS partitions=1/1 files=4 size=289.08MB
    predicates: c.c_nationkey = 10, !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems), o.o_orderkey = 10, o.o_shippriority = 10
    predicates on o_lineitems: l_partkey < 10, l_suppkey = 10
@@ -362,7 +362,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 00:EMPTYSET
 ====
@@ -373,7 +373,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 00:EMPTYSET
 ====
@@ -388,9 +388,9 @@ PLAN-ROOT SINK
 |  row-size=8B cardinality=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 files=24 size=478.45KB
+   HDFS partitions=24/24 files=24 size=478.45KB
    predicates: bool_col IS NULL, functional.alltypes.id IS NULL, id > 0, functional.alltypes.bool_col > 0, id = bool_col
-   row-size=5B cardinality=730
+   row-size=5B cardinality=1
 ====
 # = NULL and >
 select count(*) from functional.alltypes where id > 0 and bool_col = null
@@ -400,7 +400,7 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  row-size=8B cardinality=0
+|  row-size=8B cardinality=1
 |
 00:EMPTYSET
 ====

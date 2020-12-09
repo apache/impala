@@ -388,12 +388,11 @@ public class KuduScanNode extends ScanNode {
     int perHostScanRanges = estimatePerHostScanRanges(numOfScanRanges);
     int maxScannerThreads = computeMaxNumberOfScannerThreads(queryOptions,
         perHostScanRanges);
-    int num_cols = desc_.getSlots().size();
     long estimated_bytes_per_column_per_thread = BackendConfig.INSTANCE.getBackendCfg().
         kudu_scanner_thread_estimated_bytes_per_column;
     long max_estimated_bytes_per_thread = BackendConfig.INSTANCE.getBackendCfg().
         kudu_scanner_thread_max_estimated_bytes;
-    long mem_estimate_per_thread = Math.min(num_cols *
+    long mem_estimate_per_thread = Math.min(getNumMaterializedSlots(desc_) *
         estimated_bytes_per_column_per_thread, max_estimated_bytes_per_thread);
     useMtScanNode_ = queryOptions.mt_dop > 0;
     nodeResourceProfile_ = new ResourceProfileBuilder()

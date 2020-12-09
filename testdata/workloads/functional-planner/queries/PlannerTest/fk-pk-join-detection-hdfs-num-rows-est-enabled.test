@@ -10,7 +10,7 @@ tpcds.store_sales inner join tpcds_seq_snap.customer
 on ss_customer_sk = c_customer_sk
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=178.94MB mem-reservation=18.94MB thread-reservation=3 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=194.00MB mem-reservation=34.00MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: CAST(1 AS TINYINT)
 |  mem-estimate=21.98MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -19,7 +19,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF000[bloom] <- c_customer_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=0,1 row-size=8B cardinality=2.88M
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
@@ -51,7 +51,7 @@ tpcds_seq_snap.store_sales inner join tpcds.customer
 on ss_customer_sk = c_customer_sk
 ---- PLAN
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=178.94MB mem-reservation=18.94MB thread-reservation=3 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=185.50MB mem-reservation=25.50MB thread-reservation=3 runtime-filters-memory=1.00MB
 PLAN-ROOT SINK
 |  output exprs: CAST(1 AS TINYINT)
 |  mem-estimate=61.64MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -60,7 +60,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF000[bloom] <- c_customer_sk
-|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=8B cardinality=7.99M
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |

@@ -38,6 +38,11 @@ public class PlannerContext {
   // used for determining whether a broadcast join is feasible.
   public final static double HASH_TBL_SPACE_OVERHEAD = 1.1;
 
+  // Bucket is defined in the be/src/exec/hash-table.h
+  public final static double SIZE_OF_BUCKET = 16;
+  // DuplicateNode is defined in the be/src/exec/hash-table.h
+  public final static double SIZE_OF_DUPLICATENODE = 24;
+
   // Assumed average number of items in a nested collection, since we currently have no
   // statistics on nested fields. The motivation for this constant is to avoid
   // pathological plan choices that could result from a SubplanNode having an unknown
