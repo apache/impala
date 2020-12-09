@@ -154,7 +154,9 @@ class TestRPCTimeout(CustomClusterTestSuite):
   # the retry paths in the ReportExecStatus() RPC
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--status_report_interval_ms=100"
-      " --control_service_queue_mem_limit=1 --control_service_num_svc_threads=1")
+      " --control_service_queue_mem_limit=1"
+      " --control_service_queue_mem_limit_floor_bytes=1"
+      " --control_service_num_svc_threads=1")
   def test_reportexecstatus_retry(self, vector):
     self.execute_query_verify_metrics(self.TEST_QUERY, None, 10)
 

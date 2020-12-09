@@ -49,7 +49,11 @@ using kudu::rpc::RpcContext;
 
 static const string QUEUE_LIMIT_MSG = "(Advanced) Limit on RPC payloads consumption for "
     "ControlService. " + Substitute(MEM_UNITS_HELP_MSG, "the process memory limit");
-DEFINE_string(control_service_queue_mem_limit, "50MB", QUEUE_LIMIT_MSG.c_str());
+DEFINE_string(control_service_queue_mem_limit, "1%", QUEUE_LIMIT_MSG.c_str());
+DEFINE_int64(control_service_queue_mem_limit_floor_bytes, 50L * 1024L * 1024L,
+    "Lower bound on --control_service_queue_mem_limit in bytes. If "
+    "--control_service_queue_mem_limit works out to be less than this amount, "
+    "this value is used instead");
 DEFINE_int32(control_service_num_svc_threads, 0, "Number of threads for processing "
     "control service's RPCs. if left at default value 0, it will be set to number of "
     "CPU cores. Set it to a positive value to change from the default.");
@@ -68,6 +72,7 @@ ControlService::ControlService(MetricGroup* metric_group)
     CLEAN_EXIT_WITH_ERROR(Substitute("Invalid mem limit for control service queue: "
         "'$0'.", FLAGS_control_service_queue_mem_limit));
   }
+  bytes_limit = max(bytes_limit, FLAGS_control_service_queue_mem_limit_floor_bytes);
   mem_tracker_.reset(new MemTracker(
       bytes_limit, "Control Service Queue", process_mem_tracker));
   MemTrackerMetric::CreateMetrics(metric_group, mem_tracker_.get(), "ControlService");
