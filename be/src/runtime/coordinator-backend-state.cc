@@ -213,8 +213,17 @@ void Coordinator::BackendState::ExecCompleteCb(
     rpc_latency_ = MonotonicMillis() - start_ms;
 
     if (!exec_rpc_status_.ok()) {
-      SetExecError(
-          FromKuduStatus(exec_rpc_status_, "Exec() rpc failed"), exec_status_barrier);
+      // Return CANCELLED instead of ABORTED if the RPC is cancelled.
+      if (cancel_exec_rpc_ && exec_rpc_status_.IsAborted()) {
+        LOG(ERROR) << "ExecQueryFInstances rpc query_id=" << PrintId(query_id_)
+                   << " was aborted by cancellation";
+        status_ = Status::CANCELLED;
+        exec_done_ = true;
+        exec_status_barrier->NotifyRemaining(status_);
+      } else {
+        SetExecError(
+            FromKuduStatus(exec_rpc_status_, "Exec() rpc failed"), exec_status_barrier);
+      }
       goto done;
     }
 
@@ -584,6 +593,7 @@ Coordinator::BackendState::CancelResult Coordinator::BackendState::Cancel(
   // and then wait for it to be done.
   if (!exec_done_) {
     VLogForBackend("Attempting to cancel Exec() rpc");
+    cancel_exec_rpc_ = true;
     exec_rpc_controller_.Cancel();
     WaitOnExecLocked(&l);
   }
