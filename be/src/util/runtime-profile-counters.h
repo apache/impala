@@ -438,12 +438,13 @@ class RuntimeProfileBase::AveragedCounter : public RuntimeProfileBase::Counter {
   void Set(int64_t value) override { DCHECK(false); }
   void Add(int64_t delta) override { DCHECK(false); }
 
-  void PrettyPrint(
-      const std::string& prefix, const std::string& name, std::ostream* s) const override;
+  void PrettyPrint(const std::string& prefix, const std::string& name,
+      Verbosity verbosity, std::ostream* s) const override;
 
   void ToThrift(const std::string& name, TAggCounter* tcounter) const;
 
-  void ToJson(rapidjson::Document& document, rapidjson::Value* val) const override;
+  void ToJson(Verbosity verbosity, rapidjson::Document& document,
+      rapidjson::Value* val) const override;
 
   int64_t value() const override;
 
@@ -477,13 +478,14 @@ class RuntimeProfileBase::AveragedCounter : public RuntimeProfileBase::Counter {
   /// Implementation of PrettyPrint parameterized by the type that 'values_' is
   /// interpreted as - either int64_t or double, depending on the T parameter.
   template <typename T>
-  void PrettyPrintImpl(
-      const std::string& prefix, const std::string& name, std::ostream* s) const;
+  void PrettyPrintImpl(const std::string& prefix, const std::string& name,
+      Verbosity verbosity, std::ostream* s) const;
 
   /// Implementation of ToJson parameterized by the type that 'values_' is
   /// interpreted as - either int64_t or double, depending on the T parameter.
   template <typename T>
-  void ToJsonImpl(rapidjson::Document& document, rapidjson::Value* val) const;
+  void ToJsonImpl(
+      Verbosity verbosity, rapidjson::Document& document, rapidjson::Value* val) const;
 
   /// Compute all of the stats in Stats, interpreting the values in 'vals' as type T,
   /// which must be double if 'unit_' is DOUBLE_VALUE or int64_t otherwise.
@@ -574,16 +576,19 @@ class RuntimeProfileBase::SummaryStatsCounter : public RuntimeProfileBase::Count
       const std::vector<SummaryStatsCounter*>& counters,
       TAggSummaryStatsCounter* tcounter);
 
-  void ToJson(rapidjson::Document& document, rapidjson::Value* val) const override {
-    Counter::ToJson(document, val);
-    val->AddMember("min", min_, document.GetAllocator());
-    val->AddMember("max", max_, document.GetAllocator());
-    val->AddMember("avg", value(), document.GetAllocator());
+  void ToJson(Verbosity verbosity, rapidjson::Document& document,
+      rapidjson::Value* val) const override {
+    Counter::ToJson(verbosity, document, val);
+    if (total_num_values_ > 0) {
+      val->AddMember("min", min_, document.GetAllocator());
+      val->AddMember("max", max_, document.GetAllocator());
+      val->AddMember("avg", value(), document.GetAllocator());
+    }
     val->AddMember("num_of_samples", total_num_values_, document.GetAllocator());
   }
 
-  void PrettyPrint(
-      const std::string& prefix, const std::string& name, std::ostream* s) const override;
+  void PrettyPrint(const std::string& prefix, const std::string& name,
+      Verbosity verbosity, std::ostream* s) const override;
 
  private:
   /// The total number of values seen so far.
@@ -703,7 +708,8 @@ class RuntimeProfile::EventSequence {
   ///       “timestamp”: xxx
   ///   },{...}]
   /// }
-  void ToJson(rapidjson::Document& document, rapidjson::Value* value);
+  void ToJson(
+      Verbosity verbosity, rapidjson::Document& document, rapidjson::Value* value);
 
  private:
   /// Sorts events by their timestamp. Caller must hold lock_.
@@ -760,7 +766,8 @@ class RuntimeProfile::TimeSeriesCounter {
   ///   “period” : xxx,
   ///   “data”: “x,x,x,x”
   /// }
-  virtual void ToJson(rapidjson::Document& document, rapidjson::Value* val);
+  virtual void ToJson(
+      Verbosity verbosity, rapidjson::Document& document, rapidjson::Value* val);
 
   /// Adds a sample to the counter. Caller must hold lock_.
   virtual void AddSampleLocked(int64_t value, int ms_elapsed) = 0;

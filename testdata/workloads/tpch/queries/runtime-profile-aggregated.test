@@ -15,7 +15,7 @@ row_regex: .*Fragment F00 \[4 instances\].*
 # Coordinator counter - single instance.
 row_regex: .*RowsSent: 1.*
 # Scan node counter - many instances.
-row_regex: .*BytesRead: mean=.* min=.* p50=.* max=.*
+row_regex: .*BytesRead: mean=.* min=.* max=.*
 # Info string from aggregated scan node.
 row_regex: .*Table Name\[0-3\]: tpch.*lineitem.*
 # Timeline from aggregated scan node

@@ -1002,18 +1002,24 @@ class TestParquet(ImpalaTestSuite):
     compressed_bytes_read_per_col_summaries = get_bytes_summary_stats_counter(
         "ParquetCompressedBytesReadPerColumn", result.runtime_profile)
 
-    assert len(compressed_bytes_read_per_col_summaries) > 0
+    # One aggregated counter and three per-instance counters. Agg counter is first.
+    assert len(compressed_bytes_read_per_col_summaries) == 4
     for summary in compressed_bytes_read_per_col_summaries:
       assert self._is_summary_stats_counter_empty(summary)
 
     uncompressed_bytes_read_per_col_summaries = get_bytes_summary_stats_counter(
         "ParquetUncompressedBytesReadPerColumn", result.runtime_profile)
 
-    assert len(uncompressed_bytes_read_per_col_summaries) > 0
-    for summary in uncompressed_bytes_read_per_col_summaries:
-      assert not self._is_summary_stats_counter_empty(summary)
+    # One aggregated counter and three per-instance counters. Agg counter is first.
+    assert len(uncompressed_bytes_read_per_col_summaries) == 4
+    for i, summary in enumerate(uncompressed_bytes_read_per_col_summaries):
+      assert not self._is_summary_stats_counter_empty(summary), summary
       # There are 2 columns read from in lineitem_sixblocks so there should be 2 samples
-      assert summary.total_num_values == 2
+      # per instance a 6 total.
+      if i == 0:
+          assert summary.total_num_values == 6
+      else:
+          assert summary.total_num_values == 2
 
     # alltypestiny is compressed so both ParquetCompressedBytesReadPerColumn and
     # ParquetUncompressedBytesReadPerColumn should have been updated
@@ -1025,11 +1031,15 @@ class TestParquet(ImpalaTestSuite):
                          "ParquetUncompressedBytesReadPerColumn"):
       bytes_read_per_col_summaries = get_bytes_summary_stats_counter(summary_name,
           result.runtime_profile)
-      assert len(bytes_read_per_col_summaries) > 0
-      for summary in bytes_read_per_col_summaries:
+      # One aggregated counter and three per-instance counters. Agg counter is first.
+      assert len(bytes_read_per_col_summaries) == 4
+      for i, summary in enumerate(bytes_read_per_col_summaries):
         assert not self._is_summary_stats_counter_empty(summary)
-        # There are 11 columns in alltypestiny so there should be 11 samples
-        assert summary.total_num_values == 11
+        # There are 11 columns in alltypestiny so there should be 11 samples per instance.
+        if i == 0:
+          assert summary.total_num_values == 33
+        else:
+          assert summary.total_num_values == 11
 
 
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more

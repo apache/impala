@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include <cstdint>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -43,6 +44,8 @@ static const char* USAGE =
     "   text (default): pretty-print in the standard human readable format\n"
     "   json: output as JSON with one profile per line. Compatible with jsonlines.org\n"
     "   prettyjson: output as pretty-printed JSON array with one element per object\n"
+    "--profile_verbosity={0,1,2,3,4,minimal,legacy,default,extended,full}: control"
+    " verbosity of profile output. If not set, picks based on profile version\n"
     "\n"
     "Filtering options:\n"
     "--query_id=<query id>: given an impala query ID, only process profiles with this"
@@ -50,13 +53,13 @@ static const char* USAGE =
     "--min_timestamp=<integer timestamp>: only process profiles at or after this"
     " timestamp\n"
     "--max_timestamp=<integer timestamp>: only process profiles at or before this"
-    " timestamp\n"
-    "\n"
-    "--gen_experimental_profile: if set to true, generates full output for the new"
-    " experimental profile.";
+    " timestamp\n";
 
 DEFINE_string(
     profile_format, "text", "Profile format to output: either text, json or prettyjson");
+DEFINE_string(profile_verbosity, "", "Verbosity of profile output. Must be one of "
+    "{0,1,2,3,4,minimal,legacy,default,extended,full}. If not set, picks based on "
+    "version of each input profile.");
 DEFINE_string(query_id, "", "Query ID to output profiles for");
 DEFINE_int64(min_timestamp, -1, "Minimum timestamp (inclusive) to output profiles for");
 DEFINE_int64(max_timestamp, -1, "Maximum timestamp (inclusive) to output profiles for");
@@ -80,6 +83,15 @@ int main(int argc, char** argv) {
       && profile_format != "prettyjson") {
     cerr << "Invalid --profile_format value: '" << profile_format << "'\n\n"
          << DescribeOneFlag(GetCommandLineFlagInfoOrDie("profile_format"));
+    return 1;
+  }
+  RuntimeProfileBase::Verbosity configured_verbosity =
+      RuntimeProfileBase::Verbosity::DEFAULT;
+  if (FLAGS_profile_verbosity != ""
+      && !RuntimeProfileBase::ParseVerbosity(
+             FLAGS_profile_verbosity, &configured_verbosity)) {
+    cerr << "Invalid --profile_verbosity value: '" << FLAGS_profile_verbosity << "'\n\n"
+         << DescribeOneFlag(GetCommandLineFlagInfoOrDie("profile_verbosity"));
     return 1;
   }
 
@@ -110,25 +122,34 @@ int main(int argc, char** argv) {
 
     ObjectPool pool;
     RuntimeProfile* profile;
+    int32_t profile_version;
     Status status = RuntimeProfile::CreateFromArchiveString(
-        encoded_profile, &pool, &profile);
+        encoded_profile, &pool, &profile, &profile_version);
     if (!status.ok()) {
       cerr << "Error parsing entry " << lineno << ": " << status.GetDetail() << "\n";
       ++errors;
       continue;
     }
+
+    // Default verbosity depends on version - preserve legacy output for V1 profiles.
+    RuntimeProfileBase::Verbosity verbosity = configured_verbosity;
+    if (FLAGS_profile_verbosity == "") {
+      verbosity = profile_version < 2 ? RuntimeProfileBase::Verbosity::LEGACY :
+                                        RuntimeProfileBase::Verbosity::DEFAULT;
+    }
+
     if (profile_format == "text") {
-      profile->PrettyPrint(&cout);
+      profile->PrettyPrint(verbosity, &cout);
     } else if (profile_format == "json") {
       CHECK_EQ("json", profile_format);
       rapidjson::Document json_profile(rapidjson::kObjectType);
-      profile->ToJson(&json_profile);
+      profile->ToJson(verbosity, &json_profile);
       RuntimeProfile::JsonProfileToString(json_profile, /*pretty=*/false, &cout);
       cout << "\n"; // Each JSON document gets a separate line.
     } else {
       CHECK_EQ("prettyjson", profile_format);
       rapidjson::Document json_profile(rapidjson::kObjectType);
-      profile->ToJson(&json_profile);
+      profile->ToJson(verbosity, &json_profile);
       if (profiles_emitted > 0) cout << ",\n";
       RuntimeProfile::JsonProfileToString(json_profile, /*pretty=*/true, &cout);
       cout << "\n"; // Each JSON document starts on a new line.
