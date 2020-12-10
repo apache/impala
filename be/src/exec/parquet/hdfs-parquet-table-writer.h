@@ -160,6 +160,9 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   /// Selects the Parquet timestamp type to be used by this writer.
   void ConfigureTimestampType();
 
+  /// Sets 'string_utf8_' based on query options and table type.
+  void ConfigureStringType();
+
   /// Updates output partition with some summary about the written file.
   void FinalizePartitionInfo();
 
@@ -225,6 +228,9 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   /// True if we are writing an Iceberg data file. In that case the writer behaves a
   /// bit differently, e.g. writes specific type of timestamps, fills some extra metadata.
   bool is_iceberg_file_ = false;
+
+  /// If true, STRING values are annotated with UTF8 in Parquet metadata.
+  bool string_utf8_ = false;
 };
 
 }

@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.iceberg.types.Types;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
@@ -41,6 +42,7 @@ import org.apache.impala.planner.DataSink;
 import org.apache.impala.planner.TableSink;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TSortingOrder;
+import org.apache.impala.util.IcebergUtil;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -548,10 +550,25 @@ public class InsertStmt extends StatementBase {
       if (iceTable.getDefaultPartitionSpec().hasPartitionFields()) {
         throw new AnalysisException("Impala cannot write partitioned Iceberg tables.");
       }
+      validateIcebergColumnsForInsert(iceTable);
     }
 
     if (isHBaseTable && overwrite_) {
       throw new AnalysisException("HBase doesn't have a way to perform INSERT OVERWRITE");
+    }
+  }
+
+  private void validateIcebergColumnsForInsert(FeIcebergTable iceTable)
+      throws AnalysisException {
+    for (Types.NestedField field : iceTable.getIcebergSchema().columns()) {
+      org.apache.iceberg.types.Type iceType = field.type();
+      if (iceType.isPrimitiveType() && iceType instanceof Types.TimestampType) {
+        Types.TimestampType tsType = (Types.TimestampType)iceType;
+        if (tsType.shouldAdjustToUTC()) {
+          throw new AnalysisException("The Iceberg table has a TIMESTAMPTZ " +
+              "column that Impala cannot write.");
+        }
+      }
     }
   }
 

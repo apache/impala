@@ -15,9 +15,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from tests.common.impala_test_suite import ImpalaTestSuite
+import os
+import random
+
+from subprocess import check_call
+from parquet.ttypes import ConvertedType
+
+from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import SkipIf
 
+from tests.util.filesystem_utils import get_fs_path
+from tests.util.get_parquet_metadata import get_parquet_metadata
 
 class TestIcebergTable(ImpalaTestSuite):
   """Tests related to Iceberg tables."""
@@ -78,3 +86,32 @@ class TestIcebergTable(ImpalaTestSuite):
     assert(first_snapshot[2] == "NULL")
     # Check "is_current_ancestor" column.
     assert(first_snapshot[3] == "TRUE" and second_snapshot[3] == "TRUE")
+
+  @SkipIf.not_hdfs
+  def test_strings_utf8(self, vector, unique_database):
+    # Create table
+    table_name = "ice_str_utf8"
+    qualified_table_name = "%s.%s" % (unique_database, table_name)
+    query = 'create table %s (a string) stored as iceberg' % qualified_table_name
+    self.client.execute(query)
+
+    # Inserted string data should have UTF8 annotation regardless of query options.
+    query = 'insert into %s values ("impala")' % qualified_table_name
+    self.execute_query(query, {'parquet_annotate_strings_utf8': False})
+
+    # Copy the created file to the local filesystem and parse metadata
+    local_file = '/tmp/iceberg_utf8_test_%s.parq' % random.randint(0, 10000)
+    LOG.info("test_strings_utf8 local file name: " + local_file)
+    hdfs_file = get_fs_path('/test-warehouse/%s.db/%s/data/*.parq'
+        % (unique_database, table_name))
+    check_call(['hadoop', 'fs', '-copyToLocal', hdfs_file, local_file])
+    metadata = get_parquet_metadata(local_file)
+
+    # Extract SchemaElements corresponding to the table column
+    a_schema_element = metadata.schema[1]
+    assert a_schema_element.name == 'a'
+
+    # Check that the schema uses the UTF8 annotation
+    assert a_schema_element.converted_type == ConvertedType.UTF8
+
+    os.remove(local_file)

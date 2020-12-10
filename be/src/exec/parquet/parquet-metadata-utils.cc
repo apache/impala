@@ -396,7 +396,7 @@ parquet::Type::type ParquetMetadataUtils::ConvertInternalToParquetType(
 }
 
 void ParquetMetadataUtils::FillSchemaElement(const ColumnType& col_type,
-    const TQueryOptions& query_options, TParquetTimestampType::type timestamp_type,
+    bool string_utf8, TParquetTimestampType::type timestamp_type,
     parquet::SchemaElement* col_schema) {
   col_schema->__set_type(ConvertInternalToParquetType(col_type.type, timestamp_type));
   col_schema->__set_repetition_type(parquet::FieldRepetitionType::OPTIONAL);
@@ -412,7 +412,7 @@ void ParquetMetadataUtils::FillSchemaElement(const ColumnType& col_type,
     case TYPE_STRING:
       // By default STRING has no logical type, see IMPALA-5982.
       // VARCHAR and CHAR are always set to UTF8.
-      if (query_options.parquet_annotate_strings_utf8) {
+      if (string_utf8) {
         SetUtf8ConvertedAndLogicalType(col_schema);
       }
       break;

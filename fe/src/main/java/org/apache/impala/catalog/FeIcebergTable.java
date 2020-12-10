@@ -113,6 +113,11 @@ public interface FeIcebergTable extends FeFsTable {
    */
   int getDefaultPartitionSpecId();
 
+  /**
+   * @return the Iceberg schema.
+   */
+  Schema getIcebergSchema();
+
   @Override
   default boolean isCacheable() {
     return getFeFsTable().isCacheable();
