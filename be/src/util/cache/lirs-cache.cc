@@ -912,9 +912,12 @@ HandleBase* LIRSCacheShard::Lookup(const Slice& key, uint32_t hash,
           // distance is longer than any of the PROTECTED entries. So, it remains
           // an UNPROTECTED entry, but it should be added back to the recency list and
           // readded as the most recent entry on the unprotected list.
+          DCHECK_GT(num_unprotected_, 0);
           MoveToRecencyListBack(&tstate, e, false);
-          RemoveFromUnprotectedList(e);
-          AddToUnprotectedList(e);
+          if (num_unprotected_ != 1) {
+            RemoveFromUnprotectedList(e);
+            AddToUnprotectedList(e);
+          }
         }
         break;
       default:

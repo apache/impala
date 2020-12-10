@@ -418,6 +418,45 @@ TEST_F(LIRSCacheTest, UnprotectedToUnprotected) {
   }
 }
 
+TEST_F(LIRSCacheTest, ExactlyOneUnprotectedToUnprotected) {
+  // This tests the edge case where there is exactly one unprotected element
+  // and that element is looked up and remains unprotected.
+  FillCache();
+
+  // If we lookup every element that is protected, then the unprotected elements
+  // will be trimmed from the recency queue. At that point, a lookup to the
+  // unprotected elements will not change them to be protected.
+  for (int i = 0; i < 95; ++i) {
+    ASSERT_EQ(Lookup(i), i);
+  }
+  ASSERT_EQ(0, evicted_keys_.size());
+
+  // There are 5 unprotected right now. Erase 4 of them (95-98) so that only one remains.
+  for (int i = 95; i < 99; ++i) {
+    Erase(i);
+  }
+  ASSERT_EQ(4, evicted_keys_.size());
+
+  // Lookup the only remaining element (#99). This is unprotected without being in
+  // the recency list, so it stays unprotected.
+  ASSERT_EQ(Lookup(99), 99);
+  ASSERT_EQ(4, evicted_keys_.size());
+
+  FlushCache();
+
+  // All of this means that the results are the same as BasicEvictionOrdering
+  // There were 5 unprotected elements (95-99). They should be the first to be evicted.
+  for (int i = 0; i < 5; ++i) {
+    ASSERT_EQ(evicted_keys_[i], 95+i);
+    ASSERT_EQ(evicted_values_[i], 95+i);
+  }
+  // There were 95 protected elements (0-94). They should be evicted in order.
+  for (int i = 5; i < 100; ++i) {
+    ASSERT_EQ(evicted_keys_[i], i-5);
+    ASSERT_EQ(evicted_values_[i], i-5);
+  }
+}
+
 TEST_F(LIRSCacheTest, Erase) {
   // This tests that Erase works for both unprotected and protected elements.
 
