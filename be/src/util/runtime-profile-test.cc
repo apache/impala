@@ -1669,7 +1669,7 @@ TEST(ToJson, EventSequenceToJsonTest) {
   // Serialize to json
   rapidjson::Document doc(rapidjson::kObjectType);
   rapidjson::Value event_sequence_json(rapidjson::kObjectType);
-  seq->ToJson(doc, &event_sequence_json);
+  seq->ToJson(RuntimeProfile::Verbosity::DEFAULT, doc, &event_sequence_json);
 
   EXPECT_EQ(0, event_sequence_json["offset"].GetInt());
 

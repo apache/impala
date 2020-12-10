@@ -71,8 +71,9 @@ time -p ./buildall.sh -format -testdata -notests < /dev/null
 start-impala-cluster.py --kill
 
 # Build the docker images required to start the cluster.
-# parquet-reader is needed for e2e tests but not built for non-test build.
-make -j ${IMPALA_BUILD_THREADS} docker_debug_images parquet-reader
+# parquet-reader and impala-profile-tool are needed for e2e tests but not built for
+# non-test build.
+make -j ${IMPALA_BUILD_THREADS} docker_debug_images parquet-reader impala-profile-tool
 
 source_impala_config
 

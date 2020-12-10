@@ -83,12 +83,23 @@ class RuntimeProfile;
 /// All methods are thread-safe unless otherwise mentioned.
 class RuntimeProfileBase {
  public:
+  // Amount of information to include when emitting a (non-thrift) profile.
+  enum class Verbosity {
+    // Limit output to the most essential information.
+    MINIMAL = 0,
+    // Output level should be approximately the same as Impala 3.x output.
+    LEGACY = 1,
+    // Default output level for new profile - include some additional descriptive stats.
+    DEFAULT = 2,
+    // Includes more detailed descriptive statistics.
+    EXTENDED = 3,
+    // Dump as much information as is available.
+    FULL = 4,
+  };
+
   class Counter {
    public:
-    Counter(TUnit::type unit, int64_t value = 0) :
-      value_(value),
-      unit_(unit) {
-    }
+    Counter(TUnit::type unit, int64_t value = 0) : value_(value), unit_(unit) {}
     virtual ~Counter(){}
 
     virtual void Add(int64_t delta) {
@@ -122,13 +133,14 @@ class RuntimeProfileBase {
 
     /// Prints the contents of the counter in a name: value format, prefixed on
     /// each line by 'prefix' and terminated with a newline.
-    virtual void PrettyPrint(
-        const std::string& prefix, const std::string& name, std::ostream* s) const;
+    virtual void PrettyPrint(const std::string& prefix, const std::string& name,
+        Verbosity verbosity, std::ostream* s) const;
 
     /// Builds a new Value into 'val', using (if required) the allocator from
     /// 'document'. Should set the following fields where appropriate:
     /// counter_name, value, kind, unit
-    virtual void ToJson(rapidjson::Document& document, rapidjson::Value* val) const;
+    virtual void ToJson(
+        Verbosity verbosity, rapidjson::Document& document, rapidjson::Value* val) const;
 
     TUnit::type unit() const { return unit_; }
 
@@ -160,7 +172,11 @@ class RuntimeProfileBase {
 
   /// Prints the contents of the profile in a name: value format.
   /// Does not hold locks when it makes any function calls.
+  /// This first overload prints at the configured default verbosity for this process.
+  /// The second overload allows the caller to specify the verbosity.
   void PrettyPrint(std::ostream* s, const std::string& prefix = "") const;
+  void PrettyPrint(
+      Verbosity verbosity, std::ostream* s, const std::string& prefix = "") const;
 
   void GetChildren(std::vector<RuntimeProfileBase*>* children);
 
@@ -207,6 +223,10 @@ class RuntimeProfileBase {
   static const std::string SKEW_DETAILS;
   /// Argument 'threshold' provides the threshold used in the formula to detect skew.
   void AddSkewInfo(RuntimeProfileBase* root, double threshold);
+
+  // Parse verbosity from string (either enum name or integral value).
+  // Return true if successful, false if it's not a valid verbosity value.
+  static bool ParseVerbosity(const std::string& str, Verbosity* out);
 
  protected:
   FRIEND_TEST(CountersTest, AggregateEventSequences);
@@ -354,24 +374,26 @@ class RuntimeProfileBase {
   virtual void InitFromThrift(const TRuntimeProfileNode& node, ObjectPool* pool) = 0;
 
   /// Helper for ToJson().
-  void ToJsonHelper(rapidjson::Value* parent, rapidjson::Document* d) const;
+  void ToJsonHelper(
+      Verbosity verbosity, rapidjson::Value* parent, rapidjson::Document* d) const;
 
   /// Adds subclass-specific state to 'parent'.
-  virtual void ToJsonSubclass(rapidjson::Value* parent, rapidjson::Document* d) const = 0;
+  virtual void ToJsonSubclass(
+      Verbosity verbosity, rapidjson::Value* parent, rapidjson::Document* d) const = 0;
 
   /// Print the child counters of the given counter name.
-  static void PrintChildCounters(const std::string& prefix,
+  static void PrintChildCounters(const std::string& prefix, Verbosity verbosity,
       const std::string& counter_name, const CounterMap& counter_map,
       const ChildCounterMap& child_counter_map, std::ostream* s);
 
   /// Print info strings. Implemented by subclass which may store them
   /// in different ways
   virtual void PrettyPrintInfoStrings(
-      std::ostream* s, const std::string& prefix) const = 0;
+      std::ostream* s, const std::string& prefix, Verbosity verbosity) const = 0;
 
   /// Print any additional counters from the base class.
   virtual void PrettyPrintSubclassCounters(
-      std::ostream* s, const std::string& prefix) const = 0;
+      std::ostream* s, const std::string& prefix, Verbosity verbosity) const = 0;
 
   /// Add all the counters of this instance into the given parent node in JSON format
   /// Args:
@@ -380,8 +402,8 @@ class RuntimeProfileBase {
   ///   counter_name: this will be used to find its child counters in child_counter_map
   ///   counter_map: A map of counters name to counter
   ///   child_counter_map: A map of counter to its child counters
-  void ToJsonCounters(rapidjson::Value* parent, rapidjson::Document* d,
-      const string& counter_name, const CounterMap& counter_map,
+  void ToJsonCounters(Verbosity verbosity, rapidjson::Value* parent,
+      rapidjson::Document* d, const string& counter_name, const CounterMap& counter_map,
       const ChildCounterMap& child_counter_map) const;
 
   /// Implementation of AddInfoString() and AppendInfoString(). If 'append' is false,
@@ -639,7 +661,10 @@ class RuntimeProfile : public RuntimeProfileBase {
   void ToThrift(TRuntimeProfileTree* tree) const override;
 
   /// Store an entire runtime profile tree into JSON document 'd'.
+  /// This first overload prints at the configured default verbosity for this process.
+  /// The second overload allows the caller to specify the verbosity.
   void ToJson(rapidjson::Document* d) const;
+  void ToJson(Verbosity verbosity, rapidjson::Document* d) const;
 
   /// Converts a JSON Document representation of a profile. If 'pretty' is true,
   /// generates a pretty-printed string representation. If 'pretty' is false, generates
@@ -675,8 +700,8 @@ class RuntimeProfile : public RuntimeProfileBase {
       const std::string& archive_str, TRuntimeProfileTree* out);
 
   /// Creates a profile from an 'archive_str' created by SerializeToArchiveString().
-  static Status CreateFromArchiveString(
-      const std::string& archive_str, ObjectPool* pool, RuntimeProfile** out);
+  static Status CreateFromArchiveString(const std::string& archive_str, ObjectPool* pool,
+      RuntimeProfile** out, int32_t* profile_version_out);
 
   /// Set ExecSummary
   void SetTExecSummary(const TExecSummary& summary);
@@ -696,14 +721,16 @@ class RuntimeProfile : public RuntimeProfileBase {
   void InitFromThrift(const TRuntimeProfileNode& node, ObjectPool* pool) override;
 
   /// Adds subclass-specific state to 'parent'.
-  void ToJsonSubclass(rapidjson::Value* parent, rapidjson::Document* d) const override;
+  void ToJsonSubclass(Verbosity verbosity, rapidjson::Value* parent,
+      rapidjson::Document* d) const override;
 
   /// Print info strings from this subclass.
-  void PrettyPrintInfoStrings(std::ostream* s, const std::string& prefix) const override;
+  void PrettyPrintInfoStrings(
+      std::ostream* s, const std::string& prefix, Verbosity verbosity) const override;
 
   /// Print any additional counters from this subclass.
   void PrettyPrintSubclassCounters(
-      std::ostream* s, const std::string& prefix) const override;
+      std::ostream* s, const std::string& prefix, Verbosity verbosity) const override;
 
  private:
   friend class AggregatedRuntimeProfile;
@@ -824,14 +851,16 @@ class AggregatedRuntimeProfile : public RuntimeProfileBase {
   void InitFromThrift(const TRuntimeProfileNode& node, ObjectPool* pool) override;
 
   /// Adds subclass-specific state to 'parent'.
-  void ToJsonSubclass(rapidjson::Value* parent, rapidjson::Document* d) const override;
+  void ToJsonSubclass(Verbosity verbosity, rapidjson::Value* parent,
+      rapidjson::Document* d) const override;
 
   /// Print info strings from this subclass.
-  void PrettyPrintInfoStrings(std::ostream* s, const std::string& prefix) const override;
+  void PrettyPrintInfoStrings(
+      std::ostream* s, const std::string& prefix, Verbosity verbosity) const override;
 
   /// Print any additional counters from this subclass.
   void PrettyPrintSubclassCounters(
-      std::ostream* s, const std::string& prefix) const override;
+      std::ostream* s, const std::string& prefix, Verbosity verbosity) const override;
 
  private:
   /// Number of profiles that will contribute to this aggregated profile.

@@ -25,6 +25,7 @@
 #include <type_traits>
 #include <utility>
 
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
 #include <boost/range/adaptor/transformed.hpp>
@@ -59,6 +60,7 @@ DEFINE_bool_hidden(gen_experimental_profile, false,
     "(Experimental) when set on coordinator, generate a new aggregated runtime profile "
     "layout. Format is subject to change.");
 
+using boost::algorithm::to_lower_copy;
 using namespace rapidjson;
 
 namespace impala {
@@ -102,6 +104,16 @@ static int64_t BitcastToInt64(T val) {
   int64_t res;
   memcpy(&res, &val, sizeof(int64_t));
   return res;
+}
+
+static int32_t GetProfileVersion(const TRuntimeProfileTree& tree) {
+  // Assume version 1 if not set, because profile_version was only added in v2.
+  return tree.__isset.profile_version ? tree.profile_version : 1;
+}
+
+static RuntimeProfile::Verbosity DefaultVerbosity() {
+  return FLAGS_gen_experimental_profile ? RuntimeProfile::Verbosity::DEFAULT :
+                                          RuntimeProfile::Verbosity::LEGACY;
 }
 
 void ProfileEntryPrototypeRegistry::AddPrototype(const ProfileEntryPrototype* prototype) {
@@ -276,14 +288,11 @@ RuntimeProfileBase* RuntimeProfileBase::CreateFromThriftHelper(
 
   const TRuntimeProfileNode& node = nodes[*idx];
   RuntimeProfileBase* profile;
-  if (FLAGS_gen_experimental_profile && node.__isset.aggregated) {
+  if (node.__isset.aggregated) {
     DCHECK(node.aggregated.__isset.num_instances);
     profile = AggregatedRuntimeProfile::Create(pool, node.name,
         node.aggregated.num_instances, node.aggregated.__isset.input_profiles);
   } else {
-    // If we're not using the transposed profile representation, just convert
-    // the averaged profile to a regular profile (this preserves previous behaviour
-    // of the code when --gen_experimental_profile=false).
     profile = RuntimeProfile::Create(pool, node.name);
   }
   profile->metadata_ = node.node_metadata;
@@ -1003,6 +1012,28 @@ void RuntimeProfileBase::AddSkewInfo(RuntimeProfileBase* root, double threshold)
   }
 }
 
+bool RuntimeProfileBase::ParseVerbosity(const string& str, Verbosity* out) {
+  string lower = to_lower_copy(str);
+  if (lower == "minimal" || lower == "0") {
+    *out = Verbosity::MINIMAL;
+    return true;
+  } else if (lower == "legacy" || lower == "1") {
+    *out = Verbosity::LEGACY;
+    return true;
+  } else if (lower == "default" || lower == "2") {
+    *out = Verbosity::DEFAULT;
+    return true;
+  } else if (lower == "extended" || lower == "3") {
+    *out = Verbosity::EXTENDED;
+    return true;
+  } else if (lower == "full" || lower == "4") {
+    *out = Verbosity::FULL;
+    return true;
+  } else {
+    return false;
+  }
+}
+
 void RuntimeProfile::SortChildrenByTotalTime() {
   lock_guard<SpinLock> l(children_lock_);
   // Create a snapshot of total time values so that they don't change while we're
@@ -1176,9 +1207,13 @@ RuntimeProfile::EventSequence* RuntimeProfile::GetEventSequence(const string& na
 }
 
 void RuntimeProfile::ToJson(Document* d) const {
+  return ToJson(DefaultVerbosity(), d);
+}
+
+void RuntimeProfile::ToJson(Verbosity verbosity, Document* d) const {
   // queryObj that stores all JSON format profile information
   Value queryObj(kObjectType);
-  ToJsonHelper(&queryObj, d);
+  ToJsonHelper(verbosity, &queryObj, d);
   d->RemoveMember("contents");
   d->AddMember("contents", queryObj, d->GetAllocator());
 }
@@ -1199,7 +1234,7 @@ void RuntimeProfile::JsonProfileToString(
   *string_output << sb.GetString();
 }
 
-void RuntimeProfileBase::ToJsonCounters(Value* parent, Document* d,
+void RuntimeProfileBase::ToJsonCounters(Verbosity verbosity, Value* parent, Document* d,
     const string& counter_name, const CounterMap& counter_map,
     const ChildCounterMap& child_counter_map) const {
   auto& allocator = d->GetAllocator();
@@ -1211,13 +1246,13 @@ void RuntimeProfileBase::ToJsonCounters(Value* parent, Document* d,
       if (iter == counter_map.end()) continue;
 
       Value counter(kObjectType);
-      iter->second->ToJson(*d, &counter);
+      iter->second->ToJson(verbosity, *d, &counter);
       Value child_counter_json(child_counter.c_str(), child_counter.size(), allocator);
       counter.AddMember("counter_name", child_counter_json, allocator);
 
       Value child_counters_json(kArrayType);
-      ToJsonCounters(
-          &child_counters_json, d, child_counter, counter_map, child_counter_map);
+      ToJsonCounters(verbosity, &child_counters_json, d, child_counter, counter_map,
+          child_counter_map);
       if (!child_counters_json.Empty()){
         counter.AddMember("child_counters", child_counters_json, allocator);
       }
@@ -1226,7 +1261,8 @@ void RuntimeProfileBase::ToJsonCounters(Value* parent, Document* d,
   }
 }
 
-void RuntimeProfileBase::ToJsonHelper(Value* parent, Document* d) const {
+void RuntimeProfileBase::ToJsonHelper(
+    Verbosity verbosity, Value* parent, Document* d) const {
   Document::AllocatorType& allocator = d->GetAllocator();
   // Create copy of counter_map_ and child_counter_map_ so we don't need to hold lock
   // while we call value() on the counters (some of those might be DerivedCounters).
@@ -1278,11 +1314,11 @@ void RuntimeProfileBase::ToJsonHelper(Value* parent, Document* d) const {
   }
 
   // 5. Counters and info strings from subclasses
-  ToJsonSubclass(parent, d);
+  ToJsonSubclass(verbosity, parent, d);
 
   // 6. Counters
   Value counters(kArrayType);
-  ToJsonCounters(&counters, d, ROOT_COUNTER, counter_map, child_counter_map);
+  ToJsonCounters(verbosity, &counters, d, ROOT_COUNTER, counter_map, child_counter_map);
   if (!counters.Empty()) {
     parent->AddMember("counters", counters, allocator);
   }
@@ -1302,14 +1338,15 @@ void RuntimeProfileBase::ToJsonHelper(Value* parent, Document* d) const {
     for (int i = 0; i < children.size(); ++i) {
       RuntimeProfileBase* profile = children[i].first;
       Value child_profile(kObjectType);
-      profile->ToJsonHelper(&child_profile, d);
+      profile->ToJsonHelper(verbosity, &child_profile, d);
       child_profiles.PushBack(child_profile, allocator);
     }
     parent->AddMember("child_profiles", child_profiles, allocator);
   }
 }
 
-void RuntimeProfile::ToJsonSubclass(Value* parent, Document* d) const {
+void RuntimeProfile::ToJsonSubclass(
+    Verbosity verbosity, Value* parent, Document* d) const {
   Document::AllocatorType& allocator = d->GetAllocator();
   // 1. Events
   {
@@ -1319,7 +1356,7 @@ void RuntimeProfile::ToJsonSubclass(Value* parent, Document* d) const {
       for (EventSequenceMap::const_iterator it = event_sequence_map_.begin();
            it != event_sequence_map_.end(); ++it) {
         Value event_sequence_json(kObjectType);
-        it->second->ToJson(*d, &event_sequence_json);
+        it->second->ToJson(verbosity, *d, &event_sequence_json);
         event_sequences_json.PushBack(event_sequence_json, allocator);
       }
       parent->AddMember("event_sequences", event_sequences_json, allocator);
@@ -1336,7 +1373,7 @@ void RuntimeProfile::ToJsonSubclass(Value* parent, Document* d) const {
       for (const TimeSeriesCounterMap::value_type& v : time_series_counter_map_) {
         TimeSeriesCounter* counter = v.second;
         Value time_series_json(kObjectType);
-        counter->ToJson(*d, &time_series_json);
+        counter->ToJson(verbosity, *d, &time_series_json);
         time_series_counters_json.PushBack(time_series_json, allocator);
       }
       parent->AddMember("time_series_counters", time_series_counters_json, allocator);
@@ -1351,7 +1388,7 @@ void RuntimeProfile::ToJsonSubclass(Value* parent, Document* d) const {
       for (const SummaryStatsCounterMap::value_type& v : summary_stats_map_) {
         Value summary_stats_counter(kObjectType);
         Value summary_name_json(v.first.c_str(), v.first.size(), allocator);
-        v.second->ToJson(*d, &summary_stats_counter);
+        v.second->ToJson(verbosity, *d, &summary_stats_counter);
         summary_stats_counter.AddMember("counter_name", summary_name_json, allocator);
         summary_stats_counters_json.PushBack(summary_stats_counter, allocator);
       }
@@ -1360,12 +1397,17 @@ void RuntimeProfile::ToJsonSubclass(Value* parent, Document* d) const {
   }
 }
 
+void RuntimeProfileBase::PrettyPrint(ostream* s, const string& prefix) const {
+  PrettyPrint(DefaultVerbosity(), s, prefix);
+}
+
 // Print the profile:
 //  1. Profile Name
 //  2. Info Strings
 //  3. Counters
 //  4. Children
-void RuntimeProfileBase::PrettyPrint(ostream* s, const string& prefix) const {
+void RuntimeProfileBase::PrettyPrint(
+    Verbosity verbosity, ostream* s, const string& prefix) const {
   ostream& stream = *s;
 
   // Create copy of counter_map_ and child_counter_map_ so we don't need to hold lock
@@ -1405,10 +1447,10 @@ void RuntimeProfileBase::PrettyPrint(ostream* s, const string& prefix) const {
     }
   }
 
-  PrettyPrintInfoStrings(s, prefix);
-  PrettyPrintSubclassCounters(s, prefix);
+  PrettyPrintInfoStrings(s, prefix, verbosity);
+  PrettyPrintSubclassCounters(s, prefix, verbosity);
   RuntimeProfileBase::PrintChildCounters(
-      prefix, ROOT_COUNTER, counter_map, child_counter_map, s);
+      prefix, verbosity, ROOT_COUNTER, counter_map, child_counter_map, s);
 
   // Create copy of children_ so we don't need to hold lock while we call
   // PrettyPrint() on the children.
@@ -1420,11 +1462,12 @@ void RuntimeProfileBase::PrettyPrint(ostream* s, const string& prefix) const {
   for (int i = 0; i < children.size(); ++i) {
     RuntimeProfileBase* profile = children[i].first;
     bool indent = children[i].second;
-    profile->PrettyPrint(s, prefix + (indent ? "  " : ""));
+    profile->PrettyPrint(verbosity, s, prefix + (indent ? "  " : ""));
   }
 }
 
-void RuntimeProfile::PrettyPrintInfoStrings(ostream* s, const string& prefix) const {}
+void RuntimeProfile::PrettyPrintInfoStrings(
+    ostream* s, const string& prefix, Verbosity verbosity) const {}
 
 // Helper to pretty-print the data for a time series counter. 'num' is the number of
 // values in 'samples'.
@@ -1452,7 +1495,8 @@ static void PrettyPrintTimeSeries(const string& label, const int64_t* samples, i
   stream << endl;
 }
 
-void RuntimeProfile::PrettyPrintSubclassCounters(ostream* s, const string& prefix) const {
+void RuntimeProfile::PrettyPrintSubclassCounters(
+    ostream* s, const string& prefix, Verbosity verbosity) const {
   ostream& stream = *s;
   {
     // Print all the event timers as the following:
@@ -1505,7 +1549,7 @@ void RuntimeProfile::PrettyPrintSubclassCounters(ostream* s, const string& prefi
     // <Name>: (Avg: <value> ; Min: <min_value> ; Max: <max_value> ;
     // Number of samples: <total>)
     for (const auto& v : summary_stats_map_) {
-      v.second->PrettyPrint(prefix, v.first, s);
+      v.second->PrettyPrint(prefix, v.first, verbosity, s);
     }
   }
 }
@@ -1603,10 +1647,11 @@ Status RuntimeProfile::DeserializeFromArchiveString(
   return DecompressToThrift(decoded_buffer, out);
 }
 
-Status RuntimeProfile::CreateFromArchiveString(
-      const string& archive_str, ObjectPool* pool, RuntimeProfile** out) {
+Status RuntimeProfile::CreateFromArchiveString(const string& archive_str,
+    ObjectPool* pool, RuntimeProfile** out, int32_t* profile_version_out) {
   TRuntimeProfileTree tree;
   RETURN_IF_ERROR(DeserializeFromArchiveString(archive_str, &tree));
+  *profile_version_out = GetProfileVersion(tree);
   *out = RuntimeProfile::CreateFromThrift(pool, tree);
   return Status::OK();
 }
@@ -1889,7 +1934,7 @@ RuntimeProfile::EventSequence* RuntimeProfile::AddEventSequence(const string& na
   return timer;
 }
 
-void RuntimeProfileBase::PrintChildCounters(const string& prefix,
+void RuntimeProfileBase::PrintChildCounters(const string& prefix, Verbosity verbosity,
     const string& counter_name, const CounterMap& counter_map,
     const ChildCounterMap& child_counter_map, ostream* s) {
   ostream& stream = *s;
@@ -1899,9 +1944,9 @@ void RuntimeProfileBase::PrintChildCounters(const string& prefix,
     for (const string& child_counter: child_counters) {
       CounterMap::const_iterator iter = counter_map.find(child_counter);
       if (iter == counter_map.end()) continue;
-      iter->second->PrettyPrint(prefix, iter->first, &stream);
+      iter->second->PrettyPrint(prefix, iter->first, verbosity, &stream);
       RuntimeProfileBase::PrintChildCounters(
-          prefix + "  ", child_counter, counter_map, child_counter_map, s);
+          prefix + "  ", verbosity, child_counter, counter_map, child_counter_map, s);
     }
   }
 }
@@ -2177,34 +2222,38 @@ RuntimeProfileBase::AveragedCounter::GetStats() const {
 }
 
 void RuntimeProfileBase::AveragedCounter::PrettyPrint(
-    const string& prefix, const string& name, ostream* s) const {
+    const string& prefix, const string& name, Verbosity verbosity, ostream* s) const {
   if (unit_ == TUnit::DOUBLE_VALUE) {
-    PrettyPrintImpl<double>(prefix, name, s);
+    PrettyPrintImpl<double>(prefix, name, verbosity, s);
   } else {
-    PrettyPrintImpl<int64_t>(prefix, name, s);
+    PrettyPrintImpl<int64_t>(prefix, name, verbosity, s);
   }
 }
 
 template <typename T>
 void RuntimeProfileBase::AveragedCounter::PrettyPrintImpl(
-    const string& prefix, const string& name, ostream* s) const {
+    const string& prefix, const string& name, Verbosity verbosity, ostream* s) const {
   Stats<T> stats = GetStats<T>();
   (*s) << prefix << "   - " << name << ": ";
-  if (!FLAGS_gen_experimental_profile || stats.num_vals == 1) {
+  if (verbosity <= Verbosity::LEGACY || stats.num_vals == 1) {
     (*s) << PrettyPrinter::Print(stats.mean, unit_, true) << endl;
     return;
   }
 
   // For counters with <> 1 values, show summary stats and the values.
   (*s) << "mean=" << PrettyPrinter::Print(BitcastToInt64(stats.mean), unit_, true)
-       << " min=" << PrettyPrinter::Print(BitcastToInt64(stats.min), unit_, true)
-       << " p50=" << PrettyPrinter::Print(BitcastToInt64(stats.p50), unit_, true)
-       << " p75=" << PrettyPrinter::Print(BitcastToInt64(stats.p75), unit_, true)
-       << " p90=" << PrettyPrinter::Print(BitcastToInt64(stats.p90), unit_, true)
-       << " p95=" << PrettyPrinter::Print(BitcastToInt64(stats.p95), unit_, true)
-       << " max=" << PrettyPrinter::Print(BitcastToInt64(stats.max), unit_, true) << endl;
-  // Dump out individual values if they are not all identical.
-  if (stats.min != stats.max) {
+       << " min=" << PrettyPrinter::Print(BitcastToInt64(stats.min), unit_, true);
+  if (verbosity >= Verbosity::EXTENDED) {
+    (*s) << " p50=" << PrettyPrinter::Print(BitcastToInt64(stats.p50), unit_, true)
+         << " p75=" << PrettyPrinter::Print(BitcastToInt64(stats.p75), unit_, true)
+         << " p90=" << PrettyPrinter::Print(BitcastToInt64(stats.p90), unit_, true)
+         << " p95=" << PrettyPrinter::Print(BitcastToInt64(stats.p95), unit_, true);
+  }
+  (*s) << " max=" << PrettyPrinter::Print(BitcastToInt64(stats.max), unit_, true) << endl;
+  // Dump out individual values if we have FULL verbosity of with EXTENDED verbosity when
+  // they are not all identical.
+  if (verbosity >= Verbosity::FULL
+      || (verbosity >= Verbosity::EXTENDED && stats.min != stats.max)) {
     (*s) << prefix << "     [";
     for (int i = 0; i < num_values_; ++i) {
       if (i != 0) {
@@ -2224,17 +2273,18 @@ void RuntimeProfileBase::AveragedCounter::PrettyPrintImpl(
   }
 }
 
-void RuntimeProfileBase::AveragedCounter::ToJson(Document& document, Value* val) const {
+void RuntimeProfileBase::AveragedCounter::ToJson(
+    Verbosity verbosity, Document& document, Value* val) const {
   if (unit_ == TUnit::DOUBLE_VALUE) {
-    ToJsonImpl<double>(document, val);
+    ToJsonImpl<double>(verbosity, document, val);
   } else {
-    ToJsonImpl<int64_t>(document, val);
+    ToJsonImpl<int64_t>(verbosity, document, val);
   }
 }
 
 template <typename T>
 void RuntimeProfileBase::AveragedCounter::ToJsonImpl(
-    Document& document, Value* val) const {
+    Verbosity verbosity, Document& document, Value* val) const {
   Value counter_json(kObjectType);
   auto unit_itr = _TUnit_VALUES_TO_NAMES.find(unit_);
   DCHECK(unit_itr != _TUnit_VALUES_TO_NAMES.end());
@@ -2242,10 +2292,11 @@ void RuntimeProfileBase::AveragedCounter::ToJsonImpl(
   counter_json.AddMember("unit", unit_json, document.GetAllocator());
 
   Stats<T> stats = GetStats<T>();
-  if (!FLAGS_gen_experimental_profile || stats.num_vals == 1) {
+  if (verbosity <= Verbosity::LEGACY || stats.num_vals == 1) {
     // Generate the traditional single-value representation if we're using the older
     // profile version, or if the detailed statistics would just be noise.
     counter_json.AddMember("value", stats.mean, document.GetAllocator());
+    *val = counter_json;
     return;
   }
 
@@ -2436,7 +2487,7 @@ int32_t RuntimeProfileBase::SummaryStatsCounter::TotalNumValues() {
 }
 
 void RuntimeProfileBase::SummaryStatsCounter::PrettyPrint(
-    const string& prefix, const string& name, ostream* s) const {
+    const string& prefix, const string& name, Verbosity verbosity, ostream* s) const {
   ostream& stream = *s;
   stream << prefix << "   - " << name << ": ";
   lock_guard<SpinLock> l(lock_);
@@ -2454,12 +2505,13 @@ void RuntimeProfileBase::SummaryStatsCounter::PrettyPrint(
 }
 
 void RuntimeProfileBase::Counter::PrettyPrint(
-    const string& prefix, const string& name, ostream* s) const {
+    const string& prefix, const string& name, Verbosity verbosity, ostream* s) const {
   (*s) << prefix << "   - " << name << ": " << PrettyPrinter::Print(value(), unit_, true)
        << endl;
 }
 
-void RuntimeProfileBase::Counter::ToJson(Document& document, Value* val) const {
+void RuntimeProfileBase::Counter::ToJson(
+    Verbosity verbosity, Document& document, Value* val) const {
   Value counter_json(kObjectType);
   if (unit_ == TUnit::DOUBLE_VALUE) {
     counter_json.AddMember("value", double_value(), document.GetAllocator());
@@ -2473,7 +2525,8 @@ void RuntimeProfileBase::Counter::ToJson(Document& document, Value* val) const {
   *val = counter_json;
 }
 
-void RuntimeProfile::TimeSeriesCounter::ToJson(Document& document, Value* val) {
+void RuntimeProfile::TimeSeriesCounter::ToJson(
+    Verbosity verbosity, Document& document, Value* val) {
   lock_guard<SpinLock> lock(lock_);
   Value counter_json(kObjectType);
 
@@ -2505,7 +2558,8 @@ void RuntimeProfile::TimeSeriesCounter::ToJson(Document& document, Value* val) {
   *val = counter_json;
 }
 
-void RuntimeProfile::EventSequence::ToJson(Document& document, Value* value) {
+void RuntimeProfile::EventSequence::ToJson(
+    Verbosity verbosity, Document& document, Value* value) {
   lock_guard<SpinLock> event_lock(lock_);
   SortEvents();
 
@@ -2578,9 +2632,9 @@ static void PrettyPrintIndexRanges(ostream* s, const vector<int32_t>& indices) {
 }
 
 void AggregatedRuntimeProfile::PrettyPrintInfoStrings(
-    ostream* s, const string& prefix) const {
-  // Aggregated info strings are only shown in experimental profile.
-  if (!FLAGS_gen_experimental_profile) return;
+    ostream* s, const string& prefix, Verbosity verbosity) const {
+  // Aggregated info strings were not shown in averaged profile in legacy mode.
+  if (verbosity <= Verbosity::LEGACY) return;
   ostream& stream = *s;
   {
     lock_guard<SpinLock> l(input_profile_name_lock_);
@@ -2607,12 +2661,10 @@ void AggregatedRuntimeProfile::PrettyPrintInfoStrings(
 }
 
 void AggregatedRuntimeProfile::PrettyPrintSubclassCounters(
-    ostream* s, const string& prefix) const {
-  // Hide aggregated state when we are not using the transposed profile
-  // format.
-  if (!FLAGS_gen_experimental_profile) return;
+    ostream* s, const string& prefix, Verbosity verbosity) const {
   ostream& stream = *s;
-  {
+  // Legacy profile did not show aggregated time series counters.
+  if (verbosity >= Verbosity::DEFAULT) {
     lock_guard<SpinLock> l(counter_map_lock_);
     for (const auto& v : time_series_counter_map_) {
       const TAggTimeSeriesCounter& counter = v.second;
@@ -2624,7 +2676,8 @@ void AggregatedRuntimeProfile::PrettyPrintSubclassCounters(
       }
     }
   }
-  {
+  // Legacy profile did not show aggregated event sequences.
+  if (verbosity >= Verbosity::DEFAULT) {
     // Print all the event timers as the following:
     // <EventKey>[instance index] Timeline: 2s719ms
     //     - Event 1: 6.522us (6.522us)
@@ -2664,13 +2717,15 @@ void AggregatedRuntimeProfile::PrettyPrintSubclassCounters(
       // Display fully aggregated stats first.
       SummaryStatsCounter aggregated_stats(v.second.first);
       AggregateSummaryStats(v.second.second, &aggregated_stats);
-      aggregated_stats.PrettyPrint(prefix, v.first, s);
+      aggregated_stats.PrettyPrint(prefix, v.first, verbosity, s);
+
       // Display per-instance stats, if there is more than one instance.
-      if (v.second.second.size() > 1) {
+      // Legacy profile did not show per-instance stats for averaged profile.
+      if (verbosity > Verbosity::LEGACY && v.second.second.size() > 1) {
         for (int idx = 0; idx < v.second.second.size(); ++idx) {
           if (v.second.second[idx] == nullptr) continue;
           const string& per_instance_prefix = Substitute("$0[$1]", prefix, idx);
-          aggregated_stats.PrettyPrint(per_instance_prefix, v.first, s);
+          aggregated_stats.PrettyPrint(per_instance_prefix, v.first, verbosity, s);
         }
       }
     }
@@ -2777,7 +2832,8 @@ void AggregatedRuntimeProfile::ToThriftSubclass(
   }
 }
 
-void AggregatedRuntimeProfile::ToJsonSubclass(Value* parent, Document* d) const {
+void AggregatedRuntimeProfile::ToJsonSubclass(
+    Verbosity verbosity, Value* parent, Document* d) const {
   Document::AllocatorType& allocator = d->GetAllocator();
   // We do not include all of the per-instance values in the JSON representation. We do
   // not need to be able to round-trip RuntimeProfile to/from the JSON representation so
@@ -2802,7 +2858,7 @@ void AggregatedRuntimeProfile::ToJsonSubclass(Value* parent, Document* d) const 
         AggregateSummaryStats(v.second.second, &aggregated_stats);
         Value summary_stats_counter(kObjectType);
         Value summary_name_json(v.first.c_str(), v.first.size(), allocator);
-        aggregated_stats.ToJson(*d, &summary_stats_counter);
+        aggregated_stats.ToJson(verbosity, *d, &summary_stats_counter);
         summary_stats_counter.AddMember("counter_name", summary_name_json, allocator);
         summary_stats_counters_json.PushBack(summary_stats_counter, allocator);
       }
