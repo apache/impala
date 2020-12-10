@@ -997,6 +997,11 @@ void HdfsParquetTableWriter::ConfigureTimestampType() {
   timestamp_type_ = state_->query_options().parquet_timestamp_type;
 }
 
+void HdfsParquetTableWriter::ConfigureStringType() {
+  string_utf8_ = is_iceberg_file_ ||
+                 state_->query_options().parquet_annotate_strings_utf8;
+}
+
 Status HdfsParquetTableWriter::Init() {
   // Initialize file metadata
   file_metadata_.version = PARQUET_CURRENT_VERSION;
@@ -1062,6 +1067,7 @@ Status HdfsParquetTableWriter::Init() {
   Codec::CodecInfo codec_info(codec, clevel);
 
   ConfigureTimestampType();
+  ConfigureStringType();
 
   columns_.resize(num_cols);
   // Initialize each column structure.
@@ -1178,7 +1184,7 @@ Status HdfsParquetTableWriter::CreateSchema() {
     DCHECK_EQ(col_desc.name(), columns_[i]->column_name());
     const int field_id = col_desc.field_id();
     if (field_id != -1) col_schema.__set_field_id(field_id);
-    ParquetMetadataUtils::FillSchemaElement(col_type, state_->query_options(),
+    ParquetMetadataUtils::FillSchemaElement(col_type, string_utf8_,
                                             timestamp_type_, &col_schema);
   }
 

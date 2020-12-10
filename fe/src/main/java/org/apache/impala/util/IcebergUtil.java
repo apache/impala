@@ -42,25 +42,17 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
 import org.apache.iceberg.transforms.Transform;
-import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.IcebergPartitionTransform;
-import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.IcebergTable;
-import org.apache.impala.catalog.MapType;
-import org.apache.impala.catalog.ScalarType;
-import org.apache.impala.catalog.StructField;
-import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
-import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
 import org.apache.impala.catalog.iceberg.IcebergHadoopTables;
 import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.thrift.TColumnType;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
@@ -399,125 +391,6 @@ public class IcebergUtil {
    */
   public static HdfsFileFormat toHdfsFileFormat(String format) {
     return HdfsFileFormat.fromThrift(toTHdfsFileFormat(getIcebergFileFormat(format)));
-  }
-
-  /**
-   * Get iceberg type from impala column type
-   */
-  public static org.apache.iceberg.types.Type fromImpalaColumnType(
-      TColumnType columnType) throws ImpalaRuntimeException {
-    return fromImpalaType(Type.fromThrift(columnType));
-  }
-
-  /**
-   * Transform impala type to iceberg type
-   */
-  public static org.apache.iceberg.types.Type fromImpalaType(Type t)
-      throws ImpalaRuntimeException {
-    if (t.isScalarType()) {
-      ScalarType st = (ScalarType) t;
-      switch (st.getPrimitiveType()) {
-        case BOOLEAN:
-          return Types.BooleanType.get();
-        case INT:
-          return Types.IntegerType.get();
-        case BIGINT:
-          return Types.LongType.get();
-        case FLOAT:
-          return Types.FloatType.get();
-        case DOUBLE:
-          return Types.DoubleType.get();
-        case STRING:
-          return Types.StringType.get();
-        case DATE:
-          return Types.DateType.get();
-        case BINARY:
-          return Types.BinaryType.get();
-        case TIMESTAMP:
-          return Types.TimestampType.withoutZone();
-        case DECIMAL:
-          return Types.DecimalType.of(st.decimalPrecision(), st.decimalScale());
-        default:
-          throw new ImpalaRuntimeException(String.format(
-              "Type %s is not supported in Iceberg", t.toSql()));
-      }
-    } else if (t.isArrayType()) {
-      ArrayType at = (ArrayType) t;
-      return Types.ListType.ofRequired(1, fromImpalaType(at.getItemType()));
-    } else if (t.isMapType()) {
-      MapType mt = (MapType) t;
-      return Types.MapType.ofRequired(1, 2,
-          fromImpalaType(mt.getKeyType()), fromImpalaType(mt.getValueType()));
-    } else if (t.isStructType()) {
-      StructType st = (StructType) t;
-      List<Types.NestedField> icebergFields = new ArrayList<>();
-      int id = 1;
-      for (StructField field : st.getFields()) {
-        icebergFields.add(Types.NestedField.required(id++, field.getName(),
-            fromImpalaType(field.getType()), field.getComment()));
-      }
-      return Types.StructType.of(icebergFields);
-    } else {
-      throw new ImpalaRuntimeException(String.format(
-          "Type %s is not supported in Iceberg", t.toSql()));
-    }
-}
-
-  /**
-   * Transform iceberg type to impala type
-   */
-  public static Type toImpalaType(org.apache.iceberg.types.Type t)
-      throws TableLoadingException {
-    switch (t.typeId()) {
-      case BOOLEAN:
-        return Type.BOOLEAN;
-      case INTEGER:
-        return Type.INT;
-      case LONG:
-        return Type.BIGINT;
-      case FLOAT:
-        return Type.FLOAT;
-      case DOUBLE:
-        return Type.DOUBLE;
-      case STRING:
-        return Type.STRING;
-      case FIXED:
-        Types.FixedType fixed = (Types.FixedType) t;
-        return ScalarType.createCharType(fixed.length());
-      case DATE:
-        return Type.DATE;
-      case BINARY:
-        return Type.BINARY;
-      case TIMESTAMP:
-        return Type.TIMESTAMP;
-      case DECIMAL:
-        Types.DecimalType decimal = (Types.DecimalType) t;
-        return ScalarType.createDecimalType(decimal.precision(), decimal.scale());
-      case LIST: {
-        Types.ListType listType = (Types.ListType) t;
-        return new ArrayType(toImpalaType(listType.elementType()));
-      }
-      case MAP: {
-        Types.MapType mapType = (Types.MapType) t;
-        return new MapType(toImpalaType(mapType.keyType()),
-            toImpalaType(mapType.valueType()));
-      }
-      case STRUCT: {
-        Types.StructType structType = (Types.StructType) t;
-        List<StructField> structFields = new ArrayList<>();
-        List<Types.NestedField> nestedFields = structType.fields();
-        for (Types.NestedField nestedField : nestedFields) {
-          // Get field id from 'NestedField'.
-          structFields.add(new IcebergStructField(nestedField.name(),
-              toImpalaType(nestedField.type()), nestedField.doc(),
-              nestedField.fieldId()));
-        }
-        return new StructType(structFields);
-      }
-      default:
-        throw new TableLoadingException(String.format(
-            "Iceberg type '%s' is not supported in Impala", t.typeId()));
-    }
   }
 
   /**

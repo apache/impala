@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.catalog.CatalogObject;
@@ -56,6 +57,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   private Map<String, FileDescriptor> pathHashToFileDescMap_;
   private LocalFsTable localFsTable_;
   private long snapshotId_ = -1;
+  private Schema icebergSchema_;
 
   static LocalTable loadFromIceberg(LocalDb db, Table msTable,
       MetaProvider.TableMetaRef ref) throws TableLoadingException {
@@ -88,6 +90,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
     if (metadata.currentSnapshot() != null) {
       snapshotId_ = metadata.currentSnapshot().snapshotId();
     }
+    icebergSchema_ = metadata.schema();
     try {
       pathHashToFileDescMap_ = Utils.loadAllPartition(this);
     } catch (IOException e) {
@@ -96,7 +99,6 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
           (Exception)e);
     }
     icebergFileFormat_ = Utils.getIcebergFileFormat(msTable);
-
   }
 
   @Override
@@ -117,6 +119,11 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   @Override
   public String getIcebergCatalogLocation() {
     return tableParams_.icebergCatalogLocation_;
+  }
+
+  @Override
+  public Schema getIcebergSchema() {
+    return icebergSchema_;
   }
 
   @Override

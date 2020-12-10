@@ -1,0 +1,183 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+package org.apache.impala.util;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.types.Types;
+import org.apache.impala.catalog.ArrayType;
+import org.apache.impala.catalog.IcebergStructField;
+import org.apache.impala.catalog.MapType;
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
+import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.Type;
+import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TColumnType;
+
+/**
+ * Utility class for converting between Iceberg and Impala schemas and types.
+ */
+public class IcebergSchemaConverter {
+  // The methods in this class are public and static, hence it's possible to invoke
+  // them from multiple threads. Hence we use this thread-local integer to generate
+  // unique field ids for each schema element. Please note that Iceberg only care about
+  // the uniqueness of the field ids, but they will be reassigned by Iceberg.
+  private static ThreadLocal<Integer> iThreadLocal = new ThreadLocal<>();
+
+  /**
+   * Transform iceberg type to impala type
+   */
+  public static Type toImpalaType(org.apache.iceberg.types.Type t)
+      throws TableLoadingException {
+    switch (t.typeId()) {
+      case BOOLEAN:
+        return Type.BOOLEAN;
+      case INTEGER:
+        return Type.INT;
+      case LONG:
+        return Type.BIGINT;
+      case FLOAT:
+        return Type.FLOAT;
+      case DOUBLE:
+        return Type.DOUBLE;
+      case STRING:
+        return Type.STRING;
+      case DATE:
+        return Type.DATE;
+      case BINARY:
+        return Type.BINARY;
+      case TIMESTAMP:
+        return Type.TIMESTAMP;
+      case DECIMAL:
+        Types.DecimalType decimal = (Types.DecimalType) t;
+        return ScalarType.createDecimalType(decimal.precision(), decimal.scale());
+      case LIST: {
+        Types.ListType listType = (Types.ListType) t;
+        return new ArrayType(toImpalaType(listType.elementType()));
+      }
+      case MAP: {
+        Types.MapType mapType = (Types.MapType) t;
+        return new MapType(toImpalaType(mapType.keyType()),
+            toImpalaType(mapType.valueType()));
+      }
+      case STRUCT: {
+        Types.StructType structType = (Types.StructType) t;
+        List<StructField> structFields = new ArrayList<>();
+        List<Types.NestedField> nestedFields = structType.fields();
+        for (Types.NestedField nestedField : nestedFields) {
+          // Get field id from 'NestedField'.
+          structFields.add(new IcebergStructField(nestedField.name(),
+              toImpalaType(nestedField.type()), nestedField.doc(),
+              nestedField.fieldId()));
+        }
+        return new StructType(structFields);
+      }
+      default:
+        throw new TableLoadingException(String.format(
+            "Iceberg type '%s' is not supported in Impala", t.typeId()));
+    }
+  }
+
+  /**
+   * Generates Iceberg schema from given columns. It also assigns a unique 'field id' for
+   * each schema element, although Iceberg will reassign the ids.
+   */
+  public static Schema genIcebergSchema(List<TColumn> columns)
+      throws ImpalaRuntimeException {
+    iThreadLocal.set(0);
+    List<Types.NestedField> fields = new ArrayList<Types.NestedField>();
+    for (TColumn column : columns) {
+      org.apache.iceberg.types.Type icebergType = fromImpalaColumnType(
+          column.getColumnType());
+      Types.NestedField field = Types.NestedField.required(
+          nextId(), column.getColumnName(), icebergType, column.getComment());
+      fields.add(field);
+    }
+    return new Schema(fields);
+  }
+
+  public static org.apache.iceberg.types.Type fromImpalaColumnType(TColumnType colType)
+      throws ImpalaRuntimeException {
+    return fromImpalaType(Type.fromThrift(colType));
+  }
+
+  /**
+   * Transform impala type to iceberg type.
+   */
+  public static org.apache.iceberg.types.Type fromImpalaType(Type t)
+      throws ImpalaRuntimeException {
+    if (t.isScalarType()) {
+      ScalarType st = (ScalarType) t;
+      switch (st.getPrimitiveType()) {
+        case BOOLEAN:
+          return Types.BooleanType.get();
+        case INT:
+          return Types.IntegerType.get();
+        case BIGINT:
+          return Types.LongType.get();
+        case FLOAT:
+          return Types.FloatType.get();
+        case DOUBLE:
+          return Types.DoubleType.get();
+        case STRING:
+          return Types.StringType.get();
+        case DATE:
+          return Types.DateType.get();
+        case BINARY:
+          return Types.BinaryType.get();
+        case TIMESTAMP:
+          // Impala TIMESTAMP has timestamp without time zone semantics.
+          return Types.TimestampType.withoutZone();
+        case DECIMAL:
+          return Types.DecimalType.of(st.decimalPrecision(), st.decimalScale());
+        default:
+          throw new ImpalaRuntimeException(String.format(
+              "Type %s is not supported in Iceberg", t.toSql()));
+      }
+    } else if (t.isArrayType()) {
+      ArrayType at = (ArrayType) t;
+      return Types.ListType.ofRequired(nextId(), fromImpalaType(at.getItemType()));
+    } else if (t.isMapType()) {
+      MapType mt = (MapType) t;
+      return Types.MapType.ofRequired(nextId(), nextId(),
+          fromImpalaType(mt.getKeyType()), fromImpalaType(mt.getValueType()));
+    } else if (t.isStructType()) {
+      StructType st = (StructType) t;
+      List<Types.NestedField> icebergFields = new ArrayList<>();
+      for (StructField field : st.getFields()) {
+        icebergFields.add(Types.NestedField.required(nextId(), field.getName(),
+            fromImpalaType(field.getType()), field.getComment()));
+      }
+      return Types.StructType.of(icebergFields);
+    } else {
+      throw new ImpalaRuntimeException(String.format(
+          "Type %s is not supported in Iceberg", t.toSql()));
+    }
+  }
+
+  private static int nextId() {
+    int nextId = iThreadLocal.get();
+    iThreadLocal.set(nextId+1);
+    return nextId;
+  }
+}

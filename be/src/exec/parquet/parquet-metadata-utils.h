@@ -63,9 +63,9 @@ class ParquetMetadataUtils {
       const TParquetTimestampType::type timestamp_type);
 
   /// Sets type related fields in a SchemaElement based on the column's internal type
-  /// and query options.
+  /// and this function's arguments.
   static void FillSchemaElement(const ColumnType& col_type,
-      const TQueryOptions& query_options, TParquetTimestampType::type timestamp_type,
+      bool string_utf8, TParquetTimestampType::type timestamp_type,
       parquet::SchemaElement* col_schema);
 };
 

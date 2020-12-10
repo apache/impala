@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.IcebergPartitionField;
@@ -45,6 +46,7 @@ import org.apache.impala.thrift.TIcebergTable;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
+import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.thrift.TException;
 
@@ -102,7 +104,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
   private int defaultPartitionSpecId_;
 
   // Schema of the iceberg table.
-  private org.apache.iceberg.Schema icebergSchema_;
+  private Schema icebergSchema_;
 
   // Key is the DataFile path hash, value is FileDescriptor transformed from DataFile
   private Map<String, FileDescriptor> pathHashToFileDescMap_;
@@ -160,6 +162,11 @@ public class IcebergTable extends Table implements FeIcebergTable {
   @Override
   public String getStorageHandlerClassName() {
     return ICEBERG_STORAGE_HANDLER;
+  }
+
+  @Override
+  public Schema getIcebergSchema() {
+    return icebergSchema_;
   }
 
   public static boolean isIcebergStorageHandler(String handler) {
@@ -306,7 +313,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     int pos = 0;
     for (Types.NestedField column : icebergSchema_.columns()) {
       Preconditions.checkNotNull(column);
-      Type colType = IcebergUtil.toImpalaType(column.type());
+      Type colType = IcebergSchemaConverter.toImpalaType(column.type());
       // Update sd cols by iceberg NestedField
       cols.add(new FieldSchema(column.name(), colType.toSql().toLowerCase(),
           column.doc()));
@@ -346,6 +353,8 @@ public class IcebergTable extends Table implements FeIcebergTable {
         ticeberg.getPath_hash_to_file_descriptor());
     snapshotId_ = ticeberg.getSnapshot_id();
     hdfsTable_.loadFromThrift(thriftTable);
+    TableMetadata metadata = IcebergUtil.getIcebergTableMetadata(this);
+    icebergSchema_ = metadata.schema();
   }
 
   private List<IcebergPartitionSpec> loadPartitionBySpecsFromThrift(

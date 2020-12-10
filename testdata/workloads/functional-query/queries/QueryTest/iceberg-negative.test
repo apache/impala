@@ -283,3 +283,24 @@ DESCRIBE HISTORY functional_parquet.emptytable;
 ---- CATCH
 DESCRIBE HISTORY must specify an Iceberg table: functional_parquet.emptytable
 ====
+---- QUERY
+# CHAR is not supported.
+CREATE TABLE chars_formats (cs CHAR(5))
+STORED AS iceberg;
+---- CATCH
+Type CHAR(5) is not supported in Iceberg
+====
+---- QUERY
+# VARCHAR is not supported.
+CREATE TABLE chars_formats (vc VARCHAR(100))
+STORED AS iceberg;
+---- CATCH
+Type VARCHAR(100) is not supported in Iceberg
+====
+---- QUERY
+# Impala cannot write UTC normalized timestamps.
+INSERT INTO functional_parquet.iceberg_non_partitioned
+VALUES (1, "user", "action", now());
+---- CATCH
+AnalysisException: The Iceberg table has a TIMESTAMPTZ column that Impala cannot write.
+====
