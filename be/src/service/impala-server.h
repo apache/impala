@@ -769,11 +769,6 @@ class ImpalaServer : public ImpalaServiceIf,
   Status GetRuntimeProfileOutput(const string& user, const QueryHandle& query_handle,
       TRuntimeProfileFormat::type format, RuntimeProfileOutput* profile);
 
-  /// Converts a JSON Document representation of a profile to a string representation.
-  /// Both parameters cannot be nullptr.
-  void JsonProfileToStringProfile(const rapidjson::Document& json_profile,
-      std::stringstream* string_profile);
-
   /// Set the profile (or thrift_profile) field for the given TRuntimeProfileFormat
   /// using the profile from the given RuntimeProfileOutput. If 'set_failed_profile'
   /// is true, then the profile is added to the 'failed_profile' field of

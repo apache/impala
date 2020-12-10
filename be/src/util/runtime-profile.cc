@@ -28,6 +28,8 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
 #include <boost/range/adaptor/transformed.hpp>
+#include <rapidjson/prettywriter.h>
+#include <rapidjson/stringbuffer.h>
 
 #include "common/object-pool.h"
 #include "gutil/strings/strip.h"
@@ -1179,6 +1181,22 @@ void RuntimeProfile::ToJson(Document* d) const {
   ToJsonHelper(&queryObj, d);
   d->RemoveMember("contents");
   d->AddMember("contents", queryObj, d->GetAllocator());
+}
+
+void RuntimeProfile::JsonProfileToString(
+    const rapidjson::Document& json_profile, bool pretty, ostream* string_output) {
+  // Serialize to JSON without extra whitespace/formatting.
+  rapidjson::StringBuffer sb;
+  if (pretty) {
+    PrettyWriter<StringBuffer> writer(sb);
+    writer.SetIndent('\t', 1);
+    writer.SetFormatOptions(kFormatSingleLineArray);
+    json_profile.Accept(writer);
+  } else {
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+    json_profile.Accept(writer);
+  }
+  *string_output << sb.GetString();
 }
 
 void RuntimeProfileBase::ToJsonCounters(Value* parent, Document* d,
