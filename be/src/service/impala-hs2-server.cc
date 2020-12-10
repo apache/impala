@@ -32,8 +32,6 @@
 #include <gperftools/malloc_extension.h>
 #include <gtest/gtest.h>
 #include <gutil/strings/substitute.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/prettywriter.h>
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "common/logging.h"
@@ -1030,15 +1028,6 @@ void ImpalaServer::GetExecSummary(TGetExecSummaryResp& return_val,
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
-void ImpalaServer::JsonProfileToStringProfile(
-    const rapidjson::Document& json_profile, stringstream* string_profile) {
-  // Serialize to JSON without extra whitespace/formatting.
-  rapidjson::StringBuffer sb;
-  rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
-  json_profile.Accept(writer);
-  *string_profile << sb.GetString();
-}
-
 // Add the given Thrift profile to the list of failed thrift profiles for the given
 // TGetRuntimeProfileResp.
 void SetFailedProfile(
@@ -1069,7 +1058,8 @@ void ImpalaServer::SetProfile(TGetRuntimeProfileResp& get_profile_resp,
     }
   } else if (profile_format == TRuntimeProfileFormat::JSON) {
     DCHECK(profile.json_output != nullptr);
-    JsonProfileToStringProfile(*profile.json_output, profile.string_output);
+    RuntimeProfile::JsonProfileToString(
+        *profile.json_output, /*pretty=*/false, profile.string_output);
     if (set_failed_profile) {
       SetFailedProfile(profile.string_output, get_profile_resp);
     } else {

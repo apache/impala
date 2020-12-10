@@ -641,6 +641,12 @@ class RuntimeProfile : public RuntimeProfileBase {
   /// Store an entire runtime profile tree into JSON document 'd'.
   void ToJson(rapidjson::Document* d) const;
 
+  /// Converts a JSON Document representation of a profile. If 'pretty' is true,
+  /// generates a pretty-printed string representation. If 'pretty' is false, generates
+  /// a dense single-line representation.
+  static void JsonProfileToString(
+      const rapidjson::Document& json_profile, bool pretty, std::ostream* string_output);
+
   /// Serializes the runtime profile to a buffer.  This first serializes the
   /// object using thrift compact binary format and then gzip compresses it.
   /// This is not a lightweight operation and should not be in the hot path.

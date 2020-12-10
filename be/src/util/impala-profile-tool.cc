@@ -19,6 +19,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include <boost/algorithm/string/case_conv.hpp>
 #include <gflags/gflags.h>
 
 #include "common/object-pool.h"
@@ -26,36 +28,64 @@
 
 #include "common/names.h"
 
-// Utility to decode an Impala profile log from standard input.
-// The profile log is consumed from standard input and each successfully parsed entry
-// is pretty-printed to standard output.
-//
-// Example usage:
-//   impala-profile-tool < impala_profile_log_1.1-1607057366897
-//
-// The following options are supported:
-// --query_id=<query id>: given an impala query ID, only process profiles with this
-//      query id
-// --min_timestamp=<integer timestamp>: only process profiles at or after this timestamp
-// --max_timestamp=<integer timestamp>: only process profiles at or before this timestamp
-//
-// --gen_experimental_profile: if set to true, generates full output for the new
-//      experimental profile.
+static const char* USAGE =
+    "Utility to decode an Impala profile log from standard input.\n"
+    "\n"
+    "The profile log is consumed from standard input and each successfully parsed entry"
+    " is pretty-printed to standard output.\n"
+    "\n"
+    "Usage:"
+    "  impala-profile-tool < impala_profile_log_1.1-1607057366897\n"
+    "\n"
+    "The following options are supported:\n"
+    "Output options:\n"
+    "--profile_format={text,json,prettyjson}: controls\n"
+    "   text (default): pretty-print in the standard human readable format\n"
+    "   json: output as JSON with one profile per line. Compatible with jsonlines.org\n"
+    "   prettyjson: output as pretty-printed JSON array with one element per object\n"
+    "\n"
+    "Filtering options:\n"
+    "--query_id=<query id>: given an impala query ID, only process profiles with this"
+    " query id\n"
+    "--min_timestamp=<integer timestamp>: only process profiles at or after this"
+    " timestamp\n"
+    "--max_timestamp=<integer timestamp>: only process profiles at or before this"
+    " timestamp\n"
+    "\n"
+    "--gen_experimental_profile: if set to true, generates full output for the new"
+    " experimental profile.";
+
+DEFINE_string(
+    profile_format, "text", "Profile format to output: either text, json or prettyjson");
 DEFINE_string(query_id, "", "Query ID to output profiles for");
 DEFINE_int64(min_timestamp, -1, "Minimum timestamp (inclusive) to output profiles for");
 DEFINE_int64(max_timestamp, -1, "Maximum timestamp (inclusive) to output profiles for");
 
 using namespace impala;
 
+using boost::algorithm::to_lower_copy;
+using google::DescribeOneFlag;
+using google::GetCommandLineFlagInfoOrDie;
 using std::cerr;
 using std::cin;
 using std::cout;
 using std::istringstream;
 
 int main(int argc, char** argv) {
+  google::SetUsageMessage(USAGE);
   google::ParseCommandLineFlags(&argc, &argv, true);
 
+  string profile_format = to_lower_copy(FLAGS_profile_format);
+  if (profile_format != "text" && profile_format != "json"
+      && profile_format != "prettyjson") {
+    cerr << "Invalid --profile_format value: '" << profile_format << "'\n\n"
+         << DescribeOneFlag(GetCommandLineFlagInfoOrDie("profile_format"));
+    return 1;
+  }
+
+  if (profile_format == "prettyjson") cout << "[\n";
   int errors = 0;
+  int profiles_emitted = 0;
   string line;
   int lineno = 1;
   // Read profile log lines from stdin.
@@ -87,8 +117,25 @@ int main(int argc, char** argv) {
       ++errors;
       continue;
     }
-    profile->PrettyPrint(&cout);
+    if (profile_format == "text") {
+      profile->PrettyPrint(&cout);
+    } else if (profile_format == "json") {
+      CHECK_EQ("json", profile_format);
+      rapidjson::Document json_profile(rapidjson::kObjectType);
+      profile->ToJson(&json_profile);
+      RuntimeProfile::JsonProfileToString(json_profile, /*pretty=*/false, &cout);
+      cout << "\n"; // Each JSON document gets a separate line.
+    } else {
+      CHECK_EQ("prettyjson", profile_format);
+      rapidjson::Document json_profile(rapidjson::kObjectType);
+      profile->ToJson(&json_profile);
+      if (profiles_emitted > 0) cout << ",\n";
+      RuntimeProfile::JsonProfileToString(json_profile, /*pretty=*/true, &cout);
+      cout << "\n"; // Each JSON document starts on a new line.
+    }
+    ++profiles_emitted;
   }
+  if (profile_format == "prettyjson") cout << "]\n";
   if (cin.bad()) {
     cerr << "Error reading line " << lineno << "\n";
     ++errors;
