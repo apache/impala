@@ -468,6 +468,13 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   117: optional bool optimize_simple_limit = false;
+
+  // See comment in ImpalaService.thrift
+  118: optional bool use_dop_for_costing = true;
+
+  // See comment in ImpalaService.thrift
+  119: optional double broadcast_to_partition_factor = 1.0;
+
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

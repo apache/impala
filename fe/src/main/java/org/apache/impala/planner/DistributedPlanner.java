@@ -497,7 +497,24 @@ public class DistributedPlanner {
         // RHS data must be broadcast once to each node.
         // TODO: IMPALA-9176: this is inaccurate for NAAJ until IMPALA-9176 is fixed
         // because it must be broadcast once per instance.
-        broadcastCost = 2 * rhsDataSize * leftChildNodes;
+        long dataPayload = rhsDataSize * leftChildNodes;
+        long hashTblBuildCost = dataPayload;
+        if (mt_dop > 1 && ctx_.getQueryOptions().use_dop_for_costing) {
+          // In the broadcast join a single thread per node is building the hash
+          // table of size N compared to the partition case where m threads are
+          // building hash tables of size N/m each (assuming uniform distribution).
+          // Hence, the build side is faster in the latter case. For relative costing,
+          // we multiply the hash table build cost by C sqrt(m) where m = plan node's
+          // parallelism and C = a coefficient that controls the function's rate of
+          // growth (a tunable parameter). We use the sqrt to model a non-linear
+          // function since the slowdown with broadcast is not exactly linear (TODO:
+          // more analysis is needed to establish an accurate correlation).
+          PlanNode leftPlanRoot = leftChildFragment.getPlanRoot();
+          int actual_dop = leftPlanRoot.getNumInstances()/leftPlanRoot.getNumNodes();
+          hashTblBuildCost *= (long) (ctx_.getQueryOptions().broadcast_to_partition_factor
+              * Math.max(1.0, Math.sqrt(actual_dop)));
+        }
+        broadcastCost = dataPayload + hashTblBuildCost;
       }
     }
     if (LOG.isTraceEnabled()) {
@@ -595,8 +612,6 @@ public class DistributedPlanner {
      return DistributionMode.fromThrift(
          ctx_.getQueryOptions().getDefault_join_distribution_mode());
    }
-
-   int mt_dop = ctx_.getQueryOptions().mt_dop;
 
    // Decide the distribution mode based on the estimated costs, the mem limit and
    // the broadcast bytes limit. The last value is a safety check to ensure we
