@@ -602,6 +602,17 @@ enum TImpalaQueryOptions {
   // This option is opt-in by default as this optimization may in some cases produce
   // fewer (but correct) rows than the limit value in the query.
   OPTIMIZE_SIMPLE_LIMIT = 116
+
+  // When true, the degree of parallelism (if > 1) is used in costing decision
+  // of a broadcast vs partition distribution.
+  USE_DOP_FOR_COSTING = 117
+
+  // A multiplying factor between 0 to 1000 that is applied to the costing decision of
+  // a broadcast vs partition distribution. Fractional values between 0 to 1 favor
+  // broadcast by reducing the build side cost of a broadcast join. Values above 1.0
+  // favor partition distribution.
+  BROADCAST_TO_PARTITION_FACTOR = 118
+
 }
 
 // The summary of a DML statement.

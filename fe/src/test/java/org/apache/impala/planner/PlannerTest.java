@@ -1111,4 +1111,12 @@ public class PlannerTest extends PlannerTestBase {
     runPlannerTestFile("optimize-simple-limit", options);
   }
 
+  /**
+   * Test the distribution method for a join
+   */
+  @Test
+  public void testDistributionMethod() {
+    runPlannerTestFile("tpcds-dist-method", "tpcds");
+  }
+
 }
