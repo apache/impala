@@ -687,5 +687,29 @@ GRANT SELECT ON TABLE training1.course1 TO ROLE student;</codeblock>
       </p>
     </conbody>
   </concept>
-
+<concept id="lim_on_mask_functions">
+  <title>Limitations on Mask Functions</title>
+    <conbody>
+      <p>The mask functions in Hive are implemented through GenericUDFs. Even though Impala users
+        can call Hive UDFs, Impala does not yet support Hive GenericUDFs, so you cannot use Hive's
+        mask functions in Impala. However, Impala has builtin mask functions that are implemented
+        through overloads. In Impala, when using mask functions, not all parameter combinations are
+        supported. These mask functions are introduced in Impala 3.4</p>
+      <p>The following list includes all the implemented overloads.</p>
+      <ul>
+        <li>Overloads used by Ranger default masking policies,</li>
+        <li>Overloads with simple arguments,</li>
+        <li>Overload with all arguments in <codeph>int</codeph> type for full functionality. Char
+          argument needs to be converted to their ASCII value.</li>
+      </ul>
+      <p>To list the available overloads, use the following query:</p>
+      <codeblock>show functions in _impala_builtins like "mask*";</codeblock>
+      <note>
+        <ul>
+          <li>An error message that states "<i>No matching function with signature: mask...</i>"
+            implies that Impala does not contain the corresponding overload.</li>
+        </ul>
+      </note>
+    </conbody>
+</concept>
 </concept>
