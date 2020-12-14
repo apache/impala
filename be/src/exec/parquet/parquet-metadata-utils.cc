@@ -764,17 +764,9 @@ SchemaNode* ParquetSchemaResolver::NextSchemaNode(
       DCHECK_EQ(col_type->type, TYPE_MAP);
       DCHECK(table_idx == SchemaPathConstants::MAP_KEY ||
              table_idx == SchemaPathConstants::MAP_VALUE);
-      int field_id = -1;
-      if (table_idx == SchemaPathConstants::MAP_KEY) {
-        field_id = tbl_desc_.col_descs()[table_idx - 1].field_map_key_id();
-      } else {
-        field_id = tbl_desc_.col_descs()[table_idx - 1].field_map_value_id();
-      }
-      file_idx = FindChildWithFieldId(node, field_id);
-      if (file_idx >= node->children.size()) {
-        // Couldn't resolve by field id, fall back to resolution by position.
-        file_idx = table_idx;
-      }
+      // At this point we've found a MAP with a matching field id. It's safe to resolve
+      // the child (key or value) by position.
+      file_idx = table_idx;
     }
   } else {
     // Resolution by position.
