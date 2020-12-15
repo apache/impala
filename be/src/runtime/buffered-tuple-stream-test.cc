@@ -39,6 +39,7 @@
 #include "service/fe-support.h"
 #include "testutil/desc-tbl-builder.h"
 #include "testutil/gtest-util.h"
+#include "util/error-util.h"
 #include "util/test-info.h"
 
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -60,6 +61,8 @@ static const int PAGE_LEN = 2 * 1024 * 1024;
 static const uint32_t PRIME = 479001599;
 
 namespace impala {
+
+constexpr int ErrorMsg::MAX_ERROR_MESSAGE_LEN;
 
 static const StringValue STRINGS[] = {
     StringValue("ABC"), StringValue("HELLO"), StringValue("123456789"),
@@ -1451,6 +1454,65 @@ TEST_F(SimpleTupleStreamTest, ConcurrentReaders) {
     VerifyResults<int>(*int_desc_, results, ROWS_PER_BATCH * NUM_BATCHES, false);
   }
   workers.join_all();
+  stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+}
+
+TEST_F(SimpleTupleStreamTest, ShortDebugString) {
+  Init(BUFFER_POOL_LIMIT);
+
+  int num_batches = 50;
+  RowDescriptor* desc = int_desc_;
+  bool gen_null = false;
+  int64_t default_page_len = 128 * sizeof(int);
+  int64_t max_page_len = default_page_len;
+  int num_rows = BATCH_SIZE;
+
+  BufferedTupleStream stream(
+      runtime_state_, desc, &client_, default_page_len, max_page_len);
+  ASSERT_OK(stream.Init("SimpleTupleStreamTest::ShortDebugString", true));
+  bool got_write_reservation;
+  ASSERT_OK(stream.PrepareForWrite(&got_write_reservation));
+  ASSERT_TRUE(got_write_reservation);
+
+  // Add rows to the stream
+  int offset = 0;
+  for (int i = 0; i < num_batches; ++i) {
+    RowBatch* batch = nullptr;
+
+    Status status;
+    batch = CreateBatch(desc, offset, num_rows, gen_null);
+    for (int j = 0; j < batch->num_rows(); ++j) {
+      bool b = stream.AddRow(batch->GetRow(j), &status);
+      ASSERT_OK(status);
+      ASSERT_TRUE(b);
+    }
+    offset += batch->num_rows();
+    // Reset the batch to make sure the stream handles the memory correctly.
+    batch->Reset();
+  }
+
+  bool got_read_reservation;
+  ASSERT_OK(stream.PrepareForRead(false, &got_read_reservation));
+  ASSERT_TRUE(got_read_reservation);
+
+  // Read all the rows back
+  vector<int> results;
+  ReadValues(&stream, desc, &results);
+
+  // Verify result
+  VerifyResults<int>(*desc, results, num_rows * num_batches, gen_null);
+
+  // Verify that stream contains more than MAX_PAGE_ITER_DEBUG pages and only subset of
+  // pages are included in DebugString().
+  DCHECK_GT(stream.num_pages_, BufferedTupleStream::MAX_PAGE_ITER_DEBUG);
+  string page_count_substr = Substitute(
+      "$0 out of $1 pages=", BufferedTupleStream::MAX_PAGE_ITER_DEBUG, stream.num_pages_);
+  string debug_string = stream.DebugString();
+  ASSERT_NE(debug_string.find(page_count_substr), string::npos)
+      << page_count_substr << " not found at BufferedTupleStream::DebugString(). "
+      << debug_string;
+  ASSERT_LE(debug_string.length(), ErrorMsg::MAX_ERROR_MESSAGE_LEN);
+
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 

@@ -50,6 +50,8 @@ using namespace strings;
 using BufferHandle = BufferPool::BufferHandle;
 using FlushMode = RowBatch::FlushMode;
 
+constexpr int64_t BufferedTupleStream::MAX_PAGE_ITER_DEBUG;
+
 BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     const RowDescriptor* row_desc, BufferPool::ClientHandle* buffer_pool_client,
     int64_t default_page_len, int64_t max_page_len, const set<SlotId>& ext_varlen_slots)
@@ -183,10 +185,12 @@ string BufferedTupleStream::DebugString() const {
   } else {
     ss << write_page_reservation_.GetReservation();
   }
-  ss << "\n # pages=" << num_pages_ << " pages=[\n";
-  for (const Page& page : pages_) {
-    ss << "{" << page.DebugString() << "}";
-    if (&page != &pages_.back()) ss << ",\n";
+  int64_t max_page = min(num_pages_, BufferedTupleStream::MAX_PAGE_ITER_DEBUG);
+  ss << "\n " << max_page << " out of " << num_pages_ << " pages=[\n";
+  for (auto page = pages_.begin(); (page != pages_.end()) && (max_page > 0); ++page) {
+    ss << "{" << page->DebugString() << "}";
+    max_page--;
+    if (max_page > 0) ss << ",\n";
   }
   ss << "]";
   return ss.str();

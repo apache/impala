@@ -417,6 +417,8 @@ class BufferedTupleStream {
 
   std::string DebugString() const;
 
+  static constexpr int64_t MAX_PAGE_ITER_DEBUG = 100;
+
  private:
   /// Wrapper around BufferPool::PageHandle that tracks additional info about the page.
   struct Page {
@@ -558,9 +560,7 @@ class BufferedTupleStream {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferedTupleStream);
-  friend class ArrayTupleStreamTest_TestArrayDeepCopy_Test;
-  friend class ArrayTupleStreamTest_TestComputeRowSize_Test;
-  friend class MultiNullableTupleStreamTest_TestComputeRowSize_Test;
+  friend class SimpleTupleStreamTest_ShortDebugString_Test;
 
   /// Runtime state instance used to check for cancellation. Not owned.
   RuntimeState* const state_;
