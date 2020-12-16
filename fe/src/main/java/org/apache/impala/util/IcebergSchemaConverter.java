@@ -42,7 +42,12 @@ public class IcebergSchemaConverter {
   // them from multiple threads. Hence we use this thread-local integer to generate
   // unique field ids for each schema element. Please note that Iceberg only care about
   // the uniqueness of the field ids, but they will be reassigned by Iceberg.
-  private static ThreadLocal<Integer> iThreadLocal = new ThreadLocal<>();
+  private static ThreadLocal<Integer> iThreadLocal = new ThreadLocal<Integer>() {
+    @Override
+    public Integer initialValue() {
+        return 0;
+    }
+  };
 
   /**
    * Transform iceberg type to impala type
