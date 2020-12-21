@@ -685,6 +685,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
               value));
         }
         query_options->__set_resource_trace_ratio(val);
+        break;
       }
       case TImpalaQueryOptions::PLANNER_TESTCASE_MODE: {
         query_options->__set_planner_testcase_mode(IsTrue(value));
@@ -865,6 +866,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
             ParseMemValue(value, "broadcast bytes limit for join operations",
                 &broadcast_bytes_limit));
         query_options->__set_broadcast_bytes_limit(broadcast_bytes_limit);
+        break;
       }
       case TImpalaQueryOptions::RETRY_FAILED_QUERIES: {
         query_options->__set_retry_failed_queries(IsTrue(value));
@@ -969,11 +971,11 @@ Status impala::SetQueryOption(const string& key, const string& value,
          break;
       }
       case TImpalaQueryOptions::TARGETED_KUDU_SCAN_RANGE_LENGTH: {
-              int64_t scan_length = 0;
-              RETURN_IF_ERROR(
-                  ParseMemValue(value, "targeted kudu scan range length", &scan_length));
-              query_options->__set_targeted_kudu_scan_range_length(scan_length);
-              break;
+        int64_t scan_length = 0;
+        RETURN_IF_ERROR(
+            ParseMemValue(value, "targeted kudu scan range length", &scan_length));
+        query_options->__set_targeted_kudu_scan_range_length(scan_length);
+        break;
       }
       case TImpalaQueryOptions::REPORT_SKEW_LIMIT: {
         StringParser::ParseResult result;
