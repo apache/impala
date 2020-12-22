@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
+
 import org.apache.avro.Schema;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -769,20 +770,8 @@ public class HdfsTable extends Table implements FeFsTable {
       Path location, FsPermissionCache permCache) throws IOException {
     Preconditions.checkNotNull(location);
     FileSystem fs = location.getFileSystem(CONF);
-    // Avoid calling getPermissions() on file path for S3 files, as that makes a round
-    // trip to S3. Also, the S3A connector is currently unable to manage S3 permissions,
-    // so for now it is safe to assume that all files(objects) have READ_WRITE
-    // permissions, as that's what the S3A connector will always return too.
-    // TODO: Revisit if the S3A connector is updated to be able to manage S3 object
-    // permissions. (see HADOOP-13892)
-    if (FileSystemUtil.isS3AFileSystem(fs)) return TAccessLevel.READ_WRITE;
 
-    // The ADLS connector currently returns ACLs for files in ADLS, but can only map
-    // them to the ADLS client SPI and not the Hadoop users/groups, causing unexpected
-    // behavior. So ADLS ACLs are unsupported until the connector is able to map
-    // permissions to hadoop users/groups (HADOOP-14437).
-    if (FileSystemUtil.isADLFileSystem(fs)) return TAccessLevel.READ_WRITE;
-    if (FileSystemUtil.isABFSFileSystem(fs)) return TAccessLevel.READ_WRITE;
+    if (assumeReadWriteAccess(fs)) return TAccessLevel.READ_WRITE;
 
     while (location != null) {
       try {
@@ -802,6 +791,28 @@ public class HdfsTable extends Table implements FeFsTable {
     // Should never get here.
     throw new NullPointerException("Error determining access level for table " +
         tableName + ": no path ancestor exists for path: " + location);
+  }
+
+  /**
+   * @return true if we assume read-write access for this filesystem for the purpose of
+   *              {@link #getAvailableAccessLevel(String, Path, FsPermissionCache)}
+   */
+  private static boolean assumeReadWriteAccess(FileSystem fs) {
+    // Avoid calling getPermissions() on file path for S3 files, as that makes a round
+    // trip to S3. Also, the S3A connector is currently unable to manage S3 permissions,
+    // so for now it is safe to assume that all files(objects) have READ_WRITE
+    // permissions, as that's what the S3A connector will always return too.
+    // TODO: Revisit if the S3A connector is updated to be able to manage S3 object
+    // permissions. (see HADOOP-13892)
+    if (FileSystemUtil.isS3AFileSystem(fs)) return true;
+
+    // The ADLS connector currently returns ACLs for files in ADLS, but can only map
+    // them to the ADLS client SPI and not the Hadoop users/groups, causing unexpected
+    // behavior. So ADLS ACLs are unsupported until the connector is able to map
+    // permissions to hadoop users/groups (HADOOP-14437).
+    if (FileSystemUtil.isADLFileSystem(fs)) return true;
+    if (FileSystemUtil.isABFSFileSystem(fs)) return true;
+    return false;
   }
 
   /**
@@ -1817,7 +1828,9 @@ public class HdfsTable extends Table implements FeFsTable {
       Path p = entry.getElement();
       try {
         FileSystem fs = p.getFileSystem(CONF);
-        permCache.precacheChildrenOf(fs, p);
+        // Only attempt to cache permissions for filesystems where we will actually
+        // use them.
+        if (!assumeReadWriteAccess(fs)) permCache.precacheChildrenOf(fs, p);
       } catch (IOException ioe) {
         // If we fail to pre-warm the cache we'll just wait for later when we
         // try to actually load the individual permissions, at which point
