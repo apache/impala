@@ -955,9 +955,8 @@ bool HdfsParquetScanner::IsDictionaryEncoded(
   if (col_metadata.__isset.encoding_stats) {
     // Condition #1 above
     for (const parquet::PageEncodingStats& enc_stat : col_metadata.encoding_stats) {
-      if (enc_stat.page_type == parquet::PageType::DATA_PAGE &&
-          enc_stat.encoding != parquet::Encoding::PLAIN_DICTIONARY &&
-          enc_stat.count > 0) {
+      if (enc_stat.page_type == parquet::PageType::DATA_PAGE
+          && !IsDictionaryEncoding(enc_stat.encoding) && enc_stat.count > 0) {
         return false;
       }
     }
@@ -966,10 +965,10 @@ bool HdfsParquetScanner::IsDictionaryEncoded(
     bool has_dict_encoding = false;
     bool has_nondict_encoding = false;
     for (const parquet::Encoding::type& encoding : col_metadata.encodings) {
-      if (encoding == parquet::Encoding::PLAIN_DICTIONARY) has_dict_encoding = true;
+      if (IsDictionaryEncoding(encoding)) has_dict_encoding = true;
 
       // RLE and BIT_PACKED are used for repetition/definition levels
-      if (encoding != parquet::Encoding::PLAIN_DICTIONARY &&
+      if (!IsDictionaryEncoding(encoding) &&
           encoding != parquet::Encoding::RLE &&
           encoding != parquet::Encoding::BIT_PACKED) {
         has_nondict_encoding = true;

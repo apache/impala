@@ -318,14 +318,14 @@ Status ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::InitDataPag
   DCHECK(slot_desc_ == nullptr || slot_desc_->type().type != TYPE_BOOLEAN)
       << "Bool has specialized impl";
   page_encoding_ = col_chunk_reader_.encoding();
-  if (page_encoding_ != parquet::Encoding::PLAIN_DICTIONARY
+  if (!IsDictionaryEncoding(page_encoding_)
       && page_encoding_ != parquet::Encoding::PLAIN) {
     return GetUnsupportedDecodingError();
   }
 
-  // If slot_desc_ is NULL, we don't need so decode any values so dict_decoder_ does
+  // If slot_desc_ is NULL, we don't need to decode any values so dict_decoder_ does
   // not need to be initialized.
-  if (page_encoding_ == Encoding::PLAIN_DICTIONARY && slot_desc_ != nullptr) {
+  if (IsDictionaryEncoding(page_encoding_) && slot_desc_ != nullptr) {
     if (!dict_decoder_init_) {
       return Status("File corrupt. Missing dictionary page.");
     }
@@ -363,7 +363,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE,
   if (bool_decoder_) {
     return bool_decoder_->SkipValues(num_values);
   }
-  if (page_encoding_ == Encoding::PLAIN_DICTIONARY) {
+  if (IsDictionaryEncoding(page_encoding_)) {
     return dict_decoder_.SkipValues(num_values);
   } else {
     DCHECK_EQ(page_encoding_, Encoding::PLAIN);
@@ -389,7 +389,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadValue(
   if (MATERIALIZED) {
     if (def_level_ >= max_def_level()) {
       bool continue_execution;
-      if (page_encoding_ == Encoding::PLAIN_DICTIONARY) {
+      if (IsDictionaryEncoding(page_encoding_)) {
         continue_execution = NeedsConversionInline() ?
             ReadSlot<Encoding::PLAIN_DICTIONARY, true>(tuple) :
             ReadSlot<Encoding::PLAIN_DICTIONARY, false>(tuple);
@@ -643,7 +643,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::MaterializeVa
     int max_values, int tuple_size, uint8_t* RESTRICT tuple_mem,
     int* RESTRICT num_values) RESTRICT {
   // Dispatch to the correct templated implementation of MaterializeValueBatch().
-  if (page_encoding_ == Encoding::PLAIN_DICTIONARY) {
+  if (IsDictionaryEncoding(page_encoding_)) {
     if (NeedsConversionInline()) {
       return MaterializeValueBatch<IN_COLLECTION, Encoding::PLAIN_DICTIONARY, true>(
           max_values, tuple_size, tuple_mem, num_values);
@@ -753,7 +753,7 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::DecodeValue(
     uint8_t** RESTRICT data, const uint8_t* RESTRICT data_end,
     InternalType* RESTRICT val) RESTRICT {
   DCHECK_EQ(page_encoding_, ENCODING);
-  if (ENCODING == Encoding::PLAIN_DICTIONARY) {
+  if (IsDictionaryEncoding(ENCODING)) {
     if (UNLIKELY(!dict_decoder_.GetNextValue(val))) {
       SetDictDecodeError();
       return false;
@@ -803,7 +803,7 @@ bool ScalarColumnReader<bool, parquet::Type::BOOLEAN, true>::DecodeValue(
 template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
 bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::DecodeValues(
     int64_t stride, int64_t count, InternalType* RESTRICT out_vals) RESTRICT {
-  if (page_encoding_ == Encoding::PLAIN_DICTIONARY) {
+  if (IsDictionaryEncoding(page_encoding_)) {
     return DecodeValues<Encoding::PLAIN_DICTIONARY>(stride, count, out_vals);
   } else {
     DCHECK_EQ(page_encoding_, Encoding::PLAIN);
@@ -815,7 +815,7 @@ template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIAL
 template <Encoding::type ENCODING>
 bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::DecodeValues(
     int64_t stride, int64_t count, InternalType* RESTRICT out_vals) RESTRICT {
-  if (page_encoding_ == Encoding::PLAIN_DICTIONARY) {
+  if (IsDictionaryEncoding(page_encoding_)) {
     if (UNLIKELY(!dict_decoder_.GetNextValues(out_vals, stride, count))) {
       SetDictDecodeError();
       return false;

@@ -856,6 +856,12 @@ class TestParquet(ImpalaTestSuite):
         "select * from {0}.{1}".format(unique_database, TABLE_NAME))
     assert(len(result.data) == 33)
 
+  def test_rle_dictionary_encoding(self, vector, unique_database):
+    """IMPALA-6434: Add support to decode RLE_DICTIONARY encoded pages."""
+    TABLE_NAME = "alltypes_tiny_rle_dictionary"
+    create_table_from_parquet(self.client, unique_database, TABLE_NAME)
+    self.run_test_case("QueryTest/parquet-rle-dictionary", vector, unique_database)
+
   def test_type_widening(self, vector, unique_database):
     """IMPALA-6373: Test that Impala can read parquet file with column types smaller than
        the schema with larger types"""

@@ -130,6 +130,8 @@ Status ParquetColumnChunkReader::ReadDictionaryData(ScopedBuffer* uncompressed_b
       return Status("Dictionary page does not have dictionary header set.");
     }
   }
+  // Check that the dictionary page is PLAIN encoded. PLAIN_DICTIONARY in the context of
+  // a dictionary page means the same thing.
   if (dict_header != nullptr &&
       dict_header->encoding != Encoding::PLAIN &&
       dict_header->encoding != Encoding::PLAIN_DICTIONARY) {
