@@ -286,7 +286,7 @@ class TestResultSpoolingFetchSize(ImpalaTestSuite):
 
     # Amount of time to wait for the query to reach a running state before through a
     # Timeout exception.
-    timeout = 10
+    timeout = 30
 
     results = []
     handle = self.execute_query_async(self._query, exec_options)
