@@ -105,7 +105,8 @@ class FragmentInstanceState {
   /// Thrift runtime profile is stored in either 'unagg_profile' or 'agg_profile',
   /// depending on whether aggregated profiles are enabled.
   void GetStatusReport(FragmentInstanceExecStatusPB* instance_status,
-      TRuntimeProfileTree* unagg_profile, AggregatedRuntimeProfile* agg_profile);
+      TRuntimeProfileTree* unagg_profile, AggregatedRuntimeProfile* agg_profile,
+      const Status& overall_status);
 
   /// After each call to GetStatusReport(), the query state thread should call one of the
   /// following to indicate if the report rpc was successful. Note that in the case of
@@ -142,6 +143,7 @@ class FragmentInstanceState {
   FInstanceExecStatePB current_state() const { return current_state_.Load(); }
   bool final_report_sent() const { return final_report_sent_; }
   bool IsDone() const { return current_state_.Load() == FInstanceExecStatePB::FINISHED; }
+  bool ExecFailed() const { return exec_failed_.Load(); }
   ObjectPool* obj_pool();
   int64_t scan_ranges_complete() const { return scan_ranges_complete_; }
   int64_t peak_mem_consumption() const { return peak_mem_consumption_; }
@@ -254,6 +256,11 @@ class FragmentInstanceState {
   /// The current state of this fragment instance's execution. Only updated by the
   /// fragment instance thread in UpdateState() and read by the profile reporting threads.
   AtomicEnum<FInstanceExecStatePB> current_state_{FInstanceExecStatePB::WAITING_FOR_EXEC};
+
+  /// Set to true when hitting an error during execution for the fragment instance.
+  /// It's used to work around the race when updating the fragment instance state and
+  /// updating the 'Query State'.
+  AtomicBool exec_failed_{false};
 
   /// Output sink for rows sent to this fragment. Created in Prepare(), lives in
   /// obj_pool().

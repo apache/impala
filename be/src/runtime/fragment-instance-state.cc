@@ -109,22 +109,31 @@ done:
   // logged in RuntimeState:error_log_.
   Close();
 
-  // Must update the fragment instance state first before updating the 'Query State'.
-  // Otherwise, there is a race when reading the 'done' flag with GetStatusReport().
-  // This may lead to the "final" profile being sent with the 'done' flag as false.
   DCHECK_EQ(is_prepared,
       current_state_.Load() > FInstanceExecStatePB::WAITING_FOR_PREPARE);
-  UpdateState(StateEvent::EXEC_END);
 
   if (!status.ok()) {
     if (!is_prepared) {
+      UpdateState(StateEvent::EXEC_END);
+
       // Tell the managing 'QueryState' that we hit an error during Prepare().
       query_state_->ErrorDuringPrepare(status, instance_id());
     } else {
+      // Must set exec_failed_ first, then update the 'Query State' before updating the
+      // fragment instance state. Otherwise, there is a race when reading the 'done' flag
+      // with GetStatusReport(). This may lead to report the instance as "completed"
+      // without error, or the "final" profile being sent with the 'done' flag as false.
+
+      exec_failed_.Store(true);
       // Tell the managing 'QueryState' that we hit an error during execution.
       query_state_->ErrorDuringExecute(status, instance_id());
+
+      UpdateState(StateEvent::EXEC_END);
+      query_state_->DoneRemainingExecuting();
     }
   } else {
+    UpdateState(StateEvent::EXEC_END);
+
     // Tell the managing 'QueryState' that we're done with executing.
     query_state_->DoneExecuting();
   }
@@ -257,7 +266,8 @@ Status FragmentInstanceState::Prepare() {
 }
 
 void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instance_status,
-    TRuntimeProfileTree* unagg_profile, AggregatedRuntimeProfile* agg_profile) {
+    TRuntimeProfileTree* unagg_profile, AggregatedRuntimeProfile* agg_profile,
+    const Status& overall_status) {
   DCHECK_NE(unagg_profile == nullptr, agg_profile == nullptr);
   DFAKE_SCOPED_LOCK(report_status_lock_);
   DCHECK(!final_report_sent_);
@@ -274,7 +284,7 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
   }
   const TUniqueId& finstance_id = instance_id();
   TUniqueIdToUniqueIdPB(finstance_id, instance_status->mutable_fragment_instance_id());
-  const bool done = IsDone();
+  const bool done = IsDone() || (ExecFailed() && !overall_status.ok());
   instance_status->set_done(done);
   instance_status->set_current_state(current_state());
   DCHECK(profile() != nullptr);

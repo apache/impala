@@ -254,6 +254,11 @@ class QueryState {
   /// Called by a FragmentInstanceState thread to notify that it's done executing.
   void DoneExecuting() { discard_result(instances_finished_barrier_->Notify()); }
 
+  /// Called by a FragmentInstanceState thread to notify anyone waiting on
+  /// WaitForFinishOrTimeout() or waiting on WaitForFinish().
+  /// This function must be called after calling ErrorDuringExecute().
+  void DoneRemainingExecuting() { instances_finished_barrier_->NotifyRemaining(); }
+
   /// Called to notify that an error was encountered during codegen. This is called by the
   /// first fragment instance thread that invoked its corresponding FragmentState's
   /// Codegen() and encountered the error.
@@ -267,7 +272,9 @@ class QueryState {
 
   /// Called by a fragment instance thread to notify that it hit an error during Execute()
   /// Updates the query status and records the failed instance ID if they're not set
-  /// already. Also notifies anyone waiting on WaitForFinishOrTimeout().
+  /// already.
+  /// Caller must call DoneRemainingExecuting() after calling this function to notify
+  /// anyone waiting on WaitForFinishOrTimeout() or waiting on WaitForFinish().
   void ErrorDuringExecute(const Status& status, const TUniqueId& finst_id);
 
   /// Get maximum reservation allowed for this query. MAX_INT64 means effectively
