@@ -52,6 +52,13 @@ inline bool operator<(const RowRange& lhs, const RowRange& rhs) {
   return std::tie(lhs.first, lhs.last) < std::tie(rhs.first, rhs.last);
 }
 
+// Return true if this is an encoding enum value that indicates that a data page is
+// dictionary encoded.
+inline bool IsDictionaryEncoding(parquet::Encoding::type encoding) {
+  return encoding == parquet::Encoding::PLAIN_DICTIONARY
+      || encoding == parquet::Encoding::RLE_DICTIONARY;
+}
+
 /// Return the Impala compression type for the given Parquet codec. The caller must
 /// validate that the codec is a supported one, otherwise this will DCHECK.
 THdfsCompression::type ConvertParquetToImpalaCodec(parquet::CompressionCodec::type codec);

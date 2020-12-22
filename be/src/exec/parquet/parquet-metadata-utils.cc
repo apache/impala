@@ -94,6 +94,7 @@ static bool IsEncodingSupported(parquet::Encoding::type e) {
     case parquet::Encoding::PLAIN_DICTIONARY:
     case parquet::Encoding::BIT_PACKED:
     case parquet::Encoding::RLE:
+    case parquet::Encoding::RLE_DICTIONARY:
       return true;
     default:
       return false;

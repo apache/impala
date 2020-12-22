@@ -612,3 +612,10 @@ We generated data by spark-shell, version is 2.4.x, and table data is in
 testdata/data/iceberg_test/hadoop_catalog/iceberg_resolution_test, this table
 are generated with HadoopCatalog and Parquet fileformat. We use this table to
 test complex types for field id resolving.
+
+alltypes_tiny_rle_dictionary.parquet:
+Tiny file using the RLE_DICTIONARY encoding.
+Started impala with -write_new_parquet_dictionary_encodings=true
+  set max_fs_writers=1;
+  create table att stored as parquet as
+  select * from functional_parquet.alltypestiny;

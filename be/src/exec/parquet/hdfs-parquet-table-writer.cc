@@ -89,7 +89,25 @@ using namespace apache::thrift;
 static const string PARQUET_MEM_LIMIT_EXCEEDED =
     "HdfsParquetTableWriter::$0() failed to allocate $1 bytes for $2.";
 
+DEFINE_bool_hidden(write_new_parquet_dictionary_encodings, false,
+    "(Experimental) Write parquet files with PLAIN/RLE_DICTIONARY encoding instead of "
+    "PLAIN_DICTIONARY as recommended by Parquet 2.0 standard");
+
 namespace impala {
+
+// Returns the parquet::Encoding enum value to use for plain-encoded dictionary pages.
+static parquet::Encoding::type DictPageEncoding() {
+  return FLAGS_write_new_parquet_dictionary_encodings ?
+          parquet::Encoding::PLAIN :
+          parquet::Encoding::PLAIN_DICTIONARY;
+}
+
+// Returns the parquet::Encoding enum value to use for dictionary-encoded data pages.
+static parquet::Encoding::type DataPageDictionaryEncoding() {
+  return FLAGS_write_new_parquet_dictionary_encodings ?
+          parquet::Encoding::RLE_DICTIONARY:
+          parquet::Encoding::PLAIN_DICTIONARY;
+}
 
 // Base class for column writers. This contains most of the logic except for
 // the type specific functions which are implemented in the subclasses.
@@ -329,8 +347,8 @@ class HdfsParquetTableWriter::BaseColumnWriter {
 
   // Size of newly created pages. Defaults to DEFAULT_DATA_PAGE_SIZE and is increased
   // when pages are not big enough. This only happens when there are enough unique values
-  // such that we switch from PLAIN_DICTIONARY to PLAIN encoding and then have very
-  // large values (i.e. greater than DEFAULT_DATA_PAGE_SIZE).
+  // such that we switch from PLAIN_DICTIONARY/RLE_DICTIONARY to PLAIN encoding and then
+  // have very large values (i.e. greater than DEFAULT_DATA_PAGE_SIZE).
   // TODO: Consider removing and only creating a single large page as necessary.
   int64_t page_size_;
 
@@ -422,11 +440,10 @@ class HdfsParquetTableWriter::ColumnWriter :
     valid_column_index_ = true;
     // Default to dictionary encoding.  If the cardinality ends up being too high,
     // it will fall back to plain.
-    current_encoding_ = parquet::Encoding::PLAIN_DICTIONARY;
-    next_page_encoding_ = parquet::Encoding::PLAIN_DICTIONARY;
-    dict_encoder_.reset(
-        new DictEncoder<T>(parent_->per_file_mem_pool_.get(), plain_encoded_value_size_,
-            parent_->parent_->mem_tracker()));
+    current_encoding_ = DataPageDictionaryEncoding();
+    next_page_encoding_ = DataPageDictionaryEncoding();
+    dict_encoder_.reset(new DictEncoder<T>(parent_->per_file_mem_pool_.get(),
+        plain_encoded_value_size_, parent_->parent_->mem_tracker()));
     dict_encoder_base_ = dict_encoder_.get();
     page_stats_.reset(
         new ColumnStats<T>(parent_->per_file_mem_pool_.get(), plain_encoded_value_size_));
@@ -439,7 +456,7 @@ class HdfsParquetTableWriter::ColumnWriter :
  protected:
   virtual bool ProcessValue(void* value, int64_t* bytes_needed) {
     T* val = CastValue(value);
-    if (current_encoding_ == parquet::Encoding::PLAIN_DICTIONARY) {
+    if (IsDictionaryEncoding(current_encoding_)) {
       if (UNLIKELY(num_values_since_dict_size_check_ >=
                    DICTIONARY_DATA_PAGE_SIZE_CHECK_PERIOD)) {
         num_values_since_dict_size_check_ = 0;
@@ -753,7 +770,7 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
     // Write dictionary page header
     parquet::DictionaryPageHeader dict_header;
     dict_header.num_values = dict_encoder_base_->num_entries();
-    dict_header.encoding = parquet::Encoding::PLAIN_DICTIONARY;
+    dict_header.encoding = DictPageEncoding();
     ++dict_encoding_stats_[dict_header.encoding];
 
     parquet::PageHeader header;
@@ -869,7 +886,7 @@ Status HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
   // around a parquet MR bug (see IMPALA-759 for more details).
   if (current_page_->num_non_null == 0) current_encoding_ = parquet::Encoding::PLAIN;
 
-  if (current_encoding_ == parquet::Encoding::PLAIN_DICTIONARY) WriteDictDataPage();
+  if (IsDictionaryEncoding(current_encoding_)) WriteDictDataPage();
 
   parquet::PageHeader& header = current_page_->header;
   header.data_page_header.encoding = current_encoding_;
