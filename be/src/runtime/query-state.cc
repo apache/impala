@@ -507,6 +507,7 @@ void QueryState::ConstructReport(bool instances_started,
   TUniqueIdToUniqueIdPB(query_id(), report->mutable_query_id());
   DCHECK(exec_rpc_params_.has_coord_state_idx());
   report->set_coord_state_idx(exec_rpc_params_.coord_state_idx());
+  Status report_overall_status;
   {
     unique_lock<SpinLock> l(status_lock_);
 
@@ -515,6 +516,7 @@ void QueryState::ConstructReport(bool instances_started,
     if (UNLIKELY(!debug_action_status.ok())) overall_status_ = debug_action_status;
 
     overall_status_.ToProto(report->mutable_overall_status());
+    report_overall_status = overall_status_;
     if (IsValidFInstanceId(failed_finstance_id_)) {
       TUniqueIdToUniqueIdPB(failed_finstance_id_, report->mutable_fragment_instance_id());
     }
@@ -562,11 +564,12 @@ void QueryState::ConstructReport(bool instances_started,
             agg_profile = AggregatedRuntimeProfile::Create(&agg_profile_pool,
                 "tmp profile", it->second->instance_ctxs().size(), /*is_root=*/ true);
           }
-          fis->GetStatusReport(instance_status, nullptr, agg_profile);
+          fis->GetStatusReport(
+              instance_status, nullptr, agg_profile, report_overall_status);
         } else {
           profiles_forest->profile_trees.emplace_back();
-          fis->GetStatusReport(
-              instance_status, &profiles_forest->profile_trees.back(), nullptr);
+          fis->GetStatusReport(instance_status, &profiles_forest->profile_trees.back(),
+              nullptr, report_overall_status);
         }
       }
 
@@ -777,7 +780,6 @@ void QueryState::ErrorDuringExecute(const Status& status, const TUniqueId& finst
       failed_finstance_id_ = finst_id;
     }
   }
-  instances_finished_barrier_->NotifyRemaining();
 }
 
 Status QueryState::WaitForPrepare() {
