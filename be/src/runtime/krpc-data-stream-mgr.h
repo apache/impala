@@ -213,7 +213,7 @@ struct EndDataStreamCtx {
 //
 /// DataStreamMgr also allows asynchronous cancellation of streams via Cancel()
 /// which unblocks all KrpcDataStreamRecvr::GetBatch() calls that are made on behalf
-/// of the cancelled fragment id.
+/// of the cancelled query id.
 ///
 /// Exposes three metrics:
 ///  'senders-blocked-on-recvr-creation' - currently blocked senders.
@@ -280,10 +280,10 @@ class KrpcDataStreamMgr : public CacheLineAligned {
   void CloseSender(const EndDataStreamRequestPB* request,
       EndDataStreamResponsePB* response, kudu::rpc::RpcContext* context);
 
-  /// Cancels all receivers registered for fragment_instance_id immediately. The
-  /// receivers will not accept any row batches after being cancelled. Any buffered
-  /// row batches will not be freed until Close() is called on the receivers.
-  void Cancel(const TUniqueId& fragment_instance_id);
+  /// Cancels all receivers registered for 'query_id' immediately. The receivers will not
+  /// accept any row batches after being cancelled. Any buffered row batches will not be
+  /// freed until Close() is called on the receivers.
+  void Cancel(const TUniqueId& query_id);
 
   /// Waits for maintenance thread and sender response thread pool to finish.
   ~KrpcDataStreamMgr();
@@ -354,6 +354,9 @@ class KrpcDataStreamMgr : public CacheLineAligned {
   typedef std::pair<impala::TUniqueId, PlanNodeId> RecvrId;
 
   /// Less-than ordering for RecvrIds.
+  /// This ordering clusters all receivers for the same query together, because
+  /// the fragment instance ID is the query ID with the lower bits set to the
+  /// index of the fragment instance within the query.
   struct ComparisonOp {
     bool operator()(const RecvrId& a, const RecvrId& b) {
       if (a.first.hi < b.first.hi) {
@@ -370,8 +373,8 @@ class KrpcDataStreamMgr : public CacheLineAligned {
   };
 
   /// An ordered set of receiver IDs so that we can easily find all receiver IDs belonging
-  /// to a fragment instance (by calling std::set::lower_bound(finst_id, 0) to find the
-  /// first entry and iterating until the entry's finst_id doesn't match).
+  /// to a query (by calling std::set::lower_bound(query_id, 0) to find the
+  /// first entry and iterating until the entry's finst_id doesn't belong to the query).
   ///
   /// There is one entry in fragment_recvr_set_ for every entry in receiver_map_.
   typedef std::set<RecvrId, ComparisonOp> FragmentRecvrSet;

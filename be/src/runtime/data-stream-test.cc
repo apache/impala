@@ -708,9 +708,9 @@ TEST_F(DataStreamTest, UnknownSenderLargeResult) {
 TEST_F(DataStreamTest, Cancel) {
   TUniqueId instance_id;
   StartReceiver(TPartitionType::UNPARTITIONED, 1, 1, 1024, false, &instance_id);
-  stream_mgr_->Cancel(instance_id);
+  stream_mgr_->Cancel(GetQueryId(instance_id));
   StartReceiver(TPartitionType::UNPARTITIONED, 1, 1, 1024, true, &instance_id);
-  stream_mgr_->Cancel(instance_id);
+  stream_mgr_->Cancel(GetQueryId(instance_id));
   JoinReceivers();
   EXPECT_TRUE(receiver_info_[0]->status.IsCancelled());
   EXPECT_TRUE(receiver_info_[1]->status.IsCancelled());
