@@ -19,6 +19,7 @@
 # under the License.
 
 import errno
+import getpass
 import os
 import pytest
 import re
@@ -1045,5 +1046,28 @@ class TestImpalaShell(ImpalaTestSuite):
     args = ['--quiet', '-q', 'select 1']
     result = run_impala_shell_cmd(vector, args)
     expected_result = """+---+\n| 1 |\n+---+\n| 1 |\n+---+\n"""
+    assert result.stdout == expected_result
+    assert result.stderr == ""
+
+  def test_user_flag(self, vector):
+    """Check that the --user flag is respected. This test assumes we are running against
+    an unsecured cluster and can impersonate any user when connecting."""
+    base_args = ['--quiet', '-B', '-q', 'select user(), effective_user()']
+
+    # Test that default user is the user that impala-shell is run under.
+    result = run_impala_shell_cmd(vector, base_args)
+    expected_result = """{0}\t{0}\n""".format(getpass.getuser())
+    assert result.stdout == expected_result
+    assert result.stderr == ""
+
+    # Test that we can set an arbitrary user.
+    result = run_impala_shell_cmd(vector, base_args + ['--user=mickey mouse'])
+    expected_result = """mickey mouse\tmickey mouse\n"""
+    assert result.stdout == expected_result
+    assert result.stderr == ""
+
+    # Test that empty user results in "anonymous" - see IMPALA-10027.
+    result = run_impala_shell_cmd(vector, base_args + ['--user='])
+    expected_result = """anonymous\tanonymous\n"""
     assert result.stdout == expected_result
     assert result.stderr == ""

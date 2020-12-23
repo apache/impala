@@ -50,6 +50,7 @@ using namespace beeswax;
   } while (false)
 
 DECLARE_bool(ping_expose_webserver_url);
+DECLARE_string(anonymous_user_name);
 
 namespace impala {
 
@@ -108,7 +109,10 @@ void ImpalaServer::executeAndWait(beeswax::QueryHandle& beeswax_handle,
     // transport, the username may be known at that time. If the username hasn't been set
     // yet, set it now.
     lock_guard<mutex> l(session->lock);
-    if (session->connected_user.empty()) session->connected_user = query.hadoop_user;
+    if (session->connected_user.empty()) {
+      session->connected_user = query.hadoop_user.empty() ?
+          FLAGS_anonymous_user_name : query.hadoop_user;
+    }
   }
 
   // raise Syntax error or access violation; it's likely to be syntax/analysis error
@@ -509,7 +513,10 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
       // transport, the username may be known at that time. If the username hasn't been
       // set yet, set it now.
       lock_guard<mutex> l(session->lock);
-      if (session->connected_user.empty()) session->connected_user = query.hadoop_user;
+      if (session->connected_user.empty()) {
+        session->connected_user = query.hadoop_user.empty() ?
+            FLAGS_anonymous_user_name : query.hadoop_user;
+      }
       query_ctx->client_request.query_options = session->QueryOptions();
       set_query_options_mask = session->set_query_options_mask;
     }

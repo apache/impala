@@ -389,7 +389,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
       impalad_args=impalad_admission_ctrl_config_args(
         fs_allocation_file="fair-scheduler-test2.xml",
         llama_site_file="llama-site-test2.xml",
-        additional_args="-require_username"),
+        additional_args="-require_username -anonymous_user_name="),
       statestored_args=_STATESTORED_ARGS)
   def test_require_user(self):
     open_session_req = TCLIService.TOpenSessionReq()
