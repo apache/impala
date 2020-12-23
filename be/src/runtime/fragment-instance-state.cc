@@ -38,7 +38,6 @@
 #include "runtime/client-cache.h"
 #include "runtime/exec-env.h"
 #include "runtime/fragment-state.h"
-#include "runtime/krpc-data-stream-mgr.h"
 #include "runtime/krpc-data-stream-sender.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-state.h"
@@ -137,7 +136,6 @@ void FragmentInstanceState::Cancel() {
   runtime_state_->Cancel();
   PlanRootSink* root_sink = GetRootSink();
   if (root_sink != nullptr) root_sink->Cancel(runtime_state_);
-  ExecEnv::GetInstance()->stream_mgr()->Cancel(runtime_state_->fragment_instance_id());
 }
 
 Status FragmentInstanceState::Prepare() {

@@ -37,6 +37,7 @@
 #include "runtime/fragment-instance-state.h"
 #include "runtime/fragment-state.h"
 #include "runtime/initial-reservations.h"
+#include "runtime/krpc-data-stream-mgr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/query-exec-mgr.h"
 #include "runtime/runtime-filter-bank.h"
@@ -973,6 +974,8 @@ void QueryState::Cancel() {
   if (!is_cancelled_.CompareAndSwap(0, 1)) return;
   if (filter_bank_ != nullptr) filter_bank_->Cancel();
   for (auto entry: fis_map_) entry.second->Cancel();
+  // Cancel data streams for all fragment instances.
+  ExecEnv::GetInstance()->stream_mgr()->Cancel(query_id());
 }
 
 void QueryState::PublishFilter(const PublishFilterParamsPB& params, RpcContext* context) {

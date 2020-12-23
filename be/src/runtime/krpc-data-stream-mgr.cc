@@ -335,13 +335,16 @@ Status KrpcDataStreamMgr::DeregisterRecvr(
   return Status(msg);
 }
 
-void KrpcDataStreamMgr::Cancel(const TUniqueId& finst_id) {
-  VLOG_QUERY << "cancelling active streams for fragment_instance_id="
-             << PrintId(finst_id);
+void KrpcDataStreamMgr::Cancel(const TUniqueId& query_id) {
+  VLOG_QUERY << "cancelling active streams for query_id=" << PrintId(query_id);
   lock_guard<mutex> l(lock_);
+  // Fragment instance IDs are the query ID with the lower bits set to the instance
+  // index. Therefore all finstances for a query are clustered together, starting
+  // after the position in the map where the query_id would be.
   FragmentRecvrSet::iterator iter =
-      fragment_recvr_set_.lower_bound(make_pair(finst_id, 0));
-  while (iter != fragment_recvr_set_.end() && iter->first == finst_id) {
+      fragment_recvr_set_.lower_bound(make_pair(query_id, 0));
+  while (iter != fragment_recvr_set_.end() &&
+         GetQueryId(iter->first) == query_id) {
     bool unused;
     shared_ptr<KrpcDataStreamRecvr> recvr = FindRecvr(iter->first, iter->second, &unused);
     if (recvr != nullptr) {
