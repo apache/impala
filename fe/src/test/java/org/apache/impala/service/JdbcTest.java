@@ -572,10 +572,10 @@ public class JdbcTest extends JdbcTestBase {
     ResultSet rs = con_.createStatement().executeQuery("select user()");
     try {
       // We expect exactly one result row with a NULL inside the first column.
-      // The user() function returns NULL because we currently cannot set the user
-      // when establishing the Jdbc connection.
+      // The user() function returns 'anonymous' because we currently cannot set the user
+      // when establishing the Jdbc connection and it falls back to --anonymous_user_name.
       assertTrue(rs.next());
-      assertNull(rs.getString(1));
+      assertEquals("anonymous", rs.getString(1));
       assertFalse(rs.next());
     } finally {
       rs.close();

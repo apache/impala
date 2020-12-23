@@ -66,7 +66,9 @@ DEFINE_bool(skip_external_kerberos_auth, false,
     "(Advanced) skip kerberos authentication for incoming external connections to "
     "this daemon, e.g. clients connecting to the HS2 interface. Only has an effect "
     "if --principal is set, i.e. Kerberos is enabled.");
-
+DEFINE_string(anonymous_user_name, "anonymous",
+    "Default username used when a client connects to an unsecured impala daemon and "
+    "does not specify a username.");
 
 static const string mem_limit_help_msg = "Limit on process memory consumption. "
     "Includes the JVM's memory consumption only if --mem_limit_includes_jvm is true. "

@@ -94,6 +94,7 @@ DECLARE_int32(webserver_port);
 DECLARE_int32(idle_session_timeout);
 DECLARE_int32(disconnected_session_timeout);
 DECLARE_bool(ping_expose_webserver_url);
+DECLARE_string(anonymous_user_name);
 
 namespace impala {
 
@@ -329,8 +330,10 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
       Status status = AuthorizeProxyUser(state->connected_user, state->do_as_user);
       HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
     }
-  } else {
+  } else if (!request.username.empty()) {
     state->connected_user = request.username;
+  } else {
+    state->connected_user = FLAGS_anonymous_user_name;
   }
 
   // Process the supplied configuration map.
