@@ -43,6 +43,7 @@ import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.KuduTable;
@@ -605,6 +606,10 @@ public class ToSqlUtils {
       if (kuduCol.getBlockSize() != 0) {
         sb.append(String.format(" BLOCK_SIZE %d", kuduCol.getBlockSize()));
       }
+    } else if (col instanceof IcebergColumn) {
+      IcebergColumn icebergCol = (IcebergColumn) col;
+      Boolean isNullable = icebergCol.isNullable();
+      if (isNullable != null) sb.append(isNullable ? " NULL" : " NOT NULL");
     }
     if (!Strings.isNullOrEmpty(col.getComment())) {
       sb.append(String.format(" COMMENT '%s'", col.getComment()));

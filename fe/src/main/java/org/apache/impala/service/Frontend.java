@@ -484,6 +484,9 @@ public class Frontend {
         columns.add(new TColumn("encoding", Type.STRING.toThrift()));
         columns.add(new TColumn("compression", Type.STRING.toThrift()));
         columns.add(new TColumn("block_size", Type.STRING.toThrift()));
+      } else if (descStmt.getTable() instanceof FeIcebergTable
+          && descStmt.getOutputStyle() == TDescribeOutputStyle.MINIMAL) {
+        columns.add(new TColumn("nullable", Type.STRING.toThrift()));
       }
       metadata.setColumns(columns);
     } else if (analysis.isAlterTableStmt()) {
@@ -1389,11 +1392,14 @@ public class Frontend {
       filteredColumns = table.getColumnsInHiveOrder();
     }
     if (outputStyle == TDescribeOutputStyle.MINIMAL) {
-      if (!(table instanceof FeKuduTable)) {
+      if (table instanceof FeKuduTable) {
+        return DescribeResultFactory.buildKuduDescribeMinimalResult(filteredColumns);
+      } else if (table instanceof FeIcebergTable) {
+        return DescribeResultFactory.buildIcebergDescribeMinimalResult(filteredColumns);
+      } else {
         return DescribeResultFactory.buildDescribeMinimalResult(
             Column.columnsToStruct(filteredColumns));
       }
-      return DescribeResultFactory.buildKuduDescribeMinimalResult(filteredColumns);
     } else {
       Preconditions.checkArgument(outputStyle == TDescribeOutputStyle.FORMATTED ||
           outputStyle == TDescribeOutputStyle.EXTENDED);

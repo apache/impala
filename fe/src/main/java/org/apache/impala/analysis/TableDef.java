@@ -362,6 +362,7 @@ class TableDef {
   }
 
   boolean isKuduTable() { return options_.fileFormat == THdfsFileFormat.KUDU; }
+  boolean isIcebergTable() { return options_.fileFormat == THdfsFileFormat.ICEBERG; }
   List<String> getPrimaryKeyColumnNames() { return primaryKeyColNames_; }
   List<ColumnDef> getPrimaryKeyColumnDefs() { return primaryKeyColDefs_; }
   boolean isExternal() { return isExternal_; }
@@ -430,7 +431,8 @@ class TableDef {
       if (!colNames.add(colDef.getColName().toLowerCase())) {
         throw new AnalysisException("Duplicate column name: " + colDef.getColName());
       }
-      if (!isKuduTable() && colDef.hasKuduOptions()) {
+
+      if (!analyzeColumnOption(colDef)) {
         throw new AnalysisException(String.format("Unsupported column options for " +
             "file format '%s': '%s'", getFileFormat().name(), colDef.toString()));
       }
@@ -446,6 +448,31 @@ class TableDef {
         throw new AnalysisException("Duplicate column name: " + colDef.getColName());
       }
     }
+  }
+
+  /**
+   * Kudu and Iceberg table has their own column option, this function will return false
+   * if we use column option incorrectly, such as use primary key for Parquet format.
+   */
+  private boolean analyzeColumnOption(ColumnDef columnDef) {
+    boolean flag = true;
+    // Kudu option and Iceberg option have overlap
+    if (columnDef.hasKuduOptions() && columnDef.hasIcebergOptions()) {
+      if (!isKuduTable() && !isIcebergTable()) {
+        flag = false;
+      }
+    } else if (columnDef.hasKuduOptions()) {
+      if (!isKuduTable()) {
+        flag = false;
+      }
+    } else if (columnDef.hasIcebergOptions()) {
+      // Currently Iceberg option only contains 'nullable', so we won't run into this
+      // situation.
+      if (!isIcebergTable()) {
+        flag = false;
+      }
+    }
+    return flag;
   }
 
   /**

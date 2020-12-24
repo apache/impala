@@ -100,7 +100,7 @@ public class Column {
       Preconditions.checkState(columnDesc.isSetIceberg_field_id());
       col = new IcebergColumn(columnDesc.getColumnName(), type, comment, position,
           columnDesc.getIceberg_field_id(), columnDesc.getIceberg_field_map_key_id(),
-          columnDesc.getIceberg_field_map_value_id());
+          columnDesc.getIceberg_field_map_value_id(), columnDesc.isIs_nullable());
     } else if (columnDesc.isIs_hbase_column()) {
       // HBase table column. The HBase column qualifier (column name) is not be set for
       // the HBase row key, so it being set in the thrift struct is not a precondition.

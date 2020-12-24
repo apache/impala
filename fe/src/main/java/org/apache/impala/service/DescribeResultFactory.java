@@ -28,6 +28,7 @@ import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
@@ -318,6 +319,31 @@ public class DescribeResultFactory {
       descResult.results.add(new TResultRow(
           Lists.newArrayList(colNameCol, dataTypeCol, commentCol, pkCol, nullableCol,
               defaultValCol, encodingCol, compressionCol, blockSizeCol)));
+    }
+    return descResult;
+  }
+
+  /**
+   * Builds a TDescribeResult for a Iceberg table from a list of columns.
+   */
+  public static TDescribeResult buildIcebergDescribeMinimalResult(List<Column> columns) {
+    TDescribeResult descResult = new TDescribeResult();
+    descResult.results = Lists.newArrayList();
+    for (Column c: columns) {
+      Preconditions.checkState(c instanceof IcebergColumn);
+      IcebergColumn icebergColumn = (IcebergColumn) c;
+      // General describe info.
+      TColumnValue colNameCol = new TColumnValue();
+      colNameCol.setString_val(icebergColumn.getName());
+      TColumnValue dataTypeCol = new TColumnValue();
+      dataTypeCol.setString_val(icebergColumn.getType().prettyPrint().toLowerCase());
+      TColumnValue commentCol = new TColumnValue();
+      commentCol.setString_val(Strings.nullToEmpty(icebergColumn.getComment()));
+      // Iceberg-specific describe info.
+      TColumnValue nullableCol = new TColumnValue();
+      nullableCol.setString_val(Boolean.toString(icebergColumn.isNullable()));
+      descResult.results.add(new TResultRow(
+          Lists.newArrayList(colNameCol, dataTypeCol, commentCol, nullableCol)));
     }
     return descResult;
   }
