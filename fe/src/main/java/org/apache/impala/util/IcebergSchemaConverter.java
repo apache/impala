@@ -138,7 +138,7 @@ public class IcebergSchemaConverter {
         valueId = mapType.valueId();
       }
       ret.add(new IcebergColumn(column.name(), colType, column.doc(), pos++,
-          column.fieldId(), keyId, valueId));
+          column.fieldId(), keyId, valueId, column.isOptional()));
     }
     return ret;
   }
@@ -152,13 +152,27 @@ public class IcebergSchemaConverter {
     iThreadLocal.set(0);
     List<Types.NestedField> fields = new ArrayList<Types.NestedField>();
     for (TColumn column : columns) {
-      org.apache.iceberg.types.Type icebergType = fromImpalaColumnType(
-          column.getColumnType());
-      Types.NestedField field = Types.NestedField.required(
-          nextId(), column.getColumnName(), icebergType, column.getComment());
-      fields.add(field);
+      fields.add(createIcebergField(column));
     }
     return new Schema(fields);
+  }
+
+  /**
+   * Create iceberg field from TColumn
+   */
+  private static Types.NestedField createIcebergField(TColumn column)
+      throws ImpalaRuntimeException{
+    org.apache.iceberg.types.Type icebergType = fromImpalaColumnType(
+        column.getColumnType());
+    if (column.isIs_nullable()) {
+      // Create 'optional' field for 'NULL' situation
+      return Types.NestedField.optional(
+          nextId(), column.getColumnName(), icebergType, column.getComment());
+    } else {
+      // Create 'required' field for 'NOT NULL' or default situation
+      return Types.NestedField.required(
+          nextId(), column.getColumnName(), icebergType, column.getComment());
+    }
   }
 
   public static org.apache.iceberg.types.Type fromImpalaColumnType(TColumnType colType)

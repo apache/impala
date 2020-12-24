@@ -171,6 +171,9 @@ public class ColumnDef {
     return isPrimaryKey() || isNullabilitySet() || hasEncoding() || hasCompression()
         || hasDefaultValue() || hasBlockSize();
   }
+  public boolean hasIcebergOptions() {
+    return isNullabilitySet();
+  }
   public boolean hasEncoding() { return encodingVal_ != null; }
   public boolean hasCompression() { return compressionVal_ != null; }
   public boolean hasBlockSize() { return blockSize_ != null; }
@@ -186,6 +189,10 @@ public class ColumnDef {
 
   public boolean hasDefaultValue() { return defaultValue_ != null; }
   public Expr getDefaultValue() { return defaultValue_; }
+
+  public void setNullable(Boolean nullable) {
+    isNullable_ = nullable;
+  }
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
     // Check whether the column name meets the Metastore's requirements.

@@ -337,3 +337,9 @@ VALUES (1, "user", "action", now());
 ---- CATCH
 AnalysisException: The Iceberg table has a TIMESTAMPTZ column that Impala cannot write.
 ====
+---- QUERY
+CREATE TABLE iceberg_kudu_option(id int primary key)
+STORED AS ICEBERG
+---- CATCH
+AnalysisException: Unsupported column options for file format 'ICEBERG': 'id INT PRIMARY KEY'
+====

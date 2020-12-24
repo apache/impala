@@ -36,18 +36,23 @@ public class IcebergColumn extends Column {
   // Keep key and value field id for column with Map type.
   private final int fieldMapKeyId_;
   private final int fieldMapValueId_;
+  // False for required Iceberg field, true for optional Iceberg field
+  private final boolean isNullable_;
 
   public IcebergColumn(String name, Type type, String comment, int position,
-      int fieldId, int fieldMapKeyId, int fieldMapValueId) {
+      int fieldId, int fieldMapKeyId, int fieldMapValueId, boolean isNullable) {
     super(name, type, comment, position);
     fieldId_ = fieldId;
     fieldMapKeyId_ = fieldMapKeyId;
     fieldMapValueId_ = fieldMapValueId;
+    isNullable_ = isNullable;
   }
 
   public int getFieldId() {
     return fieldId_;
   }
+
+  public boolean isNullable() { return isNullable_; }
 
   @Override
   public TColumn toThrift() {
@@ -56,6 +61,7 @@ public class IcebergColumn extends Column {
     tcol.setIceberg_field_id(fieldId_);
     tcol.setIceberg_field_map_key_id(fieldMapKeyId_);
     tcol.setIceberg_field_map_value_id(fieldMapValueId_);
+    tcol.setIs_nullable(isNullable_);
     return tcol;
   }
 

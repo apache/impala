@@ -26,8 +26,6 @@ import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.iceberg.TableMetadata;
-import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.Column;
@@ -322,89 +320,6 @@ abstract class LocalTable implements FeTable {
       } catch (TableLoadingException e) {
         throw new LocalCatalogException(e);
       }
-    }
-
-    /**
-     * Only for Iceberg tables.
-     */
-    public static ColumnMap fromMsTable(Table msTbl, TableMetadata metadata) {
-      final String fullName = msTbl.getDbName() + "." + msTbl.getTableName();
-
-      // The number of clustering columns is the number of partition keys.
-      int numClusteringCols = msTbl.getPartitionKeys().size();
-      // Add all columns to the table. Ordering is important: partition columns first,
-      // then all other columns.
-      List<Column> cols;
-      try {
-        boolean isFullAcidTable = AcidUtils.isFullAcidTable(msTbl.getParameters());
-        // Iceberg tables cannot be full ACID table.
-        Preconditions.checkState(!isFullAcidTable);
-        cols = FeCatalogUtils.fieldSchemasToColumns(msTbl.getPartitionKeys(),
-            msTbl.getSd().getCols(), msTbl.getTableName(), isFullAcidTable);
-
-        List<Types.NestedField> nestedFields = metadata.schema().columns();
-        Preconditions.checkState(cols.size() == nestedFields.size());
-        ImmutableList.Builder<Column> ret = ImmutableList.builder();
-        for (int i = 0; i< cols.size(); i++) {
-          ret.add(getIcebergColumn(cols.get(i), nestedFields.get(i)));
-        }
-        return new ColumnMap(ret.build(), numClusteringCols, fullName, isFullAcidTable);
-      } catch (TableLoadingException e) {
-        throw new LocalCatalogException(e);
-      }
-    }
-
-    /**
-     * Get IcebergColum by Column and Iceberg's NestedField.
-     * We need to handle with Struct type separately.
-     */
-    private static IcebergColumn getIcebergColumn(Column col,
-        Types.NestedField nestedField) {
-      int keyId = -1, valueId = -1;
-      if (col.getType().isMapType()) {
-        // Get key id and value id for Map type.
-        Preconditions.checkState(nestedField.type().isMapType());
-        keyId = nestedField.type().asMapType().keyId();
-        valueId = nestedField.type().asMapType().valueId();
-      } else if (col.getType().isStructType()) {
-        // Generate IcebergStructField for Struct type recursively.
-        Preconditions.checkState(nestedField.type().isStructType());
-        StructType structType = ((StructType) col.getType());
-        List<StructField> structFields = structType.getFields();
-        List<Types.NestedField> nestedFields = nestedField.type().asStructType().fields();
-        for (int i = 0; i < structFields.size(); i++) {
-          // Update each sub field one by one
-          IcebergStructField icebergStructField =
-              handleStructFieldRecursively(structFields.get(i), nestedFields.get(i));
-          structType.updateFields(i, icebergStructField);
-        }
-      }
-      return new IcebergColumn(col.getName(), col.getType(), col.getComment(),
-          col.getPosition(), nestedField.fieldId(), keyId, valueId);
-    }
-
-    /**
-     * Handle these struct fields, replaced by 'IcebergStructField'.
-     */
-    private static IcebergStructField handleStructFieldRecursively(
-        StructField structField, Types.NestedField nestedField) {
-      if (structField.getType().isStructType() && nestedField.type().isStructType()) {
-        // Handle with Struct type recursively
-        StructType structType = ((StructType) structField.getType());
-        List<StructField> structFields = structType.getFields();
-        List<Types.NestedField> nestedFields = nestedField.type().asStructType().fields();
-        for (int i = 0; i < structFields.size(); i++) {
-          structType.updateFields(i, handleStructFieldRecursively(structFields.get(i),
-              nestedFields.get(i)));
-        }
-      }
-
-      // Return 'IcebergStructField' directly for Scalar/Array/Map type.
-      IcebergStructField icebergStructField =
-          new IcebergStructField(structField.getName(), structField.getType(),
-              structField.getComment(), nestedField.fieldId());
-      icebergStructField.setPosition(structField.getPosition());
-      return icebergStructField;
     }
 
     public ColumnMap(List<Column> cols, int numClusteringCols,

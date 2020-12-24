@@ -272,6 +272,7 @@ public class CreateTableStmt extends StatementBase {
 
     if (getFileFormat() == THdfsFileFormat.ICEBERG) {
       analyzeIcebergFormat(analyzer);
+      analyzeIcebergColumns();
     } else {
       List<IcebergPartitionSpec> iceSpec = tableDef_.getIcebergPartitionSpecs();
       if (iceSpec != null && !iceSpec.isEmpty()) {
@@ -693,6 +694,18 @@ public class CreateTableStmt extends StatementBase {
       }
       if (!containFlag) {
         throw new AnalysisException("Cannot find source column: " + fieldName);
+      }
+    }
+  }
+
+  /**
+   * Set column's nullable as true for default situation, so we can create optional
+   * Iceberg field
+   */
+  private void analyzeIcebergColumns() {
+    for (ColumnDef def : getColumnDefs()) {
+      if (!def.isNullabilitySet()) {
+        def.setNullable(true);
       }
     }
   }

@@ -10,15 +10,15 @@ ALTER TABLE iceberg_hadoop_tables ADD COLUMNS(message STRING, price DECIMAL(8,1)
 ALTER TABLE iceberg_hadoop_tables ADD COLUMNS(map_test MAP <STRING, array <STRING>>, struct_test STRUCT <f1: BIGINT, f2: BIGINT>);
 DESCRIBE iceberg_hadoop_tables;
 ---- RESULTS
-'level','string',''
-'event_time','timestamp',''
-'register_time','date',''
-'message','string',''
-'price','decimal(8,1)',''
-'map_test','map<string,array<string>>',''
-'struct_test','struct<\n  f1:bigint,\n  f2:bigint\n>',''
+'level','string','','true'
+'event_time','timestamp','','true'
+'register_time','date','','true'
+'message','string','','true'
+'price','decimal(8,1)','','true'
+'map_test','map<string,array<string>>','','true'
+'struct_test','struct<\n  f1:bigint,\n  f2:bigint\n>','','true'
 ---- TYPES
-STRING,STRING,STRING
+STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 ALTER TABLE iceberg_hadoop_tables set TBLPROPERTIES('fake_key'='fake_value');
@@ -58,15 +58,15 @@ ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(message STRING, price DECIMAL(8,1
 ALTER TABLE iceberg_hadoop_catalog ADD COLUMNS(map_test MAP <STRING, array <STRING>>, struct_test STRUCT <f1: BIGINT, f2: BIGINT>);
 DESCRIBE iceberg_hadoop_catalog;
 ---- RESULTS
-'level','string',''
-'event_time','timestamp',''
-'register_time','date',''
-'message','string',''
-'price','decimal(8,1)',''
-'map_test','map<string,array<string>>',''
-'struct_test','struct<\n  f1:bigint,\n  f2:bigint\n>',''
+'level','string','','true'
+'event_time','timestamp','','true'
+'register_time','date','','true'
+'message','string','','true'
+'price','decimal(8,1)','','true'
+'map_test','map<string,array<string>>','','true'
+'struct_test','struct<\n  f1:bigint,\n  f2:bigint\n>','','true'
 ---- TYPES
-STRING,STRING,STRING
+STRING,STRING,STRING,STRING
 ====
 ---- QUERY
 ALTER TABLE iceberg_hadoop_catalog set TBLPROPERTIES('test_key'='test_value');
