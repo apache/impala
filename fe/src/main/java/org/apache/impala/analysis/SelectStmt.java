@@ -19,12 +19,15 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.StructField;
@@ -1124,6 +1127,22 @@ public class SelectStmt extends QueryStmt {
       List<TupleId> tids = new ArrayList<>();
       getMaterializedTupleIds(tids); // includes the analytic tuple
       List<Expr> conjuncts = analyzer.getUnassignedConjuncts(tids, false);
+      // The predicates that can be bounded to KuduScanNode don't need to materialize
+      // here. Because we don't need to materialize the predicates that can be evaluated
+      // by Kudu.
+      for (TupleId tid : tids) {
+        if (analyzer.getTupleDesc(tid).getTable() instanceof FeKuduTable) {
+          Iterator<Expr> iterator = conjuncts.iterator();
+          while (iterator.hasNext()) {
+            Expr e = iterator.next();
+            List<TupleId> etids = new ArrayList<>();
+            e.getIds(etids, null);
+            if (1 == etids.size() && etids.get(0) == tid) {
+              iterator.remove();
+            }
+          }
+        }
+      }
       materializeSlots(analyzer, conjuncts);
       analyticInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
     }

@@ -3090,3 +3090,119 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=4 size=289.02MB
    row-size=38B cardinality=150.00K
 ====
+# IMPALA-10406: Query with analytic functions doesn't need to materialize the predicates bounded to kudu
+SELECT MIN(n_nationkey) OVER (PARTITION BY n_regionkey)
+FROM tpch_kudu.nation t1
+WHERE t1.n_name IN ('ALGERIA', 'ARGENTINA')
+---- PLAN
+PLAN-ROOT SINK
+|
+02:ANALYTIC
+|  functions: min(n_nationkey)
+|  partition by: n_regionkey
+|  row-size=6B cardinality=2
+|
+01:SORT
+|  order by: n_regionkey ASC NULLS LAST
+|  row-size=4B cardinality=2
+|
+00:SCAN KUDU [tpch_kudu.nation t1]
+   kudu predicates: t1.n_name IN ('ALGERIA', 'ARGENTINA')
+   row-size=4B cardinality=2
+====
+# IMPALA-10406: Query with analytic functions doesn't need to materialize the predicates bounded to kudu
+SELECT MIN(n_nationkey) OVER (PARTITION BY n_regionkey)
+FROM (
+    SELECT *
+    FROM tpch_kudu.nation
+    UNION ALL
+    SELECT *
+    FROM tpch_parquet.nation
+) t1
+WHERE t1.n_name IN ('ALGERIA', 'ARGENTINA')
+---- PLAN
+PLAN-ROOT SINK
+|
+04:ANALYTIC
+|  functions: min(n_nationkey)
+|  partition by: n_regionkey
+|  row-size=6B cardinality=4
+|
+03:SORT
+|  order by: n_regionkey ASC NULLS LAST
+|  row-size=4B cardinality=4
+|
+00:UNION
+|  row-size=4B cardinality=4
+|
+|--02:SCAN HDFS [tpch_parquet.nation]
+|     HDFS partitions=1/1 files=1 size=3.04KB
+|     predicates: tpch_parquet.nation.n_name IN ('ALGERIA', 'ARGENTINA')
+|     row-size=23B cardinality=2
+|
+01:SCAN KUDU [tpch_kudu.nation]
+   kudu predicates: tpch_kudu.nation.n_name IN ('ALGERIA', 'ARGENTINA')
+   row-size=4B cardinality=2
+====
+# IMPALA-10406: Query with analytic functions doesn't need to materialize the predicates bounded to kudu
+SELECT MIN(n_nationkey) OVER (PARTITION BY n_regionkey)
+FROM functional.alltypes t1
+    JOIN tpch_kudu.nation t2 ON t1.id = t2.n_nationkey
+WHERE t2.n_name IN ('ALGERIA', 'ARGENTINA');
+---- PLAN
+PLAN-ROOT SINK
+|
+04:ANALYTIC
+|  functions: min(n_nationkey)
+|  partition by: n_regionkey
+|  row-size=10B cardinality=2
+|
+03:SORT
+|  order by: n_regionkey ASC NULLS LAST
+|  row-size=8B cardinality=2
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.n_nationkey
+|  runtime filters: RF000 <- t2.n_nationkey
+|  row-size=8B cardinality=2
+|
+|--01:SCAN KUDU [tpch_kudu.nation t2]
+|     kudu predicates: t2.n_name IN ('ALGERIA', 'ARGENTINA')
+|     row-size=4B cardinality=2
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> t1.id
+   row-size=4B cardinality=7.30K
+====
+# IMPALA-10406: Query with analytic functions doesn't need to materialize the predicates bounded to kudu
+# This materializes the 't2.n_name', because the hash join predicates
+SELECT MIN(n_nationkey) OVER (PARTITION BY n_regionkey)
+FROM functional.alltypes t1
+    LEFT JOIN tpch_kudu.nation t2 ON t1.id = t2.n_nationkey
+WHERE t2.n_name IN ('ALGERIA', 'ARGENTINA')
+--- PLAN
+PLAN-ROOT SINK
+|
+04:ANALYTIC
+|  functions: min(n_nationkey)
+|  partition by: n_regionkey
+|  row-size=29B cardinality=7.30K
+|
+03:SORT
+|  order by: n_regionkey ASC NULLS LAST
+|  row-size=27B cardinality=7.30K
+|
+02:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.n_nationkey
+|  other predicates: t2.n_name IN ('ALGERIA', 'ARGENTINA')
+|  row-size=31B cardinality=7.30K
+|
+|--01:SCAN KUDU [tpch_kudu.nation t2]
+|     kudu predicates: t2.n_name IN ('ALGERIA', 'ARGENTINA')
+|     row-size=27B cardinality=2
+|
+00:SCAN HDFS [functional.alltypes t1]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
+====
