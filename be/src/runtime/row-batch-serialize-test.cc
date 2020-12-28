@@ -448,7 +448,7 @@ TEST_F(RowBatchSerializeTest, BasicArray) {
   // tuple: (int, string, array<int>)
   ColumnType array_type;
   array_type.type = TYPE_ARRAY;
-  array_type.children.push_back(TYPE_INT);
+  array_type.children.push_back(ColumnType(TYPE_INT));
 
   DescriptorTblBuilder builder(frontend(), &pool_);
   builder.DeclareTuple() << TYPE_INT << TYPE_STRING << array_type;
@@ -467,13 +467,13 @@ TEST_F(RowBatchSerializeTest, StringArray) {
   // tuple: (int, string, array<struct<int, string, string>>)
   ColumnType struct_type;
   struct_type.type = TYPE_STRUCT;
-  struct_type.children.push_back(TYPE_INT);
+  struct_type.children.push_back(ColumnType(TYPE_INT));
   struct_type.field_names.push_back("int1");
   struct_type.field_ids.push_back(-1);
-  struct_type.children.push_back(TYPE_STRING);
+  struct_type.children.push_back(ColumnType(TYPE_STRING));
   struct_type.field_names.push_back("string1");
   struct_type.field_ids.push_back(-1);
-  struct_type.children.push_back(TYPE_STRING);
+  struct_type.children.push_back(ColumnType(TYPE_STRING));
   struct_type.field_names.push_back("string2");
   struct_type.field_ids.push_back(-1);
 
@@ -498,14 +498,14 @@ TEST_F(RowBatchSerializeTest, NestedArrays) {
   // tuple: (array<struct<array<string>, array<string, string>>>)
   ColumnType inner_array_type1;
   inner_array_type1.type = TYPE_ARRAY;
-  inner_array_type1.children.push_back(TYPE_STRING);
+  inner_array_type1.children.push_back(ColumnType(TYPE_STRING));
 
   ColumnType inner_struct_type;
   inner_struct_type.type = TYPE_STRUCT;
-  inner_struct_type.children.push_back(TYPE_STRING);
+  inner_struct_type.children.push_back(ColumnType(TYPE_STRING));
   inner_struct_type.field_names.push_back("string1");
   inner_struct_type.field_ids.push_back(-1);
-  inner_struct_type.children.push_back(TYPE_STRING);
+  inner_struct_type.children.push_back(ColumnType(TYPE_STRING));
   inner_struct_type.field_names.push_back("string2");
   inner_struct_type.field_ids.push_back(-1);
 
@@ -684,7 +684,7 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
   // Need 3 tuples + array to enable non-adjacent dedup automatically
   ColumnType array_type;
   array_type.type = TYPE_ARRAY;
-  array_type.children.push_back(TYPE_STRING);
+  array_type.children.push_back(ColumnType(TYPE_STRING));
   DescriptorTblBuilder builder(frontend(), &pool_);
   builder.DeclareTuple() << TYPE_INT;
   builder.DeclareTuple() << TYPE_INT;

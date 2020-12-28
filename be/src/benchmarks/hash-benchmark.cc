@@ -442,7 +442,7 @@ llvm::Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
     llvm::Value* string_data =
         builder.CreateGEP(data, codegen->GetI32Constant(fixed_byte_size));
     llvm::Value* string_val = builder.CreateBitCast(string_data,
-            codegen->GetSlotPtrType(TYPE_STRING));
+            codegen->GetSlotPtrType(ColumnType(TYPE_STRING)));
     llvm::Value* str_ptr = builder.CreateStructGEP(NULL, string_val, 0);
     llvm::Value* str_len = builder.CreateStructGEP(NULL, string_val, 1);
     str_ptr = builder.CreateLoad(str_ptr);

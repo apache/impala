@@ -95,9 +95,11 @@ Status KrpcDataStreamMgr::Init(MemTracker* service_mem_tracker) {
 
 inline uint32_t KrpcDataStreamMgr::GetHashValue(
     const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id) {
-  uint32_t value = RawValue::GetHashValue(&fragment_instance_id.lo, TYPE_BIGINT, 0);
-  value = RawValue::GetHashValue(&fragment_instance_id.hi, TYPE_BIGINT, value);
-  value = RawValue::GetHashValue(&dest_node_id, TYPE_INT, value);
+  uint32_t value = RawValue::GetHashValue(
+      &fragment_instance_id.lo, ColumnType(TYPE_BIGINT), 0);
+  value = RawValue::GetHashValue(
+      &fragment_instance_id.hi, ColumnType(TYPE_BIGINT), value);
+  value = RawValue::GetHashValue(&dest_node_id, ColumnType(TYPE_INT), value);
   return value;
 }
 

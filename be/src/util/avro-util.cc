@@ -109,25 +109,25 @@ Status AvroSchemaToColumnType(
   switch (schema->type) {
     case AVRO_BYTES:
     case AVRO_STRING:
-      *column_type = TYPE_STRING;
+      *column_type = ColumnType(TYPE_STRING);
       return Status::OK();
     case AVRO_INT32:
-      *column_type = TYPE_INT;
+      *column_type = ColumnType(TYPE_INT);
       return Status::OK();
     case AVRO_DATE:
-      *column_type = TYPE_DATE;
+      *column_type = ColumnType(TYPE_DATE);
       return Status::OK();
     case AVRO_INT64:
-      *column_type = TYPE_BIGINT;
+      *column_type = ColumnType(TYPE_BIGINT);
       return Status::OK();
     case AVRO_FLOAT:
-      *column_type = TYPE_FLOAT;
+      *column_type = ColumnType(TYPE_FLOAT);
       return Status::OK();
     case AVRO_DOUBLE:
-      *column_type = TYPE_DOUBLE;
+      *column_type = ColumnType(TYPE_DOUBLE);
       return Status::OK();
     case AVRO_BOOLEAN:
-      *column_type = TYPE_BOOLEAN;
+      *column_type = ColumnType(TYPE_BOOLEAN);
       return Status::OK();
     case AVRO_DECIMAL: {
       int precision = avro_schema_decimal_precision(schema);

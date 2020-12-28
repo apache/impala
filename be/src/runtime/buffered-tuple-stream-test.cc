@@ -551,11 +551,11 @@ class ArrayTupleStreamTest : public SimpleTupleStreamTest {
     tuple_ids.push_back(static_cast<TTupleId>(1));
     ColumnType string_array_type;
     string_array_type.type = TYPE_ARRAY;
-    string_array_type.children.push_back(TYPE_STRING);
+    string_array_type.children.push_back(ColumnType(TYPE_STRING));
 
     ColumnType int_array_type;
     int_array_type.type = TYPE_ARRAY;
-    int_array_type.children.push_back(TYPE_STRING);
+    int_array_type.children.push_back(ColumnType(TYPE_STRING));
 
     ColumnType nested_array_type;
     nested_array_type.type = TYPE_ARRAY;

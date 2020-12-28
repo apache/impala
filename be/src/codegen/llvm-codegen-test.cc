@@ -315,7 +315,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
 // }
 llvm::Function* CodegenStringTest(LlvmCodeGen* codegen) {
   llvm::PointerType* string_val_ptr_type =
-      codegen->GetSlotPtrType(TYPE_STRING);
+      codegen->GetSlotPtrType(ColumnType(TYPE_STRING));
   EXPECT_TRUE(string_val_ptr_type != NULL);
 
   LlvmCodeGen::FnPrototype prototype(codegen, "StringTest", codegen->i32_type());

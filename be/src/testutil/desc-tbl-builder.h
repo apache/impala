@@ -69,6 +69,10 @@ class TupleDescBuilder {
     return *this;
   }
 
+  TupleDescBuilder& operator<< (PrimitiveType slot_type) {
+    return *this << ColumnType(slot_type);
+  }
+
   std::vector<ColumnType> slot_types() const { return slot_types_; }
 
  private:

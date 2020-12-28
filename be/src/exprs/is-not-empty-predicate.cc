@@ -111,8 +111,10 @@ Status IsNotEmptyPredicate::GetCodegendComputeFnImpl(
   // Add code to the block that is executed if is_null was true.
   builder.SetInsertPoint(ret_null);
   // allocate a BooleanVal, set null in it, and return it.
-  CodegenAnyVal null_result(codegen, &builder, TYPE_BOOLEAN, nullptr, "null_result");
-  builder.CreateRet(null_result.GetNullVal(codegen, TYPE_BOOLEAN));
+  CodegenAnyVal null_result(
+      codegen, &builder, ColumnType(TYPE_BOOLEAN), nullptr, "null_result");
+  builder.CreateRet(
+      null_result.GetNullVal(codegen, ColumnType(TYPE_BOOLEAN)));
 
   // Back to the branch where 'is_null' is false.
   builder.SetInsertPoint(check_count);
@@ -121,7 +123,7 @@ Status IsNotEmptyPredicate::GetCodegendComputeFnImpl(
 
   llvm::Value* has_values = builder.CreateICmpNE(num_tuples, codegen->GetI32Constant(0));
   CodegenAnyVal has_values_result(
-      codegen, &builder, TYPE_BOOLEAN, nullptr, "has_values_result");
+      codegen, &builder, ColumnType(TYPE_BOOLEAN), nullptr, "has_values_result");
   has_values_result.SetVal(has_values);
   builder.CreateRet(has_values_result.GetLoweredValue());
 

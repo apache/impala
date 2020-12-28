@@ -147,7 +147,7 @@ Status ValidTupleIdExpr::GetCodegendComputeFnImpl(
     // Add code to the block that is executed if the Tuple* was not a nullptr.
     builder.SetInsertPoint(ret_block);
     // Generate code returning an IntVal containing the tuple id.
-    CodegenAnyVal result(codegen, &builder, TYPE_INT, nullptr, "ret");
+    CodegenAnyVal result(codegen, &builder, ColumnType(TYPE_INT), nullptr, "ret");
     llvm::Constant* tuple_id =
         codegen->GetI32Constant(static_cast<uint64_t>(tuple_ids_[i]));
     result.SetVal(tuple_id);

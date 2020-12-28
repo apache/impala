@@ -365,7 +365,7 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
   T ConvertValue(const string& value);
 
   void TestStringValue(const string& expr, const string& expected_result) {
-    EXPECT_EQ(expected_result, GetValue(expr, TYPE_STRING)) << expr;
+    EXPECT_EQ(expected_result, GetValue(expr, ColumnType(TYPE_STRING))) << expr;
   }
 
   // Tests that DST of the given timezone ends at 3am
@@ -378,7 +378,7 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
   }
 
   string TestStringValueRegex(const string& expr, const string& regex) {
-    const string results = GetValue(expr, TYPE_STRING);
+    const string results = GetValue(expr, ColumnType(TYPE_STRING));
     static const boost::regex e(regex);
     const bool is_regex_match = regex_match(results, e);
     EXPECT_TRUE(is_regex_match);
@@ -591,7 +591,7 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     } else {
       typeof_query = "typeof(" + query + ")";
     }
-    const string typeof_result = GetValue(typeof_query, TYPE_STRING);
+    const string typeof_result = GetValue(typeof_query, ColumnType(TYPE_STRING));
     EXPECT_EQ(expected_type.DebugString(), typeof_result) << typeof_query;
   }
 
@@ -627,6 +627,11 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     EXPECT_EQ(result, StringParser::PARSE_SUCCESS);
   }
 
+  template <class T> void TestValue(const string& expr, PrimitiveType expr_type,
+                                    const T& expected_result) {
+    return TestValue(expr, ColumnType(expr_type), expected_result);
+  }
+
   template <class T> void TestValue(const string& expr, const ColumnType& expr_type,
                                     const T& expected_result) {
     const string result = GetValue(expr, expr_type);
@@ -655,7 +660,7 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
         float expected_float;
         expected_float = static_cast<float>(expected_result);
         RawValue::PrintValue(reinterpret_cast<const void*>(&expected_float),
-                             TYPE_FLOAT, -1, &expected_str);
+                             ColumnType(TYPE_FLOAT), -1, &expected_str);
         EXPECT_EQ(expected_str, result) << expr;
         break;
       }
@@ -664,7 +669,7 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
         double expected_double;
         expected_double = static_cast<double>(expected_result);
         RawValue::PrintValue(reinterpret_cast<const void*>(&expected_double),
-                             TYPE_DOUBLE, -1, &expected_str);
+                             ColumnType(TYPE_DOUBLE), -1, &expected_str);
         EXPECT_EQ(expected_str, result) << expr;
         break;
       }
@@ -673,8 +678,16 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
     }
   }
 
+  void TestIsNull(const string& expr, PrimitiveType expr_type) {
+    return TestIsNull(expr, ColumnType(expr_type));
+  }
+
   void TestIsNull(const string& expr, const ColumnType& expr_type) {
     EXPECT_TRUE(GetValue(expr, expr_type) == "NULL") << expr;
+  }
+
+  void TestIsNotNull(const string& expr, PrimitiveType expr_type) {
+    return TestIsNotNull(expr, ColumnType(expr_type));
   }
 
   void TestIsNotNull(const string& expr, const ColumnType& expr_type) {
@@ -682,7 +695,7 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
   }
 
   void TestError(const string& expr) {
-    GetValue(expr, INVALID_TYPE, /* expect_error */ true);
+    GetValue(expr, ColumnType(INVALID_TYPE), /* expect_error */ true);
   }
 
   void TestNonOkStatus(const string& expr) {
@@ -1152,12 +1165,16 @@ class ExprTest : public testing::TestWithParam<std::tuple<bool, bool>> {
 
   // Create a Literal expression out of 'str'. Adds the returned literal to pool_.
   Literal* CreateLiteral(const ColumnType& type, const string& str);
+  Literal* CreateLiteral(PrimitiveType type, const string& str);
 
   // Helper function for LiteralConstruction test. Creates a Literal expression
   // of 'type' from 'str' and verifies it compares equally to 'value'.
   template <typename T>
   void TestSingleLiteralConstruction(
       const ColumnType& type, const T& value, const string& string_val);
+  template <typename T>
+  void TestSingleLiteralConstruction(
+      PrimitiveType type, const T& value, const string& string_val);
 
   // Test casting stmt to all types.  Expected result is val.
   template<typename T>
@@ -1291,20 +1308,21 @@ DateValue ExprTest::ConvertValue<DateValue>(const string& value) {
 // the ambiguity in TimestampValue::operator==, even with the appropriate casts.
 void ExprTest::TestTimestampValue(const string& expr, const TimestampValue& expected_result) {
   EXPECT_EQ(expected_result,
-      ConvertValue<TimestampValue>(GetValue(expr, TYPE_TIMESTAMP)));
+      ConvertValue<TimestampValue>(GetValue(expr, ColumnType(TYPE_TIMESTAMP))));
 }
 
 // Tests whether the returned TimestampValue is valid.
 // We use this function for tests where the expected value is unknown, e.g., now().
 void ExprTest::TestValidTimestampValue(const string& expr) {
   EXPECT_TRUE(
-      ConvertValue<TimestampValue>(GetValue(expr, TYPE_TIMESTAMP)).HasDate());
+      ConvertValue<TimestampValue>(GetValue(expr, ColumnType(TYPE_TIMESTAMP))).HasDate());
 }
 
 // We can't put this into TestValue() because GTest can't resolve
 // the ambiguity in DateValue::operator==, even with the appropriate casts.
 void ExprTest::TestDateValue(const string& expr, const DateValue& expected_result) {
-  EXPECT_EQ(expected_result, ConvertValue<DateValue>(GetValue(expr, TYPE_DATE)));
+  EXPECT_EQ(expected_result,
+      ConvertValue<DateValue>(GetValue(expr, ColumnType(TYPE_DATE))));
 }
 
 template<class T>
@@ -1391,6 +1409,9 @@ Literal* ExprTest::CreateLiteral(const ColumnType& type, const string& str) {
       return nullptr;
   }
 }
+Literal* ExprTest::CreateLiteral(PrimitiveType type, const string& str) {
+  return CreateLiteral(ColumnType(type), str);
+}
 
 template <typename T>
 void ExprTest::TestSingleLiteralConstruction(
@@ -1411,6 +1432,12 @@ void ExprTest::TestSingleLiteralConstruction(
   eval->Close(&state);
   expr->Close();
   state.ReleaseResources();
+}
+
+template <typename T>
+void ExprTest::TestSingleLiteralConstruction(
+    PrimitiveType type, const T& value, const string& string_val) {
+  return TestSingleLiteralConstruction(ColumnType(type), value, string_val);
 }
 
 TEST_P(ExprTest, NullLiteral) {
@@ -1490,14 +1517,14 @@ TEST_P(ExprTest, LiteralConstruction) {
 
 
 TEST_P(ExprTest, LiteralExprs) {
-  TestFixedPointLimits<int8_t>(TYPE_TINYINT);
-  TestFixedPointLimits<int16_t>(TYPE_SMALLINT);
-  TestFixedPointLimits<int32_t>(TYPE_INT);
-  TestFixedPointLimits<int64_t>(TYPE_BIGINT);
+  TestFixedPointLimits<int8_t>(ColumnType(TYPE_TINYINT));
+  TestFixedPointLimits<int16_t>(ColumnType(TYPE_SMALLINT));
+  TestFixedPointLimits<int32_t>(ColumnType(TYPE_INT));
+  TestFixedPointLimits<int64_t>(ColumnType(TYPE_BIGINT));
   // The value is not an exact FLOAT so it gets compared as a DOUBLE
   // and fails.  This needs to be researched.
   // TestFloatingPointLimits<float>(TYPE_FLOAT);
-  TestFloatingPointLimits<double>(TYPE_DOUBLE);
+  TestFloatingPointLimits<double>(ColumnType(TYPE_DOUBLE));
 
   TestValue("true", TYPE_BOOLEAN, true);
   TestValue("false", TYPE_BOOLEAN, false);
@@ -1544,104 +1571,104 @@ TEST_P(ExprTest, EscapeStringLiteral) {
 TEST_P(ExprTest, ArithmeticExprs) {
   // Test float ops.
   TestFixedResultTypeOps<float, float, double>(min_float_values_[TYPE_FLOAT],
-      min_float_values_[TYPE_FLOAT], TYPE_DOUBLE);
+      min_float_values_[TYPE_FLOAT], ColumnType(TYPE_DOUBLE));
   TestFixedResultTypeOps<float, double, double>(min_float_values_[TYPE_FLOAT],
-      min_float_values_[TYPE_DOUBLE], TYPE_DOUBLE);
+      min_float_values_[TYPE_DOUBLE], ColumnType(TYPE_DOUBLE));
   TestFixedResultTypeOps<double, double, double>(min_float_values_[TYPE_DOUBLE],
-      min_float_values_[TYPE_DOUBLE], TYPE_DOUBLE);
+      min_float_values_[TYPE_DOUBLE], ColumnType(TYPE_DOUBLE));
 
   // Test behavior of float ops at max/min value boundaries.
   // The tests with float type should trivially pass, since their results are double.
   TestFixedResultTypeOps<float, float, double>(numeric_limits<float>::min(),
-      numeric_limits<float>::min(), TYPE_DOUBLE);
+      numeric_limits<float>::min(), ColumnType(TYPE_DOUBLE));
   TestFixedResultTypeOps<float, float, double>(numeric_limits<float>::max(),
-      numeric_limits<float>::max(), TYPE_DOUBLE);
+      numeric_limits<float>::max(), ColumnType(TYPE_DOUBLE));
   TestFixedResultTypeOps<float, float, double>(numeric_limits<float>::min(),
-      numeric_limits<float>::max(), TYPE_DOUBLE);
+      numeric_limits<float>::max(), ColumnType(TYPE_DOUBLE));
   TestFixedResultTypeOps<float, float, double>(numeric_limits<float>::max(),
-      numeric_limits<float>::min(), TYPE_DOUBLE);
+      numeric_limits<float>::min(), ColumnType(TYPE_DOUBLE));
   TestFixedResultTypeOps<double, double, double>(numeric_limits<double>::min(),
-      numeric_limits<double>::min(), TYPE_DOUBLE);
+      numeric_limits<double>::min(), ColumnType(TYPE_DOUBLE));
   TestFixedResultTypeOps<double, double, double>(numeric_limits<double>::max(),
-      numeric_limits<double>::max(), TYPE_DOUBLE);
+      numeric_limits<double>::max(), ColumnType(TYPE_DOUBLE));
   TestFixedResultTypeOps<double, double, double>(numeric_limits<double>::min(),
-      numeric_limits<double>::max(), TYPE_DOUBLE);
+      numeric_limits<double>::max(), ColumnType(TYPE_DOUBLE));
   TestFixedResultTypeOps<double, double, double>(numeric_limits<double>::max(),
-      numeric_limits<double>::min(), TYPE_DOUBLE);
+      numeric_limits<double>::min(), ColumnType(TYPE_DOUBLE));
 
   // Test behavior with zero (especially for division by zero).
   TestFixedResultTypeOps<float, float, double>(min_float_values_[TYPE_FLOAT],
-      0.0f, TYPE_DOUBLE);
+      0.0f, ColumnType(TYPE_DOUBLE));
   TestFixedResultTypeOps<double, double, double>(min_float_values_[TYPE_DOUBLE],
-      0.0, TYPE_DOUBLE);
+      0.0, ColumnType(TYPE_DOUBLE));
 
   // Test ops that always promote to fixed type (e.g., next higher resolution type).
   TestFixedResultTypeOps<int8_t, int8_t, int16_t>(min_int_values_[TYPE_TINYINT],
-      min_int_values_[TYPE_TINYINT], TYPE_SMALLINT);
+      min_int_values_[TYPE_TINYINT], ColumnType(TYPE_SMALLINT));
   TestFixedResultTypeOps<int8_t, int16_t, int32_t>(min_int_values_[TYPE_TINYINT],
-      min_int_values_[TYPE_SMALLINT], TYPE_INT);
+      min_int_values_[TYPE_SMALLINT], ColumnType(TYPE_INT));
   TestFixedResultTypeOps<int8_t, int32_t, int64_t>(min_int_values_[TYPE_TINYINT],
-      min_int_values_[TYPE_INT], TYPE_BIGINT);
+      min_int_values_[TYPE_INT], ColumnType(TYPE_BIGINT));
   TestFixedResultTypeOps<int8_t, int64_t, int64_t>(min_int_values_[TYPE_TINYINT],
-      min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
+      min_int_values_[TYPE_BIGINT], ColumnType(TYPE_BIGINT));
   TestFixedResultTypeOps<int16_t, int16_t, int32_t>(min_int_values_[TYPE_SMALLINT],
-      min_int_values_[TYPE_SMALLINT], TYPE_INT);
+      min_int_values_[TYPE_SMALLINT], ColumnType(TYPE_INT));
   TestFixedResultTypeOps<int16_t, int32_t, int64_t>(min_int_values_[TYPE_SMALLINT],
-      min_int_values_[TYPE_INT], TYPE_BIGINT);
+      min_int_values_[TYPE_INT], ColumnType(TYPE_BIGINT));
   TestFixedResultTypeOps<int16_t, int64_t, int64_t>(min_int_values_[TYPE_SMALLINT],
-      min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
+      min_int_values_[TYPE_BIGINT], ColumnType(TYPE_BIGINT));
   TestFixedResultTypeOps<int32_t, int32_t, int64_t>(min_int_values_[TYPE_INT],
-      min_int_values_[TYPE_INT], TYPE_BIGINT);
+      min_int_values_[TYPE_INT], ColumnType(TYPE_BIGINT));
   TestFixedResultTypeOps<int32_t, int64_t, int64_t>(min_int_values_[TYPE_INT],
-      min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
+      min_int_values_[TYPE_BIGINT], ColumnType(TYPE_BIGINT));
   TestFixedResultTypeOps<int64_t, int64_t, int64_t>(min_int_values_[TYPE_BIGINT],
-      min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
+      min_int_values_[TYPE_BIGINT], ColumnType(TYPE_BIGINT));
 
   // Test behavior on overflow/underflow.
   TestFixedResultTypeOps<int64_t, int64_t, int64_t>(numeric_limits<int64_t>::min()+1,
-      numeric_limits<int64_t>::min()+1, TYPE_BIGINT);
+      numeric_limits<int64_t>::min()+1, ColumnType(TYPE_BIGINT));
   TestFixedResultTypeOps<int64_t, int64_t, int64_t>(numeric_limits<int64_t>::max(),
-      numeric_limits<int64_t>::max(), TYPE_BIGINT);
+      numeric_limits<int64_t>::max(), ColumnType(TYPE_BIGINT));
   TestFixedResultTypeOps<int64_t, int64_t, int64_t>(numeric_limits<int64_t>::min()+1,
-      numeric_limits<int64_t>::max(), TYPE_BIGINT);
+      numeric_limits<int64_t>::max(), ColumnType(TYPE_BIGINT));
   TestFixedResultTypeOps<int64_t, int64_t, int64_t>(numeric_limits<int64_t>::max(),
-      numeric_limits<int64_t>::min()+1, TYPE_BIGINT);
+      numeric_limits<int64_t>::min()+1, ColumnType(TYPE_BIGINT));
 
   // Test behavior with NULLs.
   TestNullOperandFixedResultTypeOps<float, double>(min_float_values_[TYPE_FLOAT],
-      TYPE_DOUBLE);
+      ColumnType(TYPE_DOUBLE));
   TestNullOperandFixedResultTypeOps<double, double>(min_float_values_[TYPE_DOUBLE],
-      TYPE_DOUBLE);
+      ColumnType(TYPE_DOUBLE));
   TestNullOperandFixedResultTypeOps<int8_t, int64_t>(min_int_values_[TYPE_TINYINT],
-      TYPE_SMALLINT);
+      ColumnType(TYPE_SMALLINT));
   TestNullOperandFixedResultTypeOps<int16_t, int64_t>(min_int_values_[TYPE_SMALLINT],
-      TYPE_INT);
+      ColumnType(TYPE_INT));
   TestNullOperandFixedResultTypeOps<int32_t, int64_t>(min_int_values_[TYPE_INT],
-      TYPE_BIGINT);
+      ColumnType(TYPE_BIGINT));
   TestNullOperandFixedResultTypeOps<int64_t, int64_t>(min_int_values_[TYPE_BIGINT],
-      TYPE_BIGINT);
+      ColumnType(TYPE_BIGINT));
 
   // Test int ops that promote to assignment compatible type.
   TestVariableResultTypeIntOps<int8_t, int8_t>(min_int_values_[TYPE_TINYINT],
-      min_int_values_[TYPE_TINYINT], TYPE_TINYINT);
+      min_int_values_[TYPE_TINYINT], ColumnType(TYPE_TINYINT));
   TestVariableResultTypeIntOps<int8_t, int16_t>(min_int_values_[TYPE_TINYINT],
-      min_int_values_[TYPE_SMALLINT], TYPE_SMALLINT);
+      min_int_values_[TYPE_SMALLINT], ColumnType(TYPE_SMALLINT));
   TestVariableResultTypeIntOps<int8_t, int32_t>(min_int_values_[TYPE_TINYINT],
-      min_int_values_[TYPE_INT], TYPE_INT);
+      min_int_values_[TYPE_INT], ColumnType(TYPE_INT));
   TestVariableResultTypeIntOps<int8_t, int64_t>(min_int_values_[TYPE_TINYINT],
-      min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
+      min_int_values_[TYPE_BIGINT], ColumnType(TYPE_BIGINT));
   TestVariableResultTypeIntOps<int16_t, int16_t>(min_int_values_[TYPE_SMALLINT],
-      min_int_values_[TYPE_SMALLINT], TYPE_SMALLINT);
+      min_int_values_[TYPE_SMALLINT], ColumnType(TYPE_SMALLINT));
   TestVariableResultTypeIntOps<int16_t, int32_t>(min_int_values_[TYPE_SMALLINT],
-      min_int_values_[TYPE_INT],TYPE_INT);
+      min_int_values_[TYPE_INT],ColumnType(TYPE_INT));
   TestVariableResultTypeIntOps<int16_t, int64_t>(min_int_values_[TYPE_SMALLINT],
-      min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
+      min_int_values_[TYPE_BIGINT], ColumnType(TYPE_BIGINT));
   TestVariableResultTypeIntOps<int32_t, int32_t>(min_int_values_[TYPE_INT],
-      min_int_values_[TYPE_INT], TYPE_INT);
+      min_int_values_[TYPE_INT], ColumnType(TYPE_INT));
   TestVariableResultTypeIntOps<int32_t, int64_t>(min_int_values_[TYPE_INT],
-      min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
+      min_int_values_[TYPE_BIGINT], ColumnType(TYPE_BIGINT));
   TestVariableResultTypeIntOps<int64_t, int64_t>(min_int_values_[TYPE_BIGINT],
-      min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
+      min_int_values_[TYPE_BIGINT], ColumnType(TYPE_BIGINT));
 
   // Test behavior of INT_DIVIDE and MOD with zero as second argument.
   IntValMap::iterator int_iter;
@@ -1654,13 +1681,13 @@ TEST_P(ExprTest, ArithmeticExprs) {
 
   // Test behavior with NULLs.
   TestNullOperandVariableResultTypeIntOps<int8_t>(min_int_values_[TYPE_TINYINT],
-      TYPE_TINYINT);
+      ColumnType(TYPE_TINYINT));
   TestNullOperandVariableResultTypeIntOps<int16_t>(min_int_values_[TYPE_SMALLINT],
-      TYPE_SMALLINT);
+      ColumnType(TYPE_SMALLINT));
   TestNullOperandVariableResultTypeIntOps<int32_t>(min_int_values_[TYPE_INT],
-      TYPE_INT);
+      ColumnType(TYPE_INT));
   TestNullOperandVariableResultTypeIntOps<int64_t>(min_int_values_[TYPE_BIGINT],
-      TYPE_BIGINT);
+      ColumnType(TYPE_BIGINT));
 
   // Tests for dealing with '-'.
   TestValue("-1", TYPE_TINYINT, -1);
@@ -5509,8 +5536,8 @@ TEST_P(ExprTest, SessionFunctions) {
   map<Session, map<Query, string>> results;
   for (Session session: {S1, S2}) {
     ASSERT_OK(executor_->Setup()); // Starts new session
-    results[session][Q1] = GetValue("current_session()", TYPE_STRING);
-    results[session][Q2] = GetValue("current_sid()", TYPE_STRING);
+    results[session][Q1] = GetValue("current_session()", ColumnType(TYPE_STRING));
+    results[session][Q2] = GetValue("current_sid()", ColumnType(TYPE_STRING));
   }
 
   // The sessions IDs from the same session must be the same.
@@ -5934,7 +5961,7 @@ TEST_P(ExprTest, MathFunctions) {
     rand << "rand(" << seed << ")";
     random << "random(" << seed << ")";
     const double expected_result = ConvertValue<double>(GetValue(rand.str(),
-      TYPE_DOUBLE));
+      ColumnType(TYPE_DOUBLE)));
     TestValue(rand.str(), TYPE_DOUBLE, expected_result);
     TestValue(random.str(), TYPE_DOUBLE, expected_result); // Test alias
   }
@@ -7022,7 +7049,7 @@ TEST_P(ExprTest, TimestampFunctions) {
     time_t unix_start_time =
         (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
     int64_t unix_timestamp_result = ConvertValue<int64_t>(GetValue("unix_timestamp()",
-        TYPE_BIGINT));
+        ColumnType(TYPE_BIGINT)));
     EXPECT_BETWEEN(unix_start_time, unix_timestamp_result, static_cast<int64_t>(
         (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds()));
 
@@ -7033,7 +7060,7 @@ TEST_P(ExprTest, TimestampFunctions) {
       tm before = to_tm(posix_time::microsec_clock::local_time());
       unix_start_time = mktime(&before);
       unix_timestamp_result = ConvertValue<int64_t>(GetValue("unix_timestamp()",
-          TYPE_BIGINT));
+          ColumnType(TYPE_BIGINT)));
       tm after = to_tm(posix_time::microsec_clock::local_time());
       EXPECT_BETWEEN(unix_start_time, unix_timestamp_result,
           static_cast<int64_t>(mktime(&after)));
@@ -7050,11 +7077,11 @@ TEST_P(ExprTest, TimestampFunctions) {
     const TimestampValue start_time =
         TimestampValue::FromUnixTimeMicros(UnixMicros(), &local_tz);
     TimestampValue timestamp_result =
-        ConvertValue<TimestampValue>(GetValue("now()", TYPE_TIMESTAMP));
+        ConvertValue<TimestampValue>(GetValue("now()", ColumnType(TYPE_TIMESTAMP)));
     EXPECT_BETWEEN(start_time, timestamp_result,
         TimestampValue::FromUnixTimeMicros(UnixMicros(), &local_tz));
     timestamp_result = ConvertValue<TimestampValue>(GetValue("current_timestamp()",
-        TYPE_TIMESTAMP));
+        ColumnType(TYPE_TIMESTAMP)));
     EXPECT_BETWEEN(start_time, timestamp_result,
         TimestampValue::FromUnixTimeMicros(UnixMicros(), &local_tz));
   }
@@ -7062,8 +7089,8 @@ TEST_P(ExprTest, TimestampFunctions) {
   // Test that utc_timestamp() is reasonable.
   const TimestampValue utc_start_time =
       TimestampValue::UtcFromUnixTimeMicros(UnixMicros());
-  TimestampValue timestamp_result =
-      ConvertValue<TimestampValue>(GetValue("utc_timestamp()", TYPE_TIMESTAMP));
+  TimestampValue timestamp_result = ConvertValue<TimestampValue>(
+      GetValue("utc_timestamp()", ColumnType(TYPE_TIMESTAMP)));
   EXPECT_BETWEEN(utc_start_time, timestamp_result,
       TimestampValue::UtcFromUnixTimeMicros(UnixMicros()));
 
@@ -7079,7 +7106,7 @@ TEST_P(ExprTest, TimestampFunctions) {
     time_t unix_start_time =
         (posix_time::microsec_clock::local_time() - from_time_t(0)).total_seconds();
     TimestampValue timestamp_result = ConvertValue<TimestampValue>(GetValue(
-        "cast(unix_timestamp() as timestamp)", TYPE_TIMESTAMP));
+        "cast(unix_timestamp() as timestamp)", ColumnType(TYPE_TIMESTAMP)));
     EXPECT_BETWEEN(TimestampValue::FromUnixTime(unix_start_time - 1, &local_tz),
         timestamp_result,
         TimestampValue::FromUnixTimeMicros(UnixMicros(), &local_tz));
@@ -8229,7 +8256,8 @@ TEST_P(ExprTest, DateFunctions) {
 
     const boost::gregorian::date start_date =
         TimestampValue::FromUnixTimeMicros(UnixMicros(), &local_tz).date();
-    DateValue current_dv = ConvertValue<DateValue>(GetValue("current_date()", TYPE_DATE));
+    DateValue current_dv =
+        ConvertValue<DateValue>(GetValue("current_date()", ColumnType(TYPE_DATE)));
     const boost::gregorian::date end_date =
         TimestampValue::FromUnixTimeMicros(UnixMicros(), &local_tz).date();
 
@@ -8681,16 +8709,16 @@ TEST_P(ExprTest, ResultsLayoutTest) {
 
   // Test single Expr case
   vector<ColumnType> types;
-  types.push_back(TYPE_BOOLEAN);
-  types.push_back(TYPE_TINYINT);
-  types.push_back(TYPE_SMALLINT);
-  types.push_back(TYPE_INT);
-  types.push_back(TYPE_BIGINT);
-  types.push_back(TYPE_FLOAT);
-  types.push_back(TYPE_DOUBLE);
-  types.push_back(TYPE_TIMESTAMP);
-  types.push_back(TYPE_DATE);
-  types.push_back(TYPE_STRING);
+  types.push_back(ColumnType(TYPE_BOOLEAN));
+  types.push_back(ColumnType(TYPE_TINYINT));
+  types.push_back(ColumnType(TYPE_SMALLINT));
+  types.push_back(ColumnType(TYPE_INT));
+  types.push_back(ColumnType(TYPE_BIGINT));
+  types.push_back(ColumnType(TYPE_FLOAT));
+  types.push_back(ColumnType(TYPE_DOUBLE));
+  types.push_back(ColumnType(TYPE_TIMESTAMP));
+  types.push_back(ColumnType(TYPE_DATE));
+  types.push_back(ColumnType(TYPE_STRING));
 
   types.push_back(ColumnType::CreateDecimalType(1,0));
   types.push_back(ColumnType::CreateDecimalType(8,0));

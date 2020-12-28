@@ -356,10 +356,10 @@ TEST(TimestampTest, Basic) {
   EXPECT_GT(v1, v2);
   EXPECT_GE(v2, v3);
 
-  EXPECT_NE(RawValue::GetHashValue(&v1, TYPE_TIMESTAMP, 0),
-            RawValue::GetHashValue(&v2, TYPE_TIMESTAMP, 0));
-  EXPECT_EQ(RawValue::GetHashValue(&v3, TYPE_TIMESTAMP, 0),
-            RawValue::GetHashValue(&v2, TYPE_TIMESTAMP, 0));
+  EXPECT_NE(RawValue::GetHashValue(&v1, ColumnType(TYPE_TIMESTAMP), 0),
+            RawValue::GetHashValue(&v2, ColumnType(TYPE_TIMESTAMP), 0));
+  EXPECT_EQ(RawValue::GetHashValue(&v3, ColumnType(TYPE_TIMESTAMP), 0),
+            RawValue::GetHashValue(&v2, ColumnType(TYPE_TIMESTAMP), 0));
 
   char s4[] = "2012-01-20T01:10:01";
   char s5[] = "1990-10-20T10:10:10.123456789";
