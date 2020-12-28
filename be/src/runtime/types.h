@@ -97,7 +97,7 @@ struct ColumnType {
 
   static const char* LLVM_CLASS_NAME;
 
-  ColumnType(PrimitiveType type = INVALID_TYPE)
+  explicit ColumnType(PrimitiveType type = INVALID_TYPE)
     : type(type), len(-1), precision(-1), scale(-1) {
     DCHECK_NE(type, TYPE_CHAR);
     DCHECK_NE(type, TYPE_VARCHAR);

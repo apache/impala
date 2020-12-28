@@ -104,7 +104,7 @@ Status GroupingAggregatorConfig::Init(
     // Hack to avoid TYPE_NULL SlotRefs.
     SlotRef* build_expr = state->obj_pool()->Add(desc->type().type != TYPE_NULL ?
             new SlotRef(desc) :
-            new SlotRef(desc, TYPE_BOOLEAN));
+            new SlotRef(desc, ColumnType(TYPE_BOOLEAN)));
     build_exprs_.push_back(build_expr);
     // Not an entry point because all hash table callers support codegen.
     RETURN_IF_ERROR(

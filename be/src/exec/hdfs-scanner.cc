@@ -539,7 +539,8 @@ Status HdfsScanner::CodegenWriteCompleteTuple(const HdfsScanPlanNode* node,
 
       llvm::Value* conjunct_args[] = {eval, tuple_row_arg};
       CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(
-          codegen, &builder, TYPE_BOOLEAN, conjunct_fn, conjunct_args, "conjunct_eval");
+          codegen, &builder, ColumnType(TYPE_BOOLEAN), conjunct_fn, conjunct_args,
+          "conjunct_eval");
       builder.CreateCondBr(result.GetVal(), parse_block, eval_fail_block);
       builder.SetInsertPoint(parse_block);
     }

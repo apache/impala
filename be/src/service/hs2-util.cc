@@ -242,7 +242,7 @@ static void TimestampExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     if (!val.is_null) {
       TimestampValue value = TimestampValue::FromTimestampVal(val);
       RawValue::PrintValue(
-          &value, TYPE_TIMESTAMP, -1, &(column->stringVal.values.back()));
+          &value, ColumnType(TYPE_TIMESTAMP), -1, &(column->stringVal.values.back()));
     }
     SetNullBit(output_row_idx, val.is_null, &column->stringVal.nulls);
     ++output_row_idx;
@@ -260,7 +260,7 @@ static void DateExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     if (!val.is_null) {
       DateValue value = DateValue::FromDateVal(val);
       RawValue::PrintValue(
-          &value, TYPE_DATE, -1, &(column->stringVal.values.back()));
+          &value, ColumnType(TYPE_DATE), -1, &(column->stringVal.values.back()));
     }
     SetNullBit(output_row_idx, val.is_null, &column->stringVal.nulls);
     ++output_row_idx;
@@ -545,7 +545,8 @@ void impala::ExprValueToHS2TColumnValue(const void* value, const TColumnType& ty
       hs2_col_val->__isset.stringVal = true;
       hs2_col_val->stringVal.__isset.value = not_null;
       if (not_null) {
-        RawValue::PrintValue(value, TYPE_TIMESTAMP, -1, &(hs2_col_val->stringVal.value));
+        RawValue::PrintValue(
+            value, ColumnType(TYPE_TIMESTAMP), -1, &(hs2_col_val->stringVal.value));
       }
       break;
     case TPrimitiveType::DECIMAL: {

@@ -74,10 +74,10 @@ TEST(DateTest, ParseDefault) {
   EXPECT_EQ(v3, v4);
   EXPECT_EQ(v3, v5);
 
-  EXPECT_NE(RawValue::GetHashValue(&v1, TYPE_DATE, 0),
-      RawValue::GetHashValue(&v2, TYPE_DATE, 0));
-  EXPECT_EQ(RawValue::GetHashValue(&v3, TYPE_DATE, 0),
-      RawValue::GetHashValue(&v2, TYPE_DATE, 0));
+  EXPECT_NE(RawValue::GetHashValue(&v1, ColumnType(TYPE_DATE), 0),
+      RawValue::GetHashValue(&v2, ColumnType(TYPE_DATE), 0));
+  EXPECT_EQ(RawValue::GetHashValue(&v3, ColumnType(TYPE_DATE), 0),
+      RawValue::GetHashValue(&v2, ColumnType(TYPE_DATE), 0));
 
   // 1-digit months and days are ok in date string.
   ParseValidateDate("2012-1-20", false, 2012, 1, 20);

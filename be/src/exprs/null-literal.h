@@ -46,7 +46,7 @@ class NullLiteral: public ScalarExpr {
   virtual std::string DebugString() const override;
 
   /// Constructor for test.
-  NullLiteral(PrimitiveType type) : ScalarExpr(type, true) { }
+  NullLiteral(PrimitiveType type) : ScalarExpr(ColumnType(type), true) { }
 
   static const char* LLVM_CLASS_NAME;
 

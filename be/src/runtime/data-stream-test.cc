@@ -168,7 +168,7 @@ class DataStreamTest : public testing::Test {
 
     CreateRowDesc();
 
-    SlotRef* lhs_slot = obj_pool_.Add(new SlotRef(TYPE_BIGINT, 0));
+    SlotRef* lhs_slot = obj_pool_.Add(new SlotRef(ColumnType(TYPE_BIGINT), 0));
     ASSERT_OK(lhs_slot->Init(RowDescriptor(), true, fragment_state_));
     ordering_exprs_.push_back(lhs_slot);
 
@@ -487,7 +487,8 @@ class DataStreamTest : public testing::Test {
         } else if (stream_type == TPartitionType::HASH_PARTITIONED) {
           // hash-partitioned streams send values to the right partition
           int64_t value = *j;
-          uint64_t hash_val = RawValue::GetHashValueFastHash(&value, TYPE_BIGINT,
+          uint64_t hash_val = RawValue::GetHashValueFastHash(
+              &value, ColumnType(TYPE_BIGINT),
               GetExchangeHashSeed(runtime_state_->query_id()));
           EXPECT_EQ(hash_val % receiver_info_.size(), info->receiver_num);
         }

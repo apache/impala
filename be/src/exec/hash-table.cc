@@ -1056,7 +1056,7 @@ Status HashTableCtx::CodegenHashRow(LlvmCodeGen* codegen, bool use_murmur,
 
       // Convert expr_values_buffer_ loc to llvm value
       llvm::Value* str_val = builder.CreatePointerCast(
-          llvm_loc, codegen->GetSlotPtrType(TYPE_STRING), "str_val");
+          llvm_loc, codegen->GetSlotPtrType(ColumnType(TYPE_STRING)), "str_val");
 
       llvm::Value* ptr = builder.CreateStructGEP(NULL, str_val, 0);
       llvm::Value* len = builder.CreateStructGEP(NULL, str_val, 1);

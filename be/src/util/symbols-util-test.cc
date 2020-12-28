@@ -142,7 +142,7 @@ TEST(SymbolsUtil, Mangling) {
       "A::B::C(impala_udf::FunctionContext*, impala_udf::IntVal*)");
 
   // Try functions with in input INT arg. Then try with varargs and int* return arg.
-  args.push_back(TYPE_INT);
+  args.push_back(ColumnType(TYPE_INT));
   TestMangling("F", false, args, NULL,
       "_Z1FPN10impala_udf15FunctionContextERKNS_6IntValE",
       "F(impala_udf::FunctionContext*, impala_udf::IntVal const&)");
@@ -171,7 +171,7 @@ TEST(SymbolsUtil, Mangling) {
           "impala_udf::IntVal*)");
 
   // Try addding some redudant argument types. These should get compressed away.
-  args.push_back(TYPE_INT);
+  args.push_back(ColumnType(TYPE_INT));
   TestMangling("F", false, args, NULL,
       "_Z1FPN10impala_udf15FunctionContextERKNS_6IntValES4_",
       "F(impala_udf::FunctionContext*, impala_udf::IntVal const&, "
@@ -193,7 +193,7 @@ TEST(SymbolsUtil, Mangling) {
       "F::B(impala_udf::FunctionContext*, impala_udf::IntVal const&, "
           "impala_udf::IntVal const&)");
 
-  args.push_back(TYPE_INT);
+  args.push_back(ColumnType(TYPE_INT));
   TestMangling("F", false, args, NULL,
       "_Z1FPN10impala_udf15FunctionContextERKNS_6IntValES4_S4_",
       "F(impala_udf::FunctionContext*, impala_udf::IntVal const&, "
@@ -212,10 +212,10 @@ TEST(SymbolsUtil, Mangling) {
   // Try some more complicated cases.
   // fn(double, double, int, int)
   args.clear();
-  args.push_back(TYPE_DOUBLE);
-  args.push_back(TYPE_DOUBLE);
-  args.push_back(TYPE_INT);
-  args.push_back(TYPE_INT);
+  args.push_back(ColumnType(TYPE_DOUBLE));
+  args.push_back(ColumnType(TYPE_DOUBLE));
+  args.push_back(ColumnType(TYPE_INT));
+  args.push_back(ColumnType(TYPE_INT));
   TestMangling("TEST", false, args, NULL,
       "_Z4TESTPN10impala_udf15FunctionContextERKNS_9DoubleValES4_RKNS_6IntValES7_",
       "TEST(impala_udf::FunctionContext*, impala_udf::DoubleVal const&, "
@@ -239,10 +239,10 @@ TEST(SymbolsUtil, Mangling) {
 
   // fn(int, double, double, int)
   args.clear();
-  args.push_back(TYPE_INT);
-  args.push_back(TYPE_DOUBLE);
-  args.push_back(TYPE_DOUBLE);
-  args.push_back(TYPE_INT);
+  args.push_back(ColumnType(TYPE_INT));
+  args.push_back(ColumnType(TYPE_DOUBLE));
+  args.push_back(ColumnType(TYPE_DOUBLE));
+  args.push_back(ColumnType(TYPE_INT));
   TestMangling("TEST", false, args, NULL,
       "_Z4TESTPN10impala_udf15FunctionContextERKNS_6IntValERKNS_9DoubleValES7_S4_",
       "TEST(impala_udf::FunctionContext*, impala_udf::IntVal const&, impala_udf::"
@@ -255,16 +255,16 @@ TEST(SymbolsUtil, Mangling) {
 
   // All the types.
   args.clear();
-  args.push_back(TYPE_STRING);
-  args.push_back(TYPE_BOOLEAN);
-  args.push_back(TYPE_TINYINT);
-  args.push_back(TYPE_SMALLINT);
-  args.push_back(TYPE_INT);
-  args.push_back(TYPE_BIGINT);
-  args.push_back(TYPE_FLOAT);
-  args.push_back(TYPE_DOUBLE);
-  args.push_back(TYPE_TIMESTAMP);
-  args.push_back(TYPE_DATE);
+  args.push_back(ColumnType(TYPE_STRING));
+  args.push_back(ColumnType(TYPE_BOOLEAN));
+  args.push_back(ColumnType(TYPE_TINYINT));
+  args.push_back(ColumnType(TYPE_SMALLINT));
+  args.push_back(ColumnType(TYPE_INT));
+  args.push_back(ColumnType(TYPE_BIGINT));
+  args.push_back(ColumnType(TYPE_FLOAT));
+  args.push_back(ColumnType(TYPE_DOUBLE));
+  args.push_back(ColumnType(TYPE_TIMESTAMP));
+  args.push_back(ColumnType(TYPE_DATE));
   args.push_back(ColumnType::CreateCharType(10));
   TestMangling("AllTypes", false, args, NULL,
       "_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10BooleanValE"

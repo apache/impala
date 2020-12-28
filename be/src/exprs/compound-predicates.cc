@@ -154,10 +154,10 @@ Status CompoundPredicate::CodegenComputeFn(
 
   // Call lhs
   CodegenAnyVal lhs_result = CodegenAnyVal::CreateCallWrapped(
-      codegen, &builder, TYPE_BOOLEAN, lhs_function, args, "lhs_call");
+      codegen, &builder, ColumnType(TYPE_BOOLEAN), lhs_function, args, "lhs_call");
   // Call rhs
   CodegenAnyVal rhs_result = CodegenAnyVal::CreateCallWrapped(
-      codegen, &builder, TYPE_BOOLEAN, rhs_function, args, "rhs_call");
+      codegen, &builder, ColumnType(TYPE_BOOLEAN), rhs_function, args, "rhs_call");
 
   llvm::Value* lhs_is_null = lhs_result.GetIsNull();
   llvm::Value* rhs_is_null = rhs_result.GetIsNull();
@@ -231,7 +231,7 @@ Status CompoundPredicate::CodegenComputeFn(
   val_phi->addIncoming(codegen->false_value(), null_block);
   val_phi->addIncoming(not_null_phi, not_null_block);
 
-  CodegenAnyVal ret(codegen, &builder, TYPE_BOOLEAN, NULL, "ret");
+  CodegenAnyVal ret(codegen, &builder, ColumnType(TYPE_BOOLEAN), NULL, "ret");
   ret.SetIsNull(is_null_phi);
   ret.SetVal(val_phi);
   builder.CreateRet(ret.GetLoweredValue());
