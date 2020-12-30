@@ -435,7 +435,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     killed_impalad.kill()
 
     # Wait until the retry is running.
-    self.__wait_until_retried(handle)
+    self.__wait_until_retry_state(handle, 'RETRIED')
 
     # Kill another impalad so that another retry is attempted.
     self.cluster.impalads[2].kill()
@@ -718,6 +718,64 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+      impalad_args="--debug_actions=RETRY_DELAY_CHECKING_ORIGINAL_DRIVER:SLEEP@1000",
+      statestored_args="--statestore_heartbeat_frequency_ms=60000")
+  def test_retrying_query_cancel(self):
+    """Trigger a query retry, and then cancel and close the retried query in RETRYING
+    state. Validate that it doesn't crash the impalad. Set a really high statestore
+    heartbeat frequency so that killed impalads are not removed from the cluster
+    membership."""
+
+    # Kill an impalad, and run a query. The query should be retried.
+    self.cluster.impalads[1].kill()
+    query = "select count(*) from tpch_parquet.lineitem"
+    handle = self.execute_query_async(query,
+        query_options={'retry_failed_queries': 'true'})
+    self.__wait_until_retry_state(handle, 'RETRYING')
+
+    # Cancel the query.
+    self.client.cancel(handle)
+
+    # Check the original query retry status.
+    profile = self.__get_original_query_profile(handle.get_handle().id)
+    retry_status = re.search("Retry Status: (.*)", profile)
+    assert retry_status.group(1) == 'RETRYING'
+
+    self.client.close_query(handle)
+    time.sleep(2)
+    assert self.cluster.impalads[0].get_pid() is not None, "Coordinator crashed"
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--debug_actions=QUERY_RETRY_SET_RESULT_CACHE:FAIL",
+      statestored_args="--statestore_heartbeat_frequency_ms=60000")
+  def test_retry_query_result_cacheing_failed(self):
+    """Test setting up results cacheing failed."""
+
+    self.cluster.impalads[1].kill()
+    query = "select count(*) from tpch_parquet.lineitem"
+    self.hs2_client.set_configuration({'retry_failed_queries': 'true'})
+    self.hs2_client.set_configuration_option('impala.resultset.cache.size', '1024')
+    self.hs2_client.execute_async(query)
+    self.assert_eventually(60, 0.1,
+        lambda: self.cluster.get_first_impalad().service.get_num_in_flight_queries() == 1)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--debug_actions=QUERY_RETRY_SET_QUERY_IN_FLIGHT:FAIL",
+      statestored_args="--statestore_heartbeat_frequency_ms=60000")
+  def test_retry_query_set_query_in_flight_failed(self):
+    """Test setting query in flight failed."""
+
+    # Kill an impalad, and run a query. The query should be retried.
+    self.cluster.impalads[1].kill()
+    query = "select count(*) from tpch_parquet.lineitem"
+    self.execute_query_async(query, query_options={'retry_failed_queries': 'true'})
+    self.assert_eventually(60, 0.1,
+        lambda: self.cluster.get_first_impalad().service.get_num_in_flight_queries() == 1)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
       statestored_args="-statestore_heartbeat_frequency_ms=60000")
   def test_retry_query_timeout(self):
     """Trigger a query retry, and then leave the query handle open until the
@@ -842,10 +900,9 @@ class TestQueryRetries(CustomClusterTestSuite):
     if not retried_query_id_search: return None
     return retried_query_id_search.group(1)
 
-  def __wait_until_retried(self, handle, timeout=300):
+  def __wait_until_retry_state(self, handle, retry_state, timeout=300):
     """Wait until the given query handle has been retried. This is achieved by polling the
     runtime profile of the query and checking the 'Retry Status' field."""
-    retried_state = "RETRIED"
 
     def __get_retry_status():
       profile = self.__get_original_query_profile(handle.get_handle().id)
@@ -854,10 +911,10 @@ class TestQueryRetries(CustomClusterTestSuite):
 
     start_time = time.time()
     retry_status = __get_retry_status()
-    while retry_status != retried_state and time.time() - start_time < timeout:
+    while retry_status != retry_state and time.time() - start_time < timeout:
       retry_status = __get_retry_status()
       time.sleep(0.5)
-    if retry_status != retried_state:
+    if retry_status != retry_state:
       raise Timeout("query {0} was not retried within timeout".format
           (handle.get_handle().id))
 

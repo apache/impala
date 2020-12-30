@@ -1446,8 +1446,8 @@ void ImpalaServer::UnregisterQueryDiscardResult(
     const TUniqueId& query_id, bool check_inflight, const Status* cause) {
   Status status = UnregisterQuery(query_id, check_inflight, cause);
   if (!status.ok()) {
-    LOG(ERROR) << Substitute("Query de-registration for query_id={0} failed: {1}",
-        PrintId(query_id, cause->GetDetail()));
+    LOG(ERROR) << Substitute("Query de-registration for query_id=$0 failed: $1",
+        PrintId(query_id), cause->GetDetail());
   }
 }
 
@@ -1571,7 +1571,13 @@ Status ImpalaServer::GetQueryHandle(
     VLOG(1) << err.GetDetail();
     return err;
   }
-  query_handle->SetHandle(query_driver, query_driver->GetClientRequestState(query_id));
+  ClientRequestState* request_state = query_driver->GetClientRequestState(query_id);
+  if (UNLIKELY(request_state == nullptr)) {
+    Status err = Status::Expected(TErrorCode::INVALID_QUERY_HANDLE, PrintId(query_id));
+    VLOG(1) << err.GetDetail();
+    return err;
+  }
+  query_handle->SetHandle(query_driver, request_state);
   return Status::OK();
 }
 
@@ -2321,8 +2327,12 @@ void ImpalaServer::QueryStateRecord::Init(const ClientRequestState& query_handle
   }
   user_has_profile_access = query_handle.user_has_profile_access();
 
-  was_retried = query_handle.WasRetried();
-  if (was_retried) retried_query_id = make_unique<TUniqueId>(query_handle.retried_id());
+  // In some cases like canceling and closing the original query or closing the session
+  // we may not create the new query, we also check whether the retrided query id is set.
+  was_retried = query_handle.WasRetried() && query_handle.IsSetRetriedId();
+  if (was_retried) {
+    retried_query_id = make_unique<TUniqueId>(query_handle.retried_id());
+  }
 }
 
 bool ImpalaServer::QueryStateRecordLessThan::operator() (
