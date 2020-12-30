@@ -29,6 +29,7 @@
 #include "common/names.h"
 #include "common/thread-debug-info.h"
 
+DECLARE_string(debug_actions);
 namespace impala {
 
 QueryDriver::QueryDriver(ImpalaServer* parent_server) : parent_server_(parent_server) {}
@@ -104,7 +105,9 @@ ClientRequestState* QueryDriver::GetClientRequestState(const TUniqueId& query_id
     return retried_client_request_state_.get();
   }
   DCHECK(client_request_state_ != nullptr);
-  DCHECK(client_request_state_->query_id() == query_id);
+  // If cancel the retrying query the retried_client_request_state_ may not have been
+  // updated. In this case return nullptr
+  if (client_request_state_->query_id() != query_id) return nullptr;
   return client_request_state_.get();
 }
 
@@ -287,33 +290,50 @@ void QueryDriver::RetryQueryFromThread(
   // 'result_cache_max_size' value was already validated in ImpalaHs2Server, so it does
   // not need to be validated again.
   if (request_state->IsResultCacheingEnabled()) {
-    status = parent_server_->SetupResultsCacheing(
-        retry_query_handle, session, request_state->result_cache_max_size());
+    status = DebugAction(FLAGS_debug_actions, "QUERY_RETRY_SET_RESULT_CACHE");
+    if (status.ok()) {
+      status = parent_server_->SetupResultsCacheing(
+          retry_query_handle, session, request_state->result_cache_max_size());
+    }
     if (!status.ok()) {
       string error_msg = Substitute(
           "Setting up results cacheing for query $0 failed", PrintId(retry_query_id));
       HandleRetryFailure(&status, &error_msg, request_state, retry_query_id);
+      // 'retried_client_request_state_' hasn't been updated at this point, so the active
+      // ClientRequestState is still the original one. When HandleRetryFailure unregisters
+      // the retried query, it actually finalizes the original ClientRequestState. So we
+      // have to explicitly finalize 'retry_request_state', otherwise we'll hit some
+      // illegal states in destroying it.
+      RETURN_VOID_IF_ERROR(retry_request_state->Finalize(false, nullptr));
       return;
     }
   }
 
   // Mark the new query as "in flight".
-  status = parent_server_->SetQueryInflight(session, retry_query_handle);
+  status = DebugAction(FLAGS_debug_actions, "QUERY_RETRY_SET_QUERY_IN_FLIGHT");
+  if (status.ok()) {
+    status = parent_server_->SetQueryInflight(session, retry_query_handle);
+  }
   if (!status.ok()) {
     string error_msg = Substitute(
         "SetQueryInFlight for new query with id $0 failed", PrintId(retry_query_id));
     HandleRetryFailure(&status, &error_msg, request_state, retry_query_id);
+    RETURN_VOID_IF_ERROR(retry_request_state->Finalize(false, nullptr));
     return;
   }
 
+  DebugActionNoFail(FLAGS_debug_actions, "RETRY_DELAY_CHECKING_ORIGINAL_DRIVER");
   // 'client_request_state_' points to the original query and
   // 'retried_client_request_state_' points to the retried query.
   {
     // Before exposing the new query, check if the original query was unregistered while
     // the new query was being created. If it was, then abort the new query.
     if (parent_server_->GetQueryDriver(query_id) == nullptr) {
+      status = Status(TErrorCode::RUNTIME_ERROR,
+          "Failed to retry query since the original query was unregistered");
       string error_msg = Substitute("Query was unregistered");
       HandleRetryFailure(&status, &error_msg, request_state, retry_query_id);
+      RETURN_VOID_IF_ERROR(retry_request_state->Finalize(true, nullptr));
       return;
     }
     lock_guard<SpinLock> l(client_request_state_lock_);
@@ -371,6 +391,7 @@ void QueryDriver::CreateRetriedClientRequestState(ClientRequestState* request_st
 
 void QueryDriver::HandleRetryFailure(Status* status, string* error_msg,
     ClientRequestState* request_state, const TUniqueId& retry_query_id) {
+  DCHECK(status != nullptr && !status->ok());
   status->AddDetail(
       Substitute("Failed to retry query $0", PrintId(request_state->query_id())));
   status->AddDetail(*error_msg);

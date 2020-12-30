@@ -391,6 +391,10 @@ class ClientRequestState {
     return *retried_id_;
   }
 
+  bool IsSetRetriedId() const {
+    return retried_id_ != nullptr;
+  }
+
   /// Returns the QueryDriver that owns this ClientRequestState.
   QueryDriver* parent_driver() const { return parent_driver_; }
 
