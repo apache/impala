@@ -20,7 +20,9 @@ package org.apache.impala.rewrite;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.InlineViewRef;
 import org.apache.impala.analysis.Predicate;
+import org.apache.impala.analysis.TableRef;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.common.AnalysisException;
 
@@ -115,6 +117,17 @@ public class ConvertToCNFRule implements ExprRewriteRule {
           cpred.analyzeNoThrow(analyzer);
         }
         cpred.getIds(tids, null);
+        if (tids.size() == 1) {
+          TableRef tbl = analyzer.getTableRef(tids.get(0));
+          if (tbl instanceof InlineViewRef) {
+            Expr basePred = cpred.trySubstitute(((InlineViewRef)tbl).getBaseTblSmap(),
+                analyzer, false);
+            if (!basePred.equals(cpred)) {
+              tids.clear();
+              basePred.getIds(tids, null);
+            }
+          }
+        }
         if (tids.size() <= 1) {
           // if no transform is done, return the original predicate,
           // not the one that that may have been analyzed above

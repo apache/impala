@@ -2597,3 +2597,70 @@ PLAN-ROOT SINK
    HDFS partitions=11/11 files=11 size=814.73KB
    row-size=0B cardinality=11.00K
 ====
+# IMPALA-10412: ConvertToCNFRule can be applied to view table
+# Query inline view, where-clause predicate that can be pushed down to scan node
+with t as (select t1.test_id, t1.test_zip, t1.test_name, t2.zip from functional.jointbl t1
+join functional.testtbl t2 on t1.test_id = t2.id)
+select count(*) from t where t.test_zip = 1 or (t.test_name='xyz' and t.zip=1);
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.test_id = t2.id
+|  other predicates: t1.test_zip = 1 OR t2.zip = 1
+|  runtime filters: RF000 <- t2.id
+|  row-size=41B cardinality=19
+|
+|--01:SCAN HDFS [functional.testtbl t2]
+|     HDFS partitions=1/1 files=0 size=0B
+|     row-size=12B cardinality=0
+|
+00:SCAN HDFS [functional.jointbl t1]
+   HDFS partitions=1/1 files=1 size=433B
+   predicates: t1.test_zip = 1 OR t1.test_name = 'xyz'
+   runtime filters: RF000 -> t1.test_id
+   row-size=29B cardinality=19
+====
+# IMPALA-10412: ConvertToCNFRule can be applied to view table
+# Query inline view join another table, where-clause predicate that can be pushed down to scan node
+with t as (select t1.test_id, t1.test_zip, t1.test_name, t2.zip from functional.jointbl t1
+join functional.testtbl t2 on t1.test_id = t2.id)
+select count(*) from t, functional.alltypes other_table where t.test_id = other_table.id
+AND (t.test_zip = 1 or (t.test_name='xyz' and t.zip=1));
+---- PLAN
+PLAN-ROOT SINK
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: other_table.id = t1.test_id
+|  runtime filters: RF000 <- t1.test_id
+|  row-size=45B cardinality=8
+|
+|--02:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t1.test_id = t2.id
+|  |  other predicates: t1.test_zip = 1 OR t2.zip = 1
+|  |  runtime filters: RF002 <- t2.id
+|  |  row-size=41B cardinality=8
+|  |
+|  |--01:SCAN HDFS [functional.testtbl t2]
+|  |     HDFS partitions=1/1 files=0 size=0B
+|  |     row-size=12B cardinality=0
+|  |
+|  00:SCAN HDFS [functional.jointbl t1]
+|     HDFS partitions=1/1 files=1 size=433B
+|     predicates: t1.test_zip = 1 OR t1.test_name = 'xyz'
+|     runtime filters: RF002 -> t1.test_id
+|     row-size=29B cardinality=8
+|
+03:SCAN HDFS [functional.alltypes other_table]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   runtime filters: RF000 -> other_table.id
+   row-size=4B cardinality=7.30K
+====
