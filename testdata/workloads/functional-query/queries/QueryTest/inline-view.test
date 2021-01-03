@@ -555,3 +555,39 @@ order by 1 limit 5
 ---- TYPES
 INT,INT,TINYINT
 ====
+---- QUERY
+# IMPALA-10182: Nulls get eliminated with union-all for duplicate columns
+select count(*) from (
+select c1, c2 from (select tinyint_col c1, tinyint_col c2
+  from alltypesagg group by 1, 2) t1
+  group by 1, 2
+ union all
+select c1, c2 from (select tinyint_col c1, tinyint_col c2
+  from alltypesagg group by 1, 2) t1
+  group by 1, 2) tt;
+---- RESULTS
+20
+---- TYPES
+BIGINT
+====
+---- QUERY
+# IMPALA-10182: Nulls get eliminated with union-all for duplicate columns
+# Introduce nulls from the null producing side of left outer join
+with dt1 as (select t2.int_col y from alltypessmall t1
+  left outer join alltypestiny t2 on t1.int_col = t2.int_col)
+select * from (
+select c1, c2 from (select dt1.y c1, dt1.y c2 from dt1 group by 1, 2) t1
+  group by 1, 2
+ union all
+select c1, c2 from (select dt1.y c1, dt1.y c2 from dt1 group by 1, 2) t1
+  group by 1, 2) tt order by 1, 2;
+---- RESULTS
+0,0
+0,0
+1,1
+1,1
+NULL,NULL
+NULL,NULL
+---- TYPES
+INT, INT
+====
