@@ -2484,3 +2484,116 @@ PLAN-ROOT SINK
    HDFS partitions=4/4 files=4 size=6.32KB
    row-size=89B cardinality=100
 ====
+# IMPALA-10182: Nulls get eliminated with union-all for duplicate columns
+select c1, c2 from (select tinyint_col c1, tinyint_col c2
+  from functional.alltypesagg group by 1, 2) t1
+  group by 1, 2
+ union all
+select c1, c2 from (select tinyint_col c1, tinyint_col c2
+  from functional.alltypesagg group by 1, 2) t1
+  group by 1, 2;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=2B cardinality=18
+|
+|--06:AGGREGATE [FINALIZE]
+|  |  group by: tinyint_col, tinyint_col
+|  |  row-size=2B cardinality=9
+|  |
+|  05:AGGREGATE [FINALIZE]
+|  |  group by: tinyint_col
+|  |  row-size=1B cardinality=9
+|  |
+|  04:SCAN HDFS [functional.alltypesagg]
+|     HDFS partitions=11/11 files=11 size=814.73KB
+|     row-size=1B cardinality=11.00K
+|
+03:AGGREGATE [FINALIZE]
+|  group by: tinyint_col, tinyint_col
+|  row-size=2B cardinality=9
+|
+02:AGGREGATE [FINALIZE]
+|  group by: tinyint_col
+|  row-size=1B cardinality=9
+|
+01:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=1B cardinality=11.00K
+====
+# IMPALA-10182: Nulls get eliminated with union-all for duplicate columns
+# Introduce nulls from the null producing side of left outer join
+with dt1 as (select t2.int_col y from functional.alltypessmall t1
+  left outer join functional.alltypestiny t2 on t1.int_col = t2.int_col)
+select c1, c2 from (select dt1.y c1, dt1.y c2 from dt1 group by 1, 2) t1
+  group by 1, 2
+ union all
+select c1, c2 from (select dt1.y c1, dt1.y c2 from dt1 group by 1, 2) t1
+  group by 1, 2;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:UNION
+|  pass-through-operands: all
+|  row-size=8B cardinality=4
+|
+|--10:AGGREGATE [FINALIZE]
+|  |  group by: dt1.y, dt1.y
+|  |  row-size=8B cardinality=2
+|  |
+|  09:AGGREGATE [FINALIZE]
+|  |  group by: t2.int_col
+|  |  row-size=4B cardinality=2
+|  |
+|  08:HASH JOIN [LEFT OUTER JOIN]
+|  |  hash predicates: t1.int_col = t2.int_col
+|  |  row-size=8B cardinality=100
+|  |
+|  |--07:SCAN HDFS [functional.alltypestiny t2]
+|  |     HDFS partitions=4/4 files=4 size=460B
+|  |     row-size=4B cardinality=8
+|  |
+|  06:SCAN HDFS [functional.alltypessmall t1]
+|     HDFS partitions=4/4 files=4 size=6.32KB
+|     row-size=4B cardinality=100
+|
+05:AGGREGATE [FINALIZE]
+|  group by: dt1.y, dt1.y
+|  row-size=8B cardinality=2
+|
+04:AGGREGATE [FINALIZE]
+|  group by: t2.int_col
+|  row-size=4B cardinality=2
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.int_col = t2.int_col
+|  row-size=8B cardinality=100
+|
+|--02:SCAN HDFS [functional.alltypestiny t2]
+|     HDFS partitions=4/4 files=4 size=460B
+|     row-size=4B cardinality=8
+|
+01:SCAN HDFS [functional.alltypessmall t1]
+   HDFS partitions=4/4 files=4 size=6.32KB
+   row-size=4B cardinality=100
+====
+# IMPALA-9694 IllegalStateException was being thrown
+# (related to the same root cause as IMPALA-10182 above)
+# Note that the analytic function does not show up in the final plan.
+# It is optimized out since the caller is only computing count(*)
+select count(*) from (select
+  lead(timestamp_col) over (partition by int_col order by timestamp_col) c1,
+  int_col c2, int_col c3 from functional.alltypesagg) v;
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=0B cardinality=11.00K
+====

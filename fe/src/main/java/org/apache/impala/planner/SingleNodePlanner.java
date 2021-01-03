@@ -467,8 +467,24 @@ public class SingleNodePlanner {
       analyzer.createEquivConjuncts(tid, conjuncts);
     }
     if (conjuncts.isEmpty()) return root;
+
+    List<Expr> finalConjuncts = new ArrayList<>();
+    // Check if this is an inferred identity predicate i.e for c1 = c2 both
+    // sides are pointing to the same source slot. In such cases it is wrong
+    // to add the predicate to the SELECT node because it will incorrectly
+    // eliminate rows with NULL values.
+    for (Expr e : conjuncts) {
+      if (e instanceof BinaryPredicate && ((BinaryPredicate) e).isInferred()) {
+        SlotDescriptor lhs = ((BinaryPredicate) e).getChild(0).findSrcScanSlot();
+        SlotDescriptor rhs = ((BinaryPredicate) e).getChild(1).findSrcScanSlot();
+        if (lhs != null && rhs != null && lhs.equals(rhs)) continue;
+      }
+      finalConjuncts.add(e);
+    }
+    if (finalConjuncts.isEmpty()) return root;
+
     // evaluate conjuncts in SelectNode
-    SelectNode selectNode = new SelectNode(ctx_.getNextNodeId(), root, conjuncts);
+    SelectNode selectNode = new SelectNode(ctx_.getNextNodeId(), root, finalConjuncts);
     // init() marks conjuncts as assigned
     selectNode.init(analyzer);
     Preconditions.checkState(selectNode.hasValidStats());
