@@ -24,3 +24,85 @@ select "'"
 ---- TYPES
 STRING
 ====
+---- QUERY
+select "你好"
+---- RESULTS
+'\u4f60\u597d'
+---- TYPES
+STRING
+====
+---- QUERY
+select "你好"
+---- RESULTS: RAW_STRING
+'你好'
+---- TYPES
+STRING
+====
+---- QUERY
+select "你好\n你好"
+---- RESULTS
+'\u4f60\u597d\n\u4f60\u597d'
+---- TYPES
+STRING
+====
+---- QUERY
+select "你好\n你好"
+---- RESULTS: RAW_STRING,MULTI_LINE
+['你好
+你好']
+---- TYPES
+STRING
+====
+---- QUERY
+select "你好\\n你好"
+---- RESULTS
+'\u4f60\u597d\\n\u4f60\u597d'
+---- TYPES
+STRING
+====
+---- QUERY
+select "你好\\n你好"
+---- RESULTS: RAW_STRING
+'你好\n你好'
+---- TYPES
+STRING
+====
+---- QUERY
+select "你好", "Halló", "여보세요"
+---- RESULTS
+'\u4f60\u597d','Hall\xf3','\uc5ec\ubcf4\uc138\uc694'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+select "你好", "Halló", "여보세요"
+---- RESULTS: RAW_STRING
+'你好','Halló','여보세요'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+values ("你好"), ("Halló"), ("여보세요")
+---- RESULTS: RAW_STRING,VERIFY_IS_SUBSET
+'你好'
+'여보세요'
+---- TYPES
+STRING
+====
+---- QUERY
+values ("你好"), ("Halló"), ("여보세요")
+---- RESULTS: RAW_STRING,VERIFY_IS_SUPERSET
+'你好'
+'여보세요'
+'Halló'
+'hello'
+---- TYPES
+STRING
+====
+---- QUERY
+values ("你好"), ("Halló"), ("여보세요")
+---- RESULTS: RAW_STRING,VERIFY_IS_NOT_IN
+'hello'
+---- TYPES
+STRING
+====

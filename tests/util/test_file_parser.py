@@ -215,6 +215,8 @@ def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
         for comment in subsection_comment.split(','):
           if comment == 'MULTI_LINE':
             parsed_sections['MULTI_LINE'] = comment
+          elif comment == 'RAW_STRING':
+            parsed_sections['RAW_STRING'] = comment
           elif comment.startswith('VERIFY'):
             parsed_sections['VERIFIER'] = comment
           else:
