@@ -240,8 +240,8 @@ def verify_query_result_is_subset(expected_results, actual_results):
   """Check whether the results in expected_results are a subset of the results in
   actual_results. This uses set semantics, i.e. any duplicates are ignored."""
   expected_literals, expected_non_literals = expected_results.separate_rows()
-  expected_literal_strings = set([str(row) for row in expected_literals])
-  actual_literal_strings = set([str(row) for row in actual_results.rows])
+  expected_literal_strings = set([unicode(row) for row in expected_literals])
+  actual_literal_strings = set([unicode(row) for row in actual_results.rows])
   # Expected literal strings must all be present in the actual strings.
   assert expected_literal_strings <= actual_literal_strings
   # Expected patterns must be present in the actual strings.
@@ -251,18 +251,18 @@ def verify_query_result_is_subset(expected_results, actual_results):
       if actual_row == expected_row:
         matched = True
         break
-    assert matched, "Could not find expected row {0} in actual rows:\n{1}".format(
-        str(expected_row), str(actual_results))
+    assert matched, u"Could not find expected row {0} in actual rows:\n{1}".format(
+        unicode(expected_row), unicode(actual_results))
 
 def verify_query_result_is_superset(expected_results, actual_results):
   """Check whether the results in expected_results are a superset of the results in
   actual_results. This uses set semantics, i.e. any duplicates are ignored."""
   expected_literals, expected_non_literals = expected_results.separate_rows()
-  expected_literal_strings = set([str(row) for row in expected_literals])
+  expected_literal_strings = set([unicode(row) for row in expected_literals])
   # Check that all actual rows are present in either expected_literal_strings or
   # expected_non_literals.
   for actual_row in actual_results.rows:
-    if str(actual_row) in expected_literal_strings:
+    if unicode(actual_row) in expected_literal_strings:
       # Matched to a literal string
       continue
     matched = False
@@ -270,8 +270,8 @@ def verify_query_result_is_superset(expected_results, actual_results):
       if actual_row == expected_row:
         matched = True
         break
-    assert matched, "Could not find actual row {0} in expected rows:\n{1}".format(
-        str(actual_row), str(expected_results))
+    assert matched, u"Could not find actual row {0} in expected rows:\n{1}".format(
+        unicode(actual_row), unicode(expected_results))
 
 def verify_query_result_is_equal(expected_results, actual_results):
   assert_args_not_none(expected_results, actual_results)
@@ -279,8 +279,8 @@ def verify_query_result_is_equal(expected_results, actual_results):
 
 def verify_query_result_is_not_in(expected_results, actual_results):
   assert_args_not_none(expected_results, actual_results)
-  expected_set = set(map(str, expected_results.rows))
-  actual_set = set(map(str, actual_results.rows))
+  expected_set = set(map(unicode, expected_results.rows))
+  actual_set = set(map(unicode, actual_results.rows))
   assert expected_set.isdisjoint(actual_set)
 
 # Global dictionary that maps the verification type to appropriate verifier.
@@ -357,6 +357,15 @@ def verify_raw_results(test_section, exec_result, file_format, result_section,
   expected_results = None
   if result_section in test_section:
     expected_results = remove_comments(test_section[result_section])
+    if isinstance(expected_results, str):
+      # Always convert 'str' to 'unicode' since pytest will fail to report assertion
+      # failures when any 'str' values contain non-ascii bytes (IMPALA-10419).
+      try:
+        expected_results = expected_results.decode('utf-8')
+      except UnicodeDecodeError as e:
+        LOG.info("Illegal UTF-8 characters in expected results: {0}\n{1}".format(
+            expected_results, e))
+        assert False
   else:
     assert 'ERRORS' not in test_section, "'ERRORS' section must have accompanying 'RESULTS' section"
     LOG.info("No results found. Skipping verification")
@@ -442,15 +451,19 @@ def verify_raw_results(test_section, exec_result, file_format, result_section,
   if verifier and verifier.upper() == 'VERIFY_IS_EQUAL_SORTED':
     order_matters = False
   expected_results_list = []
+  is_raw_string = 'RAW_STRING' in test_section
   if 'MULTI_LINE' in test_section:
-    expected_results_list = map(lambda s: s.replace('\n', '\\n'),
-        re.findall(r'\[(.*?)\]', expected_results, flags=re.DOTALL))
+    expected_results_list = re.findall(r'\[(.*?)\]', expected_results, flags=re.DOTALL)
+    if not is_raw_string:
+      # Needs escaping
+      expected_results_list = map(lambda s: s.replace('\n', '\\n'), expected_results_list)
   else:
     expected_results_list = split_section_lines(expected_results)
   expected = QueryTestResult(expected_results_list, expected_types,
       actual_labels, order_matters)
-  actual = QueryTestResult(parse_result_rows(exec_result), actual_types,
-      actual_labels, order_matters)
+  actual = QueryTestResult(
+      parse_result_rows(exec_result, escape_strings=(not is_raw_string)),
+      actual_types, actual_labels, order_matters)
   assert verifier in VERIFIER_MAP.keys(), "Unknown verifier: " + verifier
   try:
     VERIFIER_MAP[verifier](expected, actual)
@@ -470,7 +483,8 @@ def create_query_result(exec_result, order_matters=False):
   return QueryTestResult(data, exec_result.column_types, exec_result.column_labels,
                          order_matters)
 
-def parse_result_rows(exec_result):
+
+def parse_result_rows(exec_result, escape_strings=True):
   """
   Parses a query result set and transforms it to the format used by the query test files
   """
@@ -490,9 +504,18 @@ def parse_result_rows(exec_result):
     new_cols = list()
     for i in xrange(len(cols)):
       if col_types[i] in ['STRING', 'CHAR', 'VARCHAR']:
-        col = cols[i].encode('unicode_escape')
-        # Escape single quotes to match .test file format.
-        col = col.replace("'", "''")
+        col = cols[i]
+        if isinstance(col, str):
+          try:
+            col = col.decode('utf-8')
+          except UnicodeDecodeError as e:
+            LOG.info("Illegal UTF-8 characters in actual results: {0}\n{1}".format(
+                col, e))
+            assert False
+        if escape_strings:
+          col = col.encode('unicode_escape').decode('utf-8')
+          # Escape single quotes to match .test file format.
+          col = col.replace("'", "''")
         new_cols.append("'%s'" % col)
       else:
         new_cols.append(cols[i])
