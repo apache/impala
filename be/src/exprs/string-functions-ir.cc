@@ -55,6 +55,9 @@ const char* ERROR_CHARACTER_LIMIT_EXCEEDED =
 StringVal StringFunctions::Substring(FunctionContext* context,
     const StringVal& str, const BigIntVal& pos, const BigIntVal& len) {
   if (str.is_null || pos.is_null || len.is_null) return StringVal::null();
+  if (context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE)) {
+    return Utf8Substring(context, str, pos, len);
+  }
   int fixed_pos = pos.val;
   if (fixed_pos < 0) fixed_pos = str.len + fixed_pos + 1;
   int max_len = str.len - fixed_pos + 1;
@@ -70,6 +73,60 @@ StringVal StringFunctions::Substring(FunctionContext* context,
     const StringVal& str, const BigIntVal& pos) {
   // StringVal.len is an int => INT32_MAX
   return Substring(context, str, pos, BigIntVal(INT32_MAX));
+}
+
+StringVal StringFunctions::Utf8Substring(FunctionContext* context, const StringVal& str,
+    const BigIntVal& pos) {
+  return Utf8Substring(context, str, pos, BigIntVal(INT32_MAX));
+}
+
+StringVal StringFunctions::Utf8Substring(FunctionContext* context, const StringVal& str,
+    const BigIntVal& pos, const BigIntVal& len) {
+  if (str.is_null || pos.is_null || len.is_null) return StringVal::null();
+  if (str.len == 0 || pos.val == 0 || len.val <= 0) return StringVal();
+
+  int byte_pos;
+  int utf8_cnt = 0;
+  // pos.val starts at 1 (1-indexed positions).
+  if (pos.val > 0) {
+    // Seek to the start byte of the pos-th UTF-8 character.
+    for (byte_pos = 0; utf8_cnt < pos.val && byte_pos < str.len; ++byte_pos) {
+      if (BitUtil::IsUtf8StartByte(str.ptr[byte_pos])) ++utf8_cnt;
+    }
+    // Not enough UTF-8 characters.
+    if (utf8_cnt < pos.val) return StringVal();
+    // Back to the start byte of the pos-th UTF-8 character.
+    --byte_pos;
+    int byte_start = byte_pos;
+    // Seek to the end until we get enough UTF-8 characters.
+    for (utf8_cnt = 0; utf8_cnt < len.val && byte_pos < str.len; ++byte_pos) {
+      if (BitUtil::IsUtf8StartByte(str.ptr[byte_pos])) ++utf8_cnt;
+    }
+    if (utf8_cnt == len.val) {
+      // We are now at the middle byte of the last UTF-8 character. Seek to the end of it.
+      while (byte_pos < str.len && !BitUtil::IsUtf8StartByte(str.ptr[byte_pos])) {
+        ++byte_pos;
+      }
+    }
+    return StringVal(str.ptr + byte_start, byte_pos - byte_start);
+  }
+  // pos.val is negative. Seek from the end of the string.
+  int byte_end = str.len;
+  utf8_cnt = 0;
+  byte_pos = str.len - 1;
+  while (utf8_cnt < -pos.val && byte_pos >= 0) {
+    if (BitUtil::IsUtf8StartByte(str.ptr[byte_pos])) {
+      ++utf8_cnt;
+      // Remember the end of the substring's last UTF-8 character.
+      if (utf8_cnt > 0 && utf8_cnt == -pos.val - len.val) byte_end = byte_pos;
+    }
+    --byte_pos;
+  }
+  // Not enough UTF-8 characters.
+  if (utf8_cnt < -pos.val) return StringVal();
+  // Back to the start byte of the substring's first UTF-8 character.
+  ++byte_pos;
+  return StringVal(str.ptr + byte_pos, byte_end - byte_pos);
 }
 
 // This behaves identically to the mysql implementation.
@@ -195,6 +252,9 @@ StringVal StringFunctions::Rpad(FunctionContext* context, const StringVal& str,
 
 IntVal StringFunctions::Length(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return IntVal::null();
+  if (context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE, 0)) {
+    return Utf8Length(context, str);
+  }
   return IntVal(str.len);
 }
 
@@ -203,6 +263,15 @@ IntVal StringFunctions::CharLength(FunctionContext* context, const StringVal& st
   const FunctionContext::TypeDesc* t = context->GetArgType(0);
   DCHECK_EQ(t->type, FunctionContext::TYPE_FIXED_BUFFER);
   return StringValue::UnpaddedCharLength(reinterpret_cast<char*>(str.ptr), t->len);
+}
+
+IntVal StringFunctions::Utf8Length(FunctionContext* context, const StringVal& str) {
+  if (str.is_null) return IntVal::null();
+  int len = 0;
+  for (int i = 0; i < str.len; ++i) {
+    if (BitUtil::IsUtf8StartByte(str.ptr[i])) ++len;
+  }
+  return IntVal(len);
 }
 
 StringVal StringFunctions::Lower(FunctionContext* context, const StringVal& str) {
@@ -407,9 +476,43 @@ StringVal StringFunctions::Replace(FunctionContext* context, const StringVal& st
 
 StringVal StringFunctions::Reverse(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
+  if (context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE)) {
+    return Utf8Reverse(context, str);
+  }
   StringVal result(context, str.len);
   if (UNLIKELY(result.is_null)) return StringVal::null();
   BitUtil::ByteSwap(result.ptr, str.ptr, str.len);
+  return result;
+}
+
+static inline void InPlaceReverse(uint8_t* ptr, int len) {
+  for (int i = 0, j = len - 1; i < j; ++i, --j) {
+    uint8_t tmp = ptr[i];
+    ptr[i] = ptr[j];
+    ptr[j] = tmp;
+  }
+}
+
+// Returns a string with the UTF-8 characters (code points) in revrese order. Note that
+// this function operates on Unicode code points and not user visible characters (or
+// grapheme clusters). This is consistent with other systems, e.g. Hive, SparkSQL.
+StringVal StringFunctions::Utf8Reverse(FunctionContext* context, const StringVal& str) {
+  if (str.is_null) return StringVal::null();
+  if (str.len == 0) return StringVal();
+  StringVal result(context, str.len);
+  if (UNLIKELY(result.is_null)) return StringVal::null();
+  // First make a copy of the reversed string.
+  BitUtil::ByteSwap(result.ptr, str.ptr, str.len);
+  // Then reverse bytes inside each UTF-8 character.
+  int last = result.len;
+  for (int i = result.len - 1; i >= 0; --i) {
+    if (BitUtil::IsUtf8StartByte(result.ptr[i])) {
+      // Only reverse bytes of a UTF-8 character
+      if (last - i > 1) InPlaceReverse(result.ptr + i + 1, last - i);
+      last = i;
+    }
+  }
+  if (last > 0) InPlaceReverse(result.ptr, last + 1);
   return result;
 }
 

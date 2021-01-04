@@ -1,0 +1,116 @@
+====
+---- QUERY
+set utf8_mode=true;
+select length('你好'), length('你好hello'), length('你好 hello 你好')
+---- RESULTS
+2,7,11
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+set utf8_mode=false;
+select length('你好'), length('你好hello'), length('你好 hello 你好')
+---- RESULTS
+6,11,19
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+set utf8_mode=true;
+select substring('你好hello', 1, 3)
+---- RESULTS: RAW_STRING
+'你好h'
+---- TYPES
+STRING
+====
+---- QUERY
+set utf8_mode=false;
+select substring('你好hello', 1, 3)
+---- RESULTS: RAW_STRING
+'你'
+---- TYPES
+STRING
+====
+---- QUERY
+set utf8_mode=true;
+select reverse('你好hello你好');
+---- RESULTS: RAW_STRING
+'好你olleh好你'
+---- TYPES
+STRING
+====
+---- QUERY
+set utf8_mode=off;
+select id, length(name), substring(name, 1, 3), length(substring(name, 1, 3)) from utf8_str_tiny
+---- RESULTS: RAW_STRING
+1,6,'张',3
+2,6,'李',3
+3,6,'王',3
+4,9,'李',3
+5,5,'Ali',3
+6,6,'陈',3
+7,7,'Бo',3
+8,5,'Jö',3
+9,9,'ひ',3
+10,6,'서',3
+---- TYPES
+INT,INT,STRING,INT
+====
+---- QUERY
+set utf8_mode=true;
+select id, length(name), substring(name, 1, 2), reverse(name) from utf8_str_tiny
+---- RESULTS: RAW_STRING
+1,2,'张三','三张'
+2,2,'李四','四李'
+3,2,'王五','五王'
+4,3,'李小','龙小李'
+5,5,'Al','ecilA'
+6,4,'陈B','boB陈'
+7,5,'Бo','cиpoБ'
+8,4,'Jö','gröJ'
+9,3,'ひな','たなひ'
+10,2,'서연','연서'
+---- TYPES
+INT,INT,STRING,STRING
+====
+---- QUERY
+# Test utf8 functions in where clause.
+set utf8_mode=true;
+select id, name from functional.utf8_str_tiny
+where length(name) = 2 and substring(name, 1, 1) = '李';
+---- RESULTS: RAW_STRING
+2,'李四'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Test utf8 functions in group by clause. group_concat() may produce undetermined results
+# due to the order. Here we wrap it with length().
+set utf8_mode=true;
+select substring(name, 1, 1), length(group_concat(name)) from functional.utf8_str_tiny
+group by substring(name, 1, 1);
+---- RESULTS: RAW_STRING
+'A',5
+'ひ',3
+'陈',4
+'王',2
+'张',2
+'서',2
+'J',4
+'Б',5
+'李',7
+---- TYPES
+STRING,INT
+====
+---- QUERY
+# Test utf8 functions in group by and having clauses. group_concat() may produce
+# undetermined results due to the order. Here we wrap it with length().
+set utf8_mode=true;
+select substring(name, 1, 1), length(group_concat(name)) from functional.utf8_str_tiny
+group by substring(name, 1, 1)
+having length(group_concat(name)) = 7;
+---- RESULTS: RAW_STRING
+'李',7
+---- TYPES
+STRING,INT
+====

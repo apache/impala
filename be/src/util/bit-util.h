@@ -120,6 +120,11 @@ class BitUtil {
   /// Returns the rounded down to 64 multiple.
   constexpr static inline uint32_t RoundDownNumi64(uint32_t bits) { return bits >> 6; }
 
+  /// Returns whether the given byte is the start byte of a UTF-8 character.
+  constexpr static inline bool IsUtf8StartByte(uint8_t b) {
+    return (b & 0xC0) != 0x80;
+  }
+
   /// Non hw accelerated pop count.
   /// TODO: we don't use this in any perf sensitive code paths currently.  There
   /// might be a much faster way to implement this.

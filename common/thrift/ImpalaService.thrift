@@ -617,6 +617,10 @@ enum TImpalaQueryOptions {
   // canceled if the query is still executing after this limit is hit. A value
   // of 0 means there is no limit on the number of join rows produced.
   JOIN_ROWS_PRODUCED_LIMIT = 119
+
+  // If true, strings are processed in a UTF-8 aware way, e.g. counting lengths by UTF-8
+  // characters instead of bytes.
+  UTF8_MODE = 120
 }
 
 // The summary of a DML statement.

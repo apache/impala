@@ -1010,7 +1010,8 @@ int LlvmCodeGen::InlineConstFnAttrs(const FunctionContext::TypeDesc& ret_type,
     DCHECK(state_ != nullptr);
     // All supported constants are currently integers.
     call_instr->replaceAllUsesWith(GetI32Constant(FunctionContextImpl::GetConstFnAttr(
-        state_->query_options().decimal_v2, ret_type, arg_types, t_val, i_val)));
+        state_->query_options().decimal_v2, state_->query_options().utf8_mode, ret_type,
+        arg_types, t_val, i_val)));
     call_instr->eraseFromParent();
     ++replaced;
   }

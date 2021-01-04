@@ -99,6 +99,11 @@ class RuntimeState {
     return false;
   }
 
+  bool utf8_mode() const {
+    assert(false);
+    return false;
+  }
+
   bool LogError(const std::string& error) {
     assert(false);
     return false;
@@ -558,10 +563,11 @@ static int GetTypeByteSize(const FunctionContext::TypeDesc& type) {
 }
 
 int FunctionContextImpl::GetConstFnAttr(FunctionContextImpl::ConstFnAttr t, int i) {
-  return GetConstFnAttr(state_->decimal_v2(), return_type_, arg_types_, t, i);
+  return GetConstFnAttr(state_->decimal_v2(), state_->utf8_mode(), return_type_,
+      arg_types_, t, i);
 }
 
-int FunctionContextImpl::GetConstFnAttr(bool uses_decimal_v2,
+int FunctionContextImpl::GetConstFnAttr(bool uses_decimal_v2, bool is_utf8_mode,
     const FunctionContext::TypeDesc& return_type,
     const vector<FunctionContext::TypeDesc>& arg_types, ConstFnAttr t, int i) {
   switch (t) {
@@ -592,6 +598,8 @@ int FunctionContextImpl::GetConstFnAttr(bool uses_decimal_v2,
       return arg_types[i].scale;
     case DECIMAL_V2:
       return uses_decimal_v2;
+    case UTF8_MODE:
+      return is_utf8_mode;
     default:
       assert(false);
       return -1;

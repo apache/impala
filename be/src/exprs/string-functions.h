@@ -58,6 +58,10 @@ class StringFunctions {
       const BigIntVal& len);
   static StringVal Substring(FunctionContext*, const StringVal& str,
       const BigIntVal& pos);
+  static StringVal Utf8Substring(FunctionContext*, const StringVal& str,
+      const BigIntVal& pos, const BigIntVal& len);
+  static StringVal Utf8Substring(FunctionContext*, const StringVal& str,
+      const BigIntVal& pos);
   static StringVal SplitPart(FunctionContext* context, const StringVal& str,
       const StringVal& delim, const BigIntVal& field);
   static StringVal Left(FunctionContext*, const StringVal& str, const BigIntVal& len);
@@ -70,6 +74,7 @@ class StringFunctions {
       const StringVal& pad);
   static IntVal Length(FunctionContext*, const StringVal& str);
   static IntVal CharLength(FunctionContext*, const StringVal& str);
+  static IntVal Utf8Length(FunctionContext*, const StringVal& str);
   static StringVal Lower(FunctionContext*, const StringVal& str);
   static StringVal Upper(FunctionContext*, const StringVal& str);
   static StringVal InitCap(FunctionContext*, const StringVal& str);
@@ -78,6 +83,7 @@ class StringFunctions {
   static StringVal Replace(FunctionContext*, const StringVal& str,
       const StringVal& pattern, const StringVal& replace);
   static StringVal Reverse(FunctionContext*, const StringVal& str);
+  static StringVal Utf8Reverse(FunctionContext*, const StringVal& str);
   static StringVal Translate(FunctionContext*, const StringVal& str, const StringVal& src,
       const StringVal& dst);
   static StringVal Trim(FunctionContext*, const StringVal& str);
