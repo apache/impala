@@ -154,6 +154,8 @@ class FunctionContextImpl {
     ARG_TYPE_SCALE, // int[]
     /// True if decimal_v2 query option is set.
     DECIMAL_V2,
+    /// True if utf8_mode query option is set.
+    UTF8_MODE,
   };
 
   /// This function returns the various static attributes of the UDF/UDA. Calls to this
@@ -170,7 +172,7 @@ class FunctionContextImpl {
   int GetConstFnAttr(ConstFnAttr t, int i = -1);
 
   /// Return the function attribute 't' defined in ConstFnAttr above.
-  static int GetConstFnAttr(bool uses_decimal_v2,
+  static int GetConstFnAttr(bool uses_decimal_v2, bool is_utf8_mode,
       const impala_udf::FunctionContext::TypeDesc& return_type,
       const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types, ConstFnAttr t,
       int i = -1);

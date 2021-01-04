@@ -102,6 +102,7 @@ class RuntimeState {
   int batch_size() const { return query_options().batch_size; }
   bool abort_on_error() const { return query_options().abort_on_error; }
   bool strict_mode() const { return query_options().strict_mode; }
+  bool utf8_mode() const { return query_options().utf8_mode; }
   bool decimal_v2() const { return query_options().decimal_v2; }
   const TQueryCtx& query_ctx() const;
   const TPlanFragment& fragment() const { return *fragment_; }

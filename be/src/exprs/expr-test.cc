@@ -10539,6 +10539,86 @@ TEST_P(ExprTest, MaskHashTest) {
   TestIsNull("mask_hash(cast('2016-04-20' as timestamp))", TYPE_TIMESTAMP);
 }
 
+TEST_P(ExprTest, Utf8Test) {
+  // Verifies utf8_length() counts length by UTF-8 characters instead of bytes.
+  // '你' and '好' are both encoded into 3 bytes.
+  TestIsNull("utf8_length(NULL)", TYPE_INT);
+  TestValue("utf8_length('你好')", TYPE_INT, 2);
+  TestValue("utf8_length('你好hello')", TYPE_INT, 7);
+  TestValue("utf8_length('你好 hello 你好')", TYPE_INT, 11);
+  TestValue("utf8_length('hello')", TYPE_INT, 5);
+
+  // Verifies position and length of utf8_substring() are UTF-8 aware.
+  // '你' and '好' are both encoded into 3 bytes.
+  TestStringValue("utf8_substring('Hello', 1)", "Hello");
+  TestStringValue("utf8_substring('Hello', -2)", "lo");
+  TestStringValue("utf8_substring('Hello', cast(0 as bigint))", "");
+  TestStringValue("utf8_substring('Hello', -5)", "Hello");
+  TestStringValue("utf8_substring('Hello', cast(-6 as bigint))", "");
+  TestStringValue("utf8_substring('Hello', 100)", "");
+  TestStringValue("utf8_substring('Hello', -100)", "");
+  TestIsNull("utf8_substring(NULL, 100)", TYPE_STRING);
+  TestIsNull("utf8_substring('Hello', NULL)", TYPE_STRING);
+  TestIsNull("utf8_substring(NULL, NULL)", TYPE_STRING);
+  TestStringValue("utf8_substring('Hello', 1, 1)", "H");
+  TestStringValue("utf8_substring('Hello', cast(2 as bigint), 100)", "ello");
+  TestStringValue("utf8_substring('Hello', -3, cast(2 as bigint))", "ll");
+  TestStringValue("utf8_substring('Hello', 1, 0)", "");
+  TestStringValue("utf8_substring('Hello', cast(1 as bigint), cast(-1 as bigint))", "");
+  TestIsNull("utf8_substring(NULL, 1, 100)", TYPE_STRING);
+  TestIsNull("utf8_substring('Hello', NULL, 100)", TYPE_STRING);
+  TestIsNull("utf8_substring('Hello', 1, NULL)", TYPE_STRING);
+  TestIsNull("utf8_substring(NULL, NULL, NULL)", TYPE_STRING);
+  TestStringValue("utf8_substring('你好', 0)", "");
+  TestStringValue("utf8_substring('你好', 1)", "你好");
+  TestStringValue("utf8_substring('你好', 2)", "好");
+  TestStringValue("utf8_substring('你好', 3)", "");
+  TestStringValue("utf8_substring('你好', 0, 1)", "");
+  TestStringValue("utf8_substring('你好', 1, 0)", "");
+  TestStringValue("utf8_substring('你好', 1, 1)", "你");
+  TestStringValue("utf8_substring('你好', 1, -1)", "");
+  TestStringValue("utf8_substring('你好hello', 1, 4)", "你好he");
+  TestStringValue("utf8_substring('hello你好', 2, 5)", "ello你");
+  TestStringValue("utf8_substring('你好hello你好', -1)", "好");
+  TestStringValue("utf8_substring('你好hello你好', -2)", "你好");
+  TestStringValue("utf8_substring('你好hello你好', -3)", "o你好");
+  TestStringValue("utf8_substring('你好hello你好', -7)", "hello你好");
+  TestStringValue("utf8_substring('你好hello你好', -8)", "好hello你好");
+  TestStringValue("utf8_substring('你好hello你好', -9)", "你好hello你好");
+  TestStringValue("utf8_substring('你好hello你好', -10)", "");
+  TestStringValue("utf8_substring('你好hello你好', -3, cast(2 as bigint))", "o你");
+  TestStringValue("utf8_substring('你好hello你好', -1, -1)", "");
+
+  // Verifies utf8_reverse() reverses the UTF-8 characters (code points).
+  // '你' and '好' are both encoded into 3 bytes.
+  TestIsNull("utf8_reverse(NULL)", TYPE_STRING);
+  TestStringValue("utf8_reverse('hello')", "olleh");
+  TestStringValue("utf8_reverse('')", "");
+  TestStringValue("utf8_reverse('你好')", "好你");
+  TestStringValue("utf8_reverse('你好hello')", "olleh好你");
+  TestStringValue("utf8_reverse('hello你好')", "好你olleh");
+  TestStringValue("utf8_reverse('你好hello你好')", "好你olleh好你");
+  TestStringValue("utf8_reverse('hello你好hello')", "olleh好你olleh");
+  // '🙂' is encoded into 1 code points (U+1F642) and finally encoded into 4 bytes.
+  TestStringValue("utf8_reverse('hello🙂')", "🙂olleh");
+  // Verifies utf8_reverse() reverse code points instead of grapheme clusters.
+  // 'ñ' can be encoded into 1-2 code points depending on the normalization.
+  // In NFC, it's U+00F1 which is encoded into 2 bytes (0xc3 0xb1).
+  // In NFD, it's 'n' and U+0303 which are finally encoded into 3 bytes (0x6e for 'n' and
+  // 0xcc 0x83 for the '~'). Here "n\u0303" is a grapheme cluster.
+  TestStringValue("utf8_reverse('ma\u00f1ana')", "ana\u00f1am");
+  TestStringValue("utf8_reverse('man\u0303ana')", "ana\u0303nam");
+  // NFC(default in Linux) is used in this file so the following test can pass.
+  TestStringValue("utf8_reverse('mañana')", "anañam");
+  // "\u0928\u0940" is a grapheme clusters, same as "\u0ba8\u0bbf" and
+  // "\U0001f468\u200d\U0001f468\u200d\U0001f467\u200d\U0001f467".
+  // The string is reversed in code points.
+  TestStringValue("utf8_reverse('\u0928\u0940\u0ba8\u0bbf"
+      "\U0001f468\u200d\U0001f468\u200d\U0001f467\u200d\U0001f467')",
+      "\U0001f467\u200d\U0001f467\u200d\U0001f468\u200d\U0001f468"
+      "\u0bbf\u0ba8\u0940\u0928");
+}
+
 } // namespace impala
 
 INSTANTIATE_TEST_CASE_P(Instantiations, ExprTest, ::testing::Values(

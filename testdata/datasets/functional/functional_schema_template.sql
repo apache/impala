@@ -3075,3 +3075,18 @@ AS SELECT * FROM {db_name}{db_suffix}.alltypes_date_partition_2 [convert_limit_t
 where [always_true] date_col = cast(timestamp_col as date) and int_col in (select int_col from {db_name}{db_suffix}.alltypessmall);
 ---- LOAD
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+utf8_str_tiny
+---- COLUMNS
+id int
+name string
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT id, name FROM {db_name}.{table_name};
+---- LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} VALUES
+  (1, "张三"), (2, "李四"), (3, "王五"), (4, "李小龙"), (5, "Alice"),
+  (6, "陈Bob"), (7, "Бopиc"), (8, "Jörg"), (9, "ひなた"), (10, "서연");
+====
