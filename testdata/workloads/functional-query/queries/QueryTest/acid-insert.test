@@ -25,6 +25,9 @@ select i from insertonly_nopart order by i;
 INT
 ====
 ---- QUERY
+# IMPALA-10422: Run EXPLAIN before INSERT OVERWRITE to check that
+# EXPLAIN statements don't leak transactions and locks.
+explain insert overwrite insertonly_nopart values (10);
 insert overwrite insertonly_nopart values (10);
 ====
 ---- QUERY
