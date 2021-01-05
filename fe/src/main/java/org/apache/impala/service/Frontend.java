@@ -1639,8 +1639,8 @@ public class Frontend {
           return result;
         }
       }
-      if (analysisResult.isInsertStmt() ||
-          analysisResult.isCreateTableAsSelectStmt()) {
+      if (!analysisResult.isExplainStmt() &&
+          (analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt())) {
         InsertStmt insertStmt = analysisResult.getInsertStmt();
         FeTable targetTable = insertStmt.getTargetTable();
         if (AcidUtils.isTransactionalTable(
