@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!DOCTYPE concept PUBLIC "-//OASIS//DTD DITA Concept//EN" "concept.dtd">
+<concept rev="4.0 IMPALA-10091" id="refresh_updated_hms">
+
+ <title>REFRESH_UPDATED_HMS_PARTITIONS Query Option</title>
+
+ <titlealts audience="PDF">
+
+  <navtitle>REFRESH_UPDATED_HMS_PARTITIONS</navtitle>
+
+ </titlealts>
+
+ <prolog>
+  <metadata>
+   <data name="Category" value="Impala"/>
+   <data name="Category" value="Impala Query Options"/>
+   <data name="Category" value="Querying"/>
+   <data name="Category" value="Developers"/>
+   <data name="Category" value="Administrators"/>
+  </metadata>
+ </prolog>
+
+ <conbody>
+
+  <p>
+   As the name implies the query option <codeph>REFRESH_UPDATED_HMS_PARTITIONS</codeph> is used
+   to refresh any updated HMS partitions.
+  </p>
+
+  <p>This option is disabled by default so that the performance is not compromised when refreshing a
+   table. However, for certain corner case scenarios refresh table command does not detect changed
+   partitions. In case of the default refresh, catalogd detects, adds any new partitions and removes
+   any partitions which are not present in HMS anymore. However, it does not update any partitions
+   that changed (eg. change of location). When this query option is enabled, the refresh table
+   command will detect certain changes to the partitions and update them accordingly. Currently,
+   catalogd will update the partitions if any of the following StorageDescriptor properties have
+   been modified. 1. Partition Location 2. Partition Fileformat. 3 SerdeInfo. 4. Partition schema
+   changes. 5. Partition bucketInfo.</p>
+
+  <p>
+   <b>Type:</b><codeph>BOOLEAN</codeph>; recognized values are 1 and 0, or true and false; any other
+   value will be interpreted as false.
+  </p>
+
+  <p>
+   <b>Default:</b><codeph>FALSE</codeph> (shown as 0 in output of SET statement).
+  </p>
+
+  <p><b>Added in:</b>
+   <keyword keyref="impala40"/></p>
+
+  </conbody>
+
+</concept>
