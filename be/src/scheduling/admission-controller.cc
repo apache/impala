@@ -1225,6 +1225,11 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
     queue_node->initial_queue_reason = queue_node->not_admitted_reason;
     stats->Queue();
     queue->Enqueue(queue_node);
+
+    // Must be done while we still hold 'admission_ctrl_lock_' as the dequeue loop thread
+    // can modify 'not_admitted_reason'.
+    request.summary_profile->AddInfoString(
+        PROFILE_INFO_KEY_LAST_QUEUED_REASON, queue_node->not_admitted_reason);
   }
 
   // Update the profile info before waiting. These properties will be updated with
@@ -1233,8 +1238,6 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
       PROFILE_INFO_KEY_ADMISSION_RESULT, PROFILE_INFO_VAL_QUEUED);
   request.summary_profile->AddInfoString(
       PROFILE_INFO_KEY_INITIAL_QUEUE_REASON, queue_node->initial_queue_reason);
-  request.summary_profile->AddInfoString(
-      PROFILE_INFO_KEY_LAST_QUEUED_REASON, queue_node->not_admitted_reason);
 
   queue_node->wait_start_ms = MonotonicMillis();
   *queued = true;
