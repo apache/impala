@@ -368,7 +368,6 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # .array = 34
   # .array = 35
   # .array = 36
-  @SkipIfS3.eventually_consistent
   def test_avro_primitive_in_list(self, vector, unique_database):
     self.__test_primitive_in_list(unique_database, "AvroPrimitiveInList",
       "AvroPrimitiveInList.parquet", vector)
@@ -476,7 +475,6 @@ class TestParquetArrayEncodings(ImpalaTestSuite):
   # ..intListsColumn_tuple_tuple = 6
   # ..intListsColumn_tuple_tuple = 7
   # ..intListsColumn_tuple_tuple = 8
-  @SkipIfS3.eventually_consistent
   def test_thrift_array_of_arrays(self, vector, unique_database):
     self.__test_array_of_arrays(unique_database, "ThriftArrayOfArrays",
       "bad-thrift.parquet", vector, 1)

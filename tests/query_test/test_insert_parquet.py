@@ -117,7 +117,6 @@ class TestInsertParquetQueries(ImpalaTestSuite):
 
   @SkipIfEC.oom
   @SkipIfLocal.multiple_impalad
-  @SkipIfS3.eventually_consistent
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_insert_parquet(self, vector, unique_database):
     vector.get_value('exec_option')['PARQUET_FILE_SIZE'] = \

@@ -117,7 +117,6 @@ class TestAggregation(ImpalaTestSuite):
       return False
     return True
 
-  @SkipIfS3.eventually_consistent
   def test_aggregation(self, vector):
     exec_option = vector.get_value('exec_option')
     disable_codegen = exec_option['disable_codegen']
