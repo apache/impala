@@ -51,12 +51,10 @@ class TestComputeStats(ImpalaTestSuite):
         create_uncompressed_text_dimension(cls.get_workload()))
 
   @SkipIfLocal.hdfs_blocks
-  @SkipIfS3.eventually_consistent
   def test_compute_stats(self, vector, unique_database):
     self.run_test_case('QueryTest/compute-stats', vector, unique_database)
 
   @SkipIfLocal.hdfs_blocks
-  @SkipIfS3.eventually_consistent
   def test_compute_stats_avro(self, vector, unique_database, cluster_properties):
     if cluster_properties.is_catalog_v2_cluster():
       # IMPALA-7308: changed behaviour of various Avro edge cases significantly in the
@@ -67,29 +65,24 @@ class TestComputeStats(ImpalaTestSuite):
       self.run_test_case('QueryTest/compute-stats-avro', vector, unique_database)
 
   @SkipIfLocal.hdfs_blocks
-  @SkipIfS3.eventually_consistent
   def test_compute_stats_decimal(self, vector, unique_database):
     # Test compute stats on decimal columns separately so we can vary between platforms
     # with and without write support for decimals (Hive < 0.11 and >= 0.11).
     self.run_test_case('QueryTest/compute-stats-decimal', vector, unique_database)
 
   @SkipIfLocal.hdfs_blocks
-  @SkipIfS3.eventually_consistent
   def test_compute_stats_date(self, vector, unique_database):
     # Test compute stats on date columns separately.
     self.run_test_case('QueryTest/compute-stats-date', vector, unique_database)
 
-  @SkipIfS3.eventually_consistent
   def test_compute_stats_incremental(self, vector, unique_database):
     self.run_test_case('QueryTest/compute-stats-incremental', vector, unique_database)
 
-  @SkipIfS3.eventually_consistent
   def test_compute_stats_complextype_warning(self, vector, unique_database):
     self.run_test_case('QueryTest/compute-stats-complextype-warning', vector,
         unique_database)
 
   @pytest.mark.execute_serially
-  @SkipIfS3.eventually_consistent
   def test_compute_stats_many_partitions(self, vector):
     # To cut down on test execution time, only run the compute stats test against many
     # partitions if performing an exhaustive test run.
@@ -97,7 +90,6 @@ class TestComputeStats(ImpalaTestSuite):
     self.run_test_case('QueryTest/compute-stats-many-partitions', vector)
 
   @pytest.mark.execute_serially
-  @SkipIfS3.eventually_consistent
   def test_compute_stats_keywords(self, vector):
     """IMPALA-1055: Tests compute stats with a db/table name that are keywords."""
     self.execute_query("drop database if exists `parquet` cascade")
@@ -109,7 +101,6 @@ class TestComputeStats(ImpalaTestSuite):
     finally:
       self.cleanup_db("parquet")
 
-  @SkipIfS3.eventually_consistent
   def test_compute_stats_compression_codec(self, vector, unique_database):
     """IMPALA-8254: Tests that running compute stats with compression_codec set
     should not throw an error."""
@@ -292,7 +283,6 @@ class TestComputeStats(ImpalaTestSuite):
     self.create_load_test_corrupt_stats(self, unique_database, create_load_stmts,
             table_name, 1, 1)
 
-  @SkipIfS3.eventually_consistent
   @SkipIfCatalogV2.stats_pulling_disabled()
   def test_pull_stats_profile(self, vector, unique_database):
     """Checks that the frontend profile includes metrics when computing

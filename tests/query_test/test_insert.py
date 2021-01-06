@@ -183,7 +183,6 @@ class TestInsertQueries(ImpalaTestSuite):
       v.wait_for_metric("impala-server.num-fragments-in-flight", 0, timeout=180)
 
   @UniqueDatabase.parametrize(sync_ddl=True)
-  @SkipIfS3.eventually_consistent
   def test_insert_overwrite(self, vector, unique_database):
     self.run_test_case('QueryTest/insert_overwrite', vector, unique_database,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1,

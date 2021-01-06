@@ -46,7 +46,6 @@ class TestInsertQueriesWithPermutation(ImpalaTestSuite):
     cls.ImpalaTestMatrix.add_dimension(
         create_uncompressed_text_dimension(cls.get_workload()))
 
-  @SkipIfS3.eventually_consistent
   def test_insert_permutation(self, vector):
     map(self.cleanup_db, ["insert_permutation_test"])
     self.run_test_case('QueryTest/insert_permutation', vector)
