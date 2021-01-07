@@ -17,11 +17,19 @@
 
 package org.apache.impala.util;
 
+import java.nio.ByteBuffer;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Collections;
 import java.util.List;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
@@ -38,10 +46,16 @@ import org.apache.iceberg.expressions.UnboundPredicate;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
 import org.apache.iceberg.transforms.Transform;
+import org.apache.iceberg.types.Conversions;
+import org.apache.iceberg.types.Type;
+import org.apache.iceberg.types.Types;
+import org.apache.impala.analysis.IcebergPartitionField;
+import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -62,6 +76,11 @@ import org.apache.impala.thrift.TIcebergPartitionTransform;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 
 public class IcebergUtil {
+  private static final int ICEBERG_EPOCH_YEAR = 1970;
+  private static final int ICEBERG_EPOCH_MONTH = 1;
+  private static final int ICEBERG_EPOCH_DAY = 1;
+  private static final int ICEBERG_EPOCH_HOUR = 0;
+
   /**
    * Returns the corresponding catalog implementation for 'feTable'.
    */
@@ -433,5 +452,148 @@ public class IcebergUtil {
           throw new ImpalaRuntimeException(String.format("Unexpected file format: %s",
               org.apache.impala.fb.FbFileFormat.name(fbFileFormat)));
     }
+  }
+
+  /**
+   * Iceberg's PartitionData class is hidden, so we implement it on our own.
+   */
+  public static class PartitionData implements StructLike {
+    private final Object[] values;
+
+    private PartitionData(int size) {
+      this.values = new Object[size];
+    }
+
+    @Override
+    public int size() {
+      return values.length;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> T get(int pos, Class<T> javaClass) {
+      return javaClass.cast(values[pos]);
+    }
+
+    @Override
+    public <T> void set(int pos, T value) {
+      if (value instanceof ByteBuffer) {
+        // ByteBuffer is not Serializable
+        ByteBuffer buffer = (ByteBuffer) value;
+        byte[] bytes = new byte[buffer.remaining()];
+        buffer.duplicate().get(bytes);
+        values[pos] = bytes;
+      } else {
+        values[pos] = value;
+      }
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (other == null || getClass() != other.getClass()) {
+        return false;
+      }
+
+      PartitionData that = (PartitionData) other;
+      return Arrays.equals(values, that.values);
+    }
+
+    @Override
+    public int hashCode() {
+      return Arrays.hashCode(values);
+    }
+  }
+
+  /**
+   * Create a PartitionData object from a partition path and its descriptors.
+   */
+  public static PartitionData partitionDataFromPath(Types.StructType partitionType,
+      IcebergPartitionSpec spec, String path) throws ImpalaRuntimeException {
+    if (path == null || path.isEmpty()) return null;
+
+    PartitionData data = new PartitionData(spec.getIcebergPartitionFieldsSize());
+    String[] partitions = path.split("/", -1);
+    for (int i = 0; i < partitions.length; i += 1) {
+      IcebergPartitionField field = spec.getIcebergPartitionFields().get(i);
+      String[] parts = partitions[i].split("=", 2);
+      Preconditions.checkArgument(parts.length == 2 && parts[0] != null &&
+          field.getFieldName().equals(parts[0]), "Invalid partition: %s", partitions[i]);
+      TIcebergPartitionTransformType transformType = field.getTransformType();
+      data.set(i, getPartitionValue(
+          partitionType.fields().get(i).type(), transformType, parts[1]));
+    }
+    return data;
+  }
+
+  /**
+   * Read a value from a partition path with respect to its type and partition
+   * transformation.
+   */
+  public static Object getPartitionValue(Type type,
+      TIcebergPartitionTransformType transformType, String stringValue)
+      throws ImpalaRuntimeException {
+    String HIVE_NULL = MetaStoreUtil.DEFAULT_NULL_PARTITION_KEY_VALUE;
+    if (stringValue == null || stringValue.equals(HIVE_NULL)) return null;
+
+    if (transformType == TIcebergPartitionTransformType.IDENTITY ||
+        transformType == TIcebergPartitionTransformType.TRUNCATE ||
+        transformType == TIcebergPartitionTransformType.BUCKET ||
+        transformType == TIcebergPartitionTransformType.DAY) {
+      // These partition transforms are handled successfully by Iceberg's API.
+      return Conversions.fromPartitionString(type, stringValue);
+    }
+    switch (transformType) {
+      case YEAR: return parseYearToTransformYear(stringValue);
+      case MONTH: return parseMonthToTransformMonth(stringValue);
+      case HOUR: return parseHourToTransformHour(stringValue);
+    }
+    throw new ImpalaRuntimeException("Unexpected partition transform: " + transformType);
+  }
+
+  /**
+   * In the partition path years are represented naturally, e.g. 1984. However, we need
+   * to convert it to an integer which represents the years from 1970. So, for 1984 the
+   * return value should be 14.
+   */
+  private static Integer parseYearToTransformYear(String yearStr) {
+    Integer year = Integer.valueOf(yearStr);
+    return year - ICEBERG_EPOCH_YEAR;
+  }
+
+  /**
+   * In the partition path months are represented as <year>-<month>, e.g. 2021-01. We
+   * need to convert it to a single integer which represents the months from '1970-01'.
+   */
+  private static Integer parseMonthToTransformMonth(String monthStr)
+      throws ImpalaRuntimeException {
+    String[] parts = monthStr.split("-", -1);
+    Preconditions.checkState(parts.length == 2);
+    Integer year = Integer.valueOf(parts[0]);
+    Integer month = Integer.valueOf(parts[1]);
+    int years = year - ICEBERG_EPOCH_YEAR;
+    int months = month - ICEBERG_EPOCH_MONTH;
+    return years * 12 + months;
+  }
+
+  /**
+   * In the partition path hours are represented as <year>-<month>-<day>-<hour>, e.g.
+   * 1970-01-01-01. We need to convert it to a single integer which represents the hours
+   * from '1970-01-01 00:00:00'.
+   */
+  private static Integer parseHourToTransformHour(String hourStr) {
+    final OffsetDateTime EPOCH = Instant.ofEpochSecond(0).atOffset(ZoneOffset.UTC);
+    String[] parts = hourStr.split("-", -1);
+    Preconditions.checkState(parts.length == 4);
+    Integer year = Integer.valueOf(parts[0]);
+    Integer month = Integer.valueOf(parts[1]);
+    Integer day = Integer.valueOf(parts[2]);
+    Integer hour = Integer.valueOf(parts[3]);
+    OffsetDateTime datetime = OffsetDateTime.of(
+        LocalDateTime.of(year, month, day, hour, /*minute=*/0),
+        ZoneOffset.UTC);
+    return (int)ChronoUnit.HOURS.between(EPOCH, datetime);
   }
 }

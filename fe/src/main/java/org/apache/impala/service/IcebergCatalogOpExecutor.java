@@ -175,13 +175,17 @@ public class IcebergCatalogOpExecutor {
     AppendFiles append = nativeIcebergTable.newAppend();
     for (ByteBuffer buf : dataFilesFb) {
       FbIcebergDataFile dataFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
+      PartitionSpec partSpec = nativeIcebergTable.specs().get(icebergOp.getSpec_id());
       DataFiles.Builder builder =
-          DataFiles.builder(nativeIcebergTable.specs().get(icebergOp.getSpec_id()))
+          DataFiles.builder(partSpec)
           .withPath(dataFile.path())
           .withFormat(IcebergUtil.fbFileFormatToIcebergFileFormat(dataFile.format()))
           .withRecordCount(dataFile.recordCount())
-          .withFileSizeInBytes(dataFile.fileSizeInBytes())
-          .withPartitionPath(dataFile.partitionPath());
+          .withFileSizeInBytes(dataFile.fileSizeInBytes());
+      IcebergUtil.PartitionData partitionData = IcebergUtil.partitionDataFromPath(
+          partSpec.partitionType(),
+          feIcebergTable.getDefaultPartitionSpec(), dataFile.partitionPath());
+      if (partitionData != null) builder.withPartition(partitionData);
       append.appendFile(builder.build());
     }
     append.commit();
