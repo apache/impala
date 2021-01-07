@@ -121,6 +121,11 @@ class MaskFunctions {
   static BigIntVal MaskShowFirstN(FunctionContext* ctx, const BigIntVal& val,
       const IntVal& char_count, const IntVal& upper_char, const IntVal& lower_char,
       const IntVal& digit_char, const IntVal& other_char, const IntVal& number_char);
+  /// Overload used by the default MASK_SHOW_FIRST_4 policy on date type
+  static DateVal MaskShowFirstN(FunctionContext* ctx, const DateVal& val,
+      const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
+      const StringVal& digit_char, const IntVal& other_char,
+      const StringVal& number_char);
 
   /// Declarations of mask_show_last_n()
   /// Overloads for masking a string value
@@ -327,6 +332,25 @@ class MaskFunctions {
       const IntVal& upper_char, const IntVal& lower_char, const IntVal& digit_char,
       const IntVal& other_char, const IntVal& number_char, const IntVal& day_value,
       const IntVal& month_value, const IntVal& year_value);
+  /// Other overloads
+  static BooleanVal Mask(FunctionContext* ctx, const BooleanVal& val);
+  static BooleanVal Mask(FunctionContext* ctx, const BooleanVal& val,
+      const StringVal& upper_char, const StringVal& lower_char,
+      const StringVal& digit_char, const IntVal& other_char,
+      const StringVal& number_char, const IntVal& day_value, const IntVal& month_value,
+      const IntVal& year_value);
+  static DoubleVal Mask(FunctionContext* ctx, const DoubleVal& val);
+  static DoubleVal Mask(FunctionContext* ctx, const DoubleVal& val,
+      const StringVal& upper_char, const StringVal& lower_char,
+      const StringVal& digit_char, const IntVal& other_char,
+      const StringVal& number_char, const IntVal& day_value, const IntVal& month_value,
+      const IntVal& year_value);
+  static TimestampVal Mask(FunctionContext* ctx, const TimestampVal& val);
+  static TimestampVal Mask(FunctionContext* ctx, const TimestampVal& val,
+      const StringVal& upper_char, const StringVal& lower_char,
+      const StringVal& digit_char, const IntVal& other_char,
+      const StringVal& number_char, const IntVal& day_value, const IntVal& month_value,
+      const IntVal& year_value);
 
   /// Declarations of mask_hash()
   static StringVal MaskHash(FunctionContext* ctx, const StringVal& val);
@@ -335,6 +359,20 @@ class MaskFunctions {
   static BooleanVal MaskHash(FunctionContext* ctx, const BooleanVal& val);
   static TimestampVal MaskHash(FunctionContext* ctx, const TimestampVal& val);
   static DateVal MaskHash(FunctionContext* ctx, const DateVal& val);
+
+  /// Nullify overloads
+  static BooleanVal MaskNull(FunctionContext* ctx, const BooleanVal& val,
+      const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
+      const StringVal& digit_char, const IntVal& other_char,
+      const StringVal& number_char);
+  static DoubleVal MaskNull(FunctionContext* ctx, const DoubleVal& val,
+      const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
+      const StringVal& digit_char, const IntVal& other_char,
+      const StringVal& number_char);
+  static TimestampVal MaskNull(FunctionContext* ctx, const TimestampVal& val,
+      const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
+      const StringVal& digit_char, const IntVal& other_char,
+      const StringVal& number_char);
 };
 
 } // namespace impala

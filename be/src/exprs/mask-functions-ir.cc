@@ -345,6 +345,15 @@ BigIntVal MaskFunctions::MaskShowFirstN(FunctionContext* ctx, const BigIntVal& v
   return {MaskShowFirstNImpl(val, char_count.val, number_char.val)};
 }
 
+DateVal MaskFunctions::MaskShowFirstN(FunctionContext* ctx, const DateVal& val,
+    const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
+    const StringVal& digit_char, const IntVal& other_char,
+    const StringVal& number_char) {
+  // Currently we follow Hive's behavior to always mask date values to '0001-01-01'.
+  // TODO: Implement this after HIVE-24641 is resolved.
+  return Mask(ctx, val);
+}
+
 /// MaskShowLastN overloads for string value
 StringVal MaskFunctions::MaskShowLastN(FunctionContext* ctx, const StringVal& val) {
   return MaskShowLastNImpl(ctx, val, CHAR_COUNT, MASKED_UPPERCASE, MASKED_LOWERCASE,
@@ -701,6 +710,36 @@ BigIntVal MaskFunctions::Mask(FunctionContext* ctx, const BigIntVal& val,
     const IntVal& month_value, const IntVal& year_value) {
   return {MaskShowFirstNImpl(val, 0, number_char.val)};
 }
+BooleanVal MaskFunctions::Mask(FunctionContext* ctx, const BooleanVal& val) {
+  return BooleanVal::null();
+}
+BooleanVal MaskFunctions::Mask(FunctionContext* ctx, const BooleanVal& val,
+    const StringVal& upper_char, const StringVal& lower_char,
+    const StringVal& digit_char, const IntVal& other_char,
+    const StringVal& number_char, const IntVal& day_value, const IntVal& month_value,
+    const IntVal& year_value) {
+  return BooleanVal::null();
+}
+DoubleVal MaskFunctions::Mask(FunctionContext* ctx, const DoubleVal& val) {
+  return DoubleVal::null();
+}
+DoubleVal MaskFunctions::Mask(FunctionContext* ctx, const DoubleVal& val,
+    const StringVal& upper_char, const StringVal& lower_char,
+    const StringVal& digit_char, const IntVal& other_char,
+    const StringVal& number_char, const IntVal& day_value, const IntVal& month_value,
+    const IntVal& year_value) {
+  return DoubleVal::null();
+}
+TimestampVal MaskFunctions::Mask(FunctionContext* ctx, const TimestampVal& val) {
+  return TimestampVal::null();
+}
+TimestampVal MaskFunctions::Mask(FunctionContext* ctx, const TimestampVal& val,
+    const StringVal& upper_char, const StringVal& lower_char,
+    const StringVal& digit_char, const IntVal& other_char,
+    const StringVal& number_char, const IntVal& day_value, const IntVal& month_value,
+    const IntVal& year_value) {
+  return TimestampVal::null();
+}
 
 StringVal MaskFunctions::MaskHash(FunctionContext* ctx, const StringVal& val) {
   // Hive hash the value by sha256 and encoding it into a lower case hex string in
@@ -732,4 +771,24 @@ TimestampVal MaskFunctions::MaskHash(FunctionContext* ctx, const TimestampVal& v
 }
 DateVal MaskFunctions::MaskHash(FunctionContext* ctx, const DateVal& val) {
   return DateVal::null();
+}
+
+/// Nullify overloads for other types
+BooleanVal MaskFunctions::MaskNull(FunctionContext* ctx, const BooleanVal& val,
+    const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
+    const StringVal& digit_char, const IntVal& other_char,
+    const StringVal& number_char) {
+  return BooleanVal::null();
+}
+DoubleVal MaskFunctions::MaskNull(FunctionContext* ctx, const DoubleVal& val,
+    const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
+    const StringVal& digit_char, const IntVal& other_char,
+    const StringVal& number_char) {
+  return DoubleVal::null();
+}
+TimestampVal MaskFunctions::MaskNull(FunctionContext* ctx, const TimestampVal& val,
+    const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
+    const StringVal& digit_char, const IntVal& other_char,
+    const StringVal& number_char) {
+  return TimestampVal::null();
 }
