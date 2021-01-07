@@ -25,6 +25,7 @@ import java.util.Set;
 
 import org.apache.iceberg.types.Types;
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
@@ -551,18 +552,7 @@ public class InsertStmt extends StatementBase {
       if (overwrite_) {
         throw new AnalysisException("INSERT OVERWRITE not supported for Iceberg tables.");
       }
-      FeIcebergTable iceTable = (FeIcebergTable)table_;
-      IcebergPartitionSpec icebergPartSpec = iceTable.getDefaultPartitionSpec();
-      if (icebergPartSpec.hasPartitionFields()) {
-        for (IcebergPartitionField partField :
-            icebergPartSpec.getIcebergPartitionFields()) {
-          if (partField.getTransformType() != TIcebergPartitionTransformType.IDENTITY) {
-            throw new AnalysisException("Impala can only insert data into Iceberg " +
-                "tables that only use identity partition transforms.");
-          }
-        }
-      }
-      validateIcebergColumnsForInsert(iceTable);
+      validateIcebergColumnsForInsert((FeIcebergTable)table_);
     }
 
     if (isHBaseTable && overwrite_) {
@@ -912,11 +902,57 @@ public class InsertStmt extends StatementBase {
             targetColumn, selectListExprs.get(i),
             analyzer.getQueryOptions().isDecimal_v2(),
             widestTypeExpr);
-        partitionKeyExprs_.add(compatibleExpr);
+        Expr icebergPartitionTransformExpr =
+            getIcebergPartitionTransformExpr(partField, compatibleExpr);
+        partitionKeyExprs_.add(icebergPartitionTransformExpr);
         partitionColPos_.add(targetColumn.getPosition());
         break;
       }
     }
+  }
+
+  /**
+   * Returns the partition transform expression. E.g. if the partition transform is DAY,
+   * it returns 'to_date(compatibleExpr)'. If the partition transform is BUCKET,
+   * it returns 'iceberg_bucket_transform(compatibleExpr, transformParam)'.
+   */
+  private Expr getIcebergPartitionTransformExpr(IcebergPartitionField partField,
+      Expr compatibleExpr) {
+    String funcNameStr = transformTypeToFunctionName(partField.getTransformType());
+    if (funcNameStr == null || funcNameStr.equals("")) return compatibleExpr;
+    FunctionName fnName = new FunctionName(BuiltinsDb.NAME, funcNameStr);
+    List<Expr> paramList = new ArrayList<>();
+    paramList.add(compatibleExpr);
+    Integer transformParam = partField.getTransformParam();
+    if (transformParam != null) {
+      paramList.add(NumericLiteral.create(transformParam));
+    }
+    if (partField.getTransformType() == TIcebergPartitionTransformType.MONTH) {
+      paramList.add(new StringLiteral("yyyy-MM"));
+    }
+    else if (partField.getTransformType() == TIcebergPartitionTransformType.HOUR) {
+      paramList.add(new StringLiteral("yyyy-MM-dd-HH"));
+    }
+    FunctionCallExpr fnCall = new FunctionCallExpr(fnName, new FunctionParams(paramList));
+    fnCall.setIsInternalFnCall(true);
+    return fnCall;
+  }
+
+  /**
+   * Returns the builtin function to use for the given partition transform.
+   */
+  private static String transformTypeToFunctionName(
+      TIcebergPartitionTransformType transformType) {
+    switch (transformType) {
+      case IDENTITY: return "";
+      case HOUR:
+      case MONTH: return "from_timestamp";
+      case DAY: return "to_date";
+      case YEAR: return "year";
+      case BUCKET: return "iceberg_bucket_transform";
+      case TRUNCATE: return "iceberg_truncate_transform";
+    }
+    return "";
   }
 
   private static Set<String> getKuduPartitionColumnNames(FeKuduTable table) {

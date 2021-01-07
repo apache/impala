@@ -17,6 +17,7 @@
 
 package org.apache.impala.planner;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -43,6 +44,7 @@ import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -192,18 +194,33 @@ public class IcebergScanNode extends HdfsScanNode {
         break;
       }
       case TIMESTAMP: {
-        unboundPredicate = Expressions.predicate(op, colName,
-            KuduUtil.timestampToUnixTimeMicros(analyzer, literal));
+        long unixMicros = KuduUtil.timestampToUnixTimeMicros(analyzer, literal);
+        if (unixMicros >= 0) {
+          // Iceberg's partition transformations have a bug for times before the epoch.
+          // See https://github.com/apache/iceberg/pull/1981
+          // TODO: IMPALA-10433 remove the workarounds once we use an Iceberg version
+          // that contains the fix.
+          unboundPredicate = Expressions.predicate(op, colName, unixMicros);
+        }
         break;
       }
       case DATE: {
-        unboundPredicate = Expressions.predicate(op, colName,
-            ((DateLiteral) literal).getValue());
+        int daysSinceEpoch = ((DateLiteral) literal).getValue();
+        if (daysSinceEpoch >= 0) {
+          // See comment at TIMESTAMP.
+          unboundPredicate = Expressions.predicate(op, colName, daysSinceEpoch);
+        }
         break;
       }
       case DECIMAL: {
-        unboundPredicate = Expressions.predicate(op, colName,
-            ((NumericLiteral) literal).getValue());
+        Type colType = ref.getDesc().getColumn().getType();
+        int scale = colType.getDecimalDigits();
+        BigDecimal literalValue = ((NumericLiteral) literal).getValue();
+        if (literalValue.scale() <= scale) {
+          // Iceberg DecimalLiteral needs to have the exact same scale.
+          if (literalValue.scale() < scale) literalValue = literalValue.setScale(scale);
+          unboundPredicate = Expressions.predicate(op, colName, literalValue);
+        }
         break;
       }
       default: break;

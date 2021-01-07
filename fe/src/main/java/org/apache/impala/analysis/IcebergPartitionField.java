@@ -69,6 +69,10 @@ public class IcebergPartitionField extends StmtNode {
     return transform_.getTransformType();
   }
 
+  public Integer getTransformParam() {
+    return transform_.getTransformParam();
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     transform_.analyze(analyzer);

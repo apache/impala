@@ -1,0 +1,869 @@
+====
+---- QUERY
+# Test partitioned INSERTs with single column that is also
+# the partitioned column. Partition transform is BUCKET.
+create table single_col_bucket (s string)
+partition by spec (s bucket 7)
+stored as iceberg;
+====
+---- QUERY
+insert into single_col_bucket values ('a'), ('b'), ('c'), ('d'), ('e'), ('f');
+select * from single_col_bucket;
+---- RESULTS
+'a'
+'b'
+'c'
+'d'
+'e'
+'f'
+---- TYPES
+STRING
+====
+---- QUERY
+show files in single_col_bucket;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=0/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=2/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=4/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_bucket/data/s_bucket=6/.*.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from single_col_bucket
+where s = 'a';
+---- RESULTS
+'a'
+---- TYPES
+STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from single_col_bucket
+where s = 'c';
+---- RESULTS
+'c'
+---- TYPES
+STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Bucket transform for multiple columns.
+create table multi_col_bucket (i int, s string, d date, t timestamp)
+partition by spec (i bucket 3, s bucket 5, d bucket 5, t bucket 5)
+stored as iceberg;
+====
+---- QUERY
+insert into multi_col_bucket
+values (1, 'a', '2021-01-01', '2021-01-01 01:01:01.01'),
+       (2, 'b', '2021-01-02', '2021-01-02 02:02:02.02'),
+       (3, 'c', '2021-01-03', '2021-01-03 03:03:03.03'),
+       (4, 'd', '2021-01-04', '2021-01-04 04:04:04.04');
+select * from multi_col_bucket;
+---- RESULTS
+1,'a',2021-01-01,2021-01-01 01:01:01.010000000
+2,'b',2021-01-02,2021-01-02 02:02:02.020000000
+3,'c',2021-01-03,2021-01-03 03:03:03.030000000
+4,'d',2021-01-04,2021-01-04 04:04:04.040000000
+---- TYPES
+INT,STRING,DATE,TIMESTAMP
+====
+---- QUERY
+show files in multi_col_bucket;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=0/s_bucket=1/d_bucket=2/t_bucket=4/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=0/s_bucket=2/d_bucket=3/t_bucket=0/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=0/s_bucket=4/d_bucket=1/t_bucket=3/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_bucket/data/i_bucket=2/s_bucket=0/d_bucket=0/t_bucket=4/.*.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from multi_col_bucket
+where i = 1;
+---- RESULTS
+1,'a',2021-01-01,2021-01-01 01:01:01.010000000
+---- TYPES
+INT,STRING,DATE,TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from multi_col_bucket
+where i = 2;
+---- RESULTS
+2,'b',2021-01-02,2021-01-02 02:02:02.020000000
+---- TYPES
+INT,STRING,DATE,TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from multi_col_bucket
+where s = 'd';
+---- RESULTS
+4,'d',2021-01-04,2021-01-04 04:04:04.040000000
+---- TYPES
+INT,STRING,DATE,TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from multi_col_bucket
+where d = '2021-01-03';
+---- RESULTS
+3,'c',2021-01-03,2021-01-03 03:03:03.030000000
+---- TYPES
+INT,STRING,DATE,TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from multi_col_bucket
+where t = '2021-01-03 03:03:03.030000000';
+---- RESULTS
+3,'c',2021-01-03,2021-01-03 03:03:03.030000000
+---- TYPES
+INT,STRING,DATE,TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# Test single col TRUNCATE
+create table single_col_truncate (d decimal(10, 4))
+partition by spec (d truncate 100)
+stored as iceberg;
+====
+---- QUERY
+insert into single_col_truncate
+values (1.1234), (10.5432), (200.786), (314.1592), (98765.4321),
+       (1.1235), (10.5433), (200.789), (314.1598), (98765.43);
+select * from single_col_truncate;
+---- RESULTS
+1.1234
+1.1235
+10.5432
+10.5433
+200.7860
+200.7890
+314.1592
+314.1598
+98765.4300
+98765.4321
+---- TYPES
+DECIMAL
+====
+---- QUERY
+show files in single_col_truncate;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=1.1200/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=10.5400/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=200.7800/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=314.1500/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/single_col_truncate/data/d_trunc=98765.4300/.*.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from single_col_truncate
+where d = 1.1234;
+---- RESULTS
+1.1234
+---- TYPES
+DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from single_col_truncate
+where 200 <= d and d <= 400;
+---- RESULTS
+200.7860
+200.7890
+314.1592
+314.1598
+---- TYPES
+DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 4
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from single_col_truncate
+where d > 200.78;
+---- RESULTS
+200.7860
+200.7890
+314.1592
+314.1598
+98765.4300
+98765.4321
+---- TYPES
+DECIMAL
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 6
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# Test single col TRUNCATE
+create table multi_col_truncate (i int, b bigint, d decimal(16, 6), s string)
+partition by spec (s truncate 15, i truncate 5, b truncate 11, d truncate 100000)
+stored as iceberg;
+====
+---- QUERY
+insert into multi_col_truncate values
+(1, 11, 11111.111111,    'the quick brown fox jumps over the lazy dog'),
+(2, 222, 421,            'the quick brown fox jumps over the lazy dog'),
+(6, 333, 113211.2,       'the quick brown fox over the lazy dog the quick'),
+(7, 444, 1111154.11432,  'the quick fox brown jump impala over the quick fox brown the over jump'),
+(18, 555, 9999913.232432,'the quick impala fox dog parrot lion');
+select * from multi_col_truncate;
+---- RESULTS
+1,11,11111.111111,'the quick brown fox jumps over the lazy dog'
+2,222,421.000000,'the quick brown fox jumps over the lazy dog'
+6,333,113211.200000,'the quick brown fox over the lazy dog the quick'
+7,444,1111154.114320,'the quick fox brown jump impala over the quick fox brown the over jump'
+18,555,9999913.232432,'the quick impala fox dog parrot lion'
+---- TYPES
+INT,BIGINT,DECIMAL,STRING
+====
+---- QUERY
+show files in multi_col_truncate;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=0/b_trunc=11/d_trunc=11111.100000/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=0/b_trunc=220/d_trunc=421.000000/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick brown/i_trunc=5/b_trunc=330/d_trunc=113211.200000/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick fox b/i_trunc=5/b_trunc=440/d_trunc=1111154.100000/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/multi_col_truncate/data/s_trunc=the quick impal/i_trunc=15/b_trunc=550/d_trunc=9999913.200000/.*.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from multi_col_truncate
+where s = 'the quick brown fox jumps over the lazy dog';
+---- RESULTS
+1,11,11111.111111,'the quick brown fox jumps over the lazy dog'
+2,222,421.000000,'the quick brown fox jumps over the lazy dog'
+---- TYPES
+INT,BIGINT,DECIMAL,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from multi_col_truncate
+where s = 'the quick impala';
+---- RESULTS
+---- TYPES
+INT,BIGINT,DECIMAL,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 0
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from multi_col_truncate
+where i < 5;
+---- RESULTS
+1,11,11111.111111,'the quick brown fox jumps over the lazy dog'
+2,222,421.000000,'the quick brown fox jumps over the lazy dog'
+---- TYPES
+INT,BIGINT,DECIMAL,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from multi_col_truncate
+where b > 330;
+---- RESULTS
+6,333,113211.200000,'the quick brown fox over the lazy dog the quick'
+7,444,1111154.114320,'the quick fox brown jump impala over the quick fox brown the over jump'
+18,555,9999913.232432,'the quick impala fox dog parrot lion'
+---- TYPES
+INT,BIGINT,DECIMAL,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 3
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from multi_col_truncate
+where 400 < d and d < 100000;
+---- RESULTS
+1,11,11111.111111,'the quick brown fox jumps over the lazy dog'
+2,222,421.000000,'the quick brown fox jumps over the lazy dog'
+---- TYPES
+INT,BIGINT,DECIMAL,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from multi_col_truncate
+where b > 100 and d < 100000;
+---- RESULTS
+2,222,421.000000,'the quick brown fox jumps over the lazy dog'
+---- TYPES
+INT,BIGINT,DECIMAL,STRING
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Create table with YEAR partition transform
+create table year_transform(t timestamp, d date)
+partition by spec (t year, d year)
+stored as iceberg;
+====
+---- QUERY
+insert into year_transform values
+('2021-01-08 14:04:03', '2021-01-08'),
+('2021-01-07 14:04:03', '2021-01-07'),
+('1970-01-01 00:00:00', '1970-01-01'),
+('1970-11-01 00:00:00', '1970-11-01'),
+('1969-12-15 13:55:03', '1969-12-15'),
+('1969-02-15 13:55:03', '1969-02-15');
+select * from year_transform;
+---- RESULTS
+2021-01-08 14:04:03,2021-01-08
+2021-01-07 14:04:03,2021-01-07
+1970-01-01 00:00:00,1970-01-01
+1970-11-01 00:00:00,1970-11-01
+1969-12-15 13:55:03,1969-12-15
+1969-02-15 13:55:03,1969-02-15
+---- TYPES
+TIMESTAMP,DATE
+====
+---- QUERY
+show files in year_transform;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=1969/d_year=1969/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=1970/d_year=1970/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/year_transform/data/t_year=2021/d_year=2021/.*.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from year_transform
+where t = '2021-01-08 14:04:03';
+---- RESULTS
+2021-01-08 14:04:03,2021-01-08
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from year_transform
+where t = '1970-01-01 00:00:00';
+---- RESULTS
+1970-01-01 00:00:00,1970-01-01
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from year_transform
+where t = '1969-02-15 13:55:03';
+---- RESULTS
+1969-02-15 13:55:03,1969-02-15
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from year_transform
+where t <= '1970-01-01 00:00:00';
+---- RESULTS
+1970-01-01 00:00:00,1970-01-01
+1969-12-15 13:55:03,1969-12-15
+1969-02-15 13:55:03,1969-02-15
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 4
+aggregation(SUM, NumRowGroups): 2
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from year_transform
+where d = '2021-01-07';
+---- RESULTS
+2021-01-07 14:04:03,2021-01-07
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from year_transform
+where d = '1970-01-01';
+---- RESULTS
+1970-01-01 00:00:00,1970-01-01
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from year_transform
+where d = '1969-12-15';
+---- RESULTS
+1969-12-15 13:55:03,1969-12-15
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# Create table with MONTH partition transform
+create table month_transform(t timestamp, d date)
+partition by spec (t month, d month)
+stored as iceberg;
+====
+---- QUERY
+insert into month_transform values
+('2021-01-08 14:04:03', '2021-01-08'),
+('2021-01-07 14:04:03', '2021-01-07'),
+('1970-01-01 00:00:00', '1970-01-01'),
+('1970-11-01 00:00:00', '1970-11-01'),
+('1969-12-15 13:55:03', '1969-12-15'),
+('1969-02-15 13:55:03', '1969-02-15');
+select * from month_transform;
+---- RESULTS
+2021-01-08 14:04:03,2021-01-08
+2021-01-07 14:04:03,2021-01-07
+1970-01-01 00:00:00,1970-01-01
+1970-11-01 00:00:00,1970-11-01
+1969-12-15 13:55:03,1969-12-15
+1969-02-15 13:55:03,1969-02-15
+---- TYPES
+TIMESTAMP,DATE
+====
+---- QUERY
+show files in month_transform;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1969-02/d_month=1969-02/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1969-12/d_month=1969-12/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1970-01/d_month=1970-01/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=1970-11/d_month=1970-11/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/month_transform/data/t_month=2021-01/d_month=2021-01/.*.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from month_transform
+where t = '2021-01-08 14:04:03';
+---- RESULTS
+2021-01-08 14:04:03,2021-01-08
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from month_transform
+where t = '1970-01-01 00:00:00';
+---- RESULTS
+1970-01-01 00:00:00,1970-01-01
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from month_transform
+where t = '1969-02-15 13:55:03';
+---- RESULTS
+1969-02-15 13:55:03,1969-02-15
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 5
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from month_transform
+where d = '2021-01-07';
+---- RESULTS
+2021-01-07 14:04:03,2021-01-07
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from month_transform
+where d = '1970-01-01';
+---- RESULTS
+1970-01-01 00:00:00,1970-01-01
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from month_transform
+where d = '1969-12-15';
+---- RESULTS
+1969-12-15 13:55:03,1969-12-15
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 5
+====
+---- QUERY
+# Create table with DAY partition transform
+create table day_transform(t timestamp, d date)
+partition by spec (t day, d day)
+stored as iceberg;
+====
+---- QUERY
+insert into day_transform values
+('2021-01-08 14:04:03', '2021-01-08'),
+('2021-01-08 15:04:03', '2021-01-08'),
+('2021-01-07 14:04:03', '2021-01-07'),
+('1970-01-01 00:00:00', '1970-01-01'),
+('1970-11-01 00:00:00', '1970-11-01'),
+('1969-12-15 13:55:03', '1969-12-15'),
+('1969-02-15 13:55:03', '1969-02-15');
+select * from day_transform;
+---- RESULTS
+2021-01-08 14:04:03,2021-01-08
+2021-01-08 15:04:03,2021-01-08
+2021-01-07 14:04:03,2021-01-07
+1970-01-01 00:00:00,1970-01-01
+1970-11-01 00:00:00,1970-11-01
+1969-12-15 13:55:03,1969-12-15
+1969-02-15 13:55:03,1969-02-15
+---- TYPES
+TIMESTAMP,DATE
+====
+---- QUERY
+show files in day_transform;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1969-02-15/d_day=1969-02-15/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1969-12-15/d_day=1969-12-15/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1970-01-01/d_day=1970-01-01/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=1970-11-01/d_day=1970-11-01/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-07/d_day=2021-01-07/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-08/d_day=2021-01-08/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/day_transform/data/t_day=2021-01-08/d_day=2021-01-08/.*.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from day_transform
+where t = '2021-01-08 14:04:03';
+---- RESULTS
+2021-01-08 14:04:03,2021-01-08
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from day_transform
+where t = '2021-01-07 14:04:03';
+---- RESULTS
+2021-01-07 14:04:03,2021-01-07
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from day_transform
+where t = '1970-01-01 00:00:00';
+---- RESULTS
+1970-01-01 00:00:00,1970-01-01
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from day_transform
+where t = '1969-02-15 13:55:03';
+---- RESULTS
+1969-02-15 13:55:03,1969-02-15
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 6
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from day_transform
+where d = '2021-01-07';
+---- RESULTS
+2021-01-07 14:04:03,2021-01-07
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from day_transform
+where d = '1970-01-01';
+---- RESULTS
+1970-01-01 00:00:00,1970-01-01
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from day_transform
+where d = '1969-12-15';
+---- RESULTS
+1969-12-15 13:55:03,1969-12-15
+---- TYPES
+TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 6
+====
+---- QUERY
+# Create table with HOUR partition transform
+create table hour_transform(t timestamp)
+partition by spec (t hour)
+stored as iceberg;
+====
+---- QUERY
+insert into hour_transform values
+('1969-12-31 22:55:03'),
+('1969-12-31 23:55:03'),
+('1969-12-31 23:56:03'),
+('1970-01-01 00:00:00'),
+('1970-01-01 00:00:01'),
+('1970-01-01 01:00:00'),
+('2021-01-08 14:04:03'),
+('2021-01-08 15:04:03'),
+('2021-01-08 15:04:33');
+select * from hour_transform;
+---- RESULTS
+1969-12-31 22:55:03
+1969-12-31 23:55:03
+1969-12-31 23:56:03
+1970-01-01 00:00:00
+1970-01-01 00:00:01
+1970-01-01 01:00:00
+2021-01-08 14:04:03
+2021-01-08 15:04:03
+2021-01-08 15:04:33
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+show files in hour_transform;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1969-12-31-22/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1969-12-31-23/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1970-01-01-00/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=1970-01-01-01/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=2021-01-08-14/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/hour_transform/data/t_hour=2021-01-08-15/.*.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from hour_transform
+where t = '1969-12-31 22:55:03';
+---- RESULTS
+1969-12-31 22:55:03
+---- TYPES
+TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 6
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from hour_transform
+where t = '1969-12-31 23:55:03';
+---- RESULTS
+1969-12-31 23:55:03
+---- TYPES
+TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 2
+aggregation(SUM, NumRowGroups): 6
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from hour_transform
+where t < '1970-01-01 01:00:00';
+---- RESULTS
+1969-12-31 22:55:03
+1969-12-31 23:55:03
+1969-12-31 23:56:03
+1970-01-01 00:00:00
+1970-01-01 00:00:01
+---- TYPES
+TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 5
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from hour_transform
+where t >= '1970-01-01 01:00:00';
+---- RESULTS
+1970-01-01 01:00:00
+2021-01-08 14:04:03
+2021-01-08 15:04:03
+2021-01-08 15:04:33
+---- TYPES
+TIMESTAMP
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 4
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+create table mixed_and_shuffled (s string, b bigint, de decimal(6, 2), t timestamp, da date)
+partition by spec (t day, da year, s truncate 5, b bucket 3, de truncate 100)
+stored as iceberg;
+====
+---- QUERY
+insert into mixed_and_shuffled values
+('quick brown fox', 12345, 123.45, '2021-01-01 01:02:03', '2021-01-01'),
+('quick brown impala', 54321, 543.21, '2021-01-01 02:03:04', '2021-01-01'),
+('quick brown dog', 31, 3333.45, '2020-01-06 05:06:07', '2020-01-06'),
+('pink parrot', 9999777999, 9.9, '1999-09-09 09:09:09', '1999-09-09'),
+('green python', 717171, 71, '1971-07-01 07:07:07', '1971-07-01');
+select * from mixed_and_shuffled;
+---- RESULTS
+'quick brown fox',12345,123.45,2021-01-01 01:02:03,2021-01-01
+'quick brown impala',54321,543.21,2021-01-01 02:03:04,2021-01-01
+'quick brown dog',31,3333.45,2020-01-06 05:06:07,2020-01-06
+'pink parrot',9999777999,9.90,1999-09-09 09:09:09,1999-09-09
+'green python',717171,71.00,1971-07-01 07:07:07,1971-07-01
+---- TYPES
+STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
+====
+---- QUERY
+show files in mixed_and_shuffled;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=1971-07-01/da_year=1971/s_trunc=green/b_bucket=1/de_trunc=71.00/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=1999-09-09/da_year=1999/s_trunc=pink /b_bucket=1/de_trunc=9.00/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2020-01-06/da_year=2020/s_trunc=quick/b_bucket=1/de_trunc=3333.00/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2021-01-01/da_year=2021/s_trunc=quick/b_bucket=1/de_trunc=543.00/.*.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/mixed_and_shuffled/data/t_day=2021-01-01/da_year=2021/s_trunc=quick/b_bucket=2/de_trunc=123.00/.*.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from mixed_and_shuffled
+where s = 'quick brown dog';
+---- RESULTS
+'quick brown dog',31,3333.45,2020-01-06 05:06:07,2020-01-06
+---- TYPES
+STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from mixed_and_shuffled
+where s = 'quick brown dog' and de > 1000;
+---- RESULTS
+'quick brown dog',31,3333.45,2020-01-06 05:06:07,2020-01-06
+---- TYPES
+STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from mixed_and_shuffled
+where da='1999-09-09';
+---- RESULTS
+'pink parrot',9999777999,9.90,1999-09-09 09:09:09,1999-09-09
+---- TYPES
+STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 1
+aggregation(SUM, NumRowGroups): 1
+====
+---- QUERY
+# Test partition pruning with RUNTIME_PROFILE.
+select * from mixed_and_shuffled
+where de > 100;
+---- RESULTS
+'quick brown fox',12345,123.45,2021-01-01 01:02:03,2021-01-01
+'quick brown impala',54321,543.21,2021-01-01 02:03:04,2021-01-01
+'quick brown dog',31,3333.45,2020-01-06 05:06:07,2020-01-06
+---- TYPES
+STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
+---- RUNTIME_PROFILE
+aggregation(SUM, RowsRead): 3
+aggregation(SUM, NumRowGroups): 3
+====

@@ -66,6 +66,7 @@ table_name:iceberg_int_partitioned, constraint:restrict_to, table_format:parquet
 table_name:iceberg_non_partitioned, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_partitioned, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_partitioned_orc_external, constraint:restrict_to, table_format:parquet/none/none
+table_name:iceberg_partition_transforms_zorder, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_resolution_test_external, constraint:restrict_to, table_format:parquet/none/none
 
 # TODO: Support Avro. Data loading currently fails for Avro because complex types

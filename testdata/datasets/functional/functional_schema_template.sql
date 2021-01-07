@@ -3011,6 +3011,17 @@ STORED AS ICEBERG;
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+iceberg_partition_transforms_zorder
+---- CREATE
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+(ts timestamp, s string, i int, j int)
+PARTITION BY SPEC (ts year, s bucket 5)
+SORT BY ZORDER (i, j)
+STORED AS ICEBERG;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 alltypes_date_partition_2
 ---- PARTITION_COLUMNS
 date_col date
