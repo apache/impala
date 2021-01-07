@@ -811,7 +811,7 @@ visible_functions = [
   [['shiftright'], 'INT', ['INT', 'INT'], 'impala::BitByteFunctions::ShiftRight'],
   [['shiftright'], 'BIGINT', ['BIGINT', 'INT'], 'impala::BitByteFunctions::ShiftRight'],
 
-  # Mask functions
+  # Overloads of mask_show_first_n
   [['mask_show_first_n'], 'STRING', ['STRING'], 'impala::MaskFunctions::MaskShowFirstN'],
   [['mask_show_first_n'], 'STRING', ['STRING', 'INT'], 'impala::MaskFunctions::MaskShowFirstN'],
   [['mask_show_first_n'], 'STRING', ['STRING', 'INT', 'STRING', 'STRING', 'STRING', 'STRING'],
@@ -830,6 +830,16 @@ visible_functions = [
       'impala::MaskFunctions::MaskShowFirstN'],
   [['mask_show_first_n'], 'BIGINT', ['BIGINT', 'INT', 'INT', 'INT', 'INT', 'INT', 'INT'],
       'impala::MaskFunctions::MaskShowFirstN'],
+  [['mask_show_first_n'], 'DATE', ['DATE', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskShowFirstN'],
+  # mask_show_first_n always return null for other types
+  [['mask_show_first_n'], 'BOOLEAN', ['BOOLEAN', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskNull'],
+  [['mask_show_first_n'], 'DOUBLE', ['DOUBLE', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskNull'],
+  [['mask_show_first_n'], 'TIMESTAMP', ['TIMESTAMP', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskNull'],
+  # Overloads of mask_show_last_n
   [['mask_show_last_n'], 'STRING', ['STRING'], 'impala::MaskFunctions::MaskShowLastN'],
   [['mask_show_last_n'], 'STRING', ['STRING', 'INT'], 'impala::MaskFunctions::MaskShowLastN'],
   [['mask_show_last_n'], 'STRING', ['STRING', 'INT', 'STRING', 'STRING', 'STRING', 'STRING'],
@@ -848,6 +858,18 @@ visible_functions = [
       'impala::MaskFunctions::MaskShowLastN'],
   [['mask_show_last_n'], 'BIGINT', ['BIGINT', 'INT', 'INT', 'INT', 'INT', 'INT', 'INT'],
       'impala::MaskFunctions::MaskShowLastN'],
+  # Reuse the implementation of mask_show_first_n on date type.
+  # TODO: implement this after HIVE-24641 is resolved.
+  [['mask_show_last_n'], 'DATE', ['DATE', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskShowFirstN'],
+  # mask_show_last_n always return null for other types
+  [['mask_show_last_n'], 'BOOLEAN', ['BOOLEAN', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskNull'],
+  [['mask_show_last_n'], 'DOUBLE', ['DOUBLE', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskNull'],
+  [['mask_show_last_n'], 'TIMESTAMP', ['TIMESTAMP', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskNull'],
+  # Overloads of mask_first_n
   [['mask_first_n'], 'STRING', ['STRING'], 'impala::MaskFunctions::MaskFirstN'],
   [['mask_first_n'], 'STRING', ['STRING', 'INT'], 'impala::MaskFunctions::MaskFirstN'],
   [['mask_first_n'], 'STRING', ['STRING', 'INT', 'STRING', 'STRING', 'STRING', 'STRING'],
@@ -866,6 +888,18 @@ visible_functions = [
       'impala::MaskFunctions::MaskFirstN'],
   [['mask_first_n'], 'BIGINT', ['BIGINT', 'INT', 'INT', 'INT', 'INT', 'INT', 'INT'],
       'impala::MaskFunctions::MaskFirstN'],
+  # Reuse the implementation of mask_show_first_n on date type.
+  # TODO: implement this after HIVE-24641 is resolved.
+  [['mask_first_n'], 'DATE', ['DATE', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskShowFirstN'],
+  # mask_first_n always return null for other types
+  [['mask_first_n'], 'BOOLEAN', ['BOOLEAN', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskNull'],
+  [['mask_first_n'], 'DOUBLE', ['DOUBLE', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskNull'],
+  [['mask_first_n'], 'TIMESTAMP', ['TIMESTAMP', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskNull'],
+  # Overloads of mask_last_n
   [['mask_last_n'], 'STRING', ['STRING'], 'impala::MaskFunctions::MaskLastN'],
   [['mask_last_n'], 'STRING', ['STRING', 'INT'], 'impala::MaskFunctions::MaskLastN'],
   [['mask_last_n'], 'STRING', ['STRING', 'INT', 'STRING', 'STRING', 'STRING', 'STRING'],
@@ -884,6 +918,18 @@ visible_functions = [
       'impala::MaskFunctions::MaskLastN'],
   [['mask_last_n'], 'BIGINT', ['BIGINT', 'INT', 'INT', 'INT', 'INT', 'INT', 'INT'],
       'impala::MaskFunctions::MaskLastN'],
+  # Reuse the implementation of mask_show_first_n on date type.
+  # TODO: implement this after HIVE-24641 is resolved.
+  [['mask_last_n'], 'DATE', ['DATE', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskShowFirstN'],
+  # mask_last_n always return null for other types
+  [['mask_last_n'], 'BOOLEAN', ['BOOLEAN', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskNull'],
+  [['mask_last_n'], 'DOUBLE', ['DOUBLE', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskNull'],
+  [['mask_last_n'], 'TIMESTAMP', ['TIMESTAMP', 'INT', 'STRING', 'STRING', 'STRING', 'INT', 'STRING'],
+      'impala::MaskFunctions::MaskNull'],
+  # Overloads of mask
   [['mask'], 'STRING', ['STRING'], 'impala::MaskFunctions::Mask'],
   [['mask'], 'STRING', ['STRING', 'STRING', 'STRING', 'STRING', 'STRING'],
       'impala::MaskFunctions::Mask'],
@@ -923,6 +969,16 @@ visible_functions = [
       'impala::MaskFunctions::Mask'],
   [['mask'], 'DATE', ['DATE', 'INT', 'INT', 'INT', 'INT', 'INT', 'INT', 'INT', 'INT'],
       'impala::MaskFunctions::Mask'],
+  [['mask'], 'BOOLEAN', ['BOOLEAN'], 'impala::MaskFunctions::Mask'],
+  [['mask'], 'BOOLEAN', ['BOOLEAN', 'STRING', 'STRING', 'STRING', 'INT', 'STRING', 'INT', 'INT', 'INT'],
+      'impala::MaskFunctions::Mask'],
+  [['mask'], 'DOUBLE', ['DOUBLE'], 'impala::MaskFunctions::Mask'],
+  [['mask'], 'DOUBLE', ['DOUBLE', 'STRING', 'STRING', 'STRING', 'INT', 'STRING', 'INT', 'INT', 'INT'],
+      'impala::MaskFunctions::Mask'],
+  [['mask'], 'TIMESTAMP', ['TIMESTAMP'], 'impala::MaskFunctions::Mask'],
+  [['mask'], 'TIMESTAMP', ['TIMESTAMP', 'STRING', 'STRING', 'STRING', 'INT', 'STRING', 'INT', 'INT', 'INT'],
+      'impala::MaskFunctions::Mask'],
+  # Overloads of mask_hash
   [['mask_hash'], 'STRING', ['STRING'], 'impala::MaskFunctions::MaskHash'],
   [['mask_hash'], 'BIGINT', ['BIGINT'], 'impala::MaskFunctions::MaskHash'],
   [['mask_hash'], 'DOUBLE', ['DOUBLE'], 'impala::MaskFunctions::MaskHash'],

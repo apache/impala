@@ -1,0 +1,58 @@
+====
+---- QUERY
+select * from functional.alltypestiny
+---- RESULTS
+0,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'67dae49e6e99b74e95857579068fad1965ab1fca2835a838dbfa4179eed1a8c2','5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9',NULL,NULL,1
+1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'67dae49e6e99b74e95857579068fad1965ab1fca2835a838dbfa4179eed1a8c2','6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b',NULL,NULL,1
+2,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'d8b7b45719bfb8d67a3188961ef2a9b3080392c38ed0b2800d212448df85a2c0','5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9',NULL,NULL,2
+3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'d8b7b45719bfb8d67a3188961ef2a9b3080392c38ed0b2800d212448df85a2c0','6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b',NULL,NULL,2
+4,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'13c344c063974ea1312cc9358700190b7951fe9ad04a5c124a94b99b46bf3b7b','5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9',NULL,NULL,3
+5,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'13c344c063974ea1312cc9358700190b7951fe9ad04a5c124a94b99b46bf3b7b','6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b',NULL,NULL,3
+6,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'ed904f5edfa43abef4b420d661af0321db4e1f149de01a769c46a7a5687ff7b8','5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9',NULL,NULL,4
+7,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'ed904f5edfa43abef4b420d661af0321db4e1f149de01a769c46a7a5687ff7b8','6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b',NULL,NULL,4
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+select * from functional.date_tbl
+---- RESULTS
+0,NULL,NULL
+1,NULL,NULL
+2,NULL,NULL
+3,NULL,NULL
+4,NULL,NULL
+5,NULL,NULL
+6,NULL,NULL
+10,NULL,NULL
+11,NULL,NULL
+12,NULL,NULL
+20,NULL,NULL
+21,NULL,NULL
+22,NULL,NULL
+23,NULL,NULL
+24,NULL,NULL
+25,NULL,NULL
+26,NULL,NULL
+27,NULL,NULL
+28,NULL,NULL
+29,NULL,NULL
+30,NULL,NULL
+31,NULL,NULL
+---- TYPES
+INT,DATE,DATE
+====
+---- QUERY
+select * from functional.chars_tiny
+---- RESULTS
+'af872','13b612c1bbc6102a0c061e8ac26db661e6f2b0bcf8916d698f6a48f0584bc24b                                                                            ','f4414d9d90ebd333d51355d1b987fb11'
+'f4f05','ded997a98d3dba01b80d96f599ccfc6e8734c4bfda95198ea7c05e3663563f3c                                                                            ','d11f79239eb18fd3fc118590b6e41444'
+'4d365','ba1dcef5f745da23be43af751fc5561f2429120d44df70334554f758c4fd6800                                                                            ','a15f88c2af0897ddea9c81685d7fe968'
+'cb490','dee8fd648827dc7f24c21248d3f1ce633bccb1df34e93a2c32ddb14b55e2eff4                                                                            ','478117e90c2d2eb98aa8a200e97cc569'
+'90aaa','b2921214116ba777975a5d0285a941d0566c4901e86c53d315df6d612f34c306                                                                            ','f4df435df41a53e0ed8d0e16397d0287'
+'e3b0c','e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855                                                                            ','e3b0c44298fc1c149afbf4c8996fb924'
+'f6143','15d7b5a91472ed555dc4c442081a7d8a2fffd20f84856e9739127354edb9dfdb                                                                            ','7356887119fd6ed53332f3e902cb547e'
+'f6143','15d7b5a91472ed555dc4c442081a7d8a2fffd20f84856e9739127354edb9dfdb                                                                            ','7356887119fd6ed53332f3e902cb547e'
+'95e4a','c8fcce134c7d85f738457e0b1aa3b82090cb981de4ed54840a25e3e49a623900                                                                            ','2e7d2c03a9507ae265ecf5b5356885a5'
+---- TYPES
+CHAR,CHAR,STRING
+====

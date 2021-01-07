@@ -21,6 +21,7 @@ import os
 import grp
 import json
 import pytest
+import logging
 import requests
 from subprocess import check_call
 
@@ -44,6 +45,9 @@ LOCAL_CATALOG_IMPALAD_ARGS = "--server-name=server1 --ranger_service_type=hive "
     "--ranger_app_id=impala --authorization_provider=ranger --use_local_catalog=true"
 LOCAL_CATALOG_CATALOGD_ARGS = "--server-name=server1 --ranger_service_type=hive " \
     "--ranger_app_id=impala --authorization_provider=ranger --catalog_topic_mode=minimal"
+
+LOG = logging.getLogger('impala_test_suite')
+
 
 class TestRanger(CustomClusterTestSuite):
   """
@@ -993,6 +997,51 @@ class TestRanger(CustomClusterTestSuite):
       admin_client.execute("drop database %s cascade" % unique_database)
       for i in range(policy_cnt):
         TestRanger._remove_column_masking_policy(unique_name + str(i))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_masking_overload_coverage(self, vector, unique_name):
+    """Test that we have cover all the overloads of the masking functions that could
+       appear in using default policies."""
+    user = getuser()
+    policy_names = []
+    # Create another client for admin user since current user doesn't have privileges to
+    # create/drop databases or refresh authorization.
+    admin_client = self.create_impala_client()
+    try:
+      for mask_type in ["MASK", "MASK_SHOW_LAST_4", "MASK_SHOW_FIRST_4", "MASK_HASH",
+                        "MASK_NULL", "MASK_NONE", "MASK_DATE_SHOW_YEAR"]:
+        LOG.info("Testing default mask type " + mask_type)
+        # Add masking policies on functional.alltypestiny
+        for col in ["bool_col", "tinyint_col", "smallint_col", "int_col", "bigint_col",
+                    "float_col", "double_col", "date_string_col", "string_col",
+                    "timestamp_col", "year"]:
+          policy_name = "_".join((unique_name, col, mask_type))
+          TestRanger._add_column_masking_policy(
+              policy_name, user, "functional", "alltypestiny", col, mask_type)
+          policy_names.append(policy_name)
+        # Add masking policies on functional.date_tbl
+        for col in ["date_col", "date_part"]:
+          policy_name = "_".join((unique_name, col, mask_type))
+          TestRanger._add_column_masking_policy(
+              policy_name, user, "functional", "date_tbl", col, mask_type)
+          policy_names.append(policy_name)
+        # Add masking policies on functional.chars_tiny
+        for col in ["cs", "cl", "vc"]:
+          policy_name = "_".join((unique_name, col, mask_type))
+          TestRanger._add_column_masking_policy(
+              policy_name, user, "functional", "chars_tiny", col, mask_type)
+          policy_names.append(policy_name)
+
+        self.execute_query_expect_success(admin_client, "refresh authorization",
+                                          user=ADMIN)
+        self.run_test_case("QueryTest/ranger_alltypes_" + mask_type.lower(), vector)
+        while policy_names:
+          TestRanger._remove_column_masking_policy(policy_names.pop())
+    finally:
+      while policy_names:
+        TestRanger._remove_column_masking_policy(policy_names.pop())
 
   @pytest.mark.execute_serially
   @SkipIfABFS.hive

@@ -1,0 +1,58 @@
+====
+---- QUERY
+select * from functional.alltypestiny
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00,2009,2
+4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
+5,false,1,1,1,10,1.100000023841858,10.1,'03/01/09','1',2009-03-01 00:01:00,2009,3
+6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+7,false,1,1,1,10,1.100000023841858,10.1,'04/01/09','1',2009-04-01 00:01:00,2009,4
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+select * from functional.date_tbl
+---- RESULTS
+0,0001-01-01,0001-01-01
+1,0001-12-31,0001-01-01
+2,0002-01-01,0001-01-01
+3,1399-12-31,0001-01-01
+4,2017-11-28,0001-01-01
+5,9999-12-31,0001-01-01
+6,NULL,0001-01-01
+10,2017-11-28,1399-06-27
+11,NULL,1399-06-27
+12,2018-12-31,1399-06-27
+20,0001-06-21,2017-11-27
+21,0001-06-22,2017-11-27
+22,0001-06-23,2017-11-27
+23,0001-06-24,2017-11-27
+24,0001-06-25,2017-11-27
+25,0001-06-26,2017-11-27
+26,0001-06-27,2017-11-27
+27,0001-06-28,2017-11-27
+28,0001-06-29,2017-11-27
+29,2017-11-28,2017-11-27
+30,9999-12-01,9999-12-31
+31,9999-12-31,9999-12-31
+---- TYPES
+INT,DATE,DATE
+====
+---- QUERY
+select * from functional.chars_tiny
+---- RESULTS
+'1aaaa','1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','1cccc'
+'2aaaa','2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','2cccccc'
+'3aaa ','3bbbbb                                                                                                                                      ','3ccc'
+'4aa  ','4bbbb                                                                                                                                       ','4cc'
+'5a   ','5bbb                                                                                                                                        ','5c'
+'NULL','NULL','NULL'
+'6a   ','6b                                                                                                                                          ','6c'
+'6a   ','6b                                                                                                                                          ','6c'
+'a    ','b                                                                                                                                           ','c'
+---- TYPES
+CHAR,CHAR,STRING
+====
