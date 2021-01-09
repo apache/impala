@@ -75,7 +75,58 @@ under the License.
 
   <repositories>
     <!--
-    Blacklist Apache repositories that tend to cause timeouts - see IMPALA-8516.
+    Repository order matters, especially when using mirrors. This optimizes
+    for the common case where the mirror is intended to catch artifacts
+    that would otherwise come from central and other physical servers.
+    That means putting repositories in this order:
+    1. Local / S3 repositories
+    2. Regular remote repositories
+    3. Banned repositories
+    This allows builds to get artifacts from the local repositories
+    and s3 buckets without trying the mirror first, while still
+    getting other artifacts from the mirror.
+    -->
+    <!-- Local/S3 repositories -->
+    <repository>
+      <id>impala.toolchain.kudu.repo</id>
+      <url>${env.IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY}</url>
+      <name>Impala Toolchain Kudu Repository</name>
+      <releases>
+        <enabled>${env.IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED}</enabled>
+      </releases>
+      <!--
+      This repository now uses explicit versions, so snapshots are no longer required.
+      -->
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <!--
+      The Maven repository for the CDP build identified by CDP_BUILD_NUMBER.
+      CDP does not use maven SNAPSHOT versions - every build has a version number.
+      -->
+      <id>impala.cdp.repo</id>
+      <url>${env.CDP_MAVEN_REPOSITORY}</url>
+      <name>Impala CDP Repository</name>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+
+    <!-- Regular remote repositories -->
+    <repository>
+      <id>cdh.rcs.releases.repo</id>
+      <url>https://repository.cloudera.com/artifactory/cdh-releases-rcs</url>
+      <name>CDH Releases Repository</name>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+
+    <!-- Banned repositories -->
+    <!--
+    Ban Apache repositories that tend to cause timeouts - see IMPALA-8516.
     These are pulled in via transitive deps, e.g. Sentry. Other repositories contain
     mirrored versions of these dependencies but don't have the same timeout issues.
     -->
@@ -138,8 +189,8 @@ under the License.
       The Impala development bootstrapping depends on CDH Maven snapshots
       which transitively pull dependencies from other repositories which
       can cause the build to be non-reproducible, e.g. IMPALA-7316. This
-      patch makes the build to be reproducible by blacklisting
-      cdh.snapshots.repo so that Maven does not accidentally downloads the
+      patch makes the build to be reproducible by banning
+      cdh.snapshots.repo so that Maven does not accidentally download the
       latest CDH snapshots when running a build, which can cause
       incompatibility issues.
       -->
@@ -149,40 +200,6 @@ under the License.
       <releases>
         <enabled>false</enabled>
       </releases>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-    <repository>
-      <id>cdh.rcs.releases.repo</id>
-      <url>https://repository.cloudera.com/artifactory/cdh-releases-rcs</url>
-      <name>CDH Releases Repository</name>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-    <repository>
-      <!--
-      The Maven repository for the CDP build identified by CDP_BUILD_NUMBER.
-      CDP does not use maven SNAPSHOT versions - every build has a version number.
-      -->
-      <id>impala.cdp.repo</id>
-      <url>${env.CDP_MAVEN_REPOSITORY}</url>
-      <name>Impala CDP Repository</name>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-    <repository>
-      <id>impala.toolchain.kudu.repo</id>
-      <url>${env.IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY}</url>
-      <name>Impala Toolchain Kudu Repository</name>
-      <releases>
-        <enabled>${env.IMPALA_TOOLCHAIN_KUDU_MAVEN_REPOSITORY_ENABLED}</enabled>
-      </releases>
-      <!--
-      This repository now uses explicit versions, so snapshots are no longer required.
-      -->
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
