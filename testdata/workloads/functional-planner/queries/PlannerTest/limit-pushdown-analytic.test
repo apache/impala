@@ -16,18 +16,19 @@ PLAN-ROOT SINK
 |
 03:SELECT
 |  predicates: rank() <= 10
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
 02:ANALYTIC
 |  functions: rank()
 |  partition by: int_col
 |  order by: smallint_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
-01:TOP-N [LIMIT=10]
+01:TOP-N
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -45,59 +46,61 @@ PLAN-ROOT SINK
 |
 03:SELECT
 |  predicates: rank() <= 10
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
 02:ANALYTIC
 |  functions: rank()
 |  partition by: int_col
 |  order by: smallint_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
-06:TOP-N [LIMIT=10]
+06:TOP-N
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
 |
 05:EXCHANGE [HASH(int_col)]
 |
-01:TOP-N [LIMIT=10]
+01:TOP-N
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
    row-size=14B cardinality=11.00K
 ====
-# row_number() predicate on equality instead of range.
+# row_number() predicate
 # Limit pushdown into analytic sort should be applied.
 select * from (
   select int_col, bigint_col, smallint_col,
     row_number() over (partition by int_col order by smallint_col desc) rk
   from functional.alltypesagg) dt
-where rk = 5
+where rk <= 10
 order by int_col, bigint_col, smallint_col, rk
-limit 10
+limit 5
 ---- PLAN
 PLAN-ROOT SINK
 |
-04:TOP-N [LIMIT=10]
+04:TOP-N [LIMIT=5]
 |  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
-|  row-size=22B cardinality=1
+|  row-size=22B cardinality=5
 |
 03:SELECT
-|  predicates: row_number() = 5
-|  row-size=22B cardinality=1
+|  predicates: row_number() <= 10
+|  row-size=22B cardinality=15
 |
 02:ANALYTIC
 |  functions: row_number()
 |  partition by: int_col
 |  order by: smallint_col DESC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=15
 |
-01:TOP-N [LIMIT=10]
+01:TOP-N [LIMIT=15]
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  row-size=14B cardinality=15
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -107,32 +110,32 @@ PLAN-ROOT SINK
 |
 07:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
-|  limit: 10
+|  limit: 5
 |
-04:TOP-N [LIMIT=10]
+04:TOP-N [LIMIT=5]
 |  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
-|  row-size=22B cardinality=1
+|  row-size=22B cardinality=5
 |
 03:SELECT
-|  predicates: row_number() = 5
-|  row-size=22B cardinality=1
+|  predicates: row_number() <= 10
+|  row-size=22B cardinality=15
 |
 02:ANALYTIC
 |  functions: row_number()
 |  partition by: int_col
 |  order by: smallint_col DESC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=15
 |
-06:TOP-N [LIMIT=10]
+06:TOP-N [LIMIT=15]
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  row-size=14B cardinality=15
 |
 05:EXCHANGE [HASH(int_col)]
 |
-01:TOP-N [LIMIT=10]
+01:TOP-N [LIMIT=15]
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  row-size=14B cardinality=15
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -157,18 +160,19 @@ PLAN-ROOT SINK
 |
 03:SELECT
 |  predicates: rank() <= 10
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
 02:ANALYTIC
 |  functions: rank()
 |  partition by: int_col, bigint_col
 |  order by: smallint_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
-01:TOP-N [LIMIT=10]
+01:TOP-N
 |  order by: int_col ASC NULLS LAST, bigint_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -186,24 +190,26 @@ PLAN-ROOT SINK
 |
 03:SELECT
 |  predicates: rank() <= 10
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
 02:ANALYTIC
 |  functions: rank()
 |  partition by: int_col, bigint_col
 |  order by: smallint_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
-06:TOP-N [LIMIT=10]
+06:TOP-N
 |  order by: int_col ASC NULLS LAST, bigint_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
 |
 05:EXCHANGE [HASH(int_col,bigint_col)]
 |
-01:TOP-N [LIMIT=10]
+01:TOP-N
 |  order by: int_col ASC NULLS LAST, bigint_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -289,11 +295,12 @@ PLAN-ROOT SINK
 |  partition by: int_col
 |  order by: smallint_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
-01:TOP-N [LIMIT=10]
+01:TOP-N
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -314,17 +321,19 @@ PLAN-ROOT SINK
 |  partition by: int_col
 |  order by: smallint_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
-05:TOP-N [LIMIT=10]
+05:TOP-N
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
 |
-04:EXCHANGE [HASH(int_col,smallint_col)]
+04:EXCHANGE [HASH(int_col)]
 |
-01:TOP-N [LIMIT=10]
+01:TOP-N
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -336,7 +345,7 @@ select * from (
   select int_col, bigint_col, smallint_col,
     rank() over (partition by int_col order by smallint_col desc) rk
   from functional.alltypesagg) dt
-where 10 > rk
+where 11 > rk
 order by int_col, bigint_col, smallint_col, rk
 limit 10
 ---- PLAN
@@ -347,19 +356,20 @@ PLAN-ROOT SINK
 |  row-size=22B cardinality=10
 |
 03:SELECT
-|  predicates: rank() < 10
-|  row-size=22B cardinality=10
+|  predicates: rank() < 11
+|  row-size=22B cardinality=20
 |
 02:ANALYTIC
 |  functions: rank()
 |  partition by: int_col
 |  order by: smallint_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
-01:TOP-N [LIMIT=10]
+01:TOP-N
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -376,25 +386,93 @@ PLAN-ROOT SINK
 |  row-size=22B cardinality=10
 |
 03:SELECT
-|  predicates: rank() < 10
-|  row-size=22B cardinality=10
+|  predicates: rank() < 11
+|  row-size=22B cardinality=20
 |
 02:ANALYTIC
 |  functions: rank()
 |  partition by: int_col
 |  order by: smallint_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
-06:TOP-N [LIMIT=10]
+06:TOP-N
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
 |
 05:EXCHANGE [HASH(int_col)]
 |
-01:TOP-N [LIMIT=10]
+01:TOP-N
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# IMPALA-10296: Limit pushdown should not be applied
+# when the limit on rank() is smaller than the limit on the order by.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    rank() over (partition by int_col order by smallint_col desc) rk
+  from functional.alltypesagg) dt
+where rk < 10
+order by int_col, bigint_col, smallint_col, rk
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() < 10
+|  row-size=22B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=11.00K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  limit: 10
+|
+04:TOP-N [LIMIT=10]
+|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk ASC
+|  row-size=22B cardinality=10
+|
+03:SELECT
+|  predicates: rank() < 10
+|  row-size=22B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=11.00K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=11.00K
+|
+05:EXCHANGE [HASH(int_col)]
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -420,18 +498,19 @@ PLAN-ROOT SINK
 |
 04:SELECT
 |  predicates: rank() <= 10
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
 03:ANALYTIC
 |  functions: rank()
 |  partition by: int_col
 |  order by: smallint_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=10
+|  row-size=22B cardinality=20
 |
-02:TOP-N [LIMIT=10]
+02:TOP-N
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=10
+|  limit with ties: 20
+|  row-size=14B cardinality=20
 |
 01:AGGREGATE [FINALIZE]
 |  group by: int_col, bigint_col, smallint_col
@@ -493,18 +572,19 @@ PLAN-ROOT SINK
 |
 03:SELECT
 |  predicates: rank() <= 20
-|  row-size=22B cardinality=1.10K
+|  row-size=22B cardinality=30
 |
 02:ANALYTIC
 |  functions: rank()
 |  partition by: int_col
 |  order by: smallint_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|  row-size=22B cardinality=11.00K
+|  row-size=22B cardinality=30
 |
-01:SORT
+01:TOP-N
 |  order by: int_col ASC NULLS LAST, smallint_col DESC
-|  row-size=14B cardinality=11.00K
+|  limit with ties: 30
+|  row-size=14B cardinality=30
 |
 00:SCAN HDFS [functional.alltypesagg]
    HDFS partitions=11/11 files=11 size=814.73KB
@@ -658,26 +738,74 @@ PLAN-ROOT SINK
    row-size=14B cardinality=11.00K
 ====
 # 2 ranking functions with different partition-by exprs. Predicate is on
-# the dense_rank() function. If the dense_rank() appears as the top
-# level analytic function, the limit pushdown can be applied. Otherwise,
-# it should not.
+# the row_number() function. If the row_number() appears as the top
+# level analytic function, like in this example, the limit pushdown can be
+# applied. Otherwise, it should not.
 select * from (
   select int_col, bigint_col, smallint_col,
-    dense_rank() over (partition by bigint_col order by smallint_col desc) rk2,
-    rank() over (partition by int_col order by smallint_col desc) rk1
+    rank() over (partition by int_col order by smallint_col desc) rk1,
+    row_number() over (partition by bigint_col order by smallint_col desc) rk2
   from functional.alltypesagg) dt
 where rk2 <= 10
-order by int_col, bigint_col, smallint_col, rk1, rk2
+order by bigint_col, int_col, smallint_col, rk1, rk2
 limit 10
 ---- PLAN
 PLAN-ROOT SINK
 |
 06:TOP-N [LIMIT=10]
-|  order by: int_col ASC, bigint_col ASC, smallint_col ASC, rk1 ASC, rk2 ASC
+|  order by: bigint_col ASC, int_col ASC, smallint_col ASC, rk1 ASC, rk2 ASC
 |  row-size=30B cardinality=10
 |
 05:SELECT
-|  predicates: dense_rank() <= 10
+|  predicates: row_number() <= 10
+|  row-size=30B cardinality=20
+|
+04:ANALYTIC
+|  functions: row_number()
+|  partition by: bigint_col
+|  order by: smallint_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=30B cardinality=20
+|
+03:TOP-N [LIMIT=20]
+|  order by: bigint_col ASC NULLS LAST, smallint_col DESC
+|  row-size=22B cardinality=20
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: int_col
+|  order by: smallint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=22B cardinality=11.00K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, smallint_col DESC
+|  row-size=14B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=14B cardinality=11.00K
+====
+# 2 ranking functions with different partition-by exprs. Predicate is on
+# the row_number() function. row_number() is not the top analytic function
+# here, so limit pushdown cannot be applied.
+select * from (
+  select int_col, bigint_col, smallint_col,
+    row_number() over (partition by bigint_col order by smallint_col desc) rk2,
+    rank() over (partition by int_col order by smallint_col desc) rk1
+  from functional.alltypesagg) dt
+where rk2 <= 10
+order by bigint_col, int_col, smallint_col, rk1, rk2
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+06:TOP-N [LIMIT=10]
+|  order by: bigint_col ASC, int_col ASC, smallint_col ASC, rk1 ASC, rk2 ASC
+|  row-size=30B cardinality=10
+|
+05:SELECT
+|  predicates: row_number() <= 10
 |  row-size=30B cardinality=1.10K
 |
 04:ANALYTIC
@@ -692,10 +820,10 @@ PLAN-ROOT SINK
 |  row-size=22B cardinality=11.00K
 |
 02:ANALYTIC
-|  functions: dense_rank()
+|  functions: row_number()
 |  partition by: bigint_col
 |  order by: smallint_col DESC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  row-size=22B cardinality=11.00K
 |
 01:SORT
@@ -938,4 +1066,211 @@ PLAN-ROOT SINK
    partition predicates: `month` >= 11
    HDFS partitions=4/24 files=4 size=34.10KB
    row-size=24B cardinality=2.17K
+====
+# Very high rank() predicate is not pushed down because the limit would not fit in
+# a 32-bit integer.
+select tinyint_col, string_col, id, rnk from (
+  select *, rank() over (partition by tinyint_col order by string_col) rnk
+  from functional.alltypestiny) v
+where rnk <= 9999999999
+order by tinyint_col, string_col desc, id desc
+limit 6
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=6]
+|  order by: tinyint_col ASC, string_col DESC, id DESC
+|  row-size=26B cardinality=1
+|
+03:SELECT
+|  predicates: rank() <= 9999999999
+|  row-size=26B cardinality=1
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: tinyint_col
+|  order by: string_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=26B cardinality=8
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS LAST, string_col ASC
+|  row-size=18B cardinality=8
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=18B cardinality=8
+====
+# Very high rank() predicate is pushed down because the limit fits in
+# a 32-bit integer and the top-n bytes limit does not kick in.
+select tinyint_col, string_col, id, rnk from (
+  select *, rank() over (partition by tinyint_col order by string_col) rnk
+  from functional.alltypestiny) v
+where rnk <= 999999999
+order by tinyint_col, string_col desc, id desc
+limit 6
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=6]
+|  order by: tinyint_col ASC, string_col DESC, id DESC
+|  row-size=26B cardinality=6
+|
+03:SELECT
+|  predicates: rank() <= 999999999
+|  row-size=26B cardinality=8
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: tinyint_col
+|  order by: string_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=26B cardinality=8
+|
+01:TOP-N
+|  order by: tinyint_col ASC NULLS LAST, string_col ASC
+|  limit with ties: 1000000005
+|  row-size=18B cardinality=8
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=18B cardinality=8
+====
+# rank() predicate is not pushed down because TOPN_BYTES_LIMIT prevents conversion
+# to top-n node.
+select tinyint_col, string_col, id, rnk from (
+  select *, rank() over (partition by tinyint_col order by string_col) rnk
+  from functional.alltypesagg) v
+where rnk <= 9999
+order by tinyint_col, string_col desc, id desc
+limit 6
+---- QUERYOPTIONS
+topn_bytes_limit=1000
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=6]
+|  order by: tinyint_col ASC, string_col DESC, id DESC
+|  row-size=28B cardinality=6
+|
+03:SELECT
+|  predicates: rank() <= 9999
+|  row-size=28B cardinality=11.00K
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: tinyint_col
+|  order by: string_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=28B cardinality=11.00K
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS LAST, string_col ASC
+|  row-size=20B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=20B cardinality=11.00K
+====
+# Limit cannot be pushed down past a dense_rank() predicate.
+select tinyint_col, string_col, id, rnk from (
+  select *, dense_rank() over (partition by tinyint_col order by string_col) rnk
+  from functional.alltypestiny) v
+where rnk <= 10
+order by tinyint_col, string_col desc, id desc
+limit 10
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=10]
+|  order by: tinyint_col ASC, string_col DESC, id DESC
+|  row-size=26B cardinality=1
+|
+03:SELECT
+|  predicates: dense_rank() <= 10
+|  row-size=26B cardinality=1
+|
+02:ANALYTIC
+|  functions: dense_rank()
+|  partition by: tinyint_col
+|  order by: string_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=26B cardinality=8
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS LAST, string_col ASC
+|  row-size=18B cardinality=8
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=18B cardinality=8
+====
+# Limit cannot be pushed down past = predicates, except for comparison to 1 where
+# it is equivalent to <= 1
+select tinyint_col, string_col, id, rnk from (
+  select *, rank() over (partition by tinyint_col order by id) rnk
+  from functional.alltypestiny) v
+where rnk = 2
+order by tinyint_col, string_col desc, id desc
+limit 2
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=2]
+|  order by: tinyint_col ASC, string_col DESC, id DESC
+|  row-size=26B cardinality=2
+|
+03:SELECT
+|  predicates: rank() = 2
+|  row-size=26B cardinality=8
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: tinyint_col
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=26B cardinality=8
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS LAST, id ASC
+|  row-size=18B cardinality=8
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=18B cardinality=8
+====
+# Limit cannot be pushed down past = predicates, except for comparison to 1 where
+# it is equivalent to <= 1
+select tinyint_col, string_col, id, rnk from (
+  select *, rank() over (partition by tinyint_col order by id) rnk
+  from functional.alltypestiny) v
+where rnk = 1
+order by tinyint_col, string_col desc, id desc
+limit 1
+---- PLAN
+PLAN-ROOT SINK
+|
+04:TOP-N [LIMIT=1]
+|  order by: tinyint_col ASC, string_col DESC, id DESC
+|  row-size=26B cardinality=1
+|
+03:SELECT
+|  predicates: rank() = 1
+|  row-size=26B cardinality=1
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: tinyint_col
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=26B cardinality=2
+|
+01:TOP-N
+|  order by: tinyint_col ASC NULLS LAST, id ASC
+|  limit with ties: 2
+|  row-size=18B cardinality=2
+|
+00:SCAN HDFS [functional.alltypestiny]
+   HDFS partitions=4/4 files=4 size=460B
+   row-size=18B cardinality=8
 ====

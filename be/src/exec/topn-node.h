@@ -46,6 +46,16 @@ class TopNPlanNode : public PlanNode {
   }
   ~TopNPlanNode(){}
 
+  /// Returns the per-heap capacity used for the Heap objects in this node.
+  int64_t heap_capacity() const {
+    int64_t limit = include_ties() ? tnode_->sort_node.limit_with_ties : tnode_->limit;
+    return limit + offset();
+  }
+
+  bool include_ties() const {
+    return tnode_->sort_node.include_ties;
+  }
+
   /// Ordering expressions used for tuple comparison.
   std::vector<ScalarExpr*> ordering_exprs_;
 
@@ -55,7 +65,7 @@ class TopNPlanNode : public PlanNode {
   /// Materialization exprs for the output tuple and their evaluators.
   std::vector<ScalarExpr*> output_tuple_exprs_;
 
-  /// Config used to create a TupleRowComparator instance.
+  /// Config used to create a TupleRowComparator instance for 'ordering_exprs_'.
   TupleRowComparatorConfig* row_comparator_config_ = nullptr;
 
   /// Codegened version of TopNNode::InsertBatch().
@@ -63,12 +73,37 @@ class TopNPlanNode : public PlanNode {
   CodegenFnPtr<InsertBatchFn> codegend_insert_batch_fn_;
 };
 
-/// Node for in-memory TopN (ORDER BY ... LIMIT)
-/// This handles the case where the result fits in memory.
-/// This node will materialize its input rows into a new tuple using the expressions
-/// in sort_tuple_slot_exprs_ in its sort_exec_exprs_ member.
-/// TopN is implemented by storing rows in a priority queue.
-
+/// Node for in-memory TopN operator that sorts input tuples and applies a limit such
+/// that only the Top N tuples according to the sort order are returned by the operator.
+/// This node materializes its input rows into a new row format comprised of a single
+/// tuple using the output_tuple_exprs_.
+///
+/// In-memory priority queues, represented as binary heaps, are used to compute the Top N
+/// efficiently. Maintaining in-memory heaps with the current top rows allows discarding
+/// rows that are not in the top N as soon as possible, minimizing the memory requirements
+/// and processing time of the operator.
+///
+/// TODO: currently we only support a single top-n heap per operator. IMPALA-9979 will
+/// add a partitioned mode.
+///
+/// Unpartitioned TopN Implementation Details
+/// =========================================
+/// Unpartitioned mode uses a single in-memory priority queue and does not spill results
+/// to disk. Memory consumption is bounded by the limit. After the input is consumed,
+/// rows can be directly outputted from the priority queue by calling
+/// Heap::PrepareForOutput().
+///
+/// Memory Management
+/// =================
+/// In-memory heaps are backed by 'tuple_pool_' - all tuples in the heaps must reference
+/// only memory allocated from this pool. To reclaim memory from tuples that have been
+/// evicted from the heaps, the in-memory heaps must be re-materialized with a new
+/// MemPool - see ReclaimTuplePool(). In some cases the fixed-length portion of a
+/// tuple can be reused to avoid the need to reclaim all the time.
+///
+/// In unpartitioned mode, reclamation is triggered by 'rows_to_reclaim_' hitting a
+/// threshold, which indicates that enough unused memory may have accumulated to
+/// be worth reclaiming.
 class TopNNode : public ExecNode {
  public:
   TopNNode(ObjectPool* pool, const TopNPlanNode& pnode, const DescriptorTbl& descs);
@@ -87,18 +122,24 @@ class TopNNode : public ExecNode {
 
   friend class TupleLessThan;
 
-  /// Inserts all the rows in 'batch' into the queue.
+  bool include_ties() const {
+    const TopNPlanNode& pnode = static_cast<const TopNPlanNode&>(plan_node_);
+    return pnode.include_ties();
+  }
+
+  /// Inserts all the input rows in 'batch' into 'heap_'.
   void InsertBatch(RowBatch* batch);
 
-  /// Prepare to output all of the rows in this operator in sorted order. Initializes
-  /// 'sorted_top_n_' and 'get_next_iterator_'.
+  /// Prepare to start outputting rows. Called after consuming all rows from the child.
+  /// Collects all output rows in 'sorted_top_n_' and initializes 'get_next_iter_' to
+  /// point to the first row.
   void PrepareForOutput();
 
-  // Re-materialize all tuples that reference 'tuple_pool_' and release 'tuple_pool_',
-  // replacing it with a new pool.
+  /// Re-materialize all tuples that reference 'tuple_pool_' and release 'tuple_pool_',
+  /// replacing it with a new pool.
   Status ReclaimTuplePool(RuntimeState* state);
 
-  IR_NO_INLINE int tuple_byte_size() const {
+  IR_NO_INLINE int tuple_byte_size() const noexcept {
     return output_tuple_desc_->byte_size();
   }
 
@@ -112,16 +153,12 @@ class TopNNode : public ExecNode {
   /// Cached descriptor for the materialized tuple.
   TupleDescriptor* const output_tuple_desc_;
 
-  /// Comparator for priority_queue_.
+  /// Comparator for ordering tuples globally.
   std::unique_ptr<TupleRowComparator> tuple_row_less_than_;
 
-  /// After computing the TopN in the priority_queue, pop them and put them in this vector
+  /// Temporary staging vector for sorted tuples extracted from a Heap via
+  /// Heap::PrepareForOutput().
   std::vector<Tuple*> sorted_top_n_;
-
-  /// Tuple allocated once from tuple_pool_ and reused in InsertTupleRow to
-  /// materialize input tuples if necessary. After materialization, tmp_tuple_ may be
-  /// copied into the tuple pool and inserted into the priority queue.
-  Tuple* tmp_tuple_ = nullptr;
 
   /// Stores everything referenced in priority_queue_.
   std::unique_ptr<MemPool> tuple_pool_;
@@ -133,10 +170,10 @@ class TopNNode : public ExecNode {
   /// was used to create this instance.
   const CodegenFnPtr<TopNPlanNode::InsertBatchFn>& codegend_insert_batch_fn_;
 
-  /// Timer for time spent in InsertBatch() function (or codegen'd version)
+  /// Timer for time spent in InsertBatch() function (or codegen'd version).
   RuntimeProfile::Counter* insert_batch_timer_;
 
-  /// Number of rows to be reclaimed since tuple_pool_ was last created/reclaimed
+  /// Number of rows to be reclaimed since tuple_pool_ was last created/reclaimed.
   int64_t rows_to_reclaim_;
 
   /// Number of times tuple pool memory was reclaimed
@@ -145,10 +182,15 @@ class TopNNode : public ExecNode {
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
-  /// A heap containing up to 'limit_' + 'offset_' rows.
+  /// Tuple allocated once from tuple_pool_ and reused in InsertTupleRow to
+  /// materialize input tuples if necessary. After materialization, tmp_tuple_ may be
+  /// copied into the tuple pool and inserted into the priority queue.
+  Tuple* tmp_tuple_ = nullptr;
+
+  // Single heap used as the main heap in unpartitioned Top-N.
   std::unique_ptr<Heap> heap_;
 
-  /// Number of rows skipped. Used for adhering to offset_.
+  /// Number of rows skipped. Used for adhering to offset_ in unpartitioned Top-N.
   int64_t num_rows_skipped_;
 
   /// END: Members that must be Reset()
@@ -159,7 +201,7 @@ class TopNNode : public ExecNode {
 /// up to 'capacity' tuples.
 class TopNNode::Heap {
  public:
-  Heap(const TupleRowComparator& c, int64_t capacity);
+  Heap(const TupleRowComparator& c, int64_t capacity, bool include_ties);
 
   void Reset();
   void Close();
@@ -168,8 +210,8 @@ class TopNNode::Heap {
   /// copy of 'tuple_row', which it stores in 'tuple_pool'. Always inlined in IR into
   /// TopNNode::InsertBatch() because codegen relies on this for substituting exprs
   /// in the body of TopNNode.
-  /// Returns true if a previous row was replaced.
-  bool IR_ALWAYS_INLINE InsertTupleRow(TopNNode* node, TupleRow* input_row);
+  /// Returns the number of materialized tuples discarded that may need to be reclaimed.
+  int IR_ALWAYS_INLINE InsertTupleRow(TopNNode* node, TupleRow* input_row);
 
   /// Copy the elements in the priority queue into a new tuple pool, and release
   /// the previous pool.
@@ -180,25 +222,56 @@ class TopNNode::Heap {
   void PrepareForOutput(
       const TopNNode& RESTRICT node, std::vector<Tuple*>* sorted_top_n) RESTRICT;
 
-  /// Returns number of tuples currently in heap.
-  int64_t num_tuples() const { return priority_queue_.Size(); }
+  /// Can be called to invoke DCHECKs if the heap is in an inconsistent state.
+  /// Returns a bool so it can be wrapped in a DCHECK() macro.
+  bool DCheckConsistency();
 
-  IR_NO_INLINE int64_t heap_capacity() const { return capacity_; }
+  /// Returns number of tuples currently in heap.
+  int64_t num_tuples() const { return priority_queue_.Size() + overflowed_ties_.size(); }
+
+  IR_NO_INLINE int64_t heap_capacity() const noexcept { return capacity_; }
+
+  IR_NO_INLINE bool include_ties() const noexcept { return include_ties_; }
 
 private:
+  /// Helper for RematerializeTuples() that materializes the tuples in a container in the
+  /// range (begin_it, end_it].
+  template <class T>
+  Status RematerializeTuplesHelper(TopNNode* node, RuntimeState* state,
+      MemPool* new_pool, T begin_it, T end_it);
+
+  /// Helper to insert tuple row into a full priority queue with tie handling. This
+  /// should not be called until the heap is at capacity and tie handling is needed.
+  /// 'materialized_tuple' must be materialized into the output row format, i.e.
+  /// output_tuple_desc_. Returns the number of materialized tuples discarded as a result
+  /// of this function.
+  /// Always inlined in IR because codegen relies on this for substituting exprs in the
+  /// body of the function.
+  int IR_ALWAYS_INLINE InsertTupleWithTieHandling(
+      TopNNode* node, Tuple* materialized_tuple);
+
+
   /// Limit on capacity of 'priority_queue_'. If inserting a tuple into the queue
   /// would exceed this, a tuple is popped off the queue.
   const int64_t capacity_;
 
+  /// If true, the heap may include more than 'capacity_' if multiple tuples are
+  /// tied to be the head of the heap.
+  const bool include_ties_;
+
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
-  /// The priority queue (represented by a vector and modified using
-  /// push_heap()/pop_heap() to maintain ordered heap invariants) will never have more
-  /// elements in it than the LIMIT + OFFSET. The order of the queue is the opposite of
-  /// what the ORDER BY clause specifies, such that the top of the queue is the last
-  /// sorted element.
+  /// The priority queue is represented by a vector and modified using push_heap()/
+  /// pop_heap() to maintain ordered heap invariants. It has up to 'capacity_' elements
+  /// in the heap.  The order of the queue is the opposite of what the ORDER BY clause
+  /// specifies, such that the head of the queue (i.e. index 0) is the last sorted
+  /// element.
   PriorityQueue<Tuple*, TupleRowComparator> priority_queue_;
+
+  /// Tuples tied with the head of the priority queue in excess of the heap capacity.
+  /// Only used when 'include_ties_' is true.
+  std::vector<Tuple*> overflowed_ties_;
 
   /// END: Members that must be Reset()
   /////////////////////////////////////////

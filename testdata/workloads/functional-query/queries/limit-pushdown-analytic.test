@@ -1,0 +1,96 @@
+====
+---- QUERY
+# IMPALA-10296: this query returns correct results even before
+# IMPALA-10296 because the limit is not hit. Reducing the limit
+# should simply truncate the results because the ordering is total.
+select tinyint_col, id from (
+  select *, rank() over (partition by tinyint_col order by id) rnk
+  from alltypestiny) v
+where rnk < 4
+order by tinyint_col, id desc
+limit 10
+---- TYPES
+TINYINT,INT
+---- RESULTS
+0,4
+0,2
+0,0
+1,5
+1,3
+1,1
+====
+---- QUERY
+# IMPALA-10296: it is not safe to push the limit down past the analytic.
+# This query reproduced incorrect results prior to the IMPALA-10296 fix.
+select tinyint_col, id from (
+  select *, rank() over (partition by tinyint_col order by id) rnk
+  from alltypestiny) v
+where rnk < 4
+order by tinyint_col, id desc
+limit 5
+---- TYPES
+TINYINT,INT
+---- RESULTS
+0,4
+0,2
+0,0
+1,5
+1,3
+====
+---- QUERY
+# IMPALA-10296: this query returns correct results even before
+# IMPALA-10296 because the limit is not hit. Reducing the limit
+# should simply truncate the results because the ordering is total.
+select tinyint_col, string_col, id, rnk from (
+  select *, rank() over (partition by tinyint_col order by string_col) rnk
+  from alltypestiny) v
+where rnk <= 5
+order by tinyint_col, string_col desc, id desc
+limit 10
+---- TYPES
+TINYINT,STRING,INT,BIGINT
+---- RESULTS
+0,'0',6,1
+0,'0',4,1
+0,'0',2,1
+0,'0',0,1
+1,'1',7,1
+1,'1',5,1
+1,'1',3,1
+1,'1',1,1
+====
+---- QUERY
+# IMPALA-10296: the limit can be pushed past the analytic operator,
+# but we need to increase the limit and include ties to guarantee
+# correct results.
+select tinyint_col, string_col, id, rnk from (
+  select *, rank() over (partition by tinyint_col order by string_col) rnk
+  from alltypestiny) v
+where rnk <= 5
+order by tinyint_col, string_col desc, id desc
+limit 5
+---- TYPES
+TINYINT,STRING,INT,BIGINT
+---- RESULTS
+0,'0',6,1
+0,'0',4,1
+0,'0',2,1
+0,'0',0,1
+1,'1',7,1
+====
+---- QUERY
+# IMPALA-10296: cannot push limit through an equality comparison to
+# rank the predicate can filter out an arbitrary number of rows returned
+# from the top-n sort.
+select tinyint_col, string_col, id, rnk from (
+  select *, rank() over (partition by tinyint_col order by id) rnk
+  from alltypestiny) v
+where rnk = 2
+order by tinyint_col, string_col desc, id desc
+limit 2
+---- TYPES
+TINYINT,STRING,INT,BIGINT
+---- RESULTS
+0,'0',2,2
+1,'1',3,2
+====

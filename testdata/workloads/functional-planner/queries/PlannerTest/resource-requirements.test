@@ -6122,7 +6122,7 @@ PLAN-ROOT SINK
 03:SELECT
 |  predicates: rank() <= CAST(100 AS BIGINT)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=8,7 row-size=32B cardinality=100
+|  tuple-ids=8,7 row-size=32B cardinality=200
 |  in pipelines: 01(GETNEXT)
 |
 02:ANALYTIC
@@ -6131,13 +6131,14 @@ PLAN-ROOT SINK
 |  order by: l_orderkey DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8,7 row-size=32B cardinality=100
+|  tuple-ids=8,7 row-size=32B cardinality=200
 |  in pipelines: 01(GETNEXT)
 |
-01:TOP-N [LIMIT=100]
+01:TOP-N
 |  order by: l_partkey ASC NULLS LAST, l_orderkey DESC
-|  mem-estimate=2.34KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=100
+|  limit with ties: 200
+|  mem-estimate=4.69KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=24B cardinality=200
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
@@ -6181,7 +6182,7 @@ Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservatio
 03:SELECT
 |  predicates: rank() <= CAST(100 AS BIGINT)
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=8,7 row-size=32B cardinality=100
+|  tuple-ids=8,7 row-size=32B cardinality=200
 |  in pipelines: 06(GETNEXT)
 |
 02:ANALYTIC
@@ -6190,26 +6191,28 @@ Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservatio
 |  order by: l_orderkey DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
-|  tuple-ids=8,7 row-size=32B cardinality=100
+|  tuple-ids=8,7 row-size=32B cardinality=200
 |  in pipelines: 06(GETNEXT)
 |
-06:TOP-N [LIMIT=100]
+06:TOP-N
 |  order by: l_partkey ASC NULLS LAST, l_orderkey DESC
-|  mem-estimate=2.34KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=100
+|  limit with ties: 200
+|  mem-estimate=4.69KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=24B cardinality=200
 |  in pipelines: 06(GETNEXT), 01(OPEN)
 |
 05:EXCHANGE [HASH(l_partkey)]
-|  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=100
+|  mem-estimate=17.97KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=24B cardinality=200
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=80.00MB mem-reservation=16.00MB thread-reservation=2
-01:TOP-N [LIMIT=100]
+01:TOP-N
 |  order by: l_partkey ASC NULLS LAST, l_orderkey DESC
-|  mem-estimate=2.34KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=8 row-size=24B cardinality=100
+|  limit with ties: 200
+|  mem-estimate=4.69KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=8 row-size=24B cardinality=200
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
