@@ -344,6 +344,9 @@ Status QueryState::InitBufferPoolState() {
     file_group_ = obj_pool_.Add(
         new TmpFileGroup(exec_env->tmp_file_mgr(), exec_env->disk_io_mgr(),
             host_profile_, query_id(), query_options().scratch_limit));
+    if (!query_options().debug_action.empty()) {
+      file_group_->SetDebugAction(query_options().debug_action);
+    }
   }
   return Status::OK();
 }
@@ -520,6 +523,10 @@ void QueryState::ConstructReport(bool instances_started,
     if (IsValidFInstanceId(failed_finstance_id_)) {
       TUniqueIdToUniqueIdPB(failed_finstance_id_, report->mutable_fragment_instance_id());
     }
+  }
+  if (!report_overall_status.ok() && query_spilled_.Load() == 1 && file_group_ != nullptr
+      && file_group_->IsSpillingDiskFaulty()) {
+    report->set_local_disk_faulty(true);
   }
 
   // Add profile to report

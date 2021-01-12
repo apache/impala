@@ -47,7 +47,14 @@ public:
   static Status GetErrorStatusFromErrno(const string& function_name,
       const std::string& file_path, int err_no, const Params& params = Params());
 
-private:
+  /// Return true if the 'err_no' matches any of the 'blacklistable' error code.
+  static bool IsBlacklistableError(int err_no);
+  /// Parse error text to get 'err_no' for thr given status with error code as
+  /// DISK_IO_ERROR. Return true if the 'err_no' matches any of the 'blacklistable'
+  /// error code.
+  static bool IsBlacklistableError(const Status& status);
+
+ private:
   /// Maps errno to error text
   static std::unordered_map<int, std::string> errno_to_error_text_map_;
 

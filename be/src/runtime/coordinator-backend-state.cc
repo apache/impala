@@ -539,6 +539,9 @@ bool Coordinator::BackendState::ApplyExecStatusReport(
       is_fragment_failure_ = true;
     }
   }
+  if (!overall_status.ok()) {
+    local_disk_faulty_ = backend_exec_status.local_disk_faulty();
+  }
 
   // TODO: keep backend-wide stopwatch?
   return IsDoneLocked(lock);

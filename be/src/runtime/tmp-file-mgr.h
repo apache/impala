@@ -287,6 +287,11 @@ class TmpFileGroup {
 
   TmpFileMgr* tmp_file_mgr() const { return tmp_file_mgr_; }
 
+  void SetDebugAction(const std::string& debug_action) { debug_action_ = debug_action; }
+
+  /// Return true if spill-to-disk failed due to local faulty disk.
+  bool IsSpillingDiskFaulty();
+
  private:
   friend class TmpFile;
   friend class TmpFileMgrTest;
@@ -331,6 +336,9 @@ class TmpFileGroup {
   /// tmp_file_mgr_->tmp_dir_ should be included in 'at_capacity_dirs'.
   /// 'lock_' must be held by caller.
   Status ScratchAllocationFailedStatus(const std::vector<int>& at_capacity_dirs);
+
+  /// Debug action of the query.
+  std::string debug_action_;
 
   /// The TmpFileMgr it is associated with.
   TmpFileMgr* const tmp_file_mgr_;
@@ -387,6 +395,14 @@ class TmpFileGroup {
   /// List of files representing the TmpFileGroup. Files are ordered by the priority of
   /// the related TmpDir.
   std::vector<std::unique_ptr<TmpFile>> tmp_files_;
+
+  /// Number of files in TmpFileGroup which have been blacklisted.
+  int num_blacklisted_files_;
+
+  /// Set to true to indicate spill-to-disk failure caused by faulty disks. It is set as
+  /// true if all temporary (a.k.a. scratch) files in this TmpFileGroup are blacklisted,
+  /// or getting disk error when reading temporary file back.
+  bool spilling_disk_faulty_;
 
   /// Index Range in the 'tmp_files'. Used to keep track of index range
   /// corresponding to a given priority.

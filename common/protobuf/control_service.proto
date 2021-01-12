@@ -259,6 +259,10 @@ message ReportExecStatusRequestPB {
 
   // For each join node, sum of RowsReturned counters on this backend.
   map<int32, int64> per_join_rows_produced = 16;
+
+  // If true, the executor failed to execute query fragments due to local disk IO
+  // fatal error, like local storage devices for spilling are corrupted.
+  optional bool local_disk_faulty = 17 [default = false];
 }
 
 message ReportExecStatusResponsePB {

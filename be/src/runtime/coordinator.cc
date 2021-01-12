@@ -978,6 +978,11 @@ Status Coordinator::UpdateBackendExecStatus(const ReportExecStatusRequestPB& req
     // any "faulty" nodes.
     Status retryable_status = UpdateBlacklistWithAuxErrorInfo(
         &aux_error_info, status, backend_state);
+    // Check if the backend node should be blacklisted based on the reported backend
+    // error. Note that only blacklist one node per report.
+    if (!status.ok() && retryable_status.ok()) {
+      retryable_status = UpdateBlacklistWithBackendState(status, backend_state);
+    }
 
     // If any nodes were blacklisted, retry the query. This needs to be done before
     // UpdateExecState is called with the error status to avoid exposing the error to any
@@ -1116,6 +1121,25 @@ Status Coordinator::UpdateBlacklistWithAuxErrorInfo(
         return retryable_status;
       }
     }
+  }
+  return Status::OK();
+}
+
+Status Coordinator::UpdateBlacklistWithBackendState(
+    const Status& status, BackendState* backend_state) {
+  DCHECK(!status.ok());
+  // If the Backend failed due to its local faulty disk, blacklist the backend node.
+  if (backend_state->IsLocalDiskFaulty()) {
+    Status retryable_status(TErrorCode::LOCAL_DISK_FAULTY,
+        NetworkAddressPBToString(backend_state->impalad_address()));
+    retryable_status.MergeStatus(status);
+
+    ExecEnv::GetInstance()->cluster_membership_mgr()->BlacklistExecutor(
+        backend_state->exec_params().backend_id(), retryable_status);
+    parent_request_state_->AddBlacklistedExecutorAddress(
+        backend_state->krpc_impalad_address());
+
+    return retryable_status;
   }
   return Status::OK();
 }
