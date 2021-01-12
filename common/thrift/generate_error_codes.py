@@ -468,6 +468,9 @@ error_codes = (
    "Query $0 terminated due to join rows produced exceeds the limit of $1 "
    "at node with id $2. Unset or increase JOIN_ROWS_PRODUCED_LIMIT query option "
    "to produce more rows."),
+
+  ("LOCAL_DISK_FAULTY", 152,
+   "Query execution failure caused by local disk IO fatal error on backend: $0."),
 )
 
 import sys

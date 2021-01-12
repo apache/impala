@@ -625,6 +625,15 @@ class Coordinator { // NOLINT: The member variables could be re-ordered to save 
   Status UpdateBlacklistWithAuxErrorInfo(std::vector<AuxErrorInfoPB>* aux_error_info,
       const Status& status, BackendState* backend_state) WARN_UNUSED_RESULT;
 
+  /// Helper function for UpdateBackendExecStatus that check if the backend node should
+  /// be blacklisted based on the reported backend error.
+  /// 'status' is the Status of the given BackendState. 'backend_state' is the
+  /// BackendState that reported an error.
+  /// Returns the Status object used when blacklisting a backend, or Status::OK if no
+  /// backends were blacklisted.
+  Status UpdateBlacklistWithBackendState(
+      const Status& status, BackendState* backend_state) WARN_UNUSED_RESULT;
+
   /// Called if the Exec RPC to the given vector of BackendStates failed. Currently, just
   /// triggers a retry of the query.
   void HandleFailedExecRpcs(std::vector<BackendState*> failed_backend_states);

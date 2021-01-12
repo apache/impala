@@ -47,8 +47,8 @@ class TmpFile {
   bool AllocateSpace(int64_t num_bytes, int64_t* offset);
 
   /// Called when an IO error is encountered for this file. Logs the error and blacklists
-  /// the file.
-  void Blacklist(const ErrorMsg& msg);
+  /// the file. Returns true if the file just became blacklisted.
+  bool Blacklist(const ErrorMsg& msg);
 
   /// Delete the physical file on disk, if one was created.
   /// It is not valid to read or write to a file after calling Remove().

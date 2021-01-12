@@ -186,6 +186,11 @@ class Coordinator::BackendState {
   /// instances for this backend.
   ResourceUtilization GetResourceUtilization();
 
+  bool IsLocalDiskFaulty() {
+    std::lock_guard<std::mutex> l(lock_);
+    return local_disk_faulty_;
+  }
+
   /// Merge the accumulated error log into 'merged'.
   void MergeErrorLog(ErrorLogMap* merged);
 
@@ -393,6 +398,10 @@ class Coordinator::BackendState {
   /// Id of the first fragment instance that reports an error status.
   /// Invalid if no fragment instance has reported an error status.
   TUniqueId failed_instance_id_;
+
+  /// If true, the backend reported that the query failure was caused by disk IO error
+  /// on its local disk.
+  bool local_disk_faulty_ = false;
 
   /// Errors reported by this fragment instance.
   ErrorLogMap error_log_;

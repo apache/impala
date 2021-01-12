@@ -34,6 +34,7 @@
 #include "runtime/bufferpool/buffer-pool-counters.h"
 #include "runtime/exec-env.h"
 #include "runtime/io/disk-io-mgr.h"
+#include "runtime/io/error-converter.h"
 #include "runtime/io/request-context.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/runtime-state.h"
@@ -355,9 +356,14 @@ int TmpFile::AssignDiskQueue() const {
   return file_group_->io_mgr_->AssignQueue(path_.c_str(), disk_id_, false);
 }
 
-void TmpFile::Blacklist(const ErrorMsg& msg) {
+bool TmpFile::Blacklist(const ErrorMsg& msg) {
   LOG(ERROR) << "Error for temporary file '" << path_ << "': " << msg.msg();
-  blacklisted_ = true;
+  if (!blacklisted_) {
+    blacklisted_ = true;
+    return true;
+  } else {
+    return false;
+  }
 }
 
 Status TmpFile::Remove() {
@@ -416,6 +422,8 @@ TmpFileGroup::TmpFileGroup(TmpFileMgr* tmp_file_mgr, DiskIoMgr* io_mgr,
     compression_timer_(tmp_file_mgr->compression_enabled() ?
             ADD_TIMER(profile, "TotalCompressionTime") :
             nullptr),
+    num_blacklisted_files_(0),
+    spilling_disk_faulty_(false),
     current_bytes_allocated_(0),
     next_allocation_index_(0),
     free_ranges_(64) {
@@ -731,11 +739,21 @@ void TmpFileGroup::DestroyWriteHandle(unique_ptr<TmpWriteHandle> handle) {
 void TmpFileGroup::WriteComplete(
     TmpWriteHandle* handle, const Status& write_status) {
   Status status;
-  if (!write_status.ok()) {
-    status = RecoverWriteError(handle, write_status);
+  // Debug action for simulating disk write error. To use, specify in query options as:
+  // 'debug_action': 'IMPALA_TMP_FILE_WRITE:<hostname>:<port>:<action>'
+  // where <hostname> and <port> represent the impalad which execute the fragment
+  // instances, <port> is the BE krpc port (default 27000).
+  const Status* p_write_status = &write_status;
+  Status debug_status = DebugAction(debug_action_, "IMPALA_TMP_FILE_WRITE",
+      {ExecEnv::GetInstance()->krpc_address().hostname,
+          SimpleItoa(ExecEnv::GetInstance()->krpc_address().port)});
+  if (UNLIKELY(!debug_status.ok())) p_write_status = &debug_status;
+
+  if (!p_write_status->ok()) {
+    status = RecoverWriteError(handle, *p_write_status);
     if (status.ok()) return;
   } else {
-    status = write_status;
+    status = *p_write_status;
   }
   handle->WriteComplete(status);
 }
@@ -754,7 +772,21 @@ Status TmpFileGroup::RecoverWriteError(
   {
     lock_guard<SpinLock> lock(lock_);
     scratch_errors_.push_back(write_status);
-    handle->file_->Blacklist(write_status.msg());
+    if (handle->file_->Blacklist(write_status.msg())) {
+      DCHECK_LT(num_blacklisted_files_, tmp_files_.size());
+      ++num_blacklisted_files_;
+      if (num_blacklisted_files_ == tmp_files_.size()) {
+        // Check if all errors are 'blacklistable'.
+        bool are_all_blacklistable_errors = true;
+        for (Status& err : scratch_errors_) {
+          if (!ErrorConverter::IsBlacklistableError(err)) {
+            are_all_blacklistable_errors = false;
+            break;
+          }
+        }
+        if (are_all_blacklistable_errors) spilling_disk_faulty_ = true;
+      }
+    }
   }
 
   // Do not retry cancelled writes or propagate the error, simply return CANCELLED.
@@ -788,6 +820,11 @@ Status TmpFileGroup::ScratchAllocationFailedStatus(
   // Include all previous errors that may have caused the failure.
   for (Status& err : scratch_errors_) status.MergeStatus(err);
   return status;
+}
+
+bool TmpFileGroup::IsSpillingDiskFaulty() {
+  lock_guard<SpinLock> lock(lock_);
+  return spilling_disk_faulty_;
 }
 
 string TmpFileGroup::DebugString() {

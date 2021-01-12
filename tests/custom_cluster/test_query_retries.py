@@ -23,6 +23,8 @@
 
 import pytest
 import re
+import shutil
+import tempfile
 import time
 
 from random import randint
@@ -33,14 +35,19 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.errors import Timeout
 from tests.common.skip import SkipIfEC, SkipIfBuildType
+from tests.common.skip import SkipIfNotHdfsMinicluster
 
-# The BE krpc port of the impalad to simulate rpc errors in tests.
+# The BE krpc port of the impalad to simulate rpc or disk errors in tests.
 FAILED_KRPC_PORT = 27001
 
 
 def _get_rpc_fail_action(port):
   return "IMPALA_SERVICE_POOL:127.0.0.1:{port}:ExecQueryFInstances:FAIL" \
       .format(port=port)
+
+
+def _get_disk_fail_action(port):
+  return "IMPALA_TMP_FILE_WRITE:127.0.0.1:{port}:FAIL".format(port=port)
 
 # All tests in this class have SkipIfEC because all tests run a query and expect
 # the query to be retried when killing a random impalad. On EC this does not always work
@@ -989,3 +996,137 @@ class TestQueryRetries(CustomClusterTestSuite):
         if query_id_search:
           return query_id_search.group(1)
     return None
+
+
+# Tests that verify the query-retries are properly triggered by disk IO failure.
+# Coordinator adds an executor node to its blacklist if that node reports query
+# execution status with error caused by its local faulty disk, then retries the failed
+# query.
+@SkipIfNotHdfsMinicluster.tuned_for_minicluster
+class TestQueryRetriesFaultyDisk(CustomClusterTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def setup_class(cls):
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip('runs only in exhaustive')
+    super(TestQueryRetriesFaultyDisk, cls).setup_class()
+
+  # Query with order by requires spill to disk if intermediate results don't fit in mem
+  spill_query = """
+      select o_orderdate, o_custkey, o_comment
+      from tpch.orders
+      order by o_orderdate
+      """
+  # Buffer pool limit that is low enough to force Impala to spill to disk when executing
+  # spill_query.
+  buffer_pool_limit = "45m"
+
+  def setup_method(self, method):
+    # Don't call the superclass method to prevent starting Impala before each test. In
+    # this class, each test is responsible for doing that because we want to generate
+    # the parameter string to start-impala-cluster in each test method.
+    self.created_dirs = []
+
+  def teardown_method(self, method):
+    for dir_path in self.created_dirs:
+      shutil.rmtree(dir_path, ignore_errors=True)
+
+  def __generate_scratch_dir(self, num):
+    result = []
+    for i in xrange(num):
+      dir_path = tempfile.mkdtemp()
+      self.created_dirs.append(dir_path)
+      result.append(dir_path)
+      print "Generated dir" + dir_path
+    return result
+
+  def __validate_web_ui_state(self):
+    """Validate the state of the web ui after a query (or queries) have been retried.
+    The web ui should list 0 queries as in flight, running, or queued."""
+    impalad_service = self.cluster.get_first_impalad().service
+
+    # Assert that the debug web ui shows all queries as completed
+    self.assert_eventually(60, 0.1,
+        lambda: impalad_service.get_num_in_flight_queries() == 0)
+    assert impalad_service.get_num_running_queries('default-pool') == 0
+    assert impalad_service.get_num_queued_queries('default-pool') == 0
+
+  @SkipIfBuildType.not_dev_build
+  @pytest.mark.execute_serially
+  def test_retry_spill_to_disk_failed(self, vector):
+    """ Test that verifies that when an impalad failed during spill-to-disk due to disk
+        write error, it is properly blacklisted by coordinator and query-retry is
+        triggered."""
+
+    # Start cluster with spill-to-disk enabled and one dedicated coordinator. Set a
+    # really high statestore heartbeat frequency so that blacklisted nodes are not
+    # timeout too quickly.
+    scratch_dirs = self.__generate_scratch_dir(1)
+    self._start_impala_cluster([
+        '--impalad_args=-logbuflevel=-1',
+        '--impalad_args=--scratch_dirs={0}'.format(','.join(scratch_dirs)),
+        '--impalad_args=--allow_multiple_scratch_dirs_per_device=false',
+        '--impalad_args=--statestore_heartbeat_frequency_ms=60000',
+        '--cluster_size=3', '--num_coordinators=1', '--use_exclusive_coordinators'])
+    self.assert_impalad_log_contains("INFO", "Using scratch directory ",
+        expected_count=1)
+
+    # Set debug_action to inject disk write error for spill-to-disk on impalad for which
+    # krpc port is 27001.
+    vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
+    vector.get_value('exec_option')['debug_action'] = \
+        _get_disk_fail_action(FAILED_KRPC_PORT)
+    vector.get_value('exec_option')['retry_failed_queries'] = "true"
+    coord_impalad = self.cluster.get_first_impalad()
+    client = coord_impalad.service.create_beeswax_client()
+
+    disk_failure_impalad = self.cluster.impalads[1]
+    assert disk_failure_impalad.service.krpc_port == FAILED_KRPC_PORT
+
+    # Verify all nodes are active now.
+    backends_json = self.cluster.impalads[0].service.get_debug_webpage_json("/backends")
+    assert backends_json["num_active_backends"] == 3, backends_json
+    assert len(backends_json["backends"]) == 3, backends_json
+
+    # Expect the impalad with disk failure is blacklisted, and query-retry is triggered
+    # and is completed successfully.
+    handle = self.execute_query_async_using_client(client, self.spill_query, vector)
+    results = client.fetch(self.spill_query, handle)
+    assert results.success
+
+    # Validate the state of the web ui. The query must be closed before validating the
+    # state since it asserts that no queries are in flight.
+    client.close_query(handle)
+    client.close()
+    self.__validate_web_ui_state()
+
+    # Verify that the impalad with injected disk IO error is blacklisted.
+    backends_json = coord_impalad.service.get_debug_webpage_json("/backends")
+    assert backends_json["num_blacklisted_backends"] == 1, backends_json
+    assert backends_json["num_active_backends"] == 2, backends_json
+    assert len(backends_json["backends"]) == 3, backends_json
+    num_blacklisted = 0
+    for backend_json in backends_json["backends"]:
+      if str(disk_failure_impalad.service.krpc_port) in backend_json["krpc_address"]:
+        assert backend_json["is_blacklisted"], backend_json
+        assert "Query execution failure caused by local disk IO fatal error on backend" \
+            in backend_json["blacklist_cause"]
+        num_blacklisted += 1
+      else:
+        assert not backend_json["is_blacklisted"], backend_json
+    assert num_blacklisted == 1, backends_json
+
+    # Verify that the query is re-tried and finished.
+    completed_queries = coord_impalad.service.get_completed_queries()
+    # Assert that the most recently completed query is the retried query and it is marked
+    # as 'FINISHED.
+    assert completed_queries[0]['state'] == 'FINISHED'
+    assert completed_queries[0]["rows_fetched"] == 1500000
+    # Assert that the second most recently completed query is the original query and it
+    # is marked as 'RETRIED'.
+    assert completed_queries[1]['state'] == 'RETRIED'
+    assert completed_queries[1]["rows_fetched"] == 0
+    assert completed_queries[1]['query_id'] == handle.get_handle().id
