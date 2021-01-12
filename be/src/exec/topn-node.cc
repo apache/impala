@@ -111,11 +111,11 @@ void TopNPlanNode::Codegen(FragmentState* state) {
         codegen->GetFunction(IRFunction::TOPN_NODE_INSERT_BATCH, true);
     DCHECK(insert_batch_fn != NULL);
 
-    // Generate two MaterializeExprs() functions, one using tuple_pool_ and
-    // one with no pool.
+    // Generate two MaterializeExprs() functions, one with no pool that
+    // does a shallow copy and one with 'tuple_pool_' that does a deep copy of the data.
     DCHECK(output_tuple_desc_ != NULL);
-    llvm::Function* materialize_exprs_tuple_pool_fn;
-    llvm::Function* materialize_exprs_no_pool_fn;
+    llvm::Function* materialize_exprs_tuple_pool_fn = nullptr;
+    llvm::Function* materialize_exprs_no_pool_fn = nullptr;
 
     codegen_status = Tuple::CodegenMaterializeExprs(codegen, false,
         *output_tuple_desc_, output_tuple_exprs_,
@@ -125,37 +125,45 @@ void TopNPlanNode::Codegen(FragmentState* state) {
       codegen_status = Tuple::CodegenMaterializeExprs(codegen, false,
           *output_tuple_desc_, output_tuple_exprs_,
           false, &materialize_exprs_no_pool_fn);
+    }
 
-      if (codegen_status.ok()) {
-        int replaced = codegen->ReplaceCallSites(insert_batch_fn,
-            materialize_exprs_tuple_pool_fn, Tuple::MATERIALIZE_EXPRS_SYMBOL);
-        DCHECK_REPLACE_COUNT(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
+    if (codegen_status.ok()) {
+      int replaced;
+      replaced = codegen->ReplaceCallSites(insert_batch_fn,
+          materialize_exprs_tuple_pool_fn, Tuple::MATERIALIZE_EXPRS_SYMBOL);
+      DCHECK_REPLACE_COUNT(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
 
-        // The total number of calls to TupleRowComparator::Less(Tuple*, Tuple*)
-        // is 3 in PriorityQueue and 1 in TopNNode::Heap::InsertTupleRow().
-        // Each Less(Tuple*, Tuple*) indirectly calls TupleRowComparator::Compare()
-        // once.
-        replaced = codegen->ReplaceCallSites(insert_batch_fn,
-            compare_fn, TupleRowComparator::COMPARE_SYMBOL);
-        DCHECK_REPLACE_COUNT(replaced, 4) << LlvmCodeGen::Print(insert_batch_fn);
+      replaced = codegen->ReplaceCallSites(insert_batch_fn,
+          materialize_exprs_no_pool_fn, Tuple::MATERIALIZE_EXPRS_NULL_POOL_SYMBOL);
+      DCHECK_REPLACE_COUNT(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
 
-        replaced = codegen->ReplaceCallSites(insert_batch_fn,
-            materialize_exprs_no_pool_fn, Tuple::MATERIALIZE_EXPRS_NULL_POOL_SYMBOL);
-        DCHECK_REPLACE_COUNT(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
+      // The total number of calls to tuple_row_less_than_->Compare() is 3 in
+      // PriorityQueue (called from 2 places), 1 in TopNNode::Heap::InsertTupleRow()
+      // and 3 in TopNNode::Heap::InsertTupleWithTieHandling
+      // Each tuple_row_less_than_->Less(Tuple*, Tuple*) indirectly calls Compare() once.
+      replaced = codegen->ReplaceCallSites(insert_batch_fn,
+          compare_fn, TupleRowComparator::COMPARE_SYMBOL);
+      DCHECK_REPLACE_COUNT(replaced, 10) << LlvmCodeGen::Print(insert_batch_fn);
 
-        replaced = codegen->ReplaceCallSitesWithValue(insert_batch_fn,
-            codegen->GetI64Constant(tnode_->limit + offset()), "heap_capacity");
-        DCHECK_REPLACE_COUNT(replaced, 1) << LlvmCodeGen::Print(insert_batch_fn);
+      replaced = codegen->ReplaceCallSitesWithValue(insert_batch_fn,
+          codegen->GetI64Constant(heap_capacity()), "heap_capacity");
+      DCHECK_REPLACE_COUNT(replaced, 2)
+          << LlvmCodeGen::Print(insert_batch_fn);
 
-        int tuple_byte_size = output_tuple_desc_->byte_size();
-        replaced = codegen->ReplaceCallSitesWithValue(insert_batch_fn,
-            codegen->GetI32Constant(tuple_byte_size), "tuple_byte_size");
-        DCHECK_REPLACE_COUNT(replaced, 1);
+      replaced = codegen->ReplaceCallSitesWithBoolConst(
+          insert_batch_fn, include_ties(), "include_ties");
+      DCHECK_REPLACE_COUNT(replaced, 1)
+          << LlvmCodeGen::Print(insert_batch_fn);
 
-        insert_batch_fn = codegen->FinalizeFunction(insert_batch_fn);
-        DCHECK(insert_batch_fn != NULL);
-        codegen->AddFunctionToJit(insert_batch_fn, &codegend_insert_batch_fn_);
-      }
+      int tuple_byte_size = output_tuple_desc_->byte_size();
+      replaced = codegen->ReplaceCallSitesWithValue(insert_batch_fn,
+          codegen->GetI32Constant(tuple_byte_size), "tuple_byte_size");
+      DCHECK_REPLACE_COUNT(replaced, 3)
+          << LlvmCodeGen::Print(insert_batch_fn);
+
+      insert_batch_fn = codegen->FinalizeFunction(insert_batch_fn);
+      DCHECK(insert_batch_fn != NULL);
+      codegen->AddFunctionToJit(insert_batch_fn, &codegend_insert_batch_fn_);
     }
   }
   AddCodegenStatus(codegen_status);
@@ -171,7 +179,9 @@ Status TopNNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
 
-  heap_.reset(new Heap(*tuple_row_less_than_, limit_ + offset_));
+  const TopNPlanNode& pnode = static_cast<const TopNPlanNode&>(plan_node_);
+  heap_.reset(
+      new Heap(*tuple_row_less_than_, pnode.heap_capacity(), pnode.include_ties()));
 
   // Allocate memory for a temporary tuple.
   tmp_tuple_ = reinterpret_cast<Tuple*>(
@@ -180,7 +190,7 @@ Status TopNNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(0)->Open(state));
 
   // Limit of 0, no need to fetch anything from children.
-  if (limit_ != 0) {
+  if (pnode.heap_capacity() != 0) {
     RowBatch batch(child(0)->row_desc(), state->batch_size(), mem_tracker());
     bool eos;
     do {
@@ -188,14 +198,14 @@ Status TopNNode::Open(RuntimeState* state) {
       RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
       {
         SCOPED_TIMER(insert_batch_timer_);
-        const TopNPlanNode::InsertBatchFn insert_batch_fn
-            = codegend_insert_batch_fn_.load();
+        TopNPlanNode::InsertBatchFn insert_batch_fn = codegend_insert_batch_fn_.load();
         if (insert_batch_fn != nullptr) {
           insert_batch_fn(this, &batch);
         } else {
           InsertBatch(&batch);
         }
-        if (rows_to_reclaim_ > 2 * (limit_ + offset_)) {
+        DCHECK(heap_->DCheckConsistency());
+        if (rows_to_reclaim_ > 2 * pnode.heap_capacity()) {
           RETURN_IF_ERROR(ReclaimTuplePool(state));
           COUNTER_ADD(tuple_pool_reclaim_counter_, 1);
         }
@@ -204,8 +214,6 @@ Status TopNNode::Open(RuntimeState* state) {
       RETURN_IF_ERROR(QueryMaintenance(state));
     } while (!eos);
   }
-  // TODO: this wouldn't be valid for partitioned.
-  DCHECK_LE(heap_->num_tuples(), limit_ + offset_);
   PrepareForOutput();
 
   // Unless we are inside a subplan expecting to call Open()/GetNext() on the child
@@ -248,6 +256,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 
 Status TopNNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   heap_->Reset();
+  tmp_tuple_ = nullptr;
   num_rows_skipped_ = 0;
   // Transfer ownership of tuple data to output batch.
   row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), false);
@@ -266,7 +275,7 @@ void TopNNode::Close(RuntimeState* state) {
 }
 
 void TopNNode::PrepareForOutput() {
-  // TODO: this will need to iterate through partitions.
+  DCHECK(heap_->DCheckConsistency());
   heap_->PrepareForOutput(*this, &sorted_top_n_);
   get_next_iter_ = sorted_top_n_.begin();
 }
@@ -274,17 +283,35 @@ void TopNNode::PrepareForOutput() {
 void TopNNode::Heap::PrepareForOutput(
     const TopNNode& RESTRICT node, vector<Tuple*>* sorted_top_n) RESTRICT {
   // Reverse the order of the tuples in the priority queue
-  sorted_top_n->resize(priority_queue_.Size());
+  sorted_top_n->resize(num_tuples());
   int64_t index = sorted_top_n->size() - 1;
-  while (priority_queue_.Size() > 0) {
+  /// Any ties with the min will be the last elements in 'sorted_top_n'.
+  while (!overflowed_ties_.empty()) {
+    (*sorted_top_n)[index] = overflowed_ties_.back();
+    overflowed_ties_.pop_back();
+    --index;
+  }
+  while (!priority_queue_.Empty()) {
     (*sorted_top_n)[index] = priority_queue_.Pop();
     --index;
   }
 }
 
+bool TopNNode::Heap::DCheckConsistency() {
+  DCHECK_LE(num_tuples(), capacity_ + overflowed_ties_.size())
+      << num_tuples() << " > " << capacity_ << " + " << overflowed_ties_.size();
+  if (!overflowed_ties_.empty()) {
+    DCHECK(include_ties_);
+    DCHECK_EQ(capacity_, priority_queue_.Size())
+        << "Ties should only be present if heap is at capacity";
+  }
+  return true;
+}
+
 Status TopNNode::ReclaimTuplePool(RuntimeState* state) {
   unique_ptr<MemPool> temp_pool(new MemPool(mem_tracker()));
   RETURN_IF_ERROR(heap_->RematerializeTuples(this, state, temp_pool.get()));
+  DCHECK(heap_->DCheckConsistency());
 
   rows_to_reclaim_ = 0;
   tmp_tuple_ = reinterpret_cast<Tuple*>(temp_pool->TryAllocate(
@@ -314,32 +341,42 @@ void TopNNode::DebugString(int indentation_level, stringstream* out) const {
   *out << ")";
 }
 
-TopNNode::Heap::Heap(const TupleRowComparator& c, int64_t capacity)
-  : capacity_(capacity), priority_queue_(c) {
-  priority_queue_.Reserve(capacity);
-}
+TopNNode::Heap::Heap(const TupleRowComparator& c, int64_t capacity, bool include_ties) :
+    capacity_(capacity), include_ties_(include_ties), priority_queue_(c) {}
 
 void TopNNode::Heap::Reset() {
   priority_queue_.Clear();
+  overflowed_ties_.clear();
 }
 
 void TopNNode::Heap::Close() {
   priority_queue_.Clear();
+  overflowed_ties_.clear();
 }
 
-Status TopNNode::Heap::RematerializeTuples(TopNNode* node,
-    RuntimeState* state, MemPool* new_pool) {
+template <class T>
+Status TopNNode::Heap::RematerializeTuplesHelper(TopNNode* node,
+    RuntimeState* state, MemPool* new_pool, T begin_it, T end_it) {
   const TupleDescriptor& tuple_desc = *node->output_tuple_desc_;
   int tuple_size = tuple_desc.byte_size();
-  for (int i = 0; i < priority_queue_.Size(); i++) {
+  for (T it = begin_it; it != end_it; ++it) {
     Tuple* insert_tuple = reinterpret_cast<Tuple*>(new_pool->TryAllocate(tuple_size));
     if (UNLIKELY(insert_tuple == nullptr)) {
       return new_pool->mem_tracker()->MemLimitExceeded(state,
           "Failed to allocate memory in TopNNode::ReclaimTuplePool.", tuple_size);
     }
-    priority_queue_[i]->DeepCopy(insert_tuple, tuple_desc, new_pool);
-    priority_queue_[i] = insert_tuple;
+    (*it)->DeepCopy(insert_tuple, tuple_desc, new_pool);
+    *it = insert_tuple;
   }
+  return Status::OK();
+}
+
+Status TopNNode::Heap::RematerializeTuples(TopNNode* node,
+    RuntimeState* state, MemPool* new_pool) {
+  RETURN_IF_ERROR(RematerializeTuplesHelper(
+        node, state, new_pool, priority_queue_.Begin(), priority_queue_.End()));
+  RETURN_IF_ERROR(RematerializeTuplesHelper(
+        node, state, new_pool, overflowed_ties_.begin(), overflowed_ties_.end()));
   return Status::OK();
 }
 

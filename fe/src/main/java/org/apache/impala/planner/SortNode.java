@@ -68,15 +68,20 @@ public class SortNode extends PlanNode {
   // analytic eval node otherwise null
   private AnalyticEvalNode analyticEvalNode_;
 
-  // set only for the analytic sort node
-  private List<Expr> partitioningExprs_;
-
   // info_.sortTupleSlotExprs_ substituted with the outputSmap_ for materialized slots
   // in init().
   private List<Expr> resolvedTupleExprs_;
 
   // The offset of the first row to return.
   protected long offset_;
+
+  // Whether to include ties for the last place in the Top-N values.
+  // Only supported if type_ is TOPN.
+  protected boolean includeTies_;
+
+  // If includeTies_ is true, this is the limit used. We cannot use the default 'limit_'
+  // because the plan node may return more than this number of rows.
+  protected long limitWithTies_;
 
   // The type of sort. Determines the exec node used in the BE.
   private TSortType type_;
@@ -90,15 +95,30 @@ public class SortNode extends PlanNode {
    */
   public static SortNode createPartialSortNode(
       PlanNodeId id, PlanNode input, SortInfo info) {
-    return new SortNode(id, input, info, 0, TSortType.PARTIAL);
+    return new SortNode(id, input, info, 0, -1, false, TSortType.PARTIAL);
   }
 
   /**
-   * Creates a new SortNode with a limit that is executed with TopNNode in the BE.
+   * Creates a new SortNode with a limit that is executed with either TopNNode in the BE
+   * or SortNode in the backend dependent on TOPN_BYTES_LIMIT.
    */
-  public static SortNode createTopNSortNode(
-      PlanNodeId id, PlanNode input, SortInfo info, long offset) {
-    return new SortNode(id, input, info, offset, TSortType.TOPN);
+  public static SortNode createTopNSortNode(TQueryOptions queryOptions,
+      PlanNodeId id, PlanNode input, SortInfo info, long offset, long limit,
+      boolean includeTies) {
+    long topNBytesLimit = queryOptions.topn_bytes_limit;
+    long topNCardinality = capCardinalityAtLimit(input.cardinality_, limit);
+    long estimatedTopNMaterializedSize =
+        info.estimateTopNMaterializedSize(topNCardinality, offset);
+
+    SortNode result;
+    if (topNBytesLimit <= 0 || estimatedTopNMaterializedSize < topNBytesLimit
+            || includeTies) {
+      result = new SortNode(id, input, info, offset, limit, includeTies, TSortType.TOPN);
+    } else {
+      result = SortNode.createTotalSortNode(id, input, info, offset);
+      result.setLimit(limit);
+    }
+    return result;
   }
 
   /**
@@ -106,22 +126,34 @@ public class SortNode extends PlanNode {
    */
   public static SortNode createTotalSortNode(
       PlanNodeId id, PlanNode input, SortInfo info, long offset) {
-    return new SortNode(id, input, info, offset, TSortType.TOTAL);
+    return new SortNode(id, input, info, offset, -1, false, TSortType.TOTAL);
   }
 
   private SortNode(
-      PlanNodeId id, PlanNode input, SortInfo info, long offset, TSortType type) {
+      PlanNodeId id, PlanNode input, SortInfo info, long offset, long limit,
+      boolean includeTies, TSortType type) {
     super(id, info.getSortTupleDescriptor().getId().asList(), getDisplayName(type));
+    Preconditions.checkState(offset >= 0);
+    Preconditions.checkArgument(type != TSortType.TOPN || limit >= 0);
     info_ = info;
     children_.add(input);
     offset_ = offset;
+    includeTies_ = includeTies;
+    limitWithTies_ = includeTies ? limit : -1;
     type_ = type;
+    if (!includeTies) setLimit(limit);
   }
 
   public long getOffset() { return offset_; }
   public void setOffset(long offset) { offset_ = offset; }
   public boolean hasOffset() { return offset_ > 0; }
   public boolean isTypeTopN() { return type_ == TSortType.TOPN; }
+  public boolean isIncludeTies() { return includeTies_; }
+  // Get the limit that applies to the sort, including ties or not.
+  public long getSortLimit() {
+    return includeTies_ ? limitWithTies_ : limit_;
+  }
+
   public SortInfo getSortInfo() { return info_; }
   public void setInputPartition(DataPartition inputPartition) {
     inputPartition_ = inputPartition;
@@ -134,19 +166,32 @@ public class SortNode extends PlanNode {
 
   /**
    * Under special cases, the planner may decide to convert a total sort into a
-   * TopN sort with limit
+   * TopN sort with limit. This does the conversion to top-n if the converted
+   * node would pass the TOPN_BYTES_LIMIT check. Otherwise does not modify this node.
    */
-  public void convertToTopN(long limit, List<Expr> partitioningExprs,
-      Analyzer analyzer) {
+  public void tryConvertToTopN(long limit, Analyzer analyzer, boolean includeTies) {
     Preconditions.checkArgument(type_ == TSortType.TOTAL);
+    Preconditions.checkState(!hasLimit());
+    Preconditions.checkState(!hasOffset());
+    long topNBytesLimit = analyzer.getQueryOptions().topn_bytes_limit;
+    long topNCardinality = capCardinalityAtLimit(getChild(0).cardinality_, limit);
+    long estimatedTopNMaterializedSize =
+        info_.estimateTopNMaterializedSize(topNCardinality, offset_);
+
+    if (topNBytesLimit > 0 && estimatedTopNMaterializedSize >= topNBytesLimit) {
+      return;
+    }
     type_ = TSortType.TOPN;
     displayName_ = getDisplayName(type_);
-    setLimit(limit);
-    partitioningExprs_ = partitioningExprs;
+    includeTies_ = includeTies;
+    if (includeTies) {
+      unsetLimit();
+      limitWithTies_ = limit;
+    } else {
+      setLimit(limit);
+    }
     computeStats(analyzer);
   }
-
-  public List<Expr> getPartitioningExprs() { return partitioningExprs_ ; }
 
   @Override
   public boolean allowPartitioned() {
@@ -203,7 +248,12 @@ public class SortNode extends PlanNode {
   @Override
   protected void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    cardinality_ = capCardinalityAtLimit(getChild(0).cardinality_);
+    if (includeTies_) {
+      cardinality_ = capCardinalityAtLimit(getChild(0).cardinality_, limitWithTies_);
+    } else {
+      cardinality_ = capCardinalityAtLimit(getChild(0).cardinality_);
+    }
+
     if (LOG.isTraceEnabled()) {
       LOG.trace("stats Sort: cardinality=" + Long.toString(cardinality_));
     }
@@ -221,13 +271,19 @@ public class SortNode extends PlanNode {
         .add("is_asc", "[" + Joiner.on(" ").join(strings) + "]")
         .add("nulls_first", "[" + Joiner.on(" ").join(info_.getNullsFirst()) + "]")
         .add("offset_", offset_)
+        .add("includeTies_", includeTies_)
+        .add("limitWithTies_", limitWithTies_)
         .addValue(super.debugString())
         .toString();
   }
 
   @Override
   protected void toThrift(TPlanNode msg) {
-    Preconditions.checkState(!isTypeTopN() || hasLimit(), "Top-N must have limit");
+    Preconditions.checkState(!isTypeTopN() || hasLimit() ||
+            (includeTies_ && limitWithTies_ >= 0), "Top-N must have limit",
+            debugString());
+    Preconditions.checkState(!includeTies_ || (!hasLimit() && limitWithTies_ >= 0),
+            "Top-N with tie handling must set limitWithTies_ only");
     Preconditions.checkState(offset_ >= 0);
     msg.node_type = TPlanNodeType.SORT_NODE;
     TSortInfo sort_info = new TSortInfo(Expr.treesToThrift(info_.getSortExprs()),
@@ -239,6 +295,10 @@ public class SortNode extends PlanNode {
     TSortNode sort_node = new TSortNode(sort_info, type_);
     sort_node.setOffset(offset_);
     sort_node.setEstimated_full_input_size(estimatedFullInputSize_);
+    sort_node.setInclude_ties(includeTies_);
+    if (includeTies_) {
+      sort_node.setLimit_with_ties(limitWithTies_);
+    }
     msg.sort_node = sort_node;
   }
 
@@ -253,6 +313,9 @@ public class SortNode extends PlanNode {
       output.append(getSortingOrderExplainString(info_.getSortExprs(),
           info_.getIsAscOrder(), info_.getNullsFirstParams(), info_.getSortingOrder(),
           info_.getNumLexicalKeysInZOrder()));
+      if (includeTies_) {
+        output.append(detailPrefix + "limit with ties: " + limitWithTies_ + "\n");
+      }
     }
 
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {

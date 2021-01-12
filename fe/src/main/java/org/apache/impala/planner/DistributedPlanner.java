@@ -1089,19 +1089,19 @@ public class DistributedPlanner {
       // Make sure the childFragment's output is partitioned as required by the sortNode.
       DataPartition sortPartition = sortNode.getInputPartition();
       if (!childFragment.getDataPartition().equals(sortPartition)) {
-        if (sortNode.hasLimit() && sortNode.isTypeTopN()) {
+        if (sortNode.isTypeTopN()) {
           lowerTopN = sortNode;
           childFragment.addPlanRoot(lowerTopN);
+          // Update partitioning exprs to reference sort tuple.
+          sortPartition.substitute(
+                  sortNode.getSortInfo().getOutputSmap(), ctx_.getRootAnalyzer());
           addedLowerTopN = true;
-          DataPartition hashPartition =
-            DataPartition.hashPartitioned(lowerTopN.getPartitioningExprs());
           // When creating the analytic fragment, pass in a flag to unset the limit
           // on the partition exchange. This ensures that the exchange does not
           // prematurely stop sending rows in case there's a downstream operator
           // that has a LIMIT - for instance a Sort with LIMIT after the
           // Analytic operator.
-          analyticFragment = createParentFragment(childFragment, hashPartition,
-             true);
+          analyticFragment = createParentFragment(childFragment, sortPartition, true);
         } else {
           analyticFragment = createParentFragment(childFragment, sortPartition);
         }
@@ -1109,11 +1109,12 @@ public class DistributedPlanner {
     }
     if (addedLowerTopN) {
       // Create the upper TopN node
-      SortNode upperTopN = SortNode.createTopNSortNode(ctx_.getNextNodeId(),
-              childFragment.getPlanRoot(), lowerTopN.getSortInfo(), sortNode.getOffset());
+      SortNode upperTopN = SortNode.createTopNSortNode(ctx_.getQueryOptions(),
+              ctx_.getNextNodeId(), childFragment.getPlanRoot(),
+              lowerTopN.getSortInfo(), sortNode.getOffset(), lowerTopN.getSortLimit(),
+              lowerTopN.isIncludeTies());
       upperTopN.setIsAnalyticSort(true);
       upperTopN.init(ctx_.getRootAnalyzer());
-      upperTopN.setLimit(lowerTopN.getLimit());
       // connect this to the analytic eval node
       analyticNode.setChild(0, upperTopN);
       analyticFragment.addPlanRoot(upperTopN);
@@ -1137,33 +1138,47 @@ public class DistributedPlanner {
     childFragment.addPlanRoot(node);
     if (!childFragment.isPartitioned()) return childFragment;
 
-    // Remember original offset and limit.
-    boolean hasLimit = node.hasLimit();
-    long limit = node.getLimit();
-    long offset = node.getOffset();
-
     // Create a new fragment for a sort-merging exchange.
     PlanFragment mergeFragment =
         createParentFragment(childFragment, DataPartition.UNPARTITIONED);
     ExchangeNode exchNode = (ExchangeNode) mergeFragment.getPlanRoot();
-
-    // Set limit, offset and merge parameters in the exchange node.
-    exchNode.unsetLimit();
-    if (hasLimit) exchNode.setLimit(limit);
-    exchNode.setMergeInfo(node.getSortInfo(), offset);
-
-    // Child nodes should not process the offset. If there is a limit,
-    // the child nodes need only return (offset + limit) rows.
     SortNode childSortNode = (SortNode) childFragment.getPlanRoot();
-    Preconditions.checkState(node == childSortNode);
-    if (hasLimit) {
-      childSortNode.unsetLimit();
-      childSortNode.setLimit(PlanNode.checkedAdd(limit, offset));
+    if (node.isIncludeTies()) {
+      Preconditions.checkState(node.getOffset() == 0,
+              "Tie handling with offset not supported");
+      // TopN that returns ties needs special handling because ties are not handled
+      // correctly by the ExchangeNode limit. We need to generate a top-n on top
+      // of the exchange to correctly merge the input.
+      SortNode parentSortNode = SortNode.createTopNSortNode(
+              ctx_.getQueryOptions(), ctx_.getNextNodeId(), exchNode,
+              childSortNode.getSortInfo(), 0, node.getSortLimit(),
+              childSortNode.isIncludeTies());
+      parentSortNode.init(ctx_.getRootAnalyzer());
+      mergeFragment.addPlanRoot(parentSortNode);
+    } else {
+      // Remember original offset and limit.
+      boolean hasLimit = node.hasLimit();
+      long limit = node.getLimit();
+      long offset = node.getOffset();
+
+      // Set limit, offset and merge parameters in the exchange node.
+      exchNode.unsetLimit();
+      if (hasLimit) exchNode.setLimit(limit);
+      exchNode.setMergeInfo(node.getSortInfo(), offset);
+
+      // Child nodes should not process the offset. If there is a limit,
+      // the child nodes need only return (offset + limit) rows.
+      Preconditions.checkState(node == childSortNode);
+      if (hasLimit) {
+        childSortNode.unsetLimit();
+        childSortNode.setLimit(PlanNode.checkedAdd(limit, offset));
+      }
+      childSortNode.setOffset(0);
     }
-    childSortNode.setOffset(0);
+
+
     childSortNode.computeStats(ctx_.getRootAnalyzer());
     exchNode.computeStats(ctx_.getRootAnalyzer());
-
     return mergeFragment;
   }
 }

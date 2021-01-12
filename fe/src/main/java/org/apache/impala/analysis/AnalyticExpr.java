@@ -17,7 +17,6 @@
 
 package org.apache.impala.analysis;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -74,15 +73,16 @@ public class AnalyticExpr extends Expr {
   // SQL string of this AnalyticExpr before standardization. Returned in toSqlImpl().
   private String sqlString_;
 
+  public static String DENSERANK = "dense_rank";
+  public static String RANK = "rank";
+  public static String ROWNUMBER = "row_number";
+
   private static String LEAD = "lead";
   private static String LAG = "lag";
   private static String FIRST_VALUE = "first_value";
   private static String LAST_VALUE = "last_value";
   private static String FIRST_VALUE_IGNORE_NULLS = "first_value_ignore_nulls";
   private static String LAST_VALUE_IGNORE_NULLS = "last_value_ignore_nulls";
-  private static String RANK = "rank";
-  private static String DENSERANK = "dense_rank";
-  private static String ROWNUMBER = "row_number";
   private static String MIN = "min";
   private static String MAX = "max";
   private static String PERCENT_RANK = "percent_rank";
@@ -190,7 +190,7 @@ public class AnalyticExpr extends Expr {
         && ((AggregateFunction) fn).isAnalyticFn();
   }
 
-  private static boolean isAnalyticFn(Function fn, String fnName) {
+  public static boolean isAnalyticFn(Function fn, String fnName) {
     return isAnalyticFn(fn) && fn.functionName().equals(fnName);
   }
 

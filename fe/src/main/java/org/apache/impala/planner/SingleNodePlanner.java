@@ -64,8 +64,8 @@ import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
-import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeIcebergTable;
+import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.ScalarType;
@@ -75,6 +75,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.planner.AnalyticEvalNode.LimitPushdownInfo;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.util.AcidUtils;
@@ -336,35 +337,20 @@ public class SingleNodePlanner {
       long limit, long offset, boolean hasLimit, boolean disableTopN)
       throws ImpalaException {
     SortNode sortNode;
-    long topNBytesLimit = ctx_.getQueryOptions().topn_bytes_limit;
 
     if (hasLimit && offset == 0) {
       checkAndApplyLimitPushdown(root, sortInfo, limit, analyzer);
     }
 
     if (hasLimit && !disableTopN) {
-      if (topNBytesLimit <= 0) {
-        sortNode =
-            SortNode.createTopNSortNode(ctx_.getNextNodeId(), root, sortInfo, offset);
-      } else {
-        long topNCardinality = PlanNode.capCardinalityAtLimit(root.cardinality_, limit);
-        long estimatedTopNMaterializedSize =
-            sortInfo.estimateTopNMaterializedSize(topNCardinality, offset);
-
-        if (estimatedTopNMaterializedSize < topNBytesLimit) {
-          sortNode =
-              SortNode.createTopNSortNode(ctx_.getNextNodeId(), root, sortInfo, offset);
-        } else {
-          sortNode =
-              SortNode.createTotalSortNode(ctx_.getNextNodeId(), root, sortInfo, offset);
-        }
-      }
+      sortNode = SortNode.createTopNSortNode(ctx_.getQueryOptions(),
+          ctx_.getNextNodeId(), root, sortInfo, offset, limit, false);
     } else {
       sortNode =
           SortNode.createTotalSortNode(ctx_.getNextNodeId(), root, sortInfo, offset);
+      sortNode.setLimit(limit);
     }
     Preconditions.checkState(sortNode.hasValidStats());
-    sortNode.setLimit(limit);
     sortNode.init(analyzer);
 
     return sortNode;
@@ -376,10 +362,9 @@ public class SingleNodePlanner {
    */
   private void checkAndApplyLimitPushdown(PlanNode root, SortInfo sortInfo, long limit,
       Analyzer analyzer) {
-    boolean pushdownLimit = false;
+    LimitPushdownInfo pushdownLimit = null;
     AnalyticEvalNode analyticNode = null;
     List<PlanNode> intermediateNodes = new ArrayList<>();
-    List<Expr>  partitioningExprs = new ArrayList<>();
     SortNode analyticNodeSort = null;
     PlanNode descendant = findDescendantAnalyticNode(root, intermediateNodes);
     if (descendant != null && intermediateNodes.size() <= 1) {
@@ -391,24 +376,30 @@ public class SingleNodePlanner {
         return;
       }
       analyticNodeSort = (SortNode) analyticNode.getChild(0);
+      // Don't attempt conversion if there is already a limit or offset.
+      if (analyticNodeSort.hasLimit() || analyticNodeSort.hasOffset()) {
+        return;
+      }
       int numNodes = intermediateNodes.size();
       if (numNodes > 1 ||
               (numNodes == 1 && !(intermediateNodes.get(0) instanceof SelectNode))) {
-        pushdownLimit = false;
+        pushdownLimit = null;
       } else if (numNodes == 0) {
-        pushdownLimit = analyticNode.isLimitPushdownSafe(sortInfo, null,
-            limit, analyticNodeSort, partitioningExprs, ctx_.getRootAnalyzer());
+        pushdownLimit = analyticNode.checkForLimitPushdown(sortInfo,
+            root.getOutputSmap(), null, limit, analyticNodeSort, ctx_.getRootAnalyzer());
       } else {
         SelectNode selectNode = (SelectNode) intermediateNodes.get(0);
-        pushdownLimit = analyticNode.isLimitPushdownSafe(sortInfo, selectNode,
-            limit, analyticNodeSort, partitioningExprs, ctx_.getRootAnalyzer());
+        pushdownLimit = analyticNode.checkForLimitPushdown(sortInfo,
+            root.getOutputSmap(), selectNode, limit, analyticNodeSort,
+            ctx_.getRootAnalyzer());
       }
     }
 
-    if (pushdownLimit) {
+    if (pushdownLimit != null) {
       Preconditions.checkArgument(analyticNode != null);
       Preconditions.checkArgument(analyticNode.getChild(0) instanceof SortNode);
-      analyticNodeSort.convertToTopN(limit, partitioningExprs, analyzer);
+      analyticNodeSort.tryConvertToTopN(limit + pushdownLimit.additionalLimit,
+           analyzer, pushdownLimit.includeTies);
       // after the limit is pushed down, update stats for the analytic eval node
       // and intermediate nodes
       analyticNode.computeStats(analyzer);
@@ -1997,7 +1988,6 @@ public class SingleNodePlanner {
     Expr.getIds(allJoinConjuncts, null, allSlotIds);
     List<TupleId> joinInputTupleIds = joinInput.getTupleIds();
     List<Expr> distinctExprs = new ArrayList<>();
-    double estDistinctTupleSize = 0;
     for (SlotDescriptor slot : analyzer.getSlotDescs(allSlotIds)) {
       if (joinInputTupleIds.contains(slot.getParent().getId())) {
         distinctExprs.add(new SlotRef(slot));

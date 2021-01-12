@@ -485,6 +485,12 @@ struct TSortNode {
   // Estimated bytes of input that will go into this sort node across all backends.
   // -1 if such estimate is unavailable.
   4: optional i64 estimated_full_input_size
+
+  // Whether to include ties for the last place in the Top-N
+  5: optional bool include_ties
+
+  // If include_ties is true, the limit including ties.
+  6: optional i64 limit_with_ties
 }
 
 enum TAnalyticWindowType {

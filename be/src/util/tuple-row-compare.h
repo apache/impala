@@ -113,6 +113,12 @@ class TupleRowComparator {
     return Compare(nullptr, nullptr, lhs, rhs);
   }
 
+  int ALWAYS_INLINE Compare(const Tuple* lhs, const Tuple* rhs) const {
+    TupleRow* lhs_row = reinterpret_cast<TupleRow*>(&lhs);
+    TupleRow* rhs_row = reinterpret_cast<TupleRow*>(&rhs);
+    return Compare(lhs_row, rhs_row);
+  }
+
   /// Returns true if lhs is strictly less than rhs.
   /// All exprs (ordering_exprs_lhs_ and ordering_exprs_rhs_) must have been prepared
   /// and opened before calling this.
