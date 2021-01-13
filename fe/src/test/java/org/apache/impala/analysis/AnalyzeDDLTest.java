@@ -1757,6 +1757,15 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
     AnalysisError("compute incremental stats functional.view_view",
         "COMPUTE STATS not supported for view: functional.view_view");
+
+    checkComputeStatsStmt("compute incremental stats functional.alltypes " +
+        "(tinyint_col, smallint_col)");
+    checkComputeStatsStmt(
+        "compute incremental stats functional.alltypes partition(year=2010, month=10)" +
+        "(tinyint_col, smallint_col)");
+    checkComputeStatsStmt(
+        "compute incremental stats functional.alltypes partition(year<=2010)" +
+        "(tinyint_col, smallint_col)");
   }
 
 

@@ -2261,9 +2261,15 @@ compute_stats_stmt ::=
     opt_tablesample:tblsmpl
   {: RESULT = ComputeStatsStmt.createStatsStmt(table, tblsmpl, cols); :}
   | KW_COMPUTE KW_INCREMENTAL KW_STATS table_name:table
-  {: RESULT = ComputeStatsStmt.createIncrementalStatsStmt(table, null); :}
+  {: RESULT = ComputeStatsStmt.createIncrementalStatsStmt(table, null, null); :}
+  | KW_COMPUTE KW_INCREMENTAL KW_STATS table_name:table
+    LPAREN opt_ident_list:cols RPAREN
+  {: RESULT = ComputeStatsStmt.createIncrementalStatsStmt(table, null, cols); :}
   | KW_COMPUTE KW_INCREMENTAL KW_STATS table_name:table partition_set:parts
-  {: RESULT = ComputeStatsStmt.createIncrementalStatsStmt(table, parts); :}
+  {: RESULT = ComputeStatsStmt.createIncrementalStatsStmt(table, parts, null); :}
+  | KW_COMPUTE KW_INCREMENTAL KW_STATS table_name:table partition_set:parts
+  LPAREN opt_ident_list:cols RPAREN
+  {: RESULT = ComputeStatsStmt.createIncrementalStatsStmt(table, parts, cols); :}
   ;
 
 drop_stats_stmt ::=
