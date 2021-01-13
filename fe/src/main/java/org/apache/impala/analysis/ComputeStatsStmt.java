@@ -202,7 +202,6 @@ public class ComputeStatsStmt extends StatementBase {
     Preconditions.checkState(tableName != null && !tableName.isEmpty());
     Preconditions.checkState(isIncremental || partitionSet == null);
     Preconditions.checkState(!isIncremental || sampleParams == null);
-    Preconditions.checkState(!isIncremental || columns == null);
     tableName_ = tableName;
     sampleParams_ = sampleParams;
     table_ = null;
@@ -234,8 +233,8 @@ public class ComputeStatsStmt extends StatementBase {
    * set of partitions whose stats should be computed.
    */
   public static ComputeStatsStmt createIncrementalStatsStmt(TableName tableName,
-      PartitionSet partitionSet) {
-    return new ComputeStatsStmt(tableName, null, true, partitionSet, null);
+      PartitionSet partitionSet, List<String> columns) {
+    return new ComputeStatsStmt(tableName, null, true, partitionSet, columns);
   }
 
   private List<String> getBaseColumnStatsQuerySelectList(Analyzer analyzer) {

@@ -4065,10 +4065,22 @@ public class ParserTest extends FrontendTestBase {
         "COMPUTE INCREMENTAL STATS functional.alltypes PARTITION(month=10, year=2010)");
     ParsesOk(
         "DROP INCREMENTAL STATS functional.alltypes PARTITION(month=10, year=2010)");
+    ParsesOk("COMPUTE INCREMENTAL STATS functional.alltypes(tinyint_col, smallint_col)");
+    ParsesOk(
+        "COMPUTE INCREMENTAL STATS functional.alltypes PARTITION(month=10, year=2010)"
+        + "(tinyint_col, smallint_col)");
+
     ParserError("COMPUTE INCREMENTAL STATS");
     ParserError("COMPUTE INCREMENTAL functional.alltypes");
     ParserError("DROP INCREMENTAL STATS functional.alltypes");
     ParserError("COMPUTE INCREMENTAL STATS functional.alltypes TABLESAMPLE SYSTEM(10)");
+    //Missing closing parenthesis
+    ParserError(
+        "COMPUTE INCREMENTAL STATS functional.alltypes(tinyint_col, smallint_col");
+    //Missing opening parenthesis
+    ParserError(
+        "COMPUTE INCREMENTAL STATS functional.alltypes PARTITION(month=10, year=2010)"
+        + "tinyint_col, smallint_col)");
   }
 
   @Test
