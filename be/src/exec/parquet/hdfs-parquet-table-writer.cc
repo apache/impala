@@ -594,6 +594,7 @@ public:
 
 protected:
   virtual void* ConvertValue(void* value) override {
+    if (UNLIKELY(value == nullptr)) return nullptr;
     const TimestampValue* ts = reinterpret_cast<TimestampValue*>(value);
     return ConvertTimestamp(*ts, &result_) ? &result_ : nullptr;
   }

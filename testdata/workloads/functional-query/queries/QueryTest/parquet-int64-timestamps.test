@@ -185,3 +185,43 @@ NULL
 NULL
 NULL
 ====
+---- QUERY
+# IMPALA-10426: invalid timestamps should be NULLs when inserted.
+create table invalid_timestamps (ts timestamp) stored as parquet;
+insert into invalid_timestamps
+values ('1021-01-14 11:36:44.916732000'), ('2021-02-34 11:36:44.916732000');
+select * from invalid_timestamps;
+---- RESULTS
+NULL
+NULL
+====
+---- QUERY
+truncate table invalid_timestamps;
+set parquet_timestamp_type=INT64_MILLIS;
+insert into invalid_timestamps
+values ('1021-01-14 11:36:44.916732000'), ('2021-02-34 11:36:44.916732000');
+select * from invalid_timestamps;
+---- RESULTS
+NULL
+NULL
+====
+---- QUERY
+truncate table invalid_timestamps;
+set parquet_timestamp_type=INT64_MICROS;
+insert into invalid_timestamps
+values ('1021-01-14 11:36:44.916732000'), ('2021-02-34 11:36:44.916732000');
+select * from invalid_timestamps;
+---- RESULTS
+NULL
+NULL
+====
+---- QUERY
+truncate table invalid_timestamps;
+set parquet_timestamp_type=INT64_NANOS;
+insert into invalid_timestamps
+values ('1021-01-14 11:36:44.916732000'), ('2021-02-34 11:36:44.916732000');
+select * from invalid_timestamps;
+---- RESULTS
+NULL
+NULL
+====
