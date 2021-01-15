@@ -96,27 +96,6 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
   *eof = false;
   *bytes_read = 0;
 
-  CachedHdfsFileHandle* borrowed_hdfs_fh = nullptr;
-  hdfsFile hdfs_file;
-
-  // If the reader has an exclusive file handle, use it. Otherwise, borrow
-  // a file handle from the cache.
-  if (exclusive_hdfs_fh_ != nullptr) {
-    hdfs_file = exclusive_hdfs_fh_->file();
-  } else {
-    RETURN_IF_ERROR(io_mgr->GetCachedHdfsFileHandle(hdfs_fs_,
-        scan_range_->file_string(),
-        scan_range_->mtime(), request_context, &borrowed_hdfs_fh));
-    hdfs_file = borrowed_hdfs_fh->file();
-  }
-  // Make sure to release any borrowed file handle.
-  auto release_borrowed_hdfs_fh = MakeScopeExitTrigger([this, &borrowed_hdfs_fh]() {
-    if (borrowed_hdfs_fh != nullptr) {
-      scan_range_->io_mgr_->ReleaseCachedHdfsFileHandle(scan_range_->file_string(),
-          borrowed_hdfs_fh);
-    }
-  });
-
   Status status = Status::OK();
   {
     ScopedTimer<MonotonicStopWatch> req_context_read_timer(
@@ -132,6 +111,35 @@ Status HdfsFileReader::ReadFromPos(DiskQueue* queue, int64_t file_offset, uint8_
       DCHECK_GE(cached_read, 0);
       *bytes_read = cached_read;
     }
+
+    if (*bytes_read == bytes_to_read) {
+      // All bytes successfully read from data cache. We can safely return.
+      return status;
+    }
+
+    // If we get here, the next bytes are not available in data cache, so we need to get
+    // file handle in order to read the rest of data from file.
+    // If the reader has an exclusive file handle, use it. Otherwise, borrow
+    // a file handle from the cache.
+    req_context_read_timer.Stop();
+    CachedHdfsFileHandle* borrowed_hdfs_fh = nullptr;
+    hdfsFile hdfs_file;
+    if (exclusive_hdfs_fh_ != nullptr) {
+      hdfs_file = exclusive_hdfs_fh_->file();
+    } else {
+      RETURN_IF_ERROR(
+          io_mgr->GetCachedHdfsFileHandle(hdfs_fs_, scan_range_->file_string(),
+              scan_range_->mtime(), request_context, &borrowed_hdfs_fh));
+      hdfs_file = borrowed_hdfs_fh->file();
+    }
+    // Make sure to release any borrowed file handle.
+    auto release_borrowed_hdfs_fh = MakeScopeExitTrigger([this, &borrowed_hdfs_fh]() {
+      if (borrowed_hdfs_fh != nullptr) {
+        scan_range_->io_mgr_->ReleaseCachedHdfsFileHandle(
+            scan_range_->file_string(), borrowed_hdfs_fh);
+      }
+    });
+    req_context_read_timer.Start();
 
     while (*bytes_read < bytes_to_read) {
       int bytes_remaining = bytes_to_read - *bytes_read;

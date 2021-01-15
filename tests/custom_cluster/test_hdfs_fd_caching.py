@@ -161,6 +161,48 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
     caching_expected = False
     self.run_fd_caching_test(vector, caching_expected, cache_capacity, None)
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--max_cached_file_handles=16 --unused_file_handle_timeout_sec=5 " +
+                   "--data_cache=/tmp:500MB --always_use_data_cache=true",
+      catalogd_args="--load_catalog_in_background=false")
+  def test_no_fd_caching_on_cached_data(self, vector):
+    """IMPALA-10147: Test that no file handle should be opened nor cached again if data
+    is being read from data cache."""
+    cache_capacity = 16
+    eviction_timeout_secs = 5
+
+    # Only test eviction on platforms where caching is enabled.
+    if IS_ADLS or IS_ISILON:
+      return
+
+    # Maximum number of file handles cached.
+    assert self.max_cached_handles() <= cache_capacity
+
+    num_handles_start = self.cached_handles()
+    # The table has one file. If caching is expected, there should be one more
+    # handle cached after the first select. If caching is not expected, the
+    # number of handles should not change from the initial number.
+    self.execute_query("select * from cachefd.simple", vector=vector)
+    num_handles_after = self.cached_handles()
+    assert self.max_cached_handles() <= cache_capacity
+    assert num_handles_after == (num_handles_start + 1)
+
+    # No open handles if scanning is finished.
+    assert self.outstanding_handles() == 0
+
+    # To test unused file handle eviction, sleep for longer than the timeout.
+    # All the cached handles should be evicted.
+    sleep(eviction_timeout_secs + 5)
+    assert self.cached_handles() == 0
+
+    # Reread from data cache. Expect that no handle should be opened nor cached again.
+    for x in range(10):
+      self.execute_query("select * from cachefd.simple", vector=vector)
+      assert self.cached_handles() == 0
+      assert self.max_cached_handles() <= cache_capacity
+      assert self.outstanding_handles() == 0
+
   def cached_handles(self):
     return self.get_agg_metric("impala-server.io.mgr.num-cached-file-handles")
 
