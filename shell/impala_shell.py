@@ -512,6 +512,8 @@ class ImpalaShell(cmd.Cmd, object):
         a completed command.
       - The contents are passed to the appropriate method for execution.
       - partial_cmd is reset to an empty string.
+
+    Returns text type result (unicode in Python2, str in Python3)
     """
     if self.readline: current_history_len = self.readline.get_current_history_length()
     # Input is incomplete, store the contents and do nothing.
@@ -544,9 +546,13 @@ class ImpalaShell(cmd.Cmd, object):
       # Replace the most recent history item with the completed command.
       completed_cmd = sqlparse.format(completed_cmd)
       if self.readline and current_history_len > 0:
+        # readline.replace_history_item(pos, line) requires 'line' in bytes in Python2,
+        # and str in Python3.
         if sys.version_info.major == 2:
-          completed_cmd = completed_cmd.encode('utf-8')
-        self.readline.replace_history_item(current_history_len - 1, completed_cmd)
+          history_cmd = completed_cmd.encode('utf-8')
+        else:
+          history_cmd = completed_cmd
+        self.readline.replace_history_item(current_history_len - 1, history_cmd)
       # Revert the prompt to its earlier state
       self.prompt = self.cached_prompt
     else:  # Input has a delimiter and partial_cmd is empty
@@ -627,7 +633,9 @@ class ImpalaShell(cmd.Cmd, object):
         host=self.impalad[0], port=self.impalad[1], db=db)
 
   def precmd(self, args):
-    if sys.version_info.major == 2:
+    # In Python2, 'args' could in str type if it's the original input line, or in unicode
+    # type if it's a split query appended by us. See how we deal with 'parsed_cmds' below.
+    if sys.version_info.major == 2 and isinstance(args, str):
       args = self.sanitise_input(args.decode('utf-8'))  # python2
     else:
       args = self.sanitise_input(args)  # python3
