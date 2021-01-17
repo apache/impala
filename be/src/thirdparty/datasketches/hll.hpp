@@ -434,21 +434,6 @@ class hll_union_alloc {
     explicit hll_union_alloc(int lg_max_k);
 
     /**
-     * Construct an hll_union operator from the given std::istream, which
-     * must be a valid serialized image of an hll_union.
-     * @param is The input stream from which to read.
-     */
-    static hll_union_alloc deserialize(std::istream& is);
-
-  /**
-     * Construct an hll_union operator from the given byte array, which
-     * must be a valid serialized image of an hll_union.
-     * @param bytes The byte array to read.
-     * @param len Byte array length in bytes.
-     */
-    static hll_union_alloc deserialize(const void* bytes, size_t len);
-
-    /**
      * Returns the current cardinality estimate
      * @return the cardinality estimate
      */

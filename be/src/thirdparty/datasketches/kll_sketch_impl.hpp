@@ -91,7 +91,7 @@ is_level_zero_sorted_(other.is_level_zero_sorted_)
 
 template<typename T, typename C, typename S, typename A>
 kll_sketch<T, C, S, A>& kll_sketch<T, C, S, A>::operator=(const kll_sketch& other) {
-  kll_sketch<T, C, S, A> copy(other);
+  kll_sketch copy(other);
   std::swap(k_, copy.k_);
   std::swap(m_, copy.m_);
   std::swap(min_k_, copy.min_k_);
@@ -271,6 +271,7 @@ T kll_sketch<T, C, S, A>::get_quantile(double fraction) const {
 template<typename T, typename C, typename S, typename A>
 std::vector<T, A> kll_sketch<T, C, S, A>::get_quantiles(const double* fractions, uint32_t size) const {
   std::vector<T, A> quantiles;
+  quantiles.reserve(size);
   if (is_empty()) return quantiles;
   std::unique_ptr<kll_quantile_calculator<T, C, A>, std::function<void(kll_quantile_calculator<T, C, A>*)>> quantile_calculator;
   quantiles.reserve(size);
@@ -469,9 +470,9 @@ kll_sketch<T, C, S, A> kll_sketch<T, C, S, A>::deserialize(std::istream& is) {
   check_serial_version(serial_version);
   check_family_id(family_id);
 
+  if (!is.good()) throw std::runtime_error("error reading from std::istream");
   const bool is_empty(flags_byte & (1 << flags::IS_EMPTY));
-  if (!is.good()) throw std::runtime_error("error reading from std::istream"); 
-  if (is_empty) return kll_sketch<T, C, S, A>(k);
+  if (is_empty) return kll_sketch(k);
 
   uint64_t n;
   uint16_t min_k;
@@ -524,8 +525,7 @@ kll_sketch<T, C, S, A> kll_sketch<T, C, S, A>::deserialize(std::istream& is) {
     // copy did not throw, repackage with destrtuctor
     max_value = std::unique_ptr<T, item_deleter>(max_value_buffer.release(), item_deleter());
   }
-  if (!is.good())
-    throw std::runtime_error("error reading from std::istream");
+  if (!is.good()) throw std::runtime_error("error reading from std::istream");
   return kll_sketch(k, min_k, n, num_levels, std::move(levels), std::move(items), capacity,
       std::move(min_value), std::move(max_value), is_level_zero_sorted);
 }

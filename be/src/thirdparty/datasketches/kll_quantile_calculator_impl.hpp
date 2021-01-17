@@ -81,7 +81,7 @@ template <typename T, typename C, typename A>
 void kll_quantile_calculator<T, C, A>::convert_to_preceding_cummulative() {
   uint64_t subtotal = 0;
   for (auto& entry: entries_) {
-    const uint32_t new_subtotal = subtotal + entry.second;
+    const uint64_t new_subtotal = subtotal + entry.second;
     entry.second = subtotal;
     subtotal = new_subtotal;
   }

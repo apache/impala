@@ -315,8 +315,8 @@ class kll_sketch {
      *
      * <p>If the sketch is empty this returns an empty vector.
      *
-     * @param split_points an array of <i>m</i> unique, monotonically increasing float values
-     * that divide the real number line into <i>m+1</i> consecutive disjoint intervals.
+     * @param split_points an array of <i>m</i> unique, monotonically increasing values
+     * that divide the input domain into <i>m+1</i> consecutive disjoint intervals.
      * The definition of an "interval" is inclusive of the left split point (or minimum value) and
      * exclusive of the right split point, with the exception that the last interval will include
      * the maximum value.
@@ -338,8 +338,8 @@ class kll_sketch {
      *
      * <p>If the sketch is empty this returns an empty vector.
      *
-     * @param split_points an array of <i>m</i> unique, monotonically increasing float values
-     * that divide the real number line into <i>m+1</i> consecutive disjoint intervals.
+     * @param split_points an array of <i>m</i> unique, monotonically increasing values
+     * that divide the input domain into <i>m+1</i> consecutive disjoint intervals.
      * The definition of an "interval" is inclusive of the left split point (or minimum value) and
      * exclusive of the right split point, with the exception that the last interval will include
      * the maximum value.
@@ -401,7 +401,7 @@ class kll_sketch {
      * @param is input stream
      * @return an instance of a sketch
      */
-    static kll_sketch<T, C, S, A> deserialize(std::istream& is);
+    static kll_sketch deserialize(std::istream& is);
 
     /**
      * This method deserializes a sketch from a given array of bytes.
@@ -409,7 +409,7 @@ class kll_sketch {
      * @param size the size of the array
      * @return an instance of a sketch
      */
-    static kll_sketch<T, C, S, A> deserialize(const void* bytes, size_t size);
+    static kll_sketch deserialize(const void* bytes, size_t size);
 
     /*
      * Gets the normalized rank error given k and pmf.
