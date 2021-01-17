@@ -38,34 +38,6 @@ hll_union_alloc<A>::hll_union_alloc(const int lg_max_k):
 {}
 
 template<typename A>
-hll_union_alloc<A> hll_union_alloc<A>::deserialize(const void* bytes, size_t len) {
-  hll_sketch_alloc<A> sk(hll_sketch_alloc<A>::deserialize(bytes, len));
-  // we're using the sketch's lg_config_k to initialize the union so
-  // we can initialize the Union with it as long as it's HLL_8.
-  hll_union_alloc<A> hllUnion(sk.get_lg_config_k());
-  if (sk.get_target_type() == HLL_8) {
-    std::swap(hllUnion.gadget.sketch_impl, sk.sketch_impl);
-  } else {
-    hllUnion.update(sk);
-  }
-  return hllUnion;
-}
-
-template<typename A>
-hll_union_alloc<A> hll_union_alloc<A>::deserialize(std::istream& is) {
-  hll_sketch_alloc<A> sk(hll_sketch_alloc<A>::deserialize(is));
-  // we're using the sketch's lg_config_k to initialize the union so
-  // we can initialize the Union with it as long as it's HLL_8.
-  hll_union_alloc<A> hllUnion(sk.get_lg_config_k());
-  if (sk.get_target_type() == HLL_8) {    
-    std::swap(hllUnion.gadget.sketch_impl, sk.sketch_impl);
-  } else {
-    hllUnion.update(sk);
-  }
-  return hllUnion;
-}
-
-template<typename A>
 hll_sketch_alloc<A> hll_union_alloc<A>::get_result(target_hll_type target_type) const {
   return hll_sketch_alloc<A>(gadget, target_type);
 }

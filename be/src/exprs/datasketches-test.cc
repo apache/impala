@@ -19,6 +19,9 @@
 #include "thirdparty/datasketches/cpc_sketch.hpp"
 #include "thirdparty/datasketches/cpc_union.hpp"
 #include "thirdparty/datasketches/kll_sketch.hpp"
+#include "thirdparty/datasketches/theta_sketch.hpp"
+#include "thirdparty/datasketches/theta_union.hpp"
+#include "thirdparty/datasketches/theta_intersection.hpp"
 
 #include <sstream>
 #include <stdlib.h>
@@ -150,6 +153,61 @@ TEST(TestDataSketchesKll, UseDataSketchesInterface) {
     int exact_median = 65000;
     EXPECT_LE(abs(quantiles[1] - exact_median), exact_median * 0.02);
     EXPECT_EQ(129999, quantiles[2]);
+  }
+}
+
+// This test is meant to cover that the Theta algorithm from the DataSketches library
+// can be imported into Impala, builds without errors and the basic functionality is
+// available to use.
+// The below code is mostly translated from the example code found on the official
+// DataSketches web page:
+// https://datasketches.apache.org/docs/Theta/ThetaJavaExample.html
+// The purpose is to create 2 Theta sketches that have overlap in their data, serialize
+// them, deserialize them, and then obtain a cardinality estimate after combining the
+// 2 sketches and a cardinality estimate after intersecting the 2 sketches.
+TEST(TestDataSketchesTheta, UseDataSketchesInterface) {
+  std::stringstream sketch_stream1;
+  std::stringstream sketch_stream2;
+  // this section generates two sketches with some overlap and serializes them into files
+  {
+    // 100000 distinct keys
+    datasketches::update_theta_sketch sketch1 =
+        datasketches::update_theta_sketch::builder().build();
+    for (int key = 0; key < 100000; key++) sketch1.update(key);
+    sketch1.serialize(sketch_stream1);
+
+    // 100000 distinct keys
+    datasketches::update_theta_sketch sketch2 =
+        datasketches::update_theta_sketch::builder().build();
+    for (int key = 50000; key < 150000; key++) sketch2.update(key);
+    sketch2.serialize(sketch_stream2);
+  }
+
+  // this section deserializes the sketches, produces union and intersection
+  {
+    datasketches::update_theta_sketch sketch1 =
+        datasketches::update_theta_sketch::deserialize(sketch_stream1);
+
+    datasketches::update_theta_sketch sketch2 =
+        datasketches::update_theta_sketch::deserialize(sketch_stream2);
+
+    // union opertion
+    datasketches::theta_union u = datasketches::theta_union::builder().build();
+    u.update(sketch1);
+    u.update(sketch2);
+    datasketches::compact_theta_sketch unionResult = u.get_result();
+
+    // Like HLL, the order of the inputs fed to the sketches is fix here so we get the
+    // same estimate every time we run this test.
+    EXPECT_EQ(149586, (int)unionResult.get_estimate());
+
+    // intersection opertaion
+    datasketches::theta_intersection intersection;
+    intersection.update(sketch1);
+    intersection.update(sketch2);
+    datasketches::compact_theta_sketch intersectionResult = intersection.get_result();
+
+    EXPECT_EQ(48249, (int)intersectionResult.get_estimate());
   }
 }
 
