@@ -333,12 +333,26 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     child_proc.wait()
 
   def test_unicode_input(self, vector):
-    "Test queries containing non-ascii input"
+    """Test queries containing non-ascii input"""
     # test a unicode query spanning multiple lines
-    unicode_text = u'\ufffd'
-    args = "select '%s'\n;" % unicode_text.encode('utf-8')
+    unicode_bytes = u'\ufffd'.encode('utf-8')
+    args = "select '{0}'\n;".format(unicode_bytes)
     result = run_impala_shell_interactive(vector, args)
-    assert "Fetched 1 row(s)" in result.stderr
+    assert "Fetched 1 row(s)" in result.stderr, result.stderr
+    # IMPALA-10415: Multi queries in a line containing unicode chars.
+    args = "select '{0}'; select '{0}'".format(unicode_bytes)
+    result = run_impala_shell_interactive(vector, args)
+    assert "Fetched 1 row(s)" in result.stderr, result.stderr
+    # IMPALA-10415: Multiline query with history enabled and unicode chars.
+    # readline gets its input from tty, so using stdin does not work.
+    shell_cmd = get_shell_cmd(vector)
+    child_proc = pexpect.spawn(shell_cmd[0], shell_cmd[1:])
+    child_proc.expect(PROMPT_REGEX)
+    child_proc.sendline("select '{0}'\n;".format(unicode_bytes))
+    child_proc.expect("Fetched 1 row\(s\) in [0-9]+\.?[0-9]*s")
+    child_proc.expect(PROMPT_REGEX)
+    child_proc.sendline('quit;')
+    child_proc.wait()
 
   def test_welcome_string(self, vector):
     """Test that the shell's welcome message is only printed once
@@ -1108,5 +1122,6 @@ def run_impala_shell_interactive(vector, input_lines, shell_args=None,
   p = ImpalaShell(vector, args=shell_args, env=my_env,
       wait_until_connected=wait_until_connected)
   for line in input_lines:
+    LOG.info("Running %s" % line)
     p.send_cmd(line)
   return p.get_result()
