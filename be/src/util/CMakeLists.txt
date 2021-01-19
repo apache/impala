@@ -63,6 +63,8 @@ add_library(Util
   jni-util.cc
   json-util.cc
   ldap-util.cc
+  ldap-search-bind.cc
+  ldap-simple-bind.cc
   logging-support.cc
   mem-info.cc
   memory-metrics.cc

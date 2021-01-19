@@ -101,10 +101,17 @@ DEFINE_bool(enable_ldap_auth, false,
     "If true, use LDAP authentication for client connections");
 DEFINE_string(ldap_ca_certificate, "", "The full path to the certificate file used to"
     " authenticate the LDAP server's certificate for SSL / TLS connections.");
-DEFINE_string(ldap_user_filter, "", "Comma separated list of usernames. If specified, "
-    "users must be on this list for athentication to succeed.");
-DEFINE_string(ldap_group_filter, "", "Comma separated list of groups. If specified, "
-    "users must belong to one of these groups for authentication to succeed.");
+DEFINE_string(ldap_user_filter, "", "Used as filter for both simple and search "
+    "bind mechanisms. For simple bind it is a comma separated list of user names. If "
+    "specified, users must be on this list for authentication to succeed. For search "
+    "bind it is an LDAP filter that will be used during LDAP search, it can contain "
+    "'{0}' pattern which will be replaced with the user name.");
+DEFINE_string(ldap_group_filter, "", "Used as filter for both simple and search "
+    "bind mechanisms. For simple bind it is a comma separated list of groups. If "
+    "specified, users must belong to one of these groups for authentication to succeed. "
+    "For search bind it is an LDAP filter that will be used during LDAP group search, it "
+    "can contain '{0}' pattern which will be replaced with the user name and/or '{1}' "
+    "which will be replace with the user dn.");
 
 DEFINE_string(internal_principals_whitelist, "hdfs", "(Advanced) Comma-separated list of "
     " additional usernames authorized to access Impala's internal APIs. Defaults to "
@@ -1267,7 +1274,6 @@ Status AuthManager::Init() {
   kudu::security::InitializeOpenSSL();
   LOG(INFO) << "Initialized " << OPENSSL_VERSION_TEXT;
 
-  bool use_ldap = false;
   // Could use any other requiered flag for SAML
   bool use_saml = !FLAGS_saml2_sp_callback_url.empty();
   if (use_saml) {
@@ -1282,10 +1288,8 @@ Status AuthManager::Init() {
 
   // Get all of the flag validation out of the way
   if (FLAGS_enable_ldap_auth) {
-    use_ldap = true;
-    RETURN_IF_ERROR(ImpalaLdap::ValidateFlags());
-    ldap_.reset(new ImpalaLdap());
-    RETURN_IF_ERROR(ldap_->Init(FLAGS_ldap_user_filter, FLAGS_ldap_group_filter));
+    RETURN_IF_ERROR(
+        ImpalaLdap::CreateLdap(&ldap_, FLAGS_ldap_user_filter, FLAGS_ldap_group_filter));
   }
 
   if (FLAGS_principal.empty() && !FLAGS_be_principal.empty()) {
@@ -1347,14 +1351,14 @@ Status AuthManager::Init() {
   // Set up the external auth provider as per above.  Either a "front end"
   // principal or ldap tells us to use a SecureAuthProvider, and we fill in
   // details from there.
-  if (use_ldap || external_kerberos_enabled) {
+  if (FLAGS_enable_ldap_auth || external_kerberos_enabled) {
     SecureAuthProvider* sap = NULL;
     external_auth_provider_.reset(sap = new SecureAuthProvider(false));
     if (external_kerberos_enabled) {
       RETURN_IF_ERROR(sap->InitKerberos(kerberos_external_principal));
       LOG(INFO) << "External communication is authenticated with Kerberos";
     }
-    if (use_ldap) {
+    if (FLAGS_enable_ldap_auth) {
       sap->InitLdap();
       LOG(INFO) << "External communication is authenticated with LDAP";
     }

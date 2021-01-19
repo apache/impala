@@ -30,58 +30,48 @@ namespace impala {
 
 class Status;
 
-// Utility class for checking usernames and passwords in LDAP.
+// Abstract base class for utility classes to authenticate users through LDAP.
 class ImpalaLdap {
  public:
-  static Status ValidateFlags();
-
-  /// 'user_filter' and 'group_filter' are optional comma separated lists specifying what
-  /// users and groups are allowed to authenticate.
-  Status Init(
-      const std::string& user_filter, const std::string& group_filter) WARN_UNUSED_RESULT;
+  /// Factory method that returns an initialized LDAP object based on the GFlag
+  /// configurations and the parameters.
+  static Status CreateLdap(std::unique_ptr<ImpalaLdap>* ldap,
+      const std::string& user_filter, const std::string& group_filter);
 
   /// Attempts to authenticate to LDAP using the given username and password, applying the
-  /// user or group filters as appropriate. 'passlen' is the length of the password.
+  /// user filters as appropriate. 'passlen' is the length of the password.
   /// Returns true if authentication is successful.
-  ///
-  /// Note that this method uses ldap_sasl_bind_s(), which does *not* provide any security
-  /// to the connection between Impala and the LDAP server. You must either set
-  /// --ldap_tls or have a URI which has "ldaps://" as the scheme in order to get a secure
-  /// connection. Use --ldap_ca_certificate to specify the location of the certificate
-  /// used to confirm the authenticity of the LDAP server certificate.
-  bool LdapCheckPass(
-      const char* username, const char* password, unsigned passlen) WARN_UNUSED_RESULT;
+  virtual bool LdapCheckPass(const char* username, const char* password,
+      unsigned passlen) WARN_UNUSED_RESULT = 0;
 
-  /// Returns true if 'username' passes the LDAP user and group filters, if configured.
-  bool LdapCheckFilters(std::string username) WARN_UNUSED_RESULT;
+  /// Returns true if 'username' passes the LDAP group filters, if configured.
+  virtual bool LdapCheckFilters(std::string username) WARN_UNUSED_RESULT = 0;
 
- private:
-  /// If non-empty, only users in this set can successfully authenticate.
-  std::unordered_set<std::string> user_filter_;
+  virtual ~ImpalaLdap() = default;
 
-  /// If non-empty, only users who belong to groups in this set can successfully
-  /// authenticate.
-  std::unordered_set<std::string> group_filter_;
-  /// The base DNs to use when preforming group searches.
-  std::vector<std::string> group_filter_dns_;
-
-  /// The output of --ldap_bind_password_cmd, if specified.
+ protected:
+  /// The output of --ldap_bind_password_cmd, if specified. It stores the bind user's
+  /// password.
   std::string bind_password_;
+
+  /// Validates the class specific GFlag configurations.
+  virtual Status ValidateFlags();
+
+  /// Initializes the object specific configurations, currently used to initialize
+  /// 'user_filter' and 'group_filter'.
+  virtual Status Init(const std::string& user_filter,
+      const std::string& group_filter) WARN_UNUSED_RESULT = 0;
 
   /// Attempts a bind with 'user' and 'pass'. Returns true if successful and the handle is
   /// returned in 'ldap', in which case the caller must call 'ldap_unbind_ext' on 'ldap'.
-  bool Bind(const std::string& user_dn, const char* pass, unsigned passlen, LDAP** ldap);
+  bool Bind(const std::string& user_dn, const char* pass, unsigned passlen,
+      LDAP** ldap) WARN_UNUSED_RESULT;
 
-  /// Searches LDAP to determine if 'user_str' belong to one of the groups in
-  /// 'group_filter_'. Returns true if so.
-  bool CheckGroupMembership(LDAP* ld, const std::string& user_str);
-
-  /// Returns the value part of the first attribute in the provided relative DN.
-  static std::string GetShortName(const std::string& rdn);
-
-  /// Maps the user string into an acceptable LDAP "DN" (distinguished name) based on the
-  /// values of the LDAP config flags.
-  static std::string ConstructUserDN(const std::string& user);
+  /// This method binds with the configured bind dn and bind password and attempts an
+  /// ldap search for objects on the 'base_dn' with the provided 'filter'.
+  /// It returns the DN of the object when succeeds or empty string if fails. Only
+  /// allows one matching entry.
+  std::string LdapSearchObject(LDAP* ld, const char* base_dn, const char* filter);
 };
 
 } // namespace impala

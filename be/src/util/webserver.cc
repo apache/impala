@@ -125,11 +125,19 @@ DEFINE_bool(webserver_require_ldap, false,
     "authentication. Cannot be used with --webserver_require_spnego or "
     "--webserver_password_file.");
 DEFINE_string(webserver_ldap_user_filter, "",
-    "Comma separated list of usernames. If specified, users must be on this list for "
-    "LDAP athentication to the webserver to succeed.");
+    "Used as filter for both simple and search bind mechanisms for the webserver "
+    "authentication. For simple bind it is a comma separated list of user names. If "
+    "specified, users must be on this list for authentication to succeed. For search "
+    "bind it is an LDAP filter that will be used during LDAP search, it can contain "
+    "'{0}' pattern which will be replaced with the user name.");
 DEFINE_string(webserver_ldap_group_filter, "",
-    "Comma separated list of groups. If specified, users must belong to one of these "
-    "groups for LDAP authentication to the webserver to succeed.");
+    "Used as filter for both simple and search bind mechanisms for the webserver "
+    "authentication. For simple bind it is a comma separated list of groups. If "
+    "specified, users must belong to one of these groups for authentication to succeed. "
+    "For search bind it is an LDAP filter that will be used during LDAP group search, it "
+    "can contain '{0}' pattern which will be replaced with the user name and/or '{1}' "
+    "which will be replace with the user dn.");
+
 DEFINE_bool(webserver_ldap_passwords_in_clear_ok, false,
     "(Advanced) If true, allows the webserver to start with LDAP authentication even if "
     "SSL is not enabled, a potentially insecure configuration.");
@@ -440,9 +448,9 @@ Status Webserver::Start() {
                     "set --webserver_ldap_passwords_in_clear_ok=true");
     }
 
-    ldap_.reset(new ImpalaLdap());
-    RETURN_IF_ERROR(
-        ldap_->Init(FLAGS_webserver_ldap_user_filter, FLAGS_webserver_ldap_group_filter));
+    RETURN_IF_ERROR(ImpalaLdap::CreateLdap(
+        &ldap_, FLAGS_webserver_ldap_user_filter, FLAGS_webserver_ldap_group_filter));
+
     LOG(INFO) << "Webserver: secured with LDAP authentication.";
   }
 
