@@ -32,6 +32,9 @@ public class LdapUtil {
   public static final String TEST_USER_4 = "Test4Ldap";
   public static final String TEST_PASSWORD_4 = "fghij";
 
+  public static final String TEST_USER_5 = "Test5Ldap";
+  public static final String TEST_PASSWORD_5 = "klmnop";
+
   // TEST_USER_1 and TEST_USER_2 are members of this group.
   public static final String TEST_USER_GROUP = "group1";
 

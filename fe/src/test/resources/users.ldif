@@ -9,6 +9,11 @@ objectClass: organizationalUnit
 objectClass: top
 ou: Users
 
+dn: ou=Users2,dc=myorg,dc=com
+objectClass: organizationalUnit
+objectClass: top
+ou: Users
+
 dn: ou=Groups,dc=myorg,dc=com
 objectClass: organizationalUnit
 objectClass: top
@@ -54,8 +59,19 @@ sn: Ldap
 uid: ldaptest4
 userPassword: fghij
 
+dn: cn=Test5Ldap,ou=Users2,dc=myorg,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: Test5Ldap
+sn: Ldap
+uid: ldaptest5
+userPassword: klmnop
+
 dn: cn=group1,ou=Groups,dc=myorg,dc=com
 objectClass: top
 objectClass: groupOfUniqueNames
+cn: group1
 uniqueMember: cn=Test1Ldap,ou=Users,dc=myorg,dc=com
 uniqueMember: cn=Test2Ldap,ou=Users,dc=myorg,dc=com
