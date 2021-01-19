@@ -117,6 +117,7 @@ class OutputStream(object):
           # Note that instances of this class do not persist, so it's fine to
           # close the we close the file handle after each write.
           out_file.write(formatted_data.encode('utf-8'))  # file opened in binary mode
+          out_file.write(b'\n')
       except IOError as err:
         file_err_msg = "Error opening file %s: %s" % (self.filename, str(err))
         print('{0} (falling back to stderr)'.format(file_err_msg), file=sys.stderr)

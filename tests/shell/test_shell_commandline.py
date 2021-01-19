@@ -105,6 +105,16 @@ def populated_table(empty_table, request):
   return fq_table_name
 
 
+@pytest.yield_fixture
+def tmp_file():
+  """
+  Test fixture which manages a temporary file
+  """
+  _, tmp_file = tempfile.mkstemp()
+  yield tmp_file
+  os.remove(tmp_file)
+
+
 class TestImpalaShell(ImpalaTestSuite):
   """A set of sanity tests for the Impala shell commandline parameters.
 
@@ -1071,3 +1081,21 @@ class TestImpalaShell(ImpalaTestSuite):
     expected_result = """anonymous\tanonymous\n"""
     assert result.stdout == expected_result
     assert result.stderr == ""
+
+  def test_output_file(self, vector, tmp_file):
+    """Test that writing output to a file using '--output_file' produces the same output
+    as is written to stdout."""
+    row_count = 6000  # Should be > 2048 to tickle IMPALA-10447.
+    query = "select * from tpcds.item order by i_item_sk limit %d" % row_count
+    # Run the query normally and keep the stdout.
+    output = run_impala_shell_cmd(vector, ['-q', query, '-B', '--output_delimiter=;'])
+    assert "Fetched %d row(s)" % row_count in output.stderr
+    rows_from_stdout = output.stdout.strip().split('\n')
+    # Run the query with output sent to a file using '--output_file'.
+    result = run_impala_shell_cmd(vector, ['-q', query, '-B', '--output_delimiter=;',
+                                           '--output_file=%s' % tmp_file])
+    assert "Fetched %d row(s)" % row_count in result.stderr
+    # Check that the output from the file is the same as that written to stdout.
+    with open(tmp_file, "r") as f:
+      rows_from_file = [line.rstrip() for line in f]
+      assert rows_from_stdout == rows_from_file
