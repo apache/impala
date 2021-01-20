@@ -269,7 +269,7 @@ function build_impdev() {
   # shards, depends on this binary. We build it here once,
   # instead of building it during the startup of each container running
   # a subset of E2E tests. Building it here is also a lot faster.
-  make -j$(nproc) --load-average=$(nproc) parquet-reader
+  make -j$(nproc) --load-average=$(nproc) parquet-reader impala-profile-tool
 
   # Dump current memory usage to logs, before shutting things down.
   memory_usage
