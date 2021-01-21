@@ -393,6 +393,22 @@ public class BuiltinsDb extends Db {
             "11DsHllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
         .build();
 
+  private static final Map<Type, String> DS_THETA_UPDATE_SYMBOL =
+      ImmutableMap.<Type, String>builder()
+        .put(Type.TINYINT,
+            "13DsThetaUpdateIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.INT,
+            "13DsThetaUpdateIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.BIGINT,
+            "13DsThetaUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.FLOAT,
+            "13DsThetaUpdateIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.DOUBLE,
+            "13DsThetaUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.STRING,
+            "13DsThetaUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
+        .build();
+
   private static final Map<Type, String> SAMPLED_NDV_UPDATE_SYMBOL =
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
@@ -1076,6 +1092,33 @@ public class BuiltinsDb extends Db {
             Type.STRING));
         db.addBuiltin(AggregateFunction.createUnsupportedBuiltin(db, "ds_hll_sketch",
             Lists.newArrayList(t), Type.STRING, Type.STRING));
+      }
+
+      // DataSketches Theta
+      if (DS_THETA_UPDATE_SYMBOL.containsKey(t)) {
+        db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_theta_sketch_and_estimate",
+                Lists.newArrayList(t), Type.BIGINT, Type.STRING,
+                prefix + "11DsThetaInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+                prefix + DS_THETA_UPDATE_SYMBOL.get(t),
+                prefix + "12DsThetaMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+                prefix + "16DsThetaSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+                prefix + "15DsThetaFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+                true, false, true));
+
+        db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_theta_sketch",
+                Lists.newArrayList(t), Type.STRING, Type.STRING,
+                prefix + "11DsThetaInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+                prefix + DS_THETA_UPDATE_SYMBOL.get(t),
+                prefix + "12DsThetaMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+                prefix + "16DsThetaSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+                prefix + "21DsThetaFinalizeSketchEPN10impala_udf15FunctionContextERKNS1_" +
+                        "9StringValE", true, false, true));
+      } else {
+        db.addBuiltin(AggregateFunction.createUnsupportedBuiltin(db,
+                "ds_theta_sketch_and_estimate", Lists.newArrayList(t), Type.STRING,
+                Type.STRING));
+        db.addBuiltin(AggregateFunction.createUnsupportedBuiltin(db, "ds_theta_sketch",
+                Lists.newArrayList(t), Type.STRING, Type.STRING));
       }
 
       // SAMPLED_NDV.

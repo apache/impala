@@ -162,4 +162,19 @@ TEST(HistogramTest, TestString) {
   EXPECT_TRUE(test.Execute(input, StringVal(&expected[0]))) << test.GetErrorMsg();
 }
 
+TEST(DsThetaSketch, DataToSketch) {
+  UdaTestHarness<BigIntVal, StringVal, IntVal> test(AggregateFunctions::DsThetaInit,
+      AggregateFunctions::DsThetaUpdate<IntVal>, AggregateFunctions::DsThetaMerge,
+      AggregateFunctions::DsThetaSerialize, AggregateFunctions::DsThetaFinalize);
+  std::vector<IntVal> input;
+
+  EXPECT_TRUE(test.Execute(input, BigIntVal(0)))
+      << "DsThetaSketch empty: " << test.GetErrorMsg();
+
+  for (int key = 0; key < 6; key++) input.push_back(key);
+
+  EXPECT_TRUE(test.Execute(input, BigIntVal(6)))
+      << "DsThetaSketch: " << test.GetErrorMsg();
+}
+
 IMPALA_TEST_MAIN();

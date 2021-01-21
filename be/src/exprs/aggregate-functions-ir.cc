@@ -40,6 +40,8 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "thirdparty/datasketches/hll.hpp"
+#include "thirdparty/datasketches/theta_sketch.hpp"
+#include "thirdparty/datasketches/theta_union.hpp"
 #include "thirdparty/datasketches/kll_sketch.hpp"
 #include "util/arithmetic-util.h"
 #include "util/mpfit-util.h"
@@ -1637,6 +1639,27 @@ StringVal SerializeDsHllUnion(FunctionContext* ctx,
   return SerializeCompactDsHllSketch(ctx, sketch);
 }
 
+/// Auxiliary function that receives a theta_sketch and returns the serialized version of
+/// it wrapped into a StringVal.
+/// Introducing this function in the .cc to avoid including the whole DataSketches Theta
+/// functionality into the header.
+StringVal SerializeDsThetaSketch(
+    FunctionContext* ctx, const datasketches::theta_sketch& sketch) {
+  std::stringstream serialized_input(std::ios::in | std::ios::out | std::ios::binary);
+  sketch.serialize(serialized_input);
+  return StringStreamToStringVal(ctx, serialized_input);
+}
+
+/// Auxiliary function that receives a theta_union, gets the underlying Theta sketch from
+/// the union object and returns the serialized, Theta sketch wrapped into StringVal.
+/// Introducing this function in the .cc to avoid including the whole DataSketches Theta
+/// functionality into the header.
+StringVal SerializeDsThetaUnion(
+    FunctionContext* ctx, const datasketches::theta_union& ds_union) {
+  datasketches::compact_theta_sketch sketch = ds_union.get_result();
+  return SerializeDsThetaSketch(ctx, sketch);
+}
+
 /// Auxiliary function that receives a kll_sketch<float> and returns the serialized
 /// version of it wrapped into a StringVal.
 /// Introducing this function in the .cc to avoid including the whole DataSketches HLL
@@ -1808,6 +1831,132 @@ StringVal AggregateFunctions::DsHllUnionFinalize(FunctionContext* ctx,
     return StringVal::null();
   }
   StringVal result = SerializeCompactDsHllSketch(ctx, sketch);
+  ctx->Free(src.ptr);
+  return result;
+}
+
+void AggregateFunctions::DsThetaInit(FunctionContext* ctx, StringVal* dst) {
+  AllocBuffer(ctx, dst, sizeof(datasketches::update_theta_sketch));
+  if (UNLIKELY(dst->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
+  // Note, that update_theta_sketch will always have the same size regardless of the
+  // amount of data it keeps track. This is because it's a wrapper class that holds all
+  // the inserted data on heap. Here, we put only the wrapper class into a StringVal.
+  datasketches::update_theta_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::update_theta_sketch*>(dst->ptr);
+  datasketches::update_theta_sketch sketch =
+      datasketches::update_theta_sketch::builder().build();
+  std::uninitialized_fill_n(sketch_ptr, 1, sketch);
+}
+
+template <typename T>
+void AggregateFunctions::DsThetaUpdate(
+    FunctionContext* ctx, const T& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::update_theta_sketch));
+  datasketches::update_theta_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::update_theta_sketch*>(dst->ptr);
+  sketch_ptr->update(src.val);
+}
+
+// Specialize for StringVal
+template <>
+void AggregateFunctions::DsThetaUpdate(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  if (src.is_null || src.len == 0) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::update_theta_sketch));
+  datasketches::update_theta_sketch* sketch_ptr =
+      reinterpret_cast<datasketches::update_theta_sketch*>(dst->ptr);
+  sketch_ptr->update(reinterpret_cast<char*>(src.ptr), src.len);
+}
+
+StringVal AggregateFunctions::DsThetaSerialize(
+    FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK(src.len == sizeof(datasketches::update_theta_sketch)
+      || src.len == sizeof(datasketches::theta_union));
+  StringVal dst;
+  if (src.len == sizeof(datasketches::update_theta_sketch)) {
+    auto sketch_ptr = reinterpret_cast<datasketches::theta_sketch*>(src.ptr);
+    dst = SerializeDsThetaSketch(ctx, *sketch_ptr);
+  } else {
+    auto union_ptr = reinterpret_cast<datasketches::theta_union*>(src.ptr);
+    dst = SerializeDsThetaUnion(ctx, *union_ptr);
+  }
+  ctx->Free(src.ptr);
+  return dst;
+}
+
+void AggregateFunctions::DsThetaMerge(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  DCHECK(!src.is_null);
+  DCHECK(!dst->is_null);
+  DCHECK(dst->len == sizeof(datasketches::update_theta_sketch)
+      or dst->len == sizeof(datasketches::theta_union));
+
+  // Note, 'src' is a serialized theta_sketch.
+  auto src_sketch = datasketches::theta_sketch::deserialize((void*)src.ptr, src.len);
+  if (src_sketch->is_empty()) return;
+
+  if (dst->len == sizeof(datasketches::theta_union)) {
+    auto dst_union_ptr = reinterpret_cast<datasketches::theta_union*>(dst->ptr);
+    dst_union_ptr->update(*src_sketch);
+  } else if (dst->len == sizeof(datasketches::update_theta_sketch)) {
+    auto dst_sketch_ptr = reinterpret_cast<datasketches::update_theta_sketch*>(dst->ptr);
+
+    datasketches::theta_union union_sketch = datasketches::theta_union::builder().build();
+    union_sketch.update(*src_sketch);
+    union_sketch.update(*dst_sketch_ptr);
+
+    // theta_union.get_result() returns a compact sketch, does not support updating, and
+    // is inconsistent with the initial underlying type of dst. This is different from
+    // the HLL sketch. Here use theta_union as the underlying type of dst.
+    ctx->Free(dst->ptr);
+    AllocBuffer(ctx, dst, sizeof(datasketches::theta_union));
+    if (UNLIKELY(dst->is_null)) {
+      DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+      return;
+    }
+    datasketches::theta_union* union_ptr =
+        reinterpret_cast<datasketches::theta_union*>(dst->ptr);
+    std::uninitialized_fill_n(union_ptr, 1, union_sketch);
+  }
+}
+
+BigIntVal AggregateFunctions::DsThetaFinalize(
+    FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK(src.len == sizeof(datasketches::update_theta_sketch)
+      or src.len == sizeof(datasketches::theta_union));
+  BigIntVal estimate;
+  if (src.len == sizeof(datasketches::update_theta_sketch)) {
+    auto sketch_ptr = reinterpret_cast<datasketches::theta_sketch*>(src.ptr);
+    estimate = sketch_ptr->get_estimate();
+  } else {
+    auto union_ptr = reinterpret_cast<datasketches::theta_union*>(src.ptr);
+    estimate = union_ptr->get_result().get_estimate();
+  }
+  ctx->Free(src.ptr);
+  return estimate;
+}
+
+StringVal AggregateFunctions::DsThetaFinalizeSketch(
+    FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK(src.len == sizeof(datasketches::update_theta_sketch)
+      or src.len == sizeof(datasketches::theta_union));
+  StringVal result;
+  if (src.len == sizeof(datasketches::update_theta_sketch)) {
+    auto sketch_ptr = reinterpret_cast<datasketches::theta_sketch*>(src.ptr);
+    result = SerializeDsThetaSketch(ctx, *sketch_ptr);
+  } else {
+    auto union_ptr = reinterpret_cast<datasketches::theta_union*>(src.ptr);
+    result = SerializeDsThetaUnion(ctx, *union_ptr);
+  }
   ctx->Free(src.ptr);
   return result;
 }
@@ -2899,6 +3048,23 @@ template void AggregateFunctions::DsHllUpdate(
 template void AggregateFunctions::DsHllUpdate(
     FunctionContext*, const DoubleVal&, StringVal*);
 template void AggregateFunctions::DsHllUpdate(
+    FunctionContext*, const DateVal&, StringVal*);
+
+template void AggregateFunctions::DsThetaUpdate(
+    FunctionContext*, const BooleanVal&, StringVal*);
+template void AggregateFunctions::DsThetaUpdate(
+    FunctionContext*, const TinyIntVal&, StringVal*);
+template void AggregateFunctions::DsThetaUpdate(
+    FunctionContext*, const SmallIntVal&, StringVal*);
+template void AggregateFunctions::DsThetaUpdate(
+    FunctionContext*, const IntVal&, StringVal*);
+template void AggregateFunctions::DsThetaUpdate(
+    FunctionContext*, const BigIntVal&, StringVal*);
+template void AggregateFunctions::DsThetaUpdate(
+    FunctionContext*, const FloatVal&, StringVal*);
+template void AggregateFunctions::DsThetaUpdate(
+    FunctionContext*, const DoubleVal&, StringVal*);
+template void AggregateFunctions::DsThetaUpdate(
     FunctionContext*, const DateVal&, StringVal*);
 
 template void AggregateFunctions::SampledNdvUpdate(
