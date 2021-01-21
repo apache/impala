@@ -20,6 +20,7 @@
 #include "exprs/datasketches-common.h"
 #include "gutil/strings/substitute.h"
 #include "thirdparty/datasketches/hll.hpp"
+#include "thirdparty/datasketches/theta_sketch.hpp"
 #include "thirdparty/datasketches/kll_sketch.hpp"
 #include "udf/udf-internal.h"
 
@@ -102,6 +103,23 @@ StringVal DataSketchesFunctions::DsHllStringify(FunctionContext* ctx,
   StringVal dst(ctx, str.size());
   memcpy(dst.ptr, str.c_str(), str.size());
   return dst;
+}
+
+BigIntVal DataSketchesFunctions::DsThetaEstimate(
+    FunctionContext* ctx, const StringVal& serialized_sketch) {
+  if (serialized_sketch.is_null || serialized_sketch.len == 0) return 0;
+  try {
+    // serialized_sketch may be a serialized of update_theta_sketch or
+    // compact_theta_sketch
+    auto sketch = datasketches::theta_sketch::deserialize(
+        (void*)serialized_sketch.ptr, serialized_sketch.len);
+    return sketch->get_estimate();
+  } catch (const std::exception&) {
+    // One reason of throwing from deserialization is that the input string is not a
+    // serialized sketch.
+    LogSketchDeserializationError(ctx);
+    return BigIntVal::null();
+  }
 }
 
 FloatVal DataSketchesFunctions::DsKllQuantile(FunctionContext* ctx,

@@ -64,6 +64,12 @@ public:
   static StringVal DsHllStringify(FunctionContext* ctx,
       const StringVal& serialized_sketch);
 
+  /// 'serialized_sketch' is expected as a serialized Apache DataSketches Theta sketch.
+  /// If it is not, then the query fails. Otherwise, returns the count(distinct) estimate
+  /// from the sketch.
+  static BigIntVal DsThetaEstimate(
+      FunctionContext* ctx, const StringVal& serialized_sketch);
+
   /// 'serialized_sketch' is expected as a serialized Apache DataSketches KLL sketch. If
   /// it is not, then the query fails. 'rank' is used to identify which item (estimate)
   /// to return from the sketched dataset. E.g. 0.1 means the item where 10% of the

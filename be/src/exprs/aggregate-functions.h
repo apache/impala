@@ -250,6 +250,15 @@ class AggregateFunctions {
   static void DsHllUnionMerge(FunctionContext*, const StringVal& src, StringVal* dst);
   static StringVal DsHllUnionFinalize(FunctionContext*, const StringVal& src);
 
+  /// These functions implement Apache DataSketches Theta support for sketching.
+  static void DsThetaInit(FunctionContext*, StringVal* slot);
+  template <typename T>
+  static void DsThetaUpdate(FunctionContext*, const T& src, StringVal* dst);
+  static StringVal DsThetaSerialize(FunctionContext*, const StringVal& src);
+  static void DsThetaMerge(FunctionContext*, const StringVal& src, StringVal* dst);
+  static BigIntVal DsThetaFinalize(FunctionContext*, const StringVal& src);
+  static StringVal DsThetaFinalizeSketch(FunctionContext*, const StringVal& src);
+
   /// These functions implement Apache DataSketches KLL support for sketching.
   static void DsKllInit(FunctionContext*, StringVal* slot);
   static void DsKllUpdate(FunctionContext*, const FloatVal& src, StringVal* dst);
