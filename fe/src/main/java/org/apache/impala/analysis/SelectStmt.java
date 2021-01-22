@@ -300,7 +300,6 @@ public class SelectStmt extends QueryStmt {
     private final Analyzer analyzer_;
     private List<Expr> groupingExprsCopy_;
     private List<FunctionCallExpr> aggExprs_;
-    private ExprSubstitutionMap ndvSmap_;
     private ExprSubstitutionMap countAllMap_;
 
     private SelectAnalyzer(Analyzer analyzer) {
@@ -326,7 +325,6 @@ public class SelectStmt extends QueryStmt {
         verifyAggSemantics();
         analyzeGroupingExprs();
         collectAggExprs();
-        rewriteCountDistinct();
         buildAggregateExprs();
         buildResultExprs();
         verifyAggregation();
@@ -859,34 +857,6 @@ public class SelectStmt extends QueryStmt {
       }
     }
 
-    private void rewriteCountDistinct() {
-      // Optionally rewrite all count(distinct <expr>) into equivalent NDV() calls.
-      if (!analyzer_.getQueryCtx().client_request.query_options.appx_count_distinct) {
-        return;
-      }
-      ndvSmap_ = new ExprSubstitutionMap();
-      for (FunctionCallExpr aggExpr: aggExprs_) {
-        if (!aggExpr.isDistinct()
-            || !aggExpr.getFnName().getFunction().equals("count")
-            || aggExpr.getParams().size() != 1) {
-          continue;
-        }
-        FunctionCallExpr ndvFnCall =
-            new FunctionCallExpr("ndv", aggExpr.getParams().exprs());
-        ndvFnCall.analyzeNoThrow(analyzer_);
-        Preconditions.checkState(ndvFnCall.getType().equals(aggExpr.getType()));
-        ndvSmap_.put(aggExpr, ndvFnCall);
-      }
-      // Replace all count(distinct <expr>) with NDV(<expr>).
-      List<Expr> substAggExprs = Expr.substituteList(aggExprs_,
-          ndvSmap_, analyzer_, false);
-      aggExprs_.clear();
-      for (Expr aggExpr: substAggExprs) {
-        Preconditions.checkState(aggExpr instanceof FunctionCallExpr);
-        aggExprs_.add((FunctionCallExpr) aggExpr);
-      }
-    }
-
     private void buildAggregateExprs() throws AnalysisException {
       // When DISTINCT aggregates are present, non-distinct (i.e. ALL) aggregates are
       // evaluated in two phases (see AggregateInfo for more details). In particular,
@@ -900,7 +870,6 @@ public class SelectStmt extends QueryStmt {
       // i) There is no GROUP-BY clause, and
       // ii) Other DISTINCT aggregates are present.
       countAllMap_ = createCountAllMap();
-      countAllMap_ = ExprSubstitutionMap.compose(ndvSmap_, countAllMap_, analyzer_);
       List<Expr> substitutedAggs =
           Expr.substituteList(aggExprs_, countAllMap_, analyzer_, false);
       aggExprs_.clear();

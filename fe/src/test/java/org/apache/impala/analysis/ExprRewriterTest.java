@@ -500,4 +500,90 @@ public class ExprRewriterTest extends AnalyzerTest {
     Assert.assertEquals("Bad sql with implicit casts from original query:\n" + query,
         expectedToSqlWithImplicitCasts, actual);
   }
+
+  @Test
+  public void TestToSqlWithAppxCountDistinctAndDefaultNdvs() {
+    TQueryOptions options = new TQueryOptions();
+    options.setEnable_expr_rewrites(true);
+
+    AnalysisContext ctx = createAnalysisCtx(options);
+
+    //----------------------
+    // Test query rewrites.
+    //----------------------
+    String countDistinctSql = "SELECT count(DISTINCT id) FROM functional.alltypes";
+
+    // No rewrite
+    assertToSql(ctx, countDistinctSql, countDistinctSql, countDistinctSql);
+
+    // Rewrite to ndv
+    options.setAppx_count_distinct(true);
+    assertToSql(createAnalysisCtx(options), countDistinctSql, countDistinctSql,
+            "SELECT ndv(id) FROM functional.alltypes");
+
+    // Rewrite to ndv(10)
+    options.setDefault_ndv_scale(10);
+    assertToSql(createAnalysisCtx(options), countDistinctSql, countDistinctSql,
+            "SELECT ndv(id, 10) FROM functional.alltypes");
+
+    String ndvSql = "SELECT ndv(id) FROM functional.alltypes";
+
+    // No rewrite
+    options.setDefault_ndv_scale(2);
+    assertToSql(createAnalysisCtx(options), ndvSql, ndvSql, ndvSql);
+
+    // Rewrite ndv scale
+    options.setDefault_ndv_scale(9);
+    assertToSql(createAnalysisCtx(options), ndvSql, ndvSql,
+            "SELECT ndv(id, 9) FROM functional.alltypes");
+
+    //-----------------------------------------------------------------------------------
+    // Test complex sql which has all 3 types of functions.
+    // NDV(<expr>) | NDV(<expr>, <scale>) | COUNT(DISTINCT <expr>)
+    //
+    // For coverage, we have these scenarios:
+    // CASE 1: DEFAULT_NDV_SCALE=5(same as the value in original sql),
+    //         APPX_COUNT_DISTINCT=True
+    // CASE 2: DEFAULT_NDV_SCALE=5, APPX_COUNT_DISTINCT=False
+    // CASE 3: DEFAULT_NDV_SCALE=9(different with original), APPX_COUNT_DISTINCT=True
+    // CASE 4: DEFAULT_NDV_SCALE=3, APPX_COUNT_DISTINCT=False
+    // CASE 5: DEFAULT_NDV_SCALE=2, APPX_COUNT_DISTINCT=True
+    // CASE 6: DEFAULT_NDV_SCALE=2, APPX_COUNT_DISTINCT=False
+    //-----------------------------------------------------------------------------------
+    String sql1 = "SELECT ndv(id), ndv(id, 5), count(DISTINCT id) FROM " +
+            "functional.alltypes";
+
+    // CASE 1
+    options.setDefault_ndv_scale(5).setAppx_count_distinct(true);
+    assertToSql(createAnalysisCtx(options), sql1, sql1,
+            "SELECT ndv(id, 5), ndv(id, 5), ndv(id, 5) FROM functional.alltypes");
+
+    // CASE 2
+    options.setDefault_ndv_scale(5).setAppx_count_distinct(false);
+    assertToSql(createAnalysisCtx(options), sql1, sql1,
+            "SELECT ndv(id, 5), ndv(id, 5), count(DISTINCT id)" +
+                    " FROM functional.alltypes");
+
+    // CASE 3
+    options.setDefault_ndv_scale(9).setAppx_count_distinct(true);
+    assertToSql(createAnalysisCtx(options), sql1, sql1,
+            "SELECT ndv(id, 9), ndv(id, 5), ndv(id, 9) FROM functional.alltypes");
+
+    // CASE 4
+    options.setDefault_ndv_scale(3).setAppx_count_distinct(false);
+    assertToSql(createAnalysisCtx(options), sql1, sql1,
+            "SELECT ndv(id, 3), ndv(id, 5), count(DISTINCT id) " +
+                    "FROM functional.alltypes");
+
+    // CASE 5
+    options.setDefault_ndv_scale(2).setAppx_count_distinct(true);
+    assertToSql(createAnalysisCtx(options), sql1, sql1,
+            "SELECT ndv(id), ndv(id, 5), ndv(id) FROM functional.alltypes");
+
+    // CASE 6
+    options.setDefault_ndv_scale(2).setAppx_count_distinct(false);
+    assertToSql(createAnalysisCtx(options), sql1, sql1,
+            "SELECT ndv(id), ndv(id, 5), count(DISTINCT id) FROM functional.alltypes");
+
+  }
 }

@@ -1063,6 +1063,19 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_analytic_rank_pushdown_threshold(val);
         break;
       }
+      case TImpalaQueryOptions::DEFAULT_NDV_SCALE: {
+        StringParser::ParseResult result;
+        const int32_t scale =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (value == nullptr || result != StringParser::PARSE_SUCCESS || scale < 1 ||
+            scale > 10) {
+          return Status(
+              Substitute("Invalid NDV scale: '$0'. "
+                         "Only integer value in [1, 10] is allowed.", value));
+        }
+        query_options->__set_default_ndv_scale(scale);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

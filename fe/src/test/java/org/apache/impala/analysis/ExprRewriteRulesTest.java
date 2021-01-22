@@ -177,6 +177,19 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     return RewritesOk(tableName, exprStr, Lists.newArrayList(rule), expectedExprStr);
   }
 
+  /**
+   * Given a list of `rule`, this function checks whether the rewritten <expr> is as
+   * expected.
+   *
+   * If no rule in `rules` is expected to be fired, callers should set expectedExprStr
+   * to null or "NULL". Otherwise, this function would throw an exception like
+   * "Rule xxx didn't fire"
+   *
+   * @param exprStr: origin expr
+   * @param rules: list of rewrite rules
+   * @param expectedExprStr: expected expr
+   * @return: Expr: rewritten expr
+   */
   public Expr RewritesOk(String exprStr, List<ExprRewriteRule> rules,
       String expectedExprStr)
       throws ImpalaException {
@@ -771,6 +784,53 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
     RewritesOk("if(bool_col is not distinct from bool_col, 1, 2)", rules, "1");
     RewritesOk("if(bool_col <=> bool_col, 1, 2)", rules, "1");
     RewritesOk("if(bool_col <=> NULL, 1, 2)", rules, null);
+  }
+
+  @Test
+  public void testCountDistinctToNdvRule() throws ImpalaException {
+    List<ExprRewriteRule> rules = Lists.newArrayList(
+            org.apache.impala.rewrite.CountDistinctToNdvRule.INSTANCE
+    );
+    session.options().setAppx_count_distinct(true);
+    RewritesOk("count(distinct bool_col)", rules, "ndv(bool_col)");
+  }
+
+  @Test
+  public void testDefaultNdvScaleRule() throws ImpalaException {
+    List<ExprRewriteRule> rules = Lists.newArrayList(
+            org.apache.impala.rewrite.DefaultNdvScaleRule.INSTANCE
+    );
+    session.options().setDefault_ndv_scale(10);
+    RewritesOk("ndv(bool_col)", rules, "ndv(bool_col, 10)");
+  }
+
+  @Test
+  public void testDefaultNdvScaleRuleNotSet() throws ImpalaException {
+    List<ExprRewriteRule> rules = Lists.newArrayList(
+            org.apache.impala.rewrite.DefaultNdvScaleRule.INSTANCE
+    );
+    RewritesOk("ndv(bool_col)", rules, null);
+  }
+
+  @Test
+  public void testDefaultNdvScaleRuleSetDefault() throws ImpalaException {
+    List<ExprRewriteRule> rules = Lists.newArrayList(
+            org.apache.impala.rewrite.DefaultNdvScaleRule.INSTANCE
+    );
+    session.options().setDefault_ndv_scale(2);
+    RewritesOk("ndv(bool_col)", rules, null);
+  }
+
+
+  @Test
+  public void testCountDistinctToNdvAndDefaultNdvScaleRule() throws ImpalaException {
+    List<ExprRewriteRule> rules = Lists.newArrayList(
+            org.apache.impala.rewrite.CountDistinctToNdvRule.INSTANCE,
+            org.apache.impala.rewrite.DefaultNdvScaleRule.INSTANCE
+    );
+    session.options().setAppx_count_distinct(true);
+    session.options().setDefault_ndv_scale(10);
+    RewritesOk("count(distinct bool_col)", rules, "ndv(bool_col, 10)");
   }
 
   @Test

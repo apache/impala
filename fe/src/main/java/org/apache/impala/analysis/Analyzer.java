@@ -81,6 +81,8 @@ import org.apache.impala.rewrite.NormalizeExprsRule;
 import org.apache.impala.rewrite.SimplifyCastStringToTimestamp;
 import org.apache.impala.rewrite.SimplifyConditionalsRule;
 import org.apache.impala.rewrite.SimplifyDistinctFromRule;
+import org.apache.impala.rewrite.CountDistinctToNdvRule;
+import org.apache.impala.rewrite.DefaultNdvScaleRule;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -282,7 +284,7 @@ public class Analyzer {
   /**
    * Check if the table supports the operation
    * @param table Table need to check
-   * @param operationType The type of operation
+   * @param type The type of operation
    * @throws AnalysisException If the table does not support the operation
    */
   public static void checkTableCapability(FeTable table, OperationType type)
@@ -526,6 +528,8 @@ public class Analyzer {
         rules.add(NormalizeCountStarRule.INSTANCE);
         rules.add(SimplifyDistinctFromRule.INSTANCE);
         rules.add(SimplifyCastStringToTimestamp.INSTANCE);
+        rules.add(CountDistinctToNdvRule.INSTANCE);
+        rules.add(DefaultNdvScaleRule.INSTANCE);
       }
       exprRewriter_ = new ExprRewriter(rules);
     }

@@ -652,6 +652,10 @@ enum TImpalaQueryOptions {
 
   // If true, show the min and max stats during show column stats.
   SHOW_COLUMN_MINMAX_STATS = 125
+
+  // Default NDV scale settings, make it easier to change scale in SQL function
+  // NDV(<expr>).
+  DEFAULT_NDV_SCALE = 126
 }
 
 // The summary of a DML statement.

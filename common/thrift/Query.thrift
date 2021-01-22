@@ -484,6 +484,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   126: optional bool show_column_minmax_stats = false;
+
+  // Default NDV scale
+  127: optional i32 default_ndv_scale = 2;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external
