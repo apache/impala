@@ -58,7 +58,8 @@ under the License.
         <li>
           If the <codeph>encoding_stats</codeph> is in the Parquet file, dictionary filtering
           uses it to determine if there are only dictionary encoded pages (i.e. there are no
-          data pages with an encoding other than PLAIN_DICTIONARY).
+          data pages with an encoding other than <codeph>RLE_DICTIONARY</codeph> or
+          <codeph>PLAIN_DICTIONARY</codeph>).
         </li>
 
         <li>
@@ -66,11 +67,12 @@ under the License.
           The column is purely dictionary encoded if both of the conditions satisfy:
           <ul>
             <li>
-              PLAIN_DICTIONARY is present.
+              <codeph>PLAIN_DICTIONARY</codeph> or <codeph>RLE_DICTIONARY</codeph> is present.
             </li>
 
             <li>
-              Only PLAIN_DICTIONARY, RLE, or BIT_PACKED encodings are listed.
+              Only <codeph>PLAIN_DICTIONARY</codeph>, <codeph>RLE_DICTIONARY</codeph>,
+              <codeph>RLE</codeph>, or <codeph>BIT_PACKED</codeph> encodings are listed.
             </li>
           </ul>
         </li>
