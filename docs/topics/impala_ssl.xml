@@ -166,8 +166,7 @@ under the License.
       <ul>
         <li>
           <p>
-            <codeph>tlsv1</codeph>: Allow any TLS version of 1.0 or higher. This setting is the
-            default when TLS/SSL is enabled.
+            <codeph>tlsv1</codeph>: Allow any TLS version of 1.0 or higher.
           </p>
         </li>
 
@@ -183,6 +182,10 @@ under the License.
           </p>
         </li>
       </ul>
+
+      <p>
+        The default version was changed from 'tlsv1' to 'tlsv1.2' starting in <keyword keyref="impala40"/>
+      </p>
 
       <p>
         Along with specifying the version, you can also specify the allowed set of TLS ciphers
