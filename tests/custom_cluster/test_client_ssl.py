@@ -49,11 +49,10 @@ elif _openssl_version_number < REQUIRED_MIN_OPENSSL_VERSION:
     ssl.OPENSSL_VERSION_NUMBER, REQUIRED_MIN_OPENSSL_VERSION)
 else:
   SKIP_SSL_MSG = None
+CERT_DIR = "%s/be/src/testutil" % os.environ['IMPALA_HOME']
 
 class TestClientSsl(CustomClusterTestSuite):
   """Tests for a client using SSL (particularly, the Impala Shell) """
-
-  CERT_DIR = "%s/be/src/testutil" % os.environ['IMPALA_HOME']
 
   SSL_ENABLED = "SSL is enabled"
   CONNECTED = "Connected to"
@@ -80,6 +79,13 @@ class TestClientSsl(CustomClusterTestSuite):
               "--hostname=localhost " # Required to match hostname in certificate
               % (CERT_DIR, CERT_DIR, CERT_DIR))
 
+  @classmethod
+  def setup_class(cls):
+    if sys.version_info < REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12:
+      pytest.skip("Python version does not support tls 1.2")
+    super(TestClientSsl, cls).setup_class()
+
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=SSL_ARGS, statestored_args=SSL_ARGS,
                                     catalogd_args=SSL_ARGS)
@@ -88,7 +94,7 @@ class TestClientSsl(CustomClusterTestSuite):
     self._verify_negative_cases(vector)
     # TODO: This is really two different tests, but the custom cluster takes too long to
     # start. Make it so that custom clusters can be specified across test suites.
-    self._validate_positive_cases(vector, "%s/server-cert.pem" % self.CERT_DIR)
+    self._validate_positive_cases(vector, "%s/server-cert.pem" % CERT_DIR)
 
     # No certificate checking: will accept any cert.
     self._validate_positive_cases(vector, )
@@ -160,36 +166,26 @@ class TestClientSsl(CustomClusterTestSuite):
                                     statestored_args=TLS_ECDH_ARGS,
                                     catalogd_args=TLS_ECDH_ARGS)
   @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
-  @pytest.mark.skipif(sys.version_info < REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12,
-      reason="Working around IMPALA-7628. TODO: is the right workaround?")
   def test_tls_ecdh(self, vector):
     self._verify_negative_cases(vector)
-    self._validate_positive_cases(vector, "%s/server-cert.pem" % self.CERT_DIR)
+    self._validate_positive_cases(vector, "%s/server-cert.pem" % CERT_DIR)
     self._verify_ssl_webserver()
 
-  # Test that the shell can connect to a TLS1.2 only cluster, and for good measure
-  # restrict the cipher suite to just one choice.
-  TLS_V12_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
+  # Sanity check that the shell can still connect when we set a min ssl version of 1.0
+  TLS_V10_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
                   "--ssl_server_certificate=%s/server-cert.pem "
                   "--ssl_private_key=%s/server-key.pem "
                   "--hostname=localhost " # Required to match hostname in certificate"
-                  "--ssl_minimum_version=tlsv1.2 "
-                  "--ssl_cipher_list=AES128-GCM-SHA256 "
+                  "--ssl_minimum_version=tlsv1"
                   % (CERT_DIR, CERT_DIR, CERT_DIR))
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(impalad_args=TLS_V12_ARGS,
-                                    statestored_args=TLS_V12_ARGS,
-                                    catalogd_args=TLS_V12_ARGS)
+  @CustomClusterTestSuite.with_args(impalad_args=TLS_V10_ARGS,
+                                    statestored_args=TLS_V10_ARGS,
+                                    catalogd_args=TLS_V10_ARGS)
   @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
-  def test_tls_v12(self, vector):
-    if sys.version_info < REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12:
-      result = run_impala_shell_cmd_no_expect(
-          vector, ["--ssl", "-q", "select 1 + 2"], wait_until_connected=False)
-      assert "Warning: TLSv1.2 is not supported for Python < 2.7.9" in result.stderr, \
-          result.stderr
-    else:
-      self._validate_positive_cases(vector, "%s/server-cert.pem" % self.CERT_DIR)
+  def test_tls_v10(self, vector):
+    self._validate_positive_cases(vector, "%s/server-cert.pem" % CERT_DIR)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=SSL_WILDCARD_ARGS,
@@ -203,7 +199,7 @@ class TestClientSsl(CustomClusterTestSuite):
     """
     self._verify_negative_cases(vector)
 
-    self._validate_positive_cases(vector, "%s/wildcardCA.pem" % self.CERT_DIR)
+    self._validate_positive_cases(vector, "%s/wildcardCA.pem" % CERT_DIR)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(impalad_args=SSL_WILDCARD_SAN_ARGS,
@@ -216,7 +212,7 @@ class TestClientSsl(CustomClusterTestSuite):
 
     # This block of code is the same as _validate_positive_cases() but we want to check
     # if retrieving the SAN is supported first.
-    args = ["--ssl", "-q", "select 1 + 2", "--ca_cert=%s/wildcardCA.pem" % self.CERT_DIR]
+    args = ["--ssl", "-q", "select 1 + 2", "--ca_cert=%s/wildcardCA.pem" % CERT_DIR]
     result = run_impala_shell_cmd_no_expect(vector, args)
     if self.SAN_UNSUPPORTED_ERROR in result.stderr:
       pytest.xfail("Running with a RHEL/Python combination that has a bug where Python "
@@ -225,13 +221,13 @@ class TestClientSsl(CustomClusterTestSuite):
 
     self._verify_negative_cases(vector)
 
-    self._validate_positive_cases(vector, "%s/wildcardCA.pem" % self.CERT_DIR)
+    self._validate_positive_cases(vector, "%s/wildcardCA.pem" % CERT_DIR)
 
   def _verify_negative_cases(self, vector):
     # Expect the shell to not start successfully if we point --ca_cert to an incorrect
     # certificate.
     args = ["--ssl", "-q", "select 1 + 2",
-            "--ca_cert=%s/incorrect-commonname-cert.pem" % self.CERT_DIR]
+            "--ca_cert=%s/incorrect-commonname-cert.pem" % CERT_DIR]
     run_impala_shell_cmd(vector, args, expect_success=False)
 
     # Expect the shell to not start successfully if we don't specify the --ssl option
@@ -255,5 +251,32 @@ class TestClientSsl(CustomClusterTestSuite):
   def _verify_ssl_webserver(self):
     for port in ["25000", "25010", "25020"]:
       url = "https://localhost:%s" % port
-      response = requests.get(url, verify="%s/server-cert.pem" % self.CERT_DIR)
+      response = requests.get(url, verify="%s/server-cert.pem" % CERT_DIR)
       assert response.status_code == requests.codes.ok, url
+
+
+# Run when the python version is too low to support TLS 1.2, to check that impala-shell
+# returns the expected warning.
+class TestClientSslUnsupported(CustomClusterTestSuite):
+  @classmethod
+  def setup_class(cls):
+    if sys.version_info >= REQUIRED_MIN_PYTHON_VERSION_FOR_TLSV12:
+      pytest.skip("This test is only run with older versions of python")
+    super(TestClientSslUnsupported, cls).setup_class()
+
+  SSL_ARGS = ("--ssl_client_ca_certificate=%s/server-cert.pem "
+              "--ssl_server_certificate=%s/server-cert.pem "
+              "--ssl_private_key=%s/server-key.pem "
+              "--hostname=localhost "  # Required to match hostname in certificate
+              % (CERT_DIR, CERT_DIR, CERT_DIR))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(impalad_args=SSL_ARGS,
+                                    statestored_args=SSL_ARGS,
+                                    catalogd_args=SSL_ARGS)
+  @pytest.mark.skipif(SKIP_SSL_MSG is not None, reason=SKIP_SSL_MSG)
+  def test_shell_warning(self, vector):
+    result = run_impala_shell_cmd_no_expect(
+      vector, ["--ssl", "-q", "select 1 + 2"], wait_until_connected=False)
+    assert "Warning: TLSv1.2 is not supported for Python < 2.7.9" in result.stderr, \
+      result.stderr
