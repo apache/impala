@@ -322,3 +322,21 @@ STORED AS ICEBERG
 ---- CATCH
 AnalysisException: Unsupported column options for file format 'ICEBERG': 'id INT PRIMARY KEY'
 ====
+---- QUERY
+# PARTITIONED BY and PARTITION BY SPEC is not allowed in same statement.
+CREATE TABLE iceberg_part_spec_part (i INT)
+PARTITIONED BY (p INT)
+PARTITION BY SPEC (i TRUNCATE 10)
+STORED AS ICEBERG;
+---- CATCH
+Syntax error in line
+====
+---- QUERY
+# PARTITION BY SPEC and PARTITIONED BY is not allowed in same statement.
+CREATE TABLE iceberg_part_part_spec (i INT)
+PARTITION BY SPEC (i TRUNCATE 10)
+PARTITIONED BY (p INT)
+STORED AS ICEBERG;
+---- CATCH
+Syntax error in line
+====

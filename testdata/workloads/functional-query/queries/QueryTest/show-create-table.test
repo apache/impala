@@ -789,3 +789,22 @@ LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='parquet',
 'iceberg.catalog'='hadoop.tables')
 ====
+---- CREATE_TABLE
+CREATE TABLE iceberg_old_style_partitions (i INT)
+PARTITIONED BY (p STRING, d DATE)
+STORED AS ICEBERG
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_old_style_partitions (
+  i INT NULL,
+  p STRING NULL,
+  d DATE NULL
+)
+PARTITION BY SPEC (
+  p IDENTITY,
+  d IDENTITY
+)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='parquet',
+'iceberg.catalog'='hive.catalog', 'table_type'='ICEBERG')
+====
