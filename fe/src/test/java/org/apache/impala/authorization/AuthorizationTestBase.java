@@ -648,8 +648,8 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
   }
 
   protected static String rowFilterError(String object) {
-    return "Impala does not support row filtering yet. Row filtering is enabled on " +
-        "table: " + object;
+    return "Row filtering is disabled by --enable_row_filtering flag. Can't access " +
+        "table " + object + " that has row filtering policy.";
   }
 
   protected ScalarFunction addFunction(String db, String fnName, List<Type> argTypes,

@@ -74,5 +74,5 @@ public interface AuthorizationFactory {
    * Returns whether the authorization implementation supports column masking and row
    * filtering. Currently, only Ranger implementation supports these.
    */
-  boolean supportsColumnMasking();
+  boolean supportsTableMasking();
 }

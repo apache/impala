@@ -1,0 +1,302 @@
+====
+---- QUERY
+# Row-filtering policy keeps rows with "id % 2 = 0"
+select * from functional.alltypestiny
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
+6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+# Row-filtering policy keeps rows with
+# "(string_col = '0' and id <= 0) or (string_col = '1' and bool_col = true and id > 90)"
+select id, string_col, bool_col, year, month from functional.alltypessmall
+---- RESULTS
+0,'0',true,2009,1
+96,'1',true,2009,4
+---- TYPES
+INT,STRING,BOOLEAN,INT,INT
+====
+---- QUERY
+# Test joins on the above two tables.
+select t.id, t.string_col, t.bool_col, t.year, t.month
+from functional.alltypestiny t join functional.alltypessmall s using (id)
+---- RESULTS
+0,'0',true,2009,1
+---- TYPES
+INT,STRING,BOOLEAN,INT,INT
+====
+---- QUERY
+# Test joins on the above two tables.
+select t.id, t.string_col, t.bool_col, t.year, t.month, s.id
+from functional.alltypestiny t left join functional.alltypessmall s using (id)
+---- RESULTS
+0,'0',true,2009,1,0
+2,'0',true,2009,2,NULL
+4,'0',true,2009,3,NULL
+6,'0',true,2009,4,NULL
+---- TYPES
+INT,STRING,BOOLEAN,INT,INT,INT
+====
+---- QUERY
+# Test joins on the above two tables.
+select t.id, s.id, s.string_col, s.bool_col, s.year, s.month
+from functional.alltypestiny t right join functional.alltypessmall s using (id)
+---- RESULTS
+0,0,'0',true,2009,1
+NULL,96,'1',true,2009,4
+---- TYPES
+INT,INT,STRING,BOOLEAN,INT,INT
+====
+---- QUERY
+# Row-filtering policy keeps rows with "year = 2009 and month = 1". Test on aggregate.
+select count(*) from functional.alltypes
+---- RESULTS
+310
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test on local views. functional.alltypestiny has row filter "id % 2 = 0".
+with v as (select id, bool_col, string_col from functional.alltypestiny)
+select * from v
+---- RESULTS
+0,true,'0'
+2,true,'0'
+4,true,'0'
+6,true,'0'
+---- TYPES
+INT,BOOLEAN,STRING
+====
+---- QUERY
+# Test on local views. Correctly ignore masking on local view names so no row filters are
+# applied here.
+use functional;
+with alltypestiny as (select 1 as id)
+select * from alltypestiny
+---- RESULTS
+1
+====
+---- QUERY
+# Test on local views. Correctly ignore masking on local view names so row filter of
+# functional.alltypessmall won't be applied here, and row filter of alltypestiny is
+# correctly applied.
+use functional;
+with alltypessmall as (select 1 as id)
+select alltypessmall.id from alltypestiny join alltypessmall using (id)
+---- RESULTS
+====
+---- QUERY
+# Negative test for illegal row filter that references a non-existing column 'test_id',
+# which results in AnalysisException.
+select * from functional_parquet.alltypes limit 10
+---- CATCH
+AnalysisException: Could not resolve column/field reference: 'test_id'
+====
+---- QUERY
+# Negative test for illegal row filter "100 id = int_col" which has syntax error.
+select * from functional_parquet.alltypessmall limit 10
+---- CATCH
+ParseException: Syntax error in line 1
+====
+---- QUERY
+# Row-filtering policy on 'functional_parquet.alltypes' references a nonexisting column
+# 'test_id' which exists in 'functional.jointbl'. But it won't be resolved as corelated
+# reference and will still hit AnalysisException.
+select * from functional.jointbl
+where exists(select * from functional_parquet.alltypes);
+---- CATCH
+AnalysisException: Could not resolve column/field reference: 'test_id'
+====
+---- QUERY
+# Row-filtering policy on 'functional_parquet.alltypes' references a nonexisting column
+# 'test_id' which exists in 'functional.jointbl'. But it won't be resolved as corelated
+# reference and will still hit AnalysisException.
+select * from functional.jointbl, functional_parquet.alltypes limit 10
+---- CATCH
+AnalysisException: Could not resolve column/field reference: 'test_id'
+====
+---- QUERY
+# Row-filtering policy on the view keeps rows with "id < 5". Row-filtering policy on the
+# underlying table 'alltypes' keeps rows with "year = 2009 and month = 1".
+select id, bool_col, int_col, string_col, date_string_col, year, month
+from functional.alltypes_view where id % 2 = 0
+---- RESULTS
+0,true,0,'0','01/01/09',2009,1
+2,true,2,'2','01/01/09',2009,1
+4,true,4,'4','01/01/09',2009,1
+---- TYPES
+INT,BOOLEAN,INT,STRING,STRING,INT,INT
+====
+---- QUERY
+# The query has no results since the where-clause is the opposite of the row-filter expr.
+select * from functional.alltypes_view where id >= 5
+---- RESULTS
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+# Test local view using views. Row filter "id < 5" is applied on alltypes_view. Row filter
+# "year = 2009 and month = 1" is applied on alltypes inside alltypes_view.
+with v as (
+  select id, bool_col, int_col, string_col, date_string_col, year, month
+  from functional.alltypes_view where id % 2 = 0
+) select * from v where id != 0
+---- RESULTS
+2,true,2,'2','01/01/09',2009,1
+4,true,4,'4','01/01/09',2009,1
+---- TYPES
+INT,BOOLEAN,INT,STRING,STRING,INT,INT
+====
+---- QUERY
+# Test on WITH clause and views. functional.alltypestiny has row filter "id % 2 = 0".
+# functional.alltypessmall has row filter
+# "(string_col = '0' and id <= 0) or (string_col = '1' and bool_col = true and id > 90)".
+# functional.alltypes_view has row filter "id < 5".
+# functional.alltypes used in alltypes_view has row filter "year = 2009 and month = 1".
+with v1 as (select id, bool_col, string_col from functional.alltypestiny),
+     v2 as (select id, bool_col, string_col from functional.alltypessmall)
+select v.id, v.bool_col, v.string_col from v1, v2, functional.alltypes_view v
+where v1.id = v2.id and v2.id = v.id
+---- RESULTS
+0,true,'0'
+---- TYPES
+INT,BOOLEAN,STRING
+====
+---- QUERY
+# Test on CTAS
+create table $UNIQUE_DB.masked_tbl as select * from functional.alltypestiny;
+select * from $UNIQUE_DB.masked_tbl;
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
+6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+# Test on SELECT used in INSERT statement
+create table $UNIQUE_DB.masked_tbl2 like functional.alltypestiny stored as textfile;
+insert into $UNIQUE_DB.masked_tbl2 partition(year, month) select * from functional.alltypestiny;
+select * from $UNIQUE_DB.masked_tbl2;
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
+6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+# Test on CreateView. Should not add row filters when used in sql generations.
+create view $UNIQUE_DB.masked_view as select * from functional.alltypestiny;
+show create view $UNIQUE_DB.masked_view;
+---- RESULTS
+'CREATE VIEW $UNIQUE_DB.masked_view AS\nSELECT * FROM functional.alltypestiny'
+====
+---- QUERY
+# The row filter on underlying table 'functional.alltypestiny' still take place.
+select * from $UNIQUE_DB.masked_view
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
+4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
+6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+# Test on AlterView. Should not add row filters when used in sql generations.
+alter view $UNIQUE_DB.masked_view as select id from functional.alltypestiny;
+show create view $UNIQUE_DB.masked_view;
+---- RESULTS
+'CREATE VIEW $UNIQUE_DB.masked_view AS\nSELECT id FROM functional.alltypestiny'
+====
+---- QUERY
+# The row filter on underlying table 'functional.alltypestiny' still take place.
+select * from $UNIQUE_DB.masked_view
+---- RESULTS
+0
+2
+4
+6
+---- TYPES
+INT
+====
+---- QUERY
+# TODO(IMPALA-10483): support using subquery on the same table as the row-filter expression
+select count(*) from functional.alltypesagg
+---- RESULTS
+---- CATCH
+AnalysisException: Column-masking/Row-filtering expressions using subqueries are not
+ supported (IMPALA-10483). Table(s) in the subquery: [functional.alltypesagg]
+====
+---- QUERY
+# TODO(IMPALA-10483): support using subquery on other tables as the row-filter expression
+select count(*) from functional_parquet.alltypesagg
+---- CATCH
+AnalysisException: Column-masking/Row-filtering expressions using subqueries are not
+ supported (IMPALA-10483). Table(s) in the subquery: [functional.alltypestiny]
+====
+---- QUERY
+# Row-filtering policy keeps rows with "nested_struct.a is not NULL"
+select id, nested_struct.* from functional_parquet.complextypestbl
+---- RESULTS
+1,1
+7,7
+8,-1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# Row-filtering policy keeps rows with "nested_struct.a is not NULL"
+select id, nested_struct.a, arr.item
+from functional_parquet.complextypestbl t, t.nested_struct.b arr
+---- RESULTS
+1,1,1
+7,7,2
+7,7,3
+7,7,NULL
+8,-1,-1
+---- TYPES
+BIGINT,INT,INT
+====
+---- QUERY
+# Row-filtering policy keeps rows with "nested_struct.a is not NULL"
+select id, b.item from functional_parquet.complextypestbl t, t.nested_struct.b
+---- RESULTS
+1,1
+7,2
+7,3
+7,NULL
+8,-1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# TODO: Row-filtering policy should keep rows with "nested_struct.a is not NULL" on base
+# table 'complextypestbl'. But now we can't apply it since the collection column 'b' is
+# non-relative. Fails these queries until IMPALA-10484 is resolved. See the next query
+# for desired results.
+select * from functional_parquet.complextypestbl.nested_struct.b
+---- CATCH
+AnalysisException: Using non-relative collection column nested_struct.b of table
+ functional_parquet.complextypestbl is not supported since there are row-filtering
+ policies on this table (IMPALA-10484). Rewrite query to use relative reference.
+====
+---- QUERY
+# The above query should be manually rewritten to this until IMPALA-10484 is resolved.
+select b.item from functional_parquet.complextypestbl t, t.nested_struct.b
+---- RESULTS
+1
+2
+3
+NULL
+-1
+---- TYPES
+INT
+====

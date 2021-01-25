@@ -2824,13 +2824,15 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
   }
 
   /**
-   * Column Masking is disabled by default. Test the error messages.
+   * Test the error messages when Column Masking is disabled.
    */
   @Test
   public void testColumnMaskEnabled() throws ImpalaException {
     String policyName = "col_mask";
     for (String tableName: new String[]{"alltypes", "alltypes_view"}) {
       BackendConfig.INSTANCE.setColumnMaskingEnabled(false);
+      // Row filtering depends on column masking. So we should disable it as well.
+      BackendConfig.INSTANCE.setRowFilteringEnabled(false);
       String json = String.format("{\n" +
               "  \"name\": \"%s\",\n" +
               "  \"policyType\": 1,\n" +
@@ -2942,14 +2944,19 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       } finally {
         deleteRangerPolicy(policyName);
         BackendConfig.INSTANCE.setColumnMaskingEnabled(true);
+        BackendConfig.INSTANCE.setRowFilteringEnabled(true);
       }
     }
   }
 
+  /**
+   * Test the error messages when Row Filtering is disabled.
+   */
   @Test
   public void testRowFilterEnabled() throws ImpalaException {
     String policyName = "row_filter";
     for (String tableName: new String[]{"alltypes", "alltypes_view"}) {
+      BackendConfig.INSTANCE.setRowFilteringEnabled(false);
       String json = String.format("{\n" +
           "  \"name\": \"%s\",\n" +
           "  \"policyType\": 2,\n" +
@@ -3048,6 +3055,7 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
                 onServer(TPrivilegeLevel.ALL));
       } finally {
         deleteRangerPolicy(policyName);
+        BackendConfig.INSTANCE.setRowFilteringEnabled(true);
       }
     }
   }

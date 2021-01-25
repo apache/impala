@@ -191,4 +191,6 @@ struct TBackendGflags {
   83: required bool saml2_ee_test_mode
 
   84: required string scratch_dirs
+
+  85: required bool enable_row_filtering
 }

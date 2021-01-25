@@ -53,23 +53,26 @@ public class RangerAuthorizationContext extends AuthorizationContext {
   public RangerBufferAuditHandler getAuditHandler() { return auditHandler_; }
 
   /**
-   * We stash the List of AuthzAuditEvent's in a Map after the analysis of the query and
-   * thus the AuthzAuditEvent's in the Map are deduplicated. At this point, there are
-   * only column masking-related events on the List. We will add back the deduplicated
-   * events by applyDeduplicatedAuthzEvents() only if the authorization of the query is
-   * successful. Thus, the relative order between the column masking-related events and
-   * other events on the List of auditHandler_.getAuthzEvents() is changed afterwards and
-   * only those column masking-related events are deduplicated.
+   * Stash and deduplicate the audit events produced by table masking (Column-masking /
+   * Row-filtering) which are performed during the analyze phase. Called at the end of
+   * analyzing. These stashed events will be added back after the query pass the
+   * authorization phase. Note that normal events (select, insert, drop, etc.) are
+   * produced in the authorization phase. Stashing table masking events avoids exposing
+   * them when the query fails authorization. Refer to IMPALA-9597 for further details.
    */
-  public void stashAuditEvents(RangerImpalaPlugin plugin) {
-    Set<String> unfilteredMaskNames = plugin.getUnfilteredMaskNames(
+  public void stashTableMaskingAuditEvents(RangerImpalaPlugin plugin) {
+    // Collect all the column masking types except "MASK_NONE", because MASK_NONE events
+    // have been removed in RangerAuthorizationChecker#removeStaleAudits().
+    Set<String> legalEventTypes = plugin.getUnfilteredMaskNames(
         Arrays.asList("MASK_NONE"));
+    // Row filter policies produce ROW_FILTER events.
+    legalEventTypes.add(RangerBufferAuditHandler.ACCESS_TYPE_ROWFILTER.toUpperCase());
     for (AuthzAuditEvent event : auditHandler_.getAuthzEvents()) {
-      // We assume that all the logged events until now are column masking-related. Since
-      // we remove those AuthzAuditEvent's corresponding to the "Unmasked" policy of type
-      // "MASK_NONE", we exclude this type of mask.
-      Preconditions.checkState(unfilteredMaskNames
-          .contains(event.getAccessType().toUpperCase()));
+      // We assume that all the logged events until now are table masking-related.
+      Preconditions.checkState(legalEventTypes
+          .contains(event.getAccessType().toUpperCase()),
+          "Illegal event access type: %s. Should be one of %s. Event details: %s",
+          event.getAccessType(), legalEventTypes, event);
 
       // event.getEventKey() is the concatenation of the following fields in an
       // AuthzAuditEvent: 'user', 'accessType', 'resourcePath', 'resourceType', 'action',

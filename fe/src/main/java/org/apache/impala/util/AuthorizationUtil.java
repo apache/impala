@@ -88,6 +88,10 @@ public class AuthorizationUtil {
       throw new InternalException(
           "Unable to instantiate authorization provider: " + authzFactoryClassName, e);
     }
+    if (!beCfg.isColumnMaskingEnabled() && beCfg.isRowFilteringEnabled()) {
+      throw new InternalException("Unable to enable row-filtering without column-masking."
+          + " Please set --enable_column_masking to true as well");
+    }
     final AuthorizationConfig authzConfig = authzFactory.getAuthorizationConfig();
 
     if (!authzConfig.isEnabled()) {

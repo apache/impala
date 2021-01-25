@@ -488,6 +488,148 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     }
   }
 
+  @Test
+  public void testAuditsForRowFiltering() throws ImpalaException {
+    // Two row filter policies will be added. The first one affects 'user_' and keeps rows
+    // of "functional.alltypestiny" satisfied "id=0". The second one affects user
+    // "non_owner_2" and keeps rows of "functional.alltypes" satisfied "id=1".
+    String databaseName = "functional";
+    String tableNames[] = {"alltypestiny", "alltypes"};
+    String policyNames[] = {"tiny_filter", "all_filter"};
+    String users[] = {user_.getShortName(), "non_owner_2"};
+    String filters[] = {"id=0", "id=1"};
+
+    List<String> policies = new ArrayList<>();
+    for (int i = 0; i < filters.length; ++i) {
+      String json = String.format("{\n" +
+          "  \"name\": \"%s\",\n" +
+          "  \"policyType\": 2,\n" +
+          "  \"serviceType\": \"%s\",\n" +
+          "  \"service\": \"%s\",\n" +
+          "  \"resources\": {\n" +
+          "    \"database\": {\n" +
+          "      \"values\": [\"%s\"],\n" +
+          "      \"isExcludes\": false,\n" +
+          "      \"isRecursive\": false\n" +
+          "    },\n" +
+          "    \"table\": {\n" +
+          "      \"values\": [\"%s\"],\n" +
+          "      \"isExcludes\": false,\n" +
+          "      \"isRecursive\": false\n" +
+          "    }\n" +
+          "  },\n" +
+          "  \"rowFilterPolicyItems\": [\n" +
+          "    {\n" +
+          "      \"accesses\": [\n" +
+          "        {\n" +
+          "          \"type\": \"select\",\n" +
+          "          \"isAllowed\": true\n" +
+          "        }\n" +
+          "      ],\n" +
+          "      \"users\": [\"%s\"],\n" +
+          "      \"rowFilterInfo\": {\"filterExpr\": \"%s\"}\n" +
+          "    }\n" +
+          "  ]\n" +
+          "}", policyNames[i], RANGER_SERVICE_TYPE, RANGER_SERVICE_NAME, databaseName,
+          tableNames[i], users[i], filters[i]);
+      policies.add(json);
+    }
+    try {
+      for (int i = 0; i < filters.length; ++i) {
+        String policyName = policyNames[i];
+        String json = policies.get(i);
+        createRangerPolicy(policyName, json);
+      }
+
+      authzOk(events -> {
+        assertEquals(15, events.size());
+        assertEquals("select * from functional.alltypestiny",
+            events.get(0).getRequestData());
+        assertEventEquals("@table", "select", "functional/alltypestiny", 1,
+            events.get(0));
+        assertEventEquals("@column", "select", "functional/alltypestiny/id", 1,
+            events.get(1));
+        assertEventEquals("@column", "select", "functional/alltypestiny/bool_col", 1,
+            events.get(2));
+        assertEventEquals("@column", "select", "functional/alltypestiny/tinyint_col", 1,
+            events.get(3));
+        assertEventEquals("@column", "select", "functional/alltypestiny/smallint_col", 1,
+            events.get(4));
+        assertEventEquals("@column", "select", "functional/alltypestiny/int_col", 1,
+            events.get(5));
+        assertEventEquals("@column", "select", "functional/alltypestiny/bigint_col", 1,
+            events.get(6));
+        assertEventEquals("@column", "select", "functional/alltypestiny/float_col", 1,
+            events.get(7));
+        assertEventEquals("@column", "select", "functional/alltypestiny/double_col", 1,
+            events.get(8));
+        assertEventEquals("@column", "select",
+            "functional/alltypestiny/date_string_col", 1, events.get(9));
+        assertEventEquals("@column", "select", "functional/alltypestiny/string_col", 1,
+            events.get(10));
+        assertEventEquals("@column", "select", "functional/alltypestiny/timestamp_col", 1,
+            events.get(11));
+        assertEventEquals("@column", "select", "functional/alltypestiny/year", 1,
+            events.get(12));
+        assertEventEquals("@column", "select", "functional/alltypestiny/month", 1,
+            events.get(13));
+        assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
+            events.get(14));
+      }, "select * from functional.alltypestiny", onTable("functional", "alltypestiny",
+          TPrivilegeLevel.SELECT));
+
+      authzOk(events -> {
+        assertEquals(14, events.size());
+        assertEquals("select * from functional.alltypes",
+            events.get(0).getRequestData());
+        assertEventEquals("@table", "select", "functional/alltypes", 1,
+            events.get(0));
+        assertEventEquals("@column", "select", "functional/alltypes/id", 1,
+            events.get(1));
+        assertEventEquals("@column", "select", "functional/alltypes/bool_col", 1,
+            events.get(2));
+        assertEventEquals("@column", "select", "functional/alltypes/tinyint_col", 1,
+            events.get(3));
+        assertEventEquals("@column", "select", "functional/alltypes/smallint_col", 1,
+            events.get(4));
+        assertEventEquals("@column", "select", "functional/alltypes/int_col", 1,
+            events.get(5));
+        assertEventEquals("@column", "select", "functional/alltypes/bigint_col", 1,
+            events.get(6));
+        assertEventEquals("@column", "select", "functional/alltypes/float_col", 1,
+            events.get(7));
+        assertEventEquals("@column", "select", "functional/alltypes/double_col", 1,
+            events.get(8));
+        assertEventEquals("@column", "select", "functional/alltypes/date_string_col", 1,
+            events.get(9));
+        assertEventEquals("@column", "select", "functional/alltypes/string_col", 1,
+            events.get(10));
+        assertEventEquals("@column", "select", "functional/alltypes/timestamp_col", 1,
+            events.get(11));
+        assertEventEquals("@column", "select", "functional/alltypes/year", 1,
+            events.get(12));
+        assertEventEquals("@column", "select", "functional/alltypes/month", 1,
+            events.get(13));
+      }, "select * from functional.alltypes", onTable("functional", "alltypes",
+          TPrivilegeLevel.SELECT));
+
+      // When fails with not enough privileges, no audit logs for row filtering is
+      // generated. Only the event of the first column (i.e. id) that failed the
+      // authorization will be logged.
+      authzError(events -> {assertEquals(1, events.size());
+        assertEquals("select * from functional.alltypestiny",
+            events.get(0).getRequestData());
+        assertEventEquals("@column", "select", "functional/alltypestiny/id", 0,
+            events.get(0));
+      },"select * from functional.alltypestiny", onTable("functional", "alltypestiny"));
+    } finally {
+      for (int i = 0; i < filters.length; ++i) {
+        String policyName = policyNames[i];
+        deleteRangerPolicy(policyName);
+      }
+    }
+  }
+
   private void authzOk(Consumer<List<AuthzAuditEvent>> resultChecker, String stmt,
       TPrivilege[]... privileges) throws ImpalaException {
     authorize(stmt).ok(privileges);

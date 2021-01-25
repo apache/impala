@@ -206,7 +206,12 @@ public class BackendConfig {
     backendCfg_.setEnable_column_masking(columnMaskingEnabled);
   }
 
+  public void setRowFilteringEnabled(boolean rowFilteringEnabled) {
+    backendCfg_.setEnable_row_filtering(rowFilteringEnabled);
+  }
+
   public boolean isColumnMaskingEnabled() { return backendCfg_.enable_column_masking; }
+  public boolean isRowFilteringEnabled() { return backendCfg_.enable_row_filtering; }
 
   public boolean isCompactCatalogTopic() { return backendCfg_.compact_catalog_topic; }
 
