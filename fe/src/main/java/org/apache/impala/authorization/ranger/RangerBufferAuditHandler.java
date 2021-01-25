@@ -20,6 +20,7 @@ package org.apache.impala.authorization.ranger;
 import com.google.common.base.Preconditions;
 import org.apache.ranger.audit.model.AuthzAuditEvent;
 import org.apache.ranger.plugin.audit.RangerDefaultAuditHandler;
+import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
 import org.apache.ranger.plugin.policyengine.RangerAccessResource;
 import org.apache.ranger.plugin.policyengine.RangerAccessResult;
@@ -44,6 +45,7 @@ import java.util.Optional;
 public class RangerBufferAuditHandler implements RangerAccessResultProcessor {
   private static final Logger LOG = LoggerFactory.getLogger(
       RangerBufferAuditHandler.class);
+  public static final String ACCESS_TYPE_ROWFILTER = "row_filter";
   private final RangerDefaultAuditHandler auditHandler_ = new RangerDefaultAuditHandler();
   private final List<AuthzAuditEvent> auditEvents_ = new ArrayList<>();
   private final String sqlStmt_; // The SQL statement to be logged
@@ -128,7 +130,15 @@ public class RangerBufferAuditHandler implements RangerAccessResultProcessor {
     String resourceType = resource != null ? resource.getLeafName() : null;
 
     AuthzAuditEvent auditEvent = auditHandler_.getAuthzEvents(result);
-    auditEvent.setAccessType(request.getAccessType().toUpperCase());
+    int policyType = result.getPolicyType();
+    if (policyType == RangerPolicy.POLICY_TYPE_DATAMASK && result.isMaskEnabled()) {
+      auditEvent.setAccessType(result.getMaskType().toLowerCase());
+    } else if (policyType == RangerPolicy.POLICY_TYPE_ROWFILTER) {
+      auditEvent.setAccessType(ACCESS_TYPE_ROWFILTER);
+    } else {
+      // TODO: Whether we should use lowercase or uppercase accessType?
+      auditEvent.setAccessType(request.getAccessType().toUpperCase());
+    }
     auditEvent.setRequestData(sqlStmt_);
     auditEvent.setClientIP(clientIp_);
     auditEvent.setClusterName(clusterName_);

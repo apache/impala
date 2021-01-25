@@ -192,15 +192,17 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       List<PrivilegeRequest> privilegeRequests)
       throws AuthorizationException, InternalException {
     boolean isColumnMaskingEnabled = BackendConfig.INSTANCE.isColumnMaskingEnabled();
+    boolean isRowFilteringEnabled = BackendConfig.INSTANCE.isRowFilteringEnabled();
     for (PrivilegeRequest request : privilegeRequests) {
       if (!isColumnMaskingEnabled
           && request.getAuthorizable().getType() == Type.COLUMN) {
-        authorizeColumnMask(user,
+        throwIfColumnMaskingRequired(user,
             request.getAuthorizable().getDbName(),
             request.getAuthorizable().getTableName(),
             request.getAuthorizable().getColumnName());
-      } else if (request.getAuthorizable().getType() == Type.TABLE) {
-        authorizeRowFilter(user,
+      } else if (!isRowFilteringEnabled
+          && request.getAuthorizable().getType() == Type.TABLE) {
+        throwIfRowFilteringRequired(user,
             request.getAuthorizable().getDbName(),
             request.getAuthorizable().getTableName());
       }
@@ -274,11 +276,11 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   }
 
   /**
-   * This method checks if column mask is enabled on the given columns and deny access
-   * when column mask is enabled by throwing an {@link AuthorizationException}. This is
-   * to prevent data leak when Hive has column mask enabled but not in Impala.
+   * This method throws an {@link AuthorizationException} if column mask is enabled on the
+   * given column. This is used to prevent data leak when Hive has column mask enabled but
+   * it's disabled in Impala.
    */
-  private void authorizeColumnMask(User user, String dbName, String tableName,
+  private void throwIfColumnMaskingRequired(User user, String dbName, String tableName,
       String columnName) throws InternalException, AuthorizationException {
     if (evalColumnMask(user, dbName, tableName, columnName, null).isMaskEnabled()) {
       throw new AuthorizationException(String.format(
@@ -297,17 +299,26 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
         return true;
       }
     }
-    return false;
+    return needsRowFiltering(user, dbName, tableName);
   }
 
   @Override
-  public String createColumnMask(User user, String dbName, String tableName,
-      String columnName, AuthorizationContext rangerCtx) throws InternalException {
-    RangerBufferAuditHandler auditHandler =
-        ((RangerAuthorizationContext) rangerCtx).getAuditHandler();
-    int numAuthzAuditEventsBefore = auditHandler.getAuthzEvents().size();
-    RangerAccessResult accessResult = evalColumnMask(user, dbName, tableName, columnName,
-        auditHandler);
+  public boolean needsRowFiltering(User user, String dbName, String tableName)
+      throws InternalException {
+    return evalRowFilter(user, dbName, tableName, null).isRowFilterEnabled();
+  }
+
+  /**
+   * Util method for removing stale audit events of column masking and row filtering
+   * policies. See comments below for cases we need this.
+   *
+   * TODO: Revisit RangerBufferAuditHandler and compare it to
+   *  org.apache.ranger.authorization.hive.authorizer.RangerHiveAuditHandler to see
+   *  whether we can avoid generating stale audit events there.
+   * TODO: Do we really need this for row-filtering?
+   */
+  private void removeStaleAudits(RangerBufferAuditHandler auditHandler,
+      int numAuthzAuditEventsBefore) {
     // When a user adds an "Unmasked" policy for 'columnName' that retains the original
     // value, accessResult.getMaskType() would be "MASK_NONE". We do not need to log such
     // an event. Removing such an event also makes the logged audits consistent when
@@ -335,8 +346,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     // logged in RangerBufferAuditHandler#flush().
     List<AuthzAuditEvent> auditEvents = auditHandler.getAuthzEvents();
     Preconditions.checkState(auditEvents.size() - numAuthzAuditEventsBefore <= 1);
-    if (auditEvents.size() > numAuthzAuditEventsBefore &&
-        !accessResult.isMaskEnabled()) {
+    if (auditEvents.size() > numAuthzAuditEventsBefore) {
       // Recall that the same instance of RangerAuthorizationContext is passed to
       // createColumnMask() every time this method is called. Thus the same instance of
       // RangerBufferAuditHandler is provided for evalColumnMask() to log the event.
@@ -345,13 +355,24 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       // evaluates to true, we only need to process the last event on 'auditEvents'.
       auditHandler.getAuthzEvents().remove(auditEvents.size() - 1);
     }
-    // No column masking policies, return the original column.
-    if (!accessResult.isMaskEnabled()) return columnName;
+  }
+
+  @Override
+  public String createColumnMask(User user, String dbName, String tableName,
+      String columnName, AuthorizationContext rangerCtx) throws InternalException {
+    RangerBufferAuditHandler auditHandler =
+        ((RangerAuthorizationContext) rangerCtx).getAuditHandler();
+    int numAuthzAuditEventsBefore = auditHandler.getAuthzEvents().size();
+    RangerAccessResult accessResult = evalColumnMask(user, dbName, tableName, columnName,
+        auditHandler);
+    if (!accessResult.isMaskEnabled()) {
+      // No column masking policies, remove any possible stale audit events and
+      // return the original column.
+      removeStaleAudits(auditHandler, numAuthzAuditEventsBefore);
+      return columnName;
+    }
     String maskType = accessResult.getMaskType();
     RangerServiceDef.RangerDataMaskTypeDef maskTypeDef = accessResult.getMaskTypeDef();
-    Preconditions.checkNotNull(maskType);
-    Preconditions.checkState(!auditEvents.isEmpty());
-    auditEvents.get(auditEvents.size() - 1).setAccessType(maskType.toLowerCase());
     // The expression used to replace the original column.
     String maskedColumn = columnName;
     // The expression of the mask type. Column names are referenced by "{col}".
@@ -384,14 +405,32 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   }
 
   @Override
+  public String createRowFilter(User user, String dbName, String tableName,
+      AuthorizationContext rangerCtx) throws InternalException {
+    RangerBufferAuditHandler auditHandler =
+        ((RangerAuthorizationContext) rangerCtx).getAuditHandler();
+    int numAuthzAuditEventsBefore = auditHandler.getAuthzEvents().size();
+    RangerAccessResult accessResult = evalRowFilter(user, dbName, tableName,
+        auditHandler);
+    if (!accessResult.isRowFilterEnabled()) {
+      // No row filtering policies, remove any possible stale audit events.
+      removeStaleAudits(auditHandler, numAuthzAuditEventsBefore);
+      return null;
+    }
+    String filter = accessResult.getFilterExpr();
+    LOG.info("dbName: {}, tableName: {}, rowFilter: {}", dbName, tableName, filter);
+    return filter;
+  }
+
+  @Override
   public void postAnalyze(AuthorizationContext authzCtx) {
     Preconditions.checkArgument(authzCtx instanceof RangerAuthorizationContext);
-    ((RangerAuthorizationContext) authzCtx).stashAuditEvents(plugin_);
+    ((RangerAuthorizationContext) authzCtx).stashTableMaskingAuditEvents(plugin_);
   }
 
   /**
-   * Evaluate column masking policies on the given column and returns the result.
-   * A RangerAccessResult contains the matched policy details and the masked column.
+   * Evaluate column masking policies on the given column and returns the result,
+   * a RangerAccessResult contains the matched policy details and the masked column.
    * Note that Ranger will add an AuthzAuditEvent to auditHandler.getAuthzEvents() as
    * long as there exists a policy for the given column even though the policy does not
    * apply to 'user'.
@@ -415,22 +454,32 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   }
 
   /**
-   * This method checks if row filter is enabled on the given tables and deny access
-   * when row filter is enabled by throwing an {@link AuthorizationException} . This is
-   * to prevent data leak when Hive has row filter enabled but not in Impala.
+   * Evaluate row filtering policies on the given table and returns the result,
+   * a RangerAccessResult contains the matched policy details and the filter string.
    */
-  private void authorizeRowFilter(User user, String dbName, String tableName)
-      throws InternalException, AuthorizationException {
+  private RangerAccessResult evalRowFilter(User user, String dbName, String tableName,
+      RangerBufferAuditHandler auditHandler) throws InternalException {
     RangerAccessResourceImpl resource = new RangerImpalaResourceBuilder()
         .database(dbName)
         .table(tableName)
         .build();
     RangerAccessRequest req = new RangerAccessRequestImpl(resource,
         SELECT_ACCESS_TYPE, user.getShortName(), getUserGroups(user));
-    if (plugin_.evalRowFilterPolicies(req, null).isRowFilterEnabled()) {
+    return plugin_.evalRowFilterPolicies(req, auditHandler);
+  }
+
+  /**
+   * This method throws an {@link AuthorizationException} if row filter is enabled on the
+   * given tables. This is used to prevent data leak when Hive has row filter enabled but
+   * it's disabled in Impala.
+   */
+  private void throwIfRowFilteringRequired(User user, String dbName, String tableName)
+      throws InternalException, AuthorizationException {
+    if (evalRowFilter(user, dbName, tableName, null).isRowFilterEnabled()) {
       throw new AuthorizationException(String.format(
-          "Impala does not support row filtering yet. Row filtering is enabled " +
-              "on table: %s.%s", dbName, tableName));
+          "Row filtering is disabled by --enable_row_filtering flag. Can't access " +
+              "table %s.%s that has row filtering policy.",
+          dbName, tableName));
     }
   }
 

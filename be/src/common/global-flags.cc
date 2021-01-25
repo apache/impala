@@ -338,9 +338,6 @@ DEFINE_bool_hidden(use_customized_user_groups_mapper_for_ranger, false,
     "If true, use the customized user-to-groups mapper when performing authorization via"
     " Ranger.");
 
-DEFINE_bool(enable_column_masking, true,
-    "If false, disable the column masking feature. Defaults to be true.");
-
 DEFINE_bool(enable_incremental_metadata_updates, true,
     "If true, Catalog Server will send incremental table updates in partition level in "
     "the statestore topic updates. Legacy coordinators will apply the partition updates "

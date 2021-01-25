@@ -59,7 +59,6 @@ import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.LocalKuduTable;
 import org.apache.impala.common.AnalysisException;
-import org.apache.impala.common.Id;
 import org.apache.impala.common.IdGenerator;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
@@ -775,25 +774,7 @@ public class Analyzer {
       // Register privilege requests to prefer reporting an authorization error over
       // an analysis error. We should not accidentally reveal the non-existence of a
       // table/database if the user is not authorized.
-      if (rawPath.size() > 1) {
-        registerPrivReq(builder -> {
-          builder.onTableUnknownOwner(
-              rawPath.get(0), rawPath.get(1)).allOf(tableRef.getPrivilege());
-          if (tableRef.requireGrantOption()) {
-            builder.grantOption();
-          }
-          return builder.build();
-        });
-      }
-
-      registerPrivReq(builder -> {
-        builder.onTableUnknownOwner(
-            getDefaultDb(), rawPath.get(0)).allOf(tableRef.getPrivilege());
-        if (tableRef.requireGrantOption()) {
-          builder.grantOption();
-        }
-        return builder.build();
-      });
+      registerPrivReqOnRawPath(tableRef, rawPath);
       throw e;
     } catch (TableLoadingException e) {
       throw new AnalysisException(String.format(
@@ -814,27 +795,87 @@ public class Analyzer {
             table instanceof FeDataSourceTable);
         resolvedTableRef = new BaseTableRef(tableRef, resolvedPath);
       }
-      // Only do table masking when authorization is enabled and the authorization
-      // factory supports column masking. If both of these are false, return the unmasked
-      // table ref.
-      if (!doTableMasking || !getAuthzFactory().getAuthorizationConfig().isEnabled()
-          || !getAuthzFactory().supportsColumnMasking()) {
-        return resolvedTableRef;
-      }
-      // Performing table masking.
-      AuthorizationChecker authChecker = getAuthzFactory().newAuthorizationChecker(
-          getCatalog().getAuthPolicy());
-      TableMask tableMask = new TableMask(authChecker, table, user_);
-      try {
-        if (!tableMask.needsMaskingOrFiltering()) return resolvedTableRef;
-        return InlineViewRef.createTableMaskView(resolvedPath, resolvedTableRef,
-            tableMask, getAuthzCtx());
-      } catch (InternalException e) {
-        LOG.error("Error performing table masking", e);
-        throw new AnalysisException("Error performing table masking", e);
-      }
+      if (!doTableMasking) return resolvedTableRef;
+      return resolveTableMask(resolvedTableRef, table);
     } else {
-      return new CollectionTableRef(tableRef, resolvedPath);
+      CollectionTableRef res = new CollectionTableRef(tableRef, resolvedPath);
+      // Relative table refs don't need masking. Its base table will be masked.
+      if (!doTableMasking || res.isRelative()) return res;
+      return resolveTableMask(res, res.getTable());
+    }
+  }
+
+  /**
+   * Register privilege requests based on the 'tableRawPath'. Only used when we fail to
+   * resolve the TableRef. With these requests we can prefer reporting an authorization
+   * error over an analysis error. See more in resolveTableRef().
+   */
+  private void registerPrivReqOnRawPath(TableRef tableRef, List<String> tableRawPath) {
+    if (tableRawPath.size() > 1) {
+      registerPrivReq(builder -> {
+        builder.onTableUnknownOwner(
+            tableRawPath.get(0), tableRawPath.get(1)).allOf(tableRef.getPrivilege());
+        if (tableRef.requireGrantOption()) {
+          builder.grantOption();
+        }
+        return builder.build();
+      });
+    }
+
+    registerPrivReq(builder -> {
+      builder.onTableUnknownOwner(
+          getDefaultDb(), tableRawPath.get(0)).allOf(tableRef.getPrivilege());
+      if (tableRef.requireGrantOption()) {
+        builder.grantOption();
+      }
+      return builder.build();
+    });
+  }
+
+  /**
+   * Resolves column-masking/row-filtering policies on the given table. Returns a table
+   * masking view if any of these policies exist. The TableRef should be resolved first
+   * so we know the target table/view/collection.
+   *
+   * @param resolvedTableRef A resolved TableRef for table masking
+   * @param basedTable FeTable of the resolved table or the collection's based table
+   */
+  private TableRef resolveTableMask(TableRef resolvedTableRef, FeTable basedTable)
+      throws AnalysisException {
+    Preconditions.checkState(resolvedTableRef.isResolved(), "Table should be resolved");
+    // Only do table masking when authorization is enabled and the authorization
+    // factory supports column-masking/row-filtering. If both of these are false,
+    // return the unmasked table ref.
+    if (!getAuthzFactory().getAuthorizationConfig().isEnabled()
+        || !getAuthzFactory().supportsTableMasking()) {
+      return resolvedTableRef;
+    }
+    // Performing table masking.
+    AuthorizationChecker authChecker = getAuthzFactory().newAuthorizationChecker(
+        getCatalog().getAuthPolicy());
+    TableMask tableMask = new TableMask(authChecker, basedTable, user_);
+    try {
+      if (resolvedTableRef instanceof CollectionTableRef) {
+        Preconditions.checkState(!resolvedTableRef.isRelative(),
+            "Relative table refs don't need masking. Its base table will be masked.");
+        if (tableMask.needsRowFiltering()) {
+          // TODO: Support this in IMPALA-10484.
+          throw new AnalysisException(String.format("Using non-relative collection " +
+              "column %s of table %s is not supported since there are row-filtering " +
+              "policies on this table (IMPALA-10484). Rewrite query to use relative " +
+              "reference.",
+              String.join(".", resolvedTableRef.getResolvedPath().getRawPath()),
+              basedTable.getFullName()));
+        }
+      } else if (tableMask.needsMaskingOrFiltering()) {
+        return InlineViewRef.createTableMaskView(basedTable, resolvedTableRef,
+            tableMask, getAuthzCtx());
+      }
+      return resolvedTableRef;
+    } catch (InternalException e) {
+      String msg = "Error performing table masking on " + basedTable.getFullName();
+      LOG.error(msg, e);
+      throw new AnalysisException(msg, e);
     }
   }
 

@@ -220,8 +220,19 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
       }
 
       @Override
+      public boolean needsRowFiltering(User user, String dbName, String tableName) {
+        return false;
+      }
+
+      @Override
       public String createColumnMask(User user, String dbName, String tableName,
           String columnName, AuthorizationContext authzCtx) {
+        return null;
+      }
+
+      @Override
+      public String createRowFilter(User user, String dbName, String tableName,
+          AuthorizationContext rangerCtx) {
         return null;
       }
 
@@ -243,7 +254,7 @@ public class NoopAuthorizationFactory implements AuthorizationFactory {
   }
 
   @Override
-  public boolean supportsColumnMasking() {
+  public boolean supportsTableMasking() {
     return false;
   }
 }

@@ -1,0 +1,34 @@
+====
+---- QUERY
+# Row-filtering policy keeps rows with "id % 3 = 0".
+# Column-masking policies mask "id" to "id + 100" and redact column "date_string_col".
+# Note that row filtering policies take effects prior to any column masking policies,
+# because column masking policies apply on result data.
+select id, bool_col, date_string_col, year, month from functional.alltypestiny
+---- RESULTS
+100,true,'nn/nn/nn',2009,1
+103,false,'nn/nn/nn',2009,2
+106,true,'nn/nn/nn',2009,4
+---- TYPES
+INT,BOOLEAN,STRING,INT,INT
+====
+---- QUERY
+# Column-masking policies of functional.alltypes mask "id" to "-id" and redact column
+# "date_string_col". Row-filtering policy of functional.alltypes_view keeps rows with
+# "id >= -8 and date_string_col = 'nn/nn/nn'". functional.alltypes_view is a view based
+# on table functional.alltypes, so column masking policies were applied to 'alltypes'
+# before the row-filter policies are applied to 'alltypes_view'.
+select id, bool_col, date_string_col, year, month from functional.alltypes_view
+---- RESULTS
+0,true,'nn/nn/nn',2009,1
+-1,false,'nn/nn/nn',2009,1
+-2,true,'nn/nn/nn',2009,1
+-3,false,'nn/nn/nn',2009,1
+-4,true,'nn/nn/nn',2009,1
+-5,false,'nn/nn/nn',2009,1
+-6,true,'nn/nn/nn',2009,1
+-7,false,'nn/nn/nn',2009,1
+-8,true,'nn/nn/nn',2009,1
+---- TYPES
+INT,BOOLEAN,STRING,INT,INT
+====

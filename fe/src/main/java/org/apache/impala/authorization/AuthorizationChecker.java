@@ -91,10 +91,22 @@ public interface AuthorizationChecker {
       List<String> requiredColumns) throws InternalException;
 
   /**
+   * Returns whether the given table needs row filtering when read by the given user.
+   */
+  boolean needsRowFiltering(User user, String dbName, String tableName)
+      throws InternalException;
+
+  /**
    * Returns the column mask string for the given column.
    */
   String createColumnMask(User user, String dbName, String tableName, String columnName,
       AuthorizationContext authzCtx) throws InternalException;
+
+  /**
+   * Returns the row filter for the given table.
+   */
+  String createRowFilter(User user, String dbName, String tableName,
+      AuthorizationContext rangerCtx) throws InternalException;
 
   /**
    * This method is to be executed after AnalysisContext#analyze() is completed.

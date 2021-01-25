@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.authorization.TableMask;
@@ -142,21 +143,20 @@ public class InlineViewRef extends TableRef {
    * Creates an inline-view doing table masking for column masking and row filtering
    * policies. Callers should replace 'tableRef' with the returned view.
    *
-   * @param resolvedPath resolved path for the original table/view
+   * @param resolvedTable resolved FeTable for the original table/view
    * @param tableRef original resolved table/view
    * @param tableMask TableMask providing column masking and row filtering policies
    * @param authzCtx AuthorizationContext containing RangerBufferAuditHandler
    */
-  static InlineViewRef createTableMaskView(Path resolvedPath, TableRef tableRef,
+  static InlineViewRef createTableMaskView(FeTable resolvedTable, TableRef tableRef,
       TableMask tableMask, AuthorizationContext authzCtx) throws AnalysisException,
       InternalException {
-    Preconditions.checkNotNull(resolvedPath);
-    Preconditions.checkNotNull(resolvedPath.getRootTable());
+    Preconditions.checkNotNull(resolvedTable);
     Preconditions.checkNotNull(tableRef);
     Preconditions.checkNotNull(authzCtx);
     Preconditions.checkState(tableRef instanceof InlineViewRef
         || tableRef instanceof BaseTableRef);
-    List<Column> columns = resolvedPath.getRootTable().getColumnsInHiveOrder();
+    List<Column> columns = resolvedTable.getColumnsInHiveOrder();
     List<SelectListItem> items = Lists.newArrayListWithCapacity(columns.size());
     for (Column col: columns) {
       if (col.getType().isComplexType()) continue;
@@ -168,8 +168,25 @@ public class InlineViewRef extends TableRef {
     }
     SelectList selectList = new SelectList(items);
     FromClause fromClause = new FromClause(Lists.newArrayList(tableRef));
-    SelectStmt tableMaskStmt = new SelectStmt(selectList, fromClause,
-        null, null, null, null, null);
+    Expr wherePredicate = tableMask.createRowFilter(authzCtx);
+    SelectStmt tableMaskStmt = new SelectStmt(selectList, fromClause, wherePredicate,
+        null, null, null, null);
+    // TODO(IMPALA-10483): Column-masking/Row-filtering expressions may have subqueries
+    //  which may introduce new tables. We should trigger StmtMetadataLoader#loadTables()
+    //  on 'tableMaskStmt'. Otherwise, they can't be resolved. Reject the query in this
+    //  case.
+    List<TableRef> tableRefsInView = tableMaskStmt.collectTableRefs();
+    // Should only contain the base table ref.
+    if (tableRefsInView.size() > 1) {
+      tableRefsInView.remove(tableRef);
+      throw new AnalysisException("Column-masking/Row-filtering expressions using " +
+          "subqueries are not supported (IMPALA-10483). Table(s) in the subquery: " +
+          tableRefsInView.stream()
+              .map(t -> String.join(".", t.getPath()))
+              .collect(Collectors.toList())
+      );
+    }
+
     InlineViewRef viewRef = new InlineViewRef(/*alias*/ null, tableMaskStmt,
         (TableSampleClause) null);
     tableRef.migratePropertiesTo(viewRef);

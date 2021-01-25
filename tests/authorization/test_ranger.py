@@ -712,7 +712,62 @@ class TestRanger(CustomClusterTestSuite):
     return json.loads(r.content)["id"]
 
   @staticmethod
-  def _remove_column_masking_policy(policy_name):
+  def _add_row_filtering_policy(policy_name, user, db, table, filter_expr):
+    """Adds a row filtering policy and returns the policy id"""
+    TestRanger._add_multiuser_row_filtering_policy(policy_name, db, table, [user],
+                                                   [filter_expr])
+
+  @staticmethod
+  def _add_multiuser_row_filtering_policy(policy_name, db, table, users, filters):
+    """Adds a row filtering policy on 'db'.'table' and returns the policy id.
+    users[0] has filters[0], users[1] has filters[1] and so on."""
+    assert len(users) > 0
+    assert len(users) == len(filters)
+    items = []
+    for i in range(len(users)):
+      items.append({
+          "accesses": [
+            {
+              "type": "select",
+              "isAllowed": True
+            }
+          ],
+          "users": [users[i]],
+          "rowFilterInfo": {"filterExpr": filters[i]}
+        })
+    TestRanger._add_row_filtering_policy_with_items(policy_name, db, table, items)
+
+  @staticmethod
+  def _add_row_filtering_policy_with_items(policy_name, db, table, items):
+    """ Adds a row filtering policy and returns the policy id"""
+    policy_data = {
+      "name": policy_name,
+      "policyType": 2,
+      "serviceType": "hive",
+      "service": "test_impala",
+      "resources": {
+        "database": {
+          "values": [db],
+          "isExcludes": False,
+          "isRecursive": False
+        },
+        "table": {
+          "values": [table],
+          "isExcludes": False,
+          "isRecursive": False
+        }
+      },
+      "rowFilterPolicyItems": items
+    }
+    r = requests.post("{0}/service/public/v2/api/policy".format(RANGER_HOST),
+                      auth=RANGER_AUTH, json=policy_data, headers=REST_HEADERS)
+    assert 300 > r.status_code >= 200, r.content
+    LOG.info("Added row filtering policy on table {0}.{1} for using items {2}"
+             .format(db, table, items))
+    return json.loads(r.content)["id"]
+
+  @staticmethod
+  def _remove_policy(policy_name):
     r = requests.delete(
         "{0}/service/public/v2/api/policy?servicename=test_impala&policyname={1}".format(
             RANGER_HOST, policy_name),
@@ -968,6 +1023,11 @@ class TestRanger(CustomClusterTestSuite):
         unique_name + str(policy_cnt), user, "functional", "alltypes", "string_col",
         "CUSTOM", "concat({col}, 'ttt')")
       policy_cnt += 1
+      # Add policy to mask "bigint_col" using a subquery. It will hit IMPALA-10483.
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypesagg", "bigint_col",
+        "CUSTOM", "(select count(*) from functional.alltypestiny)")
+      policy_cnt += 1
       self.execute_query_expect_success(admin_client, "refresh authorization",
                                         user=ADMIN)
       self.run_test_case("QueryTest/ranger_column_masking", vector,
@@ -996,7 +1056,7 @@ class TestRanger(CustomClusterTestSuite):
                            % (unique_database, user))
       admin_client.execute("drop database %s cascade" % unique_database)
       for i in range(policy_cnt):
-        TestRanger._remove_column_masking_policy(unique_name + str(i))
+        TestRanger._remove_policy(unique_name + str(i))
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -1038,10 +1098,160 @@ class TestRanger(CustomClusterTestSuite):
                                           user=ADMIN)
         self.run_test_case("QueryTest/ranger_alltypes_" + mask_type.lower(), vector)
         while policy_names:
-          TestRanger._remove_column_masking_policy(policy_names.pop())
+          TestRanger._remove_policy(policy_names.pop())
     finally:
       while policy_names:
-        TestRanger._remove_column_masking_policy(policy_names.pop())
+        TestRanger._remove_policy(policy_names.pop())
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_row_filtering(self, vector, unique_name):
+    user = getuser()
+    unique_database = unique_name + '_db'
+    # Create another client for admin user since current user doesn't have privileges to
+    # create/drop databases or refresh authorization.
+    admin_client = self.create_impala_client()
+    admin_client.execute("drop database if exists %s cascade" % unique_database,
+                         user=ADMIN)
+    admin_client.execute("create database %s" % unique_database, user=ADMIN)
+    # Grant CREATE on database to current user for tests on CTAS, CreateView etc.
+    # Note that 'user' is the owner of the test tables. No additional GRANTs are required.
+    admin_client.execute("grant create on database %s to user %s"
+                         % (unique_database, user))
+    policy_cnt = 0
+    try:
+      #######################################################
+      # Test row filters on current user
+      #######################################################
+      TestRanger._add_row_filtering_policy(
+          unique_name + str(policy_cnt), user, "functional", "alltypestiny", "id % 2 = 0")
+      policy_cnt += 1
+      # Add a filter using builtin functions
+      TestRanger._add_row_filtering_policy(
+          unique_name + str(policy_cnt), user, "functional", "alltypessmall",
+          """(string_col = concat('0', '') and id <= 0) or
+             (string_col = '1' and bool_col = true and id > 90)""")
+      policy_cnt += 1
+      TestRanger._add_row_filtering_policy(
+          unique_name + str(policy_cnt), user, "functional", "alltypes",
+          "year = 2009 and month = 1")
+      policy_cnt += 1
+      # Add a row-filtering policy using a nonexisting column 'test_id'. Queries in this
+      # table will fail in resolving the column.
+      TestRanger._add_row_filtering_policy(
+          unique_name + str(policy_cnt), user, "functional_parquet", "alltypes",
+          "test_id = id")
+      policy_cnt += 1
+      # Add an illegal row filter that could cause parsing error.
+      TestRanger._add_row_filtering_policy(
+          unique_name + str(policy_cnt), user, "functional_parquet", "alltypessmall",
+          "100 id = int_col")
+      policy_cnt += 1
+      # Add a row-filtering policy on a view. 'alltypes_view' is a view on table
+      # 'alltypes' which also has a row-filtering policy. They will both be performed.
+      TestRanger._add_row_filtering_policy(
+          unique_name + str(policy_cnt), user, "functional", "alltypes_view",
+          "id < 5")
+      policy_cnt += 1
+      # Row-filtering expr using subquery on current table.
+      TestRanger._add_row_filtering_policy(
+          unique_name + str(policy_cnt), user, "functional", "alltypesagg",
+          "id = (select min(id) from functional.alltypesagg)")
+      policy_cnt += 1
+      # Row-filtering expr using subquery on other tables.
+      TestRanger._add_row_filtering_policy(
+          unique_name + str(policy_cnt), user, "functional_parquet", "alltypesagg",
+          "id in (select id from functional.alltypestiny)")
+      policy_cnt += 1
+      # Row-filtering expr on nested types
+      TestRanger._add_row_filtering_policy(
+          unique_name + str(policy_cnt), user, "functional_parquet", "complextypestbl",
+          "nested_struct.a is not NULL")
+      policy_cnt += 1
+      admin_client.execute("refresh authorization")
+      self.run_test_case("QueryTest/ranger_row_filtering", vector,
+                         test_file_vars={'$UNIQUE_DB': unique_database})
+
+      #######################################################
+      # Test row filter policy on multiple users
+      #######################################################
+      TestRanger._add_multiuser_row_filtering_policy(
+          unique_name + str(policy_cnt), "functional_parquet", "alltypestiny",
+          [user, "non_owner", "non_owner_2"],
+          ["id=0", "id=1", "id=2"])
+      policy_cnt += 1
+      admin_client.execute(
+          "grant select on table functional_parquet.alltypestiny to user non_owner")
+      admin_client.execute(
+          "grant select on table functional_parquet.alltypestiny to user non_owner_2")
+      admin_client.execute("refresh authorization")
+      non_owner_client = self.create_impala_client()
+      non_owner_2_client = self.create_impala_client()
+      query = "select id from functional_parquet.alltypestiny"
+      assert self.client.execute(query).get_data() == "0"
+      assert non_owner_client.execute(query, user="non_owner").get_data() == "1"
+      assert non_owner_2_client.execute(query, user="non_owner_2").get_data() == "2"
+      query = "select max(id) from functional_parquet.alltypestiny"
+      assert self.client.execute(query).get_data() == "0"
+      assert non_owner_client.execute(query, user="non_owner").get_data() == "1"
+      assert non_owner_2_client.execute(query, user="non_owner_2").get_data() == "2"
+    finally:
+      for i in range(policy_cnt):
+        TestRanger._remove_policy(unique_name + str(i))
+      cleanup_statements = [
+        "revoke select on table functional_parquet.alltypestiny from user non_owner",
+        "revoke select on table functional_parquet.alltypestiny from user non_owner_2"
+      ]
+      for statement in cleanup_statements:
+        admin_client.execute(statement, user=ADMIN)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_column_masking_and_row_filtering(self, vector, unique_name):
+    user = getuser()
+    admin_client = self.create_impala_client()
+    policy_cnt = 0
+    try:
+      # 2 column masking policies and 1 row filtering policy on functional.alltypestiny.
+      # The row filtering policy will take effect first, then the column masking policies
+      # mask the final results.
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypestiny", "id",
+        "CUSTOM", "id + 100")   # use column name 'id' directly
+      policy_cnt += 1
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypestiny",
+        "date_string_col", "MASK")
+      policy_cnt += 1
+      TestRanger._add_row_filtering_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypestiny", "id % 3 = 0")
+      policy_cnt += 1
+      # 2 column masking policies on functional.alltypes and 1 row filtering policy on
+      # functional.alltypesview which is a view on functional.alltypes. The column masking
+      # policies on functional.alltypes will take effect first, which affects the results
+      # of functional.alltypesview. Then the row filtering policy of the view filters
+      # out rows of functional.alltypesview.
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypes", "id",
+        "CUSTOM", "-id")   # use column name 'id' directly
+      policy_cnt += 1
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypes",
+        "date_string_col", "MASK")
+      policy_cnt += 1
+      TestRanger._add_row_filtering_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypes_view",
+        "id >= -8 and date_string_col = 'nn/nn/nn'")
+      policy_cnt += 1
+
+      self.execute_query_expect_success(admin_client, "refresh authorization",
+                                        user=ADMIN)
+      self.run_test_case("QueryTest/ranger_column_masking_and_row_filtering", vector)
+    finally:
+      for i in range(policy_cnt):
+        TestRanger._remove_policy(unique_name + str(i))
 
   @pytest.mark.execute_serially
   @SkipIfABFS.hive
@@ -1066,7 +1276,7 @@ class TestRanger(CustomClusterTestSuite):
       self.run_test_case("QueryTest/hive_ranger_integration", vector)
     finally:
       check_call([script])
-      TestRanger._remove_column_masking_policy("col_mask_for_hive")
+      TestRanger._remove_policy("col_mask_for_hive")
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -1266,4 +1476,4 @@ class TestRangerColumnMaskingTpchNested(CustomClusterTestSuite):
       for tbl in tbl_cols:
         for col in tbl_cols[tbl]:
           policy_name = "%s_%s_mask" % (tbl, col)
-          TestRanger._remove_column_masking_policy(policy_name)
+          TestRanger._remove_policy(policy_name)

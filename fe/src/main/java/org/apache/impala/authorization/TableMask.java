@@ -64,6 +64,13 @@ public class TableMask {
   }
 
   /**
+   * Returns whether the table/view has row filtering policies.
+   */
+  public boolean needsRowFiltering() throws InternalException {
+    return authChecker_.needsRowFiltering(user_, dbName_, tableName_);
+  }
+
+  /**
    * Return the masked Expr of the given column
    */
   public Expr createColumnMask(String colName, Type colType,
@@ -90,5 +97,18 @@ public class TableMask {
       LOG.trace("Returned Expr: " + res.toSql());
     }
     return res;
+  }
+
+  /**
+   * Return the row filter Expr
+   */
+  public Expr createRowFilter(AuthorizationContext authzCtx)
+      throws InternalException, AnalysisException {
+    String rowFilter = authChecker_.createRowFilter(user_, dbName_, tableName_, authzCtx);
+    if (rowFilter == null) return null;
+    // Parse the row filter string to AST by using it in a fake query.
+    String stmtSql = String.format("SELECT 1 FROM foo WHERE %s", rowFilter);
+    SelectStmt selectStmt = (SelectStmt) Parser.parse(stmtSql);
+    return selectStmt.getWhereClause();
   }
 }

@@ -85,7 +85,6 @@ DECLARE_string(min_privilege_set_for_show_stmts);
 DECLARE_int32(num_expected_executors);
 DECLARE_int32(num_check_authorization_threads);
 DECLARE_bool(use_customized_user_groups_mapper_for_ranger);
-DECLARE_bool(enable_column_masking);
 DECLARE_bool(compact_catalog_topic);
 DECLARE_bool(enable_incremental_metadata_updates);
 DECLARE_int64(topic_update_tbl_max_wait_time_ms);
@@ -152,6 +151,13 @@ DEFINE_bool_hidden(saml2_ee_test_mode, false,
     "If true, no signature is checked and bearer token validation returns "
     "401 Unauthorized to allow checking cookies dealing with Thrift protocol. "
     "Should be only used in test environments." );
+
+DEFINE_bool(enable_column_masking, true,
+    "If false, disable the column masking feature. Defaults to be true.");
+
+DEFINE_bool(enable_row_filtering, true,
+    "If false, disable the row filtering feature. Defaults to be true. Enabling this flag"
+    " requires enable_column_masking to be true.");
 
 namespace impala {
 
@@ -245,6 +251,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_use_customized_user_groups_mapper_for_ranger(
       FLAGS_use_customized_user_groups_mapper_for_ranger);
   cfg.__set_enable_column_masking(FLAGS_enable_column_masking);
+  cfg.__set_enable_row_filtering(FLAGS_enable_row_filtering);
   cfg.__set_compact_catalog_topic(FLAGS_compact_catalog_topic);
   cfg.__set_enable_incremental_metadata_updates(
       FLAGS_enable_incremental_metadata_updates);
