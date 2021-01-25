@@ -3175,8 +3175,9 @@ flight_num:           INT32 SNAPPY DO:83456393 FPO:83488603 SZ:10216514/11474301
 
       <p id="impala_parquet_encodings_caveat">
         Impala can query Parquet files that use the <codeph>PLAIN</codeph>,
-        <codeph>PLAIN_DICTIONARY</codeph>, <codeph>BIT_PACKED</codeph>, and <codeph>RLE</codeph>
-        encodings. Currently, Impala does not support <codeph>RLE_DICTIONARY</codeph> encoding.
+        <codeph>PLAIN_DICTIONARY</codeph>, <codeph>BIT_PACKED</codeph>, <codeph>RLE</codeph>
+        and <codeph>RLE_DICTIONARY</codeph> encodings. <codeph>RLE_DICTIONARY</codeph> is supported
+        only in <keyword keyref="impala40"/> and up.
         When creating files outside of Impala for use by Impala, make sure to use one of the
         supported encodings. In particular, for MapReduce jobs,
         <codeph>parquet.writer.version</codeph> must not be defined (especially as
