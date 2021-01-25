@@ -21,10 +21,15 @@ under the License.
 <h2>Sessions</h2>
 
 <div class="alert alert-info" role="alert">
-<h4>There are {{num_sessions}} sessions, of which {{num_active}} are active</h4> Sessions
-may be <strong>closed</strong> either when they are idle for some time (see Idle Timeout
-below), or if they are deliberately closed, otherwise they are
-called <strong>active</strong>.</div>
+<h4>There are {{num_sessions}} sessions, of which {{num_active}} are active and
+{{num_inactive}} are inactive</h4>
+Active sessions are sessions that have not yet been expired or closed. Sessions are
+expired by the Impala server when they are idle for some time (see Idle Timeout
+below). Sessions can be closed in several ways: closed by the client, closed by this Web
+UI or closed by the Impala after all client connections are disconnected and
+-disconnected_session_timeout is exceeded. Sessions stay in the closed state
+temporarily while queries in the session are cleaned up by the Impala server, after
+which the session is removed from this list.</div>
 
 <table id="sessions-tbl" class='table table-bordered table-hover table-condensed'>
   <thead>
