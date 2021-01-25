@@ -445,3 +445,40 @@ DESCRIBE iceberg_nullable_test;
 ---- TYPES
 STRING,STRING,STRING,STRING
 ====
+---- QUERY
+CREATE TABLE iceberg_old_style_partitions (
+  register_time DATE,
+  message STRING,
+  price DECIMAL(8,1),
+  map_test MAP <STRING, array <STRING>>,
+  struct_test STRUCT <f1: BIGINT, f2: BIGINT>
+)
+PARTITIONED BY (
+  level STRING,
+  event_id INT
+)
+STORED AS ICEBERG;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+DESCRIBE iceberg_old_style_partitions;
+---- RESULTS
+'register_time','date','','true'
+'message','string','','true'
+'price','decimal(8,1)','','true'
+'map_test','map<string,array<string>>','','true'
+'struct_test','struct<\n  f1:bigint,\n  f2:bigint\n>','','true'
+'level','string','','true'
+'event_id','int','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+SHOW PARTITIONS iceberg_old_style_partitions;
+---- RESULTS
+0,6,1000,'level','IDENTITY'
+0,7,1001,'event_id','IDENTITY'
+---- TYPES
+BIGINT,BIGINT,BIGINT,STRING,STRING
+====

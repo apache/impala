@@ -37,6 +37,7 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
+import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.AvroSchemaConverter;
@@ -271,8 +272,8 @@ public class CreateTableStmt extends StatementBase {
     }
 
     if (getFileFormat() == THdfsFileFormat.ICEBERG) {
-      analyzeIcebergFormat(analyzer);
       analyzeIcebergColumns();
+      analyzeIcebergFormat(analyzer);
     } else {
       List<IcebergPartitionSpec> iceSpec = tableDef_.getIcebergPartitionSpecs();
       if (iceSpec != null && !iceSpec.isEmpty()) {
@@ -703,10 +704,32 @@ public class CreateTableStmt extends StatementBase {
    * Iceberg field
    */
   private void analyzeIcebergColumns() {
+    if (!getPartitionColumnDefs().isEmpty()) {
+      createIcebergPartitionSpecFromPartitionColumns();
+    }
     for (ColumnDef def : getColumnDefs()) {
       if (!def.isNullabilitySet()) {
         def.setNullable(true);
       }
     }
+  }
+
+  /**
+   * Creates Iceberg partition spec from partition columns. Needed to support old-style
+   * CREATE TABLE .. PARTITIONED BY (<cols>) syntax. In this case the column list in
+   * 'cols' is appended to the table-level columns, but also Iceberg-level IDENTITY
+   * partitions are created from this list.
+   */
+  private void createIcebergPartitionSpecFromPartitionColumns() {
+    Preconditions.checkState(!getPartitionColumnDefs().isEmpty());
+    Preconditions.checkState(getIcebergPartitionSpecs().isEmpty());
+    List<IcebergPartitionField> partFields = new ArrayList<>();
+    for (ColumnDef colDef : getPartitionColumnDefs()) {
+      partFields.add(new IcebergPartitionField(colDef.getColName(),
+          new IcebergPartitionTransform(TIcebergPartitionTransformType.IDENTITY)));
+    }
+    getIcebergPartitionSpecs().add(new IcebergPartitionSpec(partFields));
+    getColumnDefs().addAll(getPartitionColumnDefs());
+    getPartitionColumnDefs().clear();
   }
 }
