@@ -2119,7 +2119,7 @@ public class CatalogOpExecutor {
       throw e;
     }
     Preconditions.checkNotNull(table);
-    if (!(table instanceof HdfsTable)) {
+    if (!(table instanceof FeFsTable)) {
       throw new CatalogException(
           String.format("TRUNCATE TABLE not supported on non-HDFS table: %s",
           table.getFullName()));
@@ -2135,6 +2135,8 @@ public class CatalogOpExecutor {
       try {
         if (AcidUtils.isTransactionalTable(table.getMetaStoreTable().getParameters())) {
           newCatalogVersion = truncateTransactionalTable(params, table);
+        } else if (table instanceof FeIcebergTable) {
+          newCatalogVersion = truncateIcebergTable(params, table);
         } else {
           newCatalogVersion = truncateNonTransactionalTable(params, table);
         }
@@ -2255,6 +2257,20 @@ public class CatalogOpExecutor {
           String.format("Could not determine if the table %s is a replication source",
           tbl.getFullName()), tException);
     }
+  }
+
+  private long truncateIcebergTable(TTruncateParams params, Table table)
+      throws Exception {
+    Preconditions.checkState(table.isWriteLockedByCurrentThread());
+    Preconditions.checkState(catalog_.getLock().isWriteLockedByCurrentThread());
+    Preconditions.checkState(table instanceof FeIcebergTable);
+    long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+    catalog_.getLock().writeLock().unlock();
+    FeIcebergTable iceTable = (FeIcebergTable)table;
+    dropColumnStats(table);
+    dropTableStats(table);
+    IcebergCatalogOpExecutor.truncateTable(iceTable);
+    return newCatalogVersion;
   }
 
   private long truncateNonTransactionalTable(TTruncateParams params, Table table)

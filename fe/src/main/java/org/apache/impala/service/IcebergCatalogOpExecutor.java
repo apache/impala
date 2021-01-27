@@ -25,11 +25,13 @@ import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
+import org.apache.iceberg.DeleteFiles;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.iceberg.hadoop.HadoopTables;
@@ -189,5 +191,16 @@ public class IcebergCatalogOpExecutor {
       append.appendFile(builder.build());
     }
     append.commit();
+  }
+
+  /**
+   * Creates new snapshot for the iceberg table by deleting all data files.
+   */
+  public static void truncateTable(FeIcebergTable feIceTable)
+      throws ImpalaRuntimeException, TableLoadingException {
+    Table iceTable = IcebergUtil.loadTable(feIceTable);
+    DeleteFiles delete = iceTable.newDelete();
+    delete.deleteFromRowFilter(Expressions.alwaysTrue());
+    delete.commit();
   }
 }

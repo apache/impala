@@ -21,7 +21,6 @@ import java.util.List;
 
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.FeFsTable;
-import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TTruncateParams;
@@ -63,14 +62,10 @@ public class TruncateStmt extends StatementBase {
       if (ifExists_) return;
       throw e;
     }
-    // We only support truncating hdfs tables now, we also cannot truncate Iceberg
-    // tables.
+    // We only support truncating hdfs tables now
     if (!(table_ instanceof FeFsTable)) {
       throw new AnalysisException(String.format(
           "TRUNCATE TABLE not supported on non-HDFS table: %s", table_.getFullName()));
-    } else if (table_ instanceof FeIcebergTable) {
-      throw new AnalysisException(String.format(
-          "TRUNCATE TABLE not supported on iceberg table: %s", table_.getFullName()));
     }
     Analyzer.ensureTableNotFullAcid(table_, "TRUNCATE");
     Analyzer.checkTableCapability(table_, Analyzer.OperationType.WRITE);

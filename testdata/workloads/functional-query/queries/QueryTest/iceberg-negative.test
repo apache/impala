@@ -32,11 +32,6 @@ STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 ====
 ---- QUERY
-TRUNCATE iceberg_table_hadoop_tables
----- CATCH
-AnalysisException: TRUNCATE TABLE not supported on iceberg table: $DATABASE.iceberg_table_hadoop_tables
-====
----- QUERY
 # iceberg_non_partitioned is not partitioned
 SHOW PARTITIONS functional_parquet.iceberg_non_partitioned
 ---- CATCH
