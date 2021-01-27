@@ -38,7 +38,18 @@ def cancel_query_and_validate_state(client, query, exec_option, table_format,
   thread.start()
 
   sleep(cancel_delay)
-  assert client.get_state(handle) != client.QUERY_STATES['EXCEPTION']
+  if client.get_state(handle) == client.QUERY_STATES['EXCEPTION']:
+      # If some error occurred before trying to cancel the query then we put an error
+      # message together and fail the test.
+      thread.join()
+      error_msg = "The following query returned an error: %s\n" % query
+      if thread.fetch_results_error is not None:
+          error_msg += str(thread.fetch_results_error) + "\n"
+      profile_lines = client.get_runtime_profile(handle).splitlines()
+      for line in profile_lines:
+          if "Query Status:" in line:
+              error_msg += line
+      assert False, error_msg
   cancel_result = client.cancel(handle)
   assert cancel_result.status_code == 0,\
       'Unexpected status code from cancel request: %s' % cancel_result
