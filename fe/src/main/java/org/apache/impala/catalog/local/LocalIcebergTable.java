@@ -171,11 +171,6 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
   }
 
   @Override
-  protected void loadColumnStats() {
-    localFsTable_.loadColumnStats();
-  }
-
-  @Override
   public long snapshotId() {
     return snapshotId_;
   }

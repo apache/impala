@@ -1,0 +1,82 @@
+====
+---- QUERY
+# Create unpartitioned Iceberg table
+create table ice_nopart (i int)
+stored as iceberg;
+insert into ice_nopart values (1), (2), (3);
+select * from ice_nopart;
+---- RESULTS
+1
+2
+3
+====
+---- QUERY
+# Column tats should be cleared by TRUNCATE.
+compute stats ice_nopart;
+show column stats ice_nopart;
+---- RESULTS
+'i','INT',3,0,4,4,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+# TRUNCATE iceberg table
+truncate table ice_nopart;
+====
+---- QUERY
+# SELECT from truncated table
+select * from ice_nopart
+---- RESULTS
+====
+---- QUERY
+show column stats ice_nopart;
+---- RESULTS
+'i','INT',-1,-1,4,4,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+# Create partitioned Iceberg table
+create table ice_part (i int, s string, t timestamp)
+partition by spec (t year, i bucket 10)
+stored as iceberg;
+insert into ice_part
+values (1, 'ice',  '2021-01-27 18:57:25.155746000'),
+       (2, 'berg', '2020-01-27 18:57:25.155746000');
+select * from ice_part;
+---- RESULTS
+1,'ice',2021-01-27 18:57:25.155746000
+2,'berg',2020-01-27 18:57:25.155746000
+---- TYPES
+INT,STRING,TIMESTAMP
+====
+---- QUERY
+# Column tats should be cleared by TRUNCATE.
+compute stats ice_part;
+show column stats ice_part;
+---- RESULTS
+'i','INT',2,0,4,4,-1,-1
+'s','STRING',2,0,4,3.5,-1,-1
+'t','TIMESTAMP',2,0,16,16,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+# TRUNCATE iceberg table
+truncate table ice_part;
+====
+---- QUERY
+# SELECT from truncated table
+select * from ice_part
+---- RESULTS
+====
+---- QUERY
+# Column tats should be cleared by TRUNCATE.
+show column stats ice_part;
+---- RESULTS
+'i','INT',-1,-1,4,4,-1,-1
+'s','STRING',-1,-1,-1,-1,-1,-1
+'t','TIMESTAMP',-1,-1,16,16,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====

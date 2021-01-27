@@ -250,6 +250,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     try {
       // Copy the table to check later if anything has changed.
       msTable_ = msTbl.deepCopy();
+      setTableStats(msTable_);
       // Load metadata from Iceberg
       final Timer.Context ctxStorageLdTime =
           getMetrics().getTimer(Table.LOAD_DURATION_STORAGE_METADATA).time();

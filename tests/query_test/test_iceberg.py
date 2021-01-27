@@ -49,6 +49,9 @@ class TestIcebergTable(ImpalaTestSuite):
   def test_alter_iceberg_tables(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-alter', vector, use_db=unique_database)
 
+  def test_truncate_iceberg_tables(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-truncate', vector, use_db=unique_database)
+
   @SkipIf.not_hdfs
   def test_drop_incomplete_table(self, vector, unique_database):
     """Test DROP TABLE when the underlying directory is deleted. In that case table
