@@ -86,6 +86,7 @@ the same dependencies
               <artifact>org.apache.hive:hive-exec</artifact>
               <includes>
                 <include>org/apache/hadoop/hive/conf/**/*</include>
+                <include>org/apache/hadoop/hive/common/type/*</include>
                 <include>org/apache/hadoop/hive/common/FileUtils*</include>
                 <include>org/apache/hive/common/util/TxnIdUtils*</include>
                 <!-- Needed to support describe formatted command compat with Hive -->
