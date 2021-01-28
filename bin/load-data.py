@@ -26,11 +26,9 @@ import logging
 import multiprocessing
 import os
 import re
-import shutil
 import sqlparse
 import subprocess
 import sys
-import tempfile
 import time
 import traceback
 
@@ -148,27 +146,9 @@ def exec_hive_query_from_file_beeline(file_name):
 
   LOG.info("Beginning execution of hive SQL: {0}".format(file_name))
 
-  # When HiveServer2 is configured to use "local" mode (i.e., MR jobs are run
-  # in-process rather than on YARN), Hadoop's LocalDistributedCacheManager has a
-  # race, wherein it tires to localize jars into
-  # /tmp/hadoop-$USER/mapred/local/<millis>. Two simultaneous Hive queries
-  # against HS2 can conflict here. Weirdly LocalJobRunner handles a similar issue
-  # (with the staging directory) by appending a random number. To over come this,
-  # in the case that HS2 is on the local machine (which we conflate with also
-  # running MR jobs locally), we move the temporary directory into a unique
-  # directory via configuration. This block can be removed when
-  # https://issues.apache.org/jira/browse/MAPREDUCE-6441 is resolved.
-  hive_args = HIVE_ARGS
-  unique_dir = None
-  if options.hive_hs2_hostport.startswith("localhost:"):
-    unique_dir = tempfile.mkdtemp(prefix="hive-data-load-")
-    hive_args += ' --hiveconf "mapreduce.cluster.local.dir=%s"' % unique_dir
-
   output_file = file_name + ".log"
-  hive_cmd = "{0} {1} -f {2}".format(HIVE_CMD, hive_args, file_name)
+  hive_cmd = "{0} {1} -f {2}".format(HIVE_CMD, HIVE_ARGS, file_name)
   is_success = exec_cmd(hive_cmd, exit_on_error=False, out_file=output_file)
-  if unique_dir:
-    shutil.rmtree(unique_dir)
 
   if is_success:
     LOG.info("Finished execution of hive SQL: {0}".format(file_name))

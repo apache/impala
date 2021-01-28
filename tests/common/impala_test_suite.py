@@ -27,10 +27,8 @@ import pwd
 import pytest
 import re
 import requests
-import shutil
 import socket
 import subprocess
-import tempfile
 import time
 from functools import wraps
 from getpass import getuser
@@ -949,54 +947,33 @@ class ImpalaTestSuite(BaseTestSuite):
     Run a statement in Hive, returning stdout if successful and throwing
     RuntimeError(stderr) if not.
     """
-    # When HiveServer2 is configured to use "local" mode (i.e., MR jobs are run
-    # in-process rather than on YARN), Hadoop's LocalDistributedCacheManager has a
-    # race, wherein it tires to localize jars into
-    # /tmp/hadoop-$USER/mapred/local/<millis>. Two simultaneous Hive queries
-    # against HS2 can conflict here. Weirdly LocalJobRunner handles a similar issue
-    # (with the staging directory) by appending a random number. To overcome this,
-    # in the case that HS2 is on the local machine (which we conflate with also
-    # running MR jobs locally), we move the temporary directory into a unique
-    # directory via configuration. This workaround can be removed when
-    # https://issues.apache.org/jira/browse/MAPREDUCE-6441 is resolved.
-    # A similar workaround is used in bin/load-data.py.
-    tmpdir = None
-    beeline_opts = []
-    if pytest.config.option.hive_server2.startswith("localhost:"):
-      tmpdir = tempfile.mkdtemp(prefix="impala-tests-")
-      beeline_opts += ['--hiveconf', 'mapreduce.cluster.local.dir={0}'.format(tmpdir)]
-    try:
-      # Remove HADOOP_CLASSPATH from environment. Beeline doesn't need it,
-      # and doing so avoids Hadoop 3's classpath de-duplication code from
-      # placing $HADOOP_CONF_DIR too late in the classpath to get the right
-      # log4j configuration file picked up. Some log4j configuration files
-      # in Hadoop's jars send logging to stdout, confusing Impala's test
-      # framework.
-      env = os.environ.copy()
-      env.pop("HADOOP_CLASSPATH", None)
-      call = subprocess.Popen(
-          ['beeline',
-           '--outputformat=csv2',
-           '-u', 'jdbc:hive2://' + pytest.config.option.hive_server2,
-           '-n', username or getuser(),
-           '-e', stmt] + beeline_opts,
-          stdout=subprocess.PIPE,
-          stderr=subprocess.PIPE,
-          # Beeline in Hive 2.1 will read from stdin even when "-e"
-          # is specified; explicitly make sure there's nothing to
-          # read to avoid hanging, especially when running interactively
-          # with py.test.
-          stdin=file("/dev/null"),
-          env=env)
-      (stdout, stderr) = call.communicate()
-      call.wait()
-      if call.returncode != 0:
-        raise RuntimeError(stderr)
-      return stdout
-    finally:
-      # IMPALA-8315: removing the directory may race with Hive's own cleanup and cause
-      # errors.
-      if tmpdir is not None: shutil.rmtree(tmpdir, ignore_errors=True)
+    # Remove HADOOP_CLASSPATH from environment. Beeline doesn't need it,
+    # and doing so avoids Hadoop 3's classpath de-duplication code from
+    # placing $HADOOP_CONF_DIR too late in the classpath to get the right
+    # log4j configuration file picked up. Some log4j configuration files
+    # in Hadoop's jars send logging to stdout, confusing Impala's test
+    # framework.
+    env = os.environ.copy()
+    env.pop("HADOOP_CLASSPATH", None)
+    call = subprocess.Popen(
+        ['beeline',
+         '--outputformat=csv2',
+         '-u', 'jdbc:hive2://' + pytest.config.option.hive_server2,
+         '-n', username or getuser(),
+         '-e', stmt],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        # Beeline in Hive 2.1 will read from stdin even when "-e"
+        # is specified; explicitly make sure there's nothing to
+        # read to avoid hanging, especially when running interactively
+        # with py.test.
+        stdin=file("/dev/null"),
+        env=env)
+    (stdout, stderr) = call.communicate()
+    call.wait()
+    if call.returncode != 0:
+      raise RuntimeError(stderr)
+    return stdout
 
   def hive_partition_names(self, table_name):
     """Find the names of the partitions of a table, as Hive sees them.

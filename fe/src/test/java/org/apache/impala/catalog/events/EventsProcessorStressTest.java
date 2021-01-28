@@ -36,7 +36,6 @@ import org.apache.thrift.TException;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -189,7 +188,6 @@ public class EventsProcessorStressTest {
     }
   }
 
-  @Ignore("Ignored until MAPREDUCE-6441 is available in the toolchain")
   @Test
   public void testUsingRandomHiveQueries() throws Exception {
     LOG.info("Using number of clients: {} number of queries per client: {}", numClients_,

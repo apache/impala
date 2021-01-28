@@ -76,9 +76,6 @@ public class RandomHiveQueryRunner {
 
   private final List<QueryType> skippedQueryTypes;
 
-  // we need to add small delay between the start of each query to work-around
-  // MAPREDUCE-6441
-  private final Object delayLock_ = new Object();
   /**
    * Query type with weight. The weight of a QueryType determines the probability of its
    * occurrence by the Random Query runner. Higher the weight, more the probability of its
@@ -1104,10 +1101,6 @@ public class RandomHiveQueryRunner {
           try {
             LOG.info("Client {} running hive query set {}: {}", clientId, queryNumber,
                 query);
-            // add a delay between the start of each query to work around MAPREDUCE-6441
-            synchronized (delayLock_) {
-              Thread.sleep(10);
-            }
             query.run(hiveJdbcClientPool_);
             queryNumber++;
           } catch (Exception e) {
