@@ -258,9 +258,14 @@ void HdfsTableSink::BuildHdfsFileNames(
   }
   if (IsIceberg()) {
     //TODO: implement LocationProviders.
-    output_partition->final_hdfs_file_name_prefix =
-        Substitute("$0/data/$1/", table_desc_->IcebergTableLocation(),
-            output_partition->partition_name);
+    if (output_partition->partition_name.empty()) {
+      output_partition->final_hdfs_file_name_prefix =
+          Substitute("$0/data/", table_desc_->IcebergTableLocation());
+    } else {
+      output_partition->final_hdfs_file_name_prefix =
+          Substitute("$0/data/$1/", table_desc_->IcebergTableLocation(),
+              output_partition->partition_name);
+    }
   }
   output_partition->final_hdfs_file_name_prefix += query_suffix;
 
