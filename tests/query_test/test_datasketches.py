@@ -39,6 +39,7 @@ class TestDatasketches(ImpalaTestSuite):
 
   def test_theta(self, vector, unique_database):
     create_table_from_parquet(self.client, unique_database, 'theta_sketches_from_hive')
+    create_table_from_parquet(self.client, unique_database, 'theta_sketches_from_impala')
     self.run_test_case('QueryTest/datasketches-theta', vector, unique_database)
 
   def test_kll(self, vector, unique_database):

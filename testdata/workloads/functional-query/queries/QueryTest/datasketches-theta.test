@@ -176,3 +176,60 @@ BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 ---- RESULTS
 5,7,6,6,7,4,4,3,0
 ====
+---- QUERY
+# Unions the sketches from sketch_store and checks if the union produces the same result
+# as if the whole data was sketched together into a single sketch.
+select
+    ds_theta_estimate(ds_theta_union(date_sketch)),
+    ds_theta_estimate(ds_theta_union(float_sketch))
+from sketch_store;
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+12,10
+====
+---- QUERY
+# Checks that ds_theta_union() produces NULL for an empty dataset.
+select ds_theta_union(field) from functional_parquet.emptytable;
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Checks that ds_theta_union() produces NULL for NULL inputs.
+select ds_theta_union(null_str) from functional_parquet.nullrows;
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# ds_theta_union() returns an error if it receives an invalid serialized sketch.
+select ds_theta_union(date_string_col) from functional_parquet.alltypestiny where id=1;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# Get the same sketches from Impala and Hive and put them into the same table. When we
+# get the estimates from the unions of these sketches the expectation is to get the same
+# results as if these sketches were used separately to get the estimates.
+create table theta_sketches_impala_hive like theta_sketches_from_impala stored as parquet;
+insert into theta_sketches_impala_hive select * from theta_sketches_from_hive;
+insert into theta_sketches_impala_hive select * from theta_sketches_from_impala;
+select
+    ds_theta_estimate(ds_theta_union(ti)) as ti,
+    ds_theta_estimate(ds_theta_union(i)) as i,
+    ds_theta_estimate(ds_theta_union(bi)) as bi,
+    ds_theta_estimate(ds_theta_union(f)) as f,
+    ds_theta_estimate(ds_theta_union(d)) as d,
+    ds_theta_estimate(ds_theta_union(s)) as s,
+    ds_theta_estimate(ds_theta_union(c)) as c,
+    ds_theta_estimate(ds_theta_union(v)) as v,
+    ds_theta_estimate(ds_theta_union(nc)) as nc
+from theta_sketches_impala_hive;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+5,7,6,6,7,4,4,3,0
+====
