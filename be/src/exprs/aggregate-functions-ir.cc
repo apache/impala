@@ -1961,6 +1961,75 @@ StringVal AggregateFunctions::DsThetaFinalizeSketch(
   return result;
 }
 
+void AggregateFunctions::DsThetaUnionInit(FunctionContext* ctx, StringVal* dst) {
+  AllocBuffer(ctx, dst, sizeof(datasketches::theta_union));
+  if (UNLIKELY(dst->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
+  datasketches::theta_union* union_ptr =
+      reinterpret_cast<datasketches::theta_union*>(dst->ptr);
+  datasketches::theta_union union_sketch = datasketches::theta_union::builder().build();
+  std::uninitialized_fill_n(union_ptr, 1, union_sketch);
+}
+
+void AggregateFunctions::DsThetaUnionUpdate(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::theta_union));
+  try {
+    auto src_sketch = datasketches::theta_sketch::deserialize((void*)src.ptr, src.len);
+    datasketches::theta_union* union_ptr =
+        reinterpret_cast<datasketches::theta_union*>(dst->ptr);
+    union_ptr->update(*src_sketch);
+  } catch (const std::exception&) {
+    LogSketchDeserializationError(ctx);
+  }
+}
+
+StringVal AggregateFunctions::DsThetaUnionSerialize(
+    FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::theta_union));
+  datasketches::theta_union* union_ptr =
+      reinterpret_cast<datasketches::theta_union*>(src.ptr);
+  StringVal dst = SerializeDsThetaUnion(ctx, *union_ptr);
+  ctx->Free(src.ptr);
+  return dst;
+}
+
+void AggregateFunctions::DsThetaUnionMerge(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  DCHECK(!src.is_null);
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::theta_union));
+
+  // Note, 'src' is a serialized compact_theta_sketch and not a serialized theta_union.
+  auto src_sketch = datasketches::theta_sketch::deserialize((void*)src.ptr, src.len);
+
+  datasketches::theta_union* dst_union_ptr =
+      reinterpret_cast<datasketches::theta_union*>(dst->ptr);
+
+  dst_union_ptr->update(*src_sketch);
+}
+
+StringVal AggregateFunctions::DsThetaUnionFinalize(
+    FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::theta_union));
+  datasketches::theta_union* union_ptr =
+      reinterpret_cast<datasketches::theta_union*>(src.ptr);
+  auto sketch = union_ptr->get_result();
+  if (sketch.is_empty()) {
+    ctx->Free(src.ptr);
+    return StringVal::null();
+  }
+  StringVal result = SerializeDsThetaSketch(ctx, sketch);
+  ctx->Free(src.ptr);
+  return result;
+}
+
 void AggregateFunctions::DsKllInitHelper(FunctionContext* ctx, StringVal* slot) {
   AllocBuffer(ctx, slot, sizeof(datasketches::kll_sketch<float>));
   if (UNLIKELY(slot->is_null)) {

@@ -1413,6 +1413,20 @@ public class BuiltinsDb extends Db {
             "18DsHllUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         true, false, true));
 
+    // DataSketches Theta union
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_theta_union",
+        Lists.<Type>newArrayList(Type.STRING), Type.STRING, Type.STRING,
+        prefix + "16DsThetaUnionInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix +
+            "18DsThetaUnionUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "17DsThetaUnionMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "21DsThetaUnionSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        prefix +
+            "20DsThetaUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        true, false, true));
+
     for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue; // NULL is handled through type promotion.
       if (t.isScalarType(PrimitiveType.CHAR)) continue; // promoted to STRING
