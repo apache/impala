@@ -101,12 +101,13 @@ AS SELECT id FROM functional.alltypes;
 AnalysisException: CREATE TABLE AS SELECT does not support the (ICEBERG) file format.
 ====
 ---- QUERY
-CREATE TABLE iceberg_overwrite (i int)
+CREATE TABLE iceberg_overwrite_bucket (i int)
+PARTITION BY SPEC (i bucket 3)
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
-INSERT OVERWRITE iceberg_overwrite VALUES (1), (2), (3);
+INSERT OVERWRITE iceberg_overwrite_bucket VALUES (1), (2), (3);
 ---- CATCH
-AnalysisException: INSERT OVERWRITE not supported for Iceberg tables.
+AnalysisException: The Iceberg table has BUCKET partitioning.
 ====
 ---- QUERY
 CREATE TABLE iceberg_hive_cat_with_cat_locaction (i int)

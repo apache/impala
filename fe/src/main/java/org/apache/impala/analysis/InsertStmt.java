@@ -549,9 +549,7 @@ public class InsertStmt extends StatementBase {
     }
 
     if (table_ instanceof FeIcebergTable) {
-      if (overwrite_) {
-        throw new AnalysisException("INSERT OVERWRITE not supported for Iceberg tables.");
-      }
+      if (overwrite_) validateNoBucketTransform((FeIcebergTable)table_);
       validateIcebergColumnsForInsert((FeIcebergTable)table_);
     }
 
@@ -570,6 +568,19 @@ public class InsertStmt extends StatementBase {
           throw new AnalysisException("The Iceberg table has a TIMESTAMPTZ " +
               "column that Impala cannot write.");
         }
+      }
+    }
+  }
+
+  private void validateNoBucketTransform(FeIcebergTable iceTable)
+      throws AnalysisException {
+    IcebergPartitionSpec spec = iceTable.getDefaultPartitionSpec();
+    if (!spec.hasPartitionFields()) return;
+    for (IcebergPartitionField field : spec.getIcebergPartitionFields()) {
+      if (field.getTransformType() == TIcebergPartitionTransformType.BUCKET) {
+          throw new AnalysisException("The Iceberg table has BUCKET partitioning. " +
+              "This means the outcome of dynamic partition overwrite is unforeseeable. " +
+              "Consider using TRUNCATE and INSERT INTO to overwrite your table.");
       }
     }
   }

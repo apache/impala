@@ -28,6 +28,7 @@ import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.DeleteFiles;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.ReplacePartitions;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -165,6 +166,48 @@ public class IcebergCatalogOpExecutor {
   }
 
   /**
+   * An auxiliary interface for the Append and Overwrite operations.
+   */
+  private static interface BatchWrite {
+    public void addFile(DataFile file);
+    public void commit();
+  }
+
+  private static class Append implements BatchWrite {
+    final private AppendFiles append;
+    public Append(org.apache.iceberg.Table tbl) {
+      append = tbl.newAppend();
+    }
+
+    @Override
+    public void addFile(DataFile file) {
+      append.appendFile(file);
+    }
+
+    @Override
+    public void commit() {
+      append.commit();
+    }
+  }
+
+  private static class DynamicOverwrite implements BatchWrite {
+    final private ReplacePartitions replace;
+    public DynamicOverwrite(org.apache.iceberg.Table tbl) {
+      replace = tbl.newReplacePartitions();
+    }
+
+    @Override
+    public void addFile(DataFile file) {
+      replace.addFile(file);
+    }
+
+    @Override
+    public void commit() {
+      replace.commit();
+    }
+  }
+
+  /**
    * Append the newly inserted data files to the Iceberg table using the AppendFiles
    * API.
    */
@@ -174,7 +217,12 @@ public class IcebergCatalogOpExecutor {
     org.apache.iceberg.Table nativeIcebergTable =
         IcebergUtil.loadTable(feIcebergTable);
     List<ByteBuffer> dataFilesFb = icebergOp.getIceberg_data_files_fb();
-    AppendFiles append = nativeIcebergTable.newAppend();
+    BatchWrite batchWrite;
+    if (icebergOp.isIs_overwrite()) {
+      batchWrite = new DynamicOverwrite(nativeIcebergTable);
+    } else {
+      batchWrite = new Append(nativeIcebergTable);
+    }
     for (ByteBuffer buf : dataFilesFb) {
       FbIcebergDataFile dataFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
       PartitionSpec partSpec = nativeIcebergTable.specs().get(icebergOp.getSpec_id());
@@ -188,9 +236,9 @@ public class IcebergCatalogOpExecutor {
           partSpec.partitionType(),
           feIcebergTable.getDefaultPartitionSpec(), dataFile.partitionPath());
       if (partitionData != null) builder.withPartition(partitionData);
-      append.appendFile(builder.build());
+      batchWrite.addFile(builder.build());
     }
-    append.commit();
+    batchWrite.commit();
   }
 
   /**

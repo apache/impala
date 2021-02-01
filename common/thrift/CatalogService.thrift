@@ -201,6 +201,9 @@ struct TIcebergOperationParam {
 
   // Iceberg data files to append to the table, encoded in FlatBuffers.
   2: required list<binary> iceberg_data_files_fb;
+
+  // Is overwrite operation
+  3: required bool is_overwrite = false;
 }
 
 // Updates the metastore with new partition information and returns a response
