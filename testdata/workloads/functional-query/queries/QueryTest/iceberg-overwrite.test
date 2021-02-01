@@ -1,0 +1,168 @@
+====
+---- QUERY
+# Create unpartitioned table for INSERT OVERWRITE
+create table ice_nopart (i int, j int)
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+INSERT INTO ice_nopart VALUES (1, 2);
+SELECT * FROM ice_nopart;
+---- RESULTS
+1,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+INSERT OVERWRITE ice_nopart VALUES (10, 20);
+SELECT * FROM ice_nopart;
+---- RESULTS
+10,20
+---- TYPES
+INT,INT
+====
+---- QUERY
+INSERT OVERWRITE ice_nopart select cast(i+1 as int), cast(j+1 as int) from ice_nopart;
+SELECT * FROM ice_nopart;
+---- RESULTS
+11,21
+---- TYPES
+INT,INT
+====
+---- QUERY
+# INSERT empty result set clears table.
+INSERT OVERWRITE ice_nopart select * from ice_nopart where false;
+select * from ice_nopart;
+---- RESULTS
+====
+---- QUERY
+# Create identity-partitioned table for INSERT OVERWRITE
+create table ice_ident (i int)
+partitioned by (j int)
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+INSERT INTO ice_ident VALUES (1, 2);
+SELECT * FROM ice_ident;
+---- RESULTS
+1,2
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Add values to a new partition keeping the old ones.
+INSERT OVERWRITE ice_ident VALUES (10, 20);
+SELECT * FROM ice_ident;
+---- RESULTS
+1,2
+10,20
+---- TYPES
+INT,INT
+====
+---- QUERY
+# INSERT only updates the affected partition.
+INSERT OVERWRITE ice_ident select cast(i+1 as int), j from ice_ident where j = 2;
+SELECT * FROM ice_ident;
+---- RESULTS
+2,2
+10,20
+---- TYPES
+INT,INT
+====
+---- QUERY
+# INSERT empty result set has no effect on partitioned table.
+INSERT OVERWRITE ice_ident select * from ice_ident where false;
+select * from ice_ident;
+---- RESULTS
+2,2
+10,20
+---- TYPES
+INT,INT
+====
+---- QUERY
+# Create DAY-partitioned table for INSERT OVERWRITE
+create table ice_day (ts timestamp)
+partition by spec (ts DAY)
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_day values ('2021-02-01 16:59:36.630928000');
+insert into ice_day values ('2021-02-02 16:59:36.630928000');
+insert into ice_day values ('2021-02-02 16:59:39.630928000');
+insert into ice_day values ('2021-02-03 16:59:36.630928000');
+====
+---- QUERY
+select * from ice_day;
+---- RESULTS
+2021-02-01 16:59:36.630928000
+2021-02-02 16:59:36.630928000
+2021-02-02 16:59:39.630928000
+2021-02-03 16:59:36.630928000
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+# Update data for partition '2021-02-02'.
+insert overwrite ice_day values ('2021-02-02 00:00:00');
+select * from ice_day;
+---- RESULTS
+2021-02-01 16:59:36.630928000
+2021-02-02 00:00:00
+2021-02-03 16:59:36.630928000
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+# INSERT empty result set has no effect on partitioned table.
+INSERT OVERWRITE ice_day select * from ice_day where false;
+select * from ice_day;
+---- RESULTS
+2021-02-01 16:59:36.630928000
+2021-02-02 00:00:00
+2021-02-03 16:59:36.630928000
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+# Create TRUNCATE-partitioned table for INSERT OVERWRITE
+create table ice_trunc (d decimal(10, 2))
+partition by spec (d TRUNCATE 100)
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_trunc values (1.11);
+insert into ice_trunc values (1.12);
+insert into ice_trunc values (2.22);
+insert into ice_trunc values (3.33);
+====
+---- QUERY
+select * from ice_trunc;
+---- RESULTS
+1.11
+1.12
+2.22
+3.33
+---- TYPES
+DECIMAL
+====
+---- QUERY
+insert overwrite ice_trunc values(1.88), (1.9), (3.99), (4.44), (4.45), (5);
+select * from ice_trunc
+---- RESULTS
+1.88
+1.90
+2.22
+3.99
+4.44
+4.45
+5.00
+---- TYPES
+DECIMAL
+====

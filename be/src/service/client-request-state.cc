@@ -1298,6 +1298,7 @@ Status ClientRequestState::UpdateCatalog() {
         TIcebergOperationParam& ice_op = catalog_update.iceberg_operation;
         ice_op.__set_spec_id(finalize_params.spec_id);
         ice_op.__set_iceberg_data_files_fb(createIcebergDataFilesVector(*dml_exec_state));
+        ice_op.__set_is_overwrite(finalize_params.is_overwrite);
       }
 
       Status cnxn_status;
