@@ -109,6 +109,15 @@ SELECT "quote \"", 'quote \''
 string, string
 ====
 ---- QUERY
+# IMPALA-9641: Empty double quotation should not cause infinite loop in the
+# ImpalaD Frontend
+SELECT 1 as "``"
+---- RESULTS
+1
+---- TYPES
+int
+====
+---- QUERY
 #  Select from table that contains unsupported primitive types
 SELECT int_col, str_col, bigint_col from functional.unsupported_types
 ---- RESULTS
