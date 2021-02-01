@@ -19,6 +19,10 @@ set(IMPALA_BASE_BUILD_CONTEXT_DIR
   ${CMAKE_SOURCE_DIR}/docker/build_context
 )
 
+set(IMPALA_UTILITY_BUILD_CONTEXT_DIR
+  ${CMAKE_SOURCE_DIR}/docker/build_context_utility
+)
+
 set(DOCKER_BUILD ${CMAKE_SOURCE_DIR}/docker/docker-build.sh)
 
 find_program(LSB_RELEASE_EXEC lsb_release)
@@ -79,7 +83,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
   add_custom_target(docker_images)
   add_custom_target(docker_debug_images)
 
-  set(daemon_image_names "")
+  set(exported_image_names "")
 
   # Add a target with name 'target' to build a daemon image for the daemon with
   # name 'daemon_name', e.g. "impalad_executor". The image is tagged as 'image_name'.
@@ -98,7 +102,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       COMMENT "Building ${image_name} docker image."
       VERBATIM
     )
-    set(daemon_image_names "${daemon_image_names} ${image_name}" PARENT_SCOPE)
+    set(exported_image_names "${exported_image_names} ${image_name}" PARENT_SCOPE)
   endfunction()
 
   # Add debug and release docker image targets for the given daemon e.g. if called
@@ -113,7 +117,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
     add_daemon_docker_image(${debug_target} ${daemon_name} ${debug_image} debug)
     ADD_DEPENDENCIES(docker_images ${release_target})
     ADD_DEPENDENCIES(docker_debug_images ${debug_target})
-    set(daemon_image_names "${daemon_image_names} ${release_image}" PARENT_SCOPE)
+    set(exported_image_names "${exported_image_names} ${release_image}" PARENT_SCOPE)
   endfunction()
 
   # Stamp out image targets for all of the Impala daemons.
@@ -123,9 +127,6 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
   add_daemon_docker_images(catalogd)
   add_daemon_docker_images(statestored)
   add_daemon_docker_images(admissiond)
-
-  # Generate a text file with all of the release daemon images.
-  file(WRITE ${CMAKE_SOURCE_DIR}/docker/docker-images.txt "${daemon_image_names}")
 
   # HMS quickstart image, which requires Hive and Hadoop builds.
   set(quickstart_hms_build_dir ${CMAKE_SOURCE_DIR}/docker/quickstart_hms)
@@ -155,5 +156,42 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
     COMMENT "Building quickstart client docker image."
     VERBATIM
   )
-endif()
 
+  # Add a target to build utility docker images for 'build_type'. 'build_context_args' are
+  # passed to the setup_build_context.py script.
+  function(add_utility_images profile_tool_target profile_tool_image build_type build_context_args)
+    # Build context depends on daemons and frontend jars.
+    # Sending the whole impala workspace including test binaries, testdata, etc
+    # to the docker daemon can be very expensive, so we create a build context
+    # with symlinks
+    add_custom_target(impala_utility_build_context_${build_type}
+      COMMAND ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py ${build_context_args} --utility-context
+      DEPENDS impala-profile-tool ${CMAKE_SOURCE_DIR}/docker/setup_build_context.py
+      COMMENT "Creating impala utility build context build_type=${build_type}."
+      VERBATIM
+    )
+    # Target for the Impala profile tool image.
+    add_custom_target(${profile_tool_target}
+      # Run docker build inside the build context directory so that all dependencies are
+      # sent to the docker daemon. This allows the Dockerfile build to copy all necessary
+      # dependencies.
+      COMMAND tar cvh . -C ${CMAKE_SOURCE_DIR}/docker/impala_profile_tool/ . |
+              ${DOCKER_BUILD} -t ${profile_tool_image}
+                  --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -
+      WORKING_DIRECTORY ${IMPALA_UTILITY_BUILD_CONTEXT_DIR}/${build_type}
+      DEPENDS impala_utility_build_context_${build_type} ${CMAKE_SOURCE_DIR}/docker/impala_profile_tool/Dockerfile
+      DEPENDS ${CMAKE_SOURCE_DIR}/docker/utility_entrypoint.sh
+      COMMENT "Building Impala profile tool docker image build_type=${build_type}."
+      VERBATIM
+    )
+    set(exported_image_names "${exported_image_names} ${profile_tool_target}" PARENT_SCOPE)
+  endfunction()
+  add_utility_images(impala_profile_tool_image impala_profile_tool release "")
+  add_utility_images(impala_profile_tool_debug_image impala_profile_tool_debug debug "--debug-build")
+
+  ADD_DEPENDENCIES(docker_images impala_profile_tool_image)
+  ADD_DEPENDENCIES(docker_debug_images impala_profile_tool_debug_image)
+
+  # Generate a text file with all of the release daemon images.
+  file(WRITE ${CMAKE_SOURCE_DIR}/docker/docker-images.txt "${exported_image_names}")
+endif()
