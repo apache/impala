@@ -621,6 +621,15 @@ enum TImpalaQueryOptions {
   // If true, strings are processed in a UTF-8 aware way, e.g. counting lengths by UTF-8
   // characters instead of bytes.
   UTF8_MODE = 120
+
+  // If > 0, the rank()/row_number() pushdown into pre-analytic sorts is enabled
+  // if the limit would be less than or equal to the threshold.
+  // If 0 or -1, disables the optimization (i.e. falls back to pre-Impala-4.0
+  // behaviour).
+  // Default is 1000. Setting it higher increases the max size of the in-memory heaps
+  // used in the top-n operation. The larger the heaps, the less beneficial the
+  // optimization is compared to a full sort and the more potential for perf regressions.
+  ANALYTIC_RANK_PUSHDOWN_THRESHOLD = 121
 }
 
 // The summary of a DML statement.

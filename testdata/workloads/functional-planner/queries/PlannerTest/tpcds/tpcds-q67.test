@@ -73,6 +73,7 @@ PLAN-ROOT SINK
 09:TOP-N
 |  order by: CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN i_category WHEN 7 THEN i_category WHEN 8 THEN i_category WHEN 9 THEN i_category WHEN 10 THEN i_category WHEN 11 THEN i_category WHEN 12 THEN NULL END ASC NULLS LAST, aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END) DESC
 |  limit with ties: 200
+|  source expr: rank() <= CAST(100 AS BIGINT)
 |  mem-estimate=17.97KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=25 row-size=92B cardinality=200
 |  in pipelines: 09(GETNEXT), 08(OPEN)
@@ -240,6 +241,7 @@ Per-Host Resources: mem-estimate=43.90GB mem-reservation=244.75MB thread-reserva
 09:TOP-N
 |  order by: CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN i_category WHEN 5 THEN i_category WHEN 6 THEN i_category WHEN 7 THEN i_category WHEN 8 THEN i_category WHEN 9 THEN i_category WHEN 10 THEN i_category WHEN 11 THEN i_category WHEN 12 THEN NULL END ASC NULLS LAST, aggif(valid_tid(4,5,6,7,8,9,10,11,12) IN (4, 5, 6, 7, 8, 9, 10, 11, 12), CASE valid_tid(4,5,6,7,8,9,10,11,12) WHEN 4 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 5 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 6 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 7 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 8 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 9 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 10 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 11 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) WHEN 12 THEN sum(coalesce(ss_sales_price * ss_quantity, 0)) END) DESC
 |  limit with ties: 200
+|  source expr: rank() <= CAST(100 AS BIGINT)
 |  mem-estimate=17.97KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=25 row-size=92B cardinality=200
 |  in pipelines: 09(GETNEXT), 08(OPEN)

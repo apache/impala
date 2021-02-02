@@ -473,13 +473,16 @@ enum TSortType {
 
   // Divide the input into batches, each of which is sorted individually.
   PARTIAL = 2
+
+  // Return the first N sorted elements from each partition.
+  PARTITIONED_TOPN = 3
 }
 
 struct TSortNode {
   1: required TSortInfo sort_info
   2: required TSortType type
   // This is the number of rows to skip before returning results.
-  // Not used with TSortType::PARTIAL.
+  // Not used with TSortType::PARTIAL or TSortType::PARTITIONED_TOPN.
   3: optional i64 offset
 
   // Estimated bytes of input that will go into this sort node across all backends.
@@ -491,6 +494,16 @@ struct TSortNode {
 
   // If include_ties is true, the limit including ties.
   6: optional i64 limit_with_ties
+
+  // Max number of rows to return per partition.
+  // Used only with TSortType::PARTITIONED_TOPN
+  7: optional i64 per_partition_limit
+  // Used only with TSortType::PARTITIONED_TOPN - expressions over
+  // the sort tuple to use as the partition key.
+  8: optional list<Exprs.TExpr> partition_exprs
+  // Used only with TSortType::PARTITIONED_TOPN - sort info for ordering
+  // within a partition.
+  9: optional TSortInfo intra_partition_sort_info
 }
 
 enum TAnalyticWindowType {

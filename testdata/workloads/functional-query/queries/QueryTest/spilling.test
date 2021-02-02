@@ -366,3 +366,69 @@ BIGINT
 # Verify that at least one of the joins was spilled.
 row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
 ====
+---- QUERY
+# Spilling partitioned top-N.
+# Find suppliers with two or more duplicate l_extendedprice values tied for last place.
+# This has a relatively high partition count because it partitions by suppliers, so
+# it ends up falling back to doing a full, spilling, sort.
+set buffer_pool_limit=100m;
+SELECT s_name, min(l_quantity), min(l_extendedprice), min(l_discount), min(l_tax),
+       count(*)
+FROM   (SELECT s_name, lineitem.*, Rank()
+                 OVER(PARTITION BY s_name
+                   ORDER BY l_extendedprice) AS rank
+        FROM   lineitem join supplier on l_suppkey = s_suppkey) a
+WHERE rank < 500
+group by s_name
+having count(*) > 500
+order by s_name
+---- RESULTS
+'Supplier#000001076',1.00,989.07,0.00,0.00,501
+'Supplier#000001645',1.00,1048.14,0.00,0.00,501
+'Supplier#000002145',1.00,1046.14,0.00,0.00,501
+'Supplier#000002197',1.00,1103.19,0.00,0.00,501
+'Supplier#000002269',1.00,1220.26,0.00,0.00,501
+'Supplier#000002435',1.00,1365.42,0.00,0.00,501
+'Supplier#000002644',1.00,1076.13,0.00,0.00,501
+'Supplier#000002741',1.00,1145.24,0.00,0.00,501
+'Supplier#000002827',1.00,1287.30,0.00,0.00,501
+'Supplier#000002986',1.00,1397.48,0.00,0.00,501
+'Supplier#000003304',1.00,1236.30,0.00,0.00,501
+'Supplier#000003631',1.00,1049.12,0.00,0.00,501
+'Supplier#000003646',1.00,1058.14,0.00,0.00,501
+'Supplier#000003695',1.00,1104.19,0.00,0.00,501
+'Supplier#000003811',1.00,1256.30,0.00,0.00,501
+'Supplier#000004068',1.00,981.06,0.00,0.00,501
+'Supplier#000004131',1.00,1054.13,0.00,0.00,501
+'Supplier#000004371',1.00,1284.37,0.00,0.00,501
+'Supplier#000004442',1.00,1395.44,0.00,0.00,501
+'Supplier#000004443',1.00,1346.44,0.00,0.00,501
+'Supplier#000004913',1.00,1368.39,0.00,0.00,501
+'Supplier#000004924',1.00,1330.42,0.00,0.00,501
+'Supplier#000004926',1.00,1426.41,0.00,0.00,501
+'Supplier#000004931',1.00,1368.42,0.00,0.00,501
+'Supplier#000004941',1.00,1368.43,0.00,0.00,501
+'Supplier#000005166',1.00,1080.16,0.00,0.00,501
+'Supplier#000005400',1.00,1299.39,0.00,0.00,501
+'Supplier#000005468',1.00,1367.46,0.00,0.00,501
+'Supplier#000005852',1.00,1254.35,0.00,0.00,501
+'Supplier#000006397',1.00,1342.39,0.00,0.00,501
+'Supplier#000007646',1.00,1045.14,0.00,0.00,501
+'Supplier#000007830',1.00,1234.32,0.00,0.00,501
+'Supplier#000008157',1.00,1144.15,0.00,0.00,501
+'Supplier#000008432',1.00,1414.41,0.00,0.00,501
+'Supplier#000008720',1.00,1143.21,0.00,0.00,501
+'Supplier#000008787',1.00,1192.28,0.00,0.00,501
+'Supplier#000008851',1.00,1251.35,0.00,0.00,501
+'Supplier#000008859',1.00,1259.35,0.00,0.00,501
+'Supplier#000009255',1.00,1163.25,0.00,0.00,501
+'Supplier#000009675',1.00,1139.14,0.00,0.00,501
+'Supplier#000009847',1.00,1262.34,0.00,0.00,501
+'Supplier#000009883',1.00,1298.37,0.00,0.00,501
+---- TYPES
+STRING,DECIMAL,DECIMAL,DECIMAL,DECIMAL,BIGINT
+---- RUNTIME_PROFILE
+# Verify that at least one of the Top-N operators spilled.
+row_regex: .*InMemoryHeapsEvicted: .* \([1-9][0-9]*\)
+#row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
+====

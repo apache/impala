@@ -266,9 +266,19 @@ public class SortInfo {
    * operator and 'offset' is the value in the 'OFFSET [x]' clause.
    */
   public long estimateTopNMaterializedSize(long cardinality, long offset) {
+    long totalRows = PlanNode.checkedAdd(cardinality, offset);
+    return estimateMaterializedSize(totalRows);
+  }
+
+  /**
+   * Estimates the size of 'totalRows' rows for this sort materialized in memory.
+   * The method uses the formula <code>estimatedSize = estimated # of rows in memory *
+   * average tuple serialized size</code>.
+   */
+  public long estimateMaterializedSize(long totalRows) {
     getSortTupleDescriptor().computeMemLayout();
     return (long) Math.ceil(getSortTupleDescriptor().getAvgSerializedSize()
-        * (PlanNode.checkedAdd(cardinality, offset)));
+        * totalRows);
   }
 
   /**

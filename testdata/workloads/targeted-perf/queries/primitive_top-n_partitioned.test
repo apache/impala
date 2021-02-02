@@ -1,0 +1,45 @@
+====
+---- QUERY: primitive_top-n_partitioned
+-- Description : Scan a fact table and evaluate a partitioned top-n query
+SELECT *
+FROM   (SELECT l_shipmode, Rank()
+                 OVER(PARTITION BY l_shipmode
+                   ORDER BY l_orderkey) AS rank
+        FROM   lineitem
+        WHERE  l_shipdate < '1992-05-09') a
+WHERE rank < 5
+---- RESULTS:  VERIFY_IS_EQUAL_SORTED
+'AIR',1
+'AIR',2
+'AIR',3
+'AIR',4
+'FOB',1
+'FOB',2
+'FOB',3
+'FOB',4
+'MAIL',1
+'MAIL',2
+'MAIL',3
+'MAIL',4
+'RAIL',1
+'RAIL',2
+'RAIL',3
+'RAIL',4
+'REG AIR',1
+'REG AIR',1
+'REG AIR',3
+'REG AIR',4
+'REG AIR',4
+'SHIP',1
+'SHIP',2
+'SHIP',3
+'SHIP',4
+'TRUCK',1
+'TRUCK',2
+'TRUCK',3
+'TRUCK',4
+'TRUCK',4
+'TRUCK',4
+---- TYPES
+STRING,BIGINT
+====

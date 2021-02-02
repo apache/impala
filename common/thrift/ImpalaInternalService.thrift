@@ -480,6 +480,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   121: optional bool utf8_mode = false;
+
+  // See comment in ImpalaService.thrift
+  122: optional i64 analytic_rank_pushdown_threshold = 1000;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

@@ -132,9 +132,14 @@ class TestQueries(ImpalaTestSuite):
     if vector.get_value('table_format').file_format == 'hbase':
       pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")
     vector.get_value('exec_option')['disable_outermost_topn'] = 1
+    vector.get_value('exec_option')['analytic_rank_pushdown_threshold'] = 0
     self.run_test_case('QueryTest/sort', vector)
     # We can get the sort tests for free from the top-n file
     self.run_test_case('QueryTest/top-n', vector)
+
+  def test_partitioned_top_n(self, vector):
+    """Test partitioned Top-N operator."""
+    self.run_test_case('QueryTest/partitioned-top-n', vector)
 
   def test_inline_view(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':

@@ -1219,6 +1219,17 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
+   * Create a clone of the expression including analysis state with a different
+   * selectivity.
+   */
+  public Expr cloneAndOverrideSelectivity(double selectivity) {
+    Preconditions.checkArgument(selectivity >= 0.0 && selectivity <= 1.0, selectivity);
+    Expr e = clone();
+    e.selectivity_ = selectivity;
+    return e;
+  }
+
+  /**
    * Removes duplicate exprs (according to equals()).
    */
   public static <C extends Expr> void removeDuplicates(List<C> l) {
@@ -1414,6 +1425,19 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     for (Expr e: exprs) {
       e.getIds(tupleIds, slotIds);
     }
+  }
+
+  /**
+   * Returns true if this expression tree references a slot in the tuple identified
+   * by tid.
+   */
+  public boolean referencesTuple(TupleId tid) {
+    // This is the default implementation. Expr subclasses that reference slots in
+    // tuples, i.e. SlotRef, must override this.
+    for (Expr child: children_) {
+      if (child.referencesTuple(tid)) return true;
+    }
+    return false;
   }
 
   /**

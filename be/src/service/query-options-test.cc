@@ -280,6 +280,7 @@ TEST(QueryOptions, SetBigIntOptions) {
       {MAKE_OPTIONDEF(cpu_limit_s), {0, I64_MAX}},
       {MAKE_OPTIONDEF(num_rows_produced_limit), {0, I64_MAX}},
       {MAKE_OPTIONDEF(join_rows_produced_limit), {0, I64_MAX}},
+      {MAKE_OPTIONDEF(analytic_rank_pushdown_threshold), {-1, I64_MAX}},
   };
   for (const auto& test_case : case_set) {
     const OptionDef<int64_t>& option_def = test_case.first;

@@ -17,25 +17,31 @@
 
 package org.apache.impala.planner;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import org.apache.curator.shaded.com.google.common.collect.Iterables;
 import org.apache.impala.analysis.AggregateInfoBase;
 import org.apache.impala.analysis.AnalyticExpr;
 import org.apache.impala.analysis.AnalyticInfo;
 import org.apache.impala.analysis.AnalyticWindow;
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.OrderByElement;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.SortInfo;
+import org.apache.impala.analysis.ToSqlOptions;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
+import org.apache.impala.catalog.Function;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TSortingOrder;
 import org.slf4j.Logger;
@@ -85,6 +91,8 @@ public class AnalyticPlanner {
    * 'groupingExprs'; if this is non-null, it returns in 'inputPartitionExprs'
    * a subset of the grouping exprs which should be used for the aggregate
    * hash partitioning during the parallelization of 'root'.
+   * Any unassigned conjuncts from 'analyzer_' are applied after analytic functions are
+   * evaluated.
    * TODO: when generating sort orders for the sort groups, optimize the ordering
    * of the partition exprs (so that subsequent sort operations see the input sorted
    * on a prefix of their required sort exprs)
@@ -93,6 +101,18 @@ public class AnalyticPlanner {
    */
   public PlanNode createSingleNodePlan(PlanNode root,
       List<Expr> groupingExprs, List<Expr> inputPartitionExprs) throws ImpalaException {
+    // Identify predicates that reference the logical analytic tuple (this logical
+    // analytic tuple is replaced by different physical ones during planning)
+    List<TupleId> tids = new ArrayList<>();
+    tids.addAll(root.getTupleIds());
+    tids.add(analyticInfo_.getOutputTupleId());
+    List<Expr> analyticConjs = analyzer_.getUnassignedConjuncts(tids);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Analytic conjuncts: " +
+            Expr.listToSql(analyticConjs, ToSqlOptions.SHOW_IMPLICIT_CASTS));
+    }
+
+    List<PartitionLimit> perPartitionLimits = inferPartitionLimits(analyticConjs);
     List<WindowGroup> windowGroups = collectWindowGroups();
     for (int i = 0; i < windowGroups.size(); ++i) {
       windowGroups.get(i).init(analyzer_, "wg-" + i);
@@ -111,13 +131,43 @@ public class AnalyticPlanner {
           partitionGroups, groupingExprs, root.getNumInstances(), inputPartitionExprs);
     }
 
-    for (PartitionGroup partitionGroup: partitionGroups) {
-      for (int i = 0; i < partitionGroup.sortGroups.size(); ++i) {
-        root = createSortGroupPlan(root, partitionGroup.sortGroups.get(i),
-            i == 0 ? partitionGroup.partitionByExprs : null);
+    for (int i = 0; i < partitionGroups.size(); ++i) {
+      PartitionGroup partitionGroup = partitionGroups.get(i);
+      for (int j = 0; j < partitionGroup.sortGroups.size(); ++j) {
+        boolean lastSortGroup = (i == partitionGroups.size() - 1) &&
+                (j == partitionGroup.sortGroups.size() - 1);
+        root = createSortGroupPlan(root, partitionGroup.sortGroups.get(j),
+            j == 0 ? partitionGroup.partitionByExprs : null,
+            lastSortGroup ? perPartitionLimits : null);
       }
     }
-    return root;
+
+    List<Expr> substAnalyticConjs =
+        Expr.substituteList(analyticConjs, root.getOutputSmap(), analyzer_, false);
+    overrideSelectivityPushedLimits(analyticConjs, perPartitionLimits,
+            substAnalyticConjs);
+    return root.addConjunctsToNode(ctx_, analyzer_, tids, substAnalyticConjs);
+  }
+
+  /**
+   * Update selectivity of conjuncts in 'substAnalyticConjs' to reflect those that
+   * were pushed to a partitioned top-n.
+   *
+   * 'analyticConjs' and 'substAnalyticConjs' are the original conjuncts (matching
+   * the conjuncts in 'perPartitionLimits' and the substituted conjuncts and
+   * correspond to each other one to one.
+   */
+  private void overrideSelectivityPushedLimits(List<Expr> analyticConjs,
+          List<PartitionLimit> perPartitionLimits, List<Expr> substAnalyticConjs) {
+    for (PartitionLimit limit : perPartitionLimits) {
+      if (limit.pushed && limit.isLessThan) {
+        int idx = analyticConjs.indexOf(limit.conjunct);
+        if (idx >= 0) {
+          substAnalyticConjs.set(idx,
+                  substAnalyticConjs.get(idx).cloneAndOverrideSelectivity(1.0));
+        }
+      }
+    }
   }
 
   /**
@@ -328,9 +378,13 @@ public class AnalyticPlanner {
    * Marks the SortNode as requiring its input to be partitioned if partitionExprs
    * is not null (partitionExprs represent the data partition of the entire partition
    * group of which this sort group is a part).
+   *
+   * If 'perPartitionLimits' is non-null, attempt to place these limits in the sort.
+   * Any placed limits have 'pushed' set to true.
    */
   private PlanNode createSortGroupPlan(PlanNode root, SortGroup sortGroup,
-      List<Expr> partitionExprs) throws ImpalaException {
+      List<Expr> partitionExprs, List<PartitionLimit> perPartitionLimits)
+              throws ImpalaException {
     List<Expr> partitionByExprs = sortGroup.partitionByExprs;
     List<OrderByElement> orderByElements = sortGroup.orderByElements;
     boolean hasActivePartition = !Expr.allConstant(partitionByExprs);
@@ -367,8 +421,51 @@ public class AnalyticPlanner {
       SortInfo sortInfo = createSortInfo(root, sortExprs, isAsc, nullsFirst);
       // IMPALA-8533: Avoid generating sort with empty tuple descriptor
       if(sortInfo.getSortTupleDescriptor().getSlots().size() > 0) {
-        sortNode =
-            SortNode.createTotalSortNode(ctx_.getNextNodeId(), root, sortInfo, 0);
+        // Select the lowest limit to push into the sort. Other limit conjuncts will
+        // be added later, if needed. We could try to merge limits together when one
+        // dominates the other, e.g. RANK() < 10 and RANK() < 20. However, for
+        // simplicity, and in particular to avoid the need to handle cases where neither
+        // dominates the other, e.g. ROW_NUMBER() < 10 and RANK() < 20, we only pick one
+        // limit. Remaining limits will be assigned as predicates later in analytic
+        // planning.
+        PartitionLimit limit = null;
+        if (perPartitionLimits != null && sortGroup.windowGroups.size() == 1) {
+          for (PartitionLimit p : perPartitionLimits) {
+            if (sortGroup.windowGroups.get(0).analyticExprs.contains(p.analyticExpr)) {
+              if (limit == null || p.limit < limit.limit) {
+                limit = p;
+              }
+            }
+          }
+        }
+
+        if (limit == null ||
+            limit.limit > analyzer_.getQueryOptions().analytic_rank_pushdown_threshold) {
+          // Generate a full sort if no limit is known, or if the limit is large enough
+          // to disable rank pushed. Even if a limit is known, the full sort can be more
+          // efficient the the in-memory top-n if the limit is large enough.
+          sortNode = SortNode.createTotalSortNode(
+               ctx_.getNextNodeId(), root, sortInfo, 0);
+        } else {
+          // The backend can't handle limits < 1. We need to apply a limit of 1, and
+          // evaluate the predicate later.
+          // TODO: IMPALA-10015: we should instead generate an empty set plan that
+          // produces the appropriate tuples. This would require short-circuiting plan
+          // generation to avoid generating the whole select plan.
+          long planNodeLimit = Math.max(1, limit.limit);
+          // Convert to standard top-N if only one partition.
+          if (Iterables.all(partitionByExprs, Expr.IS_LITERAL_VALUE)) {
+            sortNode = SortNode.createTopNSortNode(ctx_.getQueryOptions(),
+                    ctx_.getNextNodeId(), root, sortInfo, 0, planNodeLimit,
+                    limit.includeTies);
+          } else {
+            sortNode = SortNode.createPartitionedTopNSortNode(
+                    ctx_.getNextNodeId(), root, sortInfo, partitionByExprs.size(),
+                    planNodeLimit, limit.includeTies);
+          }
+          sortNode.setLimitSrcPred(limit.conjunct);
+          limit.markPushed();
+        }
 
         // if this sort group does not have partitioning exprs, we want the sort
         // to be executed like a regular distributed sort
@@ -382,7 +479,6 @@ public class AnalyticPlanner {
           }
           sortNode.setInputPartition(inputPartition);
         }
-
         root = sortNode;
         root.init(analyzer_);
       }
@@ -757,5 +853,127 @@ public class AnalyticPlanner {
       if (!match) partitionGroups.add(new PartitionGroup(sortGroup));
     }
     return partitionGroups;
+  }
+
+  private static class PartitionLimit {
+    public PartitionLimit(Expr conjunct, AnalyticExpr analyticExpr, long limit,
+            boolean includeTies, boolean isLessThan) {
+      this.conjunct = conjunct;
+      this.analyticExpr = analyticExpr;
+      this.limit = limit;
+      this.includeTies = includeTies;
+      this.isLessThan = isLessThan;
+      this.pushed = false;
+    }
+
+    /// The conjunct that this was derived from.
+    public final Expr conjunct;
+
+    /// The ranking analytic expr that this limit was inferred from.
+    public final AnalyticExpr analyticExpr;
+
+    /// The limit on rows per partition returned.
+    public final long limit;
+
+    /// Whether ties for last place need to be included.
+    public final boolean includeTies;
+
+    /// Whether the source predicate was a simple < or <= inequality.
+    /// I.e. false for = and true for < and <=.
+    public final boolean isLessThan;
+
+    /// Whether the limit was pushed to a top-n operator.
+    private boolean pushed;
+
+    public boolean isPushed() {
+      return pushed;
+    }
+
+    public void markPushed() {
+      this.pushed = true;
+    }
+  }
+
+  /**
+   * Extract per-partition limits from 'conjuncts'.
+   */
+  private List<PartitionLimit> inferPartitionLimits(List<Expr> conjuncts) {
+    List<PartitionLimit> result = new ArrayList<>();
+    if (analyzer_.getQueryOptions().analytic_rank_pushdown_threshold <= 0) return result;
+    for (Expr conj : conjuncts) {
+      if (!(Expr.IS_BINARY_PREDICATE.apply(conj))) continue;
+      BinaryPredicate pred = (BinaryPredicate) conj;
+      Expr lhs = pred.getChild(0);
+      Expr rhs = pred.getChild(1);
+      // Lhs of the binary predicate must be a ranking function.
+      // Also, it must be bound to the output tuple of this analytic eval node
+      if (!(lhs instanceof SlotRef)) continue;
+
+      List<Expr> lhsSourceExprs = ((SlotRef) lhs).getDesc().getSourceExprs();
+      if (lhsSourceExprs.size() > 1 ||
+            !(lhsSourceExprs.get(0) instanceof AnalyticExpr)) {
+        continue;
+      }
+
+      boolean includeTies;
+      AnalyticExpr analyticExpr = (AnalyticExpr) lhsSourceExprs.get(0);
+      Function fn = analyticExpr.getFnCall().getFn();
+      // Check if this a predicate that we can convert to a limit in the sort.
+      // We do not have the runtime support that would be required to handle
+      // DENSE_RANK().
+      if (AnalyticExpr.isAnalyticFn(fn, AnalyticExpr.RANK)) {
+        // RANK() assigns equal values to rows where the ORDER BY expressions are equal.
+        // Thus if there are ties for the max RANK() value to be returned, we need to
+        // return all of them. E.g. if the predicate is RANK() <= 3, and the values we are
+        // ordering by are 1, 42, 99, 99, 100, then the RANK() values are 1, 2, 3, 3, 5
+        // and we need to return the top 4 rows: 1, 42, 99, 99.
+        // We do not need special handling for ties except at the limit value. E.g. if
+        // the ordering values were 1, 1, 42, 99, 100, then the RANK() values would be
+        // 1, 1, 3, 4, 5 and we only return the top 3.
+        includeTies = true;
+      } else if (AnalyticExpr.isAnalyticFn(fn, AnalyticExpr.ROWNUMBER)) {
+        includeTies = false;
+      } else {
+        continue;
+      }
+
+      AnalyticWindow window = analyticExpr.getWindow();
+      // Check that the window frame is UNBOUNDED PRECEDING to CURRENT ROW,
+      // i.e. that the function monotonically increases from 1 within the window.
+      if (window.getLeftBoundary().getType() !=
+            AnalyticWindow.BoundaryType.UNBOUNDED_PRECEDING
+          || window.getRightBoundary().getType() !=
+              AnalyticWindow.BoundaryType.CURRENT_ROW) {
+        continue;
+      }
+
+      // Next, try to extract a numeric limit that will apply to the analytic function.
+      if (!(rhs instanceof NumericLiteral)) continue;
+      BigDecimal val = ((NumericLiteral)rhs).getValue();
+      if (val.compareTo(new BigDecimal(Long.MAX_VALUE)) > 0) {
+        continue;
+      }
+      // Round down to the nearest long.
+      long longVal = val.longValue();
+      long perPartitionLimit;
+      // currently, restrict the pushdown for =, <, <= predicates
+      if (pred.getOp() == BinaryPredicate.Operator.EQ ||
+              pred.getOp() == BinaryPredicate.Operator.LE) {
+        perPartitionLimit = longVal;
+      } else if (pred.getOp() == BinaryPredicate.Operator.LT) {
+        perPartitionLimit = longVal - 1;
+      } else {
+        continue;
+      }
+      boolean isLessThan = pred.getOp() == BinaryPredicate.Operator.LE ||
+              pred.getOp() == BinaryPredicate.Operator.LT;
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(analyticExpr.debugString() + " implies per-partition limit " +
+             perPartitionLimit + " includeTies=" + includeTies);
+      }
+      result.add(new PartitionLimit(
+              conj, analyticExpr, perPartitionLimit, includeTies, isLessThan));
+    }
+    return result;
   }
 }

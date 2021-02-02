@@ -26,7 +26,7 @@ FROM (
   FROM lineitem
   WHERE l_shipdate < '1992-05-09'
   ) a
-WHERE rank < 10;
+WHERE rank < 10 or rank > 99999999999
 ---- RESULTS
 1
 2

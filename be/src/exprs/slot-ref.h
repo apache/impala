@@ -41,14 +41,14 @@ class SlotRef : public ScalarExpr {
   SlotRef(const TExprNode& node);
   SlotRef(const SlotDescriptor* desc);
 
-  /// TODO: this is a hack to allow aggregation nodes to work around NULL slot
-  /// descriptors. Ideally the FE would dictate the type of the intermediate SlotRefs.
+  /// Instantiate a SlotRef for internal use in the backend (in cases where the frontend
+  /// does not generate the appropriate exprs).
   SlotRef(const SlotDescriptor* desc, const ColumnType& type);
 
   /// Used for testing.  GetValue will return tuple + offset interpreted as 'type'
   SlotRef(const ColumnType& type, int offset, const bool nullable = false);
 
-  /// Exposed as public so AGG node can initialize its build expressions.
+  /// Initialize a SlotRef that was directly constructed by backend.
   virtual Status Init(const RowDescriptor& row_desc, bool is_entry_point,
       FragmentState* state) override WARN_UNUSED_RESULT;
   virtual std::string DebugString() const override;

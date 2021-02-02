@@ -44,3 +44,6 @@ class TestTargetedPerf(ImpalaTestSuite):
 
   def test_perf_cancel_union(self, vector):
     self.run_test_case('primitive_cancel_union', vector)
+
+  def test_perf_topn_partitioned(self, vector):
+    self.run_test_case('primitive_top-n_partitioned', vector)

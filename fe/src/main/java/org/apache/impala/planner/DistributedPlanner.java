@@ -1086,7 +1086,7 @@ public class DistributedPlanner {
       // Make sure the childFragment's output is partitioned as required by the sortNode.
       DataPartition sortPartition = sortNode.getInputPartition();
       if (!childFragment.getDataPartition().equals(sortPartition)) {
-        if (sortNode.isTypeTopN()) {
+        if (sortNode.isTypeTopN() || sortNode.isPartitionedTopN()) {
           lowerTopN = sortNode;
           childFragment.addPlanRoot(lowerTopN);
           // Update partitioning exprs to reference sort tuple.
@@ -1106,10 +1106,18 @@ public class DistributedPlanner {
     }
     if (addedLowerTopN) {
       // Create the upper TopN node
-      SortNode upperTopN = SortNode.createTopNSortNode(ctx_.getQueryOptions(),
+      SortNode upperTopN;
+      if (lowerTopN.isTypeTopN()) {
+        upperTopN = SortNode.createTopNSortNode(ctx_.getQueryOptions(),
               ctx_.getNextNodeId(), childFragment.getPlanRoot(),
               lowerTopN.getSortInfo(), sortNode.getOffset(), lowerTopN.getSortLimit(),
               lowerTopN.isIncludeTies());
+      } else {
+        upperTopN = SortNode.createPartitionedTopNSortNode(
+                ctx_.getNextNodeId(), childFragment.getPlanRoot(),
+                lowerTopN.getSortInfo(), lowerTopN.getNumPartitionExprs(),
+                lowerTopN.getPerPartitionLimit(), lowerTopN.isIncludeTies());
+      }
       upperTopN.setIsAnalyticSort(true);
       upperTopN.init(ctx_.getRootAnalyzer());
       // connect this to the analytic eval node
@@ -1143,15 +1151,28 @@ public class DistributedPlanner {
     if (node.isIncludeTies()) {
       Preconditions.checkState(node.getOffset() == 0,
               "Tie handling with offset not supported");
-      // TopN that returns ties needs special handling because ties are not handled
-      // correctly by the ExchangeNode limit. We need to generate a top-n on top
-      // of the exchange to correctly merge the input.
-      SortNode parentSortNode = SortNode.createTopNSortNode(
-              ctx_.getQueryOptions(), ctx_.getNextNodeId(), exchNode,
-              childSortNode.getSortInfo(), 0, node.getSortLimit(),
-              childSortNode.isIncludeTies());
-      parentSortNode.init(ctx_.getRootAnalyzer());
-      mergeFragment.addPlanRoot(parentSortNode);
+      if (node.isPartitionedTopN()) {
+        // Partitioned TopN that returns ties needs special handling because ties are not
+        // handled correctly by the ExchangeNode limit. We need to generate a partitioned
+        // top-n on top of the exchange to correctly merge the input.
+        SortNode parentSortNode = SortNode.createPartitionedTopNSortNode(
+                ctx_.getNextNodeId(), exchNode, childSortNode.getSortInfo(),
+                childSortNode.getNumPartitionExprs(),
+                childSortNode.getPerPartitionLimit(), childSortNode.isIncludeTies());
+        parentSortNode.init(ctx_.getRootAnalyzer());
+        mergeFragment.addPlanRoot(parentSortNode);
+      } else {
+        Preconditions.checkState(node.isTypeTopN(), "only top-n handles ties");
+        //TopN that returns ties needs special handling because ties are not handled
+        // correctly by the ExchangeNode limit. We need to generate a top-n on top
+        // of the exchange to correctly merge the input.
+        SortNode parentSortNode = SortNode.createTopNSortNode(
+                ctx_.getQueryOptions(), ctx_.getNextNodeId(), exchNode,
+                childSortNode.getSortInfo(), 0, node.getSortLimit(),
+                childSortNode.isIncludeTies());
+        parentSortNode.init(ctx_.getRootAnalyzer());
+        mergeFragment.addPlanRoot(parentSortNode);
+      }
     } else {
       // Remember original offset and limit.
       boolean hasLimit = node.hasLimit();

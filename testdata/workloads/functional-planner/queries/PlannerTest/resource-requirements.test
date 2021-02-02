@@ -2438,6 +2438,197 @@ Per-Instance Resources: mem-estimate=80.02MB mem-reservation=40.00MB thread-rese
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
 ====
+# Partitioned TOP-N
+# Memory estimate reflects estimated size of in-memory
+# heap per partition.
+select * from (
+  select l_shipdate, l_quantity, l_orderkey,
+    rank() over (partition by l_shipdate order by l_orderkey desc) rk
+  from tpch.lineitem) dt
+where rk <= 10
+---- PLAN
+Max Per-Host Resource Reservation: Memory=24.00MB Threads=2
+Per-Host Resource Estimates: Memory=104MB
+Analyzed query: SELECT * FROM (SELECT l_shipdate, l_quantity, l_orderkey, rank()
+OVER (PARTITION BY l_shipdate ORDER BY l_orderkey DESC) rk FROM tpch.lineitem)
+dt WHERE rk <= CAST(10 AS BIGINT)
+
+F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=104.00MB mem-reservation=24.00MB thread-reservation=2
+PLAN-ROOT SINK
+|  output exprs: l_shipdate, l_quantity, l_orderkey, rank()
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+03:SELECT
+|  predicates: rank() <= CAST(10 AS BIGINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=6,5 row-size=46B cardinality=26.29K
+|  in pipelines: 01(GETNEXT)
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: l_shipdate
+|  order by: l_orderkey DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6,5 row-size=46B cardinality=26.29K
+|  in pipelines: 01(GETNEXT)
+|
+01:TOP-N
+|  partition by: l_shipdate
+|  order by: l_orderkey DESC
+|  partition limit: 10 (include ties)
+|  source expr: rank() <= CAST(10 AS BIGINT)
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=38B cardinality=26.29K
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=38B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+---- DISTRIBUTEDPLAN
+Max Per-Host Resource Reservation: Memory=36.00MB Threads=4
+Per-Host Resource Estimates: Memory=117MB
+Analyzed query: SELECT * FROM (SELECT l_shipdate, l_quantity, l_orderkey, rank()
+OVER (PARTITION BY l_shipdate ORDER BY l_orderkey DESC) rk FROM tpch.lineitem)
+dt WHERE rk <= CAST(10 AS BIGINT)
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Host Resources: mem-estimate=555.67KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: l_shipdate, l_quantity, l_orderkey, rank()
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+06:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=555.67KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6,5 row-size=46B cardinality=26.29K
+|  in pipelines: 05(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(l_shipdate)] hosts=3 instances=3
+Per-Host Resources: mem-estimate=16.44MB mem-reservation=16.00MB thread-reservation=1
+03:SELECT
+|  predicates: rank() <= CAST(10 AS BIGINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=6,5 row-size=46B cardinality=26.29K
+|  in pipelines: 05(GETNEXT)
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: l_shipdate
+|  order by: l_orderkey DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6,5 row-size=46B cardinality=26.29K
+|  in pipelines: 05(GETNEXT)
+|
+05:TOP-N
+|  partition by: l_shipdate
+|  order by: l_orderkey DESC
+|  partition limit: 10 (include ties)
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=38B cardinality=26.29K
+|  in pipelines: 05(GETNEXT), 01(OPEN)
+|
+04:EXCHANGE [HASH(l_shipdate)]
+|  mem-estimate=451.20KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=38B cardinality=26.29K
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
+Per-Host Resources: mem-estimate=100.00MB mem-reservation=20.00MB thread-reservation=2
+01:TOP-N
+|  partition by: l_shipdate
+|  order by: l_orderkey DESC
+|  partition limit: 10 (include ties)
+|  source expr: rank() <= CAST(10 AS BIGINT)
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=38B cardinality=26.29K
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
+   tuple-ids=0 row-size=38B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+---- PARALLELPLANS
+Max Per-Host Resource Reservation: Memory=72.00MB Threads=5
+Per-Host Resource Estimates: Memory=234MB
+Analyzed query: SELECT * FROM (SELECT l_shipdate, l_quantity, l_orderkey, rank()
+OVER (PARTITION BY l_shipdate ORDER BY l_orderkey DESC) rk FROM tpch.lineitem)
+dt WHERE rk <= CAST(10 AS BIGINT)
+
+F02:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
+|  Per-Instance Resources: mem-estimate=717.67KB mem-reservation=0B thread-reservation=1
+PLAN-ROOT SINK
+|  output exprs: l_shipdate, l_quantity, l_orderkey, rank()
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|
+06:EXCHANGE [UNPARTITIONED]
+|  mem-estimate=717.67KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6,5 row-size=46B cardinality=26.29K
+|  in pipelines: 05(GETNEXT)
+|
+F01:PLAN FRAGMENT [HASH(l_shipdate)] hosts=3 instances=6
+Per-Instance Resources: mem-estimate=16.56MB mem-reservation=16.00MB thread-reservation=1
+03:SELECT
+|  predicates: rank() <= CAST(10 AS BIGINT)
+|  mem-estimate=0B mem-reservation=0B thread-reservation=0
+|  tuple-ids=6,5 row-size=46B cardinality=26.29K
+|  in pipelines: 05(GETNEXT)
+|
+02:ANALYTIC
+|  functions: rank()
+|  partition by: l_shipdate
+|  order by: l_orderkey DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6,5 row-size=46B cardinality=26.29K
+|  in pipelines: 05(GETNEXT)
+|
+05:TOP-N
+|  partition by: l_shipdate
+|  order by: l_orderkey DESC
+|  partition limit: 10 (include ties)
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=38B cardinality=26.29K
+|  in pipelines: 05(GETNEXT), 01(OPEN)
+|
+04:EXCHANGE [HASH(l_shipdate)]
+|  mem-estimate=577.20KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=38B cardinality=26.29K
+|  in pipelines: 01(GETNEXT)
+|
+F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
+Per-Instance Resources: mem-estimate=100.00MB mem-reservation=20.00MB thread-reservation=1
+01:TOP-N
+|  partition by: l_shipdate
+|  order by: l_orderkey DESC
+|  partition limit: 10 (include ties)
+|  source expr: rank() <= CAST(10 AS BIGINT)
+|  mem-estimate=12.00MB mem-reservation=12.00MB spill-buffer=2.00MB thread-reservation=0
+|  tuple-ids=6 row-size=38B cardinality=26.29K
+|  in pipelines: 01(GETNEXT), 00(OPEN)
+|
+00:SCAN HDFS [tpch.lineitem, RANDOM]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   stored statistics:
+     table: rows=6.00M size=718.94MB
+     columns: all
+   extrapolated-rows=disabled max-scan-range-rows=1.07M
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=0
+   tuple-ids=0 row-size=38B cardinality=6.00M
+   in pipelines: 00(GETNEXT)
+====
 # Broadcast Hash Join
 select *
 from tpch.lineitem inner join tpch.orders on l_orderkey = o_orderkey
@@ -6137,14 +6328,15 @@ PLAN-ROOT SINK
 01:TOP-N
 |  order by: l_partkey ASC NULLS LAST, l_orderkey DESC
 |  limit with ties: 200
+|  source expr: rank() <= CAST(100 AS BIGINT)
 |  mem-estimate=4.69KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=8 row-size=24B cardinality=200
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=16.00MB thread-reservation=1
@@ -6211,14 +6403,15 @@ Per-Host Resources: mem-estimate=80.00MB mem-reservation=16.00MB thread-reservat
 01:TOP-N
 |  order by: l_partkey ASC NULLS LAST, l_orderkey DESC
 |  limit with ties: 200
+|  source expr: rank() <= CAST(100 AS BIGINT)
 |  mem-estimate=4.69KB mem-reservation=0B thread-reservation=0
 |  tuple-ids=8 row-size=24B cardinality=200
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=16.00MB thread-reservation=1
