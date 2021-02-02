@@ -410,13 +410,16 @@ public class AnalyticEvalNode extends PlanNode {
   public LimitPushdownInfo checkForLimitPushdown(SortInfo sortInfo,
           ExprSubstitutionMap sortInputSmap, SelectNode selectNode, long limit,
           SortNode analyticNodeSort, Analyzer analyzer) {
+    // Pushing is only supported for certain types of sort.
+    if (!analyticNodeSort.isPartitionedTopN() && !analyticNodeSort.isTotalSort()) {
+      return null;
+    }
     if (analyticFnCalls_.size() != 1) return null;
     Expr expr = analyticFnCalls_.get(0);
     if (!(expr instanceof FunctionCallExpr) ||
          (!AnalyticExpr.isRankingFn(((FunctionCallExpr) expr).getFn()))) {
       return null;
     }
-
     List<Expr> analyticSortSortExprs = analyticNodeSort.getSortInfo().getSortExprs();
 
     // In the mapping below, we use the original sort exprs that the sortInfo was
@@ -431,19 +434,7 @@ public class AnalyticEvalNode extends PlanNode {
     List<Expr> pbExprs = substitutedPartitionExprs_;
 
     if (sortExprs.size() == 0) {
-      // if there is no sort expr in the parent sort but only limit, we can push
-      // the limit to the sort below if there is no selection node or if
-      // the predicate in the selection node is eligible
-      if (selectNode == null) {
-        return new LimitPushdownInfo(false, 0);
-      }
-      Pair<LimitPushdownInfo, Double> status =
-              checkPredEligibleForLimitPushdown(selectNode.getConjuncts(), limit);
-      if (status.first != null) {
-        selectNode.setSelectivity(status.second);
-        return status.first;
-      }
-      return null;
+      return checkForUnorderedLimitPushdown(selectNode, limit, analyticNodeSort);
     }
 
     Preconditions.checkArgument(analyticSortSortExprs.size() >= pbExprs.size());
@@ -463,21 +454,49 @@ public class AnalyticEvalNode extends PlanNode {
     }
 
     if (selectNode == null) {
-      // Limit pushdown is valid if the pre-analytic sort puts rows into the same order
-      // as sortExprs. We check the prefix match, since extra analytic sort exprs do not
-      // affect the compatibility of the ordering with sortExprs.
+      // Do not support pushing additional limit to partitioned top-n, unless it was
+      // the predicate that the partitioned top-n was originally created from.
+      if (analyticNodeSort.isPartitionedTopN()) return null;
+      Preconditions.checkState(analyticNodeSort.isTotalSort());
+      // Limit pushdown to total sort is valid if the pre-analytic sort puts rows into
+      // the same order as sortExprs. We check the prefix match, since extra analytic
+      // sort exprs do not affect the compatibility of the ordering with sortExprs.
       if (!analyticSortExprsArePrefix(sortInfo, sortExprs,
               analyticNodeSort.getSortInfo(), analyticSortSortExprs)) {
         return null;
       }
       return new LimitPushdownInfo(false, 0);
     } else {
-      Pair<LimitPushdownInfo, Double> status =
-              checkPredEligibleForLimitPushdown(selectNode.getConjuncts(), limit);
+      Pair<LimitPushdownInfo, Double> status = checkPredEligibleForLimitPushdown(
+              analyticNodeSort, selectNode.getConjuncts(), limit);
       if (status.first != null) {
         selectNode.setSelectivity(status.second);
         return status.first;
       }
+    }
+    return null;
+  }
+
+  /**
+   * Helper for {@link #checkForLimitPushdown()} that handles the case of pushing
+   * down a limit into an total sort or partitioned top N where there are no
+   * ordering expressions.
+   */
+  private LimitPushdownInfo checkForUnorderedLimitPushdown(SelectNode selectNode,
+          long limit, SortNode analyticNodeSort) {
+    // Only support transforming total sort for now.
+    if (!analyticNodeSort.isTotalSort()) return null;
+    // if there is no sort expr in the parent sort but only limit, we can push
+    // the limit to the sort below if there is no selection node or if
+    // the predicate in the selection node is eligible
+    if (selectNode == null) {
+      return new LimitPushdownInfo(false, 0);
+    }
+    Pair<LimitPushdownInfo, Double> status = checkPredEligibleForLimitPushdown(
+            analyticNodeSort, selectNode.getConjuncts(), limit);
+    if (status.first != null) {
+      selectNode.setSelectivity(status.second);
+      return status.first;
     }
     return null;
   }
@@ -551,7 +570,7 @@ public class AnalyticEvalNode extends PlanNode {
    *   null otherwise. Second value is the predicate's estimated selectivity
    */
   private Pair<LimitPushdownInfo, Double> checkPredEligibleForLimitPushdown(
-          List<Expr> conjuncts, long limit) {
+          SortNode analyticNodeSort, List<Expr> conjuncts, long limit) {
     Pair<LimitPushdownInfo, Double> falseStatus = new Pair<>(null, -1.0);
     // Currently, single conjuncts are supported.  In the future, multiple conjuncts
     // involving a range e.g 'col >= 10 AND col <= 20' could potentially be supported
@@ -610,12 +629,17 @@ public class AnalyticEvalNode extends PlanNode {
     // each analytic partition, so it is not safe to push the limit down.
     if (pred.getOp() == BinaryPredicate.Operator.EQ && limit > 1) return falseStatus;
 
-    // See method comment for explanation of why the analytic partition limit
-    // must be >= the pushed down limit.
-    if (analyticLimit < limit) return falseStatus;
+    // Check that the partition predicate matches the partition limits already pushed
+    // to a partitioned top-n node.
+    if (analyticNodeSort.isPartitionedTopN() &&
+            (analyticLimit != analyticNodeSort.getPerPartitionLimit() ||
+             includeTies != analyticNodeSort.isIncludeTies())) {
+      return falseStatus;
+    }
 
-    // Avoid overflow of limit.
-    if (analyticLimit + (long)limit > Integer.MAX_VALUE) return falseStatus;
+    LimitPushdownInfo pushdownInfo = checkLimitEligibleForPushdown(
+            limit, includeTies, analyticLimit);
+    if (pushdownInfo == null) return falseStatus;
 
     double selectivity = Expr.DEFAULT_SELECTIVITY;
     // Since the predicate is qualified for limit pushdown, estimate its selectivity.
@@ -625,8 +649,26 @@ public class AnalyticEvalNode extends PlanNode {
             pred.getOp() == BinaryPredicate.Operator.LE) {
       selectivity = 1.0;
     }
-    return new Pair<LimitPushdownInfo, Double>(
-            new LimitPushdownInfo(includeTies, (int)analyticLimit), selectivity);
+    return new Pair<LimitPushdownInfo, Double>(pushdownInfo, selectivity);
+  }
+
+  /**
+   * Implements the same check described in
+   * {@link #checkLimitEligibleForPushdown(long, boolean, long)} where we
+   * see if 'limit' can be pushed down into the pre-analytic sort where the
+   * there is a per-partition limit for the analytic 'analyticLimit', i.e.
+   * a row_number() < 10 predicate or similar.
+   */
+  private LimitPushdownInfo checkLimitEligibleForPushdown(long limit,
+          boolean includeTies, long analyticLimit) {
+    // See method comment for explanation of why the analytic partition limit
+    // must be >= the pushed down limit.
+    if (analyticLimit < limit) return null;
+
+    // Avoid overflow of limit.
+    if (analyticLimit + (long)limit > Integer.MAX_VALUE) return null;
+
+    return new LimitPushdownInfo(includeTies, (int)analyticLimit);
   }
 
 }

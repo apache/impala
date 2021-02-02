@@ -1,0 +1,82 @@
+====
+---- QUERY
+# In-memory partitioned top-N with some partitions that hit limit.
+select tinyint_col, id, rn from (
+  select *, row_number() over (partition by tinyint_col order by id) as rn
+  from alltypesagg where id % 777 = 0 or id % 10 = 7) v
+where rn <= 5
+order by tinyint_col, rn
+---- RESULTS
+1,2331,1
+2,4662,1
+3,6993,1
+4,1554,1
+4,9324,2
+5,3885,1
+6,6216,1
+7,7,1
+7,17,2
+7,27,3
+7,37,4
+7,47,5
+8,3108,1
+9,5439,1
+NULL,0,1
+NULL,0,2
+NULL,7770,3
+NULL,7770,4
+---- TYPES
+TINYINT, INT, BIGINT
+====
+---- QUERY
+# Same query with rank() predicate. There are ties in the NULL partition that
+# results in a different value.
+select tinyint_col, id, rnk from (
+  select *, rank() over (partition by tinyint_col order by id) as rnk
+  from alltypesagg where id % 777 = 0 or id % 10 = 7) v
+where rnk <= 5
+order by tinyint_col, rnk
+---- RESULTS
+1,2331,1
+2,4662,1
+3,6993,1
+4,1554,1
+4,9324,2
+5,3885,1
+6,6216,1
+7,7,1
+7,17,2
+7,27,3
+7,37,4
+7,47,5
+8,3108,1
+9,5439,1
+NULL,0,1
+NULL,0,1
+NULL,7770,3
+NULL,7770,3
+---- TYPES
+TINYINT, INT, BIGINT
+====
+----QUERY
+# Same query with lower limit. The tie in the NULL partition must be returned.
+select tinyint_col, id, rnk from (
+  select *, rank() over (partition by tinyint_col order by id) as rnk
+  from alltypesagg where id % 777 = 0 or id % 10 = 7) v
+where rnk <= 1
+order by tinyint_col, rnk
+---- RESULTS
+1,2331,1
+2,4662,1
+3,6993,1
+4,1554,1
+5,3885,1
+6,6216,1
+7,7,1
+8,3108,1
+9,5439,1
+NULL,0,1
+NULL,0,1
+---- TYPES
+TINYINT, INT, BIGINT
+====

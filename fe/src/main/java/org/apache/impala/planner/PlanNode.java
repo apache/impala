@@ -26,9 +26,11 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprId;
 import org.apache.impala.analysis.ExprSubstitutionMap;
+import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.ToSqlOptions;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
@@ -514,6 +516,44 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     List<Expr> unassigned = analyzer.getUnassignedConjuncts(this);
     conjuncts_.addAll(unassigned);
     analyzer.markConjunctsAssigned(unassigned);
+  }
+
+  /**
+   * Apply the provided conjuncts to the this node, returning the new root of
+   * the plan tree. Also add any slot equivalences for tupleIds that have not
+   * yet been enforced.
+   * TODO: change this to assign the unassigned conjuncts to root itself, if that is
+   * semantically correct
+   */
+  public PlanNode addConjunctsToNode(PlannerContext plannerCtx,
+          Analyzer analyzer, List<TupleId> tupleIds, List<Expr> conjuncts) {
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(String.format("conjuncts for (Node %s): %s",
+          getDisplayLabel(), Expr.debugString(conjuncts)));
+      LOG.trace("all conjuncts: " + analyzer.conjunctAssignmentsDebugString());
+    }
+    if (this instanceof EmptySetNode) return this;
+    for (TupleId tid: tupleIds) {
+      analyzer.createEquivConjuncts(tid, conjuncts);
+    }
+    if (conjuncts.isEmpty()) return this;
+
+    List<Expr> finalConjuncts = new ArrayList<>();
+    // Check if this is an inferred identity predicate i.e for c1 = c2 both
+    // sides are pointing to the same source slot. In such cases it is wrong
+    // to add the predicate to the SELECT node because it will incorrectly
+    // eliminate rows with NULL values.
+    for (Expr e : conjuncts) {
+      if (e instanceof BinaryPredicate && ((BinaryPredicate) e).isInferred()) {
+        SlotDescriptor lhs = ((BinaryPredicate) e).getChild(0).findSrcScanSlot();
+        SlotDescriptor rhs = ((BinaryPredicate) e).getChild(1).findSrcScanSlot();
+        if (lhs != null && rhs != null && lhs.equals(rhs)) continue;
+      }
+      finalConjuncts.add(e);
+    }
+    if (finalConjuncts.isEmpty()) return this;
+    // The conjuncts need to be evaluated in a SelectNode.
+    return SelectNode.create(plannerCtx, analyzer, this, finalConjuncts);
   }
 
   /**

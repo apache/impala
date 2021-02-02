@@ -184,7 +184,8 @@ Status PlanNode::CreatePlanNode(
     case TPlanNodeType::SORT_NODE:
       if (tnode.sort_node.type == TSortType::PARTIAL) {
         *node = pool->Add(new PartialSortPlanNode());
-      } else if (tnode.sort_node.type == TSortType::TOPN) {
+      } else if (tnode.sort_node.type == TSortType::TOPN ||
+          tnode.sort_node.type == TSortType::PARTITIONED_TOPN) {
         *node = pool->Add(new TopNPlanNode());
       } else {
         DCHECK(tnode.sort_node.type == TSortType::TOTAL);

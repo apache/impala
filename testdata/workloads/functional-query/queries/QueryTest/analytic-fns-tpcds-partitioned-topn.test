@@ -1,0 +1,325 @@
+====
+---- QUERY
+# Partitioned Top-N over a large input data set. Uses rank so has some
+# ties. Most expensive items per store.
+select *
+from (
+  select s_store_name, s_state, ss_list_price,
+        rank() over (partition by s_store_name, s_state order by ss_list_price desc nulls last) rnk
+  from store_sales ss
+      join store s on ss_store_sk = s_store_sk) v
+where rnk <= 5;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'ation','TN',200.00,1
+'ation','TN',199.98,2
+'ation','TN',199.98,2
+'ation','TN',199.92,4
+'ation','TN',199.92,4
+'eing','TN',199.98,1
+'eing','TN',199.96,2
+'eing','TN',199.94,3
+'eing','TN',199.88,4
+'eing','TN',199.86,5
+'eing','TN',199.86,5
+'bar','TN',199.94,1
+'bar','TN',199.90,2
+'bar','TN',199.90,2
+'bar','TN',199.88,4
+'bar','TN',199.86,5
+'able','TN',199.96,1
+'able','TN',199.96,1
+'able','TN',199.94,3
+'able','TN',199.90,4
+'able','TN',199.86,5
+'ese','TN',199.88,1
+'ese','TN',199.84,2
+'ese','TN',199.74,3
+'ese','TN',199.70,4
+'ese','TN',199.68,5
+'ought','TN',199.94,1
+'ought','TN',199.94,1
+'ought','TN',199.84,3
+'ought','TN',199.80,4
+'ought','TN',199.48,5
+'ought','TN',199.48,5
+---- TYPES
+STRING, STRING, DECIMAL, BIGINT
+====
+---- QUERY
+# Partitioned Top-N over a large input data set. Uses row_number so has no
+# ties. Most expensive items per store.
+select *
+from (
+  select s_store_name, s_state, ss_list_price,
+        row_number() over (partition by s_store_name, s_state order by ss_list_price desc nulls last) rn
+  from store_sales ss
+      join store s on ss_store_sk = s_store_sk) v
+where rn <= 5;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'able','TN',199.96,1
+'able','TN',199.96,2
+'able','TN',199.94,3
+'able','TN',199.90,4
+'able','TN',199.86,5
+'eing','TN',199.98,1
+'eing','TN',199.96,2
+'eing','TN',199.94,3
+'eing','TN',199.88,4
+'eing','TN',199.86,5
+'ese','TN',199.88,1
+'ese','TN',199.84,2
+'ese','TN',199.74,3
+'ese','TN',199.70,4
+'ese','TN',199.68,5
+'ought','TN',199.94,1
+'ought','TN',199.94,2
+'ought','TN',199.84,3
+'ought','TN',199.80,4
+'ought','TN',199.48,5
+'ation','TN',200.00,1
+'ation','TN',199.98,2
+'ation','TN',199.98,3
+'ation','TN',199.92,4
+'ation','TN',199.92,5
+'bar','TN',199.94,1
+'bar','TN',199.90,2
+'bar','TN',199.90,3
+'bar','TN',199.88,4
+'bar','TN',199.86,5
+---- TYPES
+STRING, STRING, DECIMAL, BIGINT
+====
+---- QUERY
+# Same with nulls first results in a huge number of ties for first.
+select s_store_name, s_state, ss_list_price, count(*)
+from (
+  select s_store_name, s_state, ss_list_price,
+        rank() over (partition by s_store_name, s_state order by ss_list_price desc) rnk
+  from store_sales ss
+      join store s on ss_store_sk = s_store_sk) v
+where rnk <= 5
+group by s_store_name, s_state, ss_list_price
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'ese','TN',NULL,10794
+'able','TN',NULL,10874
+'ought','TN',NULL,10715
+'bar','TN',NULL,10955
+'eing','TN',NULL,10917
+'ation','TN',NULL,10826
+---- TYPES
+STRING, STRING, DECIMAL, BIGINT
+====
+---- QUERY
+# Same with row_number() assigns 1, 2, 3, 4, 5 to the ties.
+select s_store_name, s_state, ss_list_price, rn
+from (
+  select s_store_name, s_state, ss_list_price,
+        row_number() over (partition by s_store_name, s_state order by ss_list_price desc) rn
+  from store_sales ss
+      join store s on ss_store_sk = s_store_sk) v
+where rn <= 5
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'ese','TN',NULL,1
+'ese','TN',NULL,2
+'ese','TN',NULL,3
+'ese','TN',NULL,4
+'ese','TN',NULL,5
+'ation','TN',NULL,1
+'ation','TN',NULL,2
+'ation','TN',NULL,3
+'ation','TN',NULL,4
+'ation','TN',NULL,5
+'bar','TN',NULL,1
+'bar','TN',NULL,2
+'bar','TN',NULL,3
+'bar','TN',NULL,4
+'bar','TN',NULL,5
+'able','TN',NULL,1
+'able','TN',NULL,2
+'able','TN',NULL,3
+'able','TN',NULL,4
+'able','TN',NULL,5
+'eing','TN',NULL,1
+'eing','TN',NULL,2
+'eing','TN',NULL,3
+'eing','TN',NULL,4
+'eing','TN',NULL,5
+'ought','TN',NULL,1
+'ought','TN',NULL,2
+'ought','TN',NULL,3
+'ought','TN',NULL,4
+'ought','TN',NULL,5
+---- TYPES
+STRING, STRING, DECIMAL, BIGINT
+====
+---- QUERY
+# Partitioned Top-N with higher number of partitions -
+# ss_sold_date_sk has ~1800 distinct values.
+# Find the 100th most expensive sale from every day.
+select * from (
+  select d_date, i_item_id, ss_list_price,
+        rank() over (partition by d_date order by ss_list_price desc) rnk
+  from store_sales ss
+      join item i on ss_item_sk = i_item_sk
+      join date_dim d on ss_sold_date_sk = d_date_sk
+  where ss_list_price is not null) v
+where rnk = 100
+order by d_date, i_item_id
+limit 50
+---- RESULTS
+'1998-01-02','AAAAAAAAAELBAAAA',141.72,100
+'1998-01-03','AAAAAAAABHIDAAAA',136.09,100
+'1998-01-04','AAAAAAAAAICAAAAA',139.69,100
+'1998-01-05','AAAAAAAAOMCAAAAA',133.78,100
+'1998-01-06','AAAAAAAACEFAAAAA',132.41,100
+'1998-01-07','AAAAAAAAIGGCAAAA',133.14,100
+'1998-01-08','AAAAAAAAGIIBAAAA',140.87,100
+'1998-01-09','AAAAAAAAGBCBAAAA',133.55,100
+'1998-01-10','AAAAAAAAOCCEAAAA',135.58,100
+'1998-01-11','AAAAAAAAIHEAAAAA',135.73,100
+'1998-01-12','AAAAAAAAJFIAAAAA',139.15,100
+'1998-01-13','AAAAAAAACCBDAAAA',128.56,100
+'1998-01-14','AAAAAAAAFMCDAAAA',136.40,100
+'1998-01-16','AAAAAAAALNGBAAAA',141.87,100
+'1998-01-17','AAAAAAAAHDBCAAAA',127.54,100
+'1998-01-18','AAAAAAAAPHLBAAAA',140.04,100
+'1998-01-19','AAAAAAAACIJBAAAA',131.46,100
+'1998-01-20','AAAAAAAAIMGCAAAA',134.34,100
+'1998-01-21','AAAAAAAANAFEAAAA',134.42,100
+'1998-01-22','AAAAAAAAKGABAAAA',141.77,100
+'1998-01-23','AAAAAAAAKJIBAAAA',131.47,100
+'1998-01-24','AAAAAAAAFABBAAAA',139.93,100
+'1998-01-25','AAAAAAAAHHNBAAAA',136.40,100
+'1998-01-26','AAAAAAAAPIACAAAA',131.45,100
+'1998-01-27','AAAAAAAACBPBAAAA',138.18,100
+'1998-01-27','AAAAAAAAOPDDAAAA',138.18,100
+'1998-01-28','AAAAAAAABHCAAAAA',130.44,100
+'1998-01-29','AAAAAAAAMELBAAAA',138.45,100
+'1998-01-30','AAAAAAAAIKLAAAAA',139.22,100
+'1998-01-31','AAAAAAAAOJADAAAA',133.87,100
+'1998-02-01','AAAAAAAAACHCAAAA',136.31,100
+'1998-02-02','AAAAAAAAKNCAAAAA',138.73,100
+'1998-02-03','AAAAAAAALDBBAAAA',139.99,100
+'1998-02-04','AAAAAAAAMIPAAAAA',141.97,100
+'1998-02-05','AAAAAAAAFPIDAAAA',127.45,100
+'1998-02-06','AAAAAAAAPNMAAAAA',136.83,100
+'1998-02-07','AAAAAAAAIDGAAAAA',131.90,100
+'1998-02-08','AAAAAAAAMNDAAAAA',129.21,100
+'1998-02-09','AAAAAAAAIAACAAAA',133.56,100
+'1998-02-10','AAAAAAAAAJHAAAAA',136.71,100
+'1998-02-11','AAAAAAAACHDCAAAA',136.11,100
+'1998-02-12','AAAAAAAAOAOBAAAA',137.46,100
+'1998-02-13','AAAAAAAAAPEAAAAA',136.12,100
+'1998-02-14','AAAAAAAAMDEBAAAA',140.04,100
+'1998-02-15','AAAAAAAAJBMAAAAA',129.20,100
+'1998-02-16','AAAAAAAAHECAAAAA',134.73,100
+'1998-02-17','AAAAAAAAEDGDAAAA',133.28,100
+'1998-02-18','AAAAAAAALMBEAAAA',136.95,100
+'1998-02-19','AAAAAAAANIPBAAAA',135.70,100
+'1998-02-20','AAAAAAAAALBCAAAA',139.14,100
+---- TYPES
+STRING, STRING, DECIMAL, BIGINT
+====
+---- QUERY
+# Partitioned Top-N with a high number of partitions and a larger limit returning many
+# columns. Memory pressure will force in-memory partitions to be evicted.
+select * from (
+  select d_date, s_store_name, s_state, i_item_id, ss_list_price,
+        ss_wholesale_cost, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price,
+        ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid,
+        ss_net_paid_inc_tax, ss_net_profit,
+        rank() over (partition by ss_sold_date_sk order by ss_list_price desc) rnk
+  from store_sales ss
+      join item i on ss_item_sk = i_item_sk
+      join date_dim d on ss_sold_date_sk = d_date_sk
+      join store s on ss_store_sk = s_store_sk
+  where ss_list_price is not null) v
+where rnk = 500
+order by ss_list_price desc, d_date, s_store_name
+limit 50
+---- RESULTS
+'2000-01-02','able','TN','AAAAAAAAMGCAAAAA',133.50,77.17,88.11,0.00,7753.68,6790.96,11748.00,232.61,0.00,7753.68,7986.29,962.72,500
+'1999-01-02','ese','TN','AAAAAAAADCCDAAAA',132.62,94.06,125.98,0.00,11842.12,8841.64,12466.28,118.42,0.00,11842.12,11960.54,3000.48,500
+'2002-01-02','bar','TN','AAAAAAAAPPABAAAA',131.59,70.37,75.00,935.25,2175.00,2040.73,3816.11,111.57,935.25,1239.75,1351.32,-800.98,500
+'1998-12-19','bar','TN','AAAAAAAAMBNAAAAA',131.49,75.14,69.68,0.00,975.52,1051.96,1840.86,9.75,0.00,975.52,985.27,-76.44,500
+'2002-12-30','ought','TN','AAAAAAAAGLKCAAAA',130.46,69.77,63.92,0.00,5944.56,6488.61,12132.78,237.78,0.00,5944.56,6182.34,-544.05,500
+'1999-12-28','able','TN','AAAAAAAACGCEAAAA',129.78,78.66,88.25,757.18,3441.75,3067.74,5061.42,80.53,757.18,2684.57,2765.10,-383.17,500
+'2001-12-30','eing','TN','AAAAAAAACBHBAAAA',128.66,NULL,113.22,NULL,2151.18,NULL,2444.54,NULL,NULL,NULL,2258.73,815.29,500
+'2002-11-13','bar','TN','AAAAAAAACAFBAAAA',128.56,64.28,88.70,372.54,443.50,321.40,642.80,2.83,372.54,70.96,73.79,-250.44,500
+'1999-12-24','able','TN','AAAAAAAAAHJBAAAA',128.48,80.81,111.77,0.00,2347.17,1697.01,2698.08,117.35,0.00,2347.17,2464.52,650.16,500
+'2002-12-23','able','TN','AAAAAAAAKCGBAAAA',128.41,69.04,15.40,0.00,523.60,2347.36,4365.94,20.94,0.00,523.60,544.54,-1823.76,500
+'2002-12-19','ation','TN','AAAAAAAAEHFBAAAA',128.27,86.09,33.35,0.00,3101.55,8006.37,11929.11,186.09,0.00,3101.55,3287.64,-4904.82,500
+'2001-12-18','bar','TN','AAAAAAAAGOCAAAAA',128.16,72.82,26.91,0.00,322.92,873.84,1537.92,16.14,0.00,322.92,339.06,-550.92,500
+'2002-12-01','ese','TN','AAAAAAAAIPBBAAAA',127.91,72.27,23.02,0.00,575.50,1806.75,3197.75,0.00,0.00,575.50,575.50,-1231.25,500
+'2001-12-04','eing','TN','AAAAAAAAIGDDAAAA',127.64,96.70,91.90,3400.30,4595.00,4835.00,6382.00,71.68,3400.30,1194.70,1266.38,-3640.30,500
+'2001-12-04','ought','TN','AAAAAAAAFMIAAAAA',127.64,94.55,98.28,0.00,8353.80,8036.75,10849.40,250.61,0.00,8353.80,8604.41,317.05,500
+'1998-12-26','able','TN','AAAAAAAAGMABAAAA',127.55,89.20,70.15,0.00,3998.55,5084.40,7270.35,319.88,0.00,3998.55,4318.43,-1085.85,500
+'1998-11-17','eing','TN','AAAAAAAAKFNBAAAA',127.45,70.03,93.03,0.00,6046.95,4551.95,8284.25,544.22,0.00,6046.95,6591.17,1495.00,500
+'1998-11-20','ation','TN','AAAAAAAAHDFBAAAA',127.40,76.29,112.11,0.00,6950.82,4729.98,7898.80,486.55,0.00,6950.82,7437.37,2220.84,500
+'1998-11-27','eing','TN','AAAAAAAAPKDAAAAA',127.26,71.10,100.53,1483.82,8243.46,5830.20,10435.32,608.36,1483.82,6759.64,7368.00,929.44,500
+'2002-11-16','bar','TN','AAAAAAAAOHDBAAAA',127.22,91.53,43.25,216.25,1081.25,2288.25,3180.50,8.65,216.25,865.00,873.65,-1423.25,500
+'2000-11-04','able','TN','AAAAAAAAIKIDAAAA',127.21,80.01,22.89,0.00,114.45,400.05,636.05,0.00,0.00,114.45,114.45,-285.60,500
+'2000-12-02','eing','TN','AAAAAAAAEEDAAAAA',127.20,63.92,68.68,0.00,5494.40,5113.60,10176.00,219.77,0.00,5494.40,5714.17,380.80,500
+'1999-12-18','able','TN','AAAAAAAAIJBCAAAA',127.07,68.32,20.33,0.00,853.86,2869.44,5336.94,25.61,0.00,853.86,879.47,-2015.58,500
+'1998-12-23','ought','TN','AAAAAAAAELJBAAAA',126.99,79.87,125.72,0.00,2640.12,1677.27,2666.79,79.20,0.00,2640.12,2719.32,962.85,500
+'1998-12-04','able','TN','AAAAAAAAEPAAAAAA',126.97,NULL,NULL,NULL,NULL,586.02,761.82,NULL,NULL,617.04,660.23,NULL,500
+'2000-12-31','bar','TN','AAAAAAAAAANBAAAA',126.79,81.80,112.84,0.00,7221.76,5235.20,8114.56,433.30,0.00,7221.76,7655.06,1986.56,500
+'2000-12-17','ation','TN','AAAAAAAAGBLBAAAA',126.68,68.11,15.20,665.76,912.00,4086.60,7600.80,4.92,665.76,246.24,251.16,-3840.36,500
+'2000-12-09','eing','TN','AAAAAAAAHMAAAAAA',126.63,70.35,100.03,0.00,400.12,281.40,506.52,20.00,0.00,400.12,420.12,118.72,500
+'2001-12-09','able','TN','AAAAAAAAHGCEAAAA',126.59,86.12,46.83,758.64,936.60,1722.40,2531.80,3.55,758.64,177.96,181.51,-1544.44,500
+'1998-12-12','bar','TN','AAAAAAAAMNEAAAAA',126.58,91.73,45.56,0.00,2232.44,4494.77,6202.42,66.97,0.00,2232.44,2299.41,-2262.33,500
+'2001-12-24','ation','TN','AAAAAAAAOHKBAAAA',126.58,83.83,31.64,0.00,1455.44,3856.18,5822.68,29.10,0.00,1455.44,1484.54,-2400.74,500
+'2002-11-26','ation','TN','AAAAAAAACKFCAAAA',126.57,69.93,32.90,0.00,1677.90,3566.43,6455.07,16.77,0.00,1677.90,1694.67,-1888.53,500
+'1998-11-11','ation','TN','AAAAAAAAGOBCAAAA',126.56,69.54,93.65,0.00,5338.05,3963.78,7213.92,213.52,0.00,5338.05,5551.57,1374.27,500
+'2000-11-09','ought','TN','AAAAAAAACOCBAAAA',126.52,80.59,121.45,0.00,728.70,483.54,759.12,14.57,0.00,728.70,743.27,245.16,500
+'2001-11-20','ese','TN','AAAAAAAACOLCAAAA',126.43,98.01,89.76,0.00,2872.32,3136.32,4045.76,143.61,0.00,2872.32,3015.93,-264.00,500
+'1998-11-08','bar','TN','AAAAAAAAMNMDAAAA',126.38,89.00,37.91,0.00,2274.60,5340.00,7582.80,204.71,0.00,2274.60,2479.31,-3065.40,500
+'1999-11-14','able','TN','AAAAAAAABILCAAAA',126.37,90.27,11.37,386.23,898.23,7131.33,9983.23,5.12,386.23,512.00,517.12,-6619.33,500
+'2001-11-10','ation','TN','AAAAAAAAAFACAAAA',126.36,90.91,0.00,0.00,0.00,4909.14,6823.44,0.00,0.00,0.00,0.00,-4909.14,500
+'2001-11-16','able','TN','AAAAAAAAGHNDAAAA',126.36,78.49,48.01,0.00,3504.73,5729.77,9224.28,245.33,0.00,3504.73,3750.06,-2225.04,500
+'1998-12-06','eing','TN','AAAAAAAAIHFAAAAA',126.35,82.05,53.06,0.00,2546.88,3938.40,6064.80,0.00,0.00,2546.88,2546.88,-1391.52,500
+'2001-12-19','ese','TN','AAAAAAAAOLADAAAA',126.34,76.11,92.22,3750.58,7654.26,6317.13,10486.22,0.00,3750.58,3903.68,3903.68,-2413.45,500
+'1998-11-28','ought','TN','AAAAAAAAKAPDAAAA',126.28,88.31,90.92,0.00,6909.92,6711.56,9597.28,552.79,0.00,6909.92,7462.71,198.36,500
+'1999-11-30','ought','TN','AAAAAAAAKOJCAAAA',126.27,78.43,18.94,0.00,113.64,470.58,757.62,0.00,0.00,113.64,113.64,-356.94,500
+'2001-12-05','ese','TN','AAAAAAAAFMKBAAAA',126.20,74.68,80.76,0.00,7995.24,7393.32,12493.80,399.76,0.00,7995.24,8395.00,601.92,500
+'1999-11-07','bar','TN','AAAAAAAALOCBAAAA',126.17,97.06,109.76,0.00,2634.24,2329.44,3028.08,131.71,0.00,2634.24,2765.95,304.80,500
+'2000-11-10','eing','TN','AAAAAAAAIGGDAAAA',126.10,74.62,104.66,263.74,732.62,522.34,882.70,23.44,263.74,468.88,492.32,-53.46,500
+'1999-01-01','ought','TN','AAAAAAAAGNMDAAAA',126.08,96.25,108.42,0.00,1626.30,1443.75,1891.20,113.84,0.00,1626.30,1740.14,182.55,500
+'2000-11-19','able','TN','AAAAAAAAFEKAAAAA',126.05,70.82,99.57,0.00,4779.36,3399.36,6050.40,238.96,0.00,4779.36,5018.32,1380.00,500
+'1999-12-20','ation','TN','AAAAAAAALGIDAAAA',125.98,66.31,119.68,0.00,4428.16,2453.47,4661.26,265.68,0.00,4428.16,4693.84,1974.69,500
+'1998-11-04','ought','TN','AAAAAAAAKOGCAAAA',125.97,65.61,123.45,2755.40,7653.90,4067.82,7810.14,440.86,2755.40,4898.50,5339.36,830.68,500
+---- TYPES
+STRING, STRING, STRING, STRING, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, BIGINT
+---- RUNTIME_PROFILE
+# Confirm that heaps were actually evicted due to memory pressure.
+row_regex: .*InMemoryHeapsEvicted: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Same as above with in-memory heaps evicted, but calculate aggregates over all the result
+# columns to ensure that the right number of rows are returned for all partitions in
+# the partitioned top-n.
+select min(d_date), min(s_store_name), min(s_state), min(i_item_id), avg(ss_list_price),
+        avg(ss_wholesale_cost), avg(ss_sales_price), avg(ss_ext_discount_amt),
+        avg(ss_ext_sales_price), avg(ss_ext_wholesale_cost), avg(ss_ext_list_price),
+        avg(ss_ext_tax), avg(ss_coupon_amt), avg(ss_net_paid), avg(ss_net_paid_inc_tax),
+        avg(ss_net_profit)
+from (
+  select d_date, s_store_name, s_state, i_item_id, ss_list_price,
+        ss_wholesale_cost, ss_sales_price, ss_ext_discount_amt, ss_ext_sales_price,
+        ss_ext_wholesale_cost, ss_ext_list_price, ss_ext_tax, ss_coupon_amt, ss_net_paid,
+        ss_net_paid_inc_tax, ss_net_profit,
+        rank() over (partition by ss_sold_date_sk order by ss_list_price desc) rnk
+  from store_sales ss
+      join item i on ss_item_sk = i_item_sk
+      join date_dim d on ss_sold_date_sk = d_date_sk
+      join store s on ss_store_sk = s_store_sk
+  where ss_list_price is not null) v
+where rnk < 500
+---- RESULTS
+'1998-01-02','able','TN','AAAAAAAAAAABAAAA',120.822125,75.697178,60.469191,305.284017,3058.201402,3824.409840,6104.842416,123.872886,305.284017,2752.882153,2876.854635,-1071.689798
+---- TYPES
+STRING, STRING, STRING, STRING, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
+---- RUNTIME_PROFILE
+# Confirm that heaps were actually evicted due to memory pressure.
+row_regex: .*InMemoryHeapsEvicted: .* \([1-9][0-9]*\)
+====

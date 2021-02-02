@@ -1021,6 +1021,20 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_utf8_mode(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::ANALYTIC_RANK_PUSHDOWN_THRESHOLD: {
+        StringParser::ParseResult status;
+        int64_t val =
+            StringParser::StringToInt<int64_t>(value.c_str(), value.size(), &status);
+        if (status != StringParser::PARSE_SUCCESS) {
+          return Status(Substitute("Invalid threshold: '$0'.", value));
+        }
+        if (val < -1) {
+          return Status(Substitute("Invalid threshold: '$0'. Only non-negative values "
+                "and -1 are allowed.", val));
+        }
+        query_options->__set_analytic_rank_pushdown_threshold(val);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

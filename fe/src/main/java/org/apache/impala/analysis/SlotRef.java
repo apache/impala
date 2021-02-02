@@ -31,8 +31,8 @@ import org.apache.impala.thrift.TExprNodeType;
 import org.apache.impala.thrift.TSlotRef;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Objects;
 import com.google.common.base.MoreObjects;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class SlotRef extends Expr {
@@ -250,6 +250,13 @@ public class SlotRef extends Expr {
     Preconditions.checkState(desc_ != null);
     if (slotIds != null) slotIds.add(desc_.getId());
     if (tupleIds != null) tupleIds.add(desc_.getParent().getId());
+  }
+
+  @Override
+  public boolean referencesTuple(TupleId tid) {
+    Preconditions.checkState(type_.isValid());
+    Preconditions.checkState(desc_ != null);
+    return desc_.getParent().getId() == tid;
   }
 
   @Override

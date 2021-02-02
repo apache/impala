@@ -202,6 +202,12 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testAnalyticRankPushdown() {
+    runPlannerTestFile("analytic-rank-pushdown");
+  }
+
+
+  @Test
   public void testHbase() {
     runPlannerTestFile("hbase");
   }
@@ -778,7 +784,11 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testSortExprMaterialization() {
     addTestFunction("TestFn", Lists.newArrayList(Type.DOUBLE), false);
-    runPlannerTestFile("sort-expr-materialization",
+    // Avoid conversion of RANK()/ROW_NUMBER() predicates to Top-N limits, which
+    // would interfere with the purpose of this test.
+    TQueryOptions options = defaultQueryOptions();
+    options.setAnalytic_rank_pushdown_threshold(0);
+    runPlannerTestFile("sort-expr-materialization", options,
         ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN));
   }
 
@@ -1083,11 +1093,24 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   /**
-   * Test limit pushdown into analytic sort under applicable conditions
+   * Test limit pushdown into analytic sort in isolation.
    */
   @Test
   public void testLimitPushdownAnalytic() {
-    runPlannerTestFile("limit-pushdown-analytic");
+    // The partitioned top-n optimization interacts with limit pushdown. We run the
+    // basic limit pushdown tests with it disabled.
+    TQueryOptions options = defaultQueryOptions();
+    options.setAnalytic_rank_pushdown_threshold(0);
+    runPlannerTestFile("limit-pushdown-analytic", options);
+  }
+
+  /**
+   * Test limit pushdown into analytic sort with the partitioned top-n transformation
+   * also enabled.
+   */
+  @Test
+  public void testLimitPushdownPartitionedTopN() {
+    runPlannerTestFile("limit-pushdown-partitioned-top-n");
   }
 
   /**

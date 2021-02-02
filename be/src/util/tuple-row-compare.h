@@ -35,6 +35,30 @@ class FragmentState;
 class RuntimeState;
 class ScalarExprEvaluator;
 
+/// A wrapper around types Comparator with a Less() method. This wrapper allows the use of
+/// type Comparator with STL containers which expect a type like std::less<T>, which uses
+/// operator() instead of Less() and is cheap to copy.
+///
+/// The C++ standard requires that std::priority_queue operations behave as wrappers to
+/// {push,pop,make,sort}_heap, which take their comparator object by value. Therefore, it
+/// is inefficient to use comparator objects that have expensive construction,
+/// destruction, and copying with std::priority_queue.
+///
+/// ComparatorWrapper takes a reference to an object of type Comparator, rather than
+/// copying that object. ComparatorWrapper<Comparator>(comp) is not safe to use beyond the
+/// lifetime of comp.
+template <typename Comparator>
+class ComparatorWrapper {
+  const Comparator& comp_;
+ public:
+  ComparatorWrapper(const Comparator& comp) : comp_(comp) {}
+
+  template <typename T>
+  bool operator()(const T& lhs, const T& rhs) const {
+    return comp_.Less(lhs, rhs);
+  }
+};
+
 /// TupleRowComparatorConfig contains the static state initialized from its corresponding
 /// thrift structure. It serves as an input for creating instances of the
 /// TupleRowComparator class.

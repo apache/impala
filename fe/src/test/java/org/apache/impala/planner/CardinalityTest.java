@@ -735,6 +735,46 @@ public class CardinalityTest extends PlannerTestBase {
   }
 
   @Test
+  public void testPartitionedTopNNode() {
+    // Create the path to the SortNode and SelectNode of interest in a distributed plan.
+    List<Integer> selectPath = Arrays.asList(0);
+    List<Integer> sortPath = Arrays.asList(0, 0, 0);
+
+    // NDV(smallint_col) = 97, NDV(bool_col) = 2
+    // 5 rows per top-N partition
+    // 97 * 2 * 5 = 970
+    String lessThanQuery = "select * from (" +
+            "  select *, row_number() over " +
+            "  (partition by smallint_col, bool_col order by id) as rn" +
+            "  from functional.alltypesagg where id % 777 = 0 or id % 10 = 7) v" +
+            " where rn <= 5";
+    final int EXPECTED_CARDINALITY = 970;
+    // Both TOP-N node and the upper Select  node are expected to return the same number
+    // of nodes - the predicate in the Select is effectively pushed to the top-n, so
+    // its selectivity should be 1.
+    verifyApproxCardinality(lessThanQuery, EXPECTED_CARDINALITY, true, ImmutableSet.of(),
+            sortPath, SortNode.class);
+    verifyApproxCardinality(lessThanQuery, EXPECTED_CARDINALITY, true, ImmutableSet.of(),
+            selectPath, SelectNode.class);
+
+
+    // Any equality predicate results in the same cardinality estimate for the top-n.
+    // It also results in the same estimate for the Select node, but for a different
+    // reason: the NDV of row_number() is estimated as 1, so the equality predicate
+    // has a selectivity estimate of 1.0.
+    String eqQuery = "select * from (" +
+            "  select *, row_number() over " +
+            "  (partition by smallint_col, bool_col order by id) as rn" +
+            "  from functional.alltypesagg where id % 777 = 0 or id % 10 = 7) v" +
+            " where rn = 5";
+    verifyApproxCardinality(eqQuery, EXPECTED_CARDINALITY, true, ImmutableSet.of(),
+            sortPath, SortNode.class);
+    verifyApproxCardinality(eqQuery, EXPECTED_CARDINALITY, true, ImmutableSet.of(),
+            selectPath, SelectNode.class);
+  }
+
+
+  @Test
   public void testSubPlanNode() {
     // Create the path to the SubplanNode of interest
     // in a distributed plan.

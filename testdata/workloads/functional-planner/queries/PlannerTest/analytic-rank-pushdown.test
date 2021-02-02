@@ -1,0 +1,1678 @@
+# Predicate on row_number() without partition by is converted into top-n
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where rnk < 100 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 100
+|  row-size=31B cardinality=10
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=99
+|
+01:TOP-N [LIMIT=99]
+|  order by: string_col DESC
+|  source expr: row_number() < CAST(100 AS BIGINT)
+|  row-size=23B cardinality=99
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 100
+|  row-size=31B cardinality=10
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=99
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: string_col DESC
+|  limit: 99
+|
+01:TOP-N [LIMIT=99]
+|  order by: string_col DESC
+|  source expr: row_number() < CAST(100 AS BIGINT)
+|  row-size=23B cardinality=99
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# Predicate on row_number() just under the default top-n conversion threshold of 1000.
+select *
+from (
+  select *,
+      row_number() over (order by l_quantity) rnk
+  from tpch.lineitem) v
+where rnk <= 1000
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() <= 1000
+|  row-size=239B cardinality=1.00K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: l_quantity ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=239B cardinality=1.00K
+|
+01:TOP-N [LIMIT=1000]
+|  order by: l_quantity ASC
+|  source expr: row_number() <= CAST(1000 AS BIGINT)
+|  row-size=231B cardinality=1.00K
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   row-size=231B cardinality=6.00M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() <= 1000
+|  row-size=239B cardinality=1.00K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: l_quantity ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=239B cardinality=1.00K
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: l_quantity ASC
+|  limit: 1000
+|
+01:TOP-N [LIMIT=1000]
+|  order by: l_quantity ASC
+|  source expr: row_number() <= CAST(1000 AS BIGINT)
+|  row-size=231B cardinality=1.00K
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   row-size=231B cardinality=6.00M
+====
+# Predicate on row_number() without partition by is converted into full sort
+# because it exceeds the default top-n conversion threshold of 1000.
+select *, rnk
+from (
+  select *,
+      row_number() over (order by l_quantity) rnk
+  from tpch.lineitem) v
+where rnk <= 1001
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() <= 1001
+|  row-size=239B cardinality=600.12K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: l_quantity ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=239B cardinality=6.00M
+|
+01:SORT
+|  order by: l_quantity ASC
+|  row-size=231B cardinality=6.00M
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   row-size=231B cardinality=6.00M
+====
+# Predicate on row_number() without partition by is converted into full sort
+# because it exceeds the top-n bytes limit (it is under the rank pushdown threshold).
+select *, rnk
+from (
+  select *,
+      row_number() over (order by l_quantity) rnk
+  from tpch.lineitem) v
+where rnk < 999999999
+---- QUERYOPTIONS
+ANALYTIC_RANK_PUSHDOWN_THRESHOLD=9999999999
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() < 999999999
+|  row-size=239B cardinality=6.00M
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: l_quantity ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=239B cardinality=6.00M
+|
+01:SORT [LIMIT=999999998]
+|  order by: l_quantity ASC
+|  source expr: row_number() < CAST(999999999 AS BIGINT)
+|  row-size=231B cardinality=6.00M
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   row-size=231B cardinality=6.00M
+====
+# Predicate on row_number() without partition by is converted into top-n
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where rnk < 100 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 100
+|  row-size=31B cardinality=10
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=99
+|
+01:TOP-N [LIMIT=99]
+|  order by: string_col DESC
+|  source expr: row_number() < CAST(100 AS BIGINT)
+|  row-size=23B cardinality=99
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 100
+|  row-size=31B cardinality=10
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=99
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: string_col DESC
+|  limit: 99
+|
+01:TOP-N [LIMIT=99]
+|  order by: string_col DESC
+|  source expr: row_number() < CAST(100 AS BIGINT)
+|  row-size=23B cardinality=99
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# Predicate on rank() without partition by is converted into unpartitioned
+# top-n with tie handling enabled.
+select * from (
+  select id, int_col,
+      rank() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where rnk < 100 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, rank() < 100
+|  row-size=31B cardinality=10
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: string_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=99
+|
+01:TOP-N
+|  order by: string_col DESC
+|  limit with ties: 99
+|  source expr: rank() < CAST(100 AS BIGINT)
+|  row-size=23B cardinality=99
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, rank() < 100
+|  row-size=31B cardinality=10
+|
+02:ANALYTIC
+|  functions: rank()
+|  order by: string_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=99
+|
+05:TOP-N
+|  order by: string_col DESC
+|  limit with ties: 99
+|  row-size=23B cardinality=99
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+01:TOP-N
+|  order by: string_col DESC
+|  limit with ties: 99
+|  source expr: rank() < CAST(100 AS BIGINT)
+|  row-size=23B cardinality=99
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# Predicate on row_number() with partition by is converted into partitioned top-n
+select * from (
+  select id, int_col,
+      row_number() over (partition by int_col order by string_col) as rnk
+  from functional.alltypesagg) v
+where rnk < 5 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() < 5
+|  row-size=31B cardinality=3.83K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=3.83K
+|
+01:TOP-N
+|  partition by: int_col
+|  order by: string_col ASC
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=23B cardinality=3.83K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: functional.alltypesagg.int_col IS NOT NULL
+   row-size=23B cardinality=10.98K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:SELECT
+|  predicates: row_number() < 5
+|  row-size=31B cardinality=3.83K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=3.83K
+|
+05:TOP-N
+|  partition by: int_col
+|  order by: string_col ASC
+|  partition limit: 4
+|  row-size=23B cardinality=3.83K
+|
+04:EXCHANGE [HASH(int_col)]
+|
+01:TOP-N
+|  partition by: int_col
+|  order by: string_col ASC
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=23B cardinality=3.83K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: functional.alltypesagg.int_col IS NOT NULL
+   row-size=23B cardinality=10.98K
+====
+# Predicate on rank() with partition by is converted into partitioned top-n
+select * from (
+  select id, int_col,
+      row_number() over (partition by int_col order by string_col) as rnk
+  from functional.alltypesagg) v
+where rnk < 5 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() < 5
+|  row-size=31B cardinality=3.83K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=3.83K
+|
+01:TOP-N
+|  partition by: int_col
+|  order by: string_col ASC
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=23B cardinality=3.83K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: functional.alltypesagg.int_col IS NOT NULL
+   row-size=23B cardinality=10.98K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:SELECT
+|  predicates: row_number() < 5
+|  row-size=31B cardinality=3.83K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=3.83K
+|
+05:TOP-N
+|  partition by: int_col
+|  order by: string_col ASC
+|  partition limit: 4
+|  row-size=23B cardinality=3.83K
+|
+04:EXCHANGE [HASH(int_col)]
+|
+01:TOP-N
+|  partition by: int_col
+|  order by: string_col ASC
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=23B cardinality=3.83K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: functional.alltypesagg.int_col IS NOT NULL
+   row-size=23B cardinality=10.98K
+====
+# Predicate on row_number() with partition by is converted into full sort
+# because it exceeds the default top-n conversion threshold of 1000.
+select *, rnk
+from (
+  select *,
+      row_number() over (partition by l_orderkey order by l_quantity) rnk
+  from tpch.lineitem) v
+where rnk <= 1001
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() <= 1001
+|  row-size=239B cardinality=600.12K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: l_orderkey
+|  order by: l_quantity ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=239B cardinality=6.00M
+|
+01:SORT
+|  order by: l_orderkey ASC NULLS LAST, l_quantity ASC
+|  row-size=231B cardinality=6.00M
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   row-size=231B cardinality=6.00M
+====
+# Predicate on row_number() with partition by does not get converted into full sort
+# - the top-n bytes limit does not apply since the partitioned top-n can spill.
+select *, rnk
+from (
+  select *,
+      row_number() over (partition by l_orderkey order by l_quantity) rnk
+  from tpch.lineitem) v
+where rnk < 999999999
+---- QUERYOPTIONS
+ANALYTIC_RANK_PUSHDOWN_THRESHOLD=9999999999
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() < 999999999
+|  row-size=239B cardinality=6.00M
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: l_orderkey
+|  order by: l_quantity ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=239B cardinality=6.00M
+|
+01:TOP-N
+|  partition by: l_orderkey
+|  order by: l_quantity ASC
+|  partition limit: 999999998
+|  source expr: row_number() < CAST(999999999 AS BIGINT)
+|  row-size=231B cardinality=6.00M
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   row-size=231B cardinality=6.00M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:SELECT
+|  predicates: row_number() < 999999999
+|  row-size=239B cardinality=6.00M
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: l_orderkey
+|  order by: l_quantity ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=239B cardinality=6.00M
+|
+05:TOP-N
+|  partition by: l_orderkey
+|  order by: l_quantity ASC
+|  partition limit: 999999998
+|  row-size=231B cardinality=6.00M
+|
+04:EXCHANGE [HASH(l_orderkey)]
+|
+01:TOP-N
+|  partition by: l_orderkey
+|  order by: l_quantity ASC
+|  partition limit: 999999998
+|  source expr: row_number() < CAST(999999999 AS BIGINT)
+|  row-size=231B cardinality=6.00M
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   row-size=231B cardinality=6.00M
+====
+# Predicates are normalized, so flipped predicates can be pushed down.
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where 99 >= rnk and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() <= 99
+|  row-size=31B cardinality=10
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=99
+|
+01:TOP-N [LIMIT=99]
+|  order by: string_col DESC
+|  source expr: row_number() <= CAST(99 AS BIGINT)
+|  row-size=23B cardinality=99
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() <= 99
+|  row-size=31B cardinality=10
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=99
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: string_col DESC
+|  limit: 99
+|
+01:TOP-N [LIMIT=99]
+|  order by: string_col DESC
+|  source expr: row_number() <= CAST(99 AS BIGINT)
+|  row-size=23B cardinality=99
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# Partition by multiple columns.
+select * from (
+  select id, int_col,
+      row_number() over (partition by year, month order by bigint_col) as rnk
+  from functional.alltypesagg) v
+where rnk < 5 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 5
+|  row-size=32B cardinality=1
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: `year`, `month`
+|  order by: bigint_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=32B cardinality=4
+|
+01:TOP-N
+|  partition by: year, month
+|  order by: bigint_col ASC
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=24B cardinality=4
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=24B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 5
+|  row-size=32B cardinality=1
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: `year`, `month`
+|  order by: bigint_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=32B cardinality=4
+|
+05:TOP-N
+|  partition by: year, month
+|  order by: bigint_col ASC
+|  partition limit: 4
+|  row-size=24B cardinality=4
+|
+04:EXCHANGE [HASH(year,month)]
+|
+01:TOP-N
+|  partition by: year, month
+|  order by: bigint_col ASC
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=24B cardinality=4
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=24B cardinality=11.00K
+====
+# dense_rank() is not eligible for push down.
+select * from (
+  select id, int_col,
+      dense_rank() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where rnk < 100 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, dense_rank() < 100
+|  row-size=31B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: dense_rank()
+|  order by: string_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=11.00K
+|
+01:SORT
+|  order by: string_col DESC
+|  row-size=23B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# Analytic predicate can be migrated into inline view (the predicate on rnk),
+# but not through the analytic if there are multiple levels of views
+# (the predicate on int_col).
+select * from (
+  select id, int_col,
+      row_number() over (partition by int_col order by string_col nulls last) as rnk
+  from (
+    select id, string_col, first_value(int_col) over (partition by id) as int_col
+    from functional.alltypes) v2) v
+where rnk < 5 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+05:SELECT
+|  predicates: first_value(int_col) IS NOT NULL, row_number() < 5
+|  row-size=33B cardinality=4
+|
+04:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=33B cardinality=40
+|
+03:TOP-N
+|  partition by: first_value(int_col)
+|  order by: string_col ASC NULLS LAST
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=25B cardinality=40
+|
+02:ANALYTIC
+|  functions: first_value(int_col)
+|  partition by: id
+|  row-size=25B cardinality=7.30K
+|
+01:SORT
+|  order by: id ASC NULLS LAST
+|  row-size=21B cardinality=7.30K
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=21B cardinality=7.30K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+05:SELECT
+|  predicates: first_value(int_col) IS NOT NULL, row_number() < 5
+|  row-size=33B cardinality=4
+|
+04:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=33B cardinality=40
+|
+08:TOP-N
+|  partition by: first_value(int_col)
+|  order by: string_col ASC NULLS LAST
+|  partition limit: 4
+|  row-size=25B cardinality=40
+|
+07:EXCHANGE [HASH(first_value(int_col))]
+|
+03:TOP-N
+|  partition by: first_value(int_col)
+|  order by: string_col ASC NULLS LAST
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=25B cardinality=40
+|
+02:ANALYTIC
+|  functions: first_value(int_col)
+|  partition by: id
+|  row-size=25B cardinality=7.30K
+|
+01:SORT
+|  order by: id ASC NULLS LAST
+|  row-size=21B cardinality=7.30K
+|
+06:EXCHANGE [HASH(id)]
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=21B cardinality=7.30K
+====
+# Analytic predicate cannot be pushed down if subquery has a limit.
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rnk
+  from functional.alltypesagg
+  limit 1000000) v
+where rnk < 100 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 100
+|  row-size=31B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  limit: 1000000
+|  row-size=31B cardinality=11.00K
+|
+01:TOP-N [LIMIT=1000000]
+|  order by: string_col DESC
+|  row-size=23B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# Analytic predicate cannot be pushed into UNION.
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rownum
+  from functional.alltypesagg UNION ALL select 1, 2, 3) v
+where rownum <= 20
+---- PLAN
+PLAN-ROOT SINK
+|
+04:SELECT
+|  predicates: rownum <= 20
+|  row-size=16B cardinality=1.10K
+|
+00:UNION
+|  constant-operands=1
+|  row-size=16B cardinality=11.00K
+|
+03:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=11.00K
+|
+02:SORT
+|  order by: string_col DESC
+|  row-size=23B cardinality=11.00K
+|
+01:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# <= predicate
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where rnk <= 100 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() <= 100
+|  row-size=31B cardinality=10
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=100
+|
+01:TOP-N [LIMIT=100]
+|  order by: string_col DESC
+|  source expr: row_number() <= CAST(100 AS BIGINT)
+|  row-size=23B cardinality=100
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() <= 100
+|  row-size=31B cardinality=10
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=100
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: string_col DESC
+|  limit: 100
+|
+01:TOP-N [LIMIT=100]
+|  order by: string_col DESC
+|  source expr: row_number() <= CAST(100 AS BIGINT)
+|  row-size=23B cardinality=100
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# = predicate
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where rnk = 42 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() = 42
+|  row-size=31B cardinality=4
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=42
+|
+01:TOP-N [LIMIT=42]
+|  order by: string_col DESC
+|  source expr: row_number() = CAST(42 AS BIGINT)
+|  row-size=23B cardinality=42
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() = 42
+|  row-size=31B cardinality=4
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=42
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: string_col DESC
+|  limit: 42
+|
+01:TOP-N [LIMIT=42]
+|  order by: string_col DESC
+|  source expr: row_number() = CAST(42 AS BIGINT)
+|  row-size=23B cardinality=42
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# BETWEEN predicate - only the <= is pushed down.
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where rnk between 46 and 52
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() >= 46, row_number() <= 52
+|  row-size=31B cardinality=5
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=52
+|
+01:TOP-N [LIMIT=52]
+|  order by: string_col DESC
+|  source expr: row_number() <= CAST(52 AS BIGINT)
+|  row-size=23B cardinality=52
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() >= 46, row_number() <= 52
+|  row-size=31B cardinality=5
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=52
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: string_col DESC
+|  limit: 52
+|
+01:TOP-N [LIMIT=52]
+|  order by: string_col DESC
+|  source expr: row_number() <= CAST(52 AS BIGINT)
+|  row-size=23B cardinality=52
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# > and >= are not pushed down.
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where rnk >= 2 and rnk > 3 and rnk < 100
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() > 3, row_number() >= 2, row_number() < 100
+|  row-size=31B cardinality=10
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=99
+|
+01:TOP-N [LIMIT=99]
+|  order by: string_col DESC
+|  source expr: row_number() < CAST(100 AS BIGINT)
+|  row-size=23B cardinality=99
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# The smallest limit is chosen for pushdown.
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rownum,
+      row_number() over (order by string_col desc) as rownum2
+  from functional.alltypesagg) v
+where rownum <= 20 and rownum2 < 20 and rownum = 50
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() <= 20, row_number() < 20, row_number() = 50
+|  row-size=31B cardinality=2
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=19
+|
+01:TOP-N [LIMIT=19]
+|  order by: string_col DESC
+|  source expr: row_number() < CAST(20 AS BIGINT)
+|  row-size=23B cardinality=19
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() <= 20, row_number() < 20, row_number() = 50
+|  row-size=31B cardinality=2
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=19
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: string_col DESC
+|  limit: 19
+|
+01:TOP-N [LIMIT=19]
+|  order by: string_col DESC
+|  source expr: row_number() < CAST(20 AS BIGINT)
+|  row-size=23B cardinality=19
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# Pushdown does not work with rank() and row_number() combined because of
+# incompatible windows.
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rownum,
+      rank() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where rnk < 21 and rownum <= 20 and rnk < 100
+---- PLAN
+PLAN-ROOT SINK
+|
+04:SELECT
+|  predicates: rank() < 100, rank() < 21, row_number() <= 20
+|  row-size=39B cardinality=1.10K
+|
+03:ANALYTIC
+|  functions: rank()
+|  order by: string_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=39B cardinality=11.00K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=11.00K
+|
+01:SORT
+|  order by: string_col DESC
+|  row-size=23B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# Limit pushdown is compatible with other analytics with same window.
+select * from (
+  select id, int_col,
+      row_number() over (partition by year order by string_col) as rnk,
+      first_value(tinyint_col) over (partition by year order by string_col)
+  from functional.alltypesagg) v
+where rnk < 5 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 5
+|  row-size=37B cardinality=1
+|
+02:ANALYTIC
+|  functions: row_number(), first_value(tinyint_col)
+|  partition by: `year`
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=37B cardinality=4
+|
+01:TOP-N
+|  partition by: year
+|  order by: string_col ASC
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=28B cardinality=4
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=28B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 5
+|  row-size=37B cardinality=1
+|
+02:ANALYTIC
+|  functions: row_number(), first_value(tinyint_col)
+|  partition by: `year`
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=37B cardinality=4
+|
+05:TOP-N
+|  partition by: year
+|  order by: string_col ASC
+|  partition limit: 4
+|  row-size=28B cardinality=4
+|
+04:EXCHANGE [HASH(year)]
+|
+01:TOP-N
+|  partition by: year
+|  order by: string_col ASC
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=28B cardinality=4
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=28B cardinality=11.00K
+====
+# Limit cannot be pushed through another analytic in the same select block with
+# a different partitioning.
+select * from (
+  select id, int_col,
+      row_number() over (partition by int_col order by string_col) as rnk,
+      sum(tinyint_col) over (partition by year order by string_col)
+  from functional.alltypesagg) v
+where rnk < 5 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+05:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 5
+|  row-size=44B cardinality=1.10K
+|
+04:ANALYTIC
+|  functions: sum(tinyint_col)
+|  partition by: `year`
+|  order by: string_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=44B cardinality=11.00K
+|
+03:SORT
+|  order by: year ASC NULLS LAST, string_col ASC
+|  row-size=36B cardinality=11.00K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=36B cardinality=11.00K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, string_col ASC
+|  row-size=28B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=28B cardinality=11.00K
+====
+# The limit can be pushed down to the sort if it is the last sort group and
+# there are no incompatible windows in that sort group.
+select * from (
+  select id, int_col,
+      row_number() over (partition by int_col order by string_col) as rnk,
+      first_value(tinyint_col) over (partition by year order by string_col
+                                     rows between 2 preceding and current row)
+  from functional.alltypesagg) v
+where rnk < 5 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+05:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 5
+|  row-size=37B cardinality=383
+|
+04:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=37B cardinality=3.83K
+|
+03:TOP-N
+|  partition by: int_col
+|  order by: string_col ASC
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=29B cardinality=3.83K
+|
+02:ANALYTIC
+|  functions: first_value_rewrite(tinyint_col, -1)
+|  partition by: `year`
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 PRECEDING
+|  row-size=29B cardinality=11.00K
+|
+01:SORT
+|  order by: year ASC NULLS LAST, string_col ASC
+|  row-size=28B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=28B cardinality=11.00K
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+05:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 5
+|  row-size=37B cardinality=383
+|
+04:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=37B cardinality=3.83K
+|
+08:TOP-N
+|  partition by: int_col
+|  order by: string_col ASC
+|  partition limit: 4
+|  row-size=29B cardinality=3.83K
+|
+07:EXCHANGE [HASH(int_col)]
+|
+03:TOP-N
+|  partition by: int_col
+|  order by: string_col ASC
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=29B cardinality=3.83K
+|
+02:ANALYTIC
+|  functions: first_value_rewrite(tinyint_col, -1)
+|  partition by: `year`
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 PRECEDING
+|  row-size=29B cardinality=11.00K
+|
+01:SORT
+|  order by: year ASC NULLS LAST, string_col ASC
+|  row-size=28B cardinality=11.00K
+|
+06:EXCHANGE [HASH(`year`)]
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=28B cardinality=11.00K
+====
+# The limit cannot be pushed down to the sort if there are incompatible windows in that
+# sort group.
+select * from (
+  select id, int_col,
+      row_number() over (partition by year order by string_col) as rnk,
+      last_value(tinyint_col) over (partition by year order by string_col
+                                     rows between 2 preceding and current row)
+  from functional.alltypesagg) v
+where rnk < 5 and int_col is not null
+---- PLAN
+PLAN-ROOT SINK
+|
+04:SELECT
+|  predicates: int_col IS NOT NULL, row_number() < 5
+|  row-size=37B cardinality=1.10K
+|
+03:ANALYTIC
+|  functions: row_number()
+|  partition by: `year`
+|  order by: string_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=37B cardinality=11.00K
+|
+02:ANALYTIC
+|  functions: last_value(tinyint_col)
+|  partition by: `year`
+|  order by: string_col ASC
+|  window: ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+|  row-size=29B cardinality=11.00K
+|
+01:SORT
+|  order by: year ASC NULLS LAST, string_col ASC
+|  row-size=28B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=28B cardinality=11.00K
+====
+# Effective limit of 0 results in a limit of 1 in the TOP-N so that it is executable,
+# and the original predicate must be preserved.
+select distinct l_shipmode, l_quantity, rnk
+from (
+  select *,
+    row_number() over (partition by l_shipmode order by l_quantity) rnk,
+    first_value(l_comment) over (partition by l_shipmode order by l_linenumber)
+    from tpch.lineitem) v
+where rnk < 1
+---- PLAN
+PLAN-ROOT SINK
+|
+04:AGGREGATE [FINALIZE]
+|  group by: l_shipmode, l_quantity, row_number()
+|  row-size=32B cardinality=7
+|
+03:SELECT
+|  predicates: row_number() < 1
+|  row-size=32B cardinality=7
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: l_shipmode
+|  order by: l_quantity ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=32B cardinality=7
+|
+01:TOP-N
+|  partition by: l_shipmode
+|  order by: l_quantity ASC
+|  partition limit: 1
+|  source expr: row_number() < CAST(1 AS BIGINT)
+|  row-size=24B cardinality=7
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   row-size=24B cardinality=6.00M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+08:AGGREGATE [FINALIZE]
+|  group by: l_shipmode, l_quantity, rnk
+|  row-size=32B cardinality=7
+|
+07:EXCHANGE [HASH(l_shipmode,l_quantity,rnk)]
+|
+04:AGGREGATE [STREAMING]
+|  group by: l_shipmode, l_quantity, row_number()
+|  row-size=32B cardinality=7
+|
+03:SELECT
+|  predicates: row_number() < 1
+|  row-size=32B cardinality=7
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: l_shipmode
+|  order by: l_quantity ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=32B cardinality=7
+|
+06:TOP-N
+|  partition by: l_shipmode
+|  order by: l_quantity ASC
+|  partition limit: 1
+|  row-size=24B cardinality=7
+|
+05:EXCHANGE [HASH(l_shipmode)]
+|
+01:TOP-N
+|  partition by: l_shipmode
+|  order by: l_quantity ASC
+|  partition limit: 1
+|  source expr: row_number() < CAST(1 AS BIGINT)
+|  row-size=24B cardinality=7
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   row-size=24B cardinality=6.00M
+====
+# Effective negative limits are handled correctly.
+select l_shipmode, l_quantity, rnk
+from (
+  select *,
+    row_number() over (partition by l_shipmode order by l_quantity) rnk,
+    first_value(l_comment) over (partition by l_shipmode order by l_linenumber)
+    from tpch.lineitem) v
+where rnk = -42
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() = -42
+|  row-size=32B cardinality=7
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: l_shipmode
+|  order by: l_quantity ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=32B cardinality=7
+|
+01:TOP-N
+|  partition by: l_shipmode
+|  order by: l_quantity ASC
+|  partition limit: 1
+|  source expr: row_number() = CAST(-42 AS BIGINT)
+|  row-size=24B cardinality=7
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   row-size=24B cardinality=6.00M
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:SELECT
+|  predicates: row_number() = -42
+|  row-size=32B cardinality=7
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: l_shipmode
+|  order by: l_quantity ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=32B cardinality=7
+|
+05:TOP-N
+|  partition by: l_shipmode
+|  order by: l_quantity ASC
+|  partition limit: 1
+|  row-size=24B cardinality=7
+|
+04:EXCHANGE [HASH(l_shipmode)]
+|
+01:TOP-N
+|  partition by: l_shipmode
+|  order by: l_quantity ASC
+|  partition limit: 1
+|  source expr: row_number() = CAST(-42 AS BIGINT)
+|  row-size=24B cardinality=7
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   row-size=24B cardinality=6.00M
+====
+# Other predicates referencing rank() and row_number() can't be
+# converted into limits.
+select * from (
+  select id, int_col,
+        row_number() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where rnk % 100 = 10 and case when id % 2 = 0 then rnk > 1 else true end
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() % 100 = 10, CASE WHEN id % 2 = 0 THEN row_number() > 1 ELSE TRUE END
+|  row-size=31B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=11.00K
+|
+01:SORT
+|  order by: string_col DESC
+|  row-size=23B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# Predicates referencing rank() nested in OR can't be converted into limits.
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where rnk < 10 or id = 10
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() < 10 OR id = 10
+|  row-size=31B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=11.00K
+|
+01:SORT
+|  order by: string_col DESC
+|  row-size=23B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# Comparison with non-constant rank predicate can't be converted into limit.
+select * from (
+  select id, int_col,
+      row_number() over (order by string_col desc) as rnk
+  from functional.alltypesagg) v
+where rnk < int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() < int_col
+|  row-size=31B cardinality=1.10K
+|
+02:ANALYTIC
+|  functions: row_number()
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=11.00K
+|
+01:SORT
+|  order by: string_col DESC
+|  row-size=23B cardinality=11.00K
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   row-size=23B cardinality=11.00K
+====
+# Partition by literal is converted into unpartitioned top-n
+select * from (
+  select id, int_col,
+      row_number() over (partition by 1 order by string_col desc) as rnk
+  from functional.alltypesagg
+  where int_col = 1) v
+where rnk < 5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() < 5
+|  row-size=31B cardinality=4
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: 1
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=4
+|
+01:TOP-N [LIMIT=4]
+|  order by: 1 ASC NULLS LAST, string_col DESC
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=23B cardinality=4
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: int_col = 1
+   row-size=23B cardinality=11
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() < 5
+|  row-size=31B cardinality=4
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: 1
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=4
+|
+04:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: 1 ASC NULLS LAST, string_col DESC
+|  limit: 4
+|
+01:TOP-N [LIMIT=4]
+|  order by: 1 ASC NULLS LAST, string_col DESC
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=23B cardinality=4
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: int_col = 1
+   row-size=23B cardinality=11
+====
+# Partition by a non-literal expression that is constant is converted into partitioned
+# top-n, but could actually be handled by unpartitioned top-n correctly.
+select * from (
+  select id, int_col,
+      row_number() over (partition by int_col order by string_col desc) as rnk
+  from functional.alltypesagg
+  where int_col = 1) v
+where rnk < 5
+---- PLAN
+PLAN-ROOT SINK
+|
+03:SELECT
+|  predicates: row_number() < 5
+|  row-size=31B cardinality=11
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=11
+|
+01:TOP-N
+|  partition by: int_col
+|  order by: string_col DESC
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=23B cardinality=11
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: int_col = 1
+   row-size=23B cardinality=11
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+03:SELECT
+|  predicates: row_number() < 5
+|  row-size=31B cardinality=11
+|
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: int_col
+|  order by: string_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=31B cardinality=11
+|
+05:TOP-N
+|  partition by: int_col
+|  order by: string_col DESC
+|  partition limit: 4
+|  row-size=23B cardinality=11
+|
+04:EXCHANGE [HASH(int_col)]
+|
+01:TOP-N
+|  partition by: int_col
+|  order by: string_col DESC
+|  partition limit: 4
+|  source expr: row_number() < CAST(5 AS BIGINT)
+|  row-size=23B cardinality=11
+|
+00:SCAN HDFS [functional.alltypesagg]
+   HDFS partitions=11/11 files=11 size=814.73KB
+   predicates: int_col = 1
+   row-size=23B cardinality=11
+====

@@ -26,6 +26,7 @@ import org.apache.impala.analysis.ExprSubstitutionMap;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.SortInfo;
+import org.apache.impala.analysis.ToSqlOptions;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TPlanNode;
@@ -75,13 +76,25 @@ public class SortNode extends PlanNode {
   // The offset of the first row to return.
   protected long offset_;
 
+  // How many of the expressions in info_ comprise the partition key.
+  // Non-negative if type_ is PARTITIONED_TOPN, -1 otherwise.
+  protected int numPartitionExprs_;
+
+  // Max rows to return for each partition key value.
+  // Non-negative if type_ is PARTITIONED_TOPN, -1 otherwise.
+  protected long perPartitionLimit_;
+
   // Whether to include ties for the last place in the Top-N values.
-  // Only supported if type_ is TOPN.
+  // Only supported if type_ is TOPN or PARTITIONED_TOPN.
   protected boolean includeTies_;
 
   // If includeTies_ is true, this is the limit used. We cannot use the default 'limit_'
   // because the plan node may return more than this number of rows.
   protected long limitWithTies_;
+
+  // The predicate that the limit was derived from, if any. If non-null,
+  // used for informational purposes in the explain string.
+  protected Expr limitSrcPred_;
 
   // The type of sort. Determines the exec node used in the BE.
   private TSortType type_;
@@ -95,7 +108,7 @@ public class SortNode extends PlanNode {
    */
   public static SortNode createPartialSortNode(
       PlanNodeId id, PlanNode input, SortInfo info) {
-    return new SortNode(id, input, info, 0, -1, false, TSortType.PARTIAL);
+    return new SortNode(id, input, info, 0, -1, -1, -1, false, TSortType.PARTIAL);
   }
 
   /**
@@ -113,7 +126,8 @@ public class SortNode extends PlanNode {
     SortNode result;
     if (topNBytesLimit <= 0 || estimatedTopNMaterializedSize < topNBytesLimit
             || includeTies) {
-      result = new SortNode(id, input, info, offset, limit, includeTies, TSortType.TOPN);
+      result = new SortNode(
+              id, input, info, offset, limit, -1, -1, includeTies, TSortType.TOPN);
     } else {
       result = SortNode.createTotalSortNode(id, input, info, offset);
       result.setLimit(limit);
@@ -122,24 +136,45 @@ public class SortNode extends PlanNode {
   }
 
   /**
+   * Creates a new SortNode with a per-partition limit that is executed with TopNNode
+   * in the BE.
+   */
+  public static SortNode createPartitionedTopNSortNode(
+      PlanNodeId id, PlanNode input, SortInfo info, int numPartitionExprs,
+      long perPartitionLimit, boolean includeTies) {
+    return new SortNode(id, input, info, 0, -1, numPartitionExprs, perPartitionLimit,
+        includeTies, TSortType.PARTITIONED_TOPN);
+  }
+
+  /**
    * Creates a new SortNode that does a total sort, possibly with a limit.
    */
   public static SortNode createTotalSortNode(
       PlanNodeId id, PlanNode input, SortInfo info, long offset) {
-    return new SortNode(id, input, info, offset, -1, false, TSortType.TOTAL);
+    return new SortNode(id, input, info, offset, -1, -1, -1, false, TSortType.TOTAL);
   }
 
   private SortNode(
       PlanNodeId id, PlanNode input, SortInfo info, long offset, long limit,
-      boolean includeTies, TSortType type) {
+      int numPartitionExprs, long perPartitionLimit, boolean includeTies,
+      TSortType type) {
     super(id, info.getSortTupleDescriptor().getId().asList(), getDisplayName(type));
     Preconditions.checkState(offset >= 0);
-    Preconditions.checkArgument(type != TSortType.TOPN || limit >= 0);
+    if (type == TSortType.PARTITIONED_TOPN) {
+      // We need to support 0 partition exprs if ties are included, because the
+      // non-partitioned Top-N and sort nodes do not currently support including ties.
+      Preconditions.checkState(includeTies || numPartitionExprs > 0);
+      Preconditions.checkState(perPartitionLimit > 0);
+    } else if (type == TSortType.TOPN) {
+      Preconditions.checkArgument(type != TSortType.TOPN || limit >= 0);
+    }
     info_ = info;
     children_.add(input);
     offset_ = offset;
+    numPartitionExprs_ = numPartitionExprs;
+    perPartitionLimit_ = perPartitionLimit;
     includeTies_ = includeTies;
-    limitWithTies_ = includeTies ? limit : -1;
+    limitWithTies_ = (type == TSortType.TOPN && includeTies) ? limit : -1;
     type_ = type;
     if (!includeTies) setLimit(limit);
   }
@@ -147,7 +182,11 @@ public class SortNode extends PlanNode {
   public long getOffset() { return offset_; }
   public void setOffset(long offset) { offset_ = offset; }
   public boolean hasOffset() { return offset_ > 0; }
+  public boolean isTotalSort() { return type_ == TSortType.TOTAL; }
   public boolean isTypeTopN() { return type_ == TSortType.TOPN; }
+  public boolean isPartitionedTopN() { return type_ == TSortType.PARTITIONED_TOPN; }
+  public int getNumPartitionExprs() { return numPartitionExprs_; }
+  public long getPerPartitionLimit() { return perPartitionLimit_; }
   public boolean isIncludeTies() { return includeTies_; }
   // Get the limit that applies to the sort, including ties or not.
   public long getSortLimit() {
@@ -165,12 +204,14 @@ public class SortNode extends PlanNode {
   public AnalyticEvalNode getAnalyticEvalNode() { return analyticEvalNode_; }
 
   /**
-   * Under special cases, the planner may decide to convert a total sort into a
-   * TopN sort with limit. This does the conversion to top-n if the converted
-   * node would pass the TOPN_BYTES_LIMIT check. Otherwise does not modify this node.
+   * Under special cases, the planner may decide to convert a total sort or
+   * partition top-N into a TopN sort with limit. This does the conversion to top-n
+   * if the converted node would pass the TOPN_BYTES_LIMIT check. Otherwise does
+   * not modify this node.
    */
   public void tryConvertToTopN(long limit, Analyzer analyzer, boolean includeTies) {
-    Preconditions.checkArgument(type_ == TSortType.TOTAL);
+    Preconditions.checkArgument(type_ == TSortType.TOTAL
+        || type_ == TSortType.PARTITIONED_TOPN);
     Preconditions.checkState(!hasLimit());
     Preconditions.checkState(!hasOffset());
     long topNBytesLimit = analyzer.getQueryOptions().topn_bytes_limit;
@@ -183,6 +224,8 @@ public class SortNode extends PlanNode {
     }
     type_ = TSortType.TOPN;
     displayName_ = getDisplayName(type_);
+    numPartitionExprs_ = -1;
+    perPartitionLimit_ = -1;
     includeTies_ = includeTies;
     if (includeTies) {
       unsetLimit();
@@ -197,6 +240,10 @@ public class SortNode extends PlanNode {
   public boolean allowPartitioned() {
     if (isAnalyticSort_ && hasLimit()) return true;
     return super.allowPartitioned();
+  }
+
+  public void setLimitSrcPred(Expr v) {
+    this.limitSrcPred_ = v;
   }
 
   @Override
@@ -248,10 +295,22 @@ public class SortNode extends PlanNode {
   @Override
   protected void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-    if (includeTies_) {
+    if (isTypeTopN() && includeTies_) {
       cardinality_ = capCardinalityAtLimit(getChild(0).cardinality_, limitWithTies_);
     } else {
       cardinality_ = capCardinalityAtLimit(getChild(0).cardinality_);
+    }
+    if (type_ == TSortType.PARTITIONED_TOPN) {
+      // We may be able to get a more precise estimate based on the number of
+      // partitions and per-partition limits.
+      List<Expr> partExprs = info_.getSortExprs().subList(0, numPartitionExprs_);
+      long partNdv = numPartitionExprs_ == 0 ? 1 : Expr.getNumDistinctValues(partExprs);
+      if (partNdv >= 0) {
+        long maxRowsInHeaps = partNdv * getPerPartitionLimit();
+        if (cardinality_ < 0 || cardinality_ > maxRowsInHeaps) {
+          cardinality_ = maxRowsInHeaps;
+        }
+      }
     }
 
     if (LOG.isTraceEnabled()) {
@@ -273,17 +332,21 @@ public class SortNode extends PlanNode {
         .add("offset_", offset_)
         .add("includeTies_", includeTies_)
         .add("limitWithTies_", limitWithTies_)
+        .add("numPartitionExprs_", numPartitionExprs_)
+        .add("perPartitionLimit_", perPartitionLimit_)
         .addValue(super.debugString())
         .toString();
   }
 
   @Override
   protected void toThrift(TPlanNode msg) {
-    Preconditions.checkState(!isTypeTopN() || hasLimit() ||
-            (includeTies_ && limitWithTies_ >= 0), "Top-N must have limit",
-            debugString());
-    Preconditions.checkState(!includeTies_ || (!hasLimit() && limitWithTies_ >= 0),
-            "Top-N with tie handling must set limitWithTies_ only");
+    if (isTypeTopN()) {
+      Preconditions.checkState(hasLimit() ||
+              (includeTies_ && limitWithTies_ >= 0), "Top-N must have limit",
+              debugString());
+      Preconditions.checkState(!includeTies_ || (!hasLimit() && limitWithTies_ >= 0),
+              "Top-N with tie handling must set limitWithTies_ only");
+    }
     Preconditions.checkState(offset_ >= 0);
     msg.node_type = TPlanNodeType.SORT_NODE;
     TSortInfo sort_info = new TSortInfo(Expr.treesToThrift(info_.getSortExprs()),
@@ -295,6 +358,21 @@ public class SortNode extends PlanNode {
     TSortNode sort_node = new TSortNode(sort_info, type_);
     sort_node.setOffset(offset_);
     sort_node.setEstimated_full_input_size(estimatedFullInputSize_);
+
+    if (type_ == TSortType.PARTITIONED_TOPN) {
+      sort_node.setPer_partition_limit(perPartitionLimit_);
+      List<Expr> partExprs = info_.getSortExprs().subList(0, numPartitionExprs_);
+      sort_node.setPartition_exprs(Expr.treesToThrift(partExprs));
+      // Remove the partition exprs for the intra-partition sort.
+      int totalExprs = info_.getSortExprs().size();
+      List<Expr> sortExprs = info_.getSortExprs().subList(numPartitionExprs_, totalExprs);
+      sort_node.setIntra_partition_sort_info(new TSortInfo(Expr.treesToThrift(sortExprs),
+          info_.getIsAscOrder().subList(numPartitionExprs_, totalExprs),
+          info_.getNullsFirst().subList(numPartitionExprs_, totalExprs),
+          info_.getSortingOrder()));
+    }
+    Preconditions.checkState(type_ == TSortType.PARTITIONED_TOPN ||
+            type_ == TSortType.TOPN || !includeTies_);
     sort_node.setInclude_ties(includeTies_);
     if (includeTies_) {
       sort_node.setLimit_with_ties(limitWithTies_);
@@ -309,12 +387,36 @@ public class SortNode extends PlanNode {
     output.append(String.format("%s%s:%s%s\n", prefix, id_.toString(),
         displayName_, getNodeExplainDetail(detailLevel)));
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
-      output.append(detailPrefix + "order by: ");
-      output.append(getSortingOrderExplainString(info_.getSortExprs(),
-          info_.getIsAscOrder(), info_.getNullsFirstParams(), info_.getSortingOrder(),
-          info_.getNumLexicalKeysInZOrder()));
-      if (includeTies_) {
-        output.append(detailPrefix + "limit with ties: " + limitWithTies_ + "\n");
+      if (type_ == TSortType.PARTITIONED_TOPN) {
+        output.append(detailPrefix + "partition by:");
+        List<Expr> partExprs = info_.getSortExprs().subList(0, numPartitionExprs_);
+        if (partExprs.size() > 0) {
+          output.append(" ");
+          output.append(Expr.toSql(partExprs, ToSqlOptions.DEFAULT));
+        }
+        int totalExprs = info_.getSortExprs().size();
+        List<Expr> sortExprs =
+              info_.getSortExprs().subList(numPartitionExprs_, totalExprs);
+        output.append("\n" + detailPrefix + "order by: ");
+        output.append(getSortingOrderExplainString(sortExprs,
+              info_.getIsAscOrder().subList(numPartitionExprs_, totalExprs),
+              info_.getNullsFirstParams().subList(numPartitionExprs_, totalExprs),
+              info_.getSortingOrder(), info_.getNumLexicalKeysInZOrder()));
+        output.append(detailPrefix + "partition limit: " + perPartitionLimit_);
+        if (includeTies_) output.append(" (include ties)");
+        output.append("\n");
+      } else {
+        output.append(detailPrefix + "order by: ");
+        output.append(getSortingOrderExplainString(info_.getSortExprs(),
+            info_.getIsAscOrder(), info_.getNullsFirstParams(), info_.getSortingOrder(),
+            info_.getNumLexicalKeysInZOrder()));
+        if (includeTies_) {
+          output.append(detailPrefix + "limit with ties: " + limitWithTies_ + "\n");
+        }
+      }
+      if (limitSrcPred_ != null) {
+        output.append(detailPrefix + "source expr: " +
+                limitSrcPred_.toSql(ToSqlOptions.SHOW_IMPLICIT_CASTS) + "\n");
       }
     }
 
@@ -360,11 +462,6 @@ public class SortNode extends PlanNode {
       return;
     }
 
-    // For an external sort, set the memory cost to be what is required for a 2-phase
-    // sort. If the input to be sorted would take up N blocks in memory, then the
-    // memory required for a 2-phase sort is sqrt(N) blocks. A single run would be of
-    // size sqrt(N) blocks, and we could merge sqrt(N) such runs with sqrt(N) blocks
-    // of memory.
     double fullInputSize = getChild(0).cardinality_ * avgRowSize_;
     estimatedFullInputSize_ = fullInputSize < 0 ? -1 : (long) Math.ceil(fullInputSize);
     boolean usesVarLenBlocks = false;
@@ -396,10 +493,24 @@ public class SortNode extends PlanNode {
           Math.min((long) Math.ceil(fullInputSize), mem_limit);
       perInstanceMinMemReservation = bufferSize * pageMultiplier;
     } else {
+      Preconditions.checkState(type_ == TSortType.TOTAL ||
+          type_ == TSortType.PARTITIONED_TOPN);
+      // For an external sort, set the memory cost to be what is required for a 2-phase
+      // sort. If the input to be sorted would take up N blocks in memory, then the
+      // memory required for a 2-phase sort is sqrt(N) blocks. A single run would be of
+      // size sqrt(N) blocks, and we could merge sqrt(N) such runs with sqrt(N) blocks
+      // of memory.
       double numInputBlocks = Math.ceil(fullInputSize / (bufferSize * pageMultiplier));
       perInstanceMemEstimate =
           bufferSize * (long) Math.ceil(Math.sqrt(numInputBlocks));
       perInstanceMinMemReservation = 3 * bufferSize * pageMultiplier;
+
+      if (type_ == TSortType.PARTITIONED_TOPN) {
+        // We may be able to estimate a lower memory requirement based on the size
+        // of in-memory heaps.
+        long totalHeapBytes = getSortInfo().estimateMaterializedSize(cardinality_);
+        perInstanceMemEstimate = Math.min(perInstanceMemEstimate, totalHeapBytes);
+      }
     }
     nodeResourceProfile_ = new ResourceProfileBuilder()
         .setMemEstimateBytes(perInstanceMemEstimate)
@@ -408,7 +519,8 @@ public class SortNode extends PlanNode {
   }
 
   private static String getDisplayName(TSortType type) {
-    if (type == TSortType.TOPN) {
+    if (type == TSortType.TOPN || type == TSortType.PARTITIONED_TOPN) {
+      // The two top-n variants can be distinguished by presence of partitioning exprs.
       return "TOP-N";
     } else if (type == TSortType.PARTIAL) {
       return "PARTIAL SORT";

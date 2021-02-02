@@ -82,14 +82,20 @@ class PriorityQueue {
   void Clear() { elements_.clear(); }
 
   // The top element
-  T& IR_ALWAYS_INLINE Top() { return elements_[0]; }
+  T& IR_ALWAYS_INLINE Top() {
+    DCHECK(!elements_.empty());
+    return elements_[0];
+  }
 
   // The ith element
-  T& operator[](int i) { return elements_[i]; }
+  T& operator[](int i) {
+    DCHECK_LT(i, elements_.size());
+    return elements_[i];
+  }
 
   void Reserve(int64_t capacity) { elements_.reserve(capacity); }
 
-  // The size f the heap
+  // The size of the heap
   int64_t IR_ALWAYS_INLINE Size() const { return elements_.size(); }
 
   // Check if the heap is empty
