@@ -233,3 +233,75 @@ BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 ---- RESULTS
 5,7,6,6,7,4,4,3,0
 ====
+---- QUERY
+# Intersect the sketches in sketch_store and check.
+select
+    ds_theta_estimate(ds_theta_intersect(date_sketch)),
+    ds_theta_estimate(ds_theta_intersect(float_sketch))
+from sketch_store;
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+0,10
+====
+---- QUERY
+# Checks that ds_theta_intersect() produces NULL for an empty dataset.
+select ds_theta_intersect(field) from functional_parquet.emptytable;
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Checks that ds_theta_intersect() produces NULL for NULL inputs.
+select ds_theta_intersect(null_str) from functional_parquet.nullrows;
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# ds_theta_intersect() returns an error if it receives an invalid serialized sketch.
+select ds_theta_intersect(date_string_col) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# Check that sketches made by Hive for intersection and estimation, which is consistent
+# with direct estimation of these sketches.
+select
+    ds_theta_estimate(ds_theta_intersect(ti)) as ti,
+    ds_theta_estimate(ds_theta_intersect(i)) as i,
+    ds_theta_estimate(ds_theta_intersect(bi)) as bi,
+    ds_theta_estimate(ds_theta_intersect(f)) as f,
+    ds_theta_estimate(ds_theta_intersect(d)) as d,
+    ds_theta_estimate(ds_theta_intersect(s)) as s,
+    ds_theta_estimate(ds_theta_intersect(c)) as c,
+    ds_theta_estimate(ds_theta_intersect(v)) as v,
+    ds_theta_estimate(ds_theta_intersect(nc)) as nc
+from theta_sketches_from_hive;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+5,7,6,6,7,4,4,3,0
+====
+---- QUERY
+# Intersect the sketches from theta_sketches_impala_hive and checks if the intersection
+# produces the same result as if these sketches were used separately to get the estimates.
+select
+    ds_theta_estimate(ds_theta_intersect(ti)) as ti,
+    ds_theta_estimate(ds_theta_intersect(i)) as i,
+    ds_theta_estimate(ds_theta_intersect(bi)) as bi,
+    ds_theta_estimate(ds_theta_intersect(f)) as f,
+    ds_theta_estimate(ds_theta_intersect(d)) as d,
+    ds_theta_estimate(ds_theta_intersect(s)) as s,
+    ds_theta_estimate(ds_theta_intersect(c)) as c,
+    ds_theta_estimate(ds_theta_intersect(v)) as v,
+    ds_theta_estimate(ds_theta_intersect(nc)) as nc
+from theta_sketches_impala_hive;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+5,7,6,6,7,4,4,3,0
+====

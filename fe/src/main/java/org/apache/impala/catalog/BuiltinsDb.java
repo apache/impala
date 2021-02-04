@@ -1434,6 +1434,20 @@ public class BuiltinsDb extends Db {
             "20DsThetaUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         true, false, true));
 
+    // DataSketches Theta intersect
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_theta_intersect",
+        Lists.<Type>newArrayList(Type.STRING), Type.STRING, Type.STRING,
+        prefix + "20DsThetaIntersectInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix +
+            "22DsThetaIntersectUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "21DsThetaIntersectMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "25DsThetaIntersectSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        prefix +
+            "24DsThetaIntersectFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        true, false, true));
+
     for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue; // NULL is handled through type promotion.
       if (t.isScalarType(PrimitiveType.CHAR)) continue; // promoted to STRING

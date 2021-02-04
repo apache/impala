@@ -42,6 +42,7 @@
 #include "thirdparty/datasketches/hll.hpp"
 #include "thirdparty/datasketches/theta_sketch.hpp"
 #include "thirdparty/datasketches/theta_union.hpp"
+#include "thirdparty/datasketches/theta_intersection.hpp"
 #include "thirdparty/datasketches/kll_sketch.hpp"
 #include "util/arithmetic-util.h"
 #include "util/mpfit-util.h"
@@ -1660,6 +1661,22 @@ StringVal SerializeDsThetaUnion(
   return SerializeDsThetaSketch(ctx, sketch);
 }
 
+/// Auxiliary function that receives a theta_intersection, gets the underlying Theta
+/// sketch from the intersection object and returns the serialized, compacted Theta sketch
+/// wrapped into StringVal (may be null).
+/// Introducing this function in the .cc to avoid including the whole DataSketches Theta
+/// functionality into the header.
+StringVal SerializeDsThetaIntersection(
+    FunctionContext* ctx, const datasketches::theta_intersection& ds_intersection) {
+  std::stringstream serialized_input;
+  // Calling get_result() before calling update() is undefined, so you need to check.
+  if (ds_intersection.has_result()) {
+    datasketches::compact_theta_sketch sketch = ds_intersection.get_result();
+    return SerializeDsThetaSketch(ctx, sketch);
+  }
+  return StringVal::null();
+}
+
 /// Auxiliary function that receives a kll_sketch<float> and returns the serialized
 /// version of it wrapped into a StringVal.
 /// Introducing this function in the .cc to avoid including the whole DataSketches HLL
@@ -2025,6 +2042,76 @@ StringVal AggregateFunctions::DsThetaUnionFinalize(
     ctx->Free(src.ptr);
     return StringVal::null();
   }
+  StringVal result = SerializeDsThetaSketch(ctx, sketch);
+  ctx->Free(src.ptr);
+  return result;
+}
+
+void AggregateFunctions::DsThetaIntersectInit(FunctionContext* ctx, StringVal* slot) {
+  AllocBuffer(ctx, slot, sizeof(datasketches::theta_intersection));
+  if (UNLIKELY(slot->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
+  datasketches::theta_intersection* intersection_ptr =
+      reinterpret_cast<datasketches::theta_intersection*>(slot->ptr);
+  *intersection_ptr = datasketches::theta_intersection();
+}
+
+void AggregateFunctions::DsThetaIntersectUpdate(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::theta_intersection));
+  try {
+    auto src_sketch = datasketches::theta_sketch::deserialize((void*)src.ptr, src.len);
+    if (src_sketch->is_empty()) return;
+    datasketches::theta_intersection* intersection_ptr =
+        reinterpret_cast<datasketches::theta_intersection*>(dst->ptr);
+    intersection_ptr->update(*src_sketch);
+  } catch (const std::exception&) {
+    LogSketchDeserializationError(ctx);
+  }
+}
+
+StringVal AggregateFunctions::DsThetaIntersectSerialize(
+    FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::theta_intersection));
+  datasketches::theta_intersection* intersection_ptr =
+      reinterpret_cast<datasketches::theta_intersection*>(src.ptr);
+  StringVal dst = SerializeDsThetaIntersection(ctx, *intersection_ptr);
+  ctx->Free(src.ptr);
+  return dst;
+}
+
+void AggregateFunctions::DsThetaIntersectMerge(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::theta_intersection));
+
+  // Note, 'src' is a serialized compact_theta_sketch and not a serialized
+  // theta_intersection.
+  auto src_sketch = datasketches::theta_sketch::deserialize((void*)src.ptr, src.len);
+
+  datasketches::theta_intersection* dst_intersection_ptr =
+      reinterpret_cast<datasketches::theta_intersection*>(dst->ptr);
+
+  dst_intersection_ptr->update(*src_sketch);
+}
+
+StringVal AggregateFunctions::DsThetaIntersectFinalize(
+    FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::theta_intersection));
+  datasketches::theta_intersection* intersection_ptr =
+      reinterpret_cast<datasketches::theta_intersection*>(src.ptr);
+  if (!intersection_ptr->has_result()) {
+    ctx->Free(src.ptr);
+    return StringVal::null();
+  }
+  auto sketch = intersection_ptr->get_result();
   StringVal result = SerializeDsThetaSketch(ctx, sketch);
   ctx->Free(src.ptr);
   return result;
