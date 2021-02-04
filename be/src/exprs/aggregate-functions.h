@@ -266,6 +266,15 @@ class AggregateFunctions {
   static void DsThetaUnionMerge(FunctionContext*, const StringVal& src, StringVal* dst);
   static StringVal DsThetaUnionFinalize(FunctionContext*, const StringVal& src);
 
+  /// These functions implement ds_theta_intersect().
+  static void DsThetaIntersectInit(FunctionContext*, StringVal* slot);
+  static void DsThetaIntersectUpdate(
+      FunctionContext*, const StringVal& src, StringVal* dst);
+  static StringVal DsThetaIntersectSerialize(FunctionContext*, const StringVal& src);
+  static void DsThetaIntersectMerge(
+      FunctionContext*, const StringVal& src, StringVal* dst);
+  static StringVal DsThetaIntersectFinalize(FunctionContext*, const StringVal& src);
+
   /// These functions implement Apache DataSketches KLL support for sketching.
   static void DsKllInit(FunctionContext*, StringVal* slot);
   static void DsKllUpdate(FunctionContext*, const FloatVal& src, StringVal* dst);
