@@ -3181,7 +3181,7 @@ SELECT MIN(n_nationkey) OVER (PARTITION BY n_regionkey)
 FROM functional.alltypes t1
     LEFT JOIN tpch_kudu.nation t2 ON t1.id = t2.n_nationkey
 WHERE t2.n_name IN ('ALGERIA', 'ARGENTINA')
---- PLAN
+---- PLAN
 PLAN-ROOT SINK
 |
 04:ANALYTIC
@@ -3205,4 +3205,141 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypes t1]
    HDFS partitions=24/24 files=24 size=478.45KB
    row-size=4B cardinality=7.30K
+====
+# IMPALA-10473: AnalyticEvalNodes with constant Partition-by and Order-by exprs should be
+# computed in single unpartitioned fragments. In this case, it's placed in the coordinator
+# fragment which contains PlanRootSink.
+select row_number() over (order by 'a') from functional.alltypes
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:ANALYTIC
+|  functions: row_number()
+|  order by: 'a' ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=8B cardinality=7.30K
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=0B cardinality=7.30K
+====
+# IMPALA-10473: AnalyticEvalNodes with constant Partition-by and Order-by exprs should be
+# computed in single unpartitioned fragments. In this case, it's placed in the coordinator
+# fragment which contains PlanRootSink.
+select row_number() over (partition by cast('5' as int) order by 1+3)
+from functional.alltypes
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:ANALYTIC
+|  functions: row_number()
+|  partition by: 5
+|  order by: 4 ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=8B cardinality=7.30K
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=0B cardinality=7.30K
+====
+# IMPALA-10473: AnalyticEvalNodes with constant Partition-by and Order-by exprs should be
+# computed in single unpartitioned fragments. In this case, row_number() is placed in the
+# coordinator fragment which contains PlanRootSink. count() has non-constant Partition-by
+# expr so is placed in a fragment that can be partitioned.
+select row_number() over (order by concat('ab', '')),
+  count() over (partition by int_col order by concat('a', 'b'))
+from functional.alltypes
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:ANALYTIC
+|  functions: row_number()
+|  order by: 'ab' ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=20B cardinality=7.30K
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:ANALYTIC
+|  functions: count()
+|  partition by: int_col
+|  order by: 'ab' ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=12B cardinality=7.30K
+|
+01:SORT
+|  order by: int_col ASC NULLS LAST, 'ab' ASC
+|  row-size=4B cardinality=7.30K
+|
+04:EXCHANGE [HASH(int_col)]
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=4B cardinality=7.30K
+====
+# IMPALA-10473: AnalyticEvalNodes with constant Partition-by and Order-by exprs should be
+# computed in single unpartitioned fragments. In this case, it's placed in the coordinator
+# fragment which contains PlanRootSink.
+with v as (
+  select row_number() over (order by 'a') as rn from functional.alltypes
+)
+select count(distinct rn) from v
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(rn)
+|  row-size=8B cardinality=1
+|
+02:AGGREGATE
+|  group by: row_number()
+|  row-size=8B cardinality=1
+|
+01:ANALYTIC
+|  functions: row_number()
+|  order by: 'a' ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=8B cardinality=7.30K
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=0B cardinality=7.30K
+====
+# IMPALA-10473: AnalyticEvalNodes with constant Partition-by and Order-by exprs should be
+# computed in single unpartitioned fragments. In this case, it's placed in the coordinator
+# fragment which contains PlanRootSink.
+with v as (
+  select row_number() over (partition by cast('1' as int) order by concat('a', 'b')) as rn
+  from functional.alltypes
+)
+select count(distinct rn) from v
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(rn)
+|  row-size=8B cardinality=1
+|
+02:AGGREGATE
+|  group by: row_number()
+|  row-size=8B cardinality=1
+|
+01:ANALYTIC
+|  functions: row_number()
+|  partition by: 1
+|  order by: 'ab' ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  row-size=8B cardinality=7.30K
+|
+04:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypes]
+   HDFS partitions=24/24 files=24 size=478.45KB
+   row-size=0B cardinality=7.30K
 ====
