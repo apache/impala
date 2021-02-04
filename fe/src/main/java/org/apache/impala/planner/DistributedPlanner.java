@@ -1060,10 +1060,7 @@ public class DistributedPlanner {
         node instanceof SortNode || node instanceof AnalyticEvalNode);
     if (node instanceof AnalyticEvalNode) {
       AnalyticEvalNode analyticNode = (AnalyticEvalNode) node;
-      if (analyticNode.getPartitionExprs().isEmpty()
-          && analyticNode.getOrderByElements().isEmpty()) {
-        // no Partition-By/Order-By exprs: compute analytic exprs in single
-        // unpartitioned fragment
+      if (analyticNode.requiresUnpartitionedEval()) {
         PlanFragment fragment = childFragment;
         if (childFragment.isPartitioned()) {
           fragment = createParentFragment(childFragment, DataPartition.UNPARTITIONED);

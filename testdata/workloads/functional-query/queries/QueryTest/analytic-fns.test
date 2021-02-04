@@ -2194,3 +2194,22 @@ TINYINT
 0
 0
 ====
+---- QUERY
+# IMPALA-10473: AnalyticEvalNodes with constant Partition-by and Order-by exprs should be
+# computed in single unpartitioned fragments.
+# Note that this test is ran with "set exec_single_node_rows_threshold=0" which is in the
+# default test dimension. Without this setting, we need a larger table to cover the bug.
+select row_number() over (order by 'a'), count() over (order by 0)
+from alltypestiny
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+1,8
+2,8
+3,8
+4,8
+5,8
+6,8
+7,8
+8,8
+====

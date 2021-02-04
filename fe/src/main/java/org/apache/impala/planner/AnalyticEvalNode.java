@@ -115,6 +115,19 @@ public class AnalyticEvalNode extends PlanNode {
   public List<Expr> getPartitionExprs() { return partitionExprs_; }
   public List<OrderByElement> getOrderByElements() { return orderByElements_; }
 
+  /**
+   * Returns whether it should be computed in a single unpartitioned fragment.
+   * True when Partition-By and Order-By exprs are all empty or constant.
+   */
+  public boolean requiresUnpartitionedEval() {
+    // false when any Partition-By/Order-By exprs are non-constant
+    if (!Expr.allConstant(partitionExprs_)) return false;
+    for (OrderByElement orderBy : orderByElements_) {
+      if (!orderBy.getExpr().isConstant()) return false;
+    }
+    return true;
+  }
+
   @Override
   public void init(Analyzer analyzer) {
     Preconditions.checkState(conjuncts_.isEmpty());
