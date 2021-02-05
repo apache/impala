@@ -292,6 +292,7 @@ class BufferPool::Client {
     DCHECK(client_lock.mutex() == &lock_ && client_lock.owns_lock());
   }
 
+  int64_t min_buffer_len() const { return pool_->min_buffer_len(); }
   ReservationTracker* reservation() { return &reservation_; }
   const BufferPoolClientCounters& counters() const { return counters_; }
   bool spilling_enabled() const { return file_group_ != NULL; }

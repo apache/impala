@@ -27,11 +27,15 @@
 #include "codegen/codegen-anyval.h"
 #include "exec/exec-node.inline.h"
 #include "exec/hdfs-scan-node.h"
+#include "exec/parquet/parquet-bloom-filter-util.h"
 #include "exec/parquet/parquet-collection-column-reader.h"
 #include "exec/parquet/parquet-column-readers.h"
 #include "exec/scanner-context.inline.h"
 #include "exec/scratch-tuple-batch.h"
+#include "exprs/literal.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-fn-call.h"
+#include "exprs/slot-ref.h"
 #include "rpc/thrift-util.h"
 #include "runtime/collection-value-builder.h"
 #include "runtime/exec-env.h"
@@ -42,6 +46,7 @@
 #include "runtime/scoped-buffer.h"
 #include "service/hs2-util.h"
 #include "util/dict-encoding.h"
+#include "util/parquet-bloom-filter.h"
 #include "util/pretty-printer.h"
 #include "util/scope-exit-trigger.h"
 
@@ -96,6 +101,7 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     num_cols_counter_(nullptr),
     num_stats_filtered_row_groups_counter_(nullptr),
     num_minmax_filtered_row_groups_counter_(nullptr),
+    num_bloom_filtered_row_groups_counter_(nullptr),
     num_rowgroups_skipped_by_unuseful_filters_counter_(nullptr),
     num_row_groups_counter_(nullptr),
     num_minmax_filtered_pages_counter_(nullptr),
@@ -118,6 +124,9 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
           TUnit::UNIT);
   num_minmax_filtered_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumRuntimeFilteredRowGroups",
+          TUnit::UNIT);
+  num_bloom_filtered_row_groups_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumBloomFilteredRowGroups",
           TUnit::UNIT);
   num_rowgroups_skipped_by_unuseful_filters_counter_ = ADD_COUNTER(
       scan_node_->runtime_profile(), "NumRowGroupsSkippedByUnusefulFilters", TUnit::UNIT);
@@ -223,6 +232,9 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   template_tuple_ = template_tuple_map_[scan_node_->tuple_desc()];
 
   RETURN_IF_ERROR(InitDictFilterStructures());
+  if (state_->query_options().parquet_bloom_filtering) {
+    RETURN_IF_ERROR(CreateColIdx2EqConjunctMap());
+  }
   return Status::OK();
 }
 
@@ -884,6 +896,19 @@ Status HdfsParquetScanner::NextRowGroup() {
         // It can also happen when there are predicates against different columns, and
         // the passing row ranges of the predicates don't have a common subset.
         COUNTER_ADD(num_stats_filtered_row_groups_counter_, 1);
+        continue;
+      }
+    }
+
+    if (state_->query_options().parquet_bloom_filtering) {
+      bool skip_row_group_on_bloom_filters;
+      Status bloom_filter_status = ProcessBloomFilter(row_group,
+          &skip_row_group_on_bloom_filters);
+      if (!bloom_filter_status.ok()) {
+        RETURN_IF_ERROR(state_->LogOrReturnError(bloom_filter_status.msg()));
+      }
+      if (skip_row_group_on_bloom_filters) {
+        COUNTER_ADD(num_bloom_filtered_row_groups_counter_, 1);
         continue;
       }
     }
@@ -1568,6 +1593,232 @@ Status HdfsParquetScanner::EvalDictionaryFilters(const parquet::RowGroup& row_gr
   return Status::OK();
 }
 
+Status HdfsParquetScanner::ReadToBuffer(uint64_t offset, uint8_t* buffer, uint64_t size) {
+  DCHECK(context_ != nullptr);
+  DCHECK(metadata_range_ != nullptr);
+  DCHECK(scan_node_ != nullptr);
+
+  const int64_t partition_id = context_->partition_descriptor()->id();
+  const int cache_options =
+      metadata_range_->cache_options() & ~BufferOpts::USE_HDFS_CACHE;
+  ScanRange* object_range = scan_node_->AllocateScanRange(
+      metadata_range_->fs(), filename(), size,
+      offset, partition_id,
+      metadata_range_->disk_id(), metadata_range_->expected_local(),
+      metadata_range_->mtime(),
+      BufferOpts::ReadInto(buffer, size, cache_options));
+  unique_ptr<BufferDescriptor> io_buffer;
+  bool needs_buffers;
+  RETURN_IF_ERROR(
+      scan_node_->reader_context()->StartScanRange(object_range,
+          &needs_buffers));
+  DCHECK(!needs_buffers) << "Already provided a buffer";
+  RETURN_IF_ERROR(object_range->GetNext(&io_buffer));
+  DCHECK_EQ(io_buffer->buffer(), buffer);
+  DCHECK_EQ(io_buffer->len(), size);
+  DCHECK(io_buffer->eosr());
+  object_range->ReturnBuffer(move(io_buffer));
+  return Status::OK();
+}
+
+// Create a map from column index to EQ conjuncts for Bloom filtering.
+Status HdfsParquetScanner::CreateColIdx2EqConjunctMap() {
+  // EQ conjuncts are represented as a LE and a GE conjunct with the same
+  // value. This map is used to pair them to form EQ conjuncts.
+  // The value is a vector because there may be multiple GE or LE conjuncts on a column.
+  unordered_map<int, std::unordered_set<std::pair<std::string, const Literal*>>>
+      conjunct_halves;
+
+  for (ScalarExprEvaluator* eval : min_max_conjunct_evals_) {
+    const ScalarExpr& expr = eval->root();
+    const string& function_name = expr.function_name();
+
+    if (function_name == "le" || function_name == "ge") {
+      // If this is a LE or GE conjunct, then 'expr' is a ScalarFnCall with 2 children:
+      // the first child or one of the nodes in its subtree is a SlotRef containing
+      // information about which column the conjunct refers to; the second child is a
+      // literal value.
+      DCHECK_EQ(expr.GetNumChildren(), 2);
+
+      const ScalarExpr* child0 = expr.GetChild(0);
+      const SlotRef* child_slot_ref = dynamic_cast<const SlotRef*>(child0);
+
+      // Sometimes the left side of the ScalarFnCall in min/max conjuncts is not directly
+      // a SlotRef but can also be an implicit cast wrapping a SlotRef. The FE ensures
+      // that these are the only possibilities. An example for the implicit cast case is
+      // when the expression is a ScalarFnCall with name "casttostring":
+      //
+      // create table chars (id int, c char(4)) stored as parquet;
+      // select count(*) from chars where c <= "aaaa"
+      //
+      // At the moment we do not support Parquet Bloom filtering for types for which this
+      // is relevant, so if we encounter an implicit cast here, we can discard the
+      // conjunct.
+      if (child_slot_ref == nullptr)
+        continue;
+
+      const ScalarExpr* child1 = expr.GetChild(1);
+      const Literal* child_literal = dynamic_cast<const Literal*>(child1);
+      DCHECK(child_literal != nullptr);
+
+      // Convert the slot_id of 'child_slot_ref' to a column index.
+      SlotDescriptor* slot_desc = scan_node_->runtime_state()->desc_tbl().
+          GetSlotDescriptor(child_slot_ref->slot_id());
+      SchemaNode* node = nullptr;
+      bool pos_field;
+      bool missing_field;
+      RETURN_IF_ERROR(schema_resolver_->ResolvePath(slot_desc->col_path(),
+            &node, &pos_field, &missing_field));
+
+      if (pos_field) {
+        stringstream err;
+        err << "Bloom filtering not supported for pos fields: "
+            << slot_desc->DebugString();
+        DCHECK(false) << err.str();
+        return Status(err.str());
+      }
+
+      if (missing_field) {
+        return Status(Substitute(
+            "Unable to find SchemaNode for path '$0' in the schema of file '$1'.",
+            PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path()), filename()));
+      }
+
+      if (!IsParquetBloomFilterSupported(node->element->type, child_slot_ref->type()))
+        continue;
+
+      const int col_idx = node->col_idx;
+
+      // Check if the other half of the EQ conjunct is already in conjunct_halves.
+      const std::unordered_set<std::pair<string, const Literal*>>& conj_halves_for_col
+          = conjunct_halves[col_idx];
+      auto it = conj_halves_for_col.begin();
+      for (; it != conj_halves_for_col.end(); it++) {
+        const std::pair<string, const Literal*>& pair = *it;
+        const bool opposite_halves = (function_name == "le" && pair.first == "ge")
+            || (function_name == "ge" && pair.first == "le");
+        if (opposite_halves && (*pair.second) == (*child_literal)) {
+          break;
+        }
+      }
+
+      const bool match_found = (it != conj_halves_for_col.end());
+      if (match_found) {
+        vector<uint8_t> buffer;
+        uint8_t* ptr = nullptr;
+        size_t len = -1;
+        RETURN_IF_ERROR(LiteralToParquetType(*child_literal, eval,
+              node->element->type, &buffer, &ptr, &len));
+        DCHECK(len != -1);
+        DCHECK(ptr != nullptr || len == 0); // For an empty string, 'ptr' is NULL.
+        const uint64_t hash = ParquetBloomFilter::Hash(ptr, len);
+
+        eq_conjunct_info_.emplace(col_idx, hash);
+
+        conjunct_halves[col_idx].erase(it);
+      } else {
+        conjunct_halves[col_idx].emplace(function_name, child_literal);
+      }
+    }
+  }
+
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::ReadBloomFilterHeader(uint64_t bloom_filter_offset,
+    ScopedBuffer* buffer, uint32_t* header_size,
+    parquet::BloomFilterHeader* bloom_filter_header) {
+  DCHECK(buffer != nullptr);
+  DCHECK(header_size != nullptr);
+
+  // Should be a power of 2 for the size check and reporting to work correctly.
+  constexpr uint32_t MAX_BLOOM_FILTER_HEADER_SIZE = 1024;
+  uint32_t buffer_size = 32;
+
+  Status status;
+  do {
+    buffer->Release();
+    if (!buffer->TryAllocate(buffer_size)) {
+      return Status(Substitute("Could not allocate buffer of $0 bytes for Parquet "
+            "Bloom filter header for file '$1'.", buffer_size, filename()));
+    }
+
+    RETURN_IF_ERROR(ReadToBuffer(bloom_filter_offset, buffer->buffer(), buffer->Size()));
+
+    *header_size = buffer_size;
+    status = DeserializeThriftMsg(buffer->buffer(), header_size, true,
+        bloom_filter_header);
+
+    buffer_size *= 2;
+    if (buffer_size > MAX_BLOOM_FILTER_HEADER_SIZE) {
+      return Status(Substitute(
+            "Bloom filter header size ($0) exceeded the limit of $1 bytes.",
+            buffer_size, MAX_BLOOM_FILTER_HEADER_SIZE));
+    }
+
+  } while (!status.ok());
+
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::ProcessBloomFilter(const parquet::RowGroup&
+    row_group, bool* skip_row_group) {
+  *skip_row_group = false;
+
+  for (const std::pair<const int, uint64_t>& col_idx_to_hash : eq_conjunct_info_) {
+    const int col_idx = col_idx_to_hash.first;
+    const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
+    if (col_chunk.__isset.meta_data
+        && col_chunk.meta_data.__isset.bloom_filter_offset
+        && !IsDictionaryEncoded(col_chunk.meta_data)) {
+      int64_t bloom_filter_offset = col_chunk.meta_data.bloom_filter_offset;
+
+      parquet::BloomFilterHeader bloom_filter_header;
+      ScopedBuffer header_buffer(scan_node_->mem_tracker());
+      uint32_t header_size;
+      RETURN_IF_ERROR(ReadBloomFilterHeader(bloom_filter_offset, &header_buffer,
+          &header_size, &bloom_filter_header));
+
+      RETURN_IF_ERROR(ValidateBloomFilterHeader(bloom_filter_header));
+
+      ScopedBuffer data_buffer(scan_node_->mem_tracker());
+
+      if (LIKELY(bloom_filter_header.numBytes > 0)) {
+        if (!data_buffer.TryAllocate(bloom_filter_header.numBytes)) {
+          return Status(Substitute("Could not allocate buffer of $0 bytes for Parquet "
+              "Bloom filter data for file '$1'.",
+              bloom_filter_header.numBytes, filename()));
+        }
+      }
+
+      // Read remaining bytes of Bloom filter data. It is possible that we
+      // have already read some of the Bloom filter data when trying to read
+      // the header.
+      const uint32_t data_already_read = header_buffer.Size() - header_size;
+      memcpy(data_buffer.buffer(), header_buffer.buffer() + header_size,
+          data_already_read);
+
+      const uint32_t data_to_read = bloom_filter_header.numBytes - data_already_read;
+      RETURN_IF_ERROR(ReadToBuffer(bloom_filter_offset + header_buffer.Size(),
+          data_buffer.buffer() + data_already_read, data_to_read));
+
+      // Construct ParquetBloomFilter instance.
+      ParquetBloomFilter bloom_filter;
+      RETURN_IF_ERROR(bloom_filter.Init(data_buffer.buffer(), data_buffer.Size()));
+
+      const uint64_t hash = col_idx_to_hash.second;
+      if (!bloom_filter.Find(hash)) {
+        *skip_row_group = true;
+        VLOG(3) << Substitute("Row group with idx $0 filtered by Parquet Bloom filter on "
+            "column with idx $1 in file $2.", row_group_idx_, col_idx, filename());
+        return Status::OK();
+      }
+    }
+  }
+
+  return Status::OK();
+}
+
 /// High-level steps of this function:
 /// 1. Allocate 'scratch' memory for tuples able to hold a full batch
 /// 2. Populate the slots of all scratch tuples one column reader at a time,
@@ -1881,23 +2132,7 @@ Status HdfsParquetScanner::ProcessFooter() {
     metadata_ptr = metadata_buffer.buffer();
 
     // Read the footer into the metadata buffer. Skip HDFS caching in this case.
-    int cache_options = metadata_range_->cache_options() & ~BufferOpts::USE_HDFS_CACHE;
-    ScanRange* metadata_range = scan_node_->AllocateScanRange(
-        metadata_range_->fs(), filename(), metadata_size, metadata_start, partition_id,
-        metadata_range_->disk_id(), metadata_range_->expected_local(),
-        metadata_range_->mtime(),
-        BufferOpts::ReadInto(metadata_buffer.buffer(), metadata_size, cache_options));
-
-    unique_ptr<BufferDescriptor> io_buffer;
-    bool needs_buffers;
-    RETURN_IF_ERROR(
-        scan_node_->reader_context()->StartScanRange(metadata_range, &needs_buffers));
-    DCHECK(!needs_buffers) << "Already provided a buffer";
-    RETURN_IF_ERROR(metadata_range->GetNext(&io_buffer));
-    DCHECK_EQ(io_buffer->buffer(), metadata_buffer.buffer());
-    DCHECK_EQ(io_buffer->len(), metadata_size);
-    DCHECK(io_buffer->eosr());
-    metadata_range->ReturnBuffer(move(io_buffer));
+    RETURN_IF_ERROR(ReadToBuffer(metadata_start, metadata_ptr, metadata_size));
   }
 
   // Deserialize file footer

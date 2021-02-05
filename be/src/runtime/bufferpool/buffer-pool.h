@@ -397,6 +397,7 @@ class BufferPool::ClientHandle {
   /// Call SetDebugDenyIncreaseReservation() on this client's ReservationTracker.
   void SetDebugDenyIncreaseReservation(double probability);
 
+  int64_t min_buffer_len() const;
   bool is_registered() const { return impl_ != NULL; }
 
   /// Return true if there are any unpinned pages for this client.

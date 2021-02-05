@@ -376,6 +376,10 @@ void BufferPool::ClientHandle::SetDebugDenyIncreaseReservation(double probabilit
   impl_->reservation()->SetDebugDenyIncreaseReservation(probability);
 }
 
+int64_t BufferPool::ClientHandle::min_buffer_len() const {
+  return impl_->min_buffer_len();
+}
+
 bool BufferPool::ClientHandle::has_unpinned_pages() const {
   return impl_->has_unpinned_pages();
 }

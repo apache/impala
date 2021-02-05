@@ -45,6 +45,7 @@ class ScalarExprEvaluator;
 class TExprNode;
 
 class Literal: public ScalarExpr {
+  friend bool operator==(const Literal& lhs, const Literal& rhs);
  public:
   virtual bool IsLiteral() const override { return true; }
   virtual Status GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** fn)

@@ -144,7 +144,7 @@ enum ConvertedType {
   /**
    * An unsigned integer value.
    *
-   * The number describes the maximum number of meainful data bits in
+   * The number describes the maximum number of meaningful data bits in
    * the stored value. 8, 16 and 32 bit values are stored using the
    * INT32 physical type.  64 bit values are stored using the INT64
    * physical type.
@@ -158,7 +158,7 @@ enum ConvertedType {
   /**
    * A signed integer value.
    *
-   * The number describes the maximum number of meainful data bits in
+   * The number describes the maximum number of meaningful data bits in
    * the stored value. 8, 16 and 32 bit values are stored using the
    * INT32 physical type.  64 bit values are stored using the INT64
    * physical type.
@@ -348,8 +348,15 @@ union LogicalType {
   4:  EnumType ENUM           // use ConvertedType ENUM
   5:  DecimalType DECIMAL     // use ConvertedType DECIMAL
   6:  DateType DATE           // use ConvertedType DATE
-  7:  TimeType TIME           // use ConvertedType TIME_MICROS or TIME_MILLIS
-  8:  TimestampType TIMESTAMP // use ConvertedType TIMESTAMP_MICROS or TIMESTAMP_MILLIS
+
+  // use ConvertedType TIME_MICROS for TIME(isAdjustedToUTC = *, unit = MICROS)
+  // use ConvertedType TIME_MILLIS for TIME(isAdjustedToUTC = *, unit = MILLIS)
+  7:  TimeType TIME
+
+  // use ConvertedType TIMESTAMP_MICROS for TIMESTAMP(isAdjustedToUTC = *, unit = MICROS)
+  // use ConvertedType TIMESTAMP_MILLIS for TIMESTAMP(isAdjustedToUTC = *, unit = MILLIS)
+  8:  TimestampType TIMESTAMP
+
   // 9: reserved for INTERVAL
   10: IntType INTEGER         // use ConvertedType INT_* or UINT_*
   11: NullType UNKNOWN        // no compatible ConvertedType
@@ -473,6 +480,15 @@ enum Encoding {
    */
   RLE_DICTIONARY = 8;
 
+  /** Encoding for floating-point data.
+      K byte-streams are created where K is the size in bytes of the data type.
+      The individual bytes of an FP value are scattered to the corresponding stream and
+      the streams are concatenated.
+      This itself does not reduce the size of the data but can lead to better compression
+      afterwards.
+   */
+  BYTE_STREAM_SPLIT = 9;
+
   /**
    * Useful for checking an integer's value before casting it to an enum of this type.
    * That check has value in avoiding undefined behavior in the [expr] section of the
@@ -480,7 +496,7 @@ enum Encoding {
    * mathematically defined or not in the range of representable values for its type,
    * the behavior is undefined."
    */
-  MAX_ENUM_VALUE = 8;
+  MAX_ENUM_VALUE = 9;
 }
 
 /**
@@ -537,7 +553,7 @@ struct DataPageHeader {
 }
 
 struct IndexPageHeader {
-  /** TODO: **/
+  // TODO
 }
 
 struct DictionaryPageHeader {
@@ -581,8 +597,53 @@ struct DataPageHeaderV2 {
   If missing it is considered compressed */
   7: optional bool is_compressed = 1;
 
-  /** optional statistics for this column chunk */
+  /** optional statistics for the data in this page **/
   8: optional Statistics statistics;
+}
+
+/** Block-based algorithm type annotation. **/
+struct SplitBlockAlgorithm {}
+/** The algorithm used in Bloom filter. **/
+union BloomFilterAlgorithm {
+  /** Block-based Bloom filter. **/
+  1: SplitBlockAlgorithm BLOCK;
+}
+
+/** Hash strategy type annotation. xxHash is an extremely fast non-cryptographic hash
+ * algorithm. It uses 64 bits version of xxHash.
+ **/
+struct XxHash {}
+
+/**
+ * The hash function used in Bloom filter. This function takes the hash of a column value
+ * using plain encoding.
+ **/
+union BloomFilterHash {
+  /** xxHash Strategy. **/
+  1: XxHash XXHASH;
+}
+
+/**
+ * The compression used in the Bloom filter.
+ **/
+struct Uncompressed {}
+union BloomFilterCompression {
+  1: Uncompressed UNCOMPRESSED;
+}
+
+/**
+  * Bloom filter header is stored at beginning of Bloom filter data of each column
+  * and followed by its bitset.
+  **/
+struct BloomFilterHeader {
+  /** The size of bitset in bytes **/
+  1: required i32 numBytes;
+  /** The algorithm for setting bits. **/
+  2: required BloomFilterAlgorithm algorithm;
+  /** The hash function used for Bloom filter. **/
+  3: required BloomFilterHash hash;
+  /** The compression used in the Bloom filter **/
+  4: required BloomFilterCompression compression;
 }
 
 struct PageHeader {
@@ -592,11 +653,34 @@ struct PageHeader {
   /** Uncompressed page size in bytes (not including this header) **/
   2: required i32 uncompressed_page_size
 
-  /** Compressed page size in bytes (not including this header) **/
+  /** Compressed (and potentially encrypted) page size in bytes, not including this header **/
   3: required i32 compressed_page_size
 
-  /** 32bit crc for the data below. This allows for disabling checksumming in HDFS
-   *  if only a few pages needs to be read
+  /** The 32bit CRC for the page, to be be calculated as follows:
+   * - Using the standard CRC32 algorithm
+   * - On the data only, i.e. this header should not be included. 'Data'
+   *   hereby refers to the concatenation of the repetition levels, the
+   *   definition levels and the column value, in this exact order.
+   * - On the encoded versions of the repetition levels, definition levels and
+   *   column values
+   * - On the compressed versions of the repetition levels, definition levels
+   *   and column values where possible;
+   *   - For v1 data pages, the repetition levels, definition levels and column
+   *     values are always compressed together. If a compression scheme is
+   *     specified, the CRC shall be calculated on the compressed version of
+   *     this concatenation. If no compression scheme is specified, the CRC
+   *     shall be calculated on the uncompressed version of this concatenation.
+   *   - For v2 data pages, the repetition levels and definition levels are
+   *     handled separately from the data and are never compressed (only
+   *     encoded). If a compression scheme is specified, the CRC shall be
+   *     calculated on the concatenation of the uncompressed repetition levels,
+   *     uncompressed definition levels and the compressed column values.
+   *     If no compression scheme is specified, the CRC shall be calculated on
+   *     the uncompressed concatenation.
+   * - In encrypted columns, CRC is calculated after page encryption; the
+   *   encryption itself is performed after page compression (if compressed)
+   * If enabled, this allows for disabling checksumming in HDFS if only a few
+   * pages need to be read.
    **/
   4: optional i32 crc
 
@@ -669,7 +753,8 @@ struct ColumnMetaData {
   /** total byte size of all uncompressed pages in this column chunk (including the headers) **/
   6: required i64 total_uncompressed_size
 
-  /** total byte size of all compressed pages in this column chunk (including the headers) **/
+  /** total byte size of all compressed, and potentially encrypted, pages
+   *  in this column chunk (including the headers) **/
   7: required i64 total_compressed_size
 
   /** Optional key/value metadata **/
@@ -691,6 +776,25 @@ struct ColumnMetaData {
    * This information can be used to determine if all data pages are
    * dictionary encoded for example **/
   13: optional list<PageEncodingStats> encoding_stats;
+
+  /** Byte offset from beginning of file to Bloom filter data. **/
+  14: optional i64 bloom_filter_offset;
+}
+
+struct EncryptionWithFooterKey {
+}
+
+struct EncryptionWithColumnKey {
+  /** Column path in schema **/
+  1: required list<string> path_in_schema
+
+  /** Retrieval metadata of column encryption key **/
+  2: optional binary key_metadata
+}
+
+union ColumnCryptoMetaData {
+  1: EncryptionWithFooterKey ENCRYPTION_WITH_FOOTER_KEY
+  2: EncryptionWithColumnKey ENCRYPTION_WITH_COLUMN_KEY
 }
 
 struct ColumnChunk {
@@ -719,6 +823,12 @@ struct ColumnChunk {
 
   /** Size of ColumnChunk's ColumnIndex, in bytes **/
   7: optional i32 column_index_length
+
+  /** Crypto metadata of encrypted columns **/
+  8: optional ColumnCryptoMetaData crypto_metadata
+
+  /** Encrypted column metadata for this chunk **/
+  9: optional binary encrypted_column_metadata
 }
 
 struct RowGroup {
@@ -737,6 +847,17 @@ struct RowGroup {
    * The sorting columns can be a subset of all the columns.
    */
   4: optional list<SortingColumn> sorting_columns
+
+  /** Byte offset from beginning of file to first page (data or dictionary)
+   * in this row group **/
+  5: optional i64 file_offset
+
+  /** Total byte size of all compressed (and potentially encrypted) column data
+   *  in this row group **/
+  6: optional i64 total_compressed_size
+
+  /** Row group ordinal in the file **/
+  7: optional i16 ordinal
 }
 
 /** Empty struct to signal the order defined by the physical or logical type */
@@ -865,6 +986,35 @@ struct ColumnIndex {
   5: optional list<i64> null_counts
 }
 
+struct AesGcmV1 {
+  /** AAD prefix **/
+  1: optional binary aad_prefix
+
+  /** Unique file identifier part of AAD suffix **/
+  2: optional binary aad_file_unique
+
+  /** In files encrypted with AAD prefix without storing it,
+   * readers must supply the prefix **/
+  3: optional bool supply_aad_prefix
+}
+
+struct AesGcmCtrV1 {
+  /** AAD prefix **/
+  1: optional binary aad_prefix
+
+  /** Unique file identifier part of AAD suffix **/
+  2: optional binary aad_file_unique
+
+  /** In files encrypted with AAD prefix without storing it,
+   * readers must supply the prefix **/
+  3: optional bool supply_aad_prefix
+}
+
+union EncryptionAlgorithm {
+  1: AesGcmV1 AES_GCM_V1
+  2: AesGcmCtrV1 AES_GCM_CTR_V1
+}
+
 /**
  * Description for file metadata
  */
@@ -897,8 +1047,9 @@ struct FileMetaData {
 
   /**
    * Sort order used for the min_value and max_value fields of each column in
-   * this file. Each sort order corresponds to one column, determined by its
-   * position in the list, matching the position of the column in the schema.
+   * this file. Sort orders are listed in the order matching the columns in the
+   * schema. The indexes are not necessary the same though, because only leaf
+   * nodes of the schema are represented in the list of sort orders.
    *
    * Without column_orders, the meaning of the min_value and max_value fields is
    * undefined. To ensure well-defined behaviour, if min_value and max_value are
@@ -908,5 +1059,32 @@ struct FileMetaData {
    * regardless of column_orders.
    */
   7: optional list<ColumnOrder> column_orders;
+
+  /**
+   * Encryption algorithm. This field is set only in encrypted files
+   * with plaintext footer. Files with encrypted footer store algorithm id
+   * in FileCryptoMetaData structure.
+   */
+  8: optional EncryptionAlgorithm encryption_algorithm
+
+  /**
+   * Retrieval metadata of key used for signing the footer.
+   * Used only in encrypted files with plaintext footer.
+   */
+  9: optional binary footer_signing_key_metadata
+}
+
+/** Crypto metadata for files with encrypted footer **/
+struct FileCryptoMetaData {
+  /**
+   * Encryption algorithm. This field is only used for files
+   * with encrypted footer. Files with plaintext footer store algorithm id
+   * inside footer (FileMetaData structure).
+   */
+  1: required EncryptionAlgorithm encryption_algorithm
+
+  /** Retrieval metadata of key used for encryption of footer,
+   *  and (possibly) columns **/
+  2: optional binary key_metadata
 }
 

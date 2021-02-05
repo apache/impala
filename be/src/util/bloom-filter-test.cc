@@ -41,9 +41,9 @@ using kudu::rpc::RpcController;
 
 namespace bloom_filter_test_util {
 
-// Make a random uint64_t, avoiding the absent high bit and the low-entropy low bits
+// Make a random uint32_t, avoiding the absent high bit and the low-entropy low bits
 // produced by rand().
-uint64_t MakeRand() {
+uint32_t MakeRand() {
   uint32_t result = (rand() >> 8) & 0xffff;
   result <<= 16;
   result |= (rand() >> 8) & 0xffff;
@@ -278,7 +278,7 @@ TEST_F(BloomFilterTest, Find) {
   for (int i = 13; i < 17; ++i) {
     BloomFilter* bf = CreateBloomFilter(i);
     for (int k = 0; k < (1 << 15); ++k) {
-      const uint64_t to_insert = MakeRand();
+      const uint32_t to_insert = MakeRand();
       BfInsert(*bf, to_insert);
       EXPECT_TRUE(BfFind(*bf, to_insert));
     }

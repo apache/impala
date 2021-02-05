@@ -24,12 +24,15 @@
 #include "exec/parquet/parquet-common.h"
 #include "exec/parquet/parquet-metadata-utils.h"
 #include "exec/parquet/parquet-page-index.h"
+#include "runtime/bufferpool/buffer-pool.h"
 #include "util/runtime-profile-counters.h"
 
 namespace impala {
 
 class CollectionValueBuilder;
 struct HdfsFileDesc;
+class Literal;
+class ParquetBloomFilter;
 
 /// Internal schema representation and resolution.
 struct SchemaNode;
@@ -388,6 +391,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// the scanner. Stored in 'obj_pool_'.
   vector<ScalarExprEvaluator*> min_max_conjunct_evals_;
 
+  /// A map from indices of columns that participate in an EQ conjunct to the hash of the
+  /// literal value of the EQ conjunct. Used in Parquet Bloom filtering.
+  std::unordered_map<int, uint64_t> eq_conjunct_info_;
+
   /// Pool used for allocating caches of definition/repetition levels and tuples for
   /// dictionary filtering. The definition/repetition levels are populated by the
   /// level readers. The pool is freed in Close().
@@ -468,6 +475,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Number of row groups that are skipped because of Parquet row group level statistics
   /// and HJ min/max filters.
   RuntimeProfile::Counter* num_minmax_filtered_row_groups_counter_;
+
+  /// Number of row groups that are skipped because of Parquet Bloom filters.
+  RuntimeProfile::Counter* num_bloom_filtered_row_groups_counter_;
 
   /// Number of row groups that are skipped by unuseful filters.
   RuntimeProfile::Counter* num_rowgroups_skipped_by_unuseful_filters_counter_;
@@ -809,6 +819,37 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// to the dictionary values. Specifically, if any dictionary-encoded column has
   /// no values that pass the relevant conjuncts, then the row group can be skipped.
   Status EvalDictionaryFilters(const parquet::RowGroup& row_group,
+      bool* skip_row_group) WARN_UNUSED_RESULT;
+
+  /// Read 'size' bytes from 'metadata_range_' starting at 'offset' into 'buffer'. The
+  /// provided buffer must be preallocated to hold at least 'size' bytes.
+  Status ReadToBuffer(uint64_t offset, uint8_t* buffer, uint64_t size) WARN_UNUSED_RESULT;
+
+  /// Processes 'min_max_conjunct_evals_' to extract equality (EQ) conjuncts. These are
+  /// now represented as two conjuncts: an LE and a GE. This function finds such pairs and
+  /// fills the map 'eq_conjunct_info_' with the hash of the literal in the EQ conjunct.
+  /// See 'eq_conjunct_info_'.
+  Status CreateColIdx2EqConjunctMap();
+
+  /// Try to read the Bloom filter header located in the file at offset
+  /// 'bloom_filter_offset'. Uses 'buffer' to store bytes read from the file. As the size
+  /// of the header is not known in advance, several read attempts may be needed,
+  /// increasing the number of bytes read in each turn until reaching a limit, in which
+  /// case an error status is returned. Because of this, after a successful read, 'buffer'
+  /// may contain bytes that are not actually part of the serialised header but come after
+  /// it in the file. 'header_size' is set to the actual length of the serialised header.
+  /// The Bloom filter header object is returned in 'bloom_filter_header'.
+  Status ReadBloomFilterHeader(uint64_t bloom_filter_offset, ScopedBuffer* buffer,
+      uint32_t* header_size, parquet::BloomFilterHeader* bloom_filter_header)
+      WARN_UNUSED_RESULT;
+
+  /// Checks to see if this row group can be eliminated based on applying conjuncts to the
+  /// Bloom filters. Specifically, if the Bloom filter of any column (for which Bloom
+  /// filtering is enabled) reports that it has no values that pass the relevant
+  /// conjuncts, then the row group can be skipped. Because Bloom filters may report false
+  /// positives, it is possible that we cannot skip a row group that actually contains no
+  /// values that pass the conjuncts.
+  Status ProcessBloomFilter(const parquet::RowGroup& row_group,
       bool* skip_row_group) WARN_UNUSED_RESULT;
 
   /// Updates the counter parquet_compressed_page_size_counter_ with the given compressed

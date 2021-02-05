@@ -42,7 +42,7 @@ DIRS=$(ls -d "${IMPALA_HOME}/be/src/"*/ | grep -v gutil | grep -v kudu |\
     grep -v thirdparty | tr '\n' ' ')
 # Include/exclude select thirdparty dirs.
 DIRS=$DIRS$(ls -d "${IMPALA_HOME}/be/src/thirdparty/"*/ | grep -v mpfit |\
-    grep -v datasketches | grep -v murmurhash | tr '\n' ' ')
+    grep -v datasketches | grep -v murmurhash | grep -v xxhash | tr '\n' ' ')
 PIPE_DIRS=$(echo "${DIRS}" | tr ' ' '|')
 
 # Reduce the concurrency to one less than the number of cores in the system. Note than

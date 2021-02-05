@@ -510,6 +510,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_parquet_dictionary_filtering(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::PARQUET_BLOOM_FILTERING: {
+        query_options->__set_parquet_bloom_filtering(IsTrue(value));
+        break;
+      }
       case TImpalaQueryOptions::PARQUET_READ_STATISTICS: {
         query_options->__set_parquet_read_statistics(IsTrue(value));
         break;

@@ -505,6 +505,9 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   129: optional bool delete_stats_in_truncate = true;
+
+  // See comment in ImpalaService.thrift
+  130: optional bool parquet_bloom_filtering = true;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

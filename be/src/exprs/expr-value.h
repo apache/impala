@@ -206,6 +206,57 @@ struct ExprValue {
     }
   }
 
+  /// Returns whether the two ExprValue's are equal if they both have the given type.
+  bool EqualsWithType(const ExprValue& other, const ColumnType& type) const {
+    switch (type.type) {
+      case INVALID_TYPE:
+        return true;
+      case TYPE_NULL:
+        return true;
+      case TYPE_BOOLEAN:
+        return bool_val == other.bool_val;
+      case TYPE_TINYINT:
+        return tinyint_val == other.tinyint_val;
+      case TYPE_SMALLINT:
+        return smallint_val == other.smallint_val;
+      case TYPE_INT:
+        return int_val == other.int_val;
+      case TYPE_BIGINT:
+        return bigint_val ==  other.bigint_val;
+      case TYPE_FLOAT:
+        return float_val == other.float_val;
+      case TYPE_DOUBLE:
+        return double_val == other.double_val;
+      case TYPE_TIMESTAMP:
+        return timestamp_val == other.timestamp_val;
+      case TYPE_STRING:
+      case TYPE_CHAR:
+      case TYPE_VARCHAR:
+        return string_val == other.string_val;
+      case TYPE_DECIMAL:
+        switch (type.GetByteSize()) {
+          case 4:
+            return decimal4_val == other.decimal4_val;
+          case 8:
+            return decimal8_val == other.decimal8_val;
+          case 16:
+            return decimal16_val == other.decimal16_val;
+        }
+      case TYPE_DATE:
+        return date_val == other.date_val;
+      case TYPE_STRUCT:
+      case TYPE_ARRAY:
+      case TYPE_MAP:
+      case TYPE_DATETIME:               // Not implemented
+      case TYPE_BINARY:                 // Not implemented
+      case TYPE_FIXED_UDA_INTERMEDIATE: // Only used internally
+      default:
+        DCHECK(false) << "ExprValue equality unimplemented for " << type << ".";
+        return false;
+    }
+
+  }
+
  private:
   std::string string_data; // Stores the data for string_val if necessary.
 

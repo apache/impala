@@ -447,4 +447,9 @@ Status Literal::GetCodegendComputeFnImpl(LlvmCodeGen* codegen, llvm::Function** 
   return Status::OK();
 }
 
+bool operator==(const Literal& lhs, const Literal& rhs) {
+  if (lhs.type() != rhs.type()) return false;
+  return lhs.value_.EqualsWithType(rhs.value_, lhs.type());
+}
+
 }

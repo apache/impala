@@ -27,7 +27,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
 
-add_library(Util
+set(UTIL_SRCS
   auth-util.cc
   avro-util.cc
   backend-gflag-util.cc
@@ -60,6 +60,7 @@ add_library(Util
   hdr-histogram.cc
   histogram-metric.cc
   impalad-metrics.cc
+  impala-bloom-filter-buffer-allocator.cc
   jni-util.cc
   json-util.cc
   ldap-util.cc
@@ -78,6 +79,7 @@ add_library(Util
   openssl-util.cc
   os-info.cc
   os-util.cc
+  parquet-bloom-filter.cc
   parse-util.cc
   path-builder.cc
   periodic-counter-updater
@@ -106,6 +108,8 @@ add_library(Util
   zip-util.cc
   ${MUSTACHE_SRC_DIR}/mustache.cc
   ${MPFIT_SRC_DIR}/mpfit.c)
+
+add_library(Util ${UTIL_SRCS})
 add_dependencies(Util gen-deps gen_ir_descriptions)
 
 add_library(UtilTests STATIC
@@ -131,6 +135,7 @@ add_library(UtilTests STATIC
   openssl-util-test.cc
   os-info-test.cc
   os-util-test.cc
+  parquet-bloom-filter-test.cc
   parse-util-test.cc
   pretty-printer-test.cc
   priority-queue-test.cc
@@ -199,6 +204,7 @@ ADD_UNIFIED_BE_LSAN_TEST(min-max-filter-test "MinMaxFilterTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(openssl-util-test "OpenSSLUtilTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(os-info-test "OsInfo.*")
 ADD_UNIFIED_BE_LSAN_TEST(os-util-test "OsUtil.*")
+ADD_UNIFIED_BE_LSAN_TEST(parquet-bloom-filter-test "ParquetBloomFilter.*")
 ADD_UNIFIED_BE_LSAN_TEST(parse-util-test "ParseMemSpecs.*")
 ADD_UNIFIED_BE_LSAN_TEST(pretty-printer-test "PrettyPrinterTest.*")
 ADD_UNIFIED_BE_LSAN_TEST(priority-queue-test "PriorityQueueTest.*")

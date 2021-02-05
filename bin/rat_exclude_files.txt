@@ -212,6 +212,8 @@ NOTICE.txt
 # Notices in thirdparty sources included in the Impala repo and called out in /LICENSE.txt
 be/src/thirdparty/squeasel/LICENSE
 be/src/thirdparty/pcg-cpp-0.98/LICENSE.txt
+be/src/thirdparty/xxhash/xxhash.h
+be/src/thirdparty/xxhash/README.md
 
 # http://www.apache.org/legal/src-headers.html: 'Snippet' files that are combined as form
 # a larger file where the larger file would have duplicate licensing headers.

@@ -1,0 +1,107 @@
+# The table contains 200 rows in 2 row groups of 100. The first contains only even
+# numbers, the second contains both odd and even numbers, converted to the column types
+# (integers, floats, doubles, strings). Odd numbers can be used to filter out the first
+# row group with the Bloom filter.
+# Generally, small numbers should be used in the WHERE conditions because larger numbers
+# may not appear in both row groups, even if they are even.
+# In some queries extra predicates are inserted to test that we can handle multiple
+# predicates.
+====
+---- QUERY
+select int8_col from parquet_bloom_filter where int8_col = 1 and int16_col > 0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 1
+====
+---- QUERY
+select int8_col from parquet_bloom_filter where int8_col = 2 and int32_col = 2;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select int16_col from parquet_bloom_filter where int16_col = 1 and string_col != "2";
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 1
+====
+---- QUERY
+select int16_col from parquet_bloom_filter where int16_col = 2;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select int32_col from parquet_bloom_filter where int32_col = 1 and int8_col < 2;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 1
+====
+---- QUERY
+select int32_col from parquet_bloom_filter where int32_col = 2;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select int64_col from parquet_bloom_filter
+where int64_col = 1 and string_col < "2" and int8_col > 0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 1
+====
+---- QUERY
+select int64_col from parquet_bloom_filter where int64_col = 2;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select float_col from parquet_bloom_filter where float_col = 1.0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 1
+====
+---- QUERY
+select float_col from parquet_bloom_filter where float_col = 2.0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select double_col from parquet_bloom_filter where double_col = 1.0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 1
+====
+---- QUERY
+select double_col from parquet_bloom_filter where double_col = 2.0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select string_col from parquet_bloom_filter where string_col = "1";
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 1
+====
+---- QUERY
+select string_col from parquet_bloom_filter where string_col = "2";
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+# Check the CHAR type, for which Impala does not support Bloom filtering.
+select char_col from parquet_bloom_filter where char_col = "1";
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select char_col from parquet_bloom_filter where char_col = "2";
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====

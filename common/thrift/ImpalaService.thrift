@@ -665,6 +665,9 @@ enum TImpalaQueryOptions {
   // If false, a truncate DDL operation will not delete table stats.
   // the default value of this is true as set in Query.thrift
   DELETE_STATS_IN_TRUNCATE = 128
+
+  // Indicates whether to use Bloom filtering for Parquet files
+  PARQUET_BLOOM_FILTERING = 129
 }
 
 // The summary of a DML statement.

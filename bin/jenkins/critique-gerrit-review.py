@@ -69,6 +69,7 @@ EXCLUDE_FILE_PATTERNS = [
     re.compile(r".*/catalog/BuiltinsDb.java"),  # Many long strings.
     re.compile(r".*/codegen/gen_ir_descriptions.py"),  # Many long strings.
     re.compile(r".*shell/ext-py/.*"),  # Third-party code.
+    re.compile(r".*be/src/thirdparty/.*"),  # Third-party code.
     re.compile(r".*/.*\.xml\.py")  # Long lines in config template files.
 ]
 

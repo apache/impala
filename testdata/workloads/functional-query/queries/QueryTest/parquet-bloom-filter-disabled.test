@@ -1,0 +1,90 @@
+# Based on QueryTest/parquet-bloom-filter.test, should be kept in sync with it. This is a
+# version that is used with parquet_bloom_filtering turned off. It checks that Parquet
+# Bloom filtering does not happen in this case.
+# For more, see QueryTest/parquet-bloom-filter.test.
+====
+---- QUERY
+select int8_col from parquet_bloom_filter where int8_col = 1 and int16_col > 0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select int8_col from parquet_bloom_filter where int8_col = 2 and int32_col = 2;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select int16_col from parquet_bloom_filter where int16_col = 1 and string_col != "2";
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select int16_col from parquet_bloom_filter where int16_col = 2;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select int32_col from parquet_bloom_filter where int32_col = 1 and int8_col < 2;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select int32_col from parquet_bloom_filter where int32_col = 2;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select int64_col from parquet_bloom_filter
+where int64_col = 1 and string_col < "2" and int8_col > 0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select int64_col from parquet_bloom_filter where int64_col = 2;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select float_col from parquet_bloom_filter where float_col = 1.0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select float_col from parquet_bloom_filter where float_col = 2.0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select double_col from parquet_bloom_filter where double_col = 1.0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select double_col from parquet_bloom_filter where double_col = 2.0;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select string_col from parquet_bloom_filter where string_col = "1";
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
+---- QUERY
+select string_col from parquet_bloom_filter where string_col = "2";
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumBloomFilteredRowGroups): 0
+====
