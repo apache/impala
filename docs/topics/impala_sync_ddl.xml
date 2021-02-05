@@ -46,13 +46,13 @@ under the License.
       you quickly switched to another node, such as by issuing a subsequent query through a load-balancing proxy.)
     </p>
 
-    <p>
-      Although <codeph>INSERT</codeph> is classified as a DML statement, when the <codeph>SYNC_DDL</codeph> option
-      is enabled, <codeph>INSERT</codeph> statements also delay their completion until all the underlying data and
-      metadata changes are propagated to all Impala nodes. Internally, Impala inserts have similarities with DDL
-      statements in traditional database systems, because they create metadata needed to track HDFS block locations
-      for new files and they potentially add new partitions to partitioned tables.
-    </p>
+    <p> Although <codeph>INSERT</codeph> is classified as a DML statement, when the
+        <codeph>SYNC_DDL</codeph> option is enabled, <codeph>INSERT</codeph> statements also delay
+      their completion until all the underlying data and metadata changes are propagated to all
+      Impala nodes and this option applies to all filesystem-based tables. Internally, Impala
+      inserts have similarities with DDL statements in traditional database systems, because they
+      create metadata needed to track HDFS block locations for new files and they potentially add
+      new partitions to partitioned tables. </p>
 
     <note>
       Because this option can introduce a delay after each write operation, if you are running a sequence of
