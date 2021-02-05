@@ -27,7 +27,7 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import SkipIfEC
 
 LOG = logging.getLogger("test_auto_scaling")
-
+TOTAL_BACKENDS_METRIC_NAME = "cluster-membership.backends.total"
 
 class TestAutoScaling(CustomClusterTestSuite):
   @classmethod
@@ -43,7 +43,7 @@ class TestAutoScaling(CustomClusterTestSuite):
   """This class contains tests that exercise the logic related to scaling clusters up and
   down by adding and removing groups of executors."""
   INITIAL_STARTUP_TIME_S = 10
-  STATE_CHANGE_TIMEOUT_S = 45
+  STATE_CHANGE_TIMEOUT_S = 60
   # This query will scan two partitions (month = 1, 2) and thus will have 1 fragment
   # instance per executor on groups of size 2. Each partition has 2 rows, so it performs
   # two comparisons and should take around 1 second to complete.
@@ -51,13 +51,20 @@ class TestAutoScaling(CustomClusterTestSuite):
              and id + random() < sleep(500)"""
 
   def _get_total_admitted_queries(self):
-    return self.impalad_test_service.get_total_admitted_queries("default-pool")
+    admitted_queries = self.impalad_test_service.get_total_admitted_queries(
+      "default-pool")
+    LOG.info("Current total admitted queries: %s", admitted_queries)
+    return admitted_queries
 
   def _get_num_backends(self):
-    return self.impalad_test_service.get_metric_value("cluster-membership.backends.total")
+    metric_val = self.impalad_test_service.get_metric_value(TOTAL_BACKENDS_METRIC_NAME)
+    LOG.info("Getting metric %s : %s", TOTAL_BACKENDS_METRIC_NAME, metric_val)
+    return metric_val
 
   def _get_num_running_queries(self):
-    return self.impalad_test_service.get_num_running_queries("default-pool")
+    running_queries = self.impalad_test_service.get_num_running_queries("default-pool")
+    LOG.info("Current running queries: %s", running_queries)
+    return running_queries
 
   @SkipIfEC.fix_later
   def test_single_workload(self):
@@ -124,7 +131,7 @@ class TestAutoScaling(CustomClusterTestSuite):
 
       # Wait for workers to spin down
       self.impalad_test_service.wait_for_metric_value(
-        "cluster-membership.backends.total", 1,
+        TOTAL_BACKENDS_METRIC_NAME, 1,
         timeout=self.STATE_CHANGE_TIMEOUT_S, interval=1)
       assert self.impalad_test_service.get_metric_value(
         "cluster-membership.executor-groups.total") == 0
@@ -155,7 +162,7 @@ class TestAutoScaling(CustomClusterTestSuite):
       # Wait for workers to spin up
       cluster_size = GROUP_SIZE + 1  # +1 to include coordinator.
       self.impalad_test_service.wait_for_metric_value(
-        "cluster-membership.backends.total", cluster_size,
+        TOTAL_BACKENDS_METRIC_NAME, cluster_size,
         timeout=self.STATE_CHANGE_TIMEOUT_S, interval=1)
 
       # Wait until we admitted at least 10 queries
@@ -184,7 +191,7 @@ class TestAutoScaling(CustomClusterTestSuite):
 
       # Wait for workers to spin down
       self.impalad_test_service.wait_for_metric_value(
-        "cluster-membership.backends.total", 1,
+        TOTAL_BACKENDS_METRIC_NAME, 1,
         timeout=self.STATE_CHANGE_TIMEOUT_S, interval=1)
       assert self.impalad_test_service.get_metric_value(
         "cluster-membership.executor-groups.total") == 0
@@ -242,7 +249,7 @@ class TestAutoScaling(CustomClusterTestSuite):
 
       # Wait for workers to spin down
       self.impalad_test_service.wait_for_metric_value(
-        "cluster-membership.backends.total", 1,
+        TOTAL_BACKENDS_METRIC_NAME, 1,
         timeout=self.STATE_CHANGE_TIMEOUT_S, interval=1)
       assert self.impalad_test_service.get_metric_value(
         "cluster-membership.executor-groups.total") == 0
