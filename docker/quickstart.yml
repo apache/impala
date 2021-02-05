@@ -25,7 +25,7 @@
 version: "3"
 services:
   hms:
-    image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}impala_quickstart_hms:${IMPALA_QUICKSTART_VERSION:-latest}
+    image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}impala_quickstart_hms
     # Give the HMS an explicit hostname to avoid issues with docker-compose-generated
     # hostnames including underscore, which is rejected by Java's URL parser.
     container_name: quickstart-hive-metastore
@@ -40,7 +40,7 @@ services:
     networks:
       - quickstart-network
   statestored:
-    image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}statestored:${IMPALA_QUICKSTART_VERSION:-latest}
+    image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}statestored
     ports:
       # Web debug UI
       - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:25010:25010"
@@ -53,7 +53,7 @@ services:
     depends_on:
       - statestored
       - hms
-    image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}catalogd:${IMPALA_QUICKSTART_VERSION:-latest}
+    image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}catalogd
     ports:
       # Web debug UI
       - "${QUICKSTART_LISTEN_ADDR:?Please set QUICKSTART_LISTEN_ADDR environment variable}:25020:25020"
@@ -67,7 +67,7 @@ services:
     networks:
       - quickstart-network
   impalad-1:
-    image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}impalad_coord_exec:${IMPALA_QUICKSTART_VERSION:-latest}
+    image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}impalad_coord_exec
     depends_on:
       - statestored
       - catalogd

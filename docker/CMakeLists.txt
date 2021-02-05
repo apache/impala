@@ -82,6 +82,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
   # instantiated below.
   add_custom_target(docker_images)
   add_custom_target(docker_debug_images)
+  add_custom_target(quickstart_docker_images)
 
   set(exported_image_names "")
 
@@ -129,6 +130,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
   add_daemon_docker_images(admissiond)
 
   # HMS quickstart image, which requires Hive and Hadoop builds.
+  set(QUICKSTART_HMS_IMAGE impala_quickstart_hms)
   set(quickstart_hms_build_dir ${CMAKE_SOURCE_DIR}/docker/quickstart_hms)
   add_custom_target(quickstart_hms_build_setup
     COMMAND rm -f ${quickstart_hms_build_dir}/hive ${quickstart_hms_build_dir}/hadoop
@@ -139,23 +141,28 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
     # Supply the appropriate base image as an argument for the Dockerfile.
     # Use tar with -h flag to assemble a tarball including all the symlinked files and
     # directories in the build context.
-    COMMAND tar cvh . -C ${quickstart_hms_build_dir} . | ${DOCKER_BUILD} --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -t impala_quickstart_hms -
+    COMMAND tar cvh . -C ${quickstart_hms_build_dir} . | ${DOCKER_BUILD} --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -t ${QUICKSTART_HMS_IMAGE} -
     DEPENDS ${quickstart_hms_build_dir}/Dockerfile quickstart_hms_build_setup
     COMMENT "Building quickstart HMS docker image."
     VERBATIM
   )
+  ADD_DEPENDENCIES(quickstart_docker_images quickstart_hms_image)
+  set(exported_image_names "${exported_image_names} ${QUICKSTART_HMS_IMAGE}")
 
   # Client quickstart image, which only requires some scripts.
+  set(QUICKSTART_CLIENT_IMAGE impala_quickstart_client)
   set(quickstart_client_build_dir ${CMAKE_SOURCE_DIR}/docker/quickstart_client)
   add_custom_target(quickstart_client_image
     # Supply the appropriate base image as an argument for the Dockerfile.
     # Use tar with -h flag to assemble a tarball including all the symlinked files and
     # directories in the build context.
-    COMMAND tar cvh . -C ${quickstart_client_build_dir} . | ${DOCKER_BUILD} ${COMMON_DOCKER_BUILD_ARGS} --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -t impala_quickstart_client -
+    COMMAND tar cvh . -C ${quickstart_client_build_dir} . | ${DOCKER_BUILD} ${COMMON_DOCKER_BUILD_ARGS} --build-arg BASE_IMAGE=${DISTRO_BASE_IMAGE} -t ${QUICKSTART_CLIENT_IMAGE} -
     DEPENDS ${quickstart_client_build_dir}/Dockerfile ${quickstart_client_build_dir}/data-load-entrypoint.sh
     COMMENT "Building quickstart client docker image."
     VERBATIM
   )
+  ADD_DEPENDENCIES(quickstart_docker_images quickstart_client_image)
+  set(exported_image_names "${exported_image_names} ${QUICKSTART_CLIENT_IMAGE}")
 
   # Add a target to build utility docker images for 'build_type'. 'build_context_args' are
   # passed to the setup_build_context.py script.
@@ -184,7 +191,7 @@ if (NOT ${DISTRO_BASE_IMAGE} STREQUAL "UNSUPPORTED")
       COMMENT "Building Impala profile tool docker image build_type=${build_type}."
       VERBATIM
     )
-    set(exported_image_names "${exported_image_names} ${profile_tool_target}" PARENT_SCOPE)
+    set(exported_image_names "${exported_image_names} ${profile_tool_image}" PARENT_SCOPE)
   endfunction()
   add_utility_images(impala_profile_tool_image impala_profile_tool release "")
   add_utility_images(impala_profile_tool_debug_image impala_profile_tool_debug debug "--debug-build")

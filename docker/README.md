@@ -35,11 +35,11 @@ If you want the cluster to be open to connections from other hosts, you can set
 export QUICKSTART_LISTEN_ADDR=0.0.0.0
 ```
 
-You can optionally set `IMPALA_QUICKSTART_IMAGE_PREFIX` to pull prebuilt images from a DockerHub repo,
-for example:
+You can optionally set `IMPALA_QUICKSTART_IMAGE_PREFIX` to pull prebuilt images from a DockerHub repo.
+For example, the following will use images like `apache/impala:81d5377c2-impalad_coordinator`:
 
 ```bash
-  export IMPALA_QUICKSTART_IMAGE_PREFIX="timgarmstrong/"
+  export IMPALA_QUICKSTART_IMAGE_PREFIX="apache/impala:81d5377c2-"
 ```
 
 Leave `IMPALA_QUICKSTART_IMAGE_PREFIX` unset to use images built from a local Impala dev environment.
@@ -143,9 +143,23 @@ The following environment variables influence the behaviour of the various
 quickstart docker compose files.
 * `KUDU_QUICKSTART_VERSION` - defaults to latest, can be overridden to a
   different tag to use different Kudu images.
-* `IMPALA_QUICKSTART_VERSION` - defaults to latest, can be overridden to a
-  different tag to use different Impala images.
 * `IMPALA_QUICKSTART_IMAGE_PREFIX` - defaults to using local images, change to
-  `"timgarmstrong/"` to use my prebuilt images.
+   to a different prefix to pick up prebuilt images.
 * `QUICKSTART_LISTEN_ADDR` - can be set to either `$QUICKSTART_IP` to listen on
   only the docker network interface, or `0.0.0.0` to listen on all interfaces.
+
+# Publishing Quickstart Docker Images (for developers)
+To publish the images you need to build locally then run `publish_images_to_apache.sh`
+to tag and push them to a docker repository. For example, to tag the images with the
+current commit hash and upload them to the default `apache/impala` Docker repository,
+you can run the following commands:
+
+```bash
+cd $IMPALA_HOME
+IMAGE_VERSION=$(git rev-parse --short HEAD)
+./buildall.sh -release -noclean -ninja -skiptests -notests
+ninja docker_images quickstart_docker_images
+./docker/publish_images_to_apache.sh -v ${IMAGE_VERSION} -
+```
+
+For official Impala releases you will want to use the release version instead.
