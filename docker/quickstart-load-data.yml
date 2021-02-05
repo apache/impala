@@ -20,7 +20,7 @@
 version: "3"
 services:
   data-loader:
-    image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}impala_quickstart_client:${IMPALA_QUICKSTART_VERSION:-latest}
+    image: ${IMPALA_QUICKSTART_IMAGE_PREFIX:-}impala_quickstart_client
     depends_on:
       - impalad-1
     command: ["load_tpcds"]
