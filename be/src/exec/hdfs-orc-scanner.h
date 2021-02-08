@@ -209,10 +209,10 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// orc::RowReaderOptions.includeTypes() expects a list
   std::list<uint64_t> selected_type_ids_;
 
-  /// Map from orc::Type id to SchemaPath. See more in descriptors.h for the definition
-  /// of SchemaPath. The map is used in the constructors of OrcColumnReaders where we
-  /// resolve SchemaPaths of the descriptors into ORC columns. Built in 'Open'.
-  std::vector<SchemaPath> col_id_path_map_;
+  /// Mappings from slot/tuple descriptors to ORC type id. We save this information during
+  /// column resolution and use it during column reader creation.
+  std::unordered_map<const SlotDescriptor*, uint64_t> slot_to_col_id_;
+  std::unordered_map<const TupleDescriptor*, uint64_t> tuple_to_col_id_;
 
   /// Scan range for the metadata (file tail).
   const io::ScanRange* metadata_range_ = nullptr;

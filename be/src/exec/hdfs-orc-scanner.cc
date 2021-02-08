@@ -240,12 +240,6 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
   // blob more efficiently.
   row_reader_options_.setEnableLazyDecoding(true);
 
-  // Build 'col_id_path_map_' that maps from ORC column ids to their corresponding
-  // SchemaPath in the table. The map is used in the constructors of OrcColumnReaders
-  // where we resolve SchemaPaths of the descriptors.
-  RETURN_IF_ERROR(schema_resolver_->BuildSchemaPaths(scan_node_->num_partition_keys(),
-      &col_id_path_map_));
-
   // To create OrcColumnReaders, we need the selected orc schema. It's a subset of the
   // file schema: a tree of selected orc types and can only be got from an orc::RowReader
   // (by orc::RowReader::getSelectedType).
@@ -382,6 +376,7 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
     return Status(Substitute("Could not find nested column '$0' in file '$1'.",
         PrintPath(*scan_node_->hdfs_table(), tuple_desc.tuple_path()), filename()));
   }
+  tuple_to_col_id_.insert({&tuple_desc, node->getColumnId()});
   if (tuple_desc.byte_size() == 0) {
     // Don't need to materialize any slots but just generate an empty tuple for each
     // (collection) row. (E.g. count(*) or 'exists' on results of subquery).
@@ -435,6 +430,7 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
       missing_field_slots_.insert(slot_desc);
       continue;
     }
+    slot_to_col_id_.insert({slot_desc, node->getColumnId()});
     if (pos_field) {
       DCHECK(pos_slot_desc == nullptr)
           << "There should only be one position slot per tuple";

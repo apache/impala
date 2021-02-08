@@ -26,68 +26,6 @@ using boost::algorithm::iequals;
 
 namespace impala {
 
-Status OrcSchemaResolver::BuildSchemaPaths(int num_partition_keys,
-    vector<SchemaPath>* col_id_path_map) const {
-  if (root_->getKind() != orc::TypeKind::STRUCT) {
-    return Status(TErrorCode::ORC_TYPE_NOT_ROOT_AT_STRUCT, "file", root_->toString(),
-        filename_);
-  }
-  bool synthetic_acid_schema = is_table_full_acid_ && !is_file_full_acid_;
-  SchemaPath path;
-  col_id_path_map->push_back(path);
-  int num_columns = root_->getSubtypeCount();
-  // Original files don't have "row" field, let's add it manually.
-  if (synthetic_acid_schema) path.push_back(ACID_FIELD_ROW + num_partition_keys);
-  for (int i = 0; i < num_columns; ++i) {
-    // For synthetic ACID schema these columns are not top-level, so don't need to
-    // adjust them by 'num_part_keys'.
-    int field_offset = synthetic_acid_schema ? 0 : num_partition_keys;
-    path.push_back(i + field_offset);
-    BuildSchemaPathHelper(*root_->getSubtype(i), &path, col_id_path_map);
-    path.pop_back();
-  }
-  return Status::OK();
-}
-
-void OrcSchemaResolver::BuildSchemaPathHelper(const orc::Type& node, SchemaPath* path,
-    vector<SchemaPath>* col_id_path_map) {
-  DCHECK_EQ(col_id_path_map->size(), node.getColumnId()) << Substitute(
-      "Failed building map from ORC type ids to SchemaPaths. $0 are built but current "
-      "ORC type id is $1, missing ORC type with id=$0.",
-      col_id_path_map->size(), node.getColumnId());
-  // Map ORC type with id=size() to 'path'.
-  col_id_path_map->push_back(*path);
-  // Deal with subtypes recursively.
-  if (node.getKind() == orc::TypeKind::STRUCT
-      || node.getKind() == orc::TypeKind::UNION) {
-    // It's possible the file schema contains more columns than the table schema.
-    // We should deal with UNION type here in case it's not in the table schema and the
-    // query is not reading them. Otherwise the map will miss some ORC types.
-    int size = node.getSubtypeCount();
-    for (int i = 0; i < size; ++i) {
-      path->push_back(i);
-      const orc::Type* child = node.getSubtype(i);
-      BuildSchemaPathHelper(*child, path, col_id_path_map);
-      path->pop_back();
-    }
-  } else if (node.getKind() == orc::TypeKind::LIST) {
-    DCHECK_EQ(node.getSubtypeCount(), 1);
-    const orc::Type* child = node.getSubtype(0);
-    path->push_back(SchemaPathConstants::ARRAY_ITEM);
-    BuildSchemaPathHelper(*child, path, col_id_path_map);
-    path->pop_back();
-  } else if (node.getKind() == orc::TypeKind::MAP) {
-    DCHECK_EQ(node.getSubtypeCount(), 2);
-    const orc::Type* key_child = node.getSubtype(0);
-    const orc::Type* value_child = node.getSubtype(1);
-    path->push_back(SchemaPathConstants::MAP_KEY);
-    BuildSchemaPathHelper(*key_child, path, col_id_path_map);
-    (*path)[path->size() - 1] = SchemaPathConstants::MAP_VALUE;
-    BuildSchemaPathHelper(*value_child, path, col_id_path_map);
-    path->pop_back();
-  }
-}
-
 Status OrcSchemaResolver::ResolveColumn(const SchemaPath& col_path,
     const orc::Type** node, bool* pos_field, bool* missing_field) const {
   const ColumnType* table_col_type = nullptr;

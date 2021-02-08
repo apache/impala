@@ -272,8 +272,9 @@ Status OrcDecimal16ColumnReader::ReadValue(int row_idx, Tuple* tuple, MemPool* p
 OrcComplexColumnReader::OrcComplexColumnReader(const orc::Type* node,
     const TupleDescriptor* table_tuple_desc, HdfsOrcScanner* scanner)
     : OrcBatchedReader(node, nullptr, scanner) {
-  SchemaPath& path = scanner->col_id_path_map_[node->getColumnId()];
-  if (path == table_tuple_desc->tuple_path()) tuple_desc_ = table_tuple_desc;
+  uint64_t node_col_id = node->getColumnId();
+  uint64_t tuple_desc_col_id = GetColId(table_tuple_desc);
+  if (node_col_id == tuple_desc_col_id) tuple_desc_ = table_tuple_desc;
   materialize_tuple_ = (tuple_desc_ != nullptr);
   VLOG(3) << "Created top level ComplexColumnReader for " << PrintNode(node)
       << ": tuple_desc_=" << (tuple_desc_ ? tuple_desc_->DebugString() : "null");
@@ -287,23 +288,37 @@ bool OrcStructReader::EndOfBatch() {
   return vbatch_ == nullptr || row_idx_ == NumElements();
 }
 
-inline bool PathContains(const SchemaPath& path, const SchemaPath& sub_path) {
-  return path.size() >= sub_path.size() &&
-      std::equal(sub_path.begin(), sub_path.end(), path.begin());
-}
-
-inline const SchemaPath& GetTargetColPath(const SlotDescriptor* slot_desc) {
+inline uint64_t OrcComplexColumnReader::GetTargetColId(
+    const SlotDescriptor* slot_desc) const {
   return slot_desc->type().IsCollectionType() ?
-         slot_desc->collection_item_descriptor()->tuple_path(): slot_desc->col_path();
+         GetColId(slot_desc->collection_item_descriptor()):
+         GetColId(slot_desc);
 }
 
-bool OrcStructReader::FindChild(const orc::Type& parent, const SchemaPath& child_path,
+/**
+ * Returns true if 'candidate_col_id' is under 'node' in the type hierarchy.
+ */
+inline bool IsDescendant(const orc::Type& node, uint64_t candidate_col_id) {
+  uint64_t node_col_id = node.getColumnId();
+  uint64_t node_max_col_id = node.getMaximumColumnId();
+  return node_col_id <= candidate_col_id && candidate_col_id <= node_max_col_id;
+}
+
+/**
+ * 'parent' is a complex type that might have multiple children, i.e. STRUCT or MAP.
+ * 'descendant_col_id' refers to an ORC type somewhere under 'parent' in the type
+ * hieararchy. This method selects the direct child of 'parent' that is also the ancestor
+ * of 'descendant_col_id'. Return the result in '*child' and its index in '*field'.
+ * Returns false for not found.
+ */
+bool FindChild(const orc::Type& parent, uint64_t descendant_col_id,
     const orc::Type** child, int* field) {
+  DCHECK(parent.getKind() == orc::TypeKind::STRUCT ||
+         parent.getKind() == orc::TypeKind::MAP);
   int size = parent.getSubtypeCount();
   for (int c = 0; c < size; ++c) {
     const orc::Type* node = parent.getSubtype(c);
-    const SchemaPath& node_path = scanner_->col_id_path_map_[node->getColumnId()];
-    if (PathContains(child_path, node_path)) {
+    if (node && IsDescendant(*node, descendant_col_id)) {
       *child = node;
       *field = c;
       return true;
@@ -319,7 +334,7 @@ void OrcStructReader::CreateChildForSlot(const orc::Type* curr_node,
   // Create a child reader and pass down 'slot_desc'.
   const orc::Type* child_node;
   int field;
-  if (!FindChild(*curr_node, GetTargetColPath(slot_desc), &child_node, &field)) {
+  if (!FindChild(*curr_node, GetTargetColId(slot_desc), &child_node, &field)) {
     DCHECK(false) << PrintNode(curr_node) << " has no children selected for "
         << slot_desc->DebugString();
   }
@@ -495,11 +510,10 @@ Status OrcStructReader::UpdateInputBatch(orc::ColumnVectorBatch* orc_batch) {
 OrcCollectionReader::OrcCollectionReader(const orc::Type* node,
     const SlotDescriptor* slot_desc, HdfsOrcScanner* scanner)
     : OrcComplexColumnReader(node, slot_desc, scanner) {
-  const SchemaPath& path = scanner->col_id_path_map_[node->getColumnId()];
   if (slot_desc->type().IsCollectionType() &&
-      slot_desc->collection_item_descriptor()->tuple_path() == path) {
-    // This is a collection SlotDescriptor whose item TupleDescriptor matches our
-    // SchemaPath. We should materialize the slot (creating a CollectionValue) and its
+      node->getColumnId() == GetTargetColId(slot_desc)) {
+    // This is a collection SlotDescriptor whose item TupleDescriptor matches
+    // 'node'. We should materialize the slot (creating a CollectionValue) and its
     // collection tuples (see more in HdfsOrcScanner::AssembleCollection).
     tuple_desc_ = slot_desc->collection_item_descriptor();
     materialize_tuple_ = true;
@@ -586,15 +600,16 @@ Status OrcListReader::SetPositionSlot(int row_idx, Tuple* tuple) {
 
 void OrcListReader::CreateChildForSlot(const orc::Type* node,
     const SlotDescriptor* slot_desc) {
-  int depth = scanner_->col_id_path_map_[node->getColumnId()].size();
-  const SchemaPath& target_path = GetTargetColPath(slot_desc);
-  DCHECK_GT(target_path.size(), depth);
-  int field = target_path[depth];
-  if (field == SchemaPathConstants::ARRAY_POS) {
+  uint64_t slot_col_id = GetTargetColId(slot_desc);
+  DCHECK(IsDescendant(*node, slot_col_id));
+  // We have a position slot descriptor if it refers to this LIST ORC type, but it isn't
+  // a collection slot.
+  bool is_pos_slot = slot_col_id == node->getColumnId() &&
+                     slot_desc->collection_item_descriptor() == nullptr;
+  if (is_pos_slot) {
     DCHECK(pos_slot_desc_ == nullptr) << "Should have unique pos slot";
     pos_slot_desc_ = slot_desc;
   } else {
-    DCHECK_EQ(field, SchemaPathConstants::ARRAY_ITEM);
     OrcColumnReader* child = OrcColumnReader::Create(node->getSubtype(0), slot_desc,
         scanner_);
     children_.push_back(child);
@@ -672,26 +687,17 @@ Status OrcListReader::ReadChildrenValue(int row_idx, int tuple_idx, Tuple* tuple
 
 void OrcMapReader::CreateChildForSlot(const orc::Type* node,
     const SlotDescriptor* slot_desc) {
-  const SchemaPath& path = scanner_->col_id_path_map_[node->getColumnId()];
-  const SchemaPath& target_path = GetTargetColPath(slot_desc);
-  int depth = path.size();
-  // The target of 'slot_desc' matches a descendant so its SchemaPath should be deeper
-  DCHECK_GT(target_path.size(), depth);
-  int field = target_path[depth];
   const orc::Type* child_type;
-  if (field == SchemaPathConstants::MAP_KEY) {
-    child_type = node->getSubtype(0);
-  } else {
-    DCHECK_EQ(field, SchemaPathConstants::MAP_VALUE);
-    child_type = node->getSubtype(1);
+  int field;
+  if (!FindChild(*node, GetTargetColId(slot_desc), &child_type, &field)) {
+    DCHECK(false) << PrintNode(node) << " has no children selected for "
+        << slot_desc->DebugString();
   }
-  DCHECK(child_type != nullptr) << Substitute(
-      "$0 matches an empty child of $1: path=$2, target_path=$3",
-      slot_desc->DebugString(), PrintNode(node), PrintNumericPath(path),
-      PrintNumericPath(target_path));
+  // Map type only has two children.
+  DCHECK_LE(field, 1);
   OrcColumnReader* child = OrcColumnReader::Create(child_type, slot_desc, scanner_);
   children_.push_back(child);
-  if (field == SchemaPathConstants::MAP_KEY) {
+  if (field == 0) {
     key_readers_.push_back(child);
   } else {
     value_readers_.push_back(child);
@@ -707,20 +713,19 @@ OrcMapReader::OrcMapReader(const orc::Type* node,
       CreateChildForSlot(node, child_slot);
     }
   } else {
-    // 'table_tuple_desc' should match to a descendant of 'node'
-    int depth = scanner->col_id_path_map_[node->getColumnId()].size();
-    DCHECK_GT(table_tuple_desc->tuple_path().size(), depth);
-    // Create a child corresponding to the subtype in the path to the descendant.
-    int field = table_tuple_desc->tuple_path()[depth];
-    DCHECK(field == SchemaPathConstants::MAP_KEY ||
-        field == SchemaPathConstants::MAP_VALUE);
-    bool key_selected = (field == SchemaPathConstants::MAP_KEY);
-    const orc::Type* child_type =
-        key_selected ? node->getSubtype(0) : node->getSubtype(1);
+    const orc::Type* child_type;
+    int field;
+    if (!FindChild(*node, GetColId(table_tuple_desc),
+        &child_type, &field)) {
+      DCHECK(false) << PrintNode(node) << " has no children selected for "
+          << table_tuple_desc->DebugString();
+    }
+    // Map type only has two children.
+    DCHECK_LE(field, 1);
     OrcComplexColumnReader* child = OrcComplexColumnReader::CreateTopLevelReader(
         child_type, table_tuple_desc, scanner);
     children_.push_back(child);
-    if (key_selected) {
+    if (field == 0) {
       key_readers_.push_back(child);
     } else {
       value_readers_.push_back(child);
