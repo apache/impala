@@ -575,6 +575,7 @@ public class SelectStmt extends QueryStmt {
       }
       // expand in From clause order
       for (TableRef tableRef: fromClause_) {
+        if (tableRef.isHidden()) continue;
         if (analyzer_.isSemiJoined(tableRef.getId())) continue;
         Path resolvedPath = new Path(tableRef.getDesc(),
             Collections.<String>emptyList());

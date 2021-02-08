@@ -234,3 +234,198 @@ select count(*) from complextypestbl.nested_struct.c.d
 ---- TYPES
 bigint
 ====
+---- QUERY
+# IMPALA-10482: Select-star query on unrelative collection column of transactional
+# table hits IllegalStateException
+select * from complextypestbl.int_array;
+---- RESULTS
+1
+2
+3
+NULL
+1
+2
+NULL
+3
+NULL
+-1
+---- TYPES
+INT
+====
+---- QUERY
+# IMPALA-10482: Select-star query on unrelative collection column of transactional
+# table hits IllegalStateException
+select * from complextypestbl.int_array_array.item
+---- RESULTS
+-1
+-2
+1
+2
+3
+4
+NULL
+1
+2
+NULL
+3
+NULL
+4
+5
+6
+---- TYPES
+INT
+====
+---- QUERY
+# IMPALA-10482: Select-star query on unrelative collection column of transactional
+# table hits IllegalStateException
+select * from complextypestbl.nested_struct.c.d.item;
+---- RESULTS
+-1,'nonnullable'
+10,'aaa'
+-10,'bbb'
+11,'c'
+NULL,'NULL'
+10,'aaa'
+NULL,'NULL'
+-10,'bbb'
+NULL,'NULL'
+11,'c'
+NULL,'NULL'
+NULL,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# IMPALA-10482: Select-star query on unrelative collection column of transactional
+# table hits IllegalStateException
+select * from complextypestbl.int_array a1, complextypestbl.int_array a2
+order by 1,2
+limit 10;
+---- RESULTS
+-1,-1
+-1,1
+-1,1
+-1,2
+-1,2
+-1,3
+-1,3
+-1,NULL
+-1,NULL
+-1,NULL
+---- TYPES
+INT,INT
+====
+---- QUERY
+select *
+from complextypestbl.int_array a1, complextypestbl.int_array a2
+where a1.item=a2.item and a1.item < 2;
+---- RESULTS
+1,1
+1,1
+1,1
+1,1
+-1,-1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# IMPALA-10493: Use ON clause to join full ACID collections
+select *
+from complextypestbl.int_array a1 join complextypestbl.int_array a2
+on a1.item=a2.item
+where a1.item < 2;
+---- RESULTS
+1,1
+1,1
+1,1
+1,1
+-1,-1
+---- TYPES
+INT,INT
+====
+---- QUERY
+# IMPALA-10493: Use USING clause to join full ACID collections
+select a1.item, a2.item
+from complextypestbl.int_array a1 join complextypestbl.int_array a2
+using (item) where a1.item != 1;
+---- RESULTS
+-1,-1
+2,2
+2,2
+3,3
+3,3
+2,2
+2,2
+3,3
+3,3
+---- TYPES
+INT,INT
+====
+---- QUERY
+select count(*) from complextypestbl.int_array a1, complextypestbl.int_array a2;
+---- RESULTS
+100
+====
+---- QUERY
+select count(*) from complextypestbl.int_array a1, complextypestbl.int_array a2
+where a1.item=a2.item and a1.item > 1;
+---- RESULTS
+8
+====
+---- QUERY
+select pos, item from pos_item_key_value_complextypestbl;
+---- RESULTS
+1,1
+2,2
+3,3
+4,4
+5,5
+6,6
+7,7
+8,8
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+select pos, item from pos_item_key_value_complextypestbl.int_array;
+---- RESULTS
+0,-1
+0,1
+1,2
+2,3
+0,NULL
+1,1
+2,2
+3,NULL
+4,3
+5,NULL
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+select key, value from pos_item_key_value_complextypestbl;
+---- RESULTS
+'1',1
+'2',2
+'3',3
+'4',4
+'5',5
+'6',6
+'7',7
+'8',8
+---- TYPES
+STRING,INT
+====
+---- QUERY
+select key, value from pos_item_key_value_complextypestbl.int_map;
+---- RESULTS
+'k1',-1
+'k1',1
+'k2',100
+'k1',2
+'k2',NULL
+'k1',NULL
+'k3',NULL
+---- TYPES
+STRING,INT
+====
