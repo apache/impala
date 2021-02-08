@@ -134,6 +134,20 @@ class OrcColumnReader {
   friend class OrcStructReader;
   friend class OrcCollectionReader;
 
+  /// Returns the ORC type column id corresponding to the given slot descriptor.
+  uint64_t GetColId(const SlotDescriptor* desc) const {
+    auto it = scanner_->slot_to_col_id_.find(desc);
+    DCHECK(it != scanner_->slot_to_col_id_.end());
+    return it->second;
+  }
+
+  /// Returns the ORC type column id corresponding to the given tuple descriptor.
+  uint64_t GetColId(const TupleDescriptor* desc) const {
+    auto it = scanner_->tuple_to_col_id_.find(desc);
+    DCHECK(it != scanner_->tuple_to_col_id_.end());
+    return it->second;
+  }
+
   /// Convenient field for debug. We can't keep the pointer of orc::Type since they'll be
   /// destroyed after orc::RowReader was released. Only keep the id orc::Type here.
   uint64_t orc_column_id_;
@@ -513,6 +527,10 @@ class OrcComplexColumnReader : public OrcBatchedReader<OrcComplexColumnReader> {
   /// delegates its job to its children. It might still write a position slot though.
   bool DirectReader() const { return slot_desc_ != nullptr; }
  protected:
+  /// Return target column id. For collection slots it returns the column id corresponding
+  /// to the collection tuple descriptor
+  uint64_t GetTargetColId(const SlotDescriptor* slot_desc) const;
+
   vector<OrcColumnReader*> children_;
 
   /// Holds the TupleDescriptor if we should materialize its tuples
@@ -603,11 +621,6 @@ class OrcStructReader : public OrcComplexColumnReader {
   }
 
   void CreateChildForSlot(const orc::Type* curr_node, const SlotDescriptor* slot_desc);
-
-  /// Find which children of 'curr_node' matches the 'child_path'. Return the result in
-  /// '*child' and its index inside the children. Returns false for not found.
-  inline bool FindChild(const orc::Type& curr_node, const SchemaPath& child_path,
-      const orc::Type** child, int* field);
 
   Status ReadAndValidateRows(ScratchTupleBatch* scratch_batch, MemPool* pool);
 };

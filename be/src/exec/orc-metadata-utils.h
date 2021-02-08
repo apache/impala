@@ -54,11 +54,6 @@ class OrcSchemaResolver {
   Status ResolveColumn(const SchemaPath& col_path, const orc::Type** node,
       bool* pos_field, bool* missing_field) const;
 
-  /// Build a map from each orc::Type id to a SchemaPath. The map will be used in
-  /// creating OrcColumnReaders. It contains all ORC types including unmaterialized ones.
-  Status BuildSchemaPaths(int num_partition_keys,
-      std::vector<SchemaPath>* col_id_path_map) const;
-
   /// Returns true if file schema corresponds to full ACIDv2 format.
   bool HasFullAcidV2Schema() const { return is_file_full_acid_; }
 
@@ -108,10 +103,5 @@ class OrcSchemaResolver {
   /// Validate whether the ColumnType is compatible with the orc type
   Status ValidateType(const ColumnType& type, const orc::Type& orc_type) const
       WARN_UNUSED_RESULT;
-
-  /// Helper function to build 'col_id_path_map' start from 'node' whose corresponding
-  /// SchemaPath is 'path'.
-  static void BuildSchemaPathHelper(const orc::Type& node, SchemaPath* path,
-      std::vector<SchemaPath>* col_id_path_map);
 };
 }
