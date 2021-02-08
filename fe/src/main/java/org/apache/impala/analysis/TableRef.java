@@ -150,6 +150,10 @@ public class TableRef extends StmtNode {
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
+  // true if this table ref is hidden, because e.g. it was generated during statement
+  // rewrite.
+  private boolean isHidden_ = false;
+
   /**
    * Returns a new, resolved, and analyzed table ref.
    */
@@ -228,6 +232,7 @@ public class TableRef extends StmtNode {
     desc_ = other.desc_;
     exposeNestedColumnsByTableMaskView_ = other.exposeNestedColumnsByTableMaskView_;
     scalarColumns_ = new LinkedHashMap<>(other.scalarColumns_);
+    isHidden_ = other.isHidden_;
   }
 
   @Override
@@ -342,6 +347,9 @@ public class TableRef extends StmtNode {
   public boolean exposeNestedColumnsByTableMaskView() {
     return exposeNestedColumnsByTableMaskView_;
   }
+
+  public void setHidden(boolean isHidden) { isHidden_ = isHidden; }
+  public boolean isHidden() { return isHidden_; }
 
   public void setJoinHints(List<PlanHint> hints) {
     Preconditions.checkNotNull(hints);

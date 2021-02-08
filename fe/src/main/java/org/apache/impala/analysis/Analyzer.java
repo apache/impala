@@ -1106,6 +1106,7 @@ public class Analyzer {
     if (pathType == PathType.SLOT_REF || pathType == PathType.STAR) {
       // Paths rooted at all of the unique registered tuple descriptors.
       for (TableRef tblRef: tableRefMap_.values()) {
+        if (tblRef.isHidden()) continue;
         candidates.add(new Path(tblRef.getDesc(), rawPath));
       }
     } else {

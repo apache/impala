@@ -1827,10 +1827,20 @@ public class StmtRewriter {
       analyzer.removeAlias(collTblRef.getUniqueAlias());
       TableRef newCollTblRef =
           TableRef.newTableRef(analyzer, newCollPath, collTblRef.getUniqueAlias());
+      // Set JOIN attributes. Please note that we cannot use TableRef.setJoinAttrs()
+      // because we only want to copy the ON clause and the plan hints. The col names
+      // in USING have been already converted to an ON clause. We let the analyzer/
+      // planner to figure out the other attributes.
+      newCollTblRef.setOnClause(collTblRef.getOnClause());
+      newCollTblRef.setJoinHints(collTblRef.getJoinHints());
+      newCollTblRef.setTableHints(collTblRef.getTableHints());
       // Substitute the old collection ref to 'newCollTblRef'.
       stmt.fromClause_.set(tableRefIdx, newCollTblRef);
       // Insert the base table ref in front of the collection ref.
       stmt.fromClause_.add(tableRefIdx, baseTblRef);
+      // The newly added table ref should be hidden, e.g. it shouldn't affect star
+      // expansion, neither column resolution.
+      baseTblRef.setHidden(true);
     }
 
     private List<String> generatePathFrom(TableName tblName) {

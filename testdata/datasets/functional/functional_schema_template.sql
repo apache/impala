@@ -800,6 +800,20 @@ DELETE FROM {db_name}{db_suffix}.{table_name} WHERE id % 2 = 0;
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+pos_item_key_value_complextypestbl
+---- COLUMNS
+pos bigint
+item int
+key string
+value int
+int_array array<int>
+int_map map<string, int>
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT id, id, CAST(id AS STRING), CAST(id AS STRING), int_array, int_map FROM {db_name}{db_suffix}.complextypestbl;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 complextypestbl_non_transactional
 ---- COLUMNS
 id bigint
