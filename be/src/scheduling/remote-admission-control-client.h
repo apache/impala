@@ -27,7 +27,13 @@
 #include "scheduling/admission-control-client.h"
 #include "scheduling/admission-controller.h"
 
+namespace kudu {
+class Status;
+}
+
 namespace impala {
+
+class AdmissionControlServiceProxy;
 
 /// Implementation of AdmissionControlClient used to submit queries for admission to an
 /// AdmissionController running locally on the coordinator.
@@ -65,6 +71,13 @@ class RemoteAdmissionControlClient : public AdmissionControlClient {
   static const int RPC_NUM_RETRIES = 3;
   static const int64_t RPC_TIMEOUT_MS = 10 * MILLIS_PER_SEC;
   static const int64_t RPC_BACKOFF_TIME_MS = 3 * MILLIS_PER_SEC;
+
+  /// Checks if admission has already been cancelled, and if not sends the AdmitQuery rpc.
+  /// Sets 'rpc_status' to the return Status from the rpc layer, and returns OK if the
+  /// query was successfully submitted for admission.
+  Status TryAdmitQuery(AdmissionControlServiceProxy* proxy,
+      const TQueryExecRequest& request, AdmitQueryRequestPB* req,
+      kudu::Status* rpc_status);
 };
 
 } // namespace impala

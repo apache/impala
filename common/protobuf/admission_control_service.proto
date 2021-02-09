@@ -222,9 +222,11 @@ message CancelAdmissionResponsePB {
 
 service AdmissionControlService {
   /// Called by the coordinator to start scheduling. The actual work is done on a thread
-  /// pool, so this call returns immedately. TODO: there are some situations where we can
-  /// return the admission result quickly, eg. if the query is rejected. We should
-  /// evaluate the benefits of saving a call to GetQueryStatus() in those situations.
+  /// pool, so this call returns immedately. Idempotent - if the query has already been
+  /// submitted previously, returns OK without doing anything. TODO: there are some
+  /// situations where we can return the admission result quickly, eg. if the query is
+  /// rejected. We should evaluate the benefits of saving a call to GetQueryStatus() in
+  /// those situations.
   rpc AdmitQuery(AdmitQueryRequestPB) returns (AdmitQueryResponsePB);
 
   /// Called by the coordinator after AdmitQuery() to monitor the admission status of the

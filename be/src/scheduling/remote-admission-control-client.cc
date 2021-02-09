@@ -37,6 +37,9 @@
 DEFINE_int32(admission_status_retry_time_ms, 10,
     "(Advanced) The number of milliseconds coordinators will wait before retrying the "
     "GetQueryStatus rpc.");
+DEFINE_int32(admission_max_retry_time_s, 60,
+    "(Advanced) The amount of time in seconds the coordinator will spend attempting to "
+    "retry admission if the admissiond is unreachable.");
 
 using namespace strings;
 using namespace kudu::rpc;
@@ -46,6 +49,49 @@ namespace impala {
 RemoteAdmissionControlClient::RemoteAdmissionControlClient(const TQueryCtx& query_ctx)
   : query_ctx_(query_ctx) {
   TUniqueIdToUniqueIdPB(query_ctx.query_id, &query_id_);
+}
+
+Status RemoteAdmissionControlClient::TryAdmitQuery(AdmissionControlServiceProxy* proxy,
+    const TQueryExecRequest& request, AdmitQueryRequestPB* req,
+    kudu::Status* rpc_status) {
+  AdmitQueryResponsePB resp;
+  RpcController rpc_controller;
+
+  KrpcSerializer serializer;
+  int sidecar_idx;
+  RETURN_IF_ERROR(serializer.SerializeToSidecar(&request, &rpc_controller, &sidecar_idx));
+  req->set_query_exec_request_sidecar_idx(sidecar_idx);
+
+  Status admit_status = Status::OK();
+  {
+    /// We hold 'lock_' for the duration of AdmitQuery to coordinate with CancelAdmission
+    /// and avoid the scenario where the CancelAdmission rpc is sent first, the admission
+    /// controller doesn't find the query because it wasn't submitted yet so nothing is
+    /// cancelled, then the AdmitQuery rpc is sent and the query is scheduled despite
+    /// already having been cancelled.
+    lock_guard<mutex> l(lock_);
+    if (cancelled_) {
+      return Status("Query already cancelled.");
+    }
+
+    *rpc_status = proxy->AdmitQuery(*req, &resp, &rpc_controller);
+    if (!rpc_status->ok()) {
+      return Status::OK();
+    }
+
+    Status debug_status = DebugAction(
+        request.query_ctx.client_request.query_options, "ADMIT_QUERY_NETWORK_ERROR");
+    if (UNLIKELY(!debug_status.ok())) {
+      *rpc_status = kudu::Status::NetworkError("Hit debug action error.");
+      return Status::OK();
+    }
+
+    admit_status = Status(resp.status());
+    if (admit_status.ok()) {
+      pending_admit_ = true;
+    }
+  }
+  return admit_status;
 }
 
 Status RemoteAdmissionControlClient::SubmitForAdmission(
@@ -58,43 +104,46 @@ Status RemoteAdmissionControlClient::SubmitForAdmission(
   std::unique_ptr<AdmissionControlServiceProxy> proxy;
   RETURN_IF_ERROR(AdmissionControlService::GetProxy(&proxy));
   AdmitQueryRequestPB req;
-  AdmitQueryResponsePB resp;
-  RpcController rpc_controller;
 
   *req.mutable_query_id() = request.query_id;
   *req.mutable_coord_id() = ExecEnv::GetInstance()->backend_id();
-
-  KrpcSerializer serializer;
-  int sidecar_idx1;
-  RETURN_IF_ERROR(
-      serializer.SerializeToSidecar(&request.request, &rpc_controller, &sidecar_idx1));
-  req.set_query_exec_request_sidecar_idx(sidecar_idx1);
 
   for (const NetworkAddressPB& address : request.blacklisted_executor_addresses) {
     *req.add_blacklisted_executor_addresses() = address;
   }
 
   query_events->MarkEvent(QUERY_EVENT_SUBMIT_FOR_ADMISSION);
-  {
-    /// We hold 'lock_' for the duration of AdmitQuery to coordinate with CancelAdmission
-    /// and avoid the scenario where the CancelAdmission rpc is sent first, the admission
-    /// controller doesn't find the query because it wasn't submitted yet so nothing is
-    /// cancelled, then the AdmitQuery rpc is sent and the query is scheduled despite
-    /// already having been cancelled.
-    lock_guard<mutex> l(lock_);
-    if (cancelled_) {
-      return Status("Query already cancelled.");
+
+  int64_t admission_start = MonotonicMillis();
+  kudu::Status admit_rpc_status = kudu::Status::OK();
+  Status admit_status =
+      TryAdmitQuery(proxy.get(), request.request, &req, &admit_rpc_status);
+  int32_t num_retries = 0;
+  // Only retry AdmitQuery if the rpc layer reported a network error, indicating that the
+  // admissiond was unreachable.
+  while (admit_rpc_status.IsNetworkError()) {
+    int64_t elapsed_s = (MonotonicMillis() - admission_start) / MILLIS_PER_SEC;
+    if (elapsed_s > FLAGS_admission_max_retry_time_s) {
+      return Status(
+          Substitute("Failed to admit query after waiting $0s and retrying $1 times.",
+              elapsed_s, num_retries));
     }
 
-    KUDU_RETURN_IF_ERROR(
-        proxy->AdmitQuery(req, &resp, &rpc_controller), "AdmitQuery rpc failed");
-    Status admit_status(resp.status());
-    RETURN_IF_ERROR(admit_status);
+    ++num_retries;
+    // Generate a random number between 0 and 1 - we'll retry sometime evenly distributed
+    // between 'retry_time' and 'retry_time * (num_retries + 1)', so we won't hit the
+    // "thundering herd" problem.
+    float jitter = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    SleepForMs(FLAGS_admission_status_retry_time_ms * (num_retries * jitter + 1));
 
-    pending_admit_ = true;
+    VLOG(3) << "Retrying AdmitQuery rpc for " << request.query_id
+            << ". Previous rpc failed with status: " << admit_rpc_status.ToString();
+    admit_status = TryAdmitQuery(proxy.get(), request.request, &req, &admit_rpc_status);
   }
 
-  Status admit_status = Status::OK();
+  KUDU_RETURN_IF_ERROR(admit_rpc_status, "AdmitQuery rpc failed");
+  RETURN_IF_ERROR(admit_status);
+
   while (true) {
     RpcController rpc_controller2;
     GetQueryStatusRequestPB get_status_req;
