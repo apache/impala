@@ -43,6 +43,17 @@ class TestProfileTool(BaseTestSuite):
         get_profile_path('impala_profile_log_tpcds_compute_stats'),
         get_profile_path('impala_profile_log_tpcds_compute_stats_extended.expected.txt'))
 
+  def test_text_output_profile_v2(self):
+    # Test text profiles with different verbosity levels.
+    self._compare_profile_tool_output(['--profile_verbosity=default'],
+        get_profile_path('impala_profile_log_tpcds_compute_stats_v2'),
+        get_profile_path(
+            'impala_profile_log_tpcds_compute_stats_v2_default.expected.txt'))
+    self._compare_profile_tool_output(['--profile_verbosity=extended'],
+        get_profile_path('impala_profile_log_tpcds_compute_stats_v2'),
+        get_profile_path(
+            'impala_profile_log_tpcds_compute_stats_v2_extended.expected.txt'))
+
   def test_json_output(self):
     # Test JSON profiles with different verbosity levels.
     self._compare_profile_tool_output(['--profile_format=json'],
