@@ -55,6 +55,11 @@ under the License.
      <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
      <p>
+     Setting <codeph>NUM_NODES</codeph> to 1 disables multithreading, i.e. if
+     <codeph>MT_DOP</codeph> is greater than 1, it is effectively reduced to 1.
+     </p>
+
+     <p>
        If you are diagnosing a problem that you suspect is due to a timing issue due to
        distributed query processing, you can set <codeph>NUM_NODES=1</codeph> to verify
        if the problem still occurs when all the work is done on a single node.

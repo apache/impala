@@ -42,6 +42,10 @@ under the License.
     </p>
 
     <p>
+      Has no effect if multi-threaded query execution is enabled, i.e.
+      <codeph>MT_DOP</codeph> is greater than 0.
+    </p>
+    <p>
       <b>Type:</b> numeric
     </p>
 
