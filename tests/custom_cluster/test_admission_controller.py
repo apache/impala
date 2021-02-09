@@ -1354,6 +1354,46 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
       method.func_dict["admissiond_args"] = method.func_dict["impalad_args"]
     super(TestAdmissionController, self).setup_method(method)
 
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(impalad_args="--admission_max_retry_time_s=5")
+  def test_admit_query_retry(self):
+    """Tests that if the AdmitQuery rpc fails with a network error, either before or after
+    reaching the admissiond and being processed, it will be retried and the query will
+    eventually succeed."""
+    # Query designed to run for a few seconds.
+    query = "select count(*) from functional.alltypes where int_col = sleep(10)"
+    # Run the query with a debug action that will sometimes return errors from AdmitQuery
+    # even though the admissiond started scheduling successfully. Tests the path where the
+    # admissiond received multiple AdmitQuery rpcs with the same query id.
+    before_kill_handle = self.execute_query_async(
+        query, {"DEBUG_ACTION": "ADMIT_QUERY_NETWORK_ERROR:FAIL@0.5"})
+    timeout_s = 10
+    # Make sure the query is through admission control before killing the admissiond. It
+    # should be unaffected and finish successfully.
+    self.wait_for_state(
+        before_kill_handle, self.client.QUERY_STATES['RUNNING'], timeout_s)
+    self.cluster.admissiond.kill()
+    result = self.client.fetch(query, before_kill_handle)
+    assert result.data == ["730"]
+
+    # Run another query and sleep briefly before starting the admissiond again. It should
+    # retry until the admissiond is available again and then succeed.
+    after_kill_handle = self.execute_query_async(query)
+    sleep(1)
+    self.cluster.admissiond.start()
+    result = self.client.fetch(query, after_kill_handle)
+    assert result.data == ["730"]
+
+    # Kill the admissiond again and don't restart it this time. The query should
+    # eventually time out on retrying and fail.
+    self.cluster.admissiond.kill()
+    no_restart_handle = self.execute_query_async(query)
+    try:
+      result = self.client.fetch(query, no_restart_handle)
+      assert False, "Query should have failed"
+    except ImpalaBeeswaxException as e:
+      assert "Failed to admit query after waiting " in str(e)
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions

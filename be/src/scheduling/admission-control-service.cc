@@ -141,8 +141,13 @@ void AdmissionControlService::AdmitQuery(
     admission_state->blacklisted_executor_addresses.emplace(address);
   }
 
-  RESPOND_IF_ERROR(admission_state_map_.Add(req->query_id(), admission_state));
-  admission_thread_pool_->Offer(req->query_id());
+  Status add_status = admission_state_map_.Add(req->query_id(), admission_state);
+  if (add_status.ok()) {
+    admission_thread_pool_->Offer(req->query_id());
+  } else {
+    LOG(INFO) << "Query " << req->query_id()
+              << " was already submitted for admission, ignoring.";
+  }
   RespondAndReleaseRpc(Status::OK(), resp, rpc_context);
 }
 
