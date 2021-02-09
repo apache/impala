@@ -2664,11 +2664,14 @@ void AggregatedRuntimeProfile::PrettyPrintSubclassCounters(
     ostream* s, const string& prefix, Verbosity verbosity) const {
   ostream& stream = *s;
   // Legacy profile did not show aggregated time series counters.
+  // Showing a time series per instance is too verbose for the default mode,
+  // so just show first.
   if (verbosity >= Verbosity::DEFAULT) {
     lock_guard<SpinLock> l(counter_map_lock_);
     for (const auto& v : time_series_counter_map_) {
       const TAggTimeSeriesCounter& counter = v.second;
-      for (int idx = 0; idx < counter.values.size(); ++idx) {
+      int num_to_print = verbosity >= Verbosity::EXTENDED ? counter.values.size() : 1;
+      for (int idx = 0; idx < num_to_print; ++idx) {
         const vector<int64_t>& values = counter.values[idx];
         const string& label = Substitute("$0[$1]", counter.name, idx);
         PrettyPrintTimeSeries(label, values.data(), values.size(),
@@ -2708,6 +2711,9 @@ void AggregatedRuntimeProfile::PrettyPrintSubclassCounters(
           prev = ts;
         }
       }
+      // Showing an event sequence per instance is too verbose for the default mode,
+      // so just show first.
+      if (verbosity < Verbosity::EXTENDED) break;
     }
   }
 
@@ -2721,7 +2727,8 @@ void AggregatedRuntimeProfile::PrettyPrintSubclassCounters(
 
       // Display per-instance stats, if there is more than one instance.
       // Legacy profile did not show per-instance stats for averaged profile.
-      if (verbosity > Verbosity::LEGACY && v.second.second.size() > 1) {
+      // Per-instance stats are too verbose for the default mode.
+      if (verbosity >= Verbosity::EXTENDED && v.second.second.size() > 1) {
         for (int idx = 0; idx < v.second.second.size(); ++idx) {
           if (v.second.second[idx] == nullptr) continue;
           const string& per_instance_prefix = Substitute("$0[$1]", prefix, idx);

@@ -161,6 +161,9 @@ testdata/impala-profiles/impala_profile_log_tpcds_compute_stats.expected.pretty.
 testdata/impala-profiles/impala_profile_log_tpcds_compute_stats.expected.pretty_extended.json
 testdata/impala-profiles/impala_profile_log_tpcds_compute_stats_default.expected.txt
 testdata/impala-profiles/impala_profile_log_tpcds_compute_stats_extended.expected.txt
+testdata/impala-profiles/impala_profile_log_tpcds_compute_stats_v2
+testdata/impala-profiles/impala_profile_log_tpcds_compute_stats_v2_default.expected.txt
+testdata/impala-profiles/impala_profile_log_tpcds_compute_stats_v2_extended.expected.txt
 testdata/hive_benchmark/grepTiny/part-00000
 testdata/tzdb/2017c.zip
 testdata/tzdb/2017c-corrupt.zip
