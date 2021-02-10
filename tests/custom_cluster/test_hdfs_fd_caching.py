@@ -164,7 +164,8 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--max_cached_file_handles=16 --unused_file_handle_timeout_sec=5 " +
-                   "--data_cache=/tmp:500MB --always_use_data_cache=true",
+                   "--always_use_data_cache=true",
+      start_args="--data_cache_dir=/tmp --data_cache_size=500MB",
       catalogd_args="--load_catalog_in_background=false")
   def test_no_fd_caching_on_cached_data(self, vector):
     """IMPALA-10147: Test that no file handle should be opened nor cached again if data
@@ -183,10 +184,12 @@ class TestHdfsFdCaching(CustomClusterTestSuite):
     # The table has one file. If caching is expected, there should be one more
     # handle cached after the first select. If caching is not expected, the
     # number of handles should not change from the initial number.
-    self.execute_query("select * from cachefd.simple", vector=vector)
-    num_handles_after = self.cached_handles()
-    assert self.max_cached_handles() <= cache_capacity
-    assert num_handles_after == (num_handles_start + 1)
+    # Read 5 times to make sure the data cache is fully warmed up.
+    for x in range(5):
+      self.execute_query("select * from cachefd.simple", vector=vector)
+      num_handles_after = self.cached_handles()
+      assert self.max_cached_handles() <= cache_capacity
+      assert num_handles_after == (num_handles_start + 1)
 
     # No open handles if scanning is finished.
     assert self.outstanding_handles() == 0
