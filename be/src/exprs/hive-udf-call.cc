@@ -62,7 +62,7 @@ AnyVal* HiveUdfCall::Evaluate(ScalarExprEvaluator* eval, const TupleRow* row) co
       fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
   DCHECK(jni_ctx != nullptr);
 
-  JNIEnv* env = jni_ctx->jni_env;
+  JNIEnv* env = JniUtil::GetJNIEnv();
   DCHECK(env != nullptr);
 
   // Evaluate all the children values and put the results in input_values_buffer
@@ -176,11 +176,6 @@ Status HiveUdfCall::OpenEvaluator(FunctionContext::FunctionStateScope scope,
 
   JNIEnv* env = JniUtil::GetJNIEnv();
   if (env == nullptr) return Status("Failed to get/create JVM");
-
-  // Cache the JNI env pointer here so it can be retrieved by codegen at execution time.
-  // LLVM can't handle thread-local variables (yet) so we cannot call JniUtil::GetJNIEnv()
-  // from codegen code.
-  jni_ctx->jni_env = env;
 
   // Fields used for error reporting.
   // This object and thus fn_ are alive when rows are evaluated.
@@ -331,7 +326,7 @@ llvm::Value* CastPtrAndLoad(LlvmCodeGen* codegen, LlvmBuilder* builder,
 /// }
 ///
 /// define { i64, i8* } @HiveUdfCall(%"class.impala::ScalarExprEvaluator"* %eval,
-///                                  %"class.impala::TupleRow"* %row) #46 {
+///                                  %"class.impala::TupleRow"* %row) #49 {
 /// entry:
 ///   %0 = alloca %"struct.impala::ColumnType"
 ///   %1 = alloca %"struct.impala::StringValue"
@@ -373,7 +368,7 @@ llvm::Value* CastPtrAndLoad(LlvmCodeGen* codegen, LlvmBuilder* builder,
 ///   br label %eval_child1
 ///
 /// eval_child1:                                 ; preds = %child_not_null, %eval_child
-///   %child4 = call { i64, i8* } @"impala::CastFunctions::CastToStringValWrapper"(
+///   %child4 = call { i64, i8* } @GetSlotRef.5(
 ///       %"class.impala::ScalarExprEvaluator"* %eval, %"class.impala::TupleRow"* %row)
 ///   %11 = extractvalue { i64, i8* } %child4, 0
 ///   %child_is_null6 = trunc i64 %11 to i1
@@ -400,7 +395,7 @@ llvm::Value* CastPtrAndLoad(LlvmCodeGen* codegen, LlvmBuilder* builder,
 ///   br label %eval_child3
 ///
 /// eval_child3:                                 ; preds = %child_not_null5, %eval_child1
-///   %child11 = call { i64, i8* } @"impala::CastFunctions::CastToStringVal.5Wrapper"(
+///   %child11 = call { i64, i8* } @GetSlotRef.6(
 ///       %"class.impala::ScalarExprEvaluator"* %eval, %"class.impala::TupleRow"* %row)
 ///   %18 = extractvalue { i64, i8* } %child11, 0
 ///   %child_is_null13 = trunc i64 %18 to i1
@@ -430,7 +425,8 @@ llvm::Value* CastPtrAndLoad(LlvmCodeGen* codegen, LlvmBuilder* builder,
 ///   store %"struct.impala::ColumnType" {
 ///       i32 10, i32 -1, i32 -1, i32 -1,
 ///       %"class.std::vector.13" zeroinitializer,
-///       %"class.std::vector.18" zeroinitializer },
+///       %"class.std::vector.18" zeroinitializer,
+///       %"class.std::vector.23" zeroinitializer },
 ///       %"struct.impala::ColumnType"* %0
 ///   %ret_ptr = call %"struct.impala_udf::AnyVal"*
 ///   ; The next two lines should be one line but the name of the identifier is too long.
@@ -576,6 +572,10 @@ DateVal HiveUdfCall::GetDateValInterpreted(
     ScalarExprEvaluator* eval, const TupleRow* row) const {
   DCHECK_EQ(type_.type, TYPE_DATE);
   return *reinterpret_cast<DateVal*>(Evaluate(eval, row));
+}
+
+JNIEnv* HiveUdfCall::GetJniEnvNotInlined() {
+  return JniUtil::GetJNIEnv();
 }
 
 }

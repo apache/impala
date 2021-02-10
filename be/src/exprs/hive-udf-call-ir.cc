@@ -51,7 +51,7 @@ uint8_t* HiveUdfCall::JniContext::GetInputValuesBufferAtOffset(
 AnyVal* HiveUdfCall::CallJavaAndStoreResult(const ColumnType* type,
     FunctionContext* fn_ctx, JniContext* jni_ctx) {
   DCHECK(jni_ctx != nullptr);
-  JNIEnv* env = jni_ctx->jni_env;
+  JNIEnv* env = GetJniEnvNotInlined();
   DCHECK(env != nullptr);
 
   // Using this version of Call has the lowest overhead. This eliminates the

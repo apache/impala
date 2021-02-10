@@ -129,7 +129,6 @@ class HiveUdfCall : public ScalarExpr {
   static jmethodID executor_close_id_;
 
   struct JniContext {
-    JNIEnv* jni_env = nullptr;
     jobject executor = nullptr;
 
     uint8_t* input_values_buffer = nullptr;
@@ -160,6 +159,17 @@ class HiveUdfCall : public ScalarExpr {
   static JNIEnv* GetJniEnv(JniContext* jni_ctx);
   static AnyVal* CallJavaAndStoreResult(const  ColumnType* type, FunctionContext* fn_ctx,
       JniContext* jni_ctx);
+
+  /// Codegen code cannot directly call JniUtil::GetJNIEnv() because LLVM JIT cannot
+  /// handle thread-local variables (see https://bugs.llvm.org/show_bug.cgi?id=21431).
+  /// The problem is that a call to JniUtil::GetJNIEnv can be inlined in codegen code,
+  /// leading to a crash. This wrapper function calls JniUtil::GetJNIEnv but cannot be
+  /// inlined, ensuring that the contents of JniUtil::GetJNIEnv, which deal with the
+  /// thread-local variable, are compiled by GCC.
+  /// Codegen code can then use this wrapper function so the resulting generated code
+  /// will contain an actual function call instruction to the pre-compiled
+  /// JniUtil::GetJNIEnv.
+  static __attribute__((noinline)) JNIEnv* GetJniEnvNotInlined();
 };
 
 }
