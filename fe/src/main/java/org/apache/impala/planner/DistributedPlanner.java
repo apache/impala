@@ -1085,7 +1085,26 @@ public class DistributedPlanner {
           childFragment.getPlanRoot().getOutputSmap(), ctx_.getRootAnalyzer());
       // Make sure the childFragment's output is partitioned as required by the sortNode.
       DataPartition sortPartition = sortNode.getInputPartition();
-      if (!childFragment.getDataPartition().equals(sortPartition)) {
+      boolean hasNullableTupleIds = childFragment.getPlanRoot().
+          getNullableTupleIds().size() > 0;
+      boolean hasCompatiblePartition = false;
+      if (hasNullableTupleIds) {
+        // If the input stream has nullable tuple ids (produced from the nullable
+        // side of an outer join), do an exact equality comparison of the child's
+        // data partition with the required partition) since a hash exchange is
+        // required to co-locate all the null values produced from the outer join
+        // (these tuples may not be originally null but became null after OJ).
+        hasCompatiblePartition = childFragment.getDataPartition().equals(sortPartition);
+      } else {
+        // Otherwise, a mutual value transfer is sufficient for compatible partitions.
+        // E.g if analytic fragment's required partition key is t2.a2 and the child is
+        // an inner join with t1.a1 = t2.a2, either a1 or a2 are sufficient to satisfy
+        // the required partitioning.
+        hasCompatiblePartition = ctx_.getRootAnalyzer().setsHaveValueTransfer(
+            childFragment.getDataPartition().getPartitionExprs(),
+            sortPartition.getPartitionExprs(), true);
+      }
+      if (!hasCompatiblePartition) {
         if (sortNode.isTypeTopN() || sortNode.isPartitionedTopN()) {
           lowerTopN = sortNode;
           childFragment.addPlanRoot(lowerTopN);
