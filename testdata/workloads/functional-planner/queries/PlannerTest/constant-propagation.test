@@ -526,3 +526,16 @@ PLAN-ROOT SINK
    predicates: timestamp_col > TIMESTAMP '2009-02-01 00:00:00', date_col = CAST(timestamp_col AS DATE)
    row-size=65B cardinality=21
 ====
+# IMPALA-9745
+# Constant propagation in the presence of implicit casts
+select * from
+ (select o_orderdate, to_timestamp(o_orderdate, 'yyyy-MM-dd') ts
+  from tpch.orders) dt where ts = '1996-12-01' and o_orderdate = ts;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [tpch.orders]
+   HDFS partitions=1/1 files=1 size=162.56MB
+   predicates: tpch.orders.o_orderdate = TIMESTAMP '1996-12-01 00:00:00'
+   row-size=22B cardinality=608
+====

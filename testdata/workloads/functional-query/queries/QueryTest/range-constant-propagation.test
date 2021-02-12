@@ -48,3 +48,17 @@ select count(*) from (select * from alltypes_dp_2_view_2 limit 10) t;
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-9745
+# Test correctness of constant propagation in the presence of
+# implicit casts
+select * from
+ (select o_orderdate, to_timestamp(o_orderdate, 'yyyy-MM-dd') ts
+  from tpch.orders) dt where ts = '1996-12-01' and o_orderdate = ts
+limit 2;
+---- RESULTS
+'1996-12-01',1996-12-01 00:00:00
+'1996-12-01',1996-12-01 00:00:00
+---- TYPES
+STRING,TIMESTAMP
+====
