@@ -107,7 +107,7 @@ public class ConstantPredicateHandler {
       Preconditions.checkNotNull(slotRef);
       Expr subst = bp.getSlotBinding(slotRef.getSlotId());
       ExprSubstitutionMap smap = new ExprSubstitutionMap();
-      smap.put(slotRef, subst);
+      smap.put(slotRef, getTargetExpr(slotRef, subst));
       for (int j = 0; j < conjuncts.size(); ++j) {
         Expr toRewrite = conjuncts.get(j);
         // Don't rewrite with our own substitution!
@@ -141,7 +141,7 @@ public class ConstantPredicateHandler {
           BinaryPredicate bp = (BinaryPredicate) rangePred;
           Expr subst = bp.getSlotBinding(slotRef.getSlotId());
           ExprSubstitutionMap smap = new ExprSubstitutionMap();
-          smap.put(slotRef, subst);
+          smap.put(slotRef, getTargetExpr(slotRef, subst));
           // make a copy since we may need to re-use the original
           Expr toRewrite = dtExpr.clone();
           toRewrite = rewriteWithOp((BinaryPredicate) toRewrite, bp.getOp(), analyzer);
@@ -177,6 +177,15 @@ public class ConstantPredicateHandler {
         pred.getChild(1));
     newPred.analyzeNoThrow(analyzer);
     return newPred;
+  }
+
+  // During constant propagation, the types also need to be propagated since a
+  // rewritten expr must have compatible data type with the source expr. So,
+  // when mapping the source to the target expr we add an implicit cast if needed.
+  private static Expr getTargetExpr(SlotRef source, Expr target) {
+    Expr expr = source.getType().equals(target.getType()) ?
+        target : new CastExpr(source.getType(), target);
+    return expr;
   }
 
 }
