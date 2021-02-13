@@ -1069,6 +1069,69 @@ class TestRanger(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_profile_protection(self, vector):
+    """Test that a requesting user is able to access the runtime profile or execution
+    summary of a query involving a view only if the user is granted the privileges on all
+    the underlying tables of the view. Recall that the view functional.complex_view we
+    use here is created based on the tables functional.alltypesagg and
+    functional.alltypestiny."""
+    admin_client = self.create_impala_client()
+    non_owner_client = self.create_impala_client()
+    test_db = "functional"
+    test_view = "complex_view"
+    grantee_user = "non_owner"
+    try:
+      admin_client.execute(
+          "grant select on table {0}.{1} to user {2}"
+          .format(test_db, test_view, grantee_user), user=ADMIN)
+
+      admin_client.execute("refresh authorization")
+      # Recall that in a successful execution, result.exec_summary and
+      # result.runtime_profile store the execution summary and runtime profile,
+      # respectively. But when the requesting user does not have the privileges
+      # on the underlying tables, an exception will be thrown from
+      # ImpalaBeeswaxClient.get_runtime_profile().
+      result = self.execute_query_expect_failure(
+          non_owner_client, "select count(*) from {0}.{1}".format(test_db, test_view),
+          user=grantee_user)
+      assert "User {0} is not authorized to access the runtime profile or " \
+          "execution summary".format(grantee_user) in str(result)
+
+      admin_client.execute(
+          "grant select on table {0}.alltypesagg to user {1}"
+          .format(test_db, grantee_user), user=ADMIN)
+
+      admin_client.execute("refresh authorization")
+      self.execute_query_expect_failure(
+          non_owner_client, "select count(*) from {0}.{1}".format(test_db, test_view),
+          user=grantee_user)
+      assert "User {0} is not authorized to access the runtime profile or " \
+          "execution summary".format(grantee_user) in str(result)
+
+      admin_client.execute(
+          "grant select on table {0}.alltypestiny to user {1}"
+          .format(test_db, grantee_user), user=ADMIN)
+
+      admin_client.execute("refresh authorization")
+      self.execute_query_expect_success(
+          non_owner_client, "select count(*) from {0}.{1}".format(test_db, test_view),
+          user=grantee_user)
+    finally:
+      cleanup_statements = [
+          "revoke select on table {0}.{1} from user {2}"
+          .format(test_db, test_view, grantee_user),
+          "revoke select on table {0}.alltypesagg from user {1}"
+          .format(test_db, grantee_user),
+          "revoke select on table {0}.alltypestiny from user {1}"
+          .format(test_db, grantee_user)
+      ]
+
+      for statement in cleanup_statements:
+        admin_client.execute(statement, user=ADMIN)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
     # We additionally provide impalad and catalogd with the customized user-to-groups
     # mapper since some test cases in grant_revoke.test require Impala to retrieve the
     # groups a given user belongs to and such users might not exist in the underlying

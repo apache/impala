@@ -179,6 +179,7 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
     // 'user_has_profile_access' flag in queryCtx_.
     for (Pair<PrivilegeRequest, String> maskedReq : analyzer.getMaskedPrivilegeReqs()) {
       try {
+        authzCtx.setRetainAudits(false);
         authorizePrivilegeRequest(authzCtx, analysisResult, catalog, maskedReq.first);
       } catch (AuthorizationException e) {
         analysisResult.setUserHasProfileAccess(false);
@@ -186,6 +187,8 @@ public abstract class BaseAuthorizationChecker implements AuthorizationChecker {
           throw new AuthorizationException(maskedReq.second);
         }
         break;
+      } finally {
+        authzCtx.setRetainAudits(true);
       }
     }
   }

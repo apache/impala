@@ -160,6 +160,45 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     }, "compute stats FUNCTIONAL.ALLTYPES",
         onTable("functional", "alltypes", TPrivilegeLevel.ALTER,
             TPrivilegeLevel.SELECT));
+
+    // Recall that the view 'functional.complex_view' is created based on two underlying
+    // tables, i.e., functional.alltypesagg and functional.alltypestiny. The following 3
+    // test cases make sure the same audit log entry indicating a successful
+    // authorization event is produced whether or not the requesting user is granted the
+    // privileges on any of the underlying tables.
+    authzOk(events -> {
+      assertEquals(1, events.size());
+      assertEventEquals("@table", "select", "functional/complex_view", 1,
+          events.get(0));
+      assertEquals("select count(*) from functional.complex_view",
+          events.get(0).getRequestData());
+    }, "select count(*) from functional.complex_view",
+        onTable("functional", "complex_view", TPrivilegeLevel.SELECT));
+
+    // The same audit log entry is produced if the requesting user is granted the
+    // privilege on one of the underlying tables.
+    authzOk(events -> {
+      assertEquals(1, events.size());
+      assertEventEquals("@table", "select", "functional/complex_view", 1,
+          events.get(0));
+      assertEquals("select count(*) from functional.complex_view",
+          events.get(0).getRequestData());
+    }, "select count(*) from functional.complex_view",
+        onTable("functional", "complex_view", TPrivilegeLevel.SELECT),
+        onTable("functional", "alltypesagg", TPrivilegeLevel.SELECT));
+
+    // The same audit log entry is produced if the requesting user is granted the
+    // privileges on all of the underlying tables.
+    authzOk(events -> {
+      assertEquals(1, events.size());
+      assertEventEquals("@table", "select", "functional/complex_view", 1,
+          events.get(0));
+      assertEquals("select count(*) from functional.complex_view",
+          events.get(0).getRequestData());
+    }, "select count(*) from functional.complex_view",
+        onTable("functional", "complex_view", TPrivilegeLevel.SELECT),
+        onTable("functional", "alltypesagg", TPrivilegeLevel.SELECT),
+        onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
   }
 
   @Test
