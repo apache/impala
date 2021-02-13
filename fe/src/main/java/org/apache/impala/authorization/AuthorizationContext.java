@@ -27,6 +27,8 @@ import java.util.Optional;
 public class AuthorizationContext {
   private final Optional<EventSequence> timeline_;
 
+  private boolean retainAudits_ = true;
+
   public AuthorizationContext(Optional<EventSequence> timeline) {
     this.timeline_ = timeline;
   }
@@ -36,4 +38,7 @@ public class AuthorizationContext {
    */
   public Optional<EventSequence> getTimeline() { return timeline_; }
 
+  public void setRetainAudits(boolean retainAudits) { retainAudits_ = retainAudits; }
+
+  public boolean getRetainAudits() { return retainAudits_; }
 }
