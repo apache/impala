@@ -115,7 +115,7 @@ SELECT 1 as "``"
 ---- RESULTS
 1
 ---- TYPES
-int
+tinyint
 ====
 ---- QUERY
 #  Select from table that contains unsupported primitive types
