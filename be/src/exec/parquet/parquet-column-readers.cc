@@ -1251,6 +1251,7 @@ Status BaseScalarColumnReader::StartPageFiltering() {
 
 bool BaseScalarColumnReader::SkipTopLevelRows(int64_t num_rows) {
   DCHECK_GE(num_buffered_values_, num_rows);
+  DCHECK_GT(num_rows, 0);
   // Fastest path: field is required and not nested.
   // So row count equals value count, and every value is stored in the page data.
   if (max_def_level() == 0 && max_rep_level() == 0) {
@@ -1286,10 +1287,17 @@ bool BaseScalarColumnReader::SkipTopLevelRows(int64_t num_rows) {
   } else {
     // 'rep_level_' being zero denotes the start of a new top-level row.
     // From the 'def_level_' we can determine the number of non-NULL values.
-    while (!(num_rows == 0 && rep_levels_.PeekLevel() == 0)) {
-      def_level_ = def_levels_.ReadLevel();
-      rep_level_ = rep_levels_.ReadLevel();
+    while (true) {
+      if (!def_levels_.CacheNextBatchIfEmpty(num_buffered_values_).ok()) return false;
+      if (!rep_levels_.CacheNextBatchIfEmpty(num_buffered_values_).ok()) return false;
+      if (num_rows == 0 && rep_levels_.PeekLevel() == 0) {
+        // No more rows to skip, and the next value belongs to a new top-level row.
+        break;
+      }
+      def_level_ = def_levels_.CacheGetNext();
+      rep_level_ = rep_levels_.CacheGetNext();
       --num_buffered_values_;
+      DCHECK_GE(num_buffered_values_, 0);
       if (def_level_ >= max_def_level()) ++num_values_to_skip;
       if (rep_level_ == 0) {
         ++current_row_;
