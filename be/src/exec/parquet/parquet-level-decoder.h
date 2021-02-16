@@ -82,6 +82,13 @@ class ParquetLevelDecoder {
   /// the cache has been exhausted, i.e. CacheHasNext() is false.
   Status CacheNextBatch(int vals_remaining);
 
+  /// No-op if there are remaining values in the cache. Invokes 'CacheNextBatch()' if the
+  /// cache is empty.
+  Status CacheNextBatchIfEmpty(int vals_to_cache) {
+    if (LIKELY(CacheHasNext())) return Status::OK();
+    return CacheNextBatch(vals_to_cache);
+  }
+
   /// Functions for working with the level cache.
   bool CacheHasNext() const { return cached_level_idx_ < num_cached_levels_; }
   uint8_t CacheGetNext() {
