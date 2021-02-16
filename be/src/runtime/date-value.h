@@ -138,6 +138,13 @@ class DateValue {
   /// Otherwise, return an invalid DateValue instance.
   DateValue AddYears(int64_t years) const;
 
+  /// If this DateValue instance valid, subtract 'days' days from it and return the
+  /// result. Otherwise, return an invalid DateValue instance.
+  DateValue SubtractDays(int64_t days) const;
+
+  /// Find a middle point date between 'min' and 'max'.
+  static DateValue FindMiddleDate(const DateValue& min, const DateValue& max);
+
   /// If this DateValue instance is valid, convert it to the number of days since epoch
   /// and return true. Result is placed in 'days'.
   /// Otherwise, return false.

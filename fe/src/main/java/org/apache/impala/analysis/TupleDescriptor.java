@@ -259,6 +259,10 @@ public class TupleDescriptor {
     return ttupleDesc;
   }
 
+  public void resetHasMemoryLayout() {
+    hasMemLayout_ = false;
+  }
+
   /**
    * In some cases changes are made to a tuple after the memory layout has been computed.
    * This function allows us to recompute the memory layout, if necessary. No-op if this

@@ -47,6 +47,7 @@
 #include "runtime/query-driver.h"
 #include "runtime/query-exec-mgr.h"
 #include "runtime/query-state.h"
+#include "runtime/raw-value.h"
 #include "scheduling/admission-control-client.h"
 #include "scheduling/scheduler.h"
 #include "service/client-request-state.h"
@@ -591,6 +592,10 @@ string Coordinator::FilterDebugString() {
   table_printer.AddColumn("Enabled", false);
   table_printer.AddColumn("Bloom Size", false);
   table_printer.AddColumn("Est fpp", false);
+  table_printer.AddColumn("Min value", false);
+  table_printer.AddColumn("Max value", false);
+  ObjectPool temp_object_pool;
+  MemTracker temp_mem_tracker;
   for (auto& v: filter_routing_table_->id_to_filter) {
     vector<string> row;
     const FilterState& state = v.second;
@@ -628,7 +633,7 @@ string Coordinator::FilterDebugString() {
     // updates have been successfully received.
     row.push_back(state.enabled() || state.received_all_updates() ? "true" : "false");
 
-    // Add size and fpp for bloom filters, the filter type otherwise.
+    // Add size and fpp for bloom filters.
     if (state.is_bloom_filter()) {
       int64_t filter_size = state.desc().filter_size_bytes;
       row.push_back(PrettyPrinter::Print(filter_size, TUnit::BYTES));
@@ -637,12 +642,41 @@ string Coordinator::FilterDebugString() {
       stringstream ss;
       ss << setprecision(3) << fpp;
       row.push_back(ss.str());
+      row.push_back("");
+      row.push_back("");
     } else {
+      // Add the filter type for minmax filters.
       row.push_back(PrintThriftEnum(state.desc().type));
       row.push_back("");
+
+      // Also add the min/max value for partitioned joins, when all updates are available
+      // and the filter is not always false. For broadcast joins, no min/max values can
+      // be shown as the filter is moved and not available in state.min_max_filter_.
+      if (state.received_all_updates()) {
+        const TRuntimeFilterDesc& desc = state.desc();
+        const TExpr& src_expr = desc.src_expr;
+        ColumnType src_type = ColumnType::FromThrift(src_expr.nodes[0].type);
+        const MinMaxFilterPB& minmax_filterPB =
+            const_cast<FilterState*>(&state)->min_max_filter();
+        if (!minmax_filterPB.always_true() && !minmax_filterPB.always_false()) {
+          MinMaxFilter* min_max_filter = MinMaxFilter::Create(
+              minmax_filterPB, src_type, &temp_object_pool, &temp_mem_tracker);
+          row.push_back(
+              RawValue::PrintValue(min_max_filter->GetMin(), src_type, src_type.scale));
+          row.push_back(
+              RawValue::PrintValue(min_max_filter->GetMax(), src_type, src_type.scale));
+        } else {
+          row.push_back("");
+          row.push_back("");
+        }
+      } else {
+        row.push_back("");
+        row.push_back("");
+      }
     }
     table_printer.AddRow(row);
   }
+  temp_mem_tracker.Close();
   // Add a line break, as in all contexts this is called we need to start a new line to
   // print it correctly.
   return Substitute("\n$0", table_printer.ToString());
@@ -1353,7 +1387,7 @@ vector<NetworkAddressPB> Coordinator::GetActiveBackends(
 }
 
 void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* context) {
-  VLOG(2) << "UpdateFilter(filter_id=" << params.filter_id() << ")";
+  VLOG(2) << "Coordinator::UpdateFilter(filter_id=" << params.filter_id() << ")";
   shared_lock<shared_mutex> lock(filter_routing_table_->lock);
   DCHECK_NE(filter_mode_, TRuntimeFilterMode::OFF)
       << "UpdateFilter() called although runtime filters are disabled";

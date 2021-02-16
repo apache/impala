@@ -110,6 +110,10 @@ struct __attribute__((__packed__)) StringValue {
     *sv = impala_udf::StringVal(reinterpret_cast<uint8_t*>(ptr), len);
   }
 
+  // Treat up to first 8 bytes of the string as an 64-bit unsigned integer. If len is
+  // less than 8, 8-len number of bytes of value '\0' are appended.
+  uint64_t ToUInt64() const;
+
   static StringValue FromStringVal(const impala_udf::StringVal& sv) {
     return StringValue(reinterpret_cast<char*>(sv.ptr), sv.len);
   }

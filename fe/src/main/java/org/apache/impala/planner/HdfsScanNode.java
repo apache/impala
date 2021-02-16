@@ -20,6 +20,7 @@ package org.apache.impala.planner;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -32,13 +33,16 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.impala.analysis.Analyzer;
+import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNotEmptyPredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.MultiAggregateInfo;
+import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
@@ -55,8 +59,10 @@ import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -66,6 +72,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.fb.FbFileBlock;
+import org.apache.impala.planner.RuntimeFilterGenerator.RuntimeFilter;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TExpr;
@@ -73,10 +80,12 @@ import org.apache.impala.thrift.TFileSplitGeneratorSpec;
 import org.apache.impala.thrift.THdfsFileSplit;
 import org.apache.impala.thrift.THdfsScanNode;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TOverlapPredicateDesc;
 import org.apache.impala.thrift.TPlanNode;
 import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TReplicaPreference;
+import org.apache.impala.thrift.TRuntimeFilterType;
 import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
@@ -92,6 +101,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.MoreObjects.ToStringHelper;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -219,6 +229,9 @@ public class HdfsScanNode extends ScanNode {
   // File formats scanned. Set in computeScanRangeLocations().
   private Set<HdfsFileFormat> fileFormats_;
 
+  // Whether all formats scanned are Parquet. Set in computeScanRangeLocations().
+  private boolean allParquet_ = false;
+
   // Number of bytes in the largest scan range (i.e. hdfs split). Set in
   // computeScanRangeLocations().
   private long largestScanRangeBytes_ = 0;
@@ -299,6 +312,12 @@ public class HdfsScanNode extends ScanNode {
   // evaluated against the min and/or the max value of the corresponding
   // parquet::Statistics.
   private TupleDescriptor minMaxTuple_;
+
+  // The list of overlap predicate descs. See TOverlapPredicateDesc in PlanNodes.thrift.
+  private ArrayList<TOverlapPredicateDesc> overlapPredicateDescs_ = new ArrayList<>();
+
+  // Index of the first slot in minMaxTuple_ for overlap predicates.
+  private int overlap_first_slot_idx_ = -1;
 
   // Slot that is used to record the Parquet metadata for the count(*) aggregation if
   // this scan node has the count(*) optimization enabled.
@@ -646,6 +665,133 @@ public class HdfsScanNode extends ScanNode {
     minMaxTuple_.computeMemLayout();
   }
 
+  // Init the necessary data structures prior to the detection of overlap predicates.
+  public void initOverlapPredicate(Analyzer analyzer) {
+    if (!allParquet_) return;
+    Preconditions.checkNotNull(minMaxTuple_);
+    // Allow the tuple to accept new slots.
+    minMaxTuple_.resetHasMemoryLayout();
+
+    overlap_first_slot_idx_ = minMaxTuple_.getSlots().size();
+  }
+
+  // Data type check on the slot type and the join column type.
+  private boolean checkTypeForOverlapPredicate(Type slotType, Type joinType) {
+    // Both slotType and joinType must be Boolean at the same time.
+    if (slotType.isBoolean() && joinType.isBoolean()) {
+      return true;
+    }
+
+    // Both slotType and joinType must be one of the integer types (tinyint, smallint,
+    // int, or bigint) at the same time.
+    if (slotType.isIntegerType() && joinType.isIntegerType()) {
+      return true;
+    }
+
+    // Both slotType and joinType must be strings at the same time, as CHAR or VARCHAR
+    // are not supported by min/max filters.
+    if (slotType.isScalarType(PrimitiveType.STRING)
+        && joinType.isScalarType(PrimitiveType.STRING)) {
+      return true;
+    }
+
+    // Both slotType and joinType must be timestamp at the same time.
+    if (slotType.isTimestamp() && joinType.isTimestamp()) {
+      return true;
+    }
+
+    // Both slotType and joinType must be date at the same time.
+    if (slotType.isDate() && joinType.isDate()) {
+      return true;
+    }
+
+    // Both slotType and joinType must be approximate numeric at the same time.
+    if (slotType.isFloatingPointType() && joinType.isFloatingPointType()) {
+      return true;
+    }
+
+    // If slotType and joinType are both decimals, make sure both are of the same
+    // precision and scale. This is because the backend representation of a decimal
+    // value (DecimalValue) does not carry precision and scale with it. Without a
+    // cast, it is difficult to compare two decimals with different precisions and
+    // scales.
+    if (slotType.isDecimal() && joinType.isDecimal()) {
+      ScalarType slotScalarType = (ScalarType)slotType;
+      ScalarType hashScalarType = (ScalarType)joinType;
+      return (slotScalarType.decimalPrecision() == hashScalarType.decimalPrecision()
+          && slotScalarType.decimalScale() == hashScalarType.decimalScale());
+    }
+
+    return false;
+  }
+
+  // Try to compute the overlap predicate for the filter. Return true if an overlap
+  // predicate can be formed utilizing the min/max filter 'filter' against the
+  // target expr 'targetExpr'. Return false otherwise.
+  public Boolean tryToComputeOverlapPredicate(
+      Analyzer analyzer, RuntimeFilter filter, Expr targetExpr) {
+    // This optimization is only valid for min/max filters and Parquet tables.
+    if (filter.getType() != TRuntimeFilterType.MIN_MAX) return false;
+    if (!allParquet_) return false;
+
+    // The unwrapped targetExpr should refer to a column in the scan node.
+    SlotRef slotRefInScan = targetExpr.unwrapSlotRef(true);
+    if (slotRefInScan == null) return false;
+
+    // Check if targetExpr refers to some column in one of the min/max conjuncts
+    // already formed. If so, do not add an overlap predicate as it may not be
+    // as effective as the conjunct.
+    List<SlotDescriptor> slotDescs = minMaxTuple_.getSlots();
+    for (int i=0; i<overlap_first_slot_idx_; i++) {
+      if (slotDescs.get(i).getPath() == slotRefInScan.getDesc().getPath())
+        return false;
+    }
+
+    Expr srcExpr = filter.getSrcExpr();
+
+    // When the target is not an implicit cast, make a type check between the type
+    // of the min/max stats that overlap predicate will see from the row groups or
+    // pages, and the type of the min/max from the other side of the join.
+    if (!targetExpr.isImplicitCast()) {
+      if (!checkTypeForOverlapPredicate(slotRefInScan.getType(), srcExpr.getType())) {
+        return false;
+      }
+    } else {
+      // The target is an implicit cast, make the following two type checks to
+      // assure the overlap filter can work with the row group or page stats
+      // (without any cast) and the min/max from the other side of the join.
+      // 1. The type of the target column and the casted-to type;
+      // 2. The the casted-to type and the type of the column from the
+      //    other side of the join.
+      //
+      // To do: cast the row group or page stats before overlap predicate
+      //        evaluation.
+      if (!checkTypeForOverlapPredicate(slotRefInScan.getType(), targetExpr.getType())
+          || !checkTypeForOverlapPredicate(targetExpr.getType(), srcExpr.getType())) {
+        return false;
+      }
+    }
+
+    int firstSlotIdx = minMaxTuple_.getSlots().size();
+    // Make two new slot descriptors to hold data min/max values (such as from
+    // row groups or pages in Parquet)) and append them to the tuple descriptor.
+    SlotDescriptor slotDescDataMin =
+        analyzer.getDescTbl().copySlotDescriptor(minMaxTuple_, slotRefInScan.getDesc());
+    SlotDescriptor slotDescDataMax =
+        analyzer.getDescTbl().copySlotDescriptor(minMaxTuple_, slotRefInScan.getDesc());
+
+    overlapPredicateDescs_.add(
+        new TOverlapPredicateDesc(filter.getFilterId().asInt(), firstSlotIdx));
+    return true;
+  }
+
+  // Finalize the necessary data structures.
+  public void finalizeOverlapPredicate() {
+    if (!allParquet_) return;
+    // Recompute the memory layout for the min/max tuple.
+    minMaxTuple_.computeMemLayout();
+  }
+
   /**
    * Recursively collects and assigns conjuncts bound by tuples materialized in a
    * collection-typed slot. As conjuncts are seen, collect non-empty nested collections.
@@ -842,6 +988,7 @@ public class HdfsScanNode extends ScanNode {
     largestScanRangeBytes_ = 0;
     maxScanRangeNumRows_ = -1;
     fileFormats_ = new HashSet<>();
+    boolean allParquet = true;
     long simpleLimitNumRows = 0; // only used for the simple limit case
     boolean isSimpleLimit = sampleParams_ == null &&
         (analyzer.getQueryCtx().client_request.getQuery_options()
@@ -891,6 +1038,9 @@ public class HdfsScanNode extends ScanNode {
 
       analyzer.getDescTbl().addReferencedPartition(tbl_, partition.getId());
       fileFormats_.add(partition.getFileFormat());
+      if (!isParquetBased(partition.getFileFormat())) {
+        allParquet = false;
+      }
       Preconditions.checkState(partition.getId() >= 0);
 
       if (!fsHasBlocks) {
@@ -953,6 +1103,7 @@ public class HdfsScanNode extends ScanNode {
         break;
       }
     }
+    allParquet_ = allParquet;
     if (totalFilesPerFs_.isEmpty() || sumValues(totalFilesPerFs_) == 0) {
       maxScanRangeNumRows_ = 0;
     } else {
@@ -1485,8 +1636,12 @@ public class HdfsScanNode extends ScanNode {
       for (Expr e: minMaxConjuncts_) {
         msg.hdfs_scan_node.addToMin_max_conjuncts(e.treeToThrift());
       }
+    }
+
+    if ( minMaxTuple_ != null ) {
       msg.hdfs_scan_node.setMin_max_tuple_id(minMaxTuple_.getId().asInt());
     }
+
     Map<Integer, List<Integer>> dictMap = new LinkedHashMap<>();
     for (Map.Entry<SlotDescriptor, List<Integer>> entry :
       dictionaryFilterConjuncts_.entrySet()) {
@@ -1497,6 +1652,12 @@ public class HdfsScanNode extends ScanNode {
 
     for (HdfsFileFormat format : fileFormats_) {
       msg.hdfs_scan_node.addToFile_formats(format.toThrift());
+    }
+
+    if (!overlapPredicateDescs_.isEmpty()) {
+      for (TOverlapPredicateDesc desc: overlapPredicateDescs_) {
+        msg.hdfs_scan_node.addToOverlap_predicate_descs(desc);
+      }
     }
   }
 
@@ -2000,5 +2161,23 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(scanRangeSpecs_);
     return scanRangeSpecs_.getConcrete_rangesSize()
         + scanRangeSpecs_.getSplit_specsSize();
+  }
+
+  /**
+   * Sort filters in runtimeFilters_: min/max first followed by bloom.
+   */
+  public void arrangeRuntimefiltersForParquet() {
+    if (allParquet_) {
+      Collections.sort(runtimeFilters_, new Comparator<RuntimeFilter>() {
+        @Override
+        public int compare(RuntimeFilter a, RuntimeFilter b) {
+          if (a.getType() == b.getType()) return 0;
+          if (a.getType() == TRuntimeFilterType.MIN_MAX
+              && b.getType() == TRuntimeFilterType.BLOOM)
+            return -1;
+          return 1;
+        }
+      });
+    }
   }
 }

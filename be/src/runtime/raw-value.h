@@ -56,6 +56,14 @@ class RawValue {
   static void PrintValue(const void* value, const ColumnType& type, int scale,
                          std::string* str);
 
+  /// Return ascii value string.
+  static std::string PrintValue(const void* value, const ColumnType& type, int scale) {
+    std::string str;
+    PrintValue(value, type, scale, &str);
+    return str;
+  }
+
+
   /// Writes the byte representation of a value to a stringstream character-by-character
   static void PrintValueAsBytes(const void* value, const ColumnType& type,
                                 std::stringstream* stream);

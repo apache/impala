@@ -22,7 +22,6 @@ WHERE cs_sold_date_sk = d_date_sk
 GROUP BY i_item_id
 ORDER BY i_item_id
 LIMIT 100;
-
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=43.34MB Threads=6
 Per-Host Resource Estimates: Memory=578MB
@@ -48,7 +47,7 @@ PLAN-ROOT SINK
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: cs_item_sk = i_item_sk
 |  fk/pk conjuncts: cs_item_sk = i_item_sk
-|  runtime filters: RF000[bloom] <- i_item_sk
+|  runtime filters: RF000[bloom] <- i_item_sk, RF001[min_max] <- i_item_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2,1,4,3 row-size=162B cardinality=186.24K
 |  in pipelines: 00(GETNEXT), 03(OPEN)
@@ -66,7 +65,7 @@ PLAN-ROOT SINK
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: cs_promo_sk = p_promo_sk
 |  fk/pk conjuncts: cs_promo_sk = p_promo_sk
-|  runtime filters: RF002[bloom] <- p_promo_sk
+|  runtime filters: RF002[bloom] <- p_promo_sk, RF003[min_max] <- p_promo_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2,1,4 row-size=126B cardinality=186.24K
 |  in pipelines: 00(GETNEXT), 04(OPEN)
@@ -85,7 +84,7 @@ PLAN-ROOT SINK
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: cs_bill_cdemo_sk = cd_demo_sk
 |  fk/pk conjuncts: cs_bill_cdemo_sk = cd_demo_sk
-|  runtime filters: RF004[bloom] <- cd_demo_sk
+|  runtime filters: RF004[bloom] <- cd_demo_sk, RF005[min_max] <- cd_demo_sk
 |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=0,2,1 row-size=96B cardinality=187.48K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -106,7 +105,7 @@ PLAN-ROOT SINK
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: cs_sold_date_sk = d_date_sk
 |  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
-|  runtime filters: RF006[bloom] <- d_date_sk
+|  runtime filters: RF006[bloom] <- d_date_sk, RF007[min_max] <- d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2 row-size=44B cardinality=294.63K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
@@ -126,7 +125,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds_parquet.catalog_sales]
    HDFS partitions=1/1 files=3 size=96.62MB
-   runtime filters: RF000[bloom] -> cs_item_sk, RF002[bloom] -> cs_promo_sk, RF004[bloom] -> cs_bill_cdemo_sk, RF006[bloom] -> cs_sold_date_sk
+   runtime filters: RF001[min_max] -> cs_item_sk, RF003[min_max] -> cs_promo_sk, RF005[min_max] -> cs_bill_cdemo_sk, RF007[min_max] -> cs_sold_date_sk, RF000[bloom] -> cs_item_sk, RF002[bloom] -> cs_promo_sk, RF004[bloom] -> cs_bill_cdemo_sk, RF006[bloom] -> cs_sold_date_sk
    stored statistics:
      table: rows=1.44M size=96.62MB
      columns: all
@@ -182,7 +181,7 @@ Per-Host Resources: mem-estimate=29.54MB mem-reservation=11.75MB thread-reservat
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: cs_item_sk = i_item_sk
 |  fk/pk conjuncts: cs_item_sk = i_item_sk
-|  runtime filters: RF000[bloom] <- i_item_sk
+|  runtime filters: RF000[bloom] <- i_item_sk, RF001[min_max] <- i_item_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2,1,4,3 row-size=162B cardinality=186.24K
 |  in pipelines: 00(GETNEXT), 03(OPEN)
@@ -207,7 +206,7 @@ Per-Host Resources: mem-estimate=29.54MB mem-reservation=11.75MB thread-reservat
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: cs_promo_sk = p_promo_sk
 |  fk/pk conjuncts: cs_promo_sk = p_promo_sk
-|  runtime filters: RF002[bloom] <- p_promo_sk
+|  runtime filters: RF002[bloom] <- p_promo_sk, RF003[min_max] <- p_promo_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2,1,4 row-size=126B cardinality=186.24K
 |  in pipelines: 00(GETNEXT), 04(OPEN)
@@ -233,7 +232,7 @@ Per-Host Resources: mem-estimate=29.54MB mem-reservation=11.75MB thread-reservat
 06:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: cs_bill_cdemo_sk = cd_demo_sk
 |  fk/pk conjuncts: cs_bill_cdemo_sk = cd_demo_sk
-|  runtime filters: RF004[bloom] <- cd_demo_sk
+|  runtime filters: RF004[bloom] <- cd_demo_sk, RF005[min_max] <- cd_demo_sk
 |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=0,2,1 row-size=96B cardinality=187.48K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -268,7 +267,7 @@ Per-Host Resources: mem-estimate=389.95MB mem-reservation=21.94MB thread-reserva
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: cs_sold_date_sk = d_date_sk
 |  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
-|  runtime filters: RF006[bloom] <- d_date_sk
+|  runtime filters: RF006[bloom] <- d_date_sk, RF007[min_max] <- d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2 row-size=44B cardinality=294.63K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
@@ -295,7 +294,7 @@ Per-Host Resources: mem-estimate=389.95MB mem-reservation=21.94MB thread-reserva
 |
 00:SCAN HDFS [tpcds_parquet.catalog_sales, RANDOM]
    HDFS partitions=1/1 files=3 size=96.62MB
-   runtime filters: RF000[bloom] -> cs_item_sk, RF002[bloom] -> cs_promo_sk, RF004[bloom] -> cs_bill_cdemo_sk, RF006[bloom] -> cs_sold_date_sk
+   runtime filters: RF001[min_max] -> cs_item_sk, RF003[min_max] -> cs_promo_sk, RF005[min_max] -> cs_bill_cdemo_sk, RF007[min_max] -> cs_sold_date_sk, RF000[bloom] -> cs_item_sk, RF002[bloom] -> cs_promo_sk, RF004[bloom] -> cs_bill_cdemo_sk, RF006[bloom] -> cs_sold_date_sk
    stored statistics:
      table: rows=1.44M size=96.62MB
      columns: all
@@ -361,7 +360,7 @@ Per-Instance Resources: mem-estimate=14.27MB mem-reservation=2.00MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: i_item_sk
-|  |  runtime filters: RF000[bloom] <- i_item_sk
+|  |  runtime filters: RF000[bloom] <- i_item_sk, RF001[min_max] <- i_item_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  15:EXCHANGE [BROADCAST]
@@ -394,7 +393,7 @@ Per-Instance Resources: mem-estimate=14.27MB mem-reservation=2.00MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: p_promo_sk
-|  |  runtime filters: RF002[bloom] <- p_promo_sk
+|  |  runtime filters: RF002[bloom] <- p_promo_sk, RF003[min_max] <- p_promo_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  14:EXCHANGE [BROADCAST]
@@ -428,7 +427,7 @@ Per-Instance Resources: mem-estimate=14.27MB mem-reservation=2.00MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=02 plan-id=03 cohort-id=01
 |  |  build expressions: cd_demo_sk
-|  |  runtime filters: RF004[bloom] <- cd_demo_sk
+|  |  runtime filters: RF004[bloom] <- cd_demo_sk, RF005[min_max] <- cd_demo_sk
 |  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |
 |  13:EXCHANGE [HASH(cd_demo_sk)]
@@ -472,7 +471,7 @@ Per-Instance Resources: mem-estimate=48.00MB mem-reservation=16.00MB thread-rese
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: d_date_sk
-|  |  runtime filters: RF006[bloom] <- d_date_sk
+|  |  runtime filters: RF006[bloom] <- d_date_sk, RF007[min_max] <- d_date_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  11:EXCHANGE [BROADCAST]
@@ -497,7 +496,7 @@ Per-Instance Resources: mem-estimate=48.00MB mem-reservation=16.00MB thread-rese
 |
 00:SCAN HDFS [tpcds_parquet.catalog_sales, RANDOM]
    HDFS partitions=1/1 files=3 size=96.62MB
-   runtime filters: RF000[bloom] -> cs_item_sk, RF002[bloom] -> cs_promo_sk, RF004[bloom] -> cs_bill_cdemo_sk, RF006[bloom] -> cs_sold_date_sk
+   runtime filters: RF001[min_max] -> cs_item_sk, RF003[min_max] -> cs_promo_sk, RF005[min_max] -> cs_bill_cdemo_sk, RF007[min_max] -> cs_sold_date_sk, RF000[bloom] -> cs_item_sk, RF002[bloom] -> cs_promo_sk, RF004[bloom] -> cs_bill_cdemo_sk, RF006[bloom] -> cs_sold_date_sk
    stored statistics:
      table: rows=1.44M size=96.62MB
      columns: all

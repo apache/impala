@@ -224,6 +224,9 @@ Status HdfsScanPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
         *min_max_row_desc, state, &min_max_conjuncts_));
   }
 
+  // Transfer overlap predicate descs.
+  overlap_predicate_descs_ = tnode.hdfs_scan_node.overlap_predicate_descs;
+
   RETURN_IF_ERROR(ProcessScanRangesAndInitSharedState(state));
 
   state->CheckAndAddCodegenDisabledMessage(codegen_status_msgs_);

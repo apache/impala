@@ -75,7 +75,7 @@ PLAN-ROOT SINK
 16:HASH JOIN [INNER JOIN]
 |  hash predicates: i_item_sk = i_item_sk, w_warehouse_sk = w_warehouse_sk
 |  fk/pk conjuncts: i_item_sk = i_item_sk, w_warehouse_sk = w_warehouse_sk
-|  runtime filters: RF000[bloom] <- i_item_sk, RF001[bloom] <- w_warehouse_sk
+|  runtime filters: RF000[bloom] <- i_item_sk, RF001[bloom] <- w_warehouse_sk, RF002[min_max] <- i_item_sk, RF003[min_max] <- w_warehouse_sk
 |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5,13 row-size=123B cardinality=431.40K
 |  in pipelines: 07(GETNEXT), 15(OPEN)
@@ -91,7 +91,7 @@ PLAN-ROOT SINK
 |  14:HASH JOIN [INNER JOIN]
 |  |  hash predicates: inv_warehouse_sk = w_warehouse_sk
 |  |  fk/pk conjuncts: inv_warehouse_sk = w_warehouse_sk
-|  |  runtime filters: RF010[bloom] <- w_warehouse_sk
+|  |  runtime filters: RF010[bloom] <- w_warehouse_sk, RF011[min_max] <- w_warehouse_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=8,11,9,10 row-size=74B cardinality=4.82M
 |  |  in pipelines: 08(GETNEXT), 10(OPEN)
@@ -109,7 +109,7 @@ PLAN-ROOT SINK
 |  13:HASH JOIN [INNER JOIN]
 |  |  hash predicates: inv_item_sk = i_item_sk
 |  |  fk/pk conjuncts: inv_item_sk = i_item_sk
-|  |  runtime filters: RF012[bloom] <- i_item_sk
+|  |  runtime filters: RF012[bloom] <- i_item_sk, RF013[min_max] <- i_item_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=8,11,9 row-size=40B cardinality=4.82M
 |  |  in pipelines: 08(GETNEXT), 09(OPEN)
@@ -127,7 +127,7 @@ PLAN-ROOT SINK
 |  12:HASH JOIN [INNER JOIN]
 |  |  hash predicates: inv_date_sk = d_date_sk
 |  |  fk/pk conjuncts: inv_date_sk = d_date_sk
-|  |  runtime filters: RF014[bloom] <- d_date_sk
+|  |  runtime filters: RF014[bloom] <- d_date_sk, RF015[min_max] <- d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=8,11 row-size=32B cardinality=4.82M
 |  |  in pipelines: 08(GETNEXT), 11(OPEN)
@@ -147,7 +147,7 @@ PLAN-ROOT SINK
 |  |
 |  08:SCAN HDFS [tpcds_parquet.inventory]
 |     HDFS partitions=1/1 files=2 size=34.09MB
-|     runtime filters: RF010[bloom] -> inv_warehouse_sk, RF012[bloom] -> inv_item_sk, RF014[bloom] -> inv_date_sk
+|     runtime filters: RF015[min_max] -> inv_date_sk, RF011[min_max] -> inv_warehouse_sk, RF013[min_max] -> inv_item_sk, RF014[bloom] -> inv_date_sk, RF010[bloom] -> inv_warehouse_sk, RF012[bloom] -> inv_item_sk
 |     stored statistics:
 |       table: rows=11.74M size=34.09MB
 |       columns: all
@@ -167,14 +167,14 @@ PLAN-ROOT SINK
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: inv_warehouse_sk = w_warehouse_sk
 |  fk/pk conjuncts: inv_warehouse_sk = w_warehouse_sk
-|  runtime filters: RF004[bloom] <- w_warehouse_sk
+|  runtime filters: RF004[bloom] <- w_warehouse_sk, RF005[min_max] <- w_warehouse_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,3,1,2 row-size=74B cardinality=4.82M
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |
 |--02:SCAN HDFS [tpcds_parquet.warehouse]
 |     HDFS partitions=1/1 files=1 size=4.38KB
-|     runtime filters: RF001[bloom] -> tpcds_parquet.warehouse.w_warehouse_sk
+|     runtime filters: RF003[min_max] -> tpcds_parquet.warehouse.w_warehouse_sk, RF001[bloom] -> tpcds_parquet.warehouse.w_warehouse_sk
 |     stored statistics:
 |       table: rows=5 size=4.38KB
 |       columns: all
@@ -186,14 +186,14 @@ PLAN-ROOT SINK
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: inv_item_sk = i_item_sk
 |  fk/pk conjuncts: inv_item_sk = i_item_sk
-|  runtime filters: RF006[bloom] <- i_item_sk
+|  runtime filters: RF006[bloom] <- i_item_sk, RF007[min_max] <- i_item_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,3,1 row-size=40B cardinality=4.82M
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds_parquet.item]
 |     HDFS partitions=1/1 files=1 size=1.73MB
-|     runtime filters: RF000[bloom] -> tpcds_parquet.item.i_item_sk
+|     runtime filters: RF002[min_max] -> tpcds_parquet.item.i_item_sk, RF000[bloom] -> tpcds_parquet.item.i_item_sk
 |     stored statistics:
 |       table: rows=18.00K size=1.73MB
 |       columns: all
@@ -205,7 +205,7 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: inv_date_sk = d_date_sk
 |  fk/pk conjuncts: inv_date_sk = d_date_sk
-|  runtime filters: RF008[bloom] <- d_date_sk
+|  runtime filters: RF008[bloom] <- d_date_sk, RF009[min_max] <- d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,3 row-size=32B cardinality=4.82M
 |  in pipelines: 00(GETNEXT), 03(OPEN)
@@ -225,7 +225,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds_parquet.inventory]
    HDFS partitions=1/1 files=2 size=34.09MB
-   runtime filters: RF000[bloom] -> tpcds_parquet.inventory.inv_item_sk, RF001[bloom] -> tpcds_parquet.inventory.inv_warehouse_sk, RF004[bloom] -> inv_warehouse_sk, RF006[bloom] -> inv_item_sk, RF008[bloom] -> inv_date_sk
+   runtime filters: RF009[min_max] -> inv_date_sk, RF002[min_max] -> tpcds_parquet.inventory.inv_item_sk, RF003[min_max] -> tpcds_parquet.inventory.inv_warehouse_sk, RF005[min_max] -> inv_warehouse_sk, RF007[min_max] -> inv_item_sk, RF008[bloom] -> inv_date_sk, RF000[bloom] -> tpcds_parquet.inventory.inv_item_sk, RF001[bloom] -> tpcds_parquet.inventory.inv_warehouse_sk, RF004[bloom] -> inv_warehouse_sk, RF006[bloom] -> inv_item_sk
    stored statistics:
      table: rows=11.74M size=34.09MB
      columns: all
@@ -259,7 +259,7 @@ Per-Host Resources: mem-estimate=39.26MB mem-reservation=25.00MB thread-reservat
 16:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: i_item_sk = i_item_sk, w_warehouse_sk = w_warehouse_sk
 |  fk/pk conjuncts: i_item_sk = i_item_sk, w_warehouse_sk = w_warehouse_sk
-|  runtime filters: RF000[bloom] <- i_item_sk, RF001[bloom] <- w_warehouse_sk
+|  runtime filters: RF000[bloom] <- i_item_sk, RF001[bloom] <- w_warehouse_sk, RF002[min_max] <- i_item_sk, RF003[min_max] <- w_warehouse_sk
 |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=5,13 row-size=123B cardinality=431.40K
 |  in pipelines: 22(GETNEXT), 27(OPEN)
@@ -296,7 +296,7 @@ Per-Host Resources: mem-estimate=39.26MB mem-reservation=25.00MB thread-reservat
 |  14:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: inv_warehouse_sk = w_warehouse_sk
 |  |  fk/pk conjuncts: inv_warehouse_sk = w_warehouse_sk
-|  |  runtime filters: RF010[bloom] <- w_warehouse_sk
+|  |  runtime filters: RF010[bloom] <- w_warehouse_sk, RF011[min_max] <- w_warehouse_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=8,11,9,10 row-size=74B cardinality=4.82M
 |  |  in pipelines: 08(GETNEXT), 10(OPEN)
@@ -321,7 +321,7 @@ Per-Host Resources: mem-estimate=39.26MB mem-reservation=25.00MB thread-reservat
 |  13:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: inv_item_sk = i_item_sk
 |  |  fk/pk conjuncts: inv_item_sk = i_item_sk
-|  |  runtime filters: RF012[bloom] <- i_item_sk
+|  |  runtime filters: RF012[bloom] <- i_item_sk, RF013[min_max] <- i_item_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=8,11,9 row-size=40B cardinality=4.82M
 |  |  in pipelines: 08(GETNEXT), 09(OPEN)
@@ -346,7 +346,7 @@ Per-Host Resources: mem-estimate=39.26MB mem-reservation=25.00MB thread-reservat
 |  12:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: inv_date_sk = d_date_sk
 |  |  fk/pk conjuncts: inv_date_sk = d_date_sk
-|  |  runtime filters: RF014[bloom] <- d_date_sk
+|  |  runtime filters: RF014[bloom] <- d_date_sk, RF015[min_max] <- d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=8,11 row-size=32B cardinality=4.82M
 |  |  in pipelines: 08(GETNEXT), 11(OPEN)
@@ -373,7 +373,7 @@ Per-Host Resources: mem-estimate=39.26MB mem-reservation=25.00MB thread-reservat
 |  |
 |  08:SCAN HDFS [tpcds_parquet.inventory, RANDOM]
 |     HDFS partitions=1/1 files=2 size=34.09MB
-|     runtime filters: RF010[bloom] -> inv_warehouse_sk, RF012[bloom] -> inv_item_sk, RF014[bloom] -> inv_date_sk
+|     runtime filters: RF015[min_max] -> inv_date_sk, RF011[min_max] -> inv_warehouse_sk, RF013[min_max] -> inv_item_sk, RF014[bloom] -> inv_date_sk, RF010[bloom] -> inv_warehouse_sk, RF012[bloom] -> inv_item_sk
 |     stored statistics:
 |       table: rows=11.74M size=34.09MB
 |       columns: all
@@ -414,7 +414,7 @@ Per-Host Resources: mem-estimate=372.37MB mem-reservation=60.81MB thread-reserva
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: inv_warehouse_sk = w_warehouse_sk
 |  fk/pk conjuncts: inv_warehouse_sk = w_warehouse_sk
-|  runtime filters: RF004[bloom] <- w_warehouse_sk
+|  runtime filters: RF004[bloom] <- w_warehouse_sk, RF005[min_max] <- w_warehouse_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,3,1,2 row-size=74B cardinality=4.82M
 |  in pipelines: 00(GETNEXT), 02(OPEN)
@@ -428,7 +428,7 @@ Per-Host Resources: mem-estimate=372.37MB mem-reservation=60.81MB thread-reserva
 |  Per-Host Resources: mem-estimate=33.00MB mem-reservation=1.02MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  02:SCAN HDFS [tpcds_parquet.warehouse, RANDOM]
 |     HDFS partitions=1/1 files=1 size=4.38KB
-|     runtime filters: RF001[bloom] -> tpcds_parquet.warehouse.w_warehouse_sk
+|     runtime filters: RF003[min_max] -> tpcds_parquet.warehouse.w_warehouse_sk, RF001[bloom] -> tpcds_parquet.warehouse.w_warehouse_sk
 |     stored statistics:
 |       table: rows=5 size=4.38KB
 |       columns: all
@@ -440,7 +440,7 @@ Per-Host Resources: mem-estimate=372.37MB mem-reservation=60.81MB thread-reserva
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: inv_item_sk = i_item_sk
 |  fk/pk conjuncts: inv_item_sk = i_item_sk
-|  runtime filters: RF006[bloom] <- i_item_sk
+|  runtime filters: RF006[bloom] <- i_item_sk, RF007[min_max] <- i_item_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,3,1 row-size=40B cardinality=4.82M
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -454,7 +454,7 @@ Per-Host Resources: mem-estimate=372.37MB mem-reservation=60.81MB thread-reserva
 |  Per-Host Resources: mem-estimate=17.00MB mem-reservation=1.25MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  01:SCAN HDFS [tpcds_parquet.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
-|     runtime filters: RF000[bloom] -> tpcds_parquet.item.i_item_sk
+|     runtime filters: RF002[min_max] -> tpcds_parquet.item.i_item_sk, RF000[bloom] -> tpcds_parquet.item.i_item_sk
 |     stored statistics:
 |       table: rows=18.00K size=1.73MB
 |       columns: all
@@ -466,7 +466,7 @@ Per-Host Resources: mem-estimate=372.37MB mem-reservation=60.81MB thread-reserva
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: inv_date_sk = d_date_sk
 |  fk/pk conjuncts: inv_date_sk = d_date_sk
-|  runtime filters: RF008[bloom] <- d_date_sk
+|  runtime filters: RF008[bloom] <- d_date_sk, RF009[min_max] <- d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,3 row-size=32B cardinality=4.82M
 |  in pipelines: 00(GETNEXT), 03(OPEN)
@@ -493,7 +493,7 @@ Per-Host Resources: mem-estimate=372.37MB mem-reservation=60.81MB thread-reserva
 |
 00:SCAN HDFS [tpcds_parquet.inventory, RANDOM]
    HDFS partitions=1/1 files=2 size=34.09MB
-   runtime filters: RF000[bloom] -> tpcds_parquet.inventory.inv_item_sk, RF001[bloom] -> tpcds_parquet.inventory.inv_warehouse_sk, RF004[bloom] -> inv_warehouse_sk, RF006[bloom] -> inv_item_sk, RF008[bloom] -> inv_date_sk
+   runtime filters: RF009[min_max] -> inv_date_sk, RF002[min_max] -> tpcds_parquet.inventory.inv_item_sk, RF003[min_max] -> tpcds_parquet.inventory.inv_warehouse_sk, RF005[min_max] -> inv_warehouse_sk, RF007[min_max] -> inv_item_sk, RF008[bloom] -> inv_date_sk, RF000[bloom] -> tpcds_parquet.inventory.inv_item_sk, RF001[bloom] -> tpcds_parquet.inventory.inv_warehouse_sk, RF004[bloom] -> inv_warehouse_sk, RF006[bloom] -> inv_item_sk
    stored statistics:
      table: rows=11.74M size=34.09MB
      columns: all
@@ -537,7 +537,7 @@ Per-Instance Resources: mem-estimate=18.13MB mem-reservation=6.00MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: i_item_sk, w_warehouse_sk
-|  |  runtime filters: RF000[bloom] <- i_item_sk, RF001[bloom] <- w_warehouse_sk
+|  |  runtime filters: RF000[bloom] <- i_item_sk, RF001[bloom] <- w_warehouse_sk, RF002[min_max] <- i_item_sk, RF003[min_max] <- w_warehouse_sk
 |  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |
 |  29:EXCHANGE [HASH(i_item_sk,w_warehouse_sk)]
@@ -583,7 +583,7 @@ Per-Instance Resources: mem-estimate=18.13MB mem-reservation=6.00MB thread-reser
 |  |  JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: w_warehouse_sk
-|  |  |  runtime filters: RF010[bloom] <- w_warehouse_sk
+|  |  |  runtime filters: RF010[bloom] <- w_warehouse_sk, RF011[min_max] <- w_warehouse_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  25:EXCHANGE [BROADCAST]
@@ -616,7 +616,7 @@ Per-Instance Resources: mem-estimate=18.13MB mem-reservation=6.00MB thread-reser
 |  |  JOIN BUILD
 |  |  |  join-table-id=02 plan-id=03 cohort-id=02
 |  |  |  build expressions: i_item_sk
-|  |  |  runtime filters: RF012[bloom] <- i_item_sk
+|  |  |  runtime filters: RF012[bloom] <- i_item_sk, RF013[min_max] <- i_item_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  24:EXCHANGE [BROADCAST]
@@ -649,7 +649,7 @@ Per-Instance Resources: mem-estimate=18.13MB mem-reservation=6.00MB thread-reser
 |  |  JOIN BUILD
 |  |  |  join-table-id=03 plan-id=04 cohort-id=02
 |  |  |  build expressions: d_date_sk
-|  |  |  runtime filters: RF014[bloom] <- d_date_sk
+|  |  |  runtime filters: RF014[bloom] <- d_date_sk, RF015[min_max] <- d_date_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  23:EXCHANGE [BROADCAST]
@@ -674,7 +674,7 @@ Per-Instance Resources: mem-estimate=18.13MB mem-reservation=6.00MB thread-reser
 |  |
 |  08:SCAN HDFS [tpcds_parquet.inventory, RANDOM]
 |     HDFS partitions=1/1 files=2 size=34.09MB
-|     runtime filters: RF010[bloom] -> inv_warehouse_sk, RF012[bloom] -> inv_item_sk, RF014[bloom] -> inv_date_sk
+|     runtime filters: RF015[min_max] -> inv_date_sk, RF011[min_max] -> inv_warehouse_sk, RF013[min_max] -> inv_item_sk, RF014[bloom] -> inv_date_sk, RF010[bloom] -> inv_warehouse_sk, RF012[bloom] -> inv_item_sk
 |     stored statistics:
 |       table: rows=11.74M size=34.09MB
 |       columns: all
@@ -726,7 +726,7 @@ Per-Instance Resources: mem-estimate=265.37MB mem-reservation=50.00MB thread-res
 |  JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: w_warehouse_sk
-|  |  runtime filters: RF004[bloom] <- w_warehouse_sk
+|  |  runtime filters: RF004[bloom] <- w_warehouse_sk, RF005[min_max] <- w_warehouse_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  20:EXCHANGE [BROADCAST]
@@ -739,7 +739,7 @@ Per-Instance Resources: mem-estimate=265.37MB mem-reservation=50.00MB thread-res
 |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
 |  02:SCAN HDFS [tpcds_parquet.warehouse, RANDOM]
 |     HDFS partitions=1/1 files=1 size=4.38KB
-|     runtime filters: RF001[bloom] -> tpcds_parquet.warehouse.w_warehouse_sk
+|     runtime filters: RF003[min_max] -> tpcds_parquet.warehouse.w_warehouse_sk, RF001[bloom] -> tpcds_parquet.warehouse.w_warehouse_sk
 |     stored statistics:
 |       table: rows=5 size=4.38KB
 |       columns: all
@@ -761,7 +761,7 @@ Per-Instance Resources: mem-estimate=265.37MB mem-reservation=50.00MB thread-res
 |  JOIN BUILD
 |  |  join-table-id=05 plan-id=06 cohort-id=01
 |  |  build expressions: i_item_sk
-|  |  runtime filters: RF006[bloom] <- i_item_sk
+|  |  runtime filters: RF006[bloom] <- i_item_sk, RF007[min_max] <- i_item_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  19:EXCHANGE [BROADCAST]
@@ -774,7 +774,7 @@ Per-Instance Resources: mem-estimate=265.37MB mem-reservation=50.00MB thread-res
 |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=1
 |  01:SCAN HDFS [tpcds_parquet.item, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.73MB
-|     runtime filters: RF000[bloom] -> tpcds_parquet.item.i_item_sk
+|     runtime filters: RF002[min_max] -> tpcds_parquet.item.i_item_sk, RF000[bloom] -> tpcds_parquet.item.i_item_sk
 |     stored statistics:
 |       table: rows=18.00K size=1.73MB
 |       columns: all
@@ -796,7 +796,7 @@ Per-Instance Resources: mem-estimate=265.37MB mem-reservation=50.00MB thread-res
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: d_date_sk
-|  |  runtime filters: RF008[bloom] <- d_date_sk
+|  |  runtime filters: RF008[bloom] <- d_date_sk, RF009[min_max] <- d_date_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  18:EXCHANGE [BROADCAST]
@@ -821,7 +821,7 @@ Per-Instance Resources: mem-estimate=265.37MB mem-reservation=50.00MB thread-res
 |
 00:SCAN HDFS [tpcds_parquet.inventory, RANDOM]
    HDFS partitions=1/1 files=2 size=34.09MB
-   runtime filters: RF000[bloom] -> tpcds_parquet.inventory.inv_item_sk, RF001[bloom] -> tpcds_parquet.inventory.inv_warehouse_sk, RF004[bloom] -> inv_warehouse_sk, RF006[bloom] -> inv_item_sk, RF008[bloom] -> inv_date_sk
+   runtime filters: RF009[min_max] -> inv_date_sk, RF002[min_max] -> tpcds_parquet.inventory.inv_item_sk, RF003[min_max] -> tpcds_parquet.inventory.inv_warehouse_sk, RF005[min_max] -> inv_warehouse_sk, RF007[min_max] -> inv_item_sk, RF008[bloom] -> inv_date_sk, RF000[bloom] -> tpcds_parquet.inventory.inv_item_sk, RF001[bloom] -> tpcds_parquet.inventory.inv_warehouse_sk, RF004[bloom] -> inv_warehouse_sk, RF006[bloom] -> inv_item_sk
    stored statistics:
      table: rows=11.74M size=34.09MB
      columns: all

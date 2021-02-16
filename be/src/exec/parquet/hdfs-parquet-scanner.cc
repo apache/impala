@@ -93,7 +93,9 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     process_footer_timer_stats_(nullptr),
     num_cols_counter_(nullptr),
     num_stats_filtered_row_groups_counter_(nullptr),
+    num_minmax_filtered_row_groups_counter_(nullptr),
     num_row_groups_counter_(nullptr),
+    num_minmax_filtered_pages_counter_(nullptr),
     num_scanners_with_no_reads_counter_(nullptr),
     num_dict_filtered_row_groups_counter_(nullptr),
     parquet_compressed_page_size_counter_(nullptr),
@@ -111,6 +113,9 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   num_stats_filtered_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumStatsFilteredRowGroups",
           TUnit::UNIT);
+  num_minmax_filtered_row_groups_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumRuntimeFilteredRowGroups",
+          TUnit::UNIT);
   num_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumRowGroups", TUnit::UNIT);
   num_row_groups_with_page_index_counter_ =
@@ -118,6 +123,8 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
           TUnit::UNIT);
   num_stats_filtered_pages_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumStatsFilteredPages", TUnit::UNIT);
+  num_minmax_filtered_pages_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumRuntimeFilteredPages", TUnit::UNIT);
   num_pages_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumPages", TUnit::UNIT);
   num_scanners_with_no_reads_counter_ =
@@ -466,6 +473,52 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
   return Status::OK();
 }
 
+Status HdfsParquetScanner::ResolveSchemaForStatFiltering(SlotDescriptor* slot_desc,
+    bool* missing_field, SchemaNode** schema_node_ptr) {
+  DCHECK(missing_field);
+  *missing_field = false;
+  // Resolve column path.
+  SchemaNode* node = nullptr;
+  bool pos_field;
+  RETURN_IF_ERROR(schema_resolver_->ResolvePath(
+      slot_desc->col_path(), &node, &pos_field, missing_field));
+
+  if (pos_field) {
+    // The planner should not send predicates with 'pos' for stats filtering to the BE.
+    // In case there is a bug, we return an error, which will abort the query.
+    stringstream err;
+    err << "Statistics not supported for pos fields: " << slot_desc->DebugString();
+    DCHECK(false) << err.str();
+    return Status(err.str());
+  }
+
+  if (schema_node_ptr) *schema_node_ptr = node;
+
+  return Status::OK();
+}
+
+ColumnStatsReader HdfsParquetScanner::CreateStatsReader(
+    const parquet::FileMetaData& file_metadata, const parquet::RowGroup& row_group,
+    SchemaNode* node, const ColumnType& col_type) {
+  DCHECK(node);
+
+  int col_idx = node->col_idx;
+  DCHECK_LT(col_idx, row_group.columns.size());
+
+  const vector<parquet::ColumnOrder>& col_orders = file_metadata.column_orders;
+  const parquet::ColumnOrder* col_order =
+      col_idx < col_orders.size() ? &col_orders[col_idx] : nullptr;
+
+  const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
+
+  DCHECK(node->element != nullptr);
+
+  ColumnStatsReader stat_reader =
+      CreateColumnStatsReader(col_chunk, col_type, col_order, *node->element);
+
+  return stat_reader;
+}
+
 Status HdfsParquetScanner::EvaluateStatsConjuncts(
     const parquet::FileMetaData& file_metadata, const parquet::RowGroup& row_group,
     bool* skip_row_group) {
@@ -481,17 +534,16 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
   DCHECK(min_max_tuple_ != nullptr);
   min_max_tuple_->Init(tuple_size);
 
-  DCHECK_EQ(min_max_tuple_desc->slots().size(), min_max_conjunct_evals_.size());
+  DCHECK_GE(min_max_tuple_desc->slots().size(), min_max_conjunct_evals_.size());
   for (int i = 0; i < min_max_conjunct_evals_.size(); ++i) {
+
     SlotDescriptor* slot_desc = min_max_tuple_desc->slots()[i];
     ScalarExprEvaluator* eval = min_max_conjunct_evals_[i];
 
-    // Resolve column path to determine col idx.
+    bool missing_field = false;
     SchemaNode* node = nullptr;
-    bool pos_field;
-    bool missing_field;
-    RETURN_IF_ERROR(schema_resolver_->ResolvePath(slot_desc->col_path(),
-        &node, &pos_field, &missing_field));
+
+    RETURN_IF_ERROR(ResolveSchemaForStatFiltering(slot_desc, &missing_field, &node));
 
     if (missing_field) {
       // We are selecting a column that is not in the file. We would set its slot to NULL
@@ -502,33 +554,11 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
       break;
     }
 
-    if (pos_field) {
-      // The planner should not send predicates with 'pos' for stats filtering to the BE.
-      // In case there is a bug, we return an error, which will abort the query.
-      stringstream err;
-      err << "Statistics not supported for pos fields: " << slot_desc->DebugString();
-      DCHECK(false) << err.str();
-      return Status(err.str());
-    }
+    ColumnStatsReader stats_reader =
+        CreateStatsReader(file_metadata, row_group, node, slot_desc->type());
 
-    int col_idx = node->col_idx;
-    DCHECK_LT(col_idx, row_group.columns.size());
-
-    const vector<parquet::ColumnOrder>& col_orders = file_metadata.column_orders;
-    const parquet::ColumnOrder* col_order = col_idx < col_orders.size() ?
-        &col_orders[col_idx] : nullptr;
-
-    const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
-    const ColumnType& col_type = slot_desc->type();
-
-    DCHECK(node->element != nullptr);
-
-    ColumnStatsReader stat_reader = CreateColumnStatsReader(col_chunk, col_type,
-        col_order, *node->element);
-
-    int64_t null_count = 0;
-    bool null_count_result = stat_reader.ReadNullCountStat(&null_count);
-    if (null_count_result && null_count == col_chunk.meta_data.num_values) {
+    bool all_nulls = false;
+    if (stats_reader.AllNulls(&all_nulls) && all_nulls) {
       *skip_row_group = true;
       break;
     }
@@ -538,7 +568,7 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
     if (!ColumnStatsReader::GetRequiredStatsField(fn_name, &stats_field)) continue;
 
     void* slot = min_max_tuple_->GetSlot(slot_desc->tuple_offset());
-    bool stats_read = stat_reader.ReadFromThrift(stats_field, slot);
+    bool stats_read = stats_reader.ReadFromThrift(stats_field, slot);
 
     if (stats_read) {
       TupleRow row;
@@ -554,6 +584,146 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
   // Free any expr result allocations accumulated during conjunct evaluation.
   context_->expr_results_pool()->Clear();
   return Status::OK();
+}
+
+Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
+    const parquet::FileMetaData& file_metadata, const parquet::RowGroup& row_group,
+    bool* skip_row_group) {
+  *skip_row_group = false;
+
+  if (!state_->query_options().parquet_read_statistics) return Status::OK();
+
+  const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
+  if (GetOverlapPredicateDescs().size() > 0 && !min_max_tuple_desc) {
+    stringstream err;
+    err << "min_max_tuple_desc is null.";
+    DCHECK(false) << err.str();
+    return Status(err.str());
+  }
+
+  DCHECK(min_max_tuple_ != nullptr);
+  min_max_tuple_->Init(min_max_tuple_desc->byte_size());
+
+  // The total number slots in min_max_tuple_ should be equal to or larger than
+  // the number of min/max conjuncts. The extra number slots are for the overlap
+  // predicates. # min_max_conjuncts + 2 * # overlap predicates = # min_max_slots.
+  DCHECK_GE(min_max_tuple_desc->slots().size(), min_max_conjunct_evals_.size());
+
+  TMinmaxFilteringLevel::type level = state_->query_options().minmax_filtering_level;
+  float threshold = (float)(state_->query_options().minmax_filter_threshold);
+
+  for (auto desc: GetOverlapPredicateDescs()) {
+
+    int filter_id = desc.filter_id;
+    int slot_idx = desc.slot_index;
+    MinMaxFilter* minmax_filter = FindMinMaxFilter(FindFilterIndex(filter_id));
+
+    if (!minmax_filter) continue;
+
+    SlotDescriptor* slot_desc = min_max_tuple_desc->slots()[slot_idx];
+
+    bool missing_field = false;
+    SchemaNode* node = nullptr;
+
+    RETURN_IF_ERROR(ResolveSchemaForStatFiltering(slot_desc, &missing_field, &node));
+
+    if (missing_field) {
+      // We are selecting a column that is not in the file. We would set its slot to NULL
+      // during the scan, so any predicate would evaluate to false. Return early. NULL
+      // comparisons cannot happen here, since predicates with NULL literals are filtered
+      // in the frontend.
+      *skip_row_group = true;
+      break;
+    }
+    ColumnStatsReader stats_reader =
+        CreateStatsReader(file_metadata, row_group, node, slot_desc->type());
+
+    bool all_nulls = false;
+    if (stats_reader.AllNulls(&all_nulls) && all_nulls) {
+      *skip_row_group = true;
+      break;
+    }
+
+    void* min_slot = nullptr;
+    void* max_slot = nullptr;
+    GetMinMaxSlotsForOverlapPred(slot_idx, &min_slot, &max_slot);
+
+    bool value_read = stats_reader.ReadMinMaxFromThrift(min_slot, max_slot);
+    if (!value_read) {
+      continue;
+    }
+
+    const ColumnType& col_type = slot_desc->type();
+
+    float overlap_ratio =
+        minmax_filter->ComputeOverlapRatio(col_type, min_slot, max_slot);
+
+    /// Compute the likelyhood of this filter being effective. Threshold 'threshold' is
+    /// the upper bound for the overlapping ratio. Any filter with an overlap ratio
+    /// (>0.0) less than 'threshold' will undertake overlap check at the page and
+    /// the row level when the filtering level control allows.
+    bool worthiness = !(minmax_filter->AlwaysTrue()) && (overlap_ratio < threshold);
+
+    VLOG(3) << "Try to filter out a rowgroup via overlap predicate:"
+            << " fid=" << filter_id
+            << ", SchemaNode=" << node->DebugString()
+            << ", columnType=" << col_type.DebugString()
+            << ", overlap ratio=" << overlap_ratio
+            << ", threshold=" << threshold
+            << ", worthiness=" << worthiness
+            << ", enabled for page=" <<
+              ((level != TMinmaxFilteringLevel::ROW_GROUP) && worthiness)
+            << ", enabled for row=" <<
+              ((level == TMinmaxFilteringLevel::ROW) && worthiness)
+            << ", data min="
+            << RawValue::PrintValue(min_slot, col_type, col_type.scale)
+            << ", data max="
+            << RawValue::PrintValue(max_slot, col_type, col_type.scale)
+            << ", content=" << minmax_filter->DebugString();
+
+    /// Find the index of the filter that is common in data structure
+    /// filter_ctxs_ and filter_stats_.
+    int idx = FindFilterIndex(filter_id);
+    DCHECK(idx >= 0);
+
+    /// If not overlapping with this particular filter, the row group can be filtered
+    /// out safely.
+    if (overlap_ratio == 0.0) {
+      VLOG(3) << "The rowgroup was filtered out.";
+      *skip_row_group = true;
+
+      /// Update the row groups stats: rejected.
+      filter_ctxs_[idx]->stats->IncrCounters(FilterStats::ROW_GROUPS_KEY, 1, 1, 1);
+      break;
+    }
+
+    /// Update two fields in the entry at index 'idx' in local filter stats so that
+    /// the info can be used when checking out the pages in the group in
+    /// FindSkipRangesForPagesWithMinMaxFilters() and rows in these pages in
+    /// HdfsScanner::EvalRuntimeFilter(). The worthiness flag is ANDed into the enabled
+    /// field so that the state in enabled will never go back to 1 once set to 0.
+    /// The filtering level control is considered too.
+    filter_stats_[idx].enabled_for_row &=
+        (level == TMinmaxFilteringLevel::ROW) && worthiness;
+    filter_stats_[idx].enabled_for_page &=
+        (level != TMinmaxFilteringLevel::ROW_GROUP) && worthiness;
+
+    /// Update the row groups stats: no rejection.
+    filter_ctxs_[idx]->stats->IncrCounters(FilterStats::ROW_GROUPS_KEY, 1, 1, 0);
+  }
+
+  return Status::OK();
+}
+
+bool HdfsParquetScanner::ShouldProcessPageIndex() {
+  if (!state_->query_options().parquet_read_page_index) return false;
+  if (!min_max_conjunct_evals_.empty()) return true;
+  for (auto desc : GetOverlapPredicateDescs()) {
+    if (IsFilterWorthyForOverlapCheck(FindFilterIndex(desc.filter_id))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 Status HdfsParquetScanner::NextRowGroup() {
@@ -618,7 +788,7 @@ Status HdfsParquetScanner::NextRowGroup() {
       COUNTER_ADD(num_row_groups_with_page_index_counter_, 1);
     }
 
-    // Evaluate row group statistics.
+    // Evaluate row group statistics with stats conjuncts.
     bool skip_row_group_on_stats;
     RETURN_IF_ERROR(
         EvaluateStatsConjuncts(file_metadata_, row_group, &skip_row_group_on_stats));
@@ -627,9 +797,17 @@ Status HdfsParquetScanner::NextRowGroup() {
       continue;
     }
 
-    // Evaluate page index.
-    if (!min_max_conjunct_evals_.empty() &&
-        state_->query_options().parquet_read_page_index) {
+    // Evaluate row group statistics with min/max filters.
+    bool skip_row_group_on_minmax;
+    RETURN_IF_ERROR(
+      EvaluateOverlapForRowGroup(file_metadata_, row_group, &skip_row_group_on_minmax));
+    if (skip_row_group_on_minmax) {
+      COUNTER_ADD(num_minmax_filtered_row_groups_counter_, 1);
+      continue;
+    }
+
+    // Evaluate page index with min-max conjuncts and/or min/max overlap predicates.
+    if (ShouldProcessPageIndex()) {
       Status page_index_status = ProcessPageIndex();
       if (!page_index_status.ok()) {
         RETURN_IF_ERROR(state_->LogOrReturnError(page_index_status.msg()));
@@ -711,6 +889,19 @@ bool HdfsParquetScanner::ReadStatFromIndex(const ColumnStatsReader& stats_reader
   return false;
 }
 
+bool HdfsParquetScanner::ReadStatFromIndex(const ColumnStatsReader& stats_reader,
+    const parquet::ColumnIndex& column_index, int page_idx, bool* is_null_page,
+    void* min_slot, void* max_slot) {
+  *is_null_page = column_index.null_pages[page_idx];
+  if (*is_null_page) return false;
+  return (
+      stats_reader.ReadFromString(ColumnStatsReader::StatsField::MIN,
+          column_index.min_values[page_idx], &column_index.max_values[page_idx], min_slot)
+      && stats_reader.ReadFromString(ColumnStatsReader::StatsField::MAX,
+          column_index.max_values[page_idx], &column_index.min_values[page_idx],
+          max_slot));
+}
+
 void HdfsParquetScanner::ResetPageFiltering() {
   filter_pages_ = false;
   candidate_ranges_.clear();
@@ -732,22 +923,86 @@ Status HdfsParquetScanner::ProcessPageIndex() {
   return Status::OK();
 }
 
-Status HdfsParquetScanner::EvaluatePageIndex() {
+const vector<TOverlapPredicateDesc>& HdfsParquetScanner::GetOverlapPredicateDescs() {
+  const HdfsScanPlanNode& pnode =
+      static_cast<const HdfsScanPlanNode&>(scan_node_->plan_node());
+  return pnode.overlap_predicate_descs_;
+}
+
+void HdfsParquetScanner::GetMinMaxSlotsForOverlapPred(
+    int overlap_slot_idx, void** min_slot, void** max_slot) {
+  DCHECK(min_slot);
+  DCHECK(max_slot);
+  SlotDescriptor* min_slot_desc =
+      scan_node_->min_max_tuple_desc()->slots()[overlap_slot_idx];
+  SlotDescriptor* max_slot_desc =
+      scan_node_->min_max_tuple_desc()->slots()[overlap_slot_idx + 1];
+  *min_slot = min_max_tuple_->GetSlot(min_slot_desc->tuple_offset());
+  *max_slot = min_max_tuple_->GetSlot(max_slot_desc->tuple_offset());
+}
+
+MinMaxFilter* HdfsParquetScanner::FindMinMaxFilter(int filter_idx) {
+  if (filter_idx >= 0 && filter_idx < filter_ctxs_.size()) {
+    const RuntimeFilter* filter = filter_ctxs_[filter_idx]->filter;
+    if (filter && filter->is_min_max_filter()) {
+      return filter->get_min_max();
+    }
+  }
+  return nullptr;
+}
+
+bool HdfsParquetScanner::IsFilterWorthyForOverlapCheck(int filter_idx) {
+  if (filter_idx >= 0 && filter_idx < filter_stats_.size()) {
+    LocalFilterStats* stats = &filter_stats_[filter_idx];
+    return stats && stats->enabled_for_page;
+  }
+  DCHECK(false);
+  return true;
+}
+
+Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(
+    vector<RowRange>* skip_ranges) {
+  DCHECK(skip_ranges);
+  const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
+  if (GetOverlapPredicateDescs().size() > 0 && !min_max_tuple_desc) {
+    stringstream err;
+    err << "min_max_tuple_desc is null.";
+    DCHECK(false) << err.str();
+    return Status(err.str());
+  }
+
+  min_max_tuple_->Init(min_max_tuple_desc->byte_size());
   parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
-  vector<RowRange> skip_ranges;
 
-  for (int i = 0; i < min_max_conjunct_evals_.size(); ++i) {
-    ScalarExprEvaluator* eval = min_max_conjunct_evals_[i];
-    SlotDescriptor* slot_desc = scan_node_->min_max_tuple_desc()->slots()[i];
+  int filtered_pages = 0;
 
-    // Resolve column path to determine col idx.
+  for (auto desc: GetOverlapPredicateDescs()) {
+    int filter_id = desc.filter_id;
+    int slot_idx = desc.slot_index;
+
+    int filter_idx = FindFilterIndex(filter_id);
+    MinMaxFilter* minmax_filter = FindMinMaxFilter(filter_idx);
+    if (!minmax_filter || !IsFilterWorthyForOverlapCheck(filter_idx)) {
+      continue;
+    }
+
+    // This is the desc for the min slot, from which we find the stats_reader
+    // through col_path.
+    SlotDescriptor* slot_desc = min_max_tuple_desc->slots()[slot_idx];
+
+    bool missing_field = false;
     SchemaNode* node = nullptr;
-    bool pos_field, missing_field;
-    RETURN_IF_ERROR(schema_resolver_->ResolvePath(slot_desc->col_path(), &node,
-        &pos_field, &missing_field));
-    if (pos_field || missing_field) continue;
+
+    RETURN_IF_ERROR(ResolveSchemaForStatFiltering(slot_desc, &missing_field, &node));
+
+    if (missing_field) {
+      continue;
+    }
 
     int col_idx = node->col_idx;
+    ColumnStatsReader stats_reader =
+        CreateStatsReader(file_metadata_, row_group, node, slot_desc->type());
+
     DCHECK_LT(col_idx, row_group.columns.size());
     const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
     if (col_chunk.column_index_length == 0) continue;
@@ -756,11 +1011,72 @@ Status HdfsParquetScanner::EvaluatePageIndex() {
     RETURN_IF_ERROR(page_index_.DeserializeColumnIndex(col_chunk, &column_index));
 
     const ColumnType& col_type = slot_desc->type();
-    const vector<parquet::ColumnOrder>& col_orders = file_metadata_.column_orders;
-    const parquet::ColumnOrder* col_order = col_idx < col_orders.size() ?
-        &col_orders[col_idx] : nullptr;
-    ColumnStatsReader stats_reader = CreateColumnStatsReader(col_chunk, col_type,
-        col_order, *node->element);
+    void* min_slot = nullptr;
+    void* max_slot = nullptr;
+    GetMinMaxSlotsForOverlapPred(slot_idx, &min_slot, &max_slot);
+
+    const int num_of_pages = column_index.null_pages.size();
+
+    VLOG(3) << "Try to filter out pages via overlap predicate."
+            << "  fid=" << filter_id << ", columnType=" << col_type.DebugString()
+            << ", data min="
+            << RawValue::PrintValue(min_slot, col_type, col_type.scale)
+            << ", data max="
+            << RawValue::PrintValue(max_slot, col_type, col_type.scale)
+            << ", filter=" << minmax_filter->DebugString();
+
+    for (int page_idx = 0; page_idx < num_of_pages; ++page_idx) {
+      bool is_null_page = false;
+      if (!ReadStatFromIndex(
+              stats_reader, column_index, page_idx, &is_null_page, min_slot, max_slot)) {
+        continue;
+      }
+
+      if (is_null_page || !minmax_filter->EvalOverlap(col_type, min_slot, max_slot)) {
+        VLOG(3) << "Page " << page_idx << " was filtered out.";
+        BaseScalarColumnReader* scalar_reader = scalar_reader_map_[col_idx];
+        RETURN_IF_ERROR(
+            page_index_.DeserializeOffsetIndex(col_chunk, &scalar_reader->offset_index_));
+        RowRange row_range;
+        GetRowRangeForPage(row_group, scalar_reader->offset_index_, page_idx, &row_range);
+        skip_ranges->push_back(row_range);
+        filtered_pages++;
+      }
+    }
+  }
+
+  if (filtered_pages > 0) {
+    COUNTER_ADD(num_minmax_filtered_pages_counter_, filtered_pages);
+  }
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::EvaluatePageIndex() {
+  parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
+  vector<RowRange> skip_ranges;
+
+  for (int i = 0; i < min_max_conjunct_evals_.size(); ++i) {
+    ScalarExprEvaluator* eval = min_max_conjunct_evals_[i];
+    SlotDescriptor* slot_desc = scan_node_->min_max_tuple_desc()->slots()[i];
+
+    bool missing_field = false;
+    SchemaNode* node = nullptr;
+
+    RETURN_IF_ERROR(ResolveSchemaForStatFiltering(slot_desc, &missing_field, &node));
+
+    if (missing_field) {
+      continue;
+    }
+    int col_idx = node->col_idx;;
+    ColumnStatsReader stats_reader =
+        CreateStatsReader(file_metadata_, row_group, node, slot_desc->type());
+
+    DCHECK_LT(col_idx, row_group.columns.size());
+    const parquet::ColumnChunk& col_chunk = row_group.columns[col_idx];
+    if (col_chunk.column_index_length == 0) continue;
+
+    parquet::ColumnIndex column_index;
+    RETURN_IF_ERROR(page_index_.DeserializeColumnIndex(col_chunk, &column_index));
 
     min_max_tuple_->Init(scan_node_->min_max_tuple_desc()->byte_size());
     void* slot = min_max_tuple_->GetSlot(slot_desc->tuple_offset());
@@ -772,8 +1088,8 @@ Status HdfsParquetScanner::EvaluatePageIndex() {
 
     for (int page_idx = 0; page_idx < num_of_pages; ++page_idx) {
       bool value_read, is_null_page;
-      value_read = ReadStatFromIndex(stats_reader, column_index, page_idx, stats_field,
-          &is_null_page, slot);
+      value_read = ReadStatFromIndex(
+          stats_reader, column_index, page_idx, stats_field, &is_null_page, slot);
       if (!is_null_page && !value_read) continue;
       TupleRow row;
       row.SetTuple(0, min_max_tuple_);
@@ -788,6 +1104,13 @@ Status HdfsParquetScanner::EvaluatePageIndex() {
       }
     }
   }
+
+  // On top of min/max conjuncts, apply min/max filters to filter out pages.
+  if (state_->query_options().minmax_filtering_level
+      != TMinmaxFilteringLevel::ROW_GROUP) {
+    RETURN_IF_ERROR(FindSkipRangesForPagesWithMinMaxFilters(&skip_ranges));
+  }
+
   if (skip_ranges.empty()) return Status::OK();
 
   for (BaseScalarColumnReader* scalar_reader : scalar_readers_) {
@@ -1556,8 +1879,8 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
 Status HdfsParquetScanner::CreateCountingReader(const SchemaPath& parent_path,
     const ParquetSchemaResolver& schema_resolver, ParquetColumnReader** reader) {
   SchemaNode* parent_node;
-  bool pos_field;
   bool missing_field;
+  bool pos_field;
   RETURN_IF_ERROR(schema_resolver.ResolvePath(
       parent_path, &parent_node, &pos_field, &missing_field));
 

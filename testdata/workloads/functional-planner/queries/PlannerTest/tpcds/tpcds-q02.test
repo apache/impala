@@ -96,7 +96,7 @@ PLAN-ROOT SINK
 16:HASH JOIN [INNER JOIN]
 |  hash predicates: d_week_seq = d_week_seq - 53
 |  fk/pk conjuncts: assumed fk/pk
-|  runtime filters: RF000[bloom] <- d_week_seq - 53
+|  runtime filters: RF000[bloom] <- d_week_seq - 53, RF001[min_max] <- d_week_seq - 53
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,8,16,18 row-size=248B cardinality=2.56K
 |  in pipelines: 05(GETNEXT), 13(OPEN)
@@ -104,7 +104,7 @@ PLAN-ROOT SINK
 |--15:HASH JOIN [INNER JOIN]
 |  |  hash predicates: d_week_seq = date_dim.d_week_seq
 |  |  fk/pk conjuncts: none
-|  |  runtime filters: RF006[bloom] <- date_dim.d_week_seq
+|  |  runtime filters: RF006[bloom] <- date_dim.d_week_seq, RF007[min_max] <- date_dim.d_week_seq
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=16,18 row-size=124B cardinality=2.56K
 |  |  in pipelines: 13(GETNEXT), 14(OPEN)
@@ -132,14 +132,14 @@ PLAN-ROOT SINK
 |  12:HASH JOIN [INNER JOIN]
 |  |  hash predicates: sold_date_sk = d_date_sk
 |  |  fk/pk conjuncts: assumed fk/pk
-|  |  runtime filters: RF008[bloom] <- d_date_sk
+|  |  runtime filters: RF008[bloom] <- d_date_sk, RF009[min_max] <- d_date_sk
 |  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=12,15 row-size=35B cardinality=2.16M
 |  |  in pipelines: 09(GETNEXT), 10(GETNEXT), 11(OPEN)
 |  |
 |  |--11:SCAN HDFS [tpcds_parquet.date_dim]
 |  |     HDFS partitions=1/1 files=1 size=2.15MB
-|  |     runtime filters: RF006[bloom] -> tpcds_parquet.date_dim.d_week_seq
+|  |     runtime filters: RF007[min_max] -> tpcds_parquet.date_dim.d_week_seq, RF006[bloom] -> tpcds_parquet.date_dim.d_week_seq
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.15MB
 |  |       columns: all
@@ -156,7 +156,7 @@ PLAN-ROOT SINK
 |  |
 |  |--10:SCAN HDFS [tpcds_parquet.catalog_sales]
 |  |     HDFS partitions=1/1 files=3 size=96.62MB
-|  |     runtime filters: RF008[bloom] -> tpcds_parquet.catalog_sales.cs_sold_date_sk
+|  |     runtime filters: RF009[min_max] -> tpcds_parquet.catalog_sales.cs_sold_date_sk, RF008[bloom] -> tpcds_parquet.catalog_sales.cs_sold_date_sk
 |  |     stored statistics:
 |  |       table: rows=1.44M size=96.62MB
 |  |       columns: all
@@ -167,7 +167,7 @@ PLAN-ROOT SINK
 |  |
 |  09:SCAN HDFS [tpcds_parquet.web_sales]
 |     HDFS partitions=1/1 files=2 size=45.09MB
-|     runtime filters: RF008[bloom] -> tpcds_parquet.web_sales.ws_sold_date_sk
+|     runtime filters: RF009[min_max] -> tpcds_parquet.web_sales.ws_sold_date_sk, RF008[bloom] -> tpcds_parquet.web_sales.ws_sold_date_sk
 |     stored statistics:
 |       table: rows=719.38K size=45.09MB
 |       columns: all
@@ -179,7 +179,7 @@ PLAN-ROOT SINK
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: d_week_seq = date_dim.d_week_seq
 |  fk/pk conjuncts: none
-|  runtime filters: RF002[bloom] <- date_dim.d_week_seq
+|  runtime filters: RF002[bloom] <- date_dim.d_week_seq, RF003[min_max] <- date_dim.d_week_seq
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,8 row-size=124B cardinality=2.56K
 |  in pipelines: 05(GETNEXT), 06(OPEN)
@@ -187,7 +187,7 @@ PLAN-ROOT SINK
 |--06:SCAN HDFS [tpcds_parquet.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.15MB
 |     predicates: d_year = CAST(2001 AS INT)
-|     runtime filters: RF000[bloom] -> tpcds_parquet.date_dim.d_week_seq
+|     runtime filters: RF001[min_max] -> tpcds_parquet.date_dim.d_week_seq, RF000[bloom] -> tpcds_parquet.date_dim.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.15MB
 |       columns: all
@@ -208,14 +208,14 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: sold_date_sk = d_date_sk
 |  fk/pk conjuncts: assumed fk/pk
-|  runtime filters: RF004[bloom] <- d_date_sk
+|  runtime filters: RF004[bloom] <- d_date_sk, RF005[min_max] <- d_date_sk
 |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=2,5 row-size=35B cardinality=2.16M
 |  in pipelines: 01(GETNEXT), 02(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpcds_parquet.date_dim]
 |     HDFS partitions=1/1 files=1 size=2.15MB
-|     runtime filters: RF000[bloom] -> tpcds_parquet.date_dim.d_week_seq, RF002[bloom] -> tpcds_parquet.date_dim.d_week_seq
+|     runtime filters: RF001[min_max] -> tpcds_parquet.date_dim.d_week_seq, RF003[min_max] -> tpcds_parquet.date_dim.d_week_seq, RF000[bloom] -> tpcds_parquet.date_dim.d_week_seq, RF002[bloom] -> tpcds_parquet.date_dim.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.15MB
 |       columns: all
@@ -232,7 +232,7 @@ PLAN-ROOT SINK
 |
 |--02:SCAN HDFS [tpcds_parquet.catalog_sales]
 |     HDFS partitions=1/1 files=3 size=96.62MB
-|     runtime filters: RF004[bloom] -> tpcds_parquet.catalog_sales.cs_sold_date_sk
+|     runtime filters: RF005[min_max] -> tpcds_parquet.catalog_sales.cs_sold_date_sk, RF004[bloom] -> tpcds_parquet.catalog_sales.cs_sold_date_sk
 |     stored statistics:
 |       table: rows=1.44M size=96.62MB
 |       columns: all
@@ -243,7 +243,7 @@ PLAN-ROOT SINK
 |
 01:SCAN HDFS [tpcds_parquet.web_sales]
    HDFS partitions=1/1 files=2 size=45.09MB
-   runtime filters: RF004[bloom] -> tpcds_parquet.web_sales.ws_sold_date_sk
+   runtime filters: RF005[min_max] -> tpcds_parquet.web_sales.ws_sold_date_sk, RF004[bloom] -> tpcds_parquet.web_sales.ws_sold_date_sk
    stored statistics:
      table: rows=719.38K size=45.09MB
      columns: all
@@ -277,7 +277,7 @@ Per-Host Resources: mem-estimate=21.88MB mem-reservation=13.81MB thread-reservat
 16:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: d_week_seq = d_week_seq - 53
 |  fk/pk conjuncts: assumed fk/pk
-|  runtime filters: RF000[bloom] <- d_week_seq - 53
+|  runtime filters: RF000[bloom] <- d_week_seq - 53, RF001[min_max] <- d_week_seq - 53
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,8,16,18 row-size=248B cardinality=2.56K
 |  in pipelines: 20(GETNEXT), 24(OPEN)
@@ -292,7 +292,7 @@ Per-Host Resources: mem-estimate=21.88MB mem-reservation=13.81MB thread-reservat
 |  15:HASH JOIN [INNER JOIN, PARTITIONED]
 |  |  hash predicates: d_week_seq = date_dim.d_week_seq
 |  |  fk/pk conjuncts: none
-|  |  runtime filters: RF006[bloom] <- date_dim.d_week_seq
+|  |  runtime filters: RF006[bloom] <- date_dim.d_week_seq, RF007[min_max] <- date_dim.d_week_seq
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=16,18 row-size=124B cardinality=2.56K
 |  |  in pipelines: 24(GETNEXT), 14(OPEN)
@@ -341,7 +341,7 @@ Per-Host Resources: mem-estimate=21.88MB mem-reservation=13.81MB thread-reservat
 |  12:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: sold_date_sk = d_date_sk
 |  |  fk/pk conjuncts: assumed fk/pk
-|  |  runtime filters: RF008[bloom] <- d_date_sk
+|  |  runtime filters: RF008[bloom] <- d_date_sk, RF009[min_max] <- d_date_sk
 |  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=12,15 row-size=35B cardinality=2.16M
 |  |  in pipelines: 09(GETNEXT), 10(GETNEXT), 11(OPEN)
@@ -355,7 +355,7 @@ Per-Host Resources: mem-estimate=21.88MB mem-reservation=13.81MB thread-reservat
 |  |  Per-Host Resources: mem-estimate=49.00MB mem-reservation=1.50MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  |  11:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.15MB
-|  |     runtime filters: RF006[bloom] -> tpcds_parquet.date_dim.d_week_seq
+|  |     runtime filters: RF007[min_max] -> tpcds_parquet.date_dim.d_week_seq, RF006[bloom] -> tpcds_parquet.date_dim.d_week_seq
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.15MB
 |  |       columns: all
@@ -372,7 +372,7 @@ Per-Host Resources: mem-estimate=21.88MB mem-reservation=13.81MB thread-reservat
 |  |
 |  |--10:SCAN HDFS [tpcds_parquet.catalog_sales, RANDOM]
 |  |     HDFS partitions=1/1 files=3 size=96.62MB
-|  |     runtime filters: RF008[bloom] -> tpcds_parquet.catalog_sales.cs_sold_date_sk
+|  |     runtime filters: RF009[min_max] -> tpcds_parquet.catalog_sales.cs_sold_date_sk, RF008[bloom] -> tpcds_parquet.catalog_sales.cs_sold_date_sk
 |  |     stored statistics:
 |  |       table: rows=1.44M size=96.62MB
 |  |       columns: all
@@ -383,7 +383,7 @@ Per-Host Resources: mem-estimate=21.88MB mem-reservation=13.81MB thread-reservat
 |  |
 |  09:SCAN HDFS [tpcds_parquet.web_sales, RANDOM]
 |     HDFS partitions=1/1 files=2 size=45.09MB
-|     runtime filters: RF008[bloom] -> tpcds_parquet.web_sales.ws_sold_date_sk
+|     runtime filters: RF009[min_max] -> tpcds_parquet.web_sales.ws_sold_date_sk, RF008[bloom] -> tpcds_parquet.web_sales.ws_sold_date_sk
 |     stored statistics:
 |       table: rows=719.38K size=45.09MB
 |       columns: all
@@ -395,7 +395,7 @@ Per-Host Resources: mem-estimate=21.88MB mem-reservation=13.81MB thread-reservat
 07:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: d_week_seq = date_dim.d_week_seq
 |  fk/pk conjuncts: none
-|  runtime filters: RF002[bloom] <- date_dim.d_week_seq
+|  runtime filters: RF002[bloom] <- date_dim.d_week_seq, RF003[min_max] <- date_dim.d_week_seq
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,8 row-size=124B cardinality=2.56K
 |  in pipelines: 20(GETNEXT), 06(OPEN)
@@ -410,7 +410,7 @@ Per-Host Resources: mem-estimate=21.88MB mem-reservation=13.81MB thread-reservat
 |  06:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.15MB
 |     predicates: d_year = CAST(2001 AS INT)
-|     runtime filters: RF000[bloom] -> tpcds_parquet.date_dim.d_week_seq
+|     runtime filters: RF001[min_max] -> tpcds_parquet.date_dim.d_week_seq, RF000[bloom] -> tpcds_parquet.date_dim.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.15MB
 |       columns: all
@@ -445,7 +445,7 @@ Per-Host Resources: mem-estimate=111.80MB mem-reservation=10.88MB thread-reserva
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: sold_date_sk = d_date_sk
 |  fk/pk conjuncts: assumed fk/pk
-|  runtime filters: RF004[bloom] <- d_date_sk
+|  runtime filters: RF004[bloom] <- d_date_sk, RF005[min_max] <- d_date_sk
 |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=2,5 row-size=35B cardinality=2.16M
 |  in pipelines: 01(GETNEXT), 02(GETNEXT), 03(OPEN)
@@ -459,7 +459,7 @@ Per-Host Resources: mem-estimate=111.80MB mem-reservation=10.88MB thread-reserva
 |  Per-Host Resources: mem-estimate=50.00MB mem-reservation=2.50MB thread-reservation=2 runtime-filters-memory=2.00MB
 |  03:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.15MB
-|     runtime filters: RF000[bloom] -> tpcds_parquet.date_dim.d_week_seq, RF002[bloom] -> tpcds_parquet.date_dim.d_week_seq
+|     runtime filters: RF001[min_max] -> tpcds_parquet.date_dim.d_week_seq, RF003[min_max] -> tpcds_parquet.date_dim.d_week_seq, RF000[bloom] -> tpcds_parquet.date_dim.d_week_seq, RF002[bloom] -> tpcds_parquet.date_dim.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.15MB
 |       columns: all
@@ -476,7 +476,7 @@ Per-Host Resources: mem-estimate=111.80MB mem-reservation=10.88MB thread-reserva
 |
 |--02:SCAN HDFS [tpcds_parquet.catalog_sales, RANDOM]
 |     HDFS partitions=1/1 files=3 size=96.62MB
-|     runtime filters: RF004[bloom] -> tpcds_parquet.catalog_sales.cs_sold_date_sk
+|     runtime filters: RF005[min_max] -> tpcds_parquet.catalog_sales.cs_sold_date_sk, RF004[bloom] -> tpcds_parquet.catalog_sales.cs_sold_date_sk
 |     stored statistics:
 |       table: rows=1.44M size=96.62MB
 |       columns: all
@@ -487,7 +487,7 @@ Per-Host Resources: mem-estimate=111.80MB mem-reservation=10.88MB thread-reserva
 |
 01:SCAN HDFS [tpcds_parquet.web_sales, RANDOM]
    HDFS partitions=1/1 files=2 size=45.09MB
-   runtime filters: RF004[bloom] -> tpcds_parquet.web_sales.ws_sold_date_sk
+   runtime filters: RF005[min_max] -> tpcds_parquet.web_sales.ws_sold_date_sk, RF004[bloom] -> tpcds_parquet.web_sales.ws_sold_date_sk
    stored statistics:
      table: rows=719.38K size=45.09MB
      columns: all
@@ -531,7 +531,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: d_week_seq - 53
-|  |  runtime filters: RF000[bloom] <- d_week_seq - 53
+|  |  runtime filters: RF000[bloom] <- d_week_seq - 53, RF001[min_max] <- d_week_seq - 53
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  26:EXCHANGE [HASH(d_week_seq - 53)]
@@ -554,7 +554,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reser
 |  |  JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: date_dim.d_week_seq
-|  |  |  runtime filters: RF006[bloom] <- date_dim.d_week_seq
+|  |  |  runtime filters: RF006[bloom] <- date_dim.d_week_seq, RF007[min_max] <- date_dim.d_week_seq
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  25:EXCHANGE [HASH(date_dim.d_week_seq)]
@@ -612,7 +612,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reser
 |  |  JOIN BUILD
 |  |  |  join-table-id=02 plan-id=03 cohort-id=02
 |  |  |  build expressions: d_date_sk
-|  |  |  runtime filters: RF008[bloom] <- d_date_sk
+|  |  |  runtime filters: RF008[bloom] <- d_date_sk, RF009[min_max] <- d_date_sk
 |  |  |  mem-estimate=5.75MB mem-reservation=5.75MB spill-buffer=128.00KB thread-reservation=0
 |  |  |
 |  |  22:EXCHANGE [BROADCAST]
@@ -625,7 +625,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reser
 |  |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
 |  |  11:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=2.15MB
-|  |     runtime filters: RF006[bloom] -> tpcds_parquet.date_dim.d_week_seq
+|  |     runtime filters: RF007[min_max] -> tpcds_parquet.date_dim.d_week_seq, RF006[bloom] -> tpcds_parquet.date_dim.d_week_seq
 |  |     stored statistics:
 |  |       table: rows=73.05K size=2.15MB
 |  |       columns: all
@@ -642,7 +642,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reser
 |  |
 |  |--10:SCAN HDFS [tpcds_parquet.catalog_sales, RANDOM]
 |  |     HDFS partitions=1/1 files=3 size=96.62MB
-|  |     runtime filters: RF008[bloom] -> tpcds_parquet.catalog_sales.cs_sold_date_sk
+|  |     runtime filters: RF009[min_max] -> tpcds_parquet.catalog_sales.cs_sold_date_sk, RF008[bloom] -> tpcds_parquet.catalog_sales.cs_sold_date_sk
 |  |     stored statistics:
 |  |       table: rows=1.44M size=96.62MB
 |  |       columns: all
@@ -653,7 +653,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reser
 |  |
 |  09:SCAN HDFS [tpcds_parquet.web_sales, RANDOM]
 |     HDFS partitions=1/1 files=2 size=45.09MB
-|     runtime filters: RF008[bloom] -> tpcds_parquet.web_sales.ws_sold_date_sk
+|     runtime filters: RF009[min_max] -> tpcds_parquet.web_sales.ws_sold_date_sk, RF008[bloom] -> tpcds_parquet.web_sales.ws_sold_date_sk
 |     stored statistics:
 |       table: rows=719.38K size=45.09MB
 |       columns: all
@@ -675,7 +675,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: date_dim.d_week_seq
-|  |  runtime filters: RF002[bloom] <- date_dim.d_week_seq
+|  |  runtime filters: RF002[bloom] <- date_dim.d_week_seq, RF003[min_max] <- date_dim.d_week_seq
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  21:EXCHANGE [HASH(date_dim.d_week_seq)]
@@ -689,7 +689,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=7.94MB thread-reser
 |  06:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.15MB
 |     predicates: d_year = CAST(2001 AS INT)
-|     runtime filters: RF000[bloom] -> tpcds_parquet.date_dim.d_week_seq
+|     runtime filters: RF001[min_max] -> tpcds_parquet.date_dim.d_week_seq, RF000[bloom] -> tpcds_parquet.date_dim.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.15MB
 |       columns: all
@@ -735,7 +735,7 @@ Per-Instance Resources: mem-estimate=58.00MB mem-reservation=7.00MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=04 plan-id=05 cohort-id=01
 |  |  build expressions: d_date_sk
-|  |  runtime filters: RF004[bloom] <- d_date_sk
+|  |  runtime filters: RF004[bloom] <- d_date_sk, RF005[min_max] <- d_date_sk
 |  |  mem-estimate=5.75MB mem-reservation=5.75MB spill-buffer=128.00KB thread-reservation=0
 |  |
 |  18:EXCHANGE [BROADCAST]
@@ -748,7 +748,7 @@ Per-Instance Resources: mem-estimate=58.00MB mem-reservation=7.00MB thread-reser
 |  Per-Instance Resources: mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=1
 |  03:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
 |     HDFS partitions=1/1 files=1 size=2.15MB
-|     runtime filters: RF000[bloom] -> tpcds_parquet.date_dim.d_week_seq, RF002[bloom] -> tpcds_parquet.date_dim.d_week_seq
+|     runtime filters: RF001[min_max] -> tpcds_parquet.date_dim.d_week_seq, RF003[min_max] -> tpcds_parquet.date_dim.d_week_seq, RF000[bloom] -> tpcds_parquet.date_dim.d_week_seq, RF002[bloom] -> tpcds_parquet.date_dim.d_week_seq
 |     stored statistics:
 |       table: rows=73.05K size=2.15MB
 |       columns: all
@@ -765,7 +765,7 @@ Per-Instance Resources: mem-estimate=58.00MB mem-reservation=7.00MB thread-reser
 |
 |--02:SCAN HDFS [tpcds_parquet.catalog_sales, RANDOM]
 |     HDFS partitions=1/1 files=3 size=96.62MB
-|     runtime filters: RF004[bloom] -> tpcds_parquet.catalog_sales.cs_sold_date_sk
+|     runtime filters: RF005[min_max] -> tpcds_parquet.catalog_sales.cs_sold_date_sk, RF004[bloom] -> tpcds_parquet.catalog_sales.cs_sold_date_sk
 |     stored statistics:
 |       table: rows=1.44M size=96.62MB
 |       columns: all
@@ -776,7 +776,7 @@ Per-Instance Resources: mem-estimate=58.00MB mem-reservation=7.00MB thread-reser
 |
 01:SCAN HDFS [tpcds_parquet.web_sales, RANDOM]
    HDFS partitions=1/1 files=2 size=45.09MB
-   runtime filters: RF004[bloom] -> tpcds_parquet.web_sales.ws_sold_date_sk
+   runtime filters: RF005[min_max] -> tpcds_parquet.web_sales.ws_sold_date_sk, RF004[bloom] -> tpcds_parquet.web_sales.ws_sold_date_sk
    stored statistics:
      table: rows=719.38K size=45.09MB
      columns: all

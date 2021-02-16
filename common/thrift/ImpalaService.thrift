@@ -630,6 +630,19 @@ enum TImpalaQueryOptions {
   // used in the top-n operation. The larger the heaps, the less beneficial the
   // optimization is compared to a full sort and the more potential for perf regressions.
   ANALYTIC_RANK_PUSHDOWN_THRESHOLD = 121
+
+  // Specifiy a threshold between 0.0 and 1.0 to control the operation of overlap
+  // predicates (via min/max filters) for equi-hash joins at the Parquet table scan
+  // operator. Set to 0.0 to disable the feature. Set to 1.0 to evaluate all
+  // overlap predicates. Set to a value between 0.0 and 1.0 to evaluate only those
+  // with an overlap ratio less than the threshold.
+  MINMAX_FILTER_THRESHOLD = 122
+
+  // Minmax filtering level to be applied to Parquet scanners.
+  //     ROW_GROUP - apply to row groups only,
+  //     PAGE      - apply to row groups and pages only.
+  //     ROW       - apply to row groups, pages and rows.
+  MINMAX_FILTERING_LEVEL = 123
 }
 
 // The summary of a DML statement.

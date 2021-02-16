@@ -16,14 +16,26 @@
 // under the License.
 
 #include "runtime/runtime-filter.h"
+#include "util/min-max-filter.h"
 
 using namespace impala;
 
 bool IR_ALWAYS_INLINE RuntimeFilter::Eval(
     void* val, const ColumnType& col_type) const noexcept {
-  DCHECK(is_bloom_filter());
-  if (bloom_filter_.Load() == BloomFilter::ALWAYS_TRUE_FILTER) return true;
-  uint32_t h = RawValue::GetHashValueFastHash32(
-      val, col_type, RuntimeFilterBank::DefaultHashSeed());
-  return bloom_filter_.Load()->Find(h);
+  if (LIKELY((is_bloom_filter()))) {
+    if (bloom_filter_.Load() == BloomFilter::ALWAYS_TRUE_FILTER) return true;
+    uint32_t h = RawValue::GetHashValueFastHash32(
+        val, col_type, RuntimeFilterBank::DefaultHashSeed());
+    return bloom_filter_.Load()->Find(h);
+  } else {
+    DCHECK(is_min_max_filter());
+    // Min/max overlap does not deal with nulls (val==nullptr).
+    if (LIKELY(val)) {
+      MinMaxFilter* filter = get_min_max(); // get the loaded version.
+      if (LIKELY(filter)) {
+        return filter->EvalOverlap(col_type, val, val);
+      }
+    }
+  }
+  return true;
 }

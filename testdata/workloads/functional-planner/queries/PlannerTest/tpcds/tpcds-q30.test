@@ -48,7 +48,6 @@ ORDER BY c_customer_id,
          c_last_review_date,
          ctr_total_return
 LIMIT 100;
-
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=27.44MB Threads=9
 Per-Host Resource Estimates: Memory=429MB
@@ -67,7 +66,7 @@ PLAN-ROOT SINK
 17:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: ca_state = ctr2.ctr_state
 |  other join predicates: sum(wr_return_amt) > avg(ctr_total_return) * CAST(1.2 AS DECIMAL(2,1))
-|  runtime filters: RF000[bloom] <- ctr2.ctr_state
+|  runtime filters: RF000[bloom] <- ctr2.ctr_state, RF001[min_max] <- ctr2.ctr_state
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,5,3 row-size=255B cardinality=3.26K
 |  in pipelines: 07(GETNEXT), 14(OPEN)
@@ -89,7 +88,7 @@ PLAN-ROOT SINK
 |  12:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ca_address_sk = wr_returning_addr_sk
 |  |  fk/pk conjuncts: ca_address_sk = wr_returning_addr_sk
-|  |  runtime filters: RF010[bloom] <- wr_returning_addr_sk
+|  |  runtime filters: RF010[bloom] <- wr_returning_addr_sk, RF011[min_max] <- wr_returning_addr_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=9,7,8 row-size=42B cardinality=12.83K
 |  |  in pipelines: 10(GETNEXT), 08(OPEN)
@@ -97,7 +96,7 @@ PLAN-ROOT SINK
 |  |--11:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: wr_returned_date_sk = d_date_sk
 |  |  |  fk/pk conjuncts: wr_returned_date_sk = d_date_sk
-|  |  |  runtime filters: RF012[bloom] <- d_date_sk
+|  |  |  runtime filters: RF012[bloom] <- d_date_sk, RF013[min_max] <- d_date_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  |  tuple-ids=7,8 row-size=24B cardinality=12.83K
 |  |  |  in pipelines: 08(GETNEXT), 09(OPEN)
@@ -117,7 +116,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  08:SCAN HDFS [tpcds_parquet.web_returns]
 |  |     HDFS partitions=1/1 files=1 size=5.66MB
-|  |     runtime filters: RF012[bloom] -> wr_returned_date_sk
+|  |     runtime filters: RF013[min_max] -> wr_returned_date_sk, RF012[bloom] -> wr_returned_date_sk
 |  |     stored statistics:
 |  |       table: rows=71.76K size=5.66MB
 |  |       columns: all
@@ -128,7 +127,7 @@ PLAN-ROOT SINK
 |  |
 |  10:SCAN HDFS [tpcds_parquet.customer_address]
 |     HDFS partitions=1/1 files=1 size=1.16MB
-|     runtime filters: RF010[bloom] -> ca_address_sk
+|     runtime filters: RF011[min_max] -> ca_address_sk, RF010[bloom] -> ca_address_sk
 |     stored statistics:
 |       table: rows=50.00K size=1.16MB
 |       columns: all
@@ -140,7 +139,7 @@ PLAN-ROOT SINK
 16:HASH JOIN [INNER JOIN]
 |  hash predicates: c_customer_sk = wr_returning_customer_sk
 |  fk/pk conjuncts: none
-|  runtime filters: RF002[bloom] <- wr_returning_customer_sk
+|  runtime filters: RF002[bloom] <- wr_returning_customer_sk, RF003[min_max] <- wr_returning_customer_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,5,3 row-size=255B cardinality=3.26K
 |  in pipelines: 07(GETNEXT), 05(OPEN)
@@ -155,7 +154,7 @@ PLAN-ROOT SINK
 |  04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ca_address_sk = wr_returning_addr_sk
 |  |  fk/pk conjuncts: ca_address_sk = wr_returning_addr_sk
-|  |  runtime filters: RF006[bloom] <- wr_returning_addr_sk
+|  |  runtime filters: RF006[bloom] <- wr_returning_addr_sk, RF007[min_max] <- wr_returning_addr_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=2,0,1 row-size=42B cardinality=12.83K
 |  |  in pipelines: 02(GETNEXT), 00(OPEN)
@@ -163,7 +162,7 @@ PLAN-ROOT SINK
 |  |--03:HASH JOIN [INNER JOIN]
 |  |  |  hash predicates: wr_returned_date_sk = d_date_sk
 |  |  |  fk/pk conjuncts: wr_returned_date_sk = d_date_sk
-|  |  |  runtime filters: RF008[bloom] <- d_date_sk
+|  |  |  runtime filters: RF008[bloom] <- d_date_sk, RF009[min_max] <- d_date_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  |  tuple-ids=0,1 row-size=24B cardinality=12.83K
 |  |  |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -183,7 +182,7 @@ PLAN-ROOT SINK
 |  |  |
 |  |  00:SCAN HDFS [tpcds_parquet.web_returns]
 |  |     HDFS partitions=1/1 files=1 size=5.66MB
-|  |     runtime filters: RF008[bloom] -> wr_returned_date_sk
+|  |     runtime filters: RF009[min_max] -> wr_returned_date_sk, RF008[bloom] -> wr_returned_date_sk
 |  |     stored statistics:
 |  |       table: rows=71.76K size=5.66MB
 |  |       columns: all
@@ -194,7 +193,7 @@ PLAN-ROOT SINK
 |  |
 |  02:SCAN HDFS [tpcds_parquet.customer_address]
 |     HDFS partitions=1/1 files=1 size=1.16MB
-|     runtime filters: RF000[bloom] -> tpcds_parquet.customer_address.ca_state, RF006[bloom] -> ca_address_sk
+|     runtime filters: RF007[min_max] -> ca_address_sk, RF001[min_max] -> tpcds_parquet.customer_address.ca_state, RF006[bloom] -> ca_address_sk, RF000[bloom] -> tpcds_parquet.customer_address.ca_state
 |     stored statistics:
 |       table: rows=50.00K size=1.16MB
 |       columns: all
@@ -206,7 +205,7 @@ PLAN-ROOT SINK
 15:HASH JOIN [INNER JOIN]
 |  hash predicates: c_current_addr_sk = ca_address_sk
 |  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
-|  runtime filters: RF004[bloom] <- ca_address_sk
+|  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,5 row-size=221B cardinality=2.27K
 |  in pipelines: 07(GETNEXT), 06(OPEN)
@@ -226,7 +225,7 @@ PLAN-ROOT SINK
 |
 07:SCAN HDFS [tpcds_parquet.customer]
    HDFS partitions=1/1 files=1 size=5.49MB
-   runtime filters: RF002[bloom] -> c_customer_sk, RF004[bloom] -> c_current_addr_sk
+   runtime filters: RF005[min_max] -> c_current_addr_sk, RF003[min_max] -> c_customer_sk, RF004[bloom] -> c_current_addr_sk, RF002[bloom] -> c_customer_sk
    stored statistics:
      table: rows=100.00K size=5.49MB
      columns: all
@@ -261,7 +260,7 @@ Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reserva
 17:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: ca_state = ctr2.ctr_state
 |  other join predicates: sum(wr_return_amt) > avg(ctr_total_return) * CAST(1.2 AS DECIMAL(2,1))
-|  runtime filters: RF000[bloom] <- ctr2.ctr_state
+|  runtime filters: RF000[bloom] <- ctr2.ctr_state, RF001[min_max] <- ctr2.ctr_state
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,5,3 row-size=255B cardinality=3.26K
 |  in pipelines: 07(GETNEXT), 30(OPEN)
@@ -318,7 +317,7 @@ Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reserva
 |  12:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ca_address_sk = wr_returning_addr_sk
 |  |  fk/pk conjuncts: ca_address_sk = wr_returning_addr_sk
-|  |  runtime filters: RF010[bloom] <- wr_returning_addr_sk
+|  |  runtime filters: RF010[bloom] <- wr_returning_addr_sk, RF011[min_max] <- wr_returning_addr_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=9,7,8 row-size=42B cardinality=12.83K
 |  |  in pipelines: 10(GETNEXT), 08(OPEN)
@@ -333,7 +332,7 @@ Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reserva
 |  |  11:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash predicates: wr_returned_date_sk = d_date_sk
 |  |  |  fk/pk conjuncts: wr_returned_date_sk = d_date_sk
-|  |  |  runtime filters: RF012[bloom] <- d_date_sk
+|  |  |  runtime filters: RF012[bloom] <- d_date_sk, RF013[min_max] <- d_date_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  |  tuple-ids=7,8 row-size=24B cardinality=12.83K
 |  |  |  in pipelines: 08(GETNEXT), 09(OPEN)
@@ -360,7 +359,7 @@ Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reserva
 |  |  |
 |  |  08:SCAN HDFS [tpcds_parquet.web_returns, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=5.66MB
-|  |     runtime filters: RF012[bloom] -> wr_returned_date_sk
+|  |     runtime filters: RF013[min_max] -> wr_returned_date_sk, RF012[bloom] -> wr_returned_date_sk
 |  |     stored statistics:
 |  |       table: rows=71.76K size=5.66MB
 |  |       columns: all
@@ -371,7 +370,7 @@ Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reserva
 |  |
 |  10:SCAN HDFS [tpcds_parquet.customer_address, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.16MB
-|     runtime filters: RF010[bloom] -> ca_address_sk
+|     runtime filters: RF011[min_max] -> ca_address_sk, RF010[bloom] -> ca_address_sk
 |     stored statistics:
 |       table: rows=50.00K size=1.16MB
 |       columns: all
@@ -383,7 +382,7 @@ Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reserva
 16:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_customer_sk = wr_returning_customer_sk
 |  fk/pk conjuncts: none
-|  runtime filters: RF002[bloom] <- wr_returning_customer_sk
+|  runtime filters: RF002[bloom] <- wr_returning_customer_sk, RF003[min_max] <- wr_returning_customer_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,5,3 row-size=255B cardinality=3.26K
 |  in pipelines: 07(GETNEXT), 23(OPEN)
@@ -419,7 +418,7 @@ Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reserva
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ca_address_sk = wr_returning_addr_sk
 |  |  fk/pk conjuncts: ca_address_sk = wr_returning_addr_sk
-|  |  runtime filters: RF006[bloom] <- wr_returning_addr_sk
+|  |  runtime filters: RF006[bloom] <- wr_returning_addr_sk, RF007[min_max] <- wr_returning_addr_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=2,0,1 row-size=42B cardinality=12.83K
 |  |  in pipelines: 02(GETNEXT), 00(OPEN)
@@ -434,7 +433,7 @@ Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reserva
 |  |  03:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  |  hash predicates: wr_returned_date_sk = d_date_sk
 |  |  |  fk/pk conjuncts: wr_returned_date_sk = d_date_sk
-|  |  |  runtime filters: RF008[bloom] <- d_date_sk
+|  |  |  runtime filters: RF008[bloom] <- d_date_sk, RF009[min_max] <- d_date_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  |  tuple-ids=0,1 row-size=24B cardinality=12.83K
 |  |  |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -461,7 +460,7 @@ Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reserva
 |  |  |
 |  |  00:SCAN HDFS [tpcds_parquet.web_returns, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=5.66MB
-|  |     runtime filters: RF008[bloom] -> wr_returned_date_sk
+|  |     runtime filters: RF009[min_max] -> wr_returned_date_sk, RF008[bloom] -> wr_returned_date_sk
 |  |     stored statistics:
 |  |       table: rows=71.76K size=5.66MB
 |  |       columns: all
@@ -472,7 +471,7 @@ Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reserva
 |  |
 |  02:SCAN HDFS [tpcds_parquet.customer_address, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.16MB
-|     runtime filters: RF000[bloom] -> tpcds_parquet.customer_address.ca_state, RF006[bloom] -> ca_address_sk
+|     runtime filters: RF007[min_max] -> ca_address_sk, RF001[min_max] -> tpcds_parquet.customer_address.ca_state, RF006[bloom] -> ca_address_sk, RF000[bloom] -> tpcds_parquet.customer_address.ca_state
 |     stored statistics:
 |       table: rows=50.00K size=1.16MB
 |       columns: all
@@ -484,7 +483,7 @@ Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reserva
 15:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_current_addr_sk = ca_address_sk
 |  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
-|  runtime filters: RF004[bloom] <- ca_address_sk
+|  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=6,5 row-size=221B cardinality=2.27K
 |  in pipelines: 07(GETNEXT), 06(OPEN)
@@ -511,7 +510,7 @@ Per-Host Resources: mem-estimate=137.32MB mem-reservation=16.81MB thread-reserva
 |
 07:SCAN HDFS [tpcds_parquet.customer, RANDOM]
    HDFS partitions=1/1 files=1 size=5.49MB
-   runtime filters: RF002[bloom] -> c_customer_sk, RF004[bloom] -> c_current_addr_sk
+   runtime filters: RF005[min_max] -> c_current_addr_sk, RF003[min_max] -> c_customer_sk, RF004[bloom] -> c_current_addr_sk, RF002[bloom] -> c_customer_sk
    stored statistics:
      table: rows=100.00K size=5.49MB
      columns: all
@@ -557,7 +556,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: ctr2.ctr_state
-|  |  runtime filters: RF000[bloom] <- ctr2.ctr_state
+|  |  runtime filters: RF000[bloom] <- ctr2.ctr_state, RF001[min_max] <- ctr2.ctr_state
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  31:EXCHANGE [BROADCAST]
@@ -623,7 +622,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reser
 |  |  JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: wr_returning_addr_sk
-|  |  |  runtime filters: RF010[bloom] <- wr_returning_addr_sk
+|  |  |  runtime filters: RF010[bloom] <- wr_returning_addr_sk, RF011[min_max] <- wr_returning_addr_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  26:EXCHANGE [BROADCAST]
@@ -647,7 +646,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reser
 |  |  |  JOIN BUILD
 |  |  |  |  join-table-id=02 plan-id=03 cohort-id=03
 |  |  |  |  build expressions: d_date_sk
-|  |  |  |  runtime filters: RF012[bloom] <- d_date_sk
+|  |  |  |  runtime filters: RF012[bloom] <- d_date_sk, RF013[min_max] <- d_date_sk
 |  |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |  |
 |  |  |  25:EXCHANGE [BROADCAST]
@@ -672,7 +671,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reser
 |  |  |
 |  |  08:SCAN HDFS [tpcds_parquet.web_returns, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=5.66MB
-|  |     runtime filters: RF012[bloom] -> wr_returned_date_sk
+|  |     runtime filters: RF013[min_max] -> wr_returned_date_sk, RF012[bloom] -> wr_returned_date_sk
 |  |     stored statistics:
 |  |       table: rows=71.76K size=5.66MB
 |  |       columns: all
@@ -683,7 +682,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reser
 |  |
 |  10:SCAN HDFS [tpcds_parquet.customer_address, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.16MB
-|     runtime filters: RF010[bloom] -> ca_address_sk
+|     runtime filters: RF011[min_max] -> ca_address_sk, RF010[bloom] -> ca_address_sk
 |     stored statistics:
 |       table: rows=50.00K size=1.16MB
 |       columns: all
@@ -705,7 +704,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=03 plan-id=04 cohort-id=01
 |  |  build expressions: wr_returning_customer_sk
-|  |  runtime filters: RF002[bloom] <- wr_returning_customer_sk
+|  |  runtime filters: RF002[bloom] <- wr_returning_customer_sk, RF003[min_max] <- wr_returning_customer_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  24:EXCHANGE [BROADCAST]
@@ -750,7 +749,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reser
 |  |  JOIN BUILD
 |  |  |  join-table-id=04 plan-id=05 cohort-id=04
 |  |  |  build expressions: wr_returning_addr_sk
-|  |  |  runtime filters: RF006[bloom] <- wr_returning_addr_sk
+|  |  |  runtime filters: RF006[bloom] <- wr_returning_addr_sk, RF007[min_max] <- wr_returning_addr_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  21:EXCHANGE [BROADCAST]
@@ -774,7 +773,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reser
 |  |  |  JOIN BUILD
 |  |  |  |  join-table-id=05 plan-id=06 cohort-id=05
 |  |  |  |  build expressions: d_date_sk
-|  |  |  |  runtime filters: RF008[bloom] <- d_date_sk
+|  |  |  |  runtime filters: RF008[bloom] <- d_date_sk, RF009[min_max] <- d_date_sk
 |  |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |  |
 |  |  |  20:EXCHANGE [BROADCAST]
@@ -799,7 +798,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reser
 |  |  |
 |  |  00:SCAN HDFS [tpcds_parquet.web_returns, RANDOM]
 |  |     HDFS partitions=1/1 files=1 size=5.66MB
-|  |     runtime filters: RF008[bloom] -> wr_returned_date_sk
+|  |     runtime filters: RF009[min_max] -> wr_returned_date_sk, RF008[bloom] -> wr_returned_date_sk
 |  |     stored statistics:
 |  |       table: rows=71.76K size=5.66MB
 |  |       columns: all
@@ -810,7 +809,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reser
 |  |
 |  02:SCAN HDFS [tpcds_parquet.customer_address, RANDOM]
 |     HDFS partitions=1/1 files=1 size=1.16MB
-|     runtime filters: RF000[bloom] -> tpcds_parquet.customer_address.ca_state, RF006[bloom] -> ca_address_sk
+|     runtime filters: RF007[min_max] -> ca_address_sk, RF001[min_max] -> tpcds_parquet.customer_address.ca_state, RF006[bloom] -> ca_address_sk, RF000[bloom] -> tpcds_parquet.customer_address.ca_state
 |     stored statistics:
 |       table: rows=50.00K size=1.16MB
 |       columns: all
@@ -832,7 +831,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=06 plan-id=07 cohort-id=01
 |  |  build expressions: ca_address_sk
-|  |  runtime filters: RF004[bloom] <- ca_address_sk
+|  |  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  19:EXCHANGE [BROADCAST]
@@ -857,7 +856,7 @@ Per-Instance Resources: mem-estimate=16.02MB mem-reservation=8.00MB thread-reser
 |
 07:SCAN HDFS [tpcds_parquet.customer, RANDOM]
    HDFS partitions=1/1 files=1 size=5.49MB
-   runtime filters: RF002[bloom] -> c_customer_sk, RF004[bloom] -> c_current_addr_sk
+   runtime filters: RF005[min_max] -> c_current_addr_sk, RF003[min_max] -> c_customer_sk, RF004[bloom] -> c_current_addr_sk, RF002[bloom] -> c_customer_sk
    stored statistics:
      table: rows=100.00K size=5.49MB
      columns: all

@@ -112,6 +112,7 @@ PLAN-ROOT SINK
 |  62:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF043[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=42,44,43,45 row-size=56B cardinality=2.27K
 |  |  in pipelines: 56(GETNEXT), 59(OPEN)
@@ -132,6 +133,7 @@ PLAN-ROOT SINK
 |  61:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  runtime filters: RF045[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=42,44,43 row-size=36B cardinality=6.82K
 |  |  in pipelines: 56(GETNEXT), 57(OPEN)
@@ -150,7 +152,7 @@ PLAN-ROOT SINK
 |  60:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF046[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF046[bloom] <- time_dim.t_time_sk, RF047[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=42,44 row-size=24B cardinality=69.82K
 |  |  in pipelines: 56(GETNEXT), 58(OPEN)
@@ -169,10 +171,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 58(GETNEXT)
 |  |
 |  56:SCAN HDFS [tpcds_parquet.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF046[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF047[min_max] -> ss_sold_time_sk, RF045[min_max] -> ss_hdemo_sk, RF043[min_max] -> ss_store_sk, RF046[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -194,6 +196,7 @@ PLAN-ROOT SINK
 |  54:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF037[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=36,38,37,39 row-size=56B cardinality=2.27K
 |  |  in pipelines: 48(GETNEXT), 51(OPEN)
@@ -214,6 +217,7 @@ PLAN-ROOT SINK
 |  53:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  runtime filters: RF039[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=36,38,37 row-size=36B cardinality=6.82K
 |  |  in pipelines: 48(GETNEXT), 49(OPEN)
@@ -232,7 +236,7 @@ PLAN-ROOT SINK
 |  52:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF040[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF040[bloom] <- time_dim.t_time_sk, RF041[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=36,38 row-size=24B cardinality=69.82K
 |  |  in pipelines: 48(GETNEXT), 50(OPEN)
@@ -251,10 +255,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 50(GETNEXT)
 |  |
 |  48:SCAN HDFS [tpcds_parquet.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF040[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF041[min_max] -> ss_sold_time_sk, RF039[min_max] -> ss_hdemo_sk, RF037[min_max] -> ss_store_sk, RF040[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -276,6 +280,7 @@ PLAN-ROOT SINK
 |  46:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF031[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=30,32,31,33 row-size=56B cardinality=2.27K
 |  |  in pipelines: 40(GETNEXT), 43(OPEN)
@@ -296,6 +301,7 @@ PLAN-ROOT SINK
 |  45:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  runtime filters: RF033[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=30,32,31 row-size=36B cardinality=6.82K
 |  |  in pipelines: 40(GETNEXT), 41(OPEN)
@@ -314,7 +320,7 @@ PLAN-ROOT SINK
 |  44:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF034[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF034[bloom] <- time_dim.t_time_sk, RF035[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=30,32 row-size=24B cardinality=69.82K
 |  |  in pipelines: 40(GETNEXT), 42(OPEN)
@@ -333,10 +339,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 42(GETNEXT)
 |  |
 |  40:SCAN HDFS [tpcds_parquet.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF034[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF035[min_max] -> ss_sold_time_sk, RF033[min_max] -> ss_hdemo_sk, RF031[min_max] -> ss_store_sk, RF034[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -358,6 +364,7 @@ PLAN-ROOT SINK
 |  38:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF025[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=24,26,25,27 row-size=56B cardinality=2.27K
 |  |  in pipelines: 32(GETNEXT), 35(OPEN)
@@ -378,6 +385,7 @@ PLAN-ROOT SINK
 |  37:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  runtime filters: RF027[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=24,26,25 row-size=36B cardinality=6.82K
 |  |  in pipelines: 32(GETNEXT), 33(OPEN)
@@ -396,7 +404,7 @@ PLAN-ROOT SINK
 |  36:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF028[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF028[bloom] <- time_dim.t_time_sk, RF029[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=24,26 row-size=24B cardinality=69.82K
 |  |  in pipelines: 32(GETNEXT), 34(OPEN)
@@ -415,10 +423,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 34(GETNEXT)
 |  |
 |  32:SCAN HDFS [tpcds_parquet.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF028[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF029[min_max] -> ss_sold_time_sk, RF027[min_max] -> ss_hdemo_sk, RF025[min_max] -> ss_store_sk, RF028[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -440,6 +448,7 @@ PLAN-ROOT SINK
 |  30:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF019[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=18,20,19,21 row-size=56B cardinality=2.27K
 |  |  in pipelines: 24(GETNEXT), 27(OPEN)
@@ -460,6 +469,7 @@ PLAN-ROOT SINK
 |  29:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  runtime filters: RF021[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=18,20,19 row-size=36B cardinality=6.82K
 |  |  in pipelines: 24(GETNEXT), 25(OPEN)
@@ -478,7 +488,7 @@ PLAN-ROOT SINK
 |  28:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF022[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF022[bloom] <- time_dim.t_time_sk, RF023[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=18,20 row-size=24B cardinality=69.82K
 |  |  in pipelines: 24(GETNEXT), 26(OPEN)
@@ -497,10 +507,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 26(GETNEXT)
 |  |
 |  24:SCAN HDFS [tpcds_parquet.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF022[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF023[min_max] -> ss_sold_time_sk, RF021[min_max] -> ss_hdemo_sk, RF019[min_max] -> ss_store_sk, RF022[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -522,6 +532,7 @@ PLAN-ROOT SINK
 |  22:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF013[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=12,14,13,15 row-size=56B cardinality=2.27K
 |  |  in pipelines: 16(GETNEXT), 19(OPEN)
@@ -542,6 +553,7 @@ PLAN-ROOT SINK
 |  21:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  runtime filters: RF015[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=12,14,13 row-size=36B cardinality=6.82K
 |  |  in pipelines: 16(GETNEXT), 17(OPEN)
@@ -560,7 +572,7 @@ PLAN-ROOT SINK
 |  20:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF016[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF016[bloom] <- time_dim.t_time_sk, RF017[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=12,14 row-size=24B cardinality=69.82K
 |  |  in pipelines: 16(GETNEXT), 18(OPEN)
@@ -579,10 +591,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 18(GETNEXT)
 |  |
 |  16:SCAN HDFS [tpcds_parquet.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF016[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF017[min_max] -> ss_sold_time_sk, RF015[min_max] -> ss_hdemo_sk, RF013[min_max] -> ss_store_sk, RF016[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -604,6 +616,7 @@ PLAN-ROOT SINK
 |  14:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF007[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=6,8,7,9 row-size=56B cardinality=2.27K
 |  |  in pipelines: 08(GETNEXT), 11(OPEN)
@@ -624,7 +637,7 @@ PLAN-ROOT SINK
 |  13:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF008[bloom] <- household_demographics.hd_demo_sk
+|  |  runtime filters: RF008[bloom] <- household_demographics.hd_demo_sk, RF009[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=6,8,7 row-size=36B cardinality=6.82K
 |  |  in pipelines: 08(GETNEXT), 09(OPEN)
@@ -643,7 +656,7 @@ PLAN-ROOT SINK
 |  12:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF010[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF010[bloom] <- time_dim.t_time_sk, RF011[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=6,8 row-size=24B cardinality=69.82K
 |  |  in pipelines: 08(GETNEXT), 10(OPEN)
@@ -662,10 +675,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 10(GETNEXT)
 |  |
 |  08:SCAN HDFS [tpcds_parquet.store_sales]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF010[bloom] -> ss_sold_time_sk, RF008[bloom] -> ss_hdemo_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF011[min_max] -> ss_sold_time_sk, RF009[min_max] -> ss_hdemo_sk, RF007[min_max] -> ss_store_sk, RF010[bloom] -> ss_sold_time_sk, RF008[bloom] -> ss_hdemo_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -682,6 +695,7 @@ PLAN-ROOT SINK
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_store_sk = s_store_sk
 |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  runtime filters: RF001[min_max] <- s_store_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2,1,3 row-size=56B cardinality=2.27K
 |  in pipelines: 00(GETNEXT), 03(OPEN)
@@ -702,7 +716,7 @@ PLAN-ROOT SINK
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
-|  runtime filters: RF002[bloom] <- household_demographics.hd_demo_sk
+|  runtime filters: RF002[bloom] <- household_demographics.hd_demo_sk, RF003[min_max] <- household_demographics.hd_demo_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2,1 row-size=36B cardinality=6.82K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -721,7 +735,7 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  runtime filters: RF004[bloom] <- time_dim.t_time_sk
+|  runtime filters: RF004[bloom] <- time_dim.t_time_sk, RF005[min_max] <- time_dim.t_time_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2 row-size=24B cardinality=69.82K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
@@ -740,10 +754,10 @@ PLAN-ROOT SINK
 |     in pipelines: 02(GETNEXT)
 |
 00:SCAN HDFS [tpcds_parquet.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=200.95MB
-   runtime filters: RF004[bloom] -> ss_sold_time_sk, RF002[bloom] -> ss_hdemo_sk
+   HDFS partitions=1824/1824 files=1824 size=200.96MB
+   runtime filters: RF005[min_max] -> ss_sold_time_sk, RF003[min_max] -> ss_hdemo_sk, RF001[min_max] -> ss_store_sk, RF004[bloom] -> ss_sold_time_sk, RF002[bloom] -> ss_hdemo_sk
    stored statistics:
-     table: rows=2.88M size=200.95MB
+     table: rows=2.88M size=200.96MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -793,6 +807,7 @@ PLAN-ROOT SINK
 |  62:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF043[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=42,44,43,45 row-size=56B cardinality=2.27K
 |  |  in pipelines: 56(GETNEXT), 59(OPEN)
@@ -820,6 +835,7 @@ PLAN-ROOT SINK
 |  61:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  runtime filters: RF045[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=42,44,43 row-size=36B cardinality=6.82K
 |  |  in pipelines: 56(GETNEXT), 57(OPEN)
@@ -845,7 +861,7 @@ PLAN-ROOT SINK
 |  60:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF046[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF046[bloom] <- time_dim.t_time_sk, RF047[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=42,44 row-size=24B cardinality=69.82K
 |  |  in pipelines: 56(GETNEXT), 58(OPEN)
@@ -871,10 +887,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 58(GETNEXT)
 |  |
 |  56:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF046[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF047[min_max] -> ss_sold_time_sk, RF045[min_max] -> ss_hdemo_sk, RF043[min_max] -> ss_store_sk, RF046[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -916,6 +932,7 @@ PLAN-ROOT SINK
 |  54:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF037[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=36,38,37,39 row-size=56B cardinality=2.27K
 |  |  in pipelines: 48(GETNEXT), 51(OPEN)
@@ -943,6 +960,7 @@ PLAN-ROOT SINK
 |  53:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  runtime filters: RF039[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=36,38,37 row-size=36B cardinality=6.82K
 |  |  in pipelines: 48(GETNEXT), 49(OPEN)
@@ -968,7 +986,7 @@ PLAN-ROOT SINK
 |  52:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF040[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF040[bloom] <- time_dim.t_time_sk, RF041[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=36,38 row-size=24B cardinality=69.82K
 |  |  in pipelines: 48(GETNEXT), 50(OPEN)
@@ -994,10 +1012,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 50(GETNEXT)
 |  |
 |  48:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF040[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF041[min_max] -> ss_sold_time_sk, RF039[min_max] -> ss_hdemo_sk, RF037[min_max] -> ss_store_sk, RF040[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -1039,6 +1057,7 @@ PLAN-ROOT SINK
 |  46:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF031[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=30,32,31,33 row-size=56B cardinality=2.27K
 |  |  in pipelines: 40(GETNEXT), 43(OPEN)
@@ -1066,6 +1085,7 @@ PLAN-ROOT SINK
 |  45:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  runtime filters: RF033[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=30,32,31 row-size=36B cardinality=6.82K
 |  |  in pipelines: 40(GETNEXT), 41(OPEN)
@@ -1091,7 +1111,7 @@ PLAN-ROOT SINK
 |  44:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF034[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF034[bloom] <- time_dim.t_time_sk, RF035[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=30,32 row-size=24B cardinality=69.82K
 |  |  in pipelines: 40(GETNEXT), 42(OPEN)
@@ -1117,10 +1137,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 42(GETNEXT)
 |  |
 |  40:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF034[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF035[min_max] -> ss_sold_time_sk, RF033[min_max] -> ss_hdemo_sk, RF031[min_max] -> ss_store_sk, RF034[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -1162,6 +1182,7 @@ PLAN-ROOT SINK
 |  38:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF025[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=24,26,25,27 row-size=56B cardinality=2.27K
 |  |  in pipelines: 32(GETNEXT), 35(OPEN)
@@ -1189,6 +1210,7 @@ PLAN-ROOT SINK
 |  37:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  runtime filters: RF027[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=24,26,25 row-size=36B cardinality=6.82K
 |  |  in pipelines: 32(GETNEXT), 33(OPEN)
@@ -1214,7 +1236,7 @@ PLAN-ROOT SINK
 |  36:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF028[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF028[bloom] <- time_dim.t_time_sk, RF029[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=24,26 row-size=24B cardinality=69.82K
 |  |  in pipelines: 32(GETNEXT), 34(OPEN)
@@ -1240,10 +1262,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 34(GETNEXT)
 |  |
 |  32:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF028[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF029[min_max] -> ss_sold_time_sk, RF027[min_max] -> ss_hdemo_sk, RF025[min_max] -> ss_store_sk, RF028[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -1285,6 +1307,7 @@ PLAN-ROOT SINK
 |  30:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF019[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=18,20,19,21 row-size=56B cardinality=2.27K
 |  |  in pipelines: 24(GETNEXT), 27(OPEN)
@@ -1312,6 +1335,7 @@ PLAN-ROOT SINK
 |  29:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  runtime filters: RF021[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=18,20,19 row-size=36B cardinality=6.82K
 |  |  in pipelines: 24(GETNEXT), 25(OPEN)
@@ -1337,7 +1361,7 @@ PLAN-ROOT SINK
 |  28:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF022[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF022[bloom] <- time_dim.t_time_sk, RF023[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=18,20 row-size=24B cardinality=69.82K
 |  |  in pipelines: 24(GETNEXT), 26(OPEN)
@@ -1363,10 +1387,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 26(GETNEXT)
 |  |
 |  24:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF022[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF023[min_max] -> ss_sold_time_sk, RF021[min_max] -> ss_hdemo_sk, RF019[min_max] -> ss_store_sk, RF022[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -1408,6 +1432,7 @@ PLAN-ROOT SINK
 |  22:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF013[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=12,14,13,15 row-size=56B cardinality=2.27K
 |  |  in pipelines: 16(GETNEXT), 19(OPEN)
@@ -1435,6 +1460,7 @@ PLAN-ROOT SINK
 |  21:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  runtime filters: RF015[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=12,14,13 row-size=36B cardinality=6.82K
 |  |  in pipelines: 16(GETNEXT), 17(OPEN)
@@ -1460,7 +1486,7 @@ PLAN-ROOT SINK
 |  20:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF016[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF016[bloom] <- time_dim.t_time_sk, RF017[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=12,14 row-size=24B cardinality=69.82K
 |  |  in pipelines: 16(GETNEXT), 18(OPEN)
@@ -1486,10 +1512,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 18(GETNEXT)
 |  |
 |  16:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF016[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF017[min_max] -> ss_sold_time_sk, RF015[min_max] -> ss_hdemo_sk, RF013[min_max] -> ss_store_sk, RF016[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -1531,6 +1557,7 @@ PLAN-ROOT SINK
 |  14:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  |  runtime filters: RF007[min_max] <- s_store_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=6,8,7,9 row-size=56B cardinality=2.27K
 |  |  in pipelines: 08(GETNEXT), 11(OPEN)
@@ -1558,7 +1585,7 @@ PLAN-ROOT SINK
 |  13:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
-|  |  runtime filters: RF008[bloom] <- household_demographics.hd_demo_sk
+|  |  runtime filters: RF008[bloom] <- household_demographics.hd_demo_sk, RF009[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=6,8,7 row-size=36B cardinality=6.82K
 |  |  in pipelines: 08(GETNEXT), 09(OPEN)
@@ -1584,7 +1611,7 @@ PLAN-ROOT SINK
 |  12:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  |  runtime filters: RF010[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF010[bloom] <- time_dim.t_time_sk, RF011[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=6,8 row-size=24B cardinality=69.82K
 |  |  in pipelines: 08(GETNEXT), 10(OPEN)
@@ -1610,10 +1637,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 10(GETNEXT)
 |  |
 |  08:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF010[bloom] -> ss_sold_time_sk, RF008[bloom] -> ss_hdemo_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF011[min_max] -> ss_sold_time_sk, RF009[min_max] -> ss_hdemo_sk, RF007[min_max] -> ss_store_sk, RF010[bloom] -> ss_sold_time_sk, RF008[bloom] -> ss_hdemo_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -1643,6 +1670,7 @@ Per-Host Resources: mem-estimate=65.81MB mem-reservation=8.81MB thread-reservati
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
 |  fk/pk conjuncts: ss_store_sk = s_store_sk
+|  runtime filters: RF001[min_max] <- s_store_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2,1,3 row-size=56B cardinality=2.27K
 |  in pipelines: 00(GETNEXT), 03(OPEN)
@@ -1670,7 +1698,7 @@ Per-Host Resources: mem-estimate=65.81MB mem-reservation=8.81MB thread-reservati
 05:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
 |  fk/pk conjuncts: ss_hdemo_sk = household_demographics.hd_demo_sk
-|  runtime filters: RF002[bloom] <- household_demographics.hd_demo_sk
+|  runtime filters: RF002[bloom] <- household_demographics.hd_demo_sk, RF003[min_max] <- household_demographics.hd_demo_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2,1 row-size=36B cardinality=6.82K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -1696,7 +1724,7 @@ Per-Host Resources: mem-estimate=65.81MB mem-reservation=8.81MB thread-reservati
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
 |  fk/pk conjuncts: ss_sold_time_sk = time_dim.t_time_sk
-|  runtime filters: RF004[bloom] <- time_dim.t_time_sk
+|  runtime filters: RF004[bloom] <- time_dim.t_time_sk, RF005[min_max] <- time_dim.t_time_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2 row-size=24B cardinality=69.82K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
@@ -1722,10 +1750,10 @@ Per-Host Resources: mem-estimate=65.81MB mem-reservation=8.81MB thread-reservati
 |     in pipelines: 02(GETNEXT)
 |
 00:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=200.95MB
-   runtime filters: RF004[bloom] -> ss_sold_time_sk, RF002[bloom] -> ss_hdemo_sk
+   HDFS partitions=1824/1824 files=1824 size=200.96MB
+   runtime filters: RF005[min_max] -> ss_sold_time_sk, RF003[min_max] -> ss_hdemo_sk, RF001[min_max] -> ss_store_sk, RF004[bloom] -> ss_sold_time_sk, RF002[bloom] -> ss_hdemo_sk
    stored statistics:
-     table: rows=2.88M size=200.95MB
+     table: rows=2.88M size=200.96MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -1793,6 +1821,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=01 plan-id=02 cohort-id=02
 |  |  |  build expressions: s_store_sk
+|  |  |  runtime filters: RF043[min_max] <- s_store_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  114:EXCHANGE [BROADCAST]
@@ -1828,6 +1857,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=02 plan-id=03 cohort-id=02
 |  |  |  build expressions: household_demographics.hd_demo_sk
+|  |  |  runtime filters: RF045[min_max] <- household_demographics.hd_demo_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  113:EXCHANGE [BROADCAST]
@@ -1861,7 +1891,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=03 plan-id=04 cohort-id=02
 |  |  |  build expressions: time_dim.t_time_sk
-|  |  |  runtime filters: RF046[bloom] <- time_dim.t_time_sk
+|  |  |  runtime filters: RF046[bloom] <- time_dim.t_time_sk, RF047[min_max] <- time_dim.t_time_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  112:EXCHANGE [BROADCAST]
@@ -1885,10 +1915,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 58(GETNEXT)
 |  |
 |  56:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF046[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF047[min_max] -> ss_sold_time_sk, RF045[min_max] -> ss_hdemo_sk, RF043[min_max] -> ss_store_sk, RF046[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -1948,6 +1978,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=05 plan-id=06 cohort-id=03
 |  |  |  build expressions: s_store_sk
+|  |  |  runtime filters: RF037[min_max] <- s_store_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  108:EXCHANGE [BROADCAST]
@@ -1983,6 +2014,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=06 plan-id=07 cohort-id=03
 |  |  |  build expressions: household_demographics.hd_demo_sk
+|  |  |  runtime filters: RF039[min_max] <- household_demographics.hd_demo_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  107:EXCHANGE [BROADCAST]
@@ -2016,7 +2048,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=07 plan-id=08 cohort-id=03
 |  |  |  build expressions: time_dim.t_time_sk
-|  |  |  runtime filters: RF040[bloom] <- time_dim.t_time_sk
+|  |  |  runtime filters: RF040[bloom] <- time_dim.t_time_sk, RF041[min_max] <- time_dim.t_time_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  106:EXCHANGE [BROADCAST]
@@ -2040,10 +2072,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 50(GETNEXT)
 |  |
 |  48:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF040[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF041[min_max] -> ss_sold_time_sk, RF039[min_max] -> ss_hdemo_sk, RF037[min_max] -> ss_store_sk, RF040[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -2103,6 +2135,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=09 plan-id=10 cohort-id=04
 |  |  |  build expressions: s_store_sk
+|  |  |  runtime filters: RF031[min_max] <- s_store_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  102:EXCHANGE [BROADCAST]
@@ -2138,6 +2171,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=10 plan-id=11 cohort-id=04
 |  |  |  build expressions: household_demographics.hd_demo_sk
+|  |  |  runtime filters: RF033[min_max] <- household_demographics.hd_demo_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  101:EXCHANGE [BROADCAST]
@@ -2171,7 +2205,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=11 plan-id=12 cohort-id=04
 |  |  |  build expressions: time_dim.t_time_sk
-|  |  |  runtime filters: RF034[bloom] <- time_dim.t_time_sk
+|  |  |  runtime filters: RF034[bloom] <- time_dim.t_time_sk, RF035[min_max] <- time_dim.t_time_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  100:EXCHANGE [BROADCAST]
@@ -2195,10 +2229,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 42(GETNEXT)
 |  |
 |  40:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF034[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF035[min_max] -> ss_sold_time_sk, RF033[min_max] -> ss_hdemo_sk, RF031[min_max] -> ss_store_sk, RF034[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -2258,6 +2292,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=13 plan-id=14 cohort-id=05
 |  |  |  build expressions: s_store_sk
+|  |  |  runtime filters: RF025[min_max] <- s_store_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  96:EXCHANGE [BROADCAST]
@@ -2293,6 +2328,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=14 plan-id=15 cohort-id=05
 |  |  |  build expressions: household_demographics.hd_demo_sk
+|  |  |  runtime filters: RF027[min_max] <- household_demographics.hd_demo_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  95:EXCHANGE [BROADCAST]
@@ -2326,7 +2362,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=15 plan-id=16 cohort-id=05
 |  |  |  build expressions: time_dim.t_time_sk
-|  |  |  runtime filters: RF028[bloom] <- time_dim.t_time_sk
+|  |  |  runtime filters: RF028[bloom] <- time_dim.t_time_sk, RF029[min_max] <- time_dim.t_time_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  94:EXCHANGE [BROADCAST]
@@ -2350,10 +2386,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 34(GETNEXT)
 |  |
 |  32:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF028[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF029[min_max] -> ss_sold_time_sk, RF027[min_max] -> ss_hdemo_sk, RF025[min_max] -> ss_store_sk, RF028[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -2413,6 +2449,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=17 plan-id=18 cohort-id=06
 |  |  |  build expressions: s_store_sk
+|  |  |  runtime filters: RF019[min_max] <- s_store_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  90:EXCHANGE [BROADCAST]
@@ -2448,6 +2485,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=18 plan-id=19 cohort-id=06
 |  |  |  build expressions: household_demographics.hd_demo_sk
+|  |  |  runtime filters: RF021[min_max] <- household_demographics.hd_demo_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  89:EXCHANGE [BROADCAST]
@@ -2481,7 +2519,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=19 plan-id=20 cohort-id=06
 |  |  |  build expressions: time_dim.t_time_sk
-|  |  |  runtime filters: RF022[bloom] <- time_dim.t_time_sk
+|  |  |  runtime filters: RF022[bloom] <- time_dim.t_time_sk, RF023[min_max] <- time_dim.t_time_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  88:EXCHANGE [BROADCAST]
@@ -2505,10 +2543,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 26(GETNEXT)
 |  |
 |  24:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF022[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF023[min_max] -> ss_sold_time_sk, RF021[min_max] -> ss_hdemo_sk, RF019[min_max] -> ss_store_sk, RF022[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -2568,6 +2606,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=21 plan-id=22 cohort-id=07
 |  |  |  build expressions: s_store_sk
+|  |  |  runtime filters: RF013[min_max] <- s_store_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  84:EXCHANGE [BROADCAST]
@@ -2603,6 +2642,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=22 plan-id=23 cohort-id=07
 |  |  |  build expressions: household_demographics.hd_demo_sk
+|  |  |  runtime filters: RF015[min_max] <- household_demographics.hd_demo_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  83:EXCHANGE [BROADCAST]
@@ -2636,7 +2676,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=23 plan-id=24 cohort-id=07
 |  |  |  build expressions: time_dim.t_time_sk
-|  |  |  runtime filters: RF016[bloom] <- time_dim.t_time_sk
+|  |  |  runtime filters: RF016[bloom] <- time_dim.t_time_sk, RF017[min_max] <- time_dim.t_time_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  82:EXCHANGE [BROADCAST]
@@ -2660,10 +2700,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 18(GETNEXT)
 |  |
 |  16:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF016[bloom] -> ss_sold_time_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF017[min_max] -> ss_sold_time_sk, RF015[min_max] -> ss_hdemo_sk, RF013[min_max] -> ss_store_sk, RF016[bloom] -> ss_sold_time_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -2723,6 +2763,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=25 plan-id=26 cohort-id=08
 |  |  |  build expressions: s_store_sk
+|  |  |  runtime filters: RF007[min_max] <- s_store_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  78:EXCHANGE [BROADCAST]
@@ -2758,7 +2799,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=26 plan-id=27 cohort-id=08
 |  |  |  build expressions: household_demographics.hd_demo_sk
-|  |  |  runtime filters: RF008[bloom] <- household_demographics.hd_demo_sk
+|  |  |  runtime filters: RF008[bloom] <- household_demographics.hd_demo_sk, RF009[min_max] <- household_demographics.hd_demo_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  77:EXCHANGE [BROADCAST]
@@ -2792,7 +2833,7 @@ PLAN-ROOT SINK
 |  |  JOIN BUILD
 |  |  |  join-table-id=27 plan-id=28 cohort-id=08
 |  |  |  build expressions: time_dim.t_time_sk
-|  |  |  runtime filters: RF010[bloom] <- time_dim.t_time_sk
+|  |  |  runtime filters: RF010[bloom] <- time_dim.t_time_sk, RF011[min_max] <- time_dim.t_time_sk
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  76:EXCHANGE [BROADCAST]
@@ -2816,10 +2857,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 10(GETNEXT)
 |  |
 |  08:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-|     HDFS partitions=1824/1824 files=1824 size=200.95MB
-|     runtime filters: RF010[bloom] -> ss_sold_time_sk, RF008[bloom] -> ss_hdemo_sk
+|     HDFS partitions=1824/1824 files=1824 size=200.96MB
+|     runtime filters: RF011[min_max] -> ss_sold_time_sk, RF009[min_max] -> ss_hdemo_sk, RF007[min_max] -> ss_store_sk, RF010[bloom] -> ss_sold_time_sk, RF008[bloom] -> ss_hdemo_sk
 |     stored statistics:
-|       table: rows=2.88M size=200.95MB
+|       table: rows=2.88M size=200.96MB
 |       partitions: 1824/1824 rows=2.88M
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -2860,6 +2901,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=1.00MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=28 plan-id=29 cohort-id=01
 |  |  build expressions: s_store_sk
+|  |  runtime filters: RF001[min_max] <- s_store_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  73:EXCHANGE [BROADCAST]
@@ -2895,7 +2937,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=1.00MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=29 plan-id=30 cohort-id=01
 |  |  build expressions: household_demographics.hd_demo_sk
-|  |  runtime filters: RF002[bloom] <- household_demographics.hd_demo_sk
+|  |  runtime filters: RF002[bloom] <- household_demographics.hd_demo_sk, RF003[min_max] <- household_demographics.hd_demo_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  72:EXCHANGE [BROADCAST]
@@ -2929,7 +2971,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=1.00MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=30 plan-id=31 cohort-id=01
 |  |  build expressions: time_dim.t_time_sk
-|  |  runtime filters: RF004[bloom] <- time_dim.t_time_sk
+|  |  runtime filters: RF004[bloom] <- time_dim.t_time_sk, RF005[min_max] <- time_dim.t_time_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  71:EXCHANGE [BROADCAST]
@@ -2953,10 +2995,10 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=1.00MB thread-reser
 |     in pipelines: 02(GETNEXT)
 |
 00:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=200.95MB
-   runtime filters: RF004[bloom] -> ss_sold_time_sk, RF002[bloom] -> ss_hdemo_sk
+   HDFS partitions=1824/1824 files=1824 size=200.96MB
+   runtime filters: RF005[min_max] -> ss_sold_time_sk, RF003[min_max] -> ss_hdemo_sk, RF001[min_max] -> ss_store_sk, RF004[bloom] -> ss_sold_time_sk, RF002[bloom] -> ss_hdemo_sk
    stored statistics:
-     table: rows=2.88M size=200.95MB
+     table: rows=2.88M size=200.96MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K

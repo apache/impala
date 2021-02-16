@@ -32,4 +32,16 @@ ostream& operator<<(ostream& os, const StringValue& string_value) {
   return os << string_value.DebugString();
 }
 
+uint64_t StringValue::ToUInt64() const {
+  unsigned char bytes[8];
+  *((uint64_t*)bytes) = 0;
+  int chars_to_copy = (len < 8) ? len : 8;
+  for (int i = 0; i < chars_to_copy; i++) {
+    bytes[i] = static_cast<unsigned char>(ptr[i]);
+  }
+  return static_cast<uint64_t>(bytes[0]) << 56 | static_cast<uint64_t>(bytes[1]) << 48
+      | static_cast<uint64_t>(bytes[2]) << 40 | static_cast<uint64_t>(bytes[3]) << 32
+      | static_cast<uint64_t>(bytes[4]) << 24 | static_cast<uint64_t>(bytes[5]) << 16
+      | static_cast<uint64_t>(bytes[6]) << 8 | static_cast<uint64_t>(bytes[7]);
+}
 }

@@ -334,12 +334,17 @@ public final class RuntimeFilterGenerator {
       Preconditions.checkNotNull(joinPredicate);
       Preconditions.checkNotNull(filterSrcNode);
       // Only consider binary equality predicates
-      if (!Predicate.isEquivalencePredicate(joinPredicate)) return null;
-
-      BinaryPredicate normalizedJoinConjunct =
-          SingleNodePlanner.getNormalizedEqPred(joinPredicate,
-              filterSrcNode.getChild(0).getTupleIds(),
-              filterSrcNode.getChild(1).getTupleIds(), analyzer);
+      if (type == TRuntimeFilterType.BLOOM
+          && !Predicate.isEquivalencePredicate(joinPredicate)) {
+        return null;
+      }
+      if (type == TRuntimeFilterType.MIN_MAX
+          && !Predicate.isSqlEquivalencePredicate(joinPredicate)) {
+        return null;
+      }
+      BinaryPredicate normalizedJoinConjunct = SingleNodePlanner.getNormalizedEqPred(
+          joinPredicate, filterSrcNode.getChild(0).getTupleIds(),
+          filterSrcNode.getChild(1).getTupleIds(), analyzer);
       if (normalizedJoinConjunct == null) return null;
 
       // Ensure that the target expr does not contain TupleIsNull predicates as these
@@ -636,6 +641,19 @@ public final class RuntimeFilterGenerator {
       if (LOG.isTraceEnabled()) LOG.trace("Runtime filter: " + filter.debugString());
       filter.assignToPlanNodes();
     }
+
+    arrangeRuntimefiltersForParquet(plan);
+  }
+
+  public static void arrangeRuntimefiltersForParquet(
+      PlanNode root) {
+    if (root instanceof HdfsScanNode) {
+      ((HdfsScanNode)root).arrangeRuntimefiltersForParquet();
+    } else {
+      for (PlanNode childNode: root.getChildren()) {
+        arrangeRuntimefiltersForParquet(childNode);
+      }
+    }
   }
 
   /**
@@ -677,6 +695,7 @@ public final class RuntimeFilterGenerator {
         joinConjuncts.addAll(joinNode.getEqJoinConjuncts());
       }
       joinConjuncts.addAll(joinNode.getConjuncts());
+
       List<RuntimeFilter> filters = new ArrayList<>();
       for (TRuntimeFilterType filterType : TRuntimeFilterType.values()) {
         for (Expr conjunct : joinConjuncts) {
@@ -774,11 +793,15 @@ public final class RuntimeFilterGenerator {
    *    to 'scanNode' if the filter is produced within the same fragment that contains the
    *    scan node.
    * 3. Only Hdfs and Kudu scan nodes are supported:
-   *     a. If the target is an HdfsScanNode, the filter must be type BLOOM.
+   *     a. If the target is an HdfsScanNode, the filter must be type BLOOM for non
+   *        Parquet tables, or type BLOOM and/or MIN_MAX for Parquet tables.
    *     b. If the target is a KuduScanNode, the filter could be type MIN_MAX, and/or
    *        BLOOM, the target must be a slot ref on a column, and the comp op cannot
    *        be 'not distinct'.
-   * A scan node may be used as a destination node for multiple runtime filters.
+   * A scan node may be used as a destination node for multiple runtime filters. This
+   * method is called once per scan node to process all filters accumulated for it
+   * for the entire query, per top-down traversal nature of the calling method
+   * generateFilters().
    */
   private void assignRuntimeFilters(PlannerContext ctx, ScanNode scanNode) {
     if (!(scanNode instanceof HdfsScanNode || scanNode instanceof KuduScanNode)) return;
@@ -787,9 +810,17 @@ public final class RuntimeFilterGenerator {
     Analyzer analyzer = ctx.getRootAnalyzer();
     boolean disableRowRuntimeFiltering =
         ctx.getQueryOptions().isDisable_row_runtime_filtering();
+    boolean disable_overlap_filter =
+        ctx.getQueryOptions().getMinmax_filter_threshold() == 0.0;
     TRuntimeFilterMode runtimeFilterMode = ctx.getQueryOptions().getRuntime_filter_mode();
     TEnabledRuntimeFilterTypes enabledRuntimeFilterTypes =
         ctx.getQueryOptions().getEnabled_runtime_filter_types();
+
+    // Init the overlap predicate for the hdfs scan node.
+    if (scanNode instanceof HdfsScanNode && !disable_overlap_filter) {
+      ((HdfsScanNode) scanNode).initOverlapPredicate(analyzer);
+    }
+
     for (RuntimeFilter filter: runtimeFiltersByTid_.get(tid)) {
       if (filter.isFinalized()) continue;
       Expr targetExpr = computeTargetExpr(filter, tid, analyzer);
@@ -802,9 +833,31 @@ public final class RuntimeFilterGenerator {
 
       // Check that the scan node supports applying filters of this type and targetExpr.
       if (scanNode instanceof HdfsScanNode) {
-        if (filter.getType() != TRuntimeFilterType.BLOOM
-            || filter.isTimestampTruncation()) {
+        if (filter.isTimestampTruncation()) {
           continue;
+        }
+        if (filter.getType() == TRuntimeFilterType.MIN_MAX) {
+          boolean allow_min_max =
+              enabledRuntimeFilterTypes == TEnabledRuntimeFilterTypes.MIN_MAX
+              || enabledRuntimeFilterTypes == TEnabledRuntimeFilterTypes.ALL;
+          if (!allow_min_max) {
+            continue;
+          }
+          // TODO: Apply min/max filters on partition columns.
+          if (isBoundByPartitionColumns) {
+            continue;
+          }
+          if (!disable_overlap_filter) {
+            // If the filter is not defined on partition columns, try to compute
+            // an overlap predicate for it. This predicate will be used to filter
+            // out row groups or pages in Parquet data files.
+            if (!((HdfsScanNode) scanNode)
+                .tryToComputeOverlapPredicate(analyzer, filter, targetExpr)) {
+              continue;
+            }
+          } else {
+            continue;
+          }
         }
       } else {
         Preconditions.checkState(scanNode instanceof KuduScanNode);
@@ -848,10 +901,14 @@ public final class RuntimeFilterGenerator {
           }
         }
       }
-
       RuntimeFilter.RuntimeFilterTarget target = new RuntimeFilter.RuntimeFilterTarget(
           scanNode, targetExpr, isBoundByPartitionColumns, isLocalTarget);
       filter.addTarget(target);
+    }
+
+    // finalize the overlap predicate for the hdfs scan node.
+    if (scanNode instanceof HdfsScanNode && !disable_overlap_filter) {
+      ((HdfsScanNode) scanNode).finalizeOverlapPredicate();
     }
   }
 

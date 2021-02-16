@@ -200,7 +200,6 @@ class TimestampValue {
 
   /// Verifies that the time is not negative and is less than a whole day.
   static inline bool IsValidTime(const boost::posix_time::time_duration& time) {
-    static const int64_t NANOS_PER_DAY = 1'000'000'000LL * SECONDS_PER_DAY;
     return !time.is_negative()
         && time.total_nanoseconds() < NANOS_PER_DAY;
   }
@@ -280,6 +279,14 @@ class TimestampValue {
   const boost::gregorian::date& date() const { return date_; }
   const boost::posix_time::time_duration& time() const { return time_; }
 
+  /// Return this added with a time duration when t is valid and HasDateAndTime() is
+  /// true on this. Return an empty TimestampValue object othewise.
+  TimestampValue Add(const boost::posix_time::time_duration& t) const;
+
+  /// Return this subtracted from a time duration when t is valid and HasDateAndTime()
+  /// is true on this. Return an empty TimestampValue object othewise.
+  TimestampValue Subtract(const boost::posix_time::time_duration& t) const;
+
   TimestampValue& operator=(const boost::posix_time::ptime& ptime) {
     date_ = ptime.date();
     time_ = ptime.time_of_day();
@@ -340,6 +347,8 @@ class TimestampValue {
   static const double ONE_BILLIONTH;
 
   static const uint64_t SECONDS_PER_DAY = 24 * 60 * 60;
+
+  static const int64_t NANOS_PER_DAY = 1'000'000'000LL * SECONDS_PER_DAY;
 
   /// Boost ptime leaves a gap in the structure, so we swap the order to make it
   /// 12 contiguous bytes.  We then must convert to and from the boost ptime data type.

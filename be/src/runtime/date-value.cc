@@ -366,6 +366,24 @@ DateValue DateValue::AddYears(int64_t years) const {
   return DateValue(result_year, today.month(), today.day());
 }
 
+DateValue DateValue::SubtractDays(int64_t days) const {
+  if (UNLIKELY(!IsValid())) {
+    return DateValue();
+  }
+  int64_t delta = days_since_epoch_ - days;
+  if (delta < MIN_DAYS_SINCE_EPOCH || delta > MAX_DAYS_SINCE_EPOCH) {
+    return DateValue();
+  }
+  return DateValue(delta);
+}
+
+DateValue DateValue::FindMiddleDate(const DateValue& min, const DateValue& max) {
+  if (UNLIKELY(!min.IsValid() || !max.IsValid())) {
+    return DateValue();
+  }
+  return DateValue((min.days_since_epoch_ + max.days_since_epoch_) / 2);
+}
+
 bool DateValue::ToDaysSinceEpoch(int32_t* days) const {
   DCHECK(days != nullptr);
   if (UNLIKELY(!IsValid())) return false;

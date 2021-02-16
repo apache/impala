@@ -270,6 +270,10 @@ public:
   /// was successful, false otherwise.
   bool ReadFromThrift(StatsField stats_field, void* slot) const;
 
+  /// Call the above ReadFromThrift() for both the MIN and MAX stats. Return true if
+  /// both stats are read successfully, false otherwise.
+  bool ReadMinMaxFromThrift(void* min_slot, void* max_slot) const;
+
   /// Read plain encoded value from a string 'encoded_value' into 'slot'.
   /// Set paired_stats_value as nullptr if there is no corresponding paired stats,
   /// or paired stats value is not set.
@@ -281,6 +285,13 @@ public:
   // it via an output parameter.
   // Returns true if the null_count stats were read successfully, false otherwise.
   bool ReadNullCountStat(int64_t* null_count) const;
+
+  /// Gets the null_count and num_values statistics from the column chunk's metadata
+  /// and decide whether all values are nulls.
+  /// Returns true if the stats were read successfully and 'all_nulls' is set to
+  /// null_count being equal to num_values. Return false if stats can not be read. In
+  /// the latter case, 'all_nulls' is not altered.
+  bool AllNulls(bool* all_nulls) const;
 
   /// Returns the required stats field for the given function. 'fn_name' can be 'le',
   /// 'lt', 'ge', and 'gt' (i.e. binary operators <=, <, >=, >). If we want to check that
