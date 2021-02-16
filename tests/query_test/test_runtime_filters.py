@@ -211,6 +211,7 @@ class TestMinMaxFilters(ImpalaTestSuite):
 
   def test_min_max_filters(self, vector):
     self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=MIN_MAX")
+    self.execute_query("SET MINMAX_FILTER_THRESHOLD=0.5")
     self.run_test_case('QueryTest/min_max_filters', vector,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
@@ -264,6 +265,27 @@ class TestMinMaxFilters(ImpalaTestSuite):
         % (table1, table2))
     assert cursor.fetchall() == [(len(matching_vals) + 2,)]
 
+
+@SkipIfLocal.multiple_impalad
+class TestOverlapMinMaxFilters(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestOverlapMinMaxFilters, cls).add_test_dimensions()
+    # Overlap min-max filters are only implemented for parquet.
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format in ['parquet'])
+    # Enable query option ASYNC_CODEGEN for slow build
+    if build_runs_slowly:
+      add_exec_option_dimension(cls, "async_codegen", 1)
+
+  def test_overlap_min_max_filters(self, vector):
+    self.execute_query("SET MINMAX_FILTER_THRESHOLD=0.5")
+    self.run_test_case('QueryTest/overlap_min_max_filters', vector,
+        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
 # Apply both Bloom filter and Minmax filters
 class TestAllRuntimeFilters(ImpalaTestSuite):

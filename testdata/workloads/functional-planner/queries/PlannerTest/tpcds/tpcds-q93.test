@@ -44,7 +44,7 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: sr_reason_sk = r_reason_sk
 |  fk/pk conjuncts: sr_reason_sk = r_reason_sk
-|  runtime filters: RF000[bloom] <- r_reason_sk
+|  runtime filters: RF000[bloom] <- r_reason_sk, RF001[min_max] <- r_reason_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1N,2 row-size=85B cardinality=82.30K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
@@ -71,7 +71,7 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [tpcds_parquet.store_returns]
 |     HDFS partitions=1/1 files=1 size=15.43MB
-|     runtime filters: RF000[bloom] -> sr_reason_sk
+|     runtime filters: RF001[min_max] -> sr_reason_sk, RF000[bloom] -> sr_reason_sk
 |     stored statistics:
 |       table: rows=287.51K size=15.43MB
 |       columns: all
@@ -81,9 +81,9 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_parquet.store_sales]
-   HDFS partitions=1824/1824 files=1824 size=200.95MB
+   HDFS partitions=1824/1824 files=1824 size=200.96MB
    stored statistics:
-     table: rows=2.88M size=200.95MB
+     table: rows=2.88M size=200.96MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -138,7 +138,7 @@ Per-Host Resources: mem-estimate=108.06MB mem-reservation=17.44MB thread-reserva
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: sr_reason_sk = r_reason_sk
 |  fk/pk conjuncts: sr_reason_sk = r_reason_sk
-|  runtime filters: RF000[bloom] <- r_reason_sk
+|  runtime filters: RF000[bloom] <- r_reason_sk, RF001[min_max] <- r_reason_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1N,2 row-size=85B cardinality=82.30K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
@@ -179,7 +179,7 @@ Per-Host Resources: mem-estimate=108.06MB mem-reservation=17.44MB thread-reserva
 |  Per-Host Resources: mem-estimate=97.00MB mem-reservation=5.00MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  01:SCAN HDFS [tpcds_parquet.store_returns, RANDOM]
 |     HDFS partitions=1/1 files=1 size=15.43MB
-|     runtime filters: RF000[bloom] -> sr_reason_sk
+|     runtime filters: RF001[min_max] -> sr_reason_sk, RF000[bloom] -> sr_reason_sk
 |     stored statistics:
 |       table: rows=287.51K size=15.43MB
 |       columns: all
@@ -189,9 +189,9 @@ Per-Host Resources: mem-estimate=108.06MB mem-reservation=17.44MB thread-reserva
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=200.95MB
+   HDFS partitions=1824/1824 files=1824 size=200.96MB
    stored statistics:
-     table: rows=2.88M size=200.95MB
+     table: rows=2.88M size=200.96MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K
@@ -256,7 +256,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reser
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: r_reason_sk
-|  |  runtime filters: RF000[bloom] <- r_reason_sk
+|  |  runtime filters: RF000[bloom] <- r_reason_sk, RF001[min_max] <- r_reason_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  08:EXCHANGE [BROADCAST]
@@ -304,7 +304,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reser
 |  Per-Instance Resources: mem-estimate=24.00MB mem-reservation=4.00MB thread-reservation=1
 |  01:SCAN HDFS [tpcds_parquet.store_returns, RANDOM]
 |     HDFS partitions=1/1 files=1 size=15.43MB
-|     runtime filters: RF000[bloom] -> sr_reason_sk
+|     runtime filters: RF001[min_max] -> sr_reason_sk, RF000[bloom] -> sr_reason_sk
 |     stored statistics:
 |       table: rows=287.51K size=15.43MB
 |       columns: all
@@ -314,9 +314,9 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reser
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds_parquet.store_sales, RANDOM]
-   HDFS partitions=1824/1824 files=1824 size=200.95MB
+   HDFS partitions=1824/1824 files=1824 size=200.96MB
    stored statistics:
-     table: rows=2.88M size=200.95MB
+     table: rows=2.88M size=200.96MB
      partitions: 1824/1824 rows=2.88M
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=130.09K

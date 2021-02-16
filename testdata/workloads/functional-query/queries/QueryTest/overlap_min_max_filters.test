@@ -1,0 +1,196 @@
+====
+---- QUERY
+###################################################
+# Both a.l_orderkey and b.o_orderkey are BIGINT.
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET MINMAX_FILTERING_LEVEL=PAGE;
+select straight_join a.l_orderkey from
+tpch_parquet.lineitem a join [SHUFFLE] tpch_parquet.orders b
+where a.l_orderkey = b.o_orderkey
+and b.o_custkey = 5 order by l_orderkey;
+---- RESULTS
+224167
+224167
+224167
+224167
+287619
+905633
+905633
+905633
+905633
+905633
+905633
+905633
+2630562
+2630562
+2630562
+2630562
+2630562
+2630562
+2630562
+---- RUNTIME_PROFILE
+row_regex: .*NumRuntimeFilteredPages: 9.*
+====
+---- QUERY
+###################################################
+# ss_sold_time_sk is INT.
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select straight_join count(*) from
+tpcds_parquet.store_sales a join [SHUFFLE] tpcds_parquet.store_sales b
+where a.ss_sold_time_sk = b.ss_sold_time_sk and b.ss_customer_sk = 1
+---- RESULTS
+882
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredRowGroups): 16
+====
+---- QUERY
+###################################################
+# a.ss_sold_time_sk is INT and b.ss_item_sk is
+# BIGINT. Implicit casting on a is involved.
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select straight_join count(*) from
+tpcds_parquet.store_sales a join [SHUFFLE] tpcds_parquet.store_sales b
+where a.ss_sold_time_sk = b.ss_item_sk and b.ss_addr_sk < 20;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredRowGroups): 1824
+====
+---- QUERY
+###################################################
+# a.ss_sold_time_sk is BIGINT and b.ss_item_sk is
+# INT. Implicit casting on b is involved. Should
+# return the same result as the query above.
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select straight_join count(*) from
+tpcds_parquet.store_sales a join [SHUFFLE] tpcds_parquet.store_sales b
+where a.ss_sold_time_sk = b.ss_item_sk and a.ss_addr_sk < 20;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredRowGroups): 90
+====
+---- QUERY
+###################################################
+# Rerun the above query with overlap filter off.
+# Should get the same result with no rowgroup or
+# pages filtered out.
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET MINMAX_FILTER_THRESHOLD=0.0;
+select straight_join count(*) from
+tpcds_parquet.store_sales a join [SHUFFLE] tpcds_parquet.store_sales b
+where a.ss_sold_time_sk = b.ss_item_sk and a.ss_addr_sk < 20;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredRowGroups): 0
+aggregation(SUM, NumRuntimeFilteredRowPages): 0
+====
+---- QUERY
+##################################################
+# Create the lineitem table with sorted l_shipdate
+# which is a STRING.
+###################################################
+drop table if exists tpch_parquet.lineitem_sorted_l_shipdate;
+CREATE TABLE tpch_parquet.lineitem_sorted_l_shipdate
+sort by (l_shipdate)
+STORED AS PARQUET
+as select * from tpch_parquet.lineitem;
+====
+---- QUERY
+###################################################
+# Join the above sorted column with the order date
+# from the orders table. Expect to see a total of
+# 120 pages filtered out.
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET MINMAX_FILTER_THRESHOLD=0.5;
+SET MINMAX_FILTERING_LEVEL=PAGE;
+select straight_join count(*)
+from tpch_parquet.lineitem_sorted_l_shipdate a join [SHUFFLE]
+tpch_parquet.orders b
+where a.l_shipdate = b.o_orderdate and b.o_orderkey = 2
+---- RESULTS
+2530
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 120
+====
+---- QUERY
+###################################################
+# Repeat the above test with the overlap filtering
+# disabled. Should return the same number of rows.
+# Expect to see 0 pages filtered out.
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET MINMAX_FILTER_THRESHOLD=0.0;
+select straight_join count(*)
+from tpch_parquet.lineitem_sorted_l_shipdate a join [SHUFFLE]
+tpch_parquet.orders b
+where a.l_shipdate = b.o_orderdate and b.o_orderkey = 2
+---- RESULTS
+2530
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 0
+====
+---- QUERY
+###################################################
+# Drop the table.
+###################################################
+drop table if exists tpch_parquet.lineitem_sorted_l_shipdate;
+====
+---- QUERY
+##################################################
+# Create the lineitem table with sorted
+# l_extendedprice which is DECIMAL(12,2).
+###################################################
+drop TABLE if exists tpch_parquet.lineitem_sorted_l_extendedprice;
+CREATE TABLE tpch_parquet.lineitem_sorted_l_extendedprice
+sort by (l_extendedprice)
+STORED AS PARQUET
+as select * from tpch_parquet.lineitem;
+====
+---- QUERY
+###################################################
+# Join the above sorted column with itself. Expect
+# to see a total of 255 pages filtered out.
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET MINMAX_FILTER_THRESHOLD=1.0;
+SET MINMAX_FILTERING_LEVEL=PAGE;
+select straight_join count(*)
+from tpch_parquet.lineitem_sorted_l_extendedprice a join [SHUFFLE]
+tpch_parquet.lineitem_sorted_l_extendedprice b
+where a.l_extendedprice = b.l_extendedprice and b.l_orderkey = 1;
+---- RESULTS
+36
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 255
+====
+---- QUERY
+###################################################
+# Join the above sorted column with itself with
+# overlap filtering disabled. Expect to see the same
+# result with 0 pages filtered out.
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET MINMAX_FILTER_THRESHOLD=0.0;
+select straight_join count(*)
+from tpch_parquet.lineitem_sorted_l_extendedprice a join [SHUFFLE]
+tpch_parquet.lineitem_sorted_l_extendedprice b
+where a.l_extendedprice = b.l_extendedprice and b.l_orderkey = 1;
+---- RESULTS
+36
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 0
+====
+---- QUERY
+###################################################
+# Drop the table.
+###################################################
+drop table if exists tpch_parquet.lineitem_sorted_l_extendedprice;
+====

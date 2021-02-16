@@ -74,6 +74,7 @@ public class BinaryPredicate extends Predicate {
     public String getName() { return name_; }
     public TComparisonOp getThriftOp() { return thriftOp_; }
     public boolean isEquivalence() { return this == EQ || this == NOT_DISTINCT; }
+    public boolean isSqlEquivalence() { return this == EQ; }
 
     public Operator converse() {
       switch (this) {

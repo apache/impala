@@ -1,0 +1,29 @@
+###################################################
+# Verify that the overlap predicate is not possible
+# when either enabled_runtime_filter_types is bloom
+# or minmax_filter_threshold is 0.0.
+###################################################
+select straight_join count(*) from
+functional_parquet.alltypes a join [SHUFFLE] functional_parquet.alltypes b
+where a.int_col = b.int_col
+---- PLAN
+PLAN-ROOT SINK
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  row-size=8B cardinality=1
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.int_col = b.int_col
+|  runtime filters: RF000 <- b.int_col
+|  row-size=8B cardinality=12.80K
+|
+|--01:SCAN HDFS [functional_parquet.alltypes b]
+|     HDFS partitions=24/24 files=24 size=201.15KB
+|     row-size=4B cardinality=12.80K
+|
+00:SCAN HDFS [functional_parquet.alltypes a]
+   HDFS partitions=24/24 files=24 size=201.15KB
+   runtime filters: RF000 -> a.int_col
+   row-size=4B cardinality=12.80K
+====

@@ -214,4 +214,34 @@ string TimestampValue::ToString() const {
   return ss.str();
 }
 
+TimestampValue TimestampValue::Add(const boost::posix_time::time_duration& t) const {
+  if (!IsValidTime(t) || !HasDateAndTime()) return TimestampValue();
+
+  int64_t this_in_nano_sec = time_.total_nanoseconds();
+  int64_t t_in_nano_sec = t.total_nanoseconds();
+
+  if (this_in_nano_sec + t_in_nano_sec < NANOS_PER_DAY) {
+    return TimestampValue(date_, time_ + t);
+  } else {
+    int64_t total_in_nano_sec = this_in_nano_sec + t_in_nano_sec;
+    int64_t days = total_in_nano_sec / NANOS_PER_DAY;
+    int64_t nano_secs_remaining = total_in_nano_sec % NANOS_PER_DAY;
+    return TimestampValue(date_ + boost::gregorian::date_duration(days),
+        boost::posix_time::time_duration(0, 0, 0, nano_secs_remaining));
+  }
+}
+
+TimestampValue TimestampValue::Subtract(const boost::posix_time::time_duration& t) const {
+  if (!IsValidTime(t) || !HasDateAndTime()) return TimestampValue();
+
+  int64_t this_in_nano_sec = time_.total_nanoseconds();
+  int64_t t_in_nano_sec = t.total_nanoseconds();
+  if (this_in_nano_sec - t_in_nano_sec >= 0) {
+    return TimestampValue(date_, time_ - t);
+  } else {
+    return TimestampValue(date_ - boost::gregorian::date_duration(1),
+        boost::posix_time::time_duration(
+            0, 0, 0, NANOS_PER_DAY + this_in_nano_sec - t_in_nano_sec));
+  }
+}
 }

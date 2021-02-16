@@ -37,8 +37,8 @@ TEST(MinMaxFilterTest, TestBoolMinMaxFilter) {
   MemTracker mem_tracker;
   ObjectPool obj_pool;
 
-  MinMaxFilter* filter = MinMaxFilter::Create(
-      ColumnType(PrimitiveType::TYPE_BOOLEAN), &obj_pool, &mem_tracker);
+  ColumnType bool_column_type(PrimitiveType::TYPE_BOOLEAN);
+  MinMaxFilter* filter = MinMaxFilter::Create(bool_column_type, &obj_pool, &mem_tracker);
   EXPECT_TRUE(filter->AlwaysFalse());
   bool b1 = true;
   filter->Insert(&b1);
@@ -47,9 +47,26 @@ TEST(MinMaxFilterTest, TestBoolMinMaxFilter) {
   EXPECT_FALSE(filter->AlwaysFalse());
 
   bool b2 = false;
+
+  // The range is currently [true, true] in filter.
+  // Check overlapping with [false, false], which should be false.
+  EXPECT_EQ(filter->EvalOverlap(bool_column_type, &b2, &b2), false);
+  // Check overlapping with [true, true], which should be true.
+  EXPECT_EQ(filter->EvalOverlap(bool_column_type, &b1, &b1), true);
+  // Check overlapping with [false, true], which should be true.
+  EXPECT_EQ(filter->EvalOverlap(bool_column_type, &b2, &b1), true);
+
+  // The range is currently [false, true] in filter.
   filter->Insert(&b2);
   EXPECT_EQ(*reinterpret_cast<const bool*>(filter->GetMin()), b2);
   EXPECT_EQ(*reinterpret_cast<const bool*>(filter->GetMax()), b1);
+
+  // Check overlapping with [false, false], which should be true.
+  EXPECT_EQ(filter->EvalOverlap(bool_column_type, &b2, &b2), true);
+  // Check overlapping with [true, true], which should be true.
+  EXPECT_EQ(filter->EvalOverlap(bool_column_type, &b1, &b1), true);
+  // Check overlapping with [false, true], which should be true.
+  EXPECT_EQ(filter->EvalOverlap(bool_column_type, &b2, &b1), true);
 
   // Check the behavior of Or.
   MinMaxFilterPB pFilter1;
@@ -82,6 +99,23 @@ void CheckIntVals(MinMaxFilter* filter, int32_t min, int32_t max) {
   EXPECT_EQ(*reinterpret_cast<const int32_t*>(filter->GetMax()), max);
   EXPECT_FALSE(filter->AlwaysFalse());
   EXPECT_FALSE(filter->AlwaysTrue());
+
+  // Check overlaps. The range is [min, max] in filter.
+  ColumnType int_type(PrimitiveType::TYPE_INT);
+
+  // Check overlapping with [min-10, min-1], which should be false.
+  int min_minus_10 = min - 10;
+  int min_minus_1 = min - 1;
+  EXPECT_EQ(filter->EvalOverlap(int_type, &min_minus_10, &min_minus_1), false);
+
+  // Check overlapping with [max+1, max+20], which should be false.
+  int max_plus_1 = max + 1;
+  int max_plus_20 = max + 20;
+  EXPECT_EQ(filter->EvalOverlap(int_type, &max_plus_1, &max_plus_20), false);
+
+  // Check overlapping with [min-1, min+(max-min)/2], which should be true.
+  int middle = min + (max-min)/2;
+  EXPECT_EQ(filter->EvalOverlap(int_type, &min_minus_1, &middle), true);
 }
 
 // Tests that a IntMinMaxFilter returns the expected min/max after having values
@@ -158,6 +192,28 @@ TEST(MinMaxFilterTest, TestNumericMinMaxFilter) {
   f2->Close();
 }
 
+// Make a string that is compared less than 'str'
+string make_less_than(const string& str) {
+  if (str.length() == 1) {
+    unsigned char c = str.c_str()[0];
+    if (c == 0) {
+      return string("");
+    }
+    c--;
+    return string(1, c);
+  }
+  string result(str);
+  result.pop_back();
+  return result;
+}
+
+// Make a string that is compared greater than 'str'
+string make_greater_than(const string& str) {
+  string result(str);
+  result.push_back('a');
+  return result;
+}
+
 void CheckStringVals(MinMaxFilter* filter, const string& min, const string& max) {
   StringValue actual_min = *reinterpret_cast<const StringValue*>(filter->GetMin());
   StringValue actual_max = *reinterpret_cast<const StringValue*>(filter->GetMax());
@@ -167,6 +223,37 @@ void CheckStringVals(MinMaxFilter* filter, const string& min, const string& max)
   EXPECT_EQ(actual_max, expected_max);
   EXPECT_FALSE(filter->AlwaysTrue());
   EXPECT_FALSE(filter->AlwaysFalse());
+
+  // Check overlaps. The range is [min, max] in filter.
+  ColumnType string_type(PrimitiveType::TYPE_STRING);
+
+  // Check overlapping with [less_than(min), less_than(min)], which should be false.
+  string less_than_str = make_less_than(min);
+  StringValue less_than(less_than_str);
+  EXPECT_EQ(filter->EvalOverlap(string_type, &less_than, &less_than), false);
+
+  // Check overlapping with [greater_than(max), greater_than(max)], which should be false.
+  string greater_than_str = make_greater_than(max);
+  StringValue greater_than(greater_than_str);
+  EXPECT_EQ(filter->EvalOverlap(string_type, &greater_than, &greater_than), false);
+
+  // Check overlapping with [less_than(min), max], which should be true.
+  EXPECT_EQ(filter->EvalOverlap(string_type, &less_than, &actual_max), true);
+
+  // Check overlapping with [min, greater_than(max)], which should be true.
+  EXPECT_EQ(filter->EvalOverlap(string_type, &actual_min, &greater_than), true);
+
+  // Test that uint64_t converted values are useful to compute overlap ratio.
+  // Note that Strings sharing a common prefix of 8 bytes long can be converted to the
+  // same value (e.g. Uint64("12345678") == Uint64("123456789")), the relationship of
+  // "<=" is tested.
+  uint64_t less_than_as_uint64 = less_than.ToUInt64();
+  uint64_t actual_min_as_uint64 = actual_min.ToUInt64();
+  uint64_t actual_max_as_uint64 = actual_max.ToUInt64();
+  uint64_t greater_than_as_uint64 = greater_than.ToUInt64();
+  EXPECT_EQ(less_than_as_uint64 <= actual_min_as_uint64, true);
+  EXPECT_EQ(actual_min_as_uint64 <= actual_max_as_uint64, true);
+  EXPECT_EQ(actual_max_as_uint64 <= greater_than_as_uint64, true);
 }
 
 // Tests that a StringMinMaxFilter returns the expected min/max after having values
@@ -368,12 +455,76 @@ static DateValue ParseSimpleDate(const char* s) {
   return DateValue::ParseSimpleDateFormat(s, strlen(s), /* accept_time_toks */ true);
 }
 
-#define DATE_TIME_CHECK_VALS(NAME, TYPE)                                           \
-  void Check##NAME##Vals(MinMaxFilter* filter, const TYPE& min, const TYPE& max) { \
-    EXPECT_EQ(*reinterpret_cast<const TYPE*>(filter->GetMin()), min);              \
-    EXPECT_EQ(*reinterpret_cast<const TYPE*>(filter->GetMax()), max);              \
-    EXPECT_FALSE(filter->AlwaysFalse());                                           \
-    EXPECT_FALSE(filter->AlwaysTrue());                                            \
+// Check overlaps on dates. The range is [min, max] in filter.
+void CheckOverlapForDate(MinMaxFilter* filter, const ColumnType& col_type,
+    const DateValue& min, const DateValue& max) {
+  // Check overlapping with [min-10, min-1], which should be false.
+  DateValue min_minus_1 = min.SubtractDays(1);
+  DateValue min_minus_10 = min.SubtractDays(10);
+  EXPECT_EQ(filter->EvalOverlap(col_type, &min_minus_10, &min_minus_1), false);
+
+  // Check overlapping with [max+1, max+20], which should be false.
+  DateValue max_plus_1 = max.AddDays(1);
+  DateValue max_plus_20 = max.AddDays(20);
+  EXPECT_EQ(filter->EvalOverlap(col_type, &max_plus_1, &max_plus_20), false);
+
+  // Check overlapping with [min-10, middle_day(min, max)], which should be true.
+  DateValue middle_date = DateValue::FindMiddleDate(min, max);
+  EXPECT_EQ(filter->EvalOverlap(col_type, &min_minus_10, &middle_date), true);
+
+  if (min < max) {
+    // Check overlapping with [min+1, max], which should be true.
+    DateValue min_plus_1 = min.AddDays(1);
+    EXPECT_EQ(filter->EvalOverlap(col_type, &min_plus_1, (void*)&max), true);
+  }
+}
+
+// Check overlaps on timestamps. The range is [min, max] in filter.
+void CheckOverlapForTimestamp(MinMaxFilter* filter, const ColumnType& col_type,
+    const TimestampValue& min, const TimestampValue& max) {
+  // Check overlapping with [min-10, min-1], which should be false.
+  TimestampValue min_minus_10 =
+      min.Subtract(boost::posix_time::time_duration(0, 0, 0, 10));
+  TimestampValue min_minus_1 = min.Subtract(boost::posix_time::time_duration(0, 0, 0, 1));
+  EXPECT_EQ(filter->EvalOverlap(col_type, &min_minus_10, &min_minus_1), false);
+
+  // Check overlapping with [max+1, max+20], which should be false.
+  TimestampValue max_plus_1 = max.Add(boost::posix_time::time_duration(0, 0, 0, 1));
+  TimestampValue max_plus_20 = max.Add(boost::posix_time::time_duration(0, 0, 0, 20));
+  EXPECT_EQ(filter->EvalOverlap(col_type, &max_plus_1, &max_plus_20), false);
+
+  // Check overlapping with [min-10, max], which should be true.
+  EXPECT_EQ(filter->EvalOverlap(col_type, &min_minus_10, (void*)&max), true);
+
+  if (min < max) {
+    // Check overlapping with [min+1 ns, max], which should be true.
+    TimestampValue min_plus_1 = min.Add(boost::posix_time::time_duration(0, 0, 0, 1));
+    EXPECT_EQ(filter->EvalOverlap(col_type, &min_plus_1, (void*)&max), true);
+  }
+
+  // The overlap ratio with [min, max] should be 1.
+  EXPECT_EQ(filter->ComputeOverlapRatio(col_type, (void*)&min, (void*)&max), 1.0);
+
+  // The overlap ratio with [min-10, max+20] should be less than or very close to 1.0,
+  // which is represented as 1.0.
+  EXPECT_TRUE(
+      (filter->ComputeOverlapRatio(col_type, (void*)&min_minus_10, (void*)&max_plus_20))
+      <= 1.0);
+
+  // No overlap. The overlap ratio should be 0.0.
+  EXPECT_EQ(
+      (filter->ComputeOverlapRatio(col_type, (void*)&min_minus_10, (void*)&min_minus_1)),
+      0.0);
+}
+
+#define DATE_TIME_CHECK_VALS(NAME, TYPE)                                   \
+  void Check##NAME##Vals(MinMaxFilter* filter, const ColumnType& col_type, \
+      const TYPE& min, const TYPE& max) {                                  \
+    EXPECT_EQ(*reinterpret_cast<const TYPE*>(filter->GetMin()), min);      \
+    EXPECT_EQ(*reinterpret_cast<const TYPE*>(filter->GetMax()), max);      \
+    EXPECT_FALSE(filter->AlwaysFalse());                                   \
+    EXPECT_FALSE(filter->AlwaysTrue());                                    \
+    CheckOverlapFor##NAME(filter, col_type, min, max);                     \
   }
 
 DATE_TIME_CHECK_VALS(Timestamp, TimestampValue);
@@ -402,16 +553,16 @@ DATE_TIME_CHECK_VALS(Date, DateValue);
     /* Now insert some stuff. */                                                    \
     TYPE t1 = ParseSimple##NAME("2000-01-01 00:00:00");                             \
     filter->Insert(&t1);                                                            \
-    Check##NAME##Vals(filter, t1, t1);                                              \
+    Check##NAME##Vals(filter, col_type, t1, t1);                                    \
     TYPE t2 = ParseSimple##NAME("1990-01-01 12:30:00");                             \
     filter->Insert(&t2);                                                            \
-    Check##NAME##Vals(filter, t2, t1);                                              \
+    Check##NAME##Vals(filter, col_type, t2, t1);                                    \
     TYPE t3 = ParseSimple##NAME("2001-04-30 05:00:00");                             \
     filter->Insert(&t3);                                                            \
-    Check##NAME##Vals(filter, t2, t3);                                              \
+    Check##NAME##Vals(filter, col_type, t2, t3);                                    \
     TYPE t4 = ParseSimple##NAME("2001-04-30 01:00:00");                             \
     filter->Insert(&t4);                                                            \
-    Check##NAME##Vals(filter, t2, t3);                                              \
+    Check##NAME##Vals(filter, col_type, t2, t3);                                    \
     /* Check Protobuf. */                                                           \
     filter->ToProtobuf(&pFilter);                                                   \
     EXPECT_FALSE(pFilter.always_false());                                           \
@@ -420,7 +571,7 @@ DATE_TIME_CHECK_VALS(Date, DateValue);
     EXPECT_EQ(TYPE::FromColumnValuePB(pFilter.max()), t3);                          \
     MinMaxFilter* filter2 =                                                         \
         MinMaxFilter::Create(pFilter, col_type, &obj_pool, &mem_tracker);           \
-    Check##NAME##Vals(filter2, t2, t3);                                             \
+    Check##NAME##Vals(filter2, col_type, t2, t3);                                   \
     filter2->Close();                                                               \
     /* Check the behavior of Or. */                                                 \
     filter->ToProtobuf(&pFilter);                                                   \
@@ -448,26 +599,64 @@ TEST(MinMaxFilterTest, TestDateMinMaxFilter) {
   DATE_TIME_CHECK_FUNCS(Date, DateValue, date, DATE);
 }
 
+#define DECIMAL_ADD(SIZE, result_type)                                                 \
+  Decimal##SIZE##Value Decimal##SIZE##Add(const Decimal##SIZE##Value& value,           \
+      int precision, int scale, double x, bool* overflow) {                            \
+    DCHECK(overflow);                                                                  \
+    Decimal##SIZE##Value d =                                                           \
+        Decimal##SIZE##Value::FromDouble(precision, scale, x, false, overflow);        \
+    if (*overflow) return Decimal##SIZE##Value();                                      \
+    return value.Add<result_type>(scale, d, scale, precision, scale, false, overflow); \
+  }
+
+DECIMAL_ADD(4, int32_t);
+DECIMAL_ADD(8, int64_t);
+DECIMAL_ADD(16, __int128_t);
+
 #define DECIMAL_CHECK(SIZE)                                                           \
   do {                                                                                \
     EXPECT_EQ(*reinterpret_cast<const Decimal##SIZE##Value*>(filter->GetMin()), min); \
     EXPECT_EQ(*reinterpret_cast<const Decimal##SIZE##Value*>(filter->GetMax()), max); \
     EXPECT_FALSE(filter->AlwaysFalse());                                              \
     EXPECT_FALSE(filter->AlwaysTrue());                                               \
+    /* Check overlaps. The range is [min, max] in filter.*/                           \
+    /* Check overlapping with [min-10, min-1], which should be false.*/               \
+    const int& precision = col_type.precision;                                        \
+    const int& scale = col_type.scale;                                                \
+    bool overflow = false;                                                            \
+    Decimal##SIZE##Value min_minus_10 =                                               \
+        Decimal##SIZE##Add(min, precision, scale, -10, &overflow);                    \
+    EXPECT_EQ(overflow, false);                                                       \
+    Decimal##SIZE##Value min_minus_1 =                                                \
+        Decimal##SIZE##Add(min, precision, scale, -1, &overflow);                     \
+    EXPECT_EQ(overflow, false);                                                       \
+    EXPECT_EQ(filter->EvalOverlap(col_type, &min_minus_10, &min_minus_1), false);     \
+    /* Check overlapping with [max+1, max+20], which should be false. */              \
+    Decimal##SIZE##Value max_plus_1 =                                                 \
+        Decimal##SIZE##Add(max, precision, scale, 1, &overflow);                      \
+    EXPECT_EQ(overflow, false);                                                       \
+    Decimal##SIZE##Value max_plus_20 =                                                \
+        Decimal##SIZE##Add(max, precision, scale, 20, &overflow);                     \
+    EXPECT_EQ(overflow, false);                                                       \
+    EXPECT_EQ(filter->EvalOverlap(col_type, &max_plus_1, &max_plus_20), false);       \
+    /* Check overlapping with [min-1, max], which should be true. */                  \
+    EXPECT_EQ(filter->EvalOverlap(col_type, &min_minus_10, (void*)&max), true);       \
+    /* Check overlapping with [min, max+20], which should be true. */                 \
+    EXPECT_EQ(filter->EvalOverlap(col_type, (void*)&min, &max_plus_20), true);        \
   } while (false)
 
-void CheckDecimalVals(
-    MinMaxFilter* filter, const Decimal4Value& min, const Decimal4Value& max) {
+void CheckDecimalVals(MinMaxFilter* filter, const ColumnType& col_type,
+    const Decimal4Value& min, const Decimal4Value& max) {
   DECIMAL_CHECK(4);
 }
 
-void CheckDecimalVals(
-    MinMaxFilter* filter, const Decimal8Value& min, const Decimal8Value& max) {
+void CheckDecimalVals(MinMaxFilter* filter, const ColumnType& col_type,
+    const Decimal8Value& min, const Decimal8Value& max) {
   DECIMAL_CHECK(8);
 }
 
-void CheckDecimalVals(
-    MinMaxFilter* filter, const Decimal16Value& min, const Decimal16Value& max) {
+void CheckDecimalVals(MinMaxFilter* filter, const ColumnType& col_type,
+    const Decimal16Value& min, const Decimal16Value& max) {
   DECIMAL_CHECK(16);
 }
 
@@ -497,15 +686,15 @@ void CheckDecimalEmptyFilter(MinMaxFilter* filter, const ColumnType& column_type
     d1##SIZE =                                                                       \
         Decimal##SIZE##Value::FromDouble(PRECISION, SCALE, VALUE1, true, &overflow); \
     filter##SIZE->Insert(&d1##SIZE);                                                 \
-    CheckDecimalVals(filter##SIZE, d1##SIZE, d1##SIZE);                              \
+    CheckDecimalVals(filter##SIZE, decimal##SIZE##_type, d1##SIZE, d1##SIZE);        \
     d2##SIZE =                                                                       \
         Decimal##SIZE##Value::FromDouble(PRECISION, SCALE, VALUE2, true, &overflow); \
     filter##SIZE->Insert(&d2##SIZE);                                                 \
-    CheckDecimalVals(filter##SIZE, d1##SIZE, d2##SIZE);                              \
+    CheckDecimalVals(filter##SIZE, decimal##SIZE##_type, d1##SIZE, d2##SIZE);        \
     d3##SIZE =                                                                       \
         Decimal##SIZE##Value::FromDouble(PRECISION, SCALE, VALUE3, true, &overflow); \
     filter##SIZE->Insert(&d3##SIZE);                                                 \
-    CheckDecimalVals(filter##SIZE, d3##SIZE, d2##SIZE);                              \
+    CheckDecimalVals(filter##SIZE, decimal##SIZE##_type, d3##SIZE, d2##SIZE);        \
   } while (false)
 
 #define DECIMAL_CHECK_PROTOBUF(SIZE)                                                   \
@@ -517,7 +706,7 @@ void CheckDecimalEmptyFilter(MinMaxFilter* filter, const ColumnType& column_type
     EXPECT_EQ(Decimal##SIZE##Value::FromColumnValuePB(pFilter##SIZE.max()), d2##SIZE); \
     MinMaxFilter* filter##SIZE##2 = MinMaxFilter::Create(                              \
         pFilter##SIZE, decimal##SIZE##_type, &obj_pool, &mem_tracker);                 \
-    CheckDecimalVals(filter##SIZE##2, d3##SIZE, d2##SIZE);                             \
+    CheckDecimalVals(filter##SIZE##2, decimal##SIZE##_type, d3##SIZE, d2##SIZE);       \
     filter##SIZE##2->Close();                                                          \
   } while (false)
 

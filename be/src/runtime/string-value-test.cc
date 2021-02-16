@@ -119,5 +119,17 @@ TEST(StringValueTest, TestCompare) {
   EXPECT_EQ(chars[3].ptr[3], '4');
 }
 
+TEST(StringValueTest, TestConvertToUInt64) {
+  // Test converting StringValues to uint64_t which utilizes up to first 8 bytes.
+  EXPECT_EQ(StringValue("").ToUInt64(), 0);
+  EXPECT_EQ(StringValue("\1").ToUInt64(),     0x100000000000000);
+  EXPECT_EQ(StringValue("\1\2").ToUInt64(),   0x102000000000000);
+  EXPECT_EQ(StringValue("\1\2\3").ToUInt64(), 0x102030000000000);
+
+  // extra character does not change the result
+  EXPECT_EQ(StringValue("\1\2\3\4\5\6\7\7").ToUInt64(),   0x102030405060707);
+  EXPECT_EQ(StringValue("\1\2\3\4\5\6\7\7\7").ToUInt64(), 0x102030405060707);
+}
+
 }
 

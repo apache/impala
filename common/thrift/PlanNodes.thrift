@@ -126,6 +126,13 @@ enum TEnabledRuntimeFilterTypes {
   ALL = 3
 }
 
+// The level of filtering of enabled min/max filters to be applied to Parquet scan nodes.
+enum TMinmaxFilteringLevel {
+  ROW_GROUP = 1
+  PAGE = 2
+  ROW = 3
+}
+
 // Specification of a runtime filter.
 struct TRuntimeFilterDesc {
   // Filter unique id (within a query)
@@ -254,6 +261,15 @@ struct TScanRange {
   3: optional binary kudu_scan_token
 }
 
+// Specification of an overlap predicate desc.
+//  filter_id: id of the filter
+//  slot_index: the index of a slot descriptor in minMaxTuple where the min value is
+//              stored. The slot next to it (at index +1) stores the max value.
+struct TOverlapPredicateDesc {
+  1: required i32 filter_id
+  2: required i32 slot_index
+}
+
 struct THdfsScanNode {
   1: required Types.TTupleId tuple_id
 
@@ -299,6 +315,9 @@ struct THdfsScanNode {
   // codegen code remotely for other impalad's as it contains all file formats that may be
   // needed for this scan node.
   12: required set<CatalogObjects.THdfsFileFormat> file_formats;
+
+  // The overlap predicates
+  13: optional list<TOverlapPredicateDesc> overlap_predicate_descs
 }
 
 struct TDataSourceScanNode {

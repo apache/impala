@@ -23,12 +23,12 @@ using std::string;
 
 namespace impala {
 
-#define NUMERIC_MIN_MAX_FILTER_INSERT(NAME, TYPE) \
-  void NAME##MinMaxFilter::Insert(const void* val) {    \
-    if (val == nullptr) return;                   \
-    const TYPE* value = reinterpret_cast<const TYPE*>(val);   \
-    if (*value < min_) min_ = *value;             \
-    if (*value > max_) max_ = *value;             \
+#define NUMERIC_MIN_MAX_FILTER_INSERT(NAME, TYPE)           \
+  void NAME##MinMaxFilter::Insert(const void* val) {        \
+    if (val == nullptr) return;                             \
+    const TYPE* value = reinterpret_cast<const TYPE*>(val); \
+    if (*value < min_) min_ = *value;                       \
+    if (*value > max_) max_ = *value;                       \
   }
 
 NUMERIC_MIN_MAX_FILTER_INSERT(Bool, bool);

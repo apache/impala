@@ -157,7 +157,7 @@ Status ScanNode::Prepare(RuntimeState* state) {
     filter_ctx.filter = state->filter_bank()->RegisterConsumer(filter_desc);
     // TODO: Enable stats for min-max filters when Kudu exposes info about filters
     // (KUDU-2162).
-    if (filter_ctx.filter->is_bloom_filter()) {
+    if (filter_ctx.filter->is_bloom_filter() || filter_ctx.filter->is_min_max_filter()) {
       string filter_profile_title = Substitute("Filter $0 ($1)", filter_desc.filter_id,
           PrettyPrinter::Print(filter_ctx.filter->filter_size(), TUnit::BYTES));
       RuntimeProfile* profile =

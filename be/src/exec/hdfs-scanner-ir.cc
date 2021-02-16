@@ -101,7 +101,7 @@ bool HdfsScanner::EvalRuntimeFilter(int i, TupleRow* row) {
   LocalFilterStats* stats = &filter_stats_[i];
   const FilterContext* ctx = filter_ctxs_[i];
   ++stats->total_possible;
-  if (stats->enabled && ctx->filter->HasFilter()) {
+  if (stats->enabled_for_row && ctx->filter->HasFilter()) {
     ++stats->considered;
     if (!ctx->Eval(row)) {
       ++stats->rejected;

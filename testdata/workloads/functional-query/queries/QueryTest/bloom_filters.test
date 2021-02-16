@@ -78,7 +78,7 @@ select STRAIGHT_JOIN count(*) from alltypes a join [SHUFFLE] alltypes b on a.id 
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*1|2 of 1|2 Runtime Filter Published.*
 row_regex: .*Filter 0 \(128.00 KB\).*
 ====
 ---- QUERY
@@ -89,7 +89,7 @@ select STRAIGHT_JOIN count(*) from alltypes a join [SHUFFLE] alltypes b on a.id 
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*1|2 of 1|2 Runtime Filter Published.*
 row_regex: .*Filter 0 \(128.00 KB\).*
 ====
 ---- QUERY
@@ -122,7 +122,7 @@ select STRAIGHT_JOIN count(*) from alltypes a join [SHUFFLE] alltypes b on a.id 
 ---- RESULTS
 7300
 ---- RUNTIME_PROFILE
-row_regex: .*1 of 1 Runtime Filter Published.*
+row_regex: .*1|2 of 1|2 Runtime Filter Published.*
 row_regex: .*Filter 0 \(8.00 KB\).*
 ====
 ---- QUERY

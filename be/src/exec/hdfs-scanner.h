@@ -181,6 +181,18 @@ class HdfsScanner {
     return desc.byte_size();
   }
 
+  /// Find the index of a filter in filter_ctxs_ (a vector) through id.
+  int FindFilterIndex(int filter_id) {
+    for (int i = 0; i < filter_ctxs_.size(); ++i) {
+      const RuntimeFilter* filter = filter_ctxs_[i]->filter;
+      if (filter && filter->id() == filter_id) {
+        return i;
+      }
+    }
+    DCHECK(false);
+    return -1;
+  }
+
   /// Scanner subclasses must implement these static functions as well.  Unfortunately,
   /// c++ does not allow static virtual functions.
 
@@ -325,13 +337,22 @@ class HdfsScanner {
     int64_t total_possible;
 
     /// Use known-width type to act as logical boolean.  Set to 1 if corresponding filter
-    /// in filter_ctxs_ should be applied, 0 if it was ineffective and was disabled.
-    uint8_t enabled;
+    /// in filter_ctxs_ should be applied at row level, 0 if it was ineffective and was
+    /// disabled.
+    uint8_t enabled_for_row;
+
+    /// Apply the filter at page level only.
+    uint8_t enabled_for_page;
 
     /// Padding to ensure structs do not straddle cache-line boundary.
-    uint8_t padding[7];
+    uint8_t padding[6];
 
-    LocalFilterStats() : considered(0), rejected(0), total_possible(0), enabled(1) { }
+    LocalFilterStats()
+      : considered(0),
+        rejected(0),
+        total_possible(0),
+        enabled_for_row(1),
+        enabled_for_page(1) {}
   };
 
   /// Cached runtime filter contexts, one for each filter that applies to this column.

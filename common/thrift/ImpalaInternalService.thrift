@@ -483,6 +483,13 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   122: optional i64 analytic_rank_pushdown_threshold = 1000;
+
+  // See comment in ImpalaService.thrift
+  123: optional double minmax_filter_threshold = 0.0;
+
+  // See comment in ImpalaService.thrift
+  124: optional PlanNodes.TMinmaxFilteringLevel minmax_filtering_level =
+      PlanNodes.TMinmaxFilteringLevel.ROW_GROUP;
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

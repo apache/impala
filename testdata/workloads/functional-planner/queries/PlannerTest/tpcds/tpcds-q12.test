@@ -64,7 +64,7 @@ PLAN-ROOT SINK
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: ws_sold_date_sk = d_date_sk
 |  fk/pk conjuncts: ws_sold_date_sk = d_date_sk
-|  runtime filters: RF000[bloom] <- d_date_sk
+|  runtime filters: RF000[bloom] <- d_date_sk, RF001[min_max] <- d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1,2 row-size=232B cardinality=215.82K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
@@ -85,7 +85,7 @@ PLAN-ROOT SINK
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: ws_item_sk = i_item_sk
 |  fk/pk conjuncts: ws_item_sk = i_item_sk
-|  runtime filters: RF002[bloom] <- i_item_sk
+|  runtime filters: RF002[bloom] <- i_item_sk, RF003[min_max] <- i_item_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=206B cardinality=215.82K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -105,7 +105,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [tpcds_parquet.web_sales]
    HDFS partitions=1/1 files=2 size=45.09MB
-   runtime filters: RF000[bloom] -> ws_sold_date_sk, RF002[bloom] -> ws_item_sk
+   runtime filters: RF001[min_max] -> ws_sold_date_sk, RF003[min_max] -> ws_item_sk, RF000[bloom] -> ws_sold_date_sk, RF002[bloom] -> ws_item_sk
    stored statistics:
      table: rows=719.38K size=45.09MB
      columns: all
@@ -174,7 +174,7 @@ Per-Host Resources: mem-estimate=137.25MB mem-reservation=47.88MB thread-reserva
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ws_sold_date_sk = d_date_sk
 |  fk/pk conjuncts: ws_sold_date_sk = d_date_sk
-|  runtime filters: RF000[bloom] <- d_date_sk
+|  runtime filters: RF000[bloom] <- d_date_sk, RF001[min_max] <- d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1,2 row-size=232B cardinality=215.82K
 |  in pipelines: 00(GETNEXT), 02(OPEN)
@@ -202,7 +202,7 @@ Per-Host Resources: mem-estimate=137.25MB mem-reservation=47.88MB thread-reserva
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ws_item_sk = i_item_sk
 |  fk/pk conjuncts: ws_item_sk = i_item_sk
-|  runtime filters: RF002[bloom] <- i_item_sk
+|  runtime filters: RF002[bloom] <- i_item_sk, RF003[min_max] <- i_item_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=206B cardinality=215.82K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -229,7 +229,7 @@ Per-Host Resources: mem-estimate=137.25MB mem-reservation=47.88MB thread-reserva
 |
 00:SCAN HDFS [tpcds_parquet.web_sales, RANDOM]
    HDFS partitions=1/1 files=2 size=45.09MB
-   runtime filters: RF000[bloom] -> ws_sold_date_sk, RF002[bloom] -> ws_item_sk
+   runtime filters: RF001[min_max] -> ws_sold_date_sk, RF003[min_max] -> ws_item_sk, RF000[bloom] -> ws_sold_date_sk, RF002[bloom] -> ws_item_sk
    stored statistics:
      table: rows=719.38K size=45.09MB
      columns: all
@@ -309,7 +309,7 @@ Per-Instance Resources: mem-estimate=66.00MB mem-reservation=42.00MB thread-rese
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: d_date_sk
-|  |  runtime filters: RF000[bloom] <- d_date_sk
+|  |  runtime filters: RF000[bloom] <- d_date_sk, RF001[min_max] <- d_date_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  10:EXCHANGE [BROADCAST]
@@ -345,7 +345,7 @@ Per-Instance Resources: mem-estimate=66.00MB mem-reservation=42.00MB thread-rese
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: i_item_sk
-|  |  runtime filters: RF002[bloom] <- i_item_sk
+|  |  runtime filters: RF002[bloom] <- i_item_sk, RF003[min_max] <- i_item_sk
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  09:EXCHANGE [BROADCAST]
@@ -370,7 +370,7 @@ Per-Instance Resources: mem-estimate=66.00MB mem-reservation=42.00MB thread-rese
 |
 00:SCAN HDFS [tpcds_parquet.web_sales, RANDOM]
    HDFS partitions=1/1 files=2 size=45.09MB
-   runtime filters: RF000[bloom] -> ws_sold_date_sk, RF002[bloom] -> ws_item_sk
+   runtime filters: RF001[min_max] -> ws_sold_date_sk, RF003[min_max] -> ws_item_sk, RF000[bloom] -> ws_sold_date_sk, RF002[bloom] -> ws_item_sk
    stored statistics:
      table: rows=719.38K size=45.09MB
      columns: all

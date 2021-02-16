@@ -398,6 +398,7 @@ public class PlannerTest extends PlannerTestBase {
     // The FK/PK detection result is included in EXTENDED or higher.
     TQueryOptions options = defaultQueryOptions();
     options.setDisable_hdfs_num_rows_estimate(true);
+    options.setMinmax_filter_threshold(0.0);
     runPlannerTestFile("fk-pk-join-detection",
         options, ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
             PlannerTestOption.VALIDATE_CARDINALITY));
@@ -467,7 +468,9 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testSetOperationRewrite() {
-    runPlannerTestFile("setoperation-rewrite");
+    TQueryOptions options = defaultQueryOptions();
+    options.setMinmax_filter_threshold(0.0);
+    runPlannerTestFile("setoperation-rewrite", options);
   }
 
   @Test
@@ -547,6 +550,7 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testTpchNested() {
+    TQueryOptions options = new TQueryOptions();
     runPlannerTestFile("tpch-nested", "tpch_nested_parquet",
         ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER,
             PlannerTestOption.VALIDATE_RESOURCES,
@@ -595,6 +599,17 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = new TQueryOptions();
     options.setRuntime_filter_mode(TRuntimeFilterMode.GLOBAL);
     runPlannerTestFile("runtime-filter-propagation", options);
+  }
+
+  @Test
+  public void testDisableRuntimeOverlapFilter() {
+    TQueryOptions options = new TQueryOptions();
+    options.setMinmax_filter_threshold(0.0);
+    runPlannerTestFile("disable-runtime-overlap-filter", options);
+
+    options.setMinmax_filter_threshold(1.0);
+    options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.BLOOM);
+    runPlannerTestFile("disable-runtime-overlap-filter", options);
   }
 
   @Test
@@ -746,6 +761,8 @@ public class PlannerTest extends PlannerTestBase {
     // Tests the resource requirement computation from the planner.
     TQueryOptions options = defaultQueryOptions();
     options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
+    options.setMinmax_filter_threshold(0.0);
+    // Required so that output doesn't vary by whether parquet tables are used or not.
     options.setDisable_hdfs_num_rows_estimate(true);
     runPlannerTestFile("resource-requirements", options,
         ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
@@ -760,6 +777,7 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.EXTENDED);
     options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
+    options.setMinmax_filter_threshold(0.0);
     options.setDisable_hdfs_num_rows_estimate(true);
     runPlannerTestFile("spillable-buffer-sizing", options,
         ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
@@ -774,6 +792,8 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.EXTENDED);
     options.setNum_scanner_threads(1); // Required so that output doesn't vary by machine
+    // Required so that output doesn't vary by the format of the table used.
+    options.setMinmax_filter_threshold(0.0);
     options.setMax_row_size(8L * 1024L * 1024L);
     runPlannerTestFile("max-row-size", options,
         ImmutableSet.of(PlannerTestOption.EXTENDED_EXPLAIN,
@@ -1079,7 +1099,9 @@ public class PlannerTest extends PlannerTestBase {
    */
   @Test
   public void testConvertToCNF() {
-    runPlannerTestFile("convert-to-cnf", "tpch_parquet");
+    TQueryOptions options = defaultQueryOptions();
+    options.setMinmax_filter_threshold(0.0);
+    runPlannerTestFile("convert-to-cnf", "tpch_parquet", options);
   }
 
   /**

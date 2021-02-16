@@ -279,7 +279,15 @@ class HdfsScanPlanNode : public ScanPlanNode {
   /// Conjuncts to evaluate on parquet::Statistics.
   std::vector<ScalarExpr*> min_max_conjuncts_;
 
-  /// Tuple id resolved in Init() to set tuple_desc_ .
+  /// The list of overlap predicate descs. Each is used to find out whether the range
+  /// of values of a data item overlap with a min/max filter. Data structure wise, each
+  /// desc is composed of the ID of the min/max filter, the slot index in
+  /// 'min_max_tuple_desc_' to hold the min value of the data item and the actual overlap
+  /// predicate. The next slot after the slot index implicitly holds the max value of
+  /// the data item.
+  std::vector<TOverlapPredicateDesc> overlap_predicate_descs_;
+
+  /// Tuple id resolved in Init() to set tuple_desc_.
   int tuple_id_ = -1;
 
   /// Descriptor for tuples this scan node constructs

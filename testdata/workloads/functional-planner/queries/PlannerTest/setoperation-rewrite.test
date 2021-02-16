@@ -89,12 +89,12 @@ PLAN-ROOT SINK
 |
 |--08:HASH JOIN [LEFT SEMI JOIN]
 |  |  hash predicates: `month` IS NOT DISTINCT FROM `month`, `year` IS NOT DISTINCT FROM `year`, id IS NOT DISTINCT FROM id
-|  |  runtime filters: RF006 <- `month`, RF007 <- `year`, RF008 <- id
+|  |  runtime filters: RF003 <- `month`, RF004 <- `year`, RF005 <- id
 |  |  row-size=12B cardinality=2
 |  |
 |  |--07:HASH JOIN [LEFT SEMI JOIN]
 |  |  |  hash predicates: `month` IS NOT DISTINCT FROM `month`, `year` IS NOT DISTINCT FROM `year`, id IS NOT DISTINCT FROM id
-|  |  |  runtime filters: RF012 <- `month`, RF013 <- `year`, RF014 <- id
+|  |  |  runtime filters: RF006 <- `month`, RF007 <- `year`, RF008 <- id
 |  |  |  row-size=12B cardinality=2
 |  |  |
 |  |  |--06:SCAN HDFS [functional.alltypestiny]
@@ -109,7 +109,7 @@ PLAN-ROOT SINK
 |  |  04:SCAN HDFS [functional.alltypestiny]
 |  |     partition predicates: `year` = 2009, `month` = 2
 |  |     HDFS partitions=1/4 files=1 size=115B
-|  |     runtime filters: RF012 -> functional.alltypestiny.month, RF013 -> functional.alltypestiny.year, RF014 -> functional.alltypestiny.id
+|  |     runtime filters: RF006 -> functional.alltypestiny.month, RF007 -> functional.alltypestiny.year, RF008 -> functional.alltypestiny.id
 |  |     row-size=12B cardinality=2
 |  |
 |  03:AGGREGATE [FINALIZE]
@@ -119,7 +119,7 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partition predicates: `year` = 2009, `month` = 1
 |     HDFS partitions=1/4 files=1 size=115B
-|     runtime filters: RF006 -> functional.alltypestiny.month, RF007 -> functional.alltypestiny.year, RF008 -> functional.alltypestiny.id
+|     runtime filters: RF003 -> functional.alltypestiny.month, RF004 -> functional.alltypestiny.year, RF005 -> functional.alltypestiny.id
 |     row-size=12B cardinality=2
 |
 01:AGGREGATE [FINALIZE]
@@ -145,14 +145,14 @@ PLAN-ROOT SINK
 |  |
 |  08:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
 |  |  hash predicates: `month` IS NOT DISTINCT FROM `month`, `year` IS NOT DISTINCT FROM `year`, id IS NOT DISTINCT FROM id
-|  |  runtime filters: RF006 <- `month`, RF007 <- `year`, RF008 <- id
+|  |  runtime filters: RF003 <- `month`, RF004 <- `year`, RF005 <- id
 |  |  row-size=12B cardinality=2
 |  |
 |  |--17:EXCHANGE [HASH(id,`year`,`month`)]
 |  |  |
 |  |  07:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  |  |  hash predicates: `month` IS NOT DISTINCT FROM `month`, `year` IS NOT DISTINCT FROM `year`, id IS NOT DISTINCT FROM id
-|  |  |  runtime filters: RF012 <- `month`, RF013 <- `year`, RF014 <- id
+|  |  |  runtime filters: RF006 <- `month`, RF007 <- `year`, RF008 <- id
 |  |  |  row-size=12B cardinality=2
 |  |  |
 |  |  |--16:EXCHANGE [BROADCAST]
@@ -175,7 +175,7 @@ PLAN-ROOT SINK
 |  |  04:SCAN HDFS [functional.alltypestiny]
 |  |     partition predicates: `year` = 2009, `month` = 2
 |  |     HDFS partitions=1/4 files=1 size=115B
-|  |     runtime filters: RF012 -> functional.alltypestiny.month, RF013 -> functional.alltypestiny.year, RF014 -> functional.alltypestiny.id
+|  |     runtime filters: RF006 -> functional.alltypestiny.month, RF007 -> functional.alltypestiny.year, RF008 -> functional.alltypestiny.id
 |  |     row-size=12B cardinality=2
 |  |
 |  13:AGGREGATE [FINALIZE]
@@ -191,7 +191,7 @@ PLAN-ROOT SINK
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partition predicates: `year` = 2009, `month` = 1
 |     HDFS partitions=1/4 files=1 size=115B
-|     runtime filters: RF006 -> functional.alltypestiny.month, RF007 -> functional.alltypestiny.year, RF008 -> functional.alltypestiny.id
+|     runtime filters: RF003 -> functional.alltypestiny.month, RF004 -> functional.alltypestiny.year, RF005 -> functional.alltypestiny.id
 |     row-size=12B cardinality=2
 |
 11:AGGREGATE [FINALIZE]

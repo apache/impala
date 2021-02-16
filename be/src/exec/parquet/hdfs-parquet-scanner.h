@@ -461,6 +461,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// row group level statistics, or page level statistics.
   RuntimeProfile::Counter* num_stats_filtered_row_groups_counter_;
 
+  /// Number of row groups that are skipped because of Parquet row group level statistics
+  /// and HJ min/max filters.
+  RuntimeProfile::Counter* num_minmax_filtered_row_groups_counter_;
+
   /// Number of row groups that need to be read.
   RuntimeProfile::Counter* num_row_groups_counter_;
 
@@ -469,6 +473,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
 
   /// Number of pages that are skipped because of Parquet page statistics.
   RuntimeProfile::Counter* num_stats_filtered_pages_counter_;
+
+  /// Number of pages that are skipped because of Parquet page level statistics
+  /// and HJ min/max filters.
+  RuntimeProfile::Counter* num_minmax_filtered_pages_counter_;
 
   /// Number of pages need to be examined. We need to scan
   /// 'num_pages_counter_ - num_stats_filtered_pages_counter_' pages.
@@ -522,6 +530,58 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// to be OK as well.
   Status NextRowGroup() WARN_UNUSED_RESULT;
 
+  /// Evaluates the overlap predicates of the 'scan_node_' using the parquet::Statistics
+  /// of 'row_group'. 'file_metadata' is used to determine the ordering that was used to
+  /// compute the statistics. Sets 'skip_row_group' to true if the row group can be
+  /// skipped, 'false' otherwise.
+  Status EvaluateOverlapForRowGroup(
+    const parquet::FileMetaData& file_metadata, const parquet::RowGroup& row_group,
+    bool* skip_row_group);
+
+  /// Detect if a column is a collection or missing for a column chunk described by a
+  /// schema path in a slot descriptor 'slot_desc'.
+  /// On return:
+  ///   Case 1: return Status::OK() and 'missing_field' is set accordingly.
+  ///   'schema_node_ptr' is optional and set to the schema node if not null.
+  //
+  ///   Case 2: return a Status with an error message when the column chunk is a
+  ///   collection.
+  Status ResolveSchemaForStatFiltering(SlotDescriptor* slot_desc, bool* missing_field,
+      SchemaNode** schema_node_ptr = nullptr);
+
+  /// Create a ColumnStatsReader object for a column chunk described by a schema
+  /// path in a slot descriptor 'slot_desc'. 'file_metadata', 'row_group', 'node',
+  /// and 'col_type' provide extra data needed.
+  /// On return:
+  ///   A column chunk stats reader ('ColumnStatsReader') is returned.
+  ColumnStatsReader CreateStatsReader(const parquet::FileMetaData& file_metadata,
+      const parquet::RowGroup& row_group, SchemaNode* node, const ColumnType& col_type);
+
+  /// Return the overlap predicate descs from the HDFS scan plan.
+  const vector<TOverlapPredicateDesc>& GetOverlapPredicateDescs();
+
+  /// Find and return the min/max filter at filter_ctx_[filter_idx].
+  /// Return nullptr if no min/max filter is found at that location.
+  MinMaxFilter* FindMinMaxFilter(int filter_idx);
+
+  /// Return the memory addresses of the min and the max slot in min_max_tuple_ at
+  /// location overlap_slot_idx and overlap_slot_idx+1.
+  void GetMinMaxSlotsForOverlapPred(
+      int overlap_slot_idx, void** min_slot, void** max_slot);
+
+  /// Decide whether page index should be processed. Return true when
+  ///  1. Query option parquet_read_page_index is set to true, and
+  ///  2. there exist min/max conjuncts or some min/max filters from joins are available.
+  bool ShouldProcessPageIndex();
+
+  /// Find skip ranges for pages in the current row group that are outside the min/max
+  /// ranges defined by overlap predicate min/max filters. These filters are specified
+  /// by GetOverlapPredStartIndex().
+  /// Return OK if all pages have been evaluated against the filters and *'skip_ranges'
+  /// is appended with those skip ranges found (if any).
+  /// Returns a non-OK status when some error is encountered.
+  Status FindSkipRangesForPagesWithMinMaxFilters(vector<RowRange>* skip_ranges);
+
   /// Resets page index filtering state, i.e. clears 'candidate_ranges_' and resets
   /// scalar readers' page filtering as well.
   void ResetPageFiltering();
@@ -542,6 +602,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Check that the scalar readers agree on the top-level row being scanned.
   Status CheckPageFiltering();
 
+  /// Find out if the enabled_for_page flag at filter_stats_[filter_idx] is true. If so,
+  /// the filter at filter_ctx_[filter_idx] is worthy to evaluate the overlap predicate.
+  bool IsFilterWorthyForOverlapCheck(int filter_idx);
+
   /// Reads statistics data for a page of given column. Page is specified by 'page_idx',
   /// column is specified by 'column_index'. 'stats_field' specifies whether we should
   /// read the min or max value. 'is_null_page' is set to true for null pages, in that
@@ -550,6 +614,15 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   static bool ReadStatFromIndex(const ColumnStatsReader& stats_reader,
       const parquet::ColumnIndex& column_index, int page_idx,
       ColumnStatsReader::StatsField stats_field, bool* is_null_page, void* slot);
+
+  /// Reads both min and max statistics data for a page of given column. Page is
+  /// specified by 'page_idx', column is specified by 'column_index'. 'is_null_page'
+  /// is set to true for null pages, in that case there is no min nor max value.
+  /// Returns true if the read of the min and the max value was successful, in this
+  /// case 'min_slot' will hold the min and 'max_slot' will hold the max value.
+  static bool ReadStatFromIndex(const ColumnStatsReader& stats_reader,
+      const parquet::ColumnIndex& column_index, int page_idx,
+      bool* is_null_page, void* min_slot, void* max_slot);
 
   /// Reads data using 'column_readers' to materialize top-level tuples into 'row_batch'.
   /// Returns a non-OK status if a non-recoverable error was encountered and execution

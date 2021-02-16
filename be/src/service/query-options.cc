@@ -404,6 +404,26 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::DISABLE_ROW_RUNTIME_FILTERING:
         query_options->__set_disable_row_runtime_filtering(IsTrue(value));
         break;
+      case TImpalaQueryOptions::MINMAX_FILTERING_LEVEL:
+        // Parse the enabled runtime filter types and validate it.
+        TMinmaxFilteringLevel::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "minmax filter level",
+            _TMinmaxFilteringLevel_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_minmax_filtering_level(enum_type);
+        break;
+      case TImpalaQueryOptions::MINMAX_FILTER_THRESHOLD: {
+        StringParser::ParseResult status;
+        double val = StringParser::StringToFloat<double>(
+            value.c_str(), static_cast<int>(value.size()), &status);
+        if (status != StringParser::PARSE_SUCCESS || val < 0.0 || val > 1.0) {
+          return Status(
+              Substitute("Invalid minmax filter threshold '$0'. Valid sizes are in"
+                         "[0.0, 1.0]",
+                  value));
+        }
+        query_options->__set_minmax_filter_threshold(val);
+        break;
+      }
       case TImpalaQueryOptions::MAX_NUM_RUNTIME_FILTERS: {
         StringParser::ParseResult status;
         int val = StringParser::StringToInt<int>(value.c_str(), value.size(), &status);

@@ -84,6 +84,11 @@ bool ColumnStatsReader::ReadFromThrift(StatsField stats_field, void* slot) const
   return ReadFromString(stats_field, *stat_value, paired_stats_value, slot);
 }
 
+bool ColumnStatsReader::ReadMinMaxFromThrift(void* min_slot, void* max_slot) const {
+  return ReadFromThrift(ColumnStatsReader::StatsField::MIN, min_slot) &&
+         ReadFromThrift(ColumnStatsReader::StatsField::MAX, max_slot);
+}
+
 bool ColumnStatsReader::ReadFromString(StatsField stats_field,
     const string& encoded_value, const string* paired_stats_value, void* slot) const {
   switch (col_type_.type) {
@@ -210,6 +215,17 @@ bool ColumnStatsReader::ReadNullCountStat(int64_t* null_count) const {
     return true;
   }
   return false;
+}
+
+bool ColumnStatsReader::AllNulls(bool* all_nulls) const {
+  DCHECK(all_nulls);
+  int64_t null_count = 0;
+  bool null_count_read = ReadNullCountStat(&null_count);
+  if (!null_count_read) {
+    return false;
+  }
+  *all_nulls = (null_count == col_chunk_.meta_data.num_values);
+  return true;
 }
 
 Status ColumnStatsBase::CopyToBuffer(StringBuffer* buffer, StringValue* value) {

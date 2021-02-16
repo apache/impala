@@ -65,7 +65,6 @@ WHERE i_manufact_id BETWEEN 738 AND 738+40
                          OR i_size = 'extra large'))))) > 0
 ORDER BY i_product_name
 LIMIT 100;
-
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=4.38MB Threads=3
 Per-Host Resource Estimates: Memory=138MB

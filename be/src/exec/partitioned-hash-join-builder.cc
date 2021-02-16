@@ -936,6 +936,12 @@ void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
 
     runtime_state_->filter_bank()->UpdateFilterFromLocal(
         ctx.filter->id(), bloom_filter, ctx.local_min_max_filter);
+
+    if ( ctx.local_min_max_filter != nullptr ) {
+      VLOG(3) << "HJBuilder published min/max filter: "
+               << " id=" << ctx.filter->id()
+               << ", details=" << ctx.local_min_max_filter->DebugString();
+    }
   }
 
   if (filter_ctxs_.size() > 0) {
