@@ -1200,20 +1200,20 @@ public class Frontend {
   /**
    * Generate result set and schema for a SHOW COLUMN STATS command.
    */
-  public TResultSet getColumnStats(String dbName, String tableName)
+  public TResultSet getColumnStats(String dbName, String tableName, boolean showMinMax)
       throws ImpalaException {
     RetryTracker retries = new RetryTracker(
         String.format("fetching column stats from %s.%s", dbName, tableName));
     while (true) {
       try {
-        return doGetColumnStats(dbName, tableName);
+        return doGetColumnStats(dbName, tableName, showMinMax);
       } catch(InconsistentMetadataFetchException e) {
         retries.handleRetryOrThrow(e);
       }
     }
   }
 
-  private TResultSet doGetColumnStats(String dbName, String tableName)
+  private TResultSet doGetColumnStats(String dbName, String tableName, boolean showMinMax)
       throws ImpalaException {
     FeTable table = getCatalog().getTable(dbName, tableName);
     TResultSet result = new TResultSet();
@@ -1228,18 +1228,36 @@ public class Frontend {
     resultSchema.addToColumns(new TColumn("Avg Size", Type.DOUBLE.toThrift()));
     resultSchema.addToColumns(new TColumn("#Trues", Type.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("#Falses", Type.BIGINT.toThrift()));
+    if (showMinMax) {
+      resultSchema.addToColumns(new TColumn("Min", Type.STRING.toThrift()));
+      resultSchema.addToColumns(new TColumn("Max", Type.STRING.toThrift()));
+    }
 
     for (Column c: table.getColumnsInHiveOrder()) {
       TResultRowBuilder rowBuilder = new TResultRowBuilder();
-      // Add name, type, NDVs, numNulls, max size and avg size.
-      rowBuilder.add(c.getName())
-          .add(c.getType().toSql())
-          .add(c.getStats().getNumDistinctValues())
-          .add(c.getStats().getNumNulls())
-          .add(c.getStats().getMaxSize())
-          .add(c.getStats().getAvgSize())
-          .add(c.getStats().getNumTrues())
-          .add(c.getStats().getNumFalses());
+      // Add name, type, NDVs, numNulls, max size, avg size, and conditionally
+      // the min value and max value.
+      if (showMinMax) {
+        rowBuilder.add(c.getName())
+            .add(c.getType().toSql())
+            .add(c.getStats().getNumDistinctValues())
+            .add(c.getStats().getNumNulls())
+            .add(c.getStats().getMaxSize())
+            .add(c.getStats().getAvgSize())
+            .add(c.getStats().getNumTrues())
+            .add(c.getStats().getNumFalses())
+            .add(c.getStats().getLowValueAsString())
+            .add(c.getStats().getHighValueAsString());
+      } else {
+        rowBuilder.add(c.getName())
+            .add(c.getType().toSql())
+            .add(c.getStats().getNumDistinctValues())
+            .add(c.getStats().getNumNulls())
+            .add(c.getStats().getMaxSize())
+            .add(c.getStats().getAvgSize())
+            .add(c.getStats().getNumTrues())
+            .add(c.getStats().getNumFalses());
+      }
       result.addToRows(rowBuilder.get());
     }
     return result;

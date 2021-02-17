@@ -185,6 +185,13 @@ TEST(MinMaxFilterTest, TestNumericMinMaxFilter) {
   EXPECT_FALSE(f1->AlwaysTrue());
   EXPECT_FALSE(f1->AlwaysFalse());
 
+  MinMaxFilterPB pFilter3;
+  pFilter3.mutable_min()->set_int_val(0);
+  pFilter3.mutable_max()->set_int_val(0);
+  pFilter2.set_always_true(true);
+  MinMaxFilter::Or(pFilter2, &pFilter3, int_type);
+  EXPECT_EQ(pFilter3.always_true(), true);
+
   int_filter->Close();
   empty_filter->Close();
   int_filter2->Close();
@@ -437,6 +444,16 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   EXPECT_TRUE(always_true_filter->AlwaysTrue());
   EXPECT_FALSE(always_true_filter->AlwaysFalse());
 
+  // Test the transfer of always true flag from operation Or() to protobuf and back
+  MinMaxFilter* f3 = MinMaxFilter::Create(string_type, &obj_pool, &mem_tracker);
+  f3->SetAlwaysTrue();
+  f1->Or(*f3);
+  EXPECT_TRUE(f3->AlwaysTrue());
+  f3->ToProtobuf(&pFilter);
+  EXPECT_TRUE(pFilter.always_true());
+  StringMinMaxFilter f4(pFilter, &mem_tracker);
+  EXPECT_TRUE(f4.AlwaysTrue());
+
   filter->Close();
   empty_filter->Close();
   filter2->Close();
@@ -445,6 +462,7 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   f1->Close();
   f2->Close();
   always_false->Close();
+  f3->Close();
 }
 
 static TimestampValue ParseSimpleTimestamp(const char* s) {

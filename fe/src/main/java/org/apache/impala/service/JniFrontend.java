@@ -385,7 +385,8 @@ public class JniFrontend {
 
     if (params.op == TShowStatsOp.COLUMN_STATS) {
       result = frontend_.getColumnStats(params.getTable_name().getDb_name(),
-          params.getTable_name().getTable_name());
+          params.getTable_name().getTable_name(),
+          params.isSetShow_column_minmax_stats() && params.show_column_minmax_stats);
     } else {
       result = frontend_.getTableStats(params.getTable_name().getDb_name(),
           params.getTable_name().getTable_name(), params.op);

@@ -312,9 +312,9 @@ void CatalogOpExecutor::SetColumnStats(const TTableSchema& col_stats_schema,
   // Set per-column stats. For a column at position i in its source table,
   // the NDVs and the number of NULLs are at position i and i + 1 of the
   // col_stats_row, respectively. Positions i + 2 and i + 3 contain the max/avg
-  // length for string columns, Positions i+4 and i+5 contains the numTrues/numFalses
-  // and -1 for non-string columns.
-  for (int i = 0; i < col_stats_row.colVals.size(); i += 6) {
+  // length for string columns. Positions i+4 and i+5 contain the numTrues/numFalses
+  // (-1 for non-string columns). Positions i+6 and i+7 contain the min and the max.
+  for (int i = 0; i < col_stats_row.colVals.size(); i += 8) {
     TColumnStats col_stats;
     col_stats.__set_num_distinct_values(col_stats_row.colVals[i].i64Val.value);
     col_stats.__set_num_nulls(col_stats_row.colVals[i + 1].i64Val.value);
@@ -322,6 +322,18 @@ void CatalogOpExecutor::SetColumnStats(const TTableSchema& col_stats_schema,
     col_stats.__set_avg_size(col_stats_row.colVals[i + 3].doubleVal.value);
     col_stats.__set_num_trues(col_stats_row.colVals[i + 4].i64Val.value);
     col_stats.__set_num_falses(col_stats_row.colVals[i + 5].i64Val.value);
+    // By default, the low and high value in TColumnStats are unset. Set both
+    // conditionally.
+    TColumnValue low_value = ConvertToTColumnValue(
+        col_stats_schema.columns[i + 6], col_stats_row.colVals[i + 6]);
+    if (isOneFieldSet(low_value)) {
+      col_stats.__set_low_value(low_value);
+    }
+    TColumnValue high_value = ConvertToTColumnValue(
+        col_stats_schema.columns[i + 7], col_stats_row.colVals[i + 7]);
+    if (isOneFieldSet(high_value)) {
+      col_stats.__set_high_value(high_value);
+    }
     params->column_stats[col_stats_schema.columns[i].columnName] = col_stats;
   }
   params->__isset.column_stats = true;

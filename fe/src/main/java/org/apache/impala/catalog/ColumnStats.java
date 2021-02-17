@@ -17,19 +17,32 @@
 
 package org.apache.impala.catalog;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.BinaryColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsData;
+import org.apache.hadoop.hive.metastore.api.Date;
 import org.apache.hadoop.hive.metastore.api.DateColumnStatsData;
+import org.apache.hadoop.hive.metastore.api.Decimal;
 import org.apache.hadoop.hive.metastore.api.DecimalColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.DoubleColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.LongColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.analysis.DateLiteral;
+import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.SlotRef;
+import org.apache.impala.util.MetaStoreUtil;
 import org.apache.impala.thrift.TColumnStats;
+import org.apache.impala.thrift.TColumnValue;
+
+import org.apache.log4j.Logger;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
@@ -47,6 +60,8 @@ public class ColumnStats {
       PrimitiveType.INT, PrimitiveType.SMALLINT, PrimitiveType.CHAR,
       PrimitiveType.VARCHAR, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
       PrimitiveType.TINYINT, PrimitiveType.DECIMAL);
+
+  private static final Logger LOG = Logger.getLogger(ColumnStats.class);
 
   public enum StatsKey {
     NUM_DISTINCT_VALUES("numDVs"),
@@ -87,6 +102,8 @@ public class ColumnStats {
   private long numNulls_;
   private long numTrues_;
   private long numFalses_;
+  private TColumnValue lowValue_;
+  private TColumnValue highValue_;
 
   public ColumnStats(Type colType) {
     initColStats(colType);
@@ -104,6 +121,8 @@ public class ColumnStats {
     numNulls_ = other.numNulls_;
     numTrues_ = other.numTrues_;
     numFalses_ = other.numFalses_;
+    lowValue_ = other.lowValue_;
+    highValue_ = other.highValue_;
     validate(null);
   }
 
@@ -120,6 +139,8 @@ public class ColumnStats {
     numNulls_ = -1;
     numTrues_ = -1;
     numFalses_ = -1;
+    lowValue_ = null;
+    highValue_ = null;
     if (colType.isFixedLengthType()) {
       avgSerializedSize_ = colType.getSlotSize();
       avgSize_ = colType.getSlotSize();
@@ -149,6 +170,8 @@ public class ColumnStats {
     }
     stats.numTrues_ = slotStats.getNumTrues();
     stats.numFalses_ = slotStats.getNumFalses();
+    stats.lowValue_ = slotStats.getLowValue();
+    stats.highValue_ = slotStats.getHighValue();
     stats.validate(colType);
     return stats;
   }
@@ -202,6 +225,306 @@ public class ColumnStats {
   public long getNumFalses() { return numFalses_; }
   public boolean hasNumDistinctValues() { return numDistinctValues_ >= 0; }
   public boolean hasStats() { return numNulls_ != -1 || numDistinctValues_ != -1; }
+  public TColumnValue getLowValue() { return lowValue_; }
+  public TColumnValue getHighValue() { return highValue_; }
+
+  /**
+   * Return the value of a defined field as a string. Return -1 if 'value' is null,
+   * all fields are undefined, or a field is defined but its value is null.
+   */
+  public String getTColumnValueAsString(TColumnValue value) {
+    if (value==null) return "-1";
+    StringBuilder sb = new StringBuilder("");
+
+    if (value.isSetBool_val()) {
+      sb.append(value.bool_val);
+    } else if (value.isSetByte_val()) {
+      sb.append(value.byte_val);
+    } else if (value.isSetShort_val()) {
+      sb.append(value.short_val);
+    } else if (value.isSetInt_val()) {
+      sb.append(value.int_val);
+    } else if (value.isSetLong_val()) {
+      sb.append(value.long_val);
+    } else if (value.isSetDouble_val()) {
+      sb.append(value.double_val);
+    } else if (value.isSetString_val()) {
+      if (value.string_val == null) {
+        sb.append("-1");
+      } else {
+        sb.append(value.string_val);
+      }
+    } else if (value.isSetBinary_val()) {
+      if (value.binary_val == null) {
+        sb.append("-1");
+      } else {
+        org.apache.thrift.TBaseHelper.toString(value.binary_val, sb);
+      }
+    } else if (value.isSetTimestamp_val()) {
+      if (value.timestamp_val == null) {
+        sb.append("-1");
+      } else {
+        org.apache.thrift.TBaseHelper.toString(value.timestamp_val, sb);
+      }
+    } else if (value.isSetDecimal_val()) {
+      if (value.decimal_val == null) {
+        sb.append("-1");
+      } else {
+        sb.append(new String(value.getDecimal_val()));
+      }
+    } else if (value.isSetDate_val()) {
+      LocalDate d = LocalDate.ofEpochDay(value.date_val);
+      sb.append(d.toString());
+    } else {
+      sb.append("-1");
+    }
+    return sb.toString();
+  }
+
+  /*
+   * Return the low and high value as a string.
+   */
+  public String getLowValueAsString() { return getTColumnValueAsString(lowValue_); }
+  public String getHighValueAsString() { return getTColumnValueAsString(highValue_); }
+
+  /*
+   * Update the low value with a numeric literal
+   */
+  protected void updateLowValue(NumericLiteral literal) {
+    if (lowValue_ == null) lowValue_ = new TColumnValue();
+    if (literal.getType().isScalarType(PrimitiveType.TINYINT)) {
+      int value = literal.getIntValue();
+      if (!lowValue_.isSetByte_val() || value < lowValue_.getByte_val()) {
+        lowValue_.setByte_val((byte) value);
+      }
+    } else if (literal.getType().isScalarType(PrimitiveType.SMALLINT)) {
+      int value = literal.getIntValue();
+      if (!lowValue_.isSetShort_val() || value < lowValue_.getShort_val()) {
+        lowValue_.setShort_val((short) value);
+      }
+    } else if (literal.getType().isScalarType(PrimitiveType.INT)) {
+      int value = literal.getIntValue();
+      if (!lowValue_.isSetInt_val() || value < lowValue_.getInt_val()) {
+        lowValue_.setInt_val(value);
+      }
+    } else if (literal.getType().isScalarType(PrimitiveType.BIGINT)) {
+      long value = literal.getLongValue();
+      if (!lowValue_.isSetLong_val() || value < lowValue_.getLong_val()) {
+        lowValue_.setLong_val(value);
+      }
+    } else if (literal.getType().isFloatingPointType()) {
+      double value = literal.getDoubleValue();
+      if (!lowValue_.isSetDouble_val() || value < lowValue_.getDouble_val()) {
+        lowValue_.setDouble_val(value);
+      }
+    } else if (literal.getType().isDecimal()) {
+      // Decimals are represented as ASCII strings in bytes[] in lowValue_.
+      if (!lowValue_.isSetDecimal_val() ) {
+        lowValue_.setDecimal_val(literal.getValue().toString().getBytes());
+      } else {
+        BigDecimal value = literal.getValue();
+        BigDecimal lValue = new BigDecimal(new String(lowValue_.getDecimal_val()));
+        if (value.compareTo(lValue) == -1) {
+          lowValue_.setDecimal_val(value.toString().getBytes());
+        }
+      }
+    }
+  }
+
+  /*
+   * Update the high value with a numeric literal
+   */
+  protected void updateHighValue(NumericLiteral literal) {
+    if (highValue_ == null) highValue_ = new TColumnValue();
+    if (literal.getType().isScalarType(PrimitiveType.TINYINT)) {
+      int value = literal.getIntValue();
+      if (!highValue_.isSetByte_val() || value > highValue_.getByte_val()) {
+        highValue_.setByte_val((byte) value);
+      }
+    } else if (literal.getType().isScalarType(PrimitiveType.SMALLINT)) {
+      int value = literal.getIntValue();
+      if (!highValue_.isSetShort_val() || value > highValue_.getShort_val()) {
+        highValue_.setShort_val((short) value);
+      }
+    } else if (literal.getType().isScalarType(PrimitiveType.INT)) {
+      int value = literal.getIntValue();
+      if (!highValue_.isSetInt_val() || value > highValue_.getInt_val()) {
+        highValue_.setInt_val(value);
+      }
+    } else if (literal.getType().isScalarType(PrimitiveType.BIGINT)) {
+      long value = literal.getLongValue();
+      if (!highValue_.isSetLong_val() || value > highValue_.getLong_val()) {
+        highValue_.setLong_val(value);
+      }
+    } else if (literal.getType().isFloatingPointType()) {
+      double value = literal.getDoubleValue();
+      if (!highValue_.isSetDouble_val() || value > highValue_.getDouble_val()) {
+        highValue_.setDouble_val(value);
+      }
+    } else if (literal.getType().isDecimal()) {
+      // Decimals are represented as ASCII strings in bytes[] in highValue_.
+      if (!highValue_.isSetDecimal_val() ) {
+        highValue_.setDecimal_val(literal.getValue().toString().getBytes());
+      } else {
+        BigDecimal value = literal.getValue();
+        BigDecimal hValue = new BigDecimal(new String(highValue_.getDecimal_val()));
+        if (value.compareTo(hValue) == 1) {
+          highValue_.setDecimal_val(value.toString().getBytes());
+        }
+      }
+    }
+  }
+
+  /*
+   * Update the low value with a date literal
+   */
+  protected void updateLowValue(DateLiteral literal) {
+    if (lowValue_ == null) lowValue_ = new TColumnValue();
+    int value = literal.getValue();
+    if (!lowValue_.isSetDate_val() || value < lowValue_.getDate_val()) {
+      lowValue_.setDate_val(value);
+    }
+  }
+
+  /*
+   * Update the high value with a date literal
+   */
+  protected void updateHighValue(DateLiteral literal) {
+    if (highValue_ == null) highValue_ = new TColumnValue();
+    int value = literal.getValue();
+    if (!highValue_.isSetDate_val() || value > highValue_.getDate_val()) {
+      highValue_.setDate_val(value);
+    }
+  }
+
+  /*
+   * Update the low and the high value with 'literal'. If 'literal' is NULL or not a type
+   * supported by HMS for storage, no update will be done. This method is mainly called
+   * to update the low and high value for partition columns in HDFS table.
+   * TODO: handle DECIMAL.
+   */
+  public void updateLowAndHighValue(LiteralExpr literal) {
+    if (Expr.IS_NULL_LITERAL.apply(literal)) return;
+    if (!MetaStoreUtil.canStoreMinmaxInHMS(literal.getType())) return;
+    if (literal instanceof NumericLiteral) {
+      updateLowValue((NumericLiteral) literal);
+      updateHighValue((NumericLiteral) literal);
+    } else if (literal instanceof DateLiteral) {
+      updateLowValue((DateLiteral) literal);
+      updateHighValue((DateLiteral) literal);
+    }
+  }
+
+  /*
+   * From the source 'longStats', set the low and high value for 'type' (one of the
+   * integer types).
+   */
+  protected void setLowAndHighValue(PrimitiveType type, LongColumnStatsData longStats) {
+    if (!longStats.isSetLowValue()) {
+      lowValue_ = null;
+    } else {
+      Long value = new Long(longStats.getLowValue());
+      lowValue_ = new TColumnValue();
+      switch (type) {
+        case TINYINT:
+          lowValue_.setByte_val(value.byteValue());
+          break;
+        case SMALLINT:
+          lowValue_.setShort_val(value.shortValue());
+          break;
+        case INT:
+          lowValue_.setInt_val(value.intValue());
+          break;
+        case BIGINT:
+          lowValue_.setLong_val(value.longValue());
+          break;
+        default:
+          Preconditions.checkState(
+              false, "Unsupported type encountered in setLowAndHighValue()");
+      }
+    }
+
+    if (!longStats.isSetHighValue()) {
+      highValue_ = null;
+    } else {
+      Long value = new Long(longStats.getHighValue());
+      highValue_ = new TColumnValue();
+      switch (type) {
+        case TINYINT:
+          highValue_.setByte_val(value.byteValue());
+          break;
+        case SMALLINT:
+          highValue_.setShort_val(value.shortValue());
+          break;
+        case INT:
+          highValue_.setInt_val(value.intValue());
+          break;
+        case BIGINT:
+          highValue_.setLong_val(value.longValue());
+          break;
+        default:
+          Preconditions.checkState(
+              false, "Unsupported type encountered in setLowAndHighValue()");
+      }
+    }
+  }
+
+  /*
+   * From the source 'doubleStats', set the low and high value.
+   */
+  protected void setLowAndHighValue(DoubleColumnStatsData doubleStats) {
+    if (!doubleStats.isSetLowValue()) {
+      lowValue_ = null;
+    } else {
+      lowValue_ = new TColumnValue();
+      lowValue_.setDouble_val(doubleStats.getLowValue());
+    }
+
+    if (!doubleStats.isSetHighValue()) {
+      highValue_ = null;
+    } else {
+      highValue_ = new TColumnValue();
+      highValue_.setDouble_val(doubleStats.getHighValue());
+    }
+  }
+
+  /*
+   * From the source 'dateStats', set the low and high value.
+   */
+  protected void setLowAndHighValue(DateColumnStatsData dateStats) {
+    if (!dateStats.isSetLowValue()) {
+      lowValue_ = null;
+    } else {
+      lowValue_ = new TColumnValue();
+      lowValue_.setDate_val((int)dateStats.getLowValue().getDaysSinceEpoch());
+    }
+
+    if (!dateStats.isSetHighValue()) {
+      highValue_ = null;
+    } else {
+      highValue_ = new TColumnValue();
+      highValue_.setDate_val((int)dateStats.getHighValue().getDaysSinceEpoch());
+    }
+  }
+
+  /*
+   * From the source 'decimalStats', set the low and high value.
+   */
+  protected void setLowAndHighValue(DecimalColumnStatsData decimalStats) {
+    if (!decimalStats.isSetLowValue()) {
+      lowValue_ = null;
+    } else {
+      lowValue_ = new TColumnValue();
+      lowValue_.setDecimal_val(decimalStats.getLowValue().getUnscaled());
+    }
+
+    if (!decimalStats.isSetHighValue()) {
+      highValue_ = null;
+    } else {
+      highValue_ = new TColumnValue();
+      highValue_.setDecimal_val(decimalStats.getHighValue().getUnscaled());
+    }
+  }
 
   /**
    * Updates the stats with the given ColumnStatisticsData. If the ColumnStatisticsData
@@ -214,6 +537,16 @@ public class ColumnStats {
     Preconditions.checkState(isSupportedColType(colType));
     initColStats(colType);
     boolean isCompatible = false;
+
+    /// Since the low and high value exist only in the following Hive stats objects:
+    ///   DateColumnStatsData
+    ///   LongColumnStatsData
+    ///   DoubleColumnStatsData
+    ///   DecimalColumnStatsData
+    /// assume no low or high values are available until one with min/max values is
+    /// encountered. At that point of time, setLowAndHighValue() will be called.
+    lowValue_ = null;
+    highValue_ = null;
     switch (colType.getPrimitiveType()) {
       case BOOLEAN:
         isCompatible = statsData.isSetBooleanStats();
@@ -242,6 +575,7 @@ public class ColumnStats {
           LongColumnStatsData longStats = statsData.getLongStats();
           numDistinctValues_ = longStats.getNumDVs();
           numNulls_ = longStats.getNumNulls();
+          setLowAndHighValue(colType.getPrimitiveType(), longStats);
         }
         break;
       case DATE:
@@ -250,6 +584,7 @@ public class ColumnStats {
           DateColumnStatsData dateStats = statsData.getDateStats();
           numDistinctValues_ = dateStats.getNumDVs();
           numNulls_ = dateStats.getNumNulls();
+          setLowAndHighValue(dateStats);
         }
         break;
       case FLOAT:
@@ -259,6 +594,7 @@ public class ColumnStats {
           DoubleColumnStatsData doubleStats = statsData.getDoubleStats();
           numDistinctValues_ = doubleStats.getNumDVs();
           numNulls_ = doubleStats.getNumNulls();
+          setLowAndHighValue(doubleStats);
         }
         break;
       case CHAR:
@@ -302,6 +638,7 @@ public class ColumnStats {
           DecimalColumnStatsData decimalStats = statsData.getDecimalStats();
           numNulls_ = decimalStats.getNumNulls();
           numDistinctValues_ = decimalStats.getNumDVs();
+          setLowAndHighValue(decimalStats);
         }
         break;
       default:
@@ -311,6 +648,74 @@ public class ColumnStats {
     }
     validate(colType);
     return isCompatible;
+  }
+
+  /**
+   * Set the low and high value for an Hive LongColumnStatsData object.
+   */
+  public static void updateLowAndHighForHiveColumnStatsData(
+      Long low_value, Long high_value, LongColumnStatsData longColStatsData) {
+    if (low_value != null) {
+      longColStatsData.setLowValue(low_value.longValue());
+    } else {
+      longColStatsData.unsetLowValue();
+    }
+    if (high_value != null) {
+      longColStatsData.setHighValue(high_value.longValue());
+    } else {
+      longColStatsData.unsetHighValue();
+    }
+  }
+
+  /**
+   * Set the low and high value for an Hive DoubleColumnStatsData object.
+   */
+  public static void updateLowAndHighForHiveColumnStatsData(
+      Double low_value, Double high_value, DoubleColumnStatsData doubleColStatsData) {
+    if (low_value != null) {
+      doubleColStatsData.setLowValue(low_value.doubleValue());
+    } else {
+      doubleColStatsData.unsetLowValue();
+    }
+    if (high_value != null) {
+      doubleColStatsData.setHighValue(high_value.doubleValue());
+    } else {
+      doubleColStatsData.unsetHighValue();
+    }
+  }
+
+  /**
+   * Set the low and high value for an Hive DateColumnStatsData object.
+   */
+  public static void updateLowAndHighForHiveColumnStatsData(
+      Date low_value, Date high_value, DateColumnStatsData dateColStatsData) {
+    if (low_value != null) {
+      dateColStatsData.setLowValue(low_value);
+    } else {
+      dateColStatsData.unsetLowValue();
+    }
+    if (high_value != null) {
+      dateColStatsData.setHighValue(high_value);
+    } else {
+      dateColStatsData.unsetHighValue();
+    }
+  }
+
+  /**
+   * Set the low and high value for an Hive DecimalColumnStatsData object.
+   */
+  public static void updateLowAndHighForHiveColumnStatsData(
+      Decimal low_value, Decimal high_value, DecimalColumnStatsData decimalColStatsData) {
+    if (low_value != null) {
+      decimalColStatsData.setLowValue(low_value);
+    } else {
+      decimalColStatsData.unsetLowValue();
+    }
+    if (high_value != null) {
+      decimalColStatsData.setHighValue(high_value);
+    } else {
+      decimalColStatsData.unsetHighValue();
+    }
   }
 
   /**
@@ -330,36 +735,121 @@ public class ColumnStats {
     long numNulls = colStats.getNum_nulls();
     long numTrues = colStats.getNum_trues();
     long numFalses = colStats.getNum_falses();
+    boolean isLowValueSet = colStats.isSetLow_value();
+    boolean isHighValueSet = colStats.isSetHigh_value();
     switch(colType.getPrimitiveType()) {
       case BOOLEAN:
         colStatsData.setBooleanStats(
             new BooleanColumnStatsData(numTrues, numFalses, numNulls));
         break;
       case TINYINT:
-        ndv = Math.min(ndv, LongMath.pow(2, Byte.SIZE));
-        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
+        {
+          ndv = Math.min(ndv, LongMath.pow(2, Byte.SIZE));
+          LongColumnStatsData longColStatsData = new LongColumnStatsData(numNulls, ndv);
+          Long lowValue = null;
+          Long highValue = null;
+          if (isLowValueSet && colStats.low_value.isSetByte_val()) {
+            lowValue = new Long(colStats.low_value.getByte_val());
+          }
+          if (isHighValueSet && colStats.high_value.isSetByte_val()) {
+            highValue = new Long(colStats.high_value.getByte_val());
+          }
+          updateLowAndHighForHiveColumnStatsData(lowValue, highValue, longColStatsData);
+          colStatsData.setLongStats(longColStatsData);
+        }
         break;
       case SMALLINT:
-        ndv = Math.min(ndv, LongMath.pow(2, Short.SIZE));
-        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
+        {
+          ndv = Math.min(ndv, LongMath.pow(2, Short.SIZE));
+          LongColumnStatsData longColStatsData = new LongColumnStatsData(numNulls, ndv);
+
+          Long lowValue = null;
+          Long highValue = null;
+          if (isLowValueSet && colStats.low_value.isSetShort_val()) {
+            lowValue = new Long(colStats.low_value.getShort_val());
+          }
+          if (isHighValueSet && colStats.high_value.isSetShort_val()) {
+            highValue = new Long(colStats.high_value.getShort_val());
+          }
+          updateLowAndHighForHiveColumnStatsData(lowValue, highValue, longColStatsData);
+
+          colStatsData.setLongStats(longColStatsData);
+        }
         break;
       case INT:
-        ndv = Math.min(ndv, LongMath.pow(2, Integer.SIZE));
-        colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
+        {
+          ndv = Math.min(ndv, LongMath.pow(2, Integer.SIZE));
+          LongColumnStatsData longColStatsData = new LongColumnStatsData(numNulls, ndv);
+
+          Long lowValue = null;
+          Long highValue = null;
+          if (isLowValueSet && colStats.low_value.isSetInt_val()) {
+            lowValue = new Long(colStats.low_value.getInt_val());
+          }
+          if (isHighValueSet && colStats.high_value.isSetInt_val()) {
+            highValue = new Long(colStats.high_value.getInt_val());
+          }
+          updateLowAndHighForHiveColumnStatsData(lowValue, highValue, longColStatsData);
+
+          colStatsData.setLongStats(longColStatsData);
+        }
         break;
       case DATE:
-        // Number of distinct dates in the 0001-01-01..9999-12-31 inclusive range is
-        // 3652059.
-        ndv = Math.min(ndv, 3652059);
-        colStatsData.setDateStats(new DateColumnStatsData(numNulls, ndv));
+        {
+          // Number of distinct dates in the 0001-01-01..9999-12-31 inclusive range is
+          // 3652059.
+          ndv = Math.min(ndv, 3652059);
+          DateColumnStatsData dateColStatsData = new DateColumnStatsData(numNulls, ndv);
+          Date lowValue = null;
+          Date highValue = null;
+          if (isLowValueSet && colStats.low_value.isSetDate_val()) {
+            lowValue = new Date(Long.valueOf(colStats.low_value.getDate_val()));
+          }
+          if (isHighValueSet && colStats.high_value.isSetDate_val()) {
+            highValue = new Date(Long.valueOf(colStats.high_value.getDate_val()));
+          }
+          updateLowAndHighForHiveColumnStatsData(lowValue, highValue, dateColStatsData);
+          colStatsData.setDateStats(dateColStatsData);
+        }
         break;
       case BIGINT:
+        {
+          LongColumnStatsData longColStatsData = new LongColumnStatsData(numNulls, ndv);
+
+          Long lowValue = null;
+          Long highValue = null;
+          if (isLowValueSet && colStats.low_value.isSetLong_val()) {
+            lowValue = new Long(colStats.low_value.getLong_val());
+          }
+          if (isHighValueSet && colStats.high_value.isSetLong_val()) {
+            highValue = new Long(colStats.high_value.getLong_val());
+          }
+          updateLowAndHighForHiveColumnStatsData(lowValue, highValue, longColStatsData);
+
+          colStatsData.setLongStats(longColStatsData);
+        }
+        break;
       case TIMESTAMP: // Hive and Impala use LongColumnStatsData for timestamps.
         colStatsData.setLongStats(new LongColumnStatsData(numNulls, ndv));
         break;
       case FLOAT:
       case DOUBLE:
-        colStatsData.setDoubleStats(new DoubleColumnStatsData(numNulls, ndv));
+        {
+          DoubleColumnStatsData doubleColStatsData =
+              new DoubleColumnStatsData(numNulls, ndv);
+
+          Double lowValue = null;
+          Double highValue = null;
+          if (isLowValueSet && colStats.low_value.isSetDouble_val()) {
+            lowValue = new Double(colStats.low_value.getDouble_val());
+          }
+          if (isHighValueSet && colStats.high_value.isSetDouble_val()) {
+            highValue = new Double(colStats.high_value.getDouble_val());
+          }
+          updateLowAndHighForHiveColumnStatsData(lowValue, highValue, doubleColStatsData);
+
+          colStatsData.setDoubleStats(doubleColStatsData);
+        }
         break;
       case CHAR:
       case VARCHAR:
@@ -370,9 +860,25 @@ public class ColumnStats {
             new StringColumnStatsData(maxStrLen, avgStrLen, numNulls, ndv));
         break;
       case DECIMAL:
-        double decMaxNdv = Math.pow(10, colType.getPrecision());
-        ndv = (long) Math.min(ndv, decMaxNdv);
-        colStatsData.setDecimalStats(new DecimalColumnStatsData(numNulls, ndv));
+        {
+          double decMaxNdv = Math.pow(10, colType.getPrecision());
+          ndv = (long) Math.min(ndv, decMaxNdv);
+          DecimalColumnStatsData decimalStatsData =
+              new DecimalColumnStatsData(numNulls, ndv);
+          Decimal lowValue = null;
+          Decimal highValue = null;
+          ScalarType colTypeScalar = (ScalarType) colType;
+          if (isLowValueSet && colStats.low_value.isSetDecimal_val()) {
+            lowValue = new Decimal((short) colTypeScalar.decimalScale(),
+                colStats.low_value.bufferForDecimal_val());
+          }
+          if (isHighValueSet && colStats.high_value.isSetDecimal_val()) {
+            highValue = new Decimal((short) colTypeScalar.decimalScale(),
+                colStats.high_value.bufferForDecimal_val());
+          }
+          updateLowAndHighForHiveColumnStatsData(lowValue, highValue, decimalStatsData);
+          colStatsData.setDecimalStats(decimalStatsData);
+        }
         break;
       default:
         return null;
@@ -463,6 +969,8 @@ public class ColumnStats {
     maxSize_ = stats.getMax_size();
     numDistinctValues_ = stats.getNum_distinct_values();
     numNulls_ = stats.getNum_nulls();
+    lowValue_ = stats.getLow_value();
+    highValue_ = stats.getHigh_value();
     validate(colType);
   }
 
@@ -474,6 +982,8 @@ public class ColumnStats {
     colStats.setNum_nulls(numNulls_);
     colStats.setNum_trues(numTrues_);
     colStats.setNum_falses(numFalses_);
+    colStats.setLow_value(lowValue_);
+    colStats.setHigh_value(highValue_);
     return colStats;
   }
 
@@ -510,6 +1020,8 @@ public class ColumnStats {
         .add("numNulls_", numNulls_)
         .add("numTrues", numTrues_)
         .add("numFalses", numFalses_)
+        .add("lowValue", getLowValueAsString())
+        .add("highValue", getHighValueAsString())
         .toString();
   }
 

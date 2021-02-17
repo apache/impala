@@ -59,6 +59,14 @@ struct PerColumnStats {
   // non-integer value)
   double avg_width;
 
+  // The low value which is undefined if all fields in TColumnValue are not defined.
+  // Otherwise, it is the one associated with the field defined (set).
+  TColumnValue low_value;
+
+  // The high value which is undefined if all fields in TColumnValue are not defined.
+  // Otherwise, it is the one associated with the field defined (set).
+  TColumnValue high_value;
+
   PerColumnStats()
     : intermediate_ndv(AggregateFunctions::DEFAULT_HLL_LEN, 0),
       num_nulls(0),
@@ -71,7 +79,8 @@ struct PerColumnStats {
   /// Updates all aggregate statistics with a new set of measurements.
   void Update(const string& ndv, int64_t num_new_rows, double new_avg_width,
       int32_t max_new_width, int64_t num_new_nulls, int64_t num_new_trues,
-      int64_t num_new_falses);
+      int64_t num_new_falses, const impala::TColumnValue& low_value,
+      const impala::TColumnValue& high_value);
 
   /// Performs any stats computations that are not distributive, that is they may not be
   /// computed in part during Update(). After this method returns, ndv_estimate and
@@ -83,6 +92,10 @@ struct PerColumnStats {
 
   /// Returns a string with debug information for this
   string DebugString() const;
+
+  /// Updates the low and the high value
+  void UpdateLowValue(const TColumnValue& value);
+  void UpdateHighValue(const TColumnValue& value);
 };
 
 namespace impala {

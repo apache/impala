@@ -55,6 +55,7 @@ import org.apache.impala.thrift.TGetPartitionStatsResponse;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TUnit;
+import org.apache.impala.util.MetaStoreUtil;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Joiner;
@@ -245,6 +246,13 @@ public class ComputeStatsStmt extends StatementBase {
     int startColIdx = (table_ instanceof FeHBaseTable) ? 0 :
         table_.getNumClusteringCols();
 
+    // Verify that the table is Parquet.
+    boolean computeMinMax = analyzer.getQueryCtx()
+                                .getClient_request()
+                                .getQuery_options()
+                                .isCompute_column_minmax_stats()
+        && hasAtLeastOneParquetPartition();
+
     for (int i = startColIdx; i < table_.getColumns().size(); ++i) {
       Column c = table_.getColumns().get(i);
       if (validatedColumnWhitelist_ != null && !validatedColumnWhitelist_.contains(c)) {
@@ -298,6 +306,24 @@ public class ComputeStatsStmt extends StatementBase {
         columnStatsSelectList.add("NULL");
         columnStatsSelectList.add("NULL");
       }
+
+      // Finally, compute the min and max. NULLs in the column are ignored unless
+      // all values are NULL in which case a NULL value will be produced.
+      //
+      // Do it only for INTEGERS, DOUBLES, DECIMAL and DATE types as they can be
+      // stored in LongColumnStatsData, DoubleColumnStatsData,
+      // DecimalColumnStatsData or DateColumnStatsData in HMS.
+      String min_expr = null;
+      String max_expr = null;
+      if (computeMinMax && MetaStoreUtil.canStoreMinmaxInHMS(type)) {
+        min_expr = "MIN(" + colRefSql + ")";
+        max_expr = "MAX(" + colRefSql + ")";
+      } else  {
+        min_expr = "NULL";
+        max_expr = "NULL";
+      }
+      columnStatsSelectList.add(min_expr);
+      columnStatsSelectList.add(max_expr);
     }
     return columnStatsSelectList;
   }
@@ -923,6 +949,33 @@ public class ComputeStatsStmt extends StatementBase {
       return FeIcebergTable.Utils.isColumnar((FeIcebergTable) table_);
     }
     return true;
+  }
+
+  /**
+   * Returns true if this statement computes stats on a table with at least one Parquet
+   * partition, false otherwise.
+   */
+  public boolean hasAtLeastOneParquetPartition() {
+    if (!(table_ instanceof FeFsTable)) return false;
+    FeFsTable hdfsTable = (FeFsTable) table_;
+    Set<Long> partitionIds = hdfsTable.getPartitionIds();
+    if (partitionIds.size() > 0) {
+      for (Long partitionId : partitionIds) {
+        FeFsPartition partition = FeCatalogUtils.loadPartition(hdfsTable, partitionId);
+        if (partition.getFileFormat().isParquetBased()) {
+          return true;
+        }
+      }
+    } else {
+      Collection<? extends FeFsPartition> allPartitions =
+          FeCatalogUtils.loadAllPartitions(hdfsTable);
+      for (FeFsPartition partition : allPartitions) {
+        if (partition.getFileFormat().isParquetBased()) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   @Override

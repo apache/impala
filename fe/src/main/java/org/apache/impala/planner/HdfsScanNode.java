@@ -382,14 +382,6 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Returns true if this HdfsFileFormat is PARQUET or HUDI_PARQUET
-   */
-  private boolean isParquetBased(HdfsFileFormat fileFormat) {
-    return fileFormat == HdfsFileFormat.PARQUET
-        || fileFormat == HdfsFileFormat.HUDI_PARQUET;
-  }
-
-  /**
    * Returns true if the Parquet count(*) optimization can be applied to the query block
    * of this scan node.
    */
@@ -1038,7 +1030,7 @@ public class HdfsScanNode extends ScanNode {
 
       analyzer.getDescTbl().addReferencedPartition(tbl_, partition.getId());
       fileFormats_.add(partition.getFileFormat());
-      if (!isParquetBased(partition.getFileFormat())) {
+      if (!partition.getFileFormat().isParquetBased()) {
         allParquet = false;
       }
       Preconditions.checkState(partition.getId() >= 0);
@@ -1046,7 +1038,7 @@ public class HdfsScanNode extends ScanNode {
       if (!fsHasBlocks) {
         // Limit the scan range length if generating scan ranges (and we're not
         // short-circuiting the scan for a partition key scan).
-        long defaultBlockSize = isParquetBased(partition.getFileFormat()) ?
+        long defaultBlockSize = (partition.getFileFormat().isParquetBased()) ?
             analyzer.getQueryOptions().parquet_object_store_split_size :
             partitionFs.getDefaultBlockSize(partition.getLocationPath());
         long maxBlockSize =
@@ -1886,7 +1878,7 @@ public class HdfsScanNode extends ScanNode {
     int perHostScanRanges = 0;
     for (HdfsFileFormat format : fileFormats_) {
       int partitionScanRange = 0;
-      if (isParquetBased(format) || format == HdfsFileFormat.ORC) {
+      if (format.isParquetBased() || format == HdfsFileFormat.ORC) {
         Preconditions.checkNotNull(columnReservations);
         // For the purpose of this estimation, the number of per-host scan ranges for
         // Parquet/HUDI_PARQUET/ORC files are equal to the number of columns read from the
@@ -1962,7 +1954,7 @@ public class HdfsScanNode extends ScanNode {
       // TODO: IMPALA-6875 - ORC should compute total reservation across columns once the
       // ORC scanner supports reservations. For now it is treated the same as a
       // row-oriented format because there is no per-column reservation.
-      if (isParquetBased(format)) {
+      if (format.isParquetBased()) {
         // With Parquet, we first read the footer then all of the materialized columns in
         // parallel.
         for (long columnReservation : columnReservations) {

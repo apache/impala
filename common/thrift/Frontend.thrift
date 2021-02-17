@@ -220,6 +220,7 @@ enum TShowStatsOp {
 struct TShowStatsParams {
   1: TShowStatsOp op
   2: CatalogObjects.TTableName table_name
+  3: optional bool show_column_minmax_stats
 }
 
 // Parameters for DESCRIBE HISTORY command

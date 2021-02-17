@@ -428,3 +428,20 @@ class TestIncompatibleColStats(ImpalaTestSuite):
     self.client.execute("compute stats %s" % table_name)
     result = self.client.execute("select s from %s" % table_name)
     assert len(result.data) == 10
+
+
+# Test column min/max stats currently enabled for Parquet tables.
+class TestParquetComputeColumnMinMax(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestParquetComputeColumnMinMax, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_constraint(
+        lambda v: v.get_value('table_format').file_format == 'parquet')
+
+  def test_compute_stats(self, vector, unique_database):
+    self.run_test_case('QueryTest/compute-stats-column-minmax', vector, unique_database)

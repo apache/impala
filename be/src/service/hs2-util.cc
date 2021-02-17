@@ -19,6 +19,7 @@
 
 #include "common/logging.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "runtime/date-value.h"
 #include "runtime/decimal-value.inline.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
@@ -601,8 +602,7 @@ void PrintVal(const apache::hive::service::cli::thrift::TByteValue& val, ostream
   }
 }
 
-void impala::PrintTColumnValue(
-    const apache::hive::service::cli::thrift::TColumnValue& colval, stringstream* out) {
+void impala::PrintTColumnValue(const thrift::TColumnValue& colval, stringstream* out) {
   if (colval.__isset.boolVal) {
     if (colval.boolVal.__isset.value) {
       (*out) << ((colval.boolVal.value) ? "true" : "false");
@@ -624,4 +624,114 @@ void impala::PrintTColumnValue(
   } else {
     (*out) << "NULL";
   }
+}
+
+TColumnValue impala::ConvertToTColumnValue(
+    const thrift::TColumnDesc& desc, const thrift::TColumnValue& hive_colval) {
+  // By default, all values in Impala TColumnValue are unset. To set a value,
+  // it must be present in a particular field in the Hive version and not null.
+  TColumnValue colval;
+  if (hive_colval.__isset.boolVal && hive_colval.boolVal.__isset.value) {
+    colval.__set_bool_val(hive_colval.boolVal.value);
+  } else if (hive_colval.__isset.doubleVal && hive_colval.doubleVal.__isset.value) {
+    colval.__set_double_val(hive_colval.doubleVal.value);
+  } else if (hive_colval.__isset.byteVal && hive_colval.byteVal.__isset.value) {
+    colval.__set_byte_val(hive_colval.byteVal.value);
+  } else if (hive_colval.__isset.i32Val && hive_colval.i32Val.__isset.value) {
+    colval.__set_int_val(hive_colval.i32Val.value);
+  } else if (hive_colval.__isset.i16Val && hive_colval.i16Val.__isset.value) {
+    colval.__set_short_val(hive_colval.i16Val.value);
+  } else if (hive_colval.__isset.i64Val && hive_colval.i64Val.__isset.value) {
+    colval.__set_long_val(hive_colval.i64Val.value);
+  } else if (hive_colval.__isset.stringVal && hive_colval.stringVal.__isset.value) {
+    switch (desc.typeDesc.types[0].primitiveEntry.type) {
+      // For Hive date type, the value is represented as a string, such as '2020-01-01'.
+      // Convert the string to Epoch days.
+      case thrift::TTypeId::DATE_TYPE:
+        {
+          DateValue d =
+              DateValue::ParseSimpleDateFormat(hive_colval.stringVal.value, false);
+          colval.__set_date_val(d.Value());
+        }
+        break;
+      // For Hive decimal type, the value is represented as a string, such as '1.234567'.
+      // Its precision and scale is contained in desc as type qualifiers.
+      case thrift::TTypeId::DECIMAL_TYPE:
+        {
+          const std::map<std::string, thrift::TTypeQualifierValue>& map =
+              desc.typeDesc.types[0].primitiveEntry.typeQualifiers.qualifiers;
+          auto it = map.find("precision");
+          if (it == map.end()) {
+            DCHECK(false) << "Unable to find precision";
+          }
+          int precision = it->second.i32Value;
+
+          it = map.find("scale");
+          if (it == map.end()) {
+            DCHECK(false) << "Unable to find scale";
+          }
+          int scale = it->second.i32Value;
+
+          VLOG(3) << "Decimal in hive_colval: value=" << hive_colval.stringVal.value
+                  << ", precision=" << precision
+                  << ", scale=" << scale;
+
+          colval.__set_decimal_val(hive_colval.stringVal.value);
+        }
+        break;
+      case thrift::TTypeId::STRING_TYPE:
+        colval.__set_string_val(hive_colval.stringVal.value);
+        break;
+      default:
+        DCHECK(false) << "Unsupported conversion for hive type "
+                      << desc.typeDesc.types[0];
+    }
+  }
+  return colval;
+}
+
+void impala::PrintTColumnValue(const impala::TColumnValue& value, stringstream* out) {
+  if (value.__isset.bool_val) {
+    *out << value.bool_val;
+  } else if (value.__isset.double_val) {
+    *out << value.double_val;
+  } else if (value.__isset.byte_val) {
+    *out << value.byte_val;
+  } else if (value.__isset.int_val) {
+    *out << value.int_val;
+  } else if (value.__isset.short_val) {
+    *out << value.short_val;
+  } else if (value.__isset.long_val) {
+    *out << value.long_val;
+  } else if (value.__isset.string_val) {
+    *out << value.string_val;
+  } else if (value.__isset.binary_val) {
+    *out << value.binary_val;
+  } else if (value.__isset.timestamp_val) {
+    *out << value.timestamp_val;
+  } else if (value.__isset.decimal_val) {
+    *out << value.decimal_val;
+  } else if (value.__isset.date_val) {
+    *out << value.date_val;
+  }
+}
+
+string impala::PrintTColumnValue(const impala::TColumnValue& value) {
+  std::stringstream ss;
+  PrintTColumnValue(value, &ss);
+  return ss.str();
+}
+
+bool impala::isOneFieldSet(const impala::TColumnValue& value) {
+  return (value.__isset.bool_val ||
+          value.__isset.double_val ||
+          value.__isset.byte_val ||
+          value.__isset.int_val ||
+          value.__isset.short_val ||
+          value.__isset.long_val ||
+          value.__isset.string_val ||
+          value.__isset.binary_val ||
+          value.__isset.timestamp_val ||
+          value.__isset.decimal_val ||
+          value.__isset.date_val);
 }

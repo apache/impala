@@ -112,9 +112,48 @@ string DecodeNdv(const string& ndv, bool is_encoded) {
   return decoded_ndv;
 }
 
+#define UPDATE_LOW_VALUE(TYPE)                                                      \
+  if (!(low_value.__isset.TYPE##_val) || value.TYPE##_val < low_value.TYPE##_val) { \
+    low_value.__set_##TYPE##_val(value.TYPE##_val);                                 \
+  }
+
+void PerColumnStats::UpdateLowValue(const impala::TColumnValue& value) {
+  if (value.__isset.double_val) {
+    UPDATE_LOW_VALUE(double);
+  } else if (value.__isset.byte_val) {
+    UPDATE_LOW_VALUE(byte);
+  } else if (value.__isset.int_val) {
+    UPDATE_LOW_VALUE(int);
+  } else if (value.__isset.short_val) {
+    UPDATE_LOW_VALUE(short);
+  } else if (value.__isset.long_val) {
+    UPDATE_LOW_VALUE(long);
+  }
+}
+
+#define UPDATE_HIGH_VALUE(TYPE)                                                       \
+  if (!(high_value.__isset.TYPE##_val) || value.TYPE##_val > high_value.TYPE##_val) { \
+    high_value.__set_##TYPE##_val(value.TYPE##_val);                                  \
+  }
+
+void PerColumnStats::UpdateHighValue(const impala::TColumnValue& value) {
+  if (value.__isset.double_val) {
+    UPDATE_HIGH_VALUE(double);
+  } else if (value.__isset.byte_val) {
+    UPDATE_HIGH_VALUE(byte);
+  } else if (value.__isset.int_val) {
+    UPDATE_HIGH_VALUE(int);
+  } else if (value.__isset.short_val) {
+    UPDATE_HIGH_VALUE(short);
+  } else if (value.__isset.long_val) {
+    UPDATE_HIGH_VALUE(long);
+  }
+}
+
 void PerColumnStats::Update(const string& ndv, int64_t num_new_rows, double new_avg_width,
     int32_t max_new_width, int64_t num_new_nulls, int64_t num_new_trues,
-    int64_t num_new_falses) {
+    int64_t num_new_falses, const impala::TColumnValue& low_value_new,
+    const impala::TColumnValue& high_value_new) {
   DCHECK_EQ(intermediate_ndv.size(), ndv.size()) << "Incompatible intermediate NDVs";
   DCHECK_GE(num_new_rows, 0);
   DCHECK_GE(max_new_width, 0);
@@ -140,6 +179,9 @@ void PerColumnStats::Update(const string& ndv, int64_t num_new_rows, double new_
   max_width = ::max(max_width, max_new_width);
   total_width += (new_avg_width * num_new_rows);
   num_rows += num_new_rows;
+
+  UpdateLowValue(low_value_new);
+  UpdateHighValue(high_value_new);
 }
 
 void PerColumnStats::Finalize() {
@@ -156,13 +198,20 @@ TColumnStats PerColumnStats::ToTColumnStats() const {
   col_stats.__set_avg_size(avg_width);
   col_stats.__set_num_trues(num_trues);
   col_stats.__set_num_falses(num_falses);
+  col_stats.__set_low_value(low_value);
+  col_stats.__set_high_value(high_value);
   return col_stats;
 }
 
 string PerColumnStats::DebugString() const {
+  stringstream ss_low_value;
+  ss_low_value << low_value;
+  stringstream ss_high_value;
+  ss_high_value << high_value;
   return Substitute("ndv: $0, num_nulls: $1, max_width: $2, avg_width: $3, num_rows: "
-                    "$4, num_trues: $5, num_falses: $6",
-      ndv_estimate, num_nulls, max_width, avg_width, num_rows, num_trues, num_falses);
+                    "$4, num_trues: $5, num_falses: $6, low_value: $7, high_value: $8",
+      ndv_estimate, num_nulls, max_width, avg_width, num_rows, num_trues, num_falses,
+      ss_low_value.str(), ss_high_value.str());
 }
 
 namespace impala {
@@ -174,8 +223,8 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
   // The rowset should have the following schema: for every column in the source table,
   // seven columns are produced, one row per partition.
   // <ndv buckets>, <num nulls>, <max width>, <avg width>, <count rows>,
-  // <num trues>, <num falses>
-  static const int COLUMNS_PER_STAT = 7;
+  // <num trues>, <num falses>, <low value>, <high value>
+  static const int COLUMNS_PER_STAT = 9;
 
   const int num_cols =
       (col_stats_schema.columns.size() - num_partition_cols) / COLUMNS_PER_STAT;
@@ -208,13 +257,22 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
         int64_t num_nulls = col_stats_row.colVals[i + 1].i64Val.value;
         int64_t num_trues = col_stats_row.colVals[i + 5].i64Val.value;
         int64_t num_falses = col_stats_row.colVals[i + 6].i64Val.value;
+        TColumnValueHive low_value = col_stats_row.colVals[i + 7];
+        TColumnValueHive high_value = col_stats_row.colVals[i + 8];
+
+        impala::TColumnValue low_value_impala =
+            ConvertToTColumnValue(col_stats_schema.columns[i + 7], low_value);
+        impala::TColumnValue high_value_impala =
+            ConvertToTColumnValue(col_stats_schema.columns[i + 8], high_value);
 
         VLOG(3) << "Updated statistics for column=["
                 << col_stats_schema.columns[i].columnName << "]," << " statistics={"
                 << ndv << "," << num_rows << "，" << avg_width << "," << num_trues
-                << "," << max_width << "," << num_nulls << "," << num_falses << "}";
-        stat->Update(
-            ndv, num_rows, avg_width, max_width, num_nulls, num_trues, num_falses);
+                << "," << max_width << "," << num_nulls << "," << num_falses
+                << PrintTColumnValue(low_value_impala) << ","
+                << PrintTColumnValue(high_value_impala) << "}";
+        stat->Update(ndv, num_rows, avg_width, max_width, num_nulls, num_trues,
+            num_falses, low_value_impala, high_value_impala);
 
         // Save the intermediate state per-column, per-partition
         TIntermediateColumnStats int_stats;
@@ -227,6 +285,8 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
         int_stats.__set_num_rows(num_rows);
         int_stats.__set_num_trues(num_trues);
         int_stats.__set_num_falses(num_falses);
+        int_stats.__set_low_value(low_value_impala);
+        int_stats.__set_high_value(high_value_impala);
 
         part_stat->intermediate_col_stats[col_stats_schema.columns[i].columnName] =
             int_stats;
@@ -283,10 +343,12 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
               << "statistics={" << int_stats.intermediate_ndv << ","
               << int_stats.num_rows << "，" << int_stats.avg_width << ","
               << int_stats.max_width << ","<< int_stats.num_nulls << ","
-              << int_stats.num_trues << "," << int_stats.num_falses << "}";
+              << int_stats.num_trues << "," << int_stats.num_falses << ","
+              << int_stats.low_value << "," << int_stats.high_value << "}";
       stats[i].Update(DecodeNdv(int_stats.intermediate_ndv, int_stats.is_ndv_encoded),
           int_stats.num_rows, int_stats.avg_width, int_stats.max_width,
-          int_stats.num_nulls, int_stats.num_trues, int_stats.num_falses);
+          int_stats.num_nulls, int_stats.num_trues, int_stats.num_falses,
+          int_stats.low_value, int_stats.high_value);
     }
   }
 

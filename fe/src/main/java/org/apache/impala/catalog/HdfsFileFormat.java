@@ -272,4 +272,11 @@ public enum HdfsFileFormat {
     }
     return result;
   }
+
+  /**
+   * Returns true if the format is Parquet, false otherwise.
+   */
+  public boolean isParquetBased() {
+    return this == HdfsFileFormat.PARQUET || this == HdfsFileFormat.HUDI_PARQUET;
+  }
 }

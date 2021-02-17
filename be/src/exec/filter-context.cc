@@ -23,6 +23,7 @@
 #include "runtime/tuple-row.h"
 #include "util/min-max-filter.h"
 #include "util/runtime-profile-counters.h"
+#include "service/hs2-util.h"
 
 using namespace impala;
 using namespace strings;
@@ -425,4 +426,58 @@ bool FilterContext::CheckForAlwaysFalse(const std::string& stats_name,
     }
   }
   return false;
+}
+
+// Return true if both the filter and column min/max stats exist and the overlap of filter
+// range [min,max] with column stats range [min, max] is more than 'threshold'. Return
+// false otherwise.
+bool FilterContext::ShouldRejectFilterBasedOnColumnStats(
+    const TRuntimeFilterTargetDesc& desc, MinMaxFilter* minmax_filter, float threshold) {
+  if (!minmax_filter) {
+    return false;
+  }
+  const TColumnValue& column_low_value = desc.low_value;
+  const TColumnValue& column_high_value = desc.high_value;
+  ColumnType col_type = ColumnType::FromThrift(desc.target_expr.nodes[0].type);
+  float ratio = 0.0;
+  switch (col_type.type) {
+    case PrimitiveType::TYPE_TINYINT:
+      if (!column_low_value.__isset.byte_val || !column_high_value.__isset.byte_val)
+        return false;
+      ratio = minmax_filter->ComputeOverlapRatio(col_type,
+          (void*)&column_low_value.byte_val, (void*)&column_high_value.byte_val);
+      break;
+    case PrimitiveType::TYPE_SMALLINT:
+      if (!column_low_value.__isset.short_val || !column_high_value.__isset.short_val)
+        return false;
+      ratio = minmax_filter->ComputeOverlapRatio(col_type,
+          (void*)&column_low_value.short_val, (void*)&column_high_value.short_val);
+      break;
+    case PrimitiveType::TYPE_INT:
+      if (!column_low_value.__isset.int_val || !column_high_value.__isset.int_val)
+        return false;
+      ratio = minmax_filter->ComputeOverlapRatio(col_type,
+          (void*)&column_low_value.int_val, (void*)&column_high_value.int_val);
+      break;
+    case PrimitiveType::TYPE_BIGINT:
+      if (!column_low_value.__isset.long_val || !column_high_value.__isset.long_val)
+        return false;
+      ratio = minmax_filter->ComputeOverlapRatio(col_type,
+          (void*)&column_low_value.long_val, (void*)&column_high_value.long_val);
+      break;
+    case PrimitiveType::TYPE_FLOAT:
+    case PrimitiveType::TYPE_DOUBLE:
+      if (!column_low_value.__isset.double_val || !column_high_value.__isset.double_val)
+        return false;
+      ratio = minmax_filter->ComputeOverlapRatio(col_type,
+          (void*)&column_low_value.double_val, (void*)&column_high_value.double_val);
+      break;
+    // Both timestamp and date are not supported since their low/high stats can't be
+    // stored in HMS yet.
+    case PrimitiveType::TYPE_TIMESTAMP:
+    case PrimitiveType::TYPE_DATE:
+    default:
+      return false;
+  }
+  return ratio >= threshold;
 }

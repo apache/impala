@@ -478,6 +478,12 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift
   124: optional PlanNodes.TMinmaxFilteringLevel minmax_filtering_level =
       PlanNodes.TMinmaxFilteringLevel.ROW_GROUP;
+
+  // See comment in ImpalaService.thrift
+  125: optional bool compute_column_minmax_stats = false;
+
+  // See comment in ImpalaService.thrift
+  126: optional bool show_column_minmax_stats = false;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

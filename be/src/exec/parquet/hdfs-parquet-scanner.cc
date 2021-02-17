@@ -40,6 +40,7 @@
 #include "runtime/runtime-filter.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/scoped-buffer.h"
+#include "service/hs2-util.h"
 #include "util/dict-encoding.h"
 #include "util/pretty-printer.h"
 #include "util/scope-exit-trigger.h"
@@ -94,6 +95,7 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     num_cols_counter_(nullptr),
     num_stats_filtered_row_groups_counter_(nullptr),
     num_minmax_filtered_row_groups_counter_(nullptr),
+    num_rowgroups_skipped_by_unuseful_filters_counter_(nullptr),
     num_row_groups_counter_(nullptr),
     num_minmax_filtered_pages_counter_(nullptr),
     num_scanners_with_no_reads_counter_(nullptr),
@@ -116,6 +118,8 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   num_minmax_filtered_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumRuntimeFilteredRowGroups",
           TUnit::UNIT);
+  num_rowgroups_skipped_by_unuseful_filters_counter_ = ADD_COUNTER(
+      scan_node_->runtime_profile(), "NumRowGroupsSkippedByUnusefulFilters", TUnit::UNIT);
   num_row_groups_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumRowGroups", TUnit::UNIT);
   num_row_groups_with_page_index_counter_ =
@@ -586,6 +590,36 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
   return Status::OK();
 }
 
+bool HdfsParquetScanner::FilterAlreadyDisabledOrOverlapWithColumnStats(
+    int filter_id, MinMaxFilter* minmax_filter, int idx, float threshold) {
+  const TRuntimeFilterDesc& filter_desc = filter_ctxs_[idx]->filter->filter_desc();
+  const TRuntimeFilterTargetDesc& target_desc = filter_desc.targets[0];
+
+  /// If the filter is always true, not enabled for row group, or covers too much area
+  /// with respect to column min and max stats, disable the use of the filter at all
+  /// levels and proceed to next predicate.
+  bool filterAlwaysTrue = false;
+  bool columnStatsRejected = false;
+  if ((filterAlwaysTrue = minmax_filter->AlwaysTrue())
+      || !filter_stats_[idx].enabled_for_rowgroup
+      || (columnStatsRejected = FilterContext::ShouldRejectFilterBasedOnColumnStats(
+              target_desc, minmax_filter, threshold))) {
+    filter_stats_[idx].enabled_for_rowgroup = false;
+    filter_stats_[idx].enabled_for_row = false;
+    filter_stats_[idx].enabled_for_page = false;
+    filter_ctxs_[idx]->stats->IncrCounters(FilterStats::ROW_GROUPS_KEY, 1, 1, 0);
+    VLOG(3) << "A filter is determined to be not useful:"
+            << " fid=" << filter_id
+            << ", enabled_for_rowgroup=" << (bool)filter_stats_[idx].enabled_for_rowgroup
+            << ", content=" << minmax_filter->DebugString()
+            << ", target column stats: low=" << PrintTColumnValue(target_desc.low_value)
+            << ", high=" << PrintTColumnValue(target_desc.high_value)
+            << ", threshold=" << threshold;
+    return true;
+  }
+  return false;
+}
+
 Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
     const parquet::FileMetaData& file_metadata, const parquet::RowGroup& row_group,
     bool* skip_row_group) {
@@ -611,14 +645,30 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
 
   TMinmaxFilteringLevel::type level = state_->query_options().minmax_filtering_level;
   float threshold = (float)(state_->query_options().minmax_filter_threshold);
+  bool row_group_skipped_by_unuseful_filters = false;
 
   for (auto desc: GetOverlapPredicateDescs()) {
-
     int filter_id = desc.filter_id;
     int slot_idx = desc.slot_index;
-    MinMaxFilter* minmax_filter = FindMinMaxFilter(FindFilterIndex(filter_id));
+    /// Find the index of the filter that is common in data structure
+    /// filter_ctxs_ and filter_stats_.
+    int idx = FindFilterIndex(filter_id);
+    DCHECK(idx >= 0);
+    MinMaxFilter* minmax_filter = FindMinMaxFilter(idx);
 
-    if (!minmax_filter) continue;
+    if (!minmax_filter) {
+      // The filter is not available yet.
+      filter_ctxs_[idx]->stats->IncrCounters(FilterStats::ROW_GROUPS_KEY, 1, 0, 0);
+      continue;
+    }
+
+    if (HdfsParquetScanner::FilterAlreadyDisabledOrOverlapWithColumnStats(
+            filter_id, minmax_filter, idx, threshold)) {
+      // The filter is already disabled or too close to the column min/max stats, ignore
+      // it.
+      row_group_skipped_by_unuseful_filters = true;
+      continue;
+    }
 
     SlotDescriptor* slot_desc = min_max_tuple_desc->slots()[slot_idx];
 
@@ -681,11 +731,6 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
             << RawValue::PrintValue(max_slot, col_type, col_type.scale)
             << ", content=" << minmax_filter->DebugString();
 
-    /// Find the index of the filter that is common in data structure
-    /// filter_ctxs_ and filter_stats_.
-    int idx = FindFilterIndex(filter_id);
-    DCHECK(idx >= 0);
-
     /// If not overlapping with this particular filter, the row group can be filtered
     /// out safely.
     if (overlap_ratio == 0.0) {
@@ -710,6 +755,10 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
 
     /// Update the row groups stats: no rejection.
     filter_ctxs_[idx]->stats->IncrCounters(FilterStats::ROW_GROUPS_KEY, 1, 1, 0);
+  }
+
+  if (row_group_skipped_by_unuseful_filters) {
+    COUNTER_ADD(num_rowgroups_skipped_by_unuseful_filters_counter_, 1);
   }
 
   return Status::OK();

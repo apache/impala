@@ -71,6 +71,56 @@ TEST(IncrStatsUtilTest, TestEncode) {
   ASSERT_EQ(DecodeNdv(encoded, is_encoded), test);
 }
 
+void checkLowAndHighValueInt(
+    const TColumnStats& stats, int expected_low, int expected_high) {
+  ASSERT_TRUE(stats.low_value.__isset.int_val);
+  ASSERT_TRUE(stats.high_value.__isset.int_val);
+  ASSERT_EQ(expected_low, stats.low_value.int_val);
+  ASSERT_EQ(expected_high, stats.high_value.int_val);
+}
+
+TEST(IncrStatsUtilTest, TestLowAndHighValueInt) {
+  PerColumnStats* stat = new PerColumnStats();
+  TColumnValue lv;
+  TColumnValue hv;
+
+  lv.__set_int_val(10);
+  hv.__set_int_val(20);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0, lv, hv);
+
+  checkLowAndHighValueInt(stat->ToTColumnStats(), 10, 20);
+
+  lv.__set_int_val(2);
+  hv.__set_int_val(30);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0, lv, hv);
+  checkLowAndHighValueInt(stat->ToTColumnStats(), 2, 30);
+}
+
+void checkLowAndHighValueShort(
+    const TColumnStats& stats, short expected_low, short expected_high) {
+  ASSERT_TRUE(stats.low_value.__isset.short_val);
+  ASSERT_TRUE(stats.high_value.__isset.short_val);
+  ASSERT_EQ(expected_low, stats.low_value.short_val);
+  ASSERT_EQ(expected_high, stats.high_value.short_val);
+}
+
+TEST(IncrStatsUtilTest, TestLowAndHighValueShort) {
+  PerColumnStats* stat = new PerColumnStats();
+  TColumnValue lv;
+  TColumnValue hv;
+
+  lv.__set_short_val(10);
+  hv.__set_short_val(20);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0, lv, hv);
+
+  checkLowAndHighValueShort(stat->ToTColumnStats(), 10, 20);
+
+  lv.__set_short_val(14);
+  hv.__set_short_val(30);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0, lv, hv);
+  checkLowAndHighValueShort(stat->ToTColumnStats(), 10, 30);
+}
+
 /**
  * This test checks the acceptable 'new_num_null' values by the PerColumnStats.Update
  * method. In earlier releases the number of null values were not counted and the
@@ -81,26 +131,28 @@ TEST(IncrStatsUtilTest, TestEncode) {
 TEST(IncrStatsUtilTest, TestNumNullAggregation) {
   PerColumnStats* stat = new PerColumnStats();
   ASSERT_EQ(0, stat->ToTColumnStats().num_nulls);
+  TColumnValue lv;
+  TColumnValue hv;
 
-  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 1, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 1, 0, 0, lv, hv);
   ASSERT_EQ(1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0, lv, hv);
   ASSERT_EQ(1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 2, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 2, 0, 0, lv, hv);
   ASSERT_EQ(3, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, -1, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, -1, 0, 0, lv, hv);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0, lv, hv);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 3, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 3, 0, 0, lv, hv);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
 
-  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, -1, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, -1, 0, 0, lv, hv);
   ASSERT_EQ(-1, stat->ToTColumnStats().num_nulls);
 }
 
@@ -111,16 +163,18 @@ TEST(IncrStatsUtilTest, TestNumNullAggregation) {
 */
 TEST(IncrStatsUtilTest, TestAvgSizehAggregation) {
   PerColumnStats* stat = new PerColumnStats();
+  TColumnValue lv;
+  TColumnValue hv;
 
-  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 1, 4, 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 1, 4, 0, 0, 0, 0, lv, hv);
   stat->Finalize();
   ASSERT_EQ(4, stat->ToTColumnStats().avg_size);
 
-  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 2, 7, 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 2, 7, 0, 0, 0, 0, lv, hv);
   stat->Finalize();
   ASSERT_EQ(6, stat->ToTColumnStats().avg_size);
 
-  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0);
+  stat->Update(string(AggregateFunctions::DEFAULT_HLL_LEN, 0), 0, 0, 0, 0, 0, 0, lv, hv);
   stat->Finalize();
   ASSERT_EQ(6, stat->ToTColumnStats().avg_size);
 }

@@ -38,6 +38,7 @@ import com.google.common.base.Preconditions;
 public class ShowStatsStmt extends StatementBase {
   protected final TShowStatsOp op_;
   protected final TableName tableName_;
+  protected boolean show_column_minmax_stats_ = false;
 
   // Set during analysis.
   protected FeTable table_;
@@ -124,11 +125,15 @@ public class ShowStatsStmt extends StatementBase {
             " must target an HDFS or Kudu table: " + table_.getFullName());
       }
     }
+    show_column_minmax_stats_ =
+        analyzer.getQueryOptions().isShow_column_minmax_stats();
   }
 
   public TShowStatsParams toThrift() {
     // Ensure the DB is set in the table_name field by using table and not tableName.
-    return new TShowStatsParams(op_,
+    TShowStatsParams showStatsParam = new TShowStatsParams(op_,
         new TableName(table_.getDb().getName(), table_.getName()).toThrift());
+    showStatsParam.setShow_column_minmax_stats(show_column_minmax_stats_);
+    return showStatsParam;
   }
 }

@@ -18,6 +18,7 @@
 namespace cpp impala
 namespace java org.apache.impala.thrift
 
+include "Data.thrift"
 include "Exprs.thrift"
 include "Status.thrift"
 include "Types.thrift"
@@ -199,6 +200,10 @@ struct TColumnStats {
   // Estimated number of true and false value for boolean type
   5: required i64 num_trues
   6: required i64 num_falses
+
+  // The low and the high value
+  7: optional Data.TColumnValue low_value
+  8: optional Data.TColumnValue high_value
 }
 
 // Intermediate state for the computation of per-column stats. Impala can aggregate these
@@ -225,6 +230,10 @@ struct TIntermediateColumnStats {
   // The number of true and false value, of the column
   7: required i64 num_trues
   8: required i64 num_falses
+
+  // The low and the high value
+  9: optional Data.TColumnValue low_value
+  10: optional Data.TColumnValue high_value
 }
 
 // Per-partition statistics

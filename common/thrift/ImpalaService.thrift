@@ -645,6 +645,12 @@ enum TImpalaQueryOptions {
   //     PAGE      - apply to row groups and pages only.
   //     ROW       - apply to row groups, pages and rows.
   MINMAX_FILTERING_LEVEL = 123
+
+  // If true, compute the column min and max stats during compute stats.
+  COMPUTE_COLUMN_MINMAX_STATS = 124
+
+  // If true, show the min and max stats during show column stats.
+  SHOW_COLUMN_MINMAX_STATS = 125
 }
 
 // The summary of a DML statement.

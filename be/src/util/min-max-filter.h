@@ -120,10 +120,10 @@ class MinMaxFilter {
   virtual float ComputeOverlapRatio(
       const ColumnType& type, void* data_min, void* data_max) = 0;
 
- protected:
   /// Makes this filter always return true.
   virtual void SetAlwaysTrue() { always_true_ = true; }
 
+ protected:
   bool always_true_;
 };
 

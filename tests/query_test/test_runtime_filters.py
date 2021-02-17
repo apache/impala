@@ -282,9 +282,9 @@ class TestOverlapMinMaxFilters(ImpalaTestSuite):
     if build_runs_slowly:
       add_exec_option_dimension(cls, "async_codegen", 1)
 
-  def test_overlap_min_max_filters(self, vector):
+  def test_overlap_min_max_filters(self, vector, unique_database):
     self.execute_query("SET MINMAX_FILTER_THRESHOLD=0.5")
-    self.run_test_case('QueryTest/overlap_min_max_filters', vector,
+    self.run_test_case('QueryTest/overlap_min_max_filters', vector, unique_database,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
 # Apply both Bloom filter and Minmax filters

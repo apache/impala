@@ -45,6 +45,7 @@ import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -53,6 +54,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
+import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TEnabledRuntimeFilterTypes;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterDesc;
@@ -224,14 +226,20 @@ public final class RuntimeFilterGenerator {
       public final boolean isBoundByPartitionColumns;
       // Indicates if 'node' is in the same fragment as the join that produces the filter
       public final boolean isLocalTarget;
+      // The low and high value of the column on which the filter is applied
+      public final TColumnValue lowValue;
+      public final TColumnValue highValue;
 
       public RuntimeFilterTarget(ScanNode targetNode, Expr targetExpr,
-          boolean isBoundByPartitionColumns, boolean isLocalTarget) {
+          boolean isBoundByPartitionColumns, boolean isLocalTarget, TColumnValue lowValue,
+          TColumnValue highValue) {
         Preconditions.checkState(targetExpr.isBoundByTupleIds(targetNode.getTupleIds()));
         node = targetNode;
         expr = targetExpr;
         this.isBoundByPartitionColumns = isBoundByPartitionColumns;
         this.isLocalTarget = isLocalTarget;
+        this.lowValue = lowValue;
+        this.highValue = highValue;
       }
 
       public TRuntimeFilterTargetDesc toThrift() {
@@ -253,6 +261,8 @@ public final class RuntimeFilterGenerator {
           tFilterTarget.setKudu_col_name(col.getKuduName());
           tFilterTarget.setKudu_col_type(col.getType().toThrift());
         }
+        tFilterTarget.setLow_value(lowValue);
+        tFilterTarget.setHigh_value(highValue);
         return tFilterTarget;
       }
 
@@ -263,6 +273,8 @@ public final class RuntimeFilterGenerator {
             .append("Target expr: " + expr.debugString() + " ")
             .append("Partition columns: " + isBoundByPartitionColumns)
             .append("Is local: " + isLocalTarget)
+            .append("lowValue: " + lowValue.toString())
+            .append("highValue: " + highValue.toString())
             .toString();
       }
     }
@@ -904,8 +916,21 @@ public final class RuntimeFilterGenerator {
           }
         }
       }
-      RuntimeFilter.RuntimeFilterTarget target = new RuntimeFilter.RuntimeFilterTarget(
-          scanNode, targetExpr, isBoundByPartitionColumns, isLocalTarget);
+      TColumnValue lowValue = null;
+      TColumnValue highValue = null;
+      if (scanNode instanceof HdfsScanNode) {
+        SlotRef slotRefInScan = targetExpr.unwrapSlotRef(true);
+        if (slotRefInScan != null) {
+          Column col = slotRefInScan.getDesc().getColumn();
+          if (col != null) {
+            lowValue = col.getStats().getLowValue();
+            highValue = col.getStats().getHighValue();
+          }
+        }
+      }
+      RuntimeFilter.RuntimeFilterTarget target =
+          new RuntimeFilter.RuntimeFilterTarget(scanNode, targetExpr,
+              isBoundByPartitionColumns, isLocalTarget, lowValue, highValue);
       filter.addTarget(target);
     }
 

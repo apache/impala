@@ -1336,10 +1336,12 @@ public class CatalogOpExecutor {
               ndvCap, entry.getValue(), tableCol.getType());
       if (colStatsData == null) continue;
       if (LOG.isTraceEnabled()) {
-        LOG.trace(String.format("Updating column stats for %s: numDVs=%d numNulls=%d " +
-            "maxSize=%d avgSize=%.2f", colName, entry.getValue().getNum_distinct_values(),
+        LOG.trace(String.format("Updating column stats for %s: numDVs=%d numNulls=%d "
+                + "maxSize=%d avgSize=%.2f minValue=%s maxValue=%s",
+            colName, entry.getValue().getNum_distinct_values(),
             entry.getValue().getNum_nulls(), entry.getValue().getMax_size(),
-            entry.getValue().getAvg_size()));
+            entry.getValue().getAvg_size(), entry.getValue().getLow_value().toString(),
+            entry.getValue().getHigh_value().toString()));
       }
       ColumnStatisticsObj colStatsObj = new ColumnStatisticsObj(colName,
           tableCol.getType().toString().toLowerCase(), colStatsData);

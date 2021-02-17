@@ -105,10 +105,11 @@ int64_t GetIntTypeValue(const ColumnType& type, const void* value) {
   const char* NAME##MinMaxFilter::LLVM_CLASS_NAME =                                    \
       "class.impala::" #NAME "MinMaxFilter";                                           \
   NAME##MinMaxFilter::NAME##MinMaxFilter(const MinMaxFilterPB& protobuf) {             \
-    DCHECK(!protobuf.always_true());                                                   \
     if (protobuf.always_false()) {                                                     \
       min_ = numeric_limits<TYPE>::max();                                              \
       max_ = numeric_limits<TYPE>::lowest();                                           \
+    } else if (protobuf.always_true()) {                                               \
+      always_true_ = true;                                                             \
     } else {                                                                           \
       DCHECK(protobuf.has_min());                                                      \
       DCHECK(protobuf.has_max());                                                      \
@@ -122,17 +123,17 @@ int64_t GetIntTypeValue(const ColumnType& type, const void* value) {
     return PrimitiveType::TYPE_##PRIMITIVE_TYPE;                                       \
   }                                                                                    \
   void NAME##MinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {                \
-    if (!AlwaysFalse()) {                                                              \
+    if (!AlwaysFalse() && !AlwaysTrue()) {                                             \
       protobuf->mutable_min()->set_##PROTOBUF_TYPE##_val(min_);                        \
       protobuf->mutable_max()->set_##PROTOBUF_TYPE##_val(max_);                        \
     }                                                                                  \
     protobuf->set_always_false(AlwaysFalse());                                         \
-    protobuf->set_always_true(false);                                                  \
+    protobuf->set_always_true(AlwaysTrue());                                           \
   }                                                                                    \
   string NAME##MinMaxFilter::DebugString() const {                                     \
     stringstream out;                                                                  \
     out << #NAME << "MinMaxFilter(min=" << min_ << ", max=" << max_                    \
-        << ", always_false=" << (AlwaysFalse() ? "true" : "false") << ")"              \
+        << ", always_false=" << (AlwaysFalse() ? "true" : "false")                     \
         << ", always_true=" << (AlwaysTrue() ? "true" : "false") << ")";               \
     return out.str();                                                                  \
   }                                                                                    \
@@ -141,6 +142,8 @@ int64_t GetIntTypeValue(const ColumnType& type, const void* value) {
       out->mutable_min()->set_bool_val(in.min().PROTOBUF_TYPE##_val());                \
       out->mutable_max()->set_bool_val(in.max().PROTOBUF_TYPE##_val());                \
       out->set_always_false(false);                                                    \
+    } else if (in.always_true() || out->always_true()) {                               \
+      out->set_always_true(true);                                                      \
     } else {                                                                           \
       out->mutable_min()->set_##PROTOBUF_TYPE##_val(                                   \
           std::min(in.min().PROTOBUF_TYPE##_val(), out->min().PROTOBUF_TYPE##_val())); \
@@ -151,7 +154,7 @@ int64_t GetIntTypeValue(const ColumnType& type, const void* value) {
   void NAME##MinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {       \
     out->mutable_min()->set_##PROTOBUF_TYPE##_val(in.min().PROTOBUF_TYPE##_val());     \
     out->mutable_max()->set_##PROTOBUF_TYPE##_val(in.max().PROTOBUF_TYPE##_val());     \
-  }                                                                                    \
+  }
 
 NUMERIC_MIN_MAX_FILTER_FUNCS(Bool, bool, bool, BOOLEAN);
 NUMERIC_MIN_MAX_FILTER_FUNCS(TinyInt, int8_t, byte, TINYINT);
@@ -408,14 +411,18 @@ void StringMinMaxFilter::Or(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
     out->mutable_max()->set_string_val(in.max().string_val());
     out->set_always_false(false);
   } else {
-    StringValue in_min_val = StringValue(in.min().string_val());
-    StringValue out_min_val = StringValue(out->min().string_val());
-    if (in_min_val < out_min_val)
-      out->mutable_min()->set_string_val(in.min().string_val());
-    StringValue in_max_val = StringValue(in.max().string_val());
-    StringValue out_max_val = StringValue(out->max().string_val());
-    if (in_max_val > out_max_val)
-      out->mutable_max()->set_string_val(in.max().string_val());
+    if (in.always_true() || out->always_true()) {
+      out->set_always_true(true);
+    } else {
+      StringValue in_min_val = StringValue(in.min().string_val());
+      StringValue out_min_val = StringValue(out->min().string_val());
+      if (in_min_val < out_min_val)
+        out->mutable_min()->set_string_val(in.min().string_val());
+      StringValue in_max_val = StringValue(in.max().string_val());
+      StringValue out_max_val = StringValue(out->max().string_val());
+      if (in_max_val > out_max_val)
+        out->mutable_max()->set_string_val(in.max().string_val());
+    }
   }
 }
 
@@ -476,7 +483,8 @@ float StringMinMaxFilter::ComputeOverlapRatio(
       "class.impala::" #NAME "MinMaxFilter";                                           \
   NAME##MinMaxFilter::NAME##MinMaxFilter(const MinMaxFilterPB& protobuf) {             \
     always_false_ = protobuf.always_false();                                           \
-    if (!always_false_) {                                                              \
+    always_true_ = protobuf.always_true();                                             \
+    if (!always_false_ && !always_true_) {                                             \
       DCHECK(protobuf.min().has_##PROTOBUF_TYPE##_val());                              \
       DCHECK(protobuf.max().has_##PROTOBUF_TYPE##_val());                              \
       min_ = TYPE::FromColumnValuePB(protobuf.min());                                  \
@@ -487,17 +495,18 @@ float StringMinMaxFilter::ComputeOverlapRatio(
     return PrimitiveType::TYPE_##PRIMITIVE_TYPE;                                       \
   }                                                                                    \
   void NAME##MinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {                \
-    if (!always_false_) {                                                              \
+    if (!always_false_ && !always_true_) {                                             \
       min_.ToColumnValuePB(protobuf->mutable_min());                                   \
       max_.ToColumnValuePB(protobuf->mutable_max());                                   \
     }                                                                                  \
     protobuf->set_always_false(always_false_);                                         \
-    protobuf->set_always_true(false);                                                  \
+    protobuf->set_always_true(always_true_);                                           \
   }                                                                                    \
   string NAME##MinMaxFilter::DebugString() const {                                     \
     stringstream out;                                                                  \
     out << #NAME << "MinMaxFilter(min=" << min_ << ", max=" << max_                    \
-        << ", always_false=" << (always_false_ ? "true" : "false") << ")";             \
+        << ", always_false=" << (always_false_ ? "true" : "false")                     \
+        << ", always_true=" << (always_false_ ? "true" : "false") << ")";              \
     return out.str();                                                                  \
   }                                                                                    \
   void NAME##MinMaxFilter::Or(const MinMaxFilterPB& in, MinMaxFilterPB* out) {         \
@@ -505,6 +514,8 @@ float StringMinMaxFilter::ComputeOverlapRatio(
       out->mutable_min()->set_##PROTOBUF_TYPE##_val(in.min().PROTOBUF_TYPE##_val());   \
       out->mutable_max()->set_##PROTOBUF_TYPE##_val(in.max().PROTOBUF_TYPE##_val());   \
       out->set_always_false(false);                                                    \
+    } else if (in.always_true() || out->always_true()) {                               \
+      out->set_always_true(true);                                                      \
     } else {                                                                           \
       TYPE in_min_val = TYPE::FromColumnValuePB(in.min());                             \
       TYPE out_min_val = TYPE::FromColumnValuePB(out->min());                          \
@@ -586,7 +597,8 @@ const char* DecimalMinMaxFilter::LLVM_CLASS_NAME = "class.impala::DecimalMinMaxF
 DecimalMinMaxFilter::DecimalMinMaxFilter(const MinMaxFilterPB& protobuf, int precision)
   : size_(ColumnType::GetDecimalByteSize(precision)),
     always_false_(protobuf.always_false()) {
-  if (!always_false_) {
+  always_true_ = protobuf.always_true();
+  if (!always_false_ && !always_true_) {
     switch (size_) {
       case DECIMAL_SIZE_4BYTE:
         DECIMAL_SET_MINMAX(4);
@@ -616,7 +628,7 @@ PrimitiveType DecimalMinMaxFilter::type() {
 // Construct a thrift min-max filter.  Will be called by the executor
 // to be sent to the coordinator
 void DecimalMinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {
-  if (!always_false_) {
+  if (!always_false_ && !always_true_) {
     switch (size_) {
       case DECIMAL_SIZE_4BYTE:
         DECIMAL_TO_PROTOBUF(4);
@@ -632,7 +644,7 @@ void DecimalMinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {
     }
   }
   protobuf->set_always_false(always_false_);
-  protobuf->set_always_true(false);
+  protobuf->set_always_true(always_true_);
 }
 
 void DecimalMinMaxFilter::Insert(const void* val) {
@@ -652,10 +664,11 @@ void DecimalMinMaxFilter::Insert(const void* val) {
   }
 }
 
-#define DECIMAL_DEBUG_STRING(SIZE)                                                \
-  do {                                                                            \
-    out << "DecimalMinMaxFilter(min=" << min##SIZE##_ << ", max=" << max##SIZE##_ \
-        << " always_false=" << (always_false_ ? "true" : "false") << ")";         \
+#define DECIMAL_DEBUG_STRING(SIZE)                                                 \
+  do {                                                                             \
+    out << "DecimalMinMaxFilter(min=" << min##SIZE##_ << ", max=" << max##SIZE##_  \
+        << ", always_false=" << (always_false_ ? "true" : "false")                 \
+        << ", always_true=" << (always_false_ ? "true" : "false") << ")";          \
   } while (false)
 
 string DecimalMinMaxFilter::DebugString() const {
@@ -696,6 +709,8 @@ void DecimalMinMaxFilter::Or(
     out->mutable_min()->set_decimal_val(in.min().decimal_val());
     out->mutable_max()->set_decimal_val(in.max().decimal_val());
     out->set_always_false(false);
+  } else if (in.always_true() || out->always_true()) {
+    out->set_always_true(true);
   } else {
     int size = ColumnType::GetDecimalByteSize(precision);
     switch (size) {

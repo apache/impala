@@ -1,0 +1,95 @@
+====
+---- QUERY
+##################################
+# Create a new alltypestiny table.
+##################################
+drop table if exists alltypestiny;
+CREATE TABLE alltypestiny
+STORED AS PARQUET
+as select * from functional_parquet.alltypestiny;
+====
+---- QUERY
+# Compute stats including the min/max for integers and floats.
+set compute_column_minmax_stats = true;
+compute stats alltypestiny;
+====
+---- QUERY
+# show column stats including the min/max.
+set show_column_minmax_stats = true;
+show column stats alltypestiny;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES, MIN, MAX
+---- RESULTS
+'id','INT',8,0,4,4.0,-1,-1,'0','7'
+'bool_col','BOOLEAN',2,0,1,1.0,4,4,'-1','-1'
+'tinyint_col','TINYINT',2,0,1,1.0,-1,-1,'0','1'
+'smallint_col','SMALLINT',2,0,2,2.0,-1,-1,'0','1'
+'int_col','INT',2,0,4,4.0,-1,-1,'0','1'
+'bigint_col','BIGINT',2,0,8,8.0,-1,-1,'0','10'
+'float_col','FLOAT',2,0,4,4.0,-1,-1,'0.0','1.100000023841858'
+'double_col','DOUBLE',2,0,8,8.0,-1,-1,'0.0','10.1'
+'date_string_col','STRING',4,0,8,8.0,-1,-1,'-1','-1'
+'string_col','STRING',2,0,1,1.0,-1,-1,'-1','-1'
+'timestamp_col','TIMESTAMP',8,0,16,16.0,-1,-1,'-1','-1'
+'year','INT',1,0,4,4.0,-1,-1,'2009','2009'
+'month','INT',4,0,4,4.0,-1,-1,'1','4'
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+##############################
+# Create a new date_tbl table.
+##############################
+drop table if exists date_tbl;
+CREATE TABLE date_tbl
+STORED AS PARQUET
+as select * from functional_parquet.date_tbl;
+====
+---- QUERY
+# Compute stats including the min/max for date types.
+set compute_column_minmax_stats = true;
+compute stats date_tbl;
+====
+---- QUERY
+# show column stats including the min/max.
+set show_column_minmax_stats = true;
+show column stats date_tbl;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES, MIN, MAX
+---- RESULTS
+'id_col','INT',22,0,4,4,-1,-1,'0','31'
+'date_col','DATE',16,2,4,4,-1,-1,'0001-01-01','9999-12-31'
+'date_part','DATE',4,0,4,4,-1,-1,'0001-01-01','9999-12-31'
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT, STRING, STRING
+====
+---- QUERY
+#################################
+# Create a new decimal_tbl table.
+#################################
+drop table if exists decimal_tbl;
+CREATE TABLE decimal_tbl
+STORED AS PARQUET
+as select * from functional_parquet.decimal_tbl;
+====
+---- QUERY
+# Compute stats including the min/max for decimal types.
+set compute_column_minmax_stats = true;
+compute stats decimal_tbl;
+====
+---- QUERY
+# show column stats including the min/max.
+set show_column_minmax_stats = true;
+show column stats decimal_tbl;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES, MIN, MAX
+---- RESULTS
+'d1','DECIMAL(9,0)',4,0,4,4,-1,-1,'1234','132842'
+'d2','DECIMAL(10,0)',3,0,8,8,-1,-1,'111','2222'
+'d3','DECIMAL(20,10)',5,0,16,16,-1,-1,'1.2345678900','12345.6789000000'
+'d4','DECIMAL(38,38)',1,0,16,16,-1,-1,'0.12345678900000000000000000000000000000','0.12345678900000000000000000000000000000'
+'d5','DECIMAL(10,5)',5,0,8,8,-1,-1,'0.10000','12345.78900'
+'d6','DECIMAL(9,0)',1,0,4,4,-1,-1,'1','1'
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT, STRING, STRING
+====

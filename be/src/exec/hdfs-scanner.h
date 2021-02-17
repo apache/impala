@@ -344,15 +344,19 @@ class HdfsScanner {
     /// Apply the filter at page level only.
     uint8_t enabled_for_page;
 
+    /// Apply the filter at row group level only.
+    uint8_t enabled_for_rowgroup;
+
     /// Padding to ensure structs do not straddle cache-line boundary.
-    uint8_t padding[6];
+    uint8_t padding[5];
 
     LocalFilterStats()
       : considered(0),
         rejected(0),
         total_possible(0),
         enabled_for_row(1),
-        enabled_for_page(1) {}
+        enabled_for_page(1),
+        enabled_for_rowgroup(1) {}
   };
 
   /// Cached runtime filter contexts, one for each filter that applies to this column.

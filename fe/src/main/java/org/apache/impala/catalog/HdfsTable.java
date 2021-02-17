@@ -950,6 +950,10 @@ public class HdfsTable extends Table implements FeFsTable {
         nullPartitionIds_.get(i).add(Long.valueOf(partition.getId()));
         continue;
       }
+
+      // Update the low and high value with 'literal'.
+      stats.updateLowAndHighValue(literal);
+
       Set<Long> partitionIds = partitionValuesMap_.get(i).get(literal);
       if (partitionIds == null) {
         partitionIds = new HashSet<>();
@@ -2748,5 +2752,14 @@ public class HdfsTable extends Table implements FeFsTable {
    */
   public void setLastVersionSeenByTopicUpdate(long version) {
     lastVersionSeenByTopicUpdate_ = version;
+  }
+
+  public boolean isParquetTable() {
+    for (FeFsPartition partition: partitionMap_.values()) {
+      if (!partition.getFileFormat().isParquetBased()) {
+        return false;
+      }
+    }
+    return true;
   }
 }

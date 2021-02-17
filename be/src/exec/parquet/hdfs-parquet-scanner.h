@@ -465,6 +465,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// and HJ min/max filters.
   RuntimeProfile::Counter* num_minmax_filtered_row_groups_counter_;
 
+  /// Number of row groups that are skipped by unuseful filters.
+  RuntimeProfile::Counter* num_rowgroups_skipped_by_unuseful_filters_counter_;
+
   /// Number of row groups that need to be read.
   RuntimeProfile::Counter* num_row_groups_counter_;
 
@@ -537,6 +540,17 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   Status EvaluateOverlapForRowGroup(
     const parquet::FileMetaData& file_metadata, const parquet::RowGroup& row_group,
     bool* skip_row_group);
+
+  /// Return true if filter 'minmax_filter' of fitler id 'filter_id' is too close to
+  /// column min/max stats available at the target desc entry targets[0] in
+  /// 'filter_ctxs_[idx]', utilizing 'threshold' as the threshold. Return 'false'
+  /// otherwise.
+  ///
+  /// Side effect enabled_for_rowgroup, enabled_for_row and enabled_for_page in
+  /// filter_stats_[idx], FilterStats::ROW_GROUPS_KEY in filter_ctxs_[idx] and
+  /// num_column_stats_rejected_rowgroups_counter_ in this scanner.
+  bool FilterAlreadyDisabledOrOverlapWithColumnStats(
+      int filter_id, MinMaxFilter* minmax_filter, int idx, float threshold);
 
   /// Detect if a column is a collection or missing for a column chunk described by a
   /// schema path in a slot descriptor 'slot_desc'.

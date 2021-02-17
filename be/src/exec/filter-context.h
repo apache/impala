@@ -146,6 +146,14 @@ struct FilterContext {
   // is updated.
   static bool CheckForAlwaysFalse(const std::string& stats_name,
       const std::vector<FilterContext>& ctxs);
+
+  /// Returns true if 'filter' is a min-max filter and whose range overlaps enough
+  /// with the range defined by the column low and high values in 'desc'. Return false
+  /// otherwise. The degree of the overlap is determined by the overlap ratio and the
+  /// 'threshold' (query option 'minmax_filter_threshold') that is used as a lower bound
+  /// for the ratio.
+  static bool ShouldRejectFilterBasedOnColumnStats(const TRuntimeFilterTargetDesc& desc,
+      MinMaxFilter* minmax_filter, float threshold);
 };
 
 }

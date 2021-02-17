@@ -601,6 +601,14 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_compute_stats_min_sample_size(min_sample_size);
         break;
       }
+      case TImpalaQueryOptions::COMPUTE_COLUMN_MINMAX_STATS: {
+        query_options->__set_compute_column_minmax_stats(IsTrue(value));
+        break;
+      }
+      case TImpalaQueryOptions::SHOW_COLUMN_MINMAX_STATS: {
+        query_options->__set_show_column_minmax_stats(IsTrue(value));
+        break;
+      }
       case TImpalaQueryOptions::EXEC_TIME_LIMIT_S: {
         StringParser::ParseResult result;
         const int32_t time_limit =

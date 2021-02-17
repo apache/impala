@@ -25,6 +25,7 @@ namespace cpp impala
 namespace java org.apache.impala.thrift
 
 include "CatalogObjects.thrift"
+include "Data.thrift"
 include "ExecStats.thrift"
 include "Exprs.thrift"
 include "Types.thrift"
@@ -112,6 +113,10 @@ struct TRuntimeFilterTargetDesc {
   // type of the targeted column.
   6: optional string kudu_col_name
   7: optional Types.TColumnType kudu_col_type;
+
+  // The low and high value as seen in the column stats of the targeted column.
+  8: optional Data.TColumnValue low_value
+  9: optional Data.TColumnValue high_value
 }
 
 enum TRuntimeFilterType {

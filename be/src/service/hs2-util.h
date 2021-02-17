@@ -17,11 +17,14 @@
 
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/Frontend_types.h"
+#include "gen-cpp/TCLIService_types.h"
 
 namespace impala {
 
 class RowBatch;
 class ScalarExprEvaluator;
+
+typedef apache::hive::service::cli::thrift::TColumnValue TColumnValueHive;
 
 /// Utility methods for converting from Impala (either an Expr result or a TColumnValue)
 /// to Hive types (either a thrift::TColumnValue (V1->V5) or a TColumn (V6->).
@@ -54,4 +57,15 @@ void StitchNulls(uint32_t num_rows_before, uint32_t num_rows_added, uint32_t sta
 void PrintTColumnValue(const apache::hive::service::cli::thrift::TColumnValue& colval,
     std::stringstream* out);
 
+/// Utility method for converting from Hive TColumnValue to Impala TColumnValue.
+TColumnValue ConvertToTColumnValue(
+    const apache::hive::service::cli::thrift::TColumnDesc& desc,
+    const apache::hive::service::cli::thrift::TColumnValue& hive_colval);
+
+/// Utility method for printing Impala TColumnValue.
+void PrintTColumnValue(const impala::TColumnValue& colval, std::stringstream* out);
+std::string PrintTColumnValue(const impala::TColumnValue& colval);
+
+/// Return true if one field in value is set. Return false otherwise.
+bool isOneFieldSet(const impala::TColumnValue& value);
 }

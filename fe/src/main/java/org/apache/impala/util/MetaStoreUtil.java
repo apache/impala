@@ -40,6 +40,7 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.thrift.TException;
@@ -358,5 +359,13 @@ public class MetaStoreUtil {
     public long getWriteId() {
       return writeId_;
     }
+  }
+
+  /**
+   * Returns true if the min/max stats of 'type' can be stored in HMS (Hive metastore).
+   */
+  public static boolean canStoreMinmaxInHMS(Type type) {
+    return (type.isIntegerType() || type.isFloatingPointType() || type.isDecimal()
+        || type.isDate());
   }
 }

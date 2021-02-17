@@ -5,11 +5,11 @@
 # with controlled number of rows per page.
 ###################################################
 set PARQUET_PAGE_ROW_COUNT_LIMIT=24000;
-drop table if exists tpch_parquet.lineitem_orderkey_only;
-CREATE TABLE tpch_parquet.lineitem_orderkey_only(l_orderkey bigint)
+drop table if exists lineitem_orderkey_only;
+CREATE TABLE lineitem_orderkey_only(l_orderkey bigint)
 sort by (l_orderkey)
 STORED AS PARQUET;
-insert into tpch_parquet.lineitem_orderkey_only
+insert into lineitem_orderkey_only
 select l_orderkey from tpch_parquet.lineitem;
 ====
 ---- QUERY
@@ -20,7 +20,7 @@ SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET MINMAX_FILTERING_LEVEL=PAGE;
 SET MINMAX_FILTER_THRESHOLD=0.5;
 select straight_join a.l_orderkey from
-tpch_parquet.lineitem_orderkey_only a join [SHUFFLE] tpch_parquet.orders b
+lineitem_orderkey_only a join [SHUFFLE] tpch_parquet.orders b
 where a.l_orderkey = b.o_orderkey
 and b.o_custkey = 5 order by l_orderkey;
 ---- RESULTS
@@ -45,12 +45,6 @@ and b.o_custkey = 5 order by l_orderkey;
 2630562
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRuntimeFilteredPages)> 200
-====
----- QUERY
-###################################################
-# Drop the table.
-###################################################
-drop table if exists tpch_parquet.lineitem_orderkey_only;
 ====
 ---- QUERY
 ###################################################
@@ -119,8 +113,8 @@ aggregation(SUM, NumRuntimeFilteredPages): 0
 # Create the lineitem table with sorted l_shipdate
 # which is a STRING.
 ###################################################
-drop table if exists tpch_parquet.lineitem_sorted_l_shipdate;
-CREATE TABLE tpch_parquet.lineitem_sorted_l_shipdate
+drop table if exists lineitem_sorted_l_shipdate;
+CREATE TABLE lineitem_sorted_l_shipdate
 sort by (l_shipdate)
 STORED AS PARQUET
 as select * from tpch_parquet.lineitem;
@@ -135,7 +129,7 @@ SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET MINMAX_FILTER_THRESHOLD=0.5;
 SET MINMAX_FILTERING_LEVEL=PAGE;
 select straight_join count(*)
-from tpch_parquet.lineitem_sorted_l_shipdate a join [SHUFFLE]
+from lineitem_sorted_l_shipdate a join [SHUFFLE]
 tpch_parquet.orders b
 where a.l_shipdate = b.o_orderdate and b.o_orderkey = 2
 ---- RESULTS
@@ -152,7 +146,7 @@ aggregation(SUM, NumRuntimeFilteredPages): 120
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET MINMAX_FILTER_THRESHOLD=0.0;
 select straight_join count(*)
-from tpch_parquet.lineitem_sorted_l_shipdate a join [SHUFFLE]
+from lineitem_sorted_l_shipdate a join [SHUFFLE]
 tpch_parquet.orders b
 where a.l_shipdate = b.o_orderdate and b.o_orderkey = 2
 ---- RESULTS
@@ -161,18 +155,12 @@ where a.l_shipdate = b.o_orderdate and b.o_orderkey = 2
 aggregation(SUM, NumRuntimeFilteredPages): 0
 ====
 ---- QUERY
-###################################################
-# Drop the table.
-###################################################
-drop table if exists tpch_parquet.lineitem_sorted_l_shipdate;
-====
----- QUERY
 ##################################################
 # Create the lineitem table with sorted
 # l_extendedprice which is DECIMAL(12,2).
 ###################################################
-drop TABLE if exists tpch_parquet.lineitem_sorted_l_extendedprice;
-CREATE TABLE tpch_parquet.lineitem_sorted_l_extendedprice
+drop TABLE if exists lineitem_sorted_l_extendedprice;
+CREATE TABLE lineitem_sorted_l_extendedprice
 sort by (l_extendedprice)
 STORED AS PARQUET
 as select * from tpch_parquet.lineitem;
@@ -186,8 +174,8 @@ SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET MINMAX_FILTER_THRESHOLD=1.0;
 SET MINMAX_FILTERING_LEVEL=PAGE;
 select straight_join count(*)
-from tpch_parquet.lineitem_sorted_l_extendedprice a join [SHUFFLE]
-tpch_parquet.lineitem_sorted_l_extendedprice b
+from lineitem_sorted_l_extendedprice a join [SHUFFLE]
+lineitem_sorted_l_extendedprice b
 where a.l_extendedprice = b.l_extendedprice and b.l_orderkey = 1;
 ---- RESULTS
 36
@@ -203,8 +191,8 @@ aggregation(SUM, NumRuntimeFilteredPages): 255
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET MINMAX_FILTER_THRESHOLD=0.0;
 select straight_join count(*)
-from tpch_parquet.lineitem_sorted_l_extendedprice a join [SHUFFLE]
-tpch_parquet.lineitem_sorted_l_extendedprice b
+from lineitem_sorted_l_extendedprice a join [SHUFFLE]
+lineitem_sorted_l_extendedprice b
 where a.l_extendedprice = b.l_extendedprice and b.l_orderkey = 1;
 ---- RESULTS
 36
@@ -213,7 +201,66 @@ aggregation(SUM, NumRuntimeFilteredPages): 0
 ====
 ---- QUERY
 ###################################################
-# Drop the table.
+# Create store_sales table in unique_database.
 ###################################################
-drop table if exists tpch_parquet.lineitem_sorted_l_extendedprice;
+drop table if exists store_sales;
+CREATE TABLE store_sales
+partitioned by (ss_sold_date_sk)
+STORED AS PARQUET
+as select * from tpcds_parquet.store_sales;
+set compute_column_minmax_stats = true;
+compute stats store_sales(ss_addr_sk);
+====
+---- QUERY
+###################################################
+# Check out the number row groups with filters
+# rejected by column stats with a partitioned join.
+###################################################
+set minmax_filter_threshold=0.5;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select count(a.ss_sold_time_sk) from
+store_sales a join [SHUFFLE] store_sales b
+on a.ss_addr_sk = b.ss_addr_sk where
+b.ss_customer_sk < 10;
+---- RESULTS
+12728
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroupsSkippedByUnusefulFilters)> 1700
+====
+---- QUERY
+###################################################
+# Check out the number row groups with filters
+# rejected by column stats with a broadcast join.
+###################################################
+set minmax_filter_threshold=0.5;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select count(a.ss_sold_time_sk) from
+store_sales a join store_sales b
+on a.ss_addr_sk = b.ss_addr_sk where
+b.ss_customer_sk < 10;
+---- RESULTS
+12728
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroupsSkippedByUnusefulFilters)> 1700
+====
+---- QUERY
+###################################################
+# clear the stats on store_sales.
+###################################################
+drop stats store_sales;
+====
+---- QUERY
+###################################################
+# The number of row groups with filters rejected by
+# column stats should drop down to 0.
+###################################################
+set minmax_filter_threshold=0.5;
+select count(a.ss_sold_time_sk) from
+store_sales a join [SHUFFLE] store_sales b
+on a.ss_addr_sk = b.ss_addr_sk where
+b.ss_customer_sk < 10;
+---- RESULTS
+12728
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroupsSkippedByUnusefulFilters): 0
 ====
