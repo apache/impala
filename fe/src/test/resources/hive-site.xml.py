@@ -61,7 +61,10 @@ CONFIG.update({
   # The default value of this configuration is 1h which will block
   # the test for long time. Overriding this configuration helps with
   # the runtime of the test.
-  'hive.repl.bootstrap.dump.open.txn.timeout': '120s'
+  'hive.repl.bootstrap.dump.open.txn.timeout': '120s',
+
+  # allow both hs2 and hs2-http protocols
+  'hive.server2.transport.mode': 'all'
 })
 
 if variant == 'changed_external_dir':

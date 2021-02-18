@@ -40,7 +40,7 @@ from Status.ttypes import TStatus
 from TCLIService.TCLIService import (TExecuteStatementReq, TOpenSessionReq,
     TCloseSessionReq, TProtocolVersion, TStatusCode, TGetOperationStatusReq,
     TOperationState, TFetchResultsReq, TFetchOrientation, TGetLogReq,
-    TGetResultSetMetadataReq, TTypeId, TCancelOperationReq)
+    TGetResultSetMetadataReq, TTypeId, TCancelOperationReq, TCloseOperationReq)
 from ImpalaHttpClient import ImpalaHttpClient
 from thrift.protocol import TBinaryProtocol
 from thrift_sasl import TSaslClientTransport
@@ -1081,6 +1081,42 @@ class RpcStatus:
   OK = 0
   ERROR = 1
 
+
+class StrictHS2Client(ImpalaHS2Client):
+  """HS2 client. Uses the HS2 protocol without Impala-specific extensions.
+  This can be used to connect with HiveServer2 directly."""
+  def __init__(self, *args, **kwargs):
+    super(StrictHS2Client, self).__init__(*args, **kwargs)
+
+  def close_dml(self, last_query_handle):
+    return self.close_query(last_query_handle)
+
+  def close_query(self, last_query_handle):
+    # Set a member in the handle to make sure that it is idempotent
+    if last_query_handle.is_closed:
+      return True
+    req = TCloseOperationReq(last_query_handle)
+
+    def CloseOperation():
+      return self.imp_service.CloseOperation(req)
+    resp = self._do_hs2_rpc(CloseOperation, retry_on_error=False)
+    last_query_handle.is_closed = True
+    return self._is_hs2_nonerror_status(resp.status.statusCode)
+
+  def _ping_impala_service(self):
+    return ("N/A", "N/A")
+
+  def get_warning_log(self, last_query_handle):
+    return ""
+
+  def get_error_log(self, last_query_handle):
+    return ""
+
+  def get_runtime_profile(self, last_query_handle):
+    return None, None
+
+  def _populate_query_options(self):
+    return
 
 class ImpalaBeeswaxClient(ImpalaClient):
   """Legacy Beeswax client. Uses the Beeswax protocol plus Impala-specific extensions.

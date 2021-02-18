@@ -39,7 +39,8 @@ import textwrap
 import time
 import traceback
 
-from impala_client import ImpalaHS2Client, ImpalaBeeswaxClient, QueryOptionLevels
+from impala_client import ImpalaHS2Client, StrictHS2Client, \
+    ImpalaBeeswaxClient, QueryOptionLevels
 from impala_shell_config_defaults import impala_shell_defaults
 from option_parser import get_option_parser, get_config_from_file
 from shell_output import (DelimitedOutputFormatter, OutputStream, PrettyOutputFormatter,
@@ -66,7 +67,8 @@ except Exception:
 DEFAULT_BEESWAX_PORT = 21000
 DEFAULT_HS2_PORT = 21050
 DEFAULT_HS2_HTTP_PORT = 28000
-
+DEFAULT_STRICT_HS2_PORT = 11050
+DEFAULT_STRICT_HS2_HTTP_PORT = 10001
 
 def strip_comments(sql):
   """sqlparse default implementation of strip comments has a bad performance when parsing
@@ -183,9 +185,15 @@ class ImpalaShell(cmd.Cmd, object):
     self.use_ssl = options.ssl
     self.ca_cert = options.ca_cert
     self.user = options.user
-    self.ldap_password = options.ldap_password
     self.ldap_password_cmd = options.ldap_password_cmd
-    self.use_ldap = options.use_ldap
+    self.strict_hs2_protocol = options.strict_hs2_protocol
+    self.ldap_password = options.ldap_password
+    # When running tests in strict mode, the server uses the ldap
+    # protocol but can allow any password.
+    if options.use_ldap_test_password:
+      self.ldap_password = 'password'
+    self.use_ldap = options.use_ldap or \
+        (self.strict_hs2_protocol and not self.use_kerberos)
     self.client_connect_timeout_ms = options.client_connect_timeout_ms
     self.verbose = options.verbose
     self.prompt = ImpalaShell.DISCONNECTED_PROMPT
@@ -562,6 +570,22 @@ class ImpalaShell(cmd.Cmd, object):
 
   def _new_impala_client(self):
     protocol = options.protocol.lower()
+    if options.strict_hs2_protocol:
+      assert protocol == 'hs2' or protocol == 'hs2-http'
+      if protocol == 'hs2':
+        return StrictHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
+                          self.use_kerberos, self.kerberos_service_name, self.use_ssl,
+                          self.ca_cert, self.user, self.ldap_password, True,
+                          self.client_connect_timeout_ms, self.verbose,
+                          use_http_base_transport=False, http_path=self.http_path,
+                          http_cookie_names=None)
+      elif protocol == 'hs2-http':
+        return StrictHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
+                          self.use_kerberos, self.kerberos_service_name, self.use_ssl,
+                          self.ca_cert, self.user, self.ldap_password, self.use_ldap,
+                          self.client_connect_timeout_ms, self.verbose,
+                          use_http_base_transport=True, http_path=self.http_path,
+                          http_cookie_names=self.http_cookie_names)
     if protocol == 'hs2':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
@@ -885,7 +909,16 @@ class ImpalaShell(cmd.Cmd, object):
             "<hostname[:port]>", file=sys.stderr)
       return CmdStatus.ERROR
     elif len(host_port) == 1:
-      if protocol == 'hs2':
+      if options.strict_hs2_protocol:
+        if protocol == 'hs2':
+          port = str(DEFAULT_STRICT_HS2_PORT)
+        elif protocol == 'hs2-http':
+          port = str(DEFAULT_STRICT_HS2_HTTP_PORT)
+        else:
+          print("Invalid protocol specified for 'strict_hs2_protocol' option: %s"
+              % protocol, file=sys.stderr)
+          raise FatalShellException()
+      elif protocol == 'hs2':
         port = str(DEFAULT_HS2_PORT)
       elif protocol == 'hs2-http':
         port = str(DEFAULT_HS2_HTTP_PORT)

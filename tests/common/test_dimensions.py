@@ -129,6 +129,14 @@ def create_client_protocol_dimension():
   return ImpalaTestDimension('protocol', 'beeswax', 'hs2', 'hs2-http')
 
 
+def create_client_protocol_strict_dimension():
+  return ImpalaTestDimension('strict_hs2_protocol', False, True)
+
+
+def create_client_protocol_no_strict_dimension():
+  return ImpalaTestDimension('strict_hs2_protocol', False)
+
+
 def hs2_parquet_constraint(v):
   """Constraint function, used to only run HS2 against Parquet format, because file format
   and the client protocol are orthogonal."""

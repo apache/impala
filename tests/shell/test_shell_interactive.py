@@ -41,6 +41,7 @@ from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import SkipIfLocal
 from tests.common.test_dimensions import create_client_protocol_dimension
+from tests.common.test_dimensions import create_client_protocol_strict_dimension
 from tests.shell.util import get_unused_port
 from util import (assert_var_substitution, ImpalaShell, get_impalad_port, get_shell_cmd,
                   get_open_sessions_metric, IMPALA_SHELL_EXECUTABLE, spawn_shell)
@@ -166,6 +167,9 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
   def add_test_dimensions(cls):
     # Run with both beeswax and HS2 to ensure that behaviour is the same.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_strict_dimension())
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+          v.get_value('protocol') != 'beeswax' or not v.get_value('strict_hs2_protocol'))
 
   def _expect_with_cmd(self, proc, cmd, vector, expectations=(), db="default"):
     """Executes a command on the expect process instance and verifies a set of
@@ -260,6 +264,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   def test_compute_stats_with_live_progress_options(self, vector, unique_database):
     """Test that setting LIVE_PROGRESS options won't cause COMPUTE STATS query fail"""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Live progress not supported in strict hs2 mode.")
     p = ImpalaShell(vector)
     p.send_cmd("set live_progress=True")
     p.send_cmd("set live_summary=True")
@@ -276,9 +282,15 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     """Test escaping quotes"""
     # test escaped quotes outside of quotes
     result = run_impala_shell_interactive(vector, "select \\'bc';")
-    assert "Unexpected character" in result.stderr
+    if vector.get_value('strict_hs2_protocol'):
+      assert "ParseException" in result.stderr
+    else:
+      assert "Unexpected character" in result.stderr
     result = run_impala_shell_interactive(vector, "select \\\"bc\";")
-    assert "Unexpected character" in result.stderr
+    if vector.get_value('strict_hs2_protocol'):
+      assert "ParseException" in result.stderr
+    else:
+      assert "Unexpected character" in result.stderr
     # test escaped quotes within quotes
     result = run_impala_shell_interactive(vector, "select 'ab\\'c';")
     assert "Fetched 1 row(s)" in result.stderr
@@ -307,6 +319,9 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_cancellation_mid_command(self, vector):
     """Test that keyboard interrupt cancels multiline query strings"""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Cancellation infrastructure does not " +
+          "work in strict hs2 mode.")
     shell_cmd = get_shell_cmd(vector)
     multiline_query = ["select column_1\n", "from table_1\n", "where ..."]
     # Test keyboard interrupt mid line
@@ -334,6 +349,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   def test_unicode_input(self, vector):
     """Test queries containing non-ascii input"""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Failed, need to investigate.")
     # test a unicode query spanning multiple lines
     unicode_bytes = u'\ufffd'.encode('utf-8')
     args = "select '{0}'\n;".format(unicode_bytes)
@@ -399,6 +416,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
     Verifies that a connect command by the user is honoured.
     """
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Connect command not supported in strict hs2 mode")
     try:
       # Disconnect existing clients so there are no open sessions.
       self.close_impala_clients()
@@ -451,6 +470,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     webpage to confirm that they've been closed.
     TODO: Add every statement type.
     """
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Inflight query support does not exist in strict hs2 mode.")
     # IMPALA-10312: deflake the test by increasing timeout above the default
     TIMEOUT_S = 30
     # Disconnect existing clients so there are no open sessions.
@@ -494,6 +515,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     Ensure that multiline queries are preserved when they're read back from history.
     Additionally, also test that comments are preserved.
     """
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("History command not supported in strict hs2 mode.")
     # readline gets its input from tty, so using stdin does not work.
     child_proc = spawn_shell(get_shell_cmd(vector))
     # List of (input query, expected text in output).
@@ -523,6 +546,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     """This test verifies that once the cmdloop is broken the history file will not be
     re-read. The cmdloop can be broken when the user sends a SIGINT or exceptions
     occur."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("History command not supported in strict hs2 mode.")
     # readline gets its input from tty, so using stdin does not work.
     shell_cmd = get_shell_cmd(vector)
     child_proc = spawn_shell(shell_cmd)
@@ -574,6 +599,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   def test_rerun(self, vector, tmp_history_file):
     """Smoke test for the 'rerun' command"""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Rerun not supported in strict hs2 mode.")
     child_proc = spawn_shell(get_shell_cmd(vector))
     child_proc.expect(":{0}] default>".format(get_impalad_port(vector)))
     self._expect_with_cmd(child_proc, "@1", vector, ("Command index out of range"))
@@ -627,6 +654,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     assert_var_substitution(result)
 
   def test_query_option_configuration(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Set command not supported in strict hs2 mode.")
     rcfile_path = os.path.join(QUERY_FILE_PATH, 'impalarc_with_query_options')
     args = ['-Q', 'MT_dop=1', '--query_option=MAX_ERRORS=200',
             '--config_file=%s' % rcfile_path]
@@ -685,6 +714,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     assert "\tLIVE_PROGRESS: True" in result.stdout
 
   def test_source_file(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Version not supported in strict hs2 mode.")
     cwd = os.getcwd()
     try:
       # Change working dir so that SOURCE command in shell.cmds can find shell2.cmds.
@@ -739,6 +770,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     """IMPALA-2181. Tests the outputs of SET and SET ALL commands. SET should contain the
     REGULAR and ADVANCED options only. SET ALL should contain all the options grouped by
     display level."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Set command not supported in strict hs2 mode.")
     shell1 = ImpalaShell(vector)
     shell1.send_cmd("set")
     result = shell1.get_result()
@@ -819,6 +852,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
 
   def test_line_with_leading_comment(self, vector, unique_database):
     # IMPALA-2195: A line with a comment produces incorrect command.
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Leading omments not supported in strict hs2 mode.")
     table = "{0}.leading_comment".format(unique_database)
     run_impala_shell_interactive(vector, 'create table {0} (i int);'.format(table))
     result = run_impala_shell_interactive(vector, '-- comment\n'
@@ -861,6 +896,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     assert 'Executes a USE... query' in result.stdout
 
   def test_line_ends_with_comment(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Not working in strict hs2 mode.")
     # IMPALA-5269: Test lines that end with a comment.
     queries = ['select 1 + 1; --comment',
                'select 1 + 1 --comment\n;']
@@ -926,11 +963,17 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
       pytest.skip("Test will fail if shell is not part of dev environment.")
 
     result = run_impala_shell_interactive(vector, "select 1 + 1; \"\n;\";")
-    assert '| 2     |' in result.stdout
+    if vector.get_value('strict_hs2_protocol'):
+      assert '| 2   |' in result.stdout
+    else:
+      assert '| 2     |' in result.stdout
     result = run_impala_shell_interactive(vector, "select '1234'\";\n;\n\";")
     assert '| 1234 |' in result.stdout
     result = run_impala_shell_interactive(vector, "select 1 + 1; \"\n;\"\n;")
-    assert '| 2     |' in result.stdout
+    if vector.get_value('strict_hs2_protocol'):
+      assert '| 2   |' in result.stdout
+    else:
+      assert '| 2     |' in result.stdout
     result = run_impala_shell_interactive(vector, "select '1\\'23\\'4'\";\n;\n\";")
     assert '| 1\'23\'4 |' in result.stdout
     result = run_impala_shell_interactive(vector, "select '1\"23\"4'\";\n;\n\";")
@@ -951,7 +994,7 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     ]
     for query in queries:
       result = run_impala_shell_interactive(vector, query)
-      assert '| 1 |' in result.stdout
+      assert '| 1 ' in result.stdout
 
   def test_shell_prompt(self, vector):
     shell_cmd = get_shell_cmd(vector)
@@ -1038,10 +1081,16 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     query = "with v as (select 1) \nselect foo('\\\\'), ('bar \n;"
     shell.send_cmd(query)
     result = shell.get_result()
-    assert "ERROR: ParseException: Unmatched string literal" in result.stderr,\
-           result.stderr
+    if vector.get_value('strict_hs2_protocol'):
+      assert "ParseException" in result.stderr,\
+             result.stderr
+    else:
+      assert "ERROR: ParseException: Unmatched string literal" in result.stderr,\
+             result.stderr
 
   def test_utf8_error_message(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("The now() function is Impala specific.")
     """Test UTF-8 error messages are shown correctly"""
     shell = ImpalaShell(vector)
     query = "select cast(now() as string format 'yyyy年MM月dd日')"
@@ -1056,6 +1105,8 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
        Query options are not sent to the coordinator immediately, so the error checking
        will only happen when running a query.
     """
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Set command not supported in strict hs2 mode.")
     p = ImpalaShell(vector)
     p.send_cmd('set timezone=BLA;')
     p.send_cmd('select 1;')

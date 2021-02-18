@@ -55,4 +55,5 @@ impala_shell_defaults = {
             'write_delimited': False,
             'client_connect_timeout_ms': 60000,
             'global_config_default_path': '/etc/impalarc',
+            'strict_hs2_protocol': False,
     }

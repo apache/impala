@@ -112,6 +112,10 @@ IMPALAD_HS2_HOST_PORT =\
     IMPALAD_HOSTNAME + ":" + pytest.config.option.impalad_hs2_port
 IMPALAD_HS2_HTTP_HOST_PORT =\
     IMPALAD_HOSTNAME + ":" + pytest.config.option.impalad_hs2_http_port
+STRICT_HS2_HOST_PORT =\
+    IMPALAD_HOSTNAME + ":" + pytest.config.option.strict_hs2_port
+STRICT_HS2_HTTP_HOST_PORT =\
+    IMPALAD_HOSTNAME + ":" + pytest.config.option.strict_hs2_http_port
 HIVE_HS2_HOST_PORT = pytest.config.option.hive_server2
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 HDFS_CONF = HdfsConfig(pytest.config.option.minicluster_xml_conf)

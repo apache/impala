@@ -277,6 +277,16 @@ def get_option_parser(defaults):
                          "to speak to the coordinator while 'hs2' and 'beeswax' use the "
                          "binary TCP based transport. Beeswax support is deprecated "
                          "and will be removed in the future.")
+  parser.add_option("--strict_hs2_protocol", dest="strict_hs2_protocol",
+                    action="store_true",
+                    help="True if the hs2 connection is using the strict hs2 protocol."
+                         "Only useful if connecting straight to hs2 instead of Impala."
+                         "The default hs2 port is 11050 and the default hs2 http port "
+                         "is 10001.")
+  parser.add_option("--use_ldap_test_password", dest="use_ldap_test_password",
+                    action="store_true",
+                    help="True if need to use the default LDAP password. This is needed "
+                         "when running tests in strict mode.")
   parser.add_option("--http_path", dest="http_path", default="cliservice",
                     help="Default http path on the coordinator to connect to. The final "
                     "connection URL looks like <http(s)>://<coordinator-host>:<port>/"

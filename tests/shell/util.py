@@ -35,7 +35,8 @@ from tests.common.environ import (IMPALA_LOCAL_BUILD_VERSION,
                                   ImpalaTestClusterProperties)
 from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import (IMPALAD_BEESWAX_HOST_PORT,
-    IMPALAD_HS2_HOST_PORT, IMPALAD_HS2_HTTP_HOST_PORT)
+    IMPALAD_HS2_HOST_PORT, IMPALAD_HS2_HTTP_HOST_PORT,
+    STRICT_HS2_HOST_PORT, STRICT_HS2_HTTP_HOST_PORT)
 
 LOG = logging.getLogger('tests/shell/util.py')
 LOG.addHandler(logging.StreamHandler())
@@ -197,10 +198,17 @@ def run_impala_shell_cmd_no_expect(vector, shell_args, env=None, stdin_input=Non
 def get_impalad_host_port(vector):
   """Get host and port to connect to based on test vector provided."""
   protocol = vector.get_value("protocol")
+  strict = vector.get_value_with_default("strict_hs2_protocol", False)
   if protocol == 'hs2':
-    return IMPALAD_HS2_HOST_PORT
+    if strict:
+      return STRICT_HS2_HOST_PORT
+    else:
+      return IMPALAD_HS2_HOST_PORT
   elif protocol == 'hs2-http':
-    return IMPALAD_HS2_HTTP_HOST_PORT
+    if strict:
+      return STRICT_HS2_HTTP_HOST_PORT
+    else:
+      return IMPALAD_HS2_HTTP_HOST_PORT
   else:
     assert protocol == 'beeswax', protocol
     return IMPALAD_BEESWAX_HOST_PORT
@@ -214,9 +222,17 @@ def get_impalad_port(vector):
 def get_shell_cmd(vector):
   """Get the basic shell command to start the shell, given the provided test vector.
   Returns the command as a list of string arguments."""
-  return [IMPALA_SHELL_EXECUTABLE,
-          "--protocol={0}".format(vector.get_value("protocol")),
-          "-i{0}".format(get_impalad_host_port(vector))]
+  if vector.get_value_with_default("strict_hs2_protocol", False):
+    protocol = vector.get_value("protocol")
+    return [IMPALA_SHELL_EXECUTABLE,
+            "--protocol={0}".format(protocol),
+            "--strict_hs2_protocol",
+            "--use_ldap_test_password",
+            "-i{0}".format(get_impalad_host_port(vector))]
+  else:
+    return [IMPALA_SHELL_EXECUTABLE,
+            "--protocol={0}".format(vector.get_value("protocol")),
+            "-i{0}".format(get_impalad_host_port(vector))]
 
 
 def spawn_shell(shell_cmd):

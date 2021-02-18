@@ -21,6 +21,7 @@
 from shell.impala_client import ImpalaBeeswaxClient, ImpalaHS2Client
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_client_protocol_dimension
+from tests.common.test_dimensions import create_client_protocol_no_strict_dimension
 from util import get_impalad_host_port
 
 
@@ -34,6 +35,7 @@ class TestShellClient(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_no_strict_dimension())
 
   def test_fetch_size(self, vector):
     """Tests that when result spooling is disabled, setting a small batch_size causes

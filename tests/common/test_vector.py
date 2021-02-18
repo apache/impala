@@ -71,6 +71,12 @@ class ImpalaTestVector(object):
   def __init__(self, vector_values):
     self.vector_values = vector_values
 
+  def get_value_with_default(self, name, default_value):
+    for vector_value in self.vector_values:
+      if vector_value.name == name:
+        return vector_value.value
+    return default_value
+
   def get_value(self, name):
     for vector_value in self.vector_values:
       if vector_value.name == name:

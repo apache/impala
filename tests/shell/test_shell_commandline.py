@@ -35,6 +35,7 @@ from tests.common.impala_service import ImpaladService
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
 from tests.common.skip import SkipIf
 from tests.common.test_dimensions import create_client_protocol_dimension
+from tests.common.test_dimensions import create_client_protocol_strict_dimension
 from time import sleep, time
 from util import (get_impalad_host_port, assert_var_substitution, run_impala_shell_cmd,
                   ImpalaShell, IMPALA_SHELL_EXECUTABLE, SHELL_IS_PYTHON_2,
@@ -135,6 +136,9 @@ class TestImpalaShell(ImpalaTestSuite):
   def add_test_dimensions(cls):
     # Run with both beeswax and HS2 to ensure that behaviour is the same.
     cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_strict_dimension())
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+          v.get_value('protocol') != 'beeswax' or not v.get_value('strict_hs2_protocol'))
 
   def test_no_args(self, vector):
     args = ['-q', DEFAULT_QUERY]
@@ -167,6 +171,8 @@ class TestImpalaShell(ImpalaTestSuite):
     assert "Query: use `parquet`" in result.stderr, result.stderr
 
   def test_unsecure_message(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Strict protocol always runs with LDAP.")
     results = run_impala_shell_cmd(vector, [], wait_until_connected=False)
     assert "with no authentication" in results.stderr
 
@@ -176,7 +182,9 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(vector, args)
     result_rows = result.stdout.strip().split('\n')
     assert len(result_rows) == 4
-    assert result_rows[0].split(',') == ['i', 's']
+    headers = result_rows[0].split(',')
+    assert headers == ['i', 's'] or \
+        headers == ['test_print_header.i', 'test_print_header.s']
 
     args = ['-B', '--output_delim=,', '-q', 'select * from {0}'.format(populated_table)]
     result = run_impala_shell_cmd(vector, args)
@@ -231,6 +239,8 @@ class TestImpalaShell(ImpalaTestSuite):
     assert output == result.stdout, "Queries with comments not parsed correctly"
 
   def test_completed_query_errors(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("The abort_on_error=false is not supported in strict hs2 mode.")
     args = ['-q', 'set abort_on_error=false;'
             'select count(*) from functional_seq_snap.bad_seq_snap']
     result = run_impala_shell_cmd(vector, args)
@@ -241,6 +251,10 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 'Problem parsing file' in result.stderr
 
   def test_completed_query_errors_1(self, vector):
+    # strict protocol does not support flag "set abort_on_error" since it
+    # connects directly to hs2 and hs2 does not know about this flag.
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Test not working with strict hs2 protocol.")
     args = ['-q', 'set abort_on_error=true;'
             'select id from functional_parquet.bad_column_metadata t']
     result = run_impala_shell_cmd(vector, args, expect_success=False)
@@ -248,6 +262,8 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 'but read 10 values from column id.' in result.stderr
 
   def test_completed_query_errors_2(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Impala-10827: Multiple queries not supported in strict hs2 mode.")
     args = ['-q', 'set abort_on_error=true; '
             'select id, cnt from functional_parquet.bad_column_metadata t, '
             '(select 1 cnt) u']
@@ -257,6 +273,8 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 'but read 10 values from column id.' in result.stderr, result.stderr
 
   def test_no_warnings_in_log_with_quiet_mode(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("The abort_on_error=false is not supported in strict hs2 mode.")
     """Regression test for IMPALA-4222."""
     args = ['--quiet', '-q', 'set abort_on_error=false;'
             'select count(*) from functional_seq_snap.bad_seq_snap']
@@ -264,6 +282,8 @@ class TestImpalaShell(ImpalaTestSuite):
     assert 'WARNINGS:' not in result.stderr, result.stderr
 
   def test_removed_query_option(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Impala query options not supported in strict hs2 mode.")
     """Test that removed query options produce warning."""
     result = run_impala_shell_cmd(vector, ['-q', 'set disable_cached_reads=true'],
                                   expect_success=True)
@@ -298,35 +318,38 @@ class TestImpalaShell(ImpalaTestSuite):
     # with
     args = ['-q', 'with t1 as (select 1) select * from t1']
     run_impala_shell_cmd(vector, args)
-    # set
-    # spaces around the = sign
-    args = ['-q', 'set batch_size  =   10']
-    run_impala_shell_cmd(vector, args)
-    # no spaces around the = sign
-    args = ['-q', 'set batch_size=10']
-    run_impala_shell_cmd(vector, args)
-    # test query options displayed
-    args = ['-q', 'set']
-    result_set = run_impala_shell_cmd(vector, args)
-    assert 'MEM_LIMIT: [0]' in result_set.stdout
-    # test to check that explain_level is STANDARD
-    assert 'EXPLAIN_LEVEL: [STANDARD]' in result_set.stdout
-    # test to check that configs without defaults show up as []
-    assert 'COMPRESSION_CODEC: []' in result_set.stdout
-    # test values displayed after setting value
-    args = ['-q', 'set mem_limit=1g;set']
-    result_set = run_impala_shell_cmd(vector, args)
-    # single list means one instance of mem_limit in displayed output
-    assert 'MEM_LIMIT: 1g' in result_set.stdout
-    assert 'MEM_LIMIT: [0]' not in result_set.stdout
-    # Negative tests for set
-    # use : instead of =
-    args = ['-q', 'set batch_size:10']
-    run_impala_shell_cmd(vector, args, expect_success=False)
-    # use 2 = signs
-    args = ['-q', 'set batch_size=10=50']
-    run_impala_shell_cmd(vector, args, expect_success=False)
-    # describe and desc should return the same result.
+
+    # Impala query options not supported in strict hs2 mode."
+    if not vector.get_value('strict_hs2_protocol'):
+      # set
+      # spaces around the = sign
+      args = ['-q', 'set batch_size  =   10']
+      run_impala_shell_cmd(vector, args)
+      # no spaces around the = sign
+      args = ['-q', 'set batch_size=10']
+      run_impala_shell_cmd(vector, args)
+      # test query options displayed
+      args = ['-q', 'set']
+      result_set = run_impala_shell_cmd(vector, args)
+      assert 'MEM_LIMIT: [0]' in result_set.stdout
+      # test to check that explain_level is STANDARD
+      assert 'EXPLAIN_LEVEL: [STANDARD]' in result_set.stdout
+      # test to check that configs without defaults show up as []
+      assert 'COMPRESSION_CODEC: []' in result_set.stdout
+      # test values displayed after setting value
+      args = ['-q', 'set mem_limit=1g;set']
+      result_set = run_impala_shell_cmd(vector, args)
+      # single list means one instance of mem_limit in displayed output
+      assert 'MEM_LIMIT: 1g' in result_set.stdout
+      assert 'MEM_LIMIT: [0]' not in result_set.stdout
+      # Negative tests for set
+      # use : instead of =
+      args = ['-q', 'set batch_size:10']
+      run_impala_shell_cmd(vector, args, expect_success=False)
+      # use 2 = signs
+      args = ['-q', 'set batch_size=10=50']
+      run_impala_shell_cmd(vector, args, expect_success=False)
+      # describe and desc should return the same result.
     args = ['-q', 'describe {0}'.format(empty_table), '-B']
     result_describe = run_impala_shell_cmd(vector, args)
     args = ['-q', 'desc {0}'.format(empty_table), '-B']
@@ -334,6 +357,8 @@ class TestImpalaShell(ImpalaTestSuite):
     assert result_describe.stdout == result_desc.stdout
 
   def test_runtime_profile(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Runtime profile not support in strict hs2 mode.")
     # test summary is in both the profile printed by the
     # -p option and the one printed by the profile command
     args = ['-p', '-q', 'select 1; profile;']
@@ -345,6 +370,8 @@ class TestImpalaShell(ImpalaTestSuite):
         "Could not detect two profiles, stdout: %s" % result_set.stdout
 
   def test_summary(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Summary not supported in strict hs2 mode.")
     args = ['-q', 'select count(*) from functional.alltypes; summary;']
     result_set = run_impala_shell_cmd(vector, args)
     assert "03:AGGREGATE" in result_set.stdout
@@ -365,6 +392,8 @@ class TestImpalaShell(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_queries_closed(self, vector):
     """Regression test for IMPALA-897."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Strict hs2 mode does not support checking in flight queries.")
     args = ['-f', '{0}/test_close_queries.sql'.format(QUERY_FILE_PATH), '--quiet', '-B']
     # Execute the shell command async
     p = ImpalaShell(vector, args)
@@ -381,6 +410,8 @@ class TestImpalaShell(ImpalaTestSuite):
     """Test cancellation (Ctrl+C event). Run a query that sleeps 10ms per row so will run
     for 110s if not cancelled, but will detect cancellation quickly because of the small
     batch size."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Message not reported in strict hs2 mode.")
     query = "set num_nodes=1; set mt_dop=1; set batch_size=1; \
              select sleep(10) from functional_parquet.alltypesagg"
     p = ImpalaShell(vector, ['-q', query])
@@ -408,7 +439,8 @@ class TestImpalaShell(ImpalaTestSuite):
   def test_query_cancellation_during_wait_to_finish(self, vector):
     """IMPALA-1144: Test cancellation (CTRL+C) while the query is in the
     wait_to_finish state"""
-
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Checking in flight queries not supported in strict hs2 mode.")
     # A select where wait_to_finish takes several seconds
     stmt = "select * from tpch.customer c1, tpch.customer c2, " + \
            "tpch.customer c3 order by c1.c_name"
@@ -419,6 +451,8 @@ class TestImpalaShell(ImpalaTestSuite):
     """Starts the execution of the received query, waits until the query
     execution in fact starts and then cancels it. Expects the query
     cancellation to succeed."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Checking in flight queries not supported in strict hs2 mode.")
     p = ImpalaShell(vector, ['-q', stmt])
     try:
       wait_for_query_state(vector, stmt, cancel_at_state)
@@ -430,6 +464,8 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_get_log_once(self, vector, empty_table):
     """Test that get_log() is always called exactly once."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Warnings are not supported in strict hs2 mode.")
     # Query with fetch
     args = ['-q', 'select * from functional.alltypeserror']
     result = run_impala_shell_cmd(vector, args)
@@ -512,25 +548,27 @@ class TestImpalaShell(ImpalaTestSuite):
       "A valid config file should not trigger any warning: {0}".format(result.stderr)
     assert 'Query: select 2' in result.stderr
 
-    # shell uses query options in global config
-    args = ['-q', 'set;']
-    result = run_impala_shell_cmd(vector, args, env=env)
-    assert 'DEFAULT_FILE_FORMAT: avro' in result.stdout
+    # Various config options not supported in strict hs2 mode.
+    if not vector.get_value('strict_hs2_protocol'):
+      # shell uses query options in global config
+      args = ['-q', 'set;']
+      result = run_impala_shell_cmd(vector, args, env=env)
+      assert 'DEFAULT_FILE_FORMAT: avro' in result.stdout
 
-    # shell options and query options in global config get overriden
-    # by options in user config
-    args = ['--config_file={0}/good_impalarc'.format(QUERY_FILE_PATH),
-            """--query=select '${VAR:msg1}'; set"""]
-    result = run_impala_shell_cmd(vector, args, env=env)
-    assert 'Query: select \'hello\'' in result.stderr
-    assert 'DEFAULT_FILE_FORMAT: parquet' in result.stdout
+      # shell options and query options in global config get overriden
+      # by options in user config
+      args = ['--config_file={0}/good_impalarc'.format(QUERY_FILE_PATH),
+              """--query=select '${VAR:msg1}'; set"""]
+      result = run_impala_shell_cmd(vector, args, env=env)
+      assert 'Query: select \'hello\'' in result.stderr
+      assert 'DEFAULT_FILE_FORMAT: parquet' in result.stdout
 
-    # command line options override options in global config
-    args = ['--query_option=DEFAULT_FILE_FORMAT=text',
-            """--query=select '${VAR:msg1}'; set"""]
-    result = run_impala_shell_cmd(vector, args, env=env)
-    assert 'Query: select \'test\'' in result.stderr
-    assert 'DEFAULT_FILE_FORMAT: text' in result.stdout
+      # command line options override options in global config
+      args = ['--query_option=DEFAULT_FILE_FORMAT=text',
+              """--query=select '${VAR:msg1}'; set"""]
+      result = run_impala_shell_cmd(vector, args, env=env)
+      assert 'Query: select \'test\'' in result.stderr
+      assert 'DEFAULT_FILE_FORMAT: text' in result.stdout
 
     # specified global config file does not exist
     env = {ImpalaShellClass.GLOBAL_CONFIG_FILE: '/does_not_exist'}
@@ -550,16 +588,18 @@ class TestImpalaShell(ImpalaTestSuite):
     result = run_impala_shell_cmd(vector, args)
     assert 'Query: select 2' in result.stderr
 
-    # IMPALA-8317: Add support for list-type, i.e. action=append in config file.
-    args = ['--config_file={0}/good_impalarc'.format(QUERY_FILE_PATH),
-            """--query=select '${VAR:msg1}'; select '${VAR:msg2}';
-            select '${VAR:msg3}'; select '${VAR:msg4}'; set"""]
-    result = run_impala_shell_cmd(vector, args)
-    assert 'Query: select \'hello\'' in result.stderr
-    assert 'Query: select \'world\'' in result.stderr
-    assert 'Query: select \'foo\'' in result.stderr
-    assert 'Query: select \'bar\'' in result.stderr
-    assert 'DEFAULT_FILE_FORMAT: parquet' in result.stdout
+    # "set" not supported for strict hs2 mode
+    if not vector.get_value('strict_hs2_protocol'):
+      # IMPALA-8317: Add support for list-type, i.e. action=append in config file.
+      args = ['--config_file={0}/good_impalarc'.format(QUERY_FILE_PATH),
+              """--query=select '${VAR:msg1}'; select '${VAR:msg2}';
+              select '${VAR:msg3}'; select '${VAR:msg4}'; set"""]
+      result = run_impala_shell_cmd(vector, args)
+      assert 'Query: select \'hello\'' in result.stderr
+      assert 'Query: select \'world\'' in result.stderr
+      assert 'Query: select \'foo\'' in result.stderr
+      assert 'Query: select \'bar\'' in result.stderr
+      assert 'DEFAULT_FILE_FORMAT: parquet' in result.stdout
 
     # Override the variables in the config file with the ones passed via --var.
     args = ['--config_file={0}/good_impalarc'.format(QUERY_FILE_PATH), '--var=msg1=foo',
@@ -715,6 +755,8 @@ class TestImpalaShell(ImpalaTestSuite):
         assert msg not in result_stderr, result_stderr
 
   def test_query_time_and_link_message(self, vector, unique_database):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Messages not sent back is strict hs2 mode.")
     shell_messages = ["Query submitted at: ", "(Coordinator: ",
         "Query progress can be monitored at: "]
     # CREATE statements should not print query time and webserver address.
@@ -755,6 +797,8 @@ class TestImpalaShell(ImpalaTestSuite):
     self._validate_shell_messages(results.stderr, shell_messages, should_exist=False)
 
   def test_insert_status(self, vector, unique_database):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("No message sent back in strict hs2 mode.")
     run_impala_shell_cmd(
         vector, ['--query=create table %s.insert_test (id int)' % unique_database])
     results = run_impala_shell_cmd(
@@ -768,6 +812,8 @@ class TestImpalaShell(ImpalaTestSuite):
     assert expected_output in results.stderr, results.stderr
 
   def test_kudu_dml_reporting(self, vector, unique_database):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Kudu not supported in strict hs2 mode.")
     db = unique_database
     run_impala_shell_cmd(vector, [
         '--query=create table %s.dml_test (id int primary key, '
@@ -836,6 +882,8 @@ class TestImpalaShell(ImpalaTestSuite):
     ''' Tests that impala-shell will always open a socket against
     the host[:port] specified by the -i option with or without the
     -b option '''
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Strict mode only supports LDAP protocol, will hang here.")
     if vector.get_value('protocol') == 'hs2-http':
       pytest.skip("--kerberos_host_fqdn not yet supported.")
     try:
@@ -861,12 +909,20 @@ class TestImpalaShell(ImpalaTestSuite):
     """Test that malformed queries are handled by the commandline shell"""
     args = ['-q', 'with foo as (select bar from temp where temp.a=\'"']
     result = run_impala_shell_cmd(vector, args, expect_success=False)
-    assert "Encountered: EOF" in result.stderr
+    if vector.get_value('strict_hs2_protocol'):
+      assert "Could not execute command:" in result.stderr
+    else:
+      assert "Encountered: EOF" in result.stderr
     args = ['-q', 'with v as (select 1) \;"']
     result = run_impala_shell_cmd(vector, args, expect_success=False)
-    assert "Encountered: Unexpected character" in result.stderr
+    if vector.get_value('strict_hs2_protocol'):
+      assert "cannot recognize input near"
+    else:
+      assert "Encountered: Unexpected character" in result.stderr
 
   def test_large_sql(self, vector, unique_database):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Test did not pass for strict hs2 mode.")
     # In this test, we are only interested in the performance of Impala shell and not
     # the performance of Impala in general. So, this test will execute a large query
     # from a non-existent table since this will make the query execution time negligible.
@@ -910,6 +966,8 @@ class TestImpalaShell(ImpalaTestSuite):
        cluster is platform specific, but there's no guarantee the local machine
        is the same OS, and the assert fails if there's a mismatch.
     """
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Set does not work with strict hs2 mode.")
     result_set = run_impala_shell_cmd(vector, ['-q', 'set;'])
     tzname = find_query_option("TIMEZONE", result_set.stdout)
     assert os.path.isfile("/usr/share/zoneinfo/" + tzname)
@@ -955,6 +1013,8 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_client_identifier(self, vector):
     """Confirms that a version string is passed along."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Profile not supported in strict hs2 mode.")
     args = ['--query', 'select 0; profile']
     result = run_impala_shell_cmd(vector, args)
     assert 'client_identifier=impala shell' in result.stdout.lower()
@@ -967,6 +1027,8 @@ class TestImpalaShell(ImpalaTestSuite):
   def test_type_formatting(self, vector):
     """Test formatting of data types that should be identical between HS2 and beeswax,
     i.e. excluding floating point values which are tested in test_float_formatting."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Failed locally, needs investigation.")
     # Query covers bool, all int types, string, timestamp, date, various decimal types,
     # CHAR (including a value with padding) and VARCHAR.
     query = """select bool_col, tinyint_col, smallint_col, int_col, bigint_col,
@@ -985,6 +1047,8 @@ class TestImpalaShell(ImpalaTestSuite):
     values that can be printed in multiple valid ways. Includes additional expressions
     to confirm that the output of ROUND() is a DOUBLE and that a plain FLOAT is
     formatted correctly."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("The typeof function is not supported in strict hs2 mode.")
     query = """select typeof(round(cast(8.072 as double), 3)), cast(0.5 as float),
                       round(cast(8.072 as double), 3), round(cast(8 as double), 3),
                       round(cast(8.0719999999 as double),3),
@@ -1009,6 +1073,8 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_null_values(self, vector):
     """Test that null values are displayed correctly."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Need to investigate, this hung.")
     query = """select id, int_col, double_col
                from functional_parquet.alltypesagg where id < 5 order by id"""
     result = run_impala_shell_cmd(vector, ['-q', query, '-B'])
@@ -1032,6 +1098,8 @@ class TestImpalaShell(ImpalaTestSuite):
 
   def test_fetch_size(self, vector):
     """Test the --fetch_size option with and without result spooling enabled."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("IMPALA-10827: Failed locally, needs investigation.")
     query = "select * from functional.alltypes limit 1024"
     query_with_result_spooling = "set spool_query_results=true; " + query
     for query in [query, query_with_result_spooling]:
@@ -1043,6 +1111,8 @@ class TestImpalaShell(ImpalaTestSuite):
     """Regression test for IMPALA-9953. Validates that if a fetch timeout occurs in the
     middle of reading rows from Impala that all rows are still printed by the Impala
     shell."""
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("Spooling not supported in strict hs2 mode.")
     # This query was stolen from __test_fetch_timeout in test_fetch_timeout.py. The query
     # has a large delay between RowBatch production. So a fetch timeout will occur while
     # fetching rows.
@@ -1059,11 +1129,16 @@ class TestImpalaShell(ImpalaTestSuite):
     """Checks that extraneous output isn't included when --quiet is set."""
     args = ['--quiet', '-q', 'select 1']
     result = run_impala_shell_cmd(vector, args)
-    expected_result = """+---+\n| 1 |\n+---+\n| 1 |\n+---+\n"""
+    if vector.get_value('strict_hs2_protocol'):
+      expected_result = """+-----+\n| _c0 |\n+-----+\n| 1   |\n+-----+\n"""
+    else:
+      expected_result = """+---+\n| 1 |\n+---+\n| 1 |\n+---+\n"""
     assert result.stdout == expected_result
     assert result.stderr == ""
 
   def test_user_flag(self, vector):
+    if vector.get_value('strict_hs2_protocol'):
+      pytest.skip("The user functions are not supported in strict hs2 mode.")
     """Check that the --user flag is respected. This test assumes we are running against
     an unsecured cluster and can impersonate any user when connecting."""
     base_args = ['--quiet', '-B', '-q', 'select user(), effective_user()']
