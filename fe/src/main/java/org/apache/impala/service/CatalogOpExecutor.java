@@ -79,6 +79,7 @@ import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogObject;
 import org.apache.impala.catalog.CatalogServiceCatalog;
@@ -1036,20 +1037,18 @@ public class CatalogOpExecutor {
     result.setVersion(updatedCatalogObject.getCatalog_version());
   }
 
-  private Table addHdfsPartitions(Table tbl, List<Partition> partitions)
-      throws CatalogException {
+  private Table addHdfsPartitions(MetaStoreClient msClient, Table tbl,
+      List<Partition> partitions) throws CatalogException {
     Preconditions.checkNotNull(tbl);
     Preconditions.checkNotNull(partitions);
     if (!(tbl instanceof HdfsTable)) {
       throw new CatalogException("Table " + tbl.getFullName() + " is not an HDFS table");
     }
     HdfsTable hdfsTable = (HdfsTable) tbl;
-    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      List<HdfsPartition> hdfsPartitions = hdfsTable.createAndLoadPartitions(
-          msClient.getHiveClient(), partitions);
-      for (HdfsPartition hdfsPartition : hdfsPartitions) {
-        catalog_.addPartition(hdfsPartition);
-      }
+    List<HdfsPartition> hdfsPartitions = hdfsTable.createAndLoadPartitions(
+        msClient.getHiveClient(), partitions);
+    for (HdfsPartition hdfsPartition : hdfsPartitions) {
+      catalog_.addPartition(hdfsPartition);
     }
     return hdfsTable;
   }
@@ -3143,18 +3142,9 @@ public class CatalogOpExecutor {
     if (allHmsPartitionsToAdd.isEmpty()) return null;
 
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      List<Partition> addedHmsPartitions = Lists.newArrayList();
+      List<Partition> addedHmsPartitions = addHmsPartitionsInTransaction(msClient,
+          tbl, allHmsPartitionsToAdd, ifNotExists);
 
-      for (List<Partition> hmsSublist :
-          Lists.partition(allHmsPartitionsToAdd, MAX_PARTITION_UPDATES_PER_RPC)) {
-        try {
-          addedHmsPartitions.addAll(msClient.getHiveClient().add_partitions(hmsSublist,
-              ifNotExists, true));
-        } catch (TException e) {
-          throw new ImpalaRuntimeException(
-              String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partitions"), e);
-        }
-      }
       // Handle HDFS cache. This is done in a separate round bacause we have to apply
       // caching only to newly added partitions.
       alterTableCachePartitions(msTbl, msClient, tableName, addedHmsPartitions,
@@ -3169,9 +3159,54 @@ public class CatalogOpExecutor {
         addedHmsPartitions.addAll(
             getPartitionsFromHms(msTbl, msClient, tableName, difference));
       }
-      addHdfsPartitions(tbl, addedHmsPartitions);
+      addHdfsPartitions(msClient, tbl, addedHmsPartitions);
     }
     return tbl;
+  }
+
+  /**
+   * Adds partitions in 'allHmsPartitionsToAdd' in batches via 'msClient'.
+   * Returns the created partitions.
+   */
+  List<Partition> addHmsPartitions(MetaStoreClient msClient,
+      List<Partition> allHmsPartitionsToAdd, boolean ifNotExists)
+      throws ImpalaRuntimeException {
+    List<Partition> addedHmsPartitions = Lists.newArrayList();
+    for (List<Partition> hmsSublist : Lists.partition(
+        allHmsPartitionsToAdd, MAX_PARTITION_UPDATES_PER_RPC)) {
+      try {
+        addedHmsPartitions.addAll(msClient.getHiveClient().add_partitions(hmsSublist,
+            ifNotExists, true));
+      } catch (TException e) {
+        throw new ImpalaRuntimeException(
+            String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partitions"), e);
+      }
+    }
+    return addedHmsPartitions;
+  }
+
+  /**
+   * Invokes addHmsPartitions() in transaction for transactional tables. For
+   * non-transactional tables it just simply invokes addHmsPartitions().
+   * Please note that once addHmsPartitions() succeeded, then even if the transaction
+   * fails, the HMS table modification won't be reverted.
+   * Returns the list of the newly added partitions.
+   */
+  List<Partition> addHmsPartitionsInTransaction(MetaStoreClient msClient, Table tbl,
+      List<Partition> partitions, boolean ifNotExists) throws ImpalaException {
+    if (!AcidUtils.isTransactionalTable(tbl.getMetaStoreTable().getParameters())) {
+      return addHmsPartitions(msClient, partitions, ifNotExists);
+    }
+    try (Transaction txn = new Transaction(
+        msClient.getHiveClient(),
+        catalog_.getAcidUserId(),
+        String.format("ADD PARTITION for %s", tbl.getFullName()))) {
+      MetastoreShim.allocateTableWriteId(msClient.getHiveClient(), txn.getId(),
+          tbl.getDb().getName(), tbl.getName());
+      List<Partition> ret = addHmsPartitions(msClient, partitions, ifNotExists);
+      txn.commit();
+      return ret;
+    }
   }
 
   /**
@@ -3901,7 +3936,7 @@ public class CatalogOpExecutor {
         // ifNotExists and needResults are true.
         List<Partition> hmsAddedPartitions =
             msClient.getHiveClient().add_partitions(hmsSublist, true, true);
-        addHdfsPartitions(tbl, hmsAddedPartitions);
+        addHdfsPartitions(msClient, tbl, hmsAddedPartitions);
         // Handle HDFS cache.
         if (cachePoolName != null) {
           for (Partition partition: hmsAddedPartitions) {

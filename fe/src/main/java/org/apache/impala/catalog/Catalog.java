@@ -125,6 +125,11 @@ public abstract class Catalog implements AutoCloseable {
   }
 
   /**
+   * Returns the Hive ACID user id used by this catalog.
+   */
+  public abstract String getAcidUserId();
+
+  /**
    * Adds a new database to the catalog, replacing any existing database with the same
    * name.
    */
@@ -684,7 +689,7 @@ public abstract class Catalog implements AutoCloseable {
    */
   public Transaction openTransaction(IMetaStoreClient hmsClient, HeartbeatContext ctx)
       throws TransactionException {
-    return new Transaction(hmsClient, transactionKeepalive_, "Impala Catalog", ctx);
+    return new Transaction(hmsClient, transactionKeepalive_, getAcidUserId(), ctx);
   }
 
   /**

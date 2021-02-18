@@ -27,6 +27,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIf, SkipIfHive2, SkipIfCatalogV2, SkipIfS3, SkipIfABFS,
                                SkipIfADLS, SkipIfIsilon, SkipIfGCS, SkipIfLocal)
 from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.util.acid_txn import AcidTxn
 
 
 class TestAcid(ImpalaTestSuite):
@@ -344,3 +345,29 @@ class TestAcid(ImpalaTestSuite):
     self.execute_query("refresh {}".format(fq_table_name))
     result = self.execute_query("select count(*) from {0}".format(fq_table_name))
     assert "3" in result.data
+
+  def test_add_partition_write_id(self, vector, unique_database):
+    """Test that ALTER TABLE ADD PARTITION increases the write id of the table."""
+    # Test INSERT-only table
+    io_tbl_name = "insert_only_table"
+    self.client.execute("""CREATE TABLE {0}.{1} (i int) PARTITIONED BY (p int)
+        TBLPROPERTIES('transactional'='true', 'transactional_properties'='insert_only')
+        """.format(unique_database, io_tbl_name))
+    self._check_add_partition_write_id_change(unique_database, io_tbl_name)
+
+    # Test Full ACID table
+    full_acid_name = "full_acid_table"
+    self.client.execute("""CREATE TABLE {0}.{1} (i int) PARTITIONED BY (p int)
+        STORED AS ORC TBLPROPERTIES('transactional'='true')
+        """.format(unique_database, full_acid_name))
+    self._check_add_partition_write_id_change(unique_database, full_acid_name)
+
+  def _check_add_partition_write_id_change(self, db_name, tbl_name):
+    acid_util = AcidTxn(self.hive_client)
+    valid_write_ids = acid_util.get_valid_write_ids(db_name, tbl_name)
+    orig_write_id = valid_write_ids.tblValidWriteIds[0].writeIdHighWaterMark
+    self.client.execute("""alter table {0}.{1} add partition (p=1)
+        """.format(db_name, tbl_name))
+    valid_write_ids = acid_util.get_valid_write_ids(db_name, tbl_name)
+    new_write_id = valid_write_ids.tblValidWriteIds[0].writeIdHighWaterMark
+    assert new_write_id > orig_write_id
