@@ -1462,8 +1462,8 @@ public class Frontend {
   /**
    * Return a TPlanExecInfo corresponding to the plan with root fragment 'planRoot'.
    */
-  private TPlanExecInfo createPlanExecInfo(PlanFragment planRoot, Planner planner,
-      TQueryCtx queryCtx, TQueryExecRequest queryExecRequest) {
+  public static TPlanExecInfo createPlanExecInfo(PlanFragment planRoot,
+      TQueryCtx queryCtx) {
     TPlanExecInfo result = new TPlanExecInfo();
     List<PlanFragment> fragments = planRoot.getFragmentsInPlanPreorder();
 
@@ -1527,14 +1527,15 @@ public class Frontend {
 
     // Compute resource requirements of the final plans.
     TQueryExecRequest result = new TQueryExecRequest();
-    planner.computeResourceReqs(planRoots, queryCtx, result);
+    Planner.computeResourceReqs(planRoots, queryCtx, result,
+        planner.getPlannerCtx(), planner.getAnalysisResult().isQueryStmt());
 
     // create per-plan exec info;
     // also assemble list of names of tables with missing or corrupt stats for
     // assembling a warning message
     for (PlanFragment planRoot: planRoots) {
       result.addToPlan_exec_info(
-          createPlanExecInfo(planRoot, planner, queryCtx, result));
+          createPlanExecInfo(planRoot, queryCtx));
     }
 
     // Optionally disable spilling in the backend. Allow spilling if there are plan hints

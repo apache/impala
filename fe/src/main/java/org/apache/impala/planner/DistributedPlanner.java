@@ -94,7 +94,7 @@ public class DistributedPlanner {
    * otherwise it may be partitioned, depending on whether its inputs are
    * partitioned; the partition function is derived from the inputs.
    */
-  private PlanFragment createPlanFragments(
+  public PlanFragment createPlanFragments(
       PlanNode root, boolean isPartitioned, List<PlanFragment> fragments)
       throws ImpalaException {
     List<PlanFragment> childFragments = new ArrayList<>();

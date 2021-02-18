@@ -1705,7 +1705,7 @@ public class HdfsTable extends Table implements FeFsTable {
   /**
    * Loads table schema.
    */
-  private void loadSchema(org.apache.hadoop.hive.metastore.api.Table msTbl)
+  public void loadSchema(org.apache.hadoop.hive.metastore.api.Table msTbl)
       throws TableLoadingException {
     nonPartFieldSchemas_.clear();
     // set NULL indicator string from table properties

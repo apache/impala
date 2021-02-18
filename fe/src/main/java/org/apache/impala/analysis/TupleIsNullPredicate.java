@@ -159,7 +159,7 @@ public class TupleIsNullPredicate extends Predicate {
    * SlotRefs evaluate to NULL, false otherwise.
    * Throws an InternalException if expr evaluation in the BE failed.
    */
-  private static boolean requiresNullWrapping(Expr expr, Analyzer analyzer)
+  public static boolean requiresNullWrapping(Expr expr, Analyzer analyzer)
       throws InternalException {
     Preconditions.checkNotNull(expr);
     Preconditions.checkState(!expr.getType().isComplexType(),

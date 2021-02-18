@@ -143,6 +143,10 @@ public class CompoundPredicate extends Predicate {
     Preconditions.checkState(fn_.getReturnType().isBoolean());
     castForFunctionCall(false, analyzer.isDecimalV2());
 
+    computeSelectivity();
+  }
+
+  protected void computeSelectivity() {
     if (!getChild(0).hasSelectivity() ||
         (children_.size() == 2 && !getChild(1).hasSelectivity())) {
       // Give up if one of our children has an unknown selectivity.

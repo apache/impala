@@ -94,6 +94,7 @@ public class Planner {
   }
 
   public TQueryCtx getQueryCtx() { return ctx_.getQueryCtx(); }
+  public PlannerContext getPlannerCtx() { return ctx_; }
   public AnalysisContext.AnalysisResult getAnalysisResult() {
     return ctx_.getAnalysisResult();
   }
@@ -125,7 +126,7 @@ public class Planner {
     invertJoins(singleNodePlan, ctx_.isSingleNodeExec());
     singleNodePlan = useNljForSingularRowBuilds(singleNodePlan, ctx_.getRootAnalyzer());
 
-    singleNodePlanner.validatePlan(singleNodePlan);
+    SingleNodePlanner.validatePlan(ctx_, singleNodePlan);
 
     if (ctx_.isSingleNodeExec()) {
       // create one fragment containing the entire single-node plan tree
@@ -244,7 +245,7 @@ public class Planner {
   public List<PlanFragment> createPlans() throws ImpalaException {
     List<PlanFragment> distrPlan = createPlanFragments();
     Preconditions.checkNotNull(distrPlan);
-    if (!useParallelPlan()) {
+    if (!useParallelPlan(ctx_)) {
       return Collections.singletonList(distrPlan.get(0));
     }
     ParallelPlanner planner = new ParallelPlanner(ctx_);
@@ -257,9 +258,9 @@ public class Planner {
    * Return true if we should generate a parallel plan for this query, based on the
    * current mt_dop value and whether a single-node plan was chosen.
    */
-  private boolean useParallelPlan() {
-    Preconditions.checkState(ctx_.getQueryOptions().isSetMt_dop());
-    return ctx_.getQueryOptions().mt_dop > 0 && !ctx_.isSingleNodeExec();
+  public static boolean useParallelPlan(PlannerContext planCtx) {
+    Preconditions.checkState(planCtx.getQueryOptions().isSetMt_dop());
+    return planCtx.getQueryOptions().mt_dop > 0 && !planCtx.isSingleNodeExec();
   }
 
   /**
@@ -394,11 +395,12 @@ public class Planner {
    * consumed by all fragment instances belonging to the query per host. Sets the
    * per-host resource values in 'request'.
    */
-  public void computeResourceReqs(List<PlanFragment> planRoots,
-      TQueryCtx queryCtx, TQueryExecRequest request) {
+  public static void computeResourceReqs(List<PlanFragment> planRoots,
+      TQueryCtx queryCtx, TQueryExecRequest request, PlannerContext planCtx,
+      boolean isQueryStmt) {
     Preconditions.checkState(!planRoots.isEmpty());
     Preconditions.checkNotNull(request);
-    TQueryOptions queryOptions = ctx_.getRootAnalyzer().getQueryOptions();
+    TQueryOptions queryOptions = planCtx.getRootAnalyzer().getQueryOptions();
     int mtDop = queryOptions.getMt_dop();
 
     // Peak per-host peak resources for all plan fragments, assuming that all fragments
@@ -413,7 +415,7 @@ public class Planner {
     List<PlanFragment> allFragments = rootFragment.getNodesPostOrder();
     for (PlanFragment fragment: allFragments) {
       // Compute the per-node, per-sink and aggregate profiles for the fragment.
-      fragment.computeResourceProfile(ctx_.getRootAnalyzer());
+      fragment.computeResourceProfile(planCtx.getRootAnalyzer());
 
       // Different fragments do not synchronize their Open() and Close(), so the backend
       // does not provide strong guarantees about whether one fragment instance releases
@@ -444,7 +446,7 @@ public class Planner {
         maxPerHostPeakResources.getMinMemReservationBytes());
     request.setMax_per_host_thread_reservation(
         maxPerHostPeakResources.getThreadReservation());
-    if (getAnalysisResult().isQueryStmt()) {
+    if (isQueryStmt) {
       // Only one instance of root fragment, so don't need to multiply instance resource
       // profile.
       ResourceProfile rootFragmentResourceProfile =
@@ -485,7 +487,7 @@ public class Planner {
    * The 'isLocalPlan' parameter indicates whether the plan tree rooted at 'root'
    * will be executed locally within one machine, i.e., without any data exchanges.
    */
-  private void invertJoins(PlanNode root, boolean isLocalPlan) {
+  public static void invertJoins(PlanNode root, boolean isLocalPlan) {
     if (root instanceof SubplanNode) {
       invertJoins(root.getChild(0), isLocalPlan);
       invertJoins(root.getChild(1), true);
@@ -572,7 +574,7 @@ public class Planner {
    * parallelism significantly, then a significant difference between lhs and rhs
    * bytes is needed to justify inversion.
    */
-  private boolean isInvertedJoinCheaper(JoinNode joinNode, boolean isLocalPlan) {
+  public static boolean isInvertedJoinCheaper(JoinNode joinNode, boolean isLocalPlan) {
     long lhsCard = joinNode.getChild(0).getCardinality();
     long rhsCard = joinNode.getChild(1).getCardinality();
     // Need cardinality estimates to make a decision.

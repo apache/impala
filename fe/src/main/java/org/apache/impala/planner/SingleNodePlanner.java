@@ -187,9 +187,10 @@ public class SingleNodePlanner {
    *   are not inside the right child of a SubplanNode.
    * Throws a NotImplementedException if plan validation fails.
    */
-  public void validatePlan(PlanNode planNode) throws NotImplementedException {
+  public static void validatePlan(PlannerContext planCtx,
+    PlanNode planNode) throws NotImplementedException {
     // Any join can run in a single-node plan.
-    if (ctx_.isSingleNodeExec()) return;
+    if (planCtx.isSingleNodeExec()) return;
 
     if (planNode instanceof NestedLoopJoinNode) {
       JoinNode joinNode = (JoinNode) planNode;
@@ -207,10 +208,10 @@ public class SingleNodePlanner {
     if (planNode instanceof SubplanNode) {
       // Right and full outer joins with no equi-join conjuncts are ok in the right
       // child of a SubplanNode.
-      validatePlan(planNode.getChild(0));
+      validatePlan(planCtx, planNode.getChild(0));
     } else {
       for (PlanNode child: planNode.getChildren()) {
-        validatePlan(child);
+        validatePlan(planCtx, child);
       }
     }
   }
@@ -317,13 +318,13 @@ public class SingleNodePlanner {
     }
 
     if (stmt.evaluateOrderBy() && sortHasMaterializedSlots) {
-      root = createSortNode(analyzer, root, stmt.getSortInfo(), stmt.getLimit(),
+      root = createSortNode(ctx_, analyzer, root, stmt.getSortInfo(), stmt.getLimit(),
           stmt.getOffset(), stmt.hasLimit(), disableTopN);
     } else {
       root.setLimit(stmt.getLimit());
       root.computeStats(analyzer);
       if (root.hasLimit()) {
-        checkAndApplyLimitPushdown(root, null, root.getLimit(), analyzer);
+        checkAndApplyLimitPushdown(root, null, root.getLimit(), analyzer, ctx_);
       }
     }
 
@@ -334,21 +335,21 @@ public class SingleNodePlanner {
    * Creates and initializes either a SortNode or a TopNNode depending on various
    * heuristics and configuration parameters.
    */
-  private SortNode createSortNode(Analyzer analyzer, PlanNode root, SortInfo sortInfo,
-      long limit, long offset, boolean hasLimit, boolean disableTopN)
-      throws ImpalaException {
+  public static SortNode createSortNode(PlannerContext planCtx, Analyzer analyzer,
+    PlanNode root, SortInfo sortInfo, long limit, long offset, boolean hasLimit,
+    boolean disableTopN) throws ImpalaException {
     SortNode sortNode;
 
     if (hasLimit && offset == 0) {
-      checkAndApplyLimitPushdown(root, sortInfo, limit, analyzer);
+      checkAndApplyLimitPushdown(root, sortInfo, limit, analyzer, planCtx);
     }
 
     if (hasLimit && !disableTopN) {
-      sortNode = SortNode.createTopNSortNode(ctx_.getQueryOptions(),
-          ctx_.getNextNodeId(), root, sortInfo, offset, limit, false);
+      sortNode = SortNode.createTopNSortNode(planCtx.getQueryOptions(),
+          planCtx.getNextNodeId(), root, sortInfo, offset, limit, false);
     } else {
       sortNode =
-          SortNode.createTotalSortNode(ctx_.getNextNodeId(), root, sortInfo, offset);
+          SortNode.createTotalSortNode(planCtx.getNextNodeId(), root, sortInfo, offset);
       sortNode.setLimit(limit);
     }
     Preconditions.checkState(sortNode.hasValidStats());
@@ -361,8 +362,8 @@ public class SingleNodePlanner {
    * For certain qualifying conditions, we can push a limit from the top level
    * sort down to the sort associated with an AnalyticEval node.
    */
-  private void checkAndApplyLimitPushdown(PlanNode root, SortInfo sortInfo, long limit,
-      Analyzer analyzer) {
+  private static void checkAndApplyLimitPushdown(PlanNode root, SortInfo sortInfo,
+    long limit, Analyzer analyzer, PlannerContext planCtx) {
     LimitPushdownInfo pushdownLimit = null;
     AnalyticEvalNode analyticNode = null;
     List<PlanNode> intermediateNodes = new ArrayList<>();
@@ -387,12 +388,13 @@ public class SingleNodePlanner {
         pushdownLimit = null;
       } else if (numNodes == 0) {
         pushdownLimit = analyticNode.checkForLimitPushdown(sortInfo,
-            root.getOutputSmap(), null, limit, analyticNodeSort, ctx_.getRootAnalyzer());
+            root.getOutputSmap(), null, limit, analyticNodeSort,
+            planCtx.getRootAnalyzer());
       } else {
         SelectNode selectNode = (SelectNode) intermediateNodes.get(0);
         pushdownLimit = analyticNode.checkForLimitPushdown(sortInfo,
             root.getOutputSmap(), selectNode, limit, analyticNodeSort,
-            ctx_.getRootAnalyzer());
+            planCtx.getRootAnalyzer());
       }
     }
 
@@ -417,7 +419,7 @@ public class SingleNodePlanner {
    * 'intermediateNodes' is populated with the nodes encountered during
    * traversal.
    */
-  private PlanNode findDescendantAnalyticNode(PlanNode root,
+  private static PlanNode findDescendantAnalyticNode(PlanNode root,
     List<PlanNode> intermediateNodes) {
     if (root == null || root instanceof AnalyticEvalNode) {
       return root;

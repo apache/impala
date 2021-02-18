@@ -154,7 +154,7 @@ public class SortNode extends PlanNode {
     return new SortNode(id, input, info, offset, -1, -1, -1, false, TSortType.TOTAL);
   }
 
-  private SortNode(
+  protected SortNode(
       PlanNodeId id, PlanNode input, SortInfo info, long offset, long limit,
       int numPartitionExprs, long perPartitionLimit, boolean includeTies,
       TSortType type) {

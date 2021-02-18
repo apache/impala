@@ -356,6 +356,14 @@ public class TupleDescriptor {
   }
 
   /**
+   * In some cases (such as with an external frontend) there may be a need
+   * to reset the mem layout such that it can be recomputed at a later time.
+   */
+  public void resetMemLayout() {
+    hasMemLayout_ = false;
+  }
+
+  /**
    * Returns true if this tuple has at least one materialized nullable Kudu scan slot.
    */
   private boolean hasNullableKuduScanSlots() {
