@@ -219,21 +219,25 @@ public class HdfsTable extends Table implements FeFsTable {
   // Array of sorted maps storing the association between partition values and
   // partition ids. There is one sorted map per partition key. It is only populated if
   // this table object is stored in ImpaladCatalog.
-  private final List<TreeMap<LiteralExpr, Set<Long>>> partitionValuesMap_ =
+  // Declared as protected to allow third party extension visibility.
+  protected final List<TreeMap<LiteralExpr, Set<Long>>> partitionValuesMap_ =
       new ArrayList<>();
 
   // Array of partition id sets that correspond to partitions with null values
   // in the partition keys; one set per partition key. It is not populated if the table is
   // stored in the catalog server.
-  private final List<Set<Long>> nullPartitionIds_ = new ArrayList<>();
+  // Declared as protected to allow third party extension visibility.
+  protected final List<Set<Long>> nullPartitionIds_ = new ArrayList<>();
 
   // Map of partition ids to HdfsPartitions.
-  private final Map<Long, HdfsPartition> partitionMap_ = new HashMap<>();
+  // Declared as protected to allow third party extension visibility.
+  protected final Map<Long, HdfsPartition> partitionMap_ = new HashMap<>();
 
   // Map of partition name to HdfsPartition object. Used for speeding up
   // table metadata loading. It is only populated if this table object is stored in
   // catalog server.
-  private final Map<String, HdfsPartition> nameToPartitionMap_ = new HashMap<>();
+  // Declared as protected to allow third party extension visibility.
+  protected final Map<String, HdfsPartition> nameToPartitionMap_ = new HashMap<>();
 
   // The partition used as a prototype when creating new partitions during
   // insertion. New partitions inherit file format and other settings from
@@ -256,7 +260,8 @@ public class HdfsTable extends Table implements FeFsTable {
   // True iff this table has incremental stats in any of its partitions.
   private boolean hasIncrementalStats_ = false;
 
-  private HdfsPartitionLocationCompressor partitionLocationCompressor_;
+  // Declared as protected to allow third party extension visibility.
+  protected HdfsPartitionLocationCompressor partitionLocationCompressor_;
 
   // Base Hdfs directory where files of this table are stored.
   // For unpartitioned tables it is simply the path where all files live.
@@ -601,8 +606,9 @@ public class HdfsTable extends Table implements FeFsTable {
 
   /**
    * Clear the partitions of an HdfsTable and the associated metadata.
+   * Declared as protected to allow third party extension visibility.
    */
-  private void resetPartitions() {
+  protected void resetPartitions() {
     partitionMap_.clear();
     nameToPartitionMap_.clear();
     partitionValuesMap_.clear();
@@ -920,8 +926,9 @@ public class HdfsTable extends Table implements FeFsTable {
    * Updates the HdfsTable's partition metadata, i.e. adds the id to the HdfsTable and
    * populates structures used for speeding up partition pruning/lookup. Also updates
    * column stats.
+   * Declared as protected to allow third party extension visibility.
    */
-  private void updatePartitionMdAndColStats(HdfsPartition partition) {
+  protected void updatePartitionMdAndColStats(HdfsPartition partition) {
     if (partition.getPartitionValues().size() != numClusteringCols_) return;
     nameToPartitionMap_.put(partition.getPartitionName(), partition);
     if (!isStoredInImpaladCatalogCache()) return;
@@ -1219,9 +1226,10 @@ public class HdfsTable extends Table implements FeFsTable {
 
   /**
    * Load Primary Key and Foreign Key information for table. Throws TableLoadingException
-   * if the load fails.
+   * if the load fails. Declared as protected to allow third party extensions on this
+   * class.
    */
-  private void loadConstraintsInfo(IMetaStoreClient client,
+  protected void loadConstraintsInfo(IMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException{
     try {
       sqlConstraints_ = new SqlConstraints(client.getPrimaryKeys(
@@ -1239,8 +1247,9 @@ public class HdfsTable extends Table implements FeFsTable {
    * and 'accessLevel_' from 'msTbl'. Returns time spent accessing file system
    * in nanoseconds. Throws an IOException if there was an error accessing
    * the table location path.
+   * Declared as protected to allow third party extension visibility.
    */
-  private long  updateMdFromHmsTable(org.apache.hadoop.hive.metastore.api.Table msTbl)
+  protected long updateMdFromHmsTable(org.apache.hadoop.hive.metastore.api.Table msTbl)
       throws IOException {
     Preconditions.checkNotNull(msTbl);
     final Clock clock = Clock.defaultClock();
@@ -2213,7 +2222,7 @@ public class HdfsTable extends Table implements FeFsTable {
       setNumFiles(fileMetadataStats_.numFiles);
     }
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
-        nullPartitionKeyValue_, nullColumnValue_, idToPartition, prototypePartition);
+        getNullPartitionKeyValue(), nullColumnValue_, idToPartition, prototypePartition);
     hdfsTable.setAvroSchema(avroSchema_);
     hdfsTable.setSql_constraints(sqlConstraints_.toThrift());
     if (type == ThriftObjectType.FULL) {
