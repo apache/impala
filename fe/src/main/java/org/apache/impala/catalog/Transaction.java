@@ -46,24 +46,37 @@ public class Transaction implements AutoCloseable {
     hmsClient_ = hmsClient;
     keepalive_ = keepalive;
     transactionId_ = MetastoreShim.openTransaction(hmsClient_);
-    LOG.info("Opened transaction: " + String.valueOf(transactionId_));
+    LOG.info(String.format("Opened transaction %d by user '%s' ", transactionId_, user));
     keepalive_.addTransaction(transactionId_, ctx);
+  }
+
+  /**
+   * Constructor for short-running transactions that we don't want to heartbeat.
+   */
+  public Transaction(IMetaStoreClient hmsClient, String user, String context)
+      throws TransactionException {
+    Preconditions.checkNotNull(hmsClient);
+    hmsClient_ = hmsClient;
+    transactionId_ = MetastoreShim.openTransaction(hmsClient_);
+    LOG.info(String.format("Opened transaction %d by user '%s' in context: %s",
+        transactionId_, user, context));
   }
 
   public long getId() { return transactionId_; }
 
   public void commit() throws TransactionException {
     Preconditions.checkState(transactionId_ > 0);
-    keepalive_.deleteTransaction(transactionId_);
+    if (keepalive_ != null) keepalive_.deleteTransaction(transactionId_);
     MetastoreShim.commitTransaction(hmsClient_, transactionId_);
     transactionId_ = -1;
   }
 
   @Override
   public void close() {
+    // Return early if transaction was committed successfully.
     if (transactionId_ <= 0) return;
 
-    keepalive_.deleteTransaction(transactionId_);
+    if (keepalive_ != null) keepalive_.deleteTransaction(transactionId_);
     try {
       MetastoreShim.abortTransaction(hmsClient_, transactionId_);
     } catch (TransactionException e) {

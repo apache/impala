@@ -3333,6 +3333,11 @@ public class CatalogServiceCatalog extends Catalog {
     }
   }
 
+  @Override
+  public String getAcidUserId() {
+    return String.format("CatalogD %s", getCatalogServiceId());
+  }
+
   /**
    * Gets the id for this catalog service
    */

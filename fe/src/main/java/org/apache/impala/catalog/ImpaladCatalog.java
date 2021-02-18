@@ -51,6 +51,7 @@ import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TByteBuffer;
+import org.apache.impala.util.TUniqueIdUtil;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.slf4j.Logger;
@@ -652,6 +653,12 @@ public class ImpaladCatalog extends Catalog implements FeCatalog {
     if (!FeSupport.NativeLibCacheRemoveEntry(hdfsLibFile)) {
       LOG.error("LibCacheRemoveEntry(" + hdfsLibFile + ") failed.");
     }
+  }
+
+  @Override
+  public String getAcidUserId() {
+    return String.format("Impala Catalog %s",
+        TUniqueIdUtil.PrintId(getCatalogServiceId()));
   }
 
   @Override
