@@ -50,7 +50,7 @@ under the License.
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <kudu.version>${env.IMPALA_KUDU_VERSION}</kudu.version>
     <commons-io.version>2.6</commons-io.version>
-    <slf4j.version>1.7.25</slf4j.version>
+    <slf4j.version>1.7.30</slf4j.version>
     <junit.version>4.12</junit.version>
     <!-- Beware compatibility requirements with Thrift and
          KMS; see IMPALA-4210. -->
@@ -61,7 +61,7 @@ under the License.
          so it's important to depend on the same one -->
     <guava.version>28.1-jre</guava.version>
     <derby.version>10.14.2.0</derby.version>
-    <jackson-databind.version>2.10.0</jackson-databind.version>
+    <jackson-databind.version>2.10.5.1</jackson-databind.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <iceberg.version>${env.IMPALA_ICEBERG_VERSION}</iceberg.version>
     <pac4j.version>4.0.3</pac4j.version>
