@@ -36,7 +36,7 @@ public class ArithmeticExpr extends Expr {
     UNARY_POSTFIX,
   }
 
-  enum Operator {
+  public enum Operator {
     MULTIPLY("*", "multiply", OperatorPosition.BINARY_INFIX),
     DIVIDE("/", "divide", OperatorPosition.BINARY_INFIX),
     MOD("%", "mod", OperatorPosition.BINARY_INFIX),
