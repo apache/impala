@@ -44,6 +44,10 @@ using kudu::client::KuduColumnTypeAttributes;
 using kudu::client::KuduValue;
 using DataType = kudu::client::KuduColumnSchema::DataType;
 
+// TODO: choose the default empirically
+DEFINE_int32(kudu_client_num_reactor_threads, 4,
+    "Number of threads the Kudu client can use to send rpcs to Kudu. Must be > 0.");
+
 DECLARE_bool(disable_kudu);
 DECLARE_int32(kudu_client_rpc_timeout_ms);
 DECLARE_int32(kudu_client_connection_negotiation_timeout_ms);
@@ -83,6 +87,12 @@ Status CreateKuduClient(const vector<string>& master_addrs,
   }
   b.connection_negotiation_timeout(kudu::MonoDelta::FromMilliseconds(
       FLAGS_kudu_client_connection_negotiation_timeout_ms));
+  if (FLAGS_kudu_client_num_reactor_threads > 0) {
+    b.num_reactors(FLAGS_kudu_client_num_reactor_threads);
+  } else {
+    LOG(WARNING) << "Ignoring value of --kudu_client_num_reactor_threads: "
+                 << FLAGS_kudu_client_num_reactor_threads;
+  }
   KUDU_RETURN_IF_ERROR(b.Build(client), "Unable to create Kudu client");
   return Status::OK();
 }
