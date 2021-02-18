@@ -44,9 +44,9 @@ import com.google.common.collect.Lists;
 public class ScalarFunction extends Function {
   // The name inside the binary at location_ that contains this particular
   // function. e.g. org.example.MyUdf.class.
-  private String symbolName_;
-  private String prepareFnSymbol_;
-  private String closeFnSymbol_;
+  protected String symbolName_;
+  protected String prepareFnSymbol_;
+  protected String closeFnSymbol_;
 
   public ScalarFunction(FunctionName fnName, List<Type> argTypes, Type retType,
       boolean hasVarArgs) {

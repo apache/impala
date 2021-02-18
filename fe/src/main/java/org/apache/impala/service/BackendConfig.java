@@ -42,10 +42,16 @@ public class BackendConfig {
   }
 
   public static void create(TBackendGflags cfg) {
+    BackendConfig.create(cfg, true);
+  }
+
+  public static void create(TBackendGflags cfg, boolean initialize) {
     Preconditions.checkNotNull(cfg);
     INSTANCE = new BackendConfig(cfg);
-    SqlScanner.init(cfg.getReserved_words_version());
-    initAuthToLocal();
+    if (initialize) {
+      SqlScanner.init(cfg.getReserved_words_version());
+      initAuthToLocal();
+    }
   }
 
   public TBackendGflags getBackendCfg() { return backendCfg_; }

@@ -321,7 +321,7 @@ public class HdfsScanNode extends ScanNode {
 
   // Slot that is used to record the Parquet metadata for the count(*) aggregation if
   // this scan node has the count(*) optimization enabled.
-  private SlotDescriptor countStarSlot_ = null;
+  protected SlotDescriptor countStarSlot_ = null;
 
   // Conjuncts used to trim the set of partitions passed to this node.
   // Used only to display EXPLAIN information.
@@ -393,7 +393,7 @@ public class HdfsScanNode extends ScanNode {
    * Returns true if the Parquet count(*) optimization can be applied to the query block
    * of this scan node.
    */
-  private boolean canApplyCountStarOptimization(Analyzer analyzer,
+  protected boolean canApplyCountStarOptimization(Analyzer analyzer,
       Set<HdfsFileFormat> fileFormats) {
     if (fileFormats.size() != 1) return false;
     if (!hasParquet(fileFormats)) return false;
@@ -2145,6 +2145,12 @@ public class HdfsScanNode extends ScanNode {
   public boolean hasCorruptTableStats() { return hasCorruptTableStats_; }
 
   public boolean hasMissingDiskIds() { return numScanRangesNoDiskIds_ > 0; }
+
+  protected Map<TupleDescriptor, List<Expr>> getCollectionConjuncts() {
+    return collectionConjuncts_;
+  }
+
+  protected Set<HdfsFileFormat> getFileFormats() { return fileFormats_; }
 
   /**
    * Returns of all the values in the given {@link Map}.

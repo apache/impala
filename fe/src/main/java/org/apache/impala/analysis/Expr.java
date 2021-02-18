@@ -1836,4 +1836,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   public List<PlanHint> getPredicateHints() { return predicateHints_; }
 
+  // A wrapper method to create null literal. This can be overriden
+  // in a derived class
+  protected Expr createNullLiteral() {
+    return new NullLiteral();
+  }
+
 }

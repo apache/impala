@@ -774,6 +774,12 @@ public class FunctionCallExpr extends Expr {
   @Override
   public Expr clone() { return new FunctionCallExpr(this); }
 
+  // Clone method with modified params. Derived classes (such as those
+  // implemented in an external frontend) may override this method.
+  protected FunctionCallExpr cloneWithNewParams(FunctionParams params) {
+    return new FunctionCallExpr(this.getFnName(), params);
+  }
+
   @Override
   protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer) {
     Expr e = super.substituteImpl(smap, analyzer);

@@ -78,6 +78,14 @@ public class PlannerContext {
     }
   }
 
+  // Constructor useful for an external planner module
+  public PlannerContext(TQueryCtx queryCtx, EventSequence timeline) {
+    queryCtx_ = queryCtx;
+    timeline_ = timeline;
+    analysisResult_ = null;
+    queryStmt_ = null;
+  }
+
   public QueryStmt getQueryStmt() { return queryStmt_; }
   public TQueryCtx getQueryCtx() { return queryCtx_; }
   public TQueryOptions getQueryOptions() { return getRootAnalyzer().getQueryOptions(); }

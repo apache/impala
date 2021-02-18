@@ -211,11 +211,11 @@ public class AnalyticExpr extends Expr {
     return isAnalyticFn(fn, NTILE);
   }
 
-  static private boolean isOffsetFn(Function fn) {
+  public static boolean isOffsetFn(Function fn) {
     return isAnalyticFn(fn, LEAD) || isAnalyticFn(fn, LAG);
   }
 
-  static private boolean isMinMax(Function fn) {
+  public static boolean isMinMax(Function fn) {
     return isAnalyticFn(fn, MIN) || isAnalyticFn(fn, MAX);
   }
 
@@ -224,7 +224,7 @@ public class AnalyticExpr extends Expr {
         isAnalyticFn(fn, ROWNUMBER);
   }
 
-  static private boolean isFirstOrLastValueFn(Function fn) {
+  public static boolean isFirstOrLastValueFn(Function fn) {
     return isAnalyticFn(fn, LAST_VALUE) || isAnalyticFn(fn, FIRST_VALUE) ||
         isAnalyticFn(fn, LAST_VALUE_IGNORE_NULLS) ||
         isAnalyticFn(fn, FIRST_VALUE_IGNORE_NULLS);
@@ -590,7 +590,7 @@ public class AnalyticExpr extends Expr {
    * 8. first/last_value() with RANGE window:
    *    Rewrite as a ROWS window.
    */
-  private void standardize(Analyzer analyzer) {
+  protected void standardize(Analyzer analyzer) {
     FunctionName analyticFnName = getFnCall().getFnName();
 
     // 1. Set a window from UNBOUNDED PRECEDING to CURRENT_ROW for row_number().
@@ -617,18 +617,17 @@ public class AnalyticExpr extends Expr {
         // Default offset is 1.
         newExprParams.add(NumericLiteral.create(1));
         // Default default value is NULL.
-        newExprParams.add(new NullLiteral());
+        newExprParams.add(createNullLiteral());
       } else if (getFnCall().getChildren().size() == 2) {
         newExprParams = Lists.newArrayListWithExpectedSize(3);
         newExprParams.addAll(getFnCall().getChildren());
         // Default default value is NULL.
-        newExprParams.add(new NullLiteral());
+        newExprParams.add(createNullLiteral());
       } else  {
         Preconditions.checkState(getFnCall().getChildren().size() == 3);
       }
       if (newExprParams != null) {
-        fnCall_ = new FunctionCallExpr(getFnCall().getFnName(),
-            new FunctionParams(newExprParams));
+        fnCall_ = fnCall_.cloneWithNewParams(new FunctionParams(newExprParams));
         fnCall_.setIsAnalyticFnCall(true);
         fnCall_.analyzeNoThrow(analyzer);
       }
@@ -792,7 +791,7 @@ public class AnalyticExpr extends Expr {
   /**
    * Populate children_ from fnCall_, partitionExprs_, orderByElements_
    */
-  private void setChildren() {
+  protected void setChildren() {
     getChildren().clear();
     addChildren(fnCall_.getChildren());
     addChildren(partitionExprs_);
