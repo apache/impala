@@ -32,6 +32,7 @@
 #include "util/event-metrics.h"
 #include "util/logging-support.h"
 #include "util/metrics.h"
+#include "util/thrift-debug-util.h"
 #include "util/webserver.h"
 
 #include "common/names.h"
@@ -87,7 +88,6 @@ DEFINE_int64(topic_update_tbl_max_wait_time_ms, 500, "Maximum time "
      "many times. After that limit is hit, topic thread block until it acquires the "
      "table lock. A value of 0 disables the timeout based locking which means topic "
      "update thread will always block until table lock is acquired.");
-
 
 DECLARE_string(debug_actions);
 DECLARE_string(state_store_host);
@@ -186,7 +186,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     Status status = catalog_server_->catalog()->GetCatalogObject(req.object_desc,
         &resp.catalog_object);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
-    VLOG_RPC << "GetCatalogObject(): response=" << ThriftDebugString(resp);
+    VLOG_RPC << "GetCatalogObject(): response=" << ThriftDebugStringNoThrow(resp);
   }
 
   void GetPartialCatalogObject(TGetPartialCatalogObjectResponse& resp,
@@ -204,7 +204,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
     resp.__set_status(thrift_status);
-    VLOG_RPC << "GetPartialCatalogObject(): response=" << ThriftDebugString(resp);
+    VLOG_RPC << "GetPartialCatalogObject(): response=" << ThriftDebugStringNoThrow(resp);
   }
 
   void GetPartitionStats(TGetPartitionStatsResponse& resp,
@@ -215,7 +215,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     TStatus thrift_status;
     status.ToThrift(&thrift_status);
     resp.__set_status(thrift_status);
-    VLOG_RPC << "GetPartitionStats(): response=" << ThriftDebugString(resp);
+    VLOG_RPC << "GetPartitionStats(): response=" << ThriftDebugStringNoThrow(resp);
   }
 
   // Prioritizes the loading of metadata for one or more catalog objects. Currently only
@@ -662,8 +662,9 @@ void CatalogServer::CatalogObjectsUrlCallback(const Webserver::WebRequest& req,
       // Get the object and dump its contents.
       TCatalogObject result;
       if (status.ok()) status = catalog_->GetCatalogObject(request, &result);
-      if (status.ok()) {
-        Value debug_string(ThriftDebugString(result).c_str(), document->GetAllocator());
+      if(status.ok()) {
+        Value debug_string(
+            ThriftDebugStringNoThrow(result).c_str(), document->GetAllocator());
         document->AddMember("thrift_string", debug_string, document->GetAllocator());
       }
     }

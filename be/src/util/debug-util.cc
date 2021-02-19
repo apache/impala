@@ -426,6 +426,20 @@ Status DebugActionImpl(
         ImpaladMetrics::DEBUG_ACTION_NUM_FAIL->Increment(1l);
       }
       return Status(TErrorCode::INTERNAL_ERROR, error_msg);
+    } else if (iequals(cmd, "EXCEPTION")) {
+      //EXCEPTION@<exception_type>
+      if (tokens.size() != 2) {
+        return Status(Substitute(ERROR_MSG, components[0], action_str,
+            "expected EXCEPTION@<exception_type>"));
+      }
+      static const auto end = EXCEPTION_STR_MAP.end();
+      auto it = EXCEPTION_STR_MAP.find(tokens[1]);
+      if (it != end) {
+        it->second();
+      } else {
+        return Status(
+            Substitute(ERROR_MSG, components[0], action_str, "Invalid exception type"));
+      }
     } else {
       DCHECK(false) << "Invalid debug action";
       return Status(Substitute(ERROR_MSG, components[0], action_str, "invalid command"));
