@@ -76,6 +76,9 @@ class TestIcebergTable(ImpalaTestSuite):
   def test_insert_overwrite(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-overwrite', vector, use_db=unique_database)
 
+  def test_ctas(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-ctas', vector, use_db=unique_database)
+
   def test_partition_transform_insert(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-partition-transform-insert', vector,
         use_db=unique_database)

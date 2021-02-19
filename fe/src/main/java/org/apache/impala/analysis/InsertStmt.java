@@ -360,7 +360,7 @@ public class InsertStmt extends StatementBase {
     }
 
     int numStaticPartitionExprs = 0;
-    if (partitionKeyValues_ != null) {
+    if (partitionKeyValues_ != null && !isIcebergTarget()) {
       for (PartitionKeyValue pkv: partitionKeyValues_) {
         Column column = table_.getColumn(pkv.getColName());
         if (column == null) {
@@ -498,13 +498,24 @@ public class InsertStmt extends StatementBase {
         throw new AnalysisException("PARTITION clause is not valid for INSERT into " +
             "HBase tables. '" + targetTableName_ + "' is an HBase table");
       } else {
-        if (table_ instanceof FeIcebergTable) {
-          throw new AnalysisException("PARTITION clause cannot be used for Iceberg " +
-              "tables.");
+        if (isIcebergTarget()) {
+          IcebergPartitionSpec partSpec =
+              ((FeIcebergTable)table_).getDefaultPartitionSpec();
+          if (partSpec == null || !partSpec.hasPartitionFields()) {
+            throw new AnalysisException("PARTITION clause is only valid for INSERT " +
+                "into partitioned table. '" + targetTableName_ + "' is not partitioned");
+          }
+          for (PartitionKeyValue pkv: partitionKeyValues_) {
+            if (pkv.isStatic()) {
+              throw new AnalysisException("Static partitioning is not supported for " +
+                  "Iceberg tables.");
+            }
+          }
+        } else {
+          // Unpartitioned table, but INSERT has PARTITION clause
+          throw new AnalysisException("PARTITION clause is only valid for INSERT into " +
+              "partitioned table. '" + targetTableName_ + "' is not partitioned");
         }
-        // Unpartitioned table, but INSERT has PARTITION clause
-        throw new AnalysisException("PARTITION clause is only valid for INSERT into " +
-            "partitioned table. '" + targetTableName_ + "' is not partitioned");
       }
     }
 
@@ -602,6 +613,10 @@ public class InsertStmt extends StatementBase {
       if (pkv.isDynamic()) return false;
     }
     return true;
+  }
+
+  private boolean isIcebergTarget() {
+    return table_ instanceof FeIcebergTable;
   }
 
   /**
@@ -748,9 +763,8 @@ public class InsertStmt extends StatementBase {
     if (isKuduTable) {
       kuduPartitionColumnNames = getKuduPartitionColumnNames((FeKuduTable) table_);
     }
-    boolean isIcebergTable = table_ instanceof FeIcebergTable;
     IcebergPartitionSpec icebergPartSpec = null;
-    if (isIcebergTable) {
+    if (isIcebergTarget()) {
       icebergPartSpec = ((FeIcebergTable)table_).getDefaultPartitionSpec();
     }
 
@@ -799,7 +813,7 @@ public class InsertStmt extends StatementBase {
       }
     }
 
-    if (isIcebergTable) {
+    if (isIcebergTarget()) {
       // Add partition key expressions in the order of the Iceberg partition fields.
       addIcebergPartExprs(analyzer, widestTypeExprList, selectExprTargetColumns,
           selectListExprs, icebergPartSpec);
@@ -820,7 +834,7 @@ public class InsertStmt extends StatementBase {
       }
     }
 
-    if (isIcebergTable) {
+    if (isIcebergTarget()) {
       Preconditions.checkState(
           partitionKeyExprs_.size() == icebergPartSpec.getIcebergPartitionFieldsSize());
     }

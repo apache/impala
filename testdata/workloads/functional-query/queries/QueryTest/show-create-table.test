@@ -808,3 +808,42 @@ LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='parquet',
 'iceberg.catalog'='hive.catalog', 'table_type'='ICEBERG')
 ====
+---- CREATE_TABLE
+CREATE TABLE iceberg_ctas
+PARTITION BY SPEC(id bucket 5)
+STORED AS ICEBERG
+AS SELECT id, bool_col, bigint_col FROM functional.alltypes;
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_ctas (
+  id INT NULL,
+  bool_col BOOLEAN NULL,
+  bigint_col BIGINT NULL
+)
+PARTITION BY SPEC (
+  id BUCKET 5
+)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='parquet',
+'iceberg.catalog'='hive.catalog', 'table_type'='ICEBERG')
+====
+---- CREATE_TABLE
+CREATE TABLE iceberg_ctas_ht
+PARTITION BY SPEC(id bucket 5)
+STORED AS ICEBERG
+TBLPROPERTIES ('iceberg.catalog'='hadoop.tables')
+AS SELECT id, bool_col, bigint_col FROM functional.alltypes;
+---- RESULTS-HIVE-3
+CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_ctas_ht (
+  id INT NULL,
+  bool_col BOOLEAN NULL,
+  bigint_col BIGINT NULL
+)
+PARTITION BY SPEC (
+  id BUCKET 5
+)
+STORED AS ICEBERG
+LOCATION '$$location_uri$$'
+TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='parquet',
+'iceberg.catalog'='hadoop.tables')
+====

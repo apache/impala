@@ -72,6 +72,7 @@ import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionField;
+import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TIcebergPartitionTransform;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 
@@ -178,17 +179,15 @@ public class IcebergUtil {
   }
 
   /**
-   * Build iceberg PartitionSpec by parameters.
+   * Build iceberg PartitionSpec from TIcebergPartitionSpec.
    * partition columns are all from source columns, this is different from hdfs table.
    */
   public static PartitionSpec createIcebergPartition(Schema schema,
-      TCreateTableParams params) throws ImpalaRuntimeException {
-    if (params.getPartition_spec() == null) {
-      return PartitionSpec.unpartitioned();
-    }
+      TIcebergPartitionSpec partSpec) throws ImpalaRuntimeException {
+    if (partSpec == null) return PartitionSpec.unpartitioned();
+
+    List<TIcebergPartitionField> partitionFields = partSpec.getPartition_fields();
     PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
-    List<TIcebergPartitionField> partitionFields =
-        params.getPartition_spec().getPartition_fields();
     for (TIcebergPartitionField partitionField : partitionFields) {
       TIcebergPartitionTransformType transformType =
           partitionField.getTransform().getTransform_type();

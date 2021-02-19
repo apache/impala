@@ -54,7 +54,7 @@ import com.google.common.collect.Maps;
  * This class is not thread-safe. A new instance is created for
  * each catalog instance.
  */
-class LocalDb implements FeDb {
+public class LocalDb implements FeDb {
   private final LocalCatalog catalog_;
   /** The lower-case name of the database. */
   private final String name_;

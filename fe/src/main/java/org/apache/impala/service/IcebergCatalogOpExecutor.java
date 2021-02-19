@@ -69,7 +69,8 @@ public class IcebergCatalogOpExecutor {
       String location, TCreateTableParams params) throws ImpalaRuntimeException {
     // Each table id increase from zero
     Schema schema = createIcebergSchema(params);
-    PartitionSpec spec = IcebergUtil.createIcebergPartition(schema, params);
+    PartitionSpec spec = IcebergUtil.createIcebergPartition(schema,
+        params.getPartition_spec());
     IcebergCatalog icebergCatalog = IcebergUtil.getIcebergCatalog(catalog, location);
     Table iceTable = icebergCatalog.createTable(identifier, schema, spec, location,
         params.getTable_properties());

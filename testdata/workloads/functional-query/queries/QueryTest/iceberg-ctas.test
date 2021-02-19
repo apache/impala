@@ -1,0 +1,105 @@
+====
+---- QUERY
+CREATE TABLE value_tbl (t TINYINT, i INT, b BIGINT, s STRING, ts TIMESTAMP, d date);
+insert into value_tbl values (0, 1, 2, 'impala', '2021-02-26 16:16:59', '2021-02-26');
+====
+---- QUERY
+# Test non-partitioned table in Iceberg HiveCatalog.
+CREATE TABLE ice_ctas STORED AS ICEBERG AS SELECT i, b FROM value_tbl;
+SELECT * FROM ice_ctas;
+---- RESULTS
+1,2
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+show files in ice_ctas;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas/data/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test partitioned table in Iceberg HiveCatalog.
+# Use old PARTITIONED BY syntax.
+CREATE TABLE ice_ctas_part PARTITIONED BY(d) STORED AS ICEBERG AS SELECT s, ts, d FROM value_tbl;
+SELECT * FROM ice_ctas_part where d='2021-02-26';
+---- RESULTS
+'impala',2021-02-26 16:16:59,2021-02-26
+---- TYPES
+STRING,TIMESTAMP,DATE
+====
+---- QUERY
+show files in ice_ctas_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-26/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# INSERT an additional row to a different partition.
+INSERT INTO ice_ctas_part VALUES ('fox','2021-02-27 16:16:59','2021-02-27');
+SELECT * FROM ice_ctas_part;
+---- RESULTS
+'impala',2021-02-26 16:16:59,2021-02-26
+'fox',2021-02-27 16:16:59,2021-02-27
+---- TYPES
+STRING,TIMESTAMP,DATE
+====
+---- QUERY
+show files in ice_ctas_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-26/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_ctas_part/data/d=2021-02-27/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test CTAS in Iceberg HadoopTables catalog.
+# Set table location to custom location.
+# Use PARTITION BY SPEC
+CREATE TABLE ice_ctas_hadoop_tables_part PARTITION BY SPEC (d month)
+STORED AS ICEBERG
+LOCATION '/test-warehouse/$DATABASE.db/loc_test'
+TBLPROPERTIES ('iceberg.catalog'='hadoop.tables') AS SELECT s, ts, d FROM value_tbl;
+SELECT * FROM ice_ctas_hadoop_tables_part where d='2021-02-26';
+---- RESULTS
+'impala',2021-02-26 16:16:59,2021-02-26
+---- TYPES
+STRING,TIMESTAMP,DATE
+====
+---- QUERY
+show files in ice_ctas_hadoop_tables_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/loc_test/data/d_month=2021-02/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test CTAS in Iceberg HadoopCatalog catalog.
+# Set 'iceberg.catalog_location' and 'iceberg.table_identifier'
+# Partition by TRUNCATE
+# Cast TINYINT to INT.
+# INSERT additional row.
+CREATE TABLE ice_ctas_hadoop_catalog_part PARTITION BY SPEC (s truncate 3)
+STORED AS ICEBERG
+TBLPROPERTIES ('iceberg.catalog'='hadoop.catalog',
+               'iceberg.catalog_location'='/test-warehouse/$DATABASE.db/cat_loc',
+               'iceberg.table_identifier'='ns1.ns2.ctas')
+AS SELECT cast(t as INT), s, d FROM value_tbl;
+INSERT INTO ice_ctas_hadoop_catalog_part VALUES (1, 'lion', '2021-02-27');
+SELECT * FROM ice_ctas_hadoop_catalog_part;
+---- RESULTS
+0,'impala',2021-02-26
+1,'lion',2021-02-27
+---- TYPES
+INT,STRING,DATE
+====
+---- QUERY
+show files in ice_ctas_hadoop_catalog_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/ns1/ns2/ctas/data/s_trunc=imp/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/cat_loc/ns1/ns2/ctas/data/s_trunc=lio/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
