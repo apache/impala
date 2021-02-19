@@ -1472,14 +1472,7 @@ void Coordinator::UpdateFilter(const UpdateFilterParamsPB& params, RpcContext* c
 
     // Called WaitForExecRpcs() so backend_states_ is valid.
     for (BackendState* bs : backend_states_) {
-      if (!IsExecuting()) {
-        if (rpc_params.has_bloom_filter()) {
-          filter_mem_tracker_->Release(state->bloom_filter_directory().size());
-          state->bloom_filter_directory().clear();
-          state->bloom_filter_directory().shrink_to_fit();
-          return;
-        }
-      }
+      if (!IsExecuting()) break;
 
       if (bs->HasFragmentIdx(target_fragment_idxs)) {
         rpc_params.set_filter_id(params.filter_id());
@@ -1569,11 +1562,7 @@ void Coordinator::FilterState::ApplyUpdate(
 void Coordinator::FilterState::DisableAndRelease(
     MemTracker* tracker, const bool all_updates_received) {
   Disable(all_updates_received);
-  if (is_bloom_filter()) {
-    tracker->Release(bloom_filter_directory_.size());
-    bloom_filter_directory_.clear();
-    bloom_filter_directory_.shrink_to_fit();
-  }
+  Release(tracker);
 }
 
 void Coordinator::FilterState::Disable(const bool all_updates_received) {
@@ -1585,6 +1574,16 @@ void Coordinator::FilterState::Disable(const bool all_updates_received) {
     DCHECK(is_min_max_filter());
     min_max_filter_.set_always_true(true);
     min_max_filter_.set_always_false(false);
+  }
+}
+
+void Coordinator::FilterState::Release(MemTracker* tracker) {
+  DCHECK(disabled());
+  DCHECK(num_inflight_publish_filter_rpcs_ == 0);
+  if (is_bloom_filter()) {
+    tracker->Release(bloom_filter_directory_.size());
+    bloom_filter_directory_.clear();
+    bloom_filter_directory_.shrink_to_fit();
   }
 }
 

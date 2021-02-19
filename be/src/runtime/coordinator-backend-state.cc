@@ -724,13 +724,9 @@ void Coordinator::BackendState::PublishFilterCompleteCb(
     if (state->num_inflight_rpcs() == 0) {
       // Since we disabled the filter once complete and held FilterState::lock_ while
       // issuing all PublishFilter() rpcs, at this point there can't be any more
-      // PublishFilter() rpcs issued.
-      DCHECK(state->disabled());
-      if (state->is_bloom_filter() && state->bloom_filter_directory().size() > 0) {
-        mem_tracker->Release(state->bloom_filter_directory().size());
-        state->bloom_filter_directory().clear();
-        state->bloom_filter_directory().shrink_to_fit();
-      }
+      // PublishFilter() rpcs issued. As the last callback completed, we must release the
+      // filter state.
+      state->Release(mem_tracker);
       state->get_publish_filter_done_cv().notify_one();
     }
   }
