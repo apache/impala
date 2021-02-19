@@ -21,6 +21,7 @@
 #include <vector>
 
 #include <thrift/protocol/TDebugProtocol.h>
+#include <thrift/Thrift.h>
 
 #include "common/compiler-util.h"
 #include "common/config.h"
@@ -190,6 +191,13 @@ static inline void DebugActionNoFail(
   DebugActionNoFail(query_options.debug_action, label);
 }
 
+/// Map of exception string to the exception throwing function which is used when
+/// executing the EXCEPTION debug action.
+static const std::unordered_map<std::string,std::function<void()>> EXCEPTION_STR_MAP {
+        {"exception",   [](){ throw std::exception(); }},
+        {"bad_alloc",   [](){ throw std::bad_alloc(); }},
+        {"TException", [](){ throw apache::thrift::TException(); }}
+};
 // FILE_CHECKs are conditions that we expect to be true but could fail due to a malformed
 // input file. They differentiate these cases from DCHECKs, which indicate conditions that
 // are true unless there's a bug in Impala. We would ideally always return a bad Status
