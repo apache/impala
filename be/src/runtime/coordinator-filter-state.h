@@ -109,6 +109,9 @@ class Coordinator::FilterState {
   void DisableAndRelease(MemTracker* tracker, const bool all_updates_received);
   /// Disables the filter but does not release the consumed memory.
   void Disable(const bool all_updates_received);
+  /// Release consumed memory of this filter. Caller must hold `lock_` and make sure
+  /// filter already disabled.
+  void Release(MemTracker* tracker);
 
   void IncrementNumInflightRpcs(int i) {
     num_inflight_publish_filter_rpcs_ += i;
