@@ -93,14 +93,6 @@ SHOW CREATE TABLE fake_iceberg_table_hadoop_catalog;
 row_regex:.*CAUSED BY: TableLoadingException: Table does not exist: fake_db.fake_table*
 ====
 ---- QUERY
-CREATE TABLE iceberg_ctas
-STORED AS ICEBERG
-TBLPROPERTIES('iceberg.catalog'='hadoop.tables')
-AS SELECT id FROM functional.alltypes;
----- CATCH
-AnalysisException: CREATE TABLE AS SELECT does not support the (ICEBERG) file format.
-====
----- QUERY
 CREATE TABLE iceberg_overwrite_bucket (i int)
 PARTITION BY SPEC (i bucket 3)
 STORED AS ICEBERG
@@ -159,7 +151,7 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 ---- QUERY
 INSERT INTO iceberg_partitioned_insert PARTITION(level='level') VALUES(now());
 ---- CATCH
-AnalysisException: PARTITION clause cannot be used for Iceberg tables.
+Static partitioning is not supported for Iceberg tables.
 ====
 ---- QUERY
 CREATE TABLE all_colss_needed_for_insert (i int, j int, k int)

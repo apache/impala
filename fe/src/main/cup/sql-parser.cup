@@ -1349,6 +1349,16 @@ create_tbl_as_select_params ::=
         select_stmt, null);
   :}
   | tbl_def_without_col_defs:tbl_def
+    iceberg_partition_spec_list:iceberg_specs
+    tbl_options:options
+    KW_AS query_stmt:select_stmt
+  {:
+    tbl_def.getIcebergPartitionSpecs().addAll(iceberg_specs);
+    tbl_def.setOptions(options);
+    RESULT = new CreateTableAsSelectStmt.CtasParams(new CreateTableStmt(tbl_def),
+        select_stmt, null);
+  :}
+  | tbl_def_without_col_defs:tbl_def
     KW_PARTITIONED KW_BY LPAREN ident_list:partition_cols RPAREN
     tbl_options:options
     KW_AS query_stmt:select_stmt

@@ -39,7 +39,7 @@ class TestShowCreateTable(ImpalaTestSuite):
                            "STATS_GENERATED_VIA_STATS_TASK", "last_modified_by",
                            "last_modified_time", "numFilesErasureCoded",
                            "bucketing_version", "OBJCAPABILITIES",
-                           "TRANSLATED_TO_EXTERNAL"]
+                           "TRANSLATED_TO_EXTERNAL", "previous_metadata_location"]
 
   @classmethod
   def get_workload(self):
@@ -169,6 +169,9 @@ class TestShowCreateTable(ImpalaTestSuite):
     # is not valid
     s = re.sub("TBLPROPERTIES\s*\(\s*\)", "", s)
     s = re.sub("SERDEPROPERTIES\s*\(\s*\)", "", s)
+    # By removing properties in the middle we might ended up having extra whitespaces,
+    # let's remove them.
+    s = ' '.join(s.split())
     return s
 
   def __properties_map_regex(self, name):

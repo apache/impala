@@ -149,7 +149,7 @@ public class IcebergSchemaConverter {
    */
   public static Schema genIcebergSchema(List<TColumn> columns)
       throws ImpalaRuntimeException {
-    iThreadLocal.set(0);
+    iThreadLocal.set(1);
     List<Types.NestedField> fields = new ArrayList<Types.NestedField>();
     for (TColumn column : columns) {
       fields.add(createIcebergField(column));

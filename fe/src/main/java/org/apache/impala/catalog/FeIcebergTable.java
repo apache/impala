@@ -382,17 +382,22 @@ public interface FeIcebergTable extends FeFsTable {
         TableMetadata metadata) throws TableLoadingException {
       List<IcebergPartitionSpec> ret = new ArrayList<>();
       for (PartitionSpec spec : metadata.specs()) {
-        List<IcebergPartitionField> fields = new ArrayList<>();;
-        HashMap<String, Integer> transformParams =
-            IcebergUtil.getPartitionTransformParams(spec);
-        for (PartitionField field : spec.fields()) {
-          fields.add(new IcebergPartitionField(field.sourceId(), field.fieldId(),
-              spec.schema().findColumnName(field.sourceId()), field.name(),
-              IcebergUtil.getPartitionTransform(field, transformParams)));
-        }
-        ret.add(new IcebergPartitionSpec(spec.specId(), fields));
+        ret.add(convertPartitionSpec(spec));
       }
       return ret;
+    }
+
+    public static IcebergPartitionSpec convertPartitionSpec(PartitionSpec spec)
+        throws TableLoadingException {
+      List<IcebergPartitionField> fields = new ArrayList<>();;
+      HashMap<String, Integer> transformParams =
+          IcebergUtil.getPartitionTransformParams(spec);
+      for (PartitionField field : spec.fields()) {
+        fields.add(new IcebergPartitionField(field.sourceId(), field.fieldId(),
+            spec.schema().findColumnName(field.sourceId()), field.name(),
+            IcebergUtil.getPartitionTransform(field, transformParams)));
+      }
+      return new IcebergPartitionSpec(spec.specId(), fields);
     }
 
     public static IcebergPartitionSpec getDefaultPartitionSpec(

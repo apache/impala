@@ -2119,10 +2119,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Unsupported file formats
     AnalysisError("create table foo stored as sequencefile as select 1",
         "CREATE TABLE AS SELECT does not support the (SEQUENCEFILE) file format. " +
-         "Supported formats are: (PARQUET, TEXTFILE, KUDU)");
+         "Supported formats are: (PARQUET, TEXTFILE, KUDU, ICEBERG)");
     AnalysisError("create table foo stored as RCFILE as select 1",
         "CREATE TABLE AS SELECT does not support the (RCFILE) file format. " +
-         "Supported formats are: (PARQUET, TEXTFILE, KUDU)");
+         "Supported formats are: (PARQUET, TEXTFILE, KUDU, ICEBERG)");
 
     // CTAS with a WITH clause and inline view (IMPALA-1100)
     AnalyzesOk("create table test_with as with with_1 as (select 1 as int_col from " +

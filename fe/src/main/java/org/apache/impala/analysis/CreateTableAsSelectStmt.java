@@ -28,8 +28,10 @@ import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.Type;
+import org.apache.impala.catalog.iceberg.IcebergCtasTarget;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.rewrite.ExprRewriter;
@@ -65,7 +67,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
   /////////////////////////////////////////
 
   private final static EnumSet<THdfsFileFormat> SUPPORTED_INSERT_FORMATS =
-      EnumSet.of(THdfsFileFormat.PARQUET, THdfsFileFormat.TEXT, THdfsFileFormat.KUDU);
+      EnumSet.of(THdfsFileFormat.ICEBERG, THdfsFileFormat.PARQUET, THdfsFileFormat.TEXT,
+          THdfsFileFormat.KUDU);
 
   /**
    * Helper class for parsing.
@@ -127,7 +130,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
       throw new AnalysisException(String.format("CREATE TABLE AS SELECT " +
           "does not support the (%s) file format. Supported formats are: (%s)",
           createStmt_.getFileFormat().toString().replace("_", ""),
-          "PARQUET, TEXTFILE, KUDU"));
+          "PARQUET, TEXTFILE, KUDU, ICEBERG"));
     }
     if (createStmt_.getFileFormat() == THdfsFileFormat.KUDU && createStmt_.isExternal()) {
       // TODO: Add support for CTAS on external Kudu tables (see IMPALA-4318)
@@ -223,6 +226,17 @@ public class CreateTableAsSelectStmt extends StatementBase {
         tmpTable = db.createKuduCtasTarget(msTbl, createStmt_.getColumnDefs(),
             createStmt_.getPrimaryKeyColumnDefs(),
             createStmt_.getKuduPartitionParams());
+      } else if (IcebergTable.isIcebergTable(msTbl)) {
+        IcebergPartitionSpec partSpec = null;
+        if (createStmt_.getIcebergPartitionSpecs() != null &&
+           !createStmt_.getIcebergPartitionSpecs().isEmpty()) {
+          // Since this is a CREATE TABLE statement, the Iceberg table can only have
+          // a single partition spec.
+          Preconditions.checkState(createStmt_.getIcebergPartitionSpecs().size() == 1);
+          partSpec = createStmt_.getIcebergPartitionSpecs().get(0);
+        }
+        tmpTable = new IcebergCtasTarget(db, msTbl, createStmt_.getColumnDefs(),
+            partSpec);
       } else if (HdfsFileFormat.isHdfsInputFormatClass(msTbl.getSd().getInputFormat())) {
         tmpTable = db.createFsCtasTarget(msTbl);
       }
