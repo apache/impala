@@ -712,11 +712,10 @@ Status ParseSamlSpUrl(string* saml_sp_path) {
     return Status(
         Substitute("Bad saml2_sp_callback_url: $0", FLAGS_saml2_sp_callback_url));
   }
-  vector<string> host_parts = Split(split[2], delimiter::Limit(":", 1));
-  if (host_parts.size() != 2 || atoi(host_parts[1].c_str()) != FLAGS_hs2_http_port) {
-    return Status(
-        "Port in saml2_sp_callback_url must be the same as FLAGS_hs2_http_port");
-  }
+  // The port in the url should be the same as FLAGS_hs2_http_port in general,
+  // but this is not enforced to allow the use case when the port is mapped,
+  // e.g. external_port->http_port. FLAGS_saml2_sp_callback_url has to contain the
+  // external_port in this case.
   if (saml_sp_path != nullptr) *saml_sp_path = "/" + split[3];
   return Status::OK();
 }
