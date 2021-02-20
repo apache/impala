@@ -16,18 +16,23 @@
 // under the License.
 package org.apache.impala.catalog;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Nullable;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.THdfsPartitionLocation;
+import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartitionStats;
+import org.apache.impala.util.ListMap;
 
 /**
  * Frontend interface for interacting with a single filesystem-based partition.
@@ -48,6 +53,11 @@ public interface FeFsPartition {
    * @return the table that contains this partition
    */
   FeFsTable getTable();
+
+  /**
+   * @return ListMap<hostIndex> from partition's table.
+   */
+  ListMap<TNetworkAddress> getHostIndex();
 
   /**
    * @return the FsType that this partition is stored on
@@ -93,6 +103,13 @@ public interface FeFsPartition {
    * @return the location of this partition as a Path
    */
   Path getLocationPath();
+
+  /**
+   * @return the FileSystem of this partition
+   */
+  default FileSystem getFileSystem(Configuration conf) throws IOException {
+    return getLocationPath().getFileSystem(conf);
+  }
 
   /**
    * @return the HDFS permissions Impala has to this partition's directory - READ_ONLY,

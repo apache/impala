@@ -200,8 +200,9 @@ public abstract class StatementBase extends StmtNode {
    * If strictDecimal is true, only consider casts that result in no loss of information
    * when casting between decimal types.
    */
-  protected Expr checkTypeCompatibility(String dstTableName, Column dstCol, Expr srcExpr,
-      boolean strictDecimal, Expr widestTypeSrcExpr) throws AnalysisException {
+  public static Expr checkTypeCompatibility(String dstTableName, Column dstCol,
+      Expr srcExpr, boolean strictDecimal, Expr widestTypeSrcExpr)
+      throws AnalysisException {
     Type dstColType = dstCol.getType();
     Type srcExprType = srcExpr.getType();
 

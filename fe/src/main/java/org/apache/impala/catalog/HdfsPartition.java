@@ -682,7 +682,29 @@ public class HdfsPartition extends CatalogObjectImpl
   // it's not used in coordinators.
   private final InFlightEvents inFlightEvents_;
 
-  private HdfsPartition(HdfsTable table, long id, long prevId, String partName,
+  /**
+   * Constructor.  Needed for third party extensions that want to use their own builder
+   * to construct the object.
+   */
+  protected HdfsPartition(HdfsTable table, long prevId, String partName,
+      List<LiteralExpr> partitionKeyValues, HdfsStorageDescriptor fileFormatDescriptor,
+      @Nonnull ImmutableList<byte[]> encodedFileDescriptors,
+      ImmutableList<byte[]> encodedInsertFileDescriptors,
+      ImmutableList<byte[]> encodedDeleteFileDescriptors,
+      HdfsPartitionLocationCompressor.Location location,
+      boolean isMarkedCached, TAccessLevel accessLevel, Map<String, String> hmsParameters,
+      CachedHmsPartitionDescriptor cachedMsPartitionDescriptor,
+      byte[] partitionStats, boolean hasIncrementalStats, long numRows, long writeId,
+      InFlightEvents inFlightEvents) {
+    this(table, partitionIdCounter_.getAndIncrement(), prevId, partName,
+        partitionKeyValues, fileFormatDescriptor, encodedFileDescriptors,
+        encodedInsertFileDescriptors, encodedDeleteFileDescriptors, location,
+        isMarkedCached, accessLevel, hmsParameters, cachedMsPartitionDescriptor,
+        partitionStats, hasIncrementalStats, numRows, writeId, inFlightEvents);
+  }
+
+
+  protected HdfsPartition(HdfsTable table, long id, long prevId, String partName,
       List<LiteralExpr> partitionKeyValues, HdfsStorageDescriptor fileFormatDescriptor,
       @Nonnull ImmutableList<byte[]> encodedFileDescriptors,
       ImmutableList<byte[]> encodedInsertFileDescriptors,
@@ -785,6 +807,9 @@ public class HdfsPartition extends CatalogObjectImpl
 
   @Override // FeFsPartition
   public HdfsTable getTable() { return table_; }
+
+  @Override // FeFsPartition
+  public ListMap<TNetworkAddress> getHostIndex() { return table_.getHostIndex(); }
 
   @Override
   public FileSystemUtil.FsType getFsType() {

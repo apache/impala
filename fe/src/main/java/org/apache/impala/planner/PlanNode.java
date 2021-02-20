@@ -590,7 +590,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * from init() (to facilitate inserting additional nodes during plan
    * partitioning w/o the need to call init() recursively on the whole tree again).
    */
-  protected void computeStats(Analyzer analyzer) {
+  public void computeStats(Analyzer analyzer) {
     avgRowSize_ = 0.0F;
     for (TupleId tid: tupleIds_) {
       TupleDescriptor desc = analyzer.getTupleDesc(tid);

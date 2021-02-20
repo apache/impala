@@ -1194,7 +1194,7 @@ public class HdfsScanNode extends ScanNode {
         // Translate from the host index (local to the HdfsTable) to network address.
         int replicaHostIdx = FileBlock.getReplicaHostIdx(block, j);
         TNetworkAddress networkAddress =
-            partition.getTable().getHostIndex().getEntry(replicaHostIdx);
+            partition.getHostIndex().getEntry(replicaHostIdx);
         Preconditions.checkNotNull(networkAddress);
         // Translate from network address to the global (to this request) host index.
         Integer globalHostIdx = analyzer.getHostIndex().getIndex(networkAddress);
