@@ -70,13 +70,20 @@ public class BuiltinsDb extends Db {
   // Size in bytes of RankState used for rank() and dense_rank().
   private static final int RANK_INTERMEDIATE_SIZE = 16;
 
-  private static BuiltinsDb INSTANCE;
+  private static Db INSTANCE;
 
   public static final String NAME = "_impala_builtins";
 
   public static synchronized Db getInstance() {
     if (INSTANCE == null) {
       INSTANCE = new BuiltinsDb();
+    }
+    return INSTANCE;
+  }
+
+  public static synchronized Db getInstance(BuiltinsDbLoader loader) {
+    if (INSTANCE == null) {
+      INSTANCE = loader.getBuiltinsDbInstance();
     }
     return INSTANCE;
   }
@@ -1523,5 +1530,12 @@ public class BuiltinsDb extends Db {
       if (sType.getLength() == length) return aggF;
     }
     return null;
+  }
+
+  /**
+   * BuiltinsDbLoader allows a third party extension to create their own BuiltinsDb.
+   */
+  public interface BuiltinsDbLoader {
+    Db getBuiltinsDbInstance();
   }
 }
