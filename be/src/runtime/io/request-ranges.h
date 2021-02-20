@@ -375,7 +375,9 @@ class ScanRange : public RequestRange {
   ReadOutcome DoRead(DiskQueue* queue, int disk_id);
 
   /// The function runs the actual read logic to read content with the specific reader.
-  ReadOutcome DoReadInternal(DiskQueue* queue, int disk_id, FileReader* file_reader);
+  /// If use_local_buffer is true, it will read from the local buffer with the local
+  /// buffer reader.
+  ReadOutcome DoReadInternal(DiskQueue* queue, int disk_id, bool use_local_buffer);
 
   /// Cleans up a buffer that was not returned to the client.
   /// Either ReturnBuffer() or CleanUpBuffer() is called for every BufferDescriptor.
@@ -585,7 +587,7 @@ class ScanRange : public RequestRange {
   /// If set to true, the scan range is using local_buffer_reader_ to do scan operations.
   /// The flag is set during DoRead(). If the path is a remote path and the file has
   /// a local buffer, the flag is set to true, otherwise the flag is false.
-  bool use_local_buffer_{false};
+  bool use_local_buffer_ = false;
 
   /// If not empty, the ScanRange will only read these parts from the file.
   std::vector<SubRange> sub_ranges_;
