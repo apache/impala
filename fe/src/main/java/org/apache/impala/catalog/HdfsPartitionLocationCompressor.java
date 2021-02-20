@@ -35,7 +35,7 @@ import com.google.common.base.Preconditions;
  * prefixes, like table locations.
  *
  */
-class HdfsPartitionLocationCompressor {
+public class HdfsPartitionLocationCompressor {
   int numClusteringColumns_;
 
   // A bi-directional map between partition location prefixes and their compressed

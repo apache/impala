@@ -39,7 +39,9 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TAccessLevel;
 import org.apache.impala.thrift.THdfsPartitionLocation;
+import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartitionStats;
+import org.apache.impala.util.ListMap;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -103,6 +105,9 @@ public class LocalFsPartition implements FeFsPartition {
   public FeFsTable getTable() {
     return table_;
   }
+
+  @Override // FeFsPartition
+  public ListMap<TNetworkAddress> getHostIndex() { return table_.getHostIndex(); }
 
   @Override
   public FileSystemUtil.FsType getFsType() {

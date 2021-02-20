@@ -85,7 +85,7 @@ public class SubplanNode extends PlanNode {
   }
 
   @Override
-  protected void computeStats(Analyzer analyzer) {
+  public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     if (getChild(0).cardinality_ != -1 && getChild(1).cardinality_ != -1) {
       cardinality_ =

@@ -352,7 +352,7 @@ public class KuduScanNode extends ScanNode {
   }
 
   @Override
-  protected void computeStats(Analyzer analyzer) {
+  public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     computeNumNodes(analyzer);
 

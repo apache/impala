@@ -642,31 +642,37 @@ public class Planner {
     return newJoinNode;
   }
 
-  private void checkForSmallQueryOptimization(PlanNode singleNodePlan) {
+  public static void checkForSmallQueryOptimization(PlanNode singleNodePlan,
+      PlannerContext ctx) {
     MaxRowsProcessedVisitor visitor = new MaxRowsProcessedVisitor();
     singleNodePlan.accept(visitor);
     if (!visitor.valid()) return;
     // This optimization executes the plan on a single node so the threshold must
     // be based on the total number of rows processed.
     long maxRowsProcessed = visitor.getMaxRowsProcessed();
-    int threshold = ctx_.getQueryOptions().exec_single_node_rows_threshold;
+    int threshold = ctx.getQueryOptions().exec_single_node_rows_threshold;
     if (maxRowsProcessed < threshold) {
       // Execute on a single node and disable codegen for small results
       LOG.trace("Query is small enough to execute on a single node: maxRowsProcessed = "
           + maxRowsProcessed);
-      ctx_.getQueryOptions().setNum_nodes(1);
-      ctx_.getQueryCtx().disable_codegen_hint = true;
-      if (maxRowsProcessed < ctx_.getQueryOptions().batch_size ||
-          maxRowsProcessed < 1024 && ctx_.getQueryOptions().batch_size == 0) {
+      ctx.getQueryOptions().setNum_nodes(1);
+      ctx.getQueryCtx().disable_codegen_hint = true;
+      if (maxRowsProcessed < ctx.getQueryOptions().batch_size ||
+          maxRowsProcessed < 1024 && ctx.getQueryOptions().batch_size == 0) {
         // Only one scanner thread for small queries
-        ctx_.getQueryOptions().setNum_scanner_threads(1);
+        ctx.getQueryOptions().setNum_scanner_threads(1);
       }
       // disable runtime filters
-      ctx_.getQueryOptions().setRuntime_filter_mode(TRuntimeFilterMode.OFF);
+      ctx.getQueryOptions().setRuntime_filter_mode(TRuntimeFilterMode.OFF);
     }
   }
 
-  private void checkForDisableCodegen(PlanNode distributedPlan) {
+  private void checkForSmallQueryOptimization(PlanNode singleNodePlan) {
+      checkForSmallQueryOptimization(singleNodePlan, ctx_);
+  }
+
+  public static void checkForDisableCodegen(PlanNode distributedPlan,
+      PlannerContext ctx) {
     MaxRowsProcessedVisitor visitor = new MaxRowsProcessedVisitor();
     distributedPlan.accept(visitor);
     if (!visitor.valid()) return;
@@ -674,9 +680,13 @@ public class Planner {
     // reduce per-node execution time enough to justify the cost of codegen. Per-node
     // execution time is correlated with the number of rows flowing through the plan.
     if (visitor.getMaxRowsProcessedPerNode()
-        < ctx_.getQueryOptions().getDisable_codegen_rows_threshold()) {
-      ctx_.getQueryCtx().disable_codegen_hint = true;
+        < ctx.getQueryOptions().getDisable_codegen_rows_threshold()) {
+      ctx.getQueryCtx().disable_codegen_hint = true;
     }
+  }
+
+  private void checkForDisableCodegen(PlanNode distributedPlan) {
+      checkForDisableCodegen(distributedPlan, ctx_);
   }
 
   /**

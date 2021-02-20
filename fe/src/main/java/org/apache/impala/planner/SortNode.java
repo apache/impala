@@ -293,7 +293,7 @@ public class SortNode extends PlanNode {
   }
 
   @Override
-  protected void computeStats(Analyzer analyzer) {
+  public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     if (isTypeTopN() && includeTies_) {
       cardinality_ = capCardinalityAtLimit(getChild(0).cardinality_, limitWithTies_);
