@@ -66,3 +66,14 @@ can do so through the environment variables and scripts listed below.
 | HBASE_HOME           | "${CDP_COMPONENTS_HOME}/hbase-${IMPALA_HBASE_VERSION}/" | |
 | THRIFT_HOME          | "${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}" | |
 
+## Hive Dependency Overrides
+Typically used together to specify a local build of Apache Hive. Care should be taken
+while using these variables since they take precedence over the defaults in
+impala-config.sh, they may cause confusion when switching between branches or versions of
+Apache Impala.
+
+| Environment variable | Description |
+| HIVE_VERSION_OVERRIDE | Used to specify different Hive version from default |
+| HIVE_STORAGE_API_VERSION_OVERRIDE | Used to specify different Hive Storage API version from default |
+| HIVE_METASTORE_THRIFT_DIR_OVERRIDE | Used to specify location of metastore thrift files to use during Thrift compilation |
+| HIVE_HOME_OVERRIDE | Used to specify location of Hive |
