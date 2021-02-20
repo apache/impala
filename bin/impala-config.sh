@@ -239,7 +239,7 @@ export IMPALA_HADOOP_URL=${CDP_HADOOP_URL-}
 export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
 export IMPALA_HBASE_VERSION=${CDP_HBASE_VERSION}
 export IMPALA_HBASE_URL=${CDP_HBASE_URL-}
-export IMPALA_HIVE_VERSION=${CDP_HIVE_VERSION}
+export IMPALA_HIVE_VERSION=${HIVE_VERSION_OVERRIDE:-"$CDP_HIVE_VERSION"}
 export IMPALA_HIVE_URL=${CDP_HIVE_URL-}
 export IMPALA_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
 export IMPALA_ICEBERG_VERSION=${CDP_ICEBERG_VERSION}
@@ -251,6 +251,7 @@ export IMPALA_RANGER_VERSION=${CDP_RANGER_VERSION}
 export IMPALA_RANGER_URL=${CDP_RANGER_URL-}
 export IMPALA_TEZ_VERSION=${CDP_TEZ_VERSION}
 export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
+export IMPALA_HIVE_STORAGE_API_VERSION=${HIVE_STORAGE_API_VERSION_OVERRIDE:-"2.3.0.$IMPALA_HIVE_VERSION"}
 
 # Extract the first component of the hive version.
 # Allow overriding of Hive source location in case we want to build Impala without
@@ -362,11 +363,11 @@ export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
 export IMPALA_CLUSTER_NODES_DIR="${IMPALA_CLUSTER_NODES_DIR-$IMPALA_HOME/testdata/cluster/cdh$CDH_MAJOR_VERSION}"
 
 ESCAPED_IMPALA_HOME=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$IMPALA_HOME")
-export HIVE_HOME="$CDP_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"
-export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${CDP_COMPONENTS_HOME}/hive-\
-${IMPALA_HIVE_VERSION}"}
+export HIVE_HOME=${HIVE_HOME_OVERRIDE:-"$CDP_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"}
+export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${CDP_COMPONENTS_HOME}/hive-${IMPALA_HIVE_VERSION}"}
 # Set the path to the hive_metastore.thrift which is used to build thrift code
-export HIVE_METASTORE_THRIFT_DIR=$HIVE_SRC_DIR/standalone-metastore/src/main/thrift
+export HIVE_METASTORE_THRIFT_DIR=${HIVE_METASTORE_THRIFT_DIR_OVERRIDE:-\
+"$HIVE_SRC_DIR/standalone-metastore/src/main/thrift"}
 export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
 export HBASE_HOME="$CDP_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
 # Previously, there were multiple configurations and the "_cdp" included below
