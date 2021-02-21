@@ -294,7 +294,7 @@ class TestScratchDir(CustomClusterTestSuite):
        to local in the test'''
     normal_dirs = self.generate_dirs(2)
     normal_dirs[0] = '{0}::{1}'.format(normal_dirs[0], 1)
-    normal_dirs[1] = '{0}:100M:{1}'.format(normal_dirs[1], 0)
+    normal_dirs[1] = '{0}:2GB:{1}'.format(normal_dirs[1], 0)
     normal_dirs.append('hdfs://localhost')
     self._start_impala_cluster([
       '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
