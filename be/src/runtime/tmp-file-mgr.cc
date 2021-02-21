@@ -1051,17 +1051,17 @@ Status TmpFileGroup::AllocateRemoteSpace(int64_t num_bytes, TmpFile** tmp_file,
         tmp_dir_remote->bytes_limit, tmp_dir_remote->path));
   }
   UpdateScratchSpaceMetrics(file_size, true);
-
-  // It should be a successful return to allocate the first range from the new file.
-  DCHECK(tmp_file_remote->AllocateSpace(num_bytes, file_offset));
-
-  tmp_files_remote_.emplace_back(std::move(tmp_file_remote));
+  tmp_files_remote_.emplace_back(move(tmp_file_remote));
   *tmp_file = tmp_files_remote_.back().get();
+  // It should be a successful return to allocate the first range from the new file.
+  if (!(*tmp_file)->AllocateSpace(num_bytes, file_offset)) {
+    DCHECK(false) << "Should be a successful allocation for the first write range.";
+  }
+  DCHECK_EQ(*file_offset, 0);
   {
     lock_guard<SpinLock> lock(tmp_files_remote_ptrs_lock_);
     tmp_files_remote_ptrs_.emplace(*tmp_file, tmp_files_remote_.back());
   }
-  *file_offset = 0;
 
   // Try to reserve the space for local buffer with a quick return to avoid
   // a long wait, if failed, caller should do the reservation for the buffer.
