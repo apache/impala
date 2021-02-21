@@ -168,7 +168,12 @@ using WriteDoneCallback = TmpFileMgr::WriteDoneCallback;
 
 TmpFileMgr::TmpFileMgr() {}
 
-TmpFileMgr::~TmpFileMgr() {}
+TmpFileMgr::~TmpFileMgr() {
+  if(tmp_dirs_remote_ctrl_.tmp_file_pool_ != nullptr) {
+    tmp_dirs_remote_ctrl_.tmp_file_pool_->ShutDown();
+    tmp_dirs_remote_ctrl_.tmp_file_mgr_thread_group_.JoinAll();
+  }
+}
 
 Status TmpFileMgr::Init(MetricGroup* metrics) {
   return InitCustom(FLAGS_scratch_dirs, !FLAGS_allow_multiple_scratch_dirs_per_device,
@@ -321,7 +326,7 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
     bool is_s3a_path = IsS3APath(tmp_path.c_str(), false);
     if (is_hdfs_path || is_s3a_path) {
       // Only support one remote dir.
-      if (tmp_dirs_remote_ != nullptr) {
+      if (HasRemoteDir()) {
         LOG(WARNING) << "Only one remote directory is supported. Directory "
                      << tmp_path.c_str() << " is abandoned.";
         continue;
@@ -379,7 +384,7 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
   std::sort(tmp_dirs_.begin(), tmp_dirs_.end(),
       [](const TmpDir& a, const TmpDir& b) { return a.priority < b.priority; });
 
-  if (tmp_dirs_remote_ != nullptr) {
+  if (HasRemoteDir()) {
     if (local_buff_dir_ == nullptr) {
       // Should at least have one local dir for the buffer. Later we might allow to use
       // s3 fast upload directly without a buffer.
@@ -400,15 +405,15 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
       metrics->AddGauge(TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS, 0);
   active_scratch_dirs_metric_ = SetMetric<string>::CreateAndRegister(
       metrics, TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS_LIST, set<string>());
-  if (tmp_dirs_remote_ == nullptr) {
-    num_active_scratch_dirs_metric_->SetValue(tmp_dirs_.size());
-  } else {
+  if (HasRemoteDir()) {
     num_active_scratch_dirs_metric_->SetValue(tmp_dirs_.size() + 1);
+  } else {
+    num_active_scratch_dirs_metric_->SetValue(tmp_dirs_.size());
   }
   for (int i = 0; i < tmp_dirs_.size(); ++i) {
     active_scratch_dirs_metric_->Add(tmp_dirs_[i].path);
   }
-  if (tmp_dirs_remote_ != nullptr) {
+  if (HasRemoteDir()) {
     active_scratch_dirs_metric_->Add(tmp_dirs_remote_->path);
     RETURN_IF_ERROR(CreateTmpFileBufferPoolThread(metrics));
   }
@@ -1740,6 +1745,10 @@ TmpFileBufferPool::TmpFileBufferPool(TmpFileMgr* tmp_file_mgr)
 }
 
 TmpFileBufferPool::~TmpFileBufferPool() {
+  DCHECK(shut_down_);
+}
+
+void TmpFileBufferPool::ShutDown() {
   {
     unique_lock<mutex> l(lock_);
     shut_down_ = true;

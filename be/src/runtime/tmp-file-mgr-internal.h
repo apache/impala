@@ -340,6 +340,9 @@ class TmpFileBufferPool {
   // from the available pool and make room for other files' buffer.
   Status DequeueTmpFilesPool(std::shared_ptr<TmpFile>* tmp_file, bool quick_return);
 
+  // Shut down the pool before destruction.
+  void ShutDown();
+
  private:
   friend class TmpFileMgr;
   friend class TmpFileMgrTest;
