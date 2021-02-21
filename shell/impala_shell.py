@@ -1317,7 +1317,13 @@ class ImpalaShell(cmd.Cmd, object):
       # an exception occurred while executing the query
       if self.last_query_handle is not None:
         self.imp_client.close_query(self.last_query_handle)
-      print(e, file=sys.stderr)
+      msg = e.value
+      # Python2 will implicitly convert unicode to str when printing to stderr. It's done
+      # using the default 'ascii' encoding, which will fail for UTF-8 error messages.
+      # Here we use 'utf-8' to explicitly convert 'msg' to str if it's in unicode type.
+      if sys.version_info.major == 2 and isinstance(msg, unicode):
+        msg = msg.encode('utf-8')
+      print(msg, file=sys.stderr)
     except DisconnectedException as e:
       # the client has lost the connection
       print(e, file=sys.stderr)

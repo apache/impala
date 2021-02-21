@@ -1041,6 +1041,15 @@ class TestImpalaShellInteractive(ImpalaTestSuite):
     assert "ERROR: ParseException: Unmatched string literal" in result.stderr,\
            result.stderr
 
+  def test_utf8_error_message(self, vector):
+    """Test UTF-8 error messages are shown correctly"""
+    shell = ImpalaShell(vector)
+    query = "select cast(now() as string format 'yyyy年MM月dd日')"
+    shell.send_cmd(query)
+    result = shell.get_result()
+    assert "ERROR: Bad date/time conversion format: yyyy年MM月dd日" in result.stderr,\
+           result.stderr
+
   def test_timezone_validation(self, vector):
     """Test that query option TIMEZONE is validated when executing a query.
 
