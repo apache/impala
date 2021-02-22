@@ -86,7 +86,6 @@ class TestClientSaml(CustomClusterTestSuite):
               "--saml2_private_key_password_cmd=\"echo -n keypass\" "
               "--saml2_idp_metadata=%s/saml2_sso_metadata.xml "
               "--saml2_sp_callback_url=%s "
-              "--saml2_callback_token_ttl=600000 "
               "--saml2_sp_entity_id=org.apache.impala "
               "--saml2_want_assertations_signed=false "
               "--saml2_allow_without_tls_debug_only=true "
