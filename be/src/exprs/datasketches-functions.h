@@ -70,6 +70,14 @@ public:
   static BigIntVal DsThetaEstimate(
       FunctionContext* ctx, const StringVal& serialized_sketch);
 
+  /// 'first_serialized_sketch' and 'second_serialized_sketch' are both expected as
+  /// serialized Apache DataSketches Theta sketches. If they are not, then the query
+  /// fails. Computes the a-not-b set operation given two sketches of same or different
+  /// column.
+  static StringVal DsThetaExclude(FunctionContext* ctx,
+      const StringVal& first_serialized_sketch,
+      const StringVal& second_serialized_sketch);
+
   /// 'serialized_sketch' is expected as a serialized Apache DataSketches KLL sketch. If
   /// it is not, then the query fails. 'rank' is used to identify which item (estimate)
   /// to return from the sketched dataset. E.g. 0.1 means the item where 10% of the

@@ -21,6 +21,7 @@
 #include "gutil/strings/substitute.h"
 #include "thirdparty/datasketches/hll.hpp"
 #include "thirdparty/datasketches/theta_sketch.hpp"
+#include "thirdparty/datasketches/theta_a_not_b.hpp"
 #include "thirdparty/datasketches/kll_sketch.hpp"
 #include "udf/udf-internal.h"
 
@@ -120,6 +121,42 @@ BigIntVal DataSketchesFunctions::DsThetaEstimate(
     LogSketchDeserializationError(ctx);
     return BigIntVal::null();
   }
+}
+
+StringVal DataSketchesFunctions::DsThetaExclude(FunctionContext* ctx,
+    const StringVal& first_serialized_sketch, const StringVal& second_serialized_sketch) {
+  datasketches::theta_a_not_b a_not_b;
+  // Deserialize two sketches
+  datasketches::theta_sketch::unique_ptr first_sketch_ptr;
+  if (!first_serialized_sketch.is_null && first_serialized_sketch.len > 0) {
+    if (!DeserializeDsSketch(first_serialized_sketch, &first_sketch_ptr)) {
+      LogSketchDeserializationError(ctx);
+      return StringVal::null();
+    }
+  }
+  datasketches::theta_sketch::unique_ptr second_sketch_ptr;
+  if (!second_serialized_sketch.is_null && second_serialized_sketch.len > 0) {
+    if (!DeserializeDsSketch(second_serialized_sketch, &second_sketch_ptr)) {
+      LogSketchDeserializationError(ctx);
+      return StringVal::null();
+    }
+  }
+  // Note, A and B refer to the two input sketches in the order A-not-B.
+  // if A is null return null.
+  // if A is not null, B is null return copyA.
+  // other return A-not-B.
+  if (first_sketch_ptr) {
+    if (!second_sketch_ptr) {
+      return StringVal::CopyFrom(
+          ctx, first_serialized_sketch.ptr, first_serialized_sketch.len);
+    }
+    // A and B are not null, call a_not_b.compute()
+    auto result = a_not_b.compute(*first_sketch_ptr, *second_sketch_ptr);
+    std::stringstream serialized_input;
+    result.serialize(serialized_input);
+    return StringStreamToStringVal(ctx, serialized_input);
+  }
+  return StringVal::null();
 }
 
 FloatVal DataSketchesFunctions::DsKllQuantile(FunctionContext* ctx,
