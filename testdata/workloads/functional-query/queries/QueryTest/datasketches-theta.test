@@ -305,3 +305,106 @@ BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 ---- RESULTS
 5,7,6,6,7,4,4,3,0
 ====
+---- QUERY
+# A and B refer to the two input sketches in the order A-not-B.
+# Checks that ds_theta_exclude() returns an null sketch for A, B is NULL inputs.
+select ds_theta_exclude(null_str, some_nulls) from functional_parquet.nullrows
+where id='b';
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Checks that ds_theta_exclude() returns an null sketch for A is NULL inputs.
+select ds_theta_exclude(null_str, sketch) from (
+select null null_str, ds_theta_sketch(some_nulls) sketch from functional_parquet.nullrows
+where id='a'
+) t;
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Check that ds_theta_exclude() returns an empty sketch When A is empty and B is null.
+select ds_theta_estimate(ds_theta_exclude(ds_theta_sketch(f2), null))
+from functional_parquet.emptytable;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# Check that ds_theta_exclude() returns an null sketch When A is null and B is empty.
+select ds_theta_exclude(null, ds_theta_sketch(f2)) from functional_parquet.emptytable;
+---- TYPES
+STRING
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Check that ds_theta_exclude() returns an empty sketch When A and B are both empty.
+select ds_theta_estimate(ds_theta_exclude(ds_theta_sketch(field), ds_theta_sketch(f2)))
+from functional_parquet.emptytable;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# ds_theta_exclude() returns an error if it receives an invalid serialized sketch.
+select ds_theta_exclude(null, date_string_col) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# ds_theta_exclude() returns an error if it receives an invalid serialized sketch.
+select ds_theta_exclude(date_string_col, null) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# Get the same sketches from Impala and Hive and put them into the same table (different
+# column prefix). The estimate in sketch A but not in sketch B is 0.
+create table theta_sketches_impala_hive2 (
+i_ti string,i_i string,i_bi string,i_f string,i_d string,i_s string,i_c string,i_v string,
+i_nc string,
+h_ti string,h_i string,h_bi string,h_f string,h_d string,h_s string,h_c string,h_v string,
+h_nc string) stored as parquet;
+insert overwrite theta_sketches_impala_hive2 select
+i.ti i_ti, i.i i_i, i.bi i_bi, i.f i_f, i.d i_d, i.s i_s, i.c i_c, i.v i_v,i.nc i_nc,
+h.ti h_ti, h.i h_i, h.bi h_bi, h.f h_f, h.d h_d, h.s h_s, h.c h_c, h.v h_v,h.nc h_nc
+from theta_sketches_from_impala i, theta_sketches_from_hive h;
+select
+    ds_theta_estimate(ds_theta_exclude(i_ti, h_ti)) as ti,
+    ds_theta_estimate(ds_theta_exclude(i_i, h_i)) as i,
+    ds_theta_estimate(ds_theta_exclude(i_bi, h_bi)) as bi,
+    ds_theta_estimate(ds_theta_exclude(i_f, h_f)) as f,
+    ds_theta_estimate(ds_theta_exclude(i_d, h_d)) as d,
+    ds_theta_estimate(ds_theta_exclude(i_s, h_s)) as s,
+    ds_theta_estimate(ds_theta_exclude(i_c, h_c)) as c,
+    ds_theta_estimate(ds_theta_exclude(i_v, h_v)) as v,
+    ds_theta_estimate(ds_theta_exclude(i_nc, h_nc)) as nc
+from theta_sketches_impala_hive2;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+0,0,0,0,0,0,0,0,0
+====
+---- QUERY
+# Check that the result of an a-not-b is a non-empty sketch.
+create table sketch_input (id1 int, id2 int);
+insert into table sketch_input values
+  (1, 2), (2, 4), (3, 6), (4, 8), (5, 10), (6, 12), (7, 14), (8, 16), (9, 18), (10, 20);
+create table sketch_intermediate (sketch1 string, sketch2 string) stored as parquet;
+insert overwrite sketch_intermediate
+  select ds_theta_sketch(id1), ds_theta_sketch(id2) from sketch_input;
+select ds_theta_estimate(ds_theta_exclude(sketch1, sketch2)) from sketch_intermediate;
+---- TYPES
+BIGINT
+---- RESULTS
+5
+====

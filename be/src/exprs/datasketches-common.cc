@@ -20,11 +20,13 @@
 #include "common/logging.h"
 #include "udf/udf-internal.h"
 #include "thirdparty/datasketches/kll_sketch.hpp"
+#include "thirdparty/datasketches/theta_sketch.hpp"
 
 namespace impala {
 
 using datasketches::hll_sketch;
 using datasketches::kll_sketch;
+using datasketches::theta_sketch;
 using impala_udf::StringVal;
 using std::stringstream;
 using std::vector;
@@ -39,6 +41,23 @@ bool DeserializeDsSketch(const StringVal& serialized_sketch, T* sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return false;
   try {
     *sketch = T::deserialize((void*)serialized_sketch.ptr, serialized_sketch.len);
+    return true;
+  } catch (const std::exception&) {
+    // One reason of throwing from deserialization is that the input string is not a
+    // serialized sketch.
+    return false;
+  }
+}
+
+// This is a specialization of the template DeserializeDsSketch() for theta sketches.
+template <>
+bool DeserializeDsSketch(
+    const StringVal& serialized_sketch, theta_sketch::unique_ptr* sketch) {
+  DCHECK(sketch != nullptr);
+  if (serialized_sketch.is_null || serialized_sketch.len == 0) return false;
+  try {
+    *sketch =
+        theta_sketch::deserialize((void*)serialized_sketch.ptr, serialized_sketch.len);
     return true;
   } catch (const std::exception&) {
     // One reason of throwing from deserialization is that the input string is not a
