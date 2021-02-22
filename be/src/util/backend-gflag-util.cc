@@ -134,8 +134,8 @@ DEFINE_bool(saml2_sign_requests, false,
     "When this configuration is set to true, Impala will sign the SAML requests "
     "which can be validated by the IDP provider.");
 
-DEFINE_int32(saml2_callback_token_ttl, 30,
-    "Time (in seconds) for which the token issued by service provider is valid.");
+DEFINE_int32(saml2_callback_token_ttl, 30000,
+    "Time (in milliseconds) for which the token issued by service provider is valid.");
 
 DEFINE_string(saml2_group_attribute_name, "",
     "The attribute name in the SAML assertion which would "
