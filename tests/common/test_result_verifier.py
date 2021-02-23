@@ -528,7 +528,7 @@ def parse_result_rows(exec_result, escape_strings=True):
 # Currently, the only implemented function is SUM and only integers are supported.
 AGGREGATION_PREFIX_PATTERN = 'aggregation\('
 AGGREGATION_PREFIX = re.compile(AGGREGATION_PREFIX_PATTERN)
-AGGREGATION_SYNTAX_MATCH_PATTERN = 'aggregation\((\w+)[ ]*,[ ]*([^)]+)\):[ ]*(\d+)'
+AGGREGATION_SYNTAX_MATCH_PATTERN = 'aggregation\((\w+)[ ]*,[ ]*([^)]+)\)([:><])[ ]*(\d+)'
 
 def try_compile_aggregation(row_string):
   """
@@ -537,12 +537,13 @@ def try_compile_aggregation(row_string):
   aggregation. Otherwise, it returns None.
   """
   if row_string and AGGREGATION_PREFIX.match(row_string):
-    function, field, value = re.findall(AGGREGATION_SYNTAX_MATCH_PATTERN, row_string)[0]
+    function, field, op, value = \
+        re.findall(AGGREGATION_SYNTAX_MATCH_PATTERN, row_string)[0]
     # Validate function
     assert(function == 'SUM')
     # Validate value is integer
     expected_value = int(value)
-    return (function, field, expected_value)
+    return (function, field, op, expected_value)
   return None
 
 def compute_aggregation(function, field, runtime_profile):
@@ -638,16 +639,31 @@ def verify_runtime_profile(expected, actual, update_section=False):
   # Compute the aggregations and check against values
   for i in xrange(len(expected_aggregations)):
     if (expected_aggregations[i] is None): continue
-    function, field, expected_value = expected_aggregations[i]
+    function, field, op, expected_value = expected_aggregations[i]
     actual_value = compute_aggregation(function, field, actual)
     if update_section:
-      updated_aggregations.append("aggregation(%s, %s): %d"
-                                  % (function, field, actual_value))
+      updated_aggregations.append("aggregation(%s, %s)%s %d"
+                                  % (function, field, op, actual_value))
     else:
-        assert actual_value == expected_value, ("Aggregation of %s over %s did not match "
-            "expected results.\nEXPECTED VALUE:\n%d\n\nACTUAL VALUE:\n%d"
-            "\n\nPROFILE:\n%s\n"
-            % (function, field, expected_value, actual_value, actual))
+        if op == ':' and actual_value != expected_value:
+          assert actual_value == expected_value, ("Aggregation of %s over %s did not "
+              "match expected results.\nEXPECTED VALUE:\n%d\n\n\nACTUAL VALUE:\n%d\n\n"
+              "OP:\n%s\n\n"
+              "\n\nPROFILE:\n%s\n"
+              % (function, field, expected_value, actual_value, op, actual))
+        elif op == '>' and actual_value <= expected_value:
+          assert actual_value > expected_value, ("Aggregation of %s over %s did not "
+              "match expected results.\nEXPECTED VALUE:\n%d\n\n\nACTUAL VALUE:\n%d\n\n"
+              "OP:\n%s\n\n"
+              "\n\nPROFILE:\n%s\n"
+              % (function, field, expected_value, actual_value, op, actual))
+        elif op == '<' and actual_value >= expected_value:
+          assert actual_value < expected_value, ("Aggregation of %s over %s did not "
+              "match expected results.\nEXPECTED VALUE:\n%d\n\n\nACTUAL VALUE:\n%d\n\n"
+              "OP:\n%s\n\n"
+              "\n\nPROFILE:\n%s\n"
+              % (function, field, expected_value, actual_value, op, actual))
+
   return updated_aggregations
 
 

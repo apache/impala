@@ -1,12 +1,26 @@
 ====
 ---- QUERY
+##################################################
+# Create a new lineitem table with sorted l_orderkey
+# with controlled number of rows per page.
+###################################################
+set PARQUET_PAGE_ROW_COUNT_LIMIT=24000;
+drop table if exists tpch_parquet.lineitem_orderkey_only;
+CREATE TABLE tpch_parquet.lineitem_orderkey_only(l_orderkey bigint)
+sort by (l_orderkey)
+STORED AS PARQUET;
+insert into tpch_parquet.lineitem_orderkey_only
+select l_orderkey from tpch_parquet.lineitem;
+====
+---- QUERY
 ###################################################
 # Both a.l_orderkey and b.o_orderkey are BIGINT.
 ###################################################
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET MINMAX_FILTERING_LEVEL=PAGE;
+SET MINMAX_FILTER_THRESHOLD=0.5;
 select straight_join a.l_orderkey from
-tpch_parquet.lineitem a join [SHUFFLE] tpch_parquet.orders b
+tpch_parquet.lineitem_orderkey_only a join [SHUFFLE] tpch_parquet.orders b
 where a.l_orderkey = b.o_orderkey
 and b.o_custkey = 5 order by l_orderkey;
 ---- RESULTS
@@ -30,13 +44,20 @@ and b.o_custkey = 5 order by l_orderkey;
 2630562
 2630562
 ---- RUNTIME_PROFILE
-row_regex: .*NumRuntimeFilteredPages: 9.*
+aggregation(SUM, NumRuntimeFilteredPages)> 200
+====
+---- QUERY
+###################################################
+# Drop the table.
+###################################################
+drop table if exists tpch_parquet.lineitem_orderkey_only;
 ====
 ---- QUERY
 ###################################################
 # ss_sold_time_sk is INT.
 ###################################################
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET MINMAX_FILTER_THRESHOLD=0.5;
 select straight_join count(*) from
 tpcds_parquet.store_sales a join [SHUFFLE] tpcds_parquet.store_sales b
 where a.ss_sold_time_sk = b.ss_sold_time_sk and b.ss_customer_sk = 1
@@ -51,6 +72,7 @@ aggregation(SUM, NumRuntimeFilteredRowGroups): 16
 # BIGINT. Implicit casting on a is involved.
 ###################################################
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET MINMAX_FILTER_THRESHOLD=0.5;
 select straight_join count(*) from
 tpcds_parquet.store_sales a join [SHUFFLE] tpcds_parquet.store_sales b
 where a.ss_sold_time_sk = b.ss_item_sk and b.ss_addr_sk < 20;
@@ -66,6 +88,7 @@ aggregation(SUM, NumRuntimeFilteredRowGroups): 1824
 # return the same result as the query above.
 ###################################################
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+SET MINMAX_FILTER_THRESHOLD=0.5;
 select straight_join count(*) from
 tpcds_parquet.store_sales a join [SHUFFLE] tpcds_parquet.store_sales b
 where a.ss_sold_time_sk = b.ss_item_sk and a.ss_addr_sk < 20;
@@ -89,7 +112,7 @@ where a.ss_sold_time_sk = b.ss_item_sk and a.ss_addr_sk < 20;
 0
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRuntimeFilteredRowGroups): 0
-aggregation(SUM, NumRuntimeFilteredRowPages): 0
+aggregation(SUM, NumRuntimeFilteredPages): 0
 ====
 ---- QUERY
 ##################################################
