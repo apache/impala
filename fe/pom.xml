@@ -531,6 +531,10 @@ under the License.
           <groupId>xalan</groupId>
           <artifactId>xalan</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.springframework</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -542,6 +546,11 @@ under the License.
       <groupId>org.apache.santuario</groupId>
       <artifactId>xmlsec</artifactId>
       <version>${xmlsec.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-core</artifactId>
+      <version>${springframework.version}</version>
     </dependency>
   </dependencies>
 

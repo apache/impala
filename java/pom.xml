@@ -65,10 +65,11 @@ under the License.
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <iceberg.version>${env.IMPALA_ICEBERG_VERSION}</iceberg.version>
     <pac4j.version>4.0.3</pac4j.version>
-    <!-- xmlsec and bcprov-jdk15on are not used by Impala directly,
+    <!-- xmlsec, bcprov-jdk15on and springframework are not used by Impala directly,
          but needed to replace pac4j 4.0.3's unsafe versions -->
     <xmlsec.version>2.2.1</xmlsec.version>
     <bcprov-jdk15on.version>1.64</bcprov-jdk15on.version>
+    <springframework.version>4.3.29.RELEASE</springframework.version>
   </properties>
 
   <repositories>
