@@ -69,6 +69,7 @@ DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);
 DECLARE_string(ssl_private_key_password_cmd);
 DECLARE_string(ssl_cipher_list);
+DECLARE_string(tls_ciphersuites);
 DECLARE_string(ssl_minimum_version);
 
 DECLARE_int64(impala_slow_rpc_threshold_ms);
@@ -176,6 +177,12 @@ Status RpcMgr::Init(const NetworkAddressPB& address) {
     bld.set_epki_private_password_key_cmd(FLAGS_ssl_private_key_password_cmd);
     if (!FLAGS_ssl_cipher_list.empty()) {
       bld.set_rpc_tls_ciphers(FLAGS_ssl_cipher_list);
+    }
+    bld.set_rpc_tls_ciphersuites(FLAGS_tls_ciphersuites);
+    // If there are no TLS 1.3 ciphersuites listed, then exclude TLS 1.3, as it
+    // cannot function.
+    if (FLAGS_tls_ciphersuites.empty()) {
+      bld.set_rpc_tls_excluded_protocols({"TLSv1.3"});
     }
     bld.set_rpc_tls_min_protocol(FLAGS_ssl_minimum_version);
     bld.set_rpc_encryption("required");

@@ -23,6 +23,7 @@
 #include <thrift/Thrift.h>
 #include <gutil/strings/substitute.h>
 
+#include "rpc/thrift-util.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
 #include "util/time.h"
@@ -36,11 +37,14 @@ using namespace strings;
 DECLARE_string(ssl_client_ca_certificate);
 DECLARE_string(ssl_cipher_list);
 DECLARE_string(ssl_minimum_version);
+DECLARE_string(tls_ciphersuites);
 
 namespace impala {
 
-ThriftClientImpl::ThriftClientImpl(const std::string& ipaddress, int port, bool ssl)
-  : address_(MakeNetworkAddress(ipaddress, port)), ssl_(ssl) {
+ThriftClientImpl::ThriftClientImpl(const std::string& ipaddress, int port, bool ssl,
+    bool disable_tls12)
+  : address_(MakeNetworkAddress(ipaddress, port)), ssl_(ssl),
+    disable_tls12_(disable_tls12) {
   if (ssl_) {
     SSLProtocol version;
     init_status_ =
@@ -52,7 +56,7 @@ ThriftClientImpl::ThriftClientImpl(const std::string& ipaddress, int port, bool 
       init_status_ = Status(err);
     }
     if (!init_status_.ok()) return;
-    ssl_factory_.reset(new TSSLSocketFactory(version));
+    ssl_factory_.reset(new ImpalaTlsSocketFactory(version));
   }
   init_status_ = CreateSocket();
 }
@@ -127,7 +131,8 @@ Status ThriftClientImpl::CreateSocket() {
     socket_.reset(new TSocket(address_.hostname, address_.port));
   } else {
     try {
-      if (!FLAGS_ssl_cipher_list.empty()) ssl_factory_->ciphers(FLAGS_ssl_cipher_list);
+      ssl_factory_->configureCiphers(FLAGS_ssl_cipher_list, FLAGS_tls_ciphersuites,
+          disable_tls12_);
       ssl_factory_->loadTrustedCertificates(FLAGS_ssl_client_ca_certificate.c_str());
       socket_ = ssl_factory_->createSocket(address_.hostname, address_.port);
     } catch (const TException& e) {

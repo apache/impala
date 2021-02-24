@@ -29,6 +29,7 @@
 
 #include "common/status.h"
 #include "gen-cpp/Frontend_types.h"
+#include "kudu/security/security_flags.h"
 #include "util/condition-variable.h"
 #include "util/metrics-fwd.h"
 #include "util/thread.h"
@@ -273,7 +274,10 @@ class ThriftServer {
   /// string containing a list of cipher suites, separated by commas, to enable.
   Status EnableSsl(apache::thrift::transport::SSLProtocol version,
       const std::string& certificate, const std::string& private_key,
-      const std::string& pem_password_cmd = "", const std::string& ciphers = "");
+      const std::string& pem_password_cmd = "", const std::string& cipher_list = "",
+      const std::string& tls_ciphersuites =
+          kudu::security::SecurityDefaults::kDefaultTlsCipherSuites,
+      bool disable_tls12 = false);
 
   /// Creates the server socket on which this server listens. May be SSL enabled. Returns
   /// OK unless there was a Thrift error.
@@ -301,6 +305,13 @@ class ThriftServer {
 
   /// List of ciphers that are ok for clients to use when connecting.
   std::string cipher_list_;
+
+  /// List of TLSv1.3 cipher suites that are ok for clients to use when connecting.
+  std::string tls_ciphersuites_;
+
+  /// Whether to disable TLSv1.2. This is only used for testing TLSv1.3 ciphersuites.
+  /// TODO: Remove this when it is possible to set ssl_minimum_version=TLSv1.3.
+  bool disable_tls12_;
 
   /// The SSL/TLS protocol client versions that this server will allow to connect.
   apache::thrift::transport::SSLProtocol version_;
@@ -428,8 +439,22 @@ class ThriftServerBuilder {
 
   /// Sets the list of acceptable cipher suites for this server. Default is to use all
   /// available system cipher suites.
-  ThriftServerBuilder& cipher_list(const std::string& ciphers) {
-    ciphers_ = ciphers;
+  ThriftServerBuilder& cipher_list(const std::string& cipher_list) {
+    cipher_list_ = cipher_list;
+    return *this;
+  }
+
+  /// Sets the list of TLS 1.3 ciphersuites for this server. Default is to
+  /// use all available TLS 1.3 ciphersuites.
+  ThriftServerBuilder& tls_ciphersuites(const std::string& tls_ciphersuites) {
+    tls_ciphersuites_ = tls_ciphersuites;
+    return *this;
+  }
+
+  /// Sets whether to disable TLS 1.2. This is used for testing TLS 1.3.
+  /// TODO: Remove this when ssl_minimum_version=tlsv1.3 is supported.
+  ThriftServerBuilder& disable_tls12(bool disable) {
+    disable_tls12_ = disable;
     return *this;
   }
 
@@ -450,7 +475,8 @@ class ThriftServerBuilder {
             server_transport_type_));
     if (enable_ssl_) {
       RETURN_IF_ERROR(ptr->EnableSsl(
-          version_, certificate_, private_key_, pem_password_cmd_, ciphers_));
+          version_, certificate_, private_key_, pem_password_cmd_, cipher_list_,
+          tls_ciphersuites_, disable_tls12_));
     }
     (*server) = ptr.release();
     return Status::OK();
@@ -475,7 +501,10 @@ class ThriftServerBuilder {
   std::string certificate_;
   std::string private_key_;
   std::string pem_password_cmd_;
-  std::string ciphers_;
+  std::string cipher_list_;
+  std::string tls_ciphersuites_ =
+      kudu::security::SecurityDefaults::kDefaultTlsCipherSuites;
+  bool disable_tls12_ = false;
 };
 
 /// Contains a map from string for --ssl_minimum_version to Thrift's SSLProtocol.

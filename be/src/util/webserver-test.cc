@@ -46,6 +46,7 @@ DECLARE_string(webserver_private_key_password_cmd);
 DECLARE_string(webserver_x_frame_options);
 DECLARE_string(ssl_cipher_list);
 DECLARE_string(ssl_minimum_version);
+DECLARE_string(tls_ciphersuites);
 DECLARE_bool(webserver_ldap_passwords_in_clear_ok);
 DECLARE_bool(cookie_require_secure);
 
@@ -280,23 +281,56 @@ TEST(Webserver, SslCipherSuite) {
       Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
   auto cmd = ScopedFlagSetter<string>::Make(
       &FLAGS_webserver_private_key_password_cmd, "echo password");
-#ifndef __aarch64__
   {
     auto ciphers = ScopedFlagSetter<string>::Make(
         &FLAGS_ssl_cipher_list, "not_a_cipher");
+    auto ciphersuites = ScopedFlagSetter<string>::Make(
+        &FLAGS_tls_ciphersuites, "");
     MetricGroup metrics("webserver-test");
     Webserver webserver("", FLAGS_webserver_port, &metrics);
     ASSERT_FALSE(webserver.Start().ok());
   }
-#endif
   {
     auto ciphers = ScopedFlagSetter<string>::Make(
         &FLAGS_ssl_cipher_list, "AES128-SHA");
+    auto ciphersuites = ScopedFlagSetter<string>::Make(
+        &FLAGS_tls_ciphersuites, "");
     MetricGroup metrics("webserver-test");
     Webserver webserver("", FLAGS_webserver_port, &metrics);
     ASSERT_OK(webserver.Start());
   }
 }
+
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+
+TEST(Webserver, TlsCiphersuite) {
+  auto cert = ScopedFlagSetter<string>::Make(&FLAGS_webserver_certificate_file,
+      Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
+  auto key = ScopedFlagSetter<string>::Make(&FLAGS_webserver_private_key_file,
+      Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
+  auto cmd = ScopedFlagSetter<string>::Make(
+      &FLAGS_webserver_private_key_password_cmd, "echo password");
+  {
+    auto ciphers = ScopedFlagSetter<string>::Make(
+        &FLAGS_ssl_minimum_version, "tlsv1.3");
+    auto ciphersuites = ScopedFlagSetter<string>::Make(
+        &FLAGS_tls_ciphersuites, "not_a_ciphersuite");
+    MetricGroup metrics("webserver-test");
+    Webserver webserver("", FLAGS_webserver_port, &metrics);
+    ASSERT_FALSE(webserver.Start().ok());
+  }
+  {
+    auto ciphers = ScopedFlagSetter<string>::Make(
+        &FLAGS_ssl_minimum_version, "tlsv1.3");
+    auto ciphersuites = ScopedFlagSetter<string>::Make(
+        &FLAGS_tls_ciphersuites, "TLS_AES_256_GCM_SHA384");
+    MetricGroup metrics("webserver-test");
+    Webserver webserver("", FLAGS_webserver_port, &metrics);
+    ASSERT_OK(webserver.Start());
+  }
+}
+
+#endif // OPENSSL_VERSION_NUMBER
 
 TEST(Webserver, SslBadTlsVersion) {
   auto cert = ScopedFlagSetter<string>::Make(&FLAGS_webserver_certificate_file,
@@ -321,8 +355,10 @@ TEST(Webserver, SslGoodTlsVersion) {
       Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
   auto cmd = ScopedFlagSetter<string>::Make(
       &FLAGS_webserver_private_key_password_cmd, "echo password");
-
-#if OPENSSL_VERSION_NUMBER >= 0x10001000L
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+  auto versions = {"tlsv1", "tlsv1.1", "tlsv1.2", "tlsv1.3"};
+  vector <string> unsupported_versions = {};
+#elif OPENSSL_VERSION_NUMBER >= 0x10001000L
   auto versions = {"tlsv1", "tlsv1.1", "tlsv1.2"};
   vector<string> unsupported_versions = {};
 #else

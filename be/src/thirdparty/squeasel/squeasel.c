@@ -168,8 +168,12 @@ static const char *http_500_error = "Internal Server Error";
 #ifndef SSL_OP_NO_TLSv1_1
 #define SSL_OP_NO_TLSv1_1 0x10000000U
 #endif
+#ifndef SSL_OP_NO_TLSv1_2
+#define SSL_OP_NO_TLSv1_2 0x08000000U
+#endif
 
 #define OPENSSL_MIN_VERSION_WITH_TLS_1_1 0x10001000L
+#define OPENSSL_MIN_VERSION_WITH_TLS_1_3 0x10101000L
 
 static const char *month_names[] = {
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -230,7 +234,7 @@ enum {
   GLOBAL_PASSWORDS_FILE, INDEX_FILES, ENABLE_KEEP_ALIVE, ACCESS_CONTROL_LIST,
   EXTRA_MIME_TYPES, LISTENING_PORTS, DOCUMENT_ROOT, SSL_CERTIFICATE, SSL_PRIVATE_KEY,
   SSL_PRIVATE_KEY_PASSWORD, SSL_GLOBAL_INIT, NUM_THREADS, RUN_AS_USER, REWRITE,
-  HIDE_FILES, REQUEST_TIMEOUT, SSL_VERSION, SSL_CIPHERS, NUM_OPTIONS
+  HIDE_FILES, REQUEST_TIMEOUT, SSL_VERSION, SSL_CIPHERS, TLS_CIPHERSUITES, NUM_OPTIONS
 };
 
 static const char *config_options[] = {
@@ -264,6 +268,7 @@ static const char *config_options[] = {
   "request_timeout_ms", "30000",
   "ssl_min_version", "tlsv1",
   "ssl_ciphers", NULL,
+  "tls_ciphersuites", NULL,
   NULL
 };
 
@@ -3884,6 +3889,12 @@ static int set_ssl_option(struct sq_context *ctx) {
       return 0;
     }
     options |= (SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
+  } else if (sq_strcasecmp(ssl_version, "tlsv1.3") == 0) {
+    if (SSLeay() < OPENSSL_MIN_VERSION_WITH_TLS_1_3) {
+      cry(fc(ctx), "Unsupported TLS version: %s", ssl_version);
+      return 0;
+    }
+    options |= (SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1 | SSL_OP_NO_TLSv1_2);
   } else {
     cry(fc(ctx), "%s: unknown SSL version: %s", __func__, ssl_version);
     return 0;
@@ -3942,6 +3953,17 @@ static int set_ssl_option(struct sq_context *ctx) {
 
   if (pem != NULL) {
     (void) SSL_CTX_use_certificate_chain_file(ctx->ssl_ctx, pem);
+  }
+
+  if (ctx->config[TLS_CIPHERSUITES] != NULL) {
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+    // Set TLSv1.3 ciphers.
+    if (SSL_CTX_set_ciphersuites(ctx->ssl_ctx, ctx->config[TLS_CIPHERSUITES]) == 0) {
+      cry(fc(ctx), "SSL_CTX_set_ciphersuites: error setting ciphersuites (%s): %s",
+          ctx->config[TLS_CIPHERSUITES], ssl_error());
+      return 0;
+    }
+#endif
   }
 
   if (ctx->config[SSL_CIPHERS] != NULL) {

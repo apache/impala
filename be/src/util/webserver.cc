@@ -153,6 +153,7 @@ DECLARE_bool(is_coordinator);
 DECLARE_int64(max_cookie_lifetime_s);
 DECLARE_string(ssl_minimum_version);
 DECLARE_string(ssl_cipher_list);
+DECLARE_string(tls_ciphersuites);
 DECLARE_string(trusted_domain);
 DECLARE_bool(trusted_domain_use_xff_header);
 DECLARE_bool(jwt_token_auth);
@@ -432,6 +433,8 @@ Status Webserver::Start() {
       options.push_back("ssl_ciphers");
       options.push_back(FLAGS_ssl_cipher_list.c_str());
     }
+    options.push_back("tls_ciphersuites");
+    options.push_back(FLAGS_tls_ciphersuites.c_str());
   }
 
   if (!FLAGS_webserver_authentication_domain.empty()) {

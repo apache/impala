@@ -117,10 +117,9 @@ TEST_P(RpcMgrTest, CorrectPasswordTls) {
   tls_rpc_mgr.Shutdown();
 }
 
-#ifndef __aarch64__
 // Test with a bad TLS cipher and verify that an error is thrown.
 TEST_P(RpcMgrTest, BadCiphersTls) {
-  ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT, "", "not_a_cipher");
+  ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT, "", "not_a_cipher", "");
 
   RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
   NetworkAddressPB tls_krpc_address;
@@ -134,12 +133,11 @@ TEST_P(RpcMgrTest, BadCiphersTls) {
   ASSERT_FALSE(tls_rpc_mgr.Init(tls_krpc_address).ok());
   tls_rpc_mgr.Shutdown();
 }
-#endif
 
 // Test with a valid TLS cipher.
 TEST_P(RpcMgrTest, ValidCiphersTls) {
   ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT, "",
-      TLS1_0_COMPATIBLE_CIPHER);
+      TLS1_0_COMPATIBLE_CIPHER, "");
 
   RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
   NetworkAddressPB tls_krpc_address;
@@ -159,7 +157,7 @@ TEST_P(RpcMgrTest, ValidCiphersTls) {
 TEST_P(RpcMgrTest, ValidMultiCiphersTls) {
   const string cipher_list = Substitute("$0,$1", TLS1_0_COMPATIBLE_CIPHER,
       TLS1_0_COMPATIBLE_CIPHER_2);
-  ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT, "", cipher_list);
+  ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT, "", cipher_list, "");
 
   RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
   NetworkAddressPB tls_krpc_address;
@@ -174,6 +172,72 @@ TEST_P(RpcMgrTest, ValidMultiCiphersTls) {
   ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
   tls_rpc_mgr.Shutdown();
 }
+
+// TLS 1.3 tests only make sense on OpenSSL 1.1.1 and above
+// These tests set ssl_minimum_version="tlsv1.3". This is safe for these tests,
+// because KRPC supports a minimum version of tlsv1.3. It is not supported
+// in general.
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+
+// Test with a bad TLS cipher and verify that an error is thrown.
+TEST_P(RpcMgrTest, BadTlsCiphersuites) {
+  ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT, "", "",
+      "not_a_ciphersuite", "tlsv1.3");
+
+  RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
+  NetworkAddressPB tls_krpc_address;
+  IpAddr ip;
+  ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
+
+  int32_t tls_service_port = FindUnusedEphemeralPort();
+  tls_krpc_address = MakeNetworkAddressPB(ip, tls_service_port,
+      tls_rpc_mgr.GetUdsAddressUniqueId());
+
+  ASSERT_FALSE(tls_rpc_mgr.Init(tls_krpc_address).ok());
+  tls_rpc_mgr.Shutdown();
+}
+
+// Test with a valid TLS 1.3 ciphersuite.
+TEST_P(RpcMgrTest, ValidTlsCiphersuites) {
+  ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT, "",
+      "", TLS1_3_CIPHERSUITE, "tlsv1.3");
+
+  RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
+  NetworkAddressPB tls_krpc_address;
+  IpAddr ip;
+  ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
+
+  int32_t tls_service_port = FindUnusedEphemeralPort();
+  tls_krpc_address = MakeNetworkAddressPB(ip, tls_service_port,
+      tls_rpc_mgr.GetUdsAddressUniqueId());
+
+  ASSERT_OK(tls_rpc_mgr.Init(tls_krpc_address));
+  ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
+  tls_rpc_mgr.Shutdown();
+}
+
+// Test with multiple valid TLS 1.3 ciphersuites
+TEST_P(RpcMgrTest, ValidMultiTlsCiphersuite) {
+  const string ciphersuite_list = Substitute("$0:$1", TLS1_3_CIPHERSUITE,
+      TLS1_3_CIPHERSUITE_2);
+  ScopedSetTlsFlags s(SERVER_CERT, PRIVATE_KEY, SERVER_CERT, "", "",
+      ciphersuite_list, "tlsv1.3");
+
+  RpcMgr tls_rpc_mgr(IsInternalTlsConfigured());
+  NetworkAddressPB tls_krpc_address;
+  IpAddr ip;
+  ASSERT_OK(HostnameToIpAddr(FLAGS_hostname, &ip));
+
+  int32_t tls_service_port = FindUnusedEphemeralPort();
+  tls_krpc_address = MakeNetworkAddressPB(ip, tls_service_port,
+      tls_rpc_mgr.GetUdsAddressUniqueId());
+
+  ASSERT_OK(tls_rpc_mgr.Init(tls_krpc_address));
+  ASSERT_OK(RunMultipleServicesTest(&tls_rpc_mgr, tls_krpc_address));
+  tls_rpc_mgr.Shutdown();
+}
+
+#endif // OPENSSL_VERSION_NUMBER
 
 // Test behavior with a slow service.
 TEST_P(RpcMgrTest, SlowCallback) {

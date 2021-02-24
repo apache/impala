@@ -19,7 +19,10 @@
 
 #include <thrift/config.h>
 
+#include "kudu/security/security_flags.h"
+#include "kudu/util/openssl_util.h"
 #include "util/hash-util.h"
+#include "util/openssl-util.h"
 #include "util/time.h"
 #include "rpc/thrift-server.h"
 #include "gen-cpp/Data_types.h"
@@ -93,6 +96,93 @@ std::shared_ptr<TProtocol> CreateDeserializeProtocol(
     TBinaryProtocolFactoryT<TMemoryBuffer> tproto_factory;
     return tproto_factory.getProtocol(mem);
   }
+}
+
+void ImpalaTlsSocketFactory::configureCiphers(const string& cipher_list,
+    const string& tls_ciphersuites, bool disable_tls12) {
+  if (cipher_list.empty() &&
+      tls_ciphersuites == kudu::security::SecurityDefaults::kDefaultTlsCipherSuites &&
+      !disable_tls12) {
+    return;
+  }
+  if (ctx_.get() == nullptr) {
+    throw TSSLException("ImpalaSslSocketFactory was not properly initialized.");
+  }
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+  // Disabling TLS 1.2 only makes sense if OpenSSL supports TLS 1.3.
+  if (disable_tls12) {
+    SCOPED_OPENSSL_NO_PENDING_ERRORS;
+    // This is a setting used for testing TLS 1.3 cipher suites.
+    LOG(INFO) << "TLS 1.2 is disabled.";
+    long options = SSL_CTX_get_options(ctx_->get());
+    options |= SSL_OP_NO_TLSv1_2;
+    SSL_CTX_set_options(ctx_->get(), options);
+  }
+  if (tls_ciphersuites != kudu::security::SecurityDefaults::kDefaultTlsCipherSuites) {
+    SCOPED_OPENSSL_NO_PENDING_ERRORS;
+    if (tls_ciphersuites.empty()) {
+      LOG(INFO) << "TLS 1.3 cipher suites are disabled.";
+      // If there are no TLS 1.3 cipher suites, disable TLS 1.3. Otherwise, the
+      // client/server negotiates TLS 1.3 but then doesn't have any ciphers.
+      long options = SSL_CTX_get_options(ctx_->get());
+      options |= SSL_OP_NO_TLSv1_3;
+      SSL_CTX_set_options(ctx_->get(), options);
+    } else {
+      LOG(INFO) << "Enabling the following TLS 1.3 cipher suites for the "
+                << "ImpalaSslSocketFactory: "
+                << tls_ciphersuites;
+    }
+    int retval = SSL_CTX_set_ciphersuites(ctx_->get(), tls_ciphersuites.c_str());
+    const string& openssl_err = kudu::security::GetOpenSSLErrors();
+    if (retval <= 0 || !openssl_err.empty()) {
+      LOG(INFO) << "SSL_CTX_set_ciphersuites failed: "
+                << openssl_err;
+      throw TSSLException("SSL_CTX_set_ciphersuites: " + openssl_err);
+    }
+  }
+#endif
+
+  SCOPED_OPENSSL_NO_PENDING_ERRORS;
+  if (!cipher_list.empty()) {
+    LOG(INFO) << "Enabling the following TLS 1.2 and below ciphers for the "
+              << "ImpalaSslSocketFactory: "
+              << cipher_list;
+    TSSLSocketFactory::ciphers(cipher_list);
+  }
+
+  // The following was taken from be/src/kudu/security/tls_context.cc, bugs fixed here
+  // may also need to be fixed there.
+  // Enable ECDH curves. For OpenSSL 1.1.0 and up, this is done automatically.
+#ifndef OPENSSL_NO_ECDH
+#if OPENSSL_VERSION_NUMBER < 0x10002000L
+  // TODO: OpenSSL 1.0.1 is old. Centos 7.4 and above use 1.0.2. This probably can
+  // be removed.
+  // OpenSSL 1.0.1 and below only support setting a single ECDH curve at once.
+  // We choose prime256v1 because it's the first curve listed in the "modern
+  // compatibility" section of the Mozilla Server Side TLS recommendations,
+  // accessed Feb. 2017.
+  c_unique_ptr<EC_KEY> ecdh{
+      EC_KEY_new_by_curve_name(NID_X9_62_prime256v1), &EC_KEY_free};
+  if (ecdh == nullptr) {
+    throw TSSLException(
+        "failed to create prime256v1 curve: " + kudu::security::GetOpenSSLErrors());
+  }
+
+  int rc = SSL_CTX_set_tmp_ecdh(ctx_->get(), ecdh.get());
+  if (rc <= 0) {
+    throw TSSLException(
+        "failed to set ECDH curve: " + kudu::security::GetOpenSSLErrors());
+  }
+#elif OPENSSL_VERSION_NUMBER < 0x10100000L
+  // OpenSSL 1.0.2 provides the set_ecdh_auto API which internally figures out
+  // the best curve to use.
+  int rc = SSL_CTX_set_ecdh_auto(ctx_->get(), 1);
+  if (rc <= 0) {
+    throw TSSLException(
+        "failed to configure ECDH support: " + kudu::security::GetOpenSSLErrors());
+  }
+#endif
+#endif
 }
 
 static void ThriftOutputFunction(const char* output) {

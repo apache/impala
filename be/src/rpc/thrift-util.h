@@ -26,6 +26,7 @@
 #include <thrift/TApplicationException.h>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <thrift/transport/TBufferTransports.h>
+#include <thrift/transport/TSSLSocket.h>
 #include <thrift/transport/TTransportException.h>
 
 #include "common/status.h"
@@ -125,6 +126,19 @@ Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
   *len = *len - bytes_left;
   return Status::OK();
 }
+
+class ImpalaTlsSocketFactory : public apache::thrift::transport::TSSLSocketFactory {
+ public:
+  ImpalaTlsSocketFactory(apache::thrift::transport::SSLProtocol version)
+    : TSSLSocketFactory(version) {}
+
+  // 'cipher_list': TLS1.2 and below cipher list
+  // 'tls_ciphersuites': TLS1.3 and above cipher suites
+  // 'disable_tls12': Whether to disable TLS1.2 (used for testing TLS1.3).
+  void configureCiphers(const string& cipher_list, const string& tls_ciphersuites,
+      bool disable_tls12);
+};
+
 
 /// Redirects all Thrift logging to VLOG(1)
 void InitThriftLogging();
