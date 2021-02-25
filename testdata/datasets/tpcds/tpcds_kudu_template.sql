@@ -760,6 +760,18 @@ TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
 
 INSERT INTO {target_db_name}.income_band SELECT * FROM {source_db_name}.income_band;
 
+---- REASON
+CREATE TABLE IF NOT EXISTS {target_db_name}.reason (
+  r_reason_sk BIGINT PRIMARY KEY,
+  r_reason_id STRING,
+  r_reason_desc STRING
+)
+PARTITION BY HASH (r_reason_sk) PARTITIONS {buckets}
+STORED AS KUDU
+TBLPROPERTIES ('kudu.master_addresses'='{kudu_master}:7051');
+
+INSERT INTO {target_db_name}.reason SELECT * FROM {source_db_name}.reason;
+
 ---- SHIP_MODE
 CREATE TABLE IF NOT EXISTS {target_db_name}.ship_mode (
   sm_ship_mode_sk BIGINT PRIMARY KEY,
