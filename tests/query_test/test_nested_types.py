@@ -26,6 +26,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (
     SkipIfIsilon,
     SkipIfS3,
+    SkipIfGCS,
     SkipIfABFS,
     SkipIfADLS,
     SkipIfEC,
@@ -160,6 +161,7 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
 
   @SkipIfIsilon.hive
   @SkipIfS3.hive
+  @SkipIfGCS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfLocal.hive
@@ -218,6 +220,7 @@ class TestNestedTypesNoMtDop(ImpalaTestSuite):
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   @SkipIfS3.hive
+  @SkipIfGCS.hive
   @SkipIfHive2.acid
   def test_partitioned_table_acid(self, vector, unique_database):
     """IMPALA-6370: Test that a partitioned table with nested types can be scanned."""
@@ -719,6 +722,7 @@ class TestMaxNestingDepth(ImpalaTestSuite):
 
   @SkipIfIsilon.hive
   @SkipIfS3.hive
+  @SkipIfGCS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfLocal.hive

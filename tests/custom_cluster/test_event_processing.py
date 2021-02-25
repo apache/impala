@@ -22,7 +22,8 @@ import pytest
 from tests.common.skip import SkipIfHive2
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import HIVE_MAJOR_VERSION
-from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
+                               SkipIfGCS, SkipIfLocal)
 from tests.util.hive_utils import HiveDbWrapper
 from tests.util.event_processor_utils import EventProcessorUtils
 from tests.util.filesystem_utils import WAREHOUSE
@@ -31,6 +32,7 @@ from tests.util.filesystem_utils import WAREHOUSE
 @SkipIfS3.hive
 @SkipIfABFS.hive
 @SkipIfADLS.hive
+@SkipIfGCS.hive
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
 class TestEventProcessing(CustomClusterTestSuite):

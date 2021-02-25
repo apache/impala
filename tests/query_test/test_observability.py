@@ -20,7 +20,7 @@ from datetime import datetime
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfLocal, SkipIfNotHdfsMinicluster)
+                               SkipIfGCS, SkipIfLocal, SkipIfNotHdfsMinicluster)
 from tests.util.filesystem_utils import IS_EC
 from time import sleep
 from RuntimeProfile.ttypes import TRuntimeProfileFormat
@@ -92,6 +92,7 @@ class TestObservability(ImpalaTestSuite):
     self.hs2_client.close_query(handle)
 
   @SkipIfS3.hbase
+  @SkipIfGCS.hbase
   @SkipIfLocal.hbase
   @SkipIfIsilon.hbase
   @SkipIfABFS.hbase
@@ -671,6 +672,7 @@ class TestObservability(ImpalaTestSuite):
         cluster_properties)
 
   @SkipIfS3.hbase
+  @SkipIfGCS.hbase
   @SkipIfLocal.hbase
   @SkipIfIsilon.hbase
   @SkipIfABFS.hbase

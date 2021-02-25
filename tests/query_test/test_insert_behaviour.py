@@ -24,7 +24,8 @@ import re
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-    SkipIfLocal, SkipIfDockerizedCluster, SkipIfCatalogV2)
+                               SkipIfGCS, SkipIfLocal, SkipIfDockerizedCluster,
+                               SkipIfCatalogV2)
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path, IS_S3
 
 @SkipIfLocal.hdfs_client
@@ -133,6 +134,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     assert len(self.filesystem_client.ls(part_dir)) == 1
 
   @SkipIfS3.hdfs_acls
+  @SkipIfGCS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
@@ -195,6 +197,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     check_has_acls("p1=1/p2=2/p3=30", "default:group:new_leaf_group:-w-")
 
   @SkipIfS3.hdfs_acls
+  @SkipIfGCS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
@@ -248,6 +251,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, insert_query)
 
   @SkipIfS3.hdfs_acls
+  @SkipIfGCS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
@@ -330,6 +334,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     load_data(self.execute_query_expect_success, "added_part")
 
   @SkipIfS3.hdfs_acls
+  @SkipIfGCS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
@@ -363,6 +368,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     assert re.search(r'Impala does not have WRITE access.*' + table_path, str(err))
 
   @SkipIfS3.hdfs_acls
+  @SkipIfGCS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
@@ -444,6 +450,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, insert_query)
 
   @SkipIfS3.hdfs_acls
+  @SkipIfGCS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
@@ -570,6 +577,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_failure(self.client, insert_query)
 
   @SkipIfS3.hdfs_acls
+  @SkipIfGCS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls

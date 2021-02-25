@@ -65,6 +65,7 @@ public class FileSystemUtil {
   public static final String SCHEME_S3A = "s3a";
   public static final String SCHEME_O3FS = "o3fs";
   public static final String SCHEME_ALLUXIO = "alluxio";
+  public static final String SCHEME_GCS = "gs";
 
   /**
    * Set containing all FileSystem scheme that known to supports storage UUIDs in
@@ -89,6 +90,7 @@ public class FileSystemUtil {
           .add(SCHEME_HDFS)
           .add(SCHEME_S3A)
           .add(SCHEME_O3FS)
+          .add(SCHEME_GCS)
           .build();
 
   /**
@@ -101,6 +103,7 @@ public class FileSystemUtil {
           .add(SCHEME_ADL)
           .add(SCHEME_HDFS)
           .add(SCHEME_S3A)
+          .add(SCHEME_GCS)
           .build();
 
   /**
@@ -114,6 +117,7 @@ public class FileSystemUtil {
           .add(SCHEME_HDFS)
           .add(SCHEME_S3A)
           .add(SCHEME_O3FS)
+          .add(SCHEME_GCS)
           .build();
 
   /**
@@ -385,6 +389,13 @@ public class FileSystemUtil {
   }
 
   /**
+   * Returns true iff the filesystem is a GoogleHadoopFileSystem.
+   */
+  public static boolean isGCSFileSystem(FileSystem fs) {
+    return hasScheme(fs, SCHEME_GCS);
+  }
+
+  /**
    * Returns true iff the filesystem is AdlFileSystem.
    */
   public static boolean isADLFileSystem(FileSystem fs) {
@@ -491,7 +502,8 @@ public class FileSystemUtil {
     LOCAL,
     S3,
     OZONE,
-    ALLUXIO;
+    ALLUXIO,
+    GCS;
 
     private static final Map<String, FsType> SCHEME_TO_FS_MAPPING =
         ImmutableMap.<String, FsType>builder()
@@ -503,6 +515,7 @@ public class FileSystemUtil {
             .put(SCHEME_S3A, S3)
             .put(SCHEME_O3FS, OZONE)
             .put(SCHEME_ALLUXIO, ALLUXIO)
+            .put(SCHEME_GCS, GCS)
             .build();
 
     /**
@@ -676,7 +689,7 @@ public class FileSystemUtil {
         return new FilterIterator(p, new RecursingIterator(fs, p));
       }
       DebugUtils.executeDebugAction(debugAction, DebugUtils.REFRESH_HDFS_LISTING_DELAY);
-      return new FilterIterator(p, fs.listStatusIterator(p));
+      return new FilterIterator(p, listStatusIterator(fs, p));
     } catch (FileNotFoundException e) {
       if (LOG.isWarnEnabled()) LOG.warn("Path does not exist: " + p.toString(), e);
       return null;
@@ -695,6 +708,23 @@ public class FileSystemUtil {
       if (LOG.isWarnEnabled()) LOG.warn("Path does not exist: " + p.toString(), e);
       return null;
     }
+  }
+
+  /**
+   * Wrapper around FileSystem.listStatusIterator() to make sure the path exists.
+   *
+   * @throws FileNotFoundException if <code>p</code> does not exist
+   * @throws IOException if any I/O error occurredd
+   */
+  public static RemoteIterator<FileStatus> listStatusIterator(FileSystem fs, Path p)
+      throws IOException {
+    RemoteIterator<FileStatus> iterator = fs.listStatusIterator(p);
+    // Some FileSystem implementations like GoogleHadoopFileSystem doesn't check
+    // existence of the start path when creating the RemoteIterator. Instead, their
+    // iterators throw the FileNotFoundException in the first call of hasNext() when
+    // the start path doesn't exist. Here we call hasNext() to ensure start path exists.
+    iterator.hasNext();
+    return iterator;
   }
 
   /**
@@ -836,7 +866,7 @@ public class FileSystemUtil {
 
     private RecursingIterator(FileSystem fs, Path startPath) throws IOException {
       this.fs_ = Preconditions.checkNotNull(fs);
-      curIter_ = fs.listStatusIterator(Preconditions.checkNotNull(startPath));
+      curIter_ = listStatusIterator(fs, Preconditions.checkNotNull(startPath));
     }
 
     @Override
@@ -873,8 +903,9 @@ public class FileSystemUtil {
         curFile_ = fileStatus;
         return;
       }
+      RemoteIterator<FileStatus> iter = listStatusIterator(fs_, fileStatus.getPath());
       iters_.push(curIter_);
-      curIter_ = fs_.listStatusIterator(fileStatus.getPath());
+      curIter_ = iter;
       curFile_ = fileStatus;
     }
 

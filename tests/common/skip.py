@@ -31,6 +31,7 @@ from tests.common.kudu_test_suite import get_kudu_master_flag
 from tests.util.filesystem_utils import (
     IS_ABFS,
     IS_ADLS,
+    IS_GCS,
     IS_EC,
     IS_HDFS,
     IS_ISILON,
@@ -106,6 +107,26 @@ class SkipIfADLS:
       reason="Tests rely on HDFS qualified paths, IMPALA-1872")
   eventually_consistent = pytest.mark.skipif(IS_ADLS,
       reason="The client is slow to realize changes to file metadata")
+
+
+class SkipIfGCS:
+
+  # These are skipped due to product limitations.
+  caching = pytest.mark.skipif(IS_GCS, reason="SET CACHED not implemented for GCS")
+  hive = pytest.mark.skipif(IS_GCS, reason="Hive doesn't work with GCS")
+  hdfs_block_size = pytest.mark.skipif(IS_GCS, reason="GCS uses it's own block size")
+  hdfs_acls = pytest.mark.skipif(IS_GCS, reason="HDFS acls are not supported on GCS")
+  jira = partial(pytest.mark.skipif, IS_GCS)
+  hdfs_encryption = pytest.mark.skipif(IS_GCS,
+      reason="HDFS encryption is not supported with GCS")
+
+  # These need test infra work to re-enable.
+  hbase = pytest.mark.skipif(IS_GCS, reason="HBase not started with GCS")
+  qualified_path = pytest.mark.skipif(IS_GCS,
+      reason="Tests rely on HDFS qualified paths, IMPALA-1872")
+  variable_listing_times = pytest.mark.skipif(IS_GCS,
+      reason="Flakiness due to unpredictable listing times on GCS.")
+
 
 class SkipIfKudu:
   no_hybrid_clock = pytest.mark.skipif(

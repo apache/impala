@@ -119,6 +119,15 @@ if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
     echo "Copying the test-warehouse to s3 failed, aborting."
     exit 1
   fi
+elif [ "${TARGET_FILESYSTEM}" = "gs" ]; then
+  # Authenticate with the service account before using gsutil
+  gcloud auth activate-service-account --key-file "$GOOGLE_APPLICATION_CREDENTIALS"
+  # Parallelly(-m) upload files
+  if ! gsutil -m -q cp -r ${SNAPSHOT_STAGING_DIR}${TEST_WAREHOUSE_DIR} \
+      gs://${GCS_BUCKET}; then
+    echo "Copying the test-warehouse to GCS failed, aborting."
+    exit 1
+  fi
 else
     hadoop fs -put ${SNAPSHOT_STAGING_DIR}${TEST_WAREHOUSE_DIR}/* ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
 fi

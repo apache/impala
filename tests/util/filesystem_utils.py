@@ -31,6 +31,7 @@ IS_LOCAL = FILESYSTEM == "local"
 IS_HDFS = FILESYSTEM == "hdfs"
 IS_ADLS = FILESYSTEM == "adls"
 IS_ABFS = FILESYSTEM == "abfs"
+IS_GCS = FILESYSTEM == "gs"
 IS_EC = os.getenv("ERASURE_CODING") == "true"
 # This condition satisfies both the states where one can assume a default fs
 #   - The environment variable is set to an empty string.
@@ -56,7 +57,7 @@ ADLS_CLIENT_SECRET = os.getenv("azure_client_secret")
 
 # A map of FILESYSTEM values to their corresponding Scan Node types
 fs_to_name = {'s3': 'S3', 'hdfs': 'HDFS', 'local': 'LOCAL', 'adls': 'ADLS',
-              'abfs': 'ADLS'}
+              'abfs': 'ADLS', 'gs': 'GCS'}
 
 
 def get_fs_name(fs):

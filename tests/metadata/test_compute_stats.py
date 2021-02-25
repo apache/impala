@@ -22,7 +22,7 @@ from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-    SkipIfLocal, SkipIfCatalogV2)
+                               SkipIfGCS, SkipIfLocal, SkipIfCatalogV2)
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_single_exec_option_dimension,
@@ -114,6 +114,7 @@ class TestComputeStats(ImpalaTestSuite):
         self.execute_query_expect_success(self.client, "drop stats {0}".format(table))
 
   @SkipIfS3.hive
+  @SkipIfGCS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -193,6 +194,7 @@ class TestComputeStats(ImpalaTestSuite):
          assert("cardinality=0" not in explain_result.data[i + 2])
 
   @SkipIfS3.hive
+  @SkipIfGCS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -240,6 +242,7 @@ class TestComputeStats(ImpalaTestSuite):
             table_name, 2, 2)
 
   @SkipIfS3.hive
+  @SkipIfGCS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive

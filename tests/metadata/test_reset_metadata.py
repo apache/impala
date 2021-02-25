@@ -16,7 +16,7 @@
 # under the License.
 
 from test_ddl_base import TestDdlBase
-from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS,
+from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfGCS,
                                SkipIfIsilon, SkipIfLocal)
 
 
@@ -37,6 +37,7 @@ class TestResetMetadata(TestDdlBase):
     self.client.execute('refresh functions %s' % unique_database.upper())
 
   @SkipIfS3.hive
+  @SkipIfGCS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive

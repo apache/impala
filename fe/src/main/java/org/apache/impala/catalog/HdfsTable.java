@@ -770,7 +770,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * permissions Impala has on the given path. If the path does not exist, recurses up
    * the path until a existing parent directory is found, and inherit access permissions
    * from that.
-   * Always returns READ_WRITE for S3 and ADLS files.
+   * Always returns READ_WRITE for S3, ADLS and GCS files.
    */
   private static TAccessLevel getAvailableAccessLevel(String tableName,
       Path location, FsPermissionCache permCache) throws IOException {
@@ -818,6 +818,12 @@ public class HdfsTable extends Table implements FeFsTable {
     // permissions to hadoop users/groups (HADOOP-14437).
     if (FileSystemUtil.isADLFileSystem(fs)) return true;
     if (FileSystemUtil.isABFSFileSystem(fs)) return true;
+
+    // GCS IAM permissions don't map to POSIX permissions. GCS connector presents fake
+    // POSIX file permissions configured by the 'fs.gs.reported.permissions' property.
+    // So calling getPermissions() on GCS files make no sense. Assume all GCS files have
+    // READ_WRITE permissions.
+    if (FileSystemUtil.isGCSFileSystem(fs)) return true;
     return false;
   }
 

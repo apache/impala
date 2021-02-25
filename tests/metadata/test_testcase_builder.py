@@ -38,6 +38,9 @@ class TestTestcaseBuilder(ImpalaTestSuite):
 
   def test_query_without_from(self):
     tmp_path = get_fs_path("/tmp")
+    # Make sure /tmp dir exists
+    if not self.filesystem_client.exists(tmp_path):
+      self.filesystem_client.make_dir('tmp')
     # Generate Testcase Data for query without table reference
     testcase_generate_query = """COPY TESTCASE TO '%s' SELECT 5 * 20""" % tmp_path
     result = self.execute_query_expect_success(self.client, testcase_generate_query)

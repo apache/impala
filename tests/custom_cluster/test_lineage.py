@@ -26,7 +26,7 @@ import tempfile
 import time
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfABFS, SkipIfADLS, SkipIfS3
+from tests.common.skip import SkipIfABFS, SkipIfADLS, SkipIfS3, SkipIfGCS
 
 LOG = logging.getLogger(__name__)
 
@@ -152,6 +152,7 @@ class TestLineage(CustomClusterTestSuite):
   @SkipIfABFS.hbase
   @SkipIfADLS.hbase
   @SkipIfS3.hbase
+  @SkipIfGCS.hbase
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--lineage_event_log_dir={0}"
                                     .format(LINEAGE_TESTS_DIR))
