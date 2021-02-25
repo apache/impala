@@ -26,6 +26,7 @@ from tests.common.skip import (
     SkipIfIsilon,
     SkipIfLocal,
     SkipIfS3,
+    SkipIfGCS,
     SkipIfABFS,
     SkipIfADLS)
 from tests.common.test_vector import ImpalaTestDimension
@@ -79,6 +80,7 @@ class TestJoinQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/single-node-joins-with-limits-exhaustive', new_vector)
 
   @SkipIfS3.hbase
+  @SkipIfGCS.hbase
   @SkipIfABFS.hbase
   @SkipIfADLS.hbase
   @SkipIfIsilon.hbase

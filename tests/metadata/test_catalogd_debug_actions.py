@@ -17,10 +17,11 @@
 
 import pytest
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfGCS
 
 
 @SkipIfS3.variable_listing_times
+@SkipIfGCS.variable_listing_times
 class TestDebugActions(ImpalaTestSuite):
 
   @pytest.mark.execute_serially

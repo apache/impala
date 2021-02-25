@@ -35,7 +35,7 @@ from TCLIService import TCLIService
 from beeswaxd.BeeswaxService import QueryState
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import SkipIfNotHdfsMinicluster
+from tests.common.skip import SkipIfNotHdfsMinicluster, SkipIfGCS
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 
 LOG = logging.getLogger(__name__)
@@ -256,6 +256,7 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
   def get_workload(cls):
     return 'functional-query'
 
+  @SkipIfGCS.jira(reason="IMPALA-10562")
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--shutdown_grace_period_s={grace_period} \

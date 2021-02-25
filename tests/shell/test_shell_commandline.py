@@ -653,7 +653,9 @@ class TestImpalaShell(ImpalaTestSuite):
 
     assert "Error retrieving LDAP password" in result_1.stderr
     assert "command was: 'cmddoesntexist'" in result_1.stderr
-    assert "No such file or directory" in result_1.stderr
+    # On GCE instances, the error thrown in subprocess is "[Errno 13] Permission denied".
+    assert "No such file or directory" in result_1.stderr \
+        or "Permission denied" in result_1.stderr
 
     result_2 = run_impala_shell_cmd(vector,
                                     args + ['--ldap_password_cmd=cat filedoesntexist'],

@@ -29,7 +29,7 @@ from tests.common.environ import impalad_basedir
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIfEC, SkipIfIsilon, SkipIfLocal, SkipIfS3, SkipIfABFS,
-    SkipIfADLS)
+                               SkipIfADLS, SkipIfGCS)
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_result_verifier import verify_query_result_is_equal
 from tests.common.test_vector import ImpalaTestDimension
@@ -537,6 +537,7 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
 @SkipIfIsilon.hive
 @SkipIfLocal.hive
 @SkipIfS3.hive
+@SkipIfGCS.hive
 @SkipIfABFS.hive
 @SkipIfADLS.hive
 # TODO: Should we move this to test_parquet_stats.py?

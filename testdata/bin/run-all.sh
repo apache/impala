@@ -80,13 +80,13 @@ elif [[ ${DEFAULT_FS} == "${LOCAL_FS}" ]]; then
   $IMPALA_HOME/testdata/bin/run-hive-server.sh -only_metastore 2>&1 | \
       tee ${IMPALA_CLUSTER_LOGS_DIR}/run-hive-server.log
 else
-  # With Isilon, we only start the Hive metastore.
-  #   - HDFS is not started becuase Isilon is used as the defaultFs in core-site
-  #   - HBase is irrelevent for Impala testing with Isilon.
+  # With Isilon, ABFS, ADLS or GCS we only start the Hive metastore.
+  #   - HDFS is not started becuase remote storage is used as the defaultFs in core-site
+  #   - HBase is irrelevent for Impala testing with remote storage.
   #   - We don't yet have a good way to start YARN using a different defaultFS. Moreoever,
   #     we currently don't run hive queries against Isilon for testing.
   #   - LLAMA is avoided because we cannot start YARN.
-  #   - KMS is used for encryption testing, which is not available on Isilon.
+  #   - KMS is used for encryption testing, which is not available on remote storage.
   #   - Hive needs YARN, and we don't run Hive queries.
   # TODO: Figure out how to start YARN, LLAMA and Hive with a different defaultFs.
   echo " --> Starting Hive Metastore Service"

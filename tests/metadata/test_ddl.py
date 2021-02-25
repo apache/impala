@@ -27,7 +27,7 @@ from tests.common.environ import (HIVE_MAJOR_VERSION)
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIf, SkipIfABFS, SkipIfADLS, SkipIfKudu, SkipIfLocal,
-                               SkipIfCatalogV2, SkipIfHive2, SkipIfS3)
+                               SkipIfCatalogV2, SkipIfHive2, SkipIfS3, SkipIfGCS)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import (
     WAREHOUSE,
@@ -297,6 +297,7 @@ class TestDdlStatements(TestDdlBase):
 
   @SkipIfHive2.orc
   @SkipIfS3.hive
+  @SkipIfGCS.hive
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_create_table_like_file_orc(self, vector, unique_database):
     COMPLEXTYPETBL_PATH = 'test-warehouse/managed/complextypestbl_orc_def/'

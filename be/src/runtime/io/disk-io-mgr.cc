@@ -130,6 +130,9 @@ DEFINE_int32(num_abfs_io_threads, 16, "Number of ABFS I/O threads");
 // (~10 nodes), 64 threads would be more ideal.
 DEFINE_int32(num_adls_io_threads, 16, "Number of ADLS I/O threads");
 
+// The maximum number of GCS I/O threads. TODO: choose the default empirically.
+DEFINE_int32(num_gcs_io_threads, 16, "Number of GCS I/O threads");
+
 // The maximum number of Ozone I/O threads. TODO: choose the default empirically.
 DEFINE_int32(num_ozone_io_threads, 16, "Number of Ozone I/O threads");
 
@@ -465,6 +468,9 @@ Status DiskIoMgr::Init() {
     } else if (i == RemoteAdlsDiskId()) {
       num_threads_per_disk = FLAGS_num_adls_io_threads;
       device_name = "ADLS remote";
+    } else if (i == RemoteGcsDiskId()) {
+      num_threads_per_disk = FLAGS_num_gcs_io_threads;
+      device_name = "GCS remote";
     } else if (i == RemoteOzoneDiskId()) {
       num_threads_per_disk = FLAGS_num_ozone_io_threads;
       device_name = "Ozone remote";
@@ -820,12 +826,14 @@ int DiskIoMgr::AssignQueue(
     if (IsS3APath(file, check_default_fs)) return RemoteS3DiskId();
     if (IsABFSPath(file, check_default_fs)) return RemoteAbfsDiskId();
     if (IsADLSPath(file, check_default_fs)) return RemoteAdlsDiskId();
+    if (IsGcsPath(file, check_default_fs)) return RemoteGcsDiskId();
     if (IsOzonePath(file, check_default_fs)) return RemoteOzoneDiskId();
   }
   // Assign to a local disk queue.
   DCHECK(!IsS3APath(file, check_default_fs)); // S3 is always remote.
   DCHECK(!IsABFSPath(file, check_default_fs)); // ABFS is always remote.
   DCHECK(!IsADLSPath(file, check_default_fs)); // ADLS is always remote.
+  DCHECK(!IsGcsPath(file, check_default_fs)); // GCS is always remote.
   DCHECK(!IsOzonePath(file, check_default_fs)); // Ozone is always remote.
   if (disk_id == -1) {
     // disk id is unknown, assign it an arbitrary one.

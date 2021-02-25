@@ -189,6 +189,7 @@ export CDP_OZONE_VERSION=1.0.0.7.2.7.0-44
 export CDP_PARQUET_VERSION=1.10.99.7.2.7.0-44
 export CDP_RANGER_VERSION=2.1.0.7.2.7.0-44
 export CDP_TEZ_VERSION=0.9.1.7.2.7.0-44
+export CDP_GCS_VERSION=2.1.2.7.2.7.0-44
 
 export ARCH_NAME=$(uname -p)
 
@@ -252,6 +253,7 @@ export IMPALA_RANGER_URL=${CDP_RANGER_URL-}
 export IMPALA_TEZ_VERSION=${CDP_TEZ_VERSION}
 export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
 export IMPALA_HIVE_STORAGE_API_VERSION=${HIVE_STORAGE_API_VERSION_OVERRIDE:-"2.3.0.$IMPALA_HIVE_VERSION"}
+export IMPALA_GCS_VERSION=${CDP_GCS_VERSION}
 
 # Extract the first component of the hive version.
 # Allow overriding of Hive source location in case we want to build Impala without
@@ -349,6 +351,10 @@ export azure_client_secret="${azure_client_secret-DummyAdlsClientSecret}"
 export azure_data_lake_store_name="${azure_data_lake_store_name-}"
 export azure_storage_account_name="${azure_storage_account_name-}"
 export azure_storage_container_name="${azure_storage_container_name-}"
+export GOOGLE_CLOUD_PROJECT_ID="${GOOGLE_CLOUD_PROJECT_ID-}"
+export GOOGLE_CLOUD_SERVICE_ACCOUNT="${GOOGLE_CLOUD_SERVICE_ACCOUNT-}"
+export GOOGLE_APPLICATION_CREDENTIALS="${GOOGLE_APPLICATION_CREDENTIALS-}"
+export GCS_BUCKET="${GCS_BUCKET-}"
 export HDFS_REPLICATION="${HDFS_REPLICATION-3}"
 export ISILON_NAMENODE="${ISILON_NAMENODE-}"
 # Internal and external interfaces that test cluster services will listen on. The
@@ -493,6 +499,15 @@ elif [ "${TARGET_FILESYSTEM}" = "abfs" ]; then
   domain="${azure_storage_account_name}.dfs.core.windows.net"
   DEFAULT_FS="abfss://${azure_storage_container_name}@${domain}"
   export DEFAULT_FS
+elif [ "${TARGET_FILESYSTEM}" = "gs" ]; then
+  # Basic error checking
+  if [[ "${GOOGLE_APPLICATION_CREDENTIALS}" = "" ]]; then
+    echo "GOOGLE_APPLICATION_CREDENTIALS should be set to the JSON file that contains
+      your service account key."
+    return 1
+  fi
+  DEFAULT_FS="gs://${GCS_BUCKET}"
+  export DEFAULT_FS
 elif [ "${TARGET_FILESYSTEM}" = "isilon" ]; then
   if [ "${ISILON_NAMENODE}" = "" ]; then
     echo "In order to access the Isilon filesystem, ISILON_NAMENODE"
@@ -526,7 +541,7 @@ elif [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
   fi
 else
   echo "Unsupported filesystem '$TARGET_FILESYSTEM'"
-  echo "Valid values are: hdfs, isilon, s3, local"
+  echo "Valid values are: hdfs, isilon, s3, abfs, adls, gs, local"
   return 1
 fi
 
@@ -735,6 +750,7 @@ echo "IMPALA_HUDI_VERSION     = $IMPALA_HUDI_VERSION"
 echo "IMPALA_KUDU_VERSION     = $IMPALA_KUDU_VERSION"
 echo "IMPALA_RANGER_VERSION   = $IMPALA_RANGER_VERSION"
 echo "IMPALA_ICEBERG_VERSION  = $IMPALA_ICEBERG_VERSION"
+echo "IMPALA_GCS_VERSION      = $IMPALA_GCS_VERSION"
 
 # Kerberos things.  If the cluster exists and is kerberized, source
 # the required environment.  This is required for any hadoop tool to

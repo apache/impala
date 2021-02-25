@@ -64,6 +64,7 @@ from tests.util.filesystem_utils import (
     IS_S3,
     IS_ABFS,
     IS_ADLS,
+    IS_GCS,
     IS_HDFS,
     S3_BUCKET_NAME,
     S3GUARD_ENABLED,
@@ -198,6 +199,7 @@ class ImpalaTestSuite(BaseTestSuite):
     #     ABFS: uses the HDFS CLI
     #     ADLS: uses a mixture of azure-data-lake-store-python and the HDFS CLI (TODO:
     #           this should completely switch to the HDFS CLI once we test it)
+    #     GCS:  uses the HDFS CLI
     #
     # 'hdfs_client' is a HDFS-specific client library, and it only works when running on
     # HDFS. When using 'hdfs_client', the test must be skipped on everything other than
@@ -218,6 +220,9 @@ class ImpalaTestSuite(BaseTestSuite):
       cls.filesystem_client = HadoopFsCommandLineClient("ABFS")
     elif IS_ADLS:
       cls.filesystem_client = ADLSClient(ADLS_STORE_NAME)
+    elif IS_GCS:
+      # GCS is implemented via HDFS command line client
+      cls.filesystem_client = HadoopFsCommandLineClient("GCS")
 
     # Override the shell history path so that commands run by any tests
     # don't write any history into the developer's file.
@@ -996,10 +1001,10 @@ class ImpalaTestSuite(BaseTestSuite):
       tf_dimensions = ImpalaTestDimension('table_format', *table_formats)
     else:
       tf_dimensions = load_table_info_dimension(cls.get_workload(), exploration_strategy)
-    # If 'skip_hbase' is specified or the filesystem is isilon, s3 or local, we don't
-    # need the hbase dimension.
+    # If 'skip_hbase' is specified or the filesystem is isilon, s3, GCS(gs) or local,
+    # we don't need the hbase dimension.
     if pytest.config.option.skip_hbase or TARGET_FILESYSTEM.lower() \
-        in ['s3', 'isilon', 'local', 'abfs', 'adls']:
+        in ['s3', 'isilon', 'local', 'abfs', 'adls', 'gs']:
       for tf_dimension in tf_dimensions:
         if tf_dimension.value.file_format == "hbase":
           tf_dimensions.remove(tf_dimension)

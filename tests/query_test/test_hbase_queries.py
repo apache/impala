@@ -22,6 +22,7 @@ import pytest
 from tests.common.skip import (
     SkipIfIsilon,
     SkipIfS3,
+    SkipIfGCS,
     SkipIfABFS,
     SkipIfADLS,
     SkipIfLocal)
@@ -66,6 +67,7 @@ class TestHBaseQueries(ImpalaTestSuite):
 
   @SkipIfIsilon.hive
   @SkipIfS3.hive
+  @SkipIfGCS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfLocal.hive

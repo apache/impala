@@ -20,7 +20,7 @@
 import pytest
 from tests.common.file_utils import create_table_and_copy_files
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfLocal
+from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfLocal, SkipIfGCS
 from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
     create_client_protocol_dimension, hs2_parquet_constraint)
 from tests.shell.util import ImpalaShell
@@ -71,6 +71,7 @@ class TestDateQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/date-partitioning', vector, use_db=unique_database)
 
   @SkipIfS3.qualified_path
+  @SkipIfGCS.qualified_path
   @SkipIfABFS.qualified_path
   @SkipIfADLS.qualified_path
   @SkipIfLocal.qualified_path

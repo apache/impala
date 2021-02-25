@@ -24,7 +24,8 @@ from subprocess import call
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon, SkipIfLocal
+from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
+                               SkipIfGCS, SkipIfLocal)
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.test_file_parser import QueryTestSectionReader
 
@@ -48,6 +49,7 @@ from tests.util.test_file_parser import QueryTestSectionReader
 # Missing Coverage: Views created by Hive and Impala being visible and queryble by each
 # other on non hdfs storage.
 @SkipIfS3.hive
+@SkipIfGCS.hive
 @SkipIfABFS.hive
 @SkipIfADLS.hive
 @SkipIfIsilon.hive

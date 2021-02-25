@@ -34,7 +34,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.errors import Timeout
-from tests.common.skip import SkipIfEC, SkipIfBuildType
+from tests.common.skip import SkipIfEC, SkipIfBuildType, SkipIfGCS
 from tests.common.skip import SkipIfNotHdfsMinicluster
 
 # The BE krpc port of the impalad to simulate rpc or disk errors in tests.
@@ -283,6 +283,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.client.close_query(handle)
     self.__validate_web_ui_state()
 
+  @SkipIfGCS.jira(reason="IMPALA-10562")
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -348,6 +349,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.client.close_query(handle)
     self.__validate_web_ui_state()
 
+  @SkipIfGCS.jira(reason="IMPALA-10562")
   @SkipIfBuildType.not_dev_build
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

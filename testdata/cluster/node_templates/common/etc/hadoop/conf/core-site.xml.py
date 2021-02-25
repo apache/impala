@@ -92,6 +92,12 @@ CONFIG = {
   # buckets and rely on the old behavior. This also means that the tests do not
   # require AWS credentials.
   'fs.s3a.bucket.probe': '1',
+
+  # GCS IAM permissions don't map to POSIX permissions required by Hadoop FileSystem,
+  # so the GCS connector presents fake POSIX file permissions. The default 700 may end up
+  # being too restrictive for some processes performing file-based checks, e.g.
+  # HiveServer2 requires permission of /tmp/hive to be at lest 733.
+  'fs.gs.reported.permissions': '777',
 }
 
 if target_filesystem == 's3':

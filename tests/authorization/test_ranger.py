@@ -28,7 +28,7 @@ from subprocess import check_call
 from getpass import getuser
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfLocal, SkipIfHive2)
+                               SkipIfLocal, SkipIfHive2, SkipIfGCS)
 from tests.util.hdfs_util import NAMENODE
 from tests.util.calculation_util import get_random_id
 
@@ -1049,6 +1049,7 @@ class TestRanger(CustomClusterTestSuite):
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   @SkipIfS3.hive
+  @SkipIfGCS.hive
   @SkipIfHive2.ranger_auth
   @CustomClusterTestSuite.with_args()
   def test_hive_with_ranger_setup(self, vector):

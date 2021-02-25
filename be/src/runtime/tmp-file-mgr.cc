@@ -278,6 +278,7 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
       s3a_options_ = {make_pair("fs.s3a.fast.upload", "true"),
           make_pair("fs.s3a.fast.upload.buffer", "disk")};
     } else {
+      // TODO(IMPALA-10561): Add support for spilling to GCS
       prefix = "";
       tmp_dirs_without_prefix = tmp_dir_spec_trimmed.substr(0);
     }
