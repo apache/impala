@@ -46,7 +46,42 @@ under the License.
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
-<codeblock>NDV([DISTINCT | ALL] <varname>expression</varname>)</codeblock>
+<codeblock>NDV([DISTINCT | ALL] <varname>expression</varname> [,scale])</codeblock>
+
+    <note> The optional argument <codeph>scale</codeph> must be an integer and can be in the range
+      from 1 to 10 and maps to a precision used by the HyperLogLog (HLL) algorithm with the
+      following mapping formula:</note>
+
+    <p><codeblock>precision = scale + 8</codeblock></p>
+
+    <p>
+      Therefore a scale of 1 is mapped to a precision of 9 and a scale of 10 is mapped to a
+      precision of 18.
+    </p>
+
+    <p>
+      Without the optional argument, the precision which determines the total number
+      of different estimators in the HLL algorithm will be still 10.
+    </p>
+
+    <p>
+      A large precision value generally produces a better estimation with less error than a small
+      precision value. This is due to the extra number of estimators involved. The expense is at the
+      need of extra memory. For a given precision p, the amount of memory used by the HLL algorithm
+      is in the order of 2^p bytes.
+    </p>
+
+    <p>
+      When provided a scale of 10 against a total of 22 distinct data sets loaded into external
+      Impala tables, the error will be computed as
+      abs(&lt;true_unique_value> - &lt;estimated_unique_value>) / &lt;true_unique_value>
+    </p>
+
+    <p>
+      The scale of 10, mapped to the precision of 18, yielded the worst estimation error at 0.42%
+      (for one set of 10 million integers), and average error no more than 0.17%. This was at the
+      cost of 256Kb of memory for the internal data structure per evaluation of the HLL algorithm.
+    </p>
 
     <p conref="../shared/impala_common.xml#common/usage_notes_blurb"/>
 
