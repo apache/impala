@@ -417,7 +417,7 @@ struct TQueryOptions {
   100: optional bool enable_cnf_rewrites = true;
 
   // See comment in ImpalaService.thrift
-  101: optional i32 max_cnf_exprs = 0;
+  101: optional i32 max_cnf_exprs = 200;
 
   // See comment in ImpalaService.thrift
   102: optional i64 kudu_snapshot_read_timestamp_micros = 0;

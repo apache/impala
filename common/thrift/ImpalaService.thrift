@@ -514,7 +514,7 @@ enum TImpalaQueryOptions {
 
   // The max number of conjunctive normal form (CNF) exprs to create when converting
   // a disjunctive expression to CNF. Each AND counts as 1 expression. A value of
-  // -1 or 0 means no limit. Default is 0 (unlimited).
+  // -1 or 0 means no limit. Default is 200.
   MAX_CNF_EXPRS = 100
 
   // Set the timestamp for Kudu snapshot reads in Unix time micros. Only valid if
