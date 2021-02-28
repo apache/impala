@@ -506,8 +506,8 @@ ScanRange* ScanRange::AllocateScanRange(ObjectPool* obj_pool, hdfsFS fs, const c
   DCHECK_GE(disk_id, -1);
   DCHECK_GE(offset, 0);
   DCHECK_GE(len, 0);
-  disk_id =
-      ExecEnv::GetInstance()->disk_io_mgr()->AssignQueue(file, disk_id, expected_local);
+  disk_id = ExecEnv::GetInstance()->disk_io_mgr()->AssignQueue(
+      file, disk_id, expected_local, /* check_default_fs */ true);
   ScanRange* range = obj_pool->Add(new ScanRange);
   range->Reset(fs, file, len, offset, disk_id, expected_local, mtime, buffer_opts,
       move(sub_ranges), metadata);
