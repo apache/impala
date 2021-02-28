@@ -1757,4 +1757,32 @@ TEST_F(TmpFileMgrTest, TestTmpFileBufferPoolOneWriteDone) {
   TestTmpFileBufferPoolTearDown(tmp_file_mgr);
 }
 
+/// Test setting a remote fs for the default fs, but should not affect the spilling.
+TEST_F(TmpFileMgrTest, TestSpillingWithRemoteDefaultFS) {
+  vector<string> tmp_dirs({"/tmp/tmp-file-mgr-test.1"});
+  TmpFileMgr tmp_file_mgr;
+  RemoveAndCreateDirs(tmp_dirs);
+  string org_default_fs = test_env_->exec_env()->default_fs();
+  string fake_remote_default_fs = "s3a://fake_s3";
+  test_env_->SetDefaultFS(fake_remote_default_fs);
+
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  string data = "arbitrary data";
+  MemRange data_mem_range(reinterpret_cast<uint8_t*>(&data[0]), data.size());
+
+  unique_ptr<TmpWriteHandle> handle;
+  WriteRange::WriteDoneCallback callback = [this](const Status& status) {
+    EXPECT_TRUE(status.ok());
+    SignalCallback(status);
+  };
+  ASSERT_OK(file_group.Write(data_mem_range, callback, &handle));
+  WaitForWrite(handle.get());
+  WaitForCallbacks(1);
+  file_group.Close();
+  test_env_->SetDefaultFS(org_default_fs);
+  test_env_->TearDownQueries();
+}
+
 } // namespace impala

@@ -810,22 +810,23 @@ Status DiskIoMgr::WriteRangeHelper(FILE* file_handle, WriteRange* write_range) {
   return Status::OK();
 }
 
-int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {
+int DiskIoMgr::AssignQueue(
+    const char* file, int disk_id, bool expected_local, bool check_default_fs) {
   // If it's a remote range, check for an appropriate remote disk queue.
   if (!expected_local) {
-    if (IsHdfsPath(file) && FLAGS_num_remote_hdfs_io_threads > 0) {
+    if (IsHdfsPath(file, check_default_fs) && FLAGS_num_remote_hdfs_io_threads > 0) {
       return RemoteDfsDiskId();
     }
-    if (IsS3APath(file)) return RemoteS3DiskId();
-    if (IsABFSPath(file)) return RemoteAbfsDiskId();
-    if (IsADLSPath(file)) return RemoteAdlsDiskId();
-    if (IsOzonePath(file)) return RemoteOzoneDiskId();
+    if (IsS3APath(file, check_default_fs)) return RemoteS3DiskId();
+    if (IsABFSPath(file, check_default_fs)) return RemoteAbfsDiskId();
+    if (IsADLSPath(file, check_default_fs)) return RemoteAdlsDiskId();
+    if (IsOzonePath(file, check_default_fs)) return RemoteOzoneDiskId();
   }
   // Assign to a local disk queue.
-  DCHECK(!IsS3APath(file)); // S3 is always remote.
-  DCHECK(!IsABFSPath(file)); // ABFS is always remote.
-  DCHECK(!IsADLSPath(file)); // ADLS is always remote.
-  DCHECK(!IsOzonePath(file)); // Ozone is always remote.
+  DCHECK(!IsS3APath(file, check_default_fs)); // S3 is always remote.
+  DCHECK(!IsABFSPath(file, check_default_fs)); // ABFS is always remote.
+  DCHECK(!IsADLSPath(file, check_default_fs)); // ADLS is always remote.
+  DCHECK(!IsOzonePath(file, check_default_fs)); // Ozone is always remote.
   if (disk_id == -1) {
     // disk id is unknown, assign it an arbitrary one.
     disk_id = next_disk_id_.Add(1);

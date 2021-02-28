@@ -52,6 +52,9 @@ class TestEnv {
   /// If not called, a process memory tracker with no limit is created.
   void SetProcessMemTrackerArgs(int64_t bytes_limit, bool use_metrics);
 
+  /// Set the Default FS of ExecEnv.
+  void SetDefaultFS(const string& fs) { exec_env_->default_fs_ = fs; }
+
   /// Initialize the TestEnv with the specified arguments.
   Status Init();
 

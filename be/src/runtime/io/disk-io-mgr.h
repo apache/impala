@@ -288,8 +288,10 @@ class DiskIoMgr : public CacheLineAligned {
   /// Determine which disk queue this file should be assigned to.  Returns an index into
   /// disk_queues_.  The disk_id is the volume ID for the local disk that holds the
   /// files, or -1 if unknown.  Flag expected_local is true iff this impalad is
-  /// co-located with the datanode for this file.
-  int AssignQueue(const char* file, int disk_id, bool expected_local = false);
+  /// co-located with the datanode for this file. Flag check_default_fs is false iff
+  /// the file is a temporary file.
+  int AssignQueue(
+      const char* file, int disk_id, bool expected_local, bool check_default_fs);
 
   int64_t min_buffer_size() const { return min_buffer_size_; }
   int64_t max_buffer_size() const { return max_buffer_size_; }

@@ -657,10 +657,14 @@ TmpFile::TmpFile(
     blacklisted_(false) {}
 
 int TmpFile::AssignDiskQueue(bool is_local_buffer) const {
+  // The file paths of TmpFiles are absolute paths, doesn't support default fs.
   if (is_local_buffer) {
-    return file_group_->io_mgr_->AssignQueue(local_buffer_path_.c_str(), -1, true);
+    // Assign a disk queue for a local buffer, which is associated with a remote file.
+    return file_group_->io_mgr_->AssignQueue(local_buffer_path_.c_str(),
+        /* disk_id */ -1, /* expected_local */ true, /* check_default_fs */ false);
   }
-  return file_group_->io_mgr_->AssignQueue(path_.c_str(), disk_id_, expected_local_);
+  return file_group_->io_mgr_->AssignQueue(
+      path_.c_str(), disk_id_, expected_local_, /* check_default_fs */ false);
 }
 
 bool TmpFile::Blacklist(const ErrorMsg& msg) {
@@ -1518,6 +1522,8 @@ Status TmpWriteHandle::Write(RequestContext* io_ctx, MemRange buffer,
 
   // Set all member variables before calling AddWriteRange(): after it succeeds,
   // WriteComplete() may be called concurrently with the remainder of this function.
+  // If the TmpFile is not local, the disk queue assigned should be for the
+  // buffer.
   data_len_ = buffer.len();
   file_ = tmp_file;
   write_range_.reset(new WriteRange(tmp_file->path(), file_offset,
