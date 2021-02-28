@@ -143,6 +143,10 @@ class TmpFileMgrTest : public ::testing::Test {
     }
   }
 
+  void RemoveDirs(const vector<string>& dirs) {
+    ASSERT_OK(FileSystemUtil::RemovePaths(dirs));
+  }
+
   /// Helper to call the private CreateFiles() method and return
   /// the created files.
   static Status CreateFiles(
@@ -1785,4 +1789,33 @@ TEST_F(TmpFileMgrTest, TestSpillingWithRemoteDefaultFS) {
   test_env_->TearDownQueries();
 }
 
+/// Test writing a single record to a remote dir with local buffer, create an IO error
+/// to trigger writing failed.
+TEST_F(TmpFileMgrTest, TestRemoteRemoveBuffer) {
+  vector<string> tmp_dirs({LOCAL_BUFFER_PATH});
+  TmpFileMgr tmp_file_mgr;
+  RemoveAndCreateDirs(tmp_dirs);
+  tmp_dirs.push_back(REMOTE_URL);
+
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  string data = "arbitrary data";
+  MemRange data_mem_range(reinterpret_cast<uint8_t*>(&data[0]), data.size());
+
+  unique_ptr<TmpWriteHandle> handle;
+  WriteRange::WriteDoneCallback callback = [this](const Status& status) {
+    EXPECT_FALSE(status.ok());
+    EXPECT_TRUE(status.IsDiskIoError());
+    SignalCallback(status);
+  };
+  // Remove the buffer before the write to create an IO Error.
+  vector<string> buffer_dirs({LOCAL_BUFFER_PATH});
+  RemoveDirs(buffer_dirs);
+  ASSERT_OK(file_group.Write(data_mem_range, callback, &handle));
+  WaitForWrite(handle.get());
+  WaitForCallbacks(1);
+  file_group.Close();
+  test_env_->TearDownQueries();
+}
 } // namespace impala

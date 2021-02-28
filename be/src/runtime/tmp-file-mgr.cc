@@ -1379,6 +1379,11 @@ Status TmpFileGroup::RecoverWriteError(
     return write_status;
   }
 
+  // We don't recover the errors generated during spilling to a remote file.
+  if (handle->file_->disk_type() != io::DiskFileType::LOCAL) {
+    return write_status;
+  }
+
   // Save and report the error before retrying so that the failure isn't silent.
   {
     lock_guard<SpinLock> lock(lock_);
