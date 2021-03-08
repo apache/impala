@@ -619,7 +619,8 @@ User doesn't have permissions to grant role grant_revoke_test_NON_OWNER
 admin
 ---- QUERY
 # Revoke the GRANT OPTION and verify the user can no longer GRANT or REVOKE
-revoke grant option for all on database functional from grant_revoke_test_NON_OWNER
+revoke grant option for all on database functional from grant_revoke_test_NON_OWNER;
+refresh authorization;
 ====
 ---- USER
 non_owner
