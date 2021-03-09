@@ -246,6 +246,8 @@ public class BackendConfig {
 
   public boolean getSaml2EETestMode() { return backendCfg_.saml2_ee_test_mode; }
 
+  public String getScratchDirs() { return backendCfg_.scratch_dirs; }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local
