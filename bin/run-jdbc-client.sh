@@ -18,4 +18,5 @@
 # under the License.
 
 . ${IMPALA_HOME}/bin/set-classpath.sh test
+CLASSPATH=${IMPALA_JDBC_DRIVER_CLASSPATH}:${CLASSPATH}
 "$JAVA" -cp $CLASSPATH org.apache.impala.testutil.ImpalaJdbcClient "$@"
