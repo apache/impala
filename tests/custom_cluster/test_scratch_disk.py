@@ -19,6 +19,7 @@
 
 import os
 import pytest
+import re
 import shutil
 import stat
 import tempfile
@@ -114,15 +115,17 @@ class TestScratchDir(CustomClusterTestSuite):
         "Running without spill to disk: no scratch directories provided\.")
     exec_option = vector.get_value('exec_option')
     exec_option['buffer_pool_limit'] = self.buffer_pool_limit
-    # IMPALA-9856: Disable query result spooling so that in_mem_query does not spill to
-    # disk.
-    exec_option['spool_query_results'] = '0'
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
     # Expect spill to disk to fail
     self.execute_query_expect_failure(client, self.spill_query, exec_option)
     # Should be able to execute in-memory query
-    self.execute_query_expect_success(client, self.in_mem_query, exec_option)
+    result = self.execute_query_expect_success(client, self.in_mem_query, exec_option)
+    # IMPALA-10565: Since scratch_dirs is empty, we expect planner to disable result
+    # spooling.
+    query_options_by_planner = ".*set by configuration and planner" \
+                               ".*SPOOL_QUERY_RESULTS=0"
+    assert re.search(query_options_by_planner, result.runtime_profile)
 
   @pytest.mark.execute_serially
   def test_non_writable_dirs(self, vector):

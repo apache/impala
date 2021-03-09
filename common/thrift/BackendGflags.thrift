@@ -189,4 +189,6 @@ struct TBackendGflags {
   82: required string saml2_group_filter
 
   83: required bool saml2_ee_test_mode
+
+  84: required string scratch_dirs
 }

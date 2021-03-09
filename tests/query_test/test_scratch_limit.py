@@ -126,3 +126,11 @@ class TestScratchLimit(ImpalaTestSuite):
     exec_option['scratch_limit'] = '0'
     for query in self.spilling_queries:
       self.execute_query_expect_success(self.client, query, exec_option)
+
+  def test_result_spooling_and_varying_scratch_limit(self, vector):
+    """
+    IMPALA-9856 make result spooling default. Since result spooling depends on ability to
+    spill to disk, query option scratch_limit may affect memory configuration of result
+    spooling feature. This test vary scratch_limit and verify the memory adjustment.
+    """
+    self.run_test_case('QueryTest/scratch-limit', vector)
