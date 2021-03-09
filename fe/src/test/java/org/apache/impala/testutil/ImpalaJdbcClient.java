@@ -18,6 +18,7 @@
 package org.apache.impala.testutil;
 
 import java.sql.Connection;
+import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -30,6 +31,7 @@ import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
@@ -85,13 +87,23 @@ public class ImpalaJdbcClient {
     }
   }
 
-  public void connect() throws ClassNotFoundException, SQLException {
+  public void connect() throws ClassNotFoundException, SQLException,
+      ImpalaRuntimeException {
     LOG.info("Using JDBC Driver Name: " + driverName_);
     LOG.info("Connecting to: " + connString_);
 
     // Make sure the driver can be found, throws a ClassNotFoundException if
     // it is not available.
     Class.forName(driverName_);
+    Driver d = DriverManager.getDriver(connString_);
+    String driverClassName = d.getClass().getName();
+    if (!driverClassName.equals(driverName_)) {
+      throw new ImpalaRuntimeException(String.format(
+          "Specified driver is %s, but for the given connection string %s the "+
+          "selected driver is %s. You might want to specify a different connection " +
+          "string with option -c.",
+          driverName_, connString_, driverClassName));
+    }
     conn_ = DriverManager.getConnection(connString_);
     stmt_ = conn_.createStatement();
   }
@@ -335,7 +347,7 @@ public class ImpalaJdbcClient {
    * separated.
    */
   public static void main(String[] args) throws SQLException, ClassNotFoundException,
-        ParseException {
+        ParseException, ImpalaRuntimeException {
     // Remove all prefixes from the logging output to make it easier to parse and disable
     // the root logger from spewing anything. This is done to make it easier to parse
     // the output.
