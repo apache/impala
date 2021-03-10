@@ -218,10 +218,10 @@ int main(int argc, char** argv) {
   }
 
   // Start up server and client shell
-  boost::shared_ptr<TestServer> handler(new TestServer);
-  boost::shared_ptr<ThreadFactory> thread_factory(
+  std::shared_ptr<TestServer> handler(new TestServer);
+  std::shared_ptr<ThreadFactory> thread_factory(
       new ThriftThreadFactory("test", "test"));
-  boost::shared_ptr<TProcessor> processor(new NetworkTestServiceProcessor(handler));
+  std::shared_ptr<TProcessor> processor(new NetworkTestServiceProcessor(handler));
   ThriftServer* server;
   ABORT_IF_ERROR(ThriftServerBuilder("Network Test Server", processor, FLAGS_port)
                      .max_concurrent_connections(100)

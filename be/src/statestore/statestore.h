@@ -166,7 +166,7 @@ class Statestore : public CacheLineAligned {
   void ShutdownForTesting();
 
   /// Returns the Thrift API interface that proxies requests onto the local Statestore.
-  const boost::shared_ptr<StatestoreServiceIf>& thrift_iface() const {
+  const std::shared_ptr<StatestoreServiceIf>& thrift_iface() const {
     return thrift_iface_;
   }
 
@@ -586,7 +586,7 @@ class Statestore : public CacheLineAligned {
   MetricGroup* metrics_;
 
   /// Thrift API implementation which proxies requests onto this Statestore
-  boost::shared_ptr<StatestoreServiceIf> thrift_iface_;
+  std::shared_ptr<StatestoreServiceIf> thrift_iface_;
 
   /// Failure detector for subscribers. If a subscriber misses a configurable number of
   /// consecutive heartbeat messages, it is considered failed and a) its transient topic

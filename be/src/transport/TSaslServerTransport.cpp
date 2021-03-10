@@ -42,7 +42,7 @@ DEFINE_int32(sasl_connect_tcp_timeout_ms, 300000, "(Advanced) The underlying TSo
 using namespace sasl;
 
 namespace apache { namespace thrift { namespace transport {
-TSaslServerTransport::TSaslServerTransport(boost::shared_ptr<TTransport> transport)
+TSaslServerTransport::TSaslServerTransport(std::shared_ptr<TTransport> transport)
    : TSaslTransport(transport) {
 }
 
@@ -53,7 +53,7 @@ TSaslServerTransport::TSaslServerTransport(const string& mechanism,
                                            unsigned flags,
                                            const map<string, string>& props,
                                            const vector<struct sasl_callback>& callbacks,
-                                           boost::shared_ptr<TTransport> transport)
+                                           std::shared_ptr<TTransport> transport)
      : TSaslTransport(transport) {
   addServerDefinition(mechanism, protocol, serverName, realm, flags,
       props, callbacks);
@@ -61,7 +61,7 @@ TSaslServerTransport::TSaslServerTransport(const string& mechanism,
 
 TSaslServerTransport:: TSaslServerTransport(
     const std::map<std::string, TSaslServerDefinition*>& serverMap,
-    boost::shared_ptr<TTransport> transport)
+    std::shared_ptr<TTransport> transport)
     : TSaslTransport(transport) {
   serverDefinitionMap_.insert(serverMap.begin(), serverMap.end());
 }
@@ -127,8 +127,8 @@ void TSaslServerTransport::handleSaslStartMessage() {
 
 }
 
-boost::shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
-    boost::shared_ptr<TTransport> trans) {
+std::shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
+    std::shared_ptr<TTransport> trans) {
   // Thrift servers use both an input and an output transport to communicate with
   // clients. In principal, these can be different, but for SASL clients we require them
   // to be the same so that the authentication state is identical for communication in
@@ -149,7 +149,7 @@ boost::shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   // ensure that when ret_transport is eventually deleted, its corresponding map entry is
   // removed. That is likely to be error prone given the locking involved; for now we go
   // with the simple solution.
-  boost::shared_ptr<TBufferedTransport> ret_transport;
+  std::shared_ptr<TBufferedTransport> ret_transport;
   {
     lock_guard<mutex> l(transportMap_mutex_);
     TransportMap::iterator trans_map = transportMap_.find(trans);
@@ -161,7 +161,7 @@ boost::shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
     // This method should never be called concurrently with the same 'trans' object.
     // Therefore, it is safe to drop the transportMap_mutex_ here.
   }
-  boost::shared_ptr<TTransport> wrapped(
+  std::shared_ptr<TTransport> wrapped(
       new TSaslServerTransport(serverDefinitionMap_, trans));
   // Set socket timeouts to prevent TSaslServerTransport->open from blocking the server
   // from accepting new connections if a read/write blocks during the handshake

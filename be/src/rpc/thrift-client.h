@@ -82,7 +82,7 @@ class ThriftClientImpl {
 
   /// Sasl Client object.  Contains client kerberos identification data.
   /// Will be NULL if kerberos is not being used.
-  boost::shared_ptr<sasl::TSasl> sasl_client_;
+  std::shared_ptr<sasl::TSasl> sasl_client_;
 
   /// This factory sets up the openSSL library state and needs to be alive as long as its
   /// owner(a ThriftClientImpl instance) does. Otherwise the OpenSSL state is lost
@@ -90,9 +90,9 @@ class ThriftClientImpl {
   boost::scoped_ptr<apache::thrift::transport::TSSLSocketFactory> ssl_factory_;
 
   /// All shared pointers, because Thrift requires them to be
-  boost::shared_ptr<apache::thrift::transport::TSocket> socket_;
-  boost::shared_ptr<apache::thrift::transport::TTransport> transport_;
-  boost::shared_ptr<apache::thrift::protocol::TBinaryProtocol> protocol_;
+  std::shared_ptr<apache::thrift::transport::TSocket> socket_;
+  std::shared_ptr<apache::thrift::transport::TTransport> transport_;
+  std::shared_ptr<apache::thrift::protocol::TBinaryProtocol> protocol_;
 };
 
 
@@ -117,7 +117,7 @@ class ThriftClient : public ThriftClientImpl {
   InterfaceType* iface() { return iface_.get(); }
 
  private:
-  boost::shared_ptr<InterfaceType> iface_;
+  std::shared_ptr<InterfaceType> iface_;
 
   AuthProvider* auth_provider_;
 };

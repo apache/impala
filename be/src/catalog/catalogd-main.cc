@@ -62,9 +62,9 @@ int CatalogdMain(int argc, char** argv) {
   CatalogServer catalog_server(daemon_env.metrics());
   ABORT_IF_ERROR(catalog_server.Start());
   catalog_server.RegisterWebpages(daemon_env.webserver());
-  boost::shared_ptr<TProcessor> processor(
+  std::shared_ptr<TProcessor> processor(
       new CatalogServiceProcessor(catalog_server.thrift_iface()));
-  boost::shared_ptr<TProcessorEventHandler> event_handler(
+  std::shared_ptr<TProcessorEventHandler> event_handler(
       new RpcEventHandler("catalog-server", daemon_env.metrics()));
   processor->setEventHandler(event_handler);
 

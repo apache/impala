@@ -83,7 +83,7 @@ int ImpaladMain(int argc, char** argv) {
       StartThreadInstrumentation(exec_env.metrics(), exec_env.webserver(), true));
   InitRpcEventTracing(exec_env.webserver(), exec_env.rpc_mgr());
 
-  boost::shared_ptr<ImpalaServer> impala_server(new ImpalaServer(&exec_env));
+  std::shared_ptr<ImpalaServer> impala_server(new ImpalaServer(&exec_env));
   Status status = impala_server->Start(FLAGS_beeswax_port, FLAGS_hs2_port,
       FLAGS_hs2_http_port, FLAGS_external_fe_port);
   if (!status.ok()) {

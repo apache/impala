@@ -61,12 +61,15 @@ using namespace apache::thrift::concurrency;
 // assumption about the implementation of read(), peek(), write() and write_partial() in
 // TSocket.cpp and TSSLSocket.cpp. Those functions may change between different versions
 // of Thrift.
-static_assert(PACKAGE_VERSION[0] == '0', "");
-static_assert(PACKAGE_VERSION[1] == '.', "");
-static_assert(PACKAGE_VERSION[2] == '9', "");
-static_assert(PACKAGE_VERSION[3] == '.', "");
-static_assert(PACKAGE_VERSION[4] == '3', "");
-static_assert(PACKAGE_VERSION[5] == '\0', "");
+#define NEW_THRIFT_VERSION_MSG \
+    "Thrift 0.11.0 is expected. Please check Thrift error codes during Thrift upgrade."
+static_assert(PACKAGE_VERSION[0] == '0', NEW_THRIFT_VERSION_MSG);
+static_assert(PACKAGE_VERSION[1] == '.', NEW_THRIFT_VERSION_MSG);
+static_assert(PACKAGE_VERSION[2] == '1', NEW_THRIFT_VERSION_MSG);
+static_assert(PACKAGE_VERSION[3] == '1', NEW_THRIFT_VERSION_MSG);
+static_assert(PACKAGE_VERSION[4] == '.', NEW_THRIFT_VERSION_MSG);
+static_assert(PACKAGE_VERSION[5] == '0', NEW_THRIFT_VERSION_MSG);
+static_assert(PACKAGE_VERSION[6] == '\0', NEW_THRIFT_VERSION_MSG);
 
 namespace impala {
 
@@ -81,8 +84,8 @@ ThriftSerializer::ThriftSerializer(bool compact, int initial_buffer_size) :
   }
 }
 
-boost::shared_ptr<TProtocol> CreateDeserializeProtocol(
-    boost::shared_ptr<TMemoryBuffer> mem, bool compact) {
+std::shared_ptr<TProtocol> CreateDeserializeProtocol(
+    std::shared_ptr<TMemoryBuffer> mem, bool compact) {
   if (compact) {
     TCompactProtocolFactoryT<TMemoryBuffer> tproto_factory;
     return tproto_factory.getProtocol(mem);

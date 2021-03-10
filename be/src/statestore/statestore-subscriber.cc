@@ -233,9 +233,9 @@ Status StatestoreSubscriber::Start() {
     LOG(INFO) << "Starting statestore subscriber";
 
     // Backend must be started before registration
-    boost::shared_ptr<TProcessor> processor(
+    std::shared_ptr<TProcessor> processor(
         new StatestoreSubscriberProcessor(thrift_iface_));
-    boost::shared_ptr<TProcessorEventHandler> event_handler(
+    std::shared_ptr<TProcessorEventHandler> event_handler(
         new RpcEventHandler("statestore-subscriber", metrics_));
     processor->setEventHandler(event_handler);
 

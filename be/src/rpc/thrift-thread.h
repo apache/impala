@@ -36,11 +36,11 @@ class ThriftThreadFactory : public apache::thrift::concurrency::ThreadFactory {
   /// Group is the thread group for new threads to be assigned to, and prefix is the
   /// per-thread prefix (threads are named "prefix-<count_>-<tid>").
   ThriftThreadFactory(const std::string& group, const std::string& prefix)
-      : group_(group), prefix_(prefix), count_(-1) { }
+      : ThreadFactory(/*detached=*/false), group_(group), prefix_(prefix), count_(-1) { }
 
   /// (From ThreadFactory) - creates a new ThriftThread to run the supplied Runnable.
-  virtual boost::shared_ptr<apache::thrift::concurrency::Thread> newThread(
-      boost::shared_ptr<apache::thrift::concurrency::Runnable> runnable) const;
+  virtual std::shared_ptr<apache::thrift::concurrency::Thread> newThread(
+      std::shared_ptr<apache::thrift::concurrency::Runnable> runnable) const;
 
   /// (From ThreadFactory) - returns the *current* thread ID, i.e. the ID of the executing
   /// thread (which may not have been created by this factory).
@@ -63,7 +63,7 @@ class ThriftThreadFactory : public apache::thrift::concurrency::ThreadFactory {
 class ThriftThread : public apache::thrift::concurrency::Thread {
  public:
   ThriftThread(const std::string& group, const std::string& name,
-      boost::shared_ptr<apache::thrift::concurrency::Runnable> runnable);
+      std::shared_ptr<apache::thrift::concurrency::Runnable> runnable);
 
   /// (From Thread) - starts execution of the runnable in a separate thread, returning once
   /// execution has begun.
@@ -81,7 +81,7 @@ class ThriftThread : public apache::thrift::concurrency::Thread {
   /// Method executed on impala_thread_. Runs the Runnable once promise has been set to the
   /// current thread ID. The runnable parameter is a shared_ptr so that is always valid
   /// even after the ThriftThread may have been terminated.
-  void RunRunnable(boost::shared_ptr<apache::thrift::concurrency::Runnable> runnable,
+  void RunRunnable(std::shared_ptr<apache::thrift::concurrency::Runnable> runnable,
       Promise<apache::thrift::concurrency::Thread::id_t>* promise);
 
   /// Impala thread that runs the runnable and registers itself with the global

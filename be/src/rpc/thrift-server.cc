@@ -200,9 +200,9 @@ const ThriftServer::ConnectionContext* ThriftServer::GetThreadConnectionContext(
 }
 
 void* ThriftServer::ThriftServerEventProcessor::createContext(
-    boost::shared_ptr<TProtocol> input, boost::shared_ptr<TProtocol> output) {
-  boost::shared_ptr<ConnectionContext> connection_ptr =
-      boost::shared_ptr<ConnectionContext>(new ConnectionContext);
+    std::shared_ptr<TProtocol> input, std::shared_ptr<TProtocol> output) {
+  std::shared_ptr<ConnectionContext> connection_ptr =
+      std::shared_ptr<ConnectionContext>(new ConnectionContext);
   thrift_server_->auth_provider_->SetupConnectionContext(connection_ptr,
       thrift_server_->transport_type_, input->getTransport().get(),
       output->getTransport().get());
@@ -235,7 +235,7 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(
 }
 
 void ThriftServer::ThriftServerEventProcessor::processContext(void* context,
-    boost::shared_ptr<TTransport> transport) {
+    std::shared_ptr<TTransport> transport) {
   __connection_context__ = reinterpret_cast<ConnectionContext*>(context);
 }
 
@@ -248,7 +248,7 @@ bool ThriftServer::ThriftServerEventProcessor::IsIdleContext(void* context) {
 }
 
 void ThriftServer::ThriftServerEventProcessor::deleteContext(void* context,
-    boost::shared_ptr<TProtocol> input, boost::shared_ptr<TProtocol> output) {
+    std::shared_ptr<TProtocol> input, std::shared_ptr<TProtocol> output) {
   __connection_context__ = reinterpret_cast<ConnectionContext*>(context);
 
   if (thrift_server_->connection_handler_ != NULL) {
@@ -266,7 +266,7 @@ void ThriftServer::ThriftServerEventProcessor::deleteContext(void* context,
 }
 
 ThriftServer::ThriftServer(const string& name,
-    const boost::shared_ptr<TProcessor>& processor, int port, AuthProvider* auth_provider,
+    const std::shared_ptr<TProcessor>& processor, int port, AuthProvider* auth_provider,
     MetricGroup* metrics, int max_concurrent_connections, int64_t queue_timeout_ms,
     int64_t idle_poll_period_ms, TransportType transport_type)
   : started_(false),
@@ -362,7 +362,7 @@ class ImpalaSslSocketFactory : public TSSLSocketFactory {
   const string password_;
 };
 }
-Status ThriftServer::CreateSocket(boost::shared_ptr<TServerSocket>* socket) {
+Status ThriftServer::CreateSocket(std::shared_ptr<TServerSocket>* socket) {
   if (ssl_enabled()) {
     if (!SSLProtoVersions::IsSupported(version_)) {
       return Status(TErrorCode::SSL_SOCKET_CREATION_FAILED,
@@ -372,7 +372,7 @@ Status ThriftServer::CreateSocket(boost::shared_ptr<TServerSocket>* socket) {
     try {
       // This 'factory' is only called once, since CreateSocket() is only called from
       // Start(). The c'tor may throw if there is an error initializing the SSL context.
-      boost::shared_ptr<TSSLSocketFactory> socket_factory(
+      std::shared_ptr<TSSLSocketFactory> socket_factory(
           new ImpalaSslSocketFactory(version_, key_password_));
       socket_factory->overrideDefaultPasswordCallback();
 
@@ -426,14 +426,14 @@ Status ThriftServer::EnableSsl(SSLProtocol version, const string& certificate,
 
 Status ThriftServer::Start() {
   DCHECK(!started_);
-  boost::shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
-  boost::shared_ptr<ThreadFactory> thread_factory(
+  std::shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
+  std::shared_ptr<ThreadFactory> thread_factory(
       new ThriftThreadFactory("thrift-server", name_));
 
   // Note - if you change the transport types here, you must check that the
   // logic in createContext is still accurate.
-  boost::shared_ptr<TServerSocket> server_socket;
-  boost::shared_ptr<TTransportFactory> transport_factory;
+  std::shared_ptr<TServerSocket> server_socket;
+  std::shared_ptr<TTransportFactory> transport_factory;
   RETURN_IF_ERROR(CreateSocket(&server_socket));
   RETURN_IF_ERROR(auth_provider_->GetServerTransportFactory(
       transport_type_, metrics_name_, metrics_, &transport_factory));
@@ -445,7 +445,7 @@ Status ThriftServer::Start() {
     (static_cast<TAcceptQueueServer*>(server_.get()))
         ->InitMetrics(metrics_, metrics_name_);
   }
-  boost::shared_ptr<ThriftServer::ThriftServerEventProcessor> event_processor(
+  std::shared_ptr<ThriftServer::ThriftServerEventProcessor> event_processor(
       new ThriftServer::ThriftServerEventProcessor(this));
   server_->setServerEventHandler(event_processor);
 

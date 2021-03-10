@@ -47,7 +47,7 @@ namespace apache {
 namespace thrift {
 namespace server {
 
-using boost::shared_ptr;
+using std::shared_ptr;
 using namespace std;
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
@@ -69,7 +69,7 @@ class TAcceptQueueServer::Task : public Runnable {
   ~Task() override = default;
 
   void run() override {
-    boost::shared_ptr<TServerEventHandler> eventHandler = server_.getEventHandler();
+    shared_ptr<TServerEventHandler> eventHandler = server_.getEventHandler();
     void* connectionContext = nullptr;
     if (eventHandler != nullptr) {
       connectionContext = eventHandler->createContext(input_, output_);
@@ -137,7 +137,7 @@ class TAcceptQueueServer::Task : public Runnable {
   // due to inactivity. If so, it will return false and the connection
   // will be closed by the caller.
   bool Peek(shared_ptr<TProtocol> input, void* connectionContext,
-      boost::shared_ptr<TServerEventHandler> eventHandler) {
+      shared_ptr<TServerEventHandler> eventHandler) {
     // Set a timeout on input socket if idle_poll_period_ms_ is non-zero.
     TSocket* socket = static_cast<TSocket*>(transport_.get());
     if (server_.idle_poll_period_ms_ > 0) {
@@ -184,11 +184,11 @@ class TAcceptQueueServer::Task : public Runnable {
   shared_ptr<TTransport> transport_;
 };
 
-TAcceptQueueServer::TAcceptQueueServer(const boost::shared_ptr<TProcessor>& processor,
-    const boost::shared_ptr<TServerTransport>& serverTransport,
-    const boost::shared_ptr<TTransportFactory>& transportFactory,
-    const boost::shared_ptr<TProtocolFactory>& protocolFactory,
-    const boost::shared_ptr<ThreadFactory>& threadFactory, const string& name,
+TAcceptQueueServer::TAcceptQueueServer(const shared_ptr<TProcessor>& processor,
+    const shared_ptr<TServerTransport>& serverTransport,
+    const shared_ptr<TTransportFactory>& transportFactory,
+    const shared_ptr<TProtocolFactory>& protocolFactory,
+    const shared_ptr<ThreadFactory>& threadFactory, const string& name,
     int32_t maxTasks, int64_t queue_timeout_ms, int64_t idle_poll_period_ms)
     : TServer(processor, serverTransport, transportFactory, protocolFactory),
       threadFactory_(threadFactory), name_(name), maxTasks_(maxTasks),

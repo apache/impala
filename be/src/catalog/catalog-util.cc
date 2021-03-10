@@ -71,7 +71,7 @@ Status JniCatalogCacheUpdateIterator::createPair(JNIEnv* env, bool deleted,
 
 jobject TopicItemSpanIterator::next(JNIEnv* env) {
   while (begin_ != end_) {
-    jobject result;
+    jobject result = nullptr;
     Status s;
     const TTopicItem* current = begin_++;
     if (decompress_) {

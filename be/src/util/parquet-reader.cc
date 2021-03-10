@@ -54,8 +54,8 @@ using std::min;
 
 using impala::PARQUET_VERSION_NUMBER;
 
-boost::shared_ptr<TProtocol> CreateDeserializeProtocol(
-    boost::shared_ptr<TMemoryBuffer> mem, bool compact) {
+std::shared_ptr<TProtocol> CreateDeserializeProtocol(
+    std::shared_ptr<TMemoryBuffer> mem, bool compact) {
   if (compact) {
     TCompactProtocolFactoryT<TMemoryBuffer> tproto_factory;
     return tproto_factory.getProtocol(mem);
@@ -72,8 +72,8 @@ template <class T>
 bool DeserializeThriftMsg(
     uint8_t* buf, uint32_t* len, bool compact, T* deserialized_msg) {
   // Deserialize msg bytes into c++ thrift msg using memory transport.
-  boost::shared_ptr<TMemoryBuffer> tmem_transport(new TMemoryBuffer(buf, *len));
-  boost::shared_ptr<TProtocol> tproto =
+  std::shared_ptr<TMemoryBuffer> tmem_transport(new TMemoryBuffer(buf, *len));
+  std::shared_ptr<TProtocol> tproto =
       CreateDeserializeProtocol(tmem_transport, compact);
   try {
     deserialized_msg->read(tproto.get());

@@ -85,7 +85,7 @@ THttpServerTransportFactory::THttpServerTransportFactory(const std::string serve
   }
 }
 
-THttpServer::THttpServer(boost::shared_ptr<TTransport> transport, bool has_ldap,
+THttpServer::THttpServer(std::shared_ptr<TTransport> transport, bool has_ldap,
     bool has_kerberos, bool has_saml, bool use_cookies, bool check_trusted_domain,
     bool metrics_enabled, HttpMetrics* http_metrics)
   : THttpTransport(transport),
@@ -391,7 +391,8 @@ void THttpServer::flush() {
   // Construct the HTTP header
   std::ostringstream h;
   h << "HTTP/1.1 200 OK" << CRLF << "Date: " << getTimeRFC1123() << CRLF
-    << "Server: Thrift/" << VERSION << CRLF << "Access-Control-Allow-Origin: *" << CRLF
+    << "Server: Thrift/" << PACKAGE_VERSION << CRLF
+    << "Access-Control-Allow-Origin: *" << CRLF
     << "Content-Type: application/x-thrift" << CRLF << "Content-Length: " << len << CRLF
     << "Connection: Keep-Alive" << CRLF;
   vector<string> return_headers = callbacks_.return_headers_fn();

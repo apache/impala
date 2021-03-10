@@ -139,7 +139,7 @@ class StatestoreSubscriber {
 
   /// Implementation of the heartbeat thrift interface, which proxies
   /// calls onto this object.
-  boost::shared_ptr<StatestoreSubscriberIf> thrift_iface_;
+  std::shared_ptr<StatestoreSubscriberIf> thrift_iface_;
 
   /// Container for the heartbeat server.
   std::shared_ptr<ThriftServer> heartbeat_server_;

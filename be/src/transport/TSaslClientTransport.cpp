@@ -32,8 +32,8 @@ using namespace sasl;
 
 namespace apache { namespace thrift { namespace transport {
 
-TSaslClientTransport::TSaslClientTransport(boost::shared_ptr<sasl::TSasl> saslClient,
-                                           boost::shared_ptr<TTransport> transport)
+TSaslClientTransport::TSaslClientTransport(std::shared_ptr<sasl::TSasl> saslClient,
+                                           std::shared_ptr<TTransport> transport)
    : TSaslTransport(saslClient, transport) {
 }
 

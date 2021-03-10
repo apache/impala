@@ -461,8 +461,8 @@ Statestore::~Statestore() {
 }
 
 Status Statestore::Init(int32_t state_store_port) {
-  boost::shared_ptr<TProcessor> processor(new StatestoreServiceProcessor(thrift_iface()));
-  boost::shared_ptr<TProcessorEventHandler> event_handler(
+  std::shared_ptr<TProcessor> processor(new StatestoreServiceProcessor(thrift_iface()));
+  std::shared_ptr<TProcessorEventHandler> event_handler(
       new RpcEventHandler("statestore", metrics_));
   processor->setEventHandler(event_handler);
   ThriftServerBuilder builder("StatestoreService", processor, state_store_port);

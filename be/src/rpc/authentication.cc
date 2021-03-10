@@ -1059,7 +1059,7 @@ Status SecureAuthProvider::Start() {
 
 Status SecureAuthProvider::GetServerTransportFactory(
     ThriftServer::TransportType underlying_transport_type, const std::string& server_name,
-    MetricGroup* metrics, boost::shared_ptr<TTransportFactory>* factory) {
+    MetricGroup* metrics, std::shared_ptr<TTransportFactory>* factory) {
   DCHECK(!principal_.empty() || has_ldap_ || has_saml_);
 
   if (underlying_transport_type == ThriftServer::HTTP) {
@@ -1110,9 +1110,9 @@ Status SecureAuthProvider::GetServerTransportFactory(
 }
 
 Status SecureAuthProvider::WrapClientTransport(const string& hostname,
-    boost::shared_ptr<TTransport> raw_transport, const string& service_name,
-    boost::shared_ptr<TTransport>* wrapped_transport) {
-  boost::shared_ptr<sasl::TSasl> sasl_client;
+    std::shared_ptr<TTransport> raw_transport, const string& service_name,
+    std::shared_ptr<TTransport>* wrapped_transport) {
+  std::shared_ptr<sasl::TSasl> sasl_client;
   const map<string, string> props; // Empty; unused by thrift
   const string auth_id; // Empty; unused by thrift
 
@@ -1140,7 +1140,7 @@ Status SecureAuthProvider::WrapClientTransport(const string& hostname,
 }
 
 void SecureAuthProvider::SetupConnectionContext(
-    const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
+    const shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
     ThriftServer::TransportType underlying_transport_type,
     TTransport* input_transport, TTransport* output_transport) {
   TSocket* socket = nullptr;
@@ -1205,7 +1205,7 @@ void SecureAuthProvider::SetupConnectionContext(
 
 Status NoAuthProvider::GetServerTransportFactory(
     ThriftServer::TransportType underlying_transport_type, const std::string& server_name,
-    MetricGroup* metrics, boost::shared_ptr<TTransportFactory>* factory) {
+    MetricGroup* metrics, std::shared_ptr<TTransportFactory>* factory) {
   // No Sasl - yawn.  Here, have a regular old buffered transport.
   switch (underlying_transport_type) {
     case ThriftServer::BINARY:
@@ -1221,15 +1221,15 @@ Status NoAuthProvider::GetServerTransportFactory(
 }
 
 Status NoAuthProvider::WrapClientTransport(const string& hostname,
-    boost::shared_ptr<TTransport> raw_transport, const string& dummy_service,
-    boost::shared_ptr<TTransport>* wrapped_transport) {
+    std::shared_ptr<TTransport> raw_transport, const string& dummy_service,
+    std::shared_ptr<TTransport>* wrapped_transport) {
   // No Sasl - yawn.  Don't do any transport wrapping for clients.
   *wrapped_transport = raw_transport;
   return Status::OK();
 }
 
 void NoAuthProvider::SetupConnectionContext(
-    const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
+    const std::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
     ThriftServer::TransportType underlying_transport_type,
     TTransport* input_transport, TTransport* output_transport) {
   connection_ptr->username = "";

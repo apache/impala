@@ -441,8 +441,6 @@ def get_toolchain_downloads():
        "flatbuffers", "gdb", "gflags", "glog", "gperftools", "gtest", "libev",
        "libunwind", "lz4", "openldap", "openssl", "orc", "protobuf", "python",
        "rapidjson", "re2", "snappy", "thrift", "tpc-h", "tpc-ds", "zlib", "zstd"])
-  toolchain_packages += [ToolchainPackage("thrift",
-      explicit_version=os.environ.get("IMPALA_THRIFT11_VERSION"))]
   # Check whether this platform is supported (or whether a valid custom toolchain
   # has been provided).
   if not try_get_platform_release_label() \

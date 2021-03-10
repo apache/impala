@@ -36,7 +36,7 @@ const int32_t DEFAULT_MEM_BUF_SIZE = 32 * 1024;
 
 namespace apache { namespace thrift { namespace transport {
 
-  TSaslTransport::TSaslTransport(boost::shared_ptr<TTransport> transport)
+  TSaslTransport::TSaslTransport(std::shared_ptr<TTransport> transport)
       : transport_(transport),
         memBuf_(new TMemoryBuffer(DEFAULT_MEM_BUF_SIZE)),
         sasl_(NULL),
@@ -44,8 +44,8 @@ namespace apache { namespace thrift { namespace transport {
         isClient_(false) {
   }
 
-  TSaslTransport::TSaslTransport(boost::shared_ptr<sasl::TSasl> saslClient,
-                                 boost::shared_ptr<TTransport> transport)
+  TSaslTransport::TSaslTransport(std::shared_ptr<sasl::TSasl> saslClient,
+                                 std::shared_ptr<TTransport> transport)
       : transport_(transport),
         memBuf_(new TMemoryBuffer()),
         sasl_(saslClient),

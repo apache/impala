@@ -71,7 +71,7 @@ class CatalogServer {
   void RegisterWebpages(Webserver* webserver);
 
   /// Returns the Thrift API interface that proxies requests onto the local CatalogService.
-  const boost::shared_ptr<CatalogServiceIf>& thrift_iface() const {
+  const std::shared_ptr<CatalogServiceIf>& thrift_iface() const {
     return thrift_iface_;
   }
   Catalog* catalog() const { return catalog_.get(); }
@@ -90,7 +90,7 @@ class CatalogServer {
   std::atomic_bool service_started_{false};
 
   /// Thrift API implementation which proxies requests onto this CatalogService.
-  boost::shared_ptr<CatalogServiceIf> thrift_iface_;
+  std::shared_ptr<CatalogServiceIf> thrift_iface_;
   ThriftSerializer thrift_serializer_;
   MetricGroup* metrics_;
   boost::scoped_ptr<Catalog> catalog_;

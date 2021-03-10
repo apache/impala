@@ -162,9 +162,7 @@ def pytest_addoption(parser):
                    "shell/ e2e tests against a version of the impala-shell that has been "
                    "installed as a python package in a separate virtualenv. The python "
                    "version in the target virtualenv does not need to the match the "
-                   "version used to execute the tests, but if the tested environment is "
-                   "using python 3, also be sure to also set the environment variable "
-                   "USE_THRIFT11_GEN_PY=true in the test env. "
+                   "version used to execute the tests. "
                    "(See $IMPALA_HOME/bin/set-pythonpath.sh.)")
 
 

@@ -42,7 +42,7 @@ using apache::thrift::concurrency::Monitor;
 using apache::thrift::concurrency::ThreadFactory;
 
 struct TAcceptQueueEntry {
-  boost::shared_ptr<TTransport> client_;
+  std::shared_ptr<TTransport> client_;
   int64_t expiration_time_ = 0LL;
 };
 
@@ -57,11 +57,11 @@ struct TAcceptQueueEntry {
 class TAcceptQueueServer : public TServer {
  public:
   class Task;
-  TAcceptQueueServer(const boost::shared_ptr<TProcessor>& processor,
-      const boost::shared_ptr<TServerTransport>& serverTransport,
-      const boost::shared_ptr<TTransportFactory>& transportFactory,
-      const boost::shared_ptr<TProtocolFactory>& protocolFactory,
-      const boost::shared_ptr<ThreadFactory>& threadFactory,
+  TAcceptQueueServer(const std::shared_ptr<TProcessor>& processor,
+      const std::shared_ptr<TServerTransport>& serverTransport,
+      const std::shared_ptr<TTransportFactory>& transportFactory,
+      const std::shared_ptr<TProtocolFactory>& protocolFactory,
+      const std::shared_ptr<ThreadFactory>& threadFactory,
       const std::string& name, int32_t maxTasks = 0,
       int64_t queue_timeout_ms = 0, int64_t idle_poll_period_ms = 0);
 
@@ -84,15 +84,15 @@ class TAcceptQueueServer : public TServer {
   // This is the work function for the thread pool, which does the work of setting up the
   // connection and starting a thread to handle it. Will block if there are currently
   // maxTasks_ connections and maxTasks_ is non-zero.
-  void SetupConnection(boost::shared_ptr<TAcceptQueueEntry> entry);
+  void SetupConnection(std::shared_ptr<TAcceptQueueEntry> entry);
 
   // Helper function to close a client connection in case of server side errors.
   void CleanupAndClose(const std::string& error,
-      boost::shared_ptr<TTransport> input,
-      boost::shared_ptr<TTransport> output,
-      boost::shared_ptr<TTransport> client);
+      std::shared_ptr<TTransport> input,
+      std::shared_ptr<TTransport> output,
+      std::shared_ptr<TTransport> client);
 
-  boost::shared_ptr<ThreadFactory> threadFactory_;
+  std::shared_ptr<ThreadFactory> threadFactory_;
   volatile bool stop_ = false;
 
   /// Name of the thrift server.

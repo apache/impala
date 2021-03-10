@@ -61,8 +61,8 @@ SHELL_HOME=${IMPALA_HOME}/shell
 BUILD_DIR=${SHELL_HOME}/build
 TARBALL_ROOT=${BUILD_DIR}/impala-shell-${VERSION}
 
-IMPALA_THRIFT_PY_VERSION="${IMPALA_THRIFT11_VERSION}"
-THRIFT_GEN_PY_DIR="${SHELL_HOME}/build/thrift-11-gen/gen-py"
+IMPALA_THRIFT_PY_VERSION="${IMPALA_THRIFT_VERSION}"
+THRIFT_GEN_PY_DIR="${SHELL_HOME}/gen-py"
 
 echo "Deleting all files in ${TARBALL_ROOT}/{gen-py,lib,ext-py}"
 rm -rf ${TARBALL_ROOT}/lib/* 2>&1 > /dev/null

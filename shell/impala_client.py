@@ -81,6 +81,20 @@ HS2_VALUE_CONVERTERS = {
     TTypeId.DATE_TYPE: (operator.attrgetter('stringVal'), None)
 }
 
+
+# Helper to decode utf8 encoded str to unicode type in Python 2. NOOP in Python 3.
+def utf8_decode_if_needed(val):
+  if sys.version_info.major < 3 and isinstance(val, str):
+    val = val.decode('utf-8', errors='replace')
+  return val
+
+
+# Helper to decode unicode to utf8 encoded str in Python 2. NOOP in Python 3.
+def utf8_encode_if_needed(val):
+  if sys.version_info.major < 3 and isinstance(val, unicode):
+    val = val.encode('utf-8', errors='replace')
+  return val
+
 # Regular expression that matches the progress line added to HS2 logs by
 # the Impala server.
 HS2_LOG_PROGRESS_REGEX = re.compile("Query.*Complete \([0-9]* out of [0-9]*\)\n")
@@ -726,8 +740,16 @@ class ImpalaHS2Client(ImpalaClient):
     return (resp.version, resp.webserver_address)
 
   def _create_query_req(self, query_str, set_query_options):
-    query = TExecuteStatementReq(sessionHandle=self.session_handle, statement=query_str,
-        confOverlay=set_query_options, runAsync=True)
+    conf_overlay = {}
+    if sys.version_info.major < 3:
+      key_value_pairs = set_query_options.iteritems()
+    else:
+      key_value_pairs = set_query_options.items()
+    for k, v in key_value_pairs:
+      conf_overlay[utf8_encode_if_needed(k)] = utf8_encode_if_needed(v)
+    query = TExecuteStatementReq(sessionHandle=self.session_handle,
+        statement=utf8_encode_if_needed(query_str),
+        confOverlay=conf_overlay, runAsync=True)
     return query
 
   def execute_query(self, query_str, set_query_options):
@@ -744,7 +766,8 @@ class ImpalaHS2Client(ImpalaClient):
     # it if server is also aware of the retries.
     resp = self._do_hs2_rpc(ExecuteStatement)
     if resp.status.statusCode != TStatusCode.SUCCESS_STATUS:
-      raise QueryStateException("ERROR: {0}".format(resp.status.errorMessage))
+      msg = utf8_decode_if_needed(resp.status.errorMessage)
+      raise QueryStateException("ERROR: {0}".format(msg))
     handle = resp.operationHandle
     if handle.hasResultSet:
       req = TGetResultSetMetadataReq(handle)
@@ -928,7 +951,8 @@ class ImpalaHS2Client(ImpalaClient):
     resp = self._do_hs2_rpc(GetLog, retry_on_error=True)
     self._check_hs2_rpc_status(resp.status)
 
-    log = resp.log
+    log = utf8_decode_if_needed(resp.log)
+
     # Strip progress message out of HS2 log.
     log = HS2_LOG_PROGRESS_REGEX.sub("", log)
     if log and log.strip():
@@ -1061,8 +1085,7 @@ class ImpalaBeeswaxClient(ImpalaClient):
       key_value_pairs = set_query_options.iteritems()
     else:
       key_value_pairs = set_query_options.items()
-
-    return ["%s=%s" % (k, v) for (k, v) in key_value_pairs]
+    return [utf8_encode_if_needed("%s=%s" % (k, v)) for (k, v) in key_value_pairs]
 
   def _open_session(self):
     # Beeswax doesn't have a "session" concept independent of connections, so
@@ -1109,7 +1132,7 @@ class ImpalaBeeswaxClient(ImpalaClient):
   def _create_query_req(self, query_str, set_query_options):
     query = BeeswaxService.Query()
     query.hadoop_user = self.user
-    query.query = query_str
+    query.query = utf8_encode_if_needed(query_str)
     query.configuration = self._options_to_string_list(set_query_options)
     return query
 
@@ -1144,10 +1167,9 @@ class ImpalaBeeswaxClient(ImpalaClient):
         raise RPCException()
 
       def split_row_and_decode_if_needed(row):
-        try:
-          return row.split('\t')
-        except UnicodeDecodeError:
-          return row.decode('utf-8', 'replace').split('\t')
+        # Decode before splitting as this can remove incidental tabs from
+        # multibyte characters.
+        return utf8_decode_if_needed(row).split('\t')
 
       yield [split_row_and_decode_if_needed(row) for row in result.data]
 
@@ -1219,6 +1241,7 @@ class ImpalaBeeswaxClient(ImpalaClient):
       type_str = "warn" if warn is True else "error"
       return "Failed to get %s log: %s" % (type_str, rpc_status)
     if log and log.strip():
+      log = utf8_decode_if_needed(log)
       log = self._append_retried_query_link(log)
       type_str = "WARNINGS" if warn is True else "ERROR"
       return "%s: %s" % (type_str, log)
@@ -1257,7 +1280,7 @@ class ImpalaBeeswaxClient(ImpalaClient):
       # Suppress the errors from cancelling a query that is in fetch state
       if suppress_error_on_cancel and self.is_query_cancelled:
         raise QueryCancelledByShellException()
-      raise RPCException("ERROR: %s" % b.message)
+      raise RPCException(utf8_encode_if_needed("ERROR: %s") % b.message)
     except TTransportException as e:
       # issue with the connection with the impalad
       raise DisconnectedException("Error communicating with impalad: %s" % e)

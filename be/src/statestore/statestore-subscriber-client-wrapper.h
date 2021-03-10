@@ -25,13 +25,13 @@ namespace impala {
 class StatestoreSubscriberClientWrapper : public StatestoreSubscriberClient {
   public:
    StatestoreSubscriberClientWrapper(
-       boost::shared_ptr<::apache::thrift::protocol::TProtocol> prot)
+       std::shared_ptr<::apache::thrift::protocol::TProtocol> prot)
      : StatestoreSubscriberClient(prot) {
    }
 
    StatestoreSubscriberClientWrapper(
-       boost::shared_ptr<::apache::thrift::protocol::TProtocol> iprot,
-       boost::shared_ptr<::apache::thrift::protocol::TProtocol> oprot)
+       std::shared_ptr<::apache::thrift::protocol::TProtocol> iprot,
+       std::shared_ptr<::apache::thrift::protocol::TProtocol> oprot)
      : StatestoreSubscriberClient(iprot, oprot) {
    }
 

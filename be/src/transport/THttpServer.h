@@ -121,7 +121,7 @@ public:
         [&]() { return (impala::TWrappedHttpRequest*) NULL; };
   };
 
-  THttpServer(boost::shared_ptr<TTransport> transport, bool has_ldap, bool has_kerberos,
+  THttpServer(std::shared_ptr<TTransport> transport, bool has_ldap, bool has_kerberos,
       bool has_saml, bool use_cookies, bool check_trusted_domain, bool metrics_enabled,
       HttpMetrics* http_metrics);
 
@@ -207,8 +207,8 @@ public:
 
  virtual ~THttpServerTransportFactory() {}
 
- virtual boost::shared_ptr<TTransport> getTransport(boost::shared_ptr<TTransport> trans) {
-   return boost::shared_ptr<TTransport>(new THttpServer(trans, has_ldap_, has_kerberos_,
+ virtual std::shared_ptr<TTransport> getTransport(std::shared_ptr<TTransport> trans) {
+   return std::shared_ptr<TTransport>(new THttpServer(trans, has_ldap_, has_kerberos_,
        has_saml_, use_cookies_, check_trusted_domain_, metrics_enabled_, &http_metrics_));
   }
 

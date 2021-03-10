@@ -25,13 +25,13 @@ namespace impala {
 class CatalogServiceClientWrapper : public CatalogServiceClient {
  public:
   CatalogServiceClientWrapper(
-      boost::shared_ptr<::apache::thrift::protocol::TProtocol> prot)
+      std::shared_ptr<::apache::thrift::protocol::TProtocol> prot)
     : CatalogServiceClient(prot) {
   }
 
   CatalogServiceClientWrapper(
-      boost::shared_ptr<::apache::thrift::protocol::TProtocol> iprot,
-      boost::shared_ptr<::apache::thrift::protocol::TProtocol> oprot)
+      std::shared_ptr<::apache::thrift::protocol::TProtocol> iprot,
+      std::shared_ptr<::apache::thrift::protocol::TProtocol> oprot)
     : CatalogServiceClient(iprot, oprot) {
   }
 

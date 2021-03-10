@@ -46,7 +46,7 @@ class AuthProvider {
   virtual Status GetServerTransportFactory(
       ThriftServer::TransportType underlying_transport_type,
       const std::string& server_name, MetricGroup* metrics,
-      boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory)
+      std::shared_ptr<apache::thrift::transport::TTransportFactory>* factory)
       WARN_UNUSED_RESULT = 0;
 
   /// Called by Thrift clients to wrap a raw transport with any intermediate transport
@@ -54,9 +54,9 @@ class AuthProvider {
   /// TODO: Return the correct clients for HTTP base transport. At this point, no clients
   /// for HTTP endpoints are internal to the Impala service, so it should be OK.
   virtual Status WrapClientTransport(const std::string& hostname,
-      boost::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
+      std::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
       const std::string& service_name,
-      boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport)
+      std::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport)
       WARN_UNUSED_RESULT = 0;
 
   /// Setup 'connection_ptr' to get its username with the given transports and sets
@@ -64,7 +64,7 @@ class AuthProvider {
   /// by the factory returned by GetServerTransportFactory() when called with the same
   /// 'underlying_transport_type'.
   virtual void SetupConnectionContext(
-      const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
+      const std::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
       ThriftServer::TransportType underlying_transport_type,
       apache::thrift::transport::TTransport* input_transport,
       apache::thrift::transport::TTransport* output_transport) = 0;
@@ -94,9 +94,9 @@ class SecureAuthProvider : public AuthProvider {
   /// we can go straight to Kerberos.
   /// This is only applicable to Thrift connections and not KRPC connections.
   virtual Status WrapClientTransport(const std::string& hostname,
-      boost::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
+      std::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
       const std::string& service_name,
-      boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport);
+      std::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport);
 
   /// This sets up a mapping between auth types (PLAIN and GSSAPI) and callbacks.
   /// When a connection comes in, thrift will see one of the above on the wire, do
@@ -106,14 +106,14 @@ class SecureAuthProvider : public AuthProvider {
   virtual Status GetServerTransportFactory(
       ThriftServer::TransportType underlying_transport_type,
       const std::string& server_name, MetricGroup* metrics,
-      boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
+      std::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
 
   /// IF sasl was used, the username will be available from the handshake, and we set it
   /// here. If HTTP Basic or SPNEGO auth was used, the username won't be available until
   /// one or more packets are received, so we register a callback with the transport that
   /// will set the username when it's available.
   virtual void SetupConnectionContext(
-      const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
+      const std::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
       ThriftServer::TransportType underlying_transport_type,
       apache::thrift::transport::TTransport* input_transport,
       apache::thrift::transport::TTransport* output_transport);
@@ -183,16 +183,15 @@ class NoAuthProvider : public AuthProvider {
   virtual Status GetServerTransportFactory(
       ThriftServer::TransportType underlying_transport_type,
       const std::string& server_name, MetricGroup* metrics,
-      boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
-
+      std::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);
   virtual Status WrapClientTransport(const std::string& hostname,
-      boost::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
+      std::shared_ptr<apache::thrift::transport::TTransport> raw_transport,
       const std::string& service_name,
-      boost::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport);
+      std::shared_ptr<apache::thrift::transport::TTransport>* wrapped_transport);
 
   /// If there is no auth, then we don't have a username available.
   virtual void SetupConnectionContext(
-      const boost::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
+      const std::shared_ptr<ThriftServer::ConnectionContext>& connection_ptr,
       ThriftServer::TransportType underlying_transport_type,
       apache::thrift::transport::TTransport* input_transport,
       apache::thrift::transport::TTransport* output_transport);

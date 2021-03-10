@@ -34,11 +34,11 @@ hdfs == 2.0.2
   docopt == 0.6.2
   execnet == 1.4.0
     apipkg == 1.4
-impyla == 0.17a1
+impyla == 0.17a3
   bitarray == 1.2.1
   sasl == 0.2.1
   # six == 1.14.0 (specified separately)
-  thrift_sasl == 0.4.2
+  thrift_sasl == 0.4.3a1
 kazoo == 2.2.1
 pexpect == 3.3
 pg8000 == 1.10.2

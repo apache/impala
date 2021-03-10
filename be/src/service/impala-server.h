@@ -197,7 +197,7 @@ class TQueryExecRequest;
 class ImpalaServer : public ImpalaServiceIf,
                      public ImpalaHiveServer2ServiceIf,
                      public ThriftServer::ConnectionHandlerIf,
-                     public boost::enable_shared_from_this<ImpalaServer>,
+                     public std::enable_shared_from_this<ImpalaServer>,
                      public CacheLineAligned {
  public:
 

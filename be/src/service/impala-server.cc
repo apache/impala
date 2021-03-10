@@ -1533,7 +1533,7 @@ Status ImpalaServer::UpdateCatalogMetrics() {
 shared_ptr<QueryDriver> ImpalaServer::GetQueryDriver(
     const TUniqueId& query_id, bool return_unregistered) {
   DCHECK_EQ(this, ExecEnv::GetInstance()->impala_server());
-  ScopedShardedMapRef<std::shared_ptr<QueryDriver>> map_ref(query_id, &query_driver_map_);
+  ScopedShardedMapRef<shared_ptr<QueryDriver>> map_ref(query_id, &query_driver_map_);
   DCHECK(map_ref.get() != nullptr);
 
   auto entry = map_ref->find(query_id);
@@ -1670,7 +1670,7 @@ Status ImpalaServer::GetSessionState(const TUniqueId& session_id, const SecretAr
               << " with invalid "
               << (secret.is_session_secret() ? "session" : "operation") << " secret.";
     }
-    *session_state = std::shared_ptr<SessionState>();
+    *session_state = shared_ptr<SessionState>();
     string err_msg = secret.is_session_secret() ?
         Substitute("Invalid session id: $0", PrintId(session_id)) :
         Substitute(LEGACY_INVALID_QUERY_HANDLE_TEMPLATE, PrintId(secret.query_id()));
@@ -2218,7 +2218,7 @@ std::shared_ptr<const BackendDescriptorPB> ImpalaServer::GetLocalBackendDescript
   lock_guard<mutex> l(local_backend_descriptor_lock_);
   // Check if the current backend descriptor needs to be initialized.
   if (local_backend_descriptor_.get() == nullptr) {
-    std::shared_ptr<BackendDescriptorPB> new_be_desc =
+    shared_ptr<BackendDescriptorPB> new_be_desc =
         std::make_shared<BackendDescriptorPB>();
     BuildLocalBackendDescriptorInternal(new_be_desc.get());
     local_backend_descriptor_ = new_be_desc;
@@ -2860,11 +2860,11 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
               << TNetworkAddressToString(exec_env_->configured_backend_address());
   } else {
     // Initialize the client servers.
-    boost::shared_ptr<ImpalaServer> handler = shared_from_this();
+    shared_ptr<ImpalaServer> handler = shared_from_this();
     if (beeswax_port > 0 || (TestInfo::is_test() && beeswax_port == 0)) {
-      boost::shared_ptr<TProcessor> beeswax_processor(
+      shared_ptr<TProcessor> beeswax_processor(
           new ImpalaServiceProcessor(handler));
-      boost::shared_ptr<TProcessorEventHandler> event_handler(
+      shared_ptr<TProcessorEventHandler> event_handler(
           new RpcEventHandler("beeswax", exec_env_->metrics()));
       beeswax_processor->setEventHandler(event_handler);
       ThriftServerBuilder builder(BEESWAX_SERVER_NAME, beeswax_processor, beeswax_port);
@@ -2890,9 +2890,9 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
     }
 
     if (hs2_port > 0 || (TestInfo::is_test() && hs2_port == 0)) {
-      boost::shared_ptr<TProcessor> hs2_fe_processor(
+      shared_ptr<TProcessor> hs2_fe_processor(
           new ImpalaHiveServer2ServiceProcessor(handler));
-      boost::shared_ptr<TProcessorEventHandler> event_handler(
+      shared_ptr<TProcessorEventHandler> event_handler(
           new RpcEventHandler("hs2", exec_env_->metrics()));
       hs2_fe_processor->setEventHandler(event_handler);
 
@@ -2919,9 +2919,9 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
     }
 
     if (external_fe_port > 0 || (TestInfo::is_test() && external_fe_port == 0)) {
-      boost::shared_ptr<TProcessor> external_fe_processor(
+      shared_ptr<TProcessor> external_fe_processor(
           new ImpalaHiveServer2ServiceProcessor(handler));
-      boost::shared_ptr<TProcessorEventHandler> event_handler(
+      shared_ptr<TProcessorEventHandler> event_handler(
           new RpcEventHandler("external_frontend", exec_env_->metrics()));
       external_fe_processor->setEventHandler(event_handler);
 
@@ -2941,9 +2941,9 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
     }
 
     if (hs2_http_port > 0 || (TestInfo::is_test() && hs2_http_port == 0)) {
-      boost::shared_ptr<TProcessor> hs2_http_processor(
+      shared_ptr<TProcessor> hs2_http_processor(
           new ImpalaHiveServer2ServiceProcessor(handler));
-      boost::shared_ptr<TProcessorEventHandler> event_handler(
+      shared_ptr<TProcessorEventHandler> event_handler(
           new RpcEventHandler("hs2_http", exec_env_->metrics()));
       hs2_http_processor->setEventHandler(event_handler);
 

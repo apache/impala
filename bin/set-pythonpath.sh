@@ -19,20 +19,13 @@
 # utility scripts depend on some modules external to infra/python/env-*.
 # TODO: we should try to reduce our reliance on PYTHONPATH if possible.
 #
-# Setting USE_THRIFT11_GEN_PY will add Thrift 11 Python generated code rather than the
-# default Thrift Python code.
 # Used to allow importing testdata, test, etc modules from other scripts.
 
 # ${IMPALA_HOME}/bin has bootstrap_toolchain.py, required by bootstrap_virtualenv.py
 export PYTHONPATH=${IMPALA_HOME}:${IMPALA_HOME}/bin
 
 # Generated Thrift files are used by tests and other scripts.
-if [ "${USE_THRIFT11_GEN_PY:-}" == "true" ]; then
-  PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/shell/build/thrift-11-gen/gen-py
-  THRIFT_HOME="${IMPALA_TOOLCHAIN_PACKAGES_HOME}/thrift-${IMPALA_THRIFT11_VERSION}"
-else
-  PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/shell/gen-py
-fi
+PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/shell/gen-py
 
 PYTHONPATH=${PYTHONPATH}:${IMPALA_HOME}/infra/python/env-gcc${IMPALA_GCC_VERSION}/lib
 

@@ -99,8 +99,8 @@ class TestHS2Service : public ImpalaHiveServer2ServiceIf {
 // difficult to craft a request that Thrift will actually recognize as an rpc, so mostly
 // what we're really testing here is just that the server doesn't hang or crash.
 TEST(ThriftHttpTest, TestChunkedRequests) {
-  boost::shared_ptr<TestHS2Service> service(new TestHS2Service());
-  boost::shared_ptr<TProcessor> hs2_http_processor(
+  std::shared_ptr<TestHS2Service> service(new TestHS2Service());
+  std::shared_ptr<TProcessor> hs2_http_processor(
       new ImpalaHiveServer2ServiceProcessor(service));
   int port = FindUnusedEphemeralPort();
   ThriftServer* http_server;
@@ -149,8 +149,8 @@ TEST(Hs2HttpTest, TestSpnego) {
   FLAGS_keytab_file = kt_path;
   AuthManager auth_manager;
   ASSERT_OK(auth_manager.Init());
-  boost::shared_ptr<TestHS2Service> service(new TestHS2Service());
-  boost::shared_ptr<TProcessor> hs2_http_processor(
+  std::shared_ptr<TestHS2Service> service(new TestHS2Service());
+  std::shared_ptr<TProcessor> hs2_http_processor(
       new ImpalaHiveServer2ServiceProcessor(service));
   int port = FindUnusedEphemeralPort();
   ThriftServer* http_server;

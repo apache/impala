@@ -37,17 +37,12 @@ class PrettyOutputFormatter(object):
     """Returns string containing representation of the table data."""
 
     def decode_if_needed(row):
-      # Checking if the values in row is decodable. If it is we just give back the row
-      # as it is, if not we generate a new row and give that back instead where the
-      # undecodable parts are swapped out.
-      try:
-        ''.join(str(row))
+      if sys.version_info.major >= 3:
         return row
-      except UnicodeDecodeError:
-        new_row = []
-        for entry in row:
-          new_row.append(entry.decode('UTF-8', 'replace'))
-        return new_row
+      # prettytable will decode with 'strict' if the string is not already unicode,
+      # we should do it here to handle invalid characters.
+      return [entry.decode('UTF-8', 'replace') if isinstance(entry, str) else entry
+         for entry in row]
 
     # Clear rows that already exist in the table.
     self.prettytable.clear_rows()
@@ -92,7 +87,8 @@ class DelimitedOutputFormatter(object):
                         lineterminator='\n', quoting=csv.QUOTE_MINIMAL)
     for row in rows:
       if sys.version_info.major == 2:
-        row = [val.encode('utf-8', 'replace') for val in row]
+        row = [val.encode('utf-8', 'replace') if isinstance(val, unicode) else val
+            for val in row]
       writer.writerow(row)
     rows = temp_buffer.getvalue().rstrip()
     temp_buffer.close()

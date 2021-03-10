@@ -88,7 +88,7 @@ class InProcessImpalaServer {
   uint32_t hs2_http_port_;
 
   /// The ImpalaServer that handles client and backend requests.
-  boost::shared_ptr<ImpalaServer> impala_server_;
+  std::shared_ptr<ImpalaServer> impala_server_;
 
   /// ExecEnv holds much of the per-service state
   boost::scoped_ptr<ExecEnv> exec_env_;

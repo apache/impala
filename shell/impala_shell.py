@@ -1139,6 +1139,10 @@ class ImpalaShell(cmd.Cmd, object):
 
   def _format_outputstream(self):
     column_names = self.imp_client.get_column_names(self.last_query_handle)
+    if sys.version_info.major == 2:
+      column_names = [
+          col.decode("utf8", errors="replace") if isinstance(col, str) else col
+          for col in column_names]
     if self.write_delimited:
       formatter = DelimitedOutputFormatter(field_delim=self.output_delimiter)
       self.output_stream = OutputStream(formatter, filename=self.output_file)

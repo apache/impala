@@ -155,7 +155,9 @@ class ImpalaBeeswaxClient(object):
     try:
       self.transport = self.__get_transport()
       self.transport.open()
-      protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
+      # TODO: TBinaryProtocol led to negative size error, check if this is a known
+      #       issue in Thrift
+      protocol = TBinaryProtocol.TBinaryProtocolAccelerated(self.transport)
       self.imp_service = ImpalaService.Client(protocol)
       self.connected = True
     except Exception, e:

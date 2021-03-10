@@ -71,11 +71,11 @@ class ThriftServer {
             new apache::thrift::transport::TTransportFactory())
       : buffer_size_(buffer_size), wrapped_factory_(wrapped_factory) {}
 
-    virtual boost::shared_ptr<apache::thrift::transport::TTransport> getTransport(
-        boost::shared_ptr<apache::thrift::transport::TTransport> trans) {
-      boost::shared_ptr<apache::thrift::transport::TTransport> wrapped =
+    virtual std::shared_ptr<apache::thrift::transport::TTransport> getTransport(
+        std::shared_ptr<apache::thrift::transport::TTransport> trans) {
+      std::shared_ptr<apache::thrift::transport::TTransport> wrapped =
           wrapped_factory_->getTransport(trans);
-      return boost::shared_ptr<apache::thrift::transport::TTransport>(
+      return std::shared_ptr<apache::thrift::transport::TTransport>(
           new apache::thrift::transport::TBufferedTransport(wrapped, buffer_size_));
     }
    private:
@@ -195,17 +195,17 @@ class ThriftServer {
     /// Called when a client connects; we create per-client state and call any
     /// ConnectionHandlerIf handler.
     virtual void* createContext(
-        boost::shared_ptr<apache::thrift::protocol::TProtocol> input,
-        boost::shared_ptr<apache::thrift::protocol::TProtocol> output);
+        std::shared_ptr<apache::thrift::protocol::TProtocol> input,
+        std::shared_ptr<apache::thrift::protocol::TProtocol> output);
 
     /// Called when a client starts an RPC; we set the thread-local connection context.
     virtual void processContext(void* context,
-        boost::shared_ptr<apache::thrift::transport::TTransport> output);
+        std::shared_ptr<apache::thrift::transport::TTransport> output);
 
     /// Called when a client disconnects; we call any ConnectionHandlerIf handler.
     virtual void deleteContext(void* context,
-        boost::shared_ptr<apache::thrift::protocol::TProtocol> input,
-        boost::shared_ptr<apache::thrift::protocol::TProtocol> output);
+        std::shared_ptr<apache::thrift::protocol::TProtocol> input,
+        std::shared_ptr<apache::thrift::protocol::TProtocol> output);
 
     /// Returns true if a client's connection is idle. A client's connection is idle iff
     /// all the sessions associated with it have expired due to idle timeout. Called from
@@ -258,7 +258,7 @@ class ThriftServer {
   ///    before the service thread wakes up to check if the connection should be closed
   ///    due to inactivity. If 0, no polling happens.
   ThriftServer(const std::string& name,
-      const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
+      const std::shared_ptr<apache::thrift::TProcessor>& processor, int port,
       AuthProvider* auth_provider = nullptr, MetricGroup* metrics = nullptr,
       int max_concurrent_connections = 0, int64_t queue_timeout_ms = 0,
       int64_t idle_poll_period_ms = 0,
@@ -277,7 +277,7 @@ class ThriftServer {
 
   /// Creates the server socket on which this server listens. May be SSL enabled. Returns
   /// OK unless there was a Thrift error.
-  Status CreateSocket(boost::shared_ptr<apache::thrift::transport::TServerSocket>* socket);
+  Status CreateSocket(std::shared_ptr<apache::thrift::transport::TServerSocket>* socket);
 
   /// True if the server has been successfully started, for internal use only
   bool started_;
@@ -331,7 +331,7 @@ class ThriftServer {
 
   /// Thrift housekeeping
   boost::scoped_ptr<apache::thrift::server::TServer> server_;
-  boost::shared_ptr<apache::thrift::TProcessor> processor_;
+  std::shared_ptr<apache::thrift::TProcessor> processor_;
 
   /// If not nullptr, called when connection events happen. Not owned by us.
   ConnectionHandlerIf* connection_handler_;
@@ -341,7 +341,7 @@ class ThriftServer {
 
   /// Map of active connection context to a shared_ptr containing that context; when an
   /// item is removed from the map, it is automatically freed.
-  typedef boost::unordered_map<ConnectionContext*, boost::shared_ptr<ConnectionContext>>
+  typedef boost::unordered_map<ConnectionContext*, std::shared_ptr<ConnectionContext>>
       ConnectionContextSet;
   ConnectionContextSet connection_contexts_;
 
@@ -371,7 +371,7 @@ class ThriftServer {
 class ThriftServerBuilder {
  public:
   ThriftServerBuilder(const std::string& name,
-      const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port)
+      const std::shared_ptr<apache::thrift::TProcessor>& processor, int port)
     : name_(name), processor_(processor), port_(port) {}
 
   /// Sets the auth provider for this server. Default is the system global auth provider.
@@ -461,7 +461,7 @@ class ThriftServerBuilder {
   int64_t idle_poll_period_ms_ = 0;
   int max_concurrent_connections_ = 0;
   std::string name_;
-  boost::shared_ptr<apache::thrift::TProcessor> processor_;
+  std::shared_ptr<apache::thrift::TProcessor> processor_;
   int port_ = 0;
   ThriftServer::TransportType server_transport_type_ =
       ThriftServer::TransportType::BINARY;

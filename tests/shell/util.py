@@ -85,23 +85,10 @@ def get_python_version_for_shell_env():
   the python version from the output. This information is present even in the
   case of a fatal shell exception, e.g., not being unable to establish a
   connection to an impalad.
-
-  Moreover, if the python version for the shell being executed is 3 or higher,
-  and USE_THRIFT11_GEN_PY is not True, the test run should exit. Using older
-  versions of thrift with python 3 will cause hard-to-triage failures because
-  older thrift gen-py files are not py3 compatible.
   """
   version_check = Popen([IMPALA_SHELL_EXECUTABLE, '-q', 'version()'],
                         stdout=PIPE, stderr=PIPE, env=build_shell_env())
   stdout, stderr = version_check.communicate()
-
-  if "No module named \'ttypes\'" in stderr:
-    # If USE_THRIFT11_GEN_PY is not true, and the shell executable is from a
-    # python 3 (or higher) environment, this is the specific error message that
-    # we'll encounter, related to python3 not allowing implicit relative imports.
-    if os.getenv("USE_THRIFT11_GEN_PY") != "true":
-      sys.exit("If tested shell environment has python 3 or higher, "
-               "the USE_THRIFT11_GEN_PY env variable must be 'true'")
 
   # e.g. Starting Impala with Kerberos authentication using Python 3.7.6
   start_msg_line = stderr.split('\n')[0]

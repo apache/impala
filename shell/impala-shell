@@ -26,7 +26,9 @@
 #
 # The required directories are:
 # gen-py/ -- containing the Python thrift stubs for connecting to Impalad
-# lib/ -- containing the Hive Beeswax libraries, and the Python thrift 0.9 libraries
+# lib/ -- containing the Hive Beeswax libraries, and the Python thrift 0.11.0 libraries
+#           note that this directory exists only in the shell tarball, not in the
+#           Impala repository, see make_shell_tarball.sh for details
 # ext-py/ -- containing all the eggs for the modules packaged with the shell.
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
