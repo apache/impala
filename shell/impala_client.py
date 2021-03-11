@@ -662,6 +662,8 @@ class ImpalaHS2Client(ImpalaClient):
       set_all_handle = None
       if self.max_tries > 1:
         retry_msg = 'Num remaining tries: {0}'.format(self.max_tries - num_tries)
+      else:
+        retry_msg = ''
       try:
         set_all_handle = self.execute_query("set all", {})
         self.default_query_options = {}
