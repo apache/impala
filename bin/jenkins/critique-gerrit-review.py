@@ -179,7 +179,7 @@ def add_misc_comments_for_line(comments, line, curr_file, curr_line_num):
         {"message": "line has trailing whitespace", "line": curr_line_num})
 
   # Check for long lines. Skip .py files since flake8 already flags long lines.
-  if len(line) > 90 and os.path.splitext(curr_file)[1] != ".py":
+  if len(line) > LINE_LIMIT and os.path.splitext(curr_file)[1] != ".py":
     msg = "line too long ({0} > {1})".format(len(line), LINE_LIMIT)
     comments[curr_file].append(
         {"message": msg, "line": curr_line_num})
@@ -188,6 +188,12 @@ def add_misc_comments_for_line(comments, line, curr_file, curr_line_num):
     comments[curr_file].append(
         {"message": "tab used for whitespace", "line": curr_line_num})
 
+  if 'ThriftDebugString' in line:
+    comments[curr_file].append(
+        {"message": ("Please make sure you don't output sensitive data with "
+                     "ThriftDebugString(). If so, use impala::RedactedDebugString() "
+                     "instead."),
+         "line": curr_line_num })
 
 def post_review_to_gerrit(review_input):
   """Post a review to the gerrit patchset. 'review_input' is a ReviewInput JSON object

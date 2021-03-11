@@ -40,7 +40,6 @@
 using boost::bind;
 using boost::mem_fn;
 using namespace apache::thrift;
-using namespace impala;
 using namespace rapidjson;
 using namespace strings;
 
@@ -99,6 +98,8 @@ DECLARE_bool(compact_catalog_topic);
 #ifndef NDEBUG
 DECLARE_int32(stress_catalog_startup_delay_ms);
 #endif
+
+namespace impala {
 
 string CatalogServer::IMPALA_CATALOG_TOPIC = "catalog-update";
 
@@ -792,4 +793,6 @@ void CatalogServer::HealthzHandler(
   }
   *(data) << "Not Available";
   *response = HttpStatusCode::ServiceUnavailable;
+}
+
 }

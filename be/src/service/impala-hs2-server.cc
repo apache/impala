@@ -55,6 +55,7 @@
 #include "util/runtime-profile-counters.h"
 #include "util/stopwatch.h"
 #include "util/string-parser.h"
+#include "util/thrift-debug-util.h"
 #include "util/uid-util.h"
 
 #include "common/names.h"
@@ -230,7 +231,7 @@ Status ImpalaServer::FetchInternal(TUniqueId query_id, SessionState* session,
 Status ImpalaServer::TExecuteStatementReqToTQueryContext(
     const TExecuteStatementReq execute_request, TQueryCtx* query_ctx) {
   query_ctx->client_request.stmt = execute_request.statement;
-  VLOG_QUERY << "TExecuteStatementReq: " << ThriftDebugString(execute_request);
+  VLOG_QUERY << "TExecuteStatementReq: " << RedactedDebugString(execute_request);
   QueryOptionsMask set_query_options_mask;
   {
     shared_ptr<SessionState> session_state;
@@ -416,7 +417,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
 
 void ImpalaServer::CloseSession(TCloseSessionResp& return_val,
     const TCloseSessionReq& request) {
-  VLOG_QUERY << "CloseSession(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "CloseSession(): request=" << RedactedDebugString(request);
 
   TUniqueId session_id;
   TUniqueId secret;
@@ -431,7 +432,7 @@ void ImpalaServer::CloseSession(TCloseSessionResp& return_val,
 
 void ImpalaServer::GetInfo(TGetInfoResp& return_val,
     const TGetInfoReq& request) {
-  VLOG_QUERY << "GetInfo(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "GetInfo(): request=" << RedactedDebugString(request);
   HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TUniqueId session_id;
@@ -526,7 +527,7 @@ void ImpalaServer::ExecuteStatementCommon(TExecuteStatementResp& return_val,
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
 
-  VLOG_QUERY << "ExecuteStatement(): return_val=" << ThriftDebugString(return_val);
+  VLOG_QUERY << "ExecuteStatement(): return_val=" << RedactedDebugString(return_val);
   return;
 
  return_error:
@@ -548,7 +549,7 @@ Status ImpalaServer::SetupResultsCacheing(const QueryHandle& query_handle,
 
 void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
     const TExecuteStatementReq& request) {
-  VLOG_QUERY << "ExecuteStatement(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "ExecuteStatement(): request=" << RedactedDebugString(request);
   ExecuteStatementCommon(return_val, request);
 }
 
@@ -571,7 +572,7 @@ void ImpalaServer::ExecutePlannedStatement(
 
 void ImpalaServer::GetTypeInfo(TGetTypeInfoResp& return_val,
     const TGetTypeInfoReq& request) {
-  VLOG_QUERY << "GetTypeInfo(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "GetTypeInfo(): request=" << RedactedDebugString(request);
   HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
@@ -585,12 +586,12 @@ void ImpalaServer::GetTypeInfo(TGetTypeInfoResp& return_val,
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
 
-  VLOG_QUERY << "GetTypeInfo(): return_val=" << ThriftDebugString(return_val);
+  VLOG_QUERY << "GetTypeInfo(): return_val=" << RedactedDebugString(return_val);
 }
 
 void ImpalaServer::GetCatalogs(TGetCatalogsResp& return_val,
     const TGetCatalogsReq& request) {
-  VLOG_QUERY << "GetCatalogs(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "GetCatalogs(): request=" << RedactedDebugString(request);
   HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
@@ -604,12 +605,12 @@ void ImpalaServer::GetCatalogs(TGetCatalogsResp& return_val,
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
 
-  VLOG_QUERY << "GetCatalogs(): return_val=" << ThriftDebugString(return_val);
+  VLOG_QUERY << "GetCatalogs(): return_val=" << RedactedDebugString(return_val);
 }
 
 void ImpalaServer::GetSchemas(TGetSchemasResp& return_val,
     const TGetSchemasReq& request) {
-  VLOG_QUERY << "GetSchemas(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "GetSchemas(): request=" << RedactedDebugString(request);
   HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
@@ -623,12 +624,12 @@ void ImpalaServer::GetSchemas(TGetSchemasResp& return_val,
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
 
-  VLOG_QUERY << "GetSchemas(): return_val=" << ThriftDebugString(return_val);
+  VLOG_QUERY << "GetSchemas(): return_val=" << RedactedDebugString(return_val);
 }
 
 void ImpalaServer::GetTables(TGetTablesResp& return_val,
     const TGetTablesReq& request) {
-  VLOG_QUERY << "GetTables(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "GetTables(): request=" << RedactedDebugString(request);
   HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
@@ -642,12 +643,12 @@ void ImpalaServer::GetTables(TGetTablesResp& return_val,
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
 
-  VLOG_QUERY << "GetTables(): return_val=" << ThriftDebugString(return_val);
+  VLOG_QUERY << "GetTables(): return_val=" << RedactedDebugString(return_val);
 }
 
 void ImpalaServer::GetTableTypes(TGetTableTypesResp& return_val,
     const TGetTableTypesReq& request) {
-  VLOG_QUERY << "GetTableTypes(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "GetTableTypes(): request=" << RedactedDebugString(request);
   HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
@@ -661,13 +662,13 @@ void ImpalaServer::GetTableTypes(TGetTableTypesResp& return_val,
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
 
-  VLOG_QUERY << "GetTableTypes(): return_val=" << ThriftDebugString(return_val);
+  VLOG_QUERY << "GetTableTypes(): return_val=" << RedactedDebugString(return_val);
 
 }
 
 void ImpalaServer::GetColumns(TGetColumnsResp& return_val,
     const TGetColumnsReq& request) {
-  VLOG_QUERY << "GetColumns(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "GetColumns(): request=" << RedactedDebugString(request);
   HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
@@ -681,12 +682,12 @@ void ImpalaServer::GetColumns(TGetColumnsResp& return_val,
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
 
-  VLOG_QUERY << "GetColumns(): return_val=" << ThriftDebugString(return_val);
+  VLOG_QUERY << "GetColumns(): return_val=" << RedactedDebugString(return_val);
 }
 
 void ImpalaServer::GetFunctions(TGetFunctionsResp& return_val,
     const TGetFunctionsReq& request) {
-  VLOG_QUERY << "GetFunctions(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "GetFunctions(): request=" << RedactedDebugString(request);
   HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
@@ -700,12 +701,12 @@ void ImpalaServer::GetFunctions(TGetFunctionsResp& return_val,
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
 
-  VLOG_QUERY << "GetFunctions(): return_val=" << ThriftDebugString(return_val);
+  VLOG_QUERY << "GetFunctions(): return_val=" << RedactedDebugString(return_val);
 }
 
 void ImpalaServer::GetPrimaryKeys(TGetPrimaryKeysResp& return_val,
     const TGetPrimaryKeysReq& request) {
-  VLOG_QUERY << "GetPrimaryKeys(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "GetPrimaryKeys(): request=" << RedactedDebugString(request);
   HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
@@ -718,12 +719,12 @@ void ImpalaServer::GetPrimaryKeys(TGetPrimaryKeysResp& return_val,
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
 
-  VLOG_QUERY << "GetPrimaryKeys(): return_val=" << ThriftDebugString(return_val);
+  VLOG_QUERY << "GetPrimaryKeys(): return_val=" << RedactedDebugString(return_val);
 }
 
 void ImpalaServer::GetCrossReference(TGetCrossReferenceResp& return_val,
     const TGetCrossReferenceReq& request) {
-  VLOG_QUERY << "GetCrossReference(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "GetCrossReference(): request=" << RedactedDebugString(request);
   HS2_RETURN_IF_ERROR(return_val, CheckNotShuttingDown(), SQLSTATE_GENERAL_ERROR);
 
   TMetadataOpRequest req;
@@ -736,7 +737,7 @@ void ImpalaServer::GetCrossReference(TGetCrossReferenceResp& return_val,
   return_val.__set_operationHandle(handle);
   return_val.__set_status(status);
 
-  VLOG_QUERY << "GetCrossReference(): return_val=" << ThriftDebugString(return_val);
+  VLOG_QUERY << "GetCrossReference(): return_val=" << RedactedDebugString(return_val);
 }
 
 void ImpalaServer::GetOperationStatus(TGetOperationStatusResp& return_val,
@@ -1182,7 +1183,7 @@ void ImpalaServer::GetDelegationToken(TGetDelegationTokenResp& return_val,
 
 void ImpalaServer::GetBackendConfig(TGetBackendConfigResp& return_val,
     const TGetBackendConfigReq& req) {
-  VLOG_QUERY << "GetBackendConfig(): req=" << ThriftDebugString(req);
+  VLOG_QUERY << "GetBackendConfig(): req=" << RedactedDebugString(req);
   const ThriftServer::ConnectionContext* connection_context =
       ThriftServer::GetThreadConnectionContext();
   if (connection_context->server_name != EXTERNAL_FRONTEND_SERVER_NAME) {
@@ -1203,7 +1204,7 @@ void ImpalaServer::GetBackendConfig(TGetBackendConfigResp& return_val,
 
 void ImpalaServer::GetExecutorMembership(
     TGetExecutorMembershipResp& return_val, const TGetExecutorMembershipReq& req) {
-  VLOG_QUERY << "GetExecutorMembership(): req=" << ThriftDebugString(req);
+  VLOG_QUERY << "GetExecutorMembership(): req=" << RedactedDebugString(req);
   const ThriftServer::ConnectionContext* connection_context =
       ThriftServer::GetThreadConnectionContext();
   if (connection_context->server_name != EXTERNAL_FRONTEND_SERVER_NAME) {
@@ -1271,7 +1272,7 @@ void ImpalaServer::AddSessionToConnection(
 
 void ImpalaServer::PingImpalaHS2Service(TPingImpalaHS2ServiceResp& return_val,
     const TPingImpalaHS2ServiceReq& req) {
-  VLOG_QUERY << "PingImpalaHS2Service(): request=" << ThriftDebugString(req);
+  VLOG_QUERY << "PingImpalaHS2Service(): request=" << RedactedDebugString(req);
   TUniqueId session_id;
   TUniqueId secret;
   HS2_RETURN_IF_ERROR(return_val,
