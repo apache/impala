@@ -482,3 +482,88 @@ BIGINT
 ---- RESULTS
 15
 ====
+---- QUERY
+# Check if the intersection of a valid sketch with a null value returns an null sketch.
+select
+    ds_theta_estimate(ds_theta_intersect_f(date_sketch, null)),
+    ds_theta_estimate(ds_theta_intersect_f(null, float_sketch))
+from sketch_store;
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+0,0
+0,0
+0,0
+0,0
+====
+---- QUERY
+# Check that ds_theta_intersect_f() returns an empty sketch for 2 empty sketch.
+select ds_theta_estimate(ds_theta_intersect_f(
+ds_theta_sketch(cast(f2 as float)), ds_theta_sketch(cast(f2 as float))))
+from functional_parquet.emptytable;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# Checks that ds_theta_intersect_f() returns an null sketch for 2 null inputs.
+select ds_theta_estimate(ds_theta_intersect_f(null_str, some_nulls)) from
+functional_parquet.nullrows where id='b';
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# ds_theta_intersect_f() returns an error if it receives an invalid serialized sketch.
+select ds_theta_intersect_f(date_string_col, null) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# ds_theta_intersect_f() returns an error if it receives an invalid serialized sketch.
+select ds_theta_intersect_f(sketch1, sketch2) from (
+select ds_theta_sketch(float_col) sketch1, max(date_string_col) sketch2 from
+functional_parquet.alltypestiny
+) t
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# Intersect the sketches from theta_sketches_impala_hive2 and checks if the intersect
+# produces the same result as if these sketches were used separately to get the estimates.
+select
+    ds_theta_estimate(ds_theta_intersect_f(i_ti, h_ti)) as ti,
+    ds_theta_estimate(ds_theta_intersect_f(i_i, h_i)) as i,
+    ds_theta_estimate(ds_theta_intersect_f(i_bi, h_bi)) as bi,
+    ds_theta_estimate(ds_theta_intersect_f(i_f, h_f)) as f,
+    ds_theta_estimate(ds_theta_intersect_f(i_d, h_d)) as d,
+    ds_theta_estimate(ds_theta_intersect_f(i_s, h_s)) as s,
+    ds_theta_estimate(ds_theta_intersect_f(i_c, h_c)) as c,
+    ds_theta_estimate(ds_theta_intersect_f(i_v, h_v)) as v,
+    ds_theta_estimate(ds_theta_intersect_f(i_nc, h_nc)) as nc
+from theta_sketches_impala_hive2;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+5,7,6,6,7,4,4,3,0
+====
+---- QUERY
+# Check that the non-empty input sketches are distinct and the result is empty.
+select ds_theta_estimate(ds_theta_intersect_f(date_sketch, float_sketch))
+from sketch_store where year=2009 and month=1;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# Check When the inputs aren't the same but has some (but not all) items common.
+select ds_theta_estimate(ds_theta_intersect_f(sketch1, sketch2)) from sketch_intermediate;
+---- TYPES
+BIGINT
+---- RESULTS
+5
+====

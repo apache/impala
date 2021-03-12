@@ -78,6 +78,33 @@ StringVal StringStreamToStringVal(FunctionContext* ctx, const stringstream& str_
   return dst;
 }
 
+bool update_sketch_to_theta_union(FunctionContext* ctx,
+    const StringVal& serialized_sketch, datasketches::theta_union& sketch) {
+  if (!serialized_sketch.is_null && serialized_sketch.len > 0) {
+    datasketches::theta_sketch::unique_ptr sketch_ptr;
+    if (!DeserializeDsSketch(serialized_sketch, &sketch_ptr)) {
+      LogSketchDeserializationError(ctx);
+      return false;
+    }
+    sketch.update(*sketch_ptr);
+  }
+  return true;
+}
+
+bool update_sketch_to_theta_intersection(FunctionContext* ctx,
+    const StringVal& serialized_sketch, datasketches::theta_intersection& sketch) {
+  if (!serialized_sketch.is_null && serialized_sketch.len > 0) {
+    datasketches::theta_sketch::unique_ptr sketch_ptr;
+    if (!DeserializeDsSketch(serialized_sketch, &sketch_ptr)) {
+      LogSketchDeserializationError(ctx);
+      return false;
+    }
+    sketch.update(*sketch_ptr);
+    return true;
+  }
+  return false;
+}
+
 template<class T>
 StringVal DsKllVectorResultToStringVal(FunctionContext* ctx,
     const vector<T>& kll_result) {
