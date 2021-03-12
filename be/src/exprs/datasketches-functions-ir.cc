@@ -22,6 +22,7 @@
 #include "thirdparty/datasketches/hll.hpp"
 #include "thirdparty/datasketches/theta_sketch.hpp"
 #include "thirdparty/datasketches/theta_union.hpp"
+#include "thirdparty/datasketches/theta_intersection.hpp"
 #include "thirdparty/datasketches/theta_a_not_b.hpp"
 #include "thirdparty/datasketches/kll_sketch.hpp"
 #include "udf/udf-internal.h"
@@ -160,19 +161,6 @@ StringVal DataSketchesFunctions::DsThetaExclude(FunctionContext* ctx,
   return StringVal::null();
 }
 
-bool update_sketch_to_theta_union(FunctionContext* ctx,
-    const StringVal& serialized_sketch, datasketches::theta_union& union_sketch) {
-  if (!serialized_sketch.is_null && serialized_sketch.len > 0) {
-    datasketches::theta_sketch::unique_ptr sketch_ptr;
-    if (!DeserializeDsSketch(serialized_sketch, &sketch_ptr)) {
-      LogSketchDeserializationError(ctx);
-      return false;
-    }
-    union_sketch.update(*sketch_ptr);
-  }
-  return true;
-}
-
 StringVal DataSketchesFunctions::DsThetaUnionF(FunctionContext* ctx,
     const StringVal& first_serialized_sketch, const StringVal& second_serialized_sketch) {
   datasketches::theta_union union_sketch = datasketches::theta_union::builder().build();
@@ -185,6 +173,25 @@ StringVal DataSketchesFunctions::DsThetaUnionF(FunctionContext* ctx,
   }
   //  Result
   datasketches::compact_theta_sketch sketch = union_sketch.get_result();
+  std::stringstream serialized_input;
+  sketch.serialize(serialized_input);
+  return StringStreamToStringVal(ctx, serialized_input);
+}
+
+StringVal DataSketchesFunctions::DsThetaIntersectF(FunctionContext* ctx,
+    const StringVal& first_serialized_sketch, const StringVal& second_serialized_sketch) {
+  datasketches::theta_intersection intersection_sketch;
+  // Update two sketches to theta_intersection
+  // Note that if one of the sketches is null, null is returned.
+  if (!update_sketch_to_theta_intersection(
+          ctx, first_serialized_sketch, intersection_sketch)) {
+    return StringVal::null();
+  }
+  if (!update_sketch_to_theta_intersection(
+          ctx, second_serialized_sketch, intersection_sketch)) {
+    return StringVal::null();
+  }
+  datasketches::compact_theta_sketch sketch = intersection_sketch.get_result();
   std::stringstream serialized_input;
   sketch.serialize(serialized_input);
   return StringStreamToStringVal(ctx, serialized_input);

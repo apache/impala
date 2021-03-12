@@ -22,6 +22,8 @@
 
 #include "common/status.h"
 #include "thirdparty/datasketches/hll.hpp"
+#include "thirdparty/datasketches/theta_union.hpp"
+#include "thirdparty/datasketches/theta_intersection.hpp"
 #include "udf/udf.h"
 
 namespace impala {
@@ -59,6 +61,19 @@ bool DeserializeDsSketch(const StringVal& serialized_sketch, T* sketch)
 StringVal StringStreamToStringVal(FunctionContext* ctx,
     const std::stringstream& str_stream);
 
+/// Helper function that receives a serialized DataSketches Theta sketch in
+/// 'serialized_sketch', deserializes it and update the deserialized sketch to 'sketch'.
+/// Returns false if the deserialization fails (the error log will be written),
+/// true otherwise.
+bool update_sketch_to_theta_union(FunctionContext* ctx,
+    const StringVal& serialized_sketch, datasketches::theta_union& sketch);
+
+/// Helper function that receives a serialized DataSketches Theta sketch in
+/// 'serialized_sketch', deserializes it and update the deserialized sketch to 'sketch'.
+/// Returns false if 'serialized_sketch' is empty or deserialization fails (the error log
+/// will be written), true otherwise.
+bool update_sketch_to_theta_intersection(FunctionContext* ctx,
+    const StringVal& serialized_sketch, datasketches::theta_intersection& sketch);
 
 /// Helper function that receives a vector and returns a comma separated StringVal that
 /// holds the items from the vector keeping the order.

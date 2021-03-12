@@ -1009,6 +1009,8 @@ visible_functions = [
      '_ZN6impala21DataSketchesFunctions14DsThetaExcludeEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
   [['ds_theta_union_f'], 'STRING', ['STRING', 'STRING'],
      '_ZN6impala21DataSketchesFunctions13DsThetaUnionFEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
+  [['ds_theta_intersect_f'], 'STRING', ['STRING', 'STRING'],
+     '_ZN6impala21DataSketchesFunctions17DsThetaIntersectFEPN10impala_udf15FunctionContextERKNS1_9StringValES6_'],
   [['ds_kll_quantile'], 'FLOAT', ['STRING', 'DOUBLE'],
       '_ZN6impala21DataSketchesFunctions13DsKllQuantileEPN10impala_udf15FunctionContextERKNS1_9StringValERKNS1_9DoubleValE'],
   [['ds_kll_n'], 'BIGINT', ['STRING'],
