@@ -408,3 +408,77 @@ BIGINT
 ---- RESULTS
 5
 ====
+---- QUERY
+# Checks that unioning a valid sketch with a null value result the valid sketch being
+# returned.
+select
+    ds_theta_estimate(ds_theta_union_f(date_sketch, null)),
+    ds_theta_estimate(ds_theta_union_f(null, float_sketch))
+from sketch_store;
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+3,10
+3,10
+3,10
+3,10
+====
+---- QUERY
+# Check that ds_theta_union_f() returns an empty sketch for an empty sketch.
+select ds_theta_estimate(ds_theta_union_f(ds_theta_sketch(cast(f2 as float)), null))
+from functional_parquet.emptytable;
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# Checks that ds_theta_union_f() returns an empty sketch for NULL inputs.
+select ds_theta_estimate(ds_theta_union_f(null_str, some_nulls)) from
+functional_parquet.nullrows where id='b';
+---- TYPES
+BIGINT
+---- RESULTS
+0
+====
+---- QUERY
+# ds_theta_union_f() returns an error if it receives an invalid serialized sketch.
+select ds_theta_union_f(null, date_string_col) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# ds_theta_union_f() returns an error if it receives an invalid serialized sketch.
+select ds_theta_union_f(date_string_col, null) from functional_parquet.alltypestiny
+where id=1;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# Unions the sketches from theta_sketches_impala_hive2 and checks if the union produces
+# the same result as if these sketches were used separately to get the estimates.
+select
+    ds_theta_estimate(ds_theta_union_f(i_ti, h_ti)) as ti,
+    ds_theta_estimate(ds_theta_union_f(i_i, h_i)) as i,
+    ds_theta_estimate(ds_theta_union_f(i_bi, h_bi)) as bi,
+    ds_theta_estimate(ds_theta_union_f(i_f, h_f)) as f,
+    ds_theta_estimate(ds_theta_union_f(i_d, h_d)) as d,
+    ds_theta_estimate(ds_theta_union_f(i_s, h_s)) as s,
+    ds_theta_estimate(ds_theta_union_f(i_c, h_c)) as c,
+    ds_theta_estimate(ds_theta_union_f(i_v, h_v)) as v,
+    ds_theta_estimate(ds_theta_union_f(i_nc, h_nc)) as nc
+from theta_sketches_impala_hive2;
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+---- RESULTS
+5,7,6,6,7,4,4,3,0
+====
+---- QUERY
+# Union two sketches from different columns of sketch_intermediate.
+select ds_theta_estimate(ds_theta_union_f(sketch1, sketch2)) from sketch_intermediate;
+---- TYPES
+BIGINT
+---- RESULTS
+15
+====
