@@ -37,7 +37,10 @@ SpillableRowBatchQueue::SpillableRowBatchQueue(const string& name,
     row_desc_(row_desc),
     resource_profile_(resource_profile),
     debug_options_(debug_options),
-    max_unpinned_bytes_(max_unpinned_bytes) {}
+    max_unpinned_bytes_(max_unpinned_bytes) {
+  DCHECK_GT(max_unpinned_bytes_, 0);
+  DCHECK_GT(resource_profile_.spillable_buffer_size, 0);
+}
 
 SpillableRowBatchQueue::~SpillableRowBatchQueue() {
   DCHECK(closed_);

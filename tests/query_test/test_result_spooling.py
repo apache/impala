@@ -488,6 +488,30 @@ class TestResultSpoolingMaxReservation(ImpalaTestSuite):
     exec_options['default_spillable_buffer_size'] = 8 * 1024
     self.__run_small_spilling_query(exec_options, "70.00 KB")
 
+  def test_unbounded_result_spooling_mem(self, vector):
+    """Test result spooling against unbounded MAX_RESULT_SPOOLING_MEM and
+    MAX_SPILLED_RESULT_SPOOLING_MEM. In this situation, planner should override
+    MAX_RESULT_SPOOLING_MEM to its default (100MB) and BufferedPlanRootSink should
+    assume MAX_SPILLED_RESULT_SPOOLING_MEM = INT64_MAX."""
+    exec_options = vector.get_value('exec_option')
+    exec_options['debug_action'] = vector.get_value('debug_action')
+    exec_options['spool_query_results'] = 'true'
+    exec_options['max_row_size'] = 8 * 1024
+    exec_options['max_result_spooling_mem'] = 0
+    exec_options['max_spilled_result_spooling_mem'] = 0
+    exec_options['default_spillable_buffer_size'] = 8 * 1024
+
+    query = "select * from functional.alltypes order by id limit 1500"
+    result = self.execute_query(query, exec_options)
+    assert result.success, "Failed to run {0} when result spooling is enabled" \
+        .format(query)
+
+    # Check that PLAN_ROOT_SINK's reservation limit match the default
+    # MAX_RESULT_SPOOLING_MEM.
+    plan_root_sink_reservation_limit = "PLAN_ROOT_SINK[\s\S]*?ReservationLimit: {0}" \
+        .format('100.00 MB')
+    assert re.search(plan_root_sink_reservation_limit, result.runtime_profile)
+
   def __run_small_spilling_query(self, exec_options, expected_limit):
     """Given an exec_options, test that simple query below spills and PLAN_ROOT_SINK's
     ReservationLimit match with the expected_limit"""

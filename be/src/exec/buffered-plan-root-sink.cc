@@ -50,9 +50,11 @@ Status BufferedPlanRootSink::Open(RuntimeState* state) {
   RETURN_IF_ERROR(DebugAction(state->query_options(), "BPRS_BEFORE_OPEN"));
   RETURN_IF_ERROR(DataSink::Open(state));
   current_batch_ = make_unique<RowBatch>(row_desc_, state->batch_size(), mem_tracker());
-  batch_queue_.reset(new SpillableRowBatchQueue(name_,
-      state->query_options().max_spilled_result_spooling_mem, state, mem_tracker(),
-      profile(), row_desc_, resource_profile_, debug_options_));
+  int64_t max_spilled_mem = state->query_options().max_spilled_result_spooling_mem;
+  // max_spilled_result_spooling_mem = 0 means unbounded.
+  if (max_spilled_mem <= 0) max_spilled_mem = INT64_MAX;
+  batch_queue_.reset(new SpillableRowBatchQueue(name_, max_spilled_mem, state,
+      mem_tracker(), profile(), row_desc_, resource_profile_, debug_options_));
   RETURN_IF_ERROR(batch_queue_->Open());
   return Status::OK();
 }

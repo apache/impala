@@ -107,12 +107,20 @@ public class PlanRootSink extends DataSink {
         return;
       }
 
+      long maxSpoolingMem = queryOptions.getMax_result_spooling_mem();
+      if (maxSpoolingMem <= 0) {
+        // max_result_spooling_mem = 0 means unbounded. But instead of setting unlimited
+        // memory reservation, we fallback to the default max_result_spooling_mem.
+        TQueryOptions defaults = new TQueryOptions();
+        maxSpoolingMem = defaults.getMax_result_spooling_mem();
+        queryOptions.setMax_result_spooling_mem(maxSpoolingMem);
+      }
+
       long bufferSize = queryOptions.getDefault_spillable_buffer_size();
       long maxRowBufferSize = PlanNode.computeMaxSpillableBufferSize(
           bufferSize, queryOptions.getMax_row_size());
       long minMemReservationBytes = 2 * maxRowBufferSize;
-      long maxMemReservationBytes = Math.max(
-          queryOptions.getMax_result_spooling_mem(), minMemReservationBytes);
+      long maxMemReservationBytes = Math.max(maxSpoolingMem, minMemReservationBytes);
 
       // User might set query option scratch_limit that is lower than either of
       // minMemReservationBytes, maxMemReservationBytes, or
