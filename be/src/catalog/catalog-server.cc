@@ -707,7 +707,7 @@ void CatalogServer::OperationUsageUrlCallback(
   // Create a summary and add it to the document
   map<string, int> aggregated_operations;
   for (const auto& catalog_op : opeartion_usage.catalog_op_counters) {
-    ++aggregated_operations[catalog_op.catalog_op_name];
+    aggregated_operations[catalog_op.catalog_op_name] += catalog_op.op_counter;
   }
   Value catalog_op_summary(kArrayType);
   for (const auto& catalog_op : aggregated_operations) {
