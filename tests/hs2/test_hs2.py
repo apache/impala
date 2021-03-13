@@ -740,6 +740,15 @@ class TestHS2(HS2TestSuite):
         TCLIService.TStatusCode.ERROR_STATUS, "Unsupported operation")
 
   @needs_session()
+  def test_get_executor_membership(self):
+    get_executor_membership_req = ImpalaHiveServer2Service.TGetExecutorMembershipReq()
+    get_executor_membership_req.sessionHandle = self.session_handle
+    get_executor_membership_resp = self.hs2_client.GetExecutorMembership(
+      get_executor_membership_req)
+    TestHS2.check_response(get_executor_membership_resp,
+        TCLIService.TStatusCode.ERROR_STATUS, "Unsupported operation")
+
+  @needs_session()
   def test_get_profile(self):
     statement = "SELECT COUNT(2) FROM functional.alltypes"
     execute_statement_resp = self.execute_statement(statement)

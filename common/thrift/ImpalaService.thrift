@@ -834,6 +834,16 @@ struct TGetBackendConfigResp {
   2: required BackendGflags.TBackendGflags backend_config
 }
 
+struct TGetExecutorMembershipReq {
+  1: required TCLIService.TSessionHandle sessionHandle
+}
+
+struct TGetExecutorMembershipResp {
+  1: required TCLIService.TStatus status
+
+  2: required Frontend.TUpdateExecutorMembershipRequest executor_membership
+}
+
 service ImpalaHiveServer2Service extends TCLIService.TCLIService {
   // Returns the exec summary for the given query. The exec summary is only valid for
   // queries that execute with Impala's backend, i.e. QUERY, DML and COMPUTE_STATS
@@ -856,4 +866,8 @@ service ImpalaHiveServer2Service extends TCLIService.TCLIService {
 
   // Returns the current TBackendGflags. Only supported for the "external fe" service.
   TGetBackendConfigResp GetBackendConfig(1:TGetBackendConfigReq req);
+
+  // Returns the executor membership information. Only supported for the "external fe"
+  // service.
+  TGetExecutorMembershipResp GetExecutorMembership(1:TGetExecutorMembershipReq req);
 }

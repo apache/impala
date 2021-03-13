@@ -357,6 +357,10 @@ class ImpalaServer : public ImpalaServiceIf,
   virtual void GetBackendConfig(TGetBackendConfigResp& return_val,
       const TGetBackendConfigReq& request);
 
+  // Retrieves the current ExecutorMembership
+  virtual void GetExecutorMembership(
+      TGetExecutorMembershipResp& return_val, const TGetExecutorMembershipReq& request);
+
   /// Closes an Impala operation and returns additional information about the closed
   /// operation.
   virtual void CloseImpalaOperation(
