@@ -32,6 +32,8 @@
 
 namespace impala {
 
+class TUpdateExecutorMembershipRequest;
+
 namespace test {
 class SchedulerWrapper;
 }
@@ -256,5 +258,8 @@ class ClusterMembershipMgr {
 
   friend class impala::test::SchedulerWrapper;
 };
+
+void PopulateExecutorMembershipRequest(ClusterMembershipMgr::SnapshotPtr& snapshot,
+    TUpdateExecutorMembershipRequest& update_req);
 
 } // end namespace impala

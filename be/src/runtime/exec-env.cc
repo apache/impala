@@ -173,47 +173,14 @@ const static int COORDINATOR_CONCURRENCY_MULTIPLIER = 8;
 namespace {
 using namespace impala;
 /// Helper method to forward cluster membership updates to the frontend.
-///
-/// The frontend uses cluster membership information to determine whether it expects the
-/// scheduler to assign local or remote reads. It also uses the number of executors to
-/// determine the join type (partitioned vs broadcast). For the default executor group, we
-/// assume that local reads are preferred and will include the hostnames and IP addresses
-/// in the update to the frontend. For non-default executor groups, we assume that we will
-/// read data remotely and will only send the number of executors in the largest healthy
-/// group.
+/// For additional details see comments for PopulateExecutorMembershipRequest()
+/// in cluster-membership-mgr.cc
 void SendClusterMembershipToFrontend(
     ClusterMembershipMgr::SnapshotPtr& snapshot, Frontend* frontend) {
   TUpdateExecutorMembershipRequest update_req;
-  const ExecutorGroup* group = nullptr;
-  bool is_default_group = false;
-  auto default_it =
-      snapshot->executor_groups.find(ImpalaServer::DEFAULT_EXECUTOR_GROUP_NAME);
-  if (default_it != snapshot->executor_groups.end()) {
-    is_default_group = true;
-    group = &(default_it->second);
-  } else {
-    int max_num_executors = 0;
-    // Find largest healthy group.
-    for (const auto& it : snapshot->executor_groups) {
-      if (!it.second.IsHealthy()) continue;
-      int num_executors = it.second.NumExecutors();
-      if (num_executors > max_num_executors) {
-        max_num_executors = num_executors;
-        group = &(it.second);
-      }
-    }
-  }
-  if (group) {
-    for (const auto& backend : group->GetAllExecutorDescriptors()) {
-      if (backend.is_executor()) {
-        if (is_default_group) {
-          update_req.hostnames.insert(backend.address().hostname());
-          update_req.ip_addresses.insert(backend.ip_address());
-        }
-        update_req.num_executors++;
-      }
-    }
-  }
+
+  PopulateExecutorMembershipRequest(snapshot, update_req);
+
   Status status = frontend->UpdateExecutorMembership(update_req);
   if (!status.ok()) {
     LOG(WARNING) << "Error updating frontend membership snapshot: " << status.GetDetail();

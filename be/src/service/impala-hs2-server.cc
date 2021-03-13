@@ -1197,6 +1197,45 @@ void ImpalaServer::GetBackendConfig(TGetBackendConfigResp& return_val,
   VLOG_RPC << "GetBackendConfig(): return_val=" << ThriftDebugString(return_val);
 }
 
+void ImpalaServer::GetExecutorMembership(
+    TGetExecutorMembershipResp& return_val, const TGetExecutorMembershipReq& req) {
+  VLOG_QUERY << "GetExecutorMembership(): req=" << ThriftDebugString(req);
+  const ThriftServer::ConnectionContext* connection_context =
+      ThriftServer::GetThreadConnectionContext();
+  if (connection_context->server_name != EXTERNAL_FRONTEND_SERVER_NAME) {
+    HS2_RETURN_ERROR(
+        return_val, "Unsupported operation", SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED);
+  }
+  TUniqueId session_id;
+  TUniqueId secret;
+  HS2_RETURN_IF_ERROR(return_val,
+      THandleIdentifierToTUniqueId(req.sessionHandle.sessionId, &session_id, &secret),
+      SQLSTATE_GENERAL_ERROR);
+  ScopedSessionState session_handle(this);
+  shared_ptr<SessionState> session;
+  HS2_RETURN_IF_ERROR(return_val,
+      session_handle.WithSession(session_id, SecretArg::Session(secret), &session),
+      SQLSTATE_GENERAL_ERROR);
+  if (session == NULL) {
+    HS2_RETURN_ERROR(return_val,
+        Substitute("Invalid session id: $0", PrintId(session_id)),
+        SQLSTATE_GENERAL_ERROR);
+  }
+
+  ClusterMembershipMgr* cluster_membership_mgr =
+      DCHECK_NOTNULL(ExecEnv::GetInstance()->cluster_membership_mgr());
+  ClusterMembershipMgr::SnapshotPtr membership_snapshot =
+      cluster_membership_mgr->GetSnapshot();
+  DCHECK_NOTNULL(membership_snapshot.get());
+
+  // Populate an instance of TUpdateExecutorMembershipRequest
+  // with the field values retrieved from membership_snapshot
+  PopulateExecutorMembershipRequest(membership_snapshot, return_val.executor_membership);
+
+  return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
+  VLOG_RPC << "GetExecutorMembership(): return_val=" << ThriftDebugString(return_val);
+}
+
 void ImpalaServer::CancelDelegationToken(TCancelDelegationTokenResp& return_val,
     const TCancelDelegationTokenReq& req) {
   return_val.status.__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
