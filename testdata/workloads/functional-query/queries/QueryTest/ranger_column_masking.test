@@ -400,7 +400,17 @@ show create view $UNIQUE_DB.masked_view;
 ====
 ---- QUERY
 select id, bigint_col from functional.alltypesagg order by id limit 10
----- CATCH
-AnalysisException: Column-masking/Row-filtering expressions using subqueries are not
- supported (IMPALA-10483). Table(s) in the subquery: [functional.alltypestiny]
+---- RESULTS
+0,8
+0,8
+1,8
+2,8
+3,8
+4,8
+5,8
+6,8
+7,8
+8,8
+---- TYPES
+INT,BIGINT
 ====

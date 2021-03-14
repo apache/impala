@@ -25,12 +25,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.impala.authorization.TableMask;
+import org.apache.impala.authorization.User;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeCatalog;
 import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeIncompleteTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.Table;
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.Frontend;
@@ -57,6 +61,7 @@ public class StmtMetadataLoader {
   private final Frontend fe_;
   private final String sessionDb_;
   private final EventSequence timeline_;
+  private final User user_;
 
   // Results of the loading process. See StmtTableCache.
   private final Set<String> dbs_ = new HashSet<>();
@@ -100,10 +105,16 @@ public class StmtMetadataLoader {
    * The 'fe' and 'sessionDb' arguments must be non-null. A null 'timeline' may be passed
    * if no events should be marked.
    */
-  public StmtMetadataLoader(Frontend fe, String sessionDb, EventSequence timeline) {
+  public StmtMetadataLoader(Frontend fe, String sessionDb, EventSequence timeline,
+      User user) {
     fe_ = Preconditions.checkNotNull(fe);
     sessionDb_ = Preconditions.checkNotNull(sessionDb);
     timeline_ = timeline;
+    user_ = user;
+  }
+
+  public StmtMetadataLoader(Frontend fe, String sessionDb, EventSequence timeline) {
+    this(fe, sessionDb, timeline, null);
   }
 
   // Getters for testing
@@ -297,6 +308,15 @@ public class StmtMetadataLoader {
       if (tbl instanceof FeView) {
         viewTbls.addAll(collectTableCandidates(((FeView) tbl).getQueryStmt()));
       }
+      // Adds tables/views introduced by column-masking/row-filtering policies.
+      if (fe_.getAuthzFactory().getAuthorizationConfig().isEnabled()
+          && fe_.getAuthzFactory().supportsTableMasking()) {
+        try {
+          viewTbls.addAll(collectPolicyTables(tbl));
+        } catch (Exception e) {
+          LOG.error("Failed to collect policy tables for {}", tblName, e);
+        }
+      }
     }
     // Recursively collect loaded/missing tables from loaded views.
     if (!viewTbls.isEmpty()) missingTbls.addAll(getMissingTables(catalog, viewTbls));
@@ -316,6 +336,30 @@ public class StmtMetadataLoader {
     Set<TableName> tableNames = new HashSet<>();
     for (TableRef ref: tblRefs) {
       tableNames.addAll(Path.getCandidateTables(ref.getPath(), sessionDb_));
+    }
+    return tableNames;
+  }
+
+  private Set<TableName> collectPolicyTables(FeTable tbl)
+      throws InternalException, AnalysisException {
+    Set<TableName> tableNames = new HashSet<>();
+    String dbName = tbl.getDb().getName();
+    String tblName = tbl.getName();
+    List<Column> columns = tbl.getColumnsInHiveOrder();
+    TableMask tableMask = new TableMask(fe_.getAuthzChecker(), dbName, tblName, columns,
+        user_);
+    if (tableMask.needsMaskingOrFiltering()) {
+      for (Column col : columns) {
+        if (col.getType().isComplexType()) continue;
+        // Use authzCtx=null to avoid audits and privilege checks.
+        SelectStmt stmt = tableMask.createColumnMaskStmt(
+            col.getName(), col.getType(), /*authzCtx*/ null);
+        if (stmt == null) continue;
+        tableNames.addAll(collectTableCandidates(stmt));
+      }
+      // Use authzCtx=null to avoid audits and privilege checks.
+      SelectStmt filterStmt = tableMask.createRowFilterStmt(/*authzCtx*/null);
+      if (filterStmt != null) tableNames.addAll(collectTableCandidates(filterStmt));
     }
     return tableNames;
   }

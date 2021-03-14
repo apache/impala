@@ -382,6 +382,8 @@ public class Frontend {
 
   public FeCatalog getCatalog() { return catalogManager_.getOrCreateCatalog(); }
 
+  public AuthorizationFactory getAuthzFactory() { return authzFactory_; }
+
   public AuthorizationChecker getAuthzChecker() { return authzChecker_.get(); }
 
   public AuthorizationManager getAuthzManager() { return authzManager_; }
@@ -1628,8 +1630,9 @@ public class Frontend {
     // Parse stmt and collect/load metadata to populate a stmt-local table cache
     StatementBase stmt = Parser.parse(
         queryCtx.client_request.stmt, queryCtx.client_request.query_options);
+    User user = new User(TSessionStateUtil.getEffectiveUser(queryCtx.session));
     StmtMetadataLoader metadataLoader =
-        new StmtMetadataLoader(this, queryCtx.session.database, timeline);
+        new StmtMetadataLoader(this, queryCtx.session.database, timeline, user);
     //TODO (IMPALA-8788): should load table write ids in transaction context.
     StmtTableCache stmtTableCache = metadataLoader.loadTables(stmt);
 
