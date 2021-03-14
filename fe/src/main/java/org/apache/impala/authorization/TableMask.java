@@ -75,10 +75,7 @@ public class TableMask {
     return authChecker_.needsRowFiltering(user_, dbName_, tableName_);
   }
 
-  /**
-   * Return the masked Expr of the given column
-   */
-  public Expr createColumnMask(String colName, Type colType,
+  public SelectStmt createColumnMaskStmt(String colName, Type colType,
       AuthorizationContext authzCtx) throws InternalException,
       AnalysisException {
     Preconditions.checkState(!colType.isComplexType());
@@ -89,7 +86,7 @@ public class TableMask {
           dbName_, tableName_, colName, maskedValue);
     }
     if (maskedValue == null || maskedValue.equals(colName)) {  // Don't need masking.
-      return new SlotRef(Lists.newArrayList(colName));
+      return null;
     }
     SelectStmt maskStmt = (SelectStmt) Parser.parse(
         String.format("SELECT CAST(%s AS %s)", maskedValue, colType));
@@ -97,6 +94,17 @@ public class TableMask {
         || maskStmt.hasHavingClause() || maskStmt.hasWhereClause()) {
       throw new AnalysisException("Illegal column masked value: " + maskedValue);
     }
+    return maskStmt;
+  }
+
+  /**
+   * Return the masked Expr of the given column
+   */
+  public Expr createColumnMask(String colName, Type colType,
+      AuthorizationContext authzCtx) throws InternalException,
+      AnalysisException {
+    SelectStmt maskStmt = createColumnMaskStmt(colName, colType, authzCtx);
+    if (maskStmt == null) return new SlotRef(Lists.newArrayList(colName));
     Expr res = maskStmt.getSelectList().getItems().get(0).getExpr();
     if (LOG.isTraceEnabled()) {
       LOG.trace("Returned Expr: " + res.toSql());
@@ -104,16 +112,22 @@ public class TableMask {
     return res;
   }
 
-  /**
-   * Return the row filter Expr
-   */
-  public Expr createRowFilter(AuthorizationContext authzCtx)
+  public SelectStmt createRowFilterStmt(AuthorizationContext authzCtx)
       throws InternalException, AnalysisException {
     String rowFilter = authChecker_.createRowFilter(user_, dbName_, tableName_, authzCtx);
     if (rowFilter == null) return null;
     // Parse the row filter string to AST by using it in a fake query.
     String stmtSql = String.format("SELECT 1 FROM foo WHERE %s", rowFilter);
-    SelectStmt selectStmt = (SelectStmt) Parser.parse(stmtSql);
+    return (SelectStmt) Parser.parse(stmtSql);
+  }
+
+  /**
+   * Return the row filter Expr
+   */
+  public Expr createRowFilter(AuthorizationContext authzCtx)
+      throws InternalException, AnalysisException {
+    SelectStmt selectStmt = createRowFilterStmt(authzCtx);
+    if (selectStmt == null) return null;
     return selectStmt.getWhereClause();
   }
 }

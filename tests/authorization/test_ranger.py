@@ -720,21 +720,34 @@ class TestRanger(CustomClusterTestSuite):
   @staticmethod
   def _add_multiuser_row_filtering_policy(policy_name, db, table, users, filters):
     """Adds a row filtering policy on 'db'.'table' and returns the policy id.
+    If len(filters) == 1, all users use the same filter. Otherwise,
     users[0] has filters[0], users[1] has filters[1] and so on."""
     assert len(users) > 0
-    assert len(users) == len(filters)
+    assert len(filters) == 1 or len(users) == len(filters)
     items = []
-    for i in range(len(users)):
+    if len(filters) == 1:
       items.append({
-          "accesses": [
-            {
-              "type": "select",
-              "isAllowed": True
-            }
-          ],
-          "users": [users[i]],
-          "rowFilterInfo": {"filterExpr": filters[i]}
-        })
+        "accesses": [
+          {
+            "type": "select",
+            "isAllowed": True
+          }
+        ],
+        "users": users,
+        "rowFilterInfo": {"filterExpr": filters[0]}
+      })
+    else:
+      for i in range(len(users)):
+        items.append({
+            "accesses": [
+              {
+                "type": "select",
+                "isAllowed": True
+              }
+            ],
+            "users": [users[i]],
+            "rowFilterInfo": {"filterExpr": filters[i]}
+          })
     TestRanger._add_row_filtering_policy_with_items(policy_name, db, table, items)
 
   @staticmethod
@@ -1196,15 +1209,94 @@ class TestRanger(CustomClusterTestSuite):
       assert self.client.execute(query).get_data() == "0"
       assert non_owner_client.execute(query, user="non_owner").get_data() == "1"
       assert non_owner_2_client.execute(query, user="non_owner_2").get_data() == "2"
+
+      #######################################################
+      # Test row filters that contains complex subqueries
+      #######################################################
+      admin_client.execute("""create table %s.employee (
+          e_id bigint,
+          e_name string,
+          e_nation string)
+          stored as textfile""" % unique_database)
+      admin_client.execute("""insert into %s.employee values
+          (0, '%s', 'CHINA'),
+          (1, 'non_owner', 'PERU'),
+          (2, 'non_owner2', 'IRAQ')
+          """ % (unique_database, user))
+      admin_client.execute("grant select on table %s.employee to user %s"
+                           % (unique_database, user))
+      admin_client.execute("grant select on table %s.employee to user non_owner"
+                           % unique_database)
+      admin_client.execute("grant select on table %s.employee to user non_owner_2"
+                           % unique_database)
+      admin_client.execute("grant select on database tpch to user %s" % user)
+      admin_client.execute("grant select on database tpch to user non_owner")
+      admin_client.execute("grant select on database tpch to user non_owner_2")
+
+      # Each employee can only see customers in the same nation.
+      row_filter_tmpl = """c_nationkey in (
+            select n_nationkey from tpch.nation
+            where n_name in (
+              select e_nation from {db}.employee
+              where e_name = %s
+            )
+          )""".format(db=unique_database)
+      TestRanger._add_multiuser_row_filtering_policy(
+          unique_name + str(policy_cnt), "tpch", "customer",
+          [user, 'non_owner', 'non_owner_2'], [row_filter_tmpl % "current_user()"])
+      policy_cnt += 1
+      admin_client.execute("refresh authorization")
+
+      user_query = "select count(*) from tpch.customer"
+      admin_query_tmpl = user_query + " where " + row_filter_tmpl
+      self._verified_multiuser_results(
+          admin_client, admin_query_tmpl, user_query,
+          [user, 'non_owner', 'non_owner_2'],
+          [self.client, non_owner_client, non_owner_2_client])
+
+      tpch_q10_tmpl = """select c_custkey, c_name,
+          sum(l_extendedprice * (1 - l_discount)) as revenue,
+          c_acctbal, n_name, c_address, c_phone, c_comment
+        from {customer_place_holder}, tpch.orders, tpch.lineitem, tpch.nation
+        where
+          c_custkey = o_custkey and l_orderkey = o_orderkey
+          and o_orderdate >= '1993-10-01' and o_orderdate < '1994-01-01'
+          and l_returnflag = 'R' and c_nationkey = n_nationkey
+        group by c_custkey, c_name, c_acctbal, c_phone, n_name, c_address, c_comment
+        order by revenue desc, c_custkey
+        limit 20"""
+      user_query = tpch_q10_tmpl.format(customer_place_holder="tpch.customer")
+      admin_value = "(select * from tpch.customer where " + row_filter_tmpl + ") v"
+      admin_query_tmpl = tpch_q10_tmpl.format(customer_place_holder=admin_value)
+      self._verified_multiuser_results(
+          admin_client, admin_query_tmpl, user_query,
+          [user, 'non_owner', 'non_owner_2'],
+          [self.client, non_owner_client, non_owner_2_client])
     finally:
       for i in range(policy_cnt):
         TestRanger._remove_policy(unique_name + str(i))
       cleanup_statements = [
         "revoke select on table functional_parquet.alltypestiny from user non_owner",
-        "revoke select on table functional_parquet.alltypestiny from user non_owner_2"
+        "revoke select on table functional_parquet.alltypestiny from user non_owner_2",
+        "revoke select on database tpch from user non_owner",
+        "revoke select on database tpch from user non_owner_2",
+        "revoke select on table %s.employee from user %s" % (unique_database, user),
+        "revoke select on table %s.employee from user non_owner" % unique_database,
+        "revoke select on table %s.employee from user non_owner_2" % unique_database,
       ]
       for statement in cleanup_statements:
-        admin_client.execute(statement, user=ADMIN)
+        try:
+          admin_client.execute(statement, user=ADMIN)
+        except Exception as e:
+          LOG.error("Ignored exception in cleanup: " + str(e))
+
+  def _verified_multiuser_results(self, admin_client, admin_query_tmpl, user_query, users,
+                                 user_clients):
+    assert len(users) == len(user_clients)
+    for i in range(len(users)):
+      admin_res = admin_client.execute(admin_query_tmpl % ("'%s'" % users[i])).get_data()
+      user_res = user_clients[i].execute(user_query).get_data()
+      assert admin_res == user_res
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(

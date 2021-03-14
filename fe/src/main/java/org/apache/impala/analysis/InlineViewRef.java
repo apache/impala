@@ -171,21 +171,6 @@ public class InlineViewRef extends TableRef {
     Expr wherePredicate = tableMask.createRowFilter(authzCtx);
     SelectStmt tableMaskStmt = new SelectStmt(selectList, fromClause, wherePredicate,
         null, null, null, null);
-    // TODO(IMPALA-10483): Column-masking/Row-filtering expressions may have subqueries
-    //  which may introduce new tables. We should trigger StmtMetadataLoader#loadTables()
-    //  on 'tableMaskStmt'. Otherwise, they can't be resolved. Reject the query in this
-    //  case.
-    List<TableRef> tableRefsInView = tableMaskStmt.collectTableRefs();
-    // Should only contain the base table ref.
-    if (tableRefsInView.size() > 1) {
-      tableRefsInView.remove(tableRef);
-      throw new AnalysisException("Column-masking/Row-filtering expressions using " +
-          "subqueries are not supported (IMPALA-10483). Table(s) in the subquery: " +
-          tableRefsInView.stream()
-              .map(t -> String.join(".", t.getPath()))
-              .collect(Collectors.toList())
-      );
-    }
 
     InlineViewRef viewRef = new InlineViewRef(/*alias*/ null, tableMaskStmt,
         (TableSampleClause) null);
@@ -418,7 +403,9 @@ public class InlineViewRef extends TableRef {
     Preconditions.checkState(queryStmt_ instanceof SelectStmt);
     SelectStmt selectStmt = (SelectStmt) queryStmt_;
     Preconditions.checkNotNull(selectStmt.fromClause_);
-    Preconditions.checkState(selectStmt.fromClause_.size() == 1);
+    // FromClause could have several table refs due to subquery rewrite, i.e. subquery
+    // could be rewritten to joins. The first table refs is the original table ref.
+    Preconditions.checkState(selectStmt.fromClause_.size() > 0);
     return selectStmt.fromClause_.get(0);
   }
 

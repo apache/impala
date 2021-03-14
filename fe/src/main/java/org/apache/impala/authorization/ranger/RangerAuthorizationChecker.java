@@ -360,12 +360,13 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   @Override
   public String createColumnMask(User user, String dbName, String tableName,
       String columnName, AuthorizationContext rangerCtx) throws InternalException {
-    RangerBufferAuditHandler auditHandler =
+    RangerBufferAuditHandler auditHandler = (rangerCtx == null) ? null:
         ((RangerAuthorizationContext) rangerCtx).getAuditHandler();
-    int numAuthzAuditEventsBefore = auditHandler.getAuthzEvents().size();
+    int numAuthzAuditEventsBefore = (auditHandler == null) ? 0 :
+        auditHandler.getAuthzEvents().size();
     RangerAccessResult accessResult = evalColumnMask(user, dbName, tableName, columnName,
         auditHandler);
-    if (!accessResult.isMaskEnabled()) {
+    if (!accessResult.isMaskEnabled() && auditHandler != null) {
       // No column masking policies, remove any possible stale audit events and
       // return the original column.
       removeStaleAudits(auditHandler, numAuthzAuditEventsBefore);
@@ -407,12 +408,13 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   @Override
   public String createRowFilter(User user, String dbName, String tableName,
       AuthorizationContext rangerCtx) throws InternalException {
-    RangerBufferAuditHandler auditHandler =
+    RangerBufferAuditHandler auditHandler = (rangerCtx == null) ? null :
         ((RangerAuthorizationContext) rangerCtx).getAuditHandler();
-    int numAuthzAuditEventsBefore = auditHandler.getAuthzEvents().size();
+    int numAuthzAuditEventsBefore = (auditHandler == null) ? 0 :
+        auditHandler.getAuthzEvents().size();
     RangerAccessResult accessResult = evalRowFilter(user, dbName, tableName,
         auditHandler);
-    if (!accessResult.isRowFilterEnabled()) {
+    if (!accessResult.isRowFilterEnabled() && auditHandler != null) {
       // No row filtering policies, remove any possible stale audit events.
       removeStaleAudits(auditHandler, numAuthzAuditEventsBefore);
       return null;

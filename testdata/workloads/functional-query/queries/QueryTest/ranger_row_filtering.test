@@ -340,19 +340,106 @@ select * from $UNIQUE_DB.masked_view
 INT
 ====
 ---- QUERY
-# TODO(IMPALA-10483): support using subquery on the same table as the row-filter expression
-select count(*) from functional.alltypesagg
+# Test subquery row filter "id = (select min(id) from functional.alltypesagg)".
+# The row filter won't be recursively applied in the subquery.
+select id, bool_col, string_col from functional.alltypesagg
 ---- RESULTS
----- CATCH
-AnalysisException: Column-masking/Row-filtering expressions using subqueries are not
- supported (IMPALA-10483). Table(s) in the subquery: [functional.alltypesagg]
+0,true,'0'
+0,true,'0'
+---- TYPES
+INT,BOOLEAN,STRING
 ====
 ---- QUERY
-# TODO(IMPALA-10483): support using subquery on other tables as the row-filter expression
+# Test subquery row filter "id = (select min(id) from functional.alltypesagg)".
+# The row filter won't be recursively applied in the subquery.
+select count(*) from functional.alltypesagg
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test subquery row filter "id in (select id from functional.alltypestiny)".
+# Row filter (id % 2 = 0) of functional.alltypestiny won't be recursively applied.
+# This is consistent with Hive.
+select id, bool_col, string_col from functional_parquet.alltypesagg
+---- RESULTS
+0,true,'0'
+0,true,'0'
+1,false,'1'
+2,true,'2'
+3,false,'3'
+4,true,'4'
+5,false,'5'
+6,true,'6'
+7,false,'7'
+---- TYPES
+INT,BOOLEAN,STRING
+====
+---- QUERY
+# Test subquery row filter "id in (select id from functional.alltypestiny)".
+# Row filter (id % 2 = 0) of functional.alltypestiny won't be recursively applied.
+# This is consistent with Hive.
 select count(*) from functional_parquet.alltypesagg
----- CATCH
-AnalysisException: Column-masking/Row-filtering expressions using subqueries are not
- supported (IMPALA-10483). Table(s) in the subquery: [functional.alltypestiny]
+---- RESULTS
+9
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test subquery row filter "id in (select id from functional.alltypestiny)".
+# Row filter (id % 2 = 0) of functional.alltypestiny will be applied on t. It won't be
+# recursively applied in the row filter of functional_parquet.alltypesagg.
+select t.id, t.bool_col, t.string_col
+from functional.alltypestiny t join functional_parquet.alltypesagg a on t.id = a.id
+---- RESULTS
+0,true,'0'
+0,true,'0'
+2,true,'0'
+4,true,'0'
+6,true,'0'
+---- TYPES
+INT,BOOLEAN,STRING
+====
+---- QUERY
+# Same as the above query but adding a WHERE clause
+select t.id, t.bool_col, t.string_col
+from functional.alltypestiny t join functional_parquet.alltypesagg a on t.id = a.id
+where t.id != 0 and a.id < 3
+---- RESULTS
+2,true,'0'
+---- TYPES
+INT,BOOLEAN,STRING
+====
+---- QUERY
+# Test subquery row filter "id in (select id from functional.alltypestiny)".
+# Row filter (id % 2 = 0) of functional.alltypestiny will be applied on t. It won't be
+# recursively applied in the row filter of functional_parquet.alltypesagg.
+select a.id, a.bool_col, a.string_col, t.id, t.bool_col, t.string_col
+from functional_parquet.alltypesagg a left join functional.alltypestiny t on t.id = a.id
+---- RESULTS
+0,true,'0',0,true,'0'
+0,true,'0',0,true,'0'
+1,false,'1',NULL,NULL,'NULL'
+2,true,'2',2,true,'0'
+3,false,'3',NULL,NULL,'NULL'
+4,true,'4',4,true,'0'
+5,false,'5',NULL,NULL,'NULL'
+6,true,'6',6,true,'0'
+7,false,'7',NULL,NULL,'NULL'
+---- TYPES
+INT,BOOLEAN,STRING,INT,BOOLEAN,STRING
+====
+---- QUERY
+# Test subquery row filter "id in (select id from functional.alltypestiny)" in local
+# views.
+with v1 as (select id, bool_col, string_col from functional_parquet.alltypesagg),
+  v2 as (select id, count(*) cnt from functional_parquet.alltypesagg group by id)
+select count(*) from v1 join v2 on v1.id = v2.id
+---- RESULTS
+9
+---- TYPES
+BIGINT
 ====
 ---- QUERY
 # Row-filtering policy keeps rows with "nested_struct.a is not NULL"
