@@ -50,13 +50,13 @@ Status LocalAdmissionControlClient::SubmitForAdmission(
 
 void LocalAdmissionControlClient::ReleaseQuery(int64_t peak_mem_consumption) {
   ExecEnv::GetInstance()->admission_controller()->ReleaseQuery(
-      query_id_, peak_mem_consumption);
+      query_id_, ExecEnv::GetInstance()->backend_id(), peak_mem_consumption);
 }
 
 void LocalAdmissionControlClient::ReleaseQueryBackends(
     const vector<NetworkAddressPB>& host_addrs) {
   ExecEnv::GetInstance()->admission_controller()->ReleaseQueryBackends(
-      query_id_, host_addrs);
+      query_id_, ExecEnv::GetInstance()->backend_id(), host_addrs);
 }
 
 void LocalAdmissionControlClient::CancelAdmission() {

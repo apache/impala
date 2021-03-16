@@ -1153,6 +1153,10 @@ class ImpalaServer : public ImpalaServiceIf,
   /// status report in greater than GetMaxReportRetryMs().
   [[noreturn]] void UnresponsiveBackendThread();
 
+  /// If the admission control service is enabled, periodically sends a list of all
+  /// current query ids to the admissiond.
+  [[noreturn]] void AdmissionHeartbeatThread();
+
   /// Called from ExpireQueries() to check query resource limits for 'crs'. If the query
   /// exceeded a resource limit, returns a non-OK status with information about what
   /// limit was exceeded. Returns OK if the query will continue running and expiration
@@ -1253,6 +1257,9 @@ class ImpalaServer : public ImpalaServiceIf,
 
   /// Thread that runs UnresponsiveBackendThread().
   std::unique_ptr<Thread> unresponsive_backend_thread_;
+
+  /// Thread that runs AdmissionHeartbeatThread().
+  std::unique_ptr<Thread> admission_heartbeat_thread_;
 
   /// The QueryDriverMap maps query ids to QueryDrivers. The QueryDrivers are owned by the
   /// ImpalaServer and QueryDriverMap references them using shared_ptr to allow

@@ -57,7 +57,9 @@
 #include "exec/external-data-source-executor.h"
 #include "exprs/timezone_db.h"
 #include "gen-cpp/CatalogService_constants.h"
+#include "gen-cpp/admission_control_service.proxy.h"
 #include "kudu/rpc/rpc_context.h"
+#include "kudu/rpc/rpc_controller.h"
 #include "kudu/util/random_util.h"
 #include "rpc/authentication.h"
 #include "rpc/rpc-mgr.h"
@@ -72,6 +74,7 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "runtime/tmp-file-mgr.h"
+#include "scheduling/admission-control-service.h"
 #include "scheduling/admission-controller.h"
 #include "service/cancellation-work.h"
 #include "service/client-request-state.h"
@@ -335,6 +338,11 @@ DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,
     "be converted from UTC to local time. Writes are unaffected. "
     "Can be overriden with the query option with the same name.");
 
+DEFINE_int32(admission_heartbeat_frequency_ms, 1000,
+    "(Advanced) The time in milliseconds to wait between sending heartbeats to the "
+    "admission service, if enabled. Heartbeats are used to ensure resources are properly "
+    "accounted for even if rpcs to the admission service occasionally fail.");
+
 namespace {
 using namespace impala;
 
@@ -535,6 +543,11 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     ABORT_IF_ERROR(Thread::Create("impala-server", "unresponsive-backend-thread",
         bind<void>(&ImpalaServer::UnresponsiveBackendThread, this),
         &unresponsive_backend_thread_));
+  }
+  if (exec_env_->AdmissionServiceEnabled()) {
+    ABORT_IF_ERROR(Thread::Create("impala-server", "admission-heartbeat-thread",
+        bind<void>(&ImpalaServer::AdmissionHeartbeatThread, this),
+        &admission_heartbeat_thread_));
   }
 
   is_coordinator_ = FLAGS_is_coordinator;
@@ -2720,6 +2733,41 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
       cancellation_thread_pool_->Offer(cancellation_work);
     }
     SleepForMs(max_lag_ms * 0.1);
+  }
+}
+
+[[noreturn]] void ImpalaServer::AdmissionHeartbeatThread() {
+  while (true) {
+    SleepForMs(FLAGS_admission_heartbeat_frequency_ms);
+    std::unique_ptr<AdmissionControlServiceProxy> proxy;
+    Status get_proxy_status = AdmissionControlService::GetProxy(&proxy);
+    if (!get_proxy_status.ok()) {
+      LOG(ERROR) << "Admission heartbeat thread was unabe to get an "
+                    "AdmissionControlService proxy:"
+                 << get_proxy_status;
+      continue;
+    }
+
+    AdmissionHeartbeatRequestPB request;
+    AdmissionHeartbeatResponsePB response;
+    *request.mutable_host_id() = exec_env_->backend_id();
+    query_driver_map_.DoFuncForAllEntries(
+        [&](const std::shared_ptr<QueryDriver>& query_driver) {
+          ClientRequestState* request_state = query_driver->GetActiveClientRequestState();
+          TUniqueIdToUniqueIdPB(request_state->query_id(), request.add_query_ids());
+        });
+
+    kudu::rpc::RpcController rpc_controller;
+    kudu::Status rpc_status =
+        proxy->AdmissionHeartbeat(request, &response, &rpc_controller);
+    if (!rpc_status.ok()) {
+      LOG(ERROR) << "Admission heartbeat rpc failed: " << rpc_status.ToString();
+      continue;
+    }
+    Status heartbeat_status(response.status());
+    if (!heartbeat_status.ok()) {
+      LOG(ERROR) << "Admission heartbeat failed: " << heartbeat_status;
+    }
   }
 }
 

@@ -36,7 +36,17 @@ namespace impala {
 class AdmissionControlServiceProxy;
 
 /// Implementation of AdmissionControlClient used to submit queries for admission to an
-/// AdmissionController running locally on the coordinator.
+/// AdmissionController running remotely in an admissiond.
+///
+/// Handles retrying of rpcs for fault tolerance:
+/// - For the AdmitQuery() rpc, retries with jitter and backoff for a configurable amount
+///   of time, then fails the query if unsuccessful. The default retry time was chosen as
+///   a larger value (60 seconds) to minimize the number of failed queries when the
+///   admissiond is restarted or temporarily unavailable.
+/// - For the ReleaseQuery(), ReleaseQueryBackends(), and CancelAdmission() rpcs, retries
+///   just 3 times before giving up. Failures of these rpcs are not considered to fail the
+///   overall query, and there are other mechanisms in place to ensure resources are
+///   eventually released regardless of failures of these rpcs, eg. AdmissionHeartbeat.
 class RemoteAdmissionControlClient : public AdmissionControlClient {
  public:
   RemoteAdmissionControlClient(const TQueryCtx& query_ctx);

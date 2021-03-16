@@ -220,6 +220,18 @@ message CancelAdmissionResponsePB {
   optional StatusPB status = 1;
 }
 
+message AdmissionHeartbeatRequestPB {
+  // The backend id for the coordinator sending this heartbeat.
+  optional UniqueIdPB host_id = 1;
+
+  // A list of all queries registered at this coordinator.
+  repeated UniqueIdPB query_ids = 2;
+}
+
+message AdmissionHeartbeatResponsePB {
+  optional StatusPB status = 1;
+}
+
 service AdmissionControlService {
   /// Called by the coordinator to start scheduling. The actual work is done on a thread
   /// pool, so this call returns immedately. Idempotent - if the query has already been
@@ -250,4 +262,13 @@ service AdmissionControlService {
   /// Called by the coordinator to cancel scheduling of a query for which GetQueryStatus
   /// has not yet returned a schedule.
   rpc CancelAdmission(CancelAdmissionRequestPB) returns (CancelAdmissionResponsePB);
+
+  /// Used to ensure that the admission service and coordinator have a consistent view of
+  /// what resources are being used even in the face of possible rpc failures.
+  /// Periodically called by each coordinator with a list of query ids for all queries at
+  /// that coordinator. If the admissiond has resources allocated to a query that is not
+  /// included in the list, it assumes the query has completed and releases it's remaining
+  /// resources.
+  rpc AdmissionHeartbeat(AdmissionHeartbeatRequestPB)
+      returns (AdmissionHeartbeatResponsePB);
 }

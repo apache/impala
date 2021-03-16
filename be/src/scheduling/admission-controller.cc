@@ -683,11 +683,14 @@ void AdmissionController::PoolStats::ReleaseQuery(int64_t peak_mem_consumption) 
   DCHECK_GE(agg_num_running_, 0);
 
   // Update the 'peak_mem_histogram' based on the given peak memory consumption of the
-  // query.
-  int64_t histogram_bucket =
-      BitUtil::RoundUp(peak_mem_consumption, HISTOGRAM_BIN_SIZE) / HISTOGRAM_BIN_SIZE;
-  histogram_bucket = std::max(std::min(histogram_bucket, HISTOGRAM_NUM_OF_BINS), 1L) - 1;
-  peak_mem_histogram_[histogram_bucket] = ++(peak_mem_histogram_[histogram_bucket]);
+  // query, if provided.
+  if (peak_mem_consumption != -1) {
+    int64_t histogram_bucket =
+        BitUtil::RoundUp(peak_mem_consumption, HISTOGRAM_BIN_SIZE) / HISTOGRAM_BIN_SIZE;
+    histogram_bucket =
+        std::max(std::min(histogram_bucket, HISTOGRAM_NUM_OF_BINS), 1L) - 1;
+    peak_mem_histogram_[histogram_bucket] = ++(peak_mem_histogram_[histogram_bucket]);
+  }
 }
 
 void AdmissionController::PoolStats::ReleaseMem(int64_t mem_to_release) {
@@ -1210,7 +1213,7 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
         return Status::CANCELLED;
       }
       VLOG_QUERY << "Admitting query id=" << PrintId(request.query_id);
-      AdmitQuery(queue_node->admitted_schedule.get(), false);
+      AdmitQuery(queue_node, false);
       stats->UpdateWaitTime(0);
       VLOG_RPC << "Final: " << stats->DebugString();
       *schedule_result = move(queue_node->admitted_schedule->query_schedule_pb());
@@ -1343,14 +1346,24 @@ Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
   }
 }
 
-void AdmissionController::ReleaseQuery(
-    const UniqueIdPB& query_id, int64_t peak_mem_consumption) {
+void AdmissionController::ReleaseQuery(const UniqueIdPB& query_id,
+    const UniqueIdPB& coord_id, int64_t peak_mem_consumption) {
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
-    auto it = running_queries_.find(query_id);
-    if (it == running_queries_.end()) {
-      LOG(DFATAL) << "Unable to find resources to release for query "
-                  << PrintId(query_id);
+    auto host_it = running_queries_.find(coord_id);
+    if (host_it == running_queries_.end()) {
+      LOG(DFATAL) << "Unable to find host " << PrintId(coord_id)
+                  << " to get resources to release for query " << PrintId(query_id)
+                  << ", may have already been released.";
+      return;
+    }
+    auto it = host_it->second.find(query_id);
+    if (it == host_it->second.end()) {
+      // In the context of the admission control service, this may happen, eg. if a
+      // ReleaseQuery rpc is reported as failed to the coordinator but actually ends up
+      // arriving much later, so only log at WARNING level.
+      LOG(WARNING) << "Unable to find resources to release for query "
+                   << PrintId(query_id) << ", may have already been released.";
       return;
     }
 
@@ -1365,19 +1378,26 @@ void AdmissionController::ReleaseQuery(
     UpdateExecGroupMetric(running_query.executor_group, -1);
     VLOG_RPC << "Released query id=" << PrintId(query_id) << " " << stats->DebugString();
     pending_dequeue_ = true;
-    running_queries_.erase(it);
+    host_it->second.erase(it);
   }
   dequeue_cv_.NotifyOne();
 }
 
-void AdmissionController::ReleaseQueryBackends(
-    const UniqueIdPB& query_id, const vector<NetworkAddressPB>& host_addrs) {
+void AdmissionController::ReleaseQueryBackends(const UniqueIdPB& query_id,
+    const UniqueIdPB& coord_id, const vector<NetworkAddressPB>& host_addrs) {
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
-    auto it = running_queries_.find(query_id);
-    if (it == running_queries_.end()) {
-      LOG(DFATAL) << "Unable to find resources to release for query backends "
-                  << PrintId(query_id);
+    auto host_it = running_queries_.find(coord_id);
+    if (host_it == running_queries_.end()) {
+      LOG(DFATAL) << "Unable to find host " << PrintId(coord_id)
+                  << " to get resources to release backends for query "
+                  << PrintId(query_id) << ", may have already been released.";
+      return;
+    }
+    auto it = host_it->second.find(query_id);
+    if (it == host_it->second.end()) {
+      LOG(DFATAL) << "Unable to find resources to release backends for query "
+                  << PrintId(query_id) << ", may have already been released.";
       return;
     }
 
@@ -1406,6 +1426,37 @@ void AdmissionController::ReleaseQueryBackends(
     pending_dequeue_ = true;
   }
   dequeue_cv_.NotifyOne();
+}
+
+vector<UniqueIdPB> AdmissionController::CleanupQueriesForHost(
+    const UniqueIdPB& coord_id, const std::unordered_set<UniqueIdPB> query_ids) {
+  vector<UniqueIdPB> to_clean_up;
+  {
+    lock_guard<mutex> lock(admission_ctrl_lock_);
+    auto host_it = running_queries_.find(coord_id);
+    if (host_it == running_queries_.end()) {
+      // This is expected if a coordinator has not submitted any queries yet, eg. at
+      // startup, so we log at a higher level to avoid log spam.
+      VLOG(3) << "Unable to find host " << PrintId(coord_id)
+              << " to cleanup queries for.";
+      return to_clean_up;
+    }
+    for (auto entry : host_it->second) {
+      const UniqueIdPB& query_id = entry.first;
+      auto it = query_ids.find(query_id);
+      if (it == query_ids.end()) {
+        to_clean_up.push_back(query_id);
+      }
+    }
+  }
+
+  for (const UniqueIdPB& query_id : to_clean_up) {
+    LOG(INFO) << "Releasing resources for query " << PrintId(query_id)
+              << " as it's coordinator " << PrintId(coord_id)
+              << " reports that it is no longer registered.";
+    ReleaseQuery(query_id, coord_id, -1);
+  }
+  return to_clean_up;
 }
 
 Status AdmissionController::ResolvePoolAndGetConfig(
@@ -1877,7 +1928,7 @@ void AdmissionController::DequeueLoop() {
         DCHECK(!is_cancelled);
         DCHECK(!is_rejected);
         DCHECK(queue_node->admitted_schedule != nullptr);
-        AdmitQuery(queue_node->admitted_schedule.get(), true);
+        AdmitQuery(queue_node, true);
       }
       pools_for_updates_.insert(pool_name);
     }
@@ -1949,7 +2000,8 @@ AdmissionController::PoolStats* AdmissionController::GetPoolStats(
   return &it->second;
 }
 
-void AdmissionController::AdmitQuery(ScheduleState* state, bool was_queued) {
+void AdmissionController::AdmitQuery(QueueNode* node, bool was_queued) {
+  ScheduleState* state = node->admitted_schedule.get();
   VLOG_RPC << "For Query " << PrintId(state->query_id())
            << " per_backend_mem_limit set to: "
            << PrintBytes(state->per_backend_mem_limit())
@@ -1987,8 +2039,16 @@ void AdmissionController::AdmitQuery(ScheduleState* state, bool was_queued) {
   num_released_backends_[state->query_id()] = state->per_backend_schedule_states().size();
 
   // Store info about the admitted resources so that we can release them.
-  DCHECK(running_queries_.find(state->query_id()) == running_queries_.end());
-  RunningQuery& running_query = running_queries_[state->query_id()];
+  auto it = running_queries_.find(node->admission_request.coord_id);
+  if (it == running_queries_.end()) {
+    auto insert_result =
+        running_queries_.insert(make_pair(node->admission_request.coord_id,
+            std::unordered_map<UniqueIdPB, RunningQuery>()));
+    DCHECK(insert_result.second);
+    it = insert_result.first;
+  }
+  DCHECK(it->second.find(state->query_id()) == it->second.end());
+  RunningQuery& running_query = it->second[state->query_id()];
   running_query.request_pool = state->request_pool();
   running_query.executor_group = state->executor_group();
   for (const auto& entry : state->per_backend_schedule_states()) {
