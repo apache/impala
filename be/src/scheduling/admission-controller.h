@@ -20,6 +20,7 @@
 
 #include <list>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -168,11 +169,30 @@ enum class AdmissionOutcome {
 /// When queries complete they must be explicitly released from the admission controller
 /// using the methods 'ReleaseQuery' and 'ReleaseQueryBackends'. These methods release
 /// the admitted memory and decrement the number of admitted queries for the resource
-/// pool. All Backends for a query must be released via 'ReleaseQueryBackends' before the
-/// query is released using 'ReleaseQuery'. Releasing Backends releases the admitted
-/// memory used by that Backend and decrements the number of running queries on the host
-/// running that Backend. Releasing a query does not release any admitted memory, it only
-/// decrements the number of running queries in the resource pool.
+/// pool.
+///
+/// In the traditional distributed admission control mode, it is required that all
+/// backends for a query must be released via 'ReleaseQueryBackends' then the query is
+/// released using 'ReleaseQuery'. This is possible to guarantee since the coordinator
+/// and AdmissionController are running in the same process.
+///
+/// In the admission control service mode, more flexibility is allowed to maintain fault
+/// tolerance in the case of rpc failures between coordinators and the admissiond. In this
+/// case, proper resource accounting is ensured with two invariants: 1) the aggregate
+/// values of resources in use always matches the contents of 'running_queries_" 2) any
+/// query will always eventually be removed from 'running_queries_' and have all of its
+/// resources released, regardless of any failures.
+/// There are a few failure cases to consider:
+/// - ReleaseQuery rpc fails: coordinators periodically send a list of registered query
+///   ids via a heartbeat rpc, allowing the admission contoller to clean up any queries
+///   that are not in that list.
+/// - TODO(IMPALA-10594): handle the case of coordinators failing
+/// - TODO(IMPALA-10591): handle the case of a ReleaseQueryBackends rpc failing
+///
+/// Releasing Backends releases the admitted memory used by that Backend and decrements
+/// the number of running queries on the host running that Backend. Releasing a query does
+/// not release any admitted memory, it only decrements the number of running queries in
+/// the resource pool.
 ///
 /// Executor Groups:
 /// Executors in a cluster can be assigned to executor groups. Each executor can only be
@@ -358,19 +378,28 @@ class AdmissionController {
 
   /// Updates the pool statistics when a query completes (either successfully,
   /// is cancelled or failed). This should be called for all requests that have
-  /// been submitted via AdmitQuery(). 'query_id' is the completed query and
-  /// 'peak_mem_consumption' is the peak memory consumption of the query.
+  /// been submitted via AdmitQuery(). 'query_id' is the completed query, 'coord_id' is
+  /// the backend id of the coordinator for the query, and 'peak_mem_consumption' is the
+  /// peak memory consumption of the query, which may be -1 if unavailable.
   /// This does not block.
-  void ReleaseQuery(const UniqueIdPB& query_id, int64_t peak_mem_consumption);
+  void ReleaseQuery(const UniqueIdPB& query_id, const UniqueIdPB& coord_id,
+      int64_t peak_mem_consumption);
 
   /// Updates the pool statistics when a Backend running a query completes (either
   /// successfully, is cancelled or failed). This should be called for all Backends part
   /// of a query for all queries that have been submitted via AdmitQuery().
-  /// 'query_id' is the associated query and the vector of NetworkAddressPBs identify the
-  /// completed Backends.
+  /// 'query_id' is the associated query, 'coord_id' is the backend id of the coordinator
+  /// for the query, and the vector of NetworkAddressPBs identify the completed Backends.
   /// This does not block.
-  void ReleaseQueryBackends(
-      const UniqueIdPB& query_id, const vector<NetworkAddressPB>& host_addr);
+  void ReleaseQueryBackends(const UniqueIdPB& query_id, const UniqueIdPB& coord_id,
+      const vector<NetworkAddressPB>& host_addr);
+
+  /// Releases the resources for any queries that were scheduled for the coordinator
+  /// 'coord_id' that are not in the list 'query_ids'. Only used in the context of the
+  /// admission control service. Returns a list of the queries that had their resources
+  /// released.
+  std::vector<UniqueIdPB> CleanupQueriesForHost(
+      const UniqueIdPB& coord_id, const std::unordered_set<UniqueIdPB> query_ids);
 
   /// Registers the request queue topic with the statestore, starts up the dequeue thread
   /// and registers a callback with the cluster membership manager to receive updates for
@@ -822,11 +851,12 @@ class AdmissionController {
     std::unordered_map<NetworkAddressPB, BackendAllocation> per_backend_resources;
   };
 
-  /// Map from query id of currently running queries to information about the resources
-  /// that were allocated to them. Used to properly account for resources when releasing
-  /// queries.
+  /// Map from host id to a map from query id of currently running queries to information
+  /// about the resources that were allocated to them. Used to properly account for
+  /// resources when releasing queries.
   /// Protected by admission_ctrl_lock_.
-  std::unordered_map<UniqueIdPB, RunningQuery> running_queries_;
+  std::unordered_map<UniqueIdPB, std::unordered_map<UniqueIdPB, RunningQuery>>
+      running_queries_;
 
   /// Map of pool names to the pool configs returned by request_pool_service_. Stored so
   /// that the dequeue thread does not need to access the configs via the request pool
@@ -1020,7 +1050,7 @@ class AdmissionController {
   /// Sets the per host mem limit and mem admitted in the schedule and does the necessary
   /// accounting and logging on successful submission.
   /// Caller must hold 'admission_ctrl_lock_'.
-  void AdmitQuery(ScheduleState* state, bool was_queued);
+  void AdmitQuery(QueueNode* node, bool was_queued);
 
   /// Same as PoolToJson() but requires 'admission_ctrl_lock_' to be held by the caller.
   /// Is a helper method used by both PoolToJson() and AllPoolsToJson()

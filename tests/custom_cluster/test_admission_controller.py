@@ -1103,10 +1103,10 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     # Setup to queue a query.
     sleep_query_handle = self.client.execute_async("select sleep(10000)")
     self.client.wait_for_admission_control(sleep_query_handle)
-    self.__wait_for_change_to_profile(sleep_query_handle,
+    self._wait_for_change_to_profile(sleep_query_handle,
                                       "Admission result: Admitted immediately")
     queued_query_handle = self.client.execute_async("select 2")
-    self.__wait_for_change_to_profile(queued_query_handle, "Admission result: Queued")
+    self._wait_for_change_to_profile(queued_query_handle, "Admission result: Queued")
 
     # Change config to be invalid.
     llama_site_path = os.path.join(RESOURCES_DIR, "copy-mem-limit-test-llama-site.xml")
@@ -1130,7 +1130,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.client.wait_for_admission_control(sleep_query_handle)
     queued_query_handle = self.client.execute_async(
       "select * from functional_parquet.alltypes limit 1")
-    self.__wait_for_change_to_profile(queued_query_handle, "Admission result: Queued")
+    self._wait_for_change_to_profile(queued_query_handle, "Admission result: Queued")
     # Change config to something less than the what is required to accommodate the
     # largest min_reservation (which in this case is 32.09 MB.
     config.set_config_value(pool_name, config_str, 25 * 1024 * 1024)
@@ -1141,7 +1141,7 @@ class TestAdmissionController(TestAdmissionControllerBase, HS2TestSuite):
     self.wait_for_state(queued_query_handle, QueryState.EXCEPTION, 20),
     self.close_query(queued_query_handle)
 
-  def __wait_for_change_to_profile(self, query_handle, search_string, timeout=20):
+  def _wait_for_change_to_profile(self, query_handle, search_string, timeout=20):
     for _ in range(timeout * 10):
       profile = self.client.get_runtime_profile(query_handle)
       if search_string in profile:
@@ -1394,6 +1394,36 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
       assert False, "Query should have failed"
     except ImpalaBeeswaxException as e:
       assert "Failed to admit query after waiting " in str(e)
+
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--vmodule admission-controller=3 --default_pool_max_requests=1 "
+      "--debug_actions=IMPALA_SERVICE_POOL:127.0.0.1:29500:ReleaseQuery:FAIL@1.0")
+  def test_release_query_failed(self):
+    """Tests that if the ReleaseQuery rpc fails, the query's resources will eventually be
+    cleaned up. Uses the --debug_action flag to simulate rpc failures, and sets max
+    requests for the default pool as the number of requests per pool is decremented when
+    the entire query is released."""
+    # Query designed to run for a few minutes.
+    query = "select count(*) from functional.alltypes where int_col = sleep(10000)"
+    handle1 = self.execute_query_async(query)
+    timeout_s = 10
+    # Make sure the first query has been admitted.
+    self.wait_for_state(
+        handle1, self.client.QUERY_STATES['RUNNING'], timeout_s)
+
+    # Run another query. This query should be queued because only 1 query is allowed in
+    # the default pool.
+    handle2 = self.execute_query_async(query)
+    self._wait_for_change_to_profile(handle2, "Admission result: Queued")
+
+    # Cancel the first query. It's resources should be released and the second query
+    # should be admitted.
+    self.client.cancel(handle1)
+    self.client.close_query(handle1)
+    self.wait_for_state(
+        handle2, self.client.QUERY_STATES['RUNNING'], timeout_s)
 
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions

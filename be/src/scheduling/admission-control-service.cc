@@ -217,7 +217,7 @@ void AdmissionControlService::ReleaseQuery(const ReleaseQueryRequestPB* req,
     lock_guard<mutex> l(admission_state->lock);
     if (!admission_state->released) {
       AdmissiondEnv::GetInstance()->admission_controller()->ReleaseQuery(
-          req->query_id(), req->peak_mem_consumption());
+          req->query_id(), admission_state->coord_id, req->peak_mem_consumption());
       admission_state->released = true;
     } else {
       LOG(WARNING) << "Query " << req->query_id() << " was already released.";
@@ -252,7 +252,7 @@ void AdmissionControlService::ReleaseQueryBackends(
     }
 
     AdmissiondEnv::GetInstance()->admission_controller()->ReleaseQueryBackends(
-        req->query_id(), host_addrs);
+        req->query_id(), admission_state->coord_id, host_addrs);
   }
 
   RespondAndReleaseRpc(Status::OK(), resp, rpc_context);
@@ -264,6 +264,27 @@ void AdmissionControlService::CancelAdmission(const CancelAdmissionRequestPB* re
   shared_ptr<AdmissionState> admission_state;
   RESPOND_IF_ERROR(admission_state_map_.Get(req->query_id(), &admission_state));
   admission_state->admit_outcome.Set(AdmissionOutcome::CANCELLED);
+  RespondAndReleaseRpc(Status::OK(), resp, rpc_context);
+}
+
+void AdmissionControlService::AdmissionHeartbeat(const AdmissionHeartbeatRequestPB* req,
+    AdmissionHeartbeatResponsePB* resp, kudu::rpc::RpcContext* rpc_context) {
+  VLOG(2) << "AdmissionHeartbeat: host_id=" << req->host_id();
+
+  std::unordered_set<UniqueIdPB> query_ids;
+  for (const UniqueIdPB& query_id : req->query_ids()) {
+    query_ids.insert(query_id);
+  }
+  vector<UniqueIdPB> cleaned_up =
+      AdmissiondEnv::GetInstance()->admission_controller()->CleanupQueriesForHost(
+          req->host_id(), query_ids);
+
+  for (const UniqueIdPB& query_id : cleaned_up) {
+    // ShardedQueryMap::Delete will log an error already if anything goes wrong, so just
+    // ignore the return value.
+    discard_result(admission_state_map_.Delete(query_id));
+  }
+
   RespondAndReleaseRpc(Status::OK(), resp, rpc_context);
 }
 

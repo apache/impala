@@ -63,6 +63,8 @@ class AdmissionControlService : public AdmissionControlServiceIf,
       ReleaseQueryBackendsResponsePB* resp, kudu::rpc::RpcContext* context) override;
   virtual void CancelAdmission(const CancelAdmissionRequestPB* req,
       CancelAdmissionResponsePB* resp, kudu::rpc::RpcContext* context) override;
+  virtual void AdmissionHeartbeat(const AdmissionHeartbeatRequestPB* req,
+      AdmissionHeartbeatResponsePB* resp, kudu::rpc::RpcContext* context) override;
 
   /// Gets a AdmissionControlService proxy to the configured admission control service.
   /// The newly created proxy is returned in 'proxy'. Returns error status on failure.
