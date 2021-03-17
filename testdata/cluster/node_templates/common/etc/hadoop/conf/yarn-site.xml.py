@@ -64,7 +64,10 @@ CONFIG = {
   # Limit memory used by the NM to 8GB.
   # TODO(todd): auto-configure this based on the memory available on the machine
   # to speed up data-loading.
-  'yarn.nodemanager.resource.memory-mb': _get_yarn_nm_ram_mb()
+  'yarn.nodemanager.resource.memory-mb': _get_yarn_nm_ram_mb(),
+
+  # Increase YARN container resources to 2GB to avoid dataload failures
+  'yarn.app.mapreduce.am.resource.mb': 2048
 }
 
 app_classpath = [
