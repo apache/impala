@@ -12,9 +12,9 @@ PLAN-ROOT SINK
 |  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
@@ -39,9 +39,9 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=2
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
@@ -66,9 +66,9 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Instance Resources: mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=0
@@ -90,9 +90,9 @@ PLAN-ROOT SINK
 |  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
@@ -117,9 +117,9 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=2
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
@@ -144,9 +144,9 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Instance Resources: mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=0
@@ -169,7 +169,7 @@ PLAN-ROOT SINK
 |  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=201.89KB
+   HDFS partitions=24/24 files=24 size=201.80KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -199,7 +199,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=2
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=201.89KB
+   HDFS partitions=24/24 files=24 size=201.80KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -229,7 +229,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=201.89KB
+   HDFS partitions=24/24 files=24 size=201.80KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -257,7 +257,7 @@ PLAN-ROOT SINK
 |  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=201.89KB
+   HDFS partitions=24/24 files=24 size=201.80KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -288,7 +288,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=2
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=201.89KB
+   HDFS partitions=24/24 files=24 size=201.80KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -319,7 +319,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 Per-Instance Resources: mem-estimate=16.00MB mem-reservation=24.00KB thread-reservation=1
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=201.89KB
+   HDFS partitions=24/24 files=24 size=201.80KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -346,7 +346,7 @@ PLAN-ROOT SINK
 |  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [functional_parquet.alltypes]
-   HDFS partitions=24/24 files=24 size=201.89KB
+   HDFS partitions=24/24 files=24 size=201.80KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -376,7 +376,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=1.00MB mem-reservation=16.00KB thread-reservation=2
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=201.89KB
+   HDFS partitions=24/24 files=24 size=201.80KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -406,7 +406,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 Per-Instance Resources: mem-estimate=16.00MB mem-reservation=16.00KB thread-reservation=1
 00:SCAN HDFS [functional_parquet.alltypes, RANDOM]
-   HDFS partitions=24/24 files=24 size=201.89KB
+   HDFS partitions=24/24 files=24 size=201.80KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -507,11 +507,11 @@ PLAN-ROOT SINK
 |  mem-estimate=91.55MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=24.00MB thread-reservation=1
    tuple-ids=0 row-size=64B cardinality=1.50M
    in pipelines: 00(GETNEXT)
@@ -533,11 +533,11 @@ PLAN-ROOT SINK
 |  mem-estimate=22.89MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=4.00MB thread-reservation=1
    tuple-ids=0 row-size=16B cardinality=1.50M
    in pipelines: 00(GETNEXT)
@@ -558,11 +558,11 @@ PLAN-ROOT SINK
 |  mem-estimate=11.44MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [tpch_nested_parquet.customer.c_orders]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=4.00MB thread-reservation=1
    tuple-ids=0 row-size=8B cardinality=1.50M
    in pipelines: 00(GETNEXT)
@@ -608,12 +608,12 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    predicates: !empty(c.c_orders)
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=32.00MB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -657,12 +657,12 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    predicates: !empty(c.c_orders)
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -707,12 +707,12 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    predicates: !empty(c.c_orders)
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -756,12 +756,12 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    predicates: !empty(c.c_orders)
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -805,12 +805,12 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    predicates: !empty(c.c_orders)
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns: unavailable
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=4.00MB thread-reservation=1
    tuple-ids=0 row-size=12B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -876,13 +876,13 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    predicates: !empty(c.c_orders)
    predicates on o: !empty(o.o_lineitems)
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=1
    tuple-ids=0 row-size=20B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -1465,22 +1465,22 @@ select * from tpch_orc_def.lineitem
 3
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=12.00MB Threads=2
-Per-Host Resource Estimates: Memory=140MB
+Per-Host Resource Estimates: Memory=188MB
 Analyzed query: SELECT * FROM tpch_orc_def.lineitem
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=188.00MB mem-reservation=12.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: tpch_orc_def.lineitem.l_orderkey, tpch_orc_def.lineitem.l_partkey, tpch_orc_def.lineitem.l_suppkey, tpch_orc_def.lineitem.l_linenumber, tpch_orc_def.lineitem.l_quantity, tpch_orc_def.lineitem.l_extendedprice, tpch_orc_def.lineitem.l_discount, tpch_orc_def.lineitem.l_tax, tpch_orc_def.lineitem.l_returnflag, tpch_orc_def.lineitem.l_linestatus, tpch_orc_def.lineitem.l_shipdate, tpch_orc_def.lineitem.l_commitdate, tpch_orc_def.lineitem.l_receiptdate, tpch_orc_def.lineitem.l_shipinstruct, tpch_orc_def.lineitem.l_shipmode, tpch_orc_def.lineitem.l_comment
 |  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [tpch_orc_def.lineitem]
-   HDFS partitions=1/1 files=5 size=142.72MB
+   HDFS partitions=1/1 files=1 size=142.84MB
    stored statistics:
-     table: rows=6.00M size=142.72MB
+     table: rows=6.00M size=142.84MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1.73M
-   mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=1
+   extrapolated-rows=disabled max-scan-range-rows=6.00M
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=231B cardinality=6.00M
    in pipelines: 00(GETNEXT)
 ====
@@ -1516,22 +1516,22 @@ select l_comment from tpch_orc_def.lineitem
 3
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=12.00MB Threads=2
-Per-Host Resource Estimates: Memory=140MB
+Per-Host Resource Estimates: Memory=188MB
 Analyzed query: SELECT l_comment FROM tpch_orc_def.lineitem
 
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=140.00MB mem-reservation=12.00MB thread-reservation=2
+|  Per-Host Resources: mem-estimate=188.00MB mem-reservation=12.00MB thread-reservation=2
 PLAN-ROOT SINK
 |  output exprs: l_comment
 |  mem-estimate=100.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [tpch_orc_def.lineitem]
-   HDFS partitions=1/1 files=5 size=142.72MB
+   HDFS partitions=1/1 files=1 size=142.84MB
    stored statistics:
-     table: rows=6.00M size=142.72MB
+     table: rows=6.00M size=142.84MB
      columns: all
-   extrapolated-rows=disabled max-scan-range-rows=1.73M
-   mem-estimate=40.00MB mem-reservation=8.00MB thread-reservation=1
+   extrapolated-rows=disabled max-scan-range-rows=6.00M
+   mem-estimate=88.00MB mem-reservation=8.00MB thread-reservation=1
    tuple-ids=0 row-size=38B cardinality=6.00M
    in pipelines: 00(GETNEXT)
 ====
@@ -1551,7 +1551,7 @@ PLAN-ROOT SINK
 |  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [functional_orc_def.alltypes]
-   HDFS partitions=24/24 files=24 size=66.20KB
+   HDFS partitions=24/24 files=24 size=42.27KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=unavailable
@@ -1577,7 +1577,7 @@ PLAN-ROOT SINK
 |  mem-estimate=10.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
 |
 00:SCAN HDFS [functional.alltypesmixedformat]
-   HDFS partitions=4/4 files=4 size=66.55KB
+   HDFS partitions=4/4 files=4 size=66.33KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/4 rows=unavailable
@@ -1607,7 +1607,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=2
 00:SCAN HDFS [functional.alltypesmixedformat, RANDOM]
-   HDFS partitions=4/4 files=4 size=66.55KB
+   HDFS partitions=4/4 files=4 size=66.33KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/4 rows=unavailable
@@ -1637,7 +1637,7 @@ PLAN-ROOT SINK
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=4
 Per-Instance Resources: mem-estimate=16.00MB mem-reservation=88.00KB thread-reservation=1
 00:SCAN HDFS [functional.alltypesmixedformat, RANDOM]
-   HDFS partitions=4/4 files=4 size=66.55KB
+   HDFS partitions=4/4 files=4 size=66.33KB
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/4 rows=unavailable
@@ -1667,7 +1667,7 @@ PLAN-ROOT SINK
      table: rows=unavailable
      columns: unavailable
    mem-estimate=256.00KB mem-reservation=0B thread-reservation=0
-   tuple-ids=0 row-size=80B cardinality=14.30K
+   tuple-ids=0 row-size=80B cardinality=14.23K
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
@@ -1684,7 +1684,7 @@ PLAN-ROOT SINK
 |
 01:EXCHANGE [UNPARTITIONED]
 |  mem-estimate=1.17MB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0 row-size=80B cardinality=14.30K
+|  tuple-ids=0 row-size=80B cardinality=14.23K
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -1694,7 +1694,7 @@ Per-Host Resources: mem-estimate=256.00KB mem-reservation=0B thread-reservation=
      table: rows=unavailable
      columns: unavailable
    mem-estimate=256.00KB mem-reservation=0B thread-reservation=0
-   tuple-ids=0 row-size=80B cardinality=14.30K
+   tuple-ids=0 row-size=80B cardinality=14.23K
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=4.00MB Threads=2
@@ -1721,7 +1721,7 @@ Per-Instance Resources: mem-estimate=256.00KB mem-reservation=0B thread-reservat
      table: rows=unavailable
      columns: unavailable
    mem-estimate=256.00KB mem-reservation=0B thread-reservation=0
-   tuple-ids=0 row-size=80B cardinality=14.30K
+   tuple-ids=0 row-size=80B cardinality=14.23K
    in pipelines: 00(GETNEXT)
 ====
 # HBase scan on table with stats.
@@ -2020,9 +2020,9 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
@@ -2069,9 +2069,9 @@ Per-Host Resources: mem-estimate=125.79MB mem-reservation=38.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=1
@@ -2118,9 +2118,9 @@ Per-Instance Resources: mem-estimate=125.79MB mem-reservation=38.00MB thread-res
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=4.00MB thread-reservation=0
@@ -2147,9 +2147,9 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=1.00MB mem-reservation=128.00KB thread-reservation=1
@@ -2186,9 +2186,9 @@ Per-Host Resources: mem-estimate=1.02MB mem-reservation=128.00KB thread-reservat
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=1.00MB mem-reservation=128.00KB thread-reservation=1
@@ -2225,9 +2225,9 @@ Per-Instance Resources: mem-estimate=80.02MB mem-reservation=128.00KB thread-res
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=128.00KB thread-reservation=0
@@ -2256,9 +2256,9 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
@@ -2290,9 +2290,9 @@ Per-Host Resources: mem-estimate=520.26MB mem-reservation=52.00MB thread-reserva
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
@@ -2324,9 +2324,9 @@ Per-Instance Resources: mem-estimate=520.26MB mem-reservation=52.00MB thread-res
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=0
@@ -2357,9 +2357,9 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
@@ -2393,9 +2393,9 @@ Per-Host Resources: mem-estimate=80.02MB mem-reservation=40.00MB thread-reservat
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
@@ -2429,9 +2429,9 @@ Per-Instance Resources: mem-estimate=80.02MB mem-reservation=40.00MB thread-rese
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=194.00MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=0
@@ -3570,11 +3570,11 @@ PLAN-ROOT SINK
 |  |     in pipelines: 09(GETNEXT)
 |  |
 |  08:SCAN HDFS [tpch_parquet.lineitem]
-|     HDFS partitions=1/1 files=3 size=193.98MB
+|     HDFS partitions=1/1 files=3 size=193.99MB
 |     predicates: l_shipmode = 'F'
 |     runtime filters: RF004[bloom] -> l_orderkey
 |     stored statistics:
-|       table: rows=6.00M size=193.98MB
+|       table: rows=6.00M size=193.99MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     parquet statistics predicates: l_shipmode = 'F'
@@ -3605,10 +3605,10 @@ PLAN-ROOT SINK
 |  |     in pipelines: 06(GETNEXT)
 |  |
 |  05:SCAN HDFS [tpch_parquet.lineitem]
-|     HDFS partitions=1/1 files=3 size=193.98MB
+|     HDFS partitions=1/1 files=3 size=193.99MB
 |     runtime filters: RF002[bloom] -> l_orderkey
 |     stored statistics:
-|       table: rows=6.00M size=193.98MB
+|       table: rows=6.00M size=193.99MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=1
@@ -3640,11 +3640,11 @@ PLAN-ROOT SINK
 |     in pipelines: 02(GETNEXT)
 |
 01:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    predicates: l_tax > CAST(10 AS DECIMAL(3,0))
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    parquet statistics predicates: l_tax > CAST(10 AS DECIMAL(3,0))
@@ -3709,11 +3709,11 @@ Per-Host Resources: mem-estimate=167.47MB mem-reservation=60.00MB thread-reserva
 |  |     in pipelines: 09(GETNEXT)
 |  |
 |  08:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-|     HDFS partitions=1/1 files=3 size=193.98MB
+|     HDFS partitions=1/1 files=3 size=193.99MB
 |     predicates: l_shipmode = 'F'
 |     runtime filters: RF004[bloom] -> l_orderkey
 |     stored statistics:
-|       table: rows=6.00M size=193.98MB
+|       table: rows=6.00M size=193.99MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     parquet statistics predicates: l_shipmode = 'F'
@@ -3751,10 +3751,10 @@ Per-Host Resources: mem-estimate=167.47MB mem-reservation=60.00MB thread-reserva
 |  |     in pipelines: 06(GETNEXT)
 |  |
 |  05:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-|     HDFS partitions=1/1 files=3 size=193.98MB
+|     HDFS partitions=1/1 files=3 size=193.99MB
 |     runtime filters: RF002[bloom] -> l_orderkey
 |     stored statistics:
-|       table: rows=6.00M size=193.98MB
+|       table: rows=6.00M size=193.99MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=1
@@ -3813,11 +3813,11 @@ Per-Host Resources: mem-estimate=67.98MB mem-reservation=52.00MB thread-reservat
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Resources: mem-estimate=81.00MB mem-reservation=25.00MB thread-reservation=2 runtime-filters-memory=1.00MB
 01:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    predicates: l_tax > CAST(10 AS DECIMAL(3,0))
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    parquet statistics predicates: l_tax > CAST(10 AS DECIMAL(3,0))
@@ -3891,11 +3891,11 @@ Per-Instance Resources: mem-estimate=80.00MB mem-reservation=24.00MB thread-rese
 |  |     in pipelines: 09(GETNEXT)
 |  |
 |  08:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-|     HDFS partitions=1/1 files=3 size=193.98MB
+|     HDFS partitions=1/1 files=3 size=193.99MB
 |     predicates: l_shipmode = 'F'
 |     runtime filters: RF004[bloom] -> l_orderkey
 |     stored statistics:
-|       table: rows=6.00M size=193.98MB
+|       table: rows=6.00M size=193.99MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     parquet statistics predicates: l_shipmode = 'F'
@@ -3941,10 +3941,10 @@ Per-Instance Resources: mem-estimate=80.00MB mem-reservation=24.00MB thread-rese
 |  |     in pipelines: 06(GETNEXT)
 |  |
 |  05:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-|     HDFS partitions=1/1 files=3 size=193.98MB
+|     HDFS partitions=1/1 files=3 size=193.99MB
 |     runtime filters: RF002[bloom] -> l_orderkey
 |     stored statistics:
-|       table: rows=6.00M size=193.98MB
+|       table: rows=6.00M size=193.99MB
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=2.14M
 |     mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=0
@@ -4012,11 +4012,11 @@ F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
 Per-Instance Resources: mem-estimate=80.00MB mem-reservation=24.00MB thread-reservation=1
 01:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    predicates: l_tax > CAST(10 AS DECIMAL(3,0))
    runtime filters: RF000[bloom] -> l_orderkey
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    parquet statistics predicates: l_tax > CAST(10 AS DECIMAL(3,0))
@@ -4855,11 +4855,11 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=1
    tuple-ids=0 row-size=54B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -4951,11 +4951,11 @@ Per-Host Resources: mem-estimate=345.94MB mem-reservation=85.94MB thread-reserva
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=1
    tuple-ids=0 row-size=54B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -5047,11 +5047,11 @@ Per-Instance Resources: mem-estimate=345.94MB mem-reservation=85.94MB thread-res
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders, c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=16.00MB thread-reservation=0
    tuple-ids=0 row-size=54B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -5143,11 +5143,11 @@ PLAN-ROOT SINK
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=56.00MB thread-reservation=1
    tuple-ids=0 row-size=230B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -5237,11 +5237,11 @@ Per-Host Resources: mem-estimate=136.00MB mem-reservation=104.00MB thread-reserv
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=56.00MB thread-reservation=1
    tuple-ids=0 row-size=230B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -5331,11 +5331,11 @@ Per-Instance Resources: mem-estimate=136.00MB mem-reservation=104.00MB thread-re
 |     in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c, RANDOM]
-   HDFS partitions=1/1 files=4 size=289.07MB
+   HDFS partitions=1/1 files=4 size=288.99MB
    stored statistics:
-     table: rows=150.00K size=289.07MB
+     table: rows=150.00K size=288.99MB
      columns missing stats: c_orders
-   extrapolated-rows=disabled max-scan-range-rows=50.18K
+   extrapolated-rows=disabled max-scan-range-rows=50.12K
    mem-estimate=88.00MB mem-reservation=56.00MB thread-reservation=0
    tuple-ids=0 row-size=230B cardinality=150.00K
    in pipelines: 00(GETNEXT)
@@ -6173,9 +6173,9 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=194.00MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=194.00MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
@@ -6222,9 +6222,9 @@ Per-Host Resources: mem-estimate=433.09MB mem-reservation=74.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=194.00MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=194.00MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=40.00MB thread-reservation=1
@@ -6334,9 +6334,9 @@ PLAN-ROOT SINK
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=16.00MB thread-reservation=1
@@ -6409,9 +6409,9 @@ Per-Host Resources: mem-estimate=80.00MB mem-reservation=16.00MB thread-reservat
 |  in pipelines: 01(GETNEXT), 00(OPEN)
 |
 00:SCAN HDFS [tpch_parquet.lineitem, RANDOM]
-   HDFS partitions=1/1 files=3 size=193.98MB
+   HDFS partitions=1/1 files=3 size=193.99MB
    stored statistics:
-     table: rows=6.00M size=193.98MB
+     table: rows=6.00M size=193.99MB
      columns: all
    extrapolated-rows=disabled max-scan-range-rows=2.14M
    mem-estimate=80.00MB mem-reservation=16.00MB thread-reservation=1
