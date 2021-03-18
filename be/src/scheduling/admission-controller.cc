@@ -1356,9 +1356,12 @@ void AdmissionController::ReleaseQuery(const UniqueIdPB& query_id,
     lock_guard<mutex> lock(admission_ctrl_lock_);
     auto host_it = running_queries_.find(coord_id);
     if (host_it == running_queries_.end()) {
-      LOG(DFATAL) << "Unable to find host " << PrintId(coord_id)
-                  << " to get resources to release for query " << PrintId(query_id)
-                  << ", may have already been released.";
+      // In the context of the admission control service, this may happen, eg. if a
+      // coordinator is reported as failed by the statestore but a ReleaseQuery rpc from
+      // it is delayed in the network and arrives much later.
+      LOG(WARNING) << "Unable to find host " << PrintId(coord_id)
+                   << " to get resources to release for query " << PrintId(query_id)
+                   << ", may have already been released.";
       return;
     }
     auto it = host_it->second.find(query_id);
@@ -1412,9 +1415,12 @@ void AdmissionController::ReleaseQueryBackendsLocked(const UniqueIdPB& query_id,
     const UniqueIdPB& coord_id, const vector<NetworkAddressPB>& host_addrs) {
   auto host_it = running_queries_.find(coord_id);
   if (host_it == running_queries_.end()) {
-    LOG(DFATAL) << "Unable to find host " << PrintId(coord_id)
-                << " to get resources to release backends for query "
-                << PrintId(query_id) << ", may have already been released.";
+    // In the context of the admission control service, this may happen, eg. if a
+    // coordinator is reported as failed by the statestore but a ReleaseQuery rpc from
+    // it is delayed in the network and arrives much later.
+    LOG(WARNING) << "Unable to find host " << PrintId(coord_id)
+                 << " to get resources to release backends for query "
+                 << PrintId(query_id) << ", may have already been released.";
     return;
   }
   auto it = host_it->second.find(query_id);
@@ -1481,6 +1487,46 @@ vector<UniqueIdPB> AdmissionController::CleanupQueriesForHost(
               << " as it's coordinator " << PrintId(coord_id)
               << " reports that it is no longer registered.";
     ReleaseQuery(query_id, coord_id, -1, /* release_remaining_backends */ true);
+  }
+  return to_clean_up;
+}
+
+std::unordered_map<UniqueIdPB, vector<UniqueIdPB>>
+AdmissionController::CancelQueriesOnFailedCoordinators(
+    std::unordered_set<UniqueIdPB> current_backends) {
+  std::unordered_map<UniqueIdPB, vector<UniqueIdPB>> to_clean_up;
+  {
+    lock_guard<mutex> lock(admission_ctrl_lock_);
+    for (const auto& entry : running_queries_) {
+      const UniqueIdPB& coord_id = entry.first;
+      auto it = current_backends.find(coord_id);
+      if (it == current_backends.end()) {
+        LOG(INFO) << "Detected that coordinator " << PrintId(coord_id)
+                  << " is no longer in the cluster membership. Cancelling "
+                  << entry.second.size() << " queries for this coordinator.";
+        to_clean_up.insert(make_pair(coord_id, vector<UniqueIdPB>()));
+        for (auto entry2 : entry.second) {
+          to_clean_up[coord_id].push_back(entry2.first);
+        }
+      }
+    }
+  }
+
+  for (const auto& entry : to_clean_up) {
+    const UniqueIdPB& coord_id = entry.first;
+    for (const UniqueIdPB& query_id : entry.second) {
+      ReleaseQuery(query_id, coord_id, -1, /* release_remaining_backends */ true);
+    }
+
+    lock_guard<mutex> lock(admission_ctrl_lock_);
+    auto it = running_queries_.find(coord_id);
+    // It's possible that more queries will have been scheduled for this coordinator
+    // since we constructed 'to_clean_up' above, eg. because they were queued. In that
+    // case, their resources will be released on the next statestore heartbeat.
+    // TODO: handle removing queued queries when their coordinator goes down.
+    if (it->second.size() == 0) {
+      running_queries_.erase(it);
+    }
   }
   return to_clean_up;
 }

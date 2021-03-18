@@ -99,6 +99,14 @@ Status AdmissiondEnv::Init() {
   RETURN_IF_ERROR(admission_control_svc_->Init());
 
   RETURN_IF_ERROR(cluster_membership_mgr_->Init());
+  cluster_membership_mgr_->RegisterUpdateCallbackFn(
+      [&](ClusterMembershipMgr::SnapshotPtr snapshot) {
+        std::unordered_set<BackendIdPB> current_backends;
+        for (const auto& it : snapshot->current_backends) {
+          current_backends.insert(it.second.backend_id());
+        }
+        admission_control_svc_->CancelQueriesOnFailedCoordinators(current_backends);
+      });
   RETURN_IF_ERROR(admission_controller_->Init());
   return Status::OK();
 }

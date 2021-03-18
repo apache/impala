@@ -70,6 +70,10 @@ class AdmissionControlService : public AdmissionControlServiceIf,
   /// The newly created proxy is returned in 'proxy'. Returns error status on failure.
   static Status GetProxy(std::unique_ptr<AdmissionControlServiceProxy>* proxy);
 
+  /// Relases the resources for any queries currently running on coordinators that do not
+  /// appear in 'current_backends'. Called in response to statestore updates.
+  void CancelQueriesOnFailedCoordinators(std::unordered_set<UniqueIdPB> current_backends);
+
  private:
   friend class ImpalaHttpHandler;
 

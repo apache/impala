@@ -289,6 +289,22 @@ void AdmissionControlService::AdmissionHeartbeat(const AdmissionHeartbeatRequest
   RespondAndReleaseRpc(Status::OK(), resp, rpc_context);
 }
 
+void AdmissionControlService::CancelQueriesOnFailedCoordinators(
+    std::unordered_set<UniqueIdPB> current_backends) {
+  std::unordered_map<UniqueIdPB, vector<UniqueIdPB>> cleaned_up =
+      AdmissiondEnv::GetInstance()
+          ->admission_controller()
+          ->CancelQueriesOnFailedCoordinators(current_backends);
+
+  for (const auto& entry : cleaned_up) {
+    for (const UniqueIdPB& query_id : entry.second) {
+      // ShardedQueryMap::Delete will log an error already if anything goes wrong, so just
+      // ignore the return value.
+      discard_result(admission_state_map_.Delete(query_id));
+    }
+  }
+}
+
 void AdmissionControlService::AdmitFromThreadPool(UniqueIdPB query_id) {
   shared_ptr<AdmissionState> admission_state;
   Status s = admission_state_map_.Get(query_id, &admission_state);

@@ -186,7 +186,9 @@ enum class AdmissionOutcome {
 /// - ReleaseQuery rpc fails: coordinators periodically send a list of registered query
 ///   ids via a heartbeat rpc, allowing the admission contoller to clean up any queries
 ///   that are not in that list.
-/// - TODO(IMPALA-10594): handle the case of coordinators failing
+/// - Coordinator fails: the admission control service uses the statestore to detect when
+///   a coordinator has been removed from the cluster membership and releases all queries
+///   that were running at that coordinator.
 /// - RelaseQueryBackends rpc fails: when ReleaseQuery is eventually called (as guaranteed
 ///   by the above), it will automatically release any remaining backends.
 ///
@@ -404,6 +406,13 @@ class AdmissionController {
   /// released.
   std::vector<UniqueIdPB> CleanupQueriesForHost(
       const UniqueIdPB& coord_id, const std::unordered_set<UniqueIdPB> query_ids);
+
+  /// Relases the resources for any queries currently running on coordinators that do not
+  /// appear in 'current_backends'. Called in response to statestore updates. Returns a
+  /// map from the backend id of any coordinator detected to have failed to a list of
+  /// queries that were released for that coordinator.
+  std::unordered_map<UniqueIdPB, std::vector<UniqueIdPB>>
+  CancelQueriesOnFailedCoordinators(std::unordered_set<UniqueIdPB> current_backends);
 
   /// Registers the request queue topic with the statestore, starts up the dequeue thread
   /// and registers a callback with the cluster membership manager to receive updates for
