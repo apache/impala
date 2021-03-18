@@ -730,10 +730,6 @@ public class Analyzer {
     return result;
   }
 
-  public TableRef resolveTableRef(TableRef tableRef) throws AnalysisException {
-    return resolveTableRef(tableRef, false);
-  }
-
   /**
    * Resolves the given TableRef into a concrete BaseTableRef, ViewRef or
    * CollectionTableRef. Returns the new resolved table ref or the given table
@@ -743,7 +739,7 @@ public class Analyzer {
    * an AuthorizationException is preferred over an AnalysisException so as not to
    * accidentally reveal the non-existence of tables/databases.
    */
-  public TableRef resolveTableRef(TableRef tableRef, boolean doTableMasking)
+  public TableRef resolveTableRef(TableRef tableRef)
       throws AnalysisException {
     // Return the table if it is already resolved. This also avoids the table being
     // masked again.
@@ -784,24 +780,15 @@ public class Analyzer {
     Preconditions.checkNotNull(resolvedPath);
     if (resolvedPath.destTable() != null) {
       FeTable table = resolvedPath.destTable();
-      TableRef resolvedTableRef;
-      if (table instanceof FeView) {
-        resolvedTableRef = new InlineViewRef((FeView) table, tableRef);
-      } else {
-        // The table must be a base table.
-        Preconditions.checkState(table instanceof FeFsTable ||
-            table instanceof FeKuduTable ||
-            table instanceof FeHBaseTable ||
-            table instanceof FeDataSourceTable);
-        resolvedTableRef = new BaseTableRef(tableRef, resolvedPath);
-      }
-      if (!doTableMasking) return resolvedTableRef;
-      return resolveTableMask(resolvedTableRef, table);
+      if (table instanceof FeView) return new InlineViewRef((FeView) table, tableRef);
+      // The table must be a base table.
+      Preconditions.checkState(table instanceof FeFsTable ||
+          table instanceof FeKuduTable ||
+          table instanceof FeHBaseTable ||
+          table instanceof FeDataSourceTable);
+      return new BaseTableRef(tableRef, resolvedPath);
     } else {
-      CollectionTableRef res = new CollectionTableRef(tableRef, resolvedPath);
-      // Relative table refs don't need masking. Its base table will be masked.
-      if (!doTableMasking || res.isRelative()) return res;
-      return resolveTableMask(res, res.getTable());
+      return new CollectionTableRef(tableRef, resolvedPath);
     }
   }
 
@@ -838,10 +825,8 @@ public class Analyzer {
    * so we know the target table/view/collection.
    *
    * @param resolvedTableRef A resolved TableRef for table masking
-   * @param basedTable FeTable of the resolved table or the collection's based table
    */
-  private TableRef resolveTableMask(TableRef resolvedTableRef, FeTable basedTable)
-      throws AnalysisException {
+  public TableRef resolveTableMask(TableRef resolvedTableRef) throws AnalysisException {
     Preconditions.checkState(resolvedTableRef.isResolved(), "Table should be resolved");
     // Only do table masking when authorization is enabled and the authorization
     // factory supports column-masking/row-filtering. If both of these are false,
@@ -853,27 +838,42 @@ public class Analyzer {
     // Performing table masking.
     AuthorizationChecker authChecker = getAuthzFactory().newAuthorizationChecker(
         getCatalog().getAuthPolicy());
-    TableMask tableMask = new TableMask(authChecker, basedTable, user_);
+    String dbName;
+    String tblName;
+    if (resolvedTableRef instanceof InlineViewRef) {
+      FeView view = ((InlineViewRef) resolvedTableRef).getView();
+      dbName = view.getDb().getName();
+      tblName = view.getName();
+    } else {
+      dbName = resolvedTableRef.getTable().getDb().getName();
+      tblName = resolvedTableRef.getTable().getName();
+    }
+    List<Column> columns = resolvedTableRef.getScalarColumns();
+    TableMask tableMask = new TableMask(authChecker, dbName, tblName, columns, user_);
     try {
       if (resolvedTableRef instanceof CollectionTableRef) {
-        Preconditions.checkState(!resolvedTableRef.isRelative(),
-            "Relative table refs don't need masking. Its base table will be masked.");
+        // Relative table refs don't need masking. Its base table will be masked.
+        if (resolvedTableRef.isRelative()) return resolvedTableRef;
         if (tableMask.needsRowFiltering()) {
-          // TODO: Support this in IMPALA-10484.
+          // The table ref is a non-relative CollectionTableRef, e.g. the table ref in
+          // "select item from functional_parquet.complextypestbl.int_array". We can't
+          // replace "complextypestbl" with a table masking view here.
+          // TODO: Support this in IMPALA-10484 by rewriting it to relative ref, e.g.
+          //  select a.item from functional_parquet.complextypestbl t, t.int_array a;
           throw new AnalysisException(String.format("Using non-relative collection " +
-              "column %s of table %s is not supported since there are row-filtering " +
+              "column %s of table %s.%s is not supported since there are row-filtering " +
               "policies on this table (IMPALA-10484). Rewrite query to use relative " +
               "reference.",
               String.join(".", resolvedTableRef.getResolvedPath().getRawPath()),
-              basedTable.getFullName()));
+              dbName, tblName));
         }
       } else if (tableMask.needsMaskingOrFiltering()) {
-        return InlineViewRef.createTableMaskView(basedTable, resolvedTableRef,
-            tableMask, getAuthzCtx());
+        return InlineViewRef.createTableMaskView(resolvedTableRef, tableMask,
+            getAuthzCtx());
       }
       return resolvedTableRef;
     } catch (InternalException e) {
-      String msg = "Error performing table masking on " + basedTable.getFullName();
+      String msg = "Error resolving table mask on " + dbName + "." + tblName;
       LOG.error(msg, e);
       throw new AnalysisException(msg, e);
     }
@@ -1324,6 +1324,28 @@ public class Analyzer {
                 column.getName(), tupleDesc.getTable().getOwnerUser()).build());
       }
     }
+  }
+
+  /**
+   * Register scalar columns. Used in resolving column mask.
+   */
+  public void registerScalarColumnForMasking(SlotDescriptor slotDesc) {
+    Preconditions.checkNotNull(slotDesc.getPath());
+    Preconditions.checkState(!slotDesc.getType().isComplexType(),
+        "Don't register complex type columns");
+    TupleDescriptor tupleDesc = slotDesc.getParent();
+    Column column = new Column(slotDesc.getPath().getRawPath().get(0), slotDesc.getType(),
+        /*position*/-1);
+    Analyzer analyzer = this;
+    TableRef tblRef;
+    do {
+      tblRef = analyzer.tableRefMap_.get(tupleDesc.getId());
+      // Search in parent query block for correlative reference.
+      analyzer = analyzer.getParentAnalyzer();
+    } while (tblRef == null && analyzer != null);
+    Preconditions.checkNotNull(tblRef,
+        "Failed to find TableRef of tuple {}", tupleDesc);
+    tblRef.registerScalarColumn(column);
   }
 
   /**

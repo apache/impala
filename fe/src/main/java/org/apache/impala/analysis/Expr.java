@@ -1842,4 +1842,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return new NullLiteral();
   }
 
+  /**
+   * Subclass that contains query statements, e.g SubQuery, should override this.
+   */
+  public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {
+    boolean hasChanges = false;
+    for (Expr child : children_) {
+      hasChanges |= child.resolveTableMask(analyzer);
+    }
+    return hasChanges;
+  }
 }

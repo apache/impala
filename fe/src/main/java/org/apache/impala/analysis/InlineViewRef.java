@@ -143,28 +143,28 @@ public class InlineViewRef extends TableRef {
    * Creates an inline-view doing table masking for column masking and row filtering
    * policies. Callers should replace 'tableRef' with the returned view.
    *
-   * @param resolvedTable resolved FeTable for the original table/view
    * @param tableRef original resolved table/view
    * @param tableMask TableMask providing column masking and row filtering policies
    * @param authzCtx AuthorizationContext containing RangerBufferAuditHandler
    */
-  static InlineViewRef createTableMaskView(FeTable resolvedTable, TableRef tableRef,
-      TableMask tableMask, AuthorizationContext authzCtx) throws AnalysisException,
-      InternalException {
-    Preconditions.checkNotNull(resolvedTable);
+  static InlineViewRef createTableMaskView(TableRef tableRef, TableMask tableMask,
+      AuthorizationContext authzCtx) throws AnalysisException, InternalException {
     Preconditions.checkNotNull(tableRef);
     Preconditions.checkNotNull(authzCtx);
     Preconditions.checkState(tableRef instanceof InlineViewRef
         || tableRef instanceof BaseTableRef);
-    List<Column> columns = resolvedTable.getColumnsInHiveOrder();
+    List<Column> columns = tableMask.getRequiredColumns();
     List<SelectListItem> items = Lists.newArrayListWithCapacity(columns.size());
     for (Column col: columns) {
-      if (col.getType().isComplexType()) continue;
-      // TODO: only add materialized columns to avoid introducing new privilege
-      //  requirements (IMPALA-9223)
+      Preconditions.checkState(!col.getType().isComplexType(),
+          "Complex type columns should not be registered to table mask");
       items.add(new SelectListItem(
           tableMask.createColumnMask(col.getName(), col.getType(), authzCtx),
           /*alias*/ col.getName()));
+    }
+    if (columns.isEmpty()) {
+      // No columns so use "SELECT 1 FROM tbl" to make a valid statement.
+      items.add(new SelectListItem(NumericLiteral.create(1), /*alias*/null));
     }
     SelectList selectList = new SelectList(items);
     FromClause fromClause = new FromClause(Lists.newArrayList(tableRef));
@@ -212,8 +212,7 @@ public class InlineViewRef extends TableRef {
     inlineViewAnalyzer_ = new Analyzer(analyzer);
 
     // Catalog views refs require special analysis settings for authorization.
-    boolean isCatalogView = (view_ != null && !view_.isLocalView());
-    if (isCatalogView) {
+    if (isCatalogView()) {
       analyzer.registerAuthAndAuditEvent(view_, priv_, requireGrantOption_);
       if (inlineViewAnalyzer_.isExplain()) {
         // If the user does not have privileges on the view's definition
@@ -231,7 +230,7 @@ public class InlineViewRef extends TableRef {
     }
 
     inlineViewAnalyzer_.setUseHiveColLabels(
-        isCatalogView ? true : analyzer.useHiveColLabels());
+        isCatalogView() ? true : analyzer.useHiveColLabels());
     queryStmt_.analyze(inlineViewAnalyzer_);
     correlatedTupleIds_.addAll(queryStmt_.getCorrelatedTupleIds());
     if (explicitColLabels_ != null) {
@@ -408,6 +407,8 @@ public class InlineViewRef extends TableRef {
   public FeView getView() { return view_; }
 
   public boolean isTableMaskingView() { return isTableMaskingView_; }
+
+  public boolean isCatalogView() { return view_ != null && !view_.isLocalView(); }
 
   /**
    * Return the unmasked TableRef if this is an inline view for table masking.

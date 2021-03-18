@@ -163,4 +163,16 @@ public class Subquery extends Expr {
 
   @Override
   protected void toThrift(TExprNode msg) {}
+
+  @Override
+  public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {
+    return stmt_.resolveTableMask(analyzer);
+  }
+
+  @Override
+  protected void resetAnalysisState() {
+    super.resetAnalysisState();
+    stmt_.reset();
+    analyzer_ = null;
+  }
 }

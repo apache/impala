@@ -299,10 +299,12 @@ public class SetOperationStmt extends QueryStmt {
   }
 
   @Override
-  public void setDoTableMasking(boolean doTableMasking) {
+  public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {
+    boolean hasChanges = false;
     for (SetOperand op : operands_) {
-      op.getQueryStmt().setDoTableMasking(doTableMasking);
+      hasChanges |= op.getQueryStmt().resolveTableMask(analyzer);
     }
+    return hasChanges;
   }
 
   @Override

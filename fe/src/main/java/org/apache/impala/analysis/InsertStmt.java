@@ -1179,4 +1179,12 @@ public class InsertStmt extends StatementBase {
     tblRefs.add(new TableRef(targetTableName_.toPath(), null));
     if (queryStmt_ != null) queryStmt_.collectTableRefs(tblRefs);
   }
+
+  @Override
+  public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {
+    boolean hasChange = false;
+    if (withClause_ != null) hasChange = withClause_.resolveTableMask(analyzer);
+    if (queryStmt_ != null) hasChange |= queryStmt_.resolveTableMask(analyzer);
+    return hasChange;
+  }
 }

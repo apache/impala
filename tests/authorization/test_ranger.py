@@ -1214,12 +1214,16 @@ class TestRanger(CustomClusterTestSuite):
     admin_client = self.create_impala_client()
     policy_cnt = 0
     try:
-      # 2 column masking policies and 1 row filtering policy on functional.alltypestiny.
+      # 3 column masking policies and 1 row filtering policy on functional.alltypestiny.
       # The row filtering policy will take effect first, then the column masking policies
       # mask the final results.
       TestRanger._add_column_masking_policy(
         unique_name + str(policy_cnt), user, "functional", "alltypestiny", "id",
         "CUSTOM", "id + 100")   # use column name 'id' directly
+      policy_cnt += 1
+      TestRanger._add_column_masking_policy(
+        unique_name + str(policy_cnt), user, "functional", "alltypestiny", "string_col",
+        "MASK_NULL")
       policy_cnt += 1
       TestRanger._add_column_masking_policy(
         unique_name + str(policy_cnt), user, "functional", "alltypestiny",

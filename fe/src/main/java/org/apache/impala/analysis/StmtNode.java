@@ -29,4 +29,14 @@ public abstract class StmtNode implements ParseNode {
    * @throws AnalysisException if any semantic errors were found
    */
   public abstract void analyze(Analyzer analyzer) throws AnalysisException;
+
+  /**
+   * By default, table masking is not performed. When authorization is enabled and
+   * tbe base table/view has column-masking / row-filtering policies, the table ref
+   * will be masked by a table masking view. Called after analyze().
+   */
+  public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {
+    // Don't apply table mask by default.
+    return false;
+  }
 }

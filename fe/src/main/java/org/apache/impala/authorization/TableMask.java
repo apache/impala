@@ -23,7 +23,7 @@ import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.Parser;
 import org.apache.impala.analysis.SelectStmt;
 import org.apache.impala.analysis.SlotRef;
-import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
@@ -31,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * A TableMask instance contains all the information for generating a subquery for table
@@ -39,28 +40,32 @@ import java.util.List;
 public class TableMask {
   private static final Logger LOG = LoggerFactory.getLogger(TableMask.class);
 
-  private AuthorizationChecker authChecker_;
-  private String dbName_;
-  private String tableName_;
-  private List<String> requiredColumns_;
-  private User user_;
+  private final AuthorizationChecker authChecker_;
+  private final String dbName_;
+  private final String tableName_;
+  private final List<Column> requiredColumns_;
+  private final List<String> requiredColumnNames_;
+  private final User user_;
 
-  public TableMask(AuthorizationChecker authzChecker, FeTable table, User user) {
+  public TableMask(AuthorizationChecker authzChecker, String dbName, String tableName,
+      List<Column> requiredColumns, User user) {
     this.authChecker_ = authzChecker;
-    this.dbName_ = table.getDb().getName();
-    this.tableName_ = table.getName();
-    // TODO: only require materialize columns to avoid unneccessary masking so we won't
-    //       hit IMPALA-9223
-    this.requiredColumns_ = table.getColumnNames();
     this.user_ = user;
+    this.dbName_ = dbName;
+    this.tableName_ = tableName;
+    this.requiredColumns_ = requiredColumns;
+    this.requiredColumnNames_ = requiredColumns.stream().map(Column::getName)
+        .collect(Collectors.toList());
   }
+
+  public List<Column> getRequiredColumns() { return requiredColumns_; }
 
   /**
    * Returns whether the table/view has column masking or row filtering policies.
    */
   public boolean needsMaskingOrFiltering() throws InternalException {
     return authChecker_.needsMaskingOrFiltering(user_, dbName_, tableName_,
-        requiredColumns_);
+        requiredColumnNames_);
   }
 
   /**

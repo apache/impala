@@ -145,4 +145,13 @@ public class WithClause extends StmtNode {
   }
 
   public List<View> getViews() { return views_; }
+
+  @Override
+  public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {
+    boolean hasChanges = false;
+    for (View v : views_) {
+      hasChanges |= v.getQueryStmt().resolveTableMask(analyzer);
+    }
+    return hasChanges;
+  }
 }
