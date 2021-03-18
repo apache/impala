@@ -216,8 +216,9 @@ void AdmissionControlService::ReleaseQuery(const ReleaseQueryRequestPB* req,
   {
     lock_guard<mutex> l(admission_state->lock);
     if (!admission_state->released) {
-      AdmissiondEnv::GetInstance()->admission_controller()->ReleaseQuery(
-          req->query_id(), admission_state->coord_id, req->peak_mem_consumption());
+      AdmissiondEnv::GetInstance()->admission_controller()->ReleaseQuery(req->query_id(),
+          admission_state->coord_id, req->peak_mem_consumption(),
+          /* release_remaining_backends */ true);
       admission_state->released = true;
     } else {
       LOG(WARNING) << "Query " << req->query_id() << " was already released.";

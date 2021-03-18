@@ -728,21 +728,24 @@ void AdmissionController::PoolStats::Dequeue(bool timed_out) {
 }
 
 void AdmissionController::UpdateStatsOnReleaseForBackends(const UniqueIdPB& query_id,
-    const RunningQuery& running_query, const vector<NetworkAddressPB>& host_addrs) {
+    RunningQuery& running_query, const vector<NetworkAddressPB>& host_addrs) {
   int64_t total_mem_to_release = 0;
   for (auto host_addr : host_addrs) {
     auto backend_allocation = running_query.per_backend_resources.find(host_addr);
     if (backend_allocation == running_query.per_backend_resources.end()) {
+      // In the context of the admission control service, this may happen, eg. if a
+      // ReleaseQueryBackends rpc is delayed in the network and arrives after the
+      // ReleaseQuery rpc, so only log as a WARNING.
       string err_msg =
           strings::Substitute("Error: Cannot find exec params of host $0 for query $1.",
               NetworkAddressPBToString(host_addr), PrintId(query_id));
-      DCHECK(false) << err_msg;
-      LOG(ERROR) << err_msg;
+      LOG(WARNING) << err_msg;
       continue;
     }
     UpdateHostStats(host_addr, -backend_allocation->second.mem_to_admit, -1,
         -backend_allocation->second.slots_to_use);
     total_mem_to_release += backend_allocation->second.mem_to_admit;
+    running_query.per_backend_resources.erase(backend_allocation);
   }
   PoolStats* pool_stats = GetPoolStats(running_query.request_pool);
   pool_stats->ReleaseMem(total_mem_to_release);
@@ -1347,7 +1350,8 @@ Status AdmissionController::WaitOnQueued(const UniqueIdPB& query_id,
 }
 
 void AdmissionController::ReleaseQuery(const UniqueIdPB& query_id,
-    const UniqueIdPB& coord_id, int64_t peak_mem_consumption) {
+    const UniqueIdPB& coord_id, int64_t peak_mem_consumption,
+    bool release_remaining_backends) {
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
     auto host_it = running_queries_.find(coord_id);
@@ -1368,6 +1372,18 @@ void AdmissionController::ReleaseQuery(const UniqueIdPB& query_id,
     }
 
     const RunningQuery& running_query = it->second;
+    if (release_remaining_backends) {
+      vector<NetworkAddressPB> to_release;
+      for (const auto& entry : running_query.per_backend_resources) {
+        to_release.push_back(entry.first);
+      }
+      if (to_release.size() > 0) {
+        LOG(INFO) << "ReleaseQuery for " << query_id << " called with "
+                  << to_release.size()
+                  << "unreleased backends. Releasing automatically.";
+        ReleaseQueryBackendsLocked(query_id, coord_id, to_release);
+      }
+    }
     DCHECK_EQ(num_released_backends_.at(query_id), 0) << PrintId(query_id);
     num_released_backends_.erase(num_released_backends_.find(query_id));
     PoolStats* stats = GetPoolStats(running_query.request_pool);
@@ -1387,45 +1403,55 @@ void AdmissionController::ReleaseQueryBackends(const UniqueIdPB& query_id,
     const UniqueIdPB& coord_id, const vector<NetworkAddressPB>& host_addrs) {
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
-    auto host_it = running_queries_.find(coord_id);
-    if (host_it == running_queries_.end()) {
-      LOG(DFATAL) << "Unable to find host " << PrintId(coord_id)
-                  << " to get resources to release backends for query "
-                  << PrintId(query_id) << ", may have already been released.";
-      return;
-    }
-    auto it = host_it->second.find(query_id);
-    if (it == host_it->second.end()) {
-      LOG(DFATAL) << "Unable to find resources to release backends for query "
-                  << PrintId(query_id) << ", may have already been released.";
-      return;
-    }
-
-    const RunningQuery& running_query = it->second;
-    UpdateStatsOnReleaseForBackends(query_id, running_query, host_addrs);
-
-    // Update num_released_backends_.
-    auto released_backends = num_released_backends_.find(query_id);
-    if (released_backends != num_released_backends_.end()) {
-      released_backends->second -= host_addrs.size();
-    } else {
-      string err_msg = Substitute(
-          "Unable to find num released backends for query $0", PrintId(query_id));
-      DCHECK(false) << err_msg;
-      LOG(ERROR) << err_msg;
-    }
-
-    if (VLOG_IS_ON(2)) {
-      stringstream ss;
-      ss << "Released query backend(s) ";
-      for (auto host_addr : host_addrs) ss << host_addr << " ";
-      ss << "for query id=" << PrintId(query_id) << " "
-         << GetPoolStats(running_query.request_pool)->DebugString();
-      VLOG(2) << ss.str();
-    }
-    pending_dequeue_ = true;
+    ReleaseQueryBackendsLocked(query_id, coord_id, host_addrs);
   }
   dequeue_cv_.NotifyOne();
+}
+
+void AdmissionController::ReleaseQueryBackendsLocked(const UniqueIdPB& query_id,
+    const UniqueIdPB& coord_id, const vector<NetworkAddressPB>& host_addrs) {
+  auto host_it = running_queries_.find(coord_id);
+  if (host_it == running_queries_.end()) {
+    LOG(DFATAL) << "Unable to find host " << PrintId(coord_id)
+                << " to get resources to release backends for query "
+                << PrintId(query_id) << ", may have already been released.";
+    return;
+  }
+  auto it = host_it->second.find(query_id);
+  if (it == host_it->second.end()) {
+    // In the context of the admission control service, this may happen, eg. if a
+    // ReleaseQueryBackends rpc is delayed in the network and arrives after the
+    // ReleaseQuery rpc, so only log as a WARNING.
+    LOG(WARNING) << "Unable to find resources to release backends for query "
+                 << PrintId(query_id) << ", may have already been released.";
+    return;
+  }
+
+  RunningQuery& running_query = it->second;
+  UpdateStatsOnReleaseForBackends(query_id, running_query, host_addrs);
+
+  // Update num_released_backends_.
+  auto released_backends = num_released_backends_.find(query_id);
+  if (released_backends != num_released_backends_.end()) {
+    released_backends->second -= host_addrs.size();
+  } else {
+    // In the context of the admission control service, this may happen, eg. if a
+    // ReleaseQueryBackends rpc is delayed in the network and arrives after the
+    // ReleaseQuery rpc, so only log as a WARNING.
+    string err_msg = Substitute(
+        "Unable to find num released backends for query $0", PrintId(query_id));
+    LOG(WARNING) << err_msg;
+  }
+
+  if (VLOG_IS_ON(2)) {
+    stringstream ss;
+    ss << "Released query backend(s) ";
+    for (auto host_addr : host_addrs) ss << host_addr << " ";
+    ss << "for query id=" << PrintId(query_id) << " "
+       << GetPoolStats(running_query.request_pool)->DebugString();
+    VLOG(2) << ss.str();
+  }
+  pending_dequeue_ = true;
 }
 
 vector<UniqueIdPB> AdmissionController::CleanupQueriesForHost(
@@ -1454,7 +1480,7 @@ vector<UniqueIdPB> AdmissionController::CleanupQueriesForHost(
     LOG(INFO) << "Releasing resources for query " << PrintId(query_id)
               << " as it's coordinator " << PrintId(coord_id)
               << " reports that it is no longer registered.";
-    ReleaseQuery(query_id, coord_id, -1);
+    ReleaseQuery(query_id, coord_id, -1, /* release_remaining_backends */ true);
   }
   return to_clean_up;
 }

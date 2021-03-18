@@ -1425,6 +1425,37 @@ class TestAdmissionControllerWithACService(TestAdmissionController):
     self.wait_for_state(
         handle2, self.client.QUERY_STATES['RUNNING'], timeout_s)
 
+  @SkipIfNotHdfsMinicluster.tuned_for_minicluster
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--vmodule admission-controller=3 "
+      "--debug_actions=IMPALA_SERVICE_POOL:127.0.0.1:29500:ReleaseQueryBackends:FAIL@1.0 "
+      "--admission_control_slots=1 --executor_groups=default-pool-group1")
+  def test_release_query_backends_failed(self):
+    """Tests that if the ReleaseQueryBackends rpc fails, the query's resources will
+    eventually be cleaned up. Uses the --debug_action flag to simulate rpc failures, and
+    sets the number of slots for a single pool as slot usage per executor is decremented
+    when releasing individual backends."""
+    # Query designed to run for a few minutes.
+    query = "select count(*) from functional.alltypes where int_col = sleep(10000)"
+    handle1 = self.execute_query_async(query)
+    timeout_s = 10
+    # Make sure the first query has been admitted.
+    self.wait_for_state(
+        handle1, self.client.QUERY_STATES['RUNNING'], timeout_s)
+
+    # Run another query. This query should be queued because the executor group only has 1
+    # slot.
+    handle2 = self.execute_query_async(query)
+    self._wait_for_change_to_profile(handle2, "Admission result: Queued")
+
+    # Cancel the first query. It's resources should be released and the second query
+    # should be admitted.
+    self.client.cancel(handle1)
+    self.client.close_query(handle1)
+    self.wait_for_state(
+        handle2, self.client.QUERY_STATES['RUNNING'], timeout_s)
+
 class TestAdmissionControllerStress(TestAdmissionControllerBase):
   """Submits a number of queries (parameterized) with some delay between submissions
   (parameterized) and the ability to submit to one impalad or many in a round-robin

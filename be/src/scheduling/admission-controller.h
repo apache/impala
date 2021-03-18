@@ -187,7 +187,8 @@ enum class AdmissionOutcome {
 ///   ids via a heartbeat rpc, allowing the admission contoller to clean up any queries
 ///   that are not in that list.
 /// - TODO(IMPALA-10594): handle the case of coordinators failing
-/// - TODO(IMPALA-10591): handle the case of a ReleaseQueryBackends rpc failing
+/// - RelaseQueryBackends rpc fails: when ReleaseQuery is eventually called (as guaranteed
+///   by the above), it will automatically release any remaining backends.
 ///
 /// Releasing Backends releases the admitted memory used by that Backend and decrements
 /// the number of running queries on the host running that Backend. Releasing a query does
@@ -381,9 +382,12 @@ class AdmissionController {
   /// been submitted via AdmitQuery(). 'query_id' is the completed query, 'coord_id' is
   /// the backend id of the coordinator for the query, and 'peak_mem_consumption' is the
   /// peak memory consumption of the query, which may be -1 if unavailable.
+  /// If 'release_remaining_backends' is true, calls ReleaseQueryBackends() for any
+  /// backends that have not been released yet. This is only used in the context of the
+  /// admission control service to account for the possibility of failed rpcs.
   /// This does not block.
   void ReleaseQuery(const UniqueIdPB& query_id, const UniqueIdPB& coord_id,
-      int64_t peak_mem_consumption);
+      int64_t peak_mem_consumption, bool release_remaining_backends = false);
 
   /// Updates the pool statistics when a Backend running a query completes (either
   /// successfully, is cancelled or failed). This should be called for all Backends part
@@ -847,7 +851,8 @@ class AdmissionController {
     /// The executor group this query was scheduled on.
     std::string executor_group;
 
-    /// Map from backend addresses to the resouces this query was allocated on them.
+    /// Map from backend addresses to the resouces this query was allocated on them. When
+    /// backends are released, they are removed from this map.
     std::unordered_map<NetworkAddressPB, BackendAllocation> per_backend_resources;
   };
 
@@ -988,7 +993,7 @@ class AdmissionController {
   /// specified in 'host_addrs'. Also updates the stats related to the admitted memory of
   /// its associated resource pool.
   void UpdateStatsOnReleaseForBackends(const UniqueIdPB& query_id,
-      const RunningQuery& running_query, const std::vector<NetworkAddressPB>& host_addrs);
+      RunningQuery& running_query, const std::vector<NetworkAddressPB>& host_addrs);
 
   /// Updates the memory admitted and the num of queries running on the specified host by
   /// adding the specified mem, num_queries and slots to the host stats.
@@ -1157,6 +1162,10 @@ class AdmissionController {
   // from which a fraction of mem consumed by the topN queries can be reported.
   void ReportTopNQueriesAtIndices(std::stringstream& ss, std::vector<Item>& listOfTopNs,
       std::vector<int>& indices, int indent, int64_t total_mem_consumed) const;
+
+  /// Performs the work of ReleaseQueryBackends(). 'admission_ctrl_lock_' must be held.
+  void ReleaseQueryBackendsLocked(const UniqueIdPB& query_id, const UniqueIdPB& coord_id,
+      const vector<NetworkAddressPB>& host_addr);
 
   FRIEND_TEST(AdmissionControllerTest, Simple);
   FRIEND_TEST(AdmissionControllerTest, PoolStats);
