@@ -487,10 +487,32 @@ public class AnalysisContext {
     // expensive with large expression trees. For example, a SQL that takes a few seconds
     // to analyze the first time may take 10 minutes for rewrites.
     analysisResult_.analyzer_.checkStmtExprLimit();
-    boolean isExplain = analysisResult_.isExplainStmt();
 
-    // Apply expr, setop, and subquery rewrites.
+    // The rewrites should have no user-visible effect on query results, including types
+    // and labels. Remember the original result types and column labels to restore them
+    // after the rewritten stmt has been reset() and re-analyzed. For a CTAS statement,
+    // the types represent column types of the table that will be created, including the
+    // partition columns, if any.
+    List<Type> origResultTypes = new ArrayList<>();
+    for (Expr e : analysisResult_.stmt_.getResultExprs()) {
+      origResultTypes.add(e.getType());
+    }
+    List<String> origColLabels =
+        Lists.newArrayList(analysisResult_.stmt_.getColLabels());
+
+    // Apply column/row masking, expr, setop, and subquery rewrites.
     boolean reAnalyze = false;
+    if (authzFactory_.getAuthorizationConfig().isEnabled()) {
+      reAnalyze = analysisResult_.stmt_.resolveTableMask(analysisResult_.analyzer_);
+      // If any catalog table/view is replaced by table masking views, we need to
+      // resolve them. Also re-analyze the SlotRefs to reference the output exprs of
+      // the table masking views.
+      if (reAnalyze) {
+        reAnalyzeWithoutPrivChecks(stmtTableCache, authzCtx, origResultTypes,
+            origColLabels);
+      }
+      reAnalyze = false;
+    }
     ExprRewriter rewriter = analysisResult_.analyzer_.getExprRewriter();
     if (analysisResult_.requiresExprRewrite()) {
       rewriter.reset();
@@ -511,24 +533,6 @@ public class AnalysisContext {
     }
     if (!reAnalyze) return;
 
-    // The rewrites should have no user-visible effect. Remember the original result
-    // types and column labels to restore them after the rewritten stmt has been
-    // reset() and re-analyzed. For a CTAS statement, the types represent column types
-    // of the table that will be created, including the partition columns, if any.
-    List<Type> origResultTypes = new ArrayList<>();
-    for (Expr e : analysisResult_.stmt_.getResultExprs()) {
-      origResultTypes.add(e.getType());
-    }
-    List<String> origColLabels =
-        Lists.newArrayList(analysisResult_.stmt_.getColLabels());
-
-    // Some expressions, such as function calls with constant arguments, can get
-    // folded into literals. Since literals do not require privilege requests, we
-    // must save the original privileges in order to not lose them during
-    // re-analysis.
-    ImmutableList<PrivilegeRequest> origPrivReqs =
-        analysisResult_.analyzer_.getPrivilegeReqs();
-
     // For SetOperationStmt we must replace the query statement with the rewritten version
     // before re-analysis.
     if (analysisResult_.requiresSetOperationRewrite()) {
@@ -540,12 +544,26 @@ public class AnalysisContext {
       }
     }
 
+    reAnalyzeWithoutPrivChecks(stmtTableCache, authzCtx, origResultTypes, origColLabels);
+    Preconditions.checkState(!analysisResult_.requiresSubqueryRewrite());
+  }
+
+  private void reAnalyzeWithoutPrivChecks(StmtTableCache stmtTableCache,
+      AuthorizationContext authzCtx, List<Type> origResultTypes,
+      List<String> origColLabels) throws AnalysisException {
+    boolean isExplain = analysisResult_.isExplainStmt();
+    // Some expressions, such as function calls with constant arguments, can get
+    // folded into literals. Since literals do not require privilege requests, we
+    // must save the original privileges in order to not lose them during
+    // re-analysis.
+    ImmutableList<PrivilegeRequest> origPrivReqs =
+        analysisResult_.analyzer_.getPrivilegeReqs();
+
     // Re-analyze the stmt with a new analyzer.
     analysisResult_.analyzer_ = createAnalyzer(stmtTableCache, authzCtx);
     // We restore the privileges collected in the first pass below. So, no point in
     // collecting them again.
     analysisResult_.analyzer_.setEnablePrivChecks(false);
-
     analysisResult_.stmt_.reset();
     try {
       analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
@@ -556,7 +574,6 @@ public class AnalysisContext {
           analysisResult_.stmt_.toSql(REWRITTEN)));
       throw e;
     }
-
     // Restore the original result types and column labels.
     analysisResult_.stmt_.castResultExprs(origResultTypes);
     analysisResult_.stmt_.setColLabels(origColLabels);
@@ -569,7 +586,6 @@ public class AnalysisContext {
       analysisResult_.analyzer_.registerPrivReq(req);
     }
     if (isExplain) analysisResult_.stmt_.setIsExplain();
-    Preconditions.checkState(!analysisResult_.requiresSubqueryRewrite());
   }
 
   public Analyzer getAnalyzer() { return analysisResult_.getAnalyzer(); }

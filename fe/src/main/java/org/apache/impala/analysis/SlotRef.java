@@ -133,6 +133,11 @@ public class SlotRef extends Expr {
       // HMS string.
       throw new UnsupportedFeatureException("Unsupported type in '" + toSql() + "'.");
     }
+    // Register scalar columns of a catalog table.
+    if (!resolvedPath.getMatchedTypes().isEmpty()
+        && !resolvedPath.getMatchedTypes().get(0).isComplexType()) {
+      analyzer.registerScalarColumnForMasking(desc_);
+    }
 
     numDistinctValues_ = adjustNumDistinctValues();
     FeTable rootTable = resolvedPath.getRootTable();

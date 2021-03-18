@@ -52,12 +52,108 @@ NULL,96,'1',true,2009,4
 INT,INT,STRING,BOOLEAN,INT,INT
 ====
 ---- QUERY
-# Row-filtering policy keeps rows with "year = 2009 and month = 1". Test on aggregate.
-select count(*) from functional.alltypes
+# Test set operation on the above two tables.
+select id, string_col, bool_col, year, month from functional.alltypestiny
+intersect
+select id, string_col, bool_col, year, month from functional.alltypessmall
 ---- RESULTS
-310
+0,'0',true,2009,1
 ---- TYPES
-BIGINT
+INT,STRING,BOOLEAN,INT,INT
+====
+---- QUERY
+# Row-filtering policy keeps rows with "year = 2009 and month = 1". Test on aggregate.
+select min(id), max(id), count(*) from functional.alltypes
+---- RESULTS
+0,309,310
+---- TYPES
+INT,INT,BIGINT
+====
+---- QUERY
+# Row-filtering policy keeps rows with "year = 2009 and month = 1". Test on aggregate.
+select count(distinct id), count(distinct string_col) from functional.alltypes
+---- RESULTS
+310,10
+---- TYPES
+BIGINT,BIGINT
+====
+---- QUERY
+# Row-filtering policy keeps rows with "year = 2009 and month = 1". Test on aggregate.
+select year, min(month), count(*) from functional.alltypes group by year
+---- RESULTS
+2009,1,310
+---- TYPES
+INT,INT,BIGINT
+====
+---- QUERY
+# Test row filter applied on subquery in HAVING clause.
+# functional_orc_def.alltypes has no row filters. functional.alltypes has a row filter
+# "year = 2009 and month = 1" which results in its row count to be 310.
+select year, month, max(id) from functional_orc_def.alltypes
+group by year, month
+having max(id) < 2 * (select count(*) from functional.alltypes)
+---- RESULTS
+2009,1,309
+2009,2,589
+---- TYPES
+INT,INT,INT
+====
+---- QUERY
+# Test row filter applied on subquery in SelectList.
+# functional.alltypestiny has row filter "id % 2 = 0", so its max(id) is 6.
+# functional.alltypes has row filter "year = 2009 and month = 1".
+SELECT id, int_col,
+  (select max(id) from functional.alltypestiny) as x,
+  case
+    when id < (select max(id) from functional.alltypestiny) then 0
+    else 1
+  end as y
+from functional.alltypes t2
+order by id
+limit 10
+---- RESULTS
+0,0,6,0
+1,1,6,0
+2,2,6,0
+3,3,6,0
+4,4,6,0
+5,5,6,0
+6,6,6,1
+7,7,6,1
+8,8,6,1
+9,9,6,1
+---- TYPES
+INT,INT,INT,TINYINT
+---- LABELS
+id,int_col,x,y
+====
+---- QUERY
+# Test row filter applied on subquery in SelectList.
+# functional.alltypestiny has row filter "id % 2 = 0", so its max(id) is 6.
+# functional.alltypes has row filter "year = 2009 and month = 1".
+SELECT id, count(*) over (partition by
+  case
+    when id > (select max(id) from functional.alltypestiny) then id
+    else id + 5
+  end) as x
+from functional.alltypes t2
+order by id
+limit 10
+---- RESULTS
+0,1
+1,1
+2,2
+3,2
+4,2
+5,2
+6,2
+7,2
+8,2
+9,2
+---- TYPES
+INT,BIGINT
+---- LABELS
+id,x
 ====
 ---- QUERY
 # Test on local views. functional.alltypestiny has row filter "id % 2 = 0".
@@ -79,6 +175,10 @@ with alltypestiny as (select 1 as id)
 select * from alltypestiny
 ---- RESULTS
 1
+---- TYPES
+TINYINT
+---- LABELS
+id
 ====
 ---- QUERY
 # Test on local views. Correctly ignore masking on local view names so row filter of
@@ -188,6 +288,18 @@ select * from $UNIQUE_DB.masked_tbl2;
 2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
 4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00,2009,3
 6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00,2009,4
+---- TYPES
+INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
+====
+---- QUERY
+# Test on INSERT with local view
+create table $UNIQUE_DB.masked_tbl3 like functional.alltypestiny stored as textfile;
+with v as (select * from functional.alltypestiny where id < 4)
+insert into $UNIQUE_DB.masked_tbl3 partition(year, month) select * from v;
+select * from $UNIQUE_DB.masked_tbl3;
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00,2009,2
 ---- TYPES
 INT,BOOLEAN,TINYINT,SMALLINT,INT,BIGINT,FLOAT,DOUBLE,STRING,STRING,TIMESTAMP,INT,INT
 ====

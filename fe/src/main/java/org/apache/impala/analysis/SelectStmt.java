@@ -265,8 +265,20 @@ public class SelectStmt extends QueryStmt {
   }
 
   @Override
-  public void setDoTableMasking(boolean doTableMasking) {
-    fromClause_.setDoTableMasking(doTableMasking);
+  public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {
+    boolean hasChanges = super.resolveTableMask(analyzer);
+    // Recurse in all places that could have subqueries. After resolveTableMask() is done
+    // on the whole AST, SlotRefs referencing the original table refs will be reset and
+    // re-analyzed to reference the table masking views. So we don't need to deal with
+    // SlotRefs here.
+    hasChanges |= fromClause_.resolveTableMask(analyzer);
+    for (SelectListItem item : selectList_.getItems()) {
+      if (item.isStar()) continue;
+      hasChanges |= item.getExpr().resolveTableMask(analyzer);
+    }
+    if (whereClause_ != null) hasChanges |= whereClause_.resolveTableMask(analyzer);
+    if (havingClause_ != null) hasChanges |= havingClause_.resolveTableMask(analyzer);
+    return hasChanges;
   }
 
   /**
@@ -642,7 +654,16 @@ public class SelectStmt extends QueryStmt {
       if (p.destType().isComplexType()) return;
       SlotDescriptor slotDesc = analyzer_.registerSlotRef(p);
       SlotRef slotRef = new SlotRef(slotDesc);
-      slotRef.analyze(analyzer_);
+      Preconditions.checkState(slotRef.isAnalyzed(),
+          "Analysis should be done in constructor");
+      // Empty matched types means this is expanded from star of a catalog table.
+      // For star of complex types, e.g. my_struct.*, my_array.*, my_map.*, the matched
+      // types will have the complex type so it's not empty.
+      if (resolvedPath.getMatchedTypes().isEmpty()) {
+        Preconditions.checkState(!slotDesc.getType().isComplexType(),
+            "Star expansion should only introduce scalar columns");
+        analyzer_.registerScalarColumnForMasking(slotDesc);
+      }
       resultExprs_.add(slotRef);
       colLabels_.add(relRawPath[relRawPath.length - 1]);
     }

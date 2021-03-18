@@ -286,4 +286,9 @@ public class CreateTableAsSelectStmt extends StatementBase {
     createStmt_.getPartitionColumnDefs().clear();
     insertStmt_.reset();
   }
+
+  @Override
+  public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {
+    return getQueryStmt().resolveTableMask(analyzer);
+  }
 }

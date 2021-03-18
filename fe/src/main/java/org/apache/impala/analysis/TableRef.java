@@ -22,10 +22,13 @@ import static org.apache.impala.analysis.ToSqlOptions.DEFAULT;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.authorization.Privilege;
+import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
@@ -141,6 +144,9 @@ public class TableRef extends StmtNode {
   // columns via the view.
   protected boolean exposeNestedColumnsByTableMaskView_ = false;
 
+  // Scalar columns referenced in the query. Used in resolving column mask.
+  protected Map<String, Column> scalarColumns_ = new LinkedHashMap<>();
+
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -221,6 +227,7 @@ public class TableRef extends StmtNode {
     correlatedTupleIds_ = Lists.newArrayList(other.correlatedTupleIds_);
     desc_ = other.desc_;
     exposeNestedColumnsByTableMaskView_ = other.exposeNestedColumnsByTableMaskView_;
+    scalarColumns_ = new LinkedHashMap<>(other.scalarColumns_);
   }
 
   @Override
@@ -705,6 +712,14 @@ public class TableRef extends StmtNode {
   }
 
   public boolean isTableMaskingView() { return false; }
+
+  public void registerScalarColumn(Column column) {
+    scalarColumns_.put(column.getName(), column);
+  }
+
+  public List<Column> getScalarColumns() {
+    return new ArrayList<>(scalarColumns_.values());
+  }
 
   void migratePropertiesTo(TableRef other) {
     other.aliases_ = aliases_;

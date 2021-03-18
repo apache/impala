@@ -1,16 +1,17 @@
 ====
 ---- QUERY
-# Row-filtering policy keeps rows with "id % 3 = 0".
-# Column-masking policies mask "id" to "id + 100" and redact column "date_string_col".
+# Row-filtering policy keeps rows with "id % 3 = 0". Column-masking policies mask
+# "id" to "id + 100", "string_col" to NULL, and redact column "date_string_col".
 # Note that row filtering policies take effects prior to any column masking policies,
 # because column masking policies apply on result data.
-select id, bool_col, date_string_col, year, month from functional.alltypestiny
+select id, bool_col, int_col, string_col, date_string_col, year, month
+from functional.alltypestiny
 ---- RESULTS
-100,true,'nn/nn/nn',2009,1
-103,false,'nn/nn/nn',2009,2
-106,true,'nn/nn/nn',2009,4
+100,true,0,'NULL','nn/nn/nn',2009,1
+103,false,1,'NULL','nn/nn/nn',2009,2
+106,true,0,'NULL','nn/nn/nn',2009,4
 ---- TYPES
-INT,BOOLEAN,STRING,INT,INT
+INT,BOOLEAN,INT,STRING,STRING,INT,INT
 ====
 ---- QUERY
 # Column-masking policies of functional.alltypes mask "id" to "-id" and redact column
@@ -31,4 +32,41 @@ select id, bool_col, date_string_col, year, month from functional.alltypes_view
 -8,true,'nn/nn/nn',2009,1
 ---- TYPES
 INT,BOOLEAN,STRING,INT,INT
+====
+---- QUERY
+# Test with expr rewrite rules.
+select id, bool_col, string_col,
+  if (id <=> id, 0, 1),
+  case when bool_col <=> bool_col then 0 when true then 1 end,
+  coalesce(string_col, '0')
+from functional.alltypestiny
+---- RESULTS
+100,true,'NULL',0,0,'0'
+103,false,'NULL',0,0,'0'
+106,true,'NULL',0,0,'0'
+---- TYPES
+INT,BOOLEAN,STRING,TINYINT,TINYINT,STRING
+====
+---- QUERY
+# Test with statement rewrite rules on uncorrelated subquery.
+select a.id, a.int_col, a.string_col from functional_orc_def.alltypes a
+where a.id in (select id from functional.alltypestiny where bool_col = true)
+and a.id < 103
+---- RESULTS
+100,0,'0'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Test with statement rewrite rules on correlated subquery.
+select id, int_col from functional.alltypesagg a
+where int_col in
+  (select id from functional.alltypestiny t where a.id = t.id)
+---- RESULTS
+100,100
+100,100
+103,103
+106,106
+---- TYPES
+INT,INT
 ====

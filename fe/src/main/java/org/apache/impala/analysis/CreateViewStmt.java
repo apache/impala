@@ -46,8 +46,6 @@ public class CreateViewStmt extends CreateOrAlterViewStmtBase {
     Analyzer viewAnalyzerr = new Analyzer(analyzer);
     // Enforce Hive column labels for view compatibility.
     viewAnalyzerr.setUseHiveColLabels(true);
-    // Disable table masking since we don't actually read the data.
-    viewDefStmt_.setDoTableMasking(false);
     viewDefStmt_.analyze(viewAnalyzerr);
 
     dbName_ = analyzer.getTargetDbName(tableName_);
