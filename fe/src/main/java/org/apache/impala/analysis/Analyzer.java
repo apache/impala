@@ -2376,6 +2376,10 @@ public class Analyzer {
    */
   public LiteralExpr evalWithNullSlots(Expr p) throws AnalysisException {
     Expr nullTuplePred = substituteNullSlots(p);
+    // can't evaluate an expression that isn't constant.
+    if (!nullTuplePred.isConstant()) {
+      return null;
+    }
     return LiteralExpr.createBounded(
             nullTuplePred, getQueryCtx(), StringLiteral.MAX_STRING_LEN);
   }

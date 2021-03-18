@@ -379,7 +379,7 @@ public final class RuntimeFilterGenerator {
               filterSrcNode.getJoinOp().isFullOuterJoin()) {
         try {
           LiteralExpr nullSlotVal = analyzer.evalWithNullSlots(srcExpr);
-          if (!(nullSlotVal instanceof NullLiteral)) {
+          if (nullSlotVal == null || !(nullSlotVal instanceof NullLiteral)) {
             // IMPALA-10252: if the source expression returns a non-NULL value for a NULL
             // input then it is not safe to generate a runtime filter from a LEFT OUTER
             // JOIN or FULL OUTER JOIN because the generated filter would be missing a
@@ -391,6 +391,9 @@ public final class RuntimeFilterGenerator {
             // row. For now we avoid the problem by skipping this filter. In future we
             // could generate valid runtime filters for these join types by adding
             // backend support to calculate and insert the missing value.
+            // It's also possible that the expression did not evaluate to a constant after
+            // null slot substitution. In this case, we also want to disable runtime
+            // filtering.
             if (LOG.isTraceEnabled()) {
               LOG.trace("Skipping runtime filter because source expression returns " +
                       "non-null after null substitution: " + srcExpr.toSql());
