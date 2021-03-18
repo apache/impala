@@ -684,6 +684,15 @@ enum TImpalaQueryOptions {
 
   // Indicates whether to use min/max filtering on partition columns
   MINMAX_FILTER_PARTITION_COLUMNS = 133
+
+  // Controls when to write Parquet Bloom filters.
+  //     NEVER      - never write Parquet Bloom filters
+  //     TBL_PROPS  - write Parquet Bloom filters as set in table properties
+  //     IF_NO_DICT - write Parquet Bloom filters if the row group is not fully
+  //                  dictionary encoded
+  //     ALWAYS     - always write Parquet Bloom filters, even if the row group is fully
+  //                  dictionary encoded
+  PARQUET_BLOOM_FILTER_WRITE = 134
 }
 
 // The summary of a DML statement.

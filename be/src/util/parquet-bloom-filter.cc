@@ -41,6 +41,13 @@
 using namespace std;
 using strings::Substitute;
 
+// TODO: Reconcile with legacy AVX support.
+DEFINE_bool(disable_parquetbloomfilter_avx2, false,
+    "Disable AVX2 operations in ParquetBloomFilter. This flag has no effect if the "
+    "target CPU doesn't support AVX2 at run-time or ParquetBloomFilter was built with "
+    "a compiler that doesn't support AVX2.");
+DECLARE_bool(enable_legacy_avx_support);
+
 namespace impala {
 
 // This is needed to avoid undefined reference errors.
@@ -51,12 +58,28 @@ constexpr uint32_t ParquetBloomFilter::SALT[8] __attribute__((aligned(32)));
 ParquetBloomFilter::ParquetBloomFilter() :
   log_num_buckets_(0),
   directory_mask_(0),
-  directory_(nullptr) {
+  directory_(nullptr),
+  always_false_(false) {
+#ifdef USE_AVX2
+  if (has_avx2()) {
+    bucket_insert_func_ptr_ = &ParquetBloomFilter::BucketInsertAVX2;
+    bucket_find_func_ptr_ = &ParquetBloomFilter::BucketFindAVX2;
+  } else {
+    bucket_insert_func_ptr_ = &ParquetBloomFilter::BucketInsert;
+    bucket_find_func_ptr_ = &ParquetBloomFilter::BucketFind;
+  }
+#else
+  bucket_insert_func_ptr_ = &ParquetBloomFilter::BucketInsert;
+  bucket_find_func_ptr_ = &ParquetBloomFilter::BucketFind;
+#endif
+
+  DCHECK(bucket_insert_func_ptr_);
+  DCHECK(bucket_find_func_ptr_);
 }
 
 ParquetBloomFilter::~ParquetBloomFilter() {}
 
-Status ParquetBloomFilter::Init(uint8_t* directory, size_t dir_size) {
+Status ParquetBloomFilter::Init(uint8_t* directory, size_t dir_size, bool always_false) {
   const int log_space_bytes = std::log2(dir_size);
   DCHECK_EQ(1ULL << log_space_bytes, dir_size);
 
@@ -70,7 +93,15 @@ Status ParquetBloomFilter::Init(uint8_t* directory, size_t dir_size) {
           log_space_bytes));
   }
   DCHECK_EQ(directory_size(), dir_size);
+  DCHECK(directory != nullptr);
   directory_ = reinterpret_cast<Bucket*>(directory);
+
+  if (always_false) {
+    // Check the assumption that the directory is empty.
+    DCHECK(std::all_of(directory, directory + dir_size,
+          [](uint8_t byte) { return byte == 0; }));
+    always_false_ = true;
+  }
 
   // Don't use log_num_buckets_ if it will lead to undefined behavior by a shift
   // that is too large.
@@ -79,9 +110,11 @@ Status ParquetBloomFilter::Init(uint8_t* directory, size_t dir_size) {
 }
 
 void ParquetBloomFilter::Insert(const uint64_t hash) noexcept {
+  always_false_ = false;
   uint32_t idx = DetermineBucketIdx(hash);
   uint32_t hash_lower = hash;
-  BucketInsert(idx, hash_lower);
+  DCHECK(bucket_insert_func_ptr_);
+  (this->*bucket_insert_func_ptr_)(idx, hash_lower);
 }
 
 void ParquetBloomFilter::HashAndInsert(const uint8_t* input, size_t size) noexcept {
@@ -90,9 +123,11 @@ void ParquetBloomFilter::HashAndInsert(const uint8_t* input, size_t size) noexce
 }
 
 bool ParquetBloomFilter::Find(const uint64_t hash) const noexcept {
+  if (always_false_) return false;
   uint32_t idx = DetermineBucketIdx(hash);
   uint32_t hash_lower = hash;
-  return BucketFind(idx, hash_lower);
+  DCHECK(bucket_find_func_ptr_);
+  return (this->*bucket_find_func_ptr_)(idx, hash_lower);
 }
 
 bool ParquetBloomFilter::HashAndFind(const uint8_t* input, size_t size) const noexcept {
@@ -135,7 +170,6 @@ uint64_t ParquetBloomFilter::Hash(const uint8_t* input, size_t size) {
   return hash;
 }
 
-#ifdef __aarch64__
 ATTRIBUTE_NO_SANITIZE_INTEGER
 void ParquetBloomFilter::BucketInsert(const uint32_t bucket_idx,
     const uint32_t hash) noexcept {
@@ -170,45 +204,10 @@ bool ParquetBloomFilter::BucketFind(
   }
   return true;
 }
-#else
-// A static helper function for the AVX2 methods. Turns a 32-bit hash into a 256-bit
-// Bucket with 1 single 1-bit set in each 32-bit lane.
-static inline ATTRIBUTE_ALWAYS_INLINE __attribute__((__target__("avx2"))) __m256i
-MakeMask(const uint32_t hash) {
-  const __m256i ones = _mm256_set1_epi32(1);
-  const __m256i rehash = _mm256_setr_epi32(BLOOM_HASH_CONSTANTS);
-  // Load hash into a YMM register, repeated eight times
-  __m256i hash_data = _mm256_set1_epi32(hash);
-  // Multiply-shift hashing ala Dietzfelbinger et al.: multiply 'hash' by eight different
-  // odd constants, then keep the 5 most significant bits from each product.
-  hash_data = _mm256_mullo_epi32(rehash, hash_data);
-  hash_data = _mm256_srli_epi32(hash_data, 27);
-  // Use these 5 bits to shift a single bit to a location in each 32-bit lane
-  return _mm256_sllv_epi32(ones, hash_data);
-}
 
-void ParquetBloomFilter::BucketInsert(const uint32_t bucket_idx,
-    const uint32_t hash) noexcept {
-  const __m256i mask = MakeMask(hash);
-  __m256i* const bucket = &(reinterpret_cast<__m256i*>(directory_)[bucket_idx]);
-  _mm256_store_si256(bucket, _mm256_or_si256(*bucket, mask));
-  // For SSE compatibility, unset the high bits of each YMM register so SSE instructions
-  // dont have to save them off before using XMM registers.
-  _mm256_zeroupper();
+bool ParquetBloomFilter::has_avx2() {
+  return !FLAGS_disable_parquetbloomfilter_avx2 && !FLAGS_enable_legacy_avx_support
+      && CpuInfo::IsSupported(CpuInfo::AVX2);
 }
-
-bool ParquetBloomFilter::BucketFind(const uint32_t bucket_idx,
-    const uint32_t hash) const noexcept {
-  const __m256i mask = MakeMask(hash);
-  const __m256i bucket = reinterpret_cast<__m256i*>(directory_)[bucket_idx];
-  // We should return true if 'bucket' has a one wherever 'mask' does. _mm256_testc_si256
-  // takes the negation of its first argument and ands that with its second argument. In
-  // our case, the result is zero everywhere iff there is a one in 'bucket' wherever
-  // 'mask' is one. testc returns 1 if the result is 0 everywhere and returns 0 otherwise.
-  const bool result = _mm256_testc_si256(bucket, mask);
-  _mm256_zeroupper();
-  return result;
-}
-#endif // #ifdef __aarch64__
 
 } // namespace impala

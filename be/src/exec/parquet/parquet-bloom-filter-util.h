@@ -57,5 +57,8 @@ Status LiteralToParquetType(const Literal& literal, ScalarExprEvaluator* eval,
     const parquet::Type::type& parquet_type, vector<uint8_t>* storage,
     uint8_t** ptr, size_t* len) WARN_UNUSED_RESULT;
 
+/// Creates a 'parquet::BloomFilterHeader' object based on 'bloom_filter'.
+parquet::BloomFilterHeader CreateBloomFilterHeader(
+    const ParquetBloomFilter& bloom_filter);
 
 } // namespace impala

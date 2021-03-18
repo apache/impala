@@ -110,6 +110,32 @@ set(UTIL_SRCS
   ${MUSTACHE_SRC_DIR}/mustache.cc
   ${MPFIT_SRC_DIR}/mpfit.c)
 
+# Detect AVX2 support
+set(AVX2_CMD "echo | ${CMAKE_CXX_COMPILER} -mavx2 -dM -E - | awk '$2 == \"__AVX2__\" { print $3 }'")
+execute_process(
+  COMMAND bash -c ${AVX2_CMD}
+  OUTPUT_VARIABLE AVX2_SUPPORT
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+# parquet-bloom-filter-avx2.cc uses AVX2 operations.
+if (AVX2_SUPPORT)
+  list(APPEND UTIL_SRCS parquet-bloom-filter-avx2.cc)
+
+  set_source_files_properties(parquet-bloom-filter-avx2.cc PROPERTIES COMPILE_FLAGS "-mavx2")
+  # parquet-bloom-filter-avx2.cc is not compiled explicitly with AVX2
+  # instructions(-mavx2) but it needs to know at compile time whether AVX2 support is
+  # available, hence the custom definition instead of relying on __AVX2__ defined by
+  # compiler with -mavx2.
+  # This is beause it derives from Kudu code at
+  # be/src/kudu/util/block_bloom_filter_avx2.cc.
+  set_source_files_properties(parquet-bloom-filter-avx2.cc parquet-bloom-filter.cc
+                              PROPERTIES COMPILE_DEFINITIONS "USE_AVX2=1")
+  message("Compiler supports AVX2")
+else()
+  message("Compiler does not support AVX2")
+endif()
+
 add_library(Util ${UTIL_SRCS})
 add_dependencies(Util gen-deps gen_ir_descriptions)
 

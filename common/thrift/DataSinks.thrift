@@ -97,6 +97,10 @@ struct THdfsTableSink {
   // Indicates how deep into the partition specification in which to start creating
   // partition directories
   10: optional i32 external_output_partition_depth;
+
+  // Mapping from column names to Parquet Bloom filter bitset sizes. Columns for which no
+  // Parquet Bloom filter should be written should not be listed here.
+  11: optional map<string, i64> parquet_bloom_filter_col_info;
 }
 
 // Structure to encapsulate specific options that are passed down to the KuduTableSink

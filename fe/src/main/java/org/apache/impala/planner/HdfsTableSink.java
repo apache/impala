@@ -18,6 +18,8 @@
 package org.apache.impala.planner;
 
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
@@ -36,11 +38,16 @@ import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableSink;
 import org.apache.impala.thrift.TTableSinkType;
+import org.apache.impala.util.BitUtil;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Sink for inserting into filesystem-backed tables.
@@ -48,6 +55,19 @@ import com.google.common.collect.Sets;
  * TODO(vercegovac): rename to FsTableSink
  */
 public class HdfsTableSink extends TableSink {
+  private final static Logger LOG = LoggerFactory.getLogger(HdfsTableSink.class);
+
+  // The name of the table property that sets the parameters of writing Parquet Bloom
+  // filters.
+  public static final String PARQUET_BLOOM_FILTER_WRITING_TBL_PROPERTY =
+    "parquet.bloom.filter.columns";
+
+  // These constants are the maximal and minimal size of the bitset of a
+  // ParquetBloomFilter object (in the BE). These should be kept in sync with the values
+  // in be/src/util/parquet-bloom-filter.h.
+  public static final long PARQUET_BLOOM_FILTER_MAX_BYTES = 128 * 1024 * 1024;
+  public static final long PARQUET_BLOOM_FILTER_MIN_BYTES = 64;
+
   // Default number of partitions used for computeResourceProfile() in the absence of
   // column stats.
   protected final long DEFAULT_NUM_PARTITIONS = 10;
@@ -221,6 +241,55 @@ public class HdfsTableSink extends TableSink {
     return "HDFS WRITER";
   }
 
+  // The table property has the following format: a comma separated list of
+  // 'col_name:bitset_size' pairs. The 'bitset_size' part means the size of the bitset of
+  // the Bloom filter, and is optional. Values will be rounded up to the smallest power of
+  // 2 not less than the given number. If the size is not given, it will be the maximal
+  // Bloom filter size (PARQUET_BLOOM_FILTER_MAX_BYTES). No Bloom filter will be written
+  // for columns not listed here.
+  // Example: "col1:1024,col2,col4:100'.
+  @VisibleForTesting
+  static Map<String, Long> parseParquetBloomFilterWritingTblProp(final String tbl_prop) {
+    Map<String, Long> result = new HashMap<>();
+    String[] colSizePairs = tbl_prop.split(",");
+    for (String colSizePair : colSizePairs) {
+      String[] tokens = colSizePair.split(":");
+
+      if (tokens.length == 0 || tokens.length > 2) {
+        String err = "Invalid token in table property "
+          + PARQUET_BLOOM_FILTER_WRITING_TBL_PROPERTY + ": "
+          + colSizePair.trim()
+          + ". Expected either a column name or a column name and a size "
+          + "separated by a colon (';').";
+        LOG.warn(err);
+        return null;
+      }
+
+      long size;
+      if (tokens.length == 1) {
+        size = PARQUET_BLOOM_FILTER_MAX_BYTES;
+      } else {
+        assert tokens.length == 2;
+        try {
+          size = Long.parseLong(tokens[1].trim());
+        } catch (NumberFormatException e) {
+          String err =
+                "Invalid bitset size in table property "
+                + PARQUET_BLOOM_FILTER_WRITING_TBL_PROPERTY + ": "
+                + tokens[1].trim();
+          LOG.warn(err);
+          return null;
+        }
+
+        size = Long.max(PARQUET_BLOOM_FILTER_MIN_BYTES, size);
+        size = Long.min(PARQUET_BLOOM_FILTER_MAX_BYTES, size);
+        size = BitUtil.roundUpToPowerOf2(size);
+      }
+      result.put(tokens[0].trim(), size);
+    }
+    return result;
+  }
+
   @Override
   protected void toThriftImpl(TDataSink tsink) {
     THdfsTableSink hdfsTableSink = new THdfsTableSink(
@@ -234,6 +303,16 @@ public class HdfsTableSink extends TableSink {
     if (skipHeaderLineCount > 0) {
       hdfsTableSink.setSkip_header_line_count(skipHeaderLineCount);
     }
+
+    org.apache.hadoop.hive.metastore.api.Table msTbl = table.getMetaStoreTable();
+    Map<String, String> params = msTbl.getParameters();
+    String parquetBloomTblProp = params.get(PARQUET_BLOOM_FILTER_WRITING_TBL_PROPERTY);
+    if (parquetBloomTblProp != null) {
+      Map<String, Long> parsedProperties = parseParquetBloomFilterWritingTblProp(
+          parquetBloomTblProp);
+      hdfsTableSink.setParquet_bloom_filter_col_info(parsedProperties);
+    }
+
     hdfsTableSink.setSort_columns(sortColumns_);
     hdfsTableSink.setSorting_order(sortingOrder_);
     hdfsTableSink.setIs_result_sink(isResultSink_);

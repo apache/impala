@@ -115,6 +115,10 @@ class HdfsTableSink : public DataSink {
   TSortingOrder::type sorting_order() const { return sorting_order_; }
   const HdfsTableDescriptor& TableDesc() { return *table_desc_; }
 
+  const std::map<string, int64_t>& GetParquetBloomFilterColumns() const {
+    return parquet_bloom_filter_columns_;
+  }
+
   RuntimeProfile::Counter* rows_inserted_counter() { return rows_inserted_counter_; }
   RuntimeProfile::Counter* bytes_written_counter() { return bytes_written_counter_; }
   RuntimeProfile::Counter* encode_timer() { return encode_timer_; }
@@ -273,6 +277,10 @@ class HdfsTableSink : public DataSink {
   // directories. Used in conjunction with external_output_dir_ to inform the table
   // sink which directories are pre-created.
   int external_output_partition_depth_ = 0;
+
+  /// Map from column names to Parquet Bloom filter bitset sizes. Columns for which
+  /// Parquet Bloom filtering is not enabled are not listed.
+  std::map<std::string, int64_t> parquet_bloom_filter_columns_;
 
   /// string representation of the unique fragment instance id. Used for per-partition
   /// Hdfs file names, and for tmp Hdfs directories. Set in Prepare();

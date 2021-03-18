@@ -104,6 +104,10 @@ HdfsTableSink::HdfsTableSink(TDataSinkId sink_id, const HdfsTableSinkConfig& sin
   if (hdfs_sink.__isset.external_output_partition_depth) {
     external_output_partition_depth_ = hdfs_sink.external_output_partition_depth;
   }
+
+  if (hdfs_sink.__isset.parquet_bloom_filter_col_info) {
+    parquet_bloom_filter_columns_ = hdfs_sink.parquet_bloom_filter_col_info;
+  }
 }
 
 Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracker) {

@@ -85,6 +85,20 @@ enum TMinmaxFilterFastCodePathMode {
   VERIFICATION=2
 }
 
+// Options for when to write Parquet Bloom filters for supported types.
+enum TParquetBloomFilterWrite {
+  // Never write Parquet Bloom filters.
+  NEVER,
+
+  // Write Parquet Bloom filters if specified in the table properties AND the row group
+  // is not fully dictionary encoded.
+  IF_NO_DICT,
+
+  // Always write Parquet Bloom filters if specified in the table properties,
+  // even if the row group is fully dictionary encoded.
+  ALWAYS
+}
+
 // constants for TQueryOptions.num_nodes
 const i32 NUM_NODES_ALL = 0
 const i32 NUM_NODES_ALL_RACKS = -1
@@ -528,6 +542,10 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   134: optional bool minmax_filter_partition_columns = true;
+
+  // See comment in ImpalaService.thrift
+  135: optional TParquetBloomFilterWrite parquet_bloom_filter_write =
+      TParquetBloomFilterWrite.IF_NO_DICT;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

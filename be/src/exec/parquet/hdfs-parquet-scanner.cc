@@ -2065,7 +2065,7 @@ Status HdfsParquetScanner::ProcessBloomFilter(const parquet::RowGroup&
 
       // Construct ParquetBloomFilter instance.
       ParquetBloomFilter bloom_filter;
-      RETURN_IF_ERROR(bloom_filter.Init(data_buffer.buffer(), data_buffer.Size()));
+      RETURN_IF_ERROR(bloom_filter.Init(data_buffer.buffer(), data_buffer.Size(), false));
 
       const uint64_t hash = col_idx_to_hash.second;
       if (!bloom_filter.Find(hash)) {

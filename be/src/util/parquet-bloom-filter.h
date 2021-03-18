@@ -38,7 +38,10 @@ class ParquetBloomFilter {
   /// Initialises the directory (bitset) of the Bloom filter. The data is not copied and
   /// is not owned by this object. The buffer must be valid as long as this object uses
   /// it.
-  Status Init(uint8_t* directory, size_t dir_size);
+  /// If 'always_false_' is true, the implementation assumes that the directory is empty.
+  /// If the directory contains any bytes other than zero, 'always_false_' should be
+  /// false.
+  Status Init(uint8_t* directory, size_t dir_size, bool always_false);
 
   void Insert(const uint64_t hash) noexcept;
   void HashAndInsert(const uint8_t* input, size_t size) noexcept;
@@ -47,6 +50,19 @@ class ParquetBloomFilter {
   /// high probabilty) if it is not.
   bool Find(const uint64_t hash) const noexcept;
   bool HashAndFind(const uint8_t* input, size_t size) const noexcept;
+
+  const uint8_t* directory() const {
+    return reinterpret_cast<const uint8_t*>(directory_);
+  }
+
+  // Size of the internal directory structure in bytes.
+  int64_t directory_size() const {
+    return 1ULL << log_space_bytes();
+  }
+
+  bool AlwaysFalse() const {
+    return always_false_;
+  }
 
   static int OptimalByteSize(const size_t ndv, const double fpp);
 
@@ -95,6 +111,9 @@ class ParquetBloomFilter {
   static constexpr uint32_t SALT[8]
       __attribute__((aligned(32))) = {BLOOM_HASH_CONSTANTS};
 
+  // Detect at run-time whether CPU supports AVX2
+  static bool has_avx2();
+
   // log_num_buckets_ is the log (base 2) of the number of buckets in the directory.
   int log_num_buckets_;
 
@@ -104,28 +123,34 @@ class ParquetBloomFilter {
 
   Bucket* directory_;
 
-/// AVX2 is not available on ARM so we have to implement the functions differently.
-#ifdef __aarch64__
+  // Indicates whether the Bloom filter is empty and therefore all *Find* calls will
+  // return false without further checks.
+  bool always_false_;
+
   // Does the actual work of Insert(). bucket_idx is the index of the bucket to insert
   // into and 'hash' is the value passed to Insert().
-  void BucketInsert(const uint32_t bucket_idx, const uint32_t hash) noexcept;
-  bool BucketFind(const uint32_t bucket_idx, const uint32_t hash) const noexcept;
-#else
-  // Same as above but using AVX2.
-  void BucketInsert(const uint32_t bucket_idx, const uint32_t hash) noexcept
-    __attribute__((__target__("avx2")));
-  bool BucketFind(const uint32_t bucket_idx, const uint32_t hash) const noexcept
-    __attribute__((__target__("avx2")));
+  void BucketInsert(uint32_t bucket_idx, uint32_t hash) noexcept;
+
+  bool BucketFind(uint32_t bucket_idx, uint32_t hash) const noexcept;
+
+#ifdef USE_AVX2
+  // A faster SIMD version of BucketInsert().
+  void BucketInsertAVX2(const uint32_t bucket_idx, const uint32_t hash) noexcept
+      __attribute__((__target__("avx2")));
+
+  // A faster SIMD version of BucketFind().
+  bool BucketFindAVX2(const uint32_t bucket_idx, const uint32_t hash) const noexcept
+      __attribute__((__target__("avx2")));
 #endif
+
+  // Function pointers initialized in the constructor to avoid run-time cost in hot-path
+  // of Find and Insert operations.
+  decltype(&ParquetBloomFilter::BucketInsert) bucket_insert_func_ptr_;
+  decltype(&ParquetBloomFilter::BucketFind) bucket_find_func_ptr_;
 
   // Returns amount of space used in log2 bytes.
   int log_space_bytes() const {
     return log_num_buckets_ + kLogBucketByteSize;
-  }
-
-  // Size of the internal directory structure in bytes.
-  int64_t directory_size() const {
-    return 1ULL << log_space_bytes();
   }
 
   uint32_t DetermineBucketIdx(const uint64_t hash) const noexcept {

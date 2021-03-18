@@ -188,6 +188,20 @@ class DictEncoder : public DictEncoderBase {
 
   virtual int num_entries() const { return nodes_.size(); }
 
+  /// Execute 'func' for each key that is present in the dictionary. Stops execution the
+  /// first time 'func' returns an error, propagating the error. Returns OK otherwise.
+  ///
+  /// Can be useful if we fall back to plain encoding from dict encoding but still want to
+  /// use a Bloom filter. In this case the filter can be filled with all elements that
+  /// have occured so far.
+  Status ForEachDictKey(const std::function<Status(const T&)>& func) {
+    for (auto pair : nodes_) {
+      RETURN_IF_ERROR(func(pair.value));
+    }
+
+    return Status::OK();
+  }
+
  private:
   /// Size of the table. Must be a power of 2.
   enum { HASH_TABLE_SIZE = 1 << 16 };

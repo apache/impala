@@ -17,12 +17,14 @@
 
 #include "exec/parquet/hdfs-parquet-table-writer.h"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/unordered_set.hpp>
 
 #include "common/version.h"
 #include "exec/hdfs-table-sink.h"
 #include "exec/parquet/parquet-column-stats.inline.h"
 #include "exec/parquet/parquet-metadata-utils.h"
+#include "exec/parquet/parquet-bloom-filter-util.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "exprs/scalar-expr.h"
 #include "rpc/thrift-util.h"
@@ -32,6 +34,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "runtime/scoped-buffer.h"
 #include "runtime/string-value.inline.h"
 #include "util/bit-stream-utils.h"
 #include "util/bit-util.h"
@@ -40,11 +43,13 @@
 #include "util/debug-util.h"
 #include "util/dict-encoding.h"
 #include "util/hdfs-util.h"
+#include "util/parquet-bloom-filter.h"
 #include "util/pretty-printer.h"
 #include "util/rle-encoding.h"
 #include "util/string-util.h"
 
 #include <sstream>
+#include <string>
 
 #include "gen-cpp/ImpalaService_types.h"
 
@@ -307,6 +312,12 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // the expression to an int64.
   virtual void* ConvertValue(void* value) { return value; }
 
+  // Some subclasses may write a ParquetBloomFilter, in which case they should override
+  // this method.
+  virtual const ParquetBloomFilter* GetParquetBloomFilter() const {
+    return nullptr;
+  }
+
   // Encodes out all data for the current page and updates the metadata.
   virtual Status FinalizeCurrentPage() WARN_UNUSED_RESULT;
 
@@ -430,9 +441,34 @@ class HdfsParquetTableWriter::ColumnWriter :
       const Codec::CodecInfo& codec_info, const std::string& col_name)
     : BaseColumnWriter(parent, eval, codec_info, col_name),
       num_values_since_dict_size_check_(0),
+      parquet_bloom_filter_bytes_(0),
+      parquet_bloom_filter_buffer_(table_sink_mem_tracker_),
       plain_encoded_value_size_(
           ParquetPlainEncoder::EncodedByteSize(eval->root().type())) {
     DCHECK_NE(eval->root().type().type, TYPE_BOOLEAN);
+
+    const std::map<string, int64_t>& col_to_size =
+      parent->parent_->GetParquetBloomFilterColumns();
+    const auto it = col_to_size.find(column_name());
+
+    if (GetBloomFilterWriteOption() == TParquetBloomFilterWrite::NEVER
+        || it == col_to_size.end()) {
+      // Parquet Bloom filtering is disabled altogether or is not turned on for this
+      // column.
+      parquet_bloom_filter_state_ = ParquetBloomFilterState::DISABLED;
+    } else {
+      // Parquet Bloom filtering is enabled for this column either immediately or if
+      // falling back from dict encoding.
+      parquet_bloom_filter_state_ = ParquetBloomFilterState::UNINITIALIZED;
+
+      // It is the responsibility of the FE to enforce the below constraints.
+      parquet_bloom_filter_bytes_ = it->second;
+      DCHECK_LE(parquet_bloom_filter_bytes_, ParquetBloomFilter::MAX_BYTES);
+      DCHECK_GE(parquet_bloom_filter_bytes_, ParquetBloomFilter::MIN_BYTES);
+      DCHECK(BitUtil::IsPowerOf2(parquet_bloom_filter_bytes_));
+    }
+    parquet_type_ = ParquetMetadataUtils::ConvertInternalToParquetType(type().type,
+        parent_->timestamp_type_);
   }
 
   virtual void Reset() {
@@ -450,6 +486,16 @@ class HdfsParquetTableWriter::ColumnWriter :
     page_stats_base_ = page_stats_.get();
     row_group_stats_.reset(
         new ColumnStats<T>(parent_->per_file_mem_pool_.get(), plain_encoded_value_size_));
+    if (parquet_bloom_filter_state_ != ParquetBloomFilterState::DISABLED) {
+      Status status = InitParquetBloomFilter();
+      if (!status.ok()) {
+        VLOG(google::WARNING)
+            << "Failed to initialise Parquet Bloom filter for column "
+            << column_name() << "."
+            << " Error message: " << status.msg().msg();
+        ReleaseParquetBloomFilterResources();
+      }
+    }
     row_group_stats_base_ = row_group_stats_.get();
   }
 
@@ -467,6 +513,7 @@ class HdfsParquetTableWriter::ColumnWriter :
       // If the dictionary contains the maximum number of values, switch to plain
       // encoding for the next page. The current page is full and must be written out.
       if (UNLIKELY(*bytes_needed < 0)) {
+        FlushDictionaryToParquetBloomFilterIfNeeded();
         next_page_encoding_ = parquet::Encoding::PLAIN;
         return false;
       }
@@ -497,7 +544,13 @@ class HdfsParquetTableWriter::ColumnWriter :
     }
 
     page_stats_->Update(*val);
+    UpdateParquetBloomFilterIfNeeded(val);
+
     return true;
+  }
+
+  virtual const ParquetBloomFilter* GetParquetBloomFilter() const {
+    return parquet_bloom_filter_.get();
   }
 
  private:
@@ -525,10 +578,163 @@ class HdfsParquetTableWriter::ColumnWriter :
   // Tracks statistics per row group. This gets reset when starting a new row group.
   scoped_ptr<ColumnStats<T>> row_group_stats_;
 
+
+  enum struct ParquetBloomFilterState {
+    /// Parquet Bloom filtering is turned off either completely or for this column.
+    DISABLED,
+
+    /// The Parquet Bloom filter needs to be initialised before being used.
+    UNINITIALIZED,
+
+    /// The Bloom filter has been initialised but it is not being used as the dictionary
+    /// can hold all elements. If the dictionary becomes full and there are still new
+    /// elements, we fall back from dictionary encoding to plain encoding and start using
+    /// the Bloom filter.
+    WAIT_FOR_FALLBACK_FROM_DICT,
+
+    /// The Parquet Bloom filter is being used.
+    ENABLED,
+
+    /// An error occured with the Parquet Bloom filter so we are not using it.
+    FAILED
+  };
+
+  ParquetBloomFilterState parquet_bloom_filter_state_;
+  uint64_t parquet_bloom_filter_bytes_;
+  ScopedBuffer parquet_bloom_filter_buffer_;
+
+  // The parquet type corresponding to this->type(). Needed by the Parquet Bloom filter.
+  parquet::Type::type parquet_type_;
+
+  // Buffer used when converting values to the form that is used for hashing and insertion
+  // into the ParquetBloomFilter. The conversion function, 'BytesToParquetType' requires a
+  // vector to be able to allocate space if necessary. However, by caching the allocated
+  // buffer here we avoid the overhead of allocation for every conversion - when
+  // 'BytesToParquetType' calls 'resize' on the vector it will already have at least the
+  // desired length in most (or all) cases.
+  //
+  // We prellocate 16 bytes because that is the longest fixed size type (except for fixed
+  // length arrays).
+  std::vector<uint8_t> parquet_bloom_conversion_buffer{16, 0};
+
+  // The ParquetBloomFilter object if one is being written. If
+  // 'ShouldInitParquetBloomFilter()' is false, the combination of the impala type and the
+  // parquet type is not supported or some error occurs during the initialisation of the
+  // ParquetBloomFilter object, it is set to NULL.
+  unique_ptr<ParquetBloomFilter> parquet_bloom_filter_;
+
   // Converts a slot pointer to a raw value suitable for encoding
   inline T* CastValue(void* value) {
     return reinterpret_cast<T*>(value);
   }
+
+  Status InitParquetBloomFilter() WARN_UNUSED_RESULT {
+    DCHECK(parquet_bloom_filter_state_ != ParquetBloomFilterState::DISABLED);
+    const ColumnType& impala_type = type();
+    if (!IsParquetBloomFilterSupported(parquet_type_, impala_type)) {
+      stringstream ss;
+      ss << "Parquet Bloom filtering not supported for parquet type " << parquet_type_
+          << " and impala type " << impala_type << ".";
+      return Status::Expected(ss.str());
+    }
+
+    parquet_bloom_filter_buffer_.Release();
+    if (!parquet_bloom_filter_buffer_.TryAllocate(parquet_bloom_filter_bytes_)) {
+      parquet_bloom_filter_state_ = ParquetBloomFilterState::FAILED;
+      return Status(Substitute("Could not allocate buffer of $0 bytes for Parquet "
+            "Bloom filter data when writing column '$1'.",
+            parquet_bloom_filter_bytes_, column_name()));
+    }
+    std::memset(parquet_bloom_filter_buffer_.buffer(), 0,
+        parquet_bloom_filter_buffer_.Size());
+
+    parquet_bloom_filter_ = make_unique<ParquetBloomFilter>();
+    Status status = parquet_bloom_filter_->Init(parquet_bloom_filter_buffer_.buffer(),
+          parquet_bloom_filter_buffer_.Size(), true);
+
+    if (!status.ok()) {
+      parquet_bloom_filter_state_ = ParquetBloomFilterState::FAILED;
+      return status;
+    } else {
+      const bool should_wait_for_fallback =
+          (GetBloomFilterWriteOption() == TParquetBloomFilterWrite::IF_NO_DICT)
+          && IsDictionaryEncoding(current_encoding_);
+      parquet_bloom_filter_state_ = should_wait_for_fallback
+          ? ParquetBloomFilterState::WAIT_FOR_FALLBACK_FROM_DICT
+          : ParquetBloomFilterState::ENABLED;;
+      return Status::OK();
+    }
+  }
+
+  void UpdateParquetBloomFilterIfNeeded(const void* val) {
+    if (parquet_bloom_filter_state_ == ParquetBloomFilterState::ENABLED) {
+      Status status = UpdateParquetBloomFilter(val);
+      if (!status.ok()) {
+        // If an error happens, for example conversion to the form expected by the Bloom
+        // filter fails, we stop writing the Bloom filter and release resources associated
+        // with it.
+        VLOG(google::WARNING)
+            << "An error happened updating Parquet Bloom filter in column "
+            << column_name() << " at row idx " << parent_->row_idx_ << "."
+            << " Error message: " << status.msg().msg();
+        parquet_bloom_filter_state_ = ParquetBloomFilterState::FAILED;
+        ReleaseParquetBloomFilterResources();
+      }
+    }
+  }
+
+  Status UpdateParquetBloomFilter(const void* val) WARN_UNUSED_RESULT {
+    DCHECK(parquet_bloom_filter_state_ == ParquetBloomFilterState::ENABLED);
+    DCHECK(parquet_bloom_filter_ != nullptr);
+
+    uint8_t* ptr = nullptr;
+    size_t len = -1;
+    const ColumnType& impala_type = type();
+    RETURN_IF_ERROR(BytesToParquetType(val, impala_type, parquet_type_,
+        &parquet_bloom_conversion_buffer, &ptr, &len));
+    DCHECK(ptr != nullptr);
+    DCHECK(len != -1);
+    parquet_bloom_filter_->HashAndInsert(ptr, len);
+
+    return Status::OK();
+  }
+
+  void ReleaseParquetBloomFilterResources() {
+    parquet_bloom_filter_ = nullptr;
+    parquet_bloom_filter_buffer_.Release();
+  }
+
+  void FlushDictionaryToParquetBloomFilterIfNeeded() {
+    if (parquet_bloom_filter_state_
+        == ParquetBloomFilterState::WAIT_FOR_FALLBACK_FROM_DICT) {
+      parquet_bloom_filter_state_ = ParquetBloomFilterState::ENABLED;
+
+      // Write dictionary keys to Parquet Bloom filter if we haven't been filling it so
+      // far (and Bloom filtering is enabled). If there are too many values for a
+      // dictionary, a Bloom filter may still be useful.
+      Status status = DictKeysToParquetBloomFilter();
+      if (!status.ok()) {
+        VLOG(google::WARNING)
+            << "Failed to add dictionary keys to Parquet Bloom filter for column "
+            << column_name()
+            << " when falling back from dictionary encoding to plain encoding."
+            << " Error message: " << status.msg().msg();
+        parquet_bloom_filter_state_ = ParquetBloomFilterState::FAILED;
+        ReleaseParquetBloomFilterResources();
+      }
+    }
+  }
+
+  Status DictKeysToParquetBloomFilter() {
+    return dict_encoder_->ForEachDictKey([this](const T& value) {
+        return UpdateParquetBloomFilter(&value);
+        });
+  }
+
+  TParquetBloomFilterWrite::type GetBloomFilterWriteOption() {
+    return parent_->state_->query_options().parquet_bloom_filter_write;
+  }
+
  protected:
   // Size of each encoded value in plain encoding. -1 if the type is variable-length.
   int64_t plain_encoded_value_size_;
@@ -1386,6 +1592,43 @@ Status HdfsParquetTableWriter::WriteFileHeader() {
   return Status::OK();
 }
 
+Status HdfsParquetTableWriter::WriteParquetBloomFilter(BaseColumnWriter* col_writer,
+    parquet::ColumnMetaData* meta_data) {
+  DCHECK(col_writer != nullptr);
+  DCHECK(meta_data != nullptr);
+
+  const ParquetBloomFilter* bloom_filter = col_writer->GetParquetBloomFilter();
+  if (bloom_filter == nullptr || bloom_filter->AlwaysFalse()) {
+    // If there is no Bloom filter for this column or if it is empty we don't need to do
+    // anything.
+    // If bloom_filter->AlwaysFalse() is true, it means the Bloom filter was initialised
+    // but no element was inserted, probably because we have not fallen back to plain
+    // encoding from dictionary encoding.
+    return Status::OK();
+  }
+
+  // Update metadata.
+  meta_data->__set_bloom_filter_offset(file_pos_);
+
+  // Write the header to the file.
+  parquet::BloomFilterHeader header = CreateBloomFilterHeader(*bloom_filter);
+  uint8_t* buffer = nullptr;
+  uint32_t len = 0;
+  RETURN_IF_ERROR(thrift_serializer_->SerializeToBuffer(&header, &len, &buffer));
+  DCHECK(buffer != nullptr);
+  DCHECK_GT(len, 0);
+  RETURN_IF_ERROR(Write(buffer, len));
+  file_pos_ += len;
+
+  // Write the Bloom filter directory (bitset) to the file.
+  const uint8_t* directory = bloom_filter->directory();
+  const int64_t directory_size = bloom_filter->directory_size();
+  RETURN_IF_ERROR(Write(directory, directory_size));
+  file_pos_ += directory_size;
+
+  return Status::OK();
+}
+
 Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
   if (current_row_group_ == nullptr) return Status::OK();
 
@@ -1441,6 +1684,10 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
 
     // Build column statistics and add them to the header.
     col_writer->EncodeRowGroupStats(&current_row_group_->columns[i].meta_data);
+
+    // Write Bloom filter and update metadata.
+    RETURN_IF_ERROR(WriteParquetBloomFilter(col_writer,
+        &current_row_group_->columns[i].meta_data));
 
     // Since we don't supported complex schemas, all columns should have the same
     // number of values.

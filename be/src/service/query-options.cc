@@ -514,6 +514,13 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_parquet_bloom_filtering(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::PARQUET_BLOOM_FILTER_WRITE: {
+        TParquetBloomFilterWrite::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "Parquet Bloom filter write",
+           _TParquetBloomFilterWrite_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_parquet_bloom_filter_write(enum_type);
+        break;
+      }
       case TImpalaQueryOptions::PARQUET_READ_STATISTICS: {
         query_options->__set_parquet_read_statistics(IsTrue(value));
         break;

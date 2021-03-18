@@ -149,6 +149,11 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   /// Writes the file metadata and footer.
   Status WriteFileFooter();
 
+  /// Writes the ParquetBloomFilter of 'col_writer' if it has one, including the header,
+  /// and updates '*meta_data'.
+  Status WriteParquetBloomFilter(BaseColumnWriter* col_writer,
+      parquet::ColumnMetaData* meta_data) WARN_UNUSED_RESULT;
+
   /// Flushes the current row group to file.  This will compute the final
   /// offsets of column chunks, updating the file metadata.
   Status FlushCurrentRowGroup();

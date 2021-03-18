@@ -216,4 +216,14 @@ Status LiteralToParquetType(const Literal& literal, ScalarExprEvaluator* eval,
   return BytesToParquetType(value, literal.type(), parquet_type, storage, ptr, len);
 }
 
+parquet::BloomFilterHeader CreateBloomFilterHeader(const ParquetBloomFilter& bloom_filter)
+{
+  parquet::BloomFilterHeader header;
+  header.algorithm.__set_BLOCK(parquet::SplitBlockAlgorithm());
+  header.hash.__set_XXHASH(parquet::XxHash());
+  header.compression.__set_UNCOMPRESSED(parquet::Uncompressed());
+  header.__set_numBytes(bloom_filter.directory_size());
+  return header;
+}
+
 } // namespace impala

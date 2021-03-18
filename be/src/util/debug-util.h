@@ -83,6 +83,7 @@ std::string PrintThriftEnum(const TEnabledRuntimeFilterTypes::type& value);
 std::string PrintThriftEnum(const TMinmaxFilteringLevel::type& value);
 std::string PrintThriftEnum(const TKuduReplicaSelection::type& value);
 std::string PrintThriftEnum(const TMinmaxFilterFastCodePathMode::type& value);
+std::string PrintThriftEnum(const TParquetBloomFilterWrite::type& value);
 
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);

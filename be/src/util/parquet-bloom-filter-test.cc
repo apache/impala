@@ -67,7 +67,7 @@ BloomWrapper CreateBloomFilter(int ndv, double fpp) {
   BloomWrapper res;
   res.bloom = std::make_unique<ParquetBloomFilter>();
   res.storage = std::make_unique<vector<uint8_t>>(storage_size, 0);
-  Status status = res.bloom->Init(res.storage->data(), storage_size);
+  Status status = res.bloom->Init(res.storage->data(), storage_size, true);
   EXPECT_TRUE(status.ok()) << status.GetDetail();
   return res;
 }
@@ -113,7 +113,7 @@ TEST(ParquetBloomFilter, Find) {
   }
 }
 
-TEST(ParquetBloomFilter, TestHashAndFind) {
+TEST(ParquetBloomFilter, HashAndFind) {
   srand(0);
   for (int ndv = 100; ndv <= 100000; ndv *= 10) {
     BloomWrapper wrapper = CreateBloomFilter(ndv, 0.01);
