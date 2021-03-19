@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.avro.SchemaParseException;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
+import org.apache.iceberg.DataFile;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
@@ -32,6 +33,7 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TAlterTableParams;
@@ -41,6 +43,7 @@ import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTablePropertyType;
 import org.apache.impala.util.AvroSchemaParser;
 import org.apache.impala.util.AvroSchemaUtils;
+import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.MetaStoreUtil;
 
 import com.google.common.base.Preconditions;
@@ -147,17 +150,49 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
 
   private void analyzeIcebergTable(Analyzer analyzer) throws AnalysisException {
     //Cannot set these properties related to metadata
-    icebergPropertyCheck(IcebergTable.ICEBERG_FILE_FORMAT);
     icebergPropertyCheck(IcebergTable.ICEBERG_CATALOG);
     icebergPropertyCheck(IcebergTable.ICEBERG_CATALOG_LOCATION);
     icebergPropertyCheck(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
     icebergPropertyCheck(IcebergTable.METADATA_LOCATION);
+    if (tblProperties_.containsKey(IcebergTable.ICEBERG_FILE_FORMAT)) {
+      icebergTableFormatCheck(tblProperties_.get(IcebergTable.ICEBERG_FILE_FORMAT));
+    }
   }
 
   private void icebergPropertyCheck(String property) throws AnalysisException {
     if (tblProperties_.containsKey(property)) {
       throw new AnalysisException(String.format("Changing the '%s' table property is " +
           "not supported for Iceberg table.", property));
+    }
+  }
+
+  private void icebergTableFormatCheck(String fileformat) throws AnalysisException {
+    Preconditions.checkState(getTargetTable() instanceof FeIcebergTable);
+    Preconditions.checkState(fileformat != null);
+    if (IcebergUtil.getIcebergFileFormat(fileformat) == null) {
+      throw new AnalysisException("Invalid fileformat for Iceberg table: " + fileformat);
+    }
+    try {
+      FeIcebergTable iceTable = (FeIcebergTable)getTargetTable();
+      List<DataFile> dataFiles = IcebergUtil.getIcebergDataFiles(iceTable,
+          new ArrayList<>());
+      if (dataFiles.isEmpty()) return;
+      DataFile firstFile = dataFiles.get(0);
+      String errorMsg = "Attempt to set Iceberg data file format to %s, but found data " +
+          "file %s with file format %s.";
+      if (!firstFile.format().name().equalsIgnoreCase(fileformat)) {
+        throw new AnalysisException(String.format(errorMsg, fileformat, firstFile.path(),
+        firstFile.format().name()));
+      }
+      //TODO(IMPALA-10610): Iceberg tables with mixed file formats are not readable.
+      for (DataFile df : dataFiles) {
+        if (df.format() != firstFile.format()) {
+          throw new AnalysisException(String.format(errorMsg, fileformat, df.path(),
+              df.format().name()));
+        }
+      }
+    } catch (TableLoadingException e) {
+      throw new AnalysisException(e);
     }
   }
 

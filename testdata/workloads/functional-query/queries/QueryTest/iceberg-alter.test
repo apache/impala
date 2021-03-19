@@ -111,3 +111,41 @@ SELECT * FROM iceberg_rename;
 ---- CATCH
 Could not resolve table reference: 'iceberg_rename'
 ====
+---- QUERY
+CREATE TABLE iceberg_changing_fileformats (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.file_format'='orc');
+DESCRIBE FORMATTED iceberg_changing_fileformats;
+---- RESULTS: VERIFY_IS_SUBSET
+'','iceberg.file_format ','orc                 '
+---- TYPES
+string, string, string
+====
+---- QUERY
+ALTER TABLE iceberg_changing_fileformats set TBLPROPERTIES('iceberg.file_format'='parquet');
+DESCRIBE FORMATTED iceberg_changing_fileformats;
+---- RESULTS: VERIFY_IS_SUBSET
+'','iceberg.file_format ','parquet             '
+---- TYPES
+string, string, string
+====
+---- QUERY
+INSERT INTO iceberg_changing_fileformats values (123);
+SELECT * FROM iceberg_changing_fileformats;
+---- RESULTS
+123
+---- TYPES
+INT
+====
+---- QUERY
+ALTER TABLE iceberg_changing_fileformats set TBLPROPERTIES('iceberg.file_format'='ORC');
+---- CATCH
+Attempt to set Iceberg data file format to ORC
+====
+---- QUERY
+DESCRIBE FORMATTED iceberg_changing_fileformats;
+---- RESULTS: VERIFY_IS_SUBSET
+'','iceberg.file_format ','parquet             '
+---- TYPES
+string, string, string
+====
