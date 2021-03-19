@@ -111,32 +111,26 @@ StringVal DataSketchesFunctions::DsHllStringify(FunctionContext* ctx,
 BigIntVal DataSketchesFunctions::DsThetaEstimate(
     FunctionContext* ctx, const StringVal& serialized_sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return 0;
-  try {
-    // serialized_sketch may be a serialized of update_theta_sketch or
-    // compact_theta_sketch
-    auto sketch = datasketches::theta_sketch::deserialize(
-        (void*)serialized_sketch.ptr, serialized_sketch.len);
-    return sketch->get_estimate();
-  } catch (const std::exception&) {
-    // One reason of throwing from deserialization is that the input string is not a
-    // serialized sketch.
+  std::unique_ptr<datasketches::compact_theta_sketch> sketch;
+  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
     LogSketchDeserializationError(ctx);
     return BigIntVal::null();
   }
+  return sketch->get_estimate();
 }
 
 StringVal DataSketchesFunctions::DsThetaExclude(FunctionContext* ctx,
     const StringVal& first_serialized_sketch, const StringVal& second_serialized_sketch) {
   datasketches::theta_a_not_b a_not_b;
   // Deserialize two sketches
-  datasketches::theta_sketch::unique_ptr first_sketch_ptr;
+  std::unique_ptr<datasketches::compact_theta_sketch> first_sketch_ptr;
   if (!first_serialized_sketch.is_null && first_serialized_sketch.len > 0) {
     if (!DeserializeDsSketch(first_serialized_sketch, &first_sketch_ptr)) {
       LogSketchDeserializationError(ctx);
       return StringVal::null();
     }
   }
-  datasketches::theta_sketch::unique_ptr second_sketch_ptr;
+  std::unique_ptr<datasketches::compact_theta_sketch> second_sketch_ptr;
   if (!second_serialized_sketch.is_null && second_serialized_sketch.len > 0) {
     if (!DeserializeDsSketch(second_serialized_sketch, &second_sketch_ptr)) {
       LogSketchDeserializationError(ctx);

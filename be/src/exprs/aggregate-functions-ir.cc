@@ -1645,7 +1645,7 @@ StringVal SerializeDsHllUnion(FunctionContext* ctx,
 /// Introducing this function in the .cc to avoid including the whole DataSketches Theta
 /// functionality into the header.
 StringVal SerializeDsThetaSketch(
-    FunctionContext* ctx, const datasketches::theta_sketch& sketch) {
+    FunctionContext* ctx, const datasketches::compact_theta_sketch& sketch) {
   std::stringstream serialized_input(std::ios::in | std::ios::out | std::ios::binary);
   sketch.serialize(serialized_input);
   return StringStreamToStringVal(ctx, serialized_input);
@@ -1898,8 +1898,8 @@ StringVal AggregateFunctions::DsThetaSerialize(
       || src.len == sizeof(datasketches::theta_union));
   StringVal dst;
   if (src.len == sizeof(datasketches::update_theta_sketch)) {
-    auto sketch_ptr = reinterpret_cast<datasketches::theta_sketch*>(src.ptr);
-    dst = SerializeDsThetaSketch(ctx, *sketch_ptr);
+    auto sketch_ptr = reinterpret_cast<datasketches::update_theta_sketch*>(src.ptr);
+    dst = SerializeDsThetaSketch(ctx, sketch_ptr->compact());
   } else {
     auto union_ptr = reinterpret_cast<datasketches::theta_union*>(src.ptr);
     dst = SerializeDsThetaUnion(ctx, *union_ptr);
@@ -1915,9 +1915,12 @@ void AggregateFunctions::DsThetaMerge(
   DCHECK(dst->len == sizeof(datasketches::update_theta_sketch)
       or dst->len == sizeof(datasketches::theta_union));
 
-  // Note, 'src' is a serialized theta_sketch.
-  auto src_sketch = datasketches::theta_sketch::deserialize((void*)src.ptr, src.len);
-  if (src_sketch->is_empty()) return;
+  // Note, 'src' is a serialized compact_theta_sketch.
+  std::unique_ptr<datasketches::compact_theta_sketch> src_sketch;
+  if (!DeserializeDsSketch(src, &src_sketch)) {
+    LogSketchDeserializationError(ctx);
+    return;
+  }
 
   if (dst->len == sizeof(datasketches::theta_union)) {
     auto dst_union_ptr = reinterpret_cast<datasketches::theta_union*>(dst->ptr);
@@ -1951,7 +1954,7 @@ BigIntVal AggregateFunctions::DsThetaFinalize(
       or src.len == sizeof(datasketches::theta_union));
   BigIntVal estimate;
   if (src.len == sizeof(datasketches::update_theta_sketch)) {
-    auto sketch_ptr = reinterpret_cast<datasketches::theta_sketch*>(src.ptr);
+    auto sketch_ptr = reinterpret_cast<datasketches::update_theta_sketch*>(src.ptr);
     estimate = sketch_ptr->get_estimate();
   } else {
     auto union_ptr = reinterpret_cast<datasketches::theta_union*>(src.ptr);
@@ -1968,8 +1971,8 @@ StringVal AggregateFunctions::DsThetaFinalizeSketch(
       or src.len == sizeof(datasketches::theta_union));
   StringVal result;
   if (src.len == sizeof(datasketches::update_theta_sketch)) {
-    auto sketch_ptr = reinterpret_cast<datasketches::theta_sketch*>(src.ptr);
-    result = SerializeDsThetaSketch(ctx, *sketch_ptr);
+    auto sketch_ptr = reinterpret_cast<datasketches::update_theta_sketch*>(src.ptr);
+    result = SerializeDsThetaSketch(ctx, sketch_ptr->compact());
   } else {
     auto union_ptr = reinterpret_cast<datasketches::theta_union*>(src.ptr);
     result = SerializeDsThetaUnion(ctx, *union_ptr);
@@ -1995,14 +1998,14 @@ void AggregateFunctions::DsThetaUnionUpdate(
   if (src.is_null) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::theta_union));
-  try {
-    auto src_sketch = datasketches::theta_sketch::deserialize((void*)src.ptr, src.len);
-    datasketches::theta_union* union_ptr =
-        reinterpret_cast<datasketches::theta_union*>(dst->ptr);
-    union_ptr->update(*src_sketch);
-  } catch (const std::exception&) {
+  std::unique_ptr<datasketches::compact_theta_sketch> src_sketch;
+  if (!DeserializeDsSketch(src, &src_sketch)) {
     LogSketchDeserializationError(ctx);
+    return;
   }
+  datasketches::theta_union* union_ptr =
+      reinterpret_cast<datasketches::theta_union*>(dst->ptr);
+  union_ptr->update(*src_sketch);
 }
 
 StringVal AggregateFunctions::DsThetaUnionSerialize(
@@ -2023,7 +2026,11 @@ void AggregateFunctions::DsThetaUnionMerge(
   DCHECK_EQ(dst->len, sizeof(datasketches::theta_union));
 
   // Note, 'src' is a serialized compact_theta_sketch and not a serialized theta_union.
-  auto src_sketch = datasketches::theta_sketch::deserialize((void*)src.ptr, src.len);
+  std::unique_ptr<datasketches::compact_theta_sketch> src_sketch;
+  if (!DeserializeDsSketch(src, &src_sketch)) {
+    LogSketchDeserializationError(ctx);
+    return;
+  }
 
   datasketches::theta_union* dst_union_ptr =
       reinterpret_cast<datasketches::theta_union*>(dst->ptr);
@@ -2063,15 +2070,14 @@ void AggregateFunctions::DsThetaIntersectUpdate(
   if (src.is_null) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::theta_intersection));
-  try {
-    auto src_sketch = datasketches::theta_sketch::deserialize((void*)src.ptr, src.len);
-    if (src_sketch->is_empty()) return;
-    datasketches::theta_intersection* intersection_ptr =
-        reinterpret_cast<datasketches::theta_intersection*>(dst->ptr);
-    intersection_ptr->update(*src_sketch);
-  } catch (const std::exception&) {
+  std::unique_ptr<datasketches::compact_theta_sketch> src_sketch;
+  if (!DeserializeDsSketch(src, &src_sketch)) {
     LogSketchDeserializationError(ctx);
+    return;
   }
+  datasketches::theta_intersection* intersection_ptr =
+      reinterpret_cast<datasketches::theta_intersection*>(dst->ptr);
+  intersection_ptr->update(*src_sketch);
 }
 
 StringVal AggregateFunctions::DsThetaIntersectSerialize(
@@ -2093,7 +2099,11 @@ void AggregateFunctions::DsThetaIntersectMerge(
 
   // Note, 'src' is a serialized compact_theta_sketch and not a serialized
   // theta_intersection.
-  auto src_sketch = datasketches::theta_sketch::deserialize((void*)src.ptr, src.len);
+  std::unique_ptr<datasketches::compact_theta_sketch> src_sketch;
+  if (!DeserializeDsSketch(src, &src_sketch)) {
+    LogSketchDeserializationError(ctx);
+    return;
+  }
 
   datasketches::theta_intersection* dst_intersection_ptr =
       reinterpret_cast<datasketches::theta_intersection*>(dst->ptr);

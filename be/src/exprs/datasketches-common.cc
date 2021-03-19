@@ -27,6 +27,7 @@ namespace impala {
 using datasketches::hll_sketch;
 using datasketches::kll_sketch;
 using datasketches::theta_sketch;
+using datasketches::compact_theta_sketch;
 using impala_udf::StringVal;
 using std::stringstream;
 using std::vector;
@@ -51,13 +52,14 @@ bool DeserializeDsSketch(const StringVal& serialized_sketch, T* sketch) {
 
 // This is a specialization of the template DeserializeDsSketch() for theta sketches.
 template <>
-bool DeserializeDsSketch(
-    const StringVal& serialized_sketch, theta_sketch::unique_ptr* sketch) {
-  DCHECK(sketch != nullptr);
+bool DeserializeDsSketch(const StringVal& serialized_sketch,
+    std::unique_ptr<compact_theta_sketch>* sketch_ptr) {
+  DCHECK(sketch_ptr->get() == nullptr);
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return false;
   try {
-    *sketch =
-        theta_sketch::deserialize((void*)serialized_sketch.ptr, serialized_sketch.len);
+    auto sketch = compact_theta_sketch::deserialize(
+        (void*)serialized_sketch.ptr, serialized_sketch.len);
+    *sketch_ptr = std::make_unique<compact_theta_sketch>(sketch);
     return true;
   } catch (const std::exception&) {
     // One reason of throwing from deserialization is that the input string is not a
@@ -81,7 +83,7 @@ StringVal StringStreamToStringVal(FunctionContext* ctx, const stringstream& str_
 bool update_sketch_to_theta_union(FunctionContext* ctx,
     const StringVal& serialized_sketch, datasketches::theta_union& sketch) {
   if (!serialized_sketch.is_null && serialized_sketch.len > 0) {
-    datasketches::theta_sketch::unique_ptr sketch_ptr;
+    std::unique_ptr<datasketches::compact_theta_sketch> sketch_ptr;
     if (!DeserializeDsSketch(serialized_sketch, &sketch_ptr)) {
       LogSketchDeserializationError(ctx);
       return false;
@@ -94,7 +96,7 @@ bool update_sketch_to_theta_union(FunctionContext* ctx,
 bool update_sketch_to_theta_intersection(FunctionContext* ctx,
     const StringVal& serialized_sketch, datasketches::theta_intersection& sketch) {
   if (!serialized_sketch.is_null && serialized_sketch.len > 0) {
-    datasketches::theta_sketch::unique_ptr sketch_ptr;
+    std::unique_ptr<datasketches::compact_theta_sketch> sketch_ptr;
     if (!DeserializeDsSketch(serialized_sketch, &sketch_ptr)) {
       LogSketchDeserializationError(ctx);
       return false;
