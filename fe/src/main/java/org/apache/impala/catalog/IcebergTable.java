@@ -262,6 +262,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         loadSchemaFromIceberg(metadata);
         // Loading hdfs table after loaded schema from Iceberg,
         // in case we create external Iceberg table skipping column info in sql.
+        icebergFileFormat_ = Utils.getIcebergFileFormat(msTbl);
         hdfsTable_.load(false, msClient, msTable_, true, true, false, null, null, reason);
         pathHashToFileDescMap_ = Utils.loadAllPartition(this);
         loadAllColumnStats(msClient);

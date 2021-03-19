@@ -605,6 +605,9 @@ public class CreateTableStmt extends StatementBase {
         IcebergTable.ICEBERG_STORAGE_HANDLER);
 
     String fileformat = getTblProperties().get(IcebergTable.ICEBERG_FILE_FORMAT);
+    if (fileformat != null && IcebergUtil.getIcebergFileFormat(fileformat) == null) {
+      throw new AnalysisException("Invalid fileformat for Iceberg table: " + fileformat);
+    }
     if (fileformat == null || fileformat.isEmpty()) {
       putGeneratedKuduProperty(IcebergTable.ICEBERG_FILE_FORMAT, "parquet");
     }

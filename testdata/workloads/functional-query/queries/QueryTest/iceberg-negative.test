@@ -188,11 +188,6 @@ ALTER TABLE iceberg_table_hadoop_catalog RENAME TO iceberg_table_hadoop_catalog_
 UnsupportedOperationException: Cannot rename Iceberg tables that use 'hadoop.catalog' as catalog.
 ====
 ---- QUERY
-ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.file_format'='orc');
----- CATCH
-AnalysisException: Changing the 'iceberg.file_format' table property is not supported for Iceberg table.
-====
----- QUERY
 ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 ---- CATCH
 AnalysisException: Changing the 'iceberg.catalog' table property is not supported for Iceberg table.
@@ -327,4 +322,18 @@ PARTITIONED BY (p INT)
 STORED AS ICEBERG;
 ---- CATCH
 Syntax error in line
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_fileformat (i int)
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.file_format'='or');
+---- CATCH
+Invalid fileformat for Iceberg table: or
+====
+---- QUERY
+CREATE TABLE iceberg_set_wrong_fileformat (i int)
+STORED AS ICEBERG;
+ALTER TABLE iceberg_set_wrong_fileformat SET TBLPROPERTIES ('iceberg.file_format'='parq');
+---- CATCH
+Invalid fileformat for Iceberg table: parq
 ====
