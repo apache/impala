@@ -345,13 +345,27 @@ def get_num_cache_requests():
   def get_num_cache_requests_util():
     rc, stdout, stderr = exec_process("hdfs cacheadmin -listDirectives -stats")
     assert rc == 0, 'Error executing hdfs cacheadmin: %s %s' % (stdout, stderr)
-    return len(stdout.split('\n'))
+    # remove blank new lines from output count
+    lines = [line for line in stdout.split('\n') if line.strip()]
+    count = None
+    for line in lines:
+      if line.startswith("Found "):
+        # the line should say "Found <int> entries"
+        # if we find this line we parse the number of entries
+        # from this line.
+        count = int(re.search(r'\d+', line).group())
+        break
+    # if count is available we return it else we just
+    # return the total number of lines
+    if count is not None:
+      return count
+    else:
+      return len(stdout.split('\n'))
 
   # IMPALA-3040: This can take time, especially under slow builds like ASAN.
   wait_time_in_sec = build_flavor_timeout(5, slow_build_timeout=20)
   num_stabilization_attempts = 0
   max_num_stabilization_attempts = 10
-  new_requests = None
   num_requests = None
   LOG.info("{0} Entered get_num_cache_requests()".format(time.time()))
   while num_stabilization_attempts < max_num_stabilization_attempts:
