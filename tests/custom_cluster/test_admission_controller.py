@@ -1654,6 +1654,7 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       self.lock = threading.RLock()
       self.query_handle = None
       self.shutdown = False  # Set by the main thread when tearing down
+      self.setDaemon(True)
 
     def run(self):
       client = None
