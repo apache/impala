@@ -17,8 +17,6 @@
 
 # To download requirements use the download_requirements script in this dir.
 
-# Remember, all modules below need to support python 2.6.
-
 # Dependents are indented. Dependents that have multiple parents are not listed
 # multiple times (though maybe they could be).
 
@@ -50,7 +48,6 @@ python-magic == 0.4.11
 # attempting to install pywebhdfs (https://github.com/pywebhdfs/pywebhdfs/issues/52).
 # pywebhdfs itself will be installed in stage 2.
   pbr == 3.1.1
-requests == 2.7.0
 # Newer versions of setuptools don't support Python 2.6
 setuptools == 36.8.0
 setuptools-scm == 1.15.4
