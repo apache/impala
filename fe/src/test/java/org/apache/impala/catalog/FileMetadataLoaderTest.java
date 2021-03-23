@@ -159,8 +159,7 @@ public class FileMetadataLoaderTest {
     fml.load();
     // Only load the compacted file.
     assertEquals(1, fml.getStats().loadedFiles);
-    // 2 * 8 files since the hidden '_orc_acid_version' is filtered out later.
-    assertEquals(16, fml.getStats().filesSupersededByAcidState);
+    assertEquals(8, fml.getStats().filesSupersededByAcidState);
   }
 
   @Test

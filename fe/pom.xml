@@ -111,6 +111,10 @@ under the License.
       <artifactId>ranger-plugins-common</artifactId>
       <version>${ranger.version}</version>
       <exclusions>
+        <exclusion>
+          <groupId>org.apache.solr</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
         <!-- Exclude json-smart to pin the version -->
         <exclusion>
           <groupId>net.minidev</groupId>
@@ -131,6 +135,10 @@ under the License.
         <exclusion>
           <groupId>org.apache.shiro</groupId>
           <artifactId>shiro-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.solr</groupId>
+          <artifactId>*</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.eclipse.jetty</groupId>
