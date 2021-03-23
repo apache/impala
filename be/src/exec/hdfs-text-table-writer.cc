@@ -121,6 +121,7 @@ Status HdfsTextTableWriter::AppendRows(
   *new_file = false;
   if (rowbatch_stringstream_.tellp() >= flush_size_) RETURN_IF_ERROR(Flush());
 
+  RETURN_IF_ERROR(state_->CheckQueryState());
   return Status::OK();
 }
 

@@ -1,0 +1,116 @@
+====
+---- QUERY
+# Verify that decimal value, which is expressed with constant decimal expression and its
+# value is not overflowed, is inserted into the table.
+set decimal_v2=true;
+insert into table overflowed_decimal_tbl_1
+select 1, cast(cast(65496456343.9565 as decimal (28,7))*44658*2.111
+as decimal (28,10));
+---- RESULTS
+: 1
+====
+---- QUERY
+# Verify that decimal value, which is expressed with decimal expression with one
+# alias and its value is not overflowed, is inserted into the table.
+set decimal_v2=true;
+insert into table overflowed_decimal_tbl_1
+select 2, cast(a*44658*2.111 as decimal (28,10)) from
+(select cast(65496456.9565 as decimal (28,7)) as a) q;
+---- RESULTS
+: 1
+====
+---- QUERY
+# Verify that decimal value, which is expressed with decimal expression with three
+# aliases and its value is not overflowed, is inserted into the table.
+set decimal_v2=true;
+insert into table overflowed_decimal_tbl_1
+select 3, cast(a*b*c as decimal (28,10)) from
+(select cast(65496456.9565 as decimal (28,7)) as a,
+ cast(44658 as decimal (28,7)) as b,
+ cast(2.111 as decimal (28,7)) as c) q;
+---- RESULTS
+: 1
+====
+---- QUERY
+# Verify that overflow behaviour of decimal_v1 is unchanged.
+# Verify decimal value, which is expressed with constant decimal expression
+# and its value is overflowed, is inserted into the table as NULL when
+# decimal_v2 is set as false.
+set decimal_v2=false;
+insert into table overflowed_decimal_tbl_1
+select 4, cast(cast(654964569154.9565 as decimal (28,7))*44658554984*2.111
+as decimal (28,10));
+select count(*) from overflowed_decimal_tbl_1 where d_28 is null;
+---- RESULTS
+1
+====
+---- QUERY
+# Verify that overflow behaviour of decimal_v1 is unchanged.
+# Verify that decimal value, which is expressed with decimal expression with one
+# alias and its value is overflowed, is inserted into the table as NULL when
+# decimal_v2 is set as false.
+set decimal_v2=false;
+insert into table overflowed_decimal_tbl_1
+select 5, cast(a*44658554984*2.111 as decimal (28,10)) from
+(select cast(654964569154.9565 as decimal (28,7)) as a) q;
+select count(*) from overflowed_decimal_tbl_1 where d_28 is null;
+---- RESULTS
+2
+====
+---- QUERY
+# Verify that overflow behaviour of decimal_v1 is unchanged.
+# Verify that decimal value, which is expressed with decimal expression with three
+# alias and its value is overflowed, is inserted into the table as NULL when
+# decimal_v2 is set as false.
+set decimal_v2=false;
+insert into table overflowed_decimal_tbl_1
+select 6, cast(a*b*c as decimal (28,10)) from
+(select cast(654964569154.9565 as decimal (28,7)) as a,
+ cast(44658554984 as decimal (28,7)) as b,
+ cast(2.111 as decimal (28,7)) as c) q;
+select count(*) from overflowed_decimal_tbl_1 where d_28 is null;
+---- RESULTS
+3
+====
+---- QUERY
+# Verify that decimal value, which is expressed with constant decimal expression
+# and its value is overflowed, cause query aborted with an error.
+set decimal_v2=true;
+insert into table overflowed_decimal_tbl_1
+select 7, cast(cast(654964569154.9565 as decimal (28,7))*44658554984*2.111
+as decimal (28,10));
+---- CATCH
+Decimal expression overflowed
+====
+---- QUERY
+# Verify that decimal value, which is expressed with decimal expression with one
+# alias and its value is overflowed, cause query aborted with an error.
+set decimal_v2=true;
+insert into table overflowed_decimal_tbl_1
+select 8, cast(a*44658554984*2.111 as decimal (28,10)) from
+(select cast(654964569154.9565 as decimal (28,7)) as a) q;
+---- CATCH
+Decimal expression overflowed
+====
+---- QUERY
+# Verify that decimal value, which is expressed with decimal expression with three
+# aliases and its value is overflowed, cause query aborted with an error.
+set decimal_v2=true;
+insert into table overflowed_decimal_tbl_1
+select 9, cast(a*b*c as decimal (28,10)) from
+(select cast(654964569154.9565 as decimal (28,7)) as a,
+ cast(44658554984 as decimal (28,7)) as b,
+ cast(2.111 as decimal (28,7)) as c) q;
+---- CATCH
+Decimal expression overflowed
+====
+---- QUERY
+# Verify that decimal value, which is expressed with selection from another table
+# and its value is overflowed, cause query aborted with an error.
+set decimal_v2=true;
+insert into table overflowed_decimal_tbl_2
+select i, cast(d_28*d_28*d_28 as decimal (28,10))
+from overflowed_decimal_tbl_1 where d_28 is not null;
+---- CATCH
+Decimal expression overflowed
+====

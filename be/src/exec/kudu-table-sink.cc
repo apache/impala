@@ -291,6 +291,7 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
 }
 
 Status KuduTableSink::CheckForErrors(RuntimeState* state) {
+  RETURN_IF_ERROR(state->CheckQueryState());
   if (session_->CountPendingErrors() == 0) return Status::OK();
 
   vector<KuduError*> errors;
