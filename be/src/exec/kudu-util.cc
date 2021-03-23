@@ -48,6 +48,10 @@ using DataType = kudu::client::KuduColumnSchema::DataType;
 DEFINE_int32(kudu_client_num_reactor_threads, 4,
     "Number of threads the Kudu client can use to send rpcs to Kudu. Must be > 0.");
 
+DEFINE_int32(kudu_client_v, -1,
+    "If >= 0, used to set the verbose logging level on the Kudu client instead of using "
+    "the value of -v");
+
 DECLARE_bool(disable_kudu);
 DECLARE_int32(kudu_client_rpc_timeout_ms);
 DECLARE_int32(kudu_client_connection_negotiation_timeout_ms);
@@ -126,7 +130,11 @@ void InitKuduLogging() {
   static kudu::client::KuduLoggingFunctionCallback<void*> log_cb(&LogKuduMessage, NULL);
   kudu::client::InstallLoggingCallback(&log_cb);
   // Kudu client logging is more noisy than Impala logging, log at v-1.
-  kudu::client::SetVerboseLogLevel(std::max(0, FLAGS_v - 1));
+  if (FLAGS_kudu_client_v >= 0) {
+    kudu::client::SetVerboseLogLevel(FLAGS_kudu_client_v);
+  } else {
+    kudu::client::SetVerboseLogLevel(std::max(0, FLAGS_v - 1));
+  }
 }
 
 ColumnType KuduDataTypeToColumnType(
