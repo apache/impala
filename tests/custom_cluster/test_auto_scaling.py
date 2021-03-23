@@ -46,9 +46,9 @@ class TestAutoScaling(CustomClusterTestSuite):
   STATE_CHANGE_TIMEOUT_S = 60
   # This query will scan two partitions (month = 1, 2) and thus will have 1 fragment
   # instance per executor on groups of size 2. Each partition has 2 rows, so it performs
-  # two comparisons and should take around 1 second to complete.
+  # two comparisons and should take around 2 second to complete.
   QUERY = """select * from functional_parquet.alltypestiny where month < 3
-             and id + random() < sleep(500)"""
+             and id + random() < sleep(1000)"""
 
   def _get_total_admitted_queries(self):
     admitted_queries = self.impalad_test_service.get_total_admitted_queries(
@@ -96,7 +96,7 @@ class TestAutoScaling(CustomClusterTestSuite):
       assert any(self._get_total_admitted_queries() >= 10 or sleep(1)
                  for _ in range(self.STATE_CHANGE_TIMEOUT_S)), \
           "Did not admit enough queries within %s s" % self.STATE_CHANGE_TIMEOUT_S
-
+      single_group_query_rate = workload.get_query_rate()
       # Wait for second executor group to start
       cluster_size = (2 * GROUP_SIZE) + 1
       assert any(self._get_num_backends() >= cluster_size or sleep(1)
@@ -109,7 +109,6 @@ class TestAutoScaling(CustomClusterTestSuite):
       # Wait for query rate to exceed the maximum for a single executor group. In the past
       # we tried to wait for it to pass a higher threshold but on some platforms we saw
       # that it was too flaky.
-      min_query_rate = EXECUTOR_SLOTS
       max_query_rate = 0
       # This barrier has been flaky in the past so we wait 2x as long as for the other
       # checks.
@@ -118,12 +117,12 @@ class TestAutoScaling(CustomClusterTestSuite):
         current_rate = workload.get_query_rate()
         LOG.info("Current rate: %s" % current_rate)
         max_query_rate = max(max_query_rate, current_rate)
-        if max_query_rate > min_query_rate:
+        if max_query_rate > single_group_query_rate:
           break
         sleep(1)
 
-      assert max_query_rate >= min_query_rate, "Query rate did not reach %s within %s " \
-          "s. Maximum was %s. Cluster size is %s." % (min_query_rate,
+      assert max_query_rate > single_group_query_rate, "Query rate did not exceed %s " \
+          "within %s s. Maximum was %s. Cluster size is %s." % (single_group_query_rate,
           self.STATE_CHANGE_TIMEOUT_S, max_query_rate, cluster_size)
 
       LOG.info("Stopping workload")
