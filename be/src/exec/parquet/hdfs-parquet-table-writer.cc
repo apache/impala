@@ -1337,6 +1337,7 @@ Status HdfsParquetTableWriter::AppendRows(
   // Reset the row_idx_ when we exhaust the batch.  We can exit before exhausting
   // the batch if we run out of file space and will continue from the last index.
   row_idx_ = 0;
+  RETURN_IF_ERROR(state_->CheckQueryState());
   return Status::OK();
 }
 
