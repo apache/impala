@@ -85,4 +85,12 @@ public enum Privilege {
    * Gets list of implied privileges for this privilege.
    */
   public EnumSet<Privilege> getImpliedPrivileges() { return implied_; }
+
+  /**
+   * Returns true if this implies modification on data or metadata.
+   */
+  public boolean impliesUpdate() {
+    return this == ALTER || this == DROP || this == CREATE || this == INSERT
+        || this == REFRESH || this == ALL;
+  }
 }

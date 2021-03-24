@@ -22,6 +22,9 @@ import javax.annotation.Nullable;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * A class to authorize access to a table.
  */
@@ -33,6 +36,7 @@ public class AuthorizableTable extends Authorizable {
   // TODO(IMPALA-10122): Remove the following field once we can properly process a
   // PrivilegeRequest for a view whose creation was not authorized.
   private final boolean viewCreatedWithoutAuthz_;
+  private final List<String> columns_ = new ArrayList<>();
 
   public AuthorizableTable(String dbName, String tableName, @Nullable String ownerUser,
       boolean viewCreatedWithoutAuthz) {
@@ -65,4 +69,13 @@ public class AuthorizableTable extends Authorizable {
   // TODO(IMPALA-10122): Remove the following method once we can properly process a
   // PrivilegeRequest for a view whose creation was not authorized.
   public boolean isViewCreatedWithoutAuthz() { return viewCreatedWithoutAuthz_; }
+
+  public void setColumns(List<String> columns) {
+    columns_.clear();
+    columns_.addAll(columns);
+  }
+
+  public List<String> getColumns() {
+    return columns_;
+  }
 }

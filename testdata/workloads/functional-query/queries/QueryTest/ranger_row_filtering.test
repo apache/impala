@@ -499,3 +499,21 @@ NULL
 ---- TYPES
 INT
 ====
+---- QUERY
+# IMPALA-10554: Updates on masked tables should be blocked.
+insert into functional.alltypestiny partition(year, month) select * from functional.alltypes
+---- CATCH
+AuthorizationException: User '$USER' does not have privileges to execute 'INSERT' on: functional.alltypestiny
+====
+---- QUERY
+# IMPALA-10554: Updates on masked tables should be blocked.
+truncate table functional.alltypestiny
+---- CATCH
+AuthorizationException: User '$USER' does not have privileges to execute 'INSERT' on: functional.alltypestiny
+====
+---- QUERY
+# IMPALA-10554: Updates on masked tables should be blocked.
+compute stats functional.alltypestiny
+---- CATCH
+AuthorizationException: User '$USER' does not have privileges to execute 'ALTER' on: functional.alltypestiny
+====

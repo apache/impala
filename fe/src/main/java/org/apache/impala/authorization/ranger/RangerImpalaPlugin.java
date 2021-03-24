@@ -19,6 +19,7 @@ package org.apache.impala.authorization.ranger;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ranger.authorization.hadoop.constants.RangerHadoopConstants;
 import org.apache.ranger.plugin.model.RangerServiceDef;
 import org.apache.ranger.plugin.service.RangerBasePlugin;
 
@@ -38,9 +39,24 @@ public class RangerImpalaPlugin extends RangerBasePlugin {
   private static volatile RangerImpalaPlugin INSTANCE = null;
   private static String SERVICE_TYPE = null;
   private static String APP_ID = null;
+  private static boolean BLOCK_UPDATE_IF_TABLE_MASK_SPECIFIED = true;
 
   private RangerImpalaPlugin(String serviceType, String appId) {
     super(serviceType, appId);
+  }
+
+  @Override
+  public void init() {
+    super.init();
+    RangerImpalaPlugin.BLOCK_UPDATE_IF_TABLE_MASK_SPECIFIED = getConfig().getBoolean(
+        RangerHadoopConstants
+            .HIVE_BLOCK_UPDATE_IF_ROWFILTER_COLUMNMASK_SPECIFIED_PROP,
+        RangerHadoopConstants
+            .HIVE_BLOCK_UPDATE_IF_ROWFILTER_COLUMNMASK_SPECIFIED_DEFAULT_VALUE);
+  }
+
+  public boolean blockUpdateIfTableMaskSpecified() {
+    return BLOCK_UPDATE_IF_TABLE_MASK_SPECIFIED;
   }
 
   public static RangerImpalaPlugin getInstance(String serviceType, String appId) {

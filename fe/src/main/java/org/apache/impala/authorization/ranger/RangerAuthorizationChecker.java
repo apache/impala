@@ -19,11 +19,13 @@ package org.apache.impala.authorization.ranger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.authorization.Authorizable;
 import org.apache.impala.authorization.Authorizable.Type;
+import org.apache.impala.authorization.AuthorizableTable;
 import org.apache.impala.authorization.AuthorizationChecker;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationContext;
@@ -90,6 +92,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     RangerAuthorizationContext rangerAuthzCtx = (RangerAuthorizationContext) authzCtx;
     List<RangerAccessResourceImpl> resources = new ArrayList<>();
     Authorizable authorizable = request.getAuthorizable();
+    Privilege privilege = request.getPrivilege();
     switch (authorizable.getType()) {
       case SERVER:
         // Hive service definition does not have a concept of server. So we define
@@ -128,11 +131,11 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
         // For example any column in foo.bar table:
         // access type: RangerPolicyEngine.ANY_ACCESS
         // resources: [server=server1, database=foo, table=bar]
-        if (request.getPrivilege() != Privilege.ANY ||
+        if (privilege != Privilege.ANY ||
           !DefaultAuthorizableFactory.ALL.equals(authorizable.getTableName())) {
           builder.table(authorizable.getTableName());
         }
-        if (request.getPrivilege() != Privilege.ANY ||
+        if (privilege != Privilege.ANY ||
           !DefaultAuthorizableFactory.ALL.equals(authorizable.getColumnName())) {
           builder.column(authorizable.getColumnName());
         }
@@ -156,15 +159,15 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     }
 
     for (RangerAccessResourceImpl resource: resources) {
-      if (request.getPrivilege() == Privilege.ANY) {
-        if (!authorizeResource(rangerAuthzCtx, resource, user, request.getPrivilege(),
-            ((RangerAuthorizationContext) authzCtx).getAuditHandler())) {
+      if (privilege == Privilege.ANY) {
+        if (!authorizeResource(rangerAuthzCtx, user, resource, authorizable, privilege,
+            rangerAuthzCtx.getAuditHandler())) {
           return false;
         }
       } else {
-        boolean authorized = request.getPrivilege().hasAnyOf() ?
-            authorizeAny(rangerAuthzCtx, resource, user, request.getPrivilege()) :
-            authorizeAll(rangerAuthzCtx, resource, user, request.getPrivilege());
+        boolean authorized = privilege.hasAnyOf() ?
+            authorizeAny(rangerAuthzCtx, resource, authorizable, user, privilege) :
+            authorizeAll(rangerAuthzCtx, resource, authorizable, user, privilege);
         if (!authorized) {
           return false;
         }
@@ -193,6 +196,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       throws AuthorizationException, InternalException {
     boolean isColumnMaskingEnabled = BackendConfig.INSTANCE.isColumnMaskingEnabled();
     boolean isRowFilteringEnabled = BackendConfig.INSTANCE.isRowFilteringEnabled();
+    if (isColumnMaskingEnabled && isRowFilteringEnabled) return;
     for (PrivilegeRequest request : privilegeRequests) {
       if (!isColumnMaskingEnabled
           && request.getAuthorizable().getType() == Type.COLUMN) {
@@ -400,7 +404,8 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     } else if (StringUtils.isNotEmpty(transformer)) {
       maskedColumn = transformer.replace("{col}", columnName);
     }
-    LOG.info("dbName: {}, tableName: {}, column: {}, maskType: {}, columnTransformer: {}",
+    LOG.trace(
+        "dbName: {}, tableName: {}, column: {}, maskType: {}, columnTransformer: {}",
         dbName, tableName, columnName, maskType, maskedColumn);
     return maskedColumn;
   }
@@ -420,7 +425,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
       return null;
     }
     String filter = accessResult.getFilterExpr();
-    LOG.info("dbName: {}, tableName: {}, rowFilter: {}", dbName, tableName, filter);
+    LOG.trace("dbName: {}, tableName: {}, rowFilter: {}", dbName, tableName, filter);
     return filter;
   }
 
@@ -502,8 +507,8 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   }
 
   private boolean authorizeAny(RangerAuthorizationContext authzCtx,
-      RangerAccessResourceImpl resource, User user, Privilege privilege)
-      throws InternalException {
+      RangerAccessResourceImpl resource, Authorizable authorizable, User user,
+      Privilege privilege) throws InternalException {
     boolean authorized = false;
     RangerBufferAuditHandler originalAuditHandler = authzCtx.getAuditHandler();
     // Use a temporary audit handler instead of the original audit handler
@@ -515,7 +520,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
         (originalAuditHandler == null || !authzCtx.getRetainAudits()) ?
         null : new RangerBufferAuditHandler(originalAuditHandler);
     for (Privilege impliedPrivilege: privilege.getImpliedPrivileges()) {
-      if (authorizeResource(authzCtx, resource, user, impliedPrivilege,
+      if (authorizeResource(authzCtx, user, resource, authorizable, impliedPrivilege,
           tmpAuditHandler)) {
         authorized = true;
         break;
@@ -531,8 +536,8 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   }
 
   private boolean authorizeAll(RangerAuthorizationContext authzCtx,
-      RangerAccessResourceImpl resource, User user, Privilege privilege)
-      throws InternalException {
+      RangerAccessResourceImpl resource, Authorizable authorizable, User user,
+      Privilege privilege) throws InternalException {
     boolean authorized = true;
     RangerBufferAuditHandler originalAuditHandler = authzCtx.getAuditHandler();
     // Use a temporary audit handler instead of the original audit handler
@@ -547,7 +552,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
         (originalAuditHandler == null || !authzCtx.getRetainAudits()) ?
         null : new RangerBufferAuditHandler(originalAuditHandler);
     for (Privilege impliedPrivilege: privilege.getImpliedPrivileges()) {
-      if (!authorizeResource(authzCtx, resource, user, impliedPrivilege,
+      if (!authorizeResource(authzCtx, user, resource, authorizable, impliedPrivilege,
           tmpAuditHandler)) {
         authorized = false;
         break;
@@ -590,8 +595,8 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
     }
   }
 
-  private boolean authorizeResource(RangerAuthorizationContext authzCtx,
-      RangerAccessResourceImpl resource, User user, Privilege privilege,
+  private boolean authorizeResource(RangerAuthorizationContext authzCtx, User user,
+      RangerAccessResourceImpl resource, Authorizable authorizable, Privilege privilege,
       RangerBufferAuditHandler auditHandler) throws InternalException {
     String accessType;
     if (privilege == Privilege.ANY) {
@@ -610,7 +615,82 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
           authzCtx.getSessionState().getNetwork_address().getHostname());
     }
     RangerAccessResult authorized = plugin_.isAccessAllowed(request, auditHandler);
-    return authorized != null && authorized.getIsAllowed();
+    if (authorized == null || !authorized.getIsAllowed()) return false;
+    // We are done if don't need to block updates on tables that have column-masking or
+    // row-filtering policies.
+    if (!plugin_.blockUpdateIfTableMaskSpecified() || !privilege.impliesUpdate()
+        || (authorizable.getType() != Type.TABLE
+           && authorizable.getType() != Type.COLUMN)) {
+      return true;
+    }
+    return authorizeByTableMasking(request, user, authorizable, authorized, privilege,
+        auditHandler);
+  }
+
+  /**
+   * Blocks the update request if any row-filtering or column masking policy exists on the
+   * resource(table/column). Appends a deny audit if any exists.
+   * Returns true if the request is authorized.
+   */
+  private boolean authorizeByTableMasking(RangerAccessRequestImpl request, User user,
+      Authorizable authorizable, RangerAccessResult accessResult, Privilege privilege,
+      RangerBufferAuditHandler auditHandler) throws InternalException {
+    Preconditions.checkNotNull(accessResult, "accessResult is null!");
+    Preconditions.checkState(accessResult.getIsAllowed(),
+        "update should be allowed before checking this");
+    String originalAccessType = request.getAccessType();
+    // Row-filtering/Column-masking policies are defined only for SELECT requests.
+    request.setAccessType(SELECT_ACCESS_TYPE);
+    // Check if row filtering is enabled for the table/view.
+    if (authorizable.getType() == Type.TABLE) {
+      RangerAccessResult rowFilterResult = plugin_.evalRowFilterPolicies(
+          request, /*resultProcessor*/null);
+      if (rowFilterResult != null && rowFilterResult.isRowFilterEnabled()) {
+        LOG.trace("Deny {} on {} due to row filtering policy {}",
+            privilege, authorizable.getName(), rowFilterResult.getPolicyId());
+        accessResult.setIsAllowed(false);
+        accessResult.setPolicyId(rowFilterResult.getPolicyId());
+        accessResult.setReason("User does not have access to all rows of the table");
+      } else {
+        LOG.trace("No row filtering policy found on {}.", authorizable.getName());
+      }
+    }
+    // Check if masking is enabled for any column in the table/view.
+    if (accessResult.getIsAllowed()) {
+      List<String> columns;
+      if (authorizable.getType() == Type.TABLE) {
+        // Check all columns.
+        columns = ((AuthorizableTable) authorizable).getColumns();
+        LOG.trace("Checking mask policies on {} columns of table {}", columns.size(),
+            authorizable.getFullTableName());
+      } else {
+        columns = Lists.newArrayList(authorizable.getColumnName());
+      }
+      for (String column : columns) {
+        RangerAccessResult columnMaskResult = evalColumnMask(user,
+            authorizable.getDbName(), authorizable.getTableName(), column,
+            /*auditHandler*/null);
+        if (columnMaskResult != null && columnMaskResult.isMaskEnabled()) {
+          LOG.trace("Deny {} on {} due to column masking policy {}",
+              privilege, authorizable.getName(), columnMaskResult.getPolicyId());
+          accessResult.setIsAllowed(false);
+          accessResult.setPolicyId(columnMaskResult.getPolicyId());
+          accessResult.setReason("User does not have access to unmasked column values");
+          break;
+        } else {
+          LOG.trace("No column masking policy found on column {} of {}.", column,
+              authorizable.getFullTableName());
+        }
+      }
+    }
+    // Set back the original access type. The request object is still referenced by the
+    // access result.
+    request.setAccessType(originalAccessType);
+    // Only add deny audits.
+    if (!accessResult.getIsAllowed() && auditHandler != null) {
+      auditHandler.processResult(accessResult);
+    }
+    return accessResult.getIsAllowed();
   }
 
   @VisibleForTesting

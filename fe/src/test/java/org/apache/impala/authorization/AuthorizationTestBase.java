@@ -38,7 +38,6 @@ import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TDescribeOutputStyle;
 import org.apache.impala.thrift.TDescribeResult;
 import org.apache.impala.thrift.TFunctionBinaryType;
-import org.apache.impala.thrift.TPrincipalType;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.impala.thrift.TPrivilegeScope;
@@ -47,15 +46,13 @@ import org.apache.impala.thrift.TTableName;
 import org.apache.ranger.plugin.util.GrantRevokeRequest;
 import org.apache.ranger.plugin.util.RangerRESTClient;
 import org.apache.ranger.plugin.util.RangerRESTUtils;
-import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status.Family;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -549,7 +546,7 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
         "Principal: %s\nStatement: %s", withPrincipal.getName(), stmt));
   }
 
-  protected void createRangerPolicy(String policyName, String json) {
+  protected long createRangerPolicy(String policyName, String json) {
     ClientResponse response = rangerRestClient_
         .getResource("/service/public/v2/api/policy")
         .accept(RangerRESTUtils.REST_MIME_TYPE_JSON)
@@ -560,7 +557,17 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
           "Unable to create a Ranger policy: %s Response: %s",
           policyName, response.getEntity(String.class)));
     }
-    LOG.info("Created ranger policy {}: {}", policyName, json);
+    String content = response.getEntity(String.class);
+    JSONParser parser = new JSONParser();
+    long policyId = -1;
+    try {
+      Object obj = parser.parse(content);
+      policyId = (Long) ((JSONObject) obj).get("id");
+    } catch (ParseException e) {
+      LOG.error("Error parsing response content: {}", content);
+    }
+    LOG.info("Created ranger policy id={}, {}: {}", policyId, policyName, json);
+    return policyId;
   }
 
   protected void deleteRangerPolicy(String policyName) {

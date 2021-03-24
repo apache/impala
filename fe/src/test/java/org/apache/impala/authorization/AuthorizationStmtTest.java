@@ -2823,55 +2823,63 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
             onTable("functional", "alltypes", TPrivilegeLevel.ALL));
   }
 
+  private void createColumnMaskingPolicy(String policyName, String dbName, String tblName,
+      String colName, String user, String maskType, String maskExpr) {
+    String json = String.format("{\n" +
+        "  \"name\": \"%s\",\n" +
+        "  \"policyType\": 1,\n" +
+        "  \"serviceType\": \"" + RANGER_SERVICE_TYPE + "\",\n" +
+        "  \"service\": \"" + RANGER_SERVICE_NAME + "\",\n" +
+        "  \"resources\": {\n" +
+        "    \"database\": {\n" +
+        "      \"values\": [\"%s\"],\n" +
+        "      \"isExcludes\": false,\n" +
+        "      \"isRecursive\": false\n" +
+        "    },\n" +
+        "    \"table\": {\n" +
+        "      \"values\": [\"%s\"],\n" +
+        "      \"isExcludes\": false,\n" +
+        "      \"isRecursive\": false\n" +
+        "    },\n" +
+        "    \"column\": {\n" +
+        "      \"values\": [\"%s\"],\n" +
+        "      \"isExcludes\": false,\n" +
+        "      \"isRecursive\": false\n" +
+        "    }\n" +
+        "  },\n" +
+        "  \"dataMaskPolicyItems\": [\n" +
+        "    {\n" +
+        "      \"accesses\": [\n" +
+        "        {\n" +
+        "          \"type\": \"select\",\n" +
+        "          \"isAllowed\": true\n" +
+        "        }\n" +
+        "      ],\n" +
+        "      \"users\": [\"%s\"],\n" +
+        "      \"dataMaskInfo\": {\n" +
+        "        \"dataMaskType\": \"%s\"\n" +
+        "        %s\n" +
+        "      }\n" +
+        "    }\n" +
+        "  ]\n" +
+        "}", policyName, dbName, tblName, colName, user, maskType,
+        maskExpr == null ? "" : String.format(", \"valueExpr\": \"%s\"", maskExpr));
+    createRangerPolicy(policyName, json);
+  }
+
   /**
    * Test the error messages when Column Masking is disabled.
    */
   @Test
-  public void testColumnMaskEnabled() throws ImpalaException {
+  public void testColumnMaskDisabled() throws ImpalaException {
     String policyName = "col_mask";
     for (String tableName: new String[]{"alltypes", "alltypes_view"}) {
       BackendConfig.INSTANCE.setColumnMaskingEnabled(false);
       // Row filtering depends on column masking. So we should disable it as well.
       BackendConfig.INSTANCE.setRowFilteringEnabled(false);
-      String json = String.format("{\n" +
-              "  \"name\": \"%s\",\n" +
-              "  \"policyType\": 1,\n" +
-              "  \"serviceType\": \"%s\",\n" +
-              "  \"service\": \"%s\",\n" +
-              "  \"resources\": {\n" +
-              "    \"database\": {\n" +
-              "      \"values\": [\"functional\"],\n" +
-              "      \"isExcludes\": false,\n" +
-              "      \"isRecursive\": false\n" +
-              "    },\n" +
-              "    \"table\": {\n" +
-              "      \"values\": [\"%s\"],\n" +
-              "      \"isExcludes\": false,\n" +
-              "      \"isRecursive\": false\n" +
-              "    },\n" +
-              "    \"column\": {\n" +
-              "      \"values\": [\"string_col\"],\n" +
-              "      \"isExcludes\": false,\n" +
-              "      \"isRecursive\": false\n" +
-              "    }\n" +
-              "  },\n" +
-              "  \"dataMaskPolicyItems\": [\n" +
-              "    {\n" +
-              "      \"accesses\": [\n" +
-              "        {\n" +
-              "          \"type\": \"select\",\n" +
-              "          \"isAllowed\": true\n" +
-              "        }\n" +
-              "      ],\n" +
-              "      \"users\": [\"%s\"],\n" +
-              "      \"dataMaskInfo\": {\"dataMaskType\": \"MASK\"}\n" +
-              "    }\n" +
-              "  ]\n" +
-              "}", policyName, RANGER_SERVICE_TYPE, RANGER_SERVICE_NAME, tableName,
-          user_.getShortName());
-
       try {
-        createRangerPolicy(policyName, json);
+        createColumnMaskingPolicy(policyName, "functional", tableName, "string_col",
+            user_.getShortName(), "MASK", /*maskExpr*/null);
         rangerImpalaPlugin_.refreshPoliciesAndTags();
 
         // Queries on columns that are not masked should be allowed.
@@ -2949,48 +2957,52 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
     }
   }
 
+  private void createRowFilteringPolicy(String policyName, String dbName, String tblName,
+      String user, String rowFilter) {
+    String json = String.format("{\n" +
+            "  \"name\": \"%s\",\n" +
+            "  \"policyType\": 2,\n" +
+            "  \"serviceType\": \"" + RANGER_SERVICE_TYPE + "\",\n" +
+            "  \"service\": \"" + RANGER_SERVICE_NAME + "\",\n" +
+            "  \"resources\": {\n" +
+            "    \"database\": {\n" +
+            "      \"values\": [\"%s\"],\n" +
+            "      \"isExcludes\": false,\n" +
+            "      \"isRecursive\": false\n" +
+            "    },\n" +
+            "    \"table\": {\n" +
+            "      \"values\": [\"%s\"],\n" +
+            "      \"isExcludes\": false,\n" +
+            "      \"isRecursive\": false\n" +
+            "    }\n" +
+            "  },\n" +
+            "  \"rowFilterPolicyItems\": [\n" +
+            "    {\n" +
+            "      \"accesses\": [\n" +
+            "        {\n" +
+            "          \"type\": \"select\",\n" +
+            "          \"isAllowed\": true\n" +
+            "        }\n" +
+            "      ],\n" +
+            "      \"users\": [\"%s\"],\n" +
+            "      \"rowFilterInfo\": {\"filterExpr\": \"%s\"}\n" +
+            "    }\n" +
+            "  ]\n" +
+            "}", policyName, dbName, tblName, user, rowFilter);
+    createRangerPolicy(policyName, json);
+  }
+
   /**
    * Test the error messages when Row Filtering is disabled.
    */
   @Test
-  public void testRowFilterEnabled() throws ImpalaException {
+  public void testRowFilterDisabled() throws ImpalaException {
     String policyName = "row_filter";
     for (String tableName: new String[]{"alltypes", "alltypes_view"}) {
       BackendConfig.INSTANCE.setRowFilteringEnabled(false);
-      String json = String.format("{\n" +
-          "  \"name\": \"%s\",\n" +
-          "  \"policyType\": 2,\n" +
-          "  \"serviceType\": \"%s\",\n" +
-          "  \"service\": \"%s\",\n" +
-          "  \"resources\": {\n" +
-          "    \"database\": {\n" +
-          "      \"values\": [\"functional\"],\n" +
-          "      \"isExcludes\": false,\n" +
-          "      \"isRecursive\": false\n" +
-          "    },\n" +
-          "    \"table\": {\n" +
-          "      \"values\": [\"%s\"],\n" +
-          "      \"isExcludes\": false,\n" +
-          "      \"isRecursive\": false\n" +
-          "    }\n" +
-          "  },\n" +
-          "  \"rowFilterPolicyItems\": [\n" +
-          "    {\n" +
-          "      \"accesses\": [\n" +
-          "        {\n" +
-          "          \"type\": \"select\",\n" +
-          "          \"isAllowed\": true\n" +
-          "        }\n" +
-          "      ],\n" +
-          "      \"users\": [\"%s\"],\n" +
-          "      \"rowFilterInfo\": {\"filterExpr\": \"id = 0\"}\n" +
-          "    }\n" +
-          "  ]\n" +
-          "}", policyName, RANGER_SERVICE_TYPE, RANGER_SERVICE_NAME, tableName,
-          user_.getShortName());
-
       try {
-        createRangerPolicy(policyName, json);
+        createRowFilteringPolicy(policyName, "functional", tableName,
+            user_.getShortName(), "id = 0");
         rangerImpalaPlugin_.refreshPoliciesAndTags();
 
         // Queries on tables that are not filtered should be allowed.
@@ -3057,6 +3069,145 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
         deleteRangerPolicy(policyName);
         BackendConfig.INSTANCE.setRowFilteringEnabled(true);
       }
+    }
+  }
+
+  /**
+   * Validates updates on data/metadata of table/view that has column-masking or
+   * row-filtering policies are blocked.
+   */
+  @Test
+  public void testUpdateOnMaskedTables() throws Exception {
+    try {
+      createRowFilteringPolicy("alltypes_row_filter", "functional", "alltypes",
+          user_.getShortName(), "id = 0");
+      createRowFilteringPolicy("alltypes_view_row_filter", "functional",
+          "alltypes_view", user_.getShortName(), "id = 0");
+      createColumnMaskingPolicy("alltypestiny_id_mask", "functional", "alltypestiny",
+          "id", user_.getShortName(), "CUSTOM", "id + 100");
+      createColumnMaskingPolicy("kudu_id_mask", "functional_kudu", "alltypes",
+          "id", user_.getShortName(), "MASK_NULL", /*maskExpr*/null);
+      // Add an unmasked policy. It should not block updates.
+      createColumnMaskingPolicy("alltypessmall_id_unmask", "functional", "alltypessmall",
+          "id", user_.getShortName(), "MASK_NONE", /*maskExpr*/null);
+      rangerImpalaPlugin_.refreshPoliciesAndTags();
+
+      // Select is ok.
+      authorize("select * from functional.alltypes")
+          .ok(onTable("functional", "alltypes", TPrivilegeLevel.SELECT));
+      authorize("select * from functional.alltypes_view")
+          .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.SELECT));
+      authorize("select * from functional.alltypestiny")
+          .ok(onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
+
+      // Block INSERT, TRUNCATE even given SERVER ALL privilege
+      authorize("insert into functional.alltypes partition(year, month) " +
+          "select * from functional.alltypestiny")
+          .error(insertError("functional.alltypes"), onServer(TPrivilegeLevel.ALL))
+          // error for 'select' appears earlier than 'insert'
+          .error(selectError("functional.alltypestiny"),
+              onTable("functional", "alltypes", TPrivilegeLevel.ALL))
+          .error(selectError("functional.alltypestiny"),
+              onDatabase("functional", allExcept(
+                  TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.INSERT,
+                  TPrivilegeLevel.SELECT)));
+      authorize("truncate table functional.alltypes")
+          .error(insertError("functional.alltypes"), onServer(TPrivilegeLevel.ALL));
+      authorize("insert into functional.alltypestiny partition(year, month) " +
+          "select * from functional.alltypessmall")
+          .error(insertError("functional.alltypestiny"), onServer(TPrivilegeLevel.ALL))
+          // error for 'select' appears earlier than 'insert'
+          .error(selectError("functional.alltypessmall"),
+              onTable("functional", "alltypestiny", TPrivilegeLevel.ALL))
+          .error(selectError("functional.alltypessmall"),
+              onDatabase("functional", allExcept(
+                  TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER, TPrivilegeLevel.INSERT,
+                  TPrivilegeLevel.SELECT)));
+      authorize("truncate table functional.alltypestiny")
+          .error(insertError("functional.alltypestiny"), onServer(TPrivilegeLevel.ALL));
+
+      // Block UPSERT, DELETE even given SERVER ALL privilege
+      authorize("upsert into functional_kudu.alltypes " +
+          "select * from functional.alltypes")
+          .error(accessError("functional_kudu.alltypes"), onServer(TPrivilegeLevel.ALL))
+          // error for 'select' appears earlier than 'access'
+          .error(selectError("functional.alltypes"),
+              onTable("functional_kudu", "alltypes", TPrivilegeLevel.ALL));
+      authorize("delete from functional_kudu.alltypes")
+          .error(accessError("functional_kudu.alltypes"), onServer(TPrivilegeLevel.ALL));
+      authorize("delete from functional_kudu.alltypes")
+          .error(accessError("functional_kudu.alltypes"), onServer(TPrivilegeLevel.ALL));
+      authorize("delete from functional_kudu.alltypes where id is not null")
+          .error(accessError("functional_kudu.alltypes"), onServer(TPrivilegeLevel.ALL));
+      authorize("delete a from functional_kudu.alltypes a join functional.alltypes b " +
+          "on a.id = b.id")
+          .error(accessError("functional_kudu.alltypes"), onServer(TPrivilegeLevel.ALL));
+
+      // Block compute stats even given SERVER ALL privilege
+      authorize("compute stats functional.alltypes")
+          .error(alterError("functional.alltypes"), onServer(TPrivilegeLevel.ALL));
+      authorize("compute incremental stats functional.alltypes")
+          .error(alterError("functional.alltypes"), onServer(TPrivilegeLevel.ALL));
+
+      // Block ALTER even given SERVER ALL privilege
+      authorize("alter table functional.alltypes add columns (new_id int)")
+          .error(alterError("functional.alltypes"), onServer(TPrivilegeLevel.ALL));
+      authorize("alter table functional.alltypes drop partition (year=2009, month=1)")
+          .error(alterError("functional.alltypes"), onServer(TPrivilegeLevel.ALL));
+      authorize("alter view functional.alltypes_view as select 1")
+          .error(alterError("functional.alltypes_view"), onServer(TPrivilegeLevel.ALL));
+      authorize("alter table functional.alltypestiny add partition (year=1, month=1)")
+          .error(alterError("functional.alltypestiny"), onServer(TPrivilegeLevel.ALL));
+
+      // Block DROP even given SERVER ALL privilege
+      authorize("drop table functional.alltypes")
+          .error(dropError("functional.alltypes"), onServer(TPrivilegeLevel.ALL));
+      authorize("drop view functional.alltypes_view")
+          .error(dropError("functional.alltypes_view"), onServer(TPrivilegeLevel.ALL));
+      authorize("drop table functional.alltypestiny")
+          .error(dropError("functional.alltypestiny"), onServer(TPrivilegeLevel.ALL));
+      authorize("drop table functional_kudu.alltypes")
+          .error(dropError("functional_kudu.alltypes"), onServer(TPrivilegeLevel.ALL));
+
+      // Block REFRESH even given SERVER ALL privilege
+      authorize("refresh functional.alltypes")
+          .error(refreshError("functional.alltypes"), onServer(TPrivilegeLevel.ALL));
+      authorize("refresh functional.alltypes_view")
+          .error(refreshError("functional.alltypes_view"), onServer(TPrivilegeLevel.ALL));
+      authorize("refresh functional.alltypestiny")
+          .error(refreshError("functional.alltypestiny"), onServer(TPrivilegeLevel.ALL));
+      authorize("invalidate metadata functional.alltypes")
+          .error(refreshError("functional.alltypes"), onServer(TPrivilegeLevel.ALL));
+      authorize("invalidate metadata functional.alltypes_view")
+          .error(refreshError("functional.alltypes_view"), onServer(TPrivilegeLevel.ALL));
+      authorize("invalidate metadata functional.alltypestiny")
+          .error(refreshError("functional.alltypestiny"), onServer(TPrivilegeLevel.ALL));
+
+      // Unmasked policy won't block updates
+      authorize("insert into functional.alltypessmall partition(year, month) " +
+          "select * from functional.alltypestiny")
+          .ok(onTable("functional", "alltypessmall", TPrivilegeLevel.INSERT),
+              onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
+      authorize("alter table functional.alltypessmall add partition (year=1, month=1)")
+          .ok(onTable("functional", "alltypessmall", TPrivilegeLevel.ALTER));
+      authorize("compute stats functional.alltypessmall")
+          .ok(onTable("functional", "alltypessmall",
+              TPrivilegeLevel.ALTER, TPrivilegeLevel.SELECT));
+      authorize("compute incremental stats functional.alltypessmall")
+          .ok(onTable("functional", "alltypessmall",
+              TPrivilegeLevel.ALTER, TPrivilegeLevel.SELECT));
+      authorize("drop table functional.alltypessmall")
+          .ok(onTable("functional", "alltypessmall", TPrivilegeLevel.DROP));
+      authorize("refresh functional.alltypessmall")
+          .ok(onTable("functional", "alltypessmall", TPrivilegeLevel.REFRESH));
+      authorize("invalidate metadata functional.alltypessmall")
+          .ok(onTable("functional", "alltypessmall", TPrivilegeLevel.REFRESH));
+    } finally {
+      deleteRangerPolicy("alltypes_row_filter");
+      deleteRangerPolicy("alltypes_view_row_filter");
+      deleteRangerPolicy("alltypestiny_id_mask");
+      deleteRangerPolicy("kudu_id_mask");
+      deleteRangerPolicy("alltypessmall_id_unmask");
     }
   }
 

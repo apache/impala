@@ -29,15 +29,17 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.thrift.TPrivilege;
 import org.apache.impala.thrift.TPrivilegeLevel;
 import org.apache.ranger.audit.model.AuthzAuditEvent;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 public class RangerAuditLogTest extends AuthorizationTestBase {
@@ -284,6 +286,8 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
         "    \"dataMaskType\": \"MASK\"\n" +
         "  }\n"
     };
+    long policyIds[] = {-1, -1, -1, -1};
+    Set<Long> columnMaskingPolicyIds = new HashSet<>();
 
     List<String> policies = new ArrayList<>();
     for (int i = 0; i < masks.length; ++i) {
@@ -331,7 +335,10 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       for (int i = 0; i < masks.length; ++i) {
         String policyName = policyNames[i];
         String json = policies.get(i);
-        createRangerPolicy(policyName, json);
+        policyIds[i] = createRangerPolicy(policyName, json);
+        assertNotEquals("Illegal policy id", -1, policyIds[i]);
+        // Only the first 3 policies apply on current user.
+        if (i < 3) columnMaskingPolicyIds.add(policyIds[i]);
       }
 
       authzOk(events -> {
@@ -348,6 +355,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
             events.get(3));
         assertEventEquals("@column", "custom", "functional/alltypestiny/string_col", 1,
             events.get(4));
+        assertEquals(events.get(4).getPolicyId(), policyIds[0]);
       }, "select id, bool_col, string_col from functional.alltypestiny",
           onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
 
@@ -385,8 +393,10 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
             events.get(13));
         assertEventEquals("@column", "mask_null",
             "functional/alltypestiny/date_string_col", 1, events.get(14));
+        assertEquals(events.get(14).getPolicyId(), policyIds[1]);
         assertEventEquals("@column", "custom", "functional/alltypestiny/string_col", 1,
             events.get(15));
+        assertEquals(events.get(15).getPolicyId(), policyIds[0]);
       }, "select * from functional.alltypestiny", onTable("functional", "alltypestiny",
           TPrivilegeLevel.SELECT));
 
@@ -411,6 +421,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
             events.get(3));
         assertEventEquals("@column", "custom", "functional/alltypestiny/string_col", 1,
             events.get(4));
+        assertEquals(events.get(4).getPolicyId(), policyIds[0]);
       }, "with iv as (select id, bool_col, string_col from functional.alltypestiny) " +
           "select * from iv", onTable("functional", "alltypestiny",
           TPrivilegeLevel.SELECT));
@@ -429,6 +440,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
             events.get(2));
         assertEventEquals("@column", "custom", "functional/alltypestiny/string_col", 1,
             events.get(3));
+        assertEquals(events.get(3).getPolicyId(), policyIds[0]);
       }, "select id, string_col from functional.alltypestiny a where exists " +
           "(select id from functional.alltypestiny where id = a.id) order by id;",
           onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
@@ -439,14 +451,73 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       // event of the first column that failed the authorization will be logged, i.e.,
       // 'id'. Refer to RangerAuthorizationChecker#authorizeTableAccess() for further
       // details.
-      authzError(events -> {assertEquals(1, events.size());
-            assertEquals("with iv as (select id, bool_col, string_col from " +
-                    "functional.alltypestiny) select * from iv",
-                events.get(0).getRequestData());
-            assertEventEquals("@column", "select", "functional/alltypestiny/id", 0,
-                events.get(0));
-          },"with iv as (select id, bool_col, string_col from functional.alltypestiny) " +
+      authzError(events -> {
+        assertEquals(1, events.size());
+        assertEquals("with iv as (select id, bool_col, string_col from " +
+                "functional.alltypestiny) select * from iv",
+            events.get(0).getRequestData());
+        assertEventEquals("@column", "select", "functional/alltypestiny/id", 0,
+            events.get(0));
+      },"with iv as (select id, bool_col, string_col from functional.alltypestiny) " +
           "select * from iv", onTable("functional", "alltypestiny"));
+
+      // Updates on metadata fails by column-masking policies.
+      authzError(events -> {
+        assertEquals(1, events.size());
+        assertEquals("invalidate metadata functional.alltypestiny",
+            events.get(0).getRequestData());
+        assertEventEquals("@table", "refresh", "functional/alltypestiny", 0,
+            events.get(0));
+        // Make sure it's denied by a column masking policy.
+        assertTrue(columnMaskingPolicyIds.contains(events.get(0).getPolicyId()));
+      }, "invalidate metadata functional.alltypestiny", onServer(TPrivilegeLevel.ALL));
+
+      // Updates on metadata fails by column-masking policies.
+      authzError(events -> {
+        assertEquals(1, events.size());
+        assertEquals("compute stats functional.alltypestiny",
+            events.get(0).getRequestData());
+        assertEventEquals("@table", "alter", "functional/alltypestiny", 0,
+            events.get(0));
+        // Make sure it's denied by a column masking policy.
+        assertTrue(columnMaskingPolicyIds.contains(events.get(0).getPolicyId()));
+      }, "compute stats functional.alltypestiny", onServer(TPrivilegeLevel.ALL));
+
+      // Updates on metadata fails by column-masking policies.
+      authzError(events -> {
+        assertEquals(1, events.size());
+        assertEquals("alter table functional.alltypestiny change column id id string",
+            events.get(0).getRequestData());
+        assertEventEquals("@table", "alter", "functional/alltypestiny", 0,
+            events.get(0));
+        // Make sure it's denied by a column masking policy.
+        assertTrue(columnMaskingPolicyIds.contains(events.get(0).getPolicyId()));
+      }, "alter table functional.alltypestiny change column id id string",
+          onServer(TPrivilegeLevel.ALL));
+
+      // Updates on data fails by column-masking policies.
+      authzError(events -> {
+        assertEquals(1, events.size());
+        assertEquals("truncate table functional.alltypestiny",
+            events.get(0).getRequestData());
+        assertEventEquals("@table", "insert", "functional/alltypestiny", 0,
+            events.get(0));
+        // Make sure it's denied by a column masking policy.
+        assertTrue(columnMaskingPolicyIds.contains(events.get(0).getPolicyId()));
+      }, "truncate table functional.alltypestiny", onServer(TPrivilegeLevel.ALL));
+
+      // Updates on data fails by column-masking policies.
+      authzError(events -> {
+        assertEquals(1, events.size());
+        assertEquals("insert into functional.alltypestiny partition(year, month) " +
+                "select * from functional.alltypes",
+            events.get(0).getRequestData());
+        assertEventEquals("@table", "insert", "functional/alltypestiny", 0,
+            events.get(0));
+        // Make sure it's denied by a column masking policy.
+        assertTrue(columnMaskingPolicyIds.contains(events.get(0).getPolicyId()));
+      }, "insert into functional.alltypestiny partition(year, month) " +
+          "select * from functional.alltypes", onServer(TPrivilegeLevel.ALL));
     } finally {
       for (int i = 0; i < masks.length; ++i) {
         String policyName = policyNames[i];
@@ -465,6 +536,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
     String policyNames[] = {"tiny_filter", "all_filter"};
     String users[] = {user_.getShortName(), "non_owner_2"};
     String filters[] = {"id=0", "id=1"};
+    long policyIds[] = {-1, -1};
 
     List<String> policies = new ArrayList<>();
     for (int i = 0; i < filters.length; ++i) {
@@ -505,7 +577,8 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       for (int i = 0; i < filters.length; ++i) {
         String policyName = policyNames[i];
         String json = policies.get(i);
-        createRangerPolicy(policyName, json);
+        policyIds[i] = createRangerPolicy(policyName, json);
+        assertNotEquals("Illegal policy id", -1, policyIds[i]);
       }
 
       // Verify row filter audits. Note that columns used in the row filter won't create
@@ -520,6 +593,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
             events.get(1));
         assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
             events.get(2));
+        assertEquals(events.get(2).getPolicyId(), policyIds[0]);
       }, "select bool_col from functional.alltypestiny",
           onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
 
@@ -531,6 +605,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
             events.get(0));
         assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
             events.get(1));
+        assertEquals(events.get(1).getPolicyId(), policyIds[0]);
       }, "select 1 from functional.alltypestiny",
           onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
 
@@ -542,6 +617,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
             events.get(0));
         assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
             events.get(1));
+        assertEquals(events.get(1).getPolicyId(), policyIds[0]);
       }, "select count(*) from functional.alltypestiny",
           onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
 
@@ -589,6 +665,7 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
             events.get(13));
         assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
             events.get(14));
+        assertEquals(events.get(14).getPolicyId(), policyIds[0]);
       }, "select * from functional.alltypestiny", onTable("functional", "alltypestiny",
           TPrivilegeLevel.SELECT));
 
@@ -631,16 +708,79 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
       // When fails with not enough privileges, no audit logs for row filtering is
       // generated. Only the event of the first column (i.e. id) that failed the
       // authorization will be logged.
-      authzError(events -> {assertEquals(1, events.size());
+      authzError(events -> {
+        assertEquals(1, events.size());
         assertEquals("select * from functional.alltypestiny",
             events.get(0).getRequestData());
         assertEventEquals("@column", "select", "functional/alltypestiny/id", 0,
             events.get(0));
       },"select * from functional.alltypestiny", onTable("functional", "alltypestiny"));
+
+      // Updates on metadata fails by row-filtering policies.
+      authzError(events -> {
+        assertEquals(1, events.size());
+        assertEquals("invalidate metadata functional.alltypestiny",
+            events.get(0).getRequestData());
+        assertEventEquals("@table", "refresh", "functional/alltypestiny", 0,
+            events.get(0));
+        // Make sure it's denied by the row filtering policy.
+        assertEquals(events.get(0).getPolicyId(), policyIds[0]);
+      }, "invalidate metadata functional.alltypestiny", onServer(TPrivilegeLevel.ALL));
+
+      // Updates on metadata fails by row-filtering policies.
+      authzError(events -> {
+        assertEquals(1, events.size());
+        assertEquals("compute stats functional.alltypestiny",
+            events.get(0).getRequestData());
+        assertEventEquals("@table", "alter", "functional/alltypestiny", 0,
+            events.get(0));
+        // Make sure it's denied by the row filtering policy.
+        assertEquals(events.get(0).getPolicyId(), policyIds[0]);
+      }, "compute stats functional.alltypestiny", onServer(TPrivilegeLevel.ALL));
+
+      // Updates on metadata fails by row-filtering policies.
+      authzError(events -> {
+        assertEquals(1, events.size());
+        assertEquals("alter table functional.alltypestiny change column id id string",
+            events.get(0).getRequestData());
+        assertEventEquals("@table", "alter", "functional/alltypestiny", 0,
+            events.get(0));
+        // Make sure it's denied by the row filtering policy.
+        assertEquals(events.get(0).getPolicyId(), policyIds[0]);
+      }, "alter table functional.alltypestiny change column id id string",
+          onServer(TPrivilegeLevel.ALL));
+
+      // Updates on data fails by row-filtering policies.
+      authzError(events -> {
+        assertEquals(1, events.size());
+        assertEquals("truncate table functional.alltypestiny",
+            events.get(0).getRequestData());
+        assertEventEquals("@table", "insert", "functional/alltypestiny", 0,
+            events.get(0));
+        // Make sure it's denied by the row filtering policy.
+        assertEquals(events.get(0).getPolicyId(), policyIds[0]);
+      }, "truncate table functional.alltypestiny", onServer(TPrivilegeLevel.ALL));
+
+      // Updates on data fails by row-filtering policies.
+      authzError(events -> {
+        assertEquals(1, events.size());
+        assertEquals("insert into functional.alltypestiny partition(year, month) " +
+                "select * from functional.alltypes",
+            events.get(0).getRequestData());
+        assertEventEquals("@table", "insert", "functional/alltypestiny", 0,
+            events.get(0));
+        // Make sure it's denied by the row filtering policy.
+        assertEquals(events.get(0).getPolicyId(), policyIds[0]);
+      }, "insert into functional.alltypestiny partition(year, month) " +
+          "select * from functional.alltypes", onServer(TPrivilegeLevel.ALL));
     } finally {
       for (int i = 0; i < filters.length; ++i) {
         String policyName = policyNames[i];
-        deleteRangerPolicy(policyName);
+        try {
+          deleteRangerPolicy(policyName);
+        } catch (RuntimeException e) {
+          // ignore this to expose the original error.
+        }
       }
     }
   }
