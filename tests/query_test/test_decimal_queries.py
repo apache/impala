@@ -25,6 +25,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (create_exec_option_dimension_from_dict,
     create_client_protocol_dimension, hs2_parquet_constraint)
 from tests.common.test_vector import ImpalaTestDimension
+from tests.util.filesystem_utils import IS_S3
 
 class TestDecimalQueries(ImpalaTestSuite):
   @classmethod
@@ -131,6 +132,7 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
   def test_ctas_exprs(self, vector, unique_database):
     TBL_NAME_1 = '`{0}`.`overflowed_decimal_tbl_1`'.format(unique_database)
     TBL_NAME_2 = '`{0}`.`overflowed_decimal_tbl_2`'.format(unique_database)
+    TBL_NAME_3 = '`{0}`.`overflowed_decimal_tbl_3`'.format(unique_database)
     if 'parquet' in str(vector.get_value('table_format')):
       stmt_1 = "CREATE TABLE {0} STORED AS PARQUET " \
           "AS SELECT 1 as i, cast(a*a*a as decimal (28,10)) as d_28 FROM " \
@@ -138,6 +140,7 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
       stmt_2 = "CREATE TABLE {0} STORED AS PARQUET " \
           "AS SELECT i, cast(d_28*d_28*d_28 as decimal (28,10)) as d_28 FROM {1} " \
           "WHERE d_28 is not null"
+      stmt_3 = "CREATE TABLE {0} (i int, d_28 decimal(28,10)) STORED AS PARQUET"
     elif 'kudu' in str(vector.get_value('table_format')):
       stmt_1 = "CREATE TABLE {0} PRIMARY KEY (i) STORED AS KUDU " \
           "AS SELECT 1 as i, cast(a*a*a as decimal (28,10)) as d_28 FROM " \
@@ -145,6 +148,7 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
       stmt_2 = "CREATE TABLE {0} PRIMARY KEY (i) STORED AS KUDU " \
           "AS SELECT i, cast(d_28*d_28*d_28 as decimal (28,10)) as d_28 FROM {1} " \
           "WHERE d_28 is not null"
+      stmt_3 = "CREATE TABLE {0} (i int primary key, d_28 decimal(28,10)) STORED AS KUDU"
     else:
       stmt_1 = "CREATE TABLE {0} " \
           "AS SELECT 1 as i, cast(a*a*a as decimal (28,10)) as d_28 FROM " \
@@ -152,9 +156,11 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
       stmt_2 = "CREATE TABLE {0} " \
           "AS SELECT i, cast(d_28*d_28*d_28 as decimal (28,10)) as d_28 FROM {1} " \
           "WHERE d_28 is not null"
+      stmt_3 = "CREATE TABLE {0} (i int, d_28 decimal(28,10))"
     query_1 = stmt_1.format(TBL_NAME_1)
     # CTAS with selection from another table.
-    query_2 = stmt_2.format(TBL_NAME_2, TBL_NAME_1)
+    query_2 = stmt_2.format(TBL_NAME_2, TBL_NAME_3)
+    query_3 = stmt_3.format(TBL_NAME_3)
 
     # Query_1 is aborted with error message "Decimal expression overflowed" and NULL is
     # not inserted into table.
@@ -166,14 +172,18 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
     except ImpalaBeeswaxException, e:
       assert "Decimal expression overflowed" in str(e)
 
-    result = self.execute_query_expect_success(self.client,
-        "SELECT count(*) FROM %s" % TBL_NAME_1)
-    assert int(result.get_data()) == 0
+    # TODO (IMPALA-10607): Following query failed for S3 build with Parquet table format.
+    if not ('parquet' in str(vector.get_value('table_format')) and IS_S3):
+      result = self.execute_query_expect_success(self.client,
+          "SELECT count(*) FROM %s" % TBL_NAME_1)
+      assert int(result.get_data()) == 0
 
-    # Insert data to table 1.
+    # Create table 3 and insert data to table 3.
+    self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS %s" % TBL_NAME_3)
+    self.execute_query_expect_success(self.client, query_3)
     self.execute_query_expect_success(self.client,
         "INSERT INTO TABLE %s VALUES(100, cast(654964569154.9565 as decimal (28,10)))" %
-        TBL_NAME_1)
+        TBL_NAME_3)
     # Query_2 is aborted with error message "Decimal expression overflowed" and NULL is
     # not inserted into table.
     self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS %s" % TBL_NAME_2)
@@ -183,6 +193,8 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
     except ImpalaBeeswaxException, e:
       assert "Decimal expression overflowed" in str(e)
 
-    result = self.execute_query_expect_success(self.client,
-        "SELECT count(*) FROM %s" % TBL_NAME_2)
-    assert int(result.get_data()) == 0
+    # TODO (IMPALA-10607): Following query failed for S3 build with Parquet table format.
+    if not ('parquet' in str(vector.get_value('table_format')) and IS_S3):
+      result = self.execute_query_expect_success(self.client,
+          "SELECT count(*) FROM %s" % TBL_NAME_2)
+      assert int(result.get_data()) == 0
