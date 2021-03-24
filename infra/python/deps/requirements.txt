@@ -21,6 +21,7 @@
 # multiple times (though maybe they could be).
 
 allpairs == 2.0.1
+argparse == 1.4.0
 # TODO: boto3 is now unused, it can be removed.
 boto3 == 1.2.3
   simplejson == 3.3.0 # For python version 2.6
@@ -37,31 +38,21 @@ flake8 == 2.6.2
   pycodestyle == 2.0.0
   pyflakes == 1.2.3
 gcovr == 3.4
+hdfs == 2.0.2
+  docopt == 0.6.2
+  execnet == 1.4.0
+impyla == 0.17a1
+  bitarray == 1.2.1
+  sasl == 0.2.1
+  # six == 1.14.0 (specified separately)
+  thrift_sasl == 0.4.2
 kazoo == 2.2.1
 ordereddict == 1.1
 pexpect == 3.3
 pg8000 == 1.10.2
 prettytable == 0.7.2
+psutil == 5.6.3
 pyparsing == 2.0.3
-python-magic == 0.4.11
-# pbr is required for pywebhdfs but must be installed in a separate call to pip before
-# attempting to install pywebhdfs (https://github.com/pywebhdfs/pywebhdfs/issues/52).
-# pywebhdfs itself will be installed in stage 2.
-  pbr == 3.1.1
-sh == 1.11
-six == 1.14.0
-sqlparse == 0.3.1
-texttable == 0.8.3
-
-# For dev purposes, not used in scripting. Version 1.2.1 is the latest that supports 2.6.
-ipython == 1.2.1
-  apipkg == 1.4
-
-virtualenv == 13.1.0
-
-#### Formerly stage2-requirements.txt
-
-# Requires setuptools-scm
 pytest == 2.9.2
   py == 1.4.32
   pytest-forked == 0.2
@@ -69,29 +60,26 @@ pytest == 2.9.2
   pytest-runner == 4.2
   pytest-xdist == 1.17.1
   pytest-timeout == 1.2.1
-hdfs == 2.0.2
-  docopt == 0.6.2
-  execnet == 1.4.0
-
-# Requires pbr
+python-magic == 0.4.11
 pywebhdfs == 0.3.2
-
+  pbr == 3.1.1
 requests == 2.20.0
    chardet == 3.0.4
    idna == 2.8
    urllib3 == 1.21.1
    certifi == 2020.12.5
+sh == 1.11
+six == 1.14.0
+sqlparse == 0.3.1
+texttable == 0.8.3
+virtualenv == 13.1.0
 
-#### Formerly compiled-requirements.txt
-
-argparse == 1.4.0
-impyla == 0.17a1
-  bitarray == 1.2.1
-  sasl == 0.2.1
-  # six == 1.14.0 (specified above)
-  thrift_sasl == 0.4.2
-psutil == 5.6.3
 # Required for Kudu:
   Cython == 0.23.4
   numpy == 1.10.4
   pytz == 2018.3
+
+# For dev purposes, not used in scripting. Version 1.2.1 is the latest that supports 2.6.
+# TODO: this seems unused and could be removed
+ipython == 1.2.1
+  apipkg == 1.4
