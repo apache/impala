@@ -48,9 +48,6 @@ python-magic == 0.4.11
 # attempting to install pywebhdfs (https://github.com/pywebhdfs/pywebhdfs/issues/52).
 # pywebhdfs itself will be installed in stage 2.
   pbr == 3.1.1
-# Newer versions of setuptools don't support Python 2.6
-setuptools == 36.8.0
-setuptools-scm == 1.15.4
 sh == 1.11
 six == 1.14.0
 sqlparse == 0.3.1
@@ -61,3 +58,40 @@ ipython == 1.2.1
   apipkg == 1.4
 
 virtualenv == 13.1.0
+
+#### Formerly stage2-requirements.txt
+
+# Requires setuptools-scm
+pytest == 2.9.2
+  py == 1.4.32
+  pytest-forked == 0.2
+  pytest-random == 0.02
+  pytest-runner == 4.2
+  pytest-xdist == 1.17.1
+  pytest-timeout == 1.2.1
+hdfs == 2.0.2
+  docopt == 0.6.2
+  execnet == 1.4.0
+
+# Requires pbr
+pywebhdfs == 0.3.2
+
+requests == 2.20.0
+   chardet == 3.0.4
+   idna == 2.8
+   urllib3 == 1.21.1
+   certifi == 2020.12.5
+
+#### Formerly compiled-requirements.txt
+
+argparse == 1.4.0
+impyla == 0.17a1
+  bitarray == 1.2.1
+  sasl == 0.2.1
+  # six == 1.14.0 (specified above)
+  thrift_sasl == 0.4.2
+psutil == 5.6.3
+# Required for Kudu:
+  Cython == 0.23.4
+  numpy == 1.10.4
+  pytz == 2018.3

@@ -18,21 +18,19 @@
 # This module will create a python virtual env and install external dependencies. If the
 # virtualenv already exists and it contains all the expected packages, nothing is done.
 #
-# A multi-step bootstrapping process is required to build and install all of the
-# dependencies:
-# 1. install basic non-C/C++ packages into the virtualenv
-# 1b. install packages that depend on step 1 but cannot be installed together with their
-#     dependencies
-# 2. use the virtualenv Python to bootstrap the toolchain
-# 3. use toolchain gcc to build C/C++ packages
-# 4. build the kudu-python package with toolchain gcc and Cython
+# It is expected that bootstrap_toolchain.py already ran prior to running this
+# (and thus the toolchain GCC compiler is in place).
 #
-# Every time this script is run, it completes as many of the bootstrapping steps as
-# possible with the available dependencies.
+# The virtualenv creation process involves multiple rounds of pip installs, but
+# this script expects to complete all rounds in a single invocation. The steps are:
+# 1. Install setuptools and its depenencies. These are used by the setup.py scripts
+#    that run during pip install.
+# 2. Install most packages (including ones that require C/C++ compilation)
+# 3. Install Kudu package (which uses the toolchain GCC and the installed Cython)
+# 4. Install ADLS packages if applicable
 #
-# This module can be run with python >= 2.4 but python >= 2.6 must be installed on the
-# system. If the default 'python' command refers to < 2.6, python 2.6 will be used
-# instead.
+# This module can be run with python >= 2.7. It makes no guarantees about usage on
+# python < 2.7.
 
 from __future__ import print_function
 import glob
@@ -44,7 +42,6 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-import textwrap
 import urllib
 from bootstrap_toolchain import ToolchainPackage
 
@@ -57,24 +54,26 @@ GCC_VERSION = os.environ["IMPALA_GCC_VERSION"]
 DEPS_DIR = os.path.join(os.path.dirname(__file__), "deps")
 ENV_DIR = os.path.join(os.path.dirname(__file__), "env-gcc{0}".format(GCC_VERSION))
 
-# Requirements file with packages we need for our build and tests.
+# Setuptools requirements file. Setuptools is required during pip install for
+# some packages. Newer setuptools dropped python 2 support, and some python
+# install tools don't understand that they need to get a version that works
+# with the current python version. This can cause them to try to install the newer
+# setuptools that won't work on python 2. Doing this as a separate step makes it
+# easy to pin the version of setuptools to a Python 2 compatible version.
+SETUPTOOLS_REQS_PATH = os.path.join(DEPS_DIR, "setuptools-requirements.txt")
+
+# Requirements file with packages we need for our build and tests, which depends
+# on setuptools being installed by the setuptools requirements step.
 REQS_PATH = os.path.join(DEPS_DIR, "requirements.txt")
 
-# Second stage of requirements which cannot be installed together with their dependencies
-# in requirements.txt.
-REQS2_PATH = os.path.join(DEPS_DIR, "stage2-requirements.txt")
-
-# Requirements for the next bootstrapping step that builds compiled requirements
-# with toolchain gcc.
-COMPILED_REQS_PATH = os.path.join(DEPS_DIR, "compiled-requirements.txt")
-
 # Requirements for the Kudu bootstrapping step, which depends on Cython being installed
-# by the compiled requirements step.
+# by the requirements step.
 KUDU_REQS_PATH = os.path.join(DEPS_DIR, "kudu-requirements.txt")
 
 # Requirements for the ADLS test client step, which depends on Cffi (C Foreign Function
-# Interface) being installed by the compiled requirements step.
+# Interface) being installed by the requirements step.
 ADLS_REQS_PATH = os.path.join(DEPS_DIR, "adls-requirements.txt")
+
 
 def delete_virtualenv_if_exist():
   if os.path.exists(ENV_DIR):
@@ -108,6 +107,7 @@ def exec_cmd(args, **kwargs):
         % (args, output))
   return output
 
+
 def use_ccache():
   '''Returns true if ccache is available and should be used'''
   if 'DISABLE_CCACHE' in os.environ: return False
@@ -116,6 +116,7 @@ def use_ccache():
     return True
   except:
     return False
+
 
 def select_cc():
   '''Return the C compiler command that should be used as a string or None if the
@@ -128,6 +129,7 @@ def select_cc():
   if not os.path.exists(cc): return None
   if use_ccache(): cc = "ccache %s" % cc
   return cc
+
 
 def exec_pip_install(args, cc="no-cc-available", env=None):
   '''Executes "pip install" with the provided command line arguments. If 'cc' is set,
@@ -218,16 +220,21 @@ def download_toolchain_python():
 
 
 def install_deps():
+  LOG.info("Installing setuptools into the virtualenv")
+  exec_pip_install(["-r", SETUPTOOLS_REQS_PATH])
+  cc = select_cc()
+  if cc is None:
+    raise Exception("CC not available")
+  env = dict(os.environ)
   LOG.info("Installing packages into the virtualenv")
-  exec_pip_install(["-r", REQS_PATH])
+  exec_pip_install(["-r", REQS_PATH], cc=cc, env=env)
   mark_reqs_installed(REQS_PATH)
-  LOG.info("Installing stage 2 packages into the virtualenv")
-  exec_pip_install(["-r", REQS2_PATH])
-  mark_reqs_installed(REQS2_PATH)
+
 
 def have_toolchain():
   '''Return true if the Impala toolchain is available'''
   return "IMPALA_TOOLCHAIN_PACKAGES_HOME" in os.environ
+
 
 def toolchain_pkg_dir(pkg_name):
   '''Return the path to the toolchain package'''
@@ -235,31 +242,6 @@ def toolchain_pkg_dir(pkg_name):
   return os.path.join(os.environ["IMPALA_TOOLCHAIN_PACKAGES_HOME"],
       pkg_name + "-" + pkg_version)
 
-def install_compiled_deps_if_possible():
-  '''Install dependencies that require compilation with toolchain GCC, if the toolchain
-  is available. Returns true if the deps are installed'''
-  if reqs_are_installed(COMPILED_REQS_PATH):
-    LOG.debug("Skipping compiled deps: matching compiled-installed-requirements.txt found")
-    return True
-  cc = select_cc()
-  if cc is None:
-    LOG.debug("Skipping compiled deps: cc not available yet")
-    return False
-
-  env = dict(os.environ)
-
-  # Compilation of pycrypto fails on CentOS 5 with newer GCC versions because of a
-  # problem with inline declarations in older libc headers. Setting -fgnu89-inline is a
-  # workaround.
-  distro_version = ''.join(exec_cmd(["lsb_release", "-irs"]).lower().split())
-  print(distro_version)
-  if distro_version.startswith("centos5."):
-    env["CFLAGS"] = "-fgnu89-inline"
-
-  LOG.info("Installing compiled requirements into the virtualenv")
-  exec_pip_install(["-r", COMPILED_REQS_PATH], cc=cc, env=env)
-  mark_reqs_installed(COMPILED_REQS_PATH)
-  return True
 
 def install_adls_deps():
   # The ADLS dependencies require that the OS is at least CentOS 6.7 or above,
@@ -275,9 +257,10 @@ def install_adls_deps():
     exec_pip_install(["-r", ADLS_REQS_PATH], cc=cc)
     mark_reqs_installed(ADLS_REQS_PATH)
 
+
 def install_kudu_client_if_possible():
   '''Installs the Kudu python module if possible, which depends on the toolchain and
-  the compiled requirements in compiled-requirements.txt. If the toolchain isn't
+  the compiled requirements in requirements.txt. If the toolchain isn't
   available, nothing will be done.'''
   if reqs_are_installed(KUDU_REQS_PATH):
     LOG.debug("Skipping Kudu: matching kudu-installed-requirements.txt found")
@@ -344,11 +327,13 @@ def error_if_kudu_client_not_found(install_dir):
         return
   raise Exception("%s not found at %s" % (kudu_client_lib, lib_dir))
 
+
 def mark_reqs_installed(reqs_path):
-  '''Mark that the requirements from the given file are installed by copying it into the root
-  directory of the virtualenv.'''
+  '''Mark that the requirements from the given file are installed by copying it into
+  the root directory of the virtualenv.'''
   installed_reqs_path = os.path.join(ENV_DIR, os.path.basename(reqs_path))
   shutil.copyfile(reqs_path, installed_reqs_path)
+
 
 def reqs_are_installed(reqs_path):
   '''Check if the requirements from the given file are installed in the virtualenv by
@@ -370,8 +355,9 @@ def reqs_are_installed(reqs_path):
   finally:
     installed_reqs_file.close()
 
+
 def setup_virtualenv_if_not_exists():
-  if not (reqs_are_installed(REQS_PATH) and reqs_are_installed(REQS2_PATH)):
+  if not (reqs_are_installed(REQS_PATH)):
     delete_virtualenv_if_exist()
     create_virtualenv()
     install_deps()
@@ -405,6 +391,5 @@ if __name__ == "__main__":
 
   # Complete as many bootstrap steps as possible (see file comment for the steps).
   setup_virtualenv_if_not_exists()
-  if install_compiled_deps_if_possible():
-    install_kudu_client_if_possible()
-    install_adls_deps()
+  install_kudu_client_if_possible()
+  install_adls_deps()
