@@ -275,7 +275,7 @@ class TestUdfPersistence(CustomClusterTestSuite):
     describe_db_hive = "DESCRIBE DATABASE EXTENDED {database}".format(
         database=self.HIVE_IMPALA_INTEGRATION_DB)
     result = self.run_stmt_in_hive(describe_db_hive)
-    regex = r"{(.*?)=(.*?)}"
+    regex = r"{.*(impala_registered_function.*?)=(.*?)[,}]"
     match = re.search(regex, result)
     func_name = match.group(1)
     func_contents = match.group(2)
