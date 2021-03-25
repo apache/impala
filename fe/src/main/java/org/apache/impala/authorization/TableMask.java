@@ -49,11 +49,11 @@ public class TableMask {
 
   public TableMask(AuthorizationChecker authzChecker, String dbName, String tableName,
       List<Column> requiredColumns, User user) {
-    this.authChecker_ = authzChecker;
-    this.user_ = user;
-    this.dbName_ = dbName;
-    this.tableName_ = tableName;
-    this.requiredColumns_ = requiredColumns;
+    this.authChecker_ = Preconditions.checkNotNull(authzChecker);
+    this.user_ = Preconditions.checkNotNull(user);
+    this.dbName_ = Preconditions.checkNotNull(dbName);
+    this.tableName_ = Preconditions.checkNotNull(tableName);
+    this.requiredColumns_ = Preconditions.checkNotNull(requiredColumns);
     this.requiredColumnNames_ = requiredColumns.stream().map(Column::getName)
         .collect(Collectors.toList());
   }

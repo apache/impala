@@ -38,6 +38,7 @@ import org.apache.impala.analysis.StmtMetadataLoader;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.NoopAuthorizationFactory;
+import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.AggregateFunction;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.CatalogException;
@@ -63,6 +64,7 @@ import org.apache.impala.util.EventSequence;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import org.apache.impala.util.TSessionStateUtil;
 
 /**
  * Test fixture for the front-end as a whole. Logically equivalent to a running
@@ -360,8 +362,9 @@ public class FrontendFixture {
   public AnalysisResult parseAndAnalyze(String stmt, AnalysisContext ctx)
       throws ImpalaException {
     StatementBase parsedStmt = Parser.parse(stmt, ctx.getQueryOptions());
+    User user = new User(TSessionStateUtil.getEffectiveUser(ctx.getQueryCtx().session));
     StmtMetadataLoader mdLoader =
-        new StmtMetadataLoader(frontend_, ctx.getQueryCtx().session.database, null);
+        new StmtMetadataLoader(frontend_, ctx.getQueryCtx().session.database, null, user);
     StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
     return ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache,
         frontend_.getAuthzChecker());
