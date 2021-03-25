@@ -68,10 +68,7 @@ import subprocess
 import sys
 
 from collections import defaultdict
-try:
-  from collections import OrderedDict
-except ImportError:
-  from ordereddict import OrderedDict
+from collections import OrderedDict
 from pprint import pformat
 
 def create_parser():

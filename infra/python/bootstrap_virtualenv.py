@@ -108,16 +108,6 @@ def exec_cmd(args, **kwargs):
   return output
 
 
-def use_ccache():
-  '''Returns true if ccache is available and should be used'''
-  if 'DISABLE_CCACHE' in os.environ: return False
-  try:
-    exec_cmd(['ccache', '-V'])
-    return True
-  except:
-    return False
-
-
 def select_cc():
   '''Return the C compiler command that should be used as a string or None if the
   compiler is not available '''
@@ -127,7 +117,6 @@ def select_cc():
   toolchain_gcc_dir = toolchain_pkg_dir("gcc")
   cc = os.path.join(toolchain_gcc_dir, "bin/gcc")
   if not os.path.exists(cc): return None
-  if use_ccache(): cc = "ccache %s" % cc
   return cc
 
 
@@ -284,6 +273,10 @@ def install_kudu_client_if_possible():
     env = dict(os.environ)
     env["KUDU_HOME"] = fake_kudu_build_dir
     kudu_client_dir = find_kudu_client_install_dir()
+    # Copy the include directory to the fake build directory
+    kudu_include_dir = os.path.join(kudu_client_dir, "include")
+    shutil.copytree(kudu_include_dir,
+                    os.path.join(fake_kudu_build_dir, "build", "latest", "src"))
     env["CPLUS_INCLUDE_PATH"] = os.path.join(kudu_client_dir, "include")
     env["LIBRARY_PATH"] = os.path.pathsep.join([os.path.join(kudu_client_dir, 'lib'),
                                                 os.path.join(kudu_client_dir, 'lib64')])

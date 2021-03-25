@@ -19,4 +19,4 @@
 # and also depends on Cython being installed into the virtualenv, so it must be installed
 # after the toolchain is bootstrapped and all requirements in requirements.txt and
 # compiled-requirements.txt are installed into the virtualenv.
-kudu-python==1.2.0
+kudu-python==1.14.0

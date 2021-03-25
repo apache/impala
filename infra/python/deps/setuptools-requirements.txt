@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Newer versions of setuptools don't support Python 2.6
-setuptools == 36.8.0
-setuptools-scm == 1.15.4
+# Newer versions of setuptools don't support Python 2.7
+setuptools == 44.1.1
+  wheel == 0.35.1
+setuptools-scm == 4.1.2

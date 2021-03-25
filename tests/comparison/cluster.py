@@ -29,8 +29,8 @@ import subprocess
 from abc import ABCMeta, abstractproperty
 from cm_api.api_client import ApiResource as CmApiResource
 from collections import defaultdict
+from collections import OrderedDict
 from contextlib import contextmanager
-from ordereddict import OrderedDict
 from getpass import getuser
 from itertools import izip
 from multiprocessing.pool import ThreadPool
