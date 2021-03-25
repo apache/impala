@@ -313,8 +313,18 @@ Status HdfsTableSink::WriteRowsToPartition(
   bool new_file;
   while (true) {
     OutputPartition* output_partition = partition_pair->first.get();
-    RETURN_IF_ERROR(
-        output_partition->writer->AppendRows(batch, partition_pair->second, &new_file));
+    Status status =
+        output_partition->writer->AppendRows(batch, partition_pair->second, &new_file);
+    if (!status.ok()) {
+      // IMPALA-10607: Deletes partition file if staging is skipped when appending rows
+      // fails. Otherwise, it leaves the file in un-finalized state.
+      if (ShouldSkipStaging(state, output_partition)) {
+        status.MergeStatus(ClosePartitionFile(state, output_partition));
+        hdfsDelete(output_partition->hdfs_connection,
+            output_partition->current_file_name.c_str(), 0);
+      }
+      return status;
+    }
     if (!new_file) break;
     RETURN_IF_ERROR(FinalizePartitionFile(state, output_partition));
     RETURN_IF_ERROR(CreateNewTmpFile(state, output_partition));

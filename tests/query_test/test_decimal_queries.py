@@ -162,9 +162,27 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
     query_2 = stmt_2.format(TBL_NAME_2, TBL_NAME_3)
     query_3 = stmt_3.format(TBL_NAME_3)
 
-    # Query_1 is aborted with error message "Decimal expression overflowed" and NULL is
-    # not inserted into table.
     self.execute_query_expect_success(self.client, "SET decimal_v2=true")
+    # Verify the table on s3a could be accessed after CTAS is finished with error and
+    # NULL is not inserted into table if s3_skip_insert_staging is set as false.
+    if IS_S3:
+      self.execute_query_expect_success(self.client, "SET s3_skip_insert_staging=false")
+      self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS %s"
+          % TBL_NAME_1)
+      try:
+        self.execute_query_using_client(self.client, query_1, vector)
+        assert False, "Query was expected to fail"
+      except ImpalaBeeswaxException, e:
+        assert "Decimal expression overflowed" in str(e)
+
+      result = self.execute_query_expect_success(self.client,
+          "SELECT count(*) FROM %s WHERE d_28 is null" % TBL_NAME_1)
+      assert int(result.get_data()) == 0
+      # Set s3_skip_insert_staging as default value.
+      self.execute_query_expect_success(self.client, "SET s3_skip_insert_staging=true")
+
+    # Verify query_1 is aborted with error message "Decimal expression overflowed" and
+    # NULL is not inserted into table.
     self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS %s" % TBL_NAME_1)
     try:
       self.execute_query_using_client(self.client, query_1, vector)
@@ -172,11 +190,18 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
     except ImpalaBeeswaxException, e:
       assert "Decimal expression overflowed" in str(e)
 
-    # TODO (IMPALA-10607): Following query failed for S3 build with Parquet table format.
-    if not ('parquet' in str(vector.get_value('table_format')) and IS_S3):
-      result = self.execute_query_expect_success(self.client,
-          "SELECT count(*) FROM %s" % TBL_NAME_1)
-      assert int(result.get_data()) == 0
+    result = self.execute_query_expect_success(self.client,
+        "SELECT count(*) FROM %s WHERE d_28 is null" % TBL_NAME_1)
+    assert int(result.get_data()) == 0
+
+    # Verify that valid data could be inserted into the new table which is created by
+    # CTAS and the CTAS finished with an error.
+    self.execute_query_expect_success(self.client,
+        "INSERT INTO TABLE %s VALUES(100, cast(654964569154.9565 as decimal (28,10)))" %
+        TBL_NAME_1)
+    result = self.execute_query_expect_success(self.client,
+        "SELECT count(*) FROM %s WHERE d_28 is not null" % TBL_NAME_1)
+    assert int(result.get_data()) == 1
 
     # Create table 3 and insert data to table 3.
     self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS %s" % TBL_NAME_3)
@@ -193,8 +218,6 @@ class TestDecimalOverflowExprs(ImpalaTestSuite):
     except ImpalaBeeswaxException, e:
       assert "Decimal expression overflowed" in str(e)
 
-    # TODO (IMPALA-10607): Following query failed for S3 build with Parquet table format.
-    if not ('parquet' in str(vector.get_value('table_format')) and IS_S3):
-      result = self.execute_query_expect_success(self.client,
-          "SELECT count(*) FROM %s" % TBL_NAME_2)
-      assert int(result.get_data()) == 0
+    result = self.execute_query_expect_success(self.client,
+        "SELECT count(*) FROM %s" % TBL_NAME_2)
+    assert int(result.get_data()) == 0
