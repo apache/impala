@@ -103,7 +103,8 @@ public class StmtMetadataLoader {
 
   /**
    * The 'fe' and 'sessionDb' arguments must be non-null. A null 'timeline' may be passed
-   * if no events should be marked.
+   * if no events should be marked. A null 'user' may be passed if don't need to resolve
+   * column-masking/row-filtering policies.
    */
   public StmtMetadataLoader(Frontend fe, String sessionDb, EventSequence timeline,
       User user) {
@@ -113,6 +114,11 @@ public class StmtMetadataLoader {
     user_ = user;
   }
 
+  /**
+   * Constructor used by callers that don't need to resolve column-masking/row-filtering
+   * policies (which may introduce new tables), e.g. MetadataOp to get columns, primary
+   * keys, cross reference of a table.
+   */
   public StmtMetadataLoader(Frontend fe, String sessionDb, EventSequence timeline) {
     this(fe, sessionDb, timeline, null);
   }
@@ -310,7 +316,7 @@ public class StmtMetadataLoader {
       }
       // Adds tables/views introduced by column-masking/row-filtering policies.
       if (fe_.getAuthzFactory().getAuthorizationConfig().isEnabled()
-          && fe_.getAuthzFactory().supportsTableMasking()) {
+          && fe_.getAuthzFactory().supportsTableMasking() && user_ != null) {
         try {
           viewTbls.addAll(collectPolicyTables(tbl));
         } catch (Exception e) {

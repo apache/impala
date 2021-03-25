@@ -440,6 +440,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
   private RangerAccessResult evalColumnMask(User user, String dbName,
       String tableName, String columnName, RangerBufferAuditHandler auditHandler)
       throws InternalException {
+    Preconditions.checkNotNull(user);
     RangerAccessResourceImpl resource = new RangerImpalaResourceBuilder()
         .database(dbName)
         .table(tableName)
@@ -461,6 +462,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
    */
   private RangerAccessResult evalRowFilter(User user, String dbName, String tableName,
       RangerBufferAuditHandler auditHandler) throws InternalException {
+    Preconditions.checkNotNull(user);
     RangerAccessResourceImpl resource = new RangerImpalaResourceBuilder()
         .database(dbName)
         .table(tableName)
@@ -487,6 +489,7 @@ public class RangerAuthorizationChecker extends BaseAuthorizationChecker {
 
   @Override
   public Set<String> getUserGroups(User user) throws InternalException {
+    Preconditions.checkNotNull(user);
     UserGroupInformation ugi;
     if (RuntimeEnv.INSTANCE.isTestEnv() ||
         BackendConfig.INSTANCE.useCustomizedUserGroupsMapperForRanger()) {
