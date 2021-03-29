@@ -118,6 +118,10 @@ fi
     -script_name "$(basename $0)" &
 TIMEOUT_PID=$!
 
+SCHEMA_MISMATCH_ERROR="A schema change has been detected in the metadata, "
+SCHEMA_MISMATCH_ERROR+="but it cannot be loaded on Isilon, s3, gcs or local filesystem, "
+SCHEMA_MISMATCH_ERROR+="and the filesystem is ${TARGET_FILESYSTEM}".
+
 if [[ $SKIP_METADATA_LOAD -eq 0  && "$SNAPSHOT_FILE" = "" ]]; then
   run-step "Generating HBase data" create-hbase.log \
       ${IMPALA_HOME}/testdata/bin/create-hbase.sh
@@ -134,6 +138,9 @@ elif [ $SKIP_SNAPSHOT_LOAD -eq 0 ]; then
       echo "ERROR in $0 at line $LINENO: A schema change has been detected in the"
       echo "metadata, but it cannot be loaded on isilon, s3, gcs or local and the"
       echo "target file system is ${TARGET_FILESYSTEM}.  Exiting."
+      # Generate an explicit JUnitXML symptom report here for easier triaging
+      ${IMPALA_HOME}/bin/generate_junitxml.py --phase=dataload \
+          --step=check-schema-diff.sh --error "${SCHEMA_MISMATCH_ERROR}"
       exit 1
     fi
     echo "Schema change detected, metadata will be loaded."
