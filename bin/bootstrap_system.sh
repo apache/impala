@@ -115,7 +115,7 @@ else
       UBUNTU20=true
       echo "Identified Ubuntu 20.04 system."
     else
-      echo "This script only supports 16.04 or 18.04 of Ubuntu" >&2
+      echo "This script supports Ubuntu versions 16.04, 18.04 or 20.04" >&2
       exit 1
     fi
   else
@@ -220,7 +220,8 @@ ubuntu apt-get --yes install ccache curl gawk g++ gcc libffi-dev \
         libsasl2-modules libsasl2-modules-gssapi-mit libssl-dev make ninja-build \
         python-dev python-setuptools postgresql ssh wget vim-common psmisc \
         lsof openjdk-8-jdk openjdk-8-source openjdk-8-dbg apt-utils git ant
-
+# Required by Kudu in the minicluster
+ubuntu20 apt-get --yes install libtinfo5
 ARCH_NAME=$(uname -p)
 if [[ $ARCH_NAME == 'aarch64' ]]; then
   ubuntu apt-get --yes install unzip pkg-config flex maven python3-pip build-essential \
@@ -252,10 +253,11 @@ fi
 # Ubuntu 18.04 and 20.04 install OpenJDK 11 and configure it as the default Java version.
 # Impala is currently tested with OpenJDK 8, so configure that version as the default.
 if [[ $ARCH_NAME == 'aarch64' ]]; then
-    ubuntu20 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
-    ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
+  ubuntu20 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
+  ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-arm64
 else
   ubuntu18 sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
+  ubuntu20 sudo update-java-alternatives -s java-1.8.0-openjdk-amd64
 fi
 
 redhat sudo yum install -y curl gawk gcc gcc-c++ git krb5-devel krb5-server \
