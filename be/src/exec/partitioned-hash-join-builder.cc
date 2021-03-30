@@ -969,8 +969,8 @@ void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
 
     if ( ctx.local_min_max_filter != nullptr ) {
       VLOG(3) << "HJBuilder published min/max filter: "
-               << " id=" << ctx.filter->id()
-               << ", details=" << ctx.local_min_max_filter->DebugString();
+              << " id=" << ctx.filter->id()
+              << ", details=" << ctx.local_min_max_filter->DebugString();
     }
   }
 

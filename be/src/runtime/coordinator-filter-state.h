@@ -121,6 +121,12 @@ class Coordinator::FilterState {
   /// Waits until any inflight PublishFilter rpcs have completed.
   void WaitForPublishFilter();
 
+  bool AlwaysTrueFilterReceived() const { return always_true_filter_received_; }
+  bool AlwaysFalseFlippedToFalse() const { return always_false_flipped_to_false_; }
+
+  // Display a FilterState object without creating an MinMaxFilter first.
+  std::string DebugString() const;
+
  private:
   /// Contains the specification of the runtime filter.
   TRuntimeFilterDesc desc_;
@@ -164,6 +170,14 @@ class Coordinator::FilterState {
 
   /// True value means coordinator has heard back from all pending backends.
   bool all_updates_received_ = false;
+
+  /// True value means an alwaysTrue filter is received. Set in
+  /// FilterState::ApplyUpdate().
+  bool always_true_filter_received_ = false;
+
+  /// True value means the always false flag in aggregated filter is flipped from
+  /// 'true' to 'false' by the coordinator. Set in FilterState::Disable().
+  bool always_false_flipped_to_false_ = false;
 };
 
 /// Struct to contain all of the data structures for filter routing. Coordinator

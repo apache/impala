@@ -649,29 +649,34 @@ string Coordinator::FilterDebugString() {
       row.push_back(PrintThriftEnum(state.desc().type));
       row.push_back("");
 
-      // Also add the min/max value for partitioned joins, when all updates are available
-      // and the filter is not always false. For broadcast joins, no min/max values can
-      // be shown as the filter is moved and not available in state.min_max_filter_.
-      if (state.received_all_updates()) {
-        const TRuntimeFilterDesc& desc = state.desc();
-        const TExpr& src_expr = desc.src_expr;
-        ColumnType src_type = ColumnType::FromThrift(src_expr.nodes[0].type);
-        const MinMaxFilterPB& minmax_filterPB =
-            const_cast<FilterState*>(&state)->min_max_filter();
-        if (!minmax_filterPB.always_true() && !minmax_filterPB.always_false()) {
-          MinMaxFilter* min_max_filter = MinMaxFilter::Create(
-              minmax_filterPB, src_type, &temp_object_pool, &temp_mem_tracker);
-          row.push_back(
-              RawValue::PrintValue(min_max_filter->GetMin(), src_type, src_type.scale));
-          row.push_back(
-              RawValue::PrintValue(min_max_filter->GetMax(), src_type, src_type.scale));
-        } else {
-          row.push_back("");
-          row.push_back("");
-        }
+      // Also add the min/max value for the accumulated filter as follows.
+      //  'PartialUpdates' - The min and the max are partially updated;
+      //  'AlwaysTrue'     - One received filter is AlwaysTrue;
+      //  'AlwaysFalse'    - No filter is received or all received filters are empty;
+      //  'Real values'    - The final accumulated min/max from all filters received.
+      const MinMaxFilterPB& minmax_filterPB =
+          const_cast<FilterState*>(&state)->min_max_filter();
+
+      if (state.AlwaysTrueFilterReceived()) {
+        DCHECK(MinMaxFilter::AlwaysTrue(minmax_filterPB));
+        row.push_back("AlwaysTrue");
+        row.push_back("AlwaysTrue");
       } else {
-        row.push_back("");
-        row.push_back("");
+        // AlwaysTrue, if set, is due to the disabling of the state by the coordinator,
+        // which can be safely ignored.
+        if (state.received_all_updates()) {
+          if (state.AlwaysFalseFlippedToFalse()
+              || MinMaxFilter::AlwaysFalse(minmax_filterPB)) {
+            row.push_back("AlwaysFalse");
+            row.push_back("AlwaysFalse");
+          } else {
+            row.push_back(MinMaxFilter::DebugString(minmax_filterPB.min()));
+            row.push_back(MinMaxFilter::DebugString(minmax_filterPB.max()));
+          }
+        } else {
+          row.push_back("PartialUpdates");
+          row.push_back("PartialUpdates");
+        }
       }
     }
     table_printer.AddRow(row);
@@ -1531,6 +1536,7 @@ void Coordinator::FilterState::ApplyUpdate(
     if (params.bloom_filter().always_true()) {
       // An always_true filter is received. We don't need to wait for other pending
       // backends.
+      always_true_filter_received_ = true;
       DisableAndRelease(coord->filter_mem_tracker_, true);
     } else if (params.bloom_filter().always_false()) {
       if (!bloom_filter_.has_log_bufferpool_space()) {
@@ -1569,16 +1575,26 @@ void Coordinator::FilterState::ApplyUpdate(
   } else {
     DCHECK(is_min_max_filter());
     DCHECK(params.has_min_max_filter());
+    VLOG(3) << "Coordinator::FilterState::ApplyUpdate() on minmax."
+            << " Current accumulated filter=" << DebugString()
+            << ". Incoming min/max param:"
+            << " has_filter_id()=" << params.has_filter_id()
+            << ", filter_id=" << params.filter_id()
+            << ", details=" << MinMaxFilter::DebugString(params.min_max_filter());
     if (params.min_max_filter().always_true()) {
       // An always_true filter is received. We don't need to wait for other pending
       // backends.
+      always_true_filter_received_ = true;
       DisableAndRelease(coord->filter_mem_tracker_, true);
+    } else if (params.min_max_filter().always_false()) {
+      // An always_true filter is received. Do nothing.
     } else if (min_max_filter_.always_false()) {
       MinMaxFilter::Copy(params.min_max_filter(), &min_max_filter_);
     } else {
       MinMaxFilter::Or(params.min_max_filter(), &min_max_filter_,
           ColumnType::FromThrift(desc_.src_expr.nodes[0].type));
     }
+    VLOG(3) << " Updated accumulated filter=" << DebugString();
   }
 
   if (pending_count_ == 0 || disabled()) {
@@ -1596,10 +1612,16 @@ void Coordinator::FilterState::Disable(const bool all_updates_received) {
   all_updates_received_ = all_updates_received;
   if (is_bloom_filter()) {
     bloom_filter_.set_always_true(true);
+    if (bloom_filter_.has_always_false() && bloom_filter_.always_false()) {
+      always_false_flipped_to_false_ = true;
+    }
     bloom_filter_.set_always_false(false);
   } else {
     DCHECK(is_min_max_filter());
     min_max_filter_.set_always_true(true);
+    if (MinMaxFilter::AlwaysFalse(min_max_filter_)) {
+      always_false_flipped_to_false_ = true;
+    }
     min_max_filter_.set_always_false(false);
   }
 }
@@ -1618,6 +1640,19 @@ void Coordinator::FilterState::WaitForPublishFilter() {
   while (num_inflight_publish_filter_rpcs_ > 0) {
     publish_filter_done_cv_.wait(lock_);
   }
+}
+
+string Coordinator::FilterState::DebugString() const {
+  std::stringstream ss;
+  if (is_min_max_filter()) {
+    ss << "Coordinator::FilterState: "
+       << "filter_id=" << desc_.filter_id
+       << ", all_updates_received_=" << all_updates_received_
+       << ", enabled=" << enabled()
+       << ", pending_count()=" << pending_count()
+       << ", " << MinMaxFilter::DebugString(min_max_filter_);
+  }
+  return ss.str();
 }
 
 void Coordinator::GetTExecSummary(TExecSummary* exec_summary) {

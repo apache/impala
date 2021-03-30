@@ -235,7 +235,8 @@ bool ScanNode::WaitForRuntimeFilters() {
     runtime_profile()->AddInfoString("Runtime filters",
         Substitute("All filters arrived. Waited $0. Maximum arrival delay: $1.",
                                          wait_time, arrival_delay));
-    VLOG(2) << "Filters arrived. Waited " << wait_time;
+    VLOG(2) << "Filters arrived. Waited " << wait_time
+            << ". Current time since reboot(ms) " << end;
     return true;
   }
 

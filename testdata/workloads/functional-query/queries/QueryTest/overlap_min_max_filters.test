@@ -264,3 +264,68 @@ b.ss_customer_sk < 10;
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRowGroupsSkippedByUnusefulFilters): 0
 ====
+---- QUERY
+###################################################
+# Compute column stats for the following tests on
+# Final filter table in profile.
+###################################################
+set compute_column_minmax_stats=true;
+compute stats lineitem_orderkey_only;
+====
+---- QUERY
+# Run an equi hash join query in which the population of the hash table quickly
+# renders the corresponding min/max filter not useful, whose min/max value will be
+# represented by AlwaysTrue in the abbreviated Final filter table shown below.
+# Looking for filter id=1, pending=0, enabled=false, MIN_MAX, Min/max=AlwaysTrue.
+#
+# ID   Pending (Expected)  Enabled  Bloom Size  Est fpp   Min value    Max value
+# ------------------------------------------------------------------------------
+# 0    0 (3)                 true     1.00 MB    0.112
+# 1    0 (3)                 false     MIN_MAX           AlwaysTrue   AlwaysTrue
+set minmax_filter_threshold=0.5;
+select straight_join count(*) from
+lineitem_orderkey_only a join [SHUFFLE] tpch_parquet.orders b
+where a.l_orderkey = b.o_orderkey;
+---- RESULTS
+6001215
+---- RUNTIME_PROFILE
+row_regex: .*1.+0 \(\d+\).+false.+MIN_MAX\s+AlwaysTrue\s+AlwaysTrue.*
+====
+---- QUERY
+# Run an equi hash join query in which the population of the hash table produces
+# a useful min/max filter. The min and max of the final filter is shown in the
+# abbreviated Final filter table below.
+# Looking for filter id=1, pending=0, enabled=true, MIN_MAX, Min=224167,
+# max=2630562.
+#
+# ID   Pending (Expected)  Enabled  Bloom Size  Est fpp   Min value    Max value
+# ------------------------------------------------------------------------------
+# 0    0 (3)                 true     1.00 MB    0.112
+# 1    0 (3)                 true     MIN_MAX                224167      2630562
+set minmax_filter_threshold=0.5;
+select straight_join count(*) from
+lineitem_orderkey_only a join [SHUFFLE] tpch_parquet.orders b
+where a.l_orderkey = b.o_orderkey and b.o_custkey = 5;
+---- RESULTS
+19
+---- RUNTIME_PROFILE
+row_regex: .*1.+0 \(\d+\).+true.+MIN_MAX\s+224167\s+2630562.*
+====
+---- QUERY
+# Run an equi hash join query in which the population of the hash table produces
+# an empty min/max filter. The min and max of the final filter is always false.
+# Looking for filter id=1, pending=0, enabled=true, MIN_MAX, Min/max=AlwaysFalse.
+#
+# ID   Pending (Expected)  Enabled  Bloom Size  Est fpp   Min value    Max value
+# ------------------------------------------------------------------------------
+# 0    0 (3)                 true     1.00 MB    0.112
+# 1    0 (3)                 true     MIN_MAX           AlwaysFalse  AlwaysFalse
+set minmax_filter_threshold=0.5;
+select straight_join count(*) from
+lineitem_orderkey_only a join [SHUFFLE] tpch_parquet.orders b
+where a.l_orderkey = b.o_orderkey and b.o_custkey = -5;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*1.+0 \(\d+\).+true.+MIN_MAX\s+AlwaysFalse\s+AlwaysFalse.*
+====

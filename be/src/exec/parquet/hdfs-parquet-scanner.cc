@@ -656,6 +656,10 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
     DCHECK(idx >= 0);
     MinMaxFilter* minmax_filter = FindMinMaxFilter(idx);
 
+    VLOG(3) << "Try to filter out a rowgroup via overlap predicate filter: "
+            << " fid=" << filter_id
+            << ", Current time since reboot(ms)=" << MonotonicMillis();
+
     if (!minmax_filter) {
       // The filter is not available yet.
       filter_ctxs_[idx]->stats->IncrCounters(FilterStats::ROW_GROUPS_KEY, 1, 0, 0);
@@ -667,6 +671,9 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
       // The filter is already disabled or too close to the column min/max stats, ignore
       // it.
       row_group_skipped_by_unuseful_filters = true;
+      VLOG(3) << "The filter is available but either disabled or overlapping too much "
+                 "with column stats: "
+              << " fid=" << filter_id;
       continue;
     }
 
@@ -714,8 +721,8 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
     /// the row level when the filtering level control allows.
     bool worthiness = !(minmax_filter->AlwaysTrue()) && (overlap_ratio < threshold);
 
-    VLOG(3) << "Try to filter out a rowgroup via overlap predicate:"
-            << " fid=" << filter_id
+    VLOG(3) << "The filter is available: "
+            << "fid=" << filter_id
             << ", SchemaNode=" << node->DebugString()
             << ", columnType=" << col_type.DebugString()
             << ", overlap ratio=" << overlap_ratio

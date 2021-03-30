@@ -981,7 +981,66 @@ void MinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
     DecimalMinMaxFilter::Copy(in, out);
     return;
   }
-  DCHECK(false) << "Unsupported MinMaxFilter type.";
+  DCHECK(false) << "Unsupported MinMaxFilter type."
+                << " input=" << MinMaxFilter::DebugString(in);
+}
+
+string MinMaxFilter::DebugString(const ColumnValuePB& v) {
+  std::stringstream ss;
+  if (v.has_string_val()) {
+    ss << v.string_val();
+  } else if (v.has_binary_val()) {
+    ss << v.binary_val();
+  } else if (v.has_timestamp_val()) {
+    ss << v.timestamp_val();
+  } else if (v.has_decimal_val()) {
+    ss << v.decimal_val();
+  } else if (v.has_bool_val()) {
+    ss << v.bool_val();
+  } else if (v.has_int_val()) {
+    ss << v.int_val();
+  } else if (v.has_long_val()) {
+    ss << v.long_val();
+  } else if (v.has_double_val()) {
+    ss << v.double_val();
+  } else if (v.has_byte_val()) {
+    ss << v.byte_val();
+  } else if (v.has_short_val()) {
+    ss << v.short_val();
+  } else if (v.has_date_val()) {
+    ss << v.date_val();
+  }
+  return ss.str();
+}
+
+string MinMaxFilter::DebugString(const MinMaxFilterPB& filter) {
+  std::stringstream ss;
+  bool always_true = filter.has_always_true() && filter.always_true();
+  bool always_false = filter.has_always_false() && filter.always_false();
+  ss << "MinmaxFilterPB:"
+     << " always_true()=" << always_true
+     << ", always_false()=" << always_false;
+
+  if (filter.has_min()) {
+    ss << ", min=" << DebugString(filter.min());
+  } else {
+    ss << ", min=N/A";
+  }
+
+  if (filter.has_max()) {
+    ss << ", max=" << DebugString(filter.max());
+  } else {
+    ss << ", max=N/A";
+  }
+  return ss.str();
+}
+
+bool MinMaxFilter::AlwaysTrue(const MinMaxFilterPB& filter) {
+  return filter.has_always_true() && filter.always_true();
+}
+
+bool MinMaxFilter::AlwaysFalse(const MinMaxFilterPB& filter) {
+  return filter.has_always_false() && filter.always_false();
 }
 
 } // namespace impala

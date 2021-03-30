@@ -62,7 +62,8 @@ class MinMaxFilter {
 
   /// Determine whether two ranges: [data_min, data_max] and [filter_min, filter_max]
   /// overlap. Return true if the two overlaps and false otherwise. Both data_min and
-  /// data_max are of type 'type'.
+  /// data_max are of type 'type'. Since the overlap result can be used to set the
+  /// the always_true_ flag, the actual overlap computation ignores the flag.
   virtual bool EvalOverlap(const ColumnType& type, void* data_min, void* data_max) = 0;
 
   virtual PrimitiveType type() = 0;
@@ -122,6 +123,18 @@ class MinMaxFilter {
 
   /// Makes this filter always return true.
   virtual void SetAlwaysTrue() { always_true_ = true; }
+
+  /// Return a debug string for 'filter'
+  static std::string DebugString(const MinMaxFilterPB& filter);
+
+  /// Test whether 'filter' is always true field is set and the field value is 'true'
+  static bool AlwaysTrue(const MinMaxFilterPB& filter);
+
+  /// Test whether 'filter' is always false field is set and the field value is 'false'
+  static bool AlwaysFalse(const MinMaxFilterPB& filter);
+
+  /// Return a debug string for 'value'
+  static std::string DebugString(const ColumnValuePB& value);
 
  protected:
   bool always_true_;
