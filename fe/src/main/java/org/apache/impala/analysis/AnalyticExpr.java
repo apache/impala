@@ -657,7 +657,7 @@ public class AnalyticExpr extends Expr {
       if (window_.getLeftBoundary().getType() != BoundaryType.PRECEDING) {
         window_ = new AnalyticWindow(window_.getType(), window_.getLeftBoundary(),
             window_.getLeftBoundary());
-        fnCall_ = new FunctionCallExpr(new FunctionName(LAST_VALUE),
+        fnCall_ = createRewrittenFunction(new FunctionName(LAST_VALUE),
             getFnCall().getParams());
       } else {
         List<Expr> paramExprs = Expr.cloneList(getFnCall().getParams().exprs());
@@ -676,7 +676,7 @@ public class AnalyticExpr extends Expr {
         window_ = new AnalyticWindow(window_.getType(),
             new Boundary(BoundaryType.UNBOUNDED_PRECEDING, null),
             window_.getLeftBoundary());
-        fnCall_ = new FunctionCallExpr(new FunctionName(FIRST_VALUE_REWRITE),
+        fnCall_ = createRewrittenFunction(new FunctionName(FIRST_VALUE_REWRITE),
             new FunctionParams(paramExprs));
         fnCall_.setIsInternalFnCall(true);
       }
@@ -708,7 +708,7 @@ public class AnalyticExpr extends Expr {
         reversedFnName = new FunctionName(FIRST_VALUE);
       }
       if (reversedFnName != null) {
-        fnCall_ = new FunctionCallExpr(reversedFnName, getFnCall().getParams());
+        fnCall_ = createRewrittenFunction(reversedFnName, getFnCall().getParams());
         fnCall_.setIsAnalyticFnCall(true);
         fnCall_.analyzeNoThrow(analyzer);
       }
@@ -744,11 +744,11 @@ public class AnalyticExpr extends Expr {
     // to allow statement rewriting for subqueries.
     if (getFnCall().getParams().isIgnoreNulls()) {
       if (analyticFnName.getFunction().equals(LAST_VALUE)) {
-        fnCall_ = new FunctionCallExpr(new FunctionName(LAST_VALUE_IGNORE_NULLS),
+        fnCall_ = createRewrittenFunction(new FunctionName(LAST_VALUE_IGNORE_NULLS),
             getFnCall().getParams());
       } else {
         Preconditions.checkState(analyticFnName.getFunction().equals(FIRST_VALUE));
-        fnCall_ = new FunctionCallExpr(new FunctionName(FIRST_VALUE_IGNORE_NULLS),
+        fnCall_ = createRewrittenFunction(new FunctionName(FIRST_VALUE_IGNORE_NULLS),
             getFnCall().getParams());
       }
       getFnCall().getParams().setIsIgnoreNulls(false);
@@ -826,5 +826,12 @@ public class AnalyticExpr extends Expr {
     // Re-sync state after possible child substitution.
     ((AnalyticExpr) e).syncWithChildren();
     return e;
+  }
+
+  // A wrapper method to create a FunctionCallExpr for a rewritten analytic
+  // function. This can be overridden in a derived class.
+  protected FunctionCallExpr createRewrittenFunction(FunctionName funcName,
+    FunctionParams funcParams) {
+    return new FunctionCallExpr(funcName, funcParams);
   }
 }

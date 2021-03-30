@@ -609,7 +609,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return cardinality;
   }
 
-  static long capCardinalityAtLimit(long cardinality, long limit) {
+  public static long capCardinalityAtLimit(long cardinality, long limit) {
     return cardinality == -1 ? limit : Math.min(cardinality, limit);
   }
 
@@ -747,7 +747,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   /**
    * Returns true if stats-related variables are valid.
    */
-  protected boolean hasValidStats() {
+  public boolean hasValidStats() {
     return (numNodes_ == -1 || numNodes_ >= 0) &&
            (numInstances_ == -1 || numInstances_ >= 0) &&
            (cardinality_ == -1 || cardinality_ >= 0);

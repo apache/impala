@@ -671,4 +671,8 @@ public class AnalyticEvalNode extends PlanNode {
     return new LimitPushdownInfo(includeTies, (int)analyticLimit);
   }
 
+  public TupleDescriptor getOutputTupleDesc() { return outputTupleDesc_; }
+  public List<Expr> getAnalyticFnCalls() { return analyticFnCalls_; }
+  public AnalyticWindow getAnalyticWindow() { return analyticWindow_; }
+
 }
