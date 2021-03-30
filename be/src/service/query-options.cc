@@ -442,9 +442,9 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       }
       case TImpalaQueryOptions::PARQUET_FALLBACK_SCHEMA_RESOLUTION: {
-        TParquetFallbackSchemaResolution::type enum_type;
+        TSchemaResolutionStrategy::type enum_type;
         RETURN_IF_ERROR(GetThriftEnum(value, "parquet fallback schema resolution",
-            _TParquetFallbackSchemaResolution_VALUES_TO_NAMES, &enum_type));
+            _TSchemaResolutionStrategy_VALUES_TO_NAMES, &enum_type));
         query_options->__set_parquet_fallback_schema_resolution(enum_type);
         break;
       }

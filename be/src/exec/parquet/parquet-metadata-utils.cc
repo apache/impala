@@ -713,7 +713,7 @@ SchemaNode* ParquetSchemaResolver::NextSchemaNode(
 
   int file_idx;
   int table_idx = path[next_idx];
-  if (fallback_schema_resolution_ == TParquetFallbackSchemaResolution::type::NAME) {
+  if (fallback_schema_resolution_ == TSchemaResolutionStrategy::type::NAME) {
     if (next_idx == 0) {
       // Resolve top-level table column by name.
       DCHECK_LT(table_idx, tbl_desc_.col_descs().size());
@@ -745,7 +745,7 @@ SchemaNode* ParquetSchemaResolver::NextSchemaNode(
       }
     }
   } else if (fallback_schema_resolution_ ==
-        TParquetFallbackSchemaResolution::type::FIELD_ID) {
+        TSchemaResolutionStrategy::type::FIELD_ID) {
     // Resolution by field id for Iceberg table.
     if (next_idx == 0) {
       // Resolve top-level table column by field id.
@@ -772,7 +772,7 @@ SchemaNode* ParquetSchemaResolver::NextSchemaNode(
   } else {
     // Resolution by position.
     DCHECK_EQ(fallback_schema_resolution_,
-        TParquetFallbackSchemaResolution::type::POSITION);
+        TSchemaResolutionStrategy::type::POSITION);
     if (next_idx == 0) {
       // For top-level columns, the first index in a path includes the table's partition
       // keys.
@@ -784,9 +784,9 @@ SchemaNode* ParquetSchemaResolver::NextSchemaNode(
 
   if (file_idx >= node->children.size()) {
     string schema_resolution_mode = "unknown";
-    auto entry = _TParquetFallbackSchemaResolution_VALUES_TO_NAMES.find(
+    auto entry = _TSchemaResolutionStrategy_VALUES_TO_NAMES.find(
         fallback_schema_resolution_);
-    if (entry != _TParquetFallbackSchemaResolution_VALUES_TO_NAMES.end()) {
+    if (entry != _TSchemaResolutionStrategy_VALUES_TO_NAMES.end()) {
       schema_resolution_mode = entry->second;
     }
     VLOG_FILE << Substitute(

@@ -3019,6 +3019,20 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/icebe
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+complextypestbl_iceberg_orc
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
+STORED AS ICEBERG
+TBLPROPERTIES('iceberg.file_format'='orc', 'iceberg.catalog'='hadoop.catalog',
+              'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog',
+              'iceberg.table_identifier'='ice.complextypestbl_iceberg_orc');
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/iceberg_test/hadoop_catalog/ice && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/iceberg_test/hadoop_catalog/ice/complextypestbl_iceberg_orc /test-warehouse/iceberg_test/hadoop_catalog/ice
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 iceberg_resolution_test_external
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}

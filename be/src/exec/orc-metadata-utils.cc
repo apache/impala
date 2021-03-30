@@ -26,7 +26,40 @@ using boost::algorithm::iequals;
 
 namespace impala {
 
+inline int GetFieldIdFromStr(const std::string& str) {
+  try {
+    return std::stoi(str);
+  } catch (std::exception&) {
+    return -1;
+  }
+}
+
+OrcSchemaResolver::OrcSchemaResolver(const HdfsTableDescriptor& tbl_desc,
+    const orc::Type* root, const char* filename, bool is_table_acid) :
+    tbl_desc_(tbl_desc), root_(root), filename_(filename),
+    is_table_full_acid_(is_table_acid) {
+  DetermineFullAcidSchema();
+  if (tbl_desc_.IsIcebergTable()) {
+    schema_resolution_strategy_ = TSchemaResolutionStrategy::FIELD_ID;
+  } else {
+    schema_resolution_strategy_ = TSchemaResolutionStrategy::POSITION;
+  }
+}
+
 Status OrcSchemaResolver::ResolveColumn(const SchemaPath& col_path,
+    const orc::Type** node, bool* pos_field, bool* missing_field) const {
+  if (schema_resolution_strategy_ == TSchemaResolutionStrategy::POSITION) {
+    return ResolveColumnByPosition(col_path, node, pos_field, missing_field);
+  } else if (schema_resolution_strategy_ == TSchemaResolutionStrategy::FIELD_ID) {
+    return ResolveColumnByIcebergFieldId(col_path, node, pos_field, missing_field);
+  } else {
+    DCHECK(false);
+    return Status(Substitute("Invalid schema resolution strategy: $0",
+        schema_resolution_strategy_));
+  }
+}
+
+Status OrcSchemaResolver::ResolveColumnByPosition(const SchemaPath& col_path,
     const orc::Type** node, bool* pos_field, bool* missing_field) const {
   const ColumnType* table_col_type = nullptr;
   *node = root_;
@@ -66,43 +99,135 @@ Status OrcSchemaResolver::ResolveColumn(const SchemaPath& col_path,
       return Status::OK();
     }
     *node = (*node)->getSubtype(file_idx);
-    if (table_col_type->type == TYPE_ARRAY) {
-      DCHECK_EQ(table_col_type->children.size(), 1);
-      if ((*node)->getKind() != orc::TypeKind::LIST) {
-        return Status(TErrorCode::ORC_NESTED_TYPE_MISMATCH, filename_,
-            PrintPath(tbl_desc_, GetCanonicalSchemaPath(table_path, i)), "array",
-            (*node)->toString());
-      }
-    } else if (table_col_type->type == TYPE_MAP) {
-      DCHECK_EQ(table_col_type->children.size(), 2);
-      if ((*node)->getKind() != orc::TypeKind::MAP) {
-        return Status(TErrorCode::ORC_NESTED_TYPE_MISMATCH, filename_,
-            PrintPath(tbl_desc_, GetCanonicalSchemaPath(table_path, i)), "map",
-            (*node)->toString());
-      }
-    } else if (table_col_type->type == TYPE_STRUCT) {
-      DCHECK_GT(table_col_type->children.size(), 0);
-      if ((*node)->getKind() != orc::TypeKind::STRUCT) {
-        return Status(TErrorCode::ORC_NESTED_TYPE_MISMATCH, filename_,
-            PrintPath(tbl_desc_, GetCanonicalSchemaPath(table_path, i)), "struct",
-            (*node)->toString());
-      }
-    } else {
-      DCHECK(!table_col_type->IsComplexType());
-      DCHECK_EQ(i, table_path.size() - 1);
-      RETURN_IF_ERROR(ValidateType(*table_col_type, **node));
-    }
+    RETURN_IF_ERROR(ValidateType(*table_col_type, **node, table_path, i));
   }
   return Status::OK();
 }
 
+Status OrcSchemaResolver::ValidateType(const ColumnType& table_col_type,
+    const orc::Type& orc_type, const SchemaPath& table_path,
+    int current_idx) const {
+  if (table_col_type.type == TYPE_ARRAY) {
+    RETURN_IF_ERROR(ValidateArray(table_col_type, orc_type, table_path, current_idx));
+  } else if (table_col_type.type == TYPE_MAP) {
+    RETURN_IF_ERROR(ValidateMap(table_col_type, orc_type, table_path, current_idx));
+  } else if (table_col_type.type == TYPE_STRUCT) {
+    RETURN_IF_ERROR(ValidateStruct(table_col_type, orc_type, table_path, current_idx));
+  } else {
+    DCHECK(!table_col_type.IsComplexType());
+    DCHECK_EQ(current_idx, table_path.size() - 1);
+    RETURN_IF_ERROR(ValidatePrimitiveType(table_col_type, orc_type));
+  }
+  return Status::OK();
+}
+
+Status OrcSchemaResolver::ValidateStruct(const ColumnType& type,
+    const orc::Type& orc_type, const SchemaPath& col_path,
+    int current_idx) const {
+  DCHECK_GT(type.children.size(), 0);
+  if (orc_type.getKind() != orc::TypeKind::STRUCT) {
+    return Status(TErrorCode::ORC_NESTED_TYPE_MISMATCH, filename_,
+        PrintPath(tbl_desc_, GetCanonicalSchemaPath(col_path, current_idx)), "struct",
+        orc_type.toString());
+  }
+  return Status::OK();
+}
+
+Status OrcSchemaResolver::ValidateArray(const ColumnType& type,
+    const orc::Type& orc_type, const SchemaPath& col_path,
+    int current_idx) const {
+  DCHECK_EQ(type.children.size(), 1);
+  if (orc_type.getKind() != orc::TypeKind::LIST) {
+    return Status(TErrorCode::ORC_NESTED_TYPE_MISMATCH, filename_,
+        PrintPath(tbl_desc_, GetCanonicalSchemaPath(col_path, current_idx)), "array",
+        orc_type.toString());
+  }
+  return Status::OK();
+}
+
+Status OrcSchemaResolver::ValidateMap(const ColumnType& type,
+    const orc::Type& orc_type, const SchemaPath& col_path,
+    int current_idx) const {
+  DCHECK_EQ(type.children.size(), 2);
+  if (orc_type.getKind() != orc::TypeKind::MAP) {
+    return Status(TErrorCode::ORC_NESTED_TYPE_MISMATCH, filename_,
+        PrintPath(tbl_desc_, GetCanonicalSchemaPath(col_path, current_idx)), "map",
+        orc_type.toString());
+  }
+  return Status::OK();
+}
+
+Status OrcSchemaResolver::ResolveColumnByIcebergFieldId(const SchemaPath& col_path,
+    const orc::Type** node, bool* pos_field, bool* missing_field) const {
+  const ColumnType* table_col_type = nullptr;
+  *node = root_;
+  *pos_field = false;
+  *missing_field = false;
+  if (col_path.empty()) return Status::OK();
+  for (int i = 0; i < col_path.size(); ++i) {
+    int table_idx = col_path[i];
+    if (i == 0) {
+      table_col_type = &tbl_desc_.col_descs()[table_idx].type();
+      int field_id = tbl_desc_.col_descs()[table_idx].field_id();
+      *node = FindChildWithFieldId(*node, field_id);
+      if (*node == nullptr) {
+        *missing_field = true;
+        return Status::OK();
+      }
+      RETURN_IF_ERROR(ValidateType(*table_col_type, **node, col_path, i));
+      continue;
+    }
+    if (table_col_type->type == TYPE_STRUCT) {
+      // Resolve struct field by field id.
+      DCHECK_LT(table_idx, table_col_type->field_ids.size());
+      const int field_id = table_col_type->field_ids[table_idx];
+      *node = FindChildWithFieldId(*node, field_id);
+    } else if (table_col_type->type == TYPE_ARRAY) {
+      if (table_idx == SchemaPathConstants::ARRAY_POS) {
+        *pos_field = true;
+        break;  // return *node as the ARRAY node
+      }
+      DCHECK_EQ(table_idx, SchemaPathConstants::ARRAY_ITEM);
+      *node = (*(node))->getSubtype(table_idx);
+    } else if (table_col_type->type == TYPE_MAP) {
+      DCHECK(table_idx == SchemaPathConstants::MAP_KEY ||
+             table_idx == SchemaPathConstants::MAP_VALUE);
+      // At this point we've found a MAP with a matching field id. It's safe to resolve
+      // the child (key or value) by position.
+      *node = (*(node))->getSubtype(table_idx);
+    }
+    if (*node == nullptr) {
+      *missing_field = true;
+      return Status::OK();
+    }
+    table_col_type = &table_col_type->children[table_idx];
+    RETURN_IF_ERROR(ValidateType(*table_col_type, **node, col_path, i));
+  }
+  return Status::OK();
+}
+
+const orc::Type* OrcSchemaResolver::FindChildWithFieldId(const orc::Type* node,
+    const int field_id) const {
+  const std::string& ICEBERG_FIELD_ID = "iceberg.id";
+  for (int i = 0; i < node->getSubtypeCount(); ++i) {
+    const orc::Type* child = node->getSubtype(i);
+    DCHECK(child != nullptr);
+    if (!child->hasAttributeKey(ICEBERG_FIELD_ID)) return nullptr;
+    std::string field_id_str = child->getAttributeValue(ICEBERG_FIELD_ID);
+    int64_t child_field_id = GetFieldIdFromStr(field_id_str);
+    if (child_field_id == -1) return nullptr;
+    if (child_field_id == field_id) return child;
+  }
+  return nullptr;
+}
+
 SchemaPath OrcSchemaResolver::GetCanonicalSchemaPath(const SchemaPath& col_path,
-    int last_idx) const {
-  DCHECK_LT(last_idx, col_path.size());
+    int current_idx) const {
+  DCHECK_LT(current_idx, col_path.size());
   SchemaPath ret;
   ret.reserve(col_path.size());
   std::copy_if(col_path.begin(),
-               col_path.begin() + last_idx + 1,
+               col_path.begin() + current_idx + 1,
                std::back_inserter(ret),
                [](int i) { return i >= 0; });
   return ret;
@@ -182,7 +307,7 @@ void OrcSchemaResolver::TranslateColPaths(const SchemaPath& col_path,
   DCHECK_EQ(table_col_path->size(), file_col_path->size());
 }
 
-Status OrcSchemaResolver::ValidateType(const ColumnType& type,
+Status OrcSchemaResolver::ValidatePrimitiveType(const ColumnType& type,
     const orc::Type& orc_type) const {
   switch (orc_type.getKind()) {
     case orc::TypeKind::BOOLEAN:

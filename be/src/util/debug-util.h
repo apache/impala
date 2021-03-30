@@ -68,7 +68,7 @@ std::string PrintThriftEnum(const TJoinOp::type& value);
 std::string PrintThriftEnum(const TKuduReadMode::type& value);
 std::string PrintThriftEnum(const TMetricKind::type& value);
 std::string PrintThriftEnum(const TParquetArrayResolution::type& value);
-std::string PrintThriftEnum(const TParquetFallbackSchemaResolution::type& value);
+std::string PrintThriftEnum(const TSchemaResolutionStrategy::type& value);
 std::string PrintThriftEnum(const TPlanNodeType::type& value);
 std::string PrintThriftEnum(const TPrefetchMode::type& value);
 std::string PrintThriftEnum(const TReplicaPreference::type& value);

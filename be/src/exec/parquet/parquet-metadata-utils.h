@@ -140,7 +140,7 @@ struct SchemaNode {
 class ParquetSchemaResolver {
  public:
   ParquetSchemaResolver(const HdfsTableDescriptor& tbl_desc,
-      TParquetFallbackSchemaResolution::type fallback_schema_resolution,
+      TSchemaResolutionStrategy::type fallback_schema_resolution,
       TParquetArrayResolution::type array_resolution)
     : tbl_desc_(tbl_desc),
       fallback_schema_resolution_(fallback_schema_resolution),
@@ -148,7 +148,7 @@ class ParquetSchemaResolver {
       filename_(NULL) {
     // We set FIELD_ID for Iceberg tables.
     if (tbl_desc_.IsIcebergTable()) {
-      fallback_schema_resolution_ = TParquetFallbackSchemaResolution::type::FIELD_ID;
+      fallback_schema_resolution_ = TSchemaResolutionStrategy::type::FIELD_ID;
     }
   }
 
@@ -238,7 +238,7 @@ class ParquetSchemaResolver {
       const SchemaPath& path, int idx) const;
 
   const HdfsTableDescriptor& tbl_desc_;
-  TParquetFallbackSchemaResolution::type fallback_schema_resolution_;
+  TSchemaResolutionStrategy::type fallback_schema_resolution_;
   const TParquetArrayResolution::type array_resolution_;
   const char* filename_;
 

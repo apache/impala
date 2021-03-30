@@ -83,6 +83,9 @@ class TestIcebergTable(ImpalaTestSuite):
     self.run_test_case('QueryTest/iceberg-partition-transform-insert', vector,
         use_db=unique_database)
 
+  def test_iceberg_orc_field_id(self, vector):
+    self.run_test_case('QueryTest/iceberg-orc-field-id', vector)
+
   def test_describe_history(self, vector, unique_database):
     self.run_test_case('QueryTest/iceberg-table-history', vector, use_db=unique_database)
 

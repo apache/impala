@@ -42,10 +42,7 @@ constexpr int CURRENT_TRANSCACTION_TYPE_ID = 5;
 class OrcSchemaResolver {
  public:
   OrcSchemaResolver(const HdfsTableDescriptor& tbl_desc, const orc::Type* root,
-      const char* filename, bool is_table_acid) : tbl_desc_(tbl_desc), root_(root),
-      filename_(filename), is_table_full_acid_(is_table_acid) {
-        DetermineFullAcidSchema();
-      }
+      const char* filename, bool is_table_acid);
 
   /// Resolve SchemaPath into orc::Type (ORC column representation)
   /// 'pos_field' is set to true if 'col_path' reference the index field of an array
@@ -62,6 +59,23 @@ class OrcSchemaResolver {
   bool IsAcidColumn(const SchemaPath& col_path) const;
 
  private:
+  TSchemaResolutionStrategy::type schema_resolution_strategy_;
+
+  /// Resolve column based on position. This only works when the fields in the HMS
+  /// table schema match the file schema (apart from Hive ACID schema differences which
+  /// are being handled).
+  Status ResolveColumnByPosition(const SchemaPath& col_path, const orc::Type** node,
+      bool* pos_field, bool* missing_field) const;
+
+  /// Resolve column based on the Iceberg field ids. This way we will retrieve the
+  /// Iceberg field ids from the HMS table via 'col_path', then find the corresponding
+  /// field in the ORC file.
+  Status ResolveColumnByIcebergFieldId(const SchemaPath& col_path, const orc::Type** node,
+      bool* pos_field, bool* missing_field) const;
+
+  /// Finds child of 'node' that has Iceberg field id equals to 'field_id'.
+  const orc::Type* FindChildWithFieldId(const orc::Type* node, const int field_id) const;
+
   /// Translates 'col_path' to non-canonical table and file paths. These non-canonical
   /// paths have the same lengths. To achieve that they might contain -1 values that must
   /// be ignored. These paths are useful for tables that have different table and file
@@ -101,7 +115,15 @@ class OrcSchemaResolver {
   bool is_file_full_acid_;
 
   /// Validate whether the ColumnType is compatible with the orc type
-  Status ValidateType(const ColumnType& type, const orc::Type& orc_type) const
+  Status ValidateType(const ColumnType& type, const orc::Type& orc_type,
+    const SchemaPath& col_path, int last_idx) const WARN_UNUSED_RESULT;
+  Status ValidateStruct(const ColumnType& type, const orc::Type& orc_type,
+      const SchemaPath& col_path, int last_idx) const WARN_UNUSED_RESULT;
+  Status ValidateArray(const ColumnType& type, const orc::Type& orc_type,
+      const SchemaPath& col_path, int last_idx) const WARN_UNUSED_RESULT;
+  Status ValidateMap(const ColumnType& type, const orc::Type& orc_type,
+      const SchemaPath& col_path, int last_idx) const WARN_UNUSED_RESULT;
+  Status ValidatePrimitiveType(const ColumnType& type, const orc::Type& orc_type) const
       WARN_UNUSED_RESULT;
 };
 }

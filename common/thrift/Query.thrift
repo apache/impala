@@ -26,10 +26,16 @@ include "Results.thrift"
 include "CatalogObjects.thrift"
 include "LineageGraph.thrift"
 
-enum TParquetFallbackSchemaResolution {
+// Enum for schema resolution strategies. A schema resolution strategy
+// determines how columns/fields are looked up in the data files.
+enum TSchemaResolutionStrategy {
+  // Resolve columns based on position. This assumes that the HMS
+  // table schema and the file schema are in sync.
   POSITION = 0
+  // Resolve columns by names.
   NAME = 1
-  // Valid for Iceberg tables
+  // Valid for Iceberg tables. This resolves columns by using the
+  // Iceberg field ids.
   FIELD_ID = 2
 }
 
@@ -185,7 +191,7 @@ struct TQueryOptions {
   // Determines how to resolve Parquet files' schemas in the absence of field IDs (which
   // is always, since fields IDs are NYI). Valid values are "position" (default) and
   // "name".
-  43: optional TParquetFallbackSchemaResolution parquet_fallback_schema_resolution = 0
+  43: optional TSchemaResolutionStrategy parquet_fallback_schema_resolution = 0
 
   // Multi-threaded execution: degree of parallelism (= number of active threads) per
   // query per backend.
