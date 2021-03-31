@@ -1759,7 +1759,13 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
       finally:
         LOG.info("Thread terminating in state=%s", self.query_state)
         if client is not None:
-          client.close()
+          try:
+            self.lock.acquire()
+            client.close()
+            # Closing the client closes the query as well
+            self.query_handle = None
+          finally:
+            self.lock.release()
 
     def _end_query(self, client, query):
       """Bring the query to the appropriate end state defined by self.query_end_behaviour.
