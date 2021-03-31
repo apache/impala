@@ -193,4 +193,6 @@ struct TBackendGflags {
   84: required string scratch_dirs
 
   85: required bool enable_row_filtering
+
+  86: required i32 max_wait_time_for_sync_ddl_s
 }

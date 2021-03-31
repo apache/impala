@@ -276,4 +276,8 @@ public class BackendConfig {
   public boolean isDedicatedCoordinator() {
     return (backendCfg_.is_executor == false) && (backendCfg_.is_coordinator == true);
   }
+
+  public int getMaxWaitTimeForSyncDdlSecs() {
+    return backendCfg_.max_wait_time_for_sync_ddl_s;
+  }
 }

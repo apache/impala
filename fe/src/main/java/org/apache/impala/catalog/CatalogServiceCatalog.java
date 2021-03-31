@@ -3086,6 +3086,11 @@ public class CatalogServiceCatalog extends Catalog {
     long lastSentTopicUpdate = lastSentTopicUpdate_.get();
     // Maximum number of attempts (topic updates) to find the catalog topic version that
     // an operation using SYNC_DDL must wait for.
+    // this maximum attempt limit is only applicable when topicUpdateTblLockMaxWaitTimeMs_
+    // is disabled (set to 0). This is due to the fact that the topic update thread will
+    // not block until it add the table to the topics when this configuration set to a
+    // non-zero value. In such a case we don't know how many topic updates would be
+    // required before the required table version is added to the topics.
     long maxNumAttempts = 5;
     if (result.isSetUpdated_catalog_objects()) {
       maxNumAttempts = Math.max(maxNumAttempts,
@@ -3125,13 +3130,14 @@ public class CatalogServiceCatalog extends Catalog {
         // threshold.
         if (lastSentTopicUpdate != currentTopicUpdate) {
           ++numAttempts;
-          if (numAttempts > maxNumAttempts) {
+          if (shouldTimeOut(numAttempts, maxNumAttempts, begin)) {
             LOG.error(String.format("Couldn't retrieve the covering topic version for "
-                + "catalog objects. Updated objects: %s, deleted objects: %s",
+                    + "catalog objects. Updated objects: %s, deleted objects: %s",
                 FeCatalogUtils.debugString(result.updated_catalog_objects),
                 FeCatalogUtils.debugString(result.removed_catalog_objects)));
             throw new CatalogException("Couldn't retrieve the catalog topic version " +
-                "for the SYNC_DDL operation after " + maxNumAttempts + " attempts." +
+                "for the SYNC_DDL operation after " + numAttempts + " attempts and " +
+                "elapsed time of " + (System.currentTimeMillis() - begin) + " msec. " +
                 "The operation has been successfully executed but its effects may have " +
                 "not been broadcast to all the coordinators.");
           }
@@ -3146,6 +3152,24 @@ public class CatalogServiceCatalog extends Catalog {
         versionToWaitFor + ". Time to identify topic version (msec): " +
         (System.currentTimeMillis() - begin));
     return versionToWaitFor;
+  }
+
+  /**
+   * This util method determines if the sync ddl operation which is waiting for the
+   * topic update to be available should timeout or not based on given number of attempts
+   * and startTime. If {@code max_wait_time_for_sync_ddl_s} flag is set, it
+   * checks for the time elapsed since the startTime otherwise checks if the numAttempts
+   * is greater than maxAttempts.
+   * @return true if the operation should timeout else false if it needs to wait more.
+   */
+  private boolean shouldTimeOut(long numAttempts, long maxNumAttempts, long startTime) {
+    int timeoutSecs = BackendConfig.INSTANCE.getMaxWaitTimeForSyncDdlSecs();
+    if (topicUpdateTblLockMaxWaitTimeMs_ > 0) {
+      if (timeoutSecs <= 0) return false;
+      return (System.currentTimeMillis() - startTime) > timeoutSecs * 1000L;
+    } else {
+      return numAttempts > maxNumAttempts;
+    }
   }
 
   /**

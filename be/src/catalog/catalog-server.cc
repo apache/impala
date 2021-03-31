@@ -74,12 +74,12 @@ DEFINE_int64_hidden(catalog_partial_fetch_rpc_queue_timeout_s, LLONG_MAX, "Maxim
     "(in seconds) a partial catalog object fetch RPC spends in the queue waiting "
     "to run. Must be set to a value greater than zero.");
 
-DEFINE_int32(catalog_max_lock_skipped_topic_updates, 2, "Maximum number of topic "
+DEFINE_int32(catalog_max_lock_skipped_topic_updates, 3, "Maximum number of topic "
     "updates skipped for a table due to lock contention in catalogd after which it must"
     "be added to the topic the update log. This limit only applies to distinct lock "
     "operations which block the topic update thread.");
 
-DEFINE_int64(topic_update_tbl_max_wait_time_ms, 500, "Maximum time "
+DEFINE_int64(topic_update_tbl_max_wait_time_ms, 120000, "Maximum time "
      "(in milliseconds) catalog's topic update thread will wait to acquire lock on "
      "table. If the topic update thread cannot acquire a table lock it skips the table "
      "from that topic update and processes the table in the next update. However to "
@@ -87,6 +87,15 @@ DEFINE_int64(topic_update_tbl_max_wait_time_ms, 500, "Maximum time "
      "many times. After that limit is hit, topic thread block until it acquires the "
      "table lock. A value of 0 disables the timeout based locking which means topic "
      "update thread will always block until table lock is acquired.");
+
+DEFINE_int32(max_wait_time_for_sync_ddl_s, 0, "Maximum time (in seconds) until "
+     "which a sync ddl operation will wait for the updated tables "
+     "to be the added to the catalog topic. A value of 0 means sync ddl operation will "
+     "wait as long as necessary until the update is propogated to all the coordinators. "
+     "This flag only takes effect when topic_update_tbl_max_wait_time_ms is enabled."
+     "A value greater than 0 means catalogd will wait until that number of seconds "
+     "before throwing an error indicating that not all the "
+     "coordinators might have applied the changes caused due to the ddl.");
 
 DECLARE_string(debug_actions);
 DECLARE_string(state_store_host);

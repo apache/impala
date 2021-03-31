@@ -212,3 +212,43 @@ class TestTopicUpdateFrequency(CustomClusterTestSuite):
     self.__run_topic_update_test(blocking_query,
       non_blocking_queries, init_queries, blocking_query_options=blocking_query_options,
       expect_topic_updates_to_block=True)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    catalogd_args="--topic_update_tbl_max_wait_time_ms=120000 "
+                  "--max_wait_time_for_sync_ddl_s=5")
+  def test_topic_sync_ddl_error(self, unique_database):
+    """Test makes sure that if a sync ddl query on a unrelated table is executed with
+     timeout, it errors out if table is not published in topic updates within the timeout
+     value."""
+    sync_ddl_query = "create table {0}.{1} (c int)".format(unique_database, "test1")
+    sync_ddl_query_2 = "create table {0}.{1} (c int)".format(unique_database, "test2")
+    blocking_query = "refresh tpcds.store_sales"
+    debug_action = "catalogd_refresh_hdfs_listing_delay:SLEEP@30"
+    self.client.execute(blocking_query)
+    blocking_query_options = {
+      "debug_action": debug_action,
+      "sync_ddl": "false"
+    }
+    slow_query_pool = ThreadPool(processes=1)
+    # run the slow query on the impalad-0 with the given query options
+    slow_query_future = slow_query_pool.apply_async(self.exec_and_time,
+      args=(blocking_query, blocking_query_options, 0))
+    # wait until the slow query is executing and blocking the topic update thread
+    # to avoid any race conditions in the test
+    time.sleep(1)
+    # now run the sync ddl query; we should expect this sync ddl query to fail
+    # since the timeout value is too low and topic update thread doesn't get unblocked
+    # before the timeout.
+    self.execute_query_expect_failure(self.client, sync_ddl_query, {"sync_ddl": "true"})
+    # wait for the slow query to complete
+    slow_query_future.get()
+    # if query is not sync ddl it should not error out
+    slow_query_future = slow_query_pool.apply_async(self.exec_and_time,
+      args=(blocking_query, blocking_query_options, 0))
+    # wait until the slow query is executing and blocking the topic update thread
+    # to avoid any race conditions in the test
+    time.sleep(1)
+    self.execute_query_expect_success(self.client, sync_ddl_query_2,
+      {"sync_ddl": "false"})
+    slow_query_future.get()
