@@ -19,7 +19,9 @@ package org.apache.impala.service;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.BaseTable;
@@ -73,7 +75,7 @@ public class IcebergCatalogOpExecutor {
         params.getPartition_spec());
     IcebergCatalog icebergCatalog = IcebergUtil.getIcebergCatalog(catalog, location);
     Table iceTable = icebergCatalog.createTable(identifier, schema, spec, location,
-        params.getTable_properties());
+        excludeHmsOnlyProps(params.getTable_properties()));
     LOG.info("Create iceberg table successful.");
     return iceTable;
   }
@@ -156,6 +158,32 @@ public class IcebergCatalogOpExecutor {
       throws ImpalaRuntimeException{
     IcebergCatalog catalog = IcebergUtil.getIcebergCatalog(feTable);
     catalog.renameTable(feTable, tableId);
+  }
+
+  /**
+   * Returns a new Map without the properties that only need to be stored at the
+   * HMS level, not at the Iceberg table level.
+   */
+  private static Map<String, String> excludeHmsOnlyProps(Map<String, String> props) {
+    Map<String, String> ret = new HashMap<>();
+    for (Map.Entry<String, String> entry : props.entrySet()) {
+      if (isHmsOnlyProperty(entry.getKey())) continue;
+      ret.put(entry.getKey(), entry.getValue());
+    }
+    return ret;
+  }
+
+  /**
+   * Returns true if the table property should only be stored in HMS.
+   * If false, the property is stored in HMS as well as iceberg.
+   */
+  private static boolean isHmsOnlyProperty(String propKey) {
+    if (IcebergTable.ICEBERG_FILE_FORMAT.equals(propKey)) return true;
+    if (IcebergTable.ICEBERG_CATALOG.equals(propKey)) return true;
+    if (IcebergTable.ICEBERG_CATALOG_LOCATION.equals(propKey)) return true;
+    if (IcebergTable.ICEBERG_TABLE_IDENTIFIER.equals(propKey)) return true;
+    if (CatalogOpExecutor.CAPABILITIES_KEY.equals(propKey)) return true;
+    return false;
   }
 
   /**

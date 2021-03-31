@@ -298,9 +298,6 @@ public class CatalogOpExecutor {
   private final static String BLACKLISTED_TABLES_INCONSISTENT_ERR_STR =
       "--blacklisted_tables may be inconsistent between catalogd and coordinators";
 
-  // Table capabilities property name
-  private static final String CAPABILITIES_KEY = "OBJCAPABILITIES";
-
   // Table default capabilities
   private static final String ACIDINSERTONLY_CAPABILITIES =
       "HIVEMANAGEDINSERTREAD,HIVEMANAGEDINSERTWRITE";
@@ -313,6 +310,9 @@ public class CatalogOpExecutor {
   // It is also used as an upper limit for the number of partitions allowed in one ADD
   // PARTITION statement.
   public final static short MAX_PARTITION_UPDATES_PER_RPC = 500;
+
+  // Table capabilities property name
+  public static final String CAPABILITIES_KEY = "OBJCAPABILITIES";
 
   private final CatalogServiceCatalog catalog_;
   private final AuthorizationConfig authzConfig_;
