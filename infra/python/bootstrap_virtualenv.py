@@ -80,10 +80,34 @@ def delete_virtualenv_if_exist():
     shutil.rmtree(ENV_DIR)
 
 
+def detect_virtualenv_version():
+  with open(REQS_PATH, "r") as reqs_file:
+    for line in reqs_file:
+      line = line.strip()
+      # Ignore blank lines and comments
+      if len(line) == 0 or line[0] == '#':
+        continue
+      if line.find("virtualenv") != -1 and line.find("==") != -1:
+        packagestring, version = [a.strip() for a in line.split("==")]
+        if packagestring == "virtualenv":
+          LOG.debug("Detected virtualenv version {0}".format(version))
+          return version
+  # If the parsing didn't work, don't raise an exception.
+  return None
+
+
 def create_virtualenv():
   LOG.info("Creating python virtualenv")
   build_dir = tempfile.mkdtemp()
-  file = tarfile.open(find_file(DEPS_DIR, "virtualenv*.tar.gz"), "r:gz")
+  # Try to find the virtualenv version by parsing the requirements file
+  # Default to "*" if we can't figure it out.
+  virtualenv_version = detect_virtualenv_version()
+  if virtualenv_version is None:
+    virtualenv_version = "*"
+  # Open the virtualenv tarball
+  virtualenv_tarball = \
+      find_file(DEPS_DIR, "virtualenv-{0}.tar.gz".format(virtualenv_version))
+  file = tarfile.open(virtualenv_tarball, "r:gz")
   for member in file.getmembers():
     file.extract(member, build_dir)
   file.close()
