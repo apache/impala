@@ -213,13 +213,16 @@ def main():
   # Ensure all branches are up to date, unless remotes are disabled
   # by specifying them with an empty string.
   if options.source_remote_name != "":
-    subprocess.check_call(['git', 'fetch', options.source_remote_name])
+    subprocess.check_call(['git', 'fetch', options.source_remote_name,
+        options.source_branch])
     full_source_branch_name = options.source_remote_name + '/' + options.source_branch
   else:
     full_source_branch_name = options.source_branch
   if options.target_remote_name != "":
-    if options.source_remote_name != options.target_remote_name:
-      subprocess.check_call(['git', 'fetch', options.target_remote_name])
+    if options.source_remote_name != options.target_remote_name\
+        or options.source_branch != options.target_branch:
+      subprocess.check_call(['git', 'fetch', options.target_remote_name,
+          options.target_branch])
     full_target_branch_name = options.target_remote_name + '/' + options.target_branch
   else:
     full_target_branch_name = options.target_branch
