@@ -30,13 +30,12 @@
 namespace datasketches {
 
 template<typename A>
-Hll4Array<A>::Hll4Array(const int lgConfigK, const bool startFullSize) :
-    HllArray<A>(lgConfigK, target_hll_type::HLL_4, startFullSize) {
+Hll4Array<A>::Hll4Array(const int lgConfigK, const bool startFullSize, const A& allocator):
+HllArray<A>(lgConfigK, target_hll_type::HLL_4, startFullSize, allocator),
+auxHashMap(nullptr)
+{
   const int numBytes = this->hll4ArrBytes(lgConfigK);
-  typedef typename std::allocator_traits<A>::template rebind_alloc<uint8_t> uint8Alloc;
-  this->hllByteArr = uint8Alloc().allocate(numBytes);
-  std::fill(this->hllByteArr, this->hllByteArr + numBytes, 0);
-  auxHashMap = nullptr;
+  this->hllByteArr.resize(numBytes, 0);
 }
 
 template<typename A>
@@ -63,17 +62,19 @@ Hll4Array<A>::~Hll4Array() {
 template<typename A>
 std::function<void(HllSketchImpl<A>*)> Hll4Array<A>::get_deleter() const {
   return [](HllSketchImpl<A>* ptr) {
-    typedef typename std::allocator_traits<A>::template rebind_alloc<Hll4Array<A>> hll4Alloc;
     Hll4Array<A>* hll = static_cast<Hll4Array<A>*>(ptr);
+    using Hll4Alloc = typename std::allocator_traits<A>::template rebind_alloc<Hll4Array<A>>;
+    Hll4Alloc hll4Alloc(hll->getAllocator());
     hll->~Hll4Array();
-    hll4Alloc().deallocate(hll, 1);
+    hll4Alloc.deallocate(hll, 1);
   };
 }
 
 template<typename A>
 Hll4Array<A>* Hll4Array<A>::copy() const {
-  typedef typename std::allocator_traits<A>::template rebind_alloc<Hll4Array<A>> hll4Alloc;
-  return new (hll4Alloc().allocate(1)) Hll4Array<A>(*this);
+  using Hll4Alloc = typename std::allocator_traits<A>::template rebind_alloc<Hll4Array<A>>;
+  Hll4Alloc hll4Alloc(this->getAllocator());
+  return new (hll4Alloc.allocate(1)) Hll4Array<A>(*this);
 }
 
 template<typename A>
@@ -195,7 +196,7 @@ void Hll4Array<A>::internalHll4Update(const int slotNo, const int newVal) {
           // added to the exception table
           putSlot(slotNo, HllUtil<A>::AUX_TOKEN);
           if (auxHashMap == nullptr) {
-            auxHashMap = AuxHashMap<A>::newAuxHashMap(HllUtil<A>::LG_AUX_ARR_INTS[this->lgConfigK], this->lgConfigK);
+            auxHashMap = AuxHashMap<A>::newAuxHashMap(HllUtil<A>::LG_AUX_ARR_INTS[this->lgConfigK], this->lgConfigK, this->getAllocator());
           }
           auxHashMap->mustAdd(slotNo, newVal);
         }
@@ -285,7 +286,7 @@ void Hll4Array<A>::shiftToBiggerCurMin() {
       } else { //newShiftedVal >= AUX_TOKEN
         // the former exception remains an exception, so must be added to the newAuxMap
         if (newAuxMap == nullptr) {
-          newAuxMap = AuxHashMap<A>::newAuxHashMap(HllUtil<A>::LG_AUX_ARR_INTS[this->lgConfigK], this->lgConfigK);
+          newAuxMap = AuxHashMap<A>::newAuxHashMap(HllUtil<A>::LG_AUX_ARR_INTS[this->lgConfigK], this->lgConfigK, this->getAllocator());
         }
         newAuxMap->mustAdd(slotNum, oldActualVal);
       }
@@ -315,12 +316,12 @@ void Hll4Array<A>::shiftToBiggerCurMin() {
 
 template<typename A>
 typename HllArray<A>::const_iterator Hll4Array<A>::begin(bool all) const {
-  return typename HllArray<A>::const_iterator(this->hllByteArr, 1 << this->lgConfigK, 0, this->tgtHllType, auxHashMap, this->curMin, all);
+  return typename HllArray<A>::const_iterator(this->hllByteArr.data(), 1 << this->lgConfigK, 0, this->tgtHllType, auxHashMap, this->curMin, all);
 }
 
 template<typename A>
 typename HllArray<A>::const_iterator Hll4Array<A>::end() const {
-  return typename HllArray<A>::const_iterator(this->hllByteArr, 1 << this->lgConfigK, 1 << this->lgConfigK, this->tgtHllType, auxHashMap, this->curMin, false);
+  return typename HllArray<A>::const_iterator(this->hllByteArr.data(), 1 << this->lgConfigK, 1 << this->lgConfigK, this->tgtHllType, auxHashMap, this->curMin, false);
 }
 
 template<typename A>

@@ -28,7 +28,7 @@ template <typename T, typename C, typename A>
 class kll_quantile_calculator {
   public:
     // assumes that all levels are sorted including level 0
-    kll_quantile_calculator(const T* items, const uint32_t* levels, uint8_t num_levels, uint64_t n);
+    kll_quantile_calculator(const T* items, const uint32_t* levels, uint8_t num_levels, uint64_t n, const A& allocator);
     T get_quantile(double fraction) const;
 
   private:

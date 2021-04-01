@@ -24,12 +24,6 @@
 
 namespace datasketches {
 
-static inline uint16_t compute_seed_hash(uint64_t seed) {
-  HashState hashes;
-  MurmurHash3_x64_128(&seed, sizeof(seed), 0, hashes);
-  return hashes.h1 & 0xffff;
-}
-
 static inline uint64_t divide_longs_rounding_up(uint64_t x, uint64_t y) {
   if (y == 0) throw std::invalid_argument("divide_longs_rounding_up: bad argument");
   const uint64_t quotient = x / y;

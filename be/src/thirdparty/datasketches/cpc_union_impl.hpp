@@ -25,16 +25,16 @@
 namespace datasketches {
 
 template<typename A>
-cpc_union_alloc<A>::cpc_union_alloc(uint8_t lg_k, uint64_t seed):
+cpc_union_alloc<A>::cpc_union_alloc(uint8_t lg_k, uint64_t seed, const A& allocator):
 lg_k(lg_k),
 seed(seed),
 accumulator(nullptr),
-bit_matrix()
+bit_matrix(allocator)
 {
   if (lg_k < CPC_MIN_LG_K || lg_k > CPC_MAX_LG_K) {
     throw std::invalid_argument("lg_k must be >= " + std::to_string(CPC_MIN_LG_K) + " and <= " + std::to_string(CPC_MAX_LG_K) + ": " + std::to_string(lg_k));
   }
-  accumulator = new (AllocCpc().allocate(1)) cpc_sketch_alloc<A>(lg_k, seed);
+  accumulator = new (AllocCpc().allocate(1)) cpc_sketch_alloc<A>(lg_k, seed, allocator);
 }
 
 template<typename A>
@@ -200,13 +200,13 @@ cpc_sketch_alloc<A> cpc_union_alloc<A>::get_result_from_bit_matrix() const {
 
   const uint8_t offset = cpc_sketch_alloc<A>::determine_correct_offset(lg_k, num_coupons);
 
-  vector_u8<A> sliding_window(k);
+  vector_u8<A> sliding_window(k, 0, bit_matrix.get_allocator());
   // don't need to zero the window's memory
 
   // dynamically growing caused snowplow effect
   uint8_t table_lg_size = lg_k - 4; // K/16; in some cases this will end up being oversized
   if (table_lg_size < 2) table_lg_size = 2;
-  u32_table<A> table(table_lg_size, 6 + lg_k);
+  u32_table<A> table(table_lg_size, 6 + lg_k, bit_matrix.get_allocator());
 
   // the following should work even when the offset is zero
   const uint64_t mask_for_clearing_window = (static_cast<uint64_t>(0xff) << offset) ^ UINT64_MAX;
@@ -314,7 +314,7 @@ void cpc_union_alloc<A>::reduce_k(uint8_t new_lg_k) {
     vector_u64<A> old_matrix = std::move(bit_matrix);
     const uint8_t old_lg_k = lg_k;
     const size_t new_k = 1 << new_lg_k;
-    bit_matrix = vector_u64<A>(new_k, 0);
+    bit_matrix = vector_u64<A>(new_k, 0, old_matrix.get_allocator());
     lg_k = new_lg_k;
     or_matrix_into_matrix(old_matrix, old_lg_k);
     return;

@@ -39,8 +39,8 @@ template<typename A>
 class u32_table {
 public:
 
-  u32_table();
-  u32_table(uint8_t lg_size, uint8_t num_valid_bits);
+  u32_table(const A& allocator);
+  u32_table(uint8_t lg_size, uint8_t num_valid_bits, const A& allocator);
 
   inline size_t get_num_items() const;
   inline const uint32_t* get_slots() const;
@@ -52,7 +52,7 @@ public:
   // returns true iff the item was present and was therefore removed from the table
   inline bool maybe_delete(uint32_t item);
 
-  static u32_table make_from_pairs(const uint32_t* pairs, size_t num_pairs, uint8_t lg_k);
+  static u32_table make_from_pairs(const uint32_t* pairs, size_t num_pairs, uint8_t lg_k, const A& allocator);
 
   vector_u32<A> unwrapping_get_items() const;
 

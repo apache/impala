@@ -24,20 +24,20 @@
 
 namespace datasketches {
 
-template<typename A = std::allocator<char>>
+template<typename A>
 class CouponHashSet : public CouponList<A> {
   public:
-    static CouponHashSet* newSet(const void* bytes, size_t len);
-    static CouponHashSet* newSet(std::istream& is);
-    explicit CouponHashSet(int lgConfigK, target_hll_type tgtHllType);
-    explicit CouponHashSet(const CouponHashSet& that, target_hll_type tgtHllType);
-    explicit CouponHashSet(const CouponHashSet& that);
+    static CouponHashSet* newSet(const void* bytes, size_t len, const A& allocator);
+    static CouponHashSet* newSet(std::istream& is, const A& allocator);
+    CouponHashSet(int lgConfigK, target_hll_type tgtHllType, const A& allocator);
+    CouponHashSet(const CouponHashSet& that, target_hll_type tgtHllType);
 
-    virtual ~CouponHashSet();
+    virtual ~CouponHashSet() = default;
     virtual std::function<void(HllSketchImpl<A>*)> get_deleter() const;
 
   protected:
-    
+    using vector_int = std::vector<int, typename std::allocator_traits<A>::template rebind_alloc<int>>;
+
     virtual CouponHashSet* copy() const;
     virtual CouponHashSet* copyAs(target_hll_type tgtHllType) const;
 
@@ -49,9 +49,9 @@ class CouponHashSet : public CouponList<A> {
     friend class HllSketchImplFactory<A>;
 
   private:
-    typedef typename std::allocator_traits<A>::template rebind_alloc<CouponHashSet<A>> chsAlloc;
+    using ChsAlloc = typename std::allocator_traits<A>::template rebind_alloc<CouponHashSet<A>>;
     bool checkGrowOrPromote();
-    void growHashSet(int srcLgCoupArrSize, int tgtLgCoupArrSize);
+    void growHashSet(int tgtLgCoupArrSize);
 };
 
 }

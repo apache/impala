@@ -161,7 +161,7 @@ class kll_sketch {
     static const uint16_t MIN_K = DEFAULT_M;
     static const uint16_t MAX_K = (1 << 16) - 1;
 
-    explicit kll_sketch(uint16_t k = DEFAULT_K);
+    explicit kll_sketch(uint16_t k = DEFAULT_K, const A& allocator = A());
     kll_sketch(const kll_sketch& other);
     kll_sketch(kll_sketch&& other) noexcept;
     ~kll_sketch();
@@ -201,6 +201,12 @@ class kll_sketch {
      * @return empty flag
      */
     bool is_empty() const;
+
+    /**
+     * Returns configured parameter k
+     * @return parameter k
+     */
+    uint16_t get_k() const;
 
     /**
      * Returns the length of the input stream.
@@ -401,7 +407,7 @@ class kll_sketch {
      * @param is input stream
      * @return an instance of a sketch
      */
-    static kll_sketch deserialize(std::istream& is);
+    static kll_sketch<T, C, S, A> deserialize(std::istream& is, const A& allocator = A());
 
     /**
      * This method deserializes a sketch from a given array of bytes.
@@ -409,7 +415,7 @@ class kll_sketch {
      * @param size the size of the array
      * @return an instance of a sketch
      */
-    static kll_sketch deserialize(const void* bytes, size_t size);
+    static kll_sketch<T, C, S, A> deserialize(const void* bytes, size_t size, const A& allocator = A());
 
     /*
      * Gets the normalized rank error given k and pmf.
@@ -461,6 +467,7 @@ class kll_sketch {
     static const uint8_t PREAMBLE_INTS_SHORT = 2; // for empty and single item
     static const uint8_t PREAMBLE_INTS_FULL = 5;
 
+    A allocator_;
     uint16_t k_;
     uint8_t m_; // minimum buffer "width"
     uint16_t min_k_; // for error estimation after merging with different k

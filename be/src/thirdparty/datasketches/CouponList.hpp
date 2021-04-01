@@ -30,19 +30,18 @@ namespace datasketches {
 template<typename A>
 class HllSketchImplFactory;
 
-template<typename A = std::allocator<char>>
+template<typename A>
 class CouponList : public HllSketchImpl<A> {
   public:
-    explicit CouponList(int lgConfigK, target_hll_type tgtHllType, hll_mode mode);
-    explicit CouponList(const CouponList& that);
-    explicit CouponList(const CouponList& that, target_hll_type tgtHllType);
+    CouponList(int lgConfigK, target_hll_type tgtHllType, hll_mode mode, const A& allocator);
+    CouponList(const CouponList& that, target_hll_type tgtHllType);
 
-    static CouponList* newList(const void* bytes, size_t len);
-    static CouponList* newList(std::istream& is);
+    static CouponList* newList(const void* bytes, size_t len, const A& allocator);
+    static CouponList* newList(std::istream& is, const A& allocator);
     virtual vector_u8<A> serialize(bool compact, unsigned header_size_bytes) const;
     virtual void serialize(std::ostream& os, bool compact) const;
 
-    virtual ~CouponList();
+    virtual ~CouponList() = default;
     virtual std::function<void(HllSketchImpl<A>*)> get_deleter() const;
 
     virtual CouponList* copy() const;
@@ -62,7 +61,9 @@ class CouponList : public HllSketchImpl<A> {
     coupon_iterator<A> end() const;
 
   protected:
-    typedef typename std::allocator_traits<A>::template rebind_alloc<CouponList<A>> clAlloc;
+    using ClAlloc = typename std::allocator_traits<A>::template rebind_alloc<CouponList<A>>;
+
+    using vector_int = std::vector<int, typename std::allocator_traits<A>::template rebind_alloc<int>>;
 
     HllSketchImpl<A>* promoteHeapListToSet(CouponList& list);
     HllSketchImpl<A>* promoteHeapListOrSetToHll(CouponList& src);
@@ -75,13 +76,11 @@ class CouponList : public HllSketchImpl<A> {
     virtual bool isOutOfOrderFlag() const;
     virtual void putOutOfOrderFlag(bool oooFlag);
 
-    virtual int getLgCouponArrInts() const;
-    virtual int* getCouponIntArr() const;
+    virtual A getAllocator() const;
 
-    int lgCouponArrInts;
     int couponCount;
     bool oooFlag;
-    int* couponIntArr;
+    vector_int coupons;
 
     friend class HllSketchImplFactory<A>;
 };

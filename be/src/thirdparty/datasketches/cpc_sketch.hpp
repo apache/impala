@@ -49,7 +49,7 @@ template<typename A> class cpc_sketch_alloc;
 template<typename A> class cpc_union_alloc;
 
 // alias with default allocator for convenience
-typedef cpc_sketch_alloc<std::allocator<void>> cpc_sketch;
+using cpc_sketch = cpc_sketch_alloc<std::allocator<uint8_t>>;
 
 // allocation and initialization of global decompression (decoding) tables
 // call this before anything else if you want to control the initialization time
@@ -67,7 +67,10 @@ public:
    * @param lg_k base 2 logarithm of the number of bins in the sketch
    * @param seed for hash function
    */
-  explicit cpc_sketch_alloc(uint8_t lg_k = CPC_DEFAULT_LG_K, uint64_t seed = DEFAULT_SEED);
+  explicit cpc_sketch_alloc(uint8_t lg_k = CPC_DEFAULT_LG_K, uint64_t seed = DEFAULT_SEED, const A& allocator = A());
+
+  using allocator_type = A;
+  A get_allocator() const;
 
   /**
    * @return configured lg_k of this sketch
@@ -204,7 +207,7 @@ public:
 
   // This is a convenience alias for users
   // The type returned by the following serialize method
-  typedef vector_u8<A> vector_bytes;
+  using vector_bytes = vector_u8<A>;
 
   /**
    * This method serializes the sketch as a vector of bytes.
@@ -221,7 +224,7 @@ public:
    * @param seed the seed for the hash function that was used to create the sketch
    * @return an instance of a sketch
    */
-  static cpc_sketch_alloc<A> deserialize(std::istream& is, uint64_t seed = DEFAULT_SEED);
+  static cpc_sketch_alloc<A> deserialize(std::istream& is, uint64_t seed = DEFAULT_SEED, const A& allocator = A());
 
   /**
    * This method deserializes a sketch from a given array of bytes.
@@ -230,7 +233,7 @@ public:
    * @param seed the seed for the hash function that was used to create the sketch
    * @return an instance of the sketch
    */
-  static cpc_sketch_alloc<A> deserialize(const void* bytes, size_t size, uint64_t seed = DEFAULT_SEED);
+  static cpc_sketch_alloc<A> deserialize(const void* bytes, size_t size, uint64_t seed = DEFAULT_SEED, const A& allocator = A());
 
   // for internal use
   uint32_t get_num_coupons() const;

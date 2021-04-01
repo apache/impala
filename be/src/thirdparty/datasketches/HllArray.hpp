@@ -28,19 +28,18 @@ namespace datasketches {
 template<typename A>
 class AuxHashMap;
 
-template<typename A = std::allocator<char>>
+template<typename A>
 class HllArray : public HllSketchImpl<A> {
   public:
-    explicit HllArray(int lgConfigK, target_hll_type tgtHllType, bool startFullSize);
-    explicit HllArray(const HllArray<A>& that);
+    HllArray(int lgConfigK, target_hll_type tgtHllType, bool startFullSize, const A& allocator);
 
-    static HllArray* newHll(const void* bytes, size_t len);
-    static HllArray* newHll(std::istream& is);
+    static HllArray* newHll(const void* bytes, size_t len, const A& allocator);
+    static HllArray* newHll(std::istream& is, const A& allocator);
 
     virtual vector_u8<A> serialize(bool compact, unsigned header_size_bytes) const;
     virtual void serialize(std::ostream& os, bool compact) const;
 
-    virtual ~HllArray();
+    virtual ~HllArray() = default;
     virtual std::function<void(HllSketchImpl<A>*)> get_deleter() const = 0;
 
     virtual HllArray* copy() const = 0;
@@ -95,6 +94,8 @@ class HllArray : public HllSketchImpl<A> {
     virtual const_iterator begin(bool all = false) const;
     virtual const_iterator end() const;
 
+    virtual A getAllocator() const;
+
   protected:
     void hipAndKxQIncrementalUpdate(uint8_t oldValue, uint8_t newValue);
     double getHllBitMapEstimate(int lgConfigK, int curMin, int numAtCurMin) const;
@@ -103,7 +104,7 @@ class HllArray : public HllSketchImpl<A> {
     double hipAccum;
     double kxq0;
     double kxq1;
-    uint8_t* hllByteArr; //init by sub-classes
+    vector_u8<A> hllByteArr; //init by sub-classes
     int curMin; //always zero for Hll6 and Hll8, only tracked by Hll4Array
     int numAtCurMin; //interpreted as num zeros when curMin == 0
     bool oooFlag; //Out-Of-Order Flag
@@ -115,7 +116,6 @@ template<typename A>
 class HllArray<A>::const_iterator: public std::iterator<std::input_iterator_tag, uint32_t> {
 public:
   const_iterator(const uint8_t* array, size_t array_slze, size_t index, target_hll_type hll_type, const AuxHashMap<A>* exceptions, uint8_t offset, bool all);
-  //const_iterator(const uint8_t* array, size_t array_slze, size_t index, target_hll_type hll_type, const AuxHashMap<A>* exceptions, uint8_t offset);
   const_iterator& operator++();
   bool operator!=(const const_iterator& other) const;
   uint32_t operator*() const;

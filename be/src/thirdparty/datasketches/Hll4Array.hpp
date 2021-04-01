@@ -31,7 +31,7 @@ class Hll4Iterator;
 template<typename A>
 class Hll4Array final : public HllArray<A> {
   public:
-    explicit Hll4Array(int lgConfigK, bool startFullSize);
+    explicit Hll4Array(int lgConfigK, bool startFullSize, const A& allocator);
     explicit Hll4Array(const Hll4Array<A>& that);
 
     virtual ~Hll4Array();

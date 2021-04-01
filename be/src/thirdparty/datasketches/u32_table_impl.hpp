@@ -29,19 +29,19 @@
 namespace datasketches {
 
 template<typename A>
-u32_table<A>::u32_table():
+u32_table<A>::u32_table(const A& allocator):
 lg_size(0),
 num_valid_bits(0),
 num_items(0),
-slots()
+slots(allocator)
 {}
 
 template<typename A>
-u32_table<A>::u32_table(uint8_t lg_size, uint8_t num_valid_bits):
+u32_table<A>::u32_table(uint8_t lg_size, uint8_t num_valid_bits, const A& allocator):
 lg_size(lg_size),
 num_valid_bits(num_valid_bits),
 num_items(0),
-slots(1 << lg_size, UINT32_MAX)
+slots(1 << lg_size, UINT32_MAX, allocator)
 {
   if (lg_size < 2) throw std::invalid_argument("lg_size must be >= 2");
   if (num_valid_bits < 1 || num_valid_bits > 32) throw std::invalid_argument("num_valid_bits must be between 1 and 32");
@@ -110,10 +110,10 @@ bool u32_table<A>::maybe_delete(uint32_t item) {
 
 // this one is specifically tailored to be a part of fm85 decompression scheme
 template<typename A>
-u32_table<A> u32_table<A>::make_from_pairs(const uint32_t* pairs, size_t num_pairs, uint8_t lg_k) {
+u32_table<A> u32_table<A>::make_from_pairs(const uint32_t* pairs, size_t num_pairs, uint8_t lg_k, const A& allocator) {
   uint8_t lg_num_slots = 2;
   while (U32_TABLE_UPSIZE_DENOM * num_pairs > U32_TABLE_UPSIZE_NUMER * (1 << lg_num_slots)) lg_num_slots++;
-  u32_table<A> table(lg_num_slots, 6 + lg_k);
+  u32_table<A> table(lg_num_slots, 6 + lg_k, allocator);
   // Note: there is a possible "snowplow effect" here because the caller is passing in a sorted pairs array
   // However, we are starting out with the correct final table size, so the problem might not occur
   for (size_t i = 0; i < num_pairs; i++) {
@@ -152,7 +152,7 @@ void u32_table<A>::rebuild(uint8_t new_lg_size) {
   const size_t new_size = 1 << new_lg_size;
   if (new_size <= num_items) throw std::logic_error("new_size <= num_items");
   vector_u32<A> old_slots = std::move(slots);
-  slots = vector_u32<A>(new_size, UINT32_MAX);
+  slots = vector_u32<A>(new_size, UINT32_MAX, old_slots.get_allocator());
   lg_size = new_lg_size;
   for (size_t i = 0; i < old_size; i++) {
     if (old_slots[i] != UINT32_MAX) {
@@ -169,9 +169,9 @@ void u32_table<A>::rebuild(uint8_t new_lg_size) {
 // The result is nearly sorted, so make sure to use an efficient sort for that case
 template<typename A>
 vector_u32<A> u32_table<A>::unwrapping_get_items() const {
-  if (num_items == 0) return vector_u32<A>();
+  if (num_items == 0) return vector_u32<A>(slots.get_allocator());
   const size_t table_size = 1 << lg_size;
-  vector_u32<A> result(num_items);
+  vector_u32<A> result(num_items, 0, slots.get_allocator());
   size_t i = 0;
   size_t l = 0;
   size_t r = num_items - 1;

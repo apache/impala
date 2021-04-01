@@ -28,22 +28,21 @@
 
 namespace datasketches {
 
-template<typename A = std::allocator<char>>
+template<typename A>
 class AuxHashMap final {
   public:
-    explicit AuxHashMap(int lgAuxArrInts, int lgConfigK);
-    explicit AuxHashMap(const AuxHashMap<A>& that);
-    static AuxHashMap* newAuxHashMap(int lgAuxArrInts, int lgConfigK);
+    AuxHashMap(int lgAuxArrInts, int lgConfigK, const A& allocator);
+    static AuxHashMap* newAuxHashMap(int lgAuxArrInts, int lgConfigK, const A& allocator);
     static AuxHashMap* newAuxHashMap(const AuxHashMap<A>& that);
 
     static AuxHashMap* deserialize(const void* bytes, size_t len,
                                    int lgConfigK,
                                    int auxCount, int lgAuxArrInts,
-                                   bool srcCompact);
+                                   bool srcCompact, const A& allocator);
     static AuxHashMap* deserialize(std::istream& is, int lgConfigK,
                                    int auxCount, int lgAuxArrInts,
-                                   bool srcCompact);
-    virtual ~AuxHashMap();
+                                   bool srcCompact, const A& allocator);
+    virtual ~AuxHashMap() = default;
     static std::function<void(AuxHashMap<A>*)> make_deleter();
     
     AuxHashMap* copy() const;
@@ -64,6 +63,8 @@ class AuxHashMap final {
   private:
     typedef typename std::allocator_traits<A>::template rebind_alloc<AuxHashMap<A>> ahmAlloc;
 
+    using vector_int = std::vector<int, typename std::allocator_traits<A>::template rebind_alloc<int>>;
+
     // static so it can be used when resizing
     static int find(const int* auxArr, int lgAuxArrInts, int lgConfigK, int slotNo);
 
@@ -73,7 +74,7 @@ class AuxHashMap final {
     const int lgConfigK;
     int lgAuxArrInts;
     int auxCount;
-    int* auxIntArr;
+    vector_int entries;
 };
 
 }

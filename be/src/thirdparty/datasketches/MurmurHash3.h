@@ -3,6 +3,7 @@
 //  * Changed input seed in MurmurHash3_x64_128 to uint64_t
 //  * Define and use HashState reference to return result
 //  * Made entire hash function defined inline
+//  * Added compute_seed_hash
 //-----------------------------------------------------------------------------
 // MurmurHash3 was written by Austin Appleby, and is placed in the public
 // domain. The author hereby disclaims copyright to this source code.
@@ -169,5 +170,11 @@ FORCE_INLINE void MurmurHash3_x64_128(const void* key, int lenBytes, uint64_t se
 }
 
 //-----------------------------------------------------------------------------
+
+FORCE_INLINE uint16_t compute_seed_hash(uint64_t seed) {
+  HashState hashes;
+  MurmurHash3_x64_128(&seed, sizeof(seed), 0, hashes);
+  return static_cast<uint16_t>(hashes.h1 & 0xffff);
+}
 
 #endif // _MURMURHASH3_H_

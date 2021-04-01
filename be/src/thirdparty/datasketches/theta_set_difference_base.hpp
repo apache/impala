@@ -17,40 +17,38 @@
  * under the License.
  */
 
-#ifndef THETA_A_NOT_B_HPP_
-#define THETA_A_NOT_B_HPP_
+#ifndef THETA_SET_DIFFERENCE_BASE_HPP_
+#define THETA_SET_DIFFERENCE_BASE_HPP_
 
-#include "theta_sketch.hpp"
-#include "theta_set_difference_base.hpp"
+#include "theta_comparators.hpp"
+#include "theta_update_sketch_base.hpp"
 
 namespace datasketches {
 
-template<typename Allocator = std::allocator<uint64_t>>
-class theta_a_not_b_alloc {
+template<
+  typename Entry,
+  typename ExtractKey,
+  typename CompactSketch,
+  typename Allocator
+>
+class theta_set_difference_base {
 public:
-  using Entry = uint64_t;
-  using ExtractKey = trivial_extract_key;
-  using CompactSketch = compact_theta_sketch_alloc<Allocator>;
-  using State = theta_set_difference_base<Entry, ExtractKey, CompactSketch, Allocator>;
+  using comparator = compare_by_key<ExtractKey>;
+  using AllocU64 = typename std::allocator_traits<Allocator>::template rebind_alloc<uint64_t>;
+  using hash_table = theta_update_sketch_base<uint64_t, trivial_extract_key, AllocU64>;
 
-  explicit theta_a_not_b_alloc(uint64_t seed = DEFAULT_SEED, const Allocator& allocator = Allocator());
+  theta_set_difference_base(uint64_t seed, const Allocator& allocator = Allocator());
 
-  /**
-   * Computes the a-not-b set operation given two sketches.
-   * @return the result of a-not-b
-   */
   template<typename FwdSketch, typename Sketch>
-  CompactSketch compute(FwdSketch&& a, const Sketch& b, bool ordered = true) const;
+  CompactSketch compute(FwdSketch&& a, const Sketch& b, bool ordered) const;
 
 private:
-  State state_;
+  Allocator allocator_;
+  uint16_t seed_hash_;
 };
-
-// alias with default allocator for convenience
-using theta_a_not_b = theta_a_not_b_alloc<std::allocator<uint64_t>>;
 
 } /* namespace datasketches */
 
-#include "theta_a_not_b_impl.hpp"
+#include "theta_set_difference_base_impl.hpp"
 
-# endif
+#endif

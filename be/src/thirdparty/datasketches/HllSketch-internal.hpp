@@ -42,28 +42,26 @@ typedef union {
 } longDoubleUnion;
 
 template<typename A>
-hll_sketch_alloc<A>::hll_sketch_alloc(int lg_config_k, target_hll_type tgt_type, bool start_full_size) {
+hll_sketch_alloc<A>::hll_sketch_alloc(int lg_config_k, target_hll_type tgt_type, bool start_full_size, const A& allocator) {
   HllUtil<A>::checkLgK(lg_config_k);
   if (start_full_size) {
-    sketch_impl = HllSketchImplFactory<A>::newHll(lg_config_k, tgt_type, start_full_size);
+    sketch_impl = HllSketchImplFactory<A>::newHll(lg_config_k, tgt_type, start_full_size, allocator);
   } else {
     typedef typename std::allocator_traits<A>::template rebind_alloc<CouponList<A>> clAlloc;
-    sketch_impl = new (clAlloc().allocate(1)) CouponList<A>(lg_config_k, tgt_type, hll_mode::LIST);
+    sketch_impl = new (clAlloc(allocator).allocate(1)) CouponList<A>(lg_config_k, tgt_type, hll_mode::LIST, allocator);
   }
 }
 
 template<typename A>
-hll_sketch_alloc<A> hll_sketch_alloc<A>::deserialize(std::istream& is) {
-  HllSketchImpl<A>* impl = HllSketchImplFactory<A>::deserialize(is);
-  hll_sketch_alloc<A> sketch(impl);
-  return sketch;
+hll_sketch_alloc<A> hll_sketch_alloc<A>::deserialize(std::istream& is, const A& allocator) {
+  HllSketchImpl<A>* impl = HllSketchImplFactory<A>::deserialize(is, allocator);
+  return hll_sketch_alloc<A>(impl);
 }
 
 template<typename A>
-hll_sketch_alloc<A> hll_sketch_alloc<A>::deserialize(const void* bytes, size_t len) {
-  HllSketchImpl<A>* impl = HllSketchImplFactory<A>::deserialize(bytes, len);
-  hll_sketch_alloc<A> sketch(impl);
-  return sketch;
+hll_sketch_alloc<A> hll_sketch_alloc<A>::deserialize(const void* bytes, size_t len, const A& allocator) {
+  HllSketchImpl<A>* impl = HllSketchImplFactory<A>::deserialize(bytes, len, allocator);
+  return hll_sketch_alloc<A>(impl);
 }
 
 template<typename A>

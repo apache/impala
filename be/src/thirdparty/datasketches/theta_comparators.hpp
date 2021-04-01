@@ -17,38 +17,32 @@
  * under the License.
  */
 
-#ifndef _HLL6ARRAY_HPP_
-#define _HLL6ARRAY_HPP_
-
-#include "HllArray.hpp"
+#ifndef THETA_COMPARATORS_HPP_
+#define THETA_COMPARATORS_HPP_
 
 namespace datasketches {
 
-template<typename A>
-class Hll6Iterator;
-
-template<typename A>
-class Hll6Array final : public HllArray<A> {
-  public:
-    Hll6Array(int lgConfigK, bool startFullSize, const A& allocator);
-
-    virtual ~Hll6Array() = default;
-    virtual std::function<void(HllSketchImpl<A>*)> get_deleter() const;
-
-    virtual Hll6Array* copy() const;
-
-    inline uint8_t getSlot(int slotNo) const;
-    inline void putSlot(int slotNo, uint8_t value);
-
-    virtual HllSketchImpl<A>* couponUpdate(int coupon) final;
-    void mergeHll(const HllArray<A>& src);
-
-    virtual int getHllByteArrBytes() const;
-
-  private:
-    void internalCouponUpdate(int coupon);
+template<typename ExtractKey>
+struct compare_by_key {
+  template<typename Entry1, typename Entry2>
+  bool operator()(Entry1&& a, Entry2&& b) const {
+    return ExtractKey()(std::forward<Entry1>(a)) < ExtractKey()(std::forward<Entry2>(b));
+  }
 };
 
-}
+// less than
 
-#endif /* _HLL6ARRAY_HPP_ */
+template<typename Key, typename Entry, typename ExtractKey>
+class key_less_than {
+public:
+  explicit key_less_than(const Key& key): key(key) {}
+  bool operator()(const Entry& entry) const {
+    return ExtractKey()(entry) < this->key;
+  }
+private:
+  Key key;
+};
+
+} /* namespace datasketches */
+
+#endif

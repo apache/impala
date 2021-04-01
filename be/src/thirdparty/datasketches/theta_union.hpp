@@ -20,103 +20,70 @@
 #ifndef THETA_UNION_HPP_
 #define THETA_UNION_HPP_
 
-#include <memory>
-#include <functional>
-#include <climits>
-
+#include "serde.hpp"
 #include "theta_sketch.hpp"
+#include "theta_union_base.hpp"
 
 namespace datasketches {
 
-/*
- * author Alexander Saydakov
- * author Lee Rhodes
- * author Kevin Lang
- */
-
-template<typename A>
+template<typename Allocator = std::allocator<uint64_t>>
 class theta_union_alloc {
 public:
-  class builder;
+  using Entry = uint64_t;
+  using ExtractKey = trivial_extract_key;
+  using Sketch = theta_sketch_alloc<Allocator>;
+  using CompactSketch = compact_theta_sketch_alloc<Allocator>;
+  using resize_factor = theta_constants::resize_factor;
+
+  struct pass_through_policy {
+    uint64_t operator()(uint64_t internal_entry, uint64_t incoming_entry) const {
+      unused(incoming_entry);
+      return internal_entry;
+    }
+  };
+  using State = theta_union_base<Entry, ExtractKey, pass_through_policy, Sketch, CompactSketch, Allocator>;
 
   // No constructor here. Use builder instead.
+  class builder;
 
   /**
    * This method is to update the union with a given sketch
    * @param sketch to update the union with
    */
-  void update(const theta_sketch_alloc<A>& sketch);
+  template<typename FwdSketch>
+  void update(FwdSketch&& sketch);
 
   /**
    * This method produces a copy of the current state of the union as a compact sketch.
    * @param ordered optional flag to specify if ordered sketch should be produced
    * @return the result of the union
    */
-  compact_theta_sketch_alloc<A> get_result(bool ordered = true) const;
+  CompactSketch get_result(bool ordered = true) const;
 
 private:
-  bool is_empty_;
-  uint64_t theta_;
-  update_theta_sketch_alloc<A> state_;
+  State state_;
 
   // for builder
-  theta_union_alloc(uint64_t theta, update_theta_sketch_alloc<A>&& state);
+  theta_union_alloc(uint8_t lg_cur_size, uint8_t lg_nom_size, resize_factor rf, uint64_t theta, uint64_t seed, const Allocator& allocator);
 };
 
-// builder
-
 template<typename A>
-class theta_union_alloc<A>::builder {
+class theta_union_alloc<A>::builder: public theta_base_builder<builder, A> {
 public:
-  typedef typename update_theta_sketch_alloc<A>::resize_factor resize_factor;
-
-  /**
-   * Set log2(k), where k is a nominal number of entries in the sketch
-   * @param lg_k base 2 logarithm of nominal number of entries
-   * @return this builder
-   */
-  builder& set_lg_k(uint8_t lg_k);
-
-  /**
-   * Set resize factor for the internal hash table (defaults to 8)
-   * @param rf resize factor
-   * @return this builder
-   */
-  builder& set_resize_factor(resize_factor rf);
-
-  /**
-   * Set sampling probability (initial theta). The default is 1, so the sketch retains
-   * all entries until it reaches the limit, at which point it goes into the estimation mode
-   * and reduces the effective sampling probability (theta) as necessary.
-   * @param p sampling probability
-   * @return this builder
-   */
-  builder& set_p(float p);
-
-  /**
-   * Set the seed for the hash function. Should be used carefully if needed.
-   * Sketches produced with different seed are not compatible
-   * and cannot be mixed in set operations.
-   * @param seed hash seed
-   * @return this builder
-   */
-  builder& set_seed(uint64_t seed);
+  builder(const A& allocator = A());
 
   /**
    * This is to create an instance of the union with predefined parameters.
-   * @return and instance of the union
+   * @return an instance of the union
    */
   theta_union_alloc<A> build() const;
-
-private:
-  typename update_theta_sketch_alloc<A>::builder sketch_builder;
 };
 
 // alias with default allocator for convenience
-typedef theta_union_alloc<std::allocator<void>> theta_union;
+using theta_union = theta_union_alloc<std::allocator<uint64_t>>;
 
 } /* namespace datasketches */
 
 #include "theta_union_impl.hpp"
 
-# endif
+#endif

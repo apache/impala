@@ -27,40 +27,29 @@
 namespace datasketches {
 
 template<typename A>
-Hll6Array<A>::Hll6Array(const int lgConfigK, const bool startFullSize) :
-    HllArray<A>(lgConfigK, target_hll_type::HLL_6, startFullSize) {
-  const int numBytes = this->hll6ArrBytes(lgConfigK);
-  typedef typename std::allocator_traits<A>::template rebind_alloc<uint8_t> uint8Alloc;
-  this->hllByteArr = uint8Alloc().allocate(numBytes);
-  std::fill(this->hllByteArr, this->hllByteArr + numBytes, 0);
-}
-
-template<typename A>
-Hll6Array<A>::Hll6Array(const Hll6Array<A>& that) :
-  HllArray<A>(that)
+Hll6Array<A>::Hll6Array(const int lgConfigK, const bool startFullSize, const A& allocator):
+HllArray<A>(lgConfigK, target_hll_type::HLL_6, startFullSize, allocator)
 {
-  // can determine hllByteArr size in parent class, no need to allocate here
-}
-
-template<typename A>
-Hll6Array<A>::~Hll6Array() {
-  // hllByteArr deleted in parent
+  const int numBytes = this->hll6ArrBytes(lgConfigK);
+  this->hllByteArr.resize(numBytes, 0);
 }
 
 template<typename A>
 std::function<void(HllSketchImpl<A>*)> Hll6Array<A>::get_deleter() const {
   return [](HllSketchImpl<A>* ptr) {
-    typedef typename std::allocator_traits<A>::template rebind_alloc<Hll6Array<A>> hll6Alloc;
+    using Hll6Alloc = typename std::allocator_traits<A>::template rebind_alloc<Hll6Array<A>>;
     Hll6Array<A>* hll = static_cast<Hll6Array<A>*>(ptr);
+    Hll6Alloc hll6Alloc(hll->getAllocator());
     hll->~Hll6Array();
-    hll6Alloc().deallocate(hll, 1);
+    hll6Alloc.deallocate(hll, 1);
   };
 }
 
 template<typename A>
 Hll6Array<A>* Hll6Array<A>::copy() const {
-  typedef typename std::allocator_traits<A>::template rebind_alloc<Hll6Array<A>> hll6Alloc;
-  return new (hll6Alloc().allocate(1)) Hll6Array<A>(*this);
+  using Hll6Alloc = typename std::allocator_traits<A>::template rebind_alloc<Hll6Array<A>>;
+  Hll6Alloc hll6Alloc(this->getAllocator());
+  return new (hll6Alloc.allocate(1)) Hll6Array<A>(*this);
 }
 
 template<typename A>

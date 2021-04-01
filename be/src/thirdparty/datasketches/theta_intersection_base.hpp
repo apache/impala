@@ -17,32 +17,43 @@
  * under the License.
  */
 
-#ifndef THETA_INTERSECTION_IMPL_HPP_
-#define THETA_INTERSECTION_IMPL_HPP_
+#ifndef THETA_INTERSECTION_BASE_HPP_
+#define THETA_INTERSECTION_BASE_HPP_
 
 namespace datasketches {
 
-template<typename A>
-theta_intersection_alloc<A>::theta_intersection_alloc(uint64_t seed, const A& allocator):
-state_(seed, pass_through_policy(), allocator)
-{}
+template<
+  typename Entry,
+  typename ExtractKey,
+  typename Policy,
+  typename Sketch,
+  typename CompactSketch,
+  typename Allocator
+>
+class theta_intersection_base {
+public:
+  using hash_table = theta_update_sketch_base<Entry, ExtractKey, Allocator>;
+  using resize_factor = typename hash_table::resize_factor;
+  using comparator = compare_by_key<ExtractKey>;
+  theta_intersection_base(uint64_t seed, const Policy& policy, const Allocator& allocator);
 
-template<typename A>
-template<typename SS>
-void theta_intersection_alloc<A>::update(SS&& sketch) {
-  state_.update(std::forward<SS>(sketch));
-}
+  template<typename FwdSketch>
+  void update(FwdSketch&& sketch);
 
-template<typename A>
-auto theta_intersection_alloc<A>::get_result(bool ordered) const -> CompactSketch {
-  return state_.get_result(ordered);
-}
+  CompactSketch get_result(bool ordered = true) const;
 
-template<typename A>
-bool theta_intersection_alloc<A>::has_result() const {
-  return state_.has_result();
-}
+  bool has_result() const;
+
+  const Policy& get_policy() const;
+
+private:
+  Policy policy_;
+  bool is_valid_;
+  hash_table table_;
+};
 
 } /* namespace datasketches */
 
-# endif
+#include "theta_intersection_base_impl.hpp"
+
+#endif

@@ -32,9 +32,9 @@
 namespace datasketches {
 
 template<typename A>
-hll_union_alloc<A>::hll_union_alloc(const int lg_max_k):
+hll_union_alloc<A>::hll_union_alloc(const int lg_max_k, const A& allocator):
   lg_max_k(HllUtil<A>::checkLgK(lg_max_k)),
-  gadget(lg_max_k, target_hll_type::HLL_8)
+  gadget(lg_max_k, target_hll_type::HLL_8, false, allocator)
 {}
 
 template<typename A>
@@ -150,16 +150,6 @@ double hll_union_alloc<A>::get_upper_bound(const int num_std_dev) const {
 }
 
 template<typename A>
-int hll_union_alloc<A>::get_compact_serialization_bytes() const {
-  return gadget.get_compact_serialization_bytes();
-}
-
-template<typename A>
-int hll_union_alloc<A>::get_updatable_serialization_bytes() const {
-  return gadget.get_updatable_serialization_bytes();
-}
-
-template<typename A>
 int hll_union_alloc<A>::get_lg_config_k() const {
   return gadget.get_lg_config_k();
 }
@@ -167,11 +157,6 @@ int hll_union_alloc<A>::get_lg_config_k() const {
 template<typename A>
 void hll_union_alloc<A>::reset() {
   gadget.reset();
-}
-
-template<typename A>
-bool hll_union_alloc<A>::is_compact() const {
-  return gadget.is_compact();
 }
 
 template<typename A>
@@ -195,18 +180,8 @@ bool hll_union_alloc<A>::is_estimation_mode() const {
 }
 
 template<typename A>
-int hll_union_alloc<A>::get_serialization_version() const {
-  return HllUtil<A>::SER_VER;
-}
-
-template<typename A>
 target_hll_type hll_union_alloc<A>::get_target_type() const {
   return target_hll_type::HLL_8;
-}
-
-template<typename A>
-int hll_union_alloc<A>::get_max_serialization_bytes(const int lg_k) {
-  return hll_sketch_alloc<A>::get_max_updatable_serialization_bytes(lg_k, target_hll_type::HLL_8);
 }
 
 template<typename A>
@@ -226,7 +201,7 @@ HllSketchImpl<A>* hll_union_alloc<A>::copy_or_downsample(const HllSketchImpl<A>*
     return src->copyAs(HLL_8);
   }
   typedef typename std::allocator_traits<A>::template rebind_alloc<Hll8Array<A>> hll8Alloc;
-  Hll8Array<A>* tgtHllArr = new (hll8Alloc().allocate(1)) Hll8Array<A>(tgt_lg_k, false);
+  Hll8Array<A>* tgtHllArr = new (hll8Alloc(src->getAllocator()).allocate(1)) Hll8Array<A>(tgt_lg_k, false, src->getAllocator());
   tgtHllArr->mergeHll(*src);
   //both of these are required for isomorphism
   tgtHllArr->putHipAccum(src->getHipAccum());

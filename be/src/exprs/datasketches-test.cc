@@ -174,22 +174,22 @@ TEST(TestDataSketchesTheta, UseDataSketchesInterface) {
     datasketches::update_theta_sketch sketch1 =
         datasketches::update_theta_sketch::builder().build();
     for (int key = 0; key < 100000; key++) sketch1.update(key);
-    sketch1.serialize(sketch_stream1);
+    sketch1.compact().serialize(sketch_stream1);
 
     // 100000 distinct keys
     datasketches::update_theta_sketch sketch2 =
         datasketches::update_theta_sketch::builder().build();
     for (int key = 50000; key < 150000; key++) sketch2.update(key);
-    sketch2.serialize(sketch_stream2);
+    sketch2.compact().serialize(sketch_stream2);
   }
 
   // this section deserializes the sketches, produces union and intersection
   {
-    datasketches::update_theta_sketch sketch1 =
-        datasketches::update_theta_sketch::deserialize(sketch_stream1);
+    datasketches::compact_theta_sketch sketch1 =
+        datasketches::compact_theta_sketch::deserialize(sketch_stream1);
 
-    datasketches::update_theta_sketch sketch2 =
-        datasketches::update_theta_sketch::deserialize(sketch_stream2);
+    datasketches::compact_theta_sketch sketch2 =
+        datasketches::compact_theta_sketch::deserialize(sketch_stream2);
 
     // union opertion
     datasketches::theta_union u = datasketches::theta_union::builder().build();

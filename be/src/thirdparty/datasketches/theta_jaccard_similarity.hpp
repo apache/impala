@@ -17,38 +17,21 @@
  * under the License.
  */
 
-#ifndef _HLL6ARRAY_HPP_
-#define _HLL6ARRAY_HPP_
+#ifndef THETA_JACCARD_SIMILARITY_HPP_
+#define THETA_JACCARD_SIMILARITY_HPP_
 
-#include "HllArray.hpp"
+#include "theta_jaccard_similarity_base.hpp"
+#include "theta_union.hpp"
+#include "theta_intersection.hpp"
 
 namespace datasketches {
 
-template<typename A>
-class Hll6Iterator;
+template<typename Allocator = std::allocator<uint64_t>>
+using theta_jaccard_similarity_alloc = jaccard_similarity_base<theta_union_alloc<Allocator>, theta_intersection_alloc<Allocator>, trivial_extract_key>;
 
-template<typename A>
-class Hll6Array final : public HllArray<A> {
-  public:
-    Hll6Array(int lgConfigK, bool startFullSize, const A& allocator);
+// alias with default allocator for convenience
+using theta_jaccard_similarity = theta_jaccard_similarity_alloc<std::allocator<uint64_t>>;
 
-    virtual ~Hll6Array() = default;
-    virtual std::function<void(HllSketchImpl<A>*)> get_deleter() const;
+} /* namespace datasketches */
 
-    virtual Hll6Array* copy() const;
-
-    inline uint8_t getSlot(int slotNo) const;
-    inline void putSlot(int slotNo, uint8_t value);
-
-    virtual HllSketchImpl<A>* couponUpdate(int coupon) final;
-    void mergeHll(const HllArray<A>& src);
-
-    virtual int getHllByteArrBytes() const;
-
-  private:
-    void internalCouponUpdate(int coupon);
-};
-
-}
-
-#endif /* _HLL6ARRAY_HPP_ */
+# endif

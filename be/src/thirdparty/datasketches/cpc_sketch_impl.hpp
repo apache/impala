@@ -41,13 +41,13 @@ void cpc_init() {
 }
 
 template<typename A>
-cpc_sketch_alloc<A>::cpc_sketch_alloc(uint8_t lg_k, uint64_t seed):
+cpc_sketch_alloc<A>::cpc_sketch_alloc(uint8_t lg_k, uint64_t seed, const A& allocator):
 lg_k(lg_k),
 seed(seed),
 was_merged(false),
 num_coupons(0),
-surprising_value_table(2, 6 + lg_k),
-sliding_window(),
+surprising_value_table(2, 6 + lg_k, allocator),
+sliding_window(allocator),
 window_offset(0),
 first_interesting_column(0),
 kxp(1 << lg_k),
@@ -56,6 +56,11 @@ hip_est_accum(0)
   if (lg_k < CPC_MIN_LG_K || lg_k > CPC_MAX_LG_K) {
     throw std::invalid_argument("lg_k must be >= " + std::to_string(CPC_MIN_LG_K) + " and <= " + std::to_string(CPC_MAX_LG_K) + ": " + std::to_string(lg_k));
   }
+}
+
+template<typename A>
+A cpc_sketch_alloc<A>::get_allocator() const {
+  return sliding_window.get_allocator();
 }
 
 template<typename A>
@@ -277,7 +282,7 @@ void cpc_sketch_alloc<A>::promote_sparse_to_windowed() {
 
   sliding_window.resize(k, 0); // zero the memory (because we will be OR'ing into it)
 
-  u32_table<A> new_table(2, 6 + lg_k);
+  u32_table<A> new_table(2, 6 + lg_k, sliding_window.get_allocator());
 
   const uint32_t* old_slots = surprising_value_table.get_slots();
   const size_t old_num_slots = 1 << surprising_value_table.get_lg_size();
@@ -401,7 +406,7 @@ string<A> cpc_sketch_alloc<A>::to_string() const {
 
 template<typename A>
 void cpc_sketch_alloc<A>::serialize(std::ostream& os) const {
-  compressed_state<A> compressed;
+  compressed_state<A> compressed(A(sliding_window.get_allocator()));
   compressed.table_data_words = 0;
   compressed.table_num_entries = 0;
   compressed.window_data_words = 0;
@@ -454,7 +459,7 @@ void cpc_sketch_alloc<A>::serialize(std::ostream& os) const {
 
 template<typename A>
 vector_u8<A> cpc_sketch_alloc<A>::serialize(unsigned header_size_bytes) const {
-  compressed_state<A> compressed;
+  compressed_state<A> compressed(sliding_window.get_allocator());
   compressed.table_data_words = 0;
   compressed.table_num_entries = 0;
   compressed.window_data_words = 0;
@@ -464,7 +469,7 @@ vector_u8<A> cpc_sketch_alloc<A>::serialize(unsigned header_size_bytes) const {
   const bool has_window = compressed.window_data.size() > 0;
   const uint8_t preamble_ints = get_preamble_ints(num_coupons, has_hip, has_table, has_window);
   const size_t size = header_size_bytes + (preamble_ints + compressed.table_data_words + compressed.window_data_words) * sizeof(uint32_t);
-  vector_u8<A> bytes(size);
+  vector_u8<A> bytes(size, 0, sliding_window.get_allocator());
   uint8_t* ptr = bytes.data() + header_size_bytes;
   ptr += copy_to_mem(&preamble_ints, ptr, sizeof(preamble_ints));
   const uint8_t serial_version = SERIAL_VERSION;
@@ -511,7 +516,7 @@ vector_u8<A> cpc_sketch_alloc<A>::serialize(unsigned header_size_bytes) const {
 }
 
 template<typename A>
-cpc_sketch_alloc<A> cpc_sketch_alloc<A>::deserialize(std::istream& is, uint64_t seed) {
+cpc_sketch_alloc<A> cpc_sketch_alloc<A>::deserialize(std::istream& is, uint64_t seed, const A& allocator) {
   uint8_t preamble_ints;
   is.read((char*)&preamble_ints, sizeof(preamble_ints));
   uint8_t serial_version;
@@ -529,7 +534,7 @@ cpc_sketch_alloc<A> cpc_sketch_alloc<A>::deserialize(std::istream& is, uint64_t 
   const bool has_hip = flags_byte & (1 << flags::HAS_HIP);
   const bool has_table = flags_byte & (1 << flags::HAS_TABLE);
   const bool has_window = flags_byte & (1 << flags::HAS_WINDOW);
-  compressed_state<A> compressed;
+  compressed_state<A> compressed(allocator);
   compressed.table_data_words = 0;
   compressed.table_num_entries = 0;
   compressed.window_data_words = 0;
@@ -583,7 +588,7 @@ cpc_sketch_alloc<A> cpc_sketch_alloc<A>::deserialize(std::istream& is, uint64_t 
     throw std::invalid_argument("Incompatible seed hashes: " + std::to_string(seed_hash) + ", "
         + std::to_string(compute_seed_hash(seed)));
   }
-  uncompressed_state<A> uncompressed;
+  uncompressed_state<A> uncompressed(allocator);
   get_compressor<A>().uncompress(compressed, uncompressed, lg_k, num_coupons);
   if (!is.good())
     throw std::runtime_error("error reading from std::istream"); 
@@ -592,7 +597,7 @@ cpc_sketch_alloc<A> cpc_sketch_alloc<A>::deserialize(std::istream& is, uint64_t 
 }
 
 template<typename A>
-cpc_sketch_alloc<A> cpc_sketch_alloc<A>::deserialize(const void* bytes, size_t size, uint64_t seed) {
+cpc_sketch_alloc<A> cpc_sketch_alloc<A>::deserialize(const void* bytes, size_t size, uint64_t seed, const A& allocator) {
   ensure_minimum_memory(size, 8);
   const char* ptr = static_cast<const char*>(bytes);
   const char* base = static_cast<const char*>(bytes);
@@ -614,7 +619,7 @@ cpc_sketch_alloc<A> cpc_sketch_alloc<A>::deserialize(const void* bytes, size_t s
   const bool has_table = flags_byte & (1 << flags::HAS_TABLE);
   const bool has_window = flags_byte & (1 << flags::HAS_WINDOW);
   ensure_minimum_memory(size, preamble_ints << 2);
-  compressed_state<A> compressed;
+  compressed_state<A> compressed(allocator);
   compressed.table_data_words = 0;
   compressed.table_num_entries = 0;
   compressed.window_data_words = 0;
@@ -677,7 +682,7 @@ cpc_sketch_alloc<A> cpc_sketch_alloc<A>::deserialize(const void* bytes, size_t s
     throw std::invalid_argument("Incompatible seed hashes: " + std::to_string(seed_hash) + ", "
         + std::to_string(compute_seed_hash(seed)));
   }
-  uncompressed_state<A> uncompressed;
+  uncompressed_state<A> uncompressed(allocator);
   get_compressor<A>().uncompress(compressed, uncompressed, lg_k, num_coupons);
   return cpc_sketch_alloc(lg_k, num_coupons, first_interesting_column, std::move(uncompressed.table),
       std::move(uncompressed.window), has_hip, kxp, hip_est_accum, seed);
@@ -766,7 +771,7 @@ vector_u64<A> cpc_sketch_alloc<A>::build_bit_matrix() const {
   // Fill the matrix with default rows in which the "early zone" is filled with ones.
   // This is essential for the routine's O(k) time cost (as opposed to O(C)).
   const uint64_t default_row = (static_cast<uint64_t>(1) << window_offset) - 1;
-  vector_u64<A> matrix(k, default_row);
+  vector_u64<A> matrix(k, default_row, sliding_window.get_allocator());
 
   if (num_coupons == 0) return matrix;
 

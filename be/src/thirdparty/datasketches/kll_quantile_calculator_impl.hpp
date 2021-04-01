@@ -29,8 +29,8 @@
 namespace datasketches {
 
 template <typename T, typename C, typename A>
-kll_quantile_calculator<T, C, A>::kll_quantile_calculator(const T* items, const uint32_t* levels, uint8_t num_levels, uint64_t n):
-n_(n), levels_(num_levels + 1)
+kll_quantile_calculator<T, C, A>::kll_quantile_calculator(const T* items, const uint32_t* levels, uint8_t num_levels, uint64_t n, const A& allocator):
+n_(n), levels_(num_levels + 1, 0, allocator), entries_(allocator)
 {
   const uint32_t num_items = levels[num_levels] - levels[0];
   entries_.reserve(num_items);
@@ -116,7 +116,7 @@ uint32_t kll_quantile_calculator<T, C, A>::search_for_chunk_containing_pos(uint6
 template <typename T, typename C, typename A>
 void kll_quantile_calculator<T, C, A>::merge_sorted_blocks(Container& entries, const uint32_t* levels, uint8_t num_levels, uint32_t num_items) {
   if (num_levels == 1) return;
-  Container temporary;
+  Container temporary(entries.get_allocator());
   temporary.reserve(num_items);
   merge_sorted_blocks_direct(entries, temporary, levels, 0, num_levels);
 }

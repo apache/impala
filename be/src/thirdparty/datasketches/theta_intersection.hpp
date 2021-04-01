@@ -20,29 +20,28 @@
 #ifndef THETA_INTERSECTION_HPP_
 #define THETA_INTERSECTION_HPP_
 
-#include <memory>
-#include <functional>
-#include <climits>
-
 #include "theta_sketch.hpp"
-#include "common_defs.hpp"
+#include "theta_intersection_base.hpp"
 
 namespace datasketches {
 
-/*
- * author Alexander Saydakov
- * author Lee Rhodes
- * author Kevin Lang
- */
-
-template<typename A>
+template<typename Allocator = std::allocator<uint64_t>>
 class theta_intersection_alloc {
 public:
-  /**
-   * Creates an instance of the intersection with a given hash seed.
-   * @param seed hash seed
-   */
-  explicit theta_intersection_alloc(uint64_t seed = DEFAULT_SEED);
+  using Entry = uint64_t;
+  using ExtractKey = trivial_extract_key;
+  using Sketch = theta_sketch_alloc<Allocator>;
+  using CompactSketch = compact_theta_sketch_alloc<Allocator>;
+
+  struct pass_through_policy {
+    uint64_t operator()(uint64_t internal_entry, uint64_t incoming_entry) const {
+      unused(incoming_entry);
+      return internal_entry;
+    }
+  };
+  using State = theta_intersection_base<Entry, ExtractKey, pass_through_policy, Sketch, CompactSketch, Allocator>;
+
+  explicit theta_intersection_alloc(uint64_t seed = DEFAULT_SEED, const Allocator& allocator = Allocator());
 
   /**
    * Updates the intersection with a given sketch.
@@ -50,7 +49,8 @@ public:
    * can reduce the current set to leave the overlapping subset only.
    * @param sketch represents input set for the intersection
    */
-  void update(const theta_sketch_alloc<A>& sketch);
+  template<typename FwdSketch>
+  void update(FwdSketch&& sketch);
 
   /**
    * Produces a copy of the current state of the intersection.
@@ -59,7 +59,7 @@ public:
    * @param ordered optional flag to specify if ordered sketch should be produced
    * @return the result of the intersection
    */
-  compact_theta_sketch_alloc<A> get_result(bool ordered = true) const;
+  CompactSketch get_result(bool ordered = true) const;
 
   /**
    * Returns true if the state of the intersection is defined (not infinite "universe").
@@ -68,21 +68,14 @@ public:
   bool has_result() const;
 
 private:
-  typedef typename std::allocator_traits<A>::template rebind_alloc<uint64_t> AllocU64;
-  bool is_valid_;
-  bool is_empty_;
-  uint64_t theta_;
-  uint8_t lg_size_;
-  vector_u64<A> keys_;
-  uint32_t num_keys_;
-  uint16_t seed_hash_;
+  State state_;
 };
 
 // alias with default allocator for convenience
-typedef theta_intersection_alloc<std::allocator<void>> theta_intersection;
+using theta_intersection = theta_intersection_alloc<std::allocator<uint64_t>>;
 
 } /* namespace datasketches */
 
 #include "theta_intersection_impl.hpp"
 
-# endif
+#endif

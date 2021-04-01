@@ -17,38 +17,20 @@
  * under the License.
  */
 
-#ifndef _HLL6ARRAY_HPP_
-#define _HLL6ARRAY_HPP_
+#ifndef THETA_CONSTANTS_HPP_
+#define THETA_CONSTANTS_HPP_
 
-#include "HllArray.hpp"
+#include <climits>
 
 namespace datasketches {
 
-template<typename A>
-class Hll6Iterator;
-
-template<typename A>
-class Hll6Array final : public HllArray<A> {
-  public:
-    Hll6Array(int lgConfigK, bool startFullSize, const A& allocator);
-
-    virtual ~Hll6Array() = default;
-    virtual std::function<void(HllSketchImpl<A>*)> get_deleter() const;
-
-    virtual Hll6Array* copy() const;
-
-    inline uint8_t getSlot(int slotNo) const;
-    inline void putSlot(int slotNo, uint8_t value);
-
-    virtual HllSketchImpl<A>* couponUpdate(int coupon) final;
-    void mergeHll(const HllArray<A>& src);
-
-    virtual int getHllByteArrBytes() const;
-
-  private:
-    void internalCouponUpdate(int coupon);
-};
-
+namespace theta_constants {
+  enum resize_factor { X1, X2, X4, X8 };
+  static const uint64_t MAX_THETA = LLONG_MAX; // signed max for compatibility with Java
+  static const uint8_t MIN_LG_K = 5;
+  static const uint8_t MAX_LG_K = 26;
 }
 
-#endif /* _HLL6ARRAY_HPP_ */
+} /* namespace datasketches */
+
+#endif

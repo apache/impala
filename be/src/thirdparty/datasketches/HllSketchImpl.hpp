@@ -27,7 +27,7 @@
 
 namespace datasketches {
 
-template<typename A = std::allocator<char>>
+template<typename A>
 class HllSketchImpl {
   public:
     HllSketchImpl(int lgConfigK, target_hll_type tgtHllType, hll_mode mode, bool startFullSize);
@@ -66,6 +66,7 @@ class HllSketchImpl {
     virtual bool isEmpty() const = 0;
     virtual bool isOutOfOrderFlag() const = 0;
     virtual void putOutOfOrderFlag(bool oooFlag) = 0;
+    virtual A getAllocator() const = 0;
     bool isStartFullSize() const;
 
   protected:

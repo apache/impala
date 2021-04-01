@@ -35,48 +35,16 @@
 namespace datasketches {
 
 template<typename A>
-HllArray<A>::HllArray(const int lgConfigK, const target_hll_type tgtHllType, bool startFullSize)
-  : HllSketchImpl<A>(lgConfigK, tgtHllType, hll_mode::HLL, startFullSize) {
-  hipAccum = 0.0;
-  kxq0 = 1 << lgConfigK;
-  kxq1 = 0.0;
-  curMin = 0;
-  numAtCurMin = 1 << lgConfigK;
-  oooFlag = false;
-  hllByteArr = nullptr; // allocated in derived class
-}
-
-template<typename A>
-HllArray<A>::HllArray(const HllArray<A>& that):
-HllSketchImpl<A>(that.lgConfigK, that.tgtHllType, hll_mode::HLL, that.startFullSize),
-hipAccum(that.hipAccum),
-kxq0(that.kxq0),
-kxq1(that.kxq1),
-hllByteArr(nullptr),
-curMin(that.curMin),
-numAtCurMin(that.numAtCurMin),
-oooFlag(that.oooFlag)
-{
-  const int arrayLen = that.getHllByteArrBytes();
-  typedef typename std::allocator_traits<A>::template rebind_alloc<uint8_t> uint8Alloc;
-  hllByteArr = uint8Alloc().allocate(arrayLen);
-  std::copy(that.hllByteArr, that.hllByteArr + arrayLen, hllByteArr);
-}
-
-template<typename A>
-HllArray<A>::~HllArray() {
-  // need to determine number of bytes to deallocate
-  int hllArrBytes = 0;
-  if (this->tgtHllType == target_hll_type::HLL_4) {
-    hllArrBytes = hll4ArrBytes(this->lgConfigK);
-  } else if (this->tgtHllType == target_hll_type::HLL_6) {
-    hllArrBytes = hll6ArrBytes(this->lgConfigK);
-  } else { // tgtHllType == HLL_8
-    hllArrBytes = hll8ArrBytes(this->lgConfigK);
-  }
-  typedef typename std::allocator_traits<A>::template rebind_alloc<uint8_t> uint8Alloc;
-  uint8Alloc().deallocate(hllByteArr, hllArrBytes);
-}
+HllArray<A>::HllArray(const int lgConfigK, const target_hll_type tgtHllType, bool startFullSize, const A& allocator):
+HllSketchImpl<A>(lgConfigK, tgtHllType, hll_mode::HLL, startFullSize),
+hipAccum(0.0),
+kxq0(1 << lgConfigK),
+kxq1(0.0),
+hllByteArr(allocator),
+curMin(0),
+numAtCurMin(1 << lgConfigK),
+oooFlag(false)
+{}
 
 template<typename A>
 HllArray<A>* HllArray<A>::copyAs(const target_hll_type tgtHllType) const {
@@ -93,7 +61,7 @@ HllArray<A>* HllArray<A>::copyAs(const target_hll_type tgtHllType) const {
 }
 
 template<typename A>
-HllArray<A>* HllArray<A>::newHll(const void* bytes, size_t len) {
+HllArray<A>* HllArray<A>::newHll(const void* bytes, size_t len, const A& allocator) {
   if (len < HllUtil<A>::HLL_BYTE_ARR_START) {
     throw std::out_of_range("Input data length insufficient to hold HLL array");
   }
@@ -143,11 +111,11 @@ HllArray<A>* HllArray<A>::newHll(const void* bytes, size_t len) {
     int auxLgIntArrSize = (int) data[4];
     const size_t offset = HllUtil<A>::HLL_BYTE_ARR_START + arrayBytes;
     const uint8_t* auxDataStart = data + offset;
-    auxHashMap = AuxHashMap<A>::deserialize(auxDataStart, len - offset, lgK, auxCount, auxLgIntArrSize, comapctFlag);
+    auxHashMap = AuxHashMap<A>::deserialize(auxDataStart, len - offset, lgK, auxCount, auxLgIntArrSize, comapctFlag, allocator);
     aux_ptr = aux_hash_map_ptr(auxHashMap, auxHashMap->make_deleter());
   }
 
-  HllArray<A>* sketch = HllSketchImplFactory<A>::newHll(lgK, tgtHllType, startFullSizeFlag);
+  HllArray<A>* sketch = HllSketchImplFactory<A>::newHll(lgK, tgtHllType, startFullSizeFlag, allocator);
   sketch->putCurMin(curMin);
   sketch->putOutOfOrderFlag(oooFlag);
   if (!oooFlag) sketch->putHipAccum(hip);
@@ -155,7 +123,7 @@ HllArray<A>* HllArray<A>::newHll(const void* bytes, size_t len) {
   sketch->putKxQ1(kxq1);
   sketch->putNumAtCurMin(numAtCurMin);
 
-  std::memcpy(sketch->hllByteArr, data + HllUtil<A>::HLL_BYTE_ARR_START, arrayBytes);
+  std::memcpy(sketch->hllByteArr.data(), data + HllUtil<A>::HLL_BYTE_ARR_START, arrayBytes);
 
   if (auxHashMap != nullptr)
     ((Hll4Array<A>*)sketch)->putAuxHashMap(auxHashMap);
@@ -165,7 +133,7 @@ HllArray<A>* HllArray<A>::newHll(const void* bytes, size_t len) {
 }
 
 template<typename A>
-HllArray<A>* HllArray<A>::newHll(std::istream& is) {
+HllArray<A>* HllArray<A>::newHll(std::istream& is, const A& allocator) {
   uint8_t listHeader[8];
   is.read((char*)listHeader, 8 * sizeof(uint8_t));
 
@@ -192,7 +160,7 @@ HllArray<A>* HllArray<A>::newHll(std::istream& is) {
   const int lgK = (int) listHeader[HllUtil<A>::LG_K_BYTE];
   const int curMin = (int) listHeader[HllUtil<A>::HLL_CUR_MIN_BYTE];
 
-  HllArray* sketch = HllSketchImplFactory<A>::newHll(lgK, tgtHllType, startFullSizeFlag);
+  HllArray* sketch = HllSketchImplFactory<A>::newHll(lgK, tgtHllType, startFullSizeFlag, allocator);
   typedef std::unique_ptr<HllArray<A>, std::function<void(HllSketchImpl<A>*)>> hll_array_ptr;
   hll_array_ptr sketch_ptr(sketch, sketch->get_deleter());
   sketch->putCurMin(curMin);
@@ -211,11 +179,11 @@ HllArray<A>* HllArray<A>::newHll(std::istream& is) {
   is.read((char*)&auxCount, sizeof(auxCount));
   sketch->putNumAtCurMin(numAtCurMin);
   
-  is.read((char*)sketch->hllByteArr, sketch->getHllByteArrBytes());
+  is.read((char*)sketch->hllByteArr.data(), sketch->getHllByteArrBytes());
   
   if (auxCount > 0) { // necessarily TgtHllType == HLL_4
     int auxLgIntArrSize = listHeader[4];
-    AuxHashMap<A>* auxHashMap = AuxHashMap<A>::deserialize(is, lgK, auxCount, auxLgIntArrSize, comapctFlag);
+    AuxHashMap<A>* auxHashMap = AuxHashMap<A>::deserialize(is, lgK, auxCount, auxLgIntArrSize, comapctFlag, allocator);
     ((Hll4Array<A>*)sketch)->putAuxHashMap(auxHashMap);
   }
 
@@ -228,7 +196,7 @@ HllArray<A>* HllArray<A>::newHll(std::istream& is) {
 template<typename A>
 vector_u8<A> HllArray<A>::serialize(bool compact, unsigned header_size_bytes) const {
   const size_t sketchSizeBytes = (compact ? getCompactSerializationBytes() : getUpdatableSerializationBytes()) + header_size_bytes;
-  vector_u8<A> byteArr(sketchSizeBytes);
+  vector_u8<A> byteArr(sketchSizeBytes, 0, getAllocator());
   uint8_t* bytes = byteArr.data() + header_size_bytes;
   AuxHashMap<A>* auxHashMap = getAuxHashMap();
 
@@ -249,7 +217,7 @@ vector_u8<A> HllArray<A>::serialize(bool compact, unsigned header_size_bytes) co
   std::memcpy(bytes + HllUtil<A>::AUX_COUNT_INT, &auxCount, sizeof(int));
 
   const int hllByteArrBytes = getHllByteArrBytes();
-  std::memcpy(bytes + getMemDataStart(), hllByteArr, hllByteArrBytes);
+  std::memcpy(bytes + getMemDataStart(), hllByteArr.data(), hllByteArrBytes);
 
   // aux map if HLL_4
   if (this->tgtHllType == HLL_4) {
@@ -309,7 +277,7 @@ void HllArray<A>::serialize(std::ostream& os, const bool compact) const {
 
   const int auxCount = (auxHashMap == nullptr ? 0 : auxHashMap->getAuxCount());
   os.write((char*)&auxCount, sizeof(auxCount));
-  os.write((char*)hllByteArr, getHllByteArrBytes());
+  os.write((char*)hllByteArr.data(), getHllByteArrBytes());
 
   // aux map if HLL_4
   if (this->tgtHllType == HLL_4) {
@@ -639,12 +607,12 @@ double HllArray<A>::getHllRawEstimate(const int lgConfigK, const double kxqSum) 
 
 template<typename A>
 typename HllArray<A>::const_iterator HllArray<A>::begin(bool all) const {
-  return const_iterator(hllByteArr, 1 << this->lgConfigK, 0, this->tgtHllType, nullptr, 0, all);
+  return const_iterator(hllByteArr.data(), 1 << this->lgConfigK, 0, this->tgtHllType, nullptr, 0, all);
 }
 
 template<typename A>
 typename HllArray<A>::const_iterator HllArray<A>::end() const {
-  return const_iterator(hllByteArr, 1 << this->lgConfigK, 1 << this->lgConfigK, this->tgtHllType, nullptr, 0, false);
+  return const_iterator(hllByteArr.data(), 1 << this->lgConfigK, 1 << this->lgConfigK, this->tgtHllType, nullptr, 0, false);
 }
 
 template<typename A>
@@ -699,6 +667,11 @@ uint8_t HllArray<A>::const_iterator::get_value(const uint8_t* array, size_t inde
   }
   // HLL_8
   return array[index];
+}
+
+template<typename A>
+A HllArray<A>::getAllocator() const {
+  return hllByteArr.get_allocator();
 }
 
 }

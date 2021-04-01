@@ -31,15 +31,15 @@
 
 namespace datasketches {
 
-template<typename A = std::allocator<char>>
+template<typename A>
 class HllSketchImplFactory final {
 public:
-  static HllSketchImpl<A>* deserialize(std::istream& os);
-  static HllSketchImpl<A>* deserialize(const void* bytes, size_t len);
+  static HllSketchImpl<A>* deserialize(std::istream& os, const A& allocator);
+  static HllSketchImpl<A>* deserialize(const void* bytes, size_t len, const A& allocator);
 
   static CouponHashSet<A>* promoteListToSet(const CouponList<A>& list);
   static HllArray<A>* promoteListOrSetToHll(const CouponList<A>& list);
-  static HllArray<A>* newHll(int lgConfigK, target_hll_type tgtHllType, bool startFullSize = false);
+  static HllArray<A>* newHll(int lgConfigK, target_hll_type tgtHllType, bool startFullSize, const A& allocator);
   
   // resets the input impl, deleting the input pointer and returning a new pointer
   static HllSketchImpl<A>* reset(HllSketchImpl<A>* impl, bool startFullSize);
@@ -51,8 +51,8 @@ public:
 
 template<typename A>
 CouponHashSet<A>* HllSketchImplFactory<A>::promoteListToSet(const CouponList<A>& list) {
-  typedef typename std::allocator_traits<A>::template rebind_alloc<CouponHashSet<A>> chsAlloc;
-  CouponHashSet<A>* chSet = new (chsAlloc().allocate(1)) CouponHashSet<A>(list.getLgConfigK(), list.getTgtHllType());
+  using ChsAlloc = typename std::allocator_traits<A>::template rebind_alloc<CouponHashSet<A>>;
+  CouponHashSet<A>* chSet = new (ChsAlloc(list.getAllocator()).allocate(1)) CouponHashSet<A>(list.getLgConfigK(), list.getTgtHllType(), list.getAllocator());
   for (auto coupon: list) {
     chSet->couponUpdate(coupon);
   }
@@ -61,7 +61,7 @@ CouponHashSet<A>* HllSketchImplFactory<A>::promoteListToSet(const CouponList<A>&
 
 template<typename A>
 HllArray<A>* HllSketchImplFactory<A>::promoteListOrSetToHll(const CouponList<A>& src) {
-  HllArray<A>* tgtHllArr = HllSketchImplFactory<A>::newHll(src.getLgConfigK(), src.getTgtHllType());
+  HllArray<A>* tgtHllArr = HllSketchImplFactory<A>::newHll(src.getLgConfigK(), src.getTgtHllType(), false, src.getAllocator());
   tgtHllArr->putKxQ0(1 << src.getLgConfigK());
   for (auto coupon: src) {
     tgtHllArr->couponUpdate(coupon);
@@ -72,48 +72,48 @@ HllArray<A>* HllSketchImplFactory<A>::promoteListOrSetToHll(const CouponList<A>&
 }
 
 template<typename A>
-HllSketchImpl<A>* HllSketchImplFactory<A>::deserialize(std::istream& is) {
+HllSketchImpl<A>* HllSketchImplFactory<A>::deserialize(std::istream& is, const A& allocator) {
   // we'll hand off the sketch based on PreInts so we don't need
   // to move the stream pointer back and forth -- perhaps somewhat fragile?
   const int preInts = is.peek();
   if (preInts == HllUtil<A>::HLL_PREINTS) {
-    return HllArray<A>::newHll(is);
+    return HllArray<A>::newHll(is, allocator);
   } else if (preInts == HllUtil<A>::HASH_SET_PREINTS) {
-    return CouponHashSet<A>::newSet(is);
+    return CouponHashSet<A>::newSet(is, allocator);
   } else if (preInts == HllUtil<A>::LIST_PREINTS) {
-    return CouponList<A>::newList(is);
+    return CouponList<A>::newList(is, allocator);
   } else {
     throw std::invalid_argument("Attempt to deserialize unknown object type");
   }
 }
 
 template<typename A>
-HllSketchImpl<A>* HllSketchImplFactory<A>::deserialize(const void* bytes, size_t len) {
+HllSketchImpl<A>* HllSketchImplFactory<A>::deserialize(const void* bytes, size_t len, const A& allocator) {
   // read current mode directly
   const int preInts = static_cast<const uint8_t*>(bytes)[0];
   if (preInts == HllUtil<A>::HLL_PREINTS) {
-    return HllArray<A>::newHll(bytes, len);
+    return HllArray<A>::newHll(bytes, len, allocator);
   } else if (preInts == HllUtil<A>::HASH_SET_PREINTS) {
-    return CouponHashSet<A>::newSet(bytes, len);
+    return CouponHashSet<A>::newSet(bytes, len, allocator);
   } else if (preInts == HllUtil<A>::LIST_PREINTS) {
-    return CouponList<A>::newList(bytes, len);
+    return CouponList<A>::newList(bytes, len, allocator);
   } else {
     throw std::invalid_argument("Attempt to deserialize unknown object type");
   }
 }
 
 template<typename A>
-HllArray<A>* HllSketchImplFactory<A>::newHll(int lgConfigK, target_hll_type tgtHllType, bool startFullSize) {
+HllArray<A>* HllSketchImplFactory<A>::newHll(int lgConfigK, target_hll_type tgtHllType, bool startFullSize, const A& allocator) {
   switch (tgtHllType) {
     case HLL_8:
-      typedef typename std::allocator_traits<A>::template rebind_alloc<Hll8Array<A>> hll8Alloc;
-      return new (hll8Alloc().allocate(1)) Hll8Array<A>(lgConfigK, startFullSize);
+      using Hll8Alloc = typename std::allocator_traits<A>::template rebind_alloc<Hll8Array<A>>;
+      return new (Hll8Alloc(allocator).allocate(1)) Hll8Array<A>(lgConfigK, startFullSize, allocator);
     case HLL_6:
-      typedef typename std::allocator_traits<A>::template rebind_alloc<Hll6Array<A>> hll6Alloc;
-      return new (hll6Alloc().allocate(1)) Hll6Array<A>(lgConfigK, startFullSize);
+      using Hll6Alloc = typename std::allocator_traits<A>::template rebind_alloc<Hll6Array<A>>;
+      return new (Hll6Alloc(allocator).allocate(1)) Hll6Array<A>(lgConfigK, startFullSize, allocator);
     case HLL_4:
-      typedef typename std::allocator_traits<A>::template rebind_alloc<Hll4Array<A>> hll4Alloc;
-      return new (hll4Alloc().allocate(1)) Hll4Array<A>(lgConfigK, startFullSize);
+      using Hll4Alloc = typename std::allocator_traits<A>::template rebind_alloc<Hll4Array<A>>;
+      return new (Hll4Alloc(allocator).allocate(1)) Hll4Array<A>(lgConfigK, startFullSize, allocator);
   }
   throw std::logic_error("Invalid target_hll_type");
 }
@@ -121,12 +121,12 @@ HllArray<A>* HllSketchImplFactory<A>::newHll(int lgConfigK, target_hll_type tgtH
 template<typename A>
 HllSketchImpl<A>* HllSketchImplFactory<A>::reset(HllSketchImpl<A>* impl, bool startFullSize) {
   if (startFullSize) {
-    HllArray<A>* hll = newHll(impl->getLgConfigK(), impl->getTgtHllType(), startFullSize);
+    HllArray<A>* hll = newHll(impl->getLgConfigK(), impl->getTgtHllType(), startFullSize, impl->getAllocator());
     impl->get_deleter()(impl);
     return hll;
   } else {
-    typedef typename std::allocator_traits<A>::template rebind_alloc<CouponList<A>> clAlloc;
-    CouponList<A>* cl = new (clAlloc().allocate(1)) CouponList<A>(impl->getLgConfigK(), impl->getTgtHllType(), hll_mode::LIST);
+    using ClAlloc = typename std::allocator_traits<A>::template rebind_alloc<CouponList<A>>;
+    CouponList<A>* cl = new (ClAlloc(impl->getAllocator()).allocate(1)) CouponList<A>(impl->getLgConfigK(), impl->getTgtHllType(), hll_mode::LIST, impl->getAllocator());
     impl->get_deleter()(impl);
     return cl;
   }
@@ -135,8 +135,9 @@ HllSketchImpl<A>* HllSketchImplFactory<A>::reset(HllSketchImpl<A>* impl, bool st
 template<typename A>
 Hll4Array<A>* HllSketchImplFactory<A>::convertToHll4(const HllArray<A>& srcHllArr) {
   const int lgConfigK = srcHllArr.getLgConfigK();
-  typedef typename std::allocator_traits<A>::template rebind_alloc<Hll4Array<A>> hll4Alloc;
-  Hll4Array<A>* hll4Array = new (hll4Alloc().allocate(1)) Hll4Array<A>(lgConfigK, srcHllArr.isStartFullSize());
+  using Hll4Alloc = typename std::allocator_traits<A>::template rebind_alloc<Hll4Array<A>>;
+  Hll4Array<A>* hll4Array = new (Hll4Alloc(srcHllArr.getAllocator()).allocate(1))
+      Hll4Array<A>(lgConfigK, srcHllArr.isStartFullSize(), srcHllArr.getAllocator());
   hll4Array->putOutOfOrderFlag(srcHllArr.isOutOfOrderFlag());
   hll4Array->mergeHll(srcHllArr);
   hll4Array->putHipAccum(srcHllArr.getHipAccum());
@@ -146,8 +147,9 @@ Hll4Array<A>* HllSketchImplFactory<A>::convertToHll4(const HllArray<A>& srcHllAr
 template<typename A>
 Hll6Array<A>* HllSketchImplFactory<A>::convertToHll6(const HllArray<A>& srcHllArr) {
   const int lgConfigK = srcHllArr.getLgConfigK();
-  typedef typename std::allocator_traits<A>::template rebind_alloc<Hll6Array<A>> hll6Alloc;
-  Hll6Array<A>* hll6Array = new (hll6Alloc().allocate(1)) Hll6Array<A>(lgConfigK, srcHllArr.isStartFullSize());
+  using Hll6Alloc = typename std::allocator_traits<A>::template rebind_alloc<Hll6Array<A>>;
+  Hll6Array<A>* hll6Array = new (Hll6Alloc(srcHllArr.getAllocator()).allocate(1))
+      Hll6Array<A>(lgConfigK, srcHllArr.isStartFullSize(), srcHllArr.getAllocator());
   hll6Array->putOutOfOrderFlag(srcHllArr.isOutOfOrderFlag());
   hll6Array->mergeHll(srcHllArr);
   hll6Array->putHipAccum(srcHllArr.getHipAccum());
@@ -157,8 +159,9 @@ Hll6Array<A>* HllSketchImplFactory<A>::convertToHll6(const HllArray<A>& srcHllAr
 template<typename A>
 Hll8Array<A>* HllSketchImplFactory<A>::convertToHll8(const HllArray<A>& srcHllArr) {
   const int lgConfigK = srcHllArr.getLgConfigK();
-  typedef typename std::allocator_traits<A>::template rebind_alloc<Hll8Array<A>> hll8Alloc;
-  Hll8Array<A>* hll8Array = new (hll8Alloc().allocate(1)) Hll8Array<A>(lgConfigK, srcHllArr.isStartFullSize());
+  using Hll8Alloc = typename std::allocator_traits<A>::template rebind_alloc<Hll8Array<A>>;
+  Hll8Array<A>* hll8Array = new (Hll8Alloc(srcHllArr.getAllocator()).allocate(1))
+      Hll8Array<A>(lgConfigK, srcHllArr.isStartFullSize(), srcHllArr.getAllocator());
   hll8Array->putOutOfOrderFlag(srcHllArr.isOutOfOrderFlag());
   hll8Array->mergeHll(srcHllArr);
   hll8Array->putHipAccum(srcHllArr.getHipAccum());

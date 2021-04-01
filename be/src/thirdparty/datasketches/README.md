@@ -10,8 +10,8 @@ changed during this process as originally the following folders were affected:
 I copied the content of these folders into the same directory so that Impala
 can compile them without rewriting the include paths in the files themselves.
 
-The git branch of the snapshot I used as a source for the files:
-The hash: b2f749ed5ce6ba650f4259602b133c310c3a5ee4
+The git branch of the snapshot I used as a source for the files: 3.0.0
+The hash: 45885c0c8c0807bb9480886d60ca7042000a4c43
 
 Browse the source files here:
-https://github.com/apache/datasketches-cpp/tree/b2f749ed5ce6ba650f4259602b133c310c3a5ee4
+https://github.com/apache/datasketches-cpp/tree/3.0.0

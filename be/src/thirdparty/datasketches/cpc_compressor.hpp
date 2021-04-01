@@ -129,14 +129,14 @@ private:
   void compress_surprising_values(const vector_u32<A>& pairs, uint8_t lg_k, compressed_state<A>& result) const;
   void compress_sliding_window(const uint8_t* window, uint8_t lg_k, uint32_t num_coupons, compressed_state<A>& target) const;
 
-  vector_u32<A> uncompress_surprising_values(const uint32_t* data, size_t data_words, size_t num_pairs, uint8_t lg_k) const;
+  vector_u32<A> uncompress_surprising_values(const uint32_t* data, size_t data_words, size_t num_pairs, uint8_t lg_k, const A& allocator) const;
   void uncompress_sliding_window(const uint32_t* data, size_t data_words, vector_u8<A>& window, uint8_t lg_k, uint32_t num_coupons) const;
 
   static size_t safe_length_for_compressed_pair_buf(uint64_t k, size_t num_pairs, size_t num_base_bits);
   static size_t safe_length_for_compressed_window_buf(uint64_t k);
   static uint8_t determine_pseudo_phase(uint8_t lg_k, uint64_t c);
 
-  static inline vector_u32<A> tricky_get_pairs_from_window(const uint8_t* window, uint32_t k, uint32_t num_pairs_to_get, uint32_t empty_space);
+  static inline vector_u32<A> tricky_get_pairs_from_window(const uint8_t* window, uint32_t k, uint32_t num_pairs_to_get, uint32_t empty_space, const A& allocator);
   static inline uint64_t golomb_choose_number_of_base_bits(uint64_t k, uint64_t count);
 };
 

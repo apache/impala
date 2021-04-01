@@ -24,7 +24,7 @@
 
 namespace datasketches {
 
-template<typename A = std::allocator<char>>
+template<typename A = std::allocator<uint8_t>>
 class CompositeInterpolationXTable {
   public:
     static int get_y_stride(int logK);

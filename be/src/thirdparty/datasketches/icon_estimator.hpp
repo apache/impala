@@ -231,7 +231,7 @@ static const double ICON_POLYNOMIAL_COEFFICIENTS[ICON_TABLE_SIZE] = {
 #endif
 };
 
-static double evaluate_polynomial(const double* coefficients, int start, int num, double x) {
+static inline double evaluate_polynomial(const double* coefficients, int start, int num, double x) {
   const int final = start + num - 1;
   double total = coefficients[final];
   for (int j = final - 1; j >= start; j--) {
@@ -241,11 +241,11 @@ static double evaluate_polynomial(const double* coefficients, int start, int num
   return total;
 }
 
-static double icon_exponential_approximation(double k, double c) {
+static inline double icon_exponential_approximation(double k, double c) {
   return (0.7940236163830469 * k * pow(2.0, c / k));
 }
 
-static double compute_icon_estimate(uint8_t lg_k, uint64_t c) {
+static inline double compute_icon_estimate(uint8_t lg_k, uint64_t c) {
   if (lg_k < ICON_MIN_LOG_K || lg_k > ICON_MAX_LOG_K) throw std::out_of_range("lg_k out of range");
   if (c < 2) return ((c == 0) ? 0.0 : 1.0);
   const size_t k = 1 << lg_k;

@@ -44,6 +44,8 @@ template<typename A> class u32_table;
 
 template<typename A>
 struct compressed_state {
+  explicit compressed_state(const A& allocator): table_data(allocator), table_data_words(0), table_num_entries(0),
+      window_data(allocator), window_data_words(0) {}
   vector_u32<A> table_data;
   uint32_t table_data_words;
   uint32_t table_num_entries; // can be different from the number of entries in the sketch in hybrid mode
@@ -53,6 +55,7 @@ struct compressed_state {
 
 template<typename A>
 struct uncompressed_state {
+  explicit uncompressed_state(const A& allocator): table(allocator), window(allocator) {}
   u32_table<A> table;
   vector_u8<A> window;
 };

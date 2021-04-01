@@ -36,7 +36,7 @@ enum hll_mode { LIST = 0, SET, HLL };
 
 // template provides internal consistency and allows static float values
 // but we don't use the template parameter anywhere
-template<typename A = std::allocator<char> >
+template<typename A = std::allocator<uint8_t> >
 class HllUtil final {
 public:
   // preamble stuff
