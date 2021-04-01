@@ -113,6 +113,7 @@ done:
       current_state_.Load() > FInstanceExecStatePB::WAITING_FOR_PREPARE);
 
   if (!status.ok()) {
+    exec_failed_.Store(true);
     if (!is_prepared) {
       UpdateState(StateEvent::EXEC_END);
 
@@ -124,7 +125,6 @@ done:
       // with GetStatusReport(). This may lead to report the instance as "completed"
       // without error, or the "final" profile being sent with the 'done' flag as false.
 
-      exec_failed_.Store(true);
       // Tell the managing 'QueryState' that we hit an error during execution.
       query_state_->ErrorDuringExecute(status, instance_id());
 
@@ -284,7 +284,9 @@ void FragmentInstanceState::GetStatusReport(FragmentInstanceExecStatusPB* instan
   }
   const TUniqueId& finstance_id = instance_id();
   TUniqueIdToUniqueIdPB(finstance_id, instance_status->mutable_fragment_instance_id());
-  const bool done = IsDone() || (ExecFailed() && !overall_status.ok());
+  // For failed fragment instance, report it as "done" when overall_statue is reported
+  // with error. This avoid coordinator to ignore the last status report.
+  const bool done = (IsDone() && !ExecFailed()) || (ExecFailed() && !overall_status.ok());
   instance_status->set_done(done);
   instance_status->set_current_state(current_state());
   DCHECK(profile() != nullptr);
