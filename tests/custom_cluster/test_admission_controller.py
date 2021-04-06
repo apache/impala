@@ -1763,6 +1763,10 @@ class TestAdmissionControllerStress(TestAdmissionControllerBase):
 
           exec_options = self.vector.get_value('exec_option')
           exec_options.update(self.additional_query_options)
+          # Turning off result spooling allows us to better control query execution by
+          # controlling the number or rows fetched. This allows us to maintain resource
+          # usage among backends.
+          exec_options['spool_query_results'] = 0
           query = QUERY.format(self.query_num)
           self.query_state = 'SUBMITTING'
           client = self.impalad.service.create_beeswax_client()
