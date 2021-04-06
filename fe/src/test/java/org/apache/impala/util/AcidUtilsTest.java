@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidReadTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
+import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.compat.MetastoreShim;
@@ -594,5 +595,19 @@ public class AcidUtilsTest {
             "base_000010/0000_0",
             "delta_0000012_0000012_0000/0000_0",
             "delta_0000012_0000012_0000/0000_1"});
+  }
+
+  @Test
+  public void testWriteIdListCompare() {
+    ValidWriteIdList a =
+            new ValidReaderWriteIdList("default.test:1:1:1:");
+    ValidWriteIdList b =
+            new ValidReaderWriteIdList("default.test:1:9223372036854775807::");
+
+    // should return -1 since b is more recent
+    assert(AcidUtils.compare(a, b) == -1);
+
+    //Should return 1 since b is more recent
+    assert(AcidUtils.compare(b,a) == 1);
   }
 }
