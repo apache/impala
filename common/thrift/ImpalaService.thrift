@@ -26,6 +26,7 @@ include "TCLIService.thrift"
 include "RuntimeProfile.thrift"
 include "Frontend.thrift"
 include "BackendGflags.thrift"
+include "Query.thrift"
 
 // ImpalaService accepts query execution options through beeswax.Query.configuration in
 // key:value form. For example, the list of strings could be:
@@ -850,6 +851,12 @@ struct TGetExecutorMembershipResp {
   2: required Frontend.TUpdateExecutorMembershipRequest executor_membership
 }
 
+struct TInitQueryContextResp {
+  1: required TCLIService.TStatus status
+
+  2: required Query.TQueryCtx query_ctx
+}
+
 service ImpalaHiveServer2Service extends TCLIService.TCLIService {
   // Returns the exec summary for the given query. The exec summary is only valid for
   // queries that execute with Impala's backend, i.e. QUERY, DML and COMPUTE_STATS
@@ -866,6 +873,10 @@ service ImpalaHiveServer2Service extends TCLIService.TCLIService {
 
   // Same as HS2 CloseOperation but can return additional information.
   TCloseImpalaOperationResp CloseImpalaOperation(1:TCloseImpalaOperationReq req);
+
+  // Returns an initialized TQueryCtx. Only supported for the "external fe" service.
+  TInitQueryContextResp InitQueryContext();
+
   // Execute statement with supplied ExecRequest
   TCLIService.TExecuteStatementResp ExecutePlannedStatement(
       1:TExecutePlannedStatementReq req);

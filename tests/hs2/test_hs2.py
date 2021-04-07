@@ -749,6 +749,12 @@ class TestHS2(HS2TestSuite):
         TCLIService.TStatusCode.ERROR_STATUS, "Unsupported operation")
 
   @needs_session()
+  def test_init_query_context(self):
+    init_query_context_resp = self.hs2_client.InitQueryContext()
+    TestHS2.check_response(init_query_context_resp,
+        TCLIService.TStatusCode.ERROR_STATUS, "Unsupported operation")
+
+  @needs_session()
   def test_get_profile(self):
     statement = "SELECT COUNT(2) FROM functional.alltypes"
     execute_statement_resp = self.execute_statement(statement)

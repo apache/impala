@@ -569,6 +569,18 @@ void ImpalaServer::ExecutePlannedStatement(
   ExecuteStatementCommon(return_val, request.statementReq, &request.plan);
 }
 
+void ImpalaServer::InitQueryContext(
+      TInitQueryContextResp& return_val) {
+  VLOG_QUERY << "InitQueryContext(()";
+  const ThriftServer::ConnectionContext* connection_context =
+      ThriftServer::GetThreadConnectionContext();
+  if (connection_context->server_name != EXTERNAL_FRONTEND_SERVER_NAME) {
+    HS2_RETURN_ERROR(return_val, "Unsupported operation",
+        SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED);
+  }
+  PrepareQueryContext(&return_val.query_ctx);
+}
+
 
 void ImpalaServer::GetTypeInfo(TGetTypeInfoResp& return_val,
     const TGetTypeInfoReq& request) {

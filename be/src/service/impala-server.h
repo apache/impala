@@ -348,6 +348,9 @@ class ImpalaServer : public ImpalaServiceIf,
   virtual void PingImpalaHS2Service(TPingImpalaHS2ServiceResp& return_val,
       const TPingImpalaHS2ServiceReq& req);
 
+  // Initialize a query context for external frontend
+  virtual void InitQueryContext(TInitQueryContextResp& return_val);
+
   // Execute the provided Thrift statement/plan
   virtual void ExecutePlannedStatement(
       apache::hive::service::cli::thrift::TExecuteStatementResp& return_val,
