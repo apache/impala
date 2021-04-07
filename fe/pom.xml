@@ -111,10 +111,9 @@ under the License.
       <artifactId>ranger-plugins-common</artifactId>
       <version>${ranger.version}</version>
       <exclusions>
-        <exclusion>
-          <groupId>org.apache.solr</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
+        <!-- Ranger jar also includes solr artifacts which we not exclude here since
+        they are used during the instantiation of RangerAuthorizationFactory
+        (See IMPALA-10644 for more details. -->
         <!-- Exclude json-smart to pin the version -->
         <exclusion>
           <groupId>net.minidev</groupId>
@@ -128,6 +127,9 @@ under the License.
       <artifactId>ranger-plugins-audit</artifactId>
       <version>${ranger.version}</version>
       <exclusions>
+        <!-- Ranger jar also includes solr artifacts which we not exclude here since
+        they are used during the instantiation of RangerAuthorizationFactory
+        (See IMPALA-10644 for more details. -->
         <exclusion>
           <groupId>org.apache.kafka</groupId>
           <artifactId>*</artifactId>
@@ -135,10 +137,6 @@ under the License.
         <exclusion>
           <groupId>org.apache.shiro</groupId>
           <artifactId>shiro-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.solr</groupId>
-          <artifactId>*</artifactId>
         </exclusion>
         <!--
         We do not explicitly exclude all artifacts in org.eclipse.jetty because
