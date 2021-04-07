@@ -27,5 +27,29 @@ bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 . "$bin"/impala-config.sh
 
+function print_usage {
+  echo "init-impala-python.sh - Script called from CMake to init python venvs"
+  echo "[-python3] : Init the python3 virtualenv (default is python2)"
+}
+
+IS_PYTHON3=false
+while [ -n "$*" ]
+do
+  case "$1" in
+    -python3)
+       IS_PYTHON3=true
+       ;;
+    -help|*)
+       print_usage
+       exit 1
+       ;;
+  esac
+  shift
+done
+
 cd $IMPALA_HOME
-bin/impala-python -c 'print("Initialized impala-python")'
+if $IS_PYTHON3 ; then
+    bin/impala-python3 -c 'print("Initialized impala-python3")'
+else
+    bin/impala-python -c 'print("Initialized impala-python")'
+fi

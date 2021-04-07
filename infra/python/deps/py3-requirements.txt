@@ -15,7 +15,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Newer versions of setuptools don't support Python 2.7
-setuptools == 44.1.1
-  wheel == 0.35.1
-setuptools-scm == 5.0.2
+# Python3-only requirements
+
+pylint == 2.10.2
+  astroid == 2.7.3
+    lazy-object-proxy == 1.6.0
+    wrapt == 1.12.1
+    typed-ast == 1.4.3
+  configparser == 4.0.2
+  isort == 4.3.21
+    futures == 3.3.0; python_version == "2.7"
+  singledispatch == 3.6.1
+  toml == 0.10.2
+  platformdirs == 2.4.1
+  typing-extensions == 3.10.0.2

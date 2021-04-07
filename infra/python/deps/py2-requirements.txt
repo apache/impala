@@ -15,7 +15,20 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Newer versions of setuptools don't support Python 2.7
-setuptools == 44.1.1
-  wheel == 0.35.1
-setuptools-scm == 5.0.2
+# Python2-only requirements
+
+cm-api == 10.0.0
+  # Already available as part of python on Linux.
+  readline == 6.2.4.1; sys_platform == 'darwin'
+flake8 == 3.9.2
+  mccabe == 0.6.1
+  pycodestyle == 2.7.0
+  pyflakes == 2.3.1
+  enum34 == 1.1.10
+  typing == 3.10.0.0
+  configparser == 4.0.2
+  functools32 == 3.2.3-2
+  importlib-metadata == 2.1.3
+    contextlib2 == 0.6.0
+    pathlib2 == 2.3.7.post1
+    zipp == 1.2.0

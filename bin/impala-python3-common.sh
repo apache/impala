@@ -15,7 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Newer versions of setuptools don't support Python 2.7
-setuptools == 44.1.1
-  wheel == 0.35.1
-setuptools-scm == 5.0.2
+# This file is intended to be sourced to perform common setup for
+# the Python 3 $IMPALA_HOME/bin/impala-py* executables.
+
+set -euo pipefail
+. $IMPALA_HOME/bin/report_build_error.sh
+setup_report_build_error
+
+. $IMPALA_HOME/bin/set-pythonpath.sh
+
+export LD_LIBRARY_PATH="$(python "$IMPALA_HOME/infra/python/bootstrap_virtualenv.py" \
+  --print-ld-library-path)"
+
+PY_DIR="$(dirname "$0")/../infra/python"
+PY_ENV_DIR="${PY_DIR}/env-gcc${IMPALA_GCC_VERSION}-py3"
+python "$PY_DIR/bootstrap_virtualenv.py" --python3

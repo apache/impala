@@ -136,8 +136,8 @@ class ImpalaTestMatrix(object):
               if self.is_valid(vec)]
 
   def __generate_pairwise_combinations(self):
-    import metacomm.combinatorics.all_pairs2
-    all_pairs = metacomm.combinatorics.all_pairs2.all_pairs2
+    from allpairspy import AllPairs
+    all_pairs = AllPairs
 
     # Pairwise fails if the number of inputs == 1. Use exhaustive in this case the
     # results will be the same.

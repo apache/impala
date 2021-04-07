@@ -48,8 +48,7 @@ import os
 import sys
 from itertools import product
 from optparse import OptionParser
-import metacomm.combinatorics.all_pairs2
-all_pairs = metacomm.combinatorics.all_pairs2.all_pairs2
+from allpairspy import AllPairs as all_pairs
 
 parser = OptionParser()
 parser.add_option("-w", "--workload", dest="workload",

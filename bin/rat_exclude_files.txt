@@ -27,6 +27,7 @@ shell/packaging/MANIFEST.in
 shell/packaging/requirements.txt
 testdata/cluster/node_templates/cdh7/etc/init.d/kms
 testdata/authentication/*
+bin/banned_py3k_warnings.txt
 
 # See $IMPALA_HOME/LICENSE.txt
 be/src/gutil/*

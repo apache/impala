@@ -20,23 +20,8 @@
 # Dependents are indented. Dependents that have multiple parents are not listed
 # multiple times (though maybe they could be).
 
-allpairs == 2.0.1
+allpairspy == 2.5.0
 argparse == 1.4.0
-cm-api == 10.0.0
-  # Already available as part of python on Linux.
-  readline == 6.2.4.1; sys_platform == 'darwin'
-flake8 == 3.9.2
-  mccabe == 0.6.1
-  pycodestyle == 2.7.0
-  pyflakes == 2.3.1
-  enum34 == 1.1.10
-  typing == 3.10.0.0
-  configparser == 4.0.2
-  functools32 == 3.2.3-2
-  importlib-metadata == 2.1.3
-    contextlib2 == 0.6.0
-    pathlib2 == 2.3.7.post1
-    zipp == 1.2.0
 future == 0.18.3
 gcovr == 4.2
   Jinja2 == 2.11.3
@@ -61,14 +46,13 @@ pyparsing == 2.0.3
 pytest == 2.9.2
   py == 1.4.32
   pytest-forked == 0.2
-  pytest-random == 0.02
   pytest-runner == 4.2
   pytest-xdist == 1.17.1
   pytest-timeout == 1.2.1
 python-magic == 0.4.11
 pywebhdfs == 0.3.2
   pbr == 3.1.1
-requests == 2.20.0
+requests == 2.21.0
   chardet == 3.0.4
   idna == 2.8
   urllib3 == 1.24.2

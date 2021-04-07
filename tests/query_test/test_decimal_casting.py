@@ -19,7 +19,7 @@
 #
 import pytest
 from decimal import Decimal, getcontext, ROUND_DOWN, ROUND_HALF_UP
-from metacomm.combinatorics.all_pairs2 import all_pairs2 as all_pairs
+from allpairspy import AllPairs as all_pairs
 from random import randint
 
 from tests.common.impala_test_suite import ImpalaTestSuite
