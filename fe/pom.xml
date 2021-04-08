@@ -140,10 +140,10 @@ under the License.
           <groupId>org.apache.solr</groupId>
           <artifactId>*</artifactId>
         </exclusion>
-        <exclusion>
-          <groupId>org.eclipse.jetty</groupId>
-          <artifactId>*</artifactId>
-        </exclusion>
+        <!--
+        We do not explicitly exclude all artifacts in org.eclipse.jetty because
+        jetty-client is needed.
+        -->
         <!-- Exclude json-smart to pin the version -->
         <exclusion>
           <groupId>net.minidev</groupId>
@@ -835,6 +835,10 @@ under the License.
                     <exclude>org.apache.orc:*</exclude>
                   </excludes>
                   <includes>
+                    <!-- ranger-plugins-audit depends on jetty-client, which in turn pulls in jetty-http and jetty-io. -->
+                    <include>org.eclipse.jetty:jetty-client</include>
+                    <include>org.eclipse.jetty:jetty-http</include>
+                    <include>org.eclipse.jetty:jetty-io</include>
                     <!-- hadoop-yarn-common depends on some Jetty utilities. -->
                     <include>org.eclipse.jetty:jetty-util</include>
                     <!-- Include the allowed versions specifically -->
