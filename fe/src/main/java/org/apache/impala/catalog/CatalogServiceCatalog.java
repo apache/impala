@@ -54,7 +54,6 @@ import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationDelta;
 import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.AuthorizationPolicy;
-import org.apache.impala.catalog.FeFsTable.Utils;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.ExternalEventsProcessor;
@@ -64,9 +63,6 @@ import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.events.SelfEventContext;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.catalog.monitor.CatalogTableMetrics;
-import org.apache.impala.catalog.metastore.CatalogMetastoreServer;
-import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
-import org.apache.impala.catalog.metastore.NoOpCatalogMetastoreServer;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -277,8 +273,6 @@ public class CatalogServiceCatalog extends Catalog {
   // Manages the event processing from metastore for issuing invalidates on tables
   private ExternalEventsProcessor metastoreEventProcessor_;
 
-  private final ICatalogMetastoreServer catalogMetastoreServer_;
-
   /**
    * See the gflag definition in be/.../catalog-server.cc for details on these modes.
    */
@@ -355,8 +349,6 @@ public class CatalogServiceCatalog extends Catalog {
     Preconditions.checkState(PARTIAL_FETCH_RPC_QUEUE_TIMEOUT_S > 0);
     // start polling for metastore events
     metastoreEventProcessor_.start();
-    catalogMetastoreServer_ = getCatalogMetastoreServer();
-    catalogMetastoreServer_.start();
   }
 
   /**
@@ -370,20 +362,6 @@ public class CatalogServiceCatalog extends Catalog {
     this(loadInBackground, numLoadingThreads, catalogServiceId, localLibraryPath,
         new MetaStoreClientPool(INITIAL_META_STORE_CLIENT_POOL_SIZE,
             initialHmsCnxnTimeoutSec));
-  }
-
-  /**
-   * Returns an instance of CatalogMetastoreServer if start_hms_server configuration is
-   * true. Otherwise, returns a NoOpCatalogMetastoreServer
-   */
-  @VisibleForTesting
-  protected ICatalogMetastoreServer getCatalogMetastoreServer() {
-    if (!BackendConfig.INSTANCE.startHmsServer()) {
-      return NoOpCatalogMetastoreServer.INSTANCE;
-    }
-    int portNumber = BackendConfig.INSTANCE.getHMSPort();
-    Preconditions.checkState(portNumber > 0, "Invalid port number for HMS service.");
-    return new CatalogMetastoreServer(this);
   }
 
   /**
@@ -3347,16 +3325,6 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public TGetPartialCatalogObjectResponse getPartialCatalogObject(
       TGetPartialCatalogObjectRequest req) throws CatalogException {
-    return getPartialCatalogObject(req, "needed by coordinator");
-  }
-
-  /**
-   * A wrapper around doGetPartialCatalogObject() that controls the number of concurrent
-   * invocations.
-   */
-  public TGetPartialCatalogObjectResponse getPartialCatalogObject(
-      TGetPartialCatalogObjectRequest req, String reason) throws CatalogException {
-    Preconditions.checkNotNull(reason);
     try {
       if (!partialObjectFetchAccess_.tryAcquire(1,
           PARTIAL_FETCH_RPC_QUEUE_TIMEOUT_S, TimeUnit.SECONDS)) {
@@ -3380,7 +3348,7 @@ public class CatalogServiceCatalog extends Catalog {
       try (ThreadNameAnnotator tna = new ThreadNameAnnotator(
             "Get Partial Catalog Object - " +
             Catalog.toCatalogObjectKey(req.object_desc))) {
-        return doGetPartialCatalogObject(req, reason);
+        return doGetPartialCatalogObject(req);
       } finally {
         partialObjectFetchAccess_.release();
       }
@@ -3419,8 +3387,7 @@ public class CatalogServiceCatalog extends Catalog {
    * response's lookup_status.
    */
   private TGetPartialCatalogObjectResponse doGetPartialCatalogObject(
-      TGetPartialCatalogObjectRequest req, String tableLoadReason)
-      throws CatalogException {
+      TGetPartialCatalogObjectRequest req) throws CatalogException {
     TCatalogObject objectDesc = Preconditions.checkNotNull(req.object_desc,
         "missing object_desc");
     switch (objectDesc.type) {
@@ -3456,7 +3423,7 @@ public class CatalogServiceCatalog extends Catalog {
         }
         table = getOrLoadTable(
             objectDesc.getTable().getDb_name(), objectDesc.getTable().getTbl_name(),
-            tableLoadReason, writeIdList, tableId);
+            "needed by coordinator", writeIdList, tableId);
       } catch (DatabaseNotFoundException e) {
         return createGetPartialCatalogObjectError(CatalogLookupStatus.DB_NOT_FOUND);
       }
@@ -3544,10 +3511,7 @@ public class CatalogServiceCatalog extends Catalog {
           .map(HdfsPartition.Builder::new)
           .collect(Collectors.toList());
       new ParallelFileMetadataLoader(
-          table.getFileSystem(), partBuilders, reqWriteIdList,
-          validTxnList, Utils.shouldRecursivelyListPartitions(table),
-          table.getHostIndex(), null, logPrefix)
-          .load();
+          table, partBuilders, reqWriteIdList, validTxnList, null, logPrefix).load();
       for (HdfsPartition.Builder builder : partBuilders) {
         // Let's retrieve the original partition instance from builder because this is
         // stored in the keys of 'partToPartialInfoMap'.

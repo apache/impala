@@ -98,16 +98,6 @@ DEFINE_int32(max_wait_time_for_sync_ddl_s, 0, "Maximum time (in seconds) until "
      "coordinators might have applied the changes caused due to the ddl.");
 
 DECLARE_string(debug_actions);
-DEFINE_bool(start_hms_server, false, "When set to true catalog server starts a HMS "
-    "server at a port specified by hms_port flag");
-
-DEFINE_int32(hms_port, 5899, "If start_hms_server is set to true, this "
-    "configuration specifies the port number at which it is started.");
-
-DEFINE_bool(fallback_to_hms_on_errors, true, "This configuration is only used if "
-    "start_hms_server is true. This is used to determine if the Catalog should fallback "
-    "to the backing HMS service if there are errors while processing the HMS request");
-
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_int32(state_store_port);

@@ -660,13 +660,10 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
       // is done while we continue to hold the table lock.
       resp.table_info.setHms_table(getMetaStoreTable().deepCopy());
     }
-    if (selector.want_stats_for_column_names != null ||
-        selector.want_stats_for_all_columns) {
-      List<String> colList = selector.want_stats_for_all_columns ? getColumnNames() :
-          selector.want_stats_for_column_names;
-      List<ColumnStatisticsObj> statsList =
-          Lists.newArrayListWithCapacity(colList.size());
-      for (String colName: colList) {
+    if (selector.want_stats_for_column_names != null) {
+      List<ColumnStatisticsObj> statsList = Lists.newArrayListWithCapacity(
+          selector.want_stats_for_column_names.size());
+      for (String colName: selector.want_stats_for_column_names) {
         Column col = getColumn(colName);
         if (col == null) continue;
 
