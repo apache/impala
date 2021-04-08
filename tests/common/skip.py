@@ -215,6 +215,8 @@ class SkipIfEC:
   contain_full_explain = pytest.mark.skipif(IS_EC, reason="Contain full explain output "
               "for hdfs tables.")
   different_schedule = pytest.mark.skipif(IS_EC, reason="Query is scheduled differently.")
+  different_scan_split = pytest.mark.skipif(IS_EC, reason="Scan split of row "
+              "groups for Parquet tables created in EC mode is different.")
 
 
 class SkipIfDockerizedCluster:

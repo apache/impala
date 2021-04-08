@@ -26,6 +26,7 @@ from tests.common.environ import build_flavor_timeout
 from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfEC
 from tests.common.skip import SkipIfLocal, SkipIfIsilon
 from tests.common.test_dimensions import add_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
@@ -266,6 +267,7 @@ class TestMinMaxFilters(ImpalaTestSuite):
     assert cursor.fetchall() == [(len(matching_vals) + 2,)]
 
 
+@SkipIfEC.different_scan_split
 @SkipIfLocal.multiple_impalad
 class TestOverlapMinMaxFilters(ImpalaTestSuite):
   @classmethod
