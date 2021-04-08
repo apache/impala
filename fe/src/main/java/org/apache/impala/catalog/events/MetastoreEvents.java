@@ -1294,7 +1294,7 @@ public class MetastoreEvents {
     @Override
     public void process() {
       boolean dbRemoved = catalogOpExecutor_
-          .removeDbIfNotAddedLater(eventId_, droppedDatabase_);
+          .removeDbIfNotAddedLater(eventId_, droppedDatabase_.getName());
       if (dbRemoved) {
         infoLog("Removed Database {} ", dbName_);
         metrics_.getCounter(MetastoreEventsProcessor.NUMBER_OF_DATABASES_REMOVED).inc();

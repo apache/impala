@@ -2551,9 +2551,11 @@ public class CatalogServiceCatalog extends Catalog {
     try {
       Db db = getDb(dbName);
       if (db == null) return null;
-      if (!db.containsTable(tblName)) return null;
+      Table existingTbl = db.getTable(tblName);
+      if (existingTbl == null) return null;
       incompleteTable = IncompleteTable.createUninitializedTable(db, tblName);
       incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
+      incompleteTable.setCreateEventId(existingTbl.getCreateEventId());
       db.addTable(incompleteTable);
     } finally {
       versionLock_.writeLock().unlock();

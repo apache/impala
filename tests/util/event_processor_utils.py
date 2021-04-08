@@ -102,6 +102,13 @@ class EventProcessorUtils(object):
     return int(metrics['last-synced-event-id'])
 
   @staticmethod
+  def get_num_skipped_events():
+      """Returns number of skipped events from metrics"""
+      metrics = EventProcessorUtils.get_event_processor_metrics()
+      assert "events-skipped" in metrics.keys()
+      return int(metrics['events-skipped'])
+
+  @staticmethod
   def get_event_processor_status():
     """
     Returns the current status of the EventsProcessor

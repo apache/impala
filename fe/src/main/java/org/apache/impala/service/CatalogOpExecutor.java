@@ -858,19 +858,17 @@ public class CatalogOpExecutor {
    * Removes the database from catalogd if it exists and has not been added since the
    * eventId was generated.
    * @param eventId The eventId being processed.
-   * @param msDb Metastore Database used to remove Db from Catalog
+   * @param dbName Metastore db name used to remove Db from Catalog
    * @return true if the database was removed; else false.
    */
-  public boolean removeDbIfNotAddedLater(long eventId,
-      org.apache.hadoop.hive.metastore.api.Database msDb) {
+  public boolean removeDbIfNotAddedLater(long eventId, String dbName) {
     getMetastoreDdlLock().lock();
     try {
-      String dbName = msDb.getName();
       Db catalogDb = catalog_.getDb(dbName);
       if (catalogDb == null) {
         LOG.info(
             "EventId: {} Skipping the event since database {} does not exist anymore",
-            eventId, msDb.getName());
+            eventId, dbName);
         return false;
       }
       // if this database has been created after this drop database event is generated
@@ -2298,7 +2296,7 @@ public class CatalogOpExecutor {
             event -> dbName.equalsIgnoreCase(event.getDbName()) && (
                 DropDatabaseEvent.DROP_DATABASE_EVENT_TYPE.equals(event.getEventType()) ||
                     DropTableEvent.DROP_TABLE_EVENT_TYPE.equals(event.getEventType())));
-        addToEventLog(events);
+        addToDeleteEventLog(events);
         addSummary(resp, "Database has been dropped.");
       } catch (TException e) {
         if (e instanceof NoSuchObjectException && params.if_exists) {
@@ -2342,9 +2340,15 @@ public class CatalogOpExecutor {
   /**
    * Adds the events to the deleteEventLog if the event processing is active.
    */
-  private void addToEventLog(List<NotificationEvent> events) {
+  public void addToDeleteEventLog(List<NotificationEvent> events) {
     if (events == null || events.isEmpty()) return;
     for (NotificationEvent event : events) {
+      String eventType = event.getEventType();
+      Preconditions.checkState(
+          eventType.equals(DropDatabaseEvent.DROP_DATABASE_EVENT_TYPE) ||
+          eventType.equals(DropTableEvent.DROP_TABLE_EVENT_TYPE) ||
+          eventType.equals(DropPartitionEvent.EVENT_TYPE), "Can not add event type: " +
+              "%s to deleteEventLog", eventType);
       String key;
       if (DropDatabaseEvent.DROP_DATABASE_EVENT_TYPE.equals(event.getEventType())) {
         key = DeleteEventLog.getDbKey(event.getDbName());
@@ -2590,7 +2594,7 @@ public class CatalogOpExecutor {
               && finalMsTbl.getDbName().equalsIgnoreCase(event.getDbName())
               && finalMsTbl.getTableName().equalsIgnoreCase(event.getTableName()));
       addSummary(resp, (params.is_table ? "Table " : "View ") + "has been dropped.");
-      addToEventLog(events);
+      addToDeleteEventLog(events);
       Table table = catalog_.removeTable(params.getTable_name().db_name,
           params.getTable_name().table_name);
       if (table == null) {

@@ -629,8 +629,6 @@ class TestMetastoreService(CustomClusterTestSuite):
             prev_get_table_response = cur_get_table_response
             # drop table
             catalog_hms_client.drop_table(db_name, new_table_name, True)
-            new_get_table_request = self.__create_get_table_hms_request(
-                db_name, new_table_name, True, False, "impala")
             if invalidateCache:
                 # new get_table_req should throw an exception
                 # since the table does not exist in cache as well as in HMS
@@ -760,6 +758,210 @@ class TestMetastoreService(CustomClusterTestSuite):
         new_get_table_request.getFileMetadata = get_file_metadata
         new_get_table_request.engine = engine
         return new_get_table_request
+
+    @pytest.mark.execute_serially
+    @CustomClusterTestSuite.with_args(
+        impalad_args="--use_local_catalog=true",
+        catalogd_args="--catalog_topic_mode=minimal "
+                      "--start_hms_server=true "
+                      "--hms_port=5899 "
+                      "--fallback_to_hms_on_errors=true "
+                      "--invalidate_hms_cache_on_ddls=true "
+                      "--hms_event_polling_interval_s=5"
+    )
+    def test_table_create_drop_seq(self):
+        """
+        The test covers two scenarios:
+        1. Drop table from metastore server and
+           immediately create it before drop and
+           create events are processed by event
+           processor
+        2. Create table and immediately drop it
+           before the events are processed by event
+           processor
+        """
+        catalog_hms_client = None
+        cur_get_table_response = None
+        db_name = ImpalaTestSuite.get_random_name(
+            "test_table_create_drop_seq_db_")
+        tbl_name = ImpalaTestSuite.get_random_name(
+            "test_table_create_drop_seq_tbl_")
+        try:
+            catalog_hms_client, hive_transport = \
+                ImpalaTestSuite.create_hive_client(5899)
+            assert catalog_hms_client is not None
+            create_db_query = "create database " + db_name
+            self.execute_query_expect_success(self.client, create_db_query)
+
+            database = catalog_hms_client.get_database(db_name)
+            assert database is not None
+            assert db_name == database.name
+
+            full_table_name = db_name + "." + tbl_name
+            # create managed table
+            create_tbl_query = "create table " + full_table_name + \
+                               "(c1 int) partitioned by (part_col int) "
+            self.execute_query_expect_success(self.client, create_tbl_query)
+
+            get_table_request = self.__create_get_table_hms_request(
+                db_name, tbl_name, True, False, "impala")
+            cur_get_table_response = catalog_hms_client.get_table_req(
+                get_table_request)
+            assert cur_get_table_response.table is not None
+            assert cur_get_table_response.table.dbName == db_name
+            assert cur_get_table_response.table.tableName == tbl_name
+
+            # Test scenario 1 - drop table and immediately create it
+
+            # wait for event processor to sync till latest HMS event
+            # before issuing drop table
+            EventProcessorUtils.wait_for_event_processing(self, 20)
+            # get skipped events count so far
+            skipped_events_count_before = \
+                EventProcessorUtils.get_num_skipped_events()
+            # drop table
+            catalog_hms_client.drop_table(db_name, tbl_name, True)
+            # immediately create same table again via Impala client
+            # before drop_event is processed by event processor
+            self.execute_query_expect_success(self.client, create_tbl_query)
+            # wait for event processor to process all events
+            EventProcessorUtils.wait_for_event_processing(self, 20)
+
+            # When DROP_TABLE event is processed by event metastore,
+            # event id for drop table < event id of create table
+            # As a result of it, table drop should be skipped
+            # CREATE_TABLE event too should be skipped since
+            # table already exists
+            skipped_events_count_after = \
+                EventProcessorUtils.get_num_skipped_events()
+            assert skipped_events_count_after == \
+                   skipped_events_count_before + 2
+
+            # drop table, we will recreate it in test 2
+            catalog_hms_client.drop_table(db_name, tbl_name, True)
+            EventProcessorUtils.wait_for_event_processing(self, 20)
+
+            # Test scenario 2 - create table and immediately drop it
+
+            # get skipped events count so far
+            skipped_events_count_before = \
+                EventProcessorUtils.get_num_skipped_events()
+
+            # create managed table
+            create_tbl_query = "create table " + full_table_name + \
+                               "(c1 int) partitioned by (part_col int) "
+            self.execute_query_expect_success(self.client, create_tbl_query)
+
+            # Immediately drop the table before CREATE_TABLE
+            # event is processed by event processor
+            catalog_hms_client.drop_table(db_name, tbl_name, True)
+
+            # wait for event processor to process all events
+            EventProcessorUtils.wait_for_event_processing(self, 20)
+
+            # When event processor processes
+            # 1. CREATE_TABLE: It should be skipped since
+            # drop table's event id  > create_table event id
+            # 2. DROP_TABLE: It should be skipped too since table
+            # does not exist in cache anymore.
+            skipped_events_count_after = \
+                EventProcessorUtils.get_num_skipped_events()
+            assert skipped_events_count_after == \
+                   skipped_events_count_before + 2
+
+        finally:
+            if catalog_hms_client is not None:
+                catalog_hms_client.shutdown()
+            if self.__get_database_no_throw(db_name) is not None:
+                self.hive_client.drop_database(db_name, True, True)
+
+    @pytest.mark.execute_serially
+    @CustomClusterTestSuite.with_args(
+        impalad_args="--use_local_catalog=true",
+        catalogd_args="--catalog_topic_mode=minimal "
+                      "--start_hms_server=true "
+                      "--hms_port=5899 "
+                      "--fallback_to_hms_on_errors=true "
+                      "--invalidate_hms_cache_on_ddls=true "
+                      "--hms_event_polling_interval_s=5"
+    )
+    def test_database_create_drop_seq(self):
+        """
+        The test covers two scenarios:
+        1. Drop db from metastore server and
+           immediately create it before drop and
+           create events are processed by event
+           processor
+        2. Create db and immediately drop it
+           before the events are processed by event
+           processor
+        """
+        catalog_hms_client = None
+        db_name = ImpalaTestSuite.get_random_name(
+            "test_database_create_drop_seq_db_")
+        try:
+            catalog_hms_client, hive_transport = \
+                ImpalaTestSuite.create_hive_client(5899)
+            assert catalog_hms_client is not None
+            create_db_query = "create database " + db_name
+            self.execute_query_expect_success(self.client,
+                                              create_db_query)
+
+            database = catalog_hms_client.get_database(db_name)
+            assert database is not None
+            assert db_name == database.name
+
+            # Test scenario 1 - drop database and immediately create it
+
+            # wait for event processor to sync till latest HMS event
+            # before issuing drop database
+            EventProcessorUtils.wait_for_event_processing(self, 20)
+            # get skipped events count so far
+            skipped_events_count_before = \
+                EventProcessorUtils.get_num_skipped_events()
+            catalog_hms_client.drop_database(db_name, False, False)
+            # immediately create new database with same name via
+            # Impala shell
+            self.execute_query_expect_success(self.client,
+                                              create_db_query)
+            # wait for event processor to process all events
+            EventProcessorUtils.wait_for_event_processing(self, 20)
+
+            skipped_events_count_after = \
+                EventProcessorUtils.get_num_skipped_events()
+            assert skipped_events_count_after == \
+                   skipped_events_count_before + 2
+
+            # drop db. We will recreate it in test 2
+            catalog_hms_client.drop_database(db_name, False, False)
+            EventProcessorUtils.wait_for_event_processing(self, 20)
+
+            skipped_events_count_before = \
+                EventProcessorUtils.get_num_skipped_events()
+
+            # Test scenario 2: create database and immediately drop it
+            self.execute_query_expect_success(self.client,
+                                              create_db_query)
+            # immediately drop db before event processor
+            # processes create_database event
+            catalog_hms_client.drop_database(db_name, False, False)
+
+            EventProcessorUtils.wait_for_event_processing(self, 20)
+
+            # When event processor processes
+            # 1. CREATE_DATABASE: It should be skipped since
+            # drop db's event id  > create_db event id
+            # 2. DROP_DB: It should be skipped too since db
+            # does not exist in cache anymore.
+            skipped_events_count_after = \
+                EventProcessorUtils.get_num_skipped_events()
+            assert skipped_events_count_after == \
+                   skipped_events_count_before + 2
+        finally:
+            if catalog_hms_client is not None:
+                catalog_hms_client.shutdown()
+            if self.__get_database_no_throw(db_name) is not None:
+                self.hive_client.drop_database(db_name, True, True)
 
     def __create_test_tbls_from_hive(self, db_name):
       """Util method to create test tables from hive in the given database. It creates
