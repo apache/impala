@@ -104,6 +104,12 @@ public abstract class TreeNode<NodeType extends TreeNode<NodeType>> {
   }
 
   /**
+   * This function helps to decide if a collect() should call itself recursively with the
+   * children of a given TreeNode.
+   */
+  protected boolean shouldCollectRecursively() { return true; }
+
+  /**
    * Add all nodes in the tree that satisfy 'predicate' to the list 'matches'
    * This node is checked first, followed by its children in order. If the node
    * itself matches, the children are skipped.
@@ -120,7 +126,9 @@ public abstract class TreeNode<NodeType extends TreeNode<NodeType>> {
       matches.add((D) this);
       return;
     }
-    for (NodeType child: children_) child.collect(predicate, matches);
+    if (shouldCollectRecursively()) {
+      for (NodeType child: children_) child.collect(predicate, matches);
+    }
   }
 
   /**

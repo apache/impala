@@ -886,7 +886,7 @@ void HdfsScanNodeBase::InitNullCollectionValues(const TupleDescriptor* tuple_des
       continue;
     }
     // Recursively traverse collection items.
-    const TupleDescriptor* item_desc = slot_desc->collection_item_descriptor();
+    const TupleDescriptor* item_desc = slot_desc->children_tuple_descriptor();
     if (item_desc->collection_slots().empty()) continue;
     for (int i = 0; i < slot->num_tuples; ++i) {
       int item_offset = i * item_desc->byte_size();

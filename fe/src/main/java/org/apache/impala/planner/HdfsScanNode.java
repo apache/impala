@@ -2066,7 +2066,7 @@ public class HdfsScanNode extends ScanNode {
             columnByteSizes.add(computeMinScalarColumnMemReservation(column));
           }
         } else {
-          appendMinColumnMemReservationsForCollection(slot, columnByteSizes);
+          appendMinColumnMemReservationsForComplexType(slot, columnByteSizes);
         }
       }
     }
@@ -2080,14 +2080,14 @@ public class HdfsScanNode extends ScanNode {
 
   /**
    * Helper for computeMinColumnMemReservations() - compute minimum memory reservations
-   * for all of the scalar columns read from disk when materializing collectionSlot.
+   * for all of the scalar columns read from disk when materializing complexSlot.
    * Appends one number per scalar column to columnMemReservations.
    */
-  private void appendMinColumnMemReservationsForCollection(SlotDescriptor collectionSlot,
+  private void appendMinColumnMemReservationsForComplexType(SlotDescriptor complexSlot,
       List<Long> columnMemReservations) {
-    Preconditions.checkState(collectionSlot.getType().isCollectionType());
+    Preconditions.checkState(complexSlot.getType().isComplexType());
     boolean addedColumn = false;
-    for (SlotDescriptor nestedSlot: collectionSlot.getItemTupleDesc().getSlots()) {
+    for (SlotDescriptor nestedSlot: complexSlot.getItemTupleDesc().getSlots()) {
       // Position virtual slots can be materialized by piggybacking on another slot.
       if (!nestedSlot.isMaterialized() || nestedSlot.isArrayPosRef()) continue;
       if (nestedSlot.getType().isScalarType()) {
@@ -2095,8 +2095,8 @@ public class HdfsScanNode extends ScanNode {
         // reservation.
         columnMemReservations.add(DEFAULT_COLUMN_SCAN_RANGE_RESERVATION);
         addedColumn = true;
-      } else {
-        appendMinColumnMemReservationsForCollection(nestedSlot, columnMemReservations);
+      } else if (nestedSlot.getType().isComplexType()) {
+        appendMinColumnMemReservationsForComplexType(nestedSlot, columnMemReservations);
       }
     }
     // Need to scan at least one column to materialize the pos virtual slot and/or

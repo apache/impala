@@ -548,6 +548,19 @@ bool StringVal::Resize(FunctionContext* ctx, int new_len) noexcept {
   return false;
 }
 
+void StructVal::ReserveMemory(FunctionContext* ctx) {
+  assert(ctx != nullptr);
+  assert(num_children >= 0);
+  assert(is_null == false);
+  if (num_children == 0) return;
+  ptr = reinterpret_cast<uint8_t**>(
+      ctx->impl()->AllocateForResults(sizeof(uint8_t*) * num_children));
+  if (UNLIKELY(ptr == nullptr)) {
+    num_children = 0;
+    is_null = true;
+  }
+}
+
 // TODO: why doesn't libudasample.so build if this in udf-ir.cc?
 const FunctionContext::TypeDesc* FunctionContext::GetArgType(int arg_idx) const {
   if (arg_idx < 0 || arg_idx >= impl_->arg_types_.size()) return NULL;

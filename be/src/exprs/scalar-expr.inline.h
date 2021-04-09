@@ -37,6 +37,7 @@ namespace impala {
 /// * ScalarExpr::GetStringVal()
 /// * ScalarExpr::GetDateVal()
 /// * ScalarExpr::GetCollectionVal()
+/// * ScalarExpr::GetStructVal()
 #pragma push_macro("SCALAR_EXPR_GET_VAL")
 #define SCALAR_EXPR_GET_VAL(val_type, type_validation)                                 \
   typedef val_type (*val_type##Wrapper)(ScalarExprEvaluator*, const TupleRow*);        \
@@ -63,6 +64,7 @@ SCALAR_EXPR_GET_VAL(StringVal, type_.IsStringType()
     || type_.type == PrimitiveType::TYPE_FIXED_UDA_INTERMEDIATE);
 SCALAR_EXPR_GET_VAL(DateVal, type_.type == PrimitiveType::TYPE_DATE);
 SCALAR_EXPR_GET_VAL(CollectionVal, type_.IsCollectionType());
+SCALAR_EXPR_GET_VAL(StructVal, type_.IsStructType());
 #pragma pop_macro("SCALAR_EXPR_GET_VAL")
 
 }

@@ -335,9 +335,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select 1 from functional.allcomplextypes where int_map_col = 1",
         "operands of type MAP<STRING,INT> and TINYINT are not comparable: " +
         "int_map_col = 1");
-    AnalysisError("select 1 from functional.allcomplextypes where int_struct_col = 1",
-        "operands of type STRUCT<f1:INT,f2:INT> and TINYINT are not comparable: " +
-        "int_struct_col = 1");
+    AnalysisError("select 1 from functional_orc_def.complextypes_structs where " +
+        "tiny_struct = true",
+        "operands of type STRUCT<b:BOOLEAN> and BOOLEAN are not comparable: " +
+        "tiny_struct = TRUE");
     // Complex types are not comparable even if identical.
     // TODO: Reconsider this behavior. Such a comparison should ideally work,
     // but may require complex-typed SlotRefs and BE functions able to accept
@@ -645,9 +646,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select int_array_col or true from functional.allcomplextypes",
         "Operand 'int_array_col' part of predicate 'int_array_col OR TRUE' should " +
             "return type 'BOOLEAN' but returns type 'ARRAY<INT>'");
-    AnalysisError("select false and int_struct_col from functional.allcomplextypes",
-        "Operand 'int_struct_col' part of predicate 'FALSE AND int_struct_col' should " +
-            "return type 'BOOLEAN' but returns type 'STRUCT<f1:INT,f2:INT>'.");
+    AnalysisError("select false and tiny_struct from " +
+        "functional_orc_def.complextypes_structs",
+        "Operand 'tiny_struct' part of predicate 'FALSE AND tiny_struct' should " +
+            "return type 'BOOLEAN' but returns type 'STRUCT<b:BOOLEAN>'.");
     AnalysisError("select not int_map_col from functional.allcomplextypes",
         "Operand 'int_map_col' part of predicate 'NOT int_map_col' should return " +
             "type 'BOOLEAN' but returns type 'MAP<STRING,INT>'.");
@@ -661,12 +663,13 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     AnalysisError("select 1 from functional.allcomplextypes where int_map_col is null",
         "IS NULL predicate does not support complex types: int_map_col IS NULL");
-    AnalysisError("select * from functional.allcomplextypes where complex_struct_col " +
-        "is null", "IS NULL predicate does not support complex types: " +
-            "complex_struct_col IS NULL");
-    AnalysisError("select * from functional.allcomplextypes where nested_struct_col " +
-        "is not null", "IS NOT NULL predicate does not support complex types: " +
-            "nested_struct_col IS NOT NULL");
+    AnalysisError("select * from functional_orc_def.complextypes_structs where " +
+        "tiny_struct is null",
+        "IS NULL predicate does not support complex types: tiny_struct IS NULL");
+    AnalysisError("select * from functional_orc_def.complextypes_structs where " +
+        "tiny_struct is not null",
+        "IS NOT NULL predicate does not support complex types: tiny_struct " +
+            "IS NOT NULL");
   }
 
   @Test
@@ -767,10 +770,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "where date_col between int_col and double_col",
         "Incompatible return types 'DATE' and 'INT' " +
         "of exprs 'date_col' and 'int_col'.");
-    AnalysisError("select 1 from functional.allcomplextypes " +
-        "where int_struct_col between 10 and 20",
-        "Incompatible return types 'STRUCT<f1:INT,f2:INT>' and 'TINYINT' " +
-        "of exprs 'int_struct_col' and '10'.");
+    AnalysisError("select 1 from functional_orc_def.complextypes_structs " +
+        "where tiny_struct between 10 and 20",
+        "Incompatible return types 'STRUCT<b:BOOLEAN>' and 'TINYINT' " +
+        "of exprs 'tiny_struct' and '10'.");
     // IMPALA-7211: Do not cast decimal types to other decimal types
     AnalyzesOk("select cast(1 as decimal(38,2)) between " +
         "0.9 * cast(1 as decimal(38,3)) and 3");
@@ -1274,9 +1277,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select id, row_number() over (order by int_array_col) " +
         "from functional_parquet.allcomplextypes", "ORDER BY expression " +
         "'int_array_col' with complex type 'ARRAY<INT>' is not supported.");
-    AnalysisError("select id, count() over (partition by int_struct_col) " +
-        "from functional_parquet.allcomplextypes", "PARTITION BY expression " +
-        "'int_struct_col' with complex type 'STRUCT<f1:INT,f2:INT>' is not supported.");
+    AnalysisError("select id, count() over (partition by tiny_struct) from " +
+        "functional_orc_def.complextypes_structs",
+        "PARTITION BY expression 'tiny_struct' with complex type " +
+        "'STRUCT<b:BOOLEAN>' is not supported.");
   }
 
   /**
@@ -1731,9 +1735,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "'string_col + INTERVAL 10 years' returns type 'STRING'. " +
         "Expected type 'TIMESTAMP' or 'DATE'.");
     AnalysisError(
-        "select int_struct_col + interval 10 years from functional.allcomplextypes",
-        "Operand 'int_struct_col' of timestamp/date arithmetic expression " +
-        "'int_struct_col + INTERVAL 10 years' returns type 'STRUCT<f1:INT,f2:INT>'. " +
+        "select tiny_struct + interval 10 years from " +
+            "functional_orc_def.complextypes_structs",
+        "Operand 'tiny_struct' of timestamp/date arithmetic expression " +
+        "'tiny_struct + INTERVAL 10 years' returns type 'STRUCT<b:BOOLEAN>'. " +
         "Expected type 'TIMESTAMP' or 'DATE'.");
     // Reversed interval and timestamp using addition.
     AnalysisError("select interval 10 years + float_col from functional.alltypes",
@@ -1863,8 +1868,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select round(cast('1.1' as decimal), 1)");
 
     // No matching signature for complex type.
-    AnalysisError("select lower(int_struct_col) from functional.allcomplextypes",
-        "No matching function with signature: lower(STRUCT<f1:INT,f2:INT>).");
+    AnalysisError("select lower(tiny_struct) from " +
+        "functional_orc_def.complextypes_structs",
+        "No matching function with signature: lower(STRUCT<b:BOOLEAN>).");
 
     // Special cases for FROM in function call
     AnalyzesOk("select extract(year from now())");
@@ -2170,10 +2176,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select if(bool_col, false, NULL) from functional.alltypes");
     AnalyzesOk("select if(NULL, NULL, NULL) from functional.alltypes");
     // No matching signature.
-    AnalysisError("select if(true, int_struct_col, int_struct_col) " +
-        "from functional.allcomplextypes",
+    AnalysisError("select if(true, tiny_struct, tiny_struct) " +
+        "from functional_orc_def.complextypes_structs",
         "No matching function with signature: " +
-        "if(BOOLEAN, STRUCT<f1:INT,f2:INT>, STRUCT<f1:INT,f2:INT>).");
+        "if(BOOLEAN, STRUCT<b:BOOLEAN>, STRUCT<b:BOOLEAN>).");
 
     // if() only accepts three arguments
     AnalysisError("select if(true, false, true, true)",

@@ -2291,17 +2291,13 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         " stored as kudu as select cs from functional.chars_tiny",
         "Cannot create table 't': Type CHAR(5) is not supported in Kudu");
     AnalysisError("create table t primary key (id) partition by hash partitions 3" +
-        " stored as kudu as select id, s from functional.complextypes_fileformat",
-        "Expr 's' in select list returns a complex type 'STRUCT<f1:STRING,f2:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
-    AnalysisError("create table t primary key (id) partition by hash partitions 3" +
         " stored as kudu as select id, m from functional.complextypes_fileformat",
-        "Expr 'm' in select list returns a complex type 'MAP<STRING,BIGINT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+        "Expr 'm' in select list returns a collection type 'MAP<STRING,BIGINT>'.\n" +
+        "Collection types are not allowed in the select list.");
     AnalysisError("create table t primary key (id) partition by hash partitions 3" +
         " stored as kudu as select id, a from functional.complextypes_fileformat",
-        "Expr 'a' in select list returns a complex type 'ARRAY<INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+        "Expr 'a' in select list returns a collection type 'ARRAY<INT>'.\n" +
+        "Collection types are not allowed in the select list.");
 
     // IMPALA-6454: CTAS into Kudu tables with primary key specified in upper case.
     AnalyzesOk("create table part_kudu_tbl primary key(INT_COL, SMALLINT_COL, ID)" +
@@ -3083,13 +3079,20 @@ public class AnalyzeDDLTest extends FrontendTestBase {
         "Incompatible return types 'INT' and 'STRING' of exprs " +
         "'int_col' and 'string_col'.");
 
-    // View cannot have complex-typed columns because complex-typed exprs are
+    // View cannot have collection-typed columns because collection-typed exprs are
     // not supported in the select list.
-    AnalysisError("create view functional.foo (a, b, c) as " +
-        "select int_array_col, int_map_col, int_struct_col " +
+    AnalysisError("create view functional.foo (a, b) as " +
+        "select int_array_col, int_map_col " +
         "from functional.allcomplextypes",
-        "Expr 'int_array_col' in select list returns a complex type 'ARRAY<INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+        "Expr 'int_array_col' in select list returns a collection type 'ARRAY<INT>'.\n" +
+        "Collection types are not allowed in the select list.");
+    // It's allowed to do the same with struct as it is supported in the select list.
+    AnalysisContext ctx = createAnalysisCtx();
+    // TODO: Turning Codegen OFF could be removed once the Codegen support is implemented
+    // for structs given in the select list.
+    ctx.getQueryOptions().setDisable_codegen(true);
+    AnalyzesOk("create view functional.foo (a) as " +
+        "select tiny_struct from functional_orc_def.complextypes_structs", ctx);
 
     // IMPALA-7679: Inserting a null column type without an explicit type should
     // throw an error.

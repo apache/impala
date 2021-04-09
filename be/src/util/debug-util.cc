@@ -181,7 +181,7 @@ string PrintTuple(const Tuple* t, const TupleDescriptor& d) {
     if (t->IsNull(slot_d->null_indicator_offset())) {
       out << "null";
     } else if (slot_d->type().IsCollectionType()) {
-      const TupleDescriptor* item_d = slot_d->collection_item_descriptor();
+      const TupleDescriptor* item_d = slot_d->children_tuple_descriptor();
       const CollectionValue* coll_value =
           reinterpret_cast<const CollectionValue*>(t->GetSlot(slot_d->tuple_offset()));
       uint8_t* coll_buf = coll_value->ptr;

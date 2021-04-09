@@ -115,8 +115,8 @@ class SlotDescriptor {
   SlotId id() const { return id_; }
   const ColumnType& type() const { return type_; }
   const TupleDescriptor* parent() const { return parent_; }
-  const TupleDescriptor* collection_item_descriptor() const {
-    return collection_item_descriptor_;
+  const TupleDescriptor* children_tuple_descriptor() const {
+    return children_tuple_descriptor_;
   }
   /// Returns the column index of this slot, including partition keys.
   /// (e.g., col_pos - num_partition_keys = the table column this slot corresponds to)
@@ -168,6 +168,8 @@ class SlotDescriptor {
   void CodegenSetNullIndicator(LlvmCodeGen* codegen, LlvmBuilder* builder,
       llvm::Value* tuple, llvm::Value* is_null) const;
 
+  /// Returns true if this slot is a child of a struct slot.
+  inline bool IsChildOfStruct() const;
  private:
   friend class DescriptorTbl;
   friend class TupleDescriptor;
@@ -175,8 +177,8 @@ class SlotDescriptor {
   const SlotId id_;
   const ColumnType type_;
   const TupleDescriptor* parent_;
-  /// Non-NULL only for collection slots
-  const TupleDescriptor* collection_item_descriptor_;
+  /// Non-NULL only for complex type slots
+  const TupleDescriptor* children_tuple_descriptor_;
   // TODO for 2.3: rename to materialized_path_
   const SchemaPath col_path_;
   const int tuple_offset_;
@@ -189,9 +191,9 @@ class SlotDescriptor {
   /// the byte size of this slot.
   const int slot_size_;
 
-  /// collection_item_descriptor should be non-NULL iff this is a collection slot
+  /// 'children_tuple_descriptor' should be non-NULL iff this is a complex type slot.
   SlotDescriptor(const TSlotDescriptor& tdesc, const TupleDescriptor* parent,
-      const TupleDescriptor* collection_item_descriptor);
+      const TupleDescriptor* children_tuple_descriptor);
 
   /// Generate LLVM code at the insert position of 'builder' to get the i8 value of
   /// the byte containing 'null_indicator_offset' in 'tuple'. If 'null_byte_ptr' is
@@ -452,8 +454,10 @@ class TupleDescriptor {
   TupleId id() const { return id_; }
   std::string DebugString() const;
 
-  /// Returns true if this tuple or any nested collection item tuples have string slots.
-  bool ContainsStringData() const;
+  bool isTupleOfStructSlot() const { return master_tuple_ != nullptr; }
+
+  TupleDescriptor* getMasterTuple() const { return master_tuple_; }
+  void setMasterTuple(TupleDescriptor* desc) { master_tuple_ = desc; }
 
   /// Return true if the physical layout of this descriptor matches that of other_desc,
   /// but not necessarily the id.
@@ -500,6 +504,20 @@ class TupleDescriptor {
   /// materialized into this tuple. Non-empty if this tuple belongs to a nested
   /// collection, empty otherwise.
   SchemaPath tuple_path_;
+
+  /// If this tuple represents the children of a struct slot then 'master_tuple_' is the
+  /// tuple that holds the topmost struct slot. For example:
+  /// - Tuple0
+  ///     - Slot1 e.g. INT slot
+  ///     - Slot2 e.g. STRUCT slot
+  ///         - Tuple1 (Holds the children of the struct)
+  ///             - Slot3 e.g. INT child of the STRUCT
+  ///             - Slot4 e.g. STRING child of the STRUCT
+  /// In the above example the 'master_tuple_' for Tuple1 (that is the struct's tuple to
+  /// hold its children) would be Tuple0. In case the STRUCT in Slot2 was a nested struct
+  /// in any depth then the 'master_tuple_' for any of the tuples under Slot2 would be
+  /// again Tuple0.
+  TupleDescriptor* master_tuple_ = nullptr;
 
   TupleDescriptor(const TTupleDescriptor& tdesc);
   void AddSlot(SlotDescriptor* slot);

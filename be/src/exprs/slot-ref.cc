@@ -46,7 +46,7 @@ SlotRef::SlotRef(const TExprNode& node)
     slot_offset_(-1),  // invalid
     null_indicator_offset_(0, 0),
     slot_id_(node.slot_ref.slot_id) {
-    // slot_/null_indicator_offset_ are set in Prepare()
+    // slot_/null_indicator_offset_ are set in Init()
 }
 
 SlotRef::SlotRef(const SlotDescriptor* desc)
@@ -54,7 +54,7 @@ SlotRef::SlotRef(const SlotDescriptor* desc)
     slot_offset_(-1),
     null_indicator_offset_(0, 0),
     slot_id_(desc->id()) {
-    // slot_/null_indicator_offset_ are set in Prepare()
+    // slot_/null_indicator_offset_ are set in Init()
 }
 
 SlotRef::SlotRef(const SlotDescriptor* desc, const ColumnType& type)
@@ -62,7 +62,7 @@ SlotRef::SlotRef(const SlotDescriptor* desc, const ColumnType& type)
     slot_offset_(-1),
     null_indicator_offset_(0, 0),
     slot_id_(desc->id()) {
-    // slot_/null_indicator_offset_ are set in Prepare()
+    // slot_/null_indicator_offset_ are set in Init()
 }
 
 SlotRef::SlotRef(const ColumnType& type, int offset, const bool nullable /* = false */)
@@ -74,7 +74,7 @@ SlotRef::SlotRef(const ColumnType& type, int offset, const bool nullable /* = fa
 
 Status SlotRef::Init(
     const RowDescriptor& row_desc, bool is_entry_point, FragmentState* state) {
-  DCHECK_EQ(children_.size(), 0);
+  DCHECK(type_.IsStructType() || children_.size() == 0);
   RETURN_IF_ERROR(ScalarExpr::Init(row_desc, is_entry_point, state));
   if (slot_id_ != -1) {
     const SlotDescriptor* slot_desc = state->desc_tbl().GetSlotDescriptor(slot_id_);
@@ -85,7 +85,11 @@ Status SlotRef::Init(
       LOG(INFO) << error.str();
       return Status(error.str());
     }
-    tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent()->id());
+    if (slot_desc->parent()->isTupleOfStructSlot()) {
+      tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent()->getMasterTuple()->id());
+    } else {
+      tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent()->id());
+    }
     if (tuple_idx_ == RowDescriptor::INVALID_IDX) {
       TupleDescriptor* d =
           state->desc_tbl().GetTupleDescriptor(slot_desc->parent()->id());
@@ -95,7 +99,9 @@ Status SlotRef::Init(
       return Status(error);
     }
     DCHECK(tuple_idx_ != RowDescriptor::INVALID_IDX);
-    tuple_is_nullable_ = row_desc.TupleIsNullable(tuple_idx_);
+    if (!slot_desc->parent()->isTupleOfStructSlot()) {
+      tuple_is_nullable_ = row_desc.TupleIsNullable(tuple_idx_);
+    }
     slot_offset_ = slot_desc->tuple_offset();
     null_indicator_offset_ = slot_desc->null_indicator_offset();
   }
@@ -115,6 +121,17 @@ string SlotRef::DebugString() const {
       << " null_indicator=" << null_indicator_offset_
       << ScalarExpr::DebugString() << ")";
   return out.str();
+}
+
+void SlotRef::AssignFnCtxIdx(int* next_fn_ctx_idx) {
+  if (!type_.IsStructType()) {
+    ScalarExpr::AssignFnCtxIdx(next_fn_ctx_idx);
+    return;
+  }
+  fn_ctx_idx_start_ = *next_fn_ctx_idx;
+  fn_ctx_idx_ = 0;
+  fn_ctx_idx_end_ = 1;
+  for (ScalarExpr* child : children()) child->AssignFnCtxIdx(next_fn_ctx_idx);
 }
 
 // There are four possible cases we may generate:
@@ -449,6 +466,27 @@ CollectionVal SlotRef::GetCollectionValInterpreted(
   CollectionValue* coll_value =
       reinterpret_cast<CollectionValue*>(t->GetSlot(slot_offset_));
   return CollectionVal(coll_value->ptr, coll_value->num_tuples);
+}
+
+StructVal SlotRef::GetStructValInterpreted(
+    ScalarExprEvaluator* eval, const TupleRow* row) const {
+  DCHECK(type_.IsStructType() && children_.size() > 0);
+  DCHECK_EQ(children_.size(), eval->GetChildEvaluators().size());
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == nullptr || t->IsNull(null_indicator_offset_)) return StructVal::null();
+
+  FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);
+  DCHECK(fn_ctx != nullptr);
+  StructVal struct_val(fn_ctx, children_.size());
+  vector<ScalarExprEvaluator*>& child_evaluators = eval->GetChildEvaluators();
+  for (int i = 0; i < child_evaluators.size(); ++i) {
+    ScalarExpr* child_expr = children_[i];
+    ScalarExprEvaluator* child_eval = child_evaluators[i];
+    DCHECK(child_eval != nullptr);
+    void* child_val = child_eval->GetValue(*child_expr, row);
+    struct_val.addChild(child_val, i);
+  }
+  return struct_val;
 }
 
 } // namespace impala

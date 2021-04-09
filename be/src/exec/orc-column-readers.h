@@ -479,9 +479,8 @@ class OrcDecimal16ColumnReader
 /// sub queries). The root reader is always an OrcStructReader since the root of the ORC
 /// schema is represented as a STRUCT type.
 ///
-/// For collection readers, they can be divided into two kinds by whether they should
-/// materialize collection tuples (reflected by materialize_tuple_). (STRUCTs always
-/// delegate materialization to their children.)
+/// For complex readers, they can be divided into two kinds by whether they should
+/// materialize their tuples (reflected by materialize_tuple_).
 ///
 /// For collection type readers that materialize a CollectionValue they create a
 /// CollectionValueBuilder when 'ReadValue' is called. Then recursively delegate the
@@ -569,6 +568,13 @@ class OrcStructReader : public OrcComplexColumnReader {
   OrcStructReader(const orc::Type* node, const TupleDescriptor* table_tuple_desc,
       HdfsOrcScanner* scanner);
 
+  /// Constructor for a slot that materializes all it's children. E.g. when a struct is
+  /// given in the select list.
+  OrcStructReader(const orc::Type* node, const SlotDescriptor* slot_desc,
+      const TupleDescriptor* children_tuple, HdfsOrcScanner* scanner);
+
+  /// Constructor for a struct that is not mapped directly to a slot instead it refers to
+  /// a descendant column.
   OrcStructReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner);
 
@@ -623,6 +629,7 @@ class OrcStructReader : public OrcComplexColumnReader {
 
   void SetNullSlot(Tuple* tuple) override {
     for (OrcColumnReader* child : children_) child->SetNullSlot(tuple);
+    tuple->SetNull(DCHECK_NOTNULL(slot_desc_)->null_indicator_offset());
   }
 
   void CreateChildForSlot(const orc::Type* curr_node, const SlotDescriptor* slot_desc);

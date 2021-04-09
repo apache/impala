@@ -468,12 +468,10 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
       continue;
     }
 
-    // 'col_path'(SchemaPath) of the SlotDescriptor won't map to a STRUCT column.
-    // We only deal with collection columns (ARRAY/MAP) and primitive columns here.
-    if (slot_desc->type().IsCollectionType()) {
+    if (slot_desc->type().IsComplexType()) {
       // Recursively resolve nested columns
-      DCHECK(slot_desc->collection_item_descriptor() != nullptr);
-      const TupleDescriptor* item_tuple_desc = slot_desc->collection_item_descriptor();
+      DCHECK(slot_desc->children_tuple_descriptor() != nullptr);
+      const TupleDescriptor* item_tuple_desc = slot_desc->children_tuple_descriptor();
       RETURN_IF_ERROR(ResolveColumns(*item_tuple_desc, selected_nodes, pos_slots));
     } else {
       VLOG(3) << "Add ORC column " << node->getColumnId() << " for "

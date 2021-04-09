@@ -667,6 +667,12 @@ class BufferedTupleStream {
   /// kept pinned until the caller calls UnpinStream().
   bool pinned_ = true;
 
+  /// Populates 'inlined_string_slots_' and 'inlined_coll_slots_' under the index of
+  /// 'tuple_idx' with the inlined string and collection slots from the slots of
+  /// 'tuple_desc'. Excludes the slots in 'ext_varlen_slot'.
+  void CollectInlinedSlots(const TupleDescriptor* tuple_desc,
+      const std::set<SlotId>& ext_varlen_slots, int tuple_idx);
+
   /// Return true if 'page' is the current page for the embedded read iterator.
   bool is_read_page(const Page* page) const {
     return read_it_.read_page_ != pages_.end() && &*read_it_.read_page_ == page;

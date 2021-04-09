@@ -29,6 +29,8 @@ from getpass import getuser
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
                                SkipIfLocal, SkipIfHive2, SkipIfGCS)
+from tests.common.test_dimensions import (create_client_protocol_dimension,
+    create_exec_option_dimension, create_orc_dimension)
 from tests.util.hdfs_util import NAMENODE
 from tests.util.calculation_util import get_random_id
 
@@ -1573,3 +1575,48 @@ class TestRangerColumnMaskingTpchNested(CustomClusterTestSuite):
         for col in tbl_cols[tbl]:
           policy_name = "%s_%s_mask" % (tbl, col)
           TestRanger._remove_policy(policy_name)
+
+
+class TestRangerColumnMaskingComplexTypesInSelectList(CustomClusterTestSuite):
+  """
+  Tests Ranger policies when complex types are given in the select list. The reason
+  this is a separate class is that directly querying complex types works only on HS2
+  while some tests in TestRanger needs Beeswax interface otherwise some of them fails.
+  """
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_orc_dimension(cls.get_workload()))
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('protocol') == 'hs2')
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        disable_codegen_options=[True]))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    impalad_args=IMPALAD_ARGS, catalogd_args=CATALOGD_ARGS)
+  def test_column_masking_with_structs_in_select_list(self, vector, unique_name):
+    user = getuser()
+    db = "functional_orc_def"
+    # Create another client for admin user since current user doesn't have privileges to
+    # create/drop databases or refresh authorization.
+    admin_client = self.create_impala_client()
+    policy_cnt = 0
+    try:
+      # Add a policy on a primitive column of a table which contains nested columns.
+      TestRanger._add_column_masking_policy(
+          unique_name + str(policy_cnt), user, "functional_orc_def",
+          "complextypes_structs", "str", "MASK_NULL")
+      policy_cnt += 1
+      self.execute_query_expect_success(admin_client, "refresh authorization",
+          user=ADMIN)
+      self.run_test_case("QueryTest/ranger_column_masking_struct_in_select_list", vector,
+          use_db=db)
+    finally:
+      for i in range(policy_cnt):
+        TestRanger._remove_policy(unique_name + str(i))

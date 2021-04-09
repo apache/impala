@@ -41,6 +41,7 @@ using impala_udf::TimestampVal;
 using impala_udf::StringVal;
 using impala_udf::DecimalVal;
 using impala_udf::CollectionVal;
+using impala_udf::StructVal;
 using impala_udf::DateVal;
 
 class MemPool;
@@ -161,6 +162,7 @@ class ScalarExprEvaluator {
   DoubleVal GetDoubleVal(const TupleRow* row);
   StringVal GetStringVal(const TupleRow* row);
   CollectionVal GetCollectionVal(const TupleRow* row);
+  StructVal GetStructVal(const TupleRow* row);
   TimestampVal GetTimestampVal(const TupleRow* row);
   DecimalVal GetDecimalVal(const TupleRow* row);
   DateVal GetDateVal(const TupleRow* row);
@@ -211,6 +213,8 @@ class ScalarExprEvaluator {
   /// not strip these symbols.
   static void InitBuiltinsDummy();
 
+  std::vector<ScalarExprEvaluator*>& GetChildEvaluators() { return childEvaluators_; }
+
   static const char* LLVM_CLASS_NAME;
 
  protected:
@@ -231,6 +235,7 @@ class ScalarExprEvaluator {
 
  private:
   friend class ScalarExpr;
+  friend class SlotRef;
 
   /// FunctionContexts for nodes in this Expr tree. Created by this ScalarExprEvaluator
   /// and live in the same object pool as this evaluator (i.e. same life span as the
@@ -252,6 +257,10 @@ class ScalarExprEvaluator {
   /// Stores the result of evaluation for this expr tree (or any sub-expression).
   /// This is used in interpreted path when we need to return a void*.
   ExprValue result_;
+
+  /// For a struct scalar expression there is one evaluator created for each child of
+  /// the struct. This is empty for non-struct expressions.
+  std::vector<ScalarExprEvaluator*> childEvaluators_;
 
   /// True if this evaluator came from a Clone() call. Used to manage FunctionStateScope.
   bool is_clone_ = false;

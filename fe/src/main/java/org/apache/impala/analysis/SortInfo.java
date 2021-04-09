@@ -23,6 +23,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.thrift.TSortingOrder;
@@ -254,7 +255,20 @@ public class SortInfo {
         dstSlotDesc.initFromExpr(srcExpr);
       }
       dstSlotDesc.setSourceExpr(srcExpr);
-      outputSmap_.put(srcExpr.clone(), new SlotRef(dstSlotDesc));
+      SlotRef dstExpr = new SlotRef(dstSlotDesc);
+      if (dstSlotDesc.getType().isStructType() &&
+          dstSlotDesc.getItemTupleDesc() != null) {
+        dstSlotDesc.clearItemTupleDesc();
+        dstExpr.createStructTuplesAndSlots(analyzer, null);
+        try {
+          dstExpr.addStructChildrenAsSlotRefs(analyzer, dstSlotDesc.getItemTupleDesc());
+        } catch (AnalysisException ex) {
+          // Adding SlotRefs shouldn't throw here as the source SlotRef had already been
+          // analysed.
+          Preconditions.checkNotNull(null);
+        }
+      }
+      outputSmap_.put(srcExpr.clone(), dstExpr);
       materializedExprs_.add(srcExpr);
     }
   }

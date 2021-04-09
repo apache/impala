@@ -315,6 +315,39 @@ struct CollectionVal : public AnyVal {
   }
 };
 
+/// A struct is represented by a vector of pointers where these pointers point to the
+/// children of the struct.
+struct StructVal : public AnyVal {
+  int num_children;
+
+  /// Pointer to the start of the vector of children pointers. These children pointers in
+  /// fact are AnyVal pointers where a null pointer means that this child is NULL.
+  /// The buffer is not null-terminated.
+  /// Memory allocation to 'ptr' is done using FunctionContext. As a result it's not
+  /// needed to take care of memory deallocation in StructVal as it will be done through
+  /// FunctionContext automatically.
+  uint8_t** ptr;
+
+  StructVal() : AnyVal(true), num_children(0), ptr(nullptr) {}
+
+  StructVal(FunctionContext* ctx, int num_children) : AnyVal(),
+      num_children(num_children), ptr(nullptr) {
+    ReserveMemory(ctx);
+  }
+
+  static StructVal null() { return StructVal(); }
+
+  void addChild(void* child, int idx) {
+    assert(idx >= 0 && idx < num_children);
+    ptr[idx] = (uint8_t*)child;
+  }
+
+private:
+  /// Uses FunctionContext to reserve memory for 'num_children' number of pointers. Sets
+  /// 'ptr' to the beginning of this allocated memory.
+  void ReserveMemory(FunctionContext* ctx);
+};
+
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 static_assert(sizeof(CollectionVal) == sizeof(StringVal), "Wrong size.");
 static_assert(

@@ -98,24 +98,23 @@ ostream& operator<<(ostream& os, const NullIndicatorOffset& null_indicator) {
 }
 
 SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc,
-    const TupleDescriptor* parent, const TupleDescriptor* collection_item_descriptor)
+    const TupleDescriptor* parent, const TupleDescriptor* children_tuple_descriptor)
   : id_(tdesc.id),
     type_(ColumnType::FromThrift(tdesc.slotType)),
     parent_(parent),
-    collection_item_descriptor_(collection_item_descriptor),
+    children_tuple_descriptor_(children_tuple_descriptor),
     col_path_(tdesc.materializedPath),
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
     slot_idx_(tdesc.slotIdx),
     slot_size_(type_.GetSlotSize()) {
-  DCHECK_NE(type_.type, TYPE_STRUCT);
   DCHECK(parent_ != nullptr) << tdesc.parent;
-  if (type_.IsCollectionType()) {
+  if (type_.IsComplexType()) {
     DCHECK(tdesc.__isset.itemTupleId);
-    DCHECK(collection_item_descriptor_ != nullptr) << tdesc.itemTupleId;
+    DCHECK(children_tuple_descriptor_ != nullptr) << tdesc.itemTupleId;
   } else {
     DCHECK(!tdesc.__isset.itemTupleId);
-    DCHECK(collection_item_descriptor == nullptr);
+    DCHECK(children_tuple_descriptor == nullptr);
   }
 }
 
@@ -138,8 +137,8 @@ string SlotDescriptor::DebugString() const {
     out << col_path_[i];
   }
   out << "]";
-  if (collection_item_descriptor_ != nullptr) {
-    out << " collection_item_tuple_id=" << collection_item_descriptor_->id();
+  if (children_tuple_descriptor_ != nullptr) {
+    out << " children_tuple_id=" << children_tuple_descriptor_->id();
   }
   out << " offset=" << tuple_offset_ << " null=" << null_indicator_offset_.DebugString()
       << " slot_idx=" << slot_idx_ << " field_idx=" << slot_idx_
@@ -154,6 +153,10 @@ bool SlotDescriptor::LayoutEquals(const SlotDescriptor& other_desc) const {
   if (tuple_offset() != other_desc.tuple_offset()) return false;
   if (!null_indicator_offset().Equals(other_desc.null_indicator_offset())) return false;
   return true;
+}
+
+inline bool SlotDescriptor::IsChildOfStruct() const {
+  return parent_->isTupleOfStructSlot();
 }
 
 ColumnDescriptor::ColumnDescriptor(const TColumnDescriptor& tdesc)
@@ -342,23 +345,17 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
 void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
   slots_.push_back(slot);
   if (slot->type().IsVarLenStringType()) {
-    string_slots_.push_back(slot);
-    has_varlen_slots_ = true;
+    TupleDescriptor* target_tuple = this;
+    // If this is a tuple for struct children then we populate the 'string_slots_' of
+    // the topmost tuple and not this one.
+    if (isTupleOfStructSlot()) target_tuple = master_tuple_;
+    target_tuple->string_slots_.push_back(slot);
+    target_tuple->has_varlen_slots_ = true;
   }
   if (slot->type().IsCollectionType()) {
     collection_slots_.push_back(slot);
     has_varlen_slots_ = true;
   }
-}
-
-bool TupleDescriptor::ContainsStringData() const {
-  if (!string_slots_.empty()) return true;
-  for (int i = 0; i < collection_slots_.size(); ++i) {
-    if (collection_slots_[i]->collection_item_descriptor_->ContainsStringData()) {
-      return true;
-    }
-  }
-  return false;
 }
 
 string TupleDescriptor::DebugString() const {
@@ -614,8 +611,7 @@ Status DescriptorTbl::CreateInternal(ObjectPool* pool, const TDescriptorTable& t
     (*tbl)->tbl_desc_map_[tdesc.id] = desc;
   }
 
-  for (size_t i = 0; i < thrift_tbl.tupleDescriptors.size(); ++i) {
-    const TTupleDescriptor& tdesc = thrift_tbl.tupleDescriptors[i];
+  for (const TTupleDescriptor& tdesc : thrift_tbl.tupleDescriptors) {
     TupleDescriptor* desc = pool->Add(new TupleDescriptor(tdesc));
     // fix up table pointer
     if (tdesc.__isset.tableId) {
@@ -624,15 +620,22 @@ Status DescriptorTbl::CreateInternal(ObjectPool* pool, const TDescriptorTable& t
     (*tbl)->tuple_desc_map_[tdesc.id] = desc;
   }
 
-  for (size_t i = 0; i < thrift_tbl.slotDescriptors.size(); ++i) {
-    const TSlotDescriptor& tdesc = thrift_tbl.slotDescriptors[i];
+  for (const TSlotDescriptor& tdesc : thrift_tbl.slotDescriptors) {
     // Tuple descriptors are already populated in tbl
     TupleDescriptor* parent = (*tbl)->GetTupleDescriptor(tdesc.parent);
     DCHECK(parent != nullptr);
-    TupleDescriptor* collection_item_descriptor = tdesc.__isset.itemTupleId ?
+    TupleDescriptor* children_tuple_descriptor = tdesc.__isset.itemTupleId ?
         (*tbl)->GetTupleDescriptor(tdesc.itemTupleId) : nullptr;
     SlotDescriptor* slot_d = pool->Add(
-        new SlotDescriptor(tdesc, parent, collection_item_descriptor));
+        new SlotDescriptor(tdesc, parent, children_tuple_descriptor));
+    if (slot_d->type().IsStructType() && children_tuple_descriptor != nullptr &&
+        children_tuple_descriptor->getMasterTuple() == nullptr) {
+      TupleDescriptor* master_tuple = parent;
+      // If this struct is nested into another structs then get the topmost tuple for the
+      // master.
+      if (parent->getMasterTuple() != nullptr) master_tuple = parent->getMasterTuple();
+      children_tuple_descriptor->setMasterTuple(master_tuple);
+    }
     (*tbl)->slot_desc_map_[tdesc.id] = slot_d;
     parent->AddSlot(slot_d);
   }

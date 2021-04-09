@@ -421,16 +421,21 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   /**
    * Checks that the given SQL analyzes ok, and asserts that the last result expr in the
-   * parsed SelectStmt is a scalar SlotRef whose absolute path is identical to the given
-   * expected one. Also asserts that the slot's absolute path is equal to its
+   * parsed SelectStmt is a non-collection SlotRef whose absolute path is identical to
+   * the given expected one. Also asserts that the slot's absolute path is equal to its
    * materialized path. Intentionally allows multiple result exprs to be analyzed to test
    * absolute path caching, though only the last path is validated.
    */
   private void testSlotRefPath(String sql, List<Integer> expectedAbsPath) {
-    SelectStmt stmt = (SelectStmt) AnalyzesOk(sql);
+    AnalysisContext ctx = createAnalysisCtx();
+    // TODO: Turning Codegen OFF could be removed once the Codegen support is implemented
+    // for structs given in the select list.
+    ctx.getQueryOptions().setDisable_codegen(true);
+
+    SelectStmt stmt = (SelectStmt) AnalyzesOk(sql, ctx);
     Expr e = stmt.getResultExprs().get(stmt.getResultExprs().size() - 1);
     Preconditions.checkState(e instanceof SlotRef);
-    Preconditions.checkState(e.getType().isScalarType());
+    Preconditions.checkState(!e.getType().isCollectionType());
     SlotRef slotRef = (SlotRef) e;
     List<Integer> actualAbsPath = slotRef.getDesc().getPath().getAbsolutePath();
     Assert.assertEquals("Mismatched absolute paths.", expectedAbsPath, actualAbsPath);
@@ -520,13 +525,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Array of structs. No name conflicts with implicit fields. Both implicit and
     // explicit paths are allowed.
-    addTestTable("create table d.t2 (c array<struct<f:int>>)");
+    addTestTable("create table d.t2 (c array<struct<f:int>>) stored as orc");
     testSlotRefPath("select f from d.t2.c", path(0, 0, 0));
     testSlotRefPath("select item.f from d.t2.c", path(0, 0, 0));
     testSlotRefPath("select pos from d.t2.c", path(0, 1));
-    AnalysisError("select item from d.t2.c",
-        "Expr 'item' in select list returns a complex type 'STRUCT<f:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+    testSlotRefPath("select item from d.t2.c", path(0, 0));
     AnalysisError("select item.pos from d.t2.c",
         "Could not resolve column/field reference: 'item.pos'");
     // Test star expansion.
@@ -535,16 +538,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Array of structs with name conflicts. Both implicit and explicit
     // paths are allowed.
-    addTestTable("create table d.t3 (c array<struct<f:int,item:int,pos:int>>)");
+    addTestTable("create table d.t3 (c array<struct<f:int,item:int,pos:int>>) " +
+        "stored as orc");
     testSlotRefPath("select f from d.t3.c", path(0, 0, 0));
     testSlotRefPath("select item.f from d.t3.c", path(0, 0, 0));
     testSlotRefPath("select item.item from d.t3.c", path(0, 0, 1));
     testSlotRefPath("select item.pos from d.t3.c", path(0, 0, 2));
     testSlotRefPath("select pos from d.t3.c", path(0, 1));
-    AnalysisError("select item from d.t3.c",
-        "Expr 'item' in select list returns a complex type " +
-        "'STRUCT<f:INT,item:INT,pos:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+    testSlotRefPath("select item from d.t3.c", path(0, 0));
     // Test star expansion.
     testStarPath("select * from d.t3.c", path(0, 0, 0), path(0, 0, 1), path(0, 0, 2));
     testStarPath("select c.* from d.t3.c", path(0, 0, 0), path(0, 0, 1), path(0, 0, 2));
@@ -561,37 +562,48 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
     // Map with a scalar key and struct value. No name conflicts. Both implicit and
     // explicit paths are allowed.
-    addTestTable("create table d.t5 (c map<int,struct<f:int>>)");
+    addTestTable("create table d.t5 (c map<int,struct<f:int>>) stored as orc");
     testSlotRefPath("select key from d.t5.c", path(0, 0));
     testSlotRefPath("select f from d.t5.c", path(0, 1, 0));
     testSlotRefPath("select value.f from d.t5.c", path(0, 1, 0));
     AnalysisError("select value.value from d.t5.c",
         "Could not resolve column/field reference: 'value.value'");
-    AnalysisError("select value from d.t5.c",
-        "Expr 'value' in select list returns a complex type " +
-        "'STRUCT<f:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+    testSlotRefPath("select value from d.t5.c", path(0, 1));
     // Test star expansion.
     testStarPath("select * from d.t5.c", path(0, 0), path(0, 1, 0));
     testStarPath("select c.* from d.t5.c", path(0, 0), path(0, 1, 0));
 
     // Map with a scalar key and struct value with name conflicts. Both implicit and
     // explicit paths are allowed.
-    addTestTable("create table d.t6 (c map<int,struct<f:int,key:int,value:int>>)");
+    addTestTable("create table d.t6 (c map<int,struct<f:int,key:int,value:int>>) " +
+        "stored as orc");
     testSlotRefPath("select key from d.t6.c", path(0, 0));
     testSlotRefPath("select f from d.t6.c", path(0, 1, 0));
     testSlotRefPath("select value.f from d.t6.c", path(0, 1, 0));
     testSlotRefPath("select value.key from d.t6.c", path(0, 1, 1));
     testSlotRefPath("select value.value from d.t6.c", path(0, 1, 2));
-    AnalysisError("select value from d.t6.c",
-        "Expr 'value' in select list returns a complex type " +
-        "'STRUCT<f:INT,key:INT,value:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+    testSlotRefPath("select value from d.t6.c", path(0, 1));
     // Test star expansion.
     testStarPath("select * from d.t6.c",
         path(0, 0), path(0, 1, 0), path(0, 1, 1), path(0, 1, 2));
     testStarPath("select c.* from d.t6.c",
         path(0, 0), path(0, 1, 0), path(0, 1, 1), path(0, 1, 2));
+
+    // Map with nested struct value with name conflict. Both implicit and explicit paths
+    // are allowed.
+    addTestTable("create table d.t6_nested (c map<int," +
+        "struct<f:int,key:int,value:int,s:struct<f:int,key:int,value:int>>>)" +
+        " stored as orc");
+    testSlotRefPath("select key from d.t6_nested.c", path(0,0));
+    testSlotRefPath("select value from d.t6_nested.c", path(0,1));
+    testSlotRefPath("select f from d.t6_nested.c", path(0, 1, 0));
+    testSlotRefPath("select value.key from d.t6_nested.c", path(0, 1, 1));
+    testSlotRefPath("select value.value from d.t6_nested.c", path(0, 1, 2));
+    testSlotRefPath("select value.s from d.t6_nested.c", path(0, 1, 3));
+    testSlotRefPath("select value.s.f from d.t6_nested.c", path(0, 1, 3, 0));
+    testSlotRefPath("select value.s.key from d.t6_nested.c", path(0, 1, 3, 1));
+    testSlotRefPath("select value.s.value from d.t6_nested.c", path(0, 1, 3, 2));
+
 
     // Test implicit/explicit paths on a complicated schema.
     addTestTable("create table d.t7 (" +
@@ -600,7 +612,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "c3 array<struct<a1:array<int>,a2:array<struct<x:int,y:int,a3:array<int>>>>>, " +
         "c4 bigint, " +
         "c5 map<int,struct<m1:map<int,string>," +
-        "                  m2:map<int,struct<x:int,y:int,m3:map<int,int>>>>>)");
+        "                  m2:map<int,struct<x:int,y:int,m3:map<int,int>>>>>) " +
+        "stored as orc");
 
     // Test paths with c3.
     testTableRefPath("select 1 from d.t7.c3.a1", path(2, 0, 0), null);
@@ -615,6 +628,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     testTableRefPath("select 1 from d.t7.c3.item.a2.item.a3", path(2, 0, 1, 0, 2), null);
     testSlotRefPath("select item from d.t7.c3.a2.a3", path(2, 0, 1, 0, 2, 0));
     testSlotRefPath("select item from d.t7.c3.item.a2.item.a3", path(2, 0, 1, 0, 2, 0));
+    AnalysisContext ctx = createAnalysisCtx();
+    ctx.getQueryOptions().setDisable_codegen(true);
+    AnalysisError("select item from d.t7.c3", ctx,
+        "Struct containing a collection type is not allowed in the select list.");
     // Test path assembly with multiple tuple descriptors.
     testTableRefPath("select 1 from d.t7, t7.c3, c3.a2, a2.a3",
         path(2, 0, 1, 0, 2), path(2, 0, 1, 0, 2));
@@ -755,27 +772,42 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Illegal column/field reference 'complex_nested_struct_col.f2.f11' with " +
         "intermediate collection 'f2' of type " +
         "'ARRAY<STRUCT<f11:BIGINT,f12:MAP<STRING,STRUCT<f21:BIGINT>>>>'");
+
+    // Check the support of struct in the select list for different file formats.
+    AnalysisContext ctx = createAnalysisCtx();
+    ctx.getQueryOptions().setDisable_codegen(true);
+    AnalysisError("select alltypes from functional_parquet.complextypes_structs", ctx,
+        "Querying STRUCT is only supported for ORC file format.");
+    AnalyzesOk("select alltypes from functional_orc_def.complextypes_structs", ctx);
+
+    // Check if a struct in the select list raises an error if it contains collections.
+    addTestTable(
+        "create table nested_structs (s1 struct<s2:struct<i:int>>) stored as orc");
+    addTestTable("create table nested_structs_with_list " +
+        "(s1 struct<s2:struct<a:array<int>>>) stored as orc");
+    AnalyzesOk("select s1 from nested_structs", ctx);
+    AnalyzesOk("select s1.s2 from nested_structs", ctx);
+    AnalysisError("select s1 from nested_structs_with_list", ctx, "Struct containing " +
+        "a collection type is not allowed in the select list.");
+    AnalysisError("select s1.s2 from nested_structs_with_list", ctx, "Struct " +
+        "containing a collection type is not allowed in the select list.");
   }
 
   @Test
   public void TestSlotRefPathAmbiguity() {
     addTestDb("a", null);
-    addTestTable("create table a.a (a struct<a:struct<a:int>>)");
+    addTestTable("create table a.a (a struct<a:struct<a:int>>) stored as orc");
 
     // Slot path is not ambiguous.
     AnalyzesOk("select a.a.a.a.a from a.a");
     AnalyzesOk("select t.a.a.a from a.a t");
 
-    // Slot path is not ambiguous but resolves to a struct.
-    AnalysisError("select a from a.a",
-        "Expr 'a' in select list returns a complex type 'STRUCT<a:STRUCT<a:INT>>'.\n" +
-        "Only scalar types are allowed in the select list.");
-    AnalysisError("select t.a from a.a t",
-        "Expr 't.a' in select list returns a complex type 'STRUCT<a:STRUCT<a:INT>>'.\n" +
-        "Only scalar types are allowed in the select list.");
-    AnalysisError("select t.a.a from a.a t",
-        "Expr 't.a.a' in select list returns a complex type 'STRUCT<a:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+    // Slot path is not ambiguous and resolves to a struct.
+    AnalysisContext ctx = createAnalysisCtx();
+    ctx.getQueryOptions().setDisable_codegen(true);
+    AnalyzesOk("select a from a.a", ctx);
+    AnalyzesOk("select t.a from a.a t", ctx);
+    AnalyzesOk("select t.a.a from a.a t", ctx);
 
     // Slot paths are ambiguous. A slot path can legally resolve to a non-scalar type,
     // even though we currently do not support non-scalar SlotRefs in the select list
@@ -970,7 +1002,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   /**
-   * Test that complex types are not allowed in the select list.
+   * Test that complex types are supported in the select list.
    */
   @Test
   public void TestComplexTypesInSelectList() {
@@ -990,35 +1022,50 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "tables only have complex-typed columns.");
     // Empty star expansion, but non empty result exprs.
     AnalyzesOk("select 1, * from only_complex_types");
-    // Illegal complex-typed expr in select list.
-    AnalysisError("select int_struct_col from functional.allcomplextypes",
-        "Expr 'int_struct_col' in select list returns a " +
-        "complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+
+    // Struct in select list works only if codegen is OFF.
+    AnalysisContext ctx = createAnalysisCtx();
+    ctx.getQueryOptions().setDisable_codegen(false);
+    AnalysisError("select alltypes from functional_orc_def.complextypes_structs", ctx,
+        "Struct type in select list is not allowed when Codegen is ON. You might want " +
+        "to set DISABLE_CODEGEN=true");
+    ctx.getQueryOptions().setDisable_codegen(true);
+    AnalyzesOk("select alltypes from functional_orc_def.complextypes_structs", ctx);
     // Illegal complex-typed expr in a union.
-    AnalysisError("select int_struct_col from functional.allcomplextypes " +
-        "union all select int_struct_col from functional.allcomplextypes",
-        "Expr 'int_struct_col' in select list returns a " +
-        "complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+    AnalysisError("select int_array_col from functional.allcomplextypes ",
+        "Expr 'int_array_col' in select list returns a collection type 'ARRAY<INT>'.\n" +
+        "Collection types are not allowed in the select list.");
+    // Illegal complex-typed expr in a union.
+    AnalysisError("select int_array_col from functional.allcomplextypes " +
+        "union all select int_array_col from functional.allcomplextypes",
+        "Expr 'int_array_col' in select list returns a collection type 'ARRAY<INT>'.\n" +
+        "Collection types are not allowed in the select list.");
+    AnalysisError("select tiny_struct from functional_orc_def.complextypes_structs " +
+        "union all select tiny_struct from functional_orc_def.complextypes_structs", ctx,
+        "Set operations don't support STRUCT type. STRUCT<b:BOOLEAN> in tiny_struct");
     // Illegal complex-typed expr inside inline view.
     AnalysisError("select 1 from " +
-        "(select int_struct_col from functional.allcomplextypes) v",
-        "Expr 'int_struct_col' in select list returns a " +
-        "complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+        "(select int_array_col from functional.allcomplextypes) v",
+        "Expr 'int_array_col' in select list returns a collection type 'ARRAY<INT>'.\n" +
+        "Collection types are not allowed in the select list.");
+    // Structs are allowed in an inline view.
+    AnalyzesOk("select v.ts from (select tiny_struct as ts from " +
+        "functional_orc_def.complextypes_structs) v;", ctx);
     // Illegal complex-typed expr in an insert.
     AnalysisError("insert into functional.allcomplextypes " +
-        "select int_struct_col from functional.allcomplextypes",
-        "Expr 'int_struct_col' in select list returns a " +
-        "complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+        "select int_array_col from functional.allcomplextypes",
+        "Expr 'int_array_col' in select list returns a collection type 'ARRAY<INT>'.\n" +
+        "Collection types are not allowed in the select list.");
     // Illegal complex-typed expr in a CTAS.
     AnalysisError("create table new_tbl as " +
-        "select int_struct_col from functional.allcomplextypes",
-        "Expr 'int_struct_col' in select list returns a " +
-        "complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+        "select int_array_col from functional.allcomplextypes",
+        "Expr 'int_array_col' in select list returns a collection type 'ARRAY<INT>'.\n" +
+        "Collection types are not allowed in the select list.");
+    AnalysisError("create table new_tbl as " +
+        "select tiny_struct from functional_orc_def.complextypes_structs", ctx,
+        "Unable to INSERT into target table (default.new_tbl) because the column " +
+            "'tiny_struct' has a complex type 'STRUCT<b:BOOLEAN>' and Impala doesn't " +
+            "support inserting into tables containing complex type columns");
   }
 
   @Test
@@ -3019,9 +3066,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
                "ORDER BY timestamp_col");
 
     // Ordering by complex-typed expressions is not allowed.
-    AnalysisError("select * from functional_parquet.allcomplextypes " +
-        "order by int_struct_col", "ORDER BY expression 'int_struct_col' with " +
-        "complex type 'STRUCT<f1:INT,f2:INT>' is not supported.");
+    AnalysisError("select * from functional_orc_def.complextypes_structs " +
+        "order by tiny_struct", "ORDER BY expression 'tiny_struct' with " +
+        "complex type 'STRUCT<b:BOOLEAN>' is not supported.");
     AnalysisError("select * from functional_parquet.allcomplextypes " +
         "order by int_array_col", "ORDER BY expression 'int_array_col' with " +
         "complex type 'ARRAY<INT>' is not supported.");

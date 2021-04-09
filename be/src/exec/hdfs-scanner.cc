@@ -93,7 +93,7 @@ Status HdfsScanner::Open(ScannerContext* context) {
     for (auto& entry : *(scan_node_->thrift_dict_filter_conjuncts_map())) {
       SlotDescriptor* slot_desc = state_->desc_tbl().GetSlotDescriptor(entry.first);
       TupleId tuple_id = (slot_desc->type().IsCollectionType() ?
-          slot_desc->collection_item_descriptor()->id() :
+          slot_desc->children_tuple_descriptor()->id() :
           slot_desc->parent()->id());
       auto conjunct_evals_it = conjunct_evals_map_.find(tuple_id);
       DCHECK(conjunct_evals_it != conjunct_evals_map_.end());

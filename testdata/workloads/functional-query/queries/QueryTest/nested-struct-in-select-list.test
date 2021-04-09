@@ -1,0 +1,155 @@
+====
+---- QUERY
+# Select a struct that contains multiple structs.
+select id, outer_struct
+from functional_orc_def.complextypes_nested_structs;
+---- RESULTS
+1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+2,'{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}'
+3,'NULL'
+4,'{"str":"","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":1,"str":"string"},"inner_struct3":{"s":null}}'
+5,'{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Select a struct that contains multiple structs using a filter on a non-struct field.
+select id, outer_struct
+from functional_orc_def.complextypes_nested_structs
+where id > 2;
+---- RESULTS
+3,'NULL'
+4,'{"str":"","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":1,"str":"string"},"inner_struct3":{"s":null}}'
+5,'{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Select a struct that contains multiple structs using a filter on a struct field.
+select id, outer_struct
+from functional_orc_def.complextypes_nested_structs
+where length(outer_struct.str) > 3;
+---- RESULTS
+1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Select a nested struct with an order by.
+select id, outer_struct
+from functional_orc_def.complextypes_nested_structs
+order by id;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+2,'{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}'
+3,'NULL'
+4,'{"str":"","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":1,"str":"string"},"inner_struct3":{"s":null}}'
+5,'{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Select a nested struct with an order by.
+select id, outer_struct
+from functional_orc_def.complextypes_nested_structs
+order by id desc;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+5,'{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}'
+4,'{"str":"","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":1,"str":"string"},"inner_struct3":{"s":null}}'
+3,'NULL'
+2,'{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}'
+1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Select the same nested struct multiple times in one query.
+select id, outer_struct, outer_struct
+from functional_orc_def.complextypes_nested_structs;
+---- RESULTS
+1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}','{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+2,'{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}','{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}'
+3,'NULL','NULL'
+4,'{"str":"","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":1,"str":"string"},"inner_struct3":{"s":null}}','{"str":"","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":1,"str":"string"},"inner_struct3":{"s":null}}'
+5,'{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}','{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Select the same nested struct multiple times in one query and order the results.
+select id, outer_struct, outer_struct
+from functional_orc_def.complextypes_nested_structs
+order by id desc;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+5,'{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}','{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}'
+4,'{"str":"","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":1,"str":"string"},"inner_struct3":{"s":null}}','{"str":"","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":1,"str":"string"},"inner_struct3":{"s":null}}'
+3,'NULL','NULL'
+2,'{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}','{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}'
+1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}','{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Similar to the above query but here the 'id' field is not in the select list but still
+# used in the order by.
+select outer_struct, outer_struct
+from functional_orc_def.complextypes_nested_structs
+order by id desc;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}','{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}'
+'{"str":"","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":1,"str":"string"},"inner_struct3":{"s":null}}','{"str":"","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":1,"str":"string"},"inner_struct3":{"s":null}}'
+'NULL','NULL'
+'{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}','{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}'
+'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}','{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+# WITH clause creates an inline view containing a nested struct.
+with sub as (
+    select id, outer_struct from functional_orc_def.complextypes_nested_structs)
+select sub.id, sub.outer_struct from sub;
+---- RESULTS
+1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+2,'{"str":"str","inner_struct1":null,"inner_struct2":{"i":100,"str":"str3"},"inner_struct3":{"s":{"i":321,"s":"dfgs"}}}'
+3,'NULL'
+4,'{"str":"","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":1,"str":"string"},"inner_struct3":{"s":null}}'
+5,'{"str":null,"inner_struct1":null,"inner_struct2":null,"inner_struct3":null}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# WITH clause creates an inline view containing a nested struct. Also has a filter on
+# the inline view and ordering by a non-complex item from the view.
+with sub as (
+    select id, outer_struct
+    from functional_orc_def.complextypes_nested_structs
+    where length(outer_struct.str) > 3)
+select sub.id, sub.outer_struct from sub order by sub.id desc;
+---- RESULTS
+1,'{"str":"somestr1","inner_struct1":{"str":"somestr2","de":12345.12},"inner_struct2":{"i":333222111,"str":"somestr3"},"inner_struct3":{"s":{"i":112288,"s":null}}}'
+---- TYPES
+INT,STRING
+---- QUERY
+# Checks that "SELECT nested_struct.* ..." omits the nested structs from the output.
+select id, outer_struct.* from functional_orc_def.complextypes_nested_structs;
+---- RESULTS
+1,'somestr1'
+2,'str'
+3,'NULL'
+4,''
+5,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Subquery that returns a complex type is not supported.
+# IMPALA-9500
+select outer_struct
+from functional_orc_def.complextypes_nested_structs
+where outer_struct in
+(select outer_struct from functional_orc_def.complextypes_nested_structs);
+---- CATCH
+AnalysisException: A subquery can't return complex types. (SELECT outer_struct FROM functional_orc_def.complex
+types_nested_structs)
+====

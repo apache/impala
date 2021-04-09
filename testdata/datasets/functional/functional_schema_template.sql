@@ -761,6 +761,70 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM functiona
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+alltypes_structs
+---- PARTITION_COLUMNS
+year int
+month int
+---- COLUMNS
+id int
+struct_val struct<bool_col:boolean, tinyint_col:tinyint, smallint_col:smallint, int_col:int, bigint_col:bigint, float_col:float, double_col:double, date_string_col:string, string_col:string, timestamp_col:timestamp>
+---- DEPENDENT_LOAD_HIVE
+INSERT INTO {db_name}{db_suffix}.{table_name}
+PARTITION (year, month)
+    SELECT
+        id,
+        named_struct(
+            'bool_col', bool_col,
+            'tinyint_col', tinyint_col,
+            'smallint_col', smallint_col,
+            'int_col', int_col,
+            'bigint_col', bigint_col,
+            'float_col', float_col,
+            'double_col', double_col,
+            'date_string_col', date_string_col,
+            'string_col', string_col,
+            'timestamp_col', timestamp_col),
+        year,
+        month
+    FROM {db_name}{db_suffix}.alltypes;
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+complextypes_structs
+---- COLUMNS
+id int
+str string
+alltypes struct<ti:tinyint, si:smallint, i:int, bi:bigint, b:boolean, f:float, do:double, da:date, ts:timestamp, s1:string, s2:string, c1:char(1), c2:char(3), vc:varchar(10), de1:decimal(5, 0), de2:decimal(10, 3)>
+tiny_struct struct<b:boolean>
+small_struct struct<i:int, s:string>
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/complextypes_structs_parquet && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/structs.parq \
+/test-warehouse/complextypes_structs_parquet/
+---- DEPENDENT_LOAD_ACID
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/ComplexTypesTbl/structs.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+complextypes_nested_structs
+---- COLUMNS
+id int
+outer_struct struct<str:string,inner_struct1:struct<str:string,de:decimal(8,2)>,inner_struct2:struct<i:int,str:string>,inner_struct3:struct<s:struct<i:int,s:string>>>
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/complextypes_nested_structs_parquet && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/structs_nested.parq \
+/test-warehouse/complextypes_nested_structs_parquet/
+---- DEPENDENT_LOAD_ACID
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/ComplexTypesTbl/structs_nested.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 complextypestbl_minor_compacted
 ---- COLUMNS
 id bigint

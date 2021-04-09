@@ -21,7 +21,11 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.impala.analysis.Path.PathType;
+import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
@@ -41,6 +45,9 @@ public class SlotRef extends Expr {
 
   // Results of analysis.
   private SlotDescriptor desc_;
+
+  // The resolved path after resolving 'rawPath_'.
+  private Path resolvedPath_ = null;
 
   public SlotRef(List<String> rawPath) {
     super();
@@ -64,7 +71,8 @@ public class SlotRef extends Expr {
   public SlotRef(SlotDescriptor desc) {
     super();
     if (desc.isScanSlot()) {
-      rawPath_ = desc.getPath().getRawPath();
+      resolvedPath_ = desc.getPath();
+      rawPath_ = resolvedPath_.getRawPath();
     } else {
       rawPath_ = null;
     }
@@ -82,6 +90,7 @@ public class SlotRef extends Expr {
    */
   private SlotRef(SlotRef other) {
     super(other);
+    resolvedPath_ = other.resolvedPath_;
     rawPath_ = other.rawPath_;
     label_ = other.label_;
     desc_ = other.desc_;
@@ -108,20 +117,30 @@ public class SlotRef extends Expr {
     return numDistinctValues;
   }
 
+  /**
+   * Resetting a struct SlotRef remove its children as an analyzeImpl() on this
+   * particular SlotRef will create the children again.
+   */
+  @Override
+  public SlotRef reset() {
+    if (type_.isStructType()) clearChildren();
+    super.reset();
+    return this;
+  }
+
   @Override
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     // TODO: derived slot refs (e.g., star-expanded) will not have rawPath set.
     // Change construction to properly handle such cases.
     Preconditions.checkState(rawPath_ != null);
-    Path resolvedPath = null;
     try {
-      resolvedPath = analyzer.resolvePathWithMasking(rawPath_, PathType.SLOT_REF);
+      resolvedPath_ = analyzer.resolvePathWithMasking(rawPath_, PathType.SLOT_REF);
     } catch (TableLoadingException e) {
       // Should never happen because we only check registered table aliases.
       Preconditions.checkState(false);
     }
-    Preconditions.checkNotNull(resolvedPath);
-    desc_ = analyzer.registerSlotRef(resolvedPath);
+    Preconditions.checkNotNull(resolvedPath_);
+    desc_ = analyzer.registerSlotRef(resolvedPath_);
     type_ = desc_.getType();
     if (!type_.isSupported()) {
       throw new UnsupportedFeatureException("Unsupported type '"
@@ -134,17 +153,118 @@ public class SlotRef extends Expr {
       throw new UnsupportedFeatureException("Unsupported type in '" + toSql() + "'.");
     }
     // Register scalar columns of a catalog table.
-    if (!resolvedPath.getMatchedTypes().isEmpty()
-        && !resolvedPath.getMatchedTypes().get(0).isComplexType()) {
+    if (!resolvedPath_.getMatchedTypes().isEmpty()
+        && !resolvedPath_.getMatchedTypes().get(0).isComplexType()) {
       analyzer.registerScalarColumnForMasking(desc_);
     }
 
     numDistinctValues_ = adjustNumDistinctValues();
-    FeTable rootTable = resolvedPath.getRootTable();
+    FeTable rootTable = resolvedPath_.getRootTable();
     if (rootTable != null && rootTable.getNumRows() > 0) {
       // The NDV cannot exceed the #rows in the table.
       numDistinctValues_ = Math.min(numDistinctValues_, rootTable.getNumRows());
     }
+    if (type_.isStructType() && rootTable != null) {
+      if (!(rootTable instanceof FeFsTable)) {
+        throw new AnalysisException(String.format(
+            "%s is not supported when querying STRUCT type %s",
+            rootTable.getClass().toString(), type_.toSql()));
+      }
+      FeFsTable feTable = (FeFsTable)rootTable;
+      for (HdfsFileFormat format : feTable.getFileFormats()) {
+        if (format != HdfsFileFormat.ORC) {
+          throw new AnalysisException("Querying STRUCT is only supported for ORC file " +
+              "format.");
+        }
+      }
+    }
+    if (type_.isStructType()) expandSlotRefForStruct(analyzer);
+  }
+
+  // This function expects this SlotRef to be a Struct and creates SlotRefs to represent
+  // the children of the struct. Also creates slot and tuple descriptors for the children
+  // of the struct.
+  private void expandSlotRefForStruct(Analyzer analyzer) throws AnalysisException {
+    Preconditions.checkState(type_ != null && type_.isStructType());
+    // If the same struct is present multiple times in the select list we create only a
+    // single TupleDescriptor instead of one for each occurence.
+    if (desc_.getItemTupleDesc() == null) {
+      checkForUnsupportedFieldsForStruct();
+      createStructTuplesAndSlots(analyzer, resolvedPath_);
+    }
+    addStructChildrenAsSlotRefs(analyzer, desc_.getItemTupleDesc());
+  }
+
+  // Expects the type of this SlotRef as a StructType. Throws an AnalysisException if any
+  // of the struct fields of this Slot ref is a collection or unsupported type.
+  private void checkForUnsupportedFieldsForStruct() throws AnalysisException {
+    Preconditions.checkState(type_ instanceof StructType);
+    for (StructField structField : ((StructType)type_).getFields()) {
+      if (!structField.getType().isSupported()) {
+        throw new AnalysisException("Unsupported type '"
+            + structField.getType().toSql() + "' in '" + toSql() + "'.");
+      }
+      if (structField.getType().isCollectionType()) {
+        throw new AnalysisException("Struct containing a collection type is not " +
+            "allowed in the select list.");
+      }
+    }
+  }
+
+  /**
+   * Creates a TupleDescriptor to hold the children of a struct slot and then creates and
+   * adds SlotDescriptors as struct children to this TupleDescriptor. Sets the created
+   * parent TupleDescriptor to 'desc_.itemTupleDesc_'.
+   */
+  public void createStructTuplesAndSlots(Analyzer analyzer, Path resolvedPath) {
+    TupleDescriptor structTuple =
+        analyzer.getDescTbl().createTupleDescriptor("struct_tuple");
+    if (resolvedPath != null) structTuple.setPath(resolvedPath);
+    structTuple.setType((StructType)type_);
+    structTuple.setParentSlotDesc(desc_);
+    for (StructField structField : ((StructType)type_).getFields()) {
+      SlotDescriptor slotDesc = analyzer.getDescTbl().addSlotDescriptor(structTuple);
+      // 'resolvedPath_' could be null e.g. when the query has an order by clause and
+      // this is the sorting tuple.
+      if (resolvedPath != null) {
+        Path relPath = Path.createRelPath(resolvedPath, structField.getName());
+        relPath.resolve();
+        slotDesc.setPath(relPath);
+      }
+      slotDesc.setType(structField.getType());
+      slotDesc.setIsMaterialized(true);
+    }
+    desc_.setItemTupleDesc(structTuple);
+  }
+
+  /**
+   * Assuming that 'structTuple' is the tuple for struct children this function iterates
+   * its slots, creates a SlotRef for each slot and adds them to 'children_' of this
+   * SlotRef.
+   */
+  public void addStructChildrenAsSlotRefs(Analyzer analyzer,
+      TupleDescriptor structTuple) throws AnalysisException {
+    Preconditions.checkState(structTuple != null);
+    Preconditions.checkState(structTuple.getParentSlotDesc() != null);
+    Preconditions.checkState(structTuple.getParentSlotDesc().getType().isStructType());
+    for (SlotDescriptor childSlot : structTuple.getSlots()) {
+      SlotRef childSlotRef = new SlotRef(childSlot);
+      children_.add(childSlotRef);
+      if (childSlot.getType().isStructType()) {
+        childSlotRef.expandSlotRefForStruct(analyzer);
+      }
+    }
+  }
+
+  /**
+   * The TreeNode.collect() function shouldn't iterate the children of this SlotRef if
+   * this is a struct SlotRef. The desired functionality is to collect the struct
+   * SlotRefs but not their children.
+   */
+  @Override
+  protected boolean shouldCollectRecursively() {
+    if (desc_ != null && desc_.getType().isStructType()) return false;
+    return true;
   }
 
   @Override
@@ -265,7 +385,9 @@ public class SlotRef extends Expr {
   }
 
   @Override
-  public Expr clone() { return new SlotRef(this); }
+  public Expr clone() {
+    return new SlotRef(this);
+  }
 
   @Override
   public String toString() {

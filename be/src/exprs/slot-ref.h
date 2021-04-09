@@ -58,13 +58,23 @@ class SlotRef : public ScalarExpr {
   virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const override;
   const SlotId& slot_id() const { return slot_id_; }
   static const char* LLVM_CLASS_NAME;
+  int GetTupleIdx() const { return tuple_idx_; }
+  NullIndicatorOffset GetNullIndicatorOffset() const { return null_indicator_offset_; }
+  int GetSlotOffset() const { return slot_offset_; }
 
  protected:
   friend class ScalarExpr;
   friend class ScalarExprEvaluator;
 
+  /// For struct SlotRefs we need a FunctionContext so that we can use it later for
+  /// allocating memory to StructVals.
+  /// If this SlotRef is not a struct then the same function in ScalarExpr is called.
+  virtual void AssignFnCtxIdx(int* next_fn_ctx_idx) override;
+
   GENERATE_GET_VAL_INTERPRETED_OVERRIDES_FOR_ALL_SCALAR_TYPES
   virtual CollectionVal GetCollectionValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const override;
+  virtual StructVal GetStructValInterpreted(
       ScalarExprEvaluator*, const TupleRow*) const override;
 
  private:

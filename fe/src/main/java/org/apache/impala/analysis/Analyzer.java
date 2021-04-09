@@ -1303,7 +1303,7 @@ public class Analyzer {
       registerColumnPrivReq(result);
       return result;
     }
-    // SlotRefs with a scalar type are registered against the slot's
+    // SlotRefs with a scalar or struct types are registered against the slot's
     // fully-qualified lowercase path.
     String key = slotPath.toString();
     Preconditions.checkState(key.equals(key.toLowerCase()),
@@ -2849,6 +2849,12 @@ public class Analyzer {
       // Type compatible with the i-th exprs of all expr lists.
       // Initialize with type of i-th expr in first list.
       Type compatibleType = firstList.get(i).getType();
+      if (firstList.get(i) instanceof SlotRef &&
+          compatibleType.isStructType()) {
+        throw new AnalysisException(String.format(
+            "Set operations don't support STRUCT type. %s in %s", compatibleType.toSql(),
+            firstList.get(i).toSql()));
+      }
       widestExprs.add(firstList.get(i));
       for (int j = 1; j < exprLists.size(); ++j) {
         Preconditions.checkState(exprLists.get(j).size() == firstList.size());

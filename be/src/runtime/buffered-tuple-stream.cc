@@ -73,28 +73,29 @@ BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     const TupleDescriptor* tuple_desc = desc_->tuple_descriptors()[i];
     const int tuple_byte_size = tuple_desc->byte_size();
     fixed_tuple_sizes_.push_back(tuple_byte_size);
+    CollectInlinedSlots(tuple_desc, ext_varlen_slots, i);
+  }
+}
 
-    vector<SlotDescriptor*> tuple_string_slots;
-    vector<SlotDescriptor*> tuple_coll_slots;
-    for (int j = 0; j < tuple_desc->slots().size(); ++j) {
-      SlotDescriptor* slot = tuple_desc->slots()[j];
-      if (!slot->type().IsVarLenType()) continue;
-      if (ext_varlen_slots.find(slot->id()) == ext_varlen_slots.end()) {
-        if (slot->type().IsVarLenStringType()) {
-          tuple_string_slots.push_back(slot);
-        } else {
-          DCHECK(slot->type().IsCollectionType());
-          tuple_coll_slots.push_back(slot);
-        }
-      }
+void BufferedTupleStream::CollectInlinedSlots(const TupleDescriptor* tuple_desc,
+    const set<SlotId>& ext_varlen_slots, int tuple_idx) {
+  vector<SlotDescriptor*> inlined_string_slots;
+  vector<SlotDescriptor*> inlined_coll_slots;
+  for (SlotDescriptor* slot : tuple_desc->string_slots()) {
+    if (ext_varlen_slots.find(slot->id()) == ext_varlen_slots.end()) {
+      inlined_string_slots.push_back(slot);
     }
-    if (!tuple_string_slots.empty()) {
-      inlined_string_slots_.push_back(make_pair(i, tuple_string_slots));
+  }
+  for (SlotDescriptor* slot : tuple_desc->collection_slots()) {
+    if (ext_varlen_slots.find(slot->id()) == ext_varlen_slots.end()) {
+      inlined_coll_slots.push_back(slot);
     }
-
-    if (!tuple_coll_slots.empty()) {
-      inlined_coll_slots_.push_back(make_pair(i, tuple_coll_slots));
-    }
+  }
+  if (!inlined_string_slots.empty()) {
+    inlined_string_slots_.push_back(make_pair(tuple_idx, inlined_string_slots));
+  }
+  if (!inlined_coll_slots.empty()) {
+    inlined_coll_slots_.push_back(make_pair(tuple_idx, inlined_coll_slots));
   }
 }
 
@@ -919,7 +920,7 @@ void BufferedTupleStream::FixUpCollectionsForRead(
     if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
 
     CollectionValue* cv = tuple->GetCollectionSlot(slot_desc->tuple_offset());
-    const TupleDescriptor& item_desc = *slot_desc->collection_item_descriptor();
+    const TupleDescriptor& item_desc = *slot_desc->children_tuple_descriptor();
     int coll_byte_size = cv->num_tuples * item_desc.byte_size();
     cv->ptr = reinterpret_cast<uint8_t*>(read_iter->read_ptr_);
     read_iter->AdvanceReadPtr(coll_byte_size);
@@ -964,7 +965,7 @@ int64_t BufferedTupleStream::ComputeRowSize(TupleRow* row) const noexcept {
     for (auto it = slots.begin(); it != slots.end(); ++it) {
       if (tuple->IsNull((*it)->null_indicator_offset())) continue;
       CollectionValue* cv = tuple->GetCollectionSlot((*it)->tuple_offset());
-      const TupleDescriptor& item_desc = *(*it)->collection_item_descriptor();
+      const TupleDescriptor& item_desc = *(*it)->children_tuple_descriptor();
       size += cv->num_tuples * item_desc.byte_size();
 
       if (!item_desc.HasVarlenSlots()) continue;
@@ -1117,7 +1118,7 @@ bool BufferedTupleStream::CopyCollections(const Tuple* tuple,
   for (const SlotDescriptor* slot_desc : collection_slots) {
     if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
     const CollectionValue* cv = tuple->GetCollectionSlot(slot_desc->tuple_offset());
-    const TupleDescriptor& item_desc = *slot_desc->collection_item_descriptor();
+    const TupleDescriptor& item_desc = *slot_desc->children_tuple_descriptor();
     if (LIKELY(cv->num_tuples > 0)) {
       int coll_byte_size = cv->num_tuples * item_desc.byte_size();
       if (UNLIKELY(*data + coll_byte_size > data_end)) return false;

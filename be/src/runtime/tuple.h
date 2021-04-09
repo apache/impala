@@ -250,6 +250,11 @@ class Tuple {
     return (*null_indicator_byte & offset.bit_mask) != 0;
   }
 
+  /// 'slot_desc' describes a struct slot in this tuple. Sets 'slot_desc' to null in this
+  /// tuple and iterates its children and sets all of them to null too. Recursively
+  /// iterates nested structs.
+  void SetStructToNull(const SlotDescriptor* const slot_desc);
+
   /// Set the null indicators on 'num_tuples' tuples. The first tuple is stored at
   /// 'tuple_mem' and subsequent tuples must be stored at a stride of 'tuple_stride'
   /// bytes.

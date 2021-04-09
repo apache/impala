@@ -393,13 +393,19 @@ public class SelectStmt extends QueryStmt {
       }
 
       for (Expr expr: resultExprs_) {
-        // Complex types are currently not supported in the select list because
+        // Collection types are currently not supported in the select list because
         // we'd need to serialize them in a meaningful way.
-        if (expr.getType().isComplexType()) {
+        if (expr.getType().isCollectionType()) {
           throw new AnalysisException(String.format(
-              "Expr '%s' in select list returns a complex type '%s'.\n" +
-              "Only scalar types are allowed in the select list.",
+              "Expr '%s' in select list returns a collection type '%s'.\n" +
+              "Collection types are not allowed in the select list.",
               expr.toSql(), expr.getType().toSql()));
+        }
+        if (expr.getType().isStructType()) {
+          if (!analyzer_.getQueryCtx().client_request.query_options.disable_codegen) {
+            throw new AnalysisException("Struct type in select list is not allowed " +
+                "when Codegen is ON. You might want to set DISABLE_CODEGEN=true");
+          }
         }
         if (!expr.getType().isSupported()) {
           throw new AnalysisException("Unsupported type '"

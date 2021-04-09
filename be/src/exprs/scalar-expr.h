@@ -56,6 +56,7 @@ using impala_udf::StringVal;
 using impala_udf::DecimalVal;
 using impala_udf::DateVal;
 using impala_udf::CollectionVal;
+using impala_udf::StructVal;
 
 class FragmentState;
 struct LibCacheEntry;
@@ -232,6 +233,7 @@ class ScalarExpr : public Expr {
   friend class Predicate;
   friend class ScalarExprEvaluator;
   friend class ScalarFnCall;
+  friend class SlotRef;
 
   /// For BE tests
   friend class ExprTest;
@@ -242,7 +244,7 @@ class ScalarExpr : public Expr {
   /// nodes which need FunctionContext in the tree. 'next_fn_ctx_idx' is the index
   /// of the next available entry in the vector. It's updated as this function is
   /// called recursively down the tree.
-  void AssignFnCtxIdx(int* next_fn_ctx_idx);
+  virtual void AssignFnCtxIdx(int* next_fn_ctx_idx);
 
   int fn_ctx_idx() const { return fn_ctx_idx_; }
 
@@ -272,6 +274,7 @@ class ScalarExpr : public Expr {
   DoubleVal GetDoubleVal(ScalarExprEvaluator*, const TupleRow*) const;
   StringVal GetStringVal(ScalarExprEvaluator*, const TupleRow*) const;
   CollectionVal GetCollectionVal(ScalarExprEvaluator*, const TupleRow*) const;
+  StructVal GetStructVal(ScalarExprEvaluator*, const TupleRow*) const;
   TimestampVal GetTimestampVal(ScalarExprEvaluator*, const TupleRow*) const;
   DecimalVal GetDecimalVal(ScalarExprEvaluator*, const TupleRow*) const;
   DateVal GetDateVal(ScalarExprEvaluator*, const TupleRow*) const;
@@ -292,6 +295,8 @@ class ScalarExpr : public Expr {
   virtual DoubleVal GetDoubleValInterpreted(ScalarExprEvaluator*, const TupleRow*) const;
   virtual StringVal GetStringValInterpreted(ScalarExprEvaluator*, const TupleRow*) const;
   virtual CollectionVal GetCollectionValInterpreted(
+      ScalarExprEvaluator*, const TupleRow*) const;
+  virtual StructVal GetStructValInterpreted(
       ScalarExprEvaluator*, const TupleRow*) const;
   virtual TimestampVal GetTimestampValInterpreted(
       ScalarExprEvaluator*, const TupleRow*) const;

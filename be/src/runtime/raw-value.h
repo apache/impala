@@ -27,6 +27,7 @@ namespace impala {
 
 class MemPool;
 class SlotDescriptor;
+struct StringValue;
 class Tuple;
 
 /// Useful utility functions for runtime values (which are passed around as void*).
@@ -125,6 +126,13 @@ class RawValue {
   /// src must be non-NULL.
   static void Write(const void* src, void* dst, const ColumnType& type, MemPool* pool);
 
+  /// Wrapper function for Write() to handle struct slots and its children. Additionally,
+  /// gathers the string slots of the slot tree into 'string_values'.
+  template <bool COLLECT_STRING_VALS>
+  static void Write(const void* value, Tuple* tuple,
+      const SlotDescriptor* slot_desc, MemPool* pool,
+    std::vector<StringValue*>* string_values);
+
   /// Returns true if v1 == v2.
   /// This is more performant than Compare() == 0 for string equality, mostly because of
   /// the length comparison check.
@@ -146,5 +154,20 @@ class RawValue {
 
   // Returns positive zero for floating point types.
   static inline const void* PositiveFloatingZero(const ColumnType& type);
+
+private:
+  /// Recursive helper function for Write() to handle struct slots.
+  template <bool COLLECT_STRING_VALS>
+  static void WriteStruct(const void* value, Tuple* tuple,
+      const SlotDescriptor* slot_desc, MemPool* pool,
+      std::vector<StringValue*>* string_values);
+
+  /// Gets the destination slot from 'tuple' and 'slot_desc', writes value to this slot
+  /// using Write(). Collects pointer of the string slots to 'string_values'. 'slot_desc'
+  /// has to be primitive type.
+  template <bool COLLECT_STRING_VALS>
+  static void WritePrimitive(const void* value, Tuple* tuple,
+      const SlotDescriptor* slot_desc, MemPool* pool,
+      std::vector<StringValue*>* string_values);
 };
 }

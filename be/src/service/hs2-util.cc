@@ -17,6 +17,10 @@
 
 #include "service/hs2-util.h"
 
+#include <rapidjson/rapidjson.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
+
 #include "common/logging.h"
 #include "exprs/scalar-expr-evaluator.h"
 #include "runtime/date-value.h"
@@ -24,6 +28,7 @@
 #include "runtime/raw-value.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/types.h"
+#include "udf/udf-internal.h"
 #include "util/bit-util.h"
 
 #include <gutil/strings/substitute.h>
@@ -336,6 +341,60 @@ static void DecimalExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
   }
 }
 
+// Gets a StructVal and puts it's JSON format into 'out_stream'. Uses 'column_type' to
+// figure out field names and types. This functions can call itself recursively in case
+// of nested structs.
+static void StructValToJSON(const StructVal& struct_val, const ColumnType& column_type,
+    rapidjson::Writer<rapidjson::StringBuffer>* writer) {
+  DCHECK(column_type.type == TYPE_STRUCT);
+  DCHECK_EQ(struct_val.num_children, column_type.children.size());
+  writer->StartObject();
+  for (int i = 0; i < struct_val.num_children; ++i) {
+    writer->String(column_type.field_names[i].c_str());
+    void* child = (void*)(struct_val.ptr[i]);
+    if (child == nullptr) {
+      writer->Null();
+    } else if (column_type.children[i].IsStructType()) {
+      StructValToJSON(*((StructVal*)child), column_type.children[i], writer);
+    } else {
+      string tmp;
+      RawValue::PrintValue(child, column_type.children[i], -1, &tmp);
+      const ColumnType& child_type = column_type.children[i];
+      if (child_type.IsStringType() || child_type.IsDateType() ||
+          child_type.IsTimestampType()) {
+        writer->String(tmp.c_str());
+      } else if (child_type.IsBooleanType()) {
+        writer->Bool( *(reinterpret_cast<bool*>(child)) );
+      } else {
+        writer->RawValue(tmp.c_str(), tmp.size(), rapidjson::kNumberType);
+      }
+    }
+  }
+  writer->EndObject();
+}
+
+static void StructExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
+    const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
+    uint32_t output_row_idx, apache::hive::service::cli::thrift::TColumn* column) {
+  DCHECK(type.types.size() > 1);
+  ReserveSpace(num_rows, output_row_idx, &column->stringVal);
+  FOREACH_ROW_LIMIT(batch, start_idx, num_rows, it) {
+    StructVal struct_val = expr_eval->GetStructVal(it.Get());
+    if (struct_val.is_null) {
+      column->stringVal.values.emplace_back();
+    } else {
+      int idx = 0;
+      ColumnType column_type(type.types, &idx);
+      rapidjson::StringBuffer buffer;
+      rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+      StructValToJSON(struct_val, column_type, &writer);
+      column->stringVal.values.emplace_back(buffer.GetString());
+    }
+    SetNullBit(output_row_idx, struct_val.is_null, &column->stringVal.nulls);
+    ++output_row_idx;
+  }
+}
+
 // For V6 and above
 void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     const TColumnType& type, RowBatch* batch, int start_idx, int num_rows,
@@ -344,6 +403,11 @@ void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
   // the type for every row.
   // TODO: instead of relying on stamped out implementations, we could codegen this loop
   // to inline the expression evaluation into the loop body.
+  if (type.types[0].type == TTypeNodeType::STRUCT) {
+    StructExprValuesToHS2TColumn(
+        expr_eval, type, batch, start_idx, num_rows, output_row_idx, column);
+    return;
+  }
   switch (type.types[0].scalar_type.type) {
     case TPrimitiveType::NULL_TYPE:
     case TPrimitiveType::BOOLEAN:
@@ -398,7 +462,7 @@ void impala::ExprValuesToHS2TColumn(ScalarExprEvaluator* expr_eval,
     }
     default:
       DCHECK(false) << "Unhandled type: "
-                    << TypeToString(ThriftToType(type.types[0].scalar_type.type));
+          << TypeToString(ThriftToType(type.types[0].scalar_type.type));
   }
 }
 

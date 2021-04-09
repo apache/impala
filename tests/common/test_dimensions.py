@@ -109,6 +109,11 @@ def create_parquet_dimension(workload):
       TableFormatInfo.create_from_string(dataset, 'parquet/none'))
 
 
+def create_orc_dimension(workload):
+  dataset = get_dataset_from_workload(workload)
+  return ImpalaTestDimension('table_format',
+      TableFormatInfo.create_from_string(dataset, 'orc/def'))
+
 def create_avro_snappy_dimension(workload):
   dataset = get_dataset_from_workload(workload)
   return ImpalaTestDimension('table_format',

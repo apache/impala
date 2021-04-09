@@ -213,7 +213,12 @@ Status ScalarExpr::CreateNode(
 Status ScalarExpr::OpenEvaluator(FunctionContext::FunctionStateScope scope,
     RuntimeState* state, ScalarExprEvaluator* eval) const {
   for (int i = 0; i < children_.size(); ++i) {
-    RETURN_IF_ERROR(children_[i]->OpenEvaluator(scope, state, eval));
+    ScalarExprEvaluator* child_eval = eval;
+    if (type_.IsStructType()) {
+      DCHECK_EQ(children_.size(), eval->GetChildEvaluators().size());
+      child_eval = eval->GetChildEvaluators()[i];
+    }
+    RETURN_IF_ERROR(children_[i]->OpenEvaluator(scope, state, child_eval));
   }
   return Status::OK();
 }
@@ -386,6 +391,7 @@ SCALAR_EXPR_GET_VAL_INTERPRETED(TimestampVal);
 SCALAR_EXPR_GET_VAL_INTERPRETED(DecimalVal);
 SCALAR_EXPR_GET_VAL_INTERPRETED(DateVal);
 SCALAR_EXPR_GET_VAL_INTERPRETED(CollectionVal);
+SCALAR_EXPR_GET_VAL_INTERPRETED(StructVal);
 
 string ScalarExpr::DebugString(const string& expr_name) const {
   stringstream out;

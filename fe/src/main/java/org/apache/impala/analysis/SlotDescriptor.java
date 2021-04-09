@@ -46,7 +46,7 @@ public class SlotDescriptor {
   private Path path_;
   private Type type_;
 
-  // Tuple descriptor for collection items. Only set if type_ is an array or map.
+  // Tuple descriptor for nested items. Set if type_ is an array, map or struct.
   private TupleDescriptor itemTupleDesc_;
 
   // for SlotRef.toSql() in the absence of a path
@@ -89,6 +89,7 @@ public class SlotDescriptor {
     parent_ = parent;
     type_ = src.type_;
     itemTupleDesc_ = src.itemTupleDesc_;
+    if (itemTupleDesc_ != null) itemTupleDesc_.setParentSlotDesc(this);
     path_ = src.path_;
     label_ = src.label_;
     sourceExprs_ = src.sourceExprs_;
@@ -120,6 +121,10 @@ public class SlotDescriptor {
         itemTupleDesc_ == null, "Item tuple descriptor already set.");
     itemTupleDesc_ = t;
   }
+  public void clearItemTupleDesc() {
+    Preconditions.checkState(itemTupleDesc_ != null);
+    itemTupleDesc_ = null;
+  }
   public boolean isMaterialized() { return isMaterialized_; }
   public void setIsMaterialized(boolean value) {
     if (isMaterialized_ == value) return;
@@ -145,7 +150,8 @@ public class SlotDescriptor {
   public void setPath(Path path) {
     Preconditions.checkNotNull(path);
     Preconditions.checkState(path.isRootedAtTuple());
-    Preconditions.checkState(path.getRootDesc() == parent_);
+    Preconditions.checkState(path.getRootDesc() == parent_ ||
+        parent_.getType().isStructType());
     path_ = path;
     type_ = path_.destType();
     label_ = Joiner.on(".").join(path.getRawPath());
@@ -239,8 +245,8 @@ public class SlotDescriptor {
     Preconditions.checkState(path_.isResolved());
 
     List<Integer> materializedPath = Lists.newArrayList(path_.getAbsolutePath());
-    // For scalar types, the materialized path is the same as path_
-    if (type_.isScalarType()) return materializedPath;
+    // For scalar types and structs the materialized path is the same as path_
+    if (type_.isScalarType() || type_.isStructType()) return materializedPath;
     Preconditions.checkState(type_.isCollectionType());
     Preconditions.checkState(path_.getFirstCollectionIndex() != -1);
     // Truncate materializedPath after first collection element
@@ -324,6 +330,7 @@ public class SlotDescriptor {
         .add("nullIndicatorBit", nullIndicatorBit_)
         .add("slotIdx", slotIdx_)
         .add("stats", stats_)
+        .add("itemTupleDesc", itemTupleDesc_)
         .toString();
   }
 

@@ -97,6 +97,12 @@ table_name:complextypestbl_medium, constraint:restrict_to, table_format:orc/def/
 table_name:complextypestbl_non_transactional, constraint:restrict_to, table_format:orc/def/block
 table_name:pos_item_key_value_complextypestbl, constraint:restrict_to, table_format:orc/def/block
 table_name:pos_item_key_value_complextypestbl, constraint:restrict_to, table_format:parquet/none/none
+table_name:alltypes_structs, constraint:restrict_to, table_format:parquet/none/none
+table_name:alltypes_structs, constraint:restrict_to, table_format:orc/def/block
+table_name:complextypes_structs, constraint:restrict_to, table_format:parquet/none/none
+table_name:complextypes_structs, constraint:restrict_to, table_format:orc/def/block
+table_name:complextypes_nested_structs, constraint:restrict_to, table_format:parquet/none/none
+table_name:complextypes_nested_structs, constraint:restrict_to, table_format:orc/def/block
 
 table_name:alltypeserror, constraint:exclude, table_format:parquet/none/none
 table_name:alltypeserrornonulls, constraint:exclude, table_format:parquet/none/none

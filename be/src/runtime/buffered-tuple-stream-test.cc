@@ -1878,7 +1878,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
     tuple0->SetNull(tuple_descs[0]->slots()[1]->null_indicator_offset());
     tuple1->SetNull(tuple_descs[1]->slots()[0]->null_indicator_offset());
     const SlotDescriptor* array_slot_desc = tuple_descs[0]->slots()[0];
-    const TupleDescriptor* item_desc = array_slot_desc->collection_item_descriptor();
+    const TupleDescriptor* item_desc = array_slot_desc->children_tuple_descriptor();
 
     int array_len = array_lens[array_len_index++ % num_array_lens];
     CollectionValue* cv = tuple0->GetCollectionSlot(array_slot_desc->tuple_offset());
@@ -1932,7 +1932,7 @@ TEST_F(ArrayTupleStreamTest, TestArrayDeepCopy) {
       ASSERT_TRUE(tuple0->IsNull(tuple_descs[0]->slots()[1]->null_indicator_offset()));
       ASSERT_TRUE(tuple1->IsNull(tuple_descs[1]->slots()[0]->null_indicator_offset()));
 
-      const TupleDescriptor* item_desc = array_slot_desc->collection_item_descriptor();
+      const TupleDescriptor* item_desc = array_slot_desc->children_tuple_descriptor();
       int expected_array_len = array_lens[array_len_index++ % num_array_lens];
       CollectionValue* cv = tuple0->GetCollectionSlot(array_slot_desc->tuple_offset());
       ASSERT_EQ(expected_array_len, cv->num_tuples);
@@ -1987,7 +1987,7 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
   // Tuple 0 has an array.
   int expected_row_size = tuple_null_indicator_bytes + array_desc_->GetRowSize();
   const SlotDescriptor* array_slot = tuple_descs[0]->slots()[0];
-  const TupleDescriptor* item_desc = array_slot->collection_item_descriptor();
+  const TupleDescriptor* item_desc = array_slot->children_tuple_descriptor();
   int array_len = 128;
   CollectionValue* cv = tuple0->GetCollectionSlot(array_slot->tuple_offset());
   CollectionValueBuilder builder(

@@ -1,0 +1,602 @@
+====
+---- QUERY
+# Select a simple struct with one bool member.
+select id, tiny_struct from functional_orc_def.complextypes_structs;
+---- RESULTS
+1,'{"b":true}'
+2,'{"b":false}'
+3,'{"b":true}'
+4,'{"b":null}'
+5,'{"b":false}'
+6,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Similar query as above but with an order by.
+select id, tiny_struct from functional_orc_def.complextypes_structs order by id;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'{"b":true}'
+2,'{"b":false}'
+3,'{"b":true}'
+4,'{"b":null}'
+5,'{"b":false}'
+6,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Ordering by a member of the struct.
+# Forced to use a SORT node instead of a TOPN.
+set disable_outermost_topn = 1;
+select id, alltypes from functional_orc_def.complextypes_structs
+order by alltypes.ti;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+4,'{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}'
+1,'{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'
+2,'{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}'
+6,'{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}'
+3,'{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}'
+5,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Querying two simple structs. There is a string in one of them and also a non-struct
+# string in the select list.
+select id, str, tiny_struct, small_struct from functional_orc_def.complextypes_structs;
+---- RESULTS
+1,'first item','{"b":true}','NULL'
+2,'second item','{"b":false}','{"i":19191,"s":"small_struct_str"}'
+3,'third item','{"b":true}','{"i":98765,"s":null}'
+4,'fourth item','{"b":null}','{"i":null,"s":"str"}'
+5,'fifth item','{"b":false}','{"i":98765,"s":"abcde f"}'
+6,'sixth item','NULL','{"i":null,"s":null}'
+---- TYPES
+INT,STRING,STRING,STRING
+====
+---- QUERY
+# Similar query as above but with an order by.
+select id, str, tiny_struct, small_struct
+from functional_orc_def.complextypes_structs
+order by id;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'first item','{"b":true}','NULL'
+2,'second item','{"b":false}','{"i":19191,"s":"small_struct_str"}'
+3,'third item','{"b":true}','{"i":98765,"s":null}'
+4,'fourth item','{"b":null}','{"i":null,"s":"str"}'
+5,'fifth item','{"b":false}','{"i":98765,"s":"abcde f"}'
+6,'sixth item','NULL','{"i":null,"s":null}'
+---- TYPES
+INT,STRING,STRING,STRING
+====
+---- QUERY
+# Querying the same struct multiple times in one query.
+select id, small_struct, small_struct from functional_orc_def.complextypes_structs;
+---- RESULTS
+1,'NULL','NULL'
+2,'{"i":19191,"s":"small_struct_str"}','{"i":19191,"s":"small_struct_str"}'
+3,'{"i":98765,"s":null}','{"i":98765,"s":null}'
+4,'{"i":null,"s":"str"}','{"i":null,"s":"str"}'
+5,'{"i":98765,"s":"abcde f"}','{"i":98765,"s":"abcde f"}'
+6,'{"i":null,"s":null}','{"i":null,"s":null}'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# The same struct multiple times in the select list where there is an ordering in the
+# results.
+select id, tiny_struct, tiny_struct
+from functional_orc_def.complextypes_structs
+order by id desc;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+6,'NULL','NULL'
+5,'{"b":false}','{"b":false}'
+4,'{"b":null}','{"b":null}'
+3,'{"b":true}','{"b":true}'
+2,'{"b":false}','{"b":false}'
+1,'{"b":true}','{"b":true}'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Similar to the above query but here the 'id' field is not in the select list but still
+# used in the order by.
+select tiny_struct, tiny_struct
+from functional_orc_def.complextypes_structs
+order by id desc;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'NULL','NULL'
+'{"b":false}','{"b":false}'
+'{"b":null}','{"b":null}'
+'{"b":true}','{"b":true}'
+'{"b":false}','{"b":false}'
+'{"b":true}','{"b":true}'
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+# Querying a struct that has all the primitive types as children.
+# There are multiple string columns to check if none of the overwrites the other.
+# There is a row where all the children of the struct are null but the struct is non
+# null. Another row hold a struct that is itself null.
+select id, str, alltypes from functional_orc_def.complextypes_structs;
+---- RESULTS
+1,'first item','{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'
+2,'second item','{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}'
+3,'third item','{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}'
+4,'fourth item','{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}'
+5,'fifth item','NULL'
+6,'sixth item','{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Similar query as above but with an order by.
+select id, str, alltypes from functional_orc_def.complextypes_structs order by id;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'first item','{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'
+2,'second item','{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}'
+3,'third item','{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}'
+4,'fourth item','{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}'
+5,'fifth item','NULL'
+6,'sixth item','{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Similar query as above but with an order by desc.
+select id, str, alltypes from functional_orc_def.complextypes_structs order by id desc;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+6,'sixth item','{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}'
+5,'fifth item','NULL'
+4,'fourth item','{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}'
+3,'third item','{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}'
+2,'second item','{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}'
+1,'first item','{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Setting BATCH_SIZE to force the results to fit in multiple row batches.
+set BATCH_SIZE=2;
+select id, str, alltypes from functional_orc_def.complextypes_structs;
+---- RESULTS
+1,'first item','{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'
+2,'second item','{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}'
+3,'third item','{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}'
+4,'fourth item','{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}'
+5,'fifth item','NULL'
+6,'sixth item','{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Querying struct in the select list and filter on one member of the struct.
+set BATCH_SIZE=0;
+select id, str, alltypes
+from functional_orc_def.complextypes_structs
+where alltypes.b = true;
+---- RESULTS
+1,'first item','{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'
+4,'fourth item','{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}'
+6,'sixth item','{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Query a single struct slot.
+select alltypes from functional_orc_def.complextypes_structs;
+---- RESULTS
+'{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'
+'{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}'
+'{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}'
+'{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}'
+'NULL'
+'{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}'
+---- TYPES
+STRING
+====
+---- QUERY
+# Query a single struct slot and order by a member of the struct.
+select alltypes from functional_orc_def.complextypes_structs order by alltypes.si;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+'{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}'
+'{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}'
+'{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'
+'{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}'
+'{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}'
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# Query struct slots only.
+select small_struct, alltypes from functional_orc_def.complextypes_structs;
+---- RESULTS
+'NULL','{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'
+'{"i":19191,"s":"small_struct_str"}','{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}'
+'{"i":98765,"s":null}','{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}'
+'{"i":null,"s":"str"}','{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}'
+'{"i":98765,"s":"abcde f"}','NULL'
+'{"i":null,"s":null}','{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}'
+---- TYPES
+STRING,STRING
+====
+---- QUERY
+# Query struct slot in a join query.
+select allt.id, comt.alltypes
+from functional_orc_def.alltypes allt
+join functional_orc_def.complextypes_structs comt on allt.id = comt.id;
+---- RESULTS
+1,'{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'
+2,'{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}'
+3,'{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}'
+4,'{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}'
+5,'NULL'
+6,'{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Similar join query as above but with different join order.
+select allt.id, comt.alltypes
+from functional_orc_def.complextypes_structs comt
+join functional_orc_def.alltypes allt on comt.id = allt.id;
+---- RESULTS
+1,'{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'
+2,'{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}'
+3,'{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}'
+4,'{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}'
+5,'NULL'
+6,'{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Querying IS NULL on a member of a struct.
+select id, str, alltypes
+from functional_orc_def.complextypes_structs
+where alltypes.da is null;
+---- RESULTS
+2,'second item','{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}'
+3,'third item','{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}'
+5,'fifth item','NULL'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Querying a struct that is inside a nested array. Directly referencing the inner array
+# in the FROM clause. This also triggers a re-analysis of the statement as the table is
+# full ACID.
+select inner_arr.ITEM, inner_arr.ITEM.e, inner_arr.ITEM.f
+from functional_orc_def.complextypestbl.nested_struct.c.d.ITEM as inner_arr;
+---- RESULTS
+'{"e":-1,"f":"nonnullable"}',-1,'nonnullable'
+'{"e":10,"f":"aaa"}',10,'aaa'
+'{"e":-10,"f":"bbb"}',-10,'bbb'
+'{"e":11,"f":"c"}',11,'c'
+'{"e":null,"f":null}',NULL,'NULL'
+'{"e":10,"f":"aaa"}',10,'aaa'
+'{"e":null,"f":null}',NULL,'NULL'
+'{"e":-10,"f":"bbb"}',-10,'bbb'
+'{"e":null,"f":null}',NULL,'NULL'
+'{"e":11,"f":"c"}',11,'c'
+'NULL',NULL,'NULL'
+'NULL',NULL,'NULL'
+---- TYPES
+STRING,INT,STRING
+====
+---- QUERY
+# Querying a struct that is inside a nested array. Referencing the inner array through a
+# join with the base table.
+select tbl.id, inner_arr.ITEM
+from functional_orc_def.complextypestbl tbl, tbl.nested_struct.c.d.ITEM as inner_arr;
+---- RESULTS
+8,'{"e":-1,"f":"nonnullable"}'
+1,'{"e":10,"f":"aaa"}'
+1,'{"e":-10,"f":"bbb"}'
+1,'{"e":11,"f":"c"}'
+2,'{"e":null,"f":null}'
+2,'{"e":10,"f":"aaa"}'
+2,'{"e":null,"f":null}'
+2,'{"e":-10,"f":"bbb"}'
+2,'{"e":null,"f":null}'
+2,'{"e":11,"f":"c"}'
+2,'NULL'
+7,'NULL'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# Querying a struct that is inside a nested array. Used 2 joins to reference the inner
+# array from the FROM clause.
+select tbl.id, inner_arr.ITEM
+from functional_orc_def.complextypestbl tbl,
+    tbl.nested_struct.c.d as outer_arr, outer_arr.ITEM as inner_arr;
+---- RESULTS
+8,'{"e":-1,"f":"nonnullable"}'
+1,'{"e":10,"f":"aaa"}'
+1,'{"e":-10,"f":"bbb"}'
+1,'{"e":11,"f":"c"}'
+2,'{"e":null,"f":null}'
+2,'{"e":10,"f":"aaa"}'
+2,'{"e":null,"f":null}'
+2,'{"e":-10,"f":"bbb"}'
+2,'{"e":null,"f":null}'
+2,'{"e":11,"f":"c"}'
+2,'NULL'
+7,'NULL'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# Querying a struct that is inside a nested array. Used different kind of joins to
+# reference the inner array from the FROM clause.
+select tbl.id, inner_arr.ITEM
+from functional_orc_def.complextypestbl tbl left join
+    tbl.nested_struct.c.d as outer_arr inner join outer_arr.ITEM as inner_arr;
+---- RESULTS
+8,'{"e":-1,"f":"nonnullable"}'
+1,'{"e":10,"f":"aaa"}'
+1,'{"e":-10,"f":"bbb"}'
+1,'{"e":11,"f":"c"}'
+2,'{"e":null,"f":null}'
+2,'{"e":10,"f":"aaa"}'
+2,'{"e":null,"f":null}'
+2,'{"e":-10,"f":"bbb"}'
+2,'{"e":null,"f":null}'
+2,'{"e":11,"f":"c"}'
+2,'NULL'
+7,'NULL'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# Similar query as above but with an order by.
+select tbl.id, inner_arr.ITEM
+from functional_orc_def.complextypestbl tbl,
+    tbl.nested_struct.c.d as outer_arr, outer_arr.ITEM as inner_arr
+order by tbl.id;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'{"e":10,"f":"aaa"}'
+1,'{"e":-10,"f":"bbb"}'
+1,'{"e":11,"f":"c"}'
+2,'{"e":null,"f":null}'
+2,'{"e":10,"f":"aaa"}'
+2,'{"e":null,"f":null}'
+2,'{"e":-10,"f":"bbb"}'
+2,'{"e":null,"f":null}'
+2,'{"e":11,"f":"c"}'
+2,'NULL'
+7,'NULL'
+8,'{"e":-1,"f":"nonnullable"}'
+---- TYPES
+BIGINT,STRING
+====
+---- QUERY
+# Structs are allowed in an inline view.
+select v.ts from
+  (select tiny_struct as ts from functional_orc_def.complextypes_structs) v
+---- RESULTS
+'{"b":true}'
+'{"b":false}'
+'{"b":true}'
+'{"b":null}'
+'{"b":false}'
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# Structs in an inline view where the underying file format is not supported for structs.
+select v.ts from
+  (select int_struct_col as ts from functional.allcomplextypes) v
+---- CATCH
+AnalysisException: Querying STRUCT is only supported for ORC file format.
+====
+---- QUERY
+# Structs in an inline view with order by.
+select v.id, v.ts from
+  (select id, tiny_struct as ts
+      from functional_orc_def.complextypes_structs
+      order by id
+      limit 3) v
+---- RESULTS
+1,'{"b":true}'
+2,'{"b":false}'
+3,'{"b":true}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+select v.id, v.ts from
+  (select id, tiny_struct as ts
+      from functional_orc_def.complextypes_structs
+      order by id
+      limit 3) v
+order by id desc
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+3,'{"b":true}'
+2,'{"b":false}'
+1,'{"b":true}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+select v.id, v.ts from
+  (select id, tiny_struct as ts
+      from functional_orc_def.complextypes_structs) v
+order by id desc
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+6,'NULL'
+5,'{"b":false}'
+4,'{"b":null}'
+3,'{"b":true}'
+2,'{"b":false}'
+1,'{"b":true}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# CREATE VIEW AS SELECT where the select returns struct.
+create view $DATABASE.struct_view as select id, small_struct
+from functional_orc_def.complextypes_structs;
+select id, small_struct from $DATABASE.struct_view;
+---- RESULTS
+1,'NULL'
+2,'{"i":19191,"s":"small_struct_str"}'
+3,'{"i":98765,"s":null}'
+4,'{"i":null,"s":"str"}'
+5,'{"i":98765,"s":"abcde f"}'
+6,'{"i":null,"s":null}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# WITH clause creates an inline view containing a struct.
+with sub as (select id, small_struct from functional_orc_def.complextypes_structs)
+select sub.id, sub.small_struct from sub;
+---- RESULTS
+1,'NULL'
+2,'{"i":19191,"s":"small_struct_str"}'
+3,'{"i":98765,"s":null}'
+4,'{"i":null,"s":"str"}'
+5,'{"i":98765,"s":"abcde f"}'
+6,'{"i":null,"s":null}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# WITH clause creates an inline view containing a struct. Also has a filter on the inline
+# view and ordering by a non-complex item from the view.
+with sub as (
+    select id, small_struct
+    from functional_orc_def.complextypes_structs
+    where small_struct.i > 19200)
+select sub.id, sub.small_struct from sub order by sub.id desc;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+5,'{"i":98765,"s":"abcde f"}'
+3,'{"i":98765,"s":null}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Create a view containing structs and query the view.
+create view tmp_view as
+    select id, str, tiny_struct, alltypes from functional_orc_def.complextypes_structs;
+select id, alltypes, tiny_struct from tmp_view;
+---- RESULTS
+1,'{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}','{"b":true}'
+2,'{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}','{"b":false}'
+3,'{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}','{"b":true}'
+4,'{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}','{"b":null}'
+5,'NULL','{"b":false}'
+6,'{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}','NULL'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Query a struct from a partitioned table to check multi-fragment execution.
+set disable_outermost_topn = 1;
+select id, struct_val from functional_orc_def.alltypes_structs order by id desc limit 5;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+7299,'{"bool_col":false,"tinyint_col":9,"smallint_col":9,"int_col":9,"bigint_col":90,"float_col":9.899999618530273,"double_col":90.89999999999999,"date_string_col":"12/31/10","string_col":"9","timestamp_col":"2010-12-31 05:09:13.860000000"}'
+7298,'{"bool_col":true,"tinyint_col":8,"smallint_col":8,"int_col":8,"bigint_col":80,"float_col":8.800000190734863,"double_col":80.8,"date_string_col":"12/31/10","string_col":"8","timestamp_col":"2010-12-31 05:08:13.780000000"}'
+7297,'{"bool_col":false,"tinyint_col":7,"smallint_col":7,"int_col":7,"bigint_col":70,"float_col":7.699999809265137,"double_col":70.7,"date_string_col":"12/31/10","string_col":"7","timestamp_col":"2010-12-31 05:07:13.710000000"}'
+7296,'{"bool_col":true,"tinyint_col":6,"smallint_col":6,"int_col":6,"bigint_col":60,"float_col":6.599999904632568,"double_col":60.59999999999999,"date_string_col":"12/31/10","string_col":"6","timestamp_col":"2010-12-31 05:06:13.650000000"}'
+7295,'{"bool_col":false,"tinyint_col":5,"smallint_col":5,"int_col":5,"bigint_col":50,"float_col":5.5,"double_col":50.5,"date_string_col":"12/31/10","string_col":"5","timestamp_col":"2010-12-31 05:05:13.600000000"}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Query the same struct multiple times from a partitioned table.
+select id, struct_val, struct_val from functional_orc_def.alltypes_structs order by id limit 2;
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,'{"bool_col":true,"tinyint_col":0,"smallint_col":0,"int_col":0,"bigint_col":0,"float_col":0,"double_col":0,"date_string_col":"01/01/09","string_col":"0","timestamp_col":"2009-01-01 00:00:00"}','{"bool_col":true,"tinyint_col":0,"smallint_col":0,"int_col":0,"bigint_col":0,"float_col":0,"double_col":0,"date_string_col":"01/01/09","string_col":"0","timestamp_col":"2009-01-01 00:00:00"}'
+1,'{"bool_col":false,"tinyint_col":1,"smallint_col":1,"int_col":1,"bigint_col":10,"float_col":1.100000023841858,"double_col":10.1,"date_string_col":"01/01/09","string_col":"1","timestamp_col":"2009-01-01 00:01:00"}','{"bool_col":false,"tinyint_col":1,"smallint_col":1,"int_col":1,"bigint_col":10,"float_col":1.100000023841858,"double_col":10.1,"date_string_col":"01/01/09","string_col":"1","timestamp_col":"2009-01-01 00:01:00"}'
+---- TYPES
+INT,STRING,STRING
+====
+---- QUERY
+# Query struct from a partitioned table with where clause on the struct's members.
+select id, struct_val
+from functional_orc_def.alltypes_structs
+where struct_val.tinyint_col=8 and struct_val.timestamp_col > "2010-12-30";
+---- RESULTS
+7288,'{"bool_col":true,"tinyint_col":8,"smallint_col":8,"int_col":8,"bigint_col":80,"float_col":8.800000190734863,"double_col":80.8,"date_string_col":"12/30/10","string_col":"8","timestamp_col":"2010-12-30 04:58:13.330000000"}'
+7298,'{"bool_col":true,"tinyint_col":8,"smallint_col":8,"int_col":8,"bigint_col":80,"float_col":8.800000190734863,"double_col":80.8,"date_string_col":"12/31/10","string_col":"8","timestamp_col":"2010-12-31 05:08:13.780000000"}'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# It's not supported to create a view with structs from a table type that doesn't
+# support selecting structs.
+create view tmp_view as select id, int_struct_col from functional_hbase.allcomplextypes;
+---- CATCH
+is not supported when querying STRUCT type STRUCT<f1:INT,f2:INT>
+====
+---- QUERY
+# It's not supported to create a view with structs from a file format that doesn't
+# support selecting structs.
+create view tmp_view as select id, int_struct_col from functional.allcomplextypes;
+---- CATCH
+AnalysisException: Querying STRUCT is only supported for ORC file format.
+====
+---- QUERY
+# Querying IS NULL on a struct is not supported.
+# IMPALA-3060
+select id, str, alltypes
+from functional_orc_def.complextypes_structs
+where alltypes is null;
+---- CATCH
+AnalysisException: IS NULL predicate does not support complex types: alltypes IS NULL
+====
+---- QUERY
+# Subquery that returns a complex type is not supported.
+# IMPALA-9500
+select alltypes
+from functional_orc_def.complextypes_structs
+where alltypes in (select alltypes from functional_orc_def.complextypes_structs);
+---- CATCH
+AnalysisException: A subquery can't return complex types. (SELECT alltypes FROM functional_orc_def.complextypes_structs)
+====
+---- QUERY
+select tbl.nested_struct from functional_orc_def.complextypestbl tbl;
+---- CATCH
+AnalysisException: Struct containing a collection type is not allowed in the select list.
+====
+---- QUERY
+select tbl.nested_struct.c from functional_orc_def.complextypestbl tbl;
+---- CATCH
+AnalysisException: Struct containing a collection type is not allowed in the select list.
+====
+---- QUERY
+# Unioning structs is not supported.
+# IMPALA-10752
+select id, tiny_struct from functional_orc_def.complextypes_structs
+union all
+select id, tiny_struct from functional_orc_def.complextypes_structs;
+---- CATCH
+AnalysisException: Set operations don't support STRUCT type. STRUCT<b:BOOLEAN> in tiny_struct
+====
+---- QUERY
+# Ordering by struct column is not supported.
+select id, tiny_struct from functional_orc_def.complextypes_structs
+order by tiny_struct
+---- CATCH
+AnalysisException: ORDER BY expression 'tiny_struct' with complex type 'STRUCT<b:BOOLEAN>' is not supported.
+====
+---- QUERY
+# Ordering by struct column (using the index of the column) is not supported.
+select id, tiny_struct from functional_orc_def.complextypes_structs
+order by 2
+---- CATCH
+AnalysisException: ORDER BY expression 'tiny_struct' with complex type 'STRUCT<b:BOOLEAN>' is not supported.
+====
+---- QUERY
+# Check that the order by don't confuse the 3rd column with the member of the struct.
+select id, tiny_struct from functional_orc_def.complextypes_structs
+order by 3
+---- CATCH
+AnalysisException: ORDER BY: ordinal exceeds the number of items in the SELECT list: 3

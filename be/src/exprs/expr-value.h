@@ -23,6 +23,7 @@
 #include "runtime/decimal-value.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
+#include "udf/udf-internal.h"
 #include "util/decimal-constants.h"
 
 namespace impala {
@@ -42,6 +43,7 @@ struct ExprValue {
   Decimal8Value decimal8_val;
   Decimal16Value decimal16_val;
   CollectionValue collection_val;
+  impala_udf::StructVal struct_val;
   DateValue date_val;
 
   ExprValue()
@@ -58,6 +60,7 @@ struct ExprValue {
       decimal8_val(),
       decimal16_val(),
       collection_val(),
+      struct_val(),
       date_val(0) {
   }
 

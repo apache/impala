@@ -86,7 +86,9 @@ public class Subquery extends Expr {
     List<Expr> stmtResultExprs = stmt_.getResultExprs();
     if (stmtResultExprs.size() == 1) {
       type_ = stmtResultExprs.get(0).getType();
-      Preconditions.checkState(!type_.isComplexType());
+      if (type_.isComplexType()) {
+        throw new AnalysisException("A subquery can't return complex types. " + toSql());
+      }
     } else {
       type_ = createStructTypeFromExprList();
     }

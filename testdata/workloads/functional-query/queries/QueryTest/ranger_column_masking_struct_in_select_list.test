@@ -1,0 +1,19 @@
+====
+---- QUERY
+# Checking that a primitive column is masked to NULL while there is a struct in the
+# select list.
+# Note1, functional_orc_def is hard-coded here. Once we implement struct direct read
+# support for Parquet as well then we can remove the DB name here. IMPALA-9496
+# Note2, turning off codegen support could be removed once we implement the support for
+# that. IMPALA-10851
+select id, str, alltypes from functional_orc_def.complextypes_structs
+---- RESULTS
+1,'NULL','{"ti":100,"si":12348,"i":156789012,"bi":163234345342,"b":true,"f":1234.56005859375,"do":65323423.33,"da":"2021-05-30","ts":"2021-06-01 10:19:04","s1":"some string","s2":"another str","c1":"x","c2":"xyz","vc":"somevarcha","de1":12345,"de2":null}'
+2,'NULL','{"ti":123,"si":4567,"i":1562322212,"bi":334333345342,"b":false,"f":NaN,"do":23233423.099,"da":null,"ts":"2020-06-11 12:10:04","s1":null,"s2":"NULL","c1":"a","c2":"ab ","vc":"varchar","de1":11223,"de2":null}'
+3,'NULL','{"ti":null,"si":null,"i":null,"bi":null,"b":null,"f":null,"do":null,"da":null,"ts":null,"s1":null,"s2":null,"c1":null,"c2":null,"vc":null,"de1":null,"de2":null}'
+4,'NULL','{"ti":90,"si":30482,"i":1664336,"bi":23567459873,"b":true,"f":0.5600000023841858,"do":NaN,"da":"2000-12-31","ts":"2024-01-01 00:00:00.123400000","s1":"random string","s2":"","c1":"c","c2":"d  ","vc":"addsdrr","de1":33357,"de2":null}'
+5,'NULL','NULL'
+6,'NULL','{"ti":127,"si":100,"i":234732212,"bi":664233223342,"b":true,"f":34.56000137329102,"do":99523423.33,"da":"1985-11-19","ts":"2020-09-15 03:11:22","s1":"string1","s2":"string2","c1":"z","c2":"   ","vc":"cv","de1":346,"de2":6235.600}'
+---- TYPES
+INT,STRING,STRING
+====

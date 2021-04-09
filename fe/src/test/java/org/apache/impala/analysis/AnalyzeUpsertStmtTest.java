@@ -122,9 +122,8 @@ public class AnalyzeUpsertStmtTest extends AnalyzerTest {
         "SELECT item FROM b.int_array_col, functional.alltypestiny");
     // Illegal complex-typed expr
     AnalysisError("upsert into functional_kudu.testtbl " +
-        "select int_struct_col from functional.allcomplextypes",
-        "Expr 'int_struct_col' in select list returns a " +
-        "complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
+        "select int_array_col from functional.allcomplextypes",
+        "Expr 'int_array_col' in select list returns a collection type 'ARRAY<INT>'.\n" +
+        "Collection types are not allowed in the select list.");
   }
 }

@@ -90,6 +90,9 @@ FunctionContext::TypeDesc AnyValUtil::ColumnTypeToTypeDesc(const ColumnType& typ
     case TYPE_DATE:
       out.type = FunctionContext::TYPE_DATE;
       break;
+    case TYPE_STRUCT:
+      out.type = FunctionContext::TYPE_STRUCT;
+      break;
     default:
       DCHECK(false) << "Unknown type: " << type;
   }

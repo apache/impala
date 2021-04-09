@@ -306,6 +306,9 @@ TTypeEntry ColumnType::ToHs2Type() const {
           (type == TYPE_CHAR) ? TTypeId::CHAR_TYPE : TTypeId::VARCHAR_TYPE);
       break;
     }
+    case TYPE_STRUCT:
+      type_entry.__set_type(TTypeId::STRING_TYPE);
+      break;
     default:
       // HiveServer2 does not have a type for invalid, date, datetime or
       // fixed_uda_intermediate.

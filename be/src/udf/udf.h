@@ -90,7 +90,8 @@ class FunctionContext {
     TYPE_DECIMAL,
     TYPE_VARCHAR,
     // A fixed-size buffer, passed as a StringVal.
-    TYPE_FIXED_UDA_INTERMEDIATE
+    TYPE_FIXED_UDA_INTERMEDIATE,
+    TYPE_STRUCT
   };
 
   struct TypeDesc {

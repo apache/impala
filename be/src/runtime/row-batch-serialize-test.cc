@@ -212,7 +212,7 @@ class RowBatchSerializeTest : public testing::Test {
       }
 
       if (type.IsCollectionType()) {
-        const TupleDescriptor& item_desc = *slot_desc->collection_item_descriptor();
+        const TupleDescriptor& item_desc = *slot_desc->children_tuple_descriptor();
         CollectionValue* coll_value = reinterpret_cast<CollectionValue*>(slot);
         CollectionValue* deserialized_coll_value =
             reinterpret_cast<CollectionValue*>(deserialized_slot);
@@ -259,7 +259,7 @@ class RowBatchSerializeTest : public testing::Test {
         break;
       }
       case TYPE_ARRAY: {
-        const TupleDescriptor* item_desc = slot_desc.collection_item_descriptor();
+        const TupleDescriptor* item_desc = slot_desc.children_tuple_descriptor();
         int array_len = rand() % (MAX_ARRAY_LEN + 1);
         CollectionValue cv;
         CollectionValueBuilder builder(&cv, *item_desc, pool, runtime_state_, array_len);
@@ -721,7 +721,7 @@ TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
   // The last tuple is a duplicated array with a large string inside.
   const TupleDescriptor* array_tuple_desc = row_desc.tuple_descriptors()[array_tuple_idx];
   const SlotDescriptor* array_slot_desc = array_tuple_desc->slots()[0];
-  const TupleDescriptor* array_item_desc = array_slot_desc->collection_item_descriptor();
+  const TupleDescriptor* array_item_desc = array_slot_desc->children_tuple_descriptor();
   const SlotDescriptor* string_slot_desc = array_item_desc->slots()[0];
   MemPool* pool = batch->tuple_data_pool();
   for (int i = 0; i < num_distinct_array_tuples; ++i) {

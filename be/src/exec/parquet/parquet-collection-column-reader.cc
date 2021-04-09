@@ -119,7 +119,7 @@ bool CollectionColumnReader::ReadSlot(CollectionValue* slot, MemPool* pool) {
   // Recursively read the collection into a new CollectionValue.
   *slot = CollectionValue();
   CollectionValueBuilder builder(
-      slot, *slot_desc_->collection_item_descriptor(), pool, parent_->state_);
+      slot, *slot_desc_->children_tuple_descriptor(), pool, parent_->state_);
   bool continue_execution =
       parent_->AssembleCollection(children_, new_collection_rep_level(), &builder);
   if (!continue_execution) return false;

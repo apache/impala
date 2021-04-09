@@ -72,7 +72,7 @@ int64_t Tuple::VarlenByteSize(const TupleDescriptor& desc) const {
     if (IsNull((*slot)->null_indicator_offset())) continue;
     const CollectionValue* coll_value = GetCollectionSlot((*slot)->tuple_offset());
     uint8_t* coll_data = coll_value->ptr;
-    const TupleDescriptor& item_desc = *(*slot)->collection_item_descriptor();
+    const TupleDescriptor& item_desc = *(*slot)->children_tuple_descriptor();
     for (int i = 0; i < coll_value->num_tuples; ++i) {
       result += reinterpret_cast<Tuple*>(coll_data)->TotalByteSize(item_desc);
       coll_data += item_desc.byte_size();
@@ -112,7 +112,7 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, MemPool* pool) {
     DCHECK((*slot)->type().IsCollectionType());
     if (IsNull((*slot)->null_indicator_offset())) continue;
     CollectionValue* cv = GetCollectionSlot((*slot)->tuple_offset());
-    const TupleDescriptor* item_desc = (*slot)->collection_item_descriptor();
+    const TupleDescriptor* item_desc = (*slot)->children_tuple_descriptor();
     int coll_byte_size = cv->num_tuples * item_desc->byte_size();
     uint8_t* coll_data = reinterpret_cast<uint8_t*>(pool->Allocate(coll_byte_size));
     memcpy(coll_data, cv->ptr, coll_byte_size);
@@ -156,7 +156,7 @@ void Tuple::DeepCopyVarlenData(const TupleDescriptor& desc, char** data, int* of
     if (IsNull((*slot)->null_indicator_offset())) continue;
 
     CollectionValue* coll_value = GetCollectionSlot((*slot)->tuple_offset());
-    const TupleDescriptor& item_desc = *(*slot)->collection_item_descriptor();
+    const TupleDescriptor& item_desc = *(*slot)->children_tuple_descriptor();
     int coll_byte_size = coll_value->num_tuples * item_desc.byte_size();
     memcpy(*data, coll_value->ptr, coll_byte_size);
     uint8_t* coll_data = reinterpret_cast<uint8_t*>(*data);
@@ -197,7 +197,7 @@ void Tuple::ConvertOffsetsToPointers(const TupleDescriptor& desc, uint8_t* tuple
     coll_value->ptr = tuple_data + offset;
 
     uint8_t* coll_data = coll_value->ptr;
-    const TupleDescriptor& item_desc = *(*slot)->collection_item_descriptor();
+    const TupleDescriptor& item_desc = *(*slot)->children_tuple_descriptor();
     for (int i = 0; i < coll_value->num_tuples; ++i) {
       reinterpret_cast<Tuple*>(coll_data)->ConvertOffsetsToPointers(
           item_desc, tuple_data);
@@ -233,17 +233,32 @@ void Tuple::MaterializeExprs(TupleRow* row, const TupleDescriptor& desc,
         slot_desc->type() == evals[i]->root().type());
     void* src = evals[i]->GetValue(row);
     if (src != NULL) {
-      void* dst = GetSlot(slot_desc->tuple_offset());
-      RawValue::Write(src, dst, slot_desc->type(), pool);
-      if (COLLECT_STRING_VALS && slot_desc->type().IsVarLenStringType()) {
-        StringValue* string_val = reinterpret_cast<StringValue*>(dst);
-        *(non_null_string_values++) = string_val;
-        *total_string_lengths += string_val->len;
-        ++(*num_non_null_string_values);
+      vector<StringValue*> string_values;
+      RawValue::Write<COLLECT_STRING_VALS>(src, this, slot_desc, pool, &string_values);
+      if (string_values.size() > 0) {
+        for (StringValue* string_val : string_values) {
+          *(non_null_string_values++) = string_val;
+          *total_string_lengths += string_val->len;
+        }
+        (*num_non_null_string_values) += string_values.size();
       }
     } else {
-      SetNull(slot_desc->null_indicator_offset());
+      if (slot_desc->type().IsStructType()) {
+        SetStructToNull(slot_desc);
+      } else {
+        SetNull(slot_desc->null_indicator_offset());
+      }
     }
+  }
+}
+
+void Tuple::SetStructToNull(const SlotDescriptor* const slot_desc) {
+  DCHECK(slot_desc != nullptr && slot_desc->type().IsStructType());
+  DCHECK(slot_desc->children_tuple_descriptor() != nullptr);
+  SetNull(slot_desc->null_indicator_offset());
+  for (SlotDescriptor* child_slot : slot_desc->children_tuple_descriptor()->slots()) {
+    SetNull(child_slot->null_indicator_offset());
+    if (child_slot->type().IsStructType()) SetStructToNull(child_slot);
   }
 }
 

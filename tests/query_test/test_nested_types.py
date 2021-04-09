@@ -34,6 +34,8 @@ from tests.common.skip import (
     SkipIfLocal,
     SkipIfNotHdfsMinicluster
     )
+from tests.common.test_dimensions import (create_exec_option_dimension,
+    create_exec_option_dimension_from_dict, create_client_protocol_dimension)
 from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path, IS_HDFS
 
@@ -111,6 +113,85 @@ class TestNestedTypes(ImpalaTestSuite):
     self.run_test_case('QueryTest/nested-types-with-clause', vector,
                        use_db='tpch_nested' + db_suffix)
 
+
+class TestNestedTypesInSelectList(ImpalaTestSuite):
+  """Functional tests for nested types provided in the select list."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestNestedTypesInSelectList, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('mt_dop', 0, 2))
+    cls.ImpalaTestMatrix.add_dimension(
+        create_exec_option_dimension_from_dict({
+            'disable_codegen': ['False', 'True']}))
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('protocol') == 'hs2')
+
+  def test_struct_in_select_list(self, vector, unique_database):
+    """Queries where a struct column is in the select list"""
+    if vector.get_value('table_format').file_format == 'parquet':
+      pytest.skip()
+    if vector.get_value('exec_option')['disable_codegen'] == 'False':
+      pytest.skip()
+    self.run_test_case('QueryTest/struct-in-select-list', vector, unique_database)
+
+  def test_nested_struct_in_select_list(self, vector, unique_database):
+    """Queries where a nested struct column is in the select list"""
+    if vector.get_value('table_format').file_format == 'parquet':
+      pytest.skip()
+    if vector.get_value('exec_option')['disable_codegen'] == 'False':
+      pytest.skip()
+    self.run_test_case('QueryTest/nested-struct-in-select-list', vector, unique_database)
+
+
+# Moved this to a separate test class from TestNestedTypesInSelectList because this needs
+# a narrower test vector.
+class TestNestedTypesInSelectListWithBeeswax(ImpalaTestSuite):
+  """Functional tests for nested types provided in the select list."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('protocol') == 'beeswax')
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        disable_codegen_options=[True]))
+
+  def test_struct_with_beeswax(self, vector):
+    expected_err = "Returning complex types is not supported through the beeswax " + \
+        "interface"
+    err = self.execute_query_expect_failure(self.client,
+        "select tiny_struct from functional_orc_def.complextypes_structs",
+        vector.get_value('exec_option'))
+    assert expected_err in str(err)
+
+
+class TestComputeStatsWithNestedTypes(ImpalaTestSuite):
+  """Functional tests for running compute stats on tables that have nested types in the
+  columns."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestComputeStatsWithNestedTypes, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
+
+  def test_compute_stats_with_structs(self, vector):
+    """COMPUTE STATS and SHOW COLUMN STATS for tables with structs"""
+    self.run_test_case('QueryTest/compute-stats-with-structs', vector)
 
 class TestNestedTypesNoMtDop(ImpalaTestSuite):
   """Functional tests for nested types that do not need to be run with mt_dop > 0."""

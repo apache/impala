@@ -231,6 +231,11 @@ void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
     results_metadata.schema.fieldSchemas.resize(result_set_md->columns.size());
     for (int i = 0; i < results_metadata.schema.fieldSchemas.size(); ++i) {
       const TColumnType& type = result_set_md->columns[i].columnType;
+      DCHECK_LE(1, type.types.size());
+      if (type.types[0].type != TTypeNodeType::SCALAR) {
+        RaiseBeeswaxException("Returning complex types is not supported through the "
+            "beeswax interface", SQLSTATE_GENERAL_ERROR);
+      }
       DCHECK_EQ(1, type.types.size());
       DCHECK_EQ(TTypeNodeType::SCALAR, type.types[0].type);
       DCHECK(type.types[0].__isset.scalar_type);

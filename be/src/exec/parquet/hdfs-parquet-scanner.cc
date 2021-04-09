@@ -2497,8 +2497,8 @@ Status HdfsParquetScanner::CreateColumnReaders(const TupleDescriptor& tuple_desc
 
     if (col_reader->IsCollectionReader()) {
       // Recursively populate col_reader's children
-      DCHECK(slot_desc->collection_item_descriptor() != nullptr);
-      const TupleDescriptor* item_tuple_desc = slot_desc->collection_item_descriptor();
+      DCHECK(slot_desc->children_tuple_descriptor() != nullptr);
+      const TupleDescriptor* item_tuple_desc = slot_desc->children_tuple_descriptor();
       CollectionColumnReader* collection_reader =
           static_cast<CollectionColumnReader*>(col_reader);
       RETURN_IF_ERROR(CreateColumnReaders(

@@ -48,7 +48,14 @@ OrcColumnReader* OrcColumnReader::Create(const orc::Type* node,
   DCHECK(slot_desc != nullptr);
   OrcColumnReader* reader = nullptr;
   if (node->getKind() == orc::TypeKind::STRUCT) {
-    reader = new OrcStructReader(node, slot_desc, scanner);
+    if (slot_desc->type().IsStructType() &&
+        slot_desc->children_tuple_descriptor() != nullptr) {
+      // This is the case where we should materialize the struct and its children.
+      reader = new OrcStructReader(node, slot_desc,
+          slot_desc->children_tuple_descriptor(), scanner);
+    } else {
+      reader = new OrcStructReader(node, slot_desc, scanner);
+    }
   } else if (node->getKind() == orc::TypeKind::LIST) {
     reader = new OrcListReader(node, slot_desc, scanner);
   } else if (node->getKind() == orc::TypeKind::MAP) {
@@ -291,7 +298,7 @@ bool OrcStructReader::EndOfBatch() {
 inline uint64_t OrcComplexColumnReader::GetTargetColId(
     const SlotDescriptor* slot_desc) const {
   return slot_desc->type().IsCollectionType() ?
-         GetColId(slot_desc->collection_item_descriptor()):
+         GetColId(slot_desc->children_tuple_descriptor()):
          GetColId(slot_desc);
 }
 
@@ -381,6 +388,16 @@ OrcStructReader::OrcStructReader(const orc::Type* node,
   }
 }
 
+OrcStructReader::OrcStructReader(const orc::Type* node, const SlotDescriptor* slot_desc,
+    const TupleDescriptor* children_tuple, HdfsOrcScanner* scanner)
+    : OrcComplexColumnReader(node, slot_desc, scanner) {
+  tuple_desc_ = children_tuple;
+  materialize_tuple_ = true;
+  for (SlotDescriptor* child_slot : tuple_desc_->slots()) {
+    CreateChildForSlot(node, child_slot);
+  }
+}
+
 OrcStructReader::OrcStructReader(const orc::Type* node,
     const SlotDescriptor* slot_desc, HdfsOrcScanner* scanner)
     : OrcComplexColumnReader(node, slot_desc, scanner) {
@@ -399,7 +416,7 @@ Status OrcStructReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
     return child->ReadValue(row_idx, tuple, pool);
   }
   if (IsNull(DCHECK_NOTNULL(batch_), row_idx)) {
-    for (OrcColumnReader* child : children_) child->SetNullSlot(tuple);
+    SetNullSlot(tuple);
     return Status::OK();
   }
   for (OrcColumnReader* child : children_) {
@@ -472,6 +489,10 @@ void OrcStructReader::FillSyntheticRowId(ScratchTupleBatch* scratch_batch,
 
 Status OrcStructReader::ReadValueBatch(int row_idx, ScratchTupleBatch* scratch_batch,
     MemPool* pool, int scratch_batch_idx) {
+  if (materialize_tuple_) {
+    return OrcBatchedReader::ReadValueBatch(row_idx, scratch_batch, pool,
+        scratch_batch_idx);
+  }
   for (OrcColumnReader* child : children_) {
     RETURN_IF_ERROR(
         child->ReadValueBatch(row_idx, scratch_batch, pool, scratch_batch_idx));
@@ -515,7 +536,7 @@ OrcCollectionReader::OrcCollectionReader(const orc::Type* node,
     // This is a collection SlotDescriptor whose item TupleDescriptor matches
     // 'node'. We should materialize the slot (creating a CollectionValue) and its
     // collection tuples (see more in HdfsOrcScanner::AssembleCollection).
-    tuple_desc_ = slot_desc->collection_item_descriptor();
+    tuple_desc_ = slot_desc->children_tuple_descriptor();
     materialize_tuple_ = true;
   }
 }
@@ -527,7 +548,9 @@ Status OrcCollectionReader::AssembleCollection(int row_idx, Tuple* tuple, MemPoo
   }
   auto coll_slot = reinterpret_cast<CollectionValue*>(GetSlot(tuple));
   *coll_slot = CollectionValue();
-  const TupleDescriptor* tuple_desc = slot_desc_->collection_item_descriptor();
+  const TupleDescriptor* tuple_desc = slot_desc_->children_tuple_descriptor();
+  DCHECK(tuple_desc != nullptr) << "There is no children tuple for slot ID: " <<
+      slot_desc_->id();
   CollectionValueBuilder builder(coll_slot, *tuple_desc, pool, scanner_->state_);
   return scanner_->AssembleCollection(*this, row_idx, &builder);
 }
@@ -605,7 +628,7 @@ void OrcListReader::CreateChildForSlot(const orc::Type* node,
   // We have a position slot descriptor if it refers to this LIST ORC type, but it isn't
   // a collection slot.
   bool is_pos_slot = slot_col_id == node->getColumnId() &&
-                     slot_desc->collection_item_descriptor() == nullptr;
+                     slot_desc->children_tuple_descriptor() == nullptr;
   if (is_pos_slot) {
     DCHECK(pos_slot_desc_ == nullptr) << "Should have unique pos slot";
     pos_slot_desc_ = slot_desc;

@@ -402,45 +402,51 @@ int64_t HS2ColumnarResultSet::ByteSize(int start_idx, int num_rows) {
 
 void HS2ColumnarResultSet::InitColumns() {
   result_set_->__isset.columns = true;
-  for (const TColumn& col : metadata_.columns) {
-    DCHECK(col.columnType.types.size() == 1)
-        << "Structured columns unsupported in HS2 interface";
-    ThriftTColumn column;
-    switch (col.columnType.types[0].scalar_type.type) {
-      case TPrimitiveType::NULL_TYPE:
-      case TPrimitiveType::BOOLEAN:
-        column.__isset.boolVal = true;
-        break;
-      case TPrimitiveType::TINYINT:
-        column.__isset.byteVal = true;
-        break;
-      case TPrimitiveType::SMALLINT:
-        column.__isset.i16Val = true;
-        break;
-      case TPrimitiveType::INT:
-        column.__isset.i32Val = true;
-        break;
-      case TPrimitiveType::BIGINT:
-        column.__isset.i64Val = true;
-        break;
-      case TPrimitiveType::FLOAT:
-      case TPrimitiveType::DOUBLE:
-        column.__isset.doubleVal = true;
-        break;
-      case TPrimitiveType::TIMESTAMP:
-      case TPrimitiveType::DATE:
-      case TPrimitiveType::DECIMAL:
-      case TPrimitiveType::VARCHAR:
-      case TPrimitiveType::CHAR:
-      case TPrimitiveType::STRING:
-        column.__isset.stringVal = true;
-        break;
-      default:
-        DCHECK(false) << "Unhandled column type: "
-                      << TypeToString(
-                             ThriftToType(col.columnType.types[0].scalar_type.type));
+  for (const TColumn& col_input : metadata_.columns) {
+    ThriftTColumn col_output;
+    if (col_input.columnType.types[0].type == TTypeNodeType::STRUCT) {
+      DCHECK(col_input.columnType.types.size() > 0);
+      // Return structs as string.
+      col_output.__isset.stringVal = true;
+    } else {
+      DCHECK(col_input.columnType.types.size() == 1);
+      DCHECK(col_input.columnType.types[0].__isset.scalar_type);
+      TPrimitiveType::type input_type = col_input.columnType.types[0].scalar_type.type;
+      switch (input_type) {
+        case TPrimitiveType::NULL_TYPE:
+        case TPrimitiveType::BOOLEAN:
+          col_output.__isset.boolVal = true;
+          break;
+        case TPrimitiveType::TINYINT:
+          col_output.__isset.byteVal = true;
+          break;
+        case TPrimitiveType::SMALLINT:
+          col_output.__isset.i16Val = true;
+          break;
+        case TPrimitiveType::INT:
+          col_output.__isset.i32Val = true;
+          break;
+        case TPrimitiveType::BIGINT:
+          col_output.__isset.i64Val = true;
+          break;
+        case TPrimitiveType::FLOAT:
+        case TPrimitiveType::DOUBLE:
+          col_output.__isset.doubleVal = true;
+          break;
+        case TPrimitiveType::TIMESTAMP:
+        case TPrimitiveType::DATE:
+        case TPrimitiveType::DECIMAL:
+        case TPrimitiveType::VARCHAR:
+        case TPrimitiveType::CHAR:
+        case TPrimitiveType::STRING:
+          col_output.__isset.stringVal = true;
+          break;
+        default:
+          DCHECK(false) << "Unhandled column type: "
+              << TypeToString(ThriftToType(input_type));
+      }
     }
-    result_set_->columns.push_back(column);
+    result_set_->columns.push_back(col_output);
   }
 }
 

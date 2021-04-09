@@ -1,0 +1,35 @@
+====
+---- QUERY
+COMPUTE STATS complextypes_structs
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+# Checks that that there are no stats generated for struct columns.
+SHOW COLUMN STATS complextypes_structs
+---- RESULTS
+'id','INT',6,0,4,4.0,-1,-1
+'str','STRING',6,0,11,10.3333330154,-1,-1
+'alltypes','STRUCT<ti:TINYINT,si:SMALLINT,i:INT,bi:BIGINT,b:BOOLEAN,f:FLOAT,do:DOUBLE,da:DATE,ts:TIMESTAMP,s1:STRING,s2:STRING,c1:CHAR(1),c2:CHAR(3),vc:VARCHAR(10),de1:DECIMAL(5,0),de2:DECIMAL(10,3)>',-1,-1,-1,-1.0,-1,-1
+'tiny_struct','STRUCT<b:BOOLEAN>',-1,-1,-1,-1.0,-1,-1
+'small_struct','STRUCT<i:INT,s:STRING>',-1,-1,-1,-1.0,-1,-1
+---- TYPES
+STRING,STRING,BIGINT,BIGINT,BIGINT,DOUBLE,BIGINT,BIGINT
+====
+---- QUERY
+COMPUTE STATS complextypes_nested_structs
+---- RESULTS
+'Updated 1 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+# Checks that that there are no stats generated for struct columns.
+SHOW COLUMN STATS complextypes_nested_structs
+---- RESULTS
+'id','INT',5,0,4,4.0,-1,-1
+'outer_struct','STRUCT<str:STRING,inner_struct1:STRUCT<str:STRING,de:DECIMAL(8,2)>,inner_struct2:STRUCT<i:INT,str:STRING>,inner_struct3:STRUCT<s:STRUCT<i:INT,s:STRING>>>',-1,-1,-1,-1.0,-1,-1
+---- TYPES
+STRING,STRING,BIGINT,BIGINT,BIGINT,DOUBLE,BIGINT,BIGINT
