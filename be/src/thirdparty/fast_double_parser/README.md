@@ -1,0 +1,3 @@
+This library is copied from https://github.com/lemire/fast_double_parser can be used under Apache License 2.0 or the Boost Software License 1.0.  It provides fast function to parse strings containing decimal numbers into double-precision (binary64) floating-point values. The internal representation of Decimal values in the library resembles Impala's `DecimalValue`. Library functions will be used to convert `DecimalValue` to `double` accurately and efficiently.
+
+Latest commit id of the library: e4f6319bfa9cbc829f7f99ae88c1d2fb205c15e8

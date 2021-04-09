@@ -533,6 +533,18 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     self._ctas_and_check_int64_timestamps(vector, unique_database, tmpdir, "micros")
     self._ctas_and_check_int64_timestamps(vector, unique_database, tmpdir, "nanos")
 
+  def test_double_precision(self, vector, unique_database):
+    # IMPALA-10654: Test inserting double into Parquet table retains the precision.
+    src_tbl = "{0}.{1}".format(unique_database, "i10654_parquet")
+    create_tbl_stmt = """create table {0} (dbl1 double)
+        stored as parquet""".format(src_tbl)
+    self.execute_query_expect_success(self.client, create_tbl_stmt)
+    insert_tbl_stmt = """insert into table {0}
+        values (-0.43149576573887316)""".format(src_tbl)
+    self.execute_query_expect_success(self.client, insert_tbl_stmt)
+    select_stmt = """select * from {0}""".format(src_tbl)
+    result = self.run_stmt_in_hive(select_stmt)
+    assert result.split('\n')[1] == '-0.43149576573887316'
 
 @SkipIfIsilon.hive
 @SkipIfLocal.hive

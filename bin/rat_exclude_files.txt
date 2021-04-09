@@ -33,6 +33,7 @@ be/src/gutil/*
 be/src/thirdparty/datasketches/*
 be/src/thirdparty/murmurhash/*
 be/src/thirdparty/mpfit/*
+be/src/thirdparty/fast_double_parser/*
 be/src/kudu/gutil
 www/highlight/*
 www/DataTables*/*

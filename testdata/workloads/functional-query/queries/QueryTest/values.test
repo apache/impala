@@ -99,3 +99,37 @@ select dbl1 * dbl2 * `dec` from i_2749;
 1.1650176
 1.4835771
 ====
+---- QUERY
+# IMPALA-10350: Test the double precision during inserts.
+# For write path to text files, the default precision of 16
+# is a limitation yet to be fixed so test would not see exact values retained.
+drop table if exists i_10350;
+create table i_10350(dbl1 double, dbl2 double);
+# insert one negative value < -2^53 * 10^(-17)
+# and another negative value > -2^53 * 10^(-17)
+# and corresponding positive values.
+insert into table i_10350 values
+    (-0.43149576573887316, -0.231495765738873),
+    (0.43149576573887316, 0.231495765738873);
+select * from i_10350;
+---- RESULTS
+-0.4314957657388732,-0.231495765738873
+0.4314957657388732,0.231495765738873
+---- TYPES
+DOUBLE,DOUBLE
+====
+---- QUERY
+# IMPALA-10654: Test accurate conversion from DecimalValue to double.
+# Test below creates DecimalValue for 0.43149576573887316, 0.231495765738873,
+# -0.43149576573887316, -0.231495765738873 and 0.43149576573887315568
+# which has `value_` > 2^53, < 2^53, < -2^53, > -2^53 and > 2^64 correspondingly.
+select cast(1 - 0.56850423426112684 as double),
+    cast(1 - 0.768504234261127 as double),
+    cast(0.56850423426112684 -1 as double),
+    cast(0.768504234261127 -1 as double),
+    cast(1 - 0.56850423426112684432 as double)
+---- RESULTS
+0.43149576573887316,0.231495765738873,-0.43149576573887316,-0.231495765738873,0.43149576573887316
+---- TYPES
+DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE
+====

@@ -18,6 +18,7 @@
 #pragma once
 
 #include "runtime/decimal-value.h"
+#include "thirdparty/fast_double_parser/fast_double_parser.h"
 
 #include <cmath>
 #include <functional>
@@ -723,7 +724,44 @@ inline std::string DecimalValue<T>::ToString(int precision, int scale) const {
 
 template<typename T>
 inline double DecimalValue<T>::ToDouble(int scale) const {
-  return static_cast<double>(value_) / pow(10.0, scale);
+  // Original approach was to use:
+  //             static_cast<double>(value_) / pow(10.0, scale).
+  // However only integers from −2^53 to 2^53 can be represented accurately by
+  // double precision without any loss.
+  // Hence, it would not work for numbers like -0.43149576573887316.
+  // For DecimalValue representing -0.43149576573887316, value_ would be
+  // -43149576573887316 and scale would be 17. As value_ < -2^53, result would
+  // not be accurate. In newer approach we are using
+  // third party library https://github.com/lemire/fast_double_parser,
+  // which handles above scenario in a performant manner.
+
+  bool success = false;
+  bool is_negative = false;
+  T abs_value = value_;
+  if (value_ < 0) {
+    is_negative = true;
+    // for computing absolute value cannot use std::abs
+    // as it's not supported for __int128_t
+    abs_value *= -1;
+  }
+  double result = 0;
+  // compute_float_64 only supports uint64_t currently
+  if (abs_value <= UINT64_MAX) {
+    // compute_float_64 computes value * 10^(power) whereas we want to compute
+    // value/ (10 ^ (scale)). Hence (-scale) will be passed as power to the function.
+    // It expects value to be absolute and for negative value is_negative will be set.
+    result = fast_double_parser::compute_float_64(-scale, abs_value, is_negative,
+        &success);
+  }
+  // Fallback to original approach. This is not always accurate as described above.
+  // Other alternative would be to convert value_ to string and parse it into
+  // double using std:strtod. However std::strtod is atleast 4X slower
+  // than this approach (https://github.com/lemire/fast_double_parser#sample-results)
+  // and that is excluding cost to convert value_ to string.
+  if (!success) {
+    result = static_cast<double>(value_) / pow(10.0, scale);
+  }
+  return result;
 }
 
 template<typename T>
