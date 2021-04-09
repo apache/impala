@@ -180,6 +180,166 @@ bool ColumnStatsReader::ReadFromString(StatsField stats_field,
   return false;
 }
 
+bool ColumnStatsReader::ReadFromStringsBatch(StatsField stats_field,
+    const vector<string>& encoded_values, int64_t start_idx, int64_t end_idx,
+    int fixed_len_size, void* slot) const {
+  int64_t num_decoded = 0;
+  switch (col_type_.type) {
+    case TYPE_BOOLEAN:
+      num_decoded = DecodeBatchOneBoundsCheck<int8_t>(encoded_values, start_idx, end_idx,
+          fixed_len_size, (int8_t*)slot, element_.type);
+      break;
+    case TYPE_TINYINT:
+      // parquet::Statistics encodes INT_8 values using 4 bytes.
+      num_decoded = DecodeBatchOneBoundsCheck<int8_t>(encoded_values, start_idx, end_idx,
+          fixed_len_size, (int8_t*)slot, parquet::Type::INT32);
+      break;
+    case TYPE_SMALLINT:
+      // parquet::Statistics encodes INT_16 values using 4 bytes.
+      num_decoded = DecodeBatchOneBoundsCheck<int16_t>(encoded_values, start_idx, end_idx,
+          fixed_len_size, (int16_t*)slot, parquet::Type::INT32);
+      break;
+    case TYPE_INT:
+      num_decoded = DecodeBatchOneBoundsCheckFastTrack<int32_t>(encoded_values, start_idx,
+          end_idx, fixed_len_size, (int32_t*)slot);
+      break;
+    case TYPE_BIGINT:
+      num_decoded = DecodeBatchOneBoundsCheckFastTrack<int64_t>(encoded_values, start_idx,
+          end_idx, fixed_len_size, (int64_t*)slot);
+      break;
+    case TYPE_FLOAT:
+      // IMPALA-6527, IMPALA-6538: ignore min/max stats if NaN
+      num_decoded = DecodeBatchOneBoundsCheckFastTrack<float>(encoded_values, start_idx,
+          end_idx, fixed_len_size, (float*)slot);
+      for (int64_t i = 0; i < num_decoded; i++) {
+        if (std::isnan(*(reinterpret_cast<float*>(slot)) + i)) return false;
+      }
+      break;
+    case TYPE_DOUBLE:
+      // IMPALA-6527, IMPALA-6538: ignore min/max stats if NaN
+      num_decoded = DecodeBatchOneBoundsCheckFastTrack<double>(encoded_values, start_idx,
+          end_idx, fixed_len_size, (double*)slot);
+      for (int64_t i=0; i<num_decoded; i++) {
+        if (std::isnan(*(reinterpret_cast<double*>(slot)) + i)) return false;
+      }
+      break;
+    case TYPE_TIMESTAMP:
+      num_decoded = DecodeBatchOneBoundsCheck<TimestampValue>(encoded_values, start_idx,
+          end_idx, fixed_len_size, (TimestampValue*)slot, element_.type);
+      break;
+    case TYPE_STRING:
+    case TYPE_VARCHAR:
+      num_decoded = DecodeBatchOneBoundsCheck<StringValue>(encoded_values,
+          start_idx, end_idx, fixed_len_size, (StringValue*)slot, element_.type);
+      break;
+    case TYPE_CHAR:
+      /// We don't read statistics for CHAR columns, since CHAR support is broken in
+      /// Impala (IMPALA-1652).
+      return false;
+    case TYPE_DECIMAL:
+      switch (col_type_.GetByteSize()) {
+        case 4:
+          num_decoded = DecodeBatchOneBoundsCheck<Decimal4Value>(encoded_values,
+              start_idx, end_idx, fixed_len_size, (Decimal4Value*)slot, element_.type);
+          break;
+        case 8:
+          num_decoded = DecodeBatchOneBoundsCheck<Decimal8Value>(encoded_values,
+              start_idx, end_idx, fixed_len_size, (Decimal8Value*)slot, element_.type);
+          break;
+        case 16:
+          num_decoded = DecodeBatchOneBoundsCheck<Decimal16Value>(encoded_values,
+              start_idx, end_idx, fixed_len_size, (Decimal16Value*)slot, element_.type);
+          break;
+        default:
+          DCHECK(false) << "Unknown decimal byte size: " << col_type_.GetByteSize();
+        }
+      break;
+    case TYPE_DATE:
+      num_decoded = DecodeBatchOneBoundsCheckFastTrack<DateValue>(encoded_values,
+          start_idx, end_idx, fixed_len_size, (DateValue*)slot);
+      break;
+    default:
+      DCHECK(false) << col_type_.DebugString();
+  }
+  return num_decoded == end_idx - start_idx + 1;
+}
+
+// The basic version of batch read of stats.
+template <typename InternalType>
+inline int64_t ColumnStatsReader::DecodeBatchOneBoundsCheck(
+    const vector<std::string>& source, int64_t start_idx, int64_t end_idx,
+    int fixed_len_size, InternalType* v, parquet::Type::type PARQUET_TYPE) const {
+  if (start_idx > end_idx || end_idx - start_idx + 1 > source.size()) return false;
+
+  int64_t pos = start_idx;
+  InternalType* output = v;
+
+  /// We unroll the loop manually in batches of 8.
+  constexpr int batch = 8;
+  int64_t num_values = (end_idx - start_idx + 1);
+  const int64_t full_batches = num_values / batch;
+
+  for (int64_t b = 0; b < full_batches; b++) {
+#pragma push_macro("DECODE_NO_CHECK_UNROLL")
+#define DECODE_NO_CHECK_UNROLL(ignore1, i, ignore2) \
+    ColumnStats<InternalType>::DecodePlainValue( \
+        source[pos + i], output + i, PARQUET_TYPE);
+
+    BOOST_PP_REPEAT_FROM_TO(0, 8 /* The value of `batch` */,
+        DECODE_NO_CHECK_UNROLL, ignore);
+#pragma pop_macro("DECODE_NO_CHECK_UNROLL")
+
+    pos += batch;
+    output += batch;
+  }
+
+  for (; pos < num_values; ++pos) {
+    ColumnStats<InternalType>::DecodePlainValue(source[pos], output, PARQUET_TYPE);
+    output++;
+  }
+
+  DCHECK_EQ(pos, num_values);
+  return num_values;
+}
+
+// A fast track version of batch read of stats.
+template <typename InternalType>
+inline int64_t ColumnStatsReader::DecodeBatchOneBoundsCheckFastTrack(
+    const vector<std::string>& source, int64_t start_idx, int64_t end_idx,
+    int fixed_len_size, InternalType* v) const {
+  if (start_idx > end_idx || end_idx - start_idx + 1 > source.size()) return false;
+
+  int64_t pos = start_idx;
+  InternalType* output = v;
+
+  /// We unroll the loop manually in batches of 8.
+  constexpr int batch = 8;
+  int64_t num_values = (end_idx - start_idx + 1);
+  const int64_t full_batches = num_values / batch;
+
+  for (int64_t b = 0; b < full_batches; b++) {
+#pragma push_macro("DECODE_NO_CHECK_UNROLL")
+#define DECODE_NO_CHECK_UNROLL(ignore1, i, ignore2) \
+    ParquetPlainEncoder::DecodeNoBoundsCheck<InternalType>( \
+        source[pos + i], output + i);
+
+    BOOST_PP_REPEAT_FROM_TO(0, 8 /* The value of `batch` */,
+        DECODE_NO_CHECK_UNROLL, ignore);
+#pragma pop_macro("DECODE_NO_CHECK_UNROLL")
+
+    pos += batch;
+    output += batch;
+  }
+
+  for (; pos < num_values; ++pos) {
+    ParquetPlainEncoder::DecodeNoBoundsCheck<InternalType>(source[pos], output);
+    output++;
+  }
+
+  DCHECK_EQ(pos, num_values);
+  return num_values;
+}
+
 bool ColumnStatsReader::DecodeTimestamp(const std::string& stat_value,
     ColumnStatsReader::StatsField stats_field, TimestampValue* slot) const {
   bool stats_read = false;

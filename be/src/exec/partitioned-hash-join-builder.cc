@@ -326,7 +326,46 @@ Status PhjBuilder::AddBatch(RowBatch* batch) {
   }
   // Free any expr result allocations made during partitioning.
   expr_results_pool_->Clear();
+  DetermineUsefulnessForMinmaxFilters();
   return Status::OK();
+}
+
+// Set AlwaysTrue to true for each of minmax filter that is not useful.
+void PhjBuilder::DetermineUsefulnessForMinmaxFilters() {
+  // Loop over all remaining min/max filters still enabled (i.e. AlwaysTrue flag is false)
+  for (std::vector<FilterContext*>::const_iterator it = minmax_filter_ctxs_.begin();
+       it != minmax_filter_ctxs_.end();) {
+    DCHECK((*it)->filter->is_min_max_filter() && (*it)->local_min_max_filter);
+    // The filter can be in alwaysTrue state if not a single not-NULL value has been
+    // inserted.
+    if (UNLIKELY((*it)->local_min_max_filter->AlwaysTrue())) {
+      ++it;
+      continue;
+    }
+    const TRuntimeFilterDesc& filter_desc = (*it)->filter->filter_desc();
+    bool useful = true;
+    for (const auto& target_desc : filter_desc.targets) {
+      if (FilterContext::ShouldRejectFilterBasedOnColumnStats(
+              target_desc, (*it)->local_min_max_filter, minmax_filter_threshold_)) {
+        useful = false;
+        break;
+      }
+    }
+    if (LIKELY(!useful)) {
+      (*it)->local_min_max_filter->SetAlwaysTrue();
+      VLOG(3) << "Filter with id " << (*it)->filter->id()
+              << " at join builder (join_node_id_=" << join_node_id_ << ")"
+              << " is not useful. Disabled."
+              << " Fillter details=" << (*it)->local_min_max_filter->DebugString()
+              << ", column stats:"
+              << " low=" << PrintTColumnValue(filter_desc.targets[0].low_value)
+              << ", high=" << PrintTColumnValue(filter_desc.targets[0].high_value)
+              << ", threshold=" << minmax_filter_threshold_;
+      it = minmax_filter_ctxs_.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 Status PhjBuilder::FlushFinal(RuntimeState* state) {
@@ -910,8 +949,12 @@ void PhjBuilder::AllocateRuntimeFilters() {
       filter_ctxs_[i].local_min_max_filter =
           runtime_state_->filter_bank()->AllocateScratchMinMaxFilter(
               filter_ctxs_[i].filter->id(), filter_ctxs_[i].expr_eval->root().type());
+      minmax_filter_ctxs_.push_back(&filter_ctxs_[i]);
     }
   }
+
+  minmax_filter_threshold_ =
+      (float)(runtime_state_->query_options().minmax_filter_threshold);
 }
 
 void PhjBuilder::InsertRuntimeFilters(
@@ -925,7 +968,6 @@ void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
   VLOG(3) << "Join builder (join_node_id_=" << join_node_id_ << ") publishing "
           << filter_ctxs_.size() << " filters.";
   int32_t num_enabled_filters = 0;
-  float threshold = (float)(runtime_state_->query_options().minmax_filter_threshold);
   for (const FilterContext& ctx : filter_ctxs_) {
     BloomFilter* bloom_filter = nullptr;
     if (ctx.local_bloom_filter != nullptr) {
@@ -939,16 +981,16 @@ void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
       const TRuntimeFilterDesc& filter_desc = ctx.filter->filter_desc();
       VLOG(3) << "Check out the usefulness of the local minmax filter:"
               << " id=" << ctx.filter->id()
-              << ", details=" << ctx.local_min_max_filter->DebugString()
+              << ", fillter details=" << ctx.local_min_max_filter->DebugString()
               << ", column stats:"
               << " low=" << PrintTColumnValue(filter_desc.targets[0].low_value)
               << ", high=" << PrintTColumnValue(filter_desc.targets[0].high_value)
-              << ", threshold=" << threshold
+              << ", threshold=" << minmax_filter_threshold_
               << ", #targets=" << filter_desc.targets.size();
       bool all_overlap = true;
-      for (auto target_desc : filter_desc.targets) {
+      for (const auto& target_desc : filter_desc.targets) {
         if (!FilterContext::ShouldRejectFilterBasedOnColumnStats(
-                target_desc, ctx.local_min_max_filter, threshold)) {
+                target_desc, ctx.local_min_max_filter, minmax_filter_threshold_)) {
           all_overlap = false;
           break;
         }

@@ -32,7 +32,7 @@ bool IR_ALWAYS_INLINE RuntimeFilter::Eval(
     // Min/max overlap does not deal with nulls (val==nullptr).
     if (LIKELY(val)) {
       MinMaxFilter* filter = get_min_max(); // get the loaded version.
-      if (LIKELY(filter) && !filter->AlwaysTrue()) {
+      if (LIKELY(filter && !filter->AlwaysTrue())) {
         return filter->EvalOverlap(col_type, val, val);
       }
     }

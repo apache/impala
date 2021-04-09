@@ -117,6 +117,9 @@ struct TRuntimeFilterTargetDesc {
   // The low and high value as seen in the column stats of the targeted column.
   8: optional Data.TColumnValue low_value
   9: optional Data.TColumnValue high_value
+
+  // Indicates if the low and high value in column stats are present
+  10: optional bool is_min_max_value_present
 }
 
 enum TRuntimeFilterType {

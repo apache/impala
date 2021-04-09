@@ -304,6 +304,11 @@ class ParquetPlainEncoder {
   static int64_t DecodeBatch(const uint8_t* buffer, const uint8_t* buffer_end,
       int fixed_len_size, int64_t num_values, int64_t stride, InternalType* v);
 
+  /// Decode 'source' by memcpy() sizeof(InternalType) bytes from 'source' to 'v'.
+  template <typename InternalType>
+  static ALWAYS_INLINE inline void DecodeNoBoundsCheck(
+      const std::string& source, InternalType* v);
+
  private:
   /// Decode values without bounds checking. `buffer_end` is only used for DCHECKs in
   /// DEBUG mode, it is unused in RELEASE mode.
@@ -450,6 +455,23 @@ template <>
 inline void ParquetPlainEncoder::DecodeNoBoundsCheck<double, parquet::Type::FLOAT>(
     const uint8_t* buffer, const uint8_t* buffer_end, int fixed_len_size, double* v) {
   DecodeWithConversion<float, double>(buffer, buffer_end, v);
+}
+
+/// The string source version of DecodeNoBoundsCheck() which works with the following
+/// combination of internal and Parquet types requiring no conversions.
+/// =============================
+/// InternalType   | PARQUET_TYPE
+/// =============================
+/// int32_t        | INT32
+/// int64_t        | INT64
+/// float          | FLOAT
+/// double         | DOUBLE
+/// DateValue      | INT32
+template <typename InternalType>
+inline void ParquetPlainEncoder::DecodeNoBoundsCheck(
+    const string& source, InternalType* v) {
+  DCHECK_GE(source.size(), sizeof(InternalType));
+  memcpy(v, source.data(), sizeof(InternalType));
 }
 
 template <>

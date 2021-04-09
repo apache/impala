@@ -90,6 +90,7 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     row_batches_produced_(0),
     metadata_range_(nullptr),
     dictionary_pool_(new MemPool(scan_node->mem_tracker())),
+    stats_batch_read_pool_(new MemPool(scan_node->mem_tracker())),
     assemble_rows_timer_(scan_node_->materialize_tuple_timer()),
     process_footer_timer_stats_(nullptr),
     num_cols_counter_(nullptr),
@@ -181,6 +182,11 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
     filter_ctxs_.push_back(ctx);
   }
   filter_stats_.resize(filter_ctxs_.size());
+  for (int i = 0; i < filter_stats_.size(); ++i) {
+    filter_stats_[i].enabled_for_rowgroup = true;
+    filter_stats_[i].enabled_for_page = true;
+    filter_stats_[i].enabled_for_row = true;
+  }
 
   DCHECK(parse_status_.ok()) << "Invalid parse_status_" << parse_status_.GetDetail();
 
@@ -611,6 +617,8 @@ bool HdfsParquetScanner::FilterAlreadyDisabledOrOverlapWithColumnStats(
     VLOG(3) << "A filter is determined to be not useful:"
             << " fid=" << filter_id
             << ", enabled_for_rowgroup=" << (bool)filter_stats_[idx].enabled_for_rowgroup
+            << ", enabled_for_page=" << (bool)filter_stats_[idx].enabled_for_page
+            << ", enabled_for_row=" << (bool)filter_stats_[idx].enabled_for_row
             << ", content=" << minmax_filter->DebugString()
             << ", target column stats: low=" << PrintTColumnValue(target_desc.low_value)
             << ", high=" << PrintTColumnValue(target_desc.high_value)
@@ -958,6 +966,85 @@ bool HdfsParquetScanner::ReadStatFromIndex(const ColumnStatsReader& stats_reader
           max_slot));
 }
 
+Status HdfsParquetScanner::AddToSkipRanges(void* min_slot, void* max_slot,
+    parquet::RowGroup& row_group, int page_idx, const ColumnType& col_type, int col_idx,
+    const parquet::ColumnChunk& col_chunk, vector<RowRange>* skip_ranges,
+    int* filtered_pages) {
+  VLOG(3) << "Page " << page_idx << " was filtered out."
+          << "data min=" << RawValue::PrintValue(min_slot, col_type, col_type.scale)
+          << ", data max=" << RawValue::PrintValue(max_slot, col_type, col_type.scale);
+
+  BaseScalarColumnReader* scalar_reader = scalar_reader_map_[col_idx];
+  parquet::OffsetIndex& offset_index = scalar_reader->offset_index_;
+  if (UNLIKELY(offset_index.page_locations.empty())) {
+    RETURN_IF_ERROR(page_index_.DeserializeOffsetIndex(col_chunk, &offset_index));
+  }
+
+  RowRange row_range;
+  GetRowRangeForPage(row_group, offset_index, page_idx, &row_range);
+  skip_ranges->push_back(row_range);
+  (*filtered_pages)++;
+
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::SkipPagesBatch(parquet::RowGroup& row_group,
+    const ColumnStatsReader& stats_reader, const parquet::ColumnIndex& column_index,
+    int start_page_idx, int end_page_idx, const ColumnType& col_type, int col_idx,
+    const parquet::ColumnChunk& col_chunk, MinMaxFilter* minmax_filter,
+    vector<RowRange>* skip_ranges, int* filtered_pages) {
+
+  DCHECK_GE(end_page_idx, start_page_idx);
+  int slot_size = col_type.GetSlotSize();
+  int64_t total_size = (end_page_idx - start_page_idx + 1) * slot_size;
+
+  VLOG(3) << "SkiPagesBatch() called: "
+          << " start_page_idx=" << start_page_idx
+          << ", end_page_idx=" << end_page_idx
+          << ", #pages=" << (end_page_idx - start_page_idx + 1)
+          << ", slot_size=" << slot_size
+          << ", total_size=" << total_size;
+
+  uint8_t* min_slots = stats_batch_read_pool_->TryAllocate(total_size);
+  if (!min_slots) {
+    return stats_batch_read_pool_->mem_tracker()->MemLimitExceeded(state_,
+        "Fail to allocate memory to hold a batch of min column stats", total_size);
+  }
+  if (!stats_reader.ReadFromStringsBatch(ColumnStatsReader::StatsField::MIN,
+          column_index.min_values, start_page_idx, end_page_idx, col_type.len,
+          min_slots)) {
+    return Status("Fail to read from min stats in column index in batch");
+  }
+
+  uint8_t* max_slots = stats_batch_read_pool_->TryAllocate(total_size);
+  if (!max_slots) {
+    return stats_batch_read_pool_->mem_tracker()->MemLimitExceeded(state_,
+        "Fail to allocate memory to hold a batch of max column stats", total_size);
+  }
+  if (!stats_reader.ReadFromStringsBatch(ColumnStatsReader::StatsField::MAX,
+         column_index.max_values, start_page_idx, end_page_idx, col_type.len,
+         max_slots)) {
+    return Status("Fail to read from max stats in column index in batch");
+  }
+
+  uint8_t* min_slot = min_slots;
+  uint8_t* max_slot = max_slots;
+  for (int i = start_page_idx; i <= end_page_idx; i++) {
+    VLOG(3) << "stats for page[" << i << "]: "
+            << "min=" << RawValue::PrintValue(min_slot, col_type, col_type.scale)
+            << ", max=" << RawValue::PrintValue(max_slot, col_type, col_type.scale);
+    if (!minmax_filter->EvalOverlap(col_type, min_slot, max_slot)) {
+      RETURN_IF_ERROR(AddToSkipRanges(min_slot, max_slot, row_group, i, col_type,
+          col_idx, col_chunk, skip_ranges, filtered_pages));
+    }
+
+    min_slot += slot_size;
+    max_slot += slot_size;
+  }
+  stats_batch_read_pool_->FreeAll();
+  return Status::OK();
+}
+
 void HdfsParquetScanner::ResetPageFiltering() {
   filter_pages_ = false;
   candidate_ranges_.clear();
@@ -1067,37 +1154,50 @@ Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(
     RETURN_IF_ERROR(page_index_.DeserializeColumnIndex(col_chunk, &column_index));
 
     const ColumnType& col_type = slot_desc->type();
-    void* min_slot = nullptr;
-    void* max_slot = nullptr;
-    GetMinMaxSlotsForOverlapPred(slot_idx, &min_slot, &max_slot);
 
     const int num_of_pages = column_index.null_pages.size();
+    // If there is only one page in a row group, there is no need to apply the
+    // filter since the page stats must be identical to that of the containing
+    // row group that has already been filtered (passed).
+    if (num_of_pages == 1) break;
 
     VLOG(3) << "Try to filter out pages via overlap predicate."
             << "  fid=" << filter_id << ", columnType=" << col_type.DebugString()
-            << ", data min="
-            << RawValue::PrintValue(min_slot, col_type, col_type.scale)
-            << ", data max="
-            << RawValue::PrintValue(max_slot, col_type, col_type.scale)
-            << ", filter=" << minmax_filter->DebugString();
+            << ", filter=" << minmax_filter->DebugString()
+            << ", #pages=" << num_of_pages;
+    int first_not_null_page_idx = -1;
 
+    // Try to detect the longest span of non-null pages and batch read min/max stats for
+    // it. If a null-page is found, skip it right away and continue.
     for (int page_idx = 0; page_idx < num_of_pages; ++page_idx) {
-      bool is_null_page = false;
-      if (!ReadStatFromIndex(
-              stats_reader, column_index, page_idx, &is_null_page, min_slot, max_slot)) {
-        continue;
-      }
+      bool is_null_page = column_index.null_pages[page_idx];
+      if (UNLIKELY(is_null_page)) {
+        RETURN_IF_ERROR(AddToSkipRanges(nullptr, nullptr, row_group, page_idx, col_type,
+            col_idx, col_chunk, skip_ranges, &filtered_pages));
 
-      if (is_null_page || !minmax_filter->EvalOverlap(col_type, min_slot, max_slot)) {
-        VLOG(3) << "Page " << page_idx << " was filtered out.";
-        BaseScalarColumnReader* scalar_reader = scalar_reader_map_[col_idx];
-        RETURN_IF_ERROR(
-            page_index_.DeserializeOffsetIndex(col_chunk, &scalar_reader->offset_index_));
-        RowRange row_range;
-        GetRowRangeForPage(row_group, scalar_reader->offset_index_, page_idx, &row_range);
-        skip_ranges->push_back(row_range);
-        filtered_pages++;
+        // Process the previous span of non-null pages, if exist. The range of the
+        // span is [first_not_null_page_idx, page_idx-1]
+        if (LIKELY(first_not_null_page_idx != -1)) {
+          RETURN_IF_ERROR(SkipPagesBatch(row_group, stats_reader, column_index,
+              first_not_null_page_idx, page_idx - 1, col_type, col_idx, col_chunk,
+              minmax_filter, skip_ranges, &filtered_pages));
+        }
+
+        first_not_null_page_idx = -1;
+      } else {
+        // Mark the first non-null page, if not done yet.
+        if (UNLIKELY(first_not_null_page_idx == -1)) {
+          first_not_null_page_idx = page_idx;
+        }
       }
+    }
+
+    // Prorcess the last span of non-null pages, if exist. The range of the span
+    // is [first_not_null_page_idx, num_of_pages-1]
+    if (LIKELY(first_not_null_page_idx != -1)) {
+      RETURN_IF_ERROR(SkipPagesBatch(row_group, stats_reader, column_index,
+          first_not_null_page_idx, num_of_pages - 1, col_type, col_idx, col_chunk,
+          minmax_filter, skip_ranges, &filtered_pages));
     }
   }
 
@@ -1152,8 +1252,10 @@ Status HdfsParquetScanner::EvaluatePageIndex() {
       // Accept NULL as the predicate can contain a CAST which may fail.
       if (is_null_page || !eval->EvalPredicateAcceptNull(&row)) {
         BaseScalarColumnReader* scalar_reader = scalar_reader_map_[col_idx];
-        RETURN_IF_ERROR(page_index_.DeserializeOffsetIndex(col_chunk,
-            &scalar_reader->offset_index_));
+        parquet::OffsetIndex& offset_index = scalar_reader->offset_index_;
+        if (offset_index.page_locations.empty()) {
+          RETURN_IF_ERROR(page_index_.DeserializeOffsetIndex(col_chunk, &offset_index));
+        }
         RowRange row_range;
         GetRowRangeForPage(row_group, scalar_reader->offset_index_, page_idx, &row_range);
         skip_ranges.push_back(row_range);

@@ -412,6 +412,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// pages in a column chunk.
   boost::scoped_ptr<MemPool> dictionary_pool_;
 
+  /// Pool to hold batch read min/max stats. This pool is shared across all the
+  /// pages in a column chunk.
+  boost::scoped_ptr<MemPool> stats_batch_read_pool_;
+
   /// True, if we filter pages based on the Parquet page index.
   bool filter_pages_ = false;
 
@@ -595,6 +599,26 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// is appended with those skip ranges found (if any).
   /// Returns a non-OK status when some error is encountered.
   Status FindSkipRangesForPagesWithMinMaxFilters(vector<RowRange>* skip_ranges);
+
+  /// Construct a RowRange with the begin and end row in page 'page_idx' and store the
+  /// object into 'skip_ranges'.
+  Status AddToSkipRanges(void* min_slot, void* max_slot, parquet::RowGroup& row_group,
+      int page_idx, const ColumnType& col_type, int col_idx,
+      const parquet::ColumnChunk& col_chunk, vector<RowRange>* skip_ranges,
+      int* filtered_pages);
+
+  /// Batch read a range ['start_page_idx', 'end_page_idx'] of min/max stats of non-null
+  /// pages for column 'col_idx' from 'column_index' and filter out those that are outside
+  /// the min/max range specified in 'minmax_filter'.
+  ///
+  /// On return:
+  ///   *skip_ranges is appended with new row ranges in those skipped pages,
+  //    *filtered_pages is incremented with the number of skipped pages.
+  Status SkipPagesBatch(parquet::RowGroup& row_group,
+      const ColumnStatsReader& stats_reader, const parquet::ColumnIndex& column_index,
+      int start_page_idx, int end_page_idx, const ColumnType& col_type, int col_idx,
+      const parquet::ColumnChunk& col_chunk, MinMaxFilter* minmax_filter,
+      vector<RowRange>* skip_ranges, int* filtered_pages);
 
   /// Resets page index filtering state, i.e. clears 'candidate_ranges_' and resets
   /// scalar readers' page filtering as well.

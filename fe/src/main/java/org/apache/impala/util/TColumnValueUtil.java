@@ -17,6 +17,8 @@
 
 package org.apache.impala.util;
 
+import org.apache.impala.catalog.ScalarType;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.TColumnValue;
 
 /**
@@ -47,5 +49,27 @@ public class TColumnValueUtil {
       }
     }
     return 0;
+  }
+
+  /**
+   * For 'type', test if the related field in TColumnValue is set.
+   */
+  public static boolean isFieldSet(Type type, TColumnValue val) {
+    if (!type.isScalarType() || val == null) return false;
+    switch (((ScalarType)type).getPrimitiveType()) {
+      case BOOLEAN: return val.isSetBool_val();
+      case TINYINT: return val.isSetByte_val();
+      case SMALLINT: return val.isSetShort_val();
+      case INT: return val.isSetInt_val();
+      case BIGINT: return val.isSetLong_val();
+      case FLOAT: return val.isSetDouble_val();
+      case DOUBLE: return val.isSetDouble_val();
+      case DATE: return val.isSetDate_val();
+      case STRING: return val.isSetString_val();
+      case TIMESTAMP: return val.isSetTimestamp_val();
+      case DECIMAL: return val.isSetDecimal_val();
+      case BINARY: return val.isSetBinary_val();
+    }
+    return false;
   }
 }

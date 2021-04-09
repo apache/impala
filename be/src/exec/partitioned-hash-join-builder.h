@@ -721,6 +721,10 @@ class PhjBuilder : public JoinBuilder {
   /// unacceptably high false-positive rate.
   void PublishRuntimeFilters(int64_t num_build_rows);
 
+  // Determine the usefulness of min/max filters in the context of column min/max stats.
+  // Set AlwaysTrue to true for each not useful. Called at the end of AddBatch().
+  void DetermineUsefulnessForMinmaxFilters();
+
   RuntimeState* const runtime_state_;
 
   /// Seed used for hashing rows. Must match seed used in the PartitionedHashJoinNode.
@@ -770,6 +774,13 @@ class PhjBuilder : public JoinBuilder {
   /// List of filters to build. One-to-one correspondence with exprs in 'filter_exprs_'.
   std::vector<FilterContext> filter_ctxs_;
 
+  /// Separately cached list of min/max filter contexts populated during
+  /// PhjBuilder::AllocateRuntimeFilters() to speed up
+  /// PhjBuilder::DetermineUsefulnessForMinmaxFilters() where only minmax filters are
+  /// relevant. Contexts in the vector are removed if they are determined to host
+  /// min/max filters that are overlapping with column stats too much.
+  std::vector<FilterContext*> minmax_filter_ctxs_;
+
   /// Reference to the hash table config which is a part of the PhjBuilderConfig that was
   /// used to create this object. Its used to create an instance of the HashTableCtx in
   /// Prepare(). Not Owned.
@@ -815,6 +826,11 @@ class PhjBuilder : public JoinBuilder {
   // Barrier used to synchronize the probe-side threads at synchronization points in the
   // partitioned hash join algorithm. Used only when 'num_probe_threads_' > 1.
   std::unique_ptr<CyclicBarrier> probe_barrier_;
+
+  /// Cached copy of the min/max filter threshold value to avoid repeated fetch of
+  /// the value from the plan. It remains a constant through out the execution of
+  /// the query.
+  float minmax_filter_threshold_ = 0.0;
 
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()

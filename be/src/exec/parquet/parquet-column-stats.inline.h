@@ -136,6 +136,38 @@ inline bool ColumnStats<bool>::DecodePlainValue(const std::string& buffer, void*
   return true;
 }
 
+/// Special version to decode Parquet INT32 for Impala tinyint with value range check.
+template <>
+inline bool ColumnStats<int8_t>::DecodePlainValue(const std::string& buffer, void* slot,
+    parquet::Type::type parquet_type) {
+  DCHECK_EQ(buffer.size(), sizeof(int32_t));
+  DCHECK_EQ(parquet_type, parquet::Type::INT32);
+  int8_t* result = reinterpret_cast<int8_t*>(slot);
+  int32_t data = *(int32_t*)(const_cast<char*>(buffer.data()));
+  if (UNLIKELY(data < std::numeric_limits<int8_t>::min()
+      || data > std::numeric_limits<int8_t>::max())) {
+    return false;
+  }
+  *result = data;
+  return true;
+}
+
+/// Special version to decode Parquet INT32 for Impala smallint with value range check.
+template <>
+inline bool ColumnStats<int16_t>::DecodePlainValue(const std::string& buffer, void* slot,
+    parquet::Type::type parquet_type) {
+  DCHECK_EQ(buffer.size(), sizeof(int32_t));
+  DCHECK_EQ(parquet_type, parquet::Type::INT32);
+  int16_t* result = reinterpret_cast<int16_t*>(slot);
+  int32_t data = *(int32_t*)(const_cast<char*>(buffer.data()));
+  if (UNLIKELY(data < std::numeric_limits<int16_t>::min()
+      || data > std::numeric_limits<int16_t>::max())) {
+    return false;
+  }
+  *result = data;
+  return true;
+}
+
 template <>
 inline int64_t ColumnStats<bool>::BytesNeeded(const bool& v) const {
   return 1;

@@ -23,76 +23,84 @@ using std::string;
 
 namespace impala {
 
-#define NUMERIC_MIN_MAX_FILTER_INSERT(NAME, TYPE)           \
-  void NAME##MinMaxFilter::Insert(const void* val) {        \
-    if (val == nullptr) return;                             \
-    const TYPE* value = reinterpret_cast<const TYPE*>(val); \
-    if (*value < min_) min_ = *value;                       \
-    if (*value > max_) max_ = *value;                       \
-  }
+#define NUMERIC_MIN_MAX_FILTER_FUNCS(NAME, TYPE)              \
+  void NAME##MinMaxFilter::Insert(const void* val) {          \
+    if (LIKELY(val)) {                                        \
+      const TYPE* value = reinterpret_cast<const TYPE*>(val); \
+      if (UNLIKELY(*value < min_)) min_ = *value;             \
+      if (UNLIKELY(*value > max_)) max_ = *value;             \
+    }                                                         \
+  }                                                           \
+  bool NAME##MinMaxFilter::AlwaysTrue() const { return always_true_; }
 
-NUMERIC_MIN_MAX_FILTER_INSERT(Bool, bool);
-NUMERIC_MIN_MAX_FILTER_INSERT(TinyInt, int8_t);
-NUMERIC_MIN_MAX_FILTER_INSERT(SmallInt, int16_t);
-NUMERIC_MIN_MAX_FILTER_INSERT(Int, int32_t);
-NUMERIC_MIN_MAX_FILTER_INSERT(BigInt, int64_t);
-NUMERIC_MIN_MAX_FILTER_INSERT(Float, float);
-NUMERIC_MIN_MAX_FILTER_INSERT(Double, double);
+NUMERIC_MIN_MAX_FILTER_FUNCS(Bool, bool);
+NUMERIC_MIN_MAX_FILTER_FUNCS(TinyInt, int8_t);
+NUMERIC_MIN_MAX_FILTER_FUNCS(SmallInt, int16_t);
+NUMERIC_MIN_MAX_FILTER_FUNCS(Int, int32_t);
+NUMERIC_MIN_MAX_FILTER_FUNCS(BigInt, int64_t);
+NUMERIC_MIN_MAX_FILTER_FUNCS(Float, float);
+NUMERIC_MIN_MAX_FILTER_FUNCS(Double, double);
 
 void StringMinMaxFilter::Insert(const void* val) {
-  if (val == nullptr || always_true_) return;
-  const StringValue* value = reinterpret_cast<const StringValue*>(val);
-  if (always_false_) {
-    min_ = *value;
-    max_ = *value;
-    always_false_ = false;
-  } else {
-    if (*value < min_) {
+  if (LIKELY(val)) {
+    const StringValue* value = reinterpret_cast<const StringValue*>(val);
+    if (UNLIKELY(always_false_)) {
       min_ = *value;
-      min_buffer_.Clear();
-    } else if (*value > max_) {
       max_ = *value;
-      max_buffer_.Clear();
+      always_false_ = false;
+    } else {
+      if (UNLIKELY(*value < min_)) {
+        min_ = *value;
+        min_buffer_.Clear();
+      } else if (UNLIKELY(*value > max_)) {
+        max_ = *value;
+        max_buffer_.Clear();
+      }
     }
   }
 }
 
-#define DATE_TIME_MIN_MAX_FILTER_INSERT(NAME, TYPE)         \
-  void NAME##MinMaxFilter::Insert(const void* val) {        \
-    if (val == nullptr) return;                             \
-    const TYPE* value = reinterpret_cast<const TYPE*>(val); \
-    if (always_false_) {                                    \
-      min_ = *value;                                        \
-      max_ = *value;                                        \
-      always_false_ = false;                                \
-    } else {                                                \
-      if (*value < min_) {                                  \
-        min_ = *value;                                      \
-      } else if (*value > max_) {                           \
-        max_ = *value;                                      \
-      }                                                     \
-    }                                                       \
-  }
+bool StringMinMaxFilter::AlwaysTrue() const { return always_true_; }
 
-DATE_TIME_MIN_MAX_FILTER_INSERT(Timestamp, TimestampValue);
-DATE_TIME_MIN_MAX_FILTER_INSERT(Date, DateValue);
+#define DATE_TIME_MIN_MAX_FILTER_FUNCS(NAME, TYPE)            \
+  void NAME##MinMaxFilter::Insert(const void* val) {          \
+    if (LIKELY(val)) {                                        \
+      const TYPE* value = reinterpret_cast<const TYPE*>(val); \
+      if (UNLIKELY(always_false_)) {                          \
+        min_ = *value;                                        \
+        max_ = *value;                                        \
+        always_false_ = false;                                \
+      } else {                                                \
+        if (UNLIKELY(*value < min_)) {                        \
+          min_ = *value;                                      \
+        } else if (UNLIKELY(*value > max_)) {                 \
+          max_ = *value;                                      \
+        }                                                     \
+      }                                                       \
+    }                                                         \
+  }                                                           \
+  bool NAME##MinMaxFilter::AlwaysTrue() const { return always_true_; }
 
-#define INSERT_DECIMAL_MINMAX(SIZE)                         \
-  do {                                                      \
-    if (val == nullptr) return;                             \
-    const Decimal##SIZE##Value* value##SIZE##_ =            \
-        reinterpret_cast<const Decimal##SIZE##Value*>(val); \
-    if (always_false_) {                                    \
-      min##SIZE##_ = *value##SIZE##_;                       \
-      max##SIZE##_ = *value##SIZE##_;                       \
-      always_false_ = false;                                \
-    } else {                                                \
-      if (*value##SIZE##_ < min##SIZE##_) {                 \
-        min##SIZE##_ = *value##SIZE##_;                     \
-      } else if (*value##SIZE##_ > max##SIZE##_) {          \
-        max##SIZE##_ = *value##SIZE##_;                     \
-      }                                                     \
-    }                                                       \
+DATE_TIME_MIN_MAX_FILTER_FUNCS(Timestamp, TimestampValue);
+DATE_TIME_MIN_MAX_FILTER_FUNCS(Date, DateValue);
+
+#define INSERT_DECIMAL_MINMAX(SIZE)                            \
+  do {                                                         \
+    if (LIKELY(val)) {                                         \
+      const Decimal##SIZE##Value* value##SIZE##_ =             \
+          reinterpret_cast<const Decimal##SIZE##Value*>(val);  \
+      if (UNLIKELY(always_false_)) {                           \
+        min##SIZE##_ = *value##SIZE##_;                        \
+        max##SIZE##_ = *value##SIZE##_;                        \
+        always_false_ = false;                                 \
+      } else {                                                 \
+        if (UNLIKELY(*value##SIZE##_ < min##SIZE##_)) {        \
+          min##SIZE##_ = *value##SIZE##_;                      \
+        } else if (UNLIKELY(*value##SIZE##_ > max##SIZE##_)) { \
+          max##SIZE##_ = *value##SIZE##_;                      \
+        }                                                      \
+      }                                                        \
+    }                                                          \
   } while (false)
 
 void DecimalMinMaxFilter::Insert4(const void* val) {
@@ -103,8 +111,23 @@ void DecimalMinMaxFilter::Insert8(const void* val) {
   INSERT_DECIMAL_MINMAX(8);
 }
 
+// Branch prediction for Decimal16 does not work very well.
 void DecimalMinMaxFilter::Insert16(const void* val) {
-  INSERT_DECIMAL_MINMAX(16);
+  if (val == nullptr) return;
+  const Decimal16Value* value16 = reinterpret_cast<const Decimal16Value*>(val);
+  if (always_false_) {
+    min16_ = *value16;
+    max16_ = *value16;
+    always_false_ = false;
+  } else {
+    if (*value16 < min16_) {
+      min16_ = *value16;
+    } else if (*value16 > max16_) {
+      max16_ = *value16;
+    }
+  }
 }
+
+bool DecimalMinMaxFilter::AlwaysTrue() const { return always_true_; }
 
 } // namespace impala

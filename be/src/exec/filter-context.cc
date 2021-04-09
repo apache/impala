@@ -88,7 +88,7 @@ void FilterContext::Insert(TupleRow* row) const noexcept {
     local_bloom_filter->Insert(filter_hash);
   } else {
     DCHECK(filter->is_min_max_filter());
-    if (local_min_max_filter == nullptr) return;
+    if (local_min_max_filter == nullptr || local_min_max_filter->AlwaysTrue()) return;
     void* val = expr_eval->GetValue(row);
     local_min_max_filter->Insert(val);
   }
@@ -228,54 +228,115 @@ Status FilterContext::CodegenEval(
   return Status::OK();
 }
 
-// An example of the generated code for TPCH-Q2: RF002 -> n_regionkey
+// An example of the generated code the following query: RF001[min_max] -> a.smallint_col
 //
-// @expr_type_arg = constant %"struct.impala::ColumnType" { i32 4, i32 -1, i32 -1,
-//     i32 -1, %"class.std::vector.422" zeroinitializer,
-//     %"class.std::vector.101" zeroinitializer }
+// set minmax_filter_threshold=1.0;
+// set minmax_filtering_level=PAGE;
+// select straight_join count(a.id) from
+// alltypes a join [SHUFFLE] alltypes b
+// on a.smallint_col = b.bigint_col;
 //
-// define void @FilterContextInsert(%"struct.impala::FilterContext"* %this,
-//     %"class.impala::TupleRow"* %row) #47 {
-// entry:
-//   %0 = alloca i16
-//   %local_bloom_filter_ptr = getelementptr inbounds %"struct.impala::FilterContext",
-//       %"struct.impala::FilterContext"* %this, i32 0, i32 3
-//   %local_bloom_filter_arg = load %"class.impala::BloomFilter"*,
-//       %"class.impala::BloomFilter"** %local_bloom_filter_ptr
-//   %filter_is_null = icmp eq %"class.impala::BloomFilter"* %local_bloom_filter_arg, null
-//   br i1 %filter_is_null, label %filters_null, label %filters_not_null
 //
-// filters_not_null:                                 ; preds = %entry
-//   %expr_eval_ptr = getelementptr inbounds %"struct.impala::FilterContext",
-//       %"struct.impala::FilterContext"* %this, i32 0, i32 0
-//   %expr_eval_arg = load %"class.impala::ScalarExprEvaluator"*,
-//       %"class.impala::ScalarExprEvaluator"** %expr_eval_ptr
-//   %result = call i32 @GetSlotRef.26(
-//       %"class.impala::ScalarExprEvaluator"* %expr_eval_arg,
-//       %"class.impala::TupleRow"* %row)
-//   %is_null = trunc i32 %result to i1
-//   br i1 %is_null, label %val_is_null, label %val_not_null
+// ; Function Attrs: noinline nounwind
+// define internal fastcc void @InsertRuntimeFilters(%"struct.impala::FilterContext"*
+// nocapture readonly %filter_ctxs, %"class.impala::TupleRow"* nocapture readonly %row)
+// unnamed_addr #6 personality i32 (...)* @__gxx_personality_v0 { entry:
+//   %local_bloom_filter_ptr.i = getelementptr inbounds %"struct.impala::FilterContext",
+//   %"struct.impala::FilterContext"* %filter_ctxs, i64 0, i32 3 %local_bloom_filter_arg.i
+//   = load %"class.impala::BloomFilter"*, %"class.impala::BloomFilter"**
+//   %local_bloom_filter_ptr.i, align 8 %filter_is_null.i = icmp eq
+//   %"class.impala::BloomFilter"* %local_bloom_filter_arg.i, null br i1
+//   %filter_is_null.i, label %FilterContextInsert.exit, label %check_val_block.i
 //
-// filters_null:                                     ; preds = %entry
-//   ret void
+// check_val_block.i:                                ; preds = %entry
+//   %cast_row_ptr.i.i = bitcast %"class.impala::TupleRow"* %row to i8**
+//   %tuple_ptr.i.i = load i8*, i8** %cast_row_ptr.i.i, align 8
+//   %null_byte_ptr.i.i = getelementptr inbounds i8, i8* %tuple_ptr.i.i, i64 8
+//   %null_byte.i.i = load i8, i8* %null_byte_ptr.i.i, align 1
+//   %null_mask.i.i = and i8 %null_byte.i.i, 1
+//   %is_null.i.i = icmp eq i8 %null_mask.i.i, 0
+//   br i1 %is_null.i.i, label %_ZN6impala8HashUtil10FastHash64EPKvlm.exit1.i.i, label
+//   %_ZN6impala8RawValue22GetHashValueFastHash32EPKvRKNS_10ColumnTypeEj.exit.i
 //
-// val_not_null:                                     ; preds = %filters_not_null
-//   %1 = ashr i32 %result, 16
-//   %2 = trunc i32 %1 to i16
-//   store i16 %2, i16* %0
-//   %native_ptr = bitcast i16* %0 to i8*
-//   br label %insert_filter
+// _ZN6impala8HashUtil10FastHash64EPKvlm.exit1.i.i:  ; preds = %check_val_block.i
+//   %val_ptr.i.i = bitcast i8* %tuple_ptr.i.i to i64*
+//   %val.i.i = load i64, i64* %val_ptr.i.i, align 8
+//   %0 = lshr i64 %val.i.i, 23
+//   %1 = xor i64 %0, %val.i.i
+//   %2 = mul i64 %1, 2388976653695081527
+//   %3 = lshr i64 %2, 47
+//   %4 = xor i64 %2, 4619197404915748858
+//   %5 = xor i64 %4, %3
+//   %6 = mul i64 %5, -8645972361240307355
+//   %7 = lshr i64 %6, 23
+//   %8 = xor i64 %7, %6
+//   %9 = mul i64 %8, 2388976653695081527
+//   %10 = lshr i64 %9, 47
+//   %11 = xor i64 %10, %9
+//   br label %_ZN6impala8RawValue22GetHashValueFastHash32EPKvRKNS_10ColumnTypeEj.exit.i
 //
-// val_is_null:                                      ; preds = %filters_not_null
-//   br label %insert_filter
+// _ZN6impala8RawValue22GetHashValueFastHash32EPKvRKNS_10ColumnTypeEj.exit.i: ; preds =
+// %_ZN6impala8HashUtil10FastHash64EPKvlm.exit1.i.i, %check_val_block.i
+//   %12 = phi i64 [ %11, %_ZN6impala8HashUtil10FastHash64EPKvlm.exit1.i.i ], [
+//   -1206697893868870850, %check_val_block.i ] %13 = lshr i64 %12, 32 %14 = sub i64 %12,
+//   %13 %15 = trunc i64 %14 to i32 %16 = getelementptr inbounds
+//   %"class.impala::BloomFilter", %"class.impala::BloomFilter"*
+//   %local_bloom_filter_arg.i, i64 0, i32 1 tail call void
+//   @_ZN4kudu16BlockBloomFilter6InsertEj(%"class.kudu::BlockBloomFilter"* %16, i32 %15)
+//   #9 br label %FilterContextInsert.exit
 //
-// insert_filter:                                    ; preds = %val_not_null, %val_is_null
-//   %val_ptr_phi = phi i8* [ %native_ptr, %val_not_null ], [ null, %val_is_null ]
-//   %hash_value = call i32
-//       @_ZN6impala8RawValue22GetHashValueFastHash32EPKvRKNS_10ColumnTypeEj(
-//       i8* %val_ptr_phi, %"struct.impala::ColumnType"* @expr_type_arg.29, i32 1234)
-//   call void @_ZN6impala11BloomFilter8IrInsertEj(
-//       %"class.impala::BloomFilter"* %local_bloom_filter_arg, i32 %hash_value)
+// FilterContextInsert.exit:                         ; preds = %entry,
+// %_ZN6impala8RawValue22GetHashValueFastHash32EPKvRKNS_10ColumnTypeEj.exit.i
+//   %local_min_max_filter_ptr.i = getelementptr inbounds %"struct.impala::FilterContext",
+//   %"struct.impala::FilterContext"* %filter_ctxs, i64 1, i32 4
+//   %cast_min_max_filter_ptr.i = bitcast %"class.impala::MinMaxFilter"**
+//   %local_min_max_filter_ptr.i to %"class.impala::BigIntMinMaxFilter"**
+//   %local_min_max_filter_arg.i = load %"class.impala::BigIntMinMaxFilter"*,
+//   %"class.impala::BigIntMinMaxFilter"** %cast_min_max_filter_ptr.i, align 8
+//   %filter_is_null.i1 = icmp eq %"class.impala::BigIntMinMaxFilter"*
+//   %local_min_max_filter_arg.i, null br i1 %filter_is_null.i1, label
+//   %FilterContextInsert.2.exit, label %filters_not_null.i
+//
+// filters_not_null.i:                               ; preds = %FilterContextInsert.exit
+//   %17 = getelementptr inbounds %"class.impala::BigIntMinMaxFilter",
+//   %"class.impala::BigIntMinMaxFilter"* %local_min_max_filter_arg.i, i64 0, i32 0, i32 1
+//   %18 = load i8, i8* %17, align 8, !tbaa !2, !range !7
+//   %19 = icmp eq i8 %18, 0
+//   br i1 %19, label %always_true_false_block.i, label %FilterContextInsert.2.exit
+//
+// always_true_false_block.i:                        ; preds = %filters_not_null.i
+//   %cast_row_ptr.i.i3 = bitcast %"class.impala::TupleRow"* %row to i8**
+//   %tuple_ptr.i.i4 = load i8*, i8** %cast_row_ptr.i.i3, align 8
+//   %null_byte_ptr.i.i5 = getelementptr inbounds i8, i8* %tuple_ptr.i.i4, i64 8
+//   %null_byte.i.i6 = load i8, i8* %null_byte_ptr.i.i5, align 1
+//   %null_mask.i.i7 = and i8 %null_byte.i.i6, 1
+//   %is_null.i.i8 = icmp eq i8 %null_mask.i.i7, 0
+//   br i1 %is_null.i.i8, label %20, label %FilterContextInsert.2.exit
+//
+// ; <label>:20:                                     ; preds = %always_true_false_block.i
+//   %val_ptr.i.i9 = bitcast i8* %tuple_ptr.i.i4 to i64*
+//   %val.i.i10 = load i64, i64* %val_ptr.i.i9, align 8
+//   %21 = getelementptr inbounds %"class.impala::BigIntMinMaxFilter",
+//   %"class.impala::BigIntMinMaxFilter"* %local_min_max_filter_arg.i, i64 0, i32 1 %22 =
+//   load i64, i64* %21, align 8, !tbaa !8 %23 = icmp slt i64 %val.i.i10, %22 br i1 %23,
+//   label %24, label %25, !prof !11
+//
+// ; <label>:24:                                     ; preds = %20
+//   store i64 %val.i.i10, i64* %21, align 8, !tbaa !8
+//   br label %25
+//
+// ; <label>:25:                                     ; preds = %24, %20
+//   %26 = getelementptr inbounds %"class.impala::BigIntMinMaxFilter",
+//   %"class.impala::BigIntMinMaxFilter"* %local_min_max_filter_arg.i, i64 0, i32 2 %27 =
+//   load i64, i64* %26, align 8, !tbaa !12 %28 = icmp sgt i64 %val.i.i10, %27 br i1 %28,
+//   label %29, label %FilterContextInsert.2.exit, !prof !11
+//
+// ; <label>:29:                                     ; preds = %25
+//   store i64 %val.i.i10, i64* %26, align 8, !tbaa !12
+//   br label %FilterContextInsert.2.exit
+//
+// FilterContextInsert.2.exit:                       ; preds = %FilterContextInsert.exit,
+// %filters_not_null.i, %always_true_false_block.i, %25, %29
 //   ret void
 // }
 Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_expr,
@@ -324,11 +385,41 @@ Status FilterContext::CodegenInsert(LlvmCodeGen* codegen, ScalarExpr* filter_exp
       llvm::BasicBlock::Create(context, "filters_not_null", insert_filter_fn);
   llvm::BasicBlock* filter_null_block =
       llvm::BasicBlock::Create(context, "filters_null", insert_filter_fn);
+  llvm::BasicBlock* check_val_block =
+      llvm::BasicBlock::Create(context, "check_val_block", insert_filter_fn);
   builder.CreateCondBr(filter_null, filter_null_block, filter_not_null_block);
   builder.SetInsertPoint(filter_null_block);
   builder.CreateRetVoid();
   builder.SetInsertPoint(filter_not_null_block);
 
+  // Test whether 'local_min_max_filter->AlwaysTrue()' is true and return if so.
+  if (filter_desc.type == TRuntimeFilterType::MIN_MAX) {
+    // Get the function for boolean <Type>MinMaxFilter::AlwaysTrue().
+    llvm::Function* always_true_member_fn = codegen->GetFunction(
+        MinMaxFilter::GetAlwaysTrueIRFunctionType(filter_expr->type()), false);
+    DCHECK(always_true_member_fn != nullptr);
+
+    llvm::Value* always_true_result =
+        builder.CreateCall(always_true_member_fn, {local_filter_arg});
+
+    llvm::BasicBlock* always_true_true_block =
+        llvm::BasicBlock::Create(context, "always_true_true_block", insert_filter_fn);
+    llvm::BasicBlock* always_true_false_block =
+        llvm::BasicBlock::Create(context, "always_true_false_block", insert_filter_fn);
+
+    builder.CreateCondBr(
+        always_true_result, always_true_true_block, always_true_false_block);
+
+    builder.SetInsertPoint(always_true_true_block);
+    builder.CreateRetVoid();
+    builder.SetInsertPoint(always_true_false_block);
+    builder.CreateBr(check_val_block);
+  } else {
+    builder.CreateBr(check_val_block);
+  }
+  builder.SetInsertPoint(check_val_block);
+
+  // Check null on the input value 'val' to be computed first
   llvm::BasicBlock* val_not_null_block =
       llvm::BasicBlock::Create(context, "val_not_null", insert_filter_fn);
   llvm::BasicBlock* val_is_null_block =
@@ -433,51 +524,12 @@ bool FilterContext::CheckForAlwaysFalse(const std::string& stats_name,
 // false otherwise.
 bool FilterContext::ShouldRejectFilterBasedOnColumnStats(
     const TRuntimeFilterTargetDesc& desc, MinMaxFilter* minmax_filter, float threshold) {
-  if (!minmax_filter) {
-    return false;
-  }
+  if (!desc.is_min_max_value_present) return false;
+  DCHECK(minmax_filter) << "Expect a valid minmax_filter";
   const TColumnValue& column_low_value = desc.low_value;
   const TColumnValue& column_high_value = desc.high_value;
   ColumnType col_type = ColumnType::FromThrift(desc.target_expr.nodes[0].type);
-  float ratio = 0.0;
-  switch (col_type.type) {
-    case PrimitiveType::TYPE_TINYINT:
-      if (!column_low_value.__isset.byte_val || !column_high_value.__isset.byte_val)
-        return false;
-      ratio = minmax_filter->ComputeOverlapRatio(col_type,
-          (void*)&column_low_value.byte_val, (void*)&column_high_value.byte_val);
-      break;
-    case PrimitiveType::TYPE_SMALLINT:
-      if (!column_low_value.__isset.short_val || !column_high_value.__isset.short_val)
-        return false;
-      ratio = minmax_filter->ComputeOverlapRatio(col_type,
-          (void*)&column_low_value.short_val, (void*)&column_high_value.short_val);
-      break;
-    case PrimitiveType::TYPE_INT:
-      if (!column_low_value.__isset.int_val || !column_high_value.__isset.int_val)
-        return false;
-      ratio = minmax_filter->ComputeOverlapRatio(col_type,
-          (void*)&column_low_value.int_val, (void*)&column_high_value.int_val);
-      break;
-    case PrimitiveType::TYPE_BIGINT:
-      if (!column_low_value.__isset.long_val || !column_high_value.__isset.long_val)
-        return false;
-      ratio = minmax_filter->ComputeOverlapRatio(col_type,
-          (void*)&column_low_value.long_val, (void*)&column_high_value.long_val);
-      break;
-    case PrimitiveType::TYPE_FLOAT:
-    case PrimitiveType::TYPE_DOUBLE:
-      if (!column_low_value.__isset.double_val || !column_high_value.__isset.double_val)
-        return false;
-      ratio = minmax_filter->ComputeOverlapRatio(col_type,
-          (void*)&column_low_value.double_val, (void*)&column_high_value.double_val);
-      break;
-    // Both timestamp and date are not supported since their low/high stats can't be
-    // stored in HMS yet.
-    case PrimitiveType::TYPE_TIMESTAMP:
-    case PrimitiveType::TYPE_DATE:
-    default:
-      return false;
-  }
+  float ratio =
+      minmax_filter->ComputeOverlapRatio(col_type, column_low_value, column_high_value);
   return ratio >= threshold;
 }

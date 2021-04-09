@@ -62,6 +62,7 @@ import org.apache.impala.thrift.TRuntimeFilterMode;
 import org.apache.impala.thrift.TRuntimeFilterTargetDesc;
 import org.apache.impala.thrift.TRuntimeFilterType;
 import org.apache.impala.util.BitUtil;
+import org.apache.impala.util.TColumnValueUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -263,6 +264,21 @@ public final class RuntimeFilterGenerator {
         }
         tFilterTarget.setLow_value(lowValue);
         tFilterTarget.setHigh_value(highValue);
+        boolean minMaxValuePresent = false;
+        if (node instanceof HdfsScanNode) {
+          // Set the min/max value present flag to avoid repeated check of the presence
+          // of the two values during execution.
+          SlotRef slotRefInScan = expr.unwrapSlotRef(true);
+          if (slotRefInScan != null) {
+            Column col = slotRefInScan.getDesc().getColumn();
+            if (col != null) {
+              Type col_type = col.getType();
+              minMaxValuePresent = TColumnValueUtil.isFieldSet(col_type, lowValue)
+                  && TColumnValueUtil.isFieldSet(col_type, highValue);
+            }
+          }
+        }
+        tFilterTarget.setIs_min_max_value_present(minMaxValuePresent);
         return tFilterTarget;
       }
 
