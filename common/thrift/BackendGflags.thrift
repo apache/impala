@@ -211,4 +211,6 @@ struct TBackendGflags {
   93: required i32 warn_catalog_response_size_mb
 
   94: required i32 warn_catalog_response_duration_s
+
+  95: required bool invalidate_hms_cache_on_ddls
 }

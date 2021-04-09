@@ -325,4 +325,8 @@ public class BackendConfig {
   public boolean enableCatalogdHMSCache() {
     return backendCfg_.enable_catalogd_hms_cache;
   }
+
+  public boolean invalidateCatalogdHMSCacheOnDDLs() {
+    return backendCfg_.invalidate_hms_cache_on_ddls;
+  }
 }

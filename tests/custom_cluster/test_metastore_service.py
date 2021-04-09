@@ -398,6 +398,331 @@ class TestMetastoreService(CustomClusterTestSuite):
         if catalog_client is not None:
           catalog_client.shutdown()
 
+    @pytest.mark.execute_serially
+    @CustomClusterTestSuite.with_args(
+        impalad_args="--use_local_catalog=true",
+        catalogd_args="--catalog_topic_mode=minimal "
+                      "--start_hms_server=true "
+                      "--hms_port=5899 "
+                      "--fallback_to_hms_on_errors=true "
+                      "--invalidate_hms_cache_on_ddls=true"
+    )
+    def test_cache_invalidated_on_nontransactional_table_ddls(self):
+        db_name = ImpalaTestSuite.get_random_name(
+            "test_cache_invalidated_on_nontransactional_table_ddls_db")
+        tbl_name = ImpalaTestSuite.get_random_name(
+            "test_cache_invalidated_on_nontransactional_table_ddls_tbl")
+        self.__test_non_transactional_table_cache_helper(db_name, tbl_name, True)
+
+    @pytest.mark.execute_serially
+    @CustomClusterTestSuite.with_args(
+        impalad_args="--use_local_catalog=true",
+        catalogd_args="--catalog_topic_mode=minimal "
+                      "--start_hms_server=true "
+                      "--hms_port=5899 "
+                      "--fallback_to_hms_on_errors=true "
+                      "--invalidate_hms_cache_on_ddls=false"
+    )
+    def test_cache_valid_on_nontransactional_table_ddls(self):
+        db_name = ImpalaTestSuite.get_random_name(
+            "test_cache_valid_on_nontransactional_table_ddls_db")
+        tbl_name = ImpalaTestSuite.get_random_name(
+            "test_cache_valid_on_nontransactional_table_ddls_tbl")
+        self.__test_non_transactional_table_cache_helper(db_name, tbl_name, False)
+
+    def __test_non_transactional_table_cache_helper(self, db_name,
+                                                    tbl_name, invalidateCache):
+        """
+        This tests the following DDLs after creating table and loading it in cache:
+        1. Drop partition:
+              If invalidateCache is True, then table should be removed from cache
+              and then subsequent get_partitions_by_names_req should load table from HMS
+              If invalidateCache is False, the get_partitions_by_names_req
+              should be served from the already cached table
+        2. Alter table rename :
+              If invalidateCache is True, this should remove the old table from the cache
+              and add new table. Subsequent get_table req on old table should throw an
+              exception. If invalidateCache is False, the old table should still be
+              present in the cache and subsequent get_table req should serve old table
+              from the cache
+        3. Alter table add column:
+              If invalidateCache is True, then table should be invalidated from cache
+              and then subsequent get_table_req should reload table from HMS
+              If invalidateCache is False, the should be served from the already
+              cached table which has the stale column info
+        4. drop table:
+              If invalidateCache is True, the table is removed from the cache
+              If invalidateCache is False, the table is *not* removed from the cache
+        """
+        catalog_hms_client = None
+        cur_get_table_response = None
+        prev_get_table_response = None
+        try:
+            catalog_hms_client, hive_transport = ImpalaTestSuite.create_hive_client(5899)
+            assert catalog_hms_client is not None
+
+            create_database_query = "create database " + db_name
+            self.execute_query_expect_success(self.client, create_database_query)
+
+            database = catalog_hms_client.get_database(db_name)
+            assert database is not None
+            assert db_name == database.name
+
+            create_tbl_query = "create table " + db_name + "." + tbl_name + \
+                               "(c1 int) partitioned by (part_col int) "
+            self.execute_query_expect_success(self.client, create_tbl_query)
+
+            insert_queries = [
+                "insert into {0}.{1} PARTITION (part_col=1) VALUES (1)".format(
+                    db_name, tbl_name),
+                "insert into {0}.{1} PARTITION (part_col=2) VALUES (2)".format(
+                    db_name, tbl_name)
+            ]
+            for query in insert_queries:
+                self.execute_query_expect_success(self.client, query)
+
+            get_table_request = self.__create_get_table_hms_request(
+                db_name, tbl_name, True, False, "impala")
+            cur_get_table_response = catalog_hms_client.get_table_req(
+                get_table_request)
+            assert cur_get_table_response.table is not None
+            assert cur_get_table_response.table.dbName == db_name
+            assert cur_get_table_response.table.tableName == tbl_name
+
+            partitions_response = catalog_hms_client.get_partition_names(
+                db_name, tbl_name, -1)
+            assert partitions_response is not None
+            assert len(partitions_response) == 2
+
+            # drop a partition
+            catalog_hms_client.drop_partition_by_name(
+                db_name, tbl_name, "part_col=2", True)
+
+            # save cur_get_table_response in prev_get_table_response
+            # before calling get_table_req HMS api
+            prev_get_table_response = cur_get_table_response
+
+            new_get_table_request = self.__create_get_table_hms_request(
+                db_name, tbl_name, True, False, "impala")
+            cur_get_table_response = catalog_hms_client.get_table_req(
+                new_get_table_request)
+            assert cur_get_table_response.table is not None
+
+            part_col_names = ["part_col=1", "part_col=2"]
+            get_parts_req = GetPartitionsByNamesRequest()
+            get_parts_req.db_name = db_name
+            get_parts_req.tbl_name = tbl_name
+            get_parts_req.names = part_col_names
+            parts_response = catalog_hms_client.get_partitions_by_names_req(
+                get_parts_req)
+            if invalidateCache:
+                # drop_partition_by_name hms api should invalidate
+                # table from cache and reload new table from HMS
+                len(parts_response.partitions) == 1
+            else:
+                # table should be served from the cache
+                # and the cached table has 2 partitions
+                len(parts_response.partitions) == 2
+
+            # alter current table by renaming
+            # the table name
+            table_to_update = self.__deepCopyTable(cur_get_table_response.table)
+            new_table_name = tbl_name + "_new"
+
+            # update table name
+            table_to_update.tableName = new_table_name
+            # alter the table
+            catalog_hms_client.alter_table(db_name, tbl_name, table_to_update)
+            prev_get_table_response = cur_get_table_response
+            expected_exception = None
+            # create get request for old table
+            old_table_get_request = self.__create_get_table_hms_request(
+                db_name, tbl_name, True, False, "impala")
+            if invalidateCache:
+                # get_table_req on old table should throw exception
+                # because it neither exists in cache nor in HMS
+                try:
+                    cur_get_table_response = catalog_hms_client.get_table_req(
+                        old_table_get_request)
+                except Exception as e:
+                    expected_exception = e
+                assert expected_exception is not None
+            else:
+                # old table still exists in cache
+                cur_get_table_response = catalog_hms_client.get_table_req(
+                    old_table_get_request)
+                assert expected_exception is None
+
+            # make sure that new table exists in cache
+            self.execute_query_expect_success(
+                self.client, "invalidate metadata " + db_name + "." + new_table_name)
+
+            # get_table_req on new table should return table
+            new_get_table_request = self.__create_get_table_hms_request(
+                db_name, new_table_name, True, False, "impala")
+
+            cur_get_table_response = catalog_hms_client.get_table_req(
+                new_get_table_request)
+            assert cur_get_table_response.table is not None
+            assert cur_get_table_response.table.sd is not None
+
+            table_to_update = self.__deepCopyTable(cur_get_table_response.table)
+
+            updated_cols = [["c1", "int", ""], ["c2", "int", ""]]
+            # alter new table by adding new column
+            table_to_update.sd.cols = self.__create_field_schemas(updated_cols)
+            catalog_hms_client.alter_table(db_name, new_table_name, table_to_update)
+            # get table
+            cur_get_table_response = catalog_hms_client.get_table_req(
+                new_get_table_request)
+
+            if invalidateCache:
+                # new get_table_req should load the table from HMS again because the table
+                # was invalidated from catalogD cache
+                self.__compare_cols(updated_cols,
+                                    cur_get_table_response.table.sd.cols, False)
+            else:
+                # new_get_table_req should load the existing table from cache
+                # so the expected cols should be old ones
+                expected_cols = [["c1", "int", ""]]
+                self.__compare_cols(
+                    expected_cols, cur_get_table_response.table.sd.cols, False)
+
+            prev_get_table_response = cur_get_table_response
+            # drop table
+            catalog_hms_client.drop_table(db_name, new_table_name, True)
+            new_get_table_request = self.__create_get_table_hms_request(
+                db_name, new_table_name, True, False, "impala")
+            if invalidateCache:
+                # new get_table_req should throw an exception
+                # since the table does not exist in cache as well as in HMS
+                expected_exception = None
+                try:
+                    cur_get_table_response = catalog_hms_client.get_table_req(
+                        new_get_table_request)
+                except Exception as e:
+                    expected_exception = e
+                assert expected_exception is not None
+            else:
+                # new get_table_req should return the
+                # table from the cache
+                cur_get_table_response = catalog_hms_client.get_table_req(
+                    new_get_table_request)
+                assert cur_get_table_response.table is not None
+                assert prev_get_table_response.table == cur_get_table_response.table
+        finally:
+            if catalog_hms_client is not None:
+                catalog_hms_client.shutdown()
+            if self.__get_database_no_throw(db_name) is not None:
+                self.hive_client.drop_database(db_name, True, True)
+
+    @pytest.mark.execute_serially
+    @CustomClusterTestSuite.with_args(
+        impalad_args="--use_local_catalog=true",
+        catalogd_args="--catalog_topic_mode=minimal "
+                      "--start_hms_server=true "
+                      "--hms_port=5899 "
+                      "--fallback_to_hms_on_errors=true "
+                      "--invalidate_hms_cache_on_ddls=true "
+                      "--hms_event_polling_interval_s=1"
+    )
+    def test_cache_invalidate_incomplete_table(self):
+        """
+        Tests the cache invalidation on an incomplete table
+        i.e a table not fully loaded in cache
+        """
+        db_name = "test_cache_invalidate_incomplete_table_db"
+        tbl_name = "test_cache_invalidate_incomplete_table_tbl"
+        catalog_hms_client = None
+        try:
+            catalog_hms_client, hive_transport = ImpalaTestSuite.create_hive_client(5899)
+            assert catalog_hms_client is not None
+
+            create_database_query = "create database " + db_name
+            self.execute_query_expect_success(self.client, create_database_query)
+
+            database = catalog_hms_client.get_database(db_name)
+            assert database is not None
+            assert db_name == database.name
+
+            create_tbl_query = "create table " + db_name + "." + tbl_name + \
+                               "(c1 int) partitioned by (part_col int) "
+            self.execute_query_expect_success(self.client, create_tbl_query)
+
+            insert_queries = [
+                "insert into {0}.{1} PARTITION (part_col=1) VALUES (1)".format(
+                    db_name, tbl_name),
+                "insert into {0}.{1} PARTITION (part_col=2) VALUES (2)".format(
+                    db_name, tbl_name)
+            ]
+            for query in insert_queries:
+                self.execute_query_expect_success(self.client, query)
+            get_table_request = self.__create_get_table_hms_request(
+                db_name, tbl_name, True, False, "impala")
+            cur_get_table_response = catalog_hms_client.get_table_req(
+                get_table_request)
+            assert cur_get_table_response.table is not None
+            assert cur_get_table_response.table.dbName == db_name
+            assert cur_get_table_response.table.tableName == tbl_name
+
+            partitions_response = catalog_hms_client.get_partition_names(
+                db_name, tbl_name, -1)
+            assert partitions_response is not None
+            assert len(partitions_response) == 2
+
+            invalidate_tbl_query = "invalidate metadata " + \
+                                   db_name + "." + tbl_name
+            # now invalidate the table metadata so that we have
+            # Incomplete table in the cache
+            self.execute_query_expect_success(self.client,
+                                              invalidate_tbl_query)
+
+            # drop a partition on an Incomplete table
+            catalog_hms_client.drop_partition_by_name(
+                db_name, tbl_name, "part_col=2", True)
+
+            new_get_table_request = self.__create_get_table_hms_request(
+                db_name, tbl_name, True, False, "impala")
+            cur_get_table_response = catalog_hms_client.get_table_req(
+                new_get_table_request)
+            assert cur_get_table_response.table is not None
+
+            part_col_names = ["part_col=1", "part_col=2"]
+            get_parts_req = GetPartitionsByNamesRequest()
+            get_parts_req.db_name = db_name
+            get_parts_req.tbl_name = tbl_name
+            get_parts_req.names = part_col_names
+            parts_response = catalog_hms_client.get_partitions_by_names_req(
+                get_parts_req)
+            assert len(parts_response.partitions) == 1
+            # invalidate the table again before dropping it
+            self.execute_query_expect_success(self.client, invalidate_tbl_query)
+            catalog_hms_client.drop_table(db_name, tbl_name, True)
+            # new get_table_req should throw an exception
+            # since the table does not exist in cache as well as in HMS
+            expected_exception = None
+            try:
+                cur_get_table_response = catalog_hms_client.get_table_req(
+                    new_get_table_request)
+            except Exception as e:
+                expected_exception = e
+            assert expected_exception is not None
+        finally:
+            if catalog_hms_client is not None:
+                catalog_hms_client.shutdown()
+            if self.__get_database_no_throw(db_name) is not None:
+                self.hive_client.drop_database(db_name, True, True)
+
+    def __create_get_table_hms_request(self, db_name, tbl_name, get_column_stats=False,
+                                       get_file_metadata=False, engine="impala"):
+        new_get_table_request = GetTableRequest()
+        new_get_table_request.dbName = db_name
+        new_get_table_request.tblName = tbl_name
+        new_get_table_request.getColumnStats = get_column_stats
+        new_get_table_request.getFileMetadata = get_file_metadata
+        new_get_table_request.engine = engine
+        return new_get_table_request
+
     def __create_test_tbls_from_hive(self, db_name):
       """Util method to create test tables from hive in the given database. It creates
       4 tables (partitioned and unpartitioned) for non-acid and acid cases and returns
@@ -666,7 +991,7 @@ class TestMetastoreService(CustomClusterTestSuite):
           assert expected_exception_str in str(e)
       assert exception is not None
 
-    def __compare_cols(self, cols, fieldSchemas):
+    def __compare_cols(self, cols, fieldSchemas, compareComments=True):
         """
         Compares the given list of fieldSchemas with the expected cols
         """
@@ -674,7 +999,8 @@ class TestMetastoreService(CustomClusterTestSuite):
         for i in range(len(cols)):
             assert cols[i][0] == fieldSchemas[i].name
             assert cols[i][1] == fieldSchemas[i].type
-            assert cols[i][2] == fieldSchemas[i].comment
+            if compareComments:
+                assert cols[i][2] == fieldSchemas[i].comment
 
     def __get_test_database(self, db_name,
         description="test_db_for_metastore_service"):
@@ -712,3 +1038,34 @@ class TestMetastoreService(CustomClusterTestSuite):
             f.comment = col[2]
             fieldSchemas.append(f)
         return fieldSchemas
+
+    def __deepCopyTable(self, other):
+        tbl = Table()
+        tbl.tableName = other.tableName
+        tbl.dbName = other.dbName
+        tbl.owner = other.owner
+        tbl.createTime = other.createTime
+        tbl.lastAccessTime = other.lastAccessTime
+        tbl.retention = other.retention
+        tbl.sd = other.sd
+        tbl.partitionKeys = other.partitionKeys
+        tbl.parameters = other.parameters
+        tbl.viewOriginalText = other.viewOriginalText
+        tbl.viewExpandedText = other.viewExpandedText
+        tbl.tableType = other.tableType
+        tbl.privileges = other.privileges
+        tbl.temporary = other.temporary
+        tbl.rewriteEnabled = other.rewriteEnabled
+        tbl.creationMetadata = other.creationMetadata
+        tbl.catName = other.catName
+        tbl.ownerType = other.ownerType
+        tbl.writeId = other.writeId
+        tbl.isStatsCompliant = other.isStatsCompliant
+        tbl.colStats = other.colStats
+        tbl.accessType = other.accessType
+        tbl.requiredReadCapabilities = other.requiredReadCapabilities
+        tbl.requiredWriteCapabilities = other.requiredWriteCapabilities
+        tbl.id = other.id
+        tbl.fileMetadata = other.fileMetadata
+        tbl.dictionary = other.dictionary
+        return tbl

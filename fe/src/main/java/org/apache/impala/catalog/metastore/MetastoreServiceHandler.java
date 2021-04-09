@@ -261,10 +261,17 @@ import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.impala.catalog.CatalogHmsAPIHelper;
+import org.apache.impala.catalog.DatabaseNotFoundException;
+import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.common.Reference;
+import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.thrift.TTableName;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -299,6 +306,7 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   protected Configuration serverConf_;
   protected PartitionExpressionProxy expressionProxy_;
   protected final String defaultCatalogName_;
+  protected final boolean invalidateCacheOnDDLs_;
 
   public MetastoreServiceHandler(CatalogServiceCatalog catalog,
       boolean fallBackToHMSOnErrors) {
@@ -325,6 +333,18 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
     }
     defaultCatalogName_ =
         MetaStoreUtils.getDefaultCatalog(serverConf_);
+    //TODO: Instead of passing individual configs in MetastoreServiceHandler,
+    //  we can either
+    //  1. Create MetastoreServiceContext (which would have all the desired configs) and
+    //     pass that in the constructor
+    //                       OR
+    //  2. Access config directly from BackendConfig INSTANCE directly.
+    //  For now, going with option #2
+
+    invalidateCacheOnDDLs_ =
+        BackendConfig.INSTANCE.invalidateCatalogdHMSCacheOnDDLs();
+    LOG.info("Invalidate catalogd cache for DDLs on non transactional tables " +
+        "is set to {}",invalidateCacheOnDDLs_);
   }
 
   @Override
@@ -620,6 +640,7 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       throws NoSuchObjectException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient().drop_table(dbname, tblname, deleteData);
+      removeNonTransactionalTableIfExists(dbname, tblname, "drop_table");
     }
   }
 
@@ -632,6 +653,8 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       client.getHiveClient().getThriftClient()
           .drop_table_with_environment_context(dbname, tblname, deleteData,
               environmentContext);
+      removeNonTransactionalTableIfExists(dbname, tblname,
+          "drop_table_with_environment_context");
     }
   }
 
@@ -816,6 +839,8 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       throws InvalidOperationException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient().alter_table(dbname, tblName, newTable);
+      renameNonTransactionalTableIfExists(dbname, tblName, newTable.getDbName(),
+          newTable.getTableName(),"alter_table");
     }
   }
 
@@ -828,6 +853,8 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       client.getHiveClient().getThriftClient()
           .alter_table_with_environment_context(dbname,
               tblName, table, environmentContext);
+      renameNonTransactionalTableIfExists(dbname, tblName, table.getDbName(),
+          table.getTableName(),"alter_table_with_environment_context");
     }
   }
 
@@ -838,6 +865,8 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient().alter_table_with_cascade(dbname, tblName,
           table, cascade);
+      renameNonTransactionalTableIfExists(dbname, tblName, table.getDbName(),
+          table.getTableName(),"alter_table_with_cascade");
     }
   }
 
@@ -845,7 +874,12 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   public AlterTableResponse alter_table_req(AlterTableRequest alterTableRequest)
       throws InvalidOperationException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient().alter_table_req(alterTableRequest);
+      AlterTableResponse response =
+              client.getHiveClient().getThriftClient().alter_table_req(alterTableRequest);
+      renameNonTransactionalTableIfExists(alterTableRequest.getDbName(),
+          alterTableRequest.getTableName(), alterTableRequest.getTable().getDbName(),
+          alterTableRequest.getTable().getTableName(),"alter_table_req");
+      return response;
     }
   }
 
@@ -853,7 +887,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   public Partition add_partition(Partition partition)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient().add_partition(partition);
+      Partition addedPartition =
+          client.getHiveClient().getThriftClient().add_partition(partition);
+      invalidateNonTransactionalTableIfExists(partition.getDbName(),
+          partition.getTableName(), "add_partition");
+      return addedPartition;
     }
   }
 
@@ -862,8 +900,12 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       EnvironmentContext environmentContext)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .add_partition_with_environment_context(partition, environmentContext);
+      Partition addedPartition = client.getHiveClient().getThriftClient()
+              .add_partition_with_environment_context(partition, environmentContext);
+      invalidateNonTransactionalTableIfExists(partition.getDbName(),
+          partition.getTableName(),
+          "add_partition_with_environment_context");
+      return addedPartition;
     }
   }
 
@@ -871,7 +913,14 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   public int add_partitions(List<Partition> partitionList)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient().add_partitions(partitionList);
+      int numPartitionsAdded =
+          client.getHiveClient().getThriftClient().add_partitions(partitionList);
+      if (numPartitionsAdded > 0) {
+        Partition partition = partitionList.get(0);
+        invalidateNonTransactionalTableIfExists(partition.getDbName(),
+            partition.getTableName(), "add_partitions");
+      }
+      return numPartitionsAdded;
     }
   }
 
@@ -879,7 +928,14 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   public int add_partitions_pspec(List<PartitionSpec> list)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient().add_partitions_pspec(list);
+      int numPartitionsAdded =  client.getHiveClient()
+              .getThriftClient().add_partitions_pspec(list);
+      if (numPartitionsAdded > 0) {
+        PartitionSpec partitionSpec = list.get(0);
+        invalidateNonTransactionalTableIfExists(partitionSpec.getDbName(),
+            partitionSpec.getTableName(), "add_partitions_pspec");
+      }
+      return numPartitionsAdded;
     }
   }
 
@@ -887,8 +943,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   public Partition append_partition(String dbname, String tblName, List<String> partVals)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .append_partition(dbname, tblName, partVals);
+      Partition partition = client.getHiveClient().getThriftClient()
+              .append_partition(dbname, tblName, partVals);
+      invalidateNonTransactionalTableIfExists(dbname, tblName,
+          "append_partition");
+      return partition;
     }
   }
 
@@ -896,8 +955,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   public AddPartitionsResult add_partitions_req(AddPartitionsRequest addPartitionsRequest)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .add_partitions_req(addPartitionsRequest);
+      AddPartitionsResult result =  client.getHiveClient().getThriftClient()
+              .add_partitions_req(addPartitionsRequest);
+      invalidateNonTransactionalTableIfExists(addPartitionsRequest.getDbName(),
+          addPartitionsRequest.getTblName(), "add_partitions_req");
+      return result;
     }
   }
 
@@ -907,9 +969,12 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       List<String> partVals, EnvironmentContext environmentContext)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .append_partition_with_environment_context(dbname, tblname, partVals,
-              environmentContext);
+      Partition partition =  client.getHiveClient().getThriftClient()
+              .append_partition_with_environment_context(dbname, tblname,
+                  partVals, environmentContext);
+      invalidateNonTransactionalTableIfExists(dbname, tblname,
+          "append_partition_with_environment_context");
+      return partition;
     }
   }
 
@@ -918,8 +983,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       String partName)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .append_partition_by_name(dbname, tblname, partName);
+      Partition partition = client.getHiveClient().getThriftClient()
+              .append_partition_by_name(dbname, tblname, partName);
+      invalidateNonTransactionalTableIfExists(dbname, tblname,
+          "append_partition_by_name");
+      return partition;
     }
   }
 
@@ -928,19 +996,25 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       String tblname, String partName, EnvironmentContext environmentContext)
       throws InvalidObjectException, AlreadyExistsException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .append_partition_by_name_with_environment_context(dbname, tblname, partName,
-              environmentContext);
+      Partition partition =  client.getHiveClient().getThriftClient()
+              .append_partition_by_name_with_environment_context(dbname, tblname,
+                  partName, environmentContext);
+      invalidateNonTransactionalTableIfExists(dbname, tblname,
+          "append_partition_by_name_with_environment_context");
+      return partition;
     }
   }
 
   @Override
-  public boolean drop_partition(String dbname, String tblanme, List<String> partVals,
+  public boolean drop_partition(String dbname, String tblname, List<String> partVals,
       boolean deleteData)
       throws NoSuchObjectException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .drop_partition(dbname, tblanme, partVals, deleteData);
+      boolean partitionDropped = client.getHiveClient().getThriftClient()
+              .drop_partition(dbname, tblname, partVals, deleteData);
+      invalidateNonTransactionalTableIfExists(dbname, tblname,
+          "drop_partition");
+      return partitionDropped;
     }
   }
 
@@ -949,9 +1023,12 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       List<String> partNames, boolean deleteData, EnvironmentContext environmentContext)
       throws NoSuchObjectException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .drop_partition_with_environment_context(dbname, tblname, partNames, deleteData,
-              environmentContext);
+      boolean partitionsDropped =  client.getHiveClient().getThriftClient()
+              .drop_partition_with_environment_context(dbname, tblname,
+                  partNames, deleteData, environmentContext);
+      invalidateNonTransactionalTableIfExists(dbname, tblname,
+          "drop_partition_with_environment_context");
+      return partitionsDropped;
     }
   }
 
@@ -960,8 +1037,12 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       boolean deleteData)
       throws NoSuchObjectException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient().drop_partition_by_name(dbname,
-          tblname, partName, deleteData);
+      boolean partitionsDropped =
+          client.getHiveClient().getThriftClient().drop_partition_by_name(dbname,
+              tblname, partName, deleteData);
+      invalidateNonTransactionalTableIfExists(dbname, tblname,
+          "drop_partition_by_name");
+      return partitionsDropped;
     }
   }
 
@@ -971,9 +1052,12 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       String partName, boolean deleteData, EnvironmentContext envContext)
       throws NoSuchObjectException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .drop_partition_by_name_with_environment_context(dbName, tableName, partName,
-              deleteData, envContext);
+      boolean partitionsDropped = client.getHiveClient().getThriftClient()
+              .drop_partition_by_name_with_environment_context(dbName, tableName,
+                  partName, deleteData, envContext);
+      invalidateNonTransactionalTableIfExists(dbName, tableName,
+          "drop_partition_by_name_with_environment_context");
+      return partitionsDropped;
     }
   }
 
@@ -982,8 +1066,12 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       DropPartitionsRequest dropPartitionsRequest)
       throws NoSuchObjectException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .drop_partitions_req(dropPartitionsRequest);
+      DropPartitionsResult result =
+          client.getHiveClient().getThriftClient()
+              .drop_partitions_req(dropPartitionsRequest);
+      invalidateNonTransactionalTableIfExists(dropPartitionsRequest.getDbName(),
+          dropPartitionsRequest.getTblName(), "drop_partitions_req");
+      return result;
     }
   }
 
@@ -1002,9 +1090,13 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       String destDb, String destTbl)
       throws TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .exchange_partition(partitionSpecMap, sourcedb, sourceTbl, destDb
-              , destTbl);
+      Partition partition = client.getHiveClient().getThriftClient()
+          .exchange_partition(partitionSpecMap, sourcedb, sourceTbl, destDb,
+              destTbl);
+      String apiName = "exchange_partition";
+      invalidateNonTransactionalTableIfExists(sourcedb, sourceTbl, apiName);
+      invalidateNonTransactionalTableIfExists(destDb, destTbl, apiName);
+      return partition;
     }
   }
 
@@ -1014,8 +1106,14 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       String destinationTableName)
       throws TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient().exchange_partitions(partitionSpecs,
-          sourceDb, sourceTable, destDb, destinationTableName);
+      List<Partition> partitions =
+          client.getHiveClient().getThriftClient()
+              .exchange_partitions(partitionSpecs, sourceDb,
+                  sourceTable, destDb, destinationTableName);
+      String apiName = "exchange_partitions";
+      invalidateNonTransactionalTableIfExists(sourceDb, sourceTable, apiName);
+      invalidateNonTransactionalTableIfExists(destDb, destinationTableName, apiName);
+      return partitions;
     }
   }
 
@@ -1347,26 +1445,33 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       throws InvalidOperationException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient()
-          .alter_partition(dbName, tblName, partition);
+              .alter_partition(dbName, tblName, partition);
+      invalidateNonTransactionalTableIfExists(dbName, tblName,
+          "alter_partition");
     }
   }
 
   @Override
-  public void alter_partitions(String dbNme, String tblName, List<Partition> partitions)
+  public void alter_partitions(String dbName, String tblName, List<Partition> partitions)
       throws InvalidOperationException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient()
-          .alter_partitions(dbNme, tblName, partitions);
+              .alter_partitions(dbName, tblName, partitions);
+      invalidateNonTransactionalTableIfExists(dbName, tblName,
+          "alter_partitions");
     }
   }
 
   @Override
-  public void alter_partitions_with_environment_context(String s, String s1,
+  public void alter_partitions_with_environment_context(String dbName, String tblName,
       List<Partition> list, EnvironmentContext environmentContext)
       throws InvalidOperationException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient()
-          .alter_partitions_with_environment_context(s, s1, list, environmentContext);
+              .alter_partitions_with_environment_context(dbName, tblName,
+                  list, environmentContext);
+      invalidateNonTransactionalTableIfExists(dbName, tblName,
+          "alter_partitions_with_environment_context");
     }
   }
 
@@ -1375,8 +1480,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       AlterPartitionsRequest alterPartitionsRequest)
       throws InvalidOperationException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .alter_partitions_req(alterPartitionsRequest);
+      AlterPartitionsResponse response =  client.getHiveClient().getThriftClient()
+              .alter_partitions_req(alterPartitionsRequest);
+      invalidateNonTransactionalTableIfExists(alterPartitionsRequest.getDbName(),
+              alterPartitionsRequest.getTableName(), "alter_partitions_req");
+      return response;
     }
   }
 
@@ -1388,6 +1496,8 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       client.getHiveClient().getThriftClient()
           .alter_partition_with_environment_context(dbName, tblName, partition,
               environmentContext);
+      invalidateNonTransactionalTableIfExists(dbName, tblName,
+          "alter_partition_with_environment_context");
     }
   }
 
@@ -1397,6 +1507,8 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient()
           .rename_partition(dbName, tblName, list, partition);
+      invalidateNonTransactionalTableIfExists(dbName, tblName,
+          "rename_partition");
     }
   }
 
@@ -1405,8 +1517,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       RenamePartitionRequest renamePartitionRequest)
       throws InvalidOperationException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
+      RenamePartitionResponse response = client.getHiveClient().getThriftClient()
           .rename_partition_req(renamePartitionRequest);
+      invalidateNonTransactionalTableIfExists(renamePartitionRequest.getDbName(),
+          renamePartitionRequest.getTableName(), "rename_partition_req");
+      return response;
     }
   }
 
@@ -2731,4 +2846,186 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   public void shutdown() throws TException {
     // nothing to do. Use this call to clean-up any session specific clean-up.
   }
+
+  /**
+   * For non transactional tables, invalidate the table from cache
+   * if hms ddl apis are accessed from catalogd's metastore server.
+   * Any subsequent get table request fetches the table from HMS and loads
+   * it in cache. This ensures that any get_table/get_partition requests after ddl
+   * operations on the same table return updated table. This behaviour
+   * has a performance penalty (since table loading in cache takes time)
+   * but ensures consistency. This change is behind catalogd server's
+   * flag: invalidate_hms_cache_on_ddls which is enabled by default
+   * It can be turned off if it becomes a performance bottleneck.
+   * @param dbNameWithCatalog: Name of database which contains the table
+   * @param tableName: Name of the table to invalidate
+   * @param apiName: The reason to invalidate table from cache.
+   */
+  private void invalidateNonTransactionalTableIfExists(String dbNameWithCatalog,
+      String tableName, String apiName) throws MetaException {
+    // return immediately if flag invalidateCacheOnDDLs_ is false
+    if (!invalidateCacheOnDDLs_) {
+      LOG.debug("Not invalidating table {}.{} from catalogd cache because " +
+              "invalidateCacheOnDDLs_ flag is set to {} ", dbNameWithCatalog,
+          tableName, invalidateCacheOnDDLs_);
+      return;
+    }
+    // Parse db name. Throw error if parsing fails.
+    String dbName = dbNameWithCatalog;
+    try {
+      dbName = MetaStoreUtils.parseDbName(dbNameWithCatalog, serverConf_)[1];
+    } catch (MetaException ex) {
+      LOG.error("Successfully executed HMS api: {} but encountered error " +
+              "when parsing dbName {} to invalidate/remove table from cache " +
+              "with error message: {}", apiName, dbNameWithCatalog,
+          ex.getMessage());
+      throw ex;
+    }
+    org.apache.impala.catalog.Table catalogTbl= null;
+    try {
+      catalogTbl = catalog_.getTable(dbName, tableName);
+    } catch (DatabaseNotFoundException ex) {
+      LOG.debug(ex.getMessage());
+      return;
+    }
+    if (catalogTbl == null) {
+      LOG.debug("{}.{} does not exist", dbName, tableName);
+      return;
+    }
+    if (catalogTbl instanceof IncompleteTable) {
+      LOG.debug("table {} is already incomplete, not invalidating" +
+              " it due to hms api: {}", catalogTbl.getFullName(),
+          apiName);
+      return;
+    }
+    Map<String, String> tblProperties = catalogTbl.getMetaStoreTable().getParameters();
+    if (tblProperties == null || MetaStoreUtils.isTransactionalTable(tblProperties)) {
+      LOG.debug("Table {} is transactional. " + "Not removing it " +
+          "from catalogd cache", catalogTbl.getFullName());
+      return;
+    }
+
+    LOG.debug("Invalidating non transactional table {} due to metastore api {}",
+            catalogTbl.getFullName(), apiName);
+    org.apache.impala.catalog.Table invalidatedCatalogTbl =
+            catalog_.invalidateTableIfExists(dbName, tableName);
+    if (invalidatedCatalogTbl != null) {
+      LOG.info("Invalidated non transactional table {} from " +
+              "catalogd cache due to metastore api: {}", catalogTbl.getFullName(),
+          apiName);
+    }
+    return;
+  }
+
+  /**
+   * This method is identical to invalidateNonTransactionalTableIfExists()
+   * except that it removes(and not invalidates) table from the cache on
+   * ddls like drop_table
+   */
+  private void removeNonTransactionalTableIfExists(String dbNameWithCatalog,
+      String tableName, String apiName) throws MetaException {
+    // return immediately if flag invalidateCacheOnDDLs_ is false
+    if (!invalidateCacheOnDDLs_) {
+      LOG.debug("Not removing table {}.{} from catalogd cache because " +
+              "invalidateCacheOnDDLs_ flag is set to {} ", dbNameWithCatalog,
+          tableName, invalidateCacheOnDDLs_);
+      return;
+    }
+    // Parse db name. Throw error if parsing fails.
+    String dbName = dbNameWithCatalog;
+    try {
+      dbName = MetaStoreUtils.parseDbName(dbNameWithCatalog, serverConf_)[1];
+    } catch (MetaException ex) {
+      LOG.error("Successfully executed HMS api: {} but encountered error " +
+              "when parsing dbName {} to invalidate/remove table from cache " +
+              "with error message: {}", apiName, dbNameWithCatalog,
+          ex.getMessage());
+      throw ex;
+    }
+    org.apache.impala.catalog.Table catalogTbl = null;
+    try {
+      catalogTbl = catalog_.getTable(dbName, tableName);
+    } catch (DatabaseNotFoundException ex) {
+      LOG.debug(ex.getMessage());
+      return;
+    }
+    if (catalogTbl == null) {
+      LOG.debug("{}.{} does not exist", dbName, tableName);
+      return;
+    }
+    if (catalogTbl instanceof IncompleteTable) {
+      LOG.debug("Removing incomplete table {} from cache " +
+          "due to HMS API: ", catalogTbl.getFullName(), apiName);
+      if (catalog_.removeTable(dbName, tableName) != null) {
+        LOG.info("Removed incomplete table {} from cache due " +
+            "to HMS API: ", catalogTbl.getFullName(), apiName);
+      }
+      return;
+    }
+    Map<String, String> tblProperties = catalogTbl.getMetaStoreTable().getParameters();
+    if (tblProperties == null || MetaStoreUtils.isTransactionalTable(tblProperties)) {
+      LOG.debug("Table {} is transactional. " +
+          "Not removing it from catalogd cache", catalogTbl.getFullName());
+      return;
+    }
+    LOG.debug("Removing non transactional table {} due to HMS api {}",
+            catalogTbl.getFullName(), apiName);
+    Reference<Boolean> tableFound = new Reference<>();
+    Reference<Boolean> tableMatched = new Reference<>();
+    // TODO: Move method removeTableIfExists to CatalogOpExecutor
+    // as suggested in
+    // IMPALA-10502 (patch: https://gerrit.cloudera.org/#/c/17308/)
+    org.apache.impala.catalog.Table removedTable =
+            catalog_.removeTableIfExists(catalogTbl.getMetaStoreTable(),
+                tableFound, tableMatched);
+    if (removedTable != null) {
+      LOG.info("Removed non transactional table {} from catalogd cache due to " +
+              "HMS api: {}", catalogTbl.getFullName(), apiName);
+    }
+    return;
+  }
+
+  /*
+  This method is similar to invalidateNonTransactionalTableIfExists except that
+  it is used only for alter_table apis. Atomically drops the old table and
+  create a new table
+   */
+  private void renameNonTransactionalTableIfExists(String oldDbNameWithCatalog,
+      String oldTableName, String newDbNameWithCatalog, String newTableName,
+      String apiName) throws MetaException {
+    // return immediately if flag invalidateCacheOnDDLs_ is false
+    if (!invalidateCacheOnDDLs_) {
+      LOG.debug("invalidateCacheOnDDLs_ flag is false, skipping cache " +
+              "update for operation {} on table {}.{}", apiName,
+          oldDbNameWithCatalog, oldTableName);
+      return;
+    }
+    String toParse = null, oldDbName, newDbName;
+    // Parse old and new db names. Throw error if parsing fails
+    try {
+      toParse = oldDbNameWithCatalog;
+      oldDbName = MetaStoreUtils.parseDbName(toParse, serverConf_)[1];
+      toParse = newDbNameWithCatalog;
+      newDbName = MetaStoreUtils.parseDbName(toParse, serverConf_)[1];
+    } catch (MetaException ex) {
+      LOG.error("Successfully executed HMS api: {} but encountered error " +
+              "when parsing dbName {}" + "with error message: {}",
+          apiName, toParse, ex.getMessage());
+      throw ex;
+    }
+    TTableName oldTable = new TTableName(oldDbName, oldTableName);
+    TTableName newTable = new TTableName(newDbName, newTableName);
+    String tableInfo = "old table " + oldDbName + "." + oldTableName +
+        " to new table " + newDbName + "." + newTableName;
+    LOG.debug("Renaming " + tableInfo);
+    Pair<org.apache.impala.catalog.Table, org.apache.impala.catalog.Table> result =
+        catalog_.renameTable(oldTable, newTable);
+    if (result.first == null || result.second == null) {
+      LOG.debug("Couldn't rename " + tableInfo);
+    } else {
+      LOG.info("Successfully renamed " + tableInfo);
+    }
+    return;
+  }
+
 }

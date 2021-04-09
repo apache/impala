@@ -108,6 +108,11 @@ DEFINE_bool(fallback_to_hms_on_errors, true, "This configuration is only used if
     "start_hms_server is true. This is used to determine if the Catalog should fallback "
     "to the backing HMS service if there are errors while processing the HMS request");
 
+DEFINE_bool(invalidate_hms_cache_on_ddls, true, "This configuration is used "
+    "only if start_hms_server is true. This is used to invalidate catalogd cache "
+    "for non transactional tables if alter/create/delete table hms apis are "
+     "invoked over catalogd's metastore endpoint");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_int32(state_store_port);
