@@ -4156,6 +4156,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col, year, " +
         "month from functional.alltypes");
+
+    // Insert with dynamic partitioning clause into a table that has unsupported partition
+    AnalysisError("insert into table functional.multipartformat partition (p) " +
+       "select 'parquet', 1", "Destination table 'functional.multipartformat' " +
+       "contains partition format(s) that are not supported to write: 'ORC', " +
+       "dynamic partition clauses are forbidden.");
   }
 
   /**
@@ -4350,6 +4356,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col " +
         "from functional.alltypes");
+
+    // Insert with static partitioning clause into a partition that has unsupported
+    // partition format.
+    AnalysisError("insert into table functional.multipartformat partition (p='orc') " +
+        "select 1", "Writing the destination partition format 'ORC' is not supported.");
 
     if (qualifier.contains("OVERWRITE")) {
       AnalysisError("insert " + qualifier + " table functional_hbase.alltypessmall " +

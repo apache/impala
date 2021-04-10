@@ -837,6 +837,23 @@ INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT c.* FROM functio
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+multipartformat
+---- CREATE_HIVE
+-- Used to test dynamic and static insert into partitioned tables which contains
+-- supported and unsupported file formats.
+CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (id int)
+  PARTITIONED BY (p string);
+---- LOAD
+ALTER TABLE {db_name}{db_suffix}.{table_name} ADD PARTITION (p='parquet');
+ALTER TABLE {db_name}{db_suffix}.{table_name} ADD PARTITION (p='orc');
+ALTER TABLE {db_name}{db_suffix}.{table_name} PARTITION (p='parquet')
+  SET FILEFORMAT PARQUET;
+ALTER TABLE {db_name}{db_suffix}.{table_name} PARTITION (p='orc')
+  SET FILEFORMAT ORC;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 complextypes_fileformat
 ---- CREATE_HIVE
 -- Used for positive/negative testing of complex types on various file formats.

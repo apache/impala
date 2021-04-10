@@ -65,7 +65,7 @@ public class HdfsTableSink extends TableSink {
   // Indicates that this sink is being used to write query results
   protected final boolean isResultSink_;
 
-  private static final Set<HdfsFileFormat> SUPPORTED_FILE_FORMATS = ImmutableSet.of(
+  public static final Set<HdfsFileFormat> SUPPORTED_FILE_FORMATS = ImmutableSet.of(
       HdfsFileFormat.PARQUET, HdfsFileFormat.TEXT, HdfsFileFormat.RC_FILE,
       HdfsFileFormat.SEQUENCE_FILE, HdfsFileFormat.AVRO, HdfsFileFormat.ICEBERG);
 
@@ -170,12 +170,6 @@ public class HdfsTableSink extends TableSink {
    * set of file formats.
    */
   private long getPerPartitionMemReq(Set<HdfsFileFormat> formats) {
-    Set<HdfsFileFormat> unsupportedFormats =
-        Sets.difference(formats, SUPPORTED_FILE_FORMATS);
-    if (!unsupportedFormats.isEmpty()) {
-      Preconditions.checkState(false,
-          "Unsupported TableSink format(s): " + Joiner.on(',').join(unsupportedFormats));
-    }
     if (formats.contains(HdfsFileFormat.PARQUET)) {
       // Writing to a Parquet partition requires up to 1GB of buffer. From a resource
       // management purview, even if there are non-Parquet partitions, we want to be

@@ -27,20 +27,25 @@ import org.apache.iceberg.types.Types;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.BuiltinsDb;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.KuduColumn;
+import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Pair;
 import org.apache.impala.planner.DataSink;
+import org.apache.impala.planner.HdfsTableSink;
 import org.apache.impala.planner.TableSink;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
@@ -50,6 +55,7 @@ import org.apache.impala.util.IcebergUtil;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 
 /**
  * Representation of a single insert or upsert statement, including the select statement
@@ -297,6 +303,13 @@ public class InsertStmt extends StatementBase {
       selectListExprs = new ArrayList<>();
     }
 
+    // Make sure static partition key values only contain const exprs.
+    if (partitionKeyValues_ != null) {
+      for (PartitionKeyValue kv: partitionKeyValues_) {
+        kv.analyze(analyzer);
+      }
+    }
+
     // Set target table and perform table-type specific analysis and auth checking.
     // Also checks if the target table is missing.
     analyzeTargetTable(analyzer);
@@ -388,13 +401,6 @@ public class InsertStmt extends StatementBase {
     // Checks that exactly all columns in the target table are assigned an expr.
     checkColumnCoverage(selectExprTargetColumns, mentionedColumnNames,
         selectListExprs.size(), numStaticPartitionExprs);
-
-    // Make sure static partition key values only contain const exprs.
-    if (partitionKeyValues_ != null) {
-      for (PartitionKeyValue kv: partitionKeyValues_) {
-        kv.analyze(analyzer);
-      }
-    }
 
     // Check that we can write to the target table/partition. This must be
     // done after the partition expression has been analyzed above.
@@ -547,6 +553,33 @@ public class InsertStmt extends StatementBase {
               targetTableName_));
         }
       }
+      // Check if the target partition is supported to write. For static partitioning the
+      // file format is available on partition level, however for dynamic partitioning
+      // the target partition formats are unknown during analysis and planning, therefore
+      // it will be verified based on the table metadata.
+      if (isStaticPartitionTarget()) {
+        PrunablePartition partition =
+            HdfsTable.getPartition(fsTable, partitionKeyValues_);
+        if (partition != null && partition instanceof FeFsPartition) {
+          HdfsFileFormat fileFormat = ((FeFsPartition) partition).getFileFormat();
+          Boolean notSupported =
+              !HdfsTableSink.SUPPORTED_FILE_FORMATS.contains(fileFormat);
+          if (notSupported) {
+            throw new AnalysisException(String.format("Writing the destination " +
+                "partition format '" + fileFormat + "' is not supported."));
+          }
+        }
+      } else {
+        Set<HdfsFileFormat> formats = fsTable.getFileFormats();
+        Set<HdfsFileFormat> unsupportedFormats =
+            Sets.difference(formats, HdfsTableSink.SUPPORTED_FILE_FORMATS);
+        if (!unsupportedFormats.isEmpty()) {
+          throw new AnalysisException(String.format("Destination table '" +
+              fsTable.getFullName() + "' contains partition format(s) that are not " +
+              "supported to write: '" + Joiner.on(',').join(unsupportedFormats) + "', " +
+              "dynamic partition clauses are forbidden."));
+        }
+      }
     }
 
     if (table_ instanceof FeKuduTable) {
@@ -600,15 +633,17 @@ public class InsertStmt extends StatementBase {
     if (!(table_ instanceof FeFsTable)) return;
     FeFsTable fsTable = (FeFsTable) table_;
 
-    FeFsTable.Utils.checkWriteAccess(fsTable,
-        hasStaticPartitionTarget() ? partitionKeyValues_ : null, "INSERT");
-  }
-
-  private boolean hasStaticPartitionTarget() {
-    if (partitionKeyValues_ == null) return false;
-
     // If the partition target is fully static, then check for write access against
     // the specific partition. Otherwise, check the whole table.
+    FeFsTable.Utils.checkWriteAccess(fsTable,
+        isStaticPartitionTarget() ? partitionKeyValues_ : null, "INSERT");
+  }
+
+  /**
+   * Returns true if all the partition key values of the target table are static.
+   */
+  private boolean isStaticPartitionTarget() {
+    if (partitionKeyValues_ == null) return false;
     for (PartitionKeyValue pkv : partitionKeyValues_) {
       if (pkv.isDynamic()) return false;
     }
