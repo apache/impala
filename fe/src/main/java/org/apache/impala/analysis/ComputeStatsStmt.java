@@ -445,9 +445,38 @@ public class ComputeStatsStmt extends StatementBase {
       // For incremental stats, estimate the size of intermediate stats and report an
       // error if the estimate is greater than --inc_stats_size_limit_bytes in bytes
       if (isIncremental_) {
+        long numOfAllIncStatsPartitions = 0;
+        Collection<? extends FeFsPartition> allPartitions =
+            FeCatalogUtils.loadAllPartitions(hdfsTable);
+
+        if (partitionSet_ == null) {
+          numOfAllIncStatsPartitions = allPartitions.size();
+        } else {
+          Set<Long> partIds =
+              Sets.newHashSetWithExpectedSize(partitionSet_.getPartitions().size());
+          for (FeFsPartition part: partitionSet_.getPartitions()) {
+            partIds.add(part.getId());
+          }
+
+          // incremental statistics size = Existing partition statistics
+          //     - Repeated calculation partition stats
+          //     + This time calculation partition stats
+          for (FeFsPartition part: allPartitions) {
+            // The partition has incremental stats, and the partition is not calculated
+            // this time. It is "Existing partition statistics
+            // - Repeated calculation partition stats"
+            if (part.hasIncrementalStats() && !partIds.contains(part.getId())) {
+              ++numOfAllIncStatsPartitions;
+            }
+          }
+          // This time calculation partition stats
+          numOfAllIncStatsPartitions += partitionSet_.getPartitions().size();
+        }
+
         long incStatMaxSize = BackendConfig.INSTANCE.getIncStatsMaxSize();
+        // The size of the existing stats and the stats to be calculated
         long statsSizeEstimate = hdfsTable.getColumns().size() *
-            hdfsTable.getPartitions().size() * HdfsTable.STATS_SIZE_PER_COLUMN_BYTES;
+            numOfAllIncStatsPartitions * HdfsTable.STATS_SIZE_PER_COLUMN_BYTES;
         if (statsSizeEstimate > incStatMaxSize) {
           LOG.error("Incremental stats size estimate for table " + hdfsTable.getName() +
               " exceeded " + incStatMaxSize + ", estimate = "

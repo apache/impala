@@ -40,6 +40,7 @@ import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
 import org.apache.impala.catalog.DataSource;
 import org.apache.impala.catalog.DataSourceTable;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
@@ -47,6 +48,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.FrontendTestBase;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.TestUtils;
@@ -1766,6 +1768,40 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     checkComputeStatsStmt(
         "compute incremental stats functional.alltypes partition(year<=2010)" +
         "(tinyint_col, smallint_col)");
+
+    long bytes = BackendConfig.INSTANCE.getBackendCfg().getInc_stats_size_limit_bytes();
+    // functional.alltypes has 24 partitions and 13 columns.
+    long statsBytes = 24 * 13 * HdfsTable.STATS_SIZE_PER_COLUMN_BYTES - 1;
+    // Change the value of inc_stats_size_limit_bytes to a small value for unit test
+    BackendConfig.INSTANCE.getBackendCfg().setInc_stats_size_limit_bytes(statsBytes);
+
+    // Calculate all partitions, the Incremental stats size exceeds the limit
+    AnalysisError("compute incremental stats functional.alltypes",
+        "Incremental stats size estimate exceeds "
+        + PrintUtils.printBytes(statsBytes)
+        + ". Please try COMPUTE STATS instead.");
+
+    // All partitions of functional.alltypes have no incremental statistics,
+    // so if only one partition is calculated,
+    // "Incremental stats size estimate exceeds " should not be reported
+    checkComputeStatsStmt(
+        "compute incremental stats functional.alltypes partition(year=2010, month=10)");
+
+    //functional.alltypes has 13 columns.
+    statsBytes = 12 * 13 * HdfsTable.STATS_SIZE_PER_COLUMN_BYTES - 1;
+    BackendConfig.INSTANCE.getBackendCfg().setInc_stats_size_limit_bytes(statsBytes);
+
+    // Calculate 12 partitions, the Incremental stats size exceeds the limit
+    AnalysisError("compute incremental stats functional.alltypes partition(year=2009)",
+        "Incremental stats size estimate exceeds "
+        + PrintUtils.printBytes(statsBytes)
+        + ". Please try COMPUTE STATS instead.");
+
+    // Calculate 11 partitions,
+    checkComputeStatsStmt(
+        "compute incremental stats functional.alltypes partition(year=2009, month<12)");
+
+    BackendConfig.INSTANCE.getBackendCfg().setInc_stats_size_limit_bytes(bytes);
   }
 
 
