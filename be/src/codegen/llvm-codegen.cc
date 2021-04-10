@@ -261,19 +261,18 @@ Status LlvmCodeGen::CreateFromMemory(FragmentState* state, ObjectPool* pool,
   SCOPED_TIMER((*codegen)->prepare_module_timer_);
   SCOPED_THREAD_COUNTER_MEASUREMENT((*codegen)->llvm_thread_counters());
 
-  // Select the appropriate IR version. We cannot use LLVM IR with SSE4.2 instructions on
-  // a machine without SSE4.2 support.
-  llvm::StringRef module_ir;
-  string module_name;
-  if (IsCPUFeatureEnabled(CpuInfo::SSE4_2)) {
-    module_ir = llvm::StringRef(
-        reinterpret_cast<const char*>(impala_sse_llvm_ir), impala_sse_llvm_ir_len);
-    module_name = "Impala IR with SSE 4.2 support";
-  } else {
-    module_ir = llvm::StringRef(
-        reinterpret_cast<const char*>(impala_no_sse_llvm_ir), impala_no_sse_llvm_ir_len);
-    module_name = "Impala IR with no SSE 4.2 support";
-  }
+  // On x86_64, Impala now requires AVX2 support. This must have already been enforced
+  // prior to this call.
+#if __x86_64__
+  CHECK(IsCPUFeatureEnabled(CpuInfo::AVX2));
+#endif
+  llvm::StringRef module_ir = llvm::StringRef(
+        reinterpret_cast<const char*>(impala_llvm_ir), impala_llvm_ir_len);
+#if __x86_64__
+  string module_name = "Impala IR with AVX2 support";
+#else
+  string module_name = "Impala IR";
+#endif
 
   unique_ptr<llvm::MemoryBuffer> module_ir_buf(
       llvm::MemoryBuffer::getMemBuffer(module_ir, "", false));

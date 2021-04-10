@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "common/logging.h"
+#include "common/status.h"
 
 namespace impala {
 
@@ -51,14 +52,15 @@ class CpuInfo {
   /// Initialize CpuInfo.
   static void Init();
 
-  /// Determine if the CPU meets the minimum CPU requirements and if not, log an error.
-  static void VerifyCpuRequirements();
+  /// Determine if the CPU meets the minimum CPU requirements and if not, return
+  /// an error status.
+  static Status EnforceCpuRequirements();
 
-  /// Determine if the CPU scaling governor is set to 'performance' and if not, issue an
-  /// error.
+  /// Determine if the CPU scaling governor is set to 'performance' and if not, log an
+  /// error message.
   static void VerifyPerformanceGovernor();
 
-  /// Determine if CPU turbo is disabled and if not, issue an error.
+  /// Determine if CPU turbo is disabled and if not, log an error message.
   static void VerifyTurboDisabled();
 
   /// Returns all the flags for this cpu

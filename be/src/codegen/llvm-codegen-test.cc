@@ -429,83 +429,62 @@ TEST_F(LlvmCodeGenTest, HashTest) {
   const char* data1 = "test string";
   const char* data2 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-  bool restore_sse_support = false;
+  scoped_ptr<LlvmCodeGen> codegen;
+  ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(fragment_state_, NULL, "test", &codegen));
+  ASSERT_TRUE(codegen.get() != NULL);
+  const auto close_codegen =
+      MakeScopeExitTrigger([&codegen]() { codegen->Close(); });
 
-  // Loop to test both the sse4 on/off paths
-  for (int i = 0; i < 2; ++i) {
-    scoped_ptr<LlvmCodeGen> codegen;
-    ASSERT_OK(LlvmCodeGen::CreateImpalaCodegen(fragment_state_, NULL, "test", &codegen));
-    ASSERT_TRUE(codegen.get() != NULL);
-    const auto close_codegen =
-        MakeScopeExitTrigger([&codegen]() { codegen->Close(); });
+  LlvmBuilder builder(codegen->context());
+  llvm::Value* llvm_data1 = codegen->GetStringConstant(&builder, data1, strlen(data1));
+  llvm::Value* llvm_data2 = codegen->GetStringConstant(&builder, data2, strlen(data2));
+  llvm::Value* llvm_len1 = codegen->GetI32Constant(strlen(data1));
+  llvm::Value* llvm_len2 = codegen->GetI32Constant(strlen(data2));
 
-    LlvmBuilder builder(codegen->context());
-    llvm::Value* llvm_data1 = codegen->GetStringConstant(&builder, data1, strlen(data1));
-    llvm::Value* llvm_data2 = codegen->GetStringConstant(&builder, data2, strlen(data2));
-    llvm::Value* llvm_len1 = codegen->GetI32Constant(strlen(data1));
-    llvm::Value* llvm_len2 = codegen->GetI32Constant(strlen(data2));
+  uint32_t expected_hash = 0;
+  expected_hash = HashUtil::Hash(data1, strlen(data1), expected_hash);
+  expected_hash = HashUtil::Hash(data2, strlen(data2), expected_hash);
+  expected_hash = HashUtil::Hash(data1, strlen(data1), expected_hash);
 
-    uint32_t expected_hash = 0;
-    expected_hash = HashUtil::Hash(data1, strlen(data1), expected_hash);
-    expected_hash = HashUtil::Hash(data2, strlen(data2), expected_hash);
-    expected_hash = HashUtil::Hash(data1, strlen(data1), expected_hash);
+  // Create a codegen'd function that hashes all the types and returns the results.
+  // The tuple/values to hash are baked into the codegen for simplicity.
+  LlvmCodeGen::FnPrototype prototype(
+      codegen.get(), "HashTest", codegen->i32_type());
 
-    // Create a codegen'd function that hashes all the types and returns the results.
-    // The tuple/values to hash are baked into the codegen for simplicity.
-    LlvmCodeGen::FnPrototype prototype(
-        codegen.get(), "HashTest", codegen->i32_type());
+  // Test both byte-size specific hash functions and the generic loop hash function
+  llvm::Function* fn_fixed = prototype.GeneratePrototype(&builder, NULL);
+  llvm::Function* data1_hash_fn = codegen->GetHashFunction(strlen(data1));
+  llvm::Function* data2_hash_fn = codegen->GetHashFunction(strlen(data2));
+  llvm::Function* generic_hash_fn = codegen->GetHashFunction();
 
-    // Test both byte-size specific hash functions and the generic loop hash function
-    llvm::Function* fn_fixed = prototype.GeneratePrototype(&builder, NULL);
-    llvm::Function* data1_hash_fn = codegen->GetHashFunction(strlen(data1));
-    llvm::Function* data2_hash_fn = codegen->GetHashFunction(strlen(data2));
-    llvm::Function* generic_hash_fn = codegen->GetHashFunction();
+  ASSERT_TRUE(data1_hash_fn != NULL);
+  ASSERT_TRUE(data2_hash_fn != NULL);
+  ASSERT_TRUE(generic_hash_fn != NULL);
 
-    ASSERT_TRUE(data1_hash_fn != NULL);
-    ASSERT_TRUE(data2_hash_fn != NULL);
-    ASSERT_TRUE(generic_hash_fn != NULL);
+  llvm::Value* seed = codegen->GetI32Constant(0);
+  seed = builder.CreateCall(
+      data1_hash_fn, llvm::ArrayRef<llvm::Value*>({llvm_data1, llvm_len1, seed}));
+  seed = builder.CreateCall(
+      data2_hash_fn, llvm::ArrayRef<llvm::Value*>({llvm_data2, llvm_len2, seed}));
+  seed = builder.CreateCall(
+      generic_hash_fn, llvm::ArrayRef<llvm::Value*>({llvm_data1, llvm_len1, seed}));
+  builder.CreateRet(seed);
 
-    llvm::Value* seed = codegen->GetI32Constant(0);
-    seed = builder.CreateCall(
-        data1_hash_fn, llvm::ArrayRef<llvm::Value*>({llvm_data1, llvm_len1, seed}));
-    seed = builder.CreateCall(
-        data2_hash_fn, llvm::ArrayRef<llvm::Value*>({llvm_data2, llvm_len2, seed}));
-    seed = builder.CreateCall(
-        generic_hash_fn, llvm::ArrayRef<llvm::Value*>({llvm_data1, llvm_len1, seed}));
-    builder.CreateRet(seed);
+  fn_fixed = codegen->FinalizeFunction(fn_fixed);
+  ASSERT_TRUE(fn_fixed != NULL);
 
-    fn_fixed = codegen->FinalizeFunction(fn_fixed);
-    ASSERT_TRUE(fn_fixed != NULL);
+  typedef uint32_t (*TestHashFn)();
+  CodegenFnPtr<TestHashFn> jitted_fn;
+  LlvmCodeGenTest::AddFunctionToJit(codegen.get(), fn_fixed, &jitted_fn);
+  ASSERT_OK(LlvmCodeGenTest::FinalizeModule(codegen.get()));
+  ASSERT_TRUE(jitted_fn.load() != nullptr);
 
-    typedef uint32_t (*TestHashFn)();
-    CodegenFnPtr<TestHashFn> jitted_fn;
-    LlvmCodeGenTest::AddFunctionToJit(codegen.get(), fn_fixed, &jitted_fn);
-    ASSERT_OK(LlvmCodeGenTest::FinalizeModule(codegen.get()));
-    ASSERT_TRUE(jitted_fn.load() != nullptr);
+  TestHashFn test_fn = jitted_fn.load();
 
-    TestHashFn test_fn = jitted_fn.load();
+  uint32_t result = test_fn();
 
-    uint32_t result = test_fn();
-
-    // Validate that the hashes are identical
-    EXPECT_EQ(result, expected_hash) << LlvmCodeGen::IsCPUFeatureEnabled(CpuInfo::SSE4_2);
-
-    if (i == 0 && LlvmCodeGen::IsCPUFeatureEnabled(CpuInfo::SSE4_2)) {
-      // Modify both CpuInfo and LlvmCodeGen::cpu_attrs_ to ensure that they have the
-      // same view of the underlying hardware while generating the hash.
-      EnableCodeGenCPUFeature(CpuInfo::SSE4_2, false);
-      CpuInfo::EnableFeature(CpuInfo::SSE4_2, false);
-      restore_sse_support = true;
-      LlvmCodeGenTest::ClearHashFns(codegen.get());
-    } else {
-      // System doesn't have sse, no reason to test non-sse path again.
-      break;
-    }
-  }
-
-  // Restore hardware feature for next test
-  EnableCodeGenCPUFeature(CpuInfo::SSE4_2, restore_sse_support);
-  CpuInfo::EnableFeature(CpuInfo::SSE4_2, restore_sse_support);
+  // Validate that the hashes are identical
+  EXPECT_EQ(result, expected_hash) << LlvmCodeGen::IsCPUFeatureEnabled(CpuInfo::SSE4_2);
 }
 
 // Test that an error propagating through codegen's diagnostic handler is

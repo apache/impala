@@ -82,7 +82,7 @@ int64_t MakeNonNegativeRand() {
 }
 
 // Just benchmark the constructor and destructor cost
-namespace initialize {
+namespace bitmapinitialize {
 
 void Benchmark(int batch_size, void* data) {
   int64_t * d = reinterpret_cast<int64_t*>(data);
@@ -94,7 +94,7 @@ void Benchmark(int batch_size, void* data) {
 }  // namespace initialize
 
 // Benchmark insert
-namespace set {
+namespace bitmapset {
 
 struct TestData {
   explicit TestData(int64_t size) : bm(size), data(1ull << 20) {
@@ -114,9 +114,9 @@ void Benchmark(int batch_size, void* data) {
   }
 }
 
-}  // namespace set
+}  // namespace bitmapset
 
-namespace get {
+namespace bitmapget {
 
 struct TestData {
   TestData(int64_t size)
@@ -142,7 +142,7 @@ void Benchmark(int batch_size, void* data) {
   }
 }
 
-}  // namespace get
+}  // namespace bitmapget
 
 int main(int argc, char **argv) {
   CpuInfo::Init();
@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
     for (int64_t size = 1000; size <= 1000 * 1000 * 1000; size *= 10) {
       int64_t* d = new int64_t(size);
       snprintf(name, sizeof(name), "size %10ld", size);
-      suite.AddBenchmark(name, initialize::Benchmark, d);
+      suite.AddBenchmark(name, bitmapinitialize::Benchmark, d);
     }
     cout << suite.Measure() << endl;
   }
@@ -163,9 +163,9 @@ int main(int argc, char **argv) {
   {
     Benchmark suite("set");
     for (int64_t size = 1000; size <= 1000 * 1000 * 1000; size *= 10) {
-      set::TestData* d = new set::TestData(size);
+      bitmapset::TestData* d = new bitmapset::TestData(size);
       snprintf(name, sizeof(name), "size %10ld", size);
-      suite.AddBenchmark(name, set::Benchmark, d);
+      suite.AddBenchmark(name, bitmapset::Benchmark, d);
     }
     cout << suite.Measure() << endl;
   }
@@ -173,9 +173,9 @@ int main(int argc, char **argv) {
   {
     Benchmark suite("get");
     for (int64_t size = 1000; size <= 1000 * 1000 * 1000; size *= 10) {
-      get::TestData* d = new get::TestData(size);
+      bitmapget::TestData* d = new bitmapget::TestData(size);
       snprintf(name, sizeof(name), "size %10ld", size);
-      suite.AddBenchmark(name, get::Benchmark, d);
+      suite.AddBenchmark(name, bitmapget::Benchmark, d);
     }
     cout << suite.Measure() << endl;
   }
