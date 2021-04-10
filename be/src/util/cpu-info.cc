@@ -33,6 +33,7 @@
 
 #include "common/compiler-util.h"
 #include "common/config.h"
+#include "common/status.h"
 #include "gen-cpp/Metrics_types.h"
 #include "gutil/strings/substitute.h"
 #include "util/pretty-printer.h"
@@ -250,11 +251,17 @@ void CpuInfo::InitNumaNodeToCores() {
   }
 }
 
-void CpuInfo::VerifyCpuRequirements() {
-  if (!CpuInfo::IsSupported(CpuInfo::SSSE3)) {
-    LOG(ERROR) << "CPU does not support the Supplemental SSE3 (SSSE3) instruction set. "
-               << "This setup is generally unsupported and Impala might be unstable.";
+Status CpuInfo::EnforceCpuRequirements() {
+  // This imposes a CPU requirement for x86_64. This function may later be modified
+  // to impose a similar requirement for other platforms.
+#ifdef __x86_64__
+  if (!CpuInfo::IsSupported(CpuInfo::AVX2)) {
+    return Status("This machine does not meet the minimum requirements for Impala "
+                  "functionality. The CPU does not support AVX2 (Advanced Vector "
+                  "Extensions 2).");
   }
+#endif
+  return Status::OK();
 }
 
 void CpuInfo::VerifyPerformanceGovernor() {

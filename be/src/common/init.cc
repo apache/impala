@@ -263,10 +263,6 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   OsInfo::Init();
   TestInfo::Init(test_mode);
 
-  // Verify CPU meets the minimum requirements before calling InitGoogleLoggingSafe()
-  // which might use SSSE3 instructions (see IMPALA-160).
-  CpuInfo::VerifyCpuRequirements();
-
   // Set the default hostname. The user can override this with the hostname flag.
   ABORT_IF_ERROR(GetHostname(&FLAGS_hostname));
 
@@ -363,6 +359,13 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   LOG(INFO) << "Process ID: " << getpid();
   LOG(INFO) << "Default AES cipher mode for spill-to-disk: "
             << EncryptionKey::ModeToString(EncryptionKey::GetSupportedDefaultMode());
+
+  // After initializing logging and printing the machine information, verify the
+  // minimal CPU requirements and exit if they are not met.
+  Status cpu_requirement_status = CpuInfo::EnforceCpuRequirements();
+  if (!cpu_requirement_status.ok()) {
+    CLEAN_EXIT_WITH_ERROR(cpu_requirement_status.GetDetail());
+  }
 
   if (FLAGS_use_resolved_hostname) {
     IpAddr ip_address;
