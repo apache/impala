@@ -39,6 +39,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
@@ -212,7 +213,7 @@ import com.google.common.collect.Maps;
 public class CatalogServiceCatalog extends Catalog {
   public static final Logger LOG = LoggerFactory.getLogger(CatalogServiceCatalog.class);
 
-  private static final int INITIAL_META_STORE_CLIENT_POOL_SIZE = 10;
+  public static final int INITIAL_META_STORE_CLIENT_POOL_SIZE = 10;
   private static final int MAX_NUM_SKIPPED_TOPIC_UPDATES = 2;
   private final int maxSkippedUpdatesLockContention_;
   //value of timeout for the topic update thread while waiting on the table lock.
@@ -280,7 +281,7 @@ public class CatalogServiceCatalog extends Catalog {
   // Manages the event processing from metastore for issuing invalidates on tables
   private ExternalEventsProcessor metastoreEventProcessor_;
 
-  private final ICatalogMetastoreServer catalogMetastoreServer_;
+  private ICatalogMetastoreServer catalogMetastoreServer_;
 
   /**
    * See the gflag definition in be/.../catalog-server.cc for details on these modes.
@@ -354,12 +355,13 @@ public class CatalogServiceCatalog extends Catalog {
         BackendConfig.INSTANCE.getBackendCfg().catalog_topic_mode.toUpperCase());
     catalogdTableInvalidator_ = CatalogdTableInvalidator.create(this,
         BackendConfig.INSTANCE);
-    metastoreEventProcessor_ = getEventsProcessor();
     Preconditions.checkState(PARTIAL_FETCH_RPC_QUEUE_TIMEOUT_S > 0);
-    // start polling for metastore events
+  }
+
+  public void startEventsProcessor() {
+    Preconditions.checkNotNull(metastoreEventProcessor_,
+        "Start events processor called before initializing it");
     metastoreEventProcessor_.start();
-    catalogMetastoreServer_ = getCatalogMetastoreServer();
-    catalogMetastoreServer_.start();
   }
 
   /**
@@ -373,20 +375,6 @@ public class CatalogServiceCatalog extends Catalog {
     this(loadInBackground, numLoadingThreads, catalogServiceId, localLibraryPath,
         new MetaStoreClientPool(INITIAL_META_STORE_CLIENT_POOL_SIZE,
             initialHmsCnxnTimeoutSec));
-  }
-
-  /**
-   * Returns an instance of CatalogMetastoreServer if start_hms_server configuration is
-   * true. Otherwise, returns a NoOpCatalogMetastoreServer
-   */
-  @VisibleForTesting
-  protected ICatalogMetastoreServer getCatalogMetastoreServer() {
-    if (!BackendConfig.INSTANCE.startHmsServer()) {
-      return NoOpCatalogMetastoreServer.INSTANCE;
-    }
-    int portNumber = BackendConfig.INSTANCE.getHMSPort();
-    Preconditions.checkState(portNumber > 0, "Invalid port number for HMS service.");
-    return new CatalogMetastoreServer(this);
   }
 
   /**
@@ -416,36 +404,6 @@ public class CatalogServiceCatalog extends Catalog {
     authzManager_ = Preconditions.checkNotNull(authzManager);
   }
 
-  /**
-   * Returns a Metastore event processor object if
-   * <code>BackendConfig#getHMSPollingIntervalInSeconds</code> returns a non-zero
-   *.value of polling interval. Otherwise, returns a no-op events processor. It is
-   * important to fetch the current notification event id at the Catalog service
-   * initialization time so that event processor starts to sync at the event id
-   * corresponding to the catalog start time.
-   */
-  private ExternalEventsProcessor getEventsProcessor() throws ImpalaException {
-    long eventPollingInterval = BackendConfig.INSTANCE.getHMSPollingIntervalInSeconds();
-    if (eventPollingInterval <= 0) {
-      LOG.info(String
-          .format("Metastore event processing is disabled. Event polling interval is %d",
-              eventPollingInterval));
-      return NoOpEventProcessor.getInstance();
-    }
-    try (MetaStoreClient metaStoreClient = getMetaStoreClient()) {
-      CurrentNotificationEventId currentNotificationId =
-          metaStoreClient.getHiveClient().getCurrentNotificationEventId();
-      return MetastoreEventsProcessor.getInstance(
-          this, currentNotificationId.getEventId(), eventPollingInterval);
-    } catch (TException e) {
-      LOG.error("Unable to fetch the current notification event id from metastore."
-          + "Metastore event processing will be disabled.", e);
-      throw new CatalogException(
-          "Fatal error while initializing metastore event processor", e);
-    }
-  }
-
-  @VisibleForTesting
   public ExternalEventsProcessor getMetastoreEventProcessor() {
     return metastoreEventProcessor_;
   }
@@ -989,7 +947,7 @@ public class CatalogServiceCatalog extends Catalog {
       // no version info or service id in the event
       if (versionNumber == -1 || serviceIdFromEvent.isEmpty()) {
         LOG.info("Not a self-event since the given version is {} and service id is {}",
-            versionNumber, serviceIdFromEvent);
+            versionNumber, serviceIdFromEvent.isEmpty() ? "empty" : serviceIdFromEvent);
         return false;
       }
       // if the service id from event doesn't match with our service id this is not a
@@ -1912,11 +1870,11 @@ public class CatalogServiceCatalog extends Catalog {
     // the event ids, if there is external DDL activity on metastore during reset.
     // Unfortunately, there is no good way to avoid this since HMS does not provide
     // APIs which can fetch all the tables/databases at a given id. It is OKAY to
-    // re-process some of these events since event processor relies on creationTime of
-    // the objects to uniquely identify tables from create and drop events. In case of
+    // re-process some of these events since event processor relies on creation eventId
+    // to uniquely determine if the table was created/dropped by catalogd. In case of
     // alter events, however it is likely that some tables would be unnecessarily
-    // invalidated. That would happen when during reset, there were external alter events
-    // and by the time we processed them, Catalog had already loaded them.
+    // refreshed. That would happen when during reset, there were external alter events
+    // and by the time we processed them, catalog had already loaded them.
     long currentEventId = metastoreEventProcessor_.getCurrentEventId();
     // pause the event processing since the cache is anyways being cleared
     metastoreEventProcessor_.pause();
@@ -2003,36 +1961,23 @@ public class CatalogServiceCatalog extends Catalog {
     return startVersion;
   }
 
+  public Db addDb(String dbName, org.apache.hadoop.hive.metastore.api.Database msDb) {
+    return addDb(dbName, msDb, -1);
+  }
+
   /**
    * Adds a database name to the metadata cache and returns the database's
    * new Db object. Used by CREATE DATABASE statements.
    */
-  public Db addDb(String dbName, org.apache.hadoop.hive.metastore.api.Database msDb) {
+  public Db addDb(String dbName, org.apache.hadoop.hive.metastore.api.Database msDb,
+      long eventId) {
     Db newDb = new Db(dbName, msDb);
     versionLock_.writeLock().lock();
     try {
       newDb.setCatalogVersion(incrementAndGetCatalogVersion());
+      newDb.setCreateEventId(eventId);
       addDb(newDb);
       return newDb;
-    } finally {
-      versionLock_.writeLock().unlock();
-    }
-  }
-
-  /**
-   * Adds a database name to the metadata cache if not exists and returns the
-   * true is a new Db Object was added. Used by MetastoreEventProcessor to handle
-   * CREATE_DATABASE events
-   */
-  public boolean addDbIfNotExists(
-      String dbName, org.apache.hadoop.hive.metastore.api.Database msDb) {
-    versionLock_.writeLock().lock();
-    try {
-      Db db = getDb(dbName);
-      if (db == null) {
-        return addDb(dbName, msDb) != null;
-      }
-      return false;
     } finally {
       versionLock_.writeLock().unlock();
     }
@@ -2050,39 +1995,6 @@ public class CatalogServiceCatalog extends Catalog {
       Db removedDb = super.removeDb(dbName);
       if (removedDb != null) updateDeleteLog(removedDb);
       return removedDb;
-    } finally {
-      versionLock_.writeLock().unlock();
-    }
-  }
-
-  /**
-   * @param msDb Metastore Database used to remove Db from Catalog
-   * @param dbFound Set to true if Database is found in Catalog
-   * @param dbMatched Set to true if Database is found in Catalog and it's CREATION_TIME
-   * is equal to the metastore DB
-   * @return the DB object removed. Return null if DB does not exist or was not removed
-   * because CREATION_TIME does not match.
-   */
-  public Db removeDbIfExists(org.apache.hadoop.hive.metastore.api.Database msDb,
-      Reference<Boolean> dbFound, Reference<Boolean> dbMatched) {
-    dbFound.setRef(false);
-    dbMatched.setRef(false);
-    versionLock_.writeLock().lock();
-    try {
-      String dbName = msDb.getName();
-      Db catalogDb = getDb(dbName);
-      if (catalogDb == null) return null;
-
-      dbFound.setRef(true);
-      // Remove the DB only if the CREATION_TIME matches with the metastore DB from event.
-      if (msDb.getCreateTime() == catalogDb.getMetaStoreDb().getCreateTime()) {
-        Db removedDb = removeDb(dbName);
-        if (removedDb != null) {
-          dbMatched.setRef(true);
-          return removedDb;
-        }
-      }
-      return null;
     } finally {
       versionLock_.writeLock().unlock();
     }
@@ -2110,35 +2022,14 @@ public class CatalogServiceCatalog extends Catalog {
     deleteLog_.addRemovedObject(db.toTCatalogObject());
   }
 
-  /**
-   * Adds table with the given db and table name to the catalog if it does not exists.
-   * @return true if the table was successfully added and false if the table already
-   * exists
-   * @throws CatalogException if the db is not found
-   */
-  public boolean addTableIfNotExists(String dbName, String tblName)
-      throws CatalogException {
-    versionLock_.writeLock().lock();
-    try {
-      Db db = getDb(dbName);
-      if (db == null) {
-        throw new CatalogException(String.format("Db %s does not exist", dbName));
-      }
-      Table existingTable = db.getTable(tblName);
-      if (existingTable != null) return false;
-      Table incompleteTable = IncompleteTable.createUninitializedTable(db, tblName);
-      incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
-      db.addTable(incompleteTable);
-      return true;
-    } finally {
-      versionLock_.writeLock().unlock();
-    }
+  public Table addIncompleteTable(String dbName, String tblName) {
+    return addIncompleteTable(dbName, tblName, -1L);
   }
 
   /**
    * Adds a table with the given name to the catalog and returns the new table.
    */
-  public Table addIncompleteTable(String dbName, String tblName) {
+  public Table addIncompleteTable(String dbName, String tblName, long createEventId) {
     versionLock_.writeLock().lock();
     try {
       // IMPALA-9211: get db object after holding the writeLock in case of getting stale
@@ -2154,6 +2045,7 @@ public class CatalogServiceCatalog extends Catalog {
       }
       Table incompleteTable = IncompleteTable.createUninitializedTable(db, tblName);
       incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
+      incompleteTable.setCreateEventId(createEventId);
       db.addTable(incompleteTable);
       return db.getTable(tblName);
     } finally {
@@ -2237,7 +2129,7 @@ public class CatalogServiceCatalog extends Catalog {
             .inc();
       }
       previousCatalogVersion = tbl.getCatalogVersion();
-      loadReq = tableLoadingMgr_.loadAsync(tableName, reason);
+      loadReq = tableLoadingMgr_.loadAsync(tableName, tbl.getCreateEventId(), reason);
     } finally {
       versionLock_.readLock().unlock();
     }
@@ -2285,50 +2177,6 @@ public class CatalogServiceCatalog extends Catalog {
       // MAX_NUM_SKIPPED_TOPIC_UPDATES limit.
       db.addTable(updatedTbl);
       return updatedTbl;
-    } finally {
-      versionLock_.writeLock().unlock();
-    }
-  }
-
-  /**
-   * Remove a catalog table based on the given metastore table if it exists and its
-   * id matches with the id of the table in Catalog.
-   *
-   * @param msTable Metastore table to be used to remove Table
-   * @param tblWasfound is set to true if the table was found in the catalog
-   * @param tblMatched is set to true if the table is found and it matched with the
-   * id of the cached metastore table in catalog or if the existing table is a
-   * incomplete table
-   * @return Removed table object. Return null if the table was not removed
-   */
-  public Table removeTableIfExists(org.apache.hadoop.hive.metastore.api.Table msTable,
-      Reference<Boolean> tblWasfound, Reference<Boolean> tblMatched) {
-    tblWasfound.setRef(false);
-    tblMatched.setRef(false);
-    // make sure that the createTime of the input table is valid
-    Preconditions.checkState(msTable.getId() > 0);
-    versionLock_.writeLock().lock();
-    try {
-      Db db = getDb(msTable.getDbName());
-      if (db == null) return null;
-
-      Table tblToBeRemoved = db.getTable(msTable.getTableName());
-      if (tblToBeRemoved == null) return null;
-
-      tblWasfound.setRef(true);
-      // make sure that you are removing the same instance of the table object which
-      // is given by comparing the metastore createTime. In case the found table is a
-      // Incomplete table remove it
-      if (tblToBeRemoved instanceof IncompleteTable
-          || (msTable.getId()
-                 == tblToBeRemoved.getMetaStoreTable().getId())) {
-        tblMatched.setRef(true);
-        Table removedTbl = db.removeTable(tblToBeRemoved.getName());
-        removedTbl.setCatalogVersion(incrementAndGetCatalogVersion());
-        deleteLog_.addRemovedObject(removedTbl.toMinimalTCatalogObject());
-        return removedTbl;
-      }
-      return null;
     } finally {
       versionLock_.writeLock().unlock();
     }
@@ -2449,42 +2297,8 @@ public class CatalogServiceCatalog extends Catalog {
           removeTable(oldTableName.getDb_name(), oldTableName.getTable_name());
       if (oldTable == null) return Pair.create(null, null);
       return Pair.create(oldTable,
-          addIncompleteTable(newTableName.getDb_name(), newTableName.getTable_name()));
-    } finally {
-      versionLock_.writeLock().unlock();
-    }
-  }
-
-  /**
-   * Renames the table by atomically removing oldTable and adding the newTable.
-   * @return true if oldTable was removed and newTable was added, false if oldTable or
-   * either of oldDb or newDb is not in catalog.
-   */
-  public boolean renameTableIfExists(TTableName oldTableName,
-      TTableName newTableName) {
-    boolean tableRenamed = false;
-    versionLock_.writeLock().lock();
-    try {
-      Db oldDb = getDb(oldTableName.db_name);
-      Db newDb = getDb(newTableName.db_name);
-      if (oldDb != null && newDb != null) {
-        Table existingTable = removeTable(oldTableName.db_name, oldTableName.table_name);
-        // Add the newTable only if oldTable existed.
-        if (existingTable != null) {
-          if (existingTable instanceof HdfsTable) {
-            // Add the old instance to the deleteLog_ so we can send isDeleted updates for
-            // its partitions.
-            existingTable.setCatalogVersion(incrementAndGetCatalogVersion());
-            deleteLog_.addRemovedObject(existingTable.toMinimalTCatalogObject());
-          }
-          Table incompleteTable = IncompleteTable.createUninitializedTable(newDb,
-              newTableName.getTable_name());
-          incompleteTable.setCatalogVersion(incrementAndGetCatalogVersion());
-          newDb.addTable(incompleteTable);
-          tableRenamed = true;
-        }
-      }
-      return tableRenamed;
+          addIncompleteTable(newTableName.getDb_name(), newTableName.getTable_name(),
+              oldTable.getCreateEventId()));
     } finally {
       versionLock_.writeLock().unlock();
     }
@@ -2616,12 +2430,14 @@ public class CatalogServiceCatalog extends Catalog {
     // 2) false - Table does not exist in metastore.
     // 3) unknown (null) - There was exception thrown by the metastore client.
     Boolean tableExistsInMetaStore;
+    org.apache.hadoop.hive.metastore.api.Table msTbl = null;
     Db db = null;
     try (MetaStoreClient msClient = getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Database msDb = null;
       try {
-        tableExistsInMetaStore = msClient.getHiveClient().tableExists(dbName, tblName);
-      } catch (UnknownDBException e) {
+        msTbl = msClient.getHiveClient().getTable(dbName, tblName);
+        tableExistsInMetaStore = (msTbl != null);
+      } catch (UnknownDBException | NoSuchObjectException e) {
         // The parent database does not exist in the metastore. Treat this the same
         // as if the table does not exist.
         tableExistsInMetaStore = false;
@@ -2667,6 +2483,7 @@ public class CatalogServiceCatalog extends Catalog {
     // Add a new uninitialized table to the table cache, effectively invalidating
     // any existing entry. The metadata for the table will be loaded lazily, on the
     // on the next access to the table.
+    Preconditions.checkNotNull(msTbl);
     Table newTable = addIncompleteTable(dbName, tblName);
     Preconditions.checkNotNull(newTable);
     if (loadInBackground_) {
@@ -3083,42 +2900,58 @@ public class CatalogServiceCatalog extends Catalog {
       String partitionName = hdfsPartition == null
           ? HdfsTable.constructPartitionName(partitionSpec)
           : hdfsPartition.getPartitionName();
-      LOG.info(String.format("Refreshing partition metadata: %s %s (%s)",
-          hdfsTable.getFullName(), partitionName, reason));
-      try (MetaStoreClient msClient = getMetaStoreClient()) {
-        org.apache.hadoop.hive.metastore.api.Partition hmsPartition = null;
-        try {
-          hmsPartition = msClient.getHiveClient().getPartition(
-              hdfsTable.getDb().getName(), hdfsTable.getName(), partitionName);
-        } catch (NoSuchObjectException e) {
-          // If partition does not exist in Hive Metastore, remove it from the
-          // catalog
-          if (hdfsPartition != null) {
-            hdfsTable.dropPartition(partitionSpec);
-            hdfsTable.setCatalogVersion(newCatalogVersion);
-            // non-existing partition was dropped from catalog, so we mark it as refreshed
-            wasPartitionReloaded.setRef(true);
-          } else {
-            LOG.info(String.format("Partition metadata for %s was not refreshed since "
-                    + "it does not exist in metastore anymore",
-                hdfsTable.getFullName() + " " + partitionName));
-          }
-          return hdfsTable.toTCatalogObject(resultType);
-        } catch (Exception e) {
-          throw new CatalogException("Error loading metadata for partition: "
-              + hdfsTable.getFullName() + " " + partitionName, e);
-        }
-        hdfsTable.reloadPartition(msClient.getHiveClient(), hdfsPartition, hmsPartition);
-      }
-      hdfsTable.setCatalogVersion(newCatalogVersion);
-      wasPartitionReloaded.setRef(true);
-      LOG.info(String.format("Refreshed partition metadata: %s %s",
-          hdfsTable.getFullName(), partitionName));
-      return hdfsTable.toTCatalogObject(resultType);
+      return reloadHdfsPartition(hdfsTable, partitionName, wasPartitionReloaded,
+          resultType, reason, newCatalogVersion, hdfsPartition);
     } finally {
       Preconditions.checkState(!versionLock_.isWriteLockedByCurrentThread());
       tbl.releaseWriteLock();
     }
+  }
+
+  /**
+   * Reloads the HdfsPartition identified by the partitionName and returns Table's
+   * TCatalogObject. The returned TCatalogObject is populated based on the value of
+   * resultType. This method expects that the table lock has been taken already by the
+   * caller. If the partition does not exist in HMS and hdfsPartition is not null, this
+   * method will remove the HdfsPartition from the table.
+   */
+  public TCatalogObject reloadHdfsPartition(HdfsTable hdfsTable, String partitionName,
+      Reference<Boolean> wasPartitionReloaded, CatalogObject.ThriftObjectType resultType,
+      String reason, long newCatalogVersion, @Nullable HdfsPartition hdfsPartition)
+      throws CatalogException {
+    Preconditions.checkState(hdfsTable.isWriteLockedByCurrentThread());
+    LOG.info(String.format("Refreshing partition metadata: %s %s (%s)",
+        hdfsTable.getFullName(), partitionName, reason));
+    try (MetaStoreClient msClient = getMetaStoreClient()) {
+      org.apache.hadoop.hive.metastore.api.Partition hmsPartition = null;
+      try {
+        hmsPartition = msClient.getHiveClient().getPartition(
+            hdfsTable.getDb().getName(), hdfsTable.getName(), partitionName);
+      } catch (NoSuchObjectException e) {
+        // If partition does not exist in Hive Metastore, remove it from the
+        // catalog
+        if (hdfsPartition != null) {
+          hdfsTable.dropPartition(hdfsPartition);
+          hdfsTable.setCatalogVersion(newCatalogVersion);
+          // non-existing partition was dropped from catalog, so we mark it as refreshed
+          wasPartitionReloaded.setRef(true);
+        } else {
+          LOG.info(String.format("Partition metadata for %s was not refreshed since "
+                  + "it does not exist in metastore anymore",
+              hdfsTable.getFullName() + " " + partitionName));
+        }
+        return hdfsTable.toTCatalogObject(resultType);
+      } catch (Exception e) {
+        throw new CatalogException("Error loading metadata for partition: "
+            + hdfsTable.getFullName() + " " + partitionName, e);
+      }
+      hdfsTable.reloadPartition(msClient.getHiveClient(), hdfsPartition, hmsPartition);
+    }
+    hdfsTable.setCatalogVersion(newCatalogVersion);
+    wasPartitionReloaded.setRef(true);
+    LOG.info(String.format("Refreshed partition metadata: %s %s",
+        hdfsTable.getFullName(), partitionName));
+    return hdfsTable.toTCatalogObject(resultType);
   }
 
   public CatalogDeltaLog getDeleteLog() { return deleteLog_; }
@@ -3665,5 +3498,10 @@ public class CatalogServiceCatalog extends Catalog {
   public void setMetastoreEventProcessor(
       ExternalEventsProcessor metastoreEventProcessor) {
     this.metastoreEventProcessor_ = metastoreEventProcessor;
+  }
+
+  @VisibleForTesting
+  public void setCatalogMetastoreServer(ICatalogMetastoreServer catalogMetastoreServer) {
+    this.catalogMetastoreServer_ = catalogMetastoreServer;
   }
 }

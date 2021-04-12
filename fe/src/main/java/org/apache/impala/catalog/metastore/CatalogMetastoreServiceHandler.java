@@ -50,6 +50,7 @@ import org.apache.impala.common.Metrics;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,9 +66,9 @@ public class CatalogMetastoreServiceHandler extends MetastoreServiceHandler {
   private static final Logger LOG = LoggerFactory
       .getLogger(CatalogMetastoreServiceHandler.class);
 
-  public CatalogMetastoreServiceHandler(CatalogServiceCatalog catalog,
+  public CatalogMetastoreServiceHandler(CatalogOpExecutor catalogOpExecutor,
       boolean fallBackToHMSOnErrors) {
-    super(catalog, fallBackToHMSOnErrors);
+    super(catalogOpExecutor, fallBackToHMSOnErrors);
   }
 
   @Override

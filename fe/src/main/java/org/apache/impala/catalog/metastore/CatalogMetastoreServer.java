@@ -45,6 +45,7 @@ import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.metastore.HmsApiNameEnum;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.common.Metrics;
+import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TCatalogdHmsCacheMetrics;
 import org.apache.impala.thrift.TCatalogHmsCacheApiMetrics;
 import org.apache.impala.service.BackendConfig;
@@ -122,12 +123,10 @@ public class CatalogMetastoreServer extends ThriftHiveMetastore implements
   // a blocking call.
   private CompletableFuture<Void> serverHandle_;
 
-  // reference to the catalog Service catalog object
-  private final CatalogServiceCatalog catalog_;
+  private final CatalogOpExecutor catalogOpExecutor_;
 
-  public CatalogMetastoreServer(CatalogServiceCatalog catalogServiceCatalog) {
-    Preconditions.checkNotNull(catalogServiceCatalog);
-    catalog_ = catalogServiceCatalog;
+  public CatalogMetastoreServer(CatalogOpExecutor catalogOpExecutor) {
+    catalogOpExecutor_ = Preconditions.checkNotNull(catalogOpExecutor);
     initMetrics();
   }
 
@@ -289,7 +288,7 @@ public class CatalogMetastoreServer extends ThriftHiveMetastore implements
     Preconditions.checkState(!started_.get(), "Metastore server is already started");
     LOG.info("Starting the Metastore server at port number {}", portNumber);
     CatalogMetastoreServiceHandler handler =
-        new CatalogMetastoreServiceHandler(catalog_,
+        new CatalogMetastoreServiceHandler(catalogOpExecutor_,
             BackendConfig.INSTANCE.fallbackToHMSOnErrors());
     // create a proxy class for the ThriftMetastore.Iface and ICatalogMetastoreServer
     // so that all the APIs can be invoked via a TimingInvocationHandler

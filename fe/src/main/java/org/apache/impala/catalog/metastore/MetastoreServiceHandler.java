@@ -27,6 +27,7 @@ import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.AbstractThriftHiveMetastore;
 import org.apache.hadoop.hive.metastore.DefaultPartitionExpressionProxy;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.IMetaStoreClient.NotificationFilter;
 import org.apache.hadoop.hive.metastore.PartFilterExprUtil;
 import org.apache.hadoop.hive.metastore.PartitionExpressionProxy;
 import org.apache.hadoop.hive.metastore.api.AbortTxnRequest;
@@ -151,6 +152,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
 import org.apache.hadoop.hive.metastore.api.NotNullConstraintsRequest;
 import org.apache.hadoop.hive.metastore.api.NotNullConstraintsResponse;
+import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.NotificationEventRequest;
 import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
 import org.apache.hadoop.hive.metastore.api.NotificationEventsCountRequest;
@@ -210,7 +212,6 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableMeta;
 import org.apache.hadoop.hive.metastore.api.TableStatsRequest;
 import org.apache.hadoop.hive.metastore.api.TableStatsResult;
-import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore.Iface;
 import org.apache.hadoop.hive.metastore.api.TruncateTableRequest;
 import org.apache.hadoop.hive.metastore.api.TruncateTableResponse;
 import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
@@ -262,14 +263,19 @@ import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.impala.catalog.CatalogHmsAPIHelper;
 import org.apache.impala.catalog.DatabaseNotFoundException;
-import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.events.MetastoreEvents.DropTableEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
+import org.apache.impala.catalog.events.MetastoreEventsProcessor;
+import org.apache.impala.common.ImpalaException;
+import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.thrift.TTableName;
 import org.apache.thrift.TException;
@@ -300,6 +306,7 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       + "table %s to the backing HiveMetastore service";
 
   // constant used for logging error messages
+  protected final CatalogOpExecutor catalogOpExecutor_;
   protected final CatalogServiceCatalog catalog_;
   protected final boolean fallBackToHMSOnErrors_;
   // TODO handle session configuration
@@ -308,9 +315,10 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   protected final String defaultCatalogName_;
   protected final boolean invalidateCacheOnDDLs_;
 
-  public MetastoreServiceHandler(CatalogServiceCatalog catalog,
+  public MetastoreServiceHandler(CatalogOpExecutor catalogOpExecutor,
       boolean fallBackToHMSOnErrors) {
-    catalog_ = Preconditions.checkNotNull(catalog);
+    catalogOpExecutor_ = Preconditions.checkNotNull(catalogOpExecutor);
+    catalog_ = Preconditions.checkNotNull(catalogOpExecutor.getCatalog());
     fallBackToHMSOnErrors_ = fallBackToHMSOnErrors;
     LOG.info("Fallback to hive metastore service on errors is {}",
         fallBackToHMSOnErrors_);
@@ -639,8 +647,9 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   public void drop_table(String dbname, String tblname, boolean deleteData)
       throws NoSuchObjectException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      long eventId = getCurrentEventId(client);
       client.getHiveClient().getThriftClient().drop_table(dbname, tblname, deleteData);
-      removeNonTransactionalTableIfExists(dbname, tblname, "drop_table");
+      removeNonTransactionalTableIfExists(eventId, dbname, tblname, "drop_table");
     }
   }
 
@@ -650,10 +659,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       EnvironmentContext environmentContext)
       throws NoSuchObjectException, MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      long eventId = getCurrentEventId(client);
       client.getHiveClient().getThriftClient()
           .drop_table_with_environment_context(dbname, tblname, deleteData,
               environmentContext);
-      removeNonTransactionalTableIfExists(dbname, tblname,
+      removeNonTransactionalTableIfExists(eventId, dbname, tblname,
           "drop_table_with_environment_context");
     }
   }
@@ -2918,11 +2928,18 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   }
 
   /**
+   * Gets the current event id from the hive metastore.
+   */
+  private long getCurrentEventId(MetaStoreClient msClient) throws TException {
+    return msClient.getHiveClient().getCurrentNotificationEventId().getEventId();
+  }
+
+  /**
    * This method is identical to invalidateNonTransactionalTableIfExists()
    * except that it removes(and not invalidates) table from the cache on
    * ddls like drop_table
    */
-  private void removeNonTransactionalTableIfExists(String dbNameWithCatalog,
+  private void removeNonTransactionalTableIfExists(long eventId, String dbNameWithCatalog,
       String tableName, String apiName) throws MetaException {
     // return immediately if flag invalidateCacheOnDDLs_ is false
     if (!invalidateCacheOnDDLs_) {
@@ -2932,9 +2949,12 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       return;
     }
     // Parse db name. Throw error if parsing fails.
-    String dbName = dbNameWithCatalog;
+    String dbName;
+    String catName;
     try {
-      dbName = MetaStoreUtils.parseDbName(dbNameWithCatalog, serverConf_)[1];
+      String[] catAndDbName = MetaStoreUtils.parseDbName(dbNameWithCatalog, serverConf_);
+      catName = catAndDbName[0];
+      dbName = catAndDbName[1];
     } catch (MetaException ex) {
       LOG.error("Successfully executed HMS api: {} but encountered error " +
               "when parsing dbName {} to invalidate/remove table from cache " +
@@ -2942,47 +2962,33 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
           ex.getMessage());
       throw ex;
     }
-    org.apache.impala.catalog.Table catalogTbl = null;
     try {
-      catalogTbl = catalog_.getTable(dbName, tableName);
-    } catch (DatabaseNotFoundException ex) {
-      LOG.debug(ex.getMessage());
-      return;
-    }
-    if (catalogTbl == null) {
-      LOG.debug("{}.{} does not exist", dbName, tableName);
-      return;
-    }
-    if (catalogTbl instanceof IncompleteTable) {
-      LOG.debug("Removing incomplete table {} from cache " +
-          "due to HMS API: ", catalogTbl.getFullName(), apiName);
-      if (catalog_.removeTable(dbName, tableName) != null) {
-        LOG.info("Removed incomplete table {} from cache due " +
-            "to HMS API: ", catalogTbl.getFullName(), apiName);
+      List<NotificationEvent> events = MetastoreEventsProcessor
+          .getNextMetastoreEvents(catalog_, eventId,
+              event -> event.getEventType()
+                  .equalsIgnoreCase(DropTableEvent.DROP_TABLE_EVENT_TYPE)
+                  && catName.equalsIgnoreCase(event.getCatName())
+                  && dbName.equalsIgnoreCase(event.getDbName())
+                  && tableName.equalsIgnoreCase(event.getTableName()));
+      if (events.isEmpty()) {
+        throw new MetaException(
+            "Drop table event not received. Check if notification events are "
+                + "configured in hive metastore");
       }
-      return;
+      long dropEventId = events.get(events.size() - 1).getEventId();
+      Reference<Boolean> tblAddedLater = new Reference<>();
+      boolean removedTbl = catalogOpExecutor_
+          .removeTableIfNotAddedLater(dropEventId, dbName, tableName, tblAddedLater);
+      if (removedTbl) {
+        LOG.info("Removed non transactional table {}.{} from catalogd cache due to " +
+            "HMS api: {}", dbName, tableName, apiName);
+      }
+    } catch (ImpalaException e) {
+      String msg =
+          "Unable to process the DROP table event for table " + dbName + "." + tableName;
+      LOG.error(msg, e);
+      throw new MetaException(msg);
     }
-    Map<String, String> tblProperties = catalogTbl.getMetaStoreTable().getParameters();
-    if (tblProperties == null || MetaStoreUtils.isTransactionalTable(tblProperties)) {
-      LOG.debug("Table {} is transactional. " +
-          "Not removing it from catalogd cache", catalogTbl.getFullName());
-      return;
-    }
-    LOG.debug("Removing non transactional table {} due to HMS api {}",
-            catalogTbl.getFullName(), apiName);
-    Reference<Boolean> tableFound = new Reference<>();
-    Reference<Boolean> tableMatched = new Reference<>();
-    // TODO: Move method removeTableIfExists to CatalogOpExecutor
-    // as suggested in
-    // IMPALA-10502 (patch: https://gerrit.cloudera.org/#/c/17308/)
-    org.apache.impala.catalog.Table removedTable =
-            catalog_.removeTableIfExists(catalogTbl.getMetaStoreTable(),
-                tableFound, tableMatched);
-    if (removedTable != null) {
-      LOG.info("Removed non transactional table {} from catalogd cache due to " +
-              "HMS api: {}", catalogTbl.getFullName(), apiName);
-    }
-    return;
   }
 
   /*

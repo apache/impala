@@ -64,11 +64,11 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
-import org.apache.hadoop.hive.metastore.messaging.CommitTxnMessage;
-import org.apache.hadoop.hive.metastore.messaging.InsertMessage;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.HdfsUri;
+import org.apache.impala.authorization.AuthorizationConfig;
+import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.catalog.CatalogException;
@@ -88,7 +88,6 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
 import org.apache.impala.catalog.events.MetastoreEvents.AlterTableEvent;
-import org.apache.impala.catalog.events.MetastoreEvents.InsertEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
@@ -194,7 +193,7 @@ public class MetastoreEventsProcessorTest {
       CurrentNotificationEventId currentNotificationId =
           metaStoreClient.getHiveClient().getCurrentNotificationEventId();
       eventsProcessor_ = new SynchronousHMSEventProcessorForTests(
-          catalog_, currentNotificationId.getEventId(), 10L);
+          catalogOpExecutor_, currentNotificationId.getEventId(), 10L);
       eventsProcessor_.start();
     }
     catalog_.setMetastoreEventProcessor(eventsProcessor_);
@@ -435,45 +434,6 @@ public class MetastoreEventsProcessorTest {
     assertNotNull(catalog_.getDb(TEST_DB_NAME));
   }
 
-  /**
-   * Test to verify that DROP_DATABASE event is processed such that it removes the DB from
-   * Catalog only if the CREATION_TIME of the Catalog's DB object is less than or equal to
-   * that in the event.
-   */
-  @Test
-  public void testDropDatabaseCreationTime()
-      throws ImpalaException, InterruptedException {
-    long filteredCount = eventsProcessor_.getMetrics()
-        .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount();
-    createDatabaseFromImpala(TEST_DB_NAME, "Test DB for CREATION_TIME");
-    // now drop the database with cascade option
-    dropDatabaseCascadeFromImpala(TEST_DB_NAME);
-
-    // Adding sleep here to make sure that the CREATION_TIME is not same
-    // as the previous CREATE_DB operation, so as to trigger the filtering logic
-    // based on CREATION_TIME in DROP_DB event processing. This is currently a
-    // limitation : the DROP_DB event filtering expects that while processing events,
-    // the CREATION_TIME of two Databases with same name won't have the same
-    // creation timestamp.
-    sleep(2000);
-    // Create database again with same name
-    createDatabaseFromImpala(TEST_DB_NAME, "Test DB for CREATION_TIME");
-    eventsProcessor_.processEvents();
-
-    // Here, we expect the events CREATE_DB, DROP_DB, CREATE_DB for the
-    // same Database name. Hence, the DROP_DB event should not be processed,
-    // as the CREATION_TIME of the catalog's Database object should be greater
-    // than that in the DROP_DB notification event. Two events are filtered here,
-    // 1 : first CREATE_DATABASE as it is followed by another create of the same name.
-    // 2 : DROP_DATABASE as it is trying to drop a database which is again created.
-    assertEquals(filteredCount + 2, eventsProcessor_.getMetrics()
-        .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
-        .getCount());
-
-    // Teardown step - Drop the created DB
-    dropDatabaseCascadeFromImpala(TEST_DB_NAME);
-  }
-
   @Test
   public void testAlterDatabaseEvents() throws TException, ImpalaException {
     createDatabase(TEST_DB_NAME, null);
@@ -531,9 +491,10 @@ public class MetastoreEventsProcessorTest {
     createDatabaseFromImpala(TEST_DB_NAME, null);
     assertNotNull("Db should have been found after create database statement",
         catalog_.getDb(TEST_DB_NAME));
+    eventsProcessor_.processEvents();
     long numberOfSelfEventsBefore =
         eventsProcessor_.getMetrics()
-            .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS)
+            .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
             .getCount();
     String owner = catalog_.getDb(TEST_DB_NAME).getMetaStoreDb().getOwnerName();
     String newOwnerUser = "newUserFromImpala";
@@ -551,7 +512,7 @@ public class MetastoreEventsProcessorTest {
 
     long selfEventsCountAfter =
         eventsProcessor_.getMetrics()
-            .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS)
+            .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
             .getCount();
     // 2 alter commands above, so we expect the count to go up by 2
     assertEquals("Unexpected number of self-events generated",
@@ -567,9 +528,10 @@ public class MetastoreEventsProcessorTest {
     createDatabaseFromImpala(TEST_DB_NAME, null);
     assertNotNull("Db should have been found after create database statement",
         catalog_.getDb(TEST_DB_NAME));
+    eventsProcessor_.processEvents();
     long numberOfSelfEventsBefore =
         eventsProcessor_.getMetrics()
-            .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS).getCount();
+            .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount();
 
     // Create a dummy scalar function.
     String fnName = "fn1";
@@ -586,7 +548,7 @@ public class MetastoreEventsProcessorTest {
     eventsProcessor_.processEvents();
     long numberOfSelfEventsAfter =
         eventsProcessor_.getMetrics()
-            .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS).getCount();
+            .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount();
     assertEquals("Unexpected number of self-events generated",
         numberOfSelfEventsBefore + 2, numberOfSelfEventsAfter);
 
@@ -628,6 +590,17 @@ public class MetastoreEventsProcessorTest {
     assertTrue("Newly created table should be instance of IncompleteTable",
         catalog_.getTable(TEST_DB_NAME, testPartitionedTbl)
                 instanceof IncompleteTable);
+
+    // Test create table on a drop database event.
+    dropDatabaseCascadeFromImpala(TEST_DB_NAME);
+    assertNull("Database not expected to exist.", catalog_.getDb(TEST_DB_NAME));
+    createDatabaseFromImpala(TEST_DB_NAME, null);
+    eventsProcessor_.processEvents();
+    createTable("createondroppeddb", false);
+    dropDatabaseCascadeFromImpala(TEST_DB_NAME);
+    eventsProcessor_.processEvents();
+    assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
+
   }
 
   /**
@@ -738,11 +711,12 @@ public class MetastoreEventsProcessorTest {
     String tableToInsertPart = "tbl_with_mul_part";
     String tableToInsertMulPart = "tbl_to_insert_mul_part";
     createInsertTestTbls(tableToInsertPart, tableToInsertMulPart);
+    eventsProcessor_.processEvents();
     // count self event from here, numberOfSelfEventsBefore=4 as we have 4 ADD PARTITION
     // events
     long numberOfSelfEventsBefore =
         eventsProcessor_.getMetrics()
-            .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS)
+            .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
             .getCount();
     runInsertTest(tableToInsertPart, tableToInsertMulPart, numberOfSelfEventsBefore,
         false);
@@ -757,11 +731,12 @@ public class MetastoreEventsProcessorTest {
     String tableToInsertPart = "tbl_with_mul_part";
     String tableToInsertMulPart = "tbl_to_insert_mul_part";
     createInsertTestTbls(tableToInsertPart, tableToInsertMulPart);
+    eventsProcessor_.processEvents();
     // count self event from here, numberOfSelfEventsBefore=4 as we have 4 ADD PARTITION
     // events
     long numberOfSelfEventsBefore =
         eventsProcessor_.getMetrics()
-            .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS)
+            .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
             .getCount();
     runInsertTest(tableToInsertPart, tableToInsertMulPart, numberOfSelfEventsBefore,
         true);
@@ -858,7 +833,7 @@ public class MetastoreEventsProcessorTest {
     updated_partitions.put(partition2, updatedPartition2);
     insertMulPartFromImpala(tableToInsertMulPart, tableToInsertPart, updated_partitions,
         overwrite);
-    // we expect 3 INSERT events (2 for the insertTbl and 1 for multiInsertTbl)
+    // we expect 4 INSERT events (2 for the insertTbl and 2 for multiInsertTbl)
     List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
     assertEquals(4, events.size());
     assertEquals(tbl1Part1Files, getFilesFromEvent(events.get(0)));
@@ -869,6 +844,7 @@ public class MetastoreEventsProcessorTest {
 
     // Test insert into table
     String unpartitionedTbl = "tbl_to_insert";
+    // create table self-event 5
     createTableLike("functional", "tinytable", TEST_DB_NAME, unpartitionedTbl);
     HdfsTable tinyTable = (HdfsTable) catalog_
         .getOrLoadTable("functional", "tinytable", "test", null);
@@ -878,17 +854,18 @@ public class MetastoreEventsProcessorTest {
         copyFiles(tinyTable.getFileSystem(), new Path(tinyTable.getHdfsBaseDir()),
             unpartTable.getFileSystem(), new Path(unpartTable.getHdfsBaseDir()),
             overwrite, "copy_");
+    // insert self-event 6
     insertFromImpala(unpartitionedTbl, false, "", "", overwrite, copied_files);
     eventsProcessor_.processEvents();
 
     long selfEventsCountAfter =
         eventsProcessor_.getMetrics()
-            .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS)
+            .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC)
             .getCount();
     // 2 single insert partition events, 1 multi insert partitions which includes 2 single
-    // insert events 1 single insert table event
+    // insert events 1 single insert table event, 1 create table event
     assertEquals("Unexpected number of self-events generated",
-        numberOfSelfEventsBefore + 5, selfEventsCountAfter);
+        numberOfSelfEventsBefore + 6, selfEventsCountAfter);
   }
 
   private List<String> getFilesFromEvent(NotificationEvent event) {
@@ -1119,39 +1096,39 @@ public class MetastoreEventsProcessorTest {
     // clean up
     dropDatabaseCascadeFromImpala("new_db");
 
-    // check invalidate after alter table add parameter
+    // check refresh after alter table add parameter
     loadTable(testTblName);
     alterTableAddParameter(testTblName, "somekey", "someval");
     eventsProcessor_.processEvents();
     assertFalse("Table should have been refreshed after alter table add parameter",
         catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
-    // check invalidate after alter table add col
+    // check refresh after alter table add col
     loadTable(testTblName);
     alterTableAddCol(testTblName, "newCol", "int", "null");
     eventsProcessor_.processEvents();
     assertFalse("Table should have been refreshed after alter table add column",
         catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
-    // check invalidate after alter table change column type
+    // check refresh after alter table change column type
     loadTable(testTblName);
     altertableChangeCol(testTblName, "newCol", "string", null);
     eventsProcessor_.processEvents();
     assertFalse("Table should have been refreshed after changing column type",
         catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
-    // check invalidate after alter table remove column
+    // check refresh after alter table remove column
     loadTable(testTblName);
     alterTableRemoveCol(testTblName, "newCol");
     eventsProcessor_.processEvents();
     assertFalse("Table should have been refreshed after removing a column",
         catalog_.getTable(TEST_DB_NAME, testTblName)
                 instanceof IncompleteTable);
-    // 5 alters above. Each one of them except rename should increment the counter by 1
-    long numberOfInvalidatesAfter = eventsProcessor_.getMetrics()
+    // 4 alters above. Each one of them except rename should increment the counter by 1
+    long numOfRefreshesAfter = eventsProcessor_.getMetrics()
         .getCounter(MetastoreEventsProcessor.NUMBER_OF_TABLE_REFRESHES).getCount();
     assertEquals("Unexpected number of table refreshes",
-        numOfRefreshesBefore + 4, numberOfInvalidatesAfter);
+        numOfRefreshesBefore + 4, numOfRefreshesAfter);
     // Check if trivial alters are ignored.
     loadTable(testTblName);
     alterTableChangeTrivialProperties(testTblName);
@@ -1277,9 +1254,9 @@ public class MetastoreEventsProcessorTest {
   private static class HMSFetchNotificationsEventProcessor
       extends MetastoreEventsProcessor {
     HMSFetchNotificationsEventProcessor(
-        CatalogServiceCatalog catalog, long startSyncFromId, long pollingFrequencyInSec)
+        CatalogOpExecutor catalogOp, long startSyncFromId, long pollingFrequencyInSec)
         throws CatalogException {
-      super(catalog, startSyncFromId, pollingFrequencyInSec);
+      super(catalogOp, startSyncFromId, pollingFrequencyInSec);
     }
 
     @Override
@@ -1298,9 +1275,13 @@ public class MetastoreEventsProcessorTest {
    * Tests event processor is active after HMS restarts.
    */
   @Test
-  public void testEventProcessorFetchAfterHMSRestart() throws CatalogException {
+  public void testEventProcessorFetchAfterHMSRestart() throws ImpalaException {
+    CatalogServiceCatalog catalog = CatalogServiceTestCatalog.create();
+    CatalogOpExecutor catalogOpExecutor = new CatalogOpExecutor(catalog,
+        new NoopAuthorizationFactory().getAuthorizationConfig(),
+        new NoopAuthorizationManager());
     MetastoreEventsProcessor fetchProcessor =
-        new HMSFetchNotificationsEventProcessor(CatalogServiceTestCatalog.create(),
+        new HMSFetchNotificationsEventProcessor(catalogOpExecutor,
             eventsProcessor_.getCurrentEventId(), 2L);
     fetchProcessor.start();
     try {
@@ -1430,71 +1411,6 @@ public class MetastoreEventsProcessorTest {
     // dropping a non-existant table should cause event processor to go into error state
     assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
     assertNull(catalog_.getTable(TEST_DB_NAME, testTblName));
-  }
-
-  /**
-   * Creates events like create, drop with the same tblName. In such case the create
-   * table should not create a in
-   */
-  @Test
-  public void testEventFiltering() throws Exception {
-    createDatabaseFromImpala(TEST_DB_NAME, "");
-    final String testTblName = "testEventFiltering";
-    createTableFromImpala(TEST_DB_NAME, testTblName, false);
-    loadTable(testTblName);
-    assertNotNull(catalog_.getTable(TEST_DB_NAME, testTblName));
-    dropTableFromImpala(TEST_DB_NAME, testTblName);
-    // the create table event should be filtered out
-    verifyFilterEvents(3, 2, Arrays.asList(CREATE_DATABASE, DROP_TABLE));
-
-    // test the table rename case
-    createTableFromImpala(TEST_DB_NAME, testTblName, false);
-    renameTableFromImpala(testTblName, "new_name");
-    // create table gets filtered out since it was renamed immediated after
-    verifyFilterEvents(2, 1, Arrays.asList(ALTER_TABLE));
-
-    //cleanup
-    dropDatabaseCascadeFromImpala(TEST_DB_NAME);
-    eventsProcessor_.processEvents();
-
-    // test when multiple events can be filtered out
-    // create_db, create_tbl, drop_tbl, drop_db
-    createDatabaseFromImpala(TEST_DB_NAME, "desc");
-    createTableFromImpala(TEST_DB_NAME, testTblName, false);
-    loadTable(TEST_DB_NAME, testTblName);
-    assertNotNull(catalog_.getTable(TEST_DB_NAME, testTblName));
-    dropTableFromImpala(TEST_DB_NAME, testTblName);
-    dropDatabaseCascadeFromImpala(TEST_DB_NAME);
-    verifyFilterEvents(4, 2, Arrays.asList(DROP_TABLE, DROP_DATABASE));
-
-    // create event stream s.t inverse events have gaps from their counterparts
-    createDatabase(TEST_DB_NAME, null);
-    // unrelated event
-    createTable("dummy", false);
-    createTable(testTblName, false);
-    // dummy events
-    alterTableAddParameter(testTblName, "paramkey", "paramVal");
-    alterTableAddParameter(testTblName, "paramkey1", "paramVal2");
-    dropTable(testTblName);
-    // this would generate drop_table for dummy table as well
-    dropDatabaseCascade(TEST_DB_NAME);
-    verifyFilterEvents(8, 5, Arrays.asList(ALTER_TABLE, ALTER_TABLE, DROP_TABLE,
-        DROP_TABLE, DROP_DATABASE));
-  }
-
-  private void verifyFilterEvents(int total, int numFiltered,
-      List<MetastoreEventType> expectedFilteredEventTypes) throws ImpalaException {
-    List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
-    assertEquals(total, events.size());
-    List<MetastoreEvent> filteredEvents =
-        eventsProcessor_.getMetastoreEventFactory().getFilteredEvents(events);
-    assertEquals(numFiltered, filteredEvents.size());
-    int i = 0;
-    for (MetastoreEvent e : filteredEvents) {
-      assertEquals(expectedFilteredEventTypes.get(i++), e.eventType_);
-    }
-    eventsProcessor_.processEvents();
-    assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
   }
 
   /**
@@ -1640,6 +1556,23 @@ public class MetastoreEventsProcessorTest {
     }
   }
 
+  private static class FakeCatalogOpExecutorForTests extends CatalogOpExecutor {
+
+    public FakeCatalogOpExecutorForTests(CatalogServiceCatalog catalog,
+        AuthorizationConfig authzConfig,
+        AuthorizationManager authzManager)
+        throws ImpalaException {
+      super(catalog, authzConfig, authzManager);
+    }
+
+    public static CatalogOpExecutor create() throws ImpalaException {
+      return new FakeCatalogOpExecutorForTests(
+          FakeCatalogServiceCatalogForFlagTests.create(),
+          new NoopAuthorizationFactory().getAuthorizationConfig(),
+          new NoopAuthorizationManager());
+    }
+  }
+
   /**
    * Test catalog service catalog which takes a value of db and tbl flags for a given
    * table
@@ -1666,6 +1599,7 @@ public class MetastoreEventsProcessorTest {
         cs = new FakeCatalogServiceCatalogForFlagTests(false, 16, new TUniqueId(),
             System.getProperty("java.io.tmpdir"), new MetaStoreClientPool(0, 0));
         cs.setAuthzManager(new NoopAuthorizationManager());
+        cs.setMetastoreEventProcessor(NoOpEventProcessor.getInstance());
         cs.reset();
       } catch (ImpalaException e) {
         throw new IllegalStateException(e.getMessage(), e);
@@ -1740,14 +1674,16 @@ public class MetastoreEventsProcessorTest {
       dbParams.put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(), dbFlag);
     }
 
-    CatalogServiceCatalog fakeCatalog = FakeCatalogServiceCatalogForFlagTests.create();
-    ((FakeCatalogServiceCatalogForFlagTests) fakeCatalog)
-        .setFlags(dbName, tblName, dbFlag, tblFlagTransition.first);
+    CatalogOpExecutor fakeCatalogOpExecutor = FakeCatalogOpExecutorForTests.create();
+    FakeCatalogServiceCatalogForFlagTests fakeCatalog =
+        (FakeCatalogServiceCatalogForFlagTests) fakeCatalogOpExecutor
+        .getCatalog();
+    fakeCatalog.setFlags(dbName, tblName, dbFlag, tblFlagTransition.first);
     NotificationEvent fakeAlterTableNotification =
         createFakeAlterTableNotification(dbName, tblName, tableBefore, tableAfter);
 
     AlterTableEvent alterTableEvent = new AlterTableEvent(
-        fakeCatalog, eventsProcessor_.getMetrics(), fakeAlterTableNotification);
+        fakeCatalogOpExecutor, eventsProcessor_.getMetrics(), fakeAlterTableNotification);
     Assert.assertFalse("Alter table which changes the flags should not be skipped. "
             + printFlagTransistions(dbFlag, tblFlagTransition),
         alterTableEvent.isEventProcessingDisabled());
@@ -1759,7 +1695,8 @@ public class MetastoreEventsProcessorTest {
     NotificationEvent nextNotification =
         createFakeAlterTableNotification(dbName, tblName, tableAfter, nextTable);
     alterTableEvent =
-        new AlterTableEvent(fakeCatalog, eventsProcessor_.getMetrics(), nextNotification);
+        new AlterTableEvent(fakeCatalogOpExecutor, eventsProcessor_.getMetrics(),
+            nextNotification);
     if (shouldNextEventBeSkipped) {
       assertTrue("Alter table event should not skipped following this table flag "
               + "transition. " + printFlagTransistions(dbFlag, tblFlagTransition),
@@ -2188,8 +2125,9 @@ public class MetastoreEventsProcessorTest {
     eventsProcessor_.processEvents();
     final String testTblName = "testSelfEventsForTable";
     createTableFromImpala(TEST_DB_NAME, testTblName, true);
+    eventsProcessor_.processEvents();
     long numberOfSelfEventsBefore = eventsProcessor_.getMetrics()
-        .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS).getCount();
+        .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount();
 
     alterTableSetTblPropertiesFromImpala(testTblName);
     eventsProcessor_.processEvents();
@@ -2215,11 +2153,6 @@ public class MetastoreEventsProcessorTest {
     TPartitionDef partitionDef = new TPartitionDef();
     partitionDef.addToPartition_spec(new TPartitionKeyValue("p1", "100"));
     partitionDef.addToPartition_spec(new TPartitionKeyValue("p2", "200"));
-
-    // add partition
-    alterTableAddPartition(TEST_DB_NAME, testTblName, partitionDef);
-    eventsProcessor_.processEvents();
-    confirmTableIsLoaded(TEST_DB_NAME, testTblName);
 
     // set fileformat
     alterTableSetFileFormatFromImpala(
@@ -2261,9 +2194,8 @@ public class MetastoreEventsProcessorTest {
     //add test for alterCommentOnTableOrView
 
     long selfEventsCountAfter = eventsProcessor_.getMetrics()
-        .getCounter(MetastoreEventsProcessor.NUMBER_OF_SELF_EVENTS).getCount();
-    // 10 alter commands above. Everyone except alterRename should generate
-    // self-events so we expect the count to go up by 9
+        .getCounter(MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC).getCount();
+    // 9 alter commands above.
     assertEquals("Unexpected number of self-events generated",
         numberOfSelfEventsBefore + 9, selfEventsCountAfter);
   }
@@ -2989,12 +2921,7 @@ public class MetastoreEventsProcessorTest {
   }
 
   /**
-   * Create DML request to Catalog
-   * @param dBName
-   * @param tableName
-   * @param redacted_sql_stmt
-   * @param created_partitions
-   * @return
+   * Create DML request to Catalog.
    */
   private TUpdateCatalogRequest createTestTUpdateCatalogRequest(String dBName,
       String tableName, String redacted_sql_stmt,

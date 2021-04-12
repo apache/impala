@@ -17,10 +17,16 @@
 
 package org.apache.impala.catalog;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hive.metastore.IMetaStoreClient.NotificationFilter;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.NotificationEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.CreateTableEvent;
+import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.log4j.Logger;
 
@@ -28,6 +34,7 @@ import com.google.common.base.Stopwatch;
 
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.util.ThreadNameAnnotator;
+import org.apache.thrift.TException;
 
 /**
  * Class that implements the logic for how a table's metadata should be loaded from
@@ -49,17 +56,20 @@ public class TableLoader {
 
   /**
    * Creates the Impala representation of Hive/HBase metadata for one table.
-   * Calls load() on the appropriate instance of Table subclass.
+   * Calls load() on the appropriate instance of Table subclass. If the eventId is not
+   * negative, it fetches all events from metastore to find out a CREATE_TABLE
+   * event from metastore which is used to set the createEventId of the table.
    * Returns new instance of Table, If there were any errors loading the table metadata
    * an IncompleteTable will be returned that contains details on the error.
    */
-  public Table load(Db db, String tblName, String reason) {
+  public Table load(Db db, String tblName, long eventId, String reason) {
     Stopwatch sw = Stopwatch.createStarted();
     String fullTblName = db.getName() + "." + tblName;
     String annotation = "Loading metadata for: " + fullTblName + " (" + reason + ")";
     LOG.info(annotation);
     Table table;
     // turn all exceptions into TableLoadingException
+    List<NotificationEvent> events = null;
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation);
          MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = null;
@@ -67,6 +77,26 @@ public class TableLoader {
       Stopwatch hmsLoadSW = Stopwatch.createStarted();
       synchronized (metastoreAccessLock_) {
         msTbl = msClient.getHiveClient().getTable(db.getName(), tblName);
+      }
+      if (eventId != -1 && catalog_.isEventProcessingActive()) {
+        // If the eventId is not -1 it means this table was likely created by Impala.
+        // However, since the load operation of the table can happen much later, it is
+        // possible that the table was recreated outside Impala and hence the eventId
+        // which is stored in the loaded table needs to be updated to the latest.
+        // we are only interested in fetching the events if we have a valid eventId
+        // for a table. For tables where eventId is unknown are not created by
+        // this catalogd and hence the self-event detection logic does not apply.
+        events = MetastoreEventsProcessor.getNextMetastoreEvents(catalog_, eventId,
+            notificationEvent -> CreateTableEvent.CREATE_TABLE_EVENT_TYPE
+                .equals(notificationEvent.getEventType())
+                && notificationEvent.getDbName().equalsIgnoreCase(db.getName())
+                && notificationEvent.getTableName().equalsIgnoreCase(tblName));
+      }
+      if (events != null && !events.isEmpty()) {
+        // if the table was recreated after the table was initially created in the
+        // catalogd, we should move the eventId forward to the latest create_table
+        // event.
+        eventId = events.get(events.size() - 1).getEventId();
       }
       long hmsLoadTime = hmsLoadSW.elapsed(TimeUnit.NANOSECONDS);
       // Check that the Hive TableType is supported
@@ -83,6 +113,7 @@ public class TableLoader {
             "Unrecognized table type for table: " + fullTblName);
       }
       table.updateHMSLoadTableSchemaTime(hmsLoadTime);
+      table.setCreateEventId(eventId);
       table.load(false, msClient.getHiveClient(), msTbl, reason);
       table.validate();
     } catch (TableLoadingException e) {

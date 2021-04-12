@@ -26,46 +26,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesRequest;
 import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesResult;
 import org.apache.hadoop.hive.metastore.api.Partition;
-import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
-import org.apache.hadoop.hive.metastore.conf.MetastoreConf.ConfVars;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
-import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.testutil.CatalogServiceTestCatalog;
-import org.apache.impala.testutil.CatalogServiceTestCatalog.CatalogServiceTestHMSCatalog;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
-public class EnableCatalogdHmsCacheFlagTest {
-  private static CatalogServiceCatalog catalog_;
-  private static HiveMetaStoreClient catalogHmsClient_;
-  private static final Configuration CONF = MetastoreConf.newMetastoreConf();
-
-  @BeforeClass
-  public static void setup() throws Exception {
-    catalog_ = CatalogServiceTestCatalog.createTestCatalogMetastoreServer();
-    MetastoreConf.setVar(CONF, ConfVars.THRIFT_URIS,
-        "thrift://localhost:" + ((CatalogServiceTestHMSCatalog) catalog_).getPort());
-    // metastore clients which connect to catalogd's HMS endpoint need this
-    // configuration set since the forwarded HMS call use catalogd's HMS client
-    // not the end-user's UGI.
-    CONF.set("hive.metastore.execute.setugi", "false");
-    catalogHmsClient_ = new HiveMetaStoreClient(CONF);
-  }
-
-  @AfterClass
-  public static void cleanUp() throws Exception {
-    catalog_.close();
-  }
+public class EnableCatalogdHmsCacheFlagTest extends AbstractCatalogMetastoreTest {
 
   /**
    * The test fetches partitions of a table over HMS API and then compares if the

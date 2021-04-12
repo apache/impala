@@ -107,10 +107,22 @@ public class Db extends CatalogObjectImpl implements FeDb {
   // its associated HMS operation (eg. alterDbOwner or commentOnDb)
   private final ReentrantLock dbLock_ = new ReentrantLock();
 
+  // if this Db is created by catalogd and if events processing is ACTIVE then
+  // this field represents the event id pertaining to the creation of this database
+  // in hive metastore. Defaults to -1 for already existing databases or if events
+  // processing is disabled.
+  private long createEventId_ = -1;
+
   public Db(String name, org.apache.hadoop.hive.metastore.api.Database msDb) {
     setMetastoreDb(name, msDb);
     tableCache_ = new CatalogObjectCache<>();
     functions_ = new HashMap<>();
+  }
+
+  public long getCreateEventId() { return createEventId_; }
+
+  public void setCreateEventId(long eventId) {
+    createEventId_ = eventId;
   }
 
   public void setIsSystemDb(boolean b) { isSystemDb_ = b; }

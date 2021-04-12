@@ -18,8 +18,11 @@
 package org.apache.impala.catalog.events;
 
 import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
+import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
+import org.apache.kudu.client.Delete;
 
 /**
  * Interface to process external events
@@ -71,4 +74,15 @@ public interface ExternalEventsProcessor {
    * content of a dedicated page for the event processor
    */
   TEventProcessorMetricsSummaryResponse getEventProcessorSummary();
+
+  /**
+   * Gets the {@link MetastoreEventFactory} to be used for creating
+   * {@link MetastoreEvents.MetastoreEvent}.
+   */
+  EventFactory getEventsFactory() throws MetastoreNotificationException;
+
+  /**
+   * Gets the delete event log for this events processor.
+   */
+  DeleteEventLog getDeleteEventLog();
 }

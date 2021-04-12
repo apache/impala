@@ -230,7 +230,8 @@ public class TableLoadingMgr {
    * the same underlying loading task (Future) will be used, helping to prevent duplicate
    * loads of the same table.
    */
-  public LoadRequest loadAsync(final TTableName tblName, final String reason)
+  public LoadRequest loadAsync(final TTableName tblName, final long createdEventId,
+      final String reason)
       throws DatabaseNotFoundException {
     final Db parentDb = catalog_.getDb(tblName.getDb_name());
     if (parentDb == null) {
@@ -241,7 +242,7 @@ public class TableLoadingMgr {
     FutureTask<Table> tableLoadTask = new FutureTask<Table>(new Callable<Table>() {
         @Override
         public Table call() throws Exception {
-          return tblLoader_.load(parentDb, tblName.table_name, reason);
+          return tblLoader_.load(parentDb, tblName.table_name, createdEventId, reason);
         }});
 
     FutureTask<Table> existingValue = loadingTables_.putIfAbsent(tblName, tableLoadTask);

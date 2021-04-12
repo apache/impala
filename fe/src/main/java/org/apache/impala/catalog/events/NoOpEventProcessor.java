@@ -86,4 +86,14 @@ public class NoOpEventProcessor implements ExternalEventsProcessor {
   public TEventProcessorMetricsSummaryResponse getEventProcessorSummary() {
     return DEFAULT_SUMMARY_RESPONSE;
   }
+
+  @Override
+  public EventFactory getEventsFactory() {
+    return hmsEvent -> null;
+  }
+
+  @Override
+  public DeleteEventLog getDeleteEventLog() {
+    return new DeleteEventLog();
+  }
 }

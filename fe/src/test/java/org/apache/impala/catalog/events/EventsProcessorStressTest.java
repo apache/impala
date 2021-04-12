@@ -23,10 +23,13 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
+import org.apache.impala.authorization.NoopAuthorizationFactory;
+import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizationManager;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
+import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.util.RandomHiveQueryRunner;
 import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
@@ -104,11 +107,14 @@ public class EventsProcessorStressTest {
   @BeforeClass
   public static void setupTestEnv() throws Exception {
     catalog_ = CatalogServiceTestCatalog.create();
+    CatalogOpExecutor catalogOpExecutor = new CatalogOpExecutor(catalog_,
+        new NoopAuthorizationFactory().getAuthorizationConfig(),
+        new NoopAuthorizationManager());
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
       CurrentNotificationEventId currentNotificationId =
           metaStoreClient.getHiveClient().getCurrentNotificationEventId();
       eventsProcessor_ = new SynchronousHMSEventProcessorForTests(
-          catalog_, currentNotificationId.getEventId(), 10L);
+          catalogOpExecutor, currentNotificationId.getEventId(), 10L);
       eventsProcessor_.start();
     }
     catalog_.setMetastoreEventProcessor(eventsProcessor_);
