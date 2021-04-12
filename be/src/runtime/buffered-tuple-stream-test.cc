@@ -1297,6 +1297,76 @@ TEST_F(SimpleTupleStreamTest, UnpinReadPage) {
   write_batch->Reset();
 }
 
+// Test that UnpinStream defer advancing the read page when all rows from the read page
+// are attached to a returned RowBatch but got not enough reservation.
+TEST_F(SimpleTupleStreamTest, DeferAdvancingReadPage) {
+  int num_rows = 1024;
+  int buffer_size = 4 * 1024;
+  // Only give 2 * buffer_size for the stream initial read and write page reservation.
+  Init(2 * buffer_size);
+
+  bool eos;
+  bool got_reservation;
+  Status status;
+  RowBatch* write_batch = CreateIntBatch(0, num_rows, false);
+
+  {
+    // Test unpinning a stream when the read page has been attached to the output batch
+    // and the output batch has NOT been reset.
+    BufferedTupleStream stream(
+        runtime_state_, int_desc_, &client_, buffer_size, buffer_size);
+    ASSERT_OK(stream.Init("SimpleTupleStreamTest::DeferAdvancingReadPage", true));
+    ASSERT_OK(stream.PrepareForReadWrite(true, &got_reservation));
+    ASSERT_TRUE(got_reservation);
+
+    // Add rows to stream.
+    for (int i = 0; i < write_batch->num_rows(); ++i) {
+      EXPECT_TRUE(stream.AddRow(write_batch->GetRow(i), &status));
+      ASSERT_OK(status);
+    }
+
+    // Read until the read page is attached to the output.
+    RowBatch read_batch(int_desc_, num_rows, &tracker_);
+    ASSERT_OK(stream.GetNext(&read_batch, &eos));
+    // If GetNext did hit the capacity of the RowBatch, then the read page should have
+    // been attached to read_batch.
+    ASSERT_TRUE(read_batch.num_rows() < num_rows);
+    ASSERT_TRUE(!eos);
+
+    // We continue adding rows into the stream without releasing the read_batch. We expect
+    // that reservation limit will be hit and stream will need to be unpinned. We also
+    // expect that, after unpinning the stream, subsequent AddRow is always successful
+    // even if we're not immediately releasing the read_batch. We insert write_batch twice
+    // to ensure that we're inserting both in pinned and unpinned mode.
+    ASSERT_TRUE(stream.is_pinned());
+    for (int j = 0; j < 2; ++j) {
+      for (int i = 0; i < write_batch->num_rows(); ++i) {
+        bool succeed = stream.AddRow(write_batch->GetRow(i), &status);
+        ASSERT_TRUE(succeed || stream.is_pinned());
+        if (!succeed) {
+          // Unpin the stream.
+          status = stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT);
+          ASSERT_OK(status);
+          ASSERT_FALSE(stream.is_pinned());
+          ASSERT_EQ(stream.bytes_unpinned(), 0);
+          ASSERT_EQ(stream.pages_.size(), 2);
+          ASSERT_EQ(stream.num_pages_, 2);
+          // Retry inserting this row by decreasing the index.
+          // After stream get into unpinned mode, further inserts should be successful,
+          // even if we're not immediately cleaning up the read_batch.
+          // Stream should be able to unpin the previous write page to reclaim some
+          // memory reservation to allocate new write page.
+          --i;
+        }
+      }
+    }
+    ASSERT_FALSE(stream.is_pinned());
+    stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+    read_batch.Reset();
+  }
+  write_batch->Reset();
+}
+
 // Test writing to a stream (AddRow and UnpinStream), even though attached pages have not
 // been released yet.
 TEST_F(SimpleTupleStreamTest, WriteAfterReadAttached) {

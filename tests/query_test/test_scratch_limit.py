@@ -71,7 +71,6 @@ class TestScratchLimit(ImpalaTestSuite):
     exec_option = vector.get_value('exec_option')
     exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     exec_option['scratch_limit'] = '500m'
-    exec_option['spool_query_results'] = '0'
     self.execute_query_expect_success(self.client, self.spilling_sort_query, exec_option)
 
   def test_with_low_scratch_limit(self, vector):
@@ -82,7 +81,6 @@ class TestScratchLimit(ImpalaTestSuite):
     exec_option = vector.get_value('exec_option')
     exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     exec_option['scratch_limit'] = '24m'
-    exec_option['spool_query_results'] = '0'
     expected_error = 'Scratch space limit of %s bytes exceeded'
     scratch_limit_in_bytes = 24 * 1024 * 1024
     try:
@@ -99,7 +97,6 @@ class TestScratchLimit(ImpalaTestSuite):
     exec_option = vector.get_value('exec_option')
     exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     exec_option['scratch_limit'] = '0'
-    exec_option['spool_query_results'] = '0'
     for query in self.spilling_queries:
       self.execute_query_expect_failure(query, exec_option)
 
@@ -110,7 +107,6 @@ class TestScratchLimit(ImpalaTestSuite):
     exec_option = vector.get_value('exec_option')
     exec_option['buffer_pool_limit'] = self.buffer_pool_limit
     exec_option['scratch_limit'] = '-1'
-    exec_option['spool_query_results'] = '0'
     self.execute_query_expect_success(self.client, self.spilling_sort_query, exec_option)
 
   def test_without_specifying_scratch_limit(self, vector):
@@ -119,7 +115,6 @@ class TestScratchLimit(ImpalaTestSuite):
     """
     exec_option = vector.get_value('exec_option')
     exec_option['buffer_pool_limit'] = self.buffer_pool_limit
-    exec_option['spool_query_results'] = '0'
     self.execute_query_expect_success(self.client, self.spilling_sort_query, exec_option)
 
   def test_with_zero_scratch_limit_no_memory_limit(self, vector):
@@ -129,7 +124,6 @@ class TestScratchLimit(ImpalaTestSuite):
     """
     exec_option = vector.get_value('exec_option')
     exec_option['scratch_limit'] = '0'
-    exec_option['spool_query_results'] = '0'
     for query in self.spilling_queries:
       self.execute_query_expect_success(self.client, query, exec_option)
 

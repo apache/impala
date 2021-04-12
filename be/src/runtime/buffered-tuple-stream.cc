@@ -716,14 +716,41 @@ Status BufferedTupleStream::UnpinStream(UnpinMode mode) {
 
   if (pinned_) {
     CHECK_CONSISTENCY_FULL(read_it_);
+    bool defer_advancing_read_page = false;
     if (&*read_it_.read_page_ != write_page_ && read_it_.read_page_ != pages_.end()
         && read_it_.read_page_rows_returned_ == read_it_.read_page_->num_rows) {
-      RETURN_IF_ERROR(NextReadPage(&read_it_));
+      if (read_it_.read_page_->attached_to_output_batch) {
+        if (num_pages_ <= 2) {
+          // NextReadPage will attempt to save default_page_len_ into write reservation if
+          // the stream ended up with only 1 read/write page after advancing the read
+          // page. This can potentially lead to negative unused reservation if the reader
+          // has not freed the row batch where the read page buffer is attached to. We
+          // defer advancing the read page until the next GetNext() call by the reader
+          // (see IMPALA-10584).
+          defer_advancing_read_page = true;
+        }
+      }
+
+      if (!defer_advancing_read_page) {
+        RETURN_IF_ERROR(NextReadPage(&read_it_));
+      }
     }
 
     // If the stream was pinned, there may be some remaining pinned pages that should
     // be unpinned at this point.
-    for (Page& page : pages_) UnpinPageIfNeeded(&page, false);
+    DCHECK_EQ(bytes_unpinned_, 0);
+    std::list<Page>::iterator it = pages_.begin();
+    if (defer_advancing_read_page) {
+      // We skip advancing the read page earlier, so the first page must be a read page
+      // and attached_to_output_batch is true. We should keep the first page pinned. The
+      // next GetNext() call is the one who will be responsible to unpin the first page.
+      DCHECK(read_it_.read_page_ == pages_.begin());
+      ++it;
+    }
+    while (it != pages_.end()) {
+      UnpinPageIfNeeded(&(*it), false);
+      ++it;
+    }
 
     // Check to see if we need to save some of the reservation we freed up.
     if (!NeedWriteReservation(true) && NeedWriteReservation(false)) {

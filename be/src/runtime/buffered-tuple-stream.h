@@ -561,6 +561,7 @@ class BufferedTupleStream {
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferedTupleStream);
   friend class SimpleTupleStreamTest_ShortDebugString_Test;
+  friend class SimpleTupleStreamTest_DeferAdvancingReadPage_Test;
 
   /// Runtime state instance used to check for cancellation. Not owned.
   RuntimeState* const state_;
