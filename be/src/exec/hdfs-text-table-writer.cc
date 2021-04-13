@@ -114,7 +114,7 @@ Status HdfsTextTableWriter::AppendRows(
       }
       // Append tuple delimiter.
       rowbatch_stringstream_ << tuple_delim_;
-      ++output_->num_rows;
+      ++output_->current_file_rows;
     }
   }
 

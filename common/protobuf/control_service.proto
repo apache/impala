@@ -51,6 +51,20 @@ message DmlStatsPB {
   optional KuduDmlStatsPB kudu_stats = 3;
 }
 
+// Per-file statistics and metadata resulting from DML statements.
+message DmlFileStatusPb {
+  required string final_path = 1;
+  required int64 num_rows = 2;
+  required int64 size = 3;
+  // Temporaty path where the file was written by the executor.
+  // The coordinator needs to move the file from staging_path to final_path.
+  // If not set, the file was already written to its final path (e.g. in
+  // transactional tables).
+  // TODO: this could be merged with final_path by storing only the suffix
+  //       of the path and append it to a staging/final prefix from DmlPartitionStatusPB
+  optional string staging_path = 4;
+}
+
 // Per-partition statistics and metadata resulting from DML statements.
 message DmlPartitionStatusPB {
   // The id of the partition written to (may be -1 if the partition is created by this
@@ -70,22 +84,21 @@ message DmlPartitionStatusPB {
   // This value is an unsigned int64.
   optional int64 kudu_latest_observed_ts = 5;
 
-  // List of flat buffer encoded Iceberg data files. See IcebergObjects.fbs
-  repeated bytes iceberg_data_files_fb = 6;
+  // List of files created during the DML statement in this partition.
+  repeated DmlFileStatusPb created_files = 6;
+
+  // Fully qualified URI to the staging directory for this partition.
+  optional string staging_dir_to_clean_up = 7;
 }
 
 // The results of a DML statement, sent to the coordinator as part of
 // ReportExecStatusRequestPB
 message DmlExecStatusPB {
-  // A map from temporary absolute file path to final absolute destination. The
-  // coordinator performs these updates after the query completes.
-  map<string, string> files_to_move = 1;
-
   // Per-partition details, used in finalization and reporting.
   // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with the
   // root's key in an unpartitioned table being ROOT_PARTITION_KEY.
   // The target table name is recorded in the corresponding TQueryExecRequest
-  map<string, DmlPartitionStatusPB> per_partition_status = 2;
+  map<string, DmlPartitionStatusPB> per_partition_status = 1;
 }
 
 // Error message exchange format

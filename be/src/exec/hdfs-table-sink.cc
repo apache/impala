@@ -411,10 +411,13 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   // location.
   if (ShouldSkipStaging(state, output_partition)) {
     output_partition->current_file_name = final_location;
+    output_partition->current_file_final_name = "";
   } else {
     output_partition->current_file_name = Substitute(file_name_pattern,
-      output_partition->tmp_hdfs_file_name_prefix, output_partition->num_files,
-      output_partition->writer->file_extension());
+        output_partition->tmp_hdfs_file_name_prefix, output_partition->num_files,
+        output_partition->writer->file_extension());
+    // Save the ultimate destination for this file (it will be moved by the coordinator).
+    output_partition->current_file_final_name = final_location;
   }
   // Check if tmp_hdfs_file_name exists.
   const char* tmp_hdfs_file_name_cstr =
@@ -449,11 +452,11 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
         output_partition->current_file_name));
   }
 
-  if (IsS3APath(output_partition->current_file_name.c_str()) ||
-      IsABFSPath(output_partition->current_file_name.c_str()) ||
-      IsADLSPath(output_partition->current_file_name.c_str()) ||
-      IsGcsPath(output_partition->current_file_name.c_str()) ||
-      IsOzonePath(output_partition->current_file_name.c_str())) {
+  if (IsS3APath(tmp_hdfs_file_name_cstr) ||
+      IsABFSPath(tmp_hdfs_file_name_cstr) ||
+      IsADLSPath(tmp_hdfs_file_name_cstr) ||
+      IsGcsPath(tmp_hdfs_file_name_cstr) ||
+      IsOzonePath(tmp_hdfs_file_name_cstr)) {
     // On S3A, the file cannot be stat'ed until after it's closed, and even so, the block
     // size reported will be just the filesystem default. Similarly, the block size
     // reported for ADLS will be the filesystem default. So, remember the requested block
@@ -477,14 +480,8 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(1);
   COUNTER_ADD(files_created_counter_, 1);
 
-  if (!ShouldSkipStaging(state, output_partition)) {
-    // Save the ultimate destination for this file (it will be moved by the coordinator).
-    state->dml_exec_state()->AddFileToMove(
-        output_partition->current_file_name, final_location);
-  }
-
   ++output_partition->num_files;
-  output_partition->num_rows = 0;
+  output_partition->current_file_rows = 0;
   Status status = output_partition->writer->InitNewFile();
   if (!status.ok()) {
     status.MergeStatus(ClosePartitionFile(state, output_partition));
@@ -666,16 +663,16 @@ inline Status HdfsTableSink::GetOutputPartition(RuntimeState* state, const Tuple
       return status;
     }
 
+    // Indicate that temporary directory is to be deleted after execution.
+    bool clean_up_staging_dir =
+        !no_more_rows && !ShouldSkipStaging(state, partition.get());
+
     // Save the partition name so that the coordinator can create the partition
     // directory structure if needed.
     state->dml_exec_state()->AddPartition(
         partition->partition_name, partition_descriptor->id(),
-        &table_desc_->hdfs_base_dir());
-
-    if (!no_more_rows && !ShouldSkipStaging(state, partition.get())) {
-      // Indicate that temporary directory is to be deleted after execution.
-      state->dml_exec_state()->AddFileToMove(partition->tmp_hdfs_dir_name, "");
-    }
+        &table_desc_->hdfs_base_dir(),
+        clean_up_staging_dir ? &partition->tmp_hdfs_dir_name : nullptr);
 
     partition_keys_to_output_partitions_[key].first = std::move(partition);
     *partition_pair = &partition_keys_to_output_partitions_[key];
@@ -732,10 +729,9 @@ Status HdfsTableSink::FinalizePartitionFile(
   if (partition->writer.get() != nullptr) {
     RETURN_IF_ERROR(partition->writer->Finalize());
     state->dml_exec_state()->UpdatePartition(
-        partition->partition_name, partition->num_rows, &partition->writer->stats());
-    if (IsIceberg()) {
-      state->dml_exec_state()->AddIcebergDataFile(*partition);
-    }
+        partition->partition_name, partition->current_file_rows,
+        &partition->writer->stats());
+    state->dml_exec_state()->AddCreatedFile(*partition);
   }
 
   RETURN_IF_ERROR(ClosePartitionFile(state, partition));

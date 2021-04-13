@@ -43,10 +43,14 @@ struct OutputPartition {
   std::string final_hdfs_file_name_prefix;
 
   /// File name for current output, with sequence number appended.
-  /// This is a temporary file that will get moved to a  permanent location
+  /// This can be a temporary file that will get moved to a permanent location
   /// when we commit the insert.
-  /// Path: <hdfs_base_dir>/<partition_values>/<unique_id_str>.<sequence number>
+  /// Path: <hdfs_base_dir>/<partition_values>/<unique_id_str>.<sequence number>[.ext]
   std::string current_file_name;
+
+  // Final location of the currently written file. If empty, then the file won't be moved
+  // from current_file_name.
+  std::string current_file_final_name;
 
   /// Name of the temporary directory that files for this partition are staged to before
   /// the coordinator moves them to their permanent location once the query completes.
@@ -69,10 +73,10 @@ struct OutputPartition {
   hdfsFile tmp_hdfs_file = nullptr;
 
   /// Records number of rows appended to the current file in this partition.
-  int64_t num_rows = 0;
+  int64_t current_file_rows = 0;
 
   /// Bytes written to the current file in this partition.
-  int64_t bytes_written = 0;
+  int64_t current_file_bytes = 0;
 
   /// Number of files created in this partition.
   int32_t num_files = 0;

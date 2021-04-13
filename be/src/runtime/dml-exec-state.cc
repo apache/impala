@@ -109,17 +109,18 @@ void DmlExecState::Update(const DmlExecStatusPB& dml_exec_status) {
     if (part.second.has_stats()) {
       MergeDmlStats(part.second.stats(), status->mutable_stats());
     }
-    for (int i = 0; i < part.second.iceberg_data_files_fb_size(); ++i) {
-      status->add_iceberg_data_files_fb(part.second.iceberg_data_files_fb(i));
+    if (!part.second.staging_dir_to_clean_up().empty()) {
+      // Empty destination means a directory to delete in files_to_move_.
+      files_to_move_[part.second.staging_dir_to_clean_up()] = "";
+    }
+    for (int i = 0; i < part.second.created_files_size(); ++i) {
+      const DmlFileStatusPb& file = part.second.created_files(i);
+      *status->add_created_files() = file;
+      if (!file.has_staging_path()) continue;
+      DCHECK(!file.staging_path().empty());
+      files_to_move_[file.staging_path()] = file.final_path();
     }
   }
-  files_to_move_.insert(
-      dml_exec_status.files_to_move().begin(), dml_exec_status.files_to_move().end());
-}
-
-void DmlExecState::AddFileToMove(const string& file_name, const string& location) {
-  lock_guard<mutex> l(lock_);
-  files_to_move_[file_name] = location;
 }
 
 uint64_t DmlExecState::GetKuduLatestObservedTimestamp() {
@@ -143,9 +144,14 @@ int64_t DmlExecState::GetNumModifiedRows() {
 bool DmlExecState::PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update) {
   lock_guard<mutex> l(lock_);
   for (const PartitionStatusMap::value_type& partition : per_partition_status_) {
-    catalog_update->created_partitions.insert(partition.first);
+    TUpdatedPartition updatedPartition;
+    for (int i = 0; i < partition.second.created_files_size(); ++i) {
+      const DmlFileStatusPb& file = partition.second.created_files(i);
+      updatedPartition.files.push_back(file.final_path());
+    }
+    catalog_update->updated_partitions[partition.first] = updatedPartition;
   }
-  return catalog_update->created_partitions.size() != 0;
+  return catalog_update->updated_partitions.size() != 0;
 }
 
 Status DmlExecState::FinalizeHdfsInsert(const TFinalizeParams& params,
@@ -409,9 +415,6 @@ void DmlExecState::PopulatePathPermissionCache(hdfsFS fs, const string& path_str
 void DmlExecState::ToProto(DmlExecStatusPB* dml_status) {
   dml_status->Clear();
   lock_guard<mutex> l(lock_);
-  for (const FileMoveMap::value_type& file : files_to_move_) {
-    (*dml_status->mutable_files_to_move())[file.first] = file.second;
-  }
   for (const PartitionStatusMap::value_type& part : per_partition_status_) {
     (*dml_status->mutable_per_partition_status())[part.first] = part.second;
   }
@@ -432,7 +435,8 @@ void DmlExecState::ToTDmlResult(TDmlResult* dml_result) {
 }
 
 void DmlExecState::AddPartition(
-    const string& name, int64_t id, const string* base_dir) {
+    const string& name, int64_t id, const string* base_dir,
+    const string* staging_dir_to_clean_up) {
   lock_guard<mutex> l(lock_);
   DCHECK(per_partition_status_.find(name) == per_partition_status_.end())
       << "Partition status of " << name << " already exists";
@@ -441,6 +445,10 @@ void DmlExecState::AddPartition(
   status.set_id(id);
   status.mutable_stats()->set_bytes_written(0L);
   status.set_partition_base_dir(base_dir != nullptr ? *base_dir : "");
+  if (staging_dir_to_clean_up != nullptr) {
+    DCHECK(!staging_dir_to_clean_up->empty());
+    status.set_staging_dir_to_clean_up(*staging_dir_to_clean_up);
+  }
   per_partition_status_.insert(make_pair(name, status));
 }
 
@@ -455,23 +463,48 @@ void DmlExecState::UpdatePartition(const string& partition_name,
   MergeDmlStats(*insert_stats, entry->second.mutable_stats());
 }
 
-void DmlExecState::AddIcebergDataFile(const OutputPartition& partition) {
+void DmlExecState::AddCreatedFile(const OutputPartition& partition) {
   using namespace org::apache::impala::fb;
   lock_guard<mutex> l(lock_);
   const string& partition_name = partition.partition_name;
   PartitionStatusMap::iterator entry = per_partition_status_.find(partition_name);
   DCHECK(entry != per_partition_status_.end());
+  DmlFileStatusPb* file = entry->second.add_created_files();
+  if (partition.current_file_final_name.empty()) {
+    file->set_final_path(partition.current_file_name);
+  } else {
+    file->set_final_path(partition.current_file_final_name);
+    file->set_staging_path(partition.current_file_name);
+  }
+  file->set_num_rows(partition.current_file_rows);
+  file->set_size(partition.current_file_bytes);
+}
 
+string createIcebergDataFileString(
+    const string& partition_name, const DmlFileStatusPb& file) {
+  using namespace org::apache::impala::fb;
   flatbuffers::FlatBufferBuilder fbb;
   flatbuffers::Offset<FbIcebergDataFile> data_file = CreateFbIcebergDataFile(fbb,
-      fbb.CreateString(partition.current_file_name),
+      fbb.CreateString(file.final_path()),
+      // Currently we can only write Parquet to Iceberg
       FbFileFormat::FbFileFormat_PARQUET,
-      partition.num_rows,
-      partition.bytes_written,
-      fbb.CreateString(partition.partition_name));
+      file.num_rows(),
+      file.size(),
+      fbb.CreateString(partition_name));
   fbb.Finish(data_file);
-  string data_file_str(reinterpret_cast<char*>(fbb.GetBufferPointer()), fbb.GetSize());
-  entry->second.add_iceberg_data_files_fb(std::move(data_file_str));
+  return string(reinterpret_cast<char*>(fbb.GetBufferPointer()), fbb.GetSize());
+}
+
+vector<string> DmlExecState::CreateIcebergDataFilesVector() {
+  vector<string> ret;
+  ret.reserve(per_partition_status_.size()); // min 1 file per partition
+  for (const PartitionStatusMap::value_type& partition : per_partition_status_) {
+    for (int i = 0; i < partition.second.created_files_size(); ++i) {
+      const DmlFileStatusPb& file = partition.second.created_files(i);
+      ret.emplace_back(createIcebergDataFileString(partition.first, file));
+    }
+  }
+  return ret;
 }
 
 void DmlExecState::MergeDmlStats(const DmlStatsPB& src, DmlStatsPB* dst) {

@@ -1320,7 +1320,7 @@ Status HdfsParquetTableWriter::AppendRows(
     }
     ++row_idx_;
     ++row_count_;
-    ++output_->num_rows;
+    ++output_->current_file_rows;
 
     if (file_size_estimate_ > file_size_limit_) {
       // This file is full.  We need a new file.
@@ -1365,7 +1365,7 @@ Status HdfsParquetTableWriter::Finalize() {
 }
 
 void HdfsParquetTableWriter::FinalizePartitionInfo() {
-  output_->bytes_written = file_pos_;
+  output_->current_file_bytes = file_pos_;
 }
 
 void HdfsParquetTableWriter::Close() {

@@ -1246,24 +1246,6 @@ Status ClientRequestState::Cancel(
   return Status::OK();
 }
 
-vector<string> createIcebergDataFilesVector(DmlExecState& dml_exec_state) {
-  vector<string> ret;
-  DmlExecStatusPB exec_state_pb;
-  dml_exec_state.ToProto(&exec_state_pb);
-  typedef google::protobuf::Map<string, DmlPartitionStatusPB> PerPartitionStatusPBMap;
-  const PerPartitionStatusPBMap& per_part_map = exec_state_pb.per_partition_status();
-  const PerPartitionStatusPBMap::value_type& part = *per_part_map.begin();
-  int64_t num_data_files = part.second.iceberg_data_files_fb_size();
-  ret.reserve(num_data_files);
-  for (const PerPartitionStatusPBMap::value_type& part : per_part_map) {
-    for (int i = 0; i < num_data_files; ++i) {
-      string data_file_fb = part.second.iceberg_data_files_fb(i);
-      ret.emplace_back(std::move(data_file_fb));
-    }
-  }
-  return ret;
-}
-
 Status ClientRequestState::UpdateCatalog() {
   if (!exec_request_->__isset.query_exec_request ||
       exec_request_->query_exec_request.stmt_type != TStmtType::DML) {
@@ -1293,9 +1275,14 @@ Status ClientRequestState::UpdateCatalog() {
       // TODO: We track partitions written to, not created, which means
       // that we do more work than is necessary, because written-to
       // partitions don't always require a metastore change.
-      VLOG_QUERY << "Updating metastore with " << catalog_update.created_partitions.size()
-                 << " altered partitions ("
-                 << join (catalog_update.created_partitions, ", ") << ")";
+      if (VLOG_IS_ON(1)) {
+        vector<string> part_list;
+        for (auto it : catalog_update.updated_partitions) part_list.push_back(it.first);
+        VLOG_QUERY << "Updating metastore with "
+                  << catalog_update.updated_partitions.size()
+                  << " altered partitions ("
+                  << join (part_list, ", ") << ")";
+      }
 
       catalog_update.target_table = finalize_params.table_name;
       catalog_update.db_name = finalize_params.table_db;
@@ -1308,7 +1295,8 @@ Status ClientRequestState::UpdateCatalog() {
         catalog_update.__isset.iceberg_operation = true;
         TIcebergOperationParam& ice_op = catalog_update.iceberg_operation;
         ice_op.__set_spec_id(finalize_params.spec_id);
-        ice_op.__set_iceberg_data_files_fb(createIcebergDataFilesVector(*dml_exec_state));
+        ice_op.__set_iceberg_data_files_fb(
+            dml_exec_state->CreateIcebergDataFilesVector());
         ice_op.__set_is_overwrite(finalize_params.is_overwrite);
       }
 

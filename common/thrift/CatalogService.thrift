@@ -206,6 +206,11 @@ struct TIcebergOperationParam {
   3: required bool is_overwrite = false;
 }
 
+// Per-partion info needed by Catalog to handle an INSERT.
+struct TUpdatedPartition {
+  1: required list<string> files;
+}
+
 // Updates the metastore with new partition information and returns a response
 // with details on the result of the operation. Used to add partitions after executing
 // DML operations, and could potentially be used in the future to update column stats
@@ -228,7 +233,7 @@ struct TUpdateCatalogRequest {
 
   // List of partitions that are new and need to be created. May
   // include the root partition (represented by the empty string).
-  6: required set<string> created_partitions;
+  6: required map<string, TUpdatedPartition> updated_partitions;
 
   // True if the update corresponds to an "insert overwrite" operation
   7: required bool is_overwrite;

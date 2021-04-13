@@ -59,7 +59,7 @@ Status HBaseTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_track
   RETURN_IF_ERROR(hbase_table_writer_->Init(state));
 
   // Add a 'root partition' status in which to collect insert statistics
-  state->dml_exec_state()->AddPartition(ROOT_PARTITION_KEY, -1L, nullptr);
+  state->dml_exec_state()->AddPartition(ROOT_PARTITION_KEY, -1L, nullptr, nullptr);
   return Status::OK();
 }
 

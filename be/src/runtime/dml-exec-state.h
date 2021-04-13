@@ -43,8 +43,7 @@ class HdfsTableDescriptor;
 /// During DML execution, the table sink adds per-partition status using AddPartition()
 /// and then UpdatePartition() for non-Kudu tables.  For Kudu tables, the sink adds DML
 /// stats using InitForKuduDml() followed by SetKuduDmlStats().  In the case of the
-/// HDFS sink, it will also record the collection of files that should be moved by the
-/// coordinator on finalization using AddFileToMove().
+/// HDFS sink, it will also record the collection of files with AddCreatedFile().
 ///
 /// The state is then serialized to thrift and merged at the coordinator using
 /// Update().  The coordinator will then use OutputPartitionStats(),
@@ -59,8 +58,11 @@ class DmlExecState {
   void Update(const DmlExecStatusPB& dml_exec_status);
 
   /// Add a new partition with the given parameters. Ignores 'base_dir' if nullptr.
+  /// If not-nullptr, staging_dir_to_clean_up will be sent to the coordinator which
+  /// will delete it.
   /// It is an error to call this for an existing partition.
-  void AddPartition(const std::string& name, int64_t id, const std::string* base_dir);
+  void AddPartition(const std::string& name, int64_t id, const std::string* base_dir,
+      const std::string* staging_dir_to_clean_up);
 
   /// Merge given values into stats for partition with name 'partition_name'.
   /// Ignores 'insert_stats' if nullptr.
@@ -69,7 +71,7 @@ class DmlExecState {
       int64_t num_modified_rows_delta, const DmlStatsPB* insert_stats);
 
   /// Extract information from 'partition', and add a new Iceberg data file.
-  void AddIcebergDataFile(const OutputPartition& partition);
+  void AddCreatedFile(const OutputPartition& partition);
 
   /// Used to initialize this state when execute Kudu DML. Must be called before
   /// SetKuduDmlStats().
@@ -78,9 +80,6 @@ class DmlExecState {
   /// Update stats for a Kudu DML sink. Requires that InitForKuduDml() was already called.
   void SetKuduDmlStats(int64_t num_modified_rows, int64_t num_row_errors,
       int64_t latest_ts);
-
-  /// Adds new file/location to the move map.
-  void AddFileToMove(const std::string& file_name, const std::string& location);
 
   /// Outputs the partition stats to a string.
   std::string OutputPartitionStats(const std::string& prefix);
@@ -110,6 +109,9 @@ class DmlExecState {
   /// Populates 'dml_result' with PartitionStatusMap data, for Impala's extension of
   /// Beeswax.
   void ToTDmlResult(TDmlResult* dml_result);
+
+  // Encodes file list info in flatbuffer format expected by Iceberg API.
+  std::vector<std::string> CreateIcebergDataFilesVector();
 
  private:
   /// protects all fields below
