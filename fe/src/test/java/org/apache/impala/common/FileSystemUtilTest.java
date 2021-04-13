@@ -30,6 +30,9 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Tests for the various util methods in FileSystemUtil class
@@ -163,6 +166,41 @@ public class FileSystemUtilTest {
     // TODO: enable following tests if we add them into impala mini cluster.
     // testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_O3FS), true);
     // testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_ALLUXIO), false);
+    // Also extend testIsPathOnFileSystem().
+  }
+
+  @Test
+  public void testIsPathOnFileSystem() throws IOException {
+    List<String> schemes = Arrays.asList(
+        FileSystemUtil.SCHEME_ABFS,
+        FileSystemUtil.SCHEME_ABFSS,
+        FileSystemUtil.SCHEME_ADL,
+        FileSystemUtil.SCHEME_HDFS,
+        FileSystemUtil.SCHEME_S3A,
+        FileSystemUtil.SCHEME_FILE);
+    List<Path> mockFiles = new ArrayList<>();
+    for (String scheme : schemes) {
+      mockFiles.add(new Path(mockLocation(scheme)));
+    }
+    List<FileSystem> fileSystems = new ArrayList<>();
+    for (Path mockFile : mockFiles) {
+      fileSystems.add(FileSystemUtil.getFileSystemForPath(mockFile));
+    }
+    for (int i = 0; i < fileSystems.size(); ++i) {
+      FileSystem fs = fileSystems.get(i);
+      for (int j = 0; j < mockFiles.size(); ++j) {
+        Path mockFile = mockFiles.get(j);
+        if (i == j) {
+          assertTrue(String.format(
+                          "Path '%s' should be on file system '%s'", mockFile, fs),
+                     FileSystemUtil.isPathOnFileSystem(mockFile, fs));
+        } else {
+          assertFalse(String.format(
+                          "Path '%s' should not be on file system '%s'", mockFile, fs),
+                      FileSystemUtil.isPathOnFileSystem(mockFile, fs));
+        }
+      }
+    }
   }
 
   private boolean testIsInIgnoredDirectory(Path input) {
@@ -185,7 +223,7 @@ public class FileSystemUtilTest {
       case FileSystemUtil.SCHEME_ADL:
         return "adl://dummy-account.azuredatalakestore.net/dummy-part-3";
       case FileSystemUtil.SCHEME_FILE:
-        return "file://tmp/dummy-part-4";
+        return "file:///tmp/dummy-part-4";
       case FileSystemUtil.SCHEME_HDFS:
         return "hdfs://localhost:20500/dummy-part-5";
       case FileSystemUtil.SCHEME_S3A:

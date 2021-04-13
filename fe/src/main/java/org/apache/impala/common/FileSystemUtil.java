@@ -263,7 +263,10 @@ public class FileSystemUtil {
             "Moving '%s' to '%s'", sourceFile.toString(), destFile.toString()));
       }
       // Move (rename) the file.
-      destFs.rename(sourceFile, destFile);
+      if (!destFs.rename(sourceFile, destFile)) {
+        throw new IOException(String.format(
+            "Failed to move '%s' to '%s'", sourceFile, destFile));
+      }
       return;
     }
     if (destIsDfs && sameFileSystem) {
@@ -579,13 +582,16 @@ public class FileSystemUtil {
    * Return true iff the path is on the given filesystem.
    */
   public static boolean isPathOnFileSystem(Path path, FileSystem fs) {
+    // Path 'path' must be qualified already.
+    Preconditions.checkState(
+        !path.equals(Path.getPathWithoutSchemeAndAuthority(path)),
+        String.format("Path '%s' is not qualified.", path));
     try {
-      // Call makeQualified() for the side-effect of FileSystem.checkPath() which will
-      // throw an exception if path is not on fs.
-      fs.makeQualified(path);
-      return true;
+      Path qp = fs.makeQualified(path);
+      return path.equals(qp);
     } catch (IllegalArgumentException e) {
       // Path is not on fs.
+      LOG.debug(String.format("Path '%s' is not on file system '%s'", path, fs));
       return false;
     }
   }
