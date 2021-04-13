@@ -577,8 +577,10 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
       impalad_args="--shutdown_grace_period_s={grace_period} \
+          --shutdown_deadline_s={deadline} \
           --hostname={hostname}".format(grace_period=IDLE_SHUTDOWN_GRACE_PERIOD_S,
-            hostname=socket.gethostname()), cluster_size=1)
+            deadline=EXEC_SHUTDOWN_DEADLINE_S, hostname=socket.gethostname()),
+      cluster_size=1)
   def test_shutdown_signal(self):
     """Test that an idle impalad shuts down in a timely manner after the shutdown grace
     period elapses."""
@@ -597,7 +599,8 @@ class TestGracefulShutdown(CustomClusterTestSuite, HS2TestSuite):
     # Make sure signal was received and the grace period and deadline are as expected.
     self.assert_impalad_log_contains('INFO',
       "Shutdown signal received. Current Shutdown Status: shutdown grace period left: "
-      "{0}s000ms, deadline left: 8760h".format(self.IDLE_SHUTDOWN_GRACE_PERIOD_S))
+      "{0}s000ms, deadline left: {1}s000ms".format(self.IDLE_SHUTDOWN_GRACE_PERIOD_S,
+        self.EXEC_SHUTDOWN_DEADLINE_S))
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(cluster_size=1)

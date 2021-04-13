@@ -191,8 +191,7 @@ extern "C" { void __gcov_flush(); }
     CHECK(err == 0) << "sigwait(): " << GetStrErrMsg(err) << ": " << err;
     CHECK_EQ(IMPALA_SHUTDOWN_SIGNAL, signal);
     ShutdownStatusPB shutdown_status;
-    const int ONE_YEAR_IN_SECONDS = 365 * 24 * 60 * 60;
-    Status status = impala_server->StartShutdown(ONE_YEAR_IN_SECONDS, &shutdown_status);
+    Status status = impala_server->StartShutdown(-1, &shutdown_status);
     if (!status.ok()) {
       LOG(ERROR) << "Shutdown signal received but unable to initiate shutdown. Status: "
                  << status.GetDetail();
