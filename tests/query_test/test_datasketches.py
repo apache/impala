@@ -39,6 +39,7 @@ class TestDatasketches(ImpalaTestSuite):
 
   def test_cpc(self, vector, unique_database):
     create_table_from_parquet(self.client, unique_database, 'cpc_sketches_from_hive')
+    create_table_from_parquet(self.client, unique_database, 'cpc_sketches_from_impala')
     self.run_test_case('QueryTest/datasketches-cpc', vector, unique_database)
 
   def test_theta(self, vector, unique_database):

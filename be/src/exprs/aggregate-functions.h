@@ -259,6 +259,13 @@ class AggregateFunctions {
   static BigIntVal DsCpcFinalize(FunctionContext*, const StringVal& src);
   static StringVal DsCpcFinalizeSketch(FunctionContext*, const StringVal& src);
 
+  /// These functions implement ds_cpc_union().
+  static void DsCpcUnionInit(FunctionContext*, StringVal* dst);
+  static void DsCpcUnionUpdate(FunctionContext*, const StringVal& src, StringVal* dst);
+  static StringVal DsCpcUnionSerialize(FunctionContext*, const StringVal& src);
+  static void DsCpcUnionMerge(FunctionContext*, const StringVal& src, StringVal* dst);
+  static StringVal DsCpcUnionFinalize(FunctionContext*, const StringVal& src);
+
   /// These functions implement Apache DataSketches Theta support for sketching.
   static void DsThetaInit(FunctionContext*, StringVal* slot);
   template <typename T>

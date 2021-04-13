@@ -1653,6 +1653,16 @@ StringVal SerializeDsCpcSketch(
   return StringStreamToStringVal(ctx, serialized_input);
 }
 
+/// Auxiliary function that receives a cpc_union, gets the underlying CPC sketch from the
+/// union object and returns the serialized, CPC sketch wrapped into StringVal.
+/// Introducing this function in the .cc to avoid including the whole DataSketches CPC
+/// functionality into the header.
+StringVal SerializeDsCpcUnion(
+    FunctionContext* ctx, const datasketches::cpc_union& ds_union) {
+  datasketches::cpc_sketch sketch = ds_union.get_result();
+  return SerializeDsCpcSketch(ctx, sketch);
+}
+
 /// Auxiliary function that receives a theta_sketch and returns the serialized version of
 /// it wrapped into a StringVal.
 /// Introducing this function in the .cc to avoid including the whole DataSketches Theta
@@ -1954,6 +1964,80 @@ StringVal AggregateFunctions::DsCpcFinalizeSketch(
   }
   ctx->Free(src.ptr);
   return result_str;
+}
+
+void AggregateFunctions::DsCpcUnionInit(FunctionContext* ctx, StringVal* slot) {
+  AllocBuffer(ctx, slot, sizeof(datasketches::cpc_union));
+  if (UNLIKELY(slot->is_null)) {
+    DCHECK(!ctx->impl()->state()->GetQueryStatus().ok());
+    return;
+  }
+  datasketches::cpc_union* union_ptr =
+      reinterpret_cast<datasketches::cpc_union*>(slot->ptr);
+  *union_ptr = datasketches::cpc_union(DS_SKETCH_CONFIG);
+}
+
+void AggregateFunctions::DsCpcUnionUpdate(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::cpc_union));
+  // These parameters might be overwritten by DeserializeDsSketch() to use the settings
+  // from the deserialized sketch from 'src'.
+  datasketches::cpc_sketch src_sketch(DS_CPC_SKETCH_CONFIG);
+  if (!DeserializeDsSketch(src, &src_sketch)) {
+    LogSketchDeserializationError(ctx);
+    return;
+  }
+  datasketches::cpc_union* union_ptr =
+      reinterpret_cast<datasketches::cpc_union*>(dst->ptr);
+  union_ptr->update(src_sketch);
+}
+
+StringVal AggregateFunctions::DsCpcUnionSerialize(
+    FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::cpc_union));
+  datasketches::cpc_union* union_ptr =
+      reinterpret_cast<datasketches::cpc_union*>(src.ptr);
+  StringVal dst = SerializeDsCpcUnion(ctx, *union_ptr);
+  ctx->Free(src.ptr);
+  return dst;
+}
+
+void AggregateFunctions::DsCpcUnionMerge(
+    FunctionContext* ctx, const StringVal& src, StringVal* dst) {
+  DCHECK(!src.is_null);
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(datasketches::cpc_union));
+
+  // Note, 'src' is a serialized Cpc_sketch and not a serialized Cpc_union.
+  datasketches::cpc_sketch src_sketch(DS_CPC_SKETCH_CONFIG);
+  if (!DeserializeDsSketch(src, &src_sketch)) {
+    LogSketchDeserializationError(ctx);
+    return;
+  }
+
+  datasketches::cpc_union* dst_union_ptr =
+      reinterpret_cast<datasketches::cpc_union*>(dst->ptr);
+
+  dst_union_ptr->update(src_sketch);
+}
+
+StringVal AggregateFunctions::DsCpcUnionFinalize(
+    FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(datasketches::cpc_union));
+  datasketches::cpc_union* union_ptr =
+      reinterpret_cast<datasketches::cpc_union*>(src.ptr);
+  datasketches::cpc_sketch sketch = union_ptr->get_result();
+  if (sketch.get_estimate() == 0.0) {
+    ctx->Free(src.ptr);
+    return StringVal::null();
+  }
+  StringVal result = SerializeDsCpcSketch(ctx, sketch);
+  ctx->Free(src.ptr);
+  return result;
 }
 
 void AggregateFunctions::DsThetaInit(FunctionContext* ctx, StringVal* dst) {

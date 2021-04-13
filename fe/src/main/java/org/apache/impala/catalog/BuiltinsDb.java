@@ -1463,6 +1463,20 @@ public class BuiltinsDb extends Db {
             "18DsHllUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         true, false, true));
 
+    // DataSketches CPC union
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_cpc_union",
+        Lists.<Type>newArrayList(Type.STRING), Type.STRING, Type.STRING,
+        prefix + "14DsCpcUnionInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix +
+            "16DsCpcUnionUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "15DsCpcUnionMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "19DsCpcUnionSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        prefix +
+            "18DsCpcUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        true, false, true));
+
     // DataSketches Theta union
     db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_theta_union",
         Lists.<Type>newArrayList(Type.STRING), Type.STRING, Type.STRING,
