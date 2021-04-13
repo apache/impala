@@ -17,13 +17,14 @@
 
 package org.apache.impala.catalog;
 
-import org.apache.curator.shaded.com.google.common.base.Preconditions;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.impala.common.TransactionException;
 import org.apache.impala.common.TransactionKeepalive;
 import org.apache.impala.common.TransactionKeepalive.HeartbeatContext;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.log4j.Logger;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Transaction class that implements the AutoCloseable interface and hence the callers

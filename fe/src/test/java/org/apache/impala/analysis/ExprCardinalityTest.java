@@ -22,7 +22,6 @@ import static org.junit.Assert.assertNotNull;
 
 import java.util.Set;
 
-import org.apache.curator.shaded.com.google.common.collect.Sets;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnStats;
@@ -38,6 +37,8 @@ import org.apache.impala.planner.CardinalityTest;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import com.google.common.collect.Sets;
 
 /**
  * Tests expression cardinality and selectivity, both of which are
