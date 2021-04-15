@@ -22,5 +22,33 @@ set -euo pipefail
 setup_report_build_error
 
 DIR=$(dirname "$0")
-echo Stopping Hive
-"$DIR"/kill-java-service.sh -c HiveServer -c HiveMetaStore
+KILL_HIVESERVER=1
+KILL_METASTORE=1
+
+while [ -n "$*" ]
+do
+  case $1 in
+    -only_hiveserver)
+      KILL_METASTORE=0
+      ;;
+    -only_metastore)
+      KILL_HIVESERVER=0
+      ;;
+    -help|-h|*)
+      echo "kill-hive-server.sh : Kills the hive server and the metastore."
+      echo "[-only_metastore] : Only kills the hive metastore."
+      echo "[-only_hiveserver] : Only kills the hive server."
+      exit 1;
+      ;;
+    esac
+  shift;
+done
+
+if [[ $KILL_HIVESERVER -eq 1 ]]; then
+  echo Stopping Hive server.
+  "$DIR"/kill-java-service.sh -c HiveServer
+fi
+if [[ $KILL_METASTORE -eq 1 ]]; then
+  echo Stopping Hive metastore.
+  "$DIR"/kill-java-service.sh -c HiveMetaStore
+fi

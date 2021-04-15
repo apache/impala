@@ -27,7 +27,8 @@ HIVE_METASTORE_PORT=9083
 LOGDIR=${IMPALA_CLUSTER_LOGS_DIR}/hive
 HIVES2_TRANSPORT="plain_sasl"
 METASTORE_TRANSPORT="buffered"
-ONLY_METASTORE=0
+START_METASTORE=1
+START_HIVESERVER=1
 ENABLE_RANGER_AUTH=0
 
 CLUSTER_BIN=${IMPALA_HOME}/testdata/bin
@@ -47,15 +48,19 @@ while [ -n "$*" ]
 do
   case $1 in
     -only_metastore)
-      ONLY_METASTORE=1
+      START_HIVESERVER=0
       ;;
     -with_ranger)
       ENABLE_RANGER_AUTH=1
       echo "Starting Hive with Ranger authorization."
       ;;
+    -only_hiveserver)
+      START_METASTORE=0
+      ;;
     -help|-h|*)
       echo "run-hive-server.sh : Starts the hive server and the metastore."
       echo "[-only_metastore] : Only starts the hive metastore."
+      echo "[-only_hiveserver] : Only starts the hive server."
       echo "[-with_ranger] : Starts with Ranger authorization (only for Hive 3)."
       exit 1;
       ;;
@@ -63,9 +68,20 @@ do
   shift;
 done
 
+if [[ $START_METASTORE -eq 0 && $START_HIVESERVER -eq 0 ]]; then
+  echo "Skipping metastore and hiveserver. Nothing to do"
+  exit 1;
+fi
+
 # TODO: We should have a retry loop for every service we start.
 # Kill for a clean start.
-${CLUSTER_BIN}/kill-hive-server.sh &> /dev/null
+if [[ $START_HIVESERVER -eq 1 ]]; then
+  ${CLUSTER_BIN}/kill-hive-server.sh -only_hiveserver &> /dev/null
+fi
+
+if [[ $START_METASTORE -eq 1 ]]; then
+  ${CLUSTER_BIN}/kill-hive-server.sh -only_metastore &> /dev/null
+fi
 
 export HIVE_METASTORE_HADOOP_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,\
 suspend=n,address=30010"
@@ -114,16 +130,20 @@ export KUDU_SKIP_HMS_PLUGIN_VALIDATION=${KUDU_SKIP_HMS_PLUGIN_VALIDATION:-1}
 # Starts a Hive Metastore Server on the specified port.
 # To debug log4j2 loading issues, add to HADOOP_CLIENT_OPTS:
 #   -Dorg.apache.logging.log4j.simplelog.StatusLogger.level=TRACE
-HADOOP_CLIENT_OPTS="-Xmx2024m -Dhive.log.file=hive-metastore.log" hive \
-  --service metastore -p $HIVE_METASTORE_PORT > ${LOGDIR}/hive-metastore.out 2>&1 &
+if [ ${START_METASTORE} -eq 1 ]; then
+  HADOOP_CLIENT_OPTS="-Xmx2024m -Dhive.log.file=hive-metastore.log" hive \
+      --service metastore -p $HIVE_METASTORE_PORT > ${LOGDIR}/hive-metastore.out 2>&1 &
 
-# Wait for the Metastore to come up because HiveServer2 relies on it being live.
-${CLUSTER_BIN}/wait-for-metastore.py --transport=${METASTORE_TRANSPORT}
+  # Wait for the Metastore to come up because HiveServer2 relies on it being live.
+  ${CLUSTER_BIN}/wait-for-metastore.py --transport=${METASTORE_TRANSPORT}
+fi
 
 # Include the latest libfesupport.so in the JAVA_LIBRARY_PATH
 export JAVA_LIBRARY_PATH="${JAVA_LIBRARY_PATH-}:${IMPALA_HOME}/be/build/latest/service/"
 
-if [ ${ONLY_METASTORE} -eq 0 ]; then
+export HIVESERVER2_HADOOP_OPTS="-Xdebug -Xrunjdwp:transport=dt_socket,server=y,\
+suspend=n,address=30020"
+if [ ${START_HIVESERVER} -eq 1 ]; then
   # Starts a HiveServer2 instance on the port specified by the HIVE_SERVER2_THRIFT_PORT
   # environment variable. HADOOP_HEAPSIZE should be set to at least 2048 to avoid OOM
   # when loading ORC tables like widerow.
