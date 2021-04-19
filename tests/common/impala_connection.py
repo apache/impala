@@ -298,7 +298,7 @@ class ImpylaHS2Connection(ImpalaConnection):
                                         use_http_transport=self.__use_http_transport,
                                         http_path=self.__http_path, **conn_kwargs)
     # Get the default query options for the session before any modifications are made.
-    self.__cursor = self.__impyla_conn.cursor()
+    self.__cursor = self.__impyla_conn.cursor(convert_types=False)
     self.__default_query_options = {}
     if not self._is_hive:
       self.__cursor.execute("set all")
@@ -473,14 +473,16 @@ class ImpylaHS2ResultSet(object):
   def __convert_result_row(self, result_tuple):
     """Take primitive values from a result tuple and construct the tab-separated string
     that would have been returned via beeswax."""
-    return '\t'.join([self.__convert_result_value(val, type)
-                      for val, type in zip(result_tuple, self.column_types)])
+    return '\t'.join([self.__convert_result_value(val) for val in result_tuple])
 
-  def __convert_result_value(self, val, type):
+  def __convert_result_value(self, val):
     """Take a primitive value from a result tuple and its type and construct the string
     that would have been returned via beeswax."""
     if val is None:
       return 'NULL'
+    if type(val) == float:
+      # Same format as what Beeswax uses in the backend.
+      return "{:.16g}".format(val)
     else:
       return str(val)
 

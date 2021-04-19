@@ -494,7 +494,7 @@ class ImpalaTestSuite(BaseTestSuite):
       actual values are easily compared.
     """
     replace_filenames_with_placeholder = True
-    for section_name in ('RESULTS', 'DBAPI_RESULTS', 'ERRORS'):
+    for section_name in ('RESULTS', 'ERRORS'):
       if section_name in test_section:
         if "$NAMENODE" in test_section[section_name]:
           replace_filenames_with_placeholder = False
@@ -515,12 +515,6 @@ class ImpalaTestSuite(BaseTestSuite):
     result_section, type_section = 'RESULTS', 'TYPES'
     if vector.get_value('protocol').startswith('hs2'):
       # hs2 or hs2-http
-      if 'DBAPI_RESULTS' in test_section:
-        assert 'RESULTS' in test_section,\
-            "Base RESULTS section must always be included alongside DBAPI_RESULTS"
-        # In some cases Impyla (the HS2 dbapi client) is expected to return different
-        # results, so use the dbapi-specific section if present.
-        result_section = 'DBAPI_RESULTS'
       if 'HS2_TYPES' in test_section:
         assert 'TYPES' in test_section,\
             "Base TYPES section must always be included alongside HS2_TYPES"
