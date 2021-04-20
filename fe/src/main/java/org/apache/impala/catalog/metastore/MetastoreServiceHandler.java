@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
+import org.apache.hadoop.hive.metastore.AbstractThriftHiveMetastore;
 import org.apache.hadoop.hive.metastore.DefaultPartitionExpressionProxy;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.PartFilterExprUtil;
@@ -279,7 +280,7 @@ import org.slf4j.LoggerFactory;
  * the arguments before sending the RPC to the HMS server. This can lead to unexpected
  * side-effects like (processorCapabilities do not match with the actual client).
  */
-public abstract class MetastoreServiceHandler implements Iface {
+public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastore {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(MetastoreServiceHandler.class);
