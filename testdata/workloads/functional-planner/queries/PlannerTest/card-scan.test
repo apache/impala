@@ -156,8 +156,6 @@ PLAN-ROOT SINK
 # Not-equal, card = 1 - 1/ndv
 # Use smaller table so effect is clear
 # |T|=8, NDV=8
-# Bug: IMPALA-8039
-# Bug, expected cardinality ~7
 select *
 from functional.alltypestiny
 where id != 10
@@ -167,7 +165,7 @@ PLAN-ROOT SINK
 00:SCAN HDFS [functional.alltypestiny]
    HDFS partitions=4/4 files=4 size=460B
    predicates: id != 10
-   row-size=89B cardinality=1
+   row-size=89B cardinality=7
 ====
 # Inequality. No useful stats.
 # Bug: IMPALA-8037, Assumes sel = 0.1

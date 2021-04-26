@@ -3453,20 +3453,20 @@ PLAN-ROOT SINK
 |
 07:SORT
 |  order by: count(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 06:AGGREGATE [FINALIZE]
 |  output: count(ps_suppkey)
 |  group by: p_brand, p_type, p_size
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 05:AGGREGATE
 |  group by: p_brand, p_type, p_size, ps_suppkey
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 04:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
 |  hash predicates: ps_suppkey = s_suppkey
-|  row-size=81B cardinality=31.92K
+|  row-size=81B cardinality=31.49K
 |
 |--02:SCAN HDFS [tpch.supplier]
 |     HDFS partitions=1/1 files=1 size=1.33MB
@@ -3476,12 +3476,12 @@ PLAN-ROOT SINK
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: ps_partkey = p_partkey
 |  runtime filters: RF000 <- p_partkey
-|  row-size=81B cardinality=31.92K
+|  row-size=81B cardinality=31.49K
 |
 |--01:SCAN HDFS [tpch.part]
 |     HDFS partitions=1/1 files=1 size=22.83MB
-|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
-|     row-size=65B cardinality=8.00K
+|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), NOT p_type LIKE 'MEDIUM POLISHED%', p_brand != 'Brand#45'
+|     row-size=65B cardinality=7.89K
 |
 00:SCAN HDFS [tpch.partsupp]
    HDFS partitions=1/1 files=1 size=112.71MB
@@ -3497,33 +3497,33 @@ PLAN-ROOT SINK
 |
 07:SORT
 |  order by: count(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 13:AGGREGATE [FINALIZE]
 |  output: count:merge(ps_suppkey)
 |  group by: p_brand, p_type, p_size
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 12:EXCHANGE [HASH(p_brand,p_type,p_size)]
 |
 06:AGGREGATE [STREAMING]
 |  output: count(ps_suppkey)
 |  group by: p_brand, p_type, p_size
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 11:AGGREGATE
 |  group by: p_brand, p_type, p_size, ps_suppkey
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 10:EXCHANGE [HASH(p_brand,p_type,p_size,ps_suppkey)]
 |
 05:AGGREGATE [STREAMING]
 |  group by: p_brand, p_type, p_size, ps_suppkey
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 04:HASH JOIN [NULL AWARE LEFT ANTI JOIN, BROADCAST]
 |  hash predicates: ps_suppkey = s_suppkey
-|  row-size=81B cardinality=31.92K
+|  row-size=81B cardinality=31.49K
 |
 |--09:EXCHANGE [BROADCAST]
 |  |
@@ -3535,14 +3535,14 @@ PLAN-ROOT SINK
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ps_partkey = p_partkey
 |  runtime filters: RF000 <- p_partkey
-|  row-size=81B cardinality=31.92K
+|  row-size=81B cardinality=31.49K
 |
 |--08:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch.part]
 |     HDFS partitions=1/1 files=1 size=22.83MB
-|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
-|     row-size=65B cardinality=8.00K
+|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), NOT p_type LIKE 'MEDIUM POLISHED%', p_brand != 'Brand#45'
+|     row-size=65B cardinality=7.89K
 |
 00:SCAN HDFS [tpch.partsupp]
    HDFS partitions=1/1 files=1 size=112.71MB
@@ -3558,33 +3558,33 @@ PLAN-ROOT SINK
 |
 07:SORT
 |  order by: count(ps_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 13:AGGREGATE [FINALIZE]
 |  output: count:merge(ps_suppkey)
 |  group by: p_brand, p_type, p_size
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 12:EXCHANGE [HASH(p_brand,p_type,p_size)]
 |
 06:AGGREGATE [STREAMING]
 |  output: count(ps_suppkey)
 |  group by: p_brand, p_type, p_size
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 11:AGGREGATE
 |  group by: p_brand, p_type, p_size, ps_suppkey
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 10:EXCHANGE [HASH(p_brand,p_type,p_size,ps_suppkey)]
 |
 05:AGGREGATE [STREAMING]
 |  group by: p_brand, p_type, p_size, ps_suppkey
-|  row-size=65B cardinality=31.92K
+|  row-size=65B cardinality=31.49K
 |
 04:HASH JOIN [NULL AWARE LEFT ANTI JOIN, BROADCAST]
 |  hash predicates: ps_suppkey = s_suppkey
-|  row-size=81B cardinality=31.92K
+|  row-size=81B cardinality=31.49K
 |
 |--JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
@@ -3599,7 +3599,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ps_partkey = p_partkey
-|  row-size=81B cardinality=31.92K
+|  row-size=81B cardinality=31.49K
 |
 |--JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
@@ -3610,8 +3610,8 @@ PLAN-ROOT SINK
 |  |
 |  01:SCAN HDFS [tpch.part]
 |     HDFS partitions=1/1 files=1 size=22.83MB
-|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
-|     row-size=65B cardinality=8.00K
+|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), NOT p_type LIKE 'MEDIUM POLISHED%', p_brand != 'Brand#45'
+|     row-size=65B cardinality=7.89K
 |
 00:SCAN HDFS [tpch.partsupp]
    HDFS partitions=1/1 files=1 size=112.71MB

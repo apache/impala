@@ -2086,7 +2086,7 @@ PLAN-ROOT SINK
 |
 05:SELECT
 |  predicates: id IS NULL, tinyint_col != 5
-|  row-size=9B cardinality=730
+|  row-size=9B cardinality=699
 |
 00:UNION
 |  row-size=9B cardinality=7.30K
@@ -2124,7 +2124,7 @@ PLAN-ROOT SINK
 |
 05:SELECT
 |  predicates: id IS NULL, tinyint_col != 5
-|  row-size=9B cardinality=730
+|  row-size=9B cardinality=699
 |
 00:UNION
 |  row-size=9B cardinality=7.30K

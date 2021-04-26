@@ -1222,7 +1222,7 @@ PLAN-ROOT SINK
 |
 |--01:SCAN HDFS [tpch.part]
 |     HDFS partitions=1/1 files=1 size=22.83MB
-|     predicates: tpch.part.p_size IN (49, 14, 23, 45, 19, 3, 36, 9), tpch.part.p_brand != 'Brand#45', NOT tpch.part.p_type LIKE 'MEDIUM POLISHED%'
+|     predicates: tpch.part.p_size IN (49, 14, 23, 45, 19, 3, 36, 9), NOT tpch.part.p_type LIKE 'MEDIUM POLISHED%', tpch.part.p_brand != 'Brand#45'
 |     row-size=65B cardinality=8.00K
 |
 00:SCAN HDFS [tpch.partsupp]

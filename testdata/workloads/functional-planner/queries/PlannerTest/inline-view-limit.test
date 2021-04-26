@@ -708,7 +708,7 @@ PLAN-ROOT SINK
 |
 02:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
-   predicates: functional.alltypessmall.id != 1, functional.alltypessmall.id > 10, functional.alltypessmall.id > 20, id != 2
+   predicates: functional.alltypessmall.id > 10, functional.alltypessmall.id > 20, functional.alltypessmall.id != 1, id != 2
    runtime filters: RF000 -> id
    row-size=4B cardinality=10
 ====
@@ -772,7 +772,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
-   predicates: functional.alltypes.id != 2, functional.alltypes.id > 10, functional.alltypes.id > 20, id != 1
+   predicates: functional.alltypes.id > 10, functional.alltypes.id > 20, functional.alltypes.id != 2, id != 1
    runtime filters: RF000 -> id
    row-size=4B cardinality=730
 ====

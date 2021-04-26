@@ -1228,7 +1228,7 @@ PLAN-ROOT SINK
 |  row-size=89B cardinality=31.92K
 |
 |--01:SCAN KUDU [tpch_kudu.part]
-|     predicates: p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
+|     predicates: NOT p_type LIKE 'MEDIUM POLISHED%', p_brand != 'Brand#45'
 |     kudu predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9)
 |     row-size=73B cardinality=8.00K
 |
