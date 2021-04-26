@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.impala.catalog.Db;
+import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Function.CompareMode;
 import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Type;
@@ -237,14 +238,42 @@ public class BinaryPredicate extends Predicate {
     // TODO: Compute selectivity for nested predicates.
     // TODO: Improve estimation using histograms.
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
-    if ((op_ == Operator.EQ || op_ == Operator.NOT_DISTINCT)
-        && isSingleColumnPredicate(slotRefRef, null)) {
-      long distinctValues = slotRefRef.getRef().getNumDistinctValues();
-      if (distinctValues > 0) {
-        selectivity_ = 1.0 / distinctValues;
-        selectivity_ = Math.max(0, Math.min(1, selectivity_));
-      }
+    if (!isSingleColumnPredicate(slotRefRef, null)) {
+      return;
     }
+    long distinctValues = slotRefRef.getRef().getNumDistinctValues();
+    if (distinctValues < 0) {
+      // Lack of statistics to estimate the selectivity.
+      return;
+    } else if (distinctValues == 0 && (op_ == Operator.EQ || op_ == Operator.NE)) {
+      // If the table is empty, then distinctValues is 0. This case is equivalent
+      // to selectivity is 0.
+      selectivity_ = 0.0;
+      return;
+    }
+
+    if (op_ == Operator.EQ || op_ == Operator.NOT_DISTINCT) {
+      selectivity_ = 1.0 / distinctValues;
+    } else if (op_ == Operator.NE || op_ == Operator.DISTINCT_FROM) {
+      // For case <column> IS DISTINCT FROM NULL, all non-null values are true
+      if (Expr.IS_NULL_LITERAL.apply(getChild(1)) && op_ == Operator.DISTINCT_FROM) {
+        selectivity_ = 1.0;
+      } else {
+        selectivity_ = 1.0 - 1.0 / distinctValues;
+      }
+      SlotDescriptor slotDesc = slotRefRef.getRef().getDesc();
+      if (slotDesc.getStats().hasNullsStats()) {
+        FeTable table = slotDesc.getParent().getTable();
+        if (table != null && table.getNumRows() > 0) {
+          long numRows = table.getNumRows();
+          selectivity_ *=
+              (double) (numRows - slotDesc.getStats().getNumNulls()) / numRows;
+        }
+      }
+    } else {
+      return;
+    }
+    selectivity_ = Math.max(0, Math.min(1, selectivity_));
   }
 
   @Override

@@ -2307,8 +2307,8 @@ PLAN-ROOT SINK
 |
 |--05:SCAN HDFS [tpch_nested_parquet.part p]
 |     HDFS partitions=1/1 files=1 size=6.24MB
-|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
-|     row-size=65B cardinality=8.00K
+|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), NOT p_type LIKE 'MEDIUM POLISHED%', p_brand != 'Brand#45'
+|     row-size=65B cardinality=7.89K
 |
 01:SUBPLAN
 |  row-size=103B cardinality=10.00K
@@ -2368,8 +2368,8 @@ PLAN-ROOT SINK
 |  |
 |  05:SCAN HDFS [tpch_nested_parquet.part p]
 |     HDFS partitions=1/1 files=1 size=6.24MB
-|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%'
-|     row-size=65B cardinality=8.00K
+|     predicates: p_size IN (49, 14, 23, 45, 19, 3, 36, 9), NOT p_type LIKE 'MEDIUM POLISHED%', p_brand != 'Brand#45'
+|     row-size=65B cardinality=7.89K
 |
 01:SUBPLAN
 |  row-size=103B cardinality=10.00K

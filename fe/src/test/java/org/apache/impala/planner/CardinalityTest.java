@@ -67,10 +67,8 @@ public class CardinalityTest extends PlannerTestBase {
     verifyCardinality(
         "SELECT id FROM functional.alltypes WHERE int_col = 1", 7300/10);
 
-    // Assume classic 0.1 selectivity for other operators
-    // IMPALA-7560 says this should be revised.
     verifyCardinality(
-        "SELECT id FROM functional.alltypes WHERE int_col != 1", 730);
+        "SELECT id FROM functional.alltypes WHERE int_col != 1", 6570);
 
     // IMPALA-7601 says the following should be revised.
     verifyCardinality(

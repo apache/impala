@@ -411,10 +411,10 @@ PLAN-ROOT SINK
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters:
-  d:string_col NOT_EQUAL '2'
   d:string_col GREATER_OR_EQUAL '4'
   d:date_string_col EQUAL '04/03/09'
-   predicates: string_col != '2', string_col >= '4', date_string_col = '04/03/09'
+  d:string_col NOT_EQUAL '2'
+   predicates: string_col >= '4', date_string_col = '04/03/09', string_col != '2'
    row-size=89B cardinality=1
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
@@ -423,10 +423,10 @@ PLAN-ROOT SINK
 |
 00:SCAN HBASE [functional_hbase.alltypessmall]
    hbase filters:
-  d:string_col NOT_EQUAL '2'
   d:string_col GREATER_OR_EQUAL '4'
   d:date_string_col EQUAL '04/03/09'
-   predicates: string_col != '2', string_col >= '4', date_string_col = '04/03/09'
+  d:string_col NOT_EQUAL '2'
+   predicates: string_col >= '4', date_string_col = '04/03/09', string_col != '2'
    row-size=89B cardinality=1
 ====
 # mix of predicates and functional_hbase. filters

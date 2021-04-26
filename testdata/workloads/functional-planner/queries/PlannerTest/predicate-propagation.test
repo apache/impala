@@ -585,7 +585,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [functional.alltypessmall]
 |     partition predicates: functional.alltypessmall.year = 2009, functional.alltypessmall.month <= 2
 |     HDFS partitions=2/4 files=2 size=3.16KB
-|     predicates: functional.alltypessmall.int_col != 5, id > 11
+|     predicates: id > 11, functional.alltypessmall.int_col != 5
 |     row-size=16B cardinality=5
 |
 00:SCAN HDFS [functional.alltypes a]
@@ -629,7 +629,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [functional.alltypessmall]
 |     partition predicates: functional.alltypessmall.year = 2009, functional.alltypessmall.month <= 2
 |     HDFS partitions=2/4 files=2 size=3.16KB
-|     predicates: functional.alltypessmall.int_col != 5, id > 11
+|     predicates:  id > 11, functional.alltypessmall.int_col != 5
 |     row-size=16B cardinality=5
 |
 00:SCAN HDFS [functional.alltypes a]
@@ -672,7 +672,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [functional.alltypessmall]
 |     partition predicates: functional.alltypessmall.year = 2009, functional.alltypessmall.month <= 2
 |     HDFS partitions=2/4 files=2 size=3.16KB
-|     predicates: functional.alltypessmall.int_col != 5, id > 11
+|     predicates: id > 11, functional.alltypessmall.int_col != 5
 |     row-size=16B cardinality=5
 |
 00:SCAN HDFS [functional.alltypes a]
@@ -709,7 +709,7 @@ PLAN-ROOT SINK
 |  01:SCAN HDFS [functional.alltypessmall]
 |     partition predicates: functional.alltypessmall.year = 2009, functional.alltypessmall.month <= 2
 |     HDFS partitions=2/4 files=2 size=3.16KB
-|     predicates: functional.alltypessmall.int_col != 5, id > 11
+|     predicates: id > 11, functional.alltypessmall.int_col != 5
 |     row-size=16B cardinality=5
 |
 00:SCAN HDFS [functional.alltypes a]
