@@ -225,7 +225,7 @@ Status OrcTimestampReader::ReadValue(int row_idx, Tuple* tuple, MemPool* pool) {
   int64_t secs = batch_->data.data()[row_idx];
   int64_t nanos = batch_->nanoseconds.data()[row_idx];
   auto slot = reinterpret_cast<TimestampValue*>(GetSlot(tuple));
-  *slot = TimestampValue::FromUnixTimeNanos(secs, nanos, UTCPTR);
+  *slot = TimestampValue::FromUnixTimeNanos(secs, nanos, timezone_);
   if (UNLIKELY(!slot->HasDate())) {
     SetNullSlot(tuple);
     TErrorCode::type errorCode = TErrorCode::ORC_TIMESTAMP_OUT_OF_RANGE;

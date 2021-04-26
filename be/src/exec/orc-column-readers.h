@@ -370,7 +370,11 @@ class OrcTimestampReader : public OrcPrimitiveColumnReader<OrcTimestampReader> {
  public:
   OrcTimestampReader(const orc::Type* node, const SlotDescriptor* slot_desc,
       HdfsOrcScanner* scanner)
-      : OrcPrimitiveColumnReader<OrcTimestampReader>(node, slot_desc, scanner) { }
+      : OrcPrimitiveColumnReader<OrcTimestampReader>(node, slot_desc, scanner) {
+    if (node->getKind() == orc::TIMESTAMP_INSTANT) {
+      timezone_ = scanner_->state_->local_time_zone();
+    }
+  }
 
   virtual ~OrcTimestampReader() { }
 
@@ -386,6 +390,7 @@ class OrcTimestampReader : public OrcPrimitiveColumnReader<OrcTimestampReader> {
   friend class OrcPrimitiveColumnReader<OrcTimestampReader>;
 
   orc::TimestampVectorBatch* batch_ = nullptr;
+  const Timezone* timezone_ = UTCPTR;
 };
 
 class OrcDateColumnReader : public OrcPrimitiveColumnReader<OrcDateColumnReader> {

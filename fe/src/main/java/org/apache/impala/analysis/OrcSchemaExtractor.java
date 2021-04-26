@@ -73,7 +73,8 @@ public class OrcSchemaExtractor {
    */
   static private Type convertPrimitiveOrcType(TypeDescription type) {
     Category category = type.getCategory();
-    Preconditions.checkState(category.isPrimitive());
+    Preconditions.checkState(category.isPrimitive() ||
+                             category.equals(Category.TIMESTAMP_INSTANT)); // ORC-790
     switch (category) {
       case BINARY: return Type.STRING;
       case BOOLEAN: return Type.BOOLEAN;
@@ -89,6 +90,7 @@ public class OrcSchemaExtractor {
       case SHORT: return Type.SMALLINT;
       case STRING: return Type.STRING;
       case TIMESTAMP: return Type.TIMESTAMP;
+      case TIMESTAMP_INSTANT: return Type.TIMESTAMP;
       case VARCHAR: return ScalarType.createVarcharType(type.getMaxLength());
       default:
         Preconditions.checkState(false,
@@ -168,7 +170,9 @@ public class OrcSchemaExtractor {
    * Converts an ORC type to an Impala Type.
    */
   static private Type convertOrcType(TypeDescription type) throws AnalysisException {
-    if (type.getCategory().isPrimitive()) {
+    Category category = type.getCategory();
+    // TIMESTAMP_INSTANT is wrongly defined as a compound type (ORC-790).
+    if (category.isPrimitive() || category.equals(Category.TIMESTAMP_INSTANT)) {
       return convertPrimitiveOrcType(type);
     } else {
       return convertComplexOrcType(type);

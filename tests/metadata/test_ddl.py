@@ -24,6 +24,7 @@ import time
 from test_ddl_base import TestDdlBase
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.environ import (HIVE_MAJOR_VERSION)
+from tests.common.file_utils import create_table_from_orc
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIf, SkipIfABFS, SkipIfADLS, SkipIfKudu, SkipIfLocal,
@@ -306,6 +307,8 @@ class TestDdlStatements(TestDdlBase):
     bucket_file = filter(lambda s: s.startswith('bucket'),
       self.filesystem_client.ls(COMPLEXTYPETBL_PATH + base_dir))[0]
     vector.get_value('exec_option')['abort_on_error'] = False
+    create_table_from_orc(self.client, unique_database,
+        'timestamp_with_local_timezone')
     self.run_test_case('QueryTest/create-table-like-file-orc', vector,
         use_db=unique_database, multiple_impalad=self._use_multiple_impalad(vector),
         test_file_vars={

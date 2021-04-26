@@ -219,6 +219,7 @@ Status OrcSchemaResolver::ValidateType(const ColumnType& type,
       }
       break;
     case orc::TypeKind::TIMESTAMP:
+    case orc::TypeKind::TIMESTAMP_INSTANT:
       if (type.type == TYPE_TIMESTAMP) return Status::OK();
       break;
     case orc::TypeKind::DECIMAL: {

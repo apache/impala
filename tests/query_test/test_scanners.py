@@ -31,7 +31,6 @@ from parquet.ttypes import ConvertedType
 from subprocess import check_call
 
 from testdata.common import widetable
-from tests.common.file_utils import create_table_and_copy_files
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (
     SkipIf,
@@ -1580,6 +1579,16 @@ class TestOrc(ImpalaTestSuite):
       del new_vector.get_value('exec_option')['abort_on_error']
       self.run_test_case('DataErrorsTest/orc-out-of-range-timestamp',
                          new_vector, unique_database)
+
+  def test_orc_timestamp_with_local_timezone(self, vector, unique_database):
+      """Test scanning of ORC file that contains 'timstamp with local timezone'."""
+      test_files = ["testdata/data/timestamp_with_local_timezone.orc"]
+      create_table_and_copy_files(self.client,
+          "create table {db}.{tbl} "
+          "(id int, user string, action string, event_time timestamp) "
+          "stored as orc", unique_database, "timestamp_with_local_timezone", test_files)
+      self.run_test_case("QueryTest/orc_timestamp_with_local_timezone", vector,
+          unique_database)
 
   def _run_invalid_schema_test(self, unique_database, test_name, expected_error):
     """Copies 'test_name'.orc to a table and runs a simple query. These tests should

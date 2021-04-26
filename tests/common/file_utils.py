@@ -29,7 +29,17 @@ from tests.util.filesystem_utils import get_fs_path
 def create_table_from_parquet(impala_client, unique_database, table_name):
   """Utility function to create a database table from a Parquet file. A Parquet file must
   exist in $IMPALA_HOME/testdata/data with the name 'table_name'.parquet"""
-  filename = '{0}.parquet'.format(table_name)
+  create_table_from_file(impala_client, unique_database, table_name, 'parquet')
+
+
+def create_table_from_orc(impala_client, unique_database, table_name):
+  """Utility function to create a database table from a Orc file. A Orc file must
+  exist in $IMPALA_HOME/testdata/data with the name 'table_name'.orc"""
+  create_table_from_file(impala_client, unique_database, table_name, 'orc')
+
+
+def create_table_from_file(impala_client, unique_database, table_name, file_format):
+  filename = '{0}.{1}'.format(table_name, file_format)
   local_file = os.path.join(os.environ['IMPALA_HOME'],
                             'testdata/data/{0}'.format(filename))
   assert os.path.isfile(local_file)
@@ -38,15 +48,15 @@ def create_table_from_parquet(impala_client, unique_database, table_name):
   tbl_dir = get_fs_path('/test-warehouse/{0}.db/{1}'.format(unique_database, table_name))
   check_call(['hdfs', 'dfs', '-mkdir', '-p', tbl_dir])
 
-  # Put the parquet file in the table's directory
+  # Put the file into the table's directory
   # Note: -d skips a staging copy
   check_call(['hdfs', 'dfs', '-put', '-f', '-d', local_file, tbl_dir])
 
   # Create the table
   hdfs_file = '{0}/{1}'.format(tbl_dir, filename)
   qualified_table_name = '{0}.{1}'.format(unique_database, table_name)
-  impala_client.execute('create table {0} like parquet "{1}" stored as parquet'.format(
-    qualified_table_name, hdfs_file))
+  impala_client.execute('create table {0} like {1} "{2}" stored as {1}'.format(
+      qualified_table_name, file_format, hdfs_file))
 
 
 def create_table_and_copy_files(impala_client, create_stmt, unique_database, table_name,

@@ -129,3 +129,15 @@ describe transactional_complextypes_clone
 ---- TYPES
 STRING, STRING, STRING
 ====
+---- QUERY
+create table timestamp_with_local_timezone_2 like ORC
+'$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/timestamp_with_local_timezone/timestamp_with_local_timezone.orc';
+describe timestamp_with_local_timezone_2
+---- RESULTS
+'id','int','Inferred from ORC file.'
+'user','string','Inferred from ORC file.'
+'action','string','Inferred from ORC file.'
+'event_time','timestamp','Inferred from ORC file.'
+---- TYPES
+STRING, STRING, STRING
+====
