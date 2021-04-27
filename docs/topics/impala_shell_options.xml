@@ -250,7 +250,7 @@ under the License.
               </entry>
               <entry>
                 <p>
-                  Connects to the <codeph>impalad</codeph> daemon on the specified host. The default port of 21000
+                  Connects to the <codeph>impalad</codeph> daemon on the specified host. The default port of 21050
                   is assumed unless you provide another value. You can connect to any host in your cluster that is
                   running <codeph>impalad</codeph>. If you connect to an instance of <codeph>impalad</codeph> that
                   was started with an alternate port specified by the <codeph>--fe_port</codeph> flag, provide that
@@ -574,13 +574,13 @@ under the License.
                     <varname>protocol</varname> values are:<ul>
                     <li><codeph>'hs2'</codeph>: Impala-shell uses the binary TCP
                       based transport to speak to the Impala Daemon via the
-                      HiveServer2 protocol.</li>
+                      HiveServer2 protocol. This is the current default setting.</li>
                     <li><codeph>'hs2-http'</codeph>: Impala-shell uses HTTP
                       transport to speak to the Impala Daemon via the
                       HiveServer2 protocol.</li>
                     <li><codeph>'beeswax'</codeph>: Impala-shell uses the binary
                       TCP based transport to speak to the Impala Daemon via
-                      Beeswax. This is the current default setting.</li>
+                      Beeswax.</li>
                   </ul></p><p>You cannot connect to the 3.2 or earlier versions
                   of Impala using the <codeph>'hs2'</codeph> or
                     <codeph>'hs2-http'</codeph> option.</p><p>Beeswax support is
