@@ -412,6 +412,9 @@ class ImpalaClient(object):
       auth = base64.encodestring(user_passwd.encode()).decode().strip('\n')
       transport.setCustomHeaders({"Authorization": "Basic {0}".format(auth)})
 
+    # Without buffering Thrift would call socket.recv() each time it deserializes
+    # something (e.g. a member in a struct).
+    transport = TBufferedTransport(transport)
     transport.open()
     return transport
 
