@@ -120,6 +120,20 @@ BigIntVal DataSketchesFunctions::DsCpcEstimate(
   return sketch.get_estimate();
 }
 
+StringVal DataSketchesFunctions::DsCpcStringify(
+    FunctionContext* ctx, const StringVal& serialized_sketch) {
+  if (serialized_sketch.is_null || serialized_sketch.len == 0) return StringVal::null();
+  datasketches::cpc_sketch sketch(DS_CPC_SKETCH_CONFIG);
+  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
+    LogSketchDeserializationError(ctx);
+    return StringVal::null();
+  }
+  string str = sketch.to_string();
+  StringVal dst(ctx, str.size());
+  memcpy(dst.ptr, str.c_str(), str.size());
+  return dst;
+}
+
 BigIntVal DataSketchesFunctions::DsThetaEstimate(
     FunctionContext* ctx, const StringVal& serialized_sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return 0;

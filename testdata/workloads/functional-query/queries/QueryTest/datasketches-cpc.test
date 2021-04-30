@@ -246,3 +246,40 @@ BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 ---- RESULTS
 5,7,6,6,7,8,8,6,NULL
 ====
+---- QUERY
+# Check that ds_cpc_stringify() returns null for an empty sketch.
+select ds_cpc_stringify(ds_cpc_sketch(cast(f2 as float))) from functional_parquet.emptytable;
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# Check that ds_cpc_stringify() returns null for a null input.
+select ds_cpc_stringify(c) from functional_parquet.nulltable;
+---- RESULTS
+'NULL'
+---- TYPES
+STRING
+====
+---- QUERY
+# Check that ds_cpc_stringify() returns error for strings that are not serialized sketches.
+select ds_cpc_stringify(date_string_col) from functional_parquet.alltypestiny;
+---- CATCH
+UDF ERROR: Unable to deserialize sketch.
+====
+---- QUERY
+# Check that ds_cpc_stringify() works on sketches created by Hive.
+select ds_cpc_stringify(f) from cpc_sketches_from_hive;
+---- RESULTS
+row_regex: .*### CPC sketch summary:.*lg_k.*seed hash.*C.*flavor.*### End sketch summary.*
+---- TYPES
+STRING
+====
+---- QUERY
+select ds_cpc_stringify(ds_cpc_sketch(float_col)) from functional_parquet.alltypestiny;
+---- RESULTS
+row_regex: .*### CPC sketch summary:.*lg_k.*seed hash.*C.*flavor.*### End sketch summary.*
+---- TYPES
+STRING
+====
