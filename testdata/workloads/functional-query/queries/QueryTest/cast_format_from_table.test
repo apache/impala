@@ -107,3 +107,15 @@ select cast("9999-12-31" as timestamp FORMAT "YYYY-MM-DD");
 ---- TYPES
 timestamp
 ====
+---- QUERY
+# Regression test for IMPALA-10691.
+set mt_dop=2;
+set max_scan_range_length=16384;
+select count(*) from alltypes a1, alltypes a2
+    where cast(cast(a1.date_string_col as date format 'MM/dd/yy') as string format 'MM/dd/yy') =
+          cast(cast(a2.date_string_col as date format 'MM/dd/yy') as string format 'MM/dd/yy');
+---- RESULTS
+73000
+---- TYPES
+bigint
+====

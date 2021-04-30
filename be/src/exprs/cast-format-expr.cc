@@ -34,18 +34,19 @@ Status CastFormatExpr::OpenEvaluator(FunctionContext::FunctionStateScope scope,
   DCHECK_GE(fn_ctx_idx_, 0);
   FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);
 
-  dt_ctx_ = std::make_unique<DateTimeFormatContext>(format_.c_str(), format_.length());
+  std::unique_ptr<DateTimeFormatContext> dt_ctx =
+      std::make_unique<DateTimeFormatContext>(format_.c_str(), format_.length());
   bool accept_time_toks = (fn_ctx->GetReturnType().type != FunctionContext::TYPE_DATE &&
                            fn_ctx->GetArgType(0)->type != FunctionContext::TYPE_DATE);
-  IsoSqlFormatTokenizer format_tokenizer(dt_ctx_.get(), GetCastMode(fn_ctx),
+  IsoSqlFormatTokenizer format_tokenizer(dt_ctx.get(), GetCastMode(fn_ctx),
       accept_time_toks);
   FormatTokenizationResult parse_result = format_tokenizer.Tokenize();
   if (parse_result != FormatTokenizationResult::SUCCESS) {
     ReportBadFormat(fn_ctx, parse_result, StringVal(format_.c_str()), true);
     return Status(TErrorCode::INTERNAL_ERROR, fn_ctx->error_msg());
   }
-  dt_ctx_->SetCenturyBreakAndCurrentTime(*fn_ctx->impl()->state()->now());
-  fn_ctx->SetFunctionState(scope, dt_ctx_.get());
+  dt_ctx->SetCenturyBreakAndCurrentTime(*fn_ctx->impl()->state()->now());
+  fn_ctx->SetFunctionState(scope, dt_ctx.release());
 
   return Status::OK();
 }
@@ -56,7 +57,12 @@ void CastFormatExpr::CloseEvaluator(FunctionContext::FunctionStateScope scope,
   if (scope == FunctionContext::FRAGMENT_LOCAL) {
     DCHECK_GE(fn_ctx_idx_, 0);
     FunctionContext* fn_ctx = eval->fn_context(fn_ctx_idx_);
-    fn_ctx->SetFunctionState(scope, nullptr);
+    DateTimeFormatContext* dt_ctx =
+        (DateTimeFormatContext*) fn_ctx->GetFunctionState(scope);
+    if (dt_ctx != nullptr) {
+      delete dt_ctx;
+      fn_ctx->SetFunctionState(scope, nullptr);
+    }
   }
   ScalarFnCall::CloseEvaluator(scope, state, eval);
 }

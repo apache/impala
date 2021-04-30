@@ -38,10 +38,6 @@ public:
       ScalarExprEvaluator* eval) const override;
 private:
   std::string format_;
-  /// Keeps track of the DateTimeFormatContext put into FunctionContext in
-  /// OpenEvaluator().
-  /// This is empty in case of FunctionContext::THREAD_LOCAL.
-  mutable std::unique_ptr<datetime_parse_util::DateTimeFormatContext> dt_ctx_;
 
   datetime_parse_util::CastDirection GetCastMode(const FunctionContext* ctx) const;
 };
