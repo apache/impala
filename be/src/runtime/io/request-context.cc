@@ -491,8 +491,7 @@ Status RequestContext::GetNextUnstartedRange(ScanRange** range, bool* needs_buff
       // Set this to nullptr, the next time this disk runs for this reader, it will
       // get another range ready.
       disk_states_[disk_id].set_next_scan_range_to_start(nullptr);
-      ScanRange::ExternalBufferTag buffer_tag = (*range)->external_buffer_tag();
-      if (buffer_tag == ScanRange::ExternalBufferTag::NO_BUFFER) {
+      if ((*range)->buffer_manager_->is_internal_buffer()) {
         // We can't schedule this range until the client gives us buffers. The context
         // must be rescheduled regardless to ensure that 'next_scan_range_to_start' is
         // refilled.
@@ -525,7 +524,7 @@ Status RequestContext::StartScanRange(ScanRange* range, bool* needs_buffers) {
   }
   // If we don't have a buffer yet, the caller must allocate buffers for the range.
   *needs_buffers =
-      range->external_buffer_tag() == ScanRange::ExternalBufferTag::NO_BUFFER;
+      range->buffer_manager_->is_internal_buffer();
   if (*needs_buffers) range->SetBlockedOnBuffer();
   AddActiveScanRangeLocked(lock, range);
   AddRangeToDisk(lock, range,
@@ -541,22 +540,22 @@ Status RequestContext::TryReadFromCache(const unique_lock<mutex>& lock,
   if (!*read_succeeded) return Status::OK();
 
   DCHECK(Validate()) << endl << DebugString();
-  ScanRange::ExternalBufferTag buffer_tag = range->external_buffer_tag();
   // The following cases are possible at this point:
   // * The scan range doesn't have sub-ranges:
-  // ** buffer_tag is CACHED_BUFFER and the buffer is already available to the reader.
+  // ** 'range->buffer_manager_->buffer_tag' is CACHED_BUFFER and the buffer is
+  //    already available to the reader.
   //    (there is nothing to do)
   //
-  // * The scan range has sub-ranges, and buffer_tag is:
-  // ** NO_BUFFER: the client needs to add buffers to the scan range
-  // ** CLIENT_BUFFER: the client already provided a buffer to copy data into it
-  *needs_buffers = buffer_tag == ScanRange::ExternalBufferTag::NO_BUFFER;
+  // * The scan range has sub-ranges, and 'range->buffer_manager_->buffer_tag' is:
+  // ** INTERNAL_BUFFER: the client needs to add buffers to the scan range.
+  // ** CLIENT_BUFFER: the client already provided a buffer to copy data into it.
+  *needs_buffers = range->buffer_manager_->is_internal_buffer();
   if (*needs_buffers) {
     DCHECK(range->HasSubRanges());
     range->SetBlockedOnBuffer();
     // The range will be scheduled when buffers are added to it.
     AddRangeToDisk(lock, range, ScheduleMode::BY_CALLER);
-  } else if (buffer_tag == ScanRange::ExternalBufferTag::CLIENT_BUFFER) {
+  } else if (range->buffer_manager_->is_client_buffer()) {
     DCHECK(range->HasSubRanges());
     AddRangeToDisk(lock, range, ScheduleMode::IMMEDIATELY);
   }

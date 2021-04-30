@@ -623,25 +623,8 @@ Status DiskIoMgr::ValidateScanRange(ScanRange* range) {
 
 Status DiskIoMgr::AllocateBuffersForRange(
     BufferPool::ClientHandle* bp_client, ScanRange* range, int64_t max_bytes) {
-  DCHECK_GE(max_bytes, min_buffer_size_);
-  DCHECK(range->external_buffer_tag() == ScanRange::ExternalBufferTag::NO_BUFFER)
-     << static_cast<int>(range->external_buffer_tag()) << " invalid to allocate buffers "
-     << "when already reading into an external buffer";
-  BufferPool* bp = ExecEnv::GetInstance()->buffer_pool();
-  Status status;
-  vector<unique_ptr<BufferDescriptor>> buffers;
-  for (int64_t buffer_size : ChooseBufferSizes(range->bytes_to_read(), max_bytes)) {
-    BufferPool::BufferHandle handle;
-    status = bp->AllocateBuffer(bp_client, buffer_size, &handle);
-    if (!status.ok()) goto error;
-    buffers.emplace_back(new BufferDescriptor(range, bp_client, move(handle)));
-  }
-  range->AddUnusedBuffers(move(buffers), false);
-  return Status::OK();
- error:
-  DCHECK(!status.ok());
-  range->CleanUpBuffers(move(buffers));
-  return status;
+  return range->AllocateBuffersForRange(bp_client, max_bytes,
+      min_buffer_size_, max_buffer_size_);
 }
 
 vector<int64_t> DiskIoMgr::ChooseBufferSizes(int64_t scan_range_len, int64_t max_bytes) {
