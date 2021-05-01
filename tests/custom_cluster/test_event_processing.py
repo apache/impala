@@ -433,6 +433,8 @@ class TestEventProcessing(CustomClusterTestSuite):
 
   def __get_impala_test_queries(self, db_name, recover_tbl_name):
     tbl_name = self.__get_random_name("tbl_")
+    acid_tbl_name = self.__get_random_name("acid_tbl_")
+    acid_no_part_tbl_name = self.__get_random_name("acid_no_part_tbl_")
     tbl2 = self.__get_random_name("tbl_")
     view_name = self.__get_random_name("view_")
     # create a empty table for both partitioned and unpartitioned case for testing insert
@@ -444,6 +446,7 @@ class TestEventProcessing(CustomClusterTestSuite):
     self.client.execute(
       "create table {0}.{1} (c1 int) partitioned by (part int)".format(db_name,
         empty_partitioned_tbl))
+    acid_props = self.__get_transactional_tblproperties(True)
     self_event_test_queries = {
       # Queries which will increment the self-events-skipped counter
       True: [
@@ -478,7 +481,16 @@ class TestEventProcessing(CustomClusterTestSuite):
             db_name, tbl2),
           # compute stats will generates ALTER_PARTITION
           "compute stats {0}.{1}".format(db_name, tbl2),
-          "alter table {0}.{1} recover partitions".format(db_name, recover_tbl_name)],
+          "alter table {0}.{1} recover partitions".format(db_name, recover_tbl_name),
+          # insert into a existing partition; generates INSERT self-event
+          "insert into table {0}.{1} partition "
+          "(year, month) select * from functional.alltypessmall where year=2009 "
+          "and month=1".format(db_name, tbl2),
+          # insert overwrite query from Impala also generates a INSERT self-event
+          "insert overwrite table {0}.{1} partition "
+          "(year, month) select * from functional.alltypessmall where year=2009 "
+          "and month=1".format(db_name, tbl2),
+          ],
       # Queries which will not increment the self-events-skipped counter
       False: [
           "create table {0}.{1} like functional.alltypessmall "
@@ -502,17 +514,37 @@ class TestEventProcessing(CustomClusterTestSuite):
             db_name, empty_unpartitioned_tbl),
           "insert overwrite {0}.{1} partition(part) select * from {0}.{1}".format(
             db_name, empty_partitioned_tbl),
+          # in case of ACID tables no INSERT event is generated as the COMMIT event
+          # contains the related data
+          "create table {0}.{1} (c1 int) {2}".format(db_name,
+            acid_no_part_tbl_name, acid_props),
+          "insert into table {0}.{1} values (1) ".format(db_name, acid_no_part_tbl_name),
+          "insert overwrite table {0}.{1} select * from {0}.{1}".format(
+            db_name, acid_no_part_tbl_name),
+          "truncate table {0}.{1}".format(db_name, acid_no_part_tbl_name),
+          # the table is empty so the following insert adds 0 rows
+          "insert overwrite table {0}.{1} select * from {0}.{1}".format(
+            db_name, acid_no_part_tbl_name),
+          "create table {0}.{1} (c1 int) partitioned by (part int) {2}".format(db_name,
+            acid_tbl_name, acid_props),
+          "insert into table {0}.{1} partition (part=1) "
+            "values (1) ".format(db_name, acid_tbl_name),
+          "insert into table {0}.{1} partition (part) select id, int_col "
+            "from functional.alltypestiny".format(db_name, acid_tbl_name),
+          # repeat the same insert, now it writes to existing partitions
+          "insert into table {0}.{1} partition (part) select id, int_col "
+            "from functional.alltypestiny".format(db_name, acid_tbl_name),
+          # following insert overwrite is used instead of truncate, because truncate
+          # leads to a non-self event that reloads the table
+          "insert overwrite table {0}.{1} partition (part) select id, int_col "
+            "from functional.alltypestiny where id=-1".format(db_name, acid_tbl_name),
+          # the table is empty so the following inserts add 0 rows
+          "insert overwrite table {0}.{1} partition (part) select id, int_col "
+            "from functional.alltypestiny".format(db_name, acid_tbl_name),
+          "insert overwrite {0}.{1} partition(part) select * from {0}.{1}".format(
+            db_name, acid_tbl_name),
       ]
     }
-    if HIVE_MAJOR_VERSION >= 3:
-      # insert into a existing partition; generates INSERT self-event
-      self_event_test_queries[True].append("insert into table {0}.{1} partition "
-          "(year, month) select * from functional.alltypessmall where year=2009 "
-          "and month=1".format(db_name, tbl2))
-      # insert overwrite query from Impala also generates a INSERT self-event
-      self_event_test_queries[True].append("insert overwrite table {0}.{1} partition "
-         "(year, month) select * from functional.alltypessmall where year=2009 "
-         "and month=1".format(db_name, tbl2))
     return self_event_test_queries
 
   def __get_hive_test_queries(self, db_name, recover_tbl_name):
