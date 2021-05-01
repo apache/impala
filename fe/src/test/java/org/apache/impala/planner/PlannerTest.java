@@ -36,6 +36,7 @@ import org.apache.impala.thrift.TEnabledRuntimeFilterTypes;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TJoinDistributionMode;
+import org.apache.impala.thrift.TKuduReplicaSelection;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterMode;
@@ -683,6 +684,17 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.VERBOSE);
     runPlannerTestFile("kudu-selectivity", options);
+  }
+
+  @Test
+  public void testKuduReplicaSelection() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setExplain_level(TExplainLevel.VERBOSE);
+    options.setKudu_replica_selection(TKuduReplicaSelection.LEADER_ONLY);
+    runPlannerTestFile("kudu-replica-selection-leader-only", options);
+
+    options.setKudu_replica_selection(TKuduReplicaSelection.CLOSEST_REPLICA);
+    runPlannerTestFile("kudu-replica-selection-closest-replica", options);
   }
 
   @Test

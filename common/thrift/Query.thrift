@@ -52,6 +52,11 @@ enum TKuduReadMode {
   READ_AT_SNAPSHOT = 2
 }
 
+enum TKuduReplicaSelection {
+  LEADER_ONLY = 0
+  CLOSEST_REPLICA = 1
+}
+
 enum TJoinDistributionMode {
   BROADCAST = 0
   SHUFFLE = 1
@@ -493,6 +498,10 @@ struct TQueryOptions {
 
   // Default NDV scale
   127: optional i32 default_ndv_scale = 2;
+
+  // See comment in ImpalaService.thrift
+  128: optional TKuduReplicaSelection kudu_replica_selection =
+      TKuduReplicaSelection.CLOSEST_REPLICA;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

@@ -236,6 +236,9 @@ TEST(QueryOptions, SetEnumOptions) {
       CASE(enabled_runtime_filter_types, TEnabledRuntimeFilterTypes,
           (BLOOM, MIN_MAX, ALL)),
       true);
+  TestEnumCase(options,
+      CASE(kudu_replica_selection, TKuduReplicaSelection, (LEADER_ONLY, CLOSEST_REPLICA)),
+      true);
 #undef CASE
 #undef ENTRIES
 #undef ENTRY

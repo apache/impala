@@ -1076,6 +1076,14 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_default_ndv_scale(scale);
         break;
       }
+      case TImpalaQueryOptions::KUDU_REPLICA_SELECTION: {
+        // Parse the kudu replica selection and validate it.
+        TKuduReplicaSelection::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "kudu replica selection",
+            _TKuduReplicaSelection_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_kudu_replica_selection(enum_type);
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

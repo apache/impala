@@ -46,6 +46,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TKuduReplicaSelection;
 import org.apache.impala.thrift.TKuduScanNode;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPlanNode;
@@ -65,6 +66,7 @@ import org.apache.kudu.client.KuduPredicate.ComparisonOp;
 import org.apache.kudu.client.KuduScanToken;
 import org.apache.kudu.client.KuduScanToken.KuduScanTokenBuilder;
 import org.apache.kudu.client.LocatedTablet;
+import org.apache.kudu.consensus.Metadata.RaftPeerPB.Role;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,6 +99,9 @@ public class KuduScanNode extends ScanNode {
   // True if this scan node should use the MT implementation in the backend.
   // Set in computeNodeResourceProfile().
   private boolean useMtScanNode_;
+
+  // True if the query option of replica selection is set as leader-only.
+  private boolean replicaSelectionLeaderOnly_ = false;
 
   // Indexes for the set of hosts that will be used for the query.
   // From analyzer.getHostIndex().getIndex(address)
@@ -217,6 +222,8 @@ public class KuduScanNode extends ScanNode {
       throws ImpalaRuntimeException {
     scanRangeSpecs_ = new TScanRangeSpec();
 
+    replicaSelectionLeaderOnly_ = (analyzer.getQueryOptions().getKudu_replica_selection()
+        == TKuduReplicaSelection.LEADER_ONLY);
     List<KuduScanToken> scanTokens = createScanTokens(analyzer, client, rpcTable);
     for (KuduScanToken token: scanTokens) {
       LocatedTablet tablet = token.getTablet();
@@ -228,6 +235,13 @@ public class KuduScanNode extends ScanNode {
       }
 
       for (LocatedTablet.Replica replica: tablet.getReplicas()) {
+        // Skip non-leader replicas if query option KUDU_REPLICA_SELECTION is set as
+        // LEADER_ONLY.
+        if (replicaSelectionLeaderOnly_
+            && !replica.getRole().equals(Role.LEADER.toString())) {
+          continue;
+        }
+
         TNetworkAddress address =
             new TNetworkAddress(replica.getRpcHost(), replica.getRpcPort());
         // Use the network address to look up the host in the global list
@@ -406,8 +420,10 @@ public class KuduScanNode extends ScanNode {
     StringBuilder result = new StringBuilder();
 
     String aliasStr = desc_.hasExplicitAlias() ? " " + desc_.getAlias() : "";
-    result.append(String.format("%s%s:%s [%s%s]\n", prefix, id_.toString(), displayName_,
-        kuduTable_.getFullName(), aliasStr));
+    result.append(
+        String.format(replicaSelectionLeaderOnly_ ? "%s%s:%s [%s%s, LEADER-only]\n" :
+                                                    "%s%s:%s [%s%s]\n",
+            prefix, id_.toString(), displayName_, kuduTable_.getFullName(), aliasStr));
 
     switch (detailLevel) {
       case MINIMAL: break;

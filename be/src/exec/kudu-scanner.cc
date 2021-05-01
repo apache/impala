@@ -60,8 +60,6 @@ using kudu::client::KuduValue;
 DEFINE_string(kudu_read_mode, "READ_LATEST", "(Advanced) Sets the Kudu scan ReadMode. "
     "Supported Kudu read modes are READ_LATEST and READ_AT_SNAPSHOT. Can be overridden "
     "with the query option of the same name.");
-DEFINE_bool(pick_only_leaders_for_tests, false,
-            "Whether to pick only leader replicas, for tests purposes only.");
 DEFINE_int32(kudu_scanner_keep_alive_period_sec, 15,
     "The period at which Kudu Scanners should send keep-alive requests to the tablet "
     "server to ensure that scanners do not time out.");
@@ -192,7 +190,8 @@ Status KuduScanner::OpenNextScanToken(const string& scan_token, bool* eos) {
       BuildErrorString("Unable to deserialize scan token"));
   scanner_.reset(scanner);
 
-  if (UNLIKELY(FLAGS_pick_only_leaders_for_tests)) {
+  if (state_->query_options().kudu_replica_selection
+      == TKuduReplicaSelection::LEADER_ONLY) {
     KUDU_RETURN_IF_ERROR(scanner_->SetSelection(kudu::client::KuduClient::LEADER_ONLY),
         BuildErrorString("Could not set replica selection"));
   }

@@ -550,6 +550,23 @@ class TestKuduOperations(KuduTestSuite):
     where id > 2 limit 100""" % table_name)
     self._retry_query(cursor, "select count(*) from %s" % table_name, [(103,)])
 
+  def test_replica_selection(self, cursor, unique_database):
+    """This test verifies that scans work as expected with different replica selection.
+    """
+    table_name = "%s.replica_selection" % unique_database
+    cursor.execute("""create table %s (a int primary key, b string) partition by hash(a)
+        partitions 8 stored as kudu""" % table_name)
+    cursor.execute("""insert into %s select id, string_col from functional.alltypes
+        limit 100""" % table_name)
+
+    cursor.execute("set kudu_replica_selection=LEADER_ONLY")
+    cursor.execute("select count(*) from %s" % table_name)
+    assert cursor.fetchall() == [(100,)]
+
+    cursor.execute("set kudu_replica_selection=CLOSEST_REPLICA")
+    cursor.execute("select count(*) from %s" % table_name)
+    assert cursor.fetchall() == [(100,)]
+
 
 class TestKuduPartitioning(KuduTestSuite):
   @classmethod

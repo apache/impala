@@ -656,6 +656,11 @@ enum TImpalaQueryOptions {
   // Default NDV scale settings, make it easier to change scale in SQL function
   // NDV(<expr>).
   DEFAULT_NDV_SCALE = 126
+
+  // Policy with which to choose amongst multiple Kudu replicas.
+  //     LEADER_ONLY     - Select the LEADER replica.
+  //     CLOSEST_REPLICA - Select the closest replica to the client (default).
+  KUDU_REPLICA_SELECTION = 127
 }
 
 // The summary of a DML statement.
