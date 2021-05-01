@@ -4669,8 +4669,9 @@ public class CatalogOpExecutor {
           Lists.newArrayList();
       // Names of the partitions that are added with add_partitions() RPC.
       // add_partitions() fires events for these partitions, so we don't need to
-      // fire an insert event.
-      Set<String> addedPartitionNames = new HashSet<>();
+      // fire an insert event. Collect the partition name both as a single string and
+      // as a list of values for convenience.
+      Map<String, List<String>> addedPartitionNames = new HashMap<>();
       addCatalogServiceIdentifiers(table, catalog_.getCatalogServiceId(),
           newCatalogVersion);
       if (table.getNumClusteringCols() > 0) {
@@ -4742,7 +4743,7 @@ public class CatalogOpExecutor {
             for (org.apache.hadoop.hive.metastore.api.Partition part: addedHmsParts) {
               String part_name =
                   FeCatalogUtils.getPartitionName((FeFsTable)table, part.getValues());
-              addedPartitionNames.add(part_name);
+              addedPartitionNames.put(part_name, part.getValues());
             }
             if (addedHmsParts.size() > 0) {
               if (cachePoolName != null) {
@@ -4886,7 +4887,8 @@ public class CatalogOpExecutor {
    * @param tblTxn Contains the transactionId and the writeId for the insert.
    */
   private void createInsertEvents(FeFsTable table,
-      Map<String, TUpdatedPartition> updatedPartitions, Set<String> addedPartitionNames,
+      Map<String, TUpdatedPartition> updatedPartitions,
+      Map<String, List<String>> addedPartitionNames,
       boolean isInsertOverwrite, TblTransaction tblTxn) throws CatalogException {
     if (!shouldGenerateInsertEvents()) {
       return;
@@ -4907,18 +4909,13 @@ public class CatalogOpExecutor {
     boolean isPartitioned = table.getNumClusteringCols() > 0;
     // List of all insert events that we call HMS fireInsertEvent() on.
     List<InsertEventRequestData> insertEventReqDatas = new ArrayList<>();
-    // List of all partitions that we insert into
-    List<HdfsPartition> partitions = new ArrayList<>();
+    // List of all existing partitions that we insert into.
+    List<HdfsPartition> existingPartitions = new ArrayList<>();
     if (isPartitioned) {
-      Set<String> partSet = updatedPartitions.keySet();
-      if (!isTransactional) {
-        // add_partitions() RPC have already fired events for new partitions in the
-        // non-transactional case.
-        partSet = new HashSet<String>(partSet);
-        partSet.removeAll(addedPartitionNames);
-      }
+      Set<String> existingPartSet = new HashSet<String>(updatedPartitions.keySet());
+      existingPartSet.removeAll(addedPartitionNames.keySet());
       // Only HdfsTable can have partitions, Iceberg tables are treated as unpartitioned.
-      partitions = ((HdfsTable) table).getPartitionsForNames(partSet);
+      existingPartitions = ((HdfsTable) table).getPartitionsForNames(existingPartSet);
     } else {
       Preconditions.checkState(updatedPartitions.size() == 1);
       // Unpartitioned tables have a single partition with empty name,
@@ -4932,7 +4929,8 @@ public class CatalogOpExecutor {
           makeInsertEventData( table, partVals, newFiles, isInsertOverwrite));
     }
 
-    for (HdfsPartition part : partitions) {
+    // Create events for existing partitions in partitioned tables.
+    for (HdfsPartition part : existingPartitions) {
       List<String> newFiles = updatedPartitions.get(part.getPartitionName()).getFiles();
       List<String> partVals  = part.getPartitionValuesAsStrings(true);
       Preconditions.checkState(!newFiles.isEmpty() || isInsertOverwrite);
@@ -4943,19 +4941,46 @@ public class CatalogOpExecutor {
           makeInsertEventData(table, partVals, newFiles, isInsertOverwrite));
     }
 
-    if (insertEventReqDatas.isEmpty()) return;
+    // Create events for new partitions only in ACID tables.
+    if (isTransactional) {
+      for (Map.Entry<String, List<String>> part : addedPartitionNames.entrySet()) {
+        List<String> newFiles = updatedPartitions.get(part.getKey()).getFiles();
+        List<String> partVals  = part.getValue();
+        Preconditions.checkState(!newFiles.isEmpty() || isInsertOverwrite);
+        Preconditions.checkState(!partVals.isEmpty());
+        LOG.info(String.format("%s new files detected for table %s new partition %s",
+            newFiles.size(), table.getFullName(), part.getKey()));
+        insertEventReqDatas.add(
+            makeInsertEventData(table, partVals, newFiles, isInsertOverwrite));
+      }
+    }
+
+    if (insertEventReqDatas.isEmpty()) {
+      return;
+    }
 
     MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient();
     TableInsertEventInfo insertEventInfo = new TableInsertEventInfo(
         insertEventReqDatas, isTransactional, txnId, writeId);
     List<Long> eventIds = MetastoreShim.fireInsertEvents(metaStoreClient,
         insertEventInfo, table.getDb().getName(), table.getName());
+    if (isTransactional) {
+      // ACID inserts do not generate INSERT events as it is enough to listen to the
+      // COMMIT event fired by HMS. Impala ignores COMMIT events, so we don't
+      // have to worry about reloading as a result of this "self" event.
+      // Note that Hive inserts also lead to an ALTER event which is the actual event
+      // that causes Impala to reload the table.
+      Preconditions.checkState(eventIds.isEmpty());
+      return;
+    }
     if (!eventIds.isEmpty()) {
       if (!isPartitioned) { // insert into table
+        Preconditions.checkState(eventIds.size() == 1);
         catalog_.addVersionsForInflightEvents(true, (Table)table, eventIds.get(0));
       } else { // insert into partition
-        for (int par_idx = 0; par_idx < partitions.size(); par_idx++) {
-          partitions.get(par_idx).addToVersionsForInflightEvents(
+        Preconditions.checkState(existingPartitions.size() == eventIds.size());
+        for (int par_idx = 0; par_idx < existingPartitions.size(); par_idx++) {
+          existingPartitions.get(par_idx).addToVersionsForInflightEvents(
               true, eventIds.get(par_idx));
         }
       }
