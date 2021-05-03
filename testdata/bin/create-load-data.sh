@@ -335,19 +335,21 @@ function setup-ranger {
     "${RANGER_SETUP_DIR}/impala_group_owner.json.template" > \
     "${RANGER_SETUP_DIR}/impala_group_owner.json"
 
-  export GROUP_ID_OWNER=$(wget -qO - --auth-no-challenge --user=admin --password=admin \
+  GROUP_ID_OWNER=$(wget -qO - --auth-no-challenge --user=admin --password=admin \
     --post-file="${RANGER_SETUP_DIR}/impala_group_owner.json" \
     --header="accept:application/json" \
     --header="Content-Type:application/json" \
     http://localhost:6080/service/xusers/secure/groups |
     python -c "import sys, json; print json.load(sys.stdin)['id']")
+  export GROUP_ID_OWNER
 
-  export GROUP_ID_NON_OWNER=$(wget -qO - --auth-no-challenge --user=admin \
+  GROUP_ID_NON_OWNER=$(wget -qO - --auth-no-challenge --user=admin \
     --password=admin --post-file="${RANGER_SETUP_DIR}/impala_group_non_owner.json" \
     --header="accept:application/json" \
     --header="Content-Type:application/json" \
     http://localhost:6080/service/xusers/secure/groups |
     python -c "import sys, json; print json.load(sys.stdin)['id']")
+  export GROUP_ID_NON_OWNER
 
   perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
     "${RANGER_SETUP_DIR}/impala_user_owner.json.template" > \
@@ -382,7 +384,8 @@ function setup-ranger {
     --header="Content-Type:application/json" \
     http://localhost:6080/service/public/v2/api/service
 
-  curl -u admin:admin -H "Accept: application/json" -H "Content-Type: application/json" \
+  curl -f -u admin:admin -H "Accept: application/json" \
+    -H "Content-Type: application/json" \
     -X PUT http://localhost:6080/service/public/v2/api/policy/4 \
     -d @"${RANGER_SETUP_DIR}/policy_4_revised.json"
 }
