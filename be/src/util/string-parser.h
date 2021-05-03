@@ -24,10 +24,12 @@
 #include "common/compiler-util.h"
 
 #include "common/logging.h"
+#include <gtest/gtest_prod.h>
 #include "runtime/decimal-value.h"
 #include "runtime/date-parse-util.h"
 #include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
+#include "thirdparty/fast_double_parser/fast_double_parser.h"
 #include "util/decimal-util.h"
 
 namespace impala {
@@ -282,6 +284,12 @@ class StringParser {
   }
 
  private:
+  // Max length of string passed to 'fast_double_parser::parse_number'.
+  static const int MAX_LEN_FAST_FLOAT_PARSER = 50;
+
+  // Not using FRIEND_TEST as TestStringToFloatPreprocess is not a TestSuite
+  friend void TestStringToFloatPreprocess(const char* s, const char* expected);
+
   /// This is considerably faster than glibc's implementation.
   /// In the case of overflow, the max/min value for the data type will be returned.
   /// Assumes s represents a decimal number.
@@ -447,14 +455,13 @@ class StringParser {
     return len >= 3 && strncasecmp(s, "nan", 3) == 0 && IsAllWhitespace(s + 3, len - 3);
   }
 
-  /// This is considerably faster than glibc's implementation (>100x why???)
-  /// No special case handling needs to be done for overflows, the floating point spec
-  /// already does it and will cap the values to -inf/inf
-  /// To avoid inaccurate conversions this function falls back to strtod for
-  /// scientific notation.
+  /// Function to convert string to float. It is a wrapper over
+  /// fast_double_parser::parse_number which provides fast function to parse string into
+  /// double. It accepts string with notations like "1.0e10". It would not sacrifise
+  /// accuracy and match exactly (down the smallest bit) the result of a standard
+  /// function like strtod.
+  /// On failure result is set to PARSE_FAILURE and 0 is returned.
   /// Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
-  /// TODO: Investigate using intrinsics to speed up the slow strtod path.
-  /// TODO: there are other possible optimizations, see IMPALA-1729
   template <typename T>
   static inline T StringToFloatInternal(const char* s, int len, ParseResult* result) {
     if (UNLIKELY(len <= 0)) {
@@ -481,69 +488,56 @@ class StringParser {
           : std::numeric_limits<T>::quiet_NaN();
     }
 
-    // Use double here to not lose precision while accumulating the result
-    double val = 0;
-    double divide = 1;
-    bool decimal = false;
-    int64_t remainder = 0;
-    // The number of significant figures we've encountered so far (i.e., digits excluding
-    // leading 0s). This technically shouldn't count trailing 0s either, but for us it
-    // doesn't matter if we count them based on the implementation below.
-    int sig_figs = 0;
-    const int first = i;
-    for (; i < len; ++i) {
-      if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
-        if (s[i] != '0' || sig_figs > 0) ++sig_figs;
-        if (decimal) {
-          // According to the IEEE floating-point spec, a double has up to 15-17
-          // significant decimal digits (see
-          // http://en.wikipedia.org/wiki/Double-precision_floating-point_format). We stop
-          // processing digits after we've already seen at least 18 sig figs to avoid
-          // overflowing 'remainder' (we stop after 18 instead of 17 to get the rounding
-          // right).
-          if (sig_figs <= 18) {
-            remainder = remainder * 10 + s[i] - '0';
-            divide *= 10;
-          }
-        } else {
-          val = val * 10 + s[i] - '0';
-        }
-      } else if (!decimal && s[i] == '.') {
-        decimal = true;
-      } else if (s[i] == 'e' || s[i] == 'E') {
-        break;
-      } else {
-        if ((UNLIKELY(i == first || !IsAllWhitespace(s + i, len - i)))) {
-          // Reject the string because either the first char was not a digit, "." or "e",
-          // or the remaining chars are not all whitespace
-          *result = PARSE_FAILURE;
-          return 0;
-        }
-        // skip trailing whitespace.
-        break;
-      }
+    // Using the fast_double_parser library function to parse strings
+    // containing decimal numbers into double-precision (binary64)
+    // floating-point values. Function is performant and does not sacrifice accuracy.
+    // The function will match exactly (down the smallest bit) the result of a
+    // standard function like strtod.
+
+    const char * s_end; // post-parsing will point after last character parsed.
+    int trailing_len; // length of remaning string not parsed by library
+
+    // Below  are used for making copy of 's' if required.
+    // For short string c_str will be used and for longer string 's_copy' is used.
+    char c_str[StringParser::MAX_LEN_FAST_FLOAT_PARSER + 2];
+    std::string s_copy;
+
+    // Needs non-zero intitialization, as fast_parser library returns 0 for
+    // UNDERFLOW error.
+    double val = 1;
+    // Use stack for copying short string and use std::string (malloc) for
+    // longer string.
+    if (LIKELY(len - i < StringParser::MAX_LEN_FAST_FLOAT_PARSER)) {
+      // Process the string and make it compatible for the library.
+      int input_len = StringToFloatPreprocess(s + i, len - i, c_str);
+      s_end = fast_double_parser::parse_number(c_str, &val);
+      trailing_len = input_len - (int) (s_end - c_str);
+    } else {
+      // Parser library will invoke 'strtod' for longer string so directly invoke
+      // it to avoid preprocessing.
+      s_copy.insert(0, s + i, len - i);
+      s_end = fast_double_parser::parse_float_strtod(s_copy.c_str(), &val);
+      trailing_len = s_copy.length() - (s_end - s_copy.c_str());
     }
 
-    val += remainder / divide;
-
-    if (i < len && (s[i] == 'e' || s[i] == 'E')) {
-      // Create a C-string from s starting after the optional '-' sign and fall back to
-      // strtod to avoid conversion inaccuracy for scientific notation.
-      // Do not use boost::lexical_cast because it causes codegen to crash for an
-      // unknown reason (exception handling?).
-      char c_str[len - negative + 1];
-      memcpy(c_str, s + negative, len - negative);
-      c_str[len - negative] = '\0';
-      char* s_end;
-      val = strtod(c_str, &s_end);
-      if (s_end != c_str + len - negative) {
-        // skip trailing whitespace
-        int trailing_len = len - negative - (int)(s_end - c_str);
-        if (UNLIKELY(!IsAllWhitespace(s_end, trailing_len))) {
-          *result = PARSE_FAILURE;
-          return val;
-        }
+    if (UNLIKELY(s_end == nullptr)) {
+      // Determine if it is an overflow case
+      if (UNLIKELY(!std::isfinite(val))) {
+        *result = PARSE_OVERFLOW;
+      } else if (UNLIKELY(val == 0)) {
+        *result = PARSE_UNDERFLOW;
+      } else {
+        *result = PARSE_FAILURE;
+        return 0;
       }
+      return (T)(negative ? -val : val);
+    }
+
+    // check if trailing characters are present and are all white spaces
+    DCHECK(trailing_len >= 0);
+    if (UNLIKELY(trailing_len > 0 && !IsAllWhitespace(s_end, trailing_len))) {
+      *result = PARSE_FAILURE;
+      return 0;
     }
 
     // Determine if it is an overflow case and update the result
@@ -553,6 +547,43 @@ class StringParser {
       *result = PARSE_SUCCESS;
     }
     return (T)(negative ? -val : val);
+  }
+
+  /// Internal utility function for `StringToFloatInternal`.
+  /// It performs these 3 things to make strings compatible with
+  /// `fast_double_parser::parse_number`:
+  /// 1. Removes leading 0s before another integer i.e.,'000012'->'12', '01.2'->'1.2'
+  /// 2. Collapsing leading 0s before any digit
+  ///    i.e., '000.7'->'0.7', '0000'->'0', '00077.7' -> '77.7'.
+  /// 3. Prefix strings starting with '.' like '.56' or '-.56' with 0.
+  /// 'result' will point to processed string which will be null-terminated.
+  /// length of null-terminated string pointed to by 'result' is returned.
+  /// It doesn't handle strings starting with sign like "+" or "-".
+  static inline int StringToFloatPreprocess(const char* s, int len, char * result) {
+    int result_len = 0; // current length of 'result'
+    const char* curr = StripLeadingZeros(s, len);
+    int curr_len = (int) (s + len - curr); // remanining length of 'curr'
+    if (UNLIKELY(*curr == '.')) {
+      // Prefix strings starting with '.' like '.56' or '-.56' with 0.
+      result[result_len++] = '0';
+    }
+    // copy rest 'curr' to result 'res'
+    memcpy(result + result_len, curr, curr_len);
+    result_len += curr_len;
+    result[result_len] = '\0';
+    return result_len;
+  }
+
+  /// Utility to collapse leading 0s before any digit
+  /// E.g., '000.7'->'0.7', '0000'->'0', '00077.7'->'77.7'.
+  static inline const char* StripLeadingZeros(const char* s, int len) {
+    const char* curr = s;
+    const char* end = s + len - 1;
+    while(curr < end && *curr == '0'
+        && fast_double_parser::is_integer(*(curr + 1))) {
+      curr++;
+    }
+    return curr;
   }
 
   /// Parses a string for 'true' or 'false', case insensitive.

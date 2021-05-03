@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <boost/lexical_cast.hpp>
 #include "testutil/gtest-util.h"
@@ -97,11 +98,11 @@ template<typename T>
 void TestFloatValue(const string& s, StringParser::ParseResult exp_result) {
   StringParser::ParseResult result;
   T val = StringParser::StringToFloat<T>(s.data(), s.length(), &result);
-  EXPECT_EQ(exp_result, result);
+  EXPECT_EQ(exp_result, result) << s;
 
   if (exp_result == StringParser::PARSE_SUCCESS && result == exp_result) {
     T exp_val = strtod(s.c_str(), NULL);
-    EXPECT_EQ(exp_val, val);
+    EXPECT_EQ(exp_val, val) << s;
   }
 }
 
@@ -151,6 +152,20 @@ void TestFloatBruteForce() {
     string s = lexical_cast<string>(cur_val);
     TestFloatValue<T>(s, StringParser::PARSE_SUCCESS);
     cur_val /= 2;
+  }
+}
+
+void TestStringToFloatPreprocess(const char* s, const char* expected) {
+  string trailers[] = {"", "4567", "fdfgh"};
+  for (int i = 0; i < 3; ++i) {
+    string input = s + trailers[i];
+    // don't process trailers
+    int processing_len = input.length() - trailers[i].length();
+    char result[input.length() + 2];
+    int res = StringParser::StringToFloatPreprocess(input.data(), processing_len,
+      result);
+    EXPECT_EQ(strlen(expected), res);
+    EXPECT_EQ(string(result), string(expected));
   }
 }
 
@@ -452,6 +467,10 @@ TEST(StringToFloat, Basic) {
   TestAllFloatVariants("12.34.5.6", StringParser::PARSE_FAILURE);
   TestAllFloatVariants("0..e", StringParser::PARSE_FAILURE);
 
+  //Test longer strings (>100)
+  string space_100(100, '0');
+  TestAllFloatVariants(space_100 + ".7" + space_100, StringParser::PARSE_SUCCESS);
+
   // Test broken strings with null-character in the middle.
   string s1("in\0f", 4);
   TestAllFloatVariants(s1, StringParser::PARSE_FAILURE);
@@ -504,6 +523,30 @@ TEST(StringToFloat, InvalidLeadingTrailing) {
 TEST(StringToFloat, BruteForce) {
   TestFloatBruteForce<float>();
   TestFloatBruteForce<double>();
+}
+
+TEST(StringToFloat, Preprocess) {
+  TestStringToFloatPreprocess("00000000000000", "0");
+  TestStringToFloatPreprocess("0000000000000234", "234");
+  TestStringToFloatPreprocess("00000000000000.1", "0.1");
+  TestStringToFloatPreprocess("0000000134.56", "134.56");
+  TestStringToFloatPreprocess(".765", "0.765");
+  TestStringToFloatPreprocess("000006.4396785e3", "6.4396785e3");
+  TestStringToFloatPreprocess(".43256e4", "0.43256e4");
+  // Inputs for which function is Identity function.
+  TestStringToFloatPreprocess("0.5", "0.5");
+  TestStringToFloatPreprocess("123", "123");
+  TestStringToFloatPreprocess("12.33432435454", "12.33432435454");
+  TestStringToFloatPreprocess("infinity", "infinity");
+  TestStringToFloatPreprocess("NaN", "NaN");
+  TestStringToFloatPreprocess("6.4396785e3", "6.4396785e3");
+  // Invalid input
+  TestStringToFloatPreprocess("0NaN", "0NaN");
+  TestStringToFloatPreprocess("000000  ^&$23", "0  ^&$23");
+  TestStringToFloatPreprocess(".&*(%", "0.&*(%");
+  TestStringToFloatPreprocess("rrtrtsgfg", "rrtrtsgfg");
+  TestStringToFloatPreprocess("-0000.4", "-0000.4");
+  TestStringToFloatPreprocess("+.4675", "+.4675");
 }
 
 TEST(StringToBool, Basic) {

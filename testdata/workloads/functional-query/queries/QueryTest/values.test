@@ -133,3 +133,11 @@ select cast(1 - 0.56850423426112684 as double),
 ---- TYPES
 DOUBLE,DOUBLE,DOUBLE,DOUBLE,DOUBLE
 ====
+---- QUERY
+# IMPALA-10680: Test accurate conversion from string to double
+select cast("0.43149576573887316" as double)
+---- RESULTS
+0.43149576573887316
+---- TYPES
+DOUBLE
+====

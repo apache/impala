@@ -3224,16 +3224,26 @@ TEST_P(ExprTest, CastExprs) {
   TestCast("cast(0.01234567890123456789 as double)", 0.01234567890123456789);
   TestCast("cast(0.1234567890123456789 as double)", 0.1234567890123456789);
   TestCast("cast(-2.2250738585072020E-308 as double)", -2.2250738585072020e-308);
+  // casting string to double
+  TestCast("cast('0.43149576573887316' as double)", 0.43149576573887316);
+  TestCast("cast('-0.43149576573887316' as double)", -0.43149576573887316);
+  TestCast("cast('0.123e10' as double)", 0.123e10);
+  TestCast("cast('123.123e10' as double)", 123.123e10, true);
+  TestCast("cast('1.01234567890123456789' as double)", 1.01234567890123456789);
 
   // From http://en.wikipedia.org/wiki/Double-precision_floating-point_format
   // Min subnormal positive double
   TestCast("cast(4.9406564584124654e-324 as double)", 4.9406564584124654e-324);
+  TestCast("cast('4.9406564584124654e-324' as double)", 4.9406564584124654e-324);
   // Max subnormal double
   TestCast("cast(2.2250738585072009e-308 as double)", 2.2250738585072009e-308);
+  TestCast("cast('2.2250738585072009e-308' as double)", 2.2250738585072009e-308);
   // Min normal positive double
   TestCast("cast(2.2250738585072014e-308 as double)", 2.2250738585072014e-308);
+  TestCast("cast('2.2250738585072014e-308' as double)", 2.2250738585072014e-308);
   // Max Double
   TestCast("cast(1.7976931348623157e+308 as double)", 1.7976931348623157e308, true);
+  TestCast("cast('1.7976931348623157e+308' as double)", 1.7976931348623157e308, true);
 
   // From String
   TestCast("'0'", "0");
