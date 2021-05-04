@@ -533,6 +533,17 @@ class TestHdfsParquetTableWriter(ImpalaTestSuite):
     self._ctas_and_check_int64_timestamps(vector, unique_database, tmpdir, "micros")
     self._ctas_and_check_int64_timestamps(vector, unique_database, tmpdir, "nanos")
 
+  # Skip test for non-HDFS environment as it uses Hive statement.
+  # Hive statement is being used as Impala's result are converted
+  # by python to string. In both HS2 and beewax, it only handles float
+  # precision uptil 16 decimal digits and test needs 17.
+  # IMPALA-9365 describes why HS2 is not started on non-HDFS test env.
+  @SkipIfS3.hive
+  @SkipIfGCS.hive
+  @SkipIfABFS.hive
+  @SkipIfADLS.hive
+  @SkipIfIsilon.hive
+  @SkipIfLocal.hive
   def test_double_precision(self, vector, unique_database):
     # IMPALA-10654: Test inserting double into Parquet table retains the precision.
     src_tbl = "{0}.{1}".format(unique_database, "i10654_parquet")
