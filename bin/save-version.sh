@@ -21,8 +21,8 @@
 # Note: for internal (aka pre-release) versions, the version should have
 # "-INTERNAL" appended. Parts of the code will look for this to distinguish
 # between released and internal versions.
-VERSION=4.0.0-SNAPSHOT
-GIT_HASH=$(git rev-parse HEAD 2> /dev/null)
+VERSION=4.0.0-RELEASE
+GIT_HASH=676f79aa81d02c8638439edf6a43841fb0a7671e
 if [ -z $GIT_HASH ]
 then
   GIT_HASH="Could not obtain git hash"
