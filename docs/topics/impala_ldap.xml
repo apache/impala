@@ -121,7 +121,7 @@ under the License.
         <dlentry>
 
           <dt>
-            <codeph>&#8209;&#8209;enable_ldap_auth</codeph>
+            <codeph>--enable_ldap_auth</codeph>
           </dt>
 
           <dd>
@@ -135,7 +135,7 @@ under the License.
         <dlentry>
 
           <dt>
-            <codeph>&#8209;&#8209;ldap_uri</codeph>
+            <codeph>--ldap_uri</codeph>
           </dt>
 
           <dd>
@@ -150,15 +150,96 @@ under the License.
           </dd>
 
         </dlentry>
+
+        <dlentry>
+
+          <dt>
+            <codeph>--ldap_search_bind_authentication</codeph>
+          </dt>
+
+          <dd>
+            <p>
+              Allows to switch between search and simple bind user lookup
+              methods when authenticating, the default value is <codeph>false
+              </codeph> which is simple bind.
+            </p>
+          </dd>
+
+        </dlentry>
       </dl>
 
     </conbody>
 
   </concept>
 
-  <concept id="ldap_bind_strings">
+  <concept id="ldap_bind_user">
 
-    <title>Support for Custom Bind Strings</title>
+    <title>Bind User Credentials</title>
+
+    <conbody>
+
+      <p>
+        The bind user is used to run the user/group searches, the credentials
+        can be configured with the following flags:
+      </p>
+
+      <dl>
+        <dlentry>
+
+          <dt>
+            <codeph>--ldap_allow_anonymous_binds</codeph>
+          </dt>
+
+          <dd>
+            <p>
+              When true, LDAP authentication with a blank password (an
+              'anonymous bind') is allowed by Impala. The default value is
+              <codeph>false</codeph>.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry>
+
+          <dt>
+            <codeph>--ldap_bind_dn</codeph>
+          </dt>
+
+          <dd>
+            <p>
+              Distinguished name of the user to bind as when doing user or group
+              searches. Only required if user or group filters are being used
+              and the LDAP server is not configured to allow anonymous searches.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry>
+
+          <dt>
+            <codeph>--ldap_bind_password_cmd</codeph>
+          </dt>
+
+          <dd>
+            <p>
+              A Unix command whose output returns the password to use with
+              <codeph>--ldap_bind_dn</codeph>. The output of the command will
+              be truncated to 1024 bytes and trimmed of trailing whitespace.
+            </p>
+          </dd>
+
+        </dlentry>
+      </dl>
+
+    </conbody>
+
+  </concept>
+
+  <concept id="ldap_simple_bind">
+
+    <title>Simple Bind User Authentication</title>
 
     <conbody>
 
@@ -175,6 +256,13 @@ under the License.
         <codeph>'henry'</codeph>) to a more complicated string. If necessary, specify one of the
         following configuration options when starting the <cmdname>impalad</cmdname> daemon.
       </p>
+
+      <note>
+        The <codeph>--ldap_domain</codeph>, <codeph>--ldap_baseDN</codeph> and
+        <codeph>--ldap_bind_pattern</codeph> options are mutually exclusive,
+        and Impala does not start if more than one of these options are
+        specified.
+      </note>
 
       <dl>
         <dlentry>
@@ -226,12 +314,176 @@ under the License.
           </dd>
 
         </dlentry>
+
+        <dlentry>
+
+          <dt>
+            <codeph>--ldap_user_filter</codeph>
+          </dt>
+
+          <dd>
+            <p>
+              A comma separated list of user names. If specified, users must be
+              on this list for authentication to succeed
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry>
+
+          <dt>
+            <codeph>--ldap_group_filter</codeph>
+          </dt>
+
+          <dd>
+            <p>
+              If specified, users must belong to one of these groups for
+              authentication to succeed.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry>
+
+          <dt>
+            <codeph>--ldap_group_dn_pattern</codeph>
+          </dt>
+
+          <dd>
+            <p>
+              Colon separated list of patterns for the 'distinguished name' use
+              to search for groups in the directory. Each pattern may contain a
+              '%s' which will be substituted with each group name from
+              <codeph>--ldap_group_filter</codeph> when doing group searches.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry>
+
+          <dt>
+            <codeph>--ldap_group_membership_key</codeph>
+          </dt>
+
+          <dd>
+            <p>
+              The LDAP attribute on group entries that indicates its members.
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry>
+
+          <dt>
+            <codeph>--ldap_group_class_key</codeph>
+          </dt>
+
+          <dd>
+            <p>
+              The LDAP objectClass each of the groups in
+              <codeph>--ldap_group_filter</codeph> implements in LDAP.
+            </p>
+          </dd>
+
+        </dlentry>
       </dl>
 
+    </conbody>
+
+  </concept>
+
+  <concept id="ldap_search_bind">
+
+    <title>Search Bind User Authentication</title>
+
+    <conbody>
+
       <p>
-        The above options are mutually exclusive, and Impala does not start if more than one of
-        these options are specified.
+        When Search Bind authentication is enabled Impala first tries to bind
+        with the configured bind user, then executes an LDAP Search operation
+        to find if the user exists. Once the search succeeds the DN is
+        retrieved from the LDAP search results and another LDAP bind request
+        is executed, this time with the connecting user to verify the password.
       </p>
+
+      <p>
+        This authentication method allows to authenticate users existing in
+        different LDAP subtrees when these users' parent tree is configured as
+        base DN.
+      </p>
+
+      <dl>
+      <dlentry>
+
+        <dt>
+          <codeph>--ldap_user_search_basedn</codeph>
+        </dt>
+
+        <dd>
+          <p>
+            The 'distinguished name' DN that will be used to search for the
+            authenticating user, this field is required for search bind
+            authentication.
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry>
+
+        <dt>
+          <codeph>--ldap_group_search_basedn</codeph>
+        </dt>
+
+        <dd>
+          <p>
+            The 'distinguished name' DN that will be used to search for the
+            authenticating group. If left empty, group checks will not be
+            performed.
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry>
+
+        <dt>
+          <codeph>--ldap_user_filter</codeph>
+        </dt>
+
+        <dd>
+          <p>
+            LDAP filter that will be used during LDAP search, it can contain
+            <codeph>{0}</codeph> pattern which will be replaced with the
+            user name. The default value is <codeph>
+            (&amp;(objectClass=user)(sAMAccountName={0}))</codeph>.
+          </p>
+        </dd>
+
+      </dlentry>
+
+      <dlentry>
+
+        <dt>
+          <codeph>--ldap_group_filter</codeph>
+        </dt>
+
+        <dd>
+          <p>
+            LDAP filter that will be used during LDAP group search, it can
+            contain <codeph>{0}</codeph> pattern which will be replaced with
+            the user name and/or <codeph>{1}</codeph> which will be replaced
+            with the user DN. The default value is <codeph>
+            (&amp;(objectClass=group)(member={1})</codeph>.
+          </p>
+        </dd>
+
+      </dlentry>
+      </dl>
 
     </conbody>
 
@@ -259,6 +511,24 @@ under the License.
         636 instead of 389.
       </p>
 
+      <dl>
+        <dlentry>
+
+          <dt>
+            <codeph>--ldap_passwords_in_clear_ok</codeph>
+          </dt>
+
+          <dd>
+            <p>
+              Allows LDAP passwords to be sent in the clear (without TLS/SSL)
+              over the network, when set to <codeph>true</codeph>. This option
+              should not be used in production environments.
+            </p>
+          </dd>
+
+        </dlentry>
+      </dl>
+
       <p rev="1.4.0">
         <b>Secure LDAP connections through TLS:</b>
       </p>
@@ -276,7 +546,7 @@ under the License.
         <dlentry>
 
           <dt>
-            <codeph>&#8209;&#8209;ldap_tls</codeph>
+            <codeph>--ldap_tls</codeph>
           </dt>
 
           <dd>
@@ -291,7 +561,7 @@ under the License.
         <dlentry>
 
           <dt>
-            <codeph>&#8209;&#8209;ldap_ca_certificate</codeph>
+            <codeph>--ldap_ca_certificate</codeph>
           </dt>
 
           <dd>
@@ -353,11 +623,29 @@ under the License.
           </dd>
 
         </dlentry>
+
+        <dlentry>
+
+          <dt>
+            <codeph>--auth_creds_ok_in_clear</codeph>
+          </dt>
+
+          <dd>
+            <p>
+              If set, LDAP authentication may be used with an insecure
+              connection to Impala. This flag is required when SSL between
+              <codeph>impala-shell</codeph> and Impala Server is not configured.
+              Authentication credentials will therefore be sent unencrypted, and
+              may be vulnerable to attack.
+            </p>
+          </dd>
+
+        </dlentry>
       </dl>
 
-      <p>
+      <note>
         <cmdname>impala-shell</cmdname> automatically prompts for the password.
-      </p>
+      </note>
 
       <p>
         See <xref href="impala_jdbc.xml#impala_jdbc"/> for the format to use with the JDBC
