@@ -54,6 +54,9 @@ struct HttpMetrics {
 
   impala::IntCounter* total_saml_auth_success_ = nullptr;
   impala::IntCounter* total_saml_auth_failure_ = nullptr;
+
+  impala::IntCounter* total_jwt_token_auth_success_ = nullptr;
+  impala::IntCounter* total_jwt_token_auth_failure_ = nullptr;
 };
 
 /*
@@ -119,11 +122,17 @@ public:
     // SAML2 SSO.
     std::function<impala::TWrappedHttpRequest*()> init_wrapped_http_request_fn =
         [&]() { return (impala::TWrappedHttpRequest*) NULL; };
+
+    // Function that takes the JWT token from the header, and returns true
+    // if verification for the token is successful.
+    std::function<bool(const std::string&)> jwt_token_auth_fn = [&](const std::string&) {
+      return false;
+    };
   };
 
   THttpServer(std::shared_ptr<TTransport> transport, bool has_ldap, bool has_kerberos,
-      bool has_saml, bool use_cookies, bool check_trusted_domain, bool metrics_enabled,
-      HttpMetrics* http_metrics);
+      bool has_saml, bool use_cookies, bool check_trusted_domain, bool has_jwt,
+      bool metrics_enabled, HttpMetrics* http_metrics);
 
   virtual ~THttpServer();
 
@@ -147,9 +156,9 @@ protected:
   void resetAuthState();
  private:
   // If either of the following is true, a '401 - Unauthorized' will be returned to the
-  // client on requests that do not contain a valid 'Authorization' of SAML SSO related
-  // header. If 'has_ldap_' is true, 'Basic' auth headers will be processed, and if
-  // 'has_kerberos_' is true 'Negotiate' auth headers will be processed.
+  // client on requests that do not contain a valid 'Authorization' of SAML SSO or JWT
+  // related header. If 'has_ldap_' is true, 'Basic' auth headers will be processed, and
+  // if 'has_kerberos_' is true 'Negotiate' auth headers will be processed.
   bool has_ldap_ = false;
   bool has_kerberos_ = false;
 
@@ -186,6 +195,9 @@ protected:
   // trusted domain.
   bool check_trusted_domain_ = false;
 
+  // If set, support for trusting an authentication based on JWT token.
+  bool has_jwt_ = false;
+
   bool metrics_enabled_ = false;
   HttpMetrics* http_metrics_ = nullptr;
 
@@ -203,13 +215,14 @@ public:
 
  THttpServerTransportFactory(const std::string server_name, impala::MetricGroup* metrics,
      bool has_ldap, bool has_kerberos, bool use_cookies, bool check_trusted_domain,
-     bool has_saml);
+     bool has_saml, bool has_jwt);
 
  virtual ~THttpServerTransportFactory() {}
 
  virtual std::shared_ptr<TTransport> getTransport(std::shared_ptr<TTransport> trans) {
-   return std::shared_ptr<TTransport>(new THttpServer(trans, has_ldap_, has_kerberos_,
-       has_saml_, use_cookies_, check_trusted_domain_, metrics_enabled_, &http_metrics_));
+   return std::shared_ptr<TTransport>(
+       new THttpServer(trans, has_ldap_, has_kerberos_, has_saml_, use_cookies_,
+           check_trusted_domain_, has_jwt_, metrics_enabled_, &http_metrics_));
   }
 
  private:
@@ -218,6 +231,7 @@ public:
   bool use_cookies_ = false;
   bool check_trusted_domain_ = false;
   bool has_saml_ = false;
+  bool has_jwt_ = false;
 
   // Metrics for every transport produced by this factory.
   bool metrics_enabled_ = false;

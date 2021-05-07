@@ -57,6 +57,7 @@
 #include "util/coding-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
+#include "util/jwt-util.h"
 #include "util/ldap-util.h"
 #include "util/network-util.h"
 #include "util/os-util.h"
@@ -136,6 +137,31 @@ DEFINE_bool_hidden(saml2_allow_without_tls_debug_only, false,
     "on unsecure channel. This should be only enabled for development / testing.");
 
 DECLARE_string(saml2_sp_callback_url);
+
+// If set, Impala support for trusting an authentication based on JWT token in the HTTP
+// header.
+DEFINE_bool(jwt_token_auth, false,
+    "When true, read the JWT token out of the HTTP Header and extract user name from "
+    "the token payload.");
+// The last segment of a JWT is the signature, which is used to verify that the token was
+// signed by the sender and not altered in any way. By default, it's required to validate
+// the signature of the JWT tokens. Otherwise it may expose security issue.
+DEFINE_bool(jwt_validate_signature, true,
+    "When true, validate the signature of JWT token with pre-installed JWKS.");
+// JWKS consists the public keys used by the signing party to the clients that need to
+// validate signatures. It represents cryptographic keys in JSON data structure.
+DEFINE_string(jwks_file_path, "",
+    "File path of the pre-installed JSON Web Key Set (JWKS) for JWT verification");
+// This specifies the custom claim in the JWT that contains the "username" for the
+// session.
+DEFINE_string(jwt_custom_claim_username, "username", "Custom claim 'username'");
+// If set, Impala allows JWT authentication on unsecure channel.
+// JWT is only secure when used with TLS. But in some deployment scenarios, TLS is handled
+// by proxy so that it does not show up as TLS to Impala.
+DEFINE_bool_hidden(jwt_allow_without_tls, false,
+    "When this configuration is set to true, Impala allows JWT authentication on "
+    "unsecure channel. This should be only enabled for testing, or development for which "
+    "TLS is handled by proxy.");
 
 namespace impala {
 
@@ -523,6 +549,41 @@ bool BasicAuth(ThriftServer::ConnectionContext* connection_context,
   }
   connection_context->return_headers.push_back("WWW-Authenticate: Basic");
   return false;
+}
+
+bool JWTTokenAuth(ThriftServer::ConnectionContext* connection_context,
+    const AuthenticationHash& hash, const string& token) {
+  JWTHelper::UniqueJWTDecodedToken decoded_token;
+  Status status = JWTHelper::Decode(token, decoded_token);
+  if (!status.ok()) {
+    LOG(ERROR) << "Error decoding JWT token received from: "
+               << TNetworkAddressToString(connection_context->network_address)
+               << " Error: " << status;
+    return false;
+  }
+  if (FLAGS_jwt_validate_signature) {
+    status = JWTHelper::GetInstance()->Verify(decoded_token.get());
+    if (!status.ok()) {
+      LOG(ERROR) << "Error verifying JWT token received from: "
+                 << TNetworkAddressToString(connection_context->network_address)
+                 << " Error: " << status;
+      return false;
+    }
+  }
+
+  DCHECK(!FLAGS_jwt_custom_claim_username.empty());
+  string username;
+  status = JWTHelper::GetCustomClaimUsername(
+      decoded_token.get(), FLAGS_jwt_custom_claim_username, username);
+  if (!status.ok()) {
+    LOG(ERROR) << "Error extracting username from JWT token received from: "
+               << TNetworkAddressToString(connection_context->network_address)
+               << " Error: " << status;
+    return false;
+  }
+  connection_context->username = username;
+  // TODO: cookies are not added, but are not needed right now
+  return true;
 }
 
 // Performs a step of SPNEGO auth for the HTTP transport and sets the username on
@@ -1060,14 +1121,14 @@ Status SecureAuthProvider::Start() {
 Status SecureAuthProvider::GetServerTransportFactory(
     ThriftServer::TransportType underlying_transport_type, const std::string& server_name,
     MetricGroup* metrics, std::shared_ptr<TTransportFactory>* factory) {
-  DCHECK(!principal_.empty() || has_ldap_ || has_saml_);
+  DCHECK(!principal_.empty() || has_ldap_ || has_saml_ || has_jwt_);
 
   if (underlying_transport_type == ThriftServer::HTTP) {
     bool has_kerberos = !principal_.empty();
     bool use_cookies = FLAGS_max_cookie_lifetime_s > 0;
     bool check_trusted_domain = !FLAGS_trusted_domain.empty();
     factory->reset(new THttpServerTransportFactory(server_name, metrics, has_ldap_,
-        has_kerberos, use_cookies, check_trusted_domain, has_saml_));
+        has_kerberos, use_cookies, check_trusted_domain, has_saml_, has_jwt_));
     return Status::OK();
   }
 
@@ -1191,6 +1252,10 @@ void SecureAuthProvider::SetupConnectionContext(
         callbacks.validate_saml2_bearer_fn =
             std::bind(ValidateSaml2Bearer, connection_ptr.get(), hash_);
       }
+      if (has_jwt_) {
+        callbacks.jwt_token_auth_fn =
+            std::bind(JWTTokenAuth, connection_ptr.get(), hash_, std::placeholders::_1);
+      }
       http_input_transport->setCallbacks(callbacks);
       http_output_transport->setCallbacks(callbacks);
       socket = down_cast<TSocket*>(http_input_transport->getUnderlyingTransport().get());
@@ -1286,6 +1351,20 @@ Status AuthManager::Init() {
     }
   }
 
+  bool use_jwt = FLAGS_jwt_token_auth;
+  if (use_jwt) {
+    if (!IsExternalTlsConfigured()) {
+      if (!FLAGS_jwt_allow_without_tls) {
+        return Status("JWT authentication should be only used with TLS enabled.");
+      }
+      LOG(WARNING) << "JWT authentication is used without TLS.";
+    }
+    if (FLAGS_jwt_custom_claim_username.empty()) {
+      return Status(
+          "JWT authentication requires jwt_custom_claim_username to be specified.");
+    }
+  }
+
   // Get all of the flag validation out of the way
   if (FLAGS_enable_ldap_auth) {
     RETURN_IF_ERROR(
@@ -1338,7 +1417,7 @@ Status AuthManager::Init() {
 
   if (IsInternalKerberosEnabled()) {
     // Initialize the auth provider first, in case validation of the principal fails.
-    SecureAuthProvider* sap = NULL;
+    SecureAuthProvider* sap = nullptr;
     internal_auth_provider_.reset(sap = new SecureAuthProvider(true));
     RETURN_IF_ERROR(sap->InitKerberos(kerberos_internal_principal));
     LOG(INFO) << "Internal communication is authenticated with Kerberos";
@@ -1352,7 +1431,7 @@ Status AuthManager::Init() {
   // principal or ldap tells us to use a SecureAuthProvider, and we fill in
   // details from there.
   if (FLAGS_enable_ldap_auth || external_kerberos_enabled) {
-    SecureAuthProvider* sap = NULL;
+    SecureAuthProvider* sap = nullptr;
     external_auth_provider_.reset(sap = new SecureAuthProvider(false));
     if (external_kerberos_enabled) {
       RETURN_IF_ERROR(sap->InitKerberos(kerberos_external_principal));
@@ -1366,15 +1445,25 @@ Status AuthManager::Init() {
       LOG(INFO) << "External communication can be also authenticated with SAML2 SSO";
       sap->InitSaml();
     }
+    if (use_jwt) {
+      LOG(INFO) << "External communication can be also authenticated with JWT";
+      sap->InitJwt();
+    }
   } else {
     external_auth_provider_.reset(new NoAuthProvider());
     LOG(INFO) << "External communication is not authenticated for binary protocols";
     if (use_saml) {
-      SecureAuthProvider* sap = NULL;
+      SecureAuthProvider* sap = nullptr;
       external_http_auth_provider_.reset(sap = new SecureAuthProvider(false));
       sap->InitSaml();
-      LOG(INFO) <<
-          "External communication is authenticated for hs2-http protocol with SAML2 SSO";
+      LOG(INFO) << "External communication is authenticated for hs2-http protocol with "
+                   "SAML2 SSO";
+    } else if (use_jwt) {
+      SecureAuthProvider* sap = nullptr;
+      external_http_auth_provider_.reset(sap = new SecureAuthProvider(false));
+      sap->InitJwt();
+      LOG(INFO)
+          << "External communication is authenticated for hs2-http protocol with JWT";
     } else {
       LOG(INFO) << "External communication is not authenticated for hs2-http protocol";
     }

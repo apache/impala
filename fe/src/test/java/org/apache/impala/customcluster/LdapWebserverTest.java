@@ -22,6 +22,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
@@ -103,6 +104,18 @@ public class LdapWebserverTest {
         .getMetric("impala.webserver.total-trusted-domain-check-success");
     assertTrue("Expected: " + expectedSuccess + ", Actual: " + actualSuccess,
         expectedSuccess.contains(actualSuccess));
+  }
+
+  private void verifyJwtAuthMetrics(
+      Range<Long> expectedAuthSuccess, Range<Long> expectedAuthFailure) throws Exception {
+    long actualAuthSuccess =
+        (long) metrics_.getMetric("impala.webserver.total-jwt-token-auth-success");
+    assertTrue("Expected: " + expectedAuthSuccess + ", Actual: " + actualAuthSuccess,
+        expectedAuthSuccess.contains(actualAuthSuccess));
+    long actualAuthFailure =
+        (long) metrics_.getMetric("impala.webserver.total-jwt-token-auth-failure");
+    assertTrue("Expected: " + expectedAuthFailure + ", Actual: " + actualAuthFailure,
+        expectedAuthFailure.contains(actualAuthFailure));
   }
 
   @Test
@@ -243,6 +256,45 @@ public class LdapWebserverTest {
         .getMetric("impala.webserver.total-trusted-domain-check-success");
     attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", null);
     verifyTrustedDomainMetrics(Range.closed(successMetricBefore, successMetricBefore));
+  }
+
+  /**
+   * Tests if sessions are authenticated by verifying the JWT token for connections
+   * to the Web Server.
+   */
+  @Test
+  public void testWebserverJwtAuth() throws Exception {
+    String jwksFilename =
+        new File(System.getenv("IMPALA_HOME"), "testdata/jwt/jwks_rs256.json").getPath();
+    setUp(String.format(
+              "--jwt_token_auth=true --jwt_validate_signature=true --jwks_file_path=%s "
+                  + "--jwt_allow_without_tls=true",
+              jwksFilename),
+        "");
+
+    // Case 1: Authenticate with valid JWT Token in HTTP header.
+    String jwtToken =
+        "eyJhbGciOiJSUzI1NiIsImtpZCI6InB1YmxpYzpjNDI0YjY3Yi1mZTI4LTQ1ZDctYjAxNS1m"
+        + "NzlkYTUwYjViMjEiLCJ0eXAiOiJKV1MifQ.eyJpc3MiOiJhdXRoMCIsInVzZXJuYW1lIjoia"
+        + "W1wYWxhIn0.OW5H2SClLlsotsCarTHYEbqlbRh43LFwOyo9WubpNTwE7hTuJDsnFoVrvHiWI"
+        + "02W69TZNat7DYcC86A_ogLMfNXagHjlMFJaRnvG5Ekag8NRuZNJmHVqfX-qr6x7_8mpOdU55"
+        + "4kc200pqbpYLhhuK4Qf7oT7y9mOrtNrUKGDCZ0Q2y_mizlbY6SMg4RWqSz0RQwJbRgXIWSgc"
+        + "bZd0GbD_MQQ8x7WRE4nluU-5Fl4N2Wo8T9fNTuxALPiuVeIczO25b5n4fryfKasSgaZfmk0C"
+        + "oOJzqbtmQxqiK9QNSJAiH2kaqMwLNgAdgn8fbd-lB1RAEGeyPH8Px8ipqcKsPk0bg";
+    attemptConnection("Bearer " + jwtToken, "127.0.0.1");
+    verifyJwtAuthMetrics(Range.closed(1L, 1L), zero);
+
+    // Case 2: Failed with invalid JWT Token.
+    String invalidJwtToken =
+        "eyJhbGciOiJSUzI1NiIsImtpZCI6InB1YmxpYzpjNDI0YjY3Yi1mZTI4LTQ1ZDctYjAxNS1m"
+        + "NzlkYTUwYjViMjEiLCJ0eXAiOiJKV1MifQ.eyJpc3MiOiJhdXRoMCIsInVzZXJuYW1lIjoia"
+        + "W1wYWxhIn0.";
+    try {
+      attemptConnection("Bearer " + invalidJwtToken, "127.0.0.1");
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Server returned HTTP response code: 401"));
+    }
+    verifyJwtAuthMetrics(Range.closed(1L, 1L), Range.closed(1L, 1L));
   }
 
   // Helper method to make a get call to the webserver using the input basic

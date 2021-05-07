@@ -87,6 +87,7 @@
 #include "util/error-util.h"
 #include "util/histogram-metric.h"
 #include "util/impalad-metrics.h"
+#include "util/jwt-util.h"
 #include "util/metrics.h"
 #include "util/network-util.h"
 #include "util/openssl-util.h"
@@ -342,6 +343,11 @@ DEFINE_int32(admission_heartbeat_frequency_ms, 1000,
     "(Advanced) The time in milliseconds to wait between sending heartbeats to the "
     "admission service, if enabled. Heartbeats are used to ensure resources are properly "
     "accounted for even if rpcs to the admission service occasionally fail.");
+
+// Flags for JWT token based authentication.
+DECLARE_bool(jwt_token_auth);
+DECLARE_bool(jwt_validate_signature);
+DECLARE_string(jwks_file_path);
 
 namespace {
 using namespace impala;
@@ -2869,6 +2875,17 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
     LOG(INFO) << "Initialized executor Impala server on "
               << TNetworkAddressToString(exec_env_->configured_backend_address());
   } else {
+    // Load JWKS from file if validation for signature of JWT token is enabled.
+    if (FLAGS_jwt_token_auth && FLAGS_jwt_validate_signature) {
+      if (!FLAGS_jwks_file_path.empty()) {
+        RETURN_IF_ERROR(JWTHelper::GetInstance()->Init(FLAGS_jwks_file_path));
+      } else {
+        LOG(ERROR) << "JWKS file is not specified when the validation of JWT signature "
+                   << " is enabled.";
+        return Status("JWKS file is not specified");
+      }
+    }
+
     // Initialize the client servers.
     shared_ptr<ImpalaServer> handler = shared_from_this();
     if (beeswax_port > 0 || (TestInfo::is_test() && beeswax_port == 0)) {

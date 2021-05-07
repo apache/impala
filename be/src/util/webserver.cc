@@ -41,8 +41,8 @@
 #include "kudu/util/env.h"
 #include "kudu/util/logging.h"
 #include "kudu/util/net/sockaddr.h"
-#include "rpc/authentication.h"
 #include "rpc/authentication-util.h"
+#include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
 #include "runtime/exec-env.h"
 #include "service/impala-server.h"
@@ -52,6 +52,7 @@
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
+#include "util/jwt-util.h"
 #include "util/mem-info.h"
 #include "util/metrics.h"
 #include "util/os-info.h"
@@ -150,6 +151,9 @@ DECLARE_string(ssl_minimum_version);
 DECLARE_string(ssl_cipher_list);
 DECLARE_string(trusted_domain);
 DECLARE_bool(trusted_domain_use_xff_header);
+DECLARE_bool(jwt_token_auth);
+DECLARE_bool(jwt_validate_signature);
+DECLARE_string(jwt_custom_claim_username);
 
 static const char* DOC_FOLDER = "/www/";
 static const int DOC_FOLDER_LEN = strlen(DOC_FOLDER);
@@ -282,7 +286,8 @@ Webserver::Webserver(const string& interface, const int port, MetricGroup* metri
     error_handler_(UrlHandler(
         bind<void>(&Webserver::ErrorHandler, this, _1, _2), "error.tmpl", false)),
     use_cookies_(FLAGS_max_cookie_lifetime_s > 0),
-    check_trusted_domain_(!FLAGS_trusted_domain.empty()) {
+    check_trusted_domain_(!FLAGS_trusted_domain.empty()),
+    use_jwt_(FLAGS_jwt_token_auth) {
   http_address_ = MakeNetworkAddress(interface.empty() ? "0.0.0.0" : interface, port);
   Init();
 
@@ -308,6 +313,12 @@ Webserver::Webserver(const string& interface, const int port, MetricGroup* metri
       && (auth_mode_ == AuthMode::SPNEGO || auth_mode_ == AuthMode::LDAP)) {
     total_trusted_domain_check_success_ =
         metrics->AddCounter("impala.webserver.total-trusted-domain-check-success", 0);
+  }
+  if (use_jwt_) {
+    total_jwt_token_auth_success_ =
+        metrics->AddCounter("impala.webserver.total-jwt-token-auth-success", 0);
+    total_jwt_token_auth_failure_ =
+        metrics->AddCounter("impala.webserver.total-jwt-token-auth-failure", 0);
   }
 }
 
@@ -600,8 +611,36 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
   }
 
   vector<string> response_headers;
-  bool authenticated = auth_mode_ != AuthMode::SPNEGO && auth_mode_ != AuthMode::LDAP;
-  // Try authenticating with a cookie first, if enabled.
+  bool authenticated = false;
+  // Try authenticating with JWT token first, if enabled.
+  if (use_jwt_) {
+    const char* auth_value = nullptr;
+    const char* value = sq_get_header(connection, "Authorization");
+    if (value != nullptr) auth_value = StripLeadingWhiteSpace(value);
+    // Check Authorization header with the Bearer authentication scheme as:
+    // Authorization: Bearer <token>
+    // A well-formed JWT consists of three concatenated Base64url-encoded strings,
+    // separated by dots (.).
+    if (auth_value != nullptr && strncasecmp(auth_value, "Bearer ", 7) == 0
+        && strchr(auth_value, '.') != nullptr) {
+      string jwt_token = string(auth_value + 7);
+      StripWhiteSpace(&jwt_token);
+      if (!jwt_token.empty()) {
+        if (JWTTokenAuth(jwt_token, connection, request_info)) {
+          total_jwt_token_auth_success_->Increment(1);
+          authenticated = true;
+          // TODO: cookies are not added, but are not needed right now
+        } else {
+          LOG(INFO) << "Invalid JWT token provided: " << jwt_token;
+          total_jwt_token_auth_failure_->Increment(1);
+        }
+      }
+    }
+  }
+  if (!authenticated) {
+    authenticated = auth_mode_ != AuthMode::SPNEGO && auth_mode_ != AuthMode::LDAP;
+  }
+  // Try authenticating with a cookie, if enabled.
   if (!authenticated && use_cookies_) {
     const char* cookie_header = sq_get_header(connection, "Cookie");
     string username;
@@ -826,6 +865,37 @@ bool Webserver::TrustedDomainCheck(const string& origin, struct sq_connection* c
   if (!status.ok()) {
     LOG(ERROR) << "Error parsing basic authentication token from: "
                << GetRemoteAddress(request_info).ToString() << " Error: " << status;
+    return false;
+  }
+  request_info->remote_user = strdup(username.c_str());
+  return true;
+}
+
+bool Webserver::JWTTokenAuth(const std::string& jwt_token,
+    struct sq_connection* connection, struct sq_request_info* request_info) {
+  JWTHelper::UniqueJWTDecodedToken decoded_token;
+  Status status = JWTHelper::Decode(jwt_token, decoded_token);
+  if (!status.ok()) {
+    LOG(ERROR) << "Error decoding JWT token in Authorization header, "
+               << "Error: " << status;
+    return false;
+  }
+  if (FLAGS_jwt_validate_signature) {
+    status = JWTHelper::GetInstance()->Verify(decoded_token.get());
+    if (!status.ok()) {
+      LOG(ERROR) << "Error verifying JWT token in Authorization header, "
+                 << "Error: " << status;
+      return false;
+    }
+  }
+
+  DCHECK(!FLAGS_jwt_custom_claim_username.empty());
+  string username;
+  status = JWTHelper::GetCustomClaimUsername(
+      decoded_token.get(), FLAGS_jwt_custom_claim_username, username);
+  if (!status.ok()) {
+    LOG(ERROR) << "Cannot retrieve username from JWT token in Authorization header, "
+               << "Error: " << status;
     return false;
   }
   request_info->remote_user = strdup(username.c_str());

@@ -438,7 +438,7 @@ def get_toolchain_downloads():
   toolchain_packages += [llvm_package, llvm_package_asserts, gcc_package]
   toolchain_packages += map(ToolchainPackage,
       ["avro", "binutils", "boost", "breakpad", "bzip2", "cctz", "cmake", "crcutil",
-       "flatbuffers", "gdb", "gflags", "glog", "gperftools", "gtest", "libev",
+       "flatbuffers", "gdb", "gflags", "glog", "gperftools", "gtest", "jwt-cpp", "libev",
        "libunwind", "lz4", "openldap", "openssl", "orc", "protobuf", "python",
        "rapidjson", "re2", "snappy", "thrift", "tpc-h", "tpc-ds", "zlib", "zstd"])
   # Check whether this platform is supported (or whether a valid custom toolchain

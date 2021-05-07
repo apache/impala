@@ -201,6 +201,11 @@ class Webserver {
   bool TrustedDomainCheck(const std::string& origin, struct sq_connection* connection,
       struct sq_request_info* request_info);
 
+  /// Checks and returns true if the JWT token in Authorization header could be verified
+  /// and the token has a valid username.
+  bool JWTTokenAuth(const std::string& jwt_token, struct sq_connection* connection,
+      struct sq_request_info* request_info);
+
   // Handle Basic authentication for this request. Returns an error if authentication was
   // unsuccessful.
   Status HandleBasic(struct sq_connection* connection,
@@ -267,6 +272,10 @@ class Webserver {
   /// auth if it originates from a trusted domain.
   bool check_trusted_domain_;
 
+  /// If true, the JWT token in Authorization header will be used for authentication.
+  /// An incoming connection will be accepted if the JWT token could be verified.
+  bool use_jwt_ = false;
+
   /// Used to validate usernames/passwords If LDAP authentication is in use.
   std::unique_ptr<ImpalaLdap> ldap_;
 
@@ -288,6 +297,11 @@ class Webserver {
   /// If 'use_cookies_' is true, metrics for the number of successful
   /// attempts to authorize connections originating from a trusted domain.
   IntCounter* total_trusted_domain_check_success_ = nullptr;
+
+  /// If 'use_jwt_' is true, metrics for the number of successful and failed JWT auth
+  /// attempts.
+  IntCounter* total_jwt_token_auth_success_ = nullptr;
+  IntCounter* total_jwt_token_auth_failure_ = nullptr;
 };
 
 }

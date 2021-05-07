@@ -102,6 +102,7 @@ set_dep_root(GFLAGS)
 set_dep_root(GLOG)
 set_dep_root(GPERFTOOLS)
 set_dep_root(GTEST)
+set_dep_root(JWT_CPP)
 set_dep_root(LIBEV)
 set_dep_root(LIBUNWIND)
 set_dep_root(LLVM)
@@ -288,6 +289,11 @@ IMPALA_ADD_THIRDPARTY_LIB(zstd ${ZSTD_INCLUDE_DIR} ${ZSTD_STATIC_LIB} "")
 # find re2 headers and libs
 find_package(Re2 REQUIRED)
 IMPALA_ADD_THIRDPARTY_LIB(re2 ${RE2_INCLUDE_DIR} ${RE2_STATIC_LIB} "")
+
+# find jwt-cpp headers
+find_package(JwtCpp REQUIRED)
+include_directories(${JWT_CPP_INCLUDE_DIR})
+message(STATUS "jwt-cpp include dir: " ${JWT_CPP_INCLUDE_DIR})
 
 # find rapidjson headers
 find_package(RapidJson REQUIRED)

@@ -22,6 +22,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -121,6 +122,18 @@ public class LdapHS2Test {
         .getMetric("impala.thrift-server.hiveserver2-http-frontend."
             + "total-trusted-domain-check-success");
     assertEquals(expectedAuthSuccess, actualAuthSuccess);
+  }
+
+  private void verifyJwtAuthMetrics(long expectedAuthSuccess, long expectedAuthFailure)
+      throws Exception {
+    long actualAuthSuccess =
+        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+            + "total-jwt-token-auth-success");
+    assertEquals(expectedAuthSuccess, actualAuthSuccess);
+    long actualAuthFailure =
+        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+            + "total-jwt-token-auth-failure");
+    assertEquals(expectedAuthFailure, actualAuthFailure);
   }
 
   /**
@@ -403,5 +416,67 @@ public class LdapHS2Test {
     // Account for 1 successful basic auth increment.
     verifyMetrics(4, 1);
     verifyTrustedDomainMetrics(6);
+  }
+
+  /**
+   * Tests if sessions are authenticated by verifying the JWT token for connections
+   * to the HTTP hiveserver2 endpoint.
+   */
+  @Test
+  public void testHiveserver2JwtAuth() throws Exception {
+    String jwksFilename =
+        new File(System.getenv("IMPALA_HOME"), "testdata/jwt/jwks_rs256.json").getPath();
+    setUp(String.format(
+        "--jwt_token_auth=true --jwt_validate_signature=true --jwks_file_path=%s "
+            + "--jwt_allow_without_tls=true",
+        jwksFilename));
+    verifyMetrics(0, 0);
+    THttpClient transport = new THttpClient("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+
+    // Case 1: Authenticate with valid JWT Token in HTTP header.
+    String jwtToken =
+        "eyJhbGciOiJSUzI1NiIsImtpZCI6InB1YmxpYzpjNDI0YjY3Yi1mZTI4LTQ1ZDctYjAxNS1m"
+        + "NzlkYTUwYjViMjEiLCJ0eXAiOiJKV1MifQ.eyJpc3MiOiJhdXRoMCIsInVzZXJuYW1lIjoia"
+        + "W1wYWxhIn0.OW5H2SClLlsotsCarTHYEbqlbRh43LFwOyo9WubpNTwE7hTuJDsnFoVrvHiWI"
+        + "02W69TZNat7DYcC86A_ogLMfNXagHjlMFJaRnvG5Ekag8NRuZNJmHVqfX-qr6x7_8mpOdU55"
+        + "4kc200pqbpYLhhuK4Qf7oT7y9mOrtNrUKGDCZ0Q2y_mizlbY6SMg4RWqSz0RQwJbRgXIWSgc"
+        + "bZd0GbD_MQQ8x7WRE4nluU-5Fl4N2Wo8T9fNTuxALPiuVeIczO25b5n4fryfKasSgaZfmk0C"
+        + "oOJzqbtmQxqiK9QNSJAiH2kaqMwLNgAdgn8fbd-lB1RAEGeyPH8Px8ipqcKsPk0bg";
+    headers.put("Authorization", "Bearer " + jwtToken);
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    // Open a session which will get username 'impala' from JWT token and use it as
+    // login user.
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    TOpenSessionResp openResp = client.OpenSession(openReq);
+    // One successful authentication.
+    verifyMetrics(0, 0);
+    verifyJwtAuthMetrics(1, 0);
+    // Running a query should succeed.
+    TOperationHandle operationHandle = execAndFetch(
+        client, openResp.getSessionHandle(), "select logged_in_user()", "impala");
+    // Two more successful authentications - for the Exec() and the Fetch().
+    verifyMetrics(0, 0);
+    verifyJwtAuthMetrics(3, 0);
+
+    // case 2: Authenticate fails with invalid JWT token which does not have signature.
+    String invalidJwtToken =
+        "eyJhbGciOiJSUzI1NiIsImtpZCI6InB1YmxpYzpjNDI0YjY3Yi1mZTI4LTQ1ZDctYjAxNS1m"
+        + "NzlkYTUwYjViMjEiLCJ0eXAiOiJKV1MifQ.eyJpc3MiOiJhdXRoMCIsInVzZXJuYW1lIjoia"
+        + "W1wYWxhIn0.";
+    headers.put("Authorization", "Bearer " + invalidJwtToken);
+    headers.put("X-Forwarded-For", "127.0.0.1");
+    transport.setCustomHeaders(headers);
+    try {
+      openResp = client.OpenSession(openReq);
+      fail("Exception exception.");
+    } catch (Exception e) {
+      verifyJwtAuthMetrics(3, 1);
+      assertEquals(e.getMessage(), "HTTP Response code: 401");
+    }
   }
 }

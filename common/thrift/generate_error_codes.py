@@ -471,6 +471,10 @@ error_codes = (
 
   ("LOCAL_DISK_FAULTY", 152,
    "Query execution failure caused by local disk IO fatal error on backend: $0."),
+
+  ("JWKS_PARSE_ERROR", 153, "Error parsing JWKS: $0."),
+
+  ("JWT_VERIFY_FAILED", 154, "Error verifying JWT Token: $0."),
 )
 
 import sys

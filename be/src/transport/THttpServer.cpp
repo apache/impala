@@ -46,12 +46,13 @@ using strings::Substitute;
 
 THttpServerTransportFactory::THttpServerTransportFactory(const std::string server_name,
     impala::MetricGroup* metrics, bool has_ldap, bool has_kerberos, bool use_cookies,
-    bool check_trusted_domain, bool has_saml)
+    bool check_trusted_domain, bool has_saml, bool has_jwt)
   : has_ldap_(has_ldap),
     has_kerberos_(has_kerberos),
     use_cookies_(use_cookies),
     check_trusted_domain_(check_trusted_domain),
     has_saml_(has_saml),
+    has_jwt_(has_jwt),
     metrics_enabled_(metrics != nullptr) {
   if (metrics_enabled_) {
     if (has_ldap_) {
@@ -82,18 +83,25 @@ THttpServerTransportFactory::THttpServerTransportFactory(const std::string serve
       http_metrics_.total_saml_auth_failure_ =
           metrics->AddCounter(Substitute("$0.total-saml-auth-failure", server_name), 0);
     }
+    if (has_jwt_) {
+      http_metrics_.total_jwt_token_auth_success_ = metrics->AddCounter(
+          Substitute("$0.total-jwt-token-auth-success", server_name), 0);
+      http_metrics_.total_jwt_token_auth_failure_ = metrics->AddCounter(
+          Substitute("$0.total-jwt-token-auth-failure", server_name), 0);
+    }
   }
 }
 
 THttpServer::THttpServer(std::shared_ptr<TTransport> transport, bool has_ldap,
     bool has_kerberos, bool has_saml, bool use_cookies, bool check_trusted_domain,
-    bool metrics_enabled, HttpMetrics* http_metrics)
+    bool has_jwt, bool metrics_enabled, HttpMetrics* http_metrics)
   : THttpTransport(transport),
     has_ldap_(has_ldap),
     has_kerberos_(has_kerberos),
     has_saml_(has_saml),
     use_cookies_(use_cookies),
     check_trusted_domain_(check_trusted_domain),
+    has_jwt_(has_jwt),
     metrics_enabled_(metrics_enabled),
     http_metrics_(http_metrics) {}
 
@@ -127,7 +135,7 @@ void THttpServer::parseHeader(char* header) {
     contentLength_ = atoi(value);
   } else if (strncmp(header, "X-Forwarded-For", sz) == 0) {
     origin_ = value;
-  } else if ((has_ldap_ || has_kerberos_ || has_saml_)
+  } else if ((has_ldap_ || has_kerberos_ || has_saml_ || has_jwt_)
       && THRIFT_strncasecmp(header, "Authorization", sz) == 0) {
     auth_value_ = string(value);
   } else if (use_cookies_ && THRIFT_strncasecmp(header, "Cookie", sz) == 0) {
@@ -209,7 +217,7 @@ bool THttpServer::parseStatusLine(char* status) {
 }
 
 void THttpServer::headersDone() {
-  if (!has_ldap_ && !has_kerberos_ && !has_saml_) {
+  if (!has_ldap_ && !has_kerberos_ && !has_saml_ && !has_jwt_) {
     // We don't need to authenticate.
     resetAuthState();
     return;
@@ -236,6 +244,25 @@ void THttpServer::headersDone() {
         if (metrics_enabled_) http_metrics_->total_cookie_auth_success_->Increment(1);
       } else if (metrics_enabled_) {
         http_metrics_->total_cookie_auth_failure_->Increment(1);
+      }
+    }
+  }
+
+  if (!authorized && has_jwt_ && !auth_value_.empty()
+      && auth_value_.find('.') != string::npos) {
+    // Check Authorization header with the Bearer authentication scheme as:
+    // Authorization: Bearer <token>
+    // JWT contains at least one period ('.'). A well-formed JWT consists of three
+    // concatenated Base64url-encoded strings, separated by dots (.).
+    StripWhiteSpace(&auth_value_);
+    string jwt_token;
+    bool got_bearer_auth = TryStripPrefixString(auth_value_, "Bearer ", &jwt_token);
+    if (got_bearer_auth) {
+      if (callbacks_.jwt_token_auth_fn(jwt_token)) {
+        authorized = true;
+        if (metrics_enabled_) http_metrics_->total_jwt_token_auth_success_->Increment(1);
+      } else {
+        if (metrics_enabled_) http_metrics_->total_jwt_token_auth_failure_->Increment(1);
       }
     }
   }

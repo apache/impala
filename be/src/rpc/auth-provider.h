@@ -83,7 +83,7 @@ class AuthProvider {
 class SecureAuthProvider : public AuthProvider {
  public:
   SecureAuthProvider(bool is_internal)
-    : has_ldap_(false), has_saml_(false), is_internal_(is_internal) {}
+    : has_ldap_(false), has_saml_(false), has_jwt_(false), is_internal_(is_internal) {}
 
   /// Performs initialization of external state.
   /// If we're using ldap, set up appropriate certificate usage.
@@ -131,6 +131,8 @@ class SecureAuthProvider : public AuthProvider {
 
   void InitSaml() { has_saml_ = true; }
 
+  void InitJwt() { has_jwt_ = true; }
+
   /// Used for testing
   const std::string& principal() const { return principal_; }
   const std::string& service_name() const { return service_name_; }
@@ -143,6 +145,8 @@ class SecureAuthProvider : public AuthProvider {
   bool has_ldap_;
 
   bool has_saml_;
+
+  bool has_jwt_;
 
   /// Hostname of this machine - if kerberos, derived from principal.  If there
   /// is no kerberos, but LDAP is used, then acquired via GetHostname().

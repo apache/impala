@@ -1392,6 +1392,26 @@
     "key": "impala.thrift-server.hiveserver2-http-frontend.total-saml-auth-failure"
   },
   {
+    "description": "The number of HiveServer2 HTTP API connection requests to this Impala Daemon that were successfully authenticated using JWT Token.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 HTTP API Connection JWT Token Success",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.hiveserver2-http-frontend.total-jwt-token-auth-success"
+  },
+  {
+    "description": "The number of HiveServer2 HTTP API connection requests to this Impala Daemon that were attempted to authenticate using JWT Token but were unsuccessful.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 HTTP API Connection JWT Token Failure",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.hiveserver2-http-frontend.total-jwt-token-auth-failure"
+  },
+  {
     "description": "The amount of memory freed by the last memory tracker garbage collection.",
     "contexts": [
       "IMPALAD"
@@ -2823,7 +2843,7 @@
     "kind": "COUNTER",
     "key": "impala.webserver.total-cookie-auth-failure"
   },
-    {
+  {
     "description": "The number of HTTP connection requests to this daemon's webserver that originated from a trusted domain.",
     "contexts": [
       "IMPALAD",
@@ -2834,6 +2854,30 @@
     "units": "NONE",
     "kind": "COUNTER",
     "key": "impala.webserver.total-trusted-domain-check-success"
+  },
+  {
+    "description": "The number of HTTP connection requests to this daemon's webserver that were successfully authenticated using a JWT token.",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Webserver HTTP Connection JWT Token Auth Success",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.webserver.total-jwt-token-auth-success"
+  },
+  {
+    "description": "The number of HTTP connection requests to this daemon's webserver that provided an invalid JWT token.",
+    "contexts": [
+      "IMPALAD",
+      "CATALOGSERVER",
+      "STATESTORE"
+    ],
+    "label": "Webserver HTTP Connection JWT Token Auth Failure",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "impala.webserver.total-jwt-token-auth-failure"
   },
   {
     "description": "The number of times the FAIL debug action returned an error. For testing only.",
