@@ -218,7 +218,7 @@ explain select id from alltypes;
 ---- RESULTS: VERIFY_IS_SUBSET
 '   stored statistics:'
 '     table: rows=unavailable size=unavailable'
-'     partitions: 0/24 rows=17.91K'
+row_regex:.* partitions: 0/24 rows=17\.9.*K
 '     columns: unavailable'
 row_regex:.* extrapolated-rows=unavailable.*
 row_regex:.* tuple-ids=0 row-size=4B cardinality=17\.9.*K
