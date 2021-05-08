@@ -354,8 +354,7 @@ void AggregateFunctions::TimestampAvgUpdate(FunctionContext* ctx,
   AvgState* avg = reinterpret_cast<AvgState*>(dst->ptr);
   const TimestampValue& tm_src = TimestampValue::FromTimestampVal(src);
   double val;
-  const Timezone* tz = ctx->impl()->state()->time_zone_for_unix_time_conversions();
-  if (tm_src.ToSubsecondUnixTime(tz, &val)) {
+  if (tm_src.ToSubsecondUnixTime(UTCPTR, &val)) {
     avg->sum += val;
     ++avg->count;
   }
@@ -369,8 +368,7 @@ void AggregateFunctions::TimestampAvgRemove(FunctionContext* ctx,
   AvgState* avg = reinterpret_cast<AvgState*>(dst->ptr);
   const TimestampValue& tm_src = TimestampValue::FromTimestampVal(src);
   double val;
-  const Timezone* tz = ctx->impl()->state()->time_zone_for_unix_time_conversions();
-  if (tm_src.ToSubsecondUnixTime(tz, &val)) {
+  if (tm_src.ToSubsecondUnixTime(UTCPTR, &val)) {
     avg->sum -= val;
     --avg->count;
     DCHECK_GE(avg->count, 0);
@@ -381,9 +379,8 @@ TimestampVal AggregateFunctions::TimestampAvgGetValue(FunctionContext* ctx,
     const StringVal& src) {
   AvgState* val_struct = reinterpret_cast<AvgState*>(src.ptr);
   if (val_struct->count == 0) return TimestampVal::null();
-  const Timezone* tz = ctx->impl()->state()->time_zone_for_unix_time_conversions();
   const TimestampValue& tv = TimestampValue::FromSubsecondUnixTime(
-      val_struct->sum / val_struct->count, tz);
+      val_struct->sum / val_struct->count, UTCPTR);
   if (tv.HasDate()) {
     TimestampVal result;
     tv.ToTimestampVal(&result);
