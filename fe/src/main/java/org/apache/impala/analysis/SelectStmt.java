@@ -19,7 +19,6 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -39,6 +38,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.TableAliasGenerator;
 import org.apache.impala.common.TreeNode;
 import org.apache.impala.rewrite.ExprRewriter;
+import org.apache.impala.service.BackendConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,39 +53,6 @@ import com.google.common.collect.Lists;
  */
 public class SelectStmt extends QueryStmt {
   private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
-
-  /**
-   * Impala 3.x and earlier provide non-standard support for a single ordinal
-   * in the HAVING clause:
-   *
-   * SELECT region, count(*), count(*) > 10 FROM sales
-   * HAVING 3
-   *
-   * Most other SQL dialects do not allow ordinals in expressions (such as
-   * HAVING), only in lists (GROUP BY, ORDER BY). The standard way to express
-   * the above is:
-   *
-   * SELECT region, count(*) FROM sales
-   * HAVING count(*) > 10
-   *
-   * Or, better (not currently supported by IMPALA):
-   *
-   * SELECT region, count(*) c FROM SALES
-   * HAVING c > 10
-   *
-   * We intend to disable this non-standard feature in the next major
-   * release. For now, we leave the feature/bug enabled, controlled by
-   * the following constant.
-   *
-   * In that same release, we will enable the third example above.
-   * At present, all that is supported is the odd:
-   *
-   * SELECT region, count(*), count(*) > 10 p FROM sales
-   * HAVING p
-   *
-   * See IMPALA-7844.
-   */
-  public static final boolean ALLOW_ORDINALS_IN_HAVING = true;
 
   /////////////////////////////////////////
   // BEGIN: Members that need to be reset()
@@ -739,7 +706,7 @@ public class SelectStmt extends QueryStmt {
       }
       // Resolve (top-level) aliases and analyzes
       havingPred_ = resolveReferenceExpr(havingClause_, "HAVING", analyzer_,
-          ALLOW_ORDINALS_IN_HAVING);
+          BackendConfig.INSTANCE.getAllowOrdinalsInHaving());
       // can't contain analytic exprs
       Expr analyticExpr = havingPred_.findFirstOf(AnalyticExpr.class);
       if (analyticExpr != null) {

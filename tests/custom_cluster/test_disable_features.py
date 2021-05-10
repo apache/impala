@@ -47,3 +47,19 @@ class TestDisableFeatures(CustomClusterTestSuite):
         use_db=unique_database, multiple_impalad=True)
     self.run_test_case('QueryTest/alter-table-set-column-stats', vector,
         use_db=unique_database, multiple_impalad=True)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--allow_ordinals_in_having=true")
+  def test_allow_ordinals_in_having(self, vector):
+    """Mirror the FE tests in AnalyzeStmtsTest#TestHavingIntegers to make sure the flag
+       can bring back the legacy feature"""
+    self.client.execute("select not bool_col as nb from functional.alltypes having 1")
+    self.execute_query_expect_failure(
+        self.client, "select count(*) from functional.alltypes having 1")
+    self.client.execute("select count(*) > 10 from functional.alltypes having 1")
+    self.execute_query_expect_failure(
+        self.client,
+        "select sum(id) over(order by id) from functional.alltypes having 1")
+    self.execute_query_expect_failure(
+        self.client,
+        "select sum(id) over(order by id) from functional.alltypes having -1")

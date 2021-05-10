@@ -37,6 +37,7 @@ import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.junit.Assert;
 import org.junit.Test;
@@ -1138,9 +1139,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   // HAVING is an expression, not a list like GROUP BY or ORDER BY.
   // Verify that an integer is treated as a constant, not an ordinal.
   @Test
-  public void TestHavingIntegers() throws AnalysisException {
-    if (SelectStmt.ALLOW_ORDINALS_IN_HAVING) {
+  public void TestHavingIntegers() {
+    try {
       // Legacy 3.x functionality
+      BackendConfig.INSTANCE.setAllowOrdinalsInHaving(true);
       AnalyzesOk("select not bool_col as nb from functional.alltypes having 1");
       AnalysisError("select count(*) from functional.alltypes having 1",
           "HAVING clause 'count(*)' requires return type 'BOOLEAN'. " +
@@ -1151,15 +1153,15 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "sum(id) OVER (ORDER BY id ASC)");
       AnalysisError("select sum(id) over(order by id) from functional.alltypes having -1",
           "HAVING: ordinal must be >= 1: -1");
-    } else {
       // Forward-looking, post 3.x functionality
       // IMPALA-7844: Ordinals not supported in HAVING since
       // HAVING is an expression, not a list like GROUP BY or ORDER BY.
+      BackendConfig.INSTANCE.setAllowOrdinalsInHaving(false);
       AnalysisError("select not bool_col as nb from functional.alltypes having 1",
           "HAVING clause '1' requires return type 'BOOLEAN'. " +
           "Actual type is 'TINYINT'.");
       AnalysisError("select not bool_col as nb from functional.alltypes having -1",
-          "HAVING clause '1' requires return type 'BOOLEAN'. " +
+          "HAVING clause '-1' requires return type 'BOOLEAN'. " +
           "Actual type is 'TINYINT'.");
       // Constant exprs should not be interpreted as ordinals
       AnalysisError("select int_col, bool_col, count(*) from functional.alltypes " +
@@ -1170,6 +1172,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "group by 1, 2 having if(TRUE, 2, int_col)",
           "HAVING clause 'if(TRUE, 2, int_col)' requires return type 'BOOLEAN'. " +
           "Actual type is 'INT'.");
+    } finally {
+      BackendConfig.INSTANCE.setAllowOrdinalsInHaving(false);
     }
   }
 

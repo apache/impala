@@ -160,6 +160,11 @@ DEFINE_bool(enable_row_filtering, true,
     "If false, disable the row filtering feature. Defaults to be true. Enabling this flag"
     " requires enable_column_masking to be true.");
 
+DEFINE_bool(allow_ordinals_in_having, false,
+    "If true, allow using ordinals in HAVING clause. This non-standard feature is "
+    "supported in Impala 3.x and earlier. We intend to disable it since 4.0. So it "
+    "defaults to be false. See IMPALA-7844.");
+
 namespace impala {
 
 Status GetConfigFromCommand(const string& flag_cmd, string& result) {
@@ -279,6 +284,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_saml2_ee_test_mode(FLAGS_saml2_ee_test_mode);
   cfg.__set_scratch_dirs(FLAGS_scratch_dirs);
   cfg.__set_max_wait_time_for_sync_ddl_s(FLAGS_max_wait_time_for_sync_ddl_s);
+  cfg.__set_allow_ordinals_in_having(FLAGS_allow_ordinals_in_having);
   return Status::OK();
 }
 

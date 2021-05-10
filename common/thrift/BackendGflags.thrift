@@ -195,4 +195,6 @@ struct TBackendGflags {
   85: required bool enable_row_filtering
 
   86: required i32 max_wait_time_for_sync_ddl_s
+
+  87: required bool allow_ordinals_in_having
 }
