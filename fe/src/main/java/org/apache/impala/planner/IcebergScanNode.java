@@ -195,21 +195,12 @@ public class IcebergScanNode extends HdfsScanNode {
       }
       case TIMESTAMP: {
         long unixMicros = KuduUtil.timestampToUnixTimeMicros(analyzer, literal);
-        if (unixMicros >= 0) {
-          // Iceberg's partition transformations have a bug for times before the epoch.
-          // See https://github.com/apache/iceberg/pull/1981
-          // TODO: IMPALA-10433 remove the workarounds once we use an Iceberg version
-          // that contains the fix.
-          unboundPredicate = Expressions.predicate(op, colName, unixMicros);
-        }
+        unboundPredicate = Expressions.predicate(op, colName, unixMicros);
         break;
       }
       case DATE: {
         int daysSinceEpoch = ((DateLiteral) literal).getValue();
-        if (daysSinceEpoch >= 0) {
-          // See comment at TIMESTAMP.
-          unboundPredicate = Expressions.predicate(op, colName, daysSinceEpoch);
-        }
+        unboundPredicate = Expressions.predicate(op, colName, daysSinceEpoch);
         break;
       }
       case DECIMAL: {

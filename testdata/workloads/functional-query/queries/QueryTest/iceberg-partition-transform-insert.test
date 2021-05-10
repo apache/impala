@@ -402,7 +402,7 @@ where t = '1969-02-15 13:55:03';
 TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 2
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 2
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -452,7 +452,7 @@ where d = '1969-12-15';
 TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 2
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 2
 ====
 ---- QUERY
 # Create table with MONTH partition transform
@@ -524,7 +524,7 @@ where t = '1969-02-15 13:55:03';
 TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 1
-aggregation(SUM, NumRowGroups): 5
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -560,7 +560,7 @@ where d = '1969-12-15';
 TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 1
-aggregation(SUM, NumRowGroups): 5
+aggregation(SUM, NumRowGroups): 2
 ====
 ---- QUERY
 # Create table with DAY partition transform
@@ -648,7 +648,7 @@ where t = '1969-02-15 13:55:03';
 TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 1
-aggregation(SUM, NumRowGroups): 6
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -684,7 +684,7 @@ where d = '1969-12-15';
 TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 1
-aggregation(SUM, NumRowGroups): 6
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # Create table with HOUR partition transform
@@ -739,7 +739,7 @@ where t = '1969-12-31 22:55:03';
 TIMESTAMP
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 1
-aggregation(SUM, NumRowGroups): 6
+aggregation(SUM, NumRowGroups): 2
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -751,7 +751,7 @@ where t = '1969-12-31 23:55:03';
 TIMESTAMP
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 2
-aggregation(SUM, NumRowGroups): 6
+aggregation(SUM, NumRowGroups): 2
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
