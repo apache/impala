@@ -205,6 +205,10 @@ DEFINE_int32(kudu_client_connection_negotiation_timeout_ms, 3000,
     "(Advanced) Timeout for connection negotiation between Kudu client and "
     "Kudu masters and tablet servers, in milliseconds");
 
+// SASL protocol name for Kudu used in the FE and BE when creating Kudu client.
+// The default name is "kudu".
+DEFINE_string(kudu_sasl_protocol_name, "kudu", "SASL protocol name for Kudu");
+
 DEFINE_int64(inc_stats_size_limit_bytes, 200 * (1LL<<20), "Maximum size of "
     "incremental stats the catalog is allowed to serialize per table. "
     "This limit is set as a safety check, to prevent the JVM from "

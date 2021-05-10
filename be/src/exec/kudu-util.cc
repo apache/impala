@@ -55,6 +55,7 @@ DEFINE_int32(kudu_client_v, -1,
 DECLARE_bool(disable_kudu);
 DECLARE_int32(kudu_client_rpc_timeout_ms);
 DECLARE_int32(kudu_client_connection_negotiation_timeout_ms);
+DECLARE_string(kudu_sasl_protocol_name);
 
 namespace impala {
 
@@ -97,6 +98,7 @@ Status CreateKuduClient(const vector<string>& master_addrs,
     LOG(WARNING) << "Ignoring value of --kudu_client_num_reactor_threads: "
                  << FLAGS_kudu_client_num_reactor_threads;
   }
+  b.sasl_protocol_name(FLAGS_kudu_sasl_protocol_name);
   KUDU_RETURN_IF_ERROR(b.Build(client), "Unable to create Kudu client");
   return Status::OK();
 }

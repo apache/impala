@@ -74,6 +74,8 @@ public class BackendConfig {
   }
   public int getKuduClientTimeoutMs() { return backendCfg_.kudu_operation_timeout_ms; }
 
+  public String getKuduSaslProtocolName() { return backendCfg_.kudu_sasl_protocol_name; }
+
   public String getImpalaBuildVersion() { return backendCfg_.impala_build_version; }
   public int getImpalaLogLevel() { return backendCfg_.impala_log_lvl; }
   public int getNonImpalaJavaVlogLevel() { return backendCfg_.non_impala_java_vlog; }

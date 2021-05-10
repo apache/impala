@@ -95,6 +95,7 @@ DECLARE_bool(start_hms_server);
 DECLARE_int32(hms_port);
 DECLARE_bool(fallback_to_hms_on_errors);
 DECLARE_bool(enable_catalogd_hms_cache);
+DECLARE_string(kudu_sasl_protocol_name);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -293,6 +294,7 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_hms_port(FLAGS_hms_port);
   cfg.__set_fallback_to_hms_on_errors(FLAGS_fallback_to_hms_on_errors);
   cfg.__set_enable_catalogd_hms_cache(FLAGS_enable_catalogd_hms_cache);
+  cfg.__set_kudu_sasl_protocol_name(FLAGS_kudu_sasl_protocol_name);
   return Status::OK();
 }
 

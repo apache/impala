@@ -205,4 +205,6 @@ struct TBackendGflags {
   90: required bool fallback_to_hms_on_errors
 
   91: required bool enable_catalogd_hms_cache
+
+  92: required string kudu_sasl_protocol_name
 }

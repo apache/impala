@@ -93,6 +93,7 @@ public class KuduUtil {
       b.defaultAdminOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
       b.defaultOperationTimeoutMs(BackendConfig.INSTANCE.getKuduClientTimeoutMs());
       b.workerCount(KUDU_CLIENT_WORKER_THREAD_COUNT);
+      b.saslProtocolName(BackendConfig.INSTANCE.getKuduSaslProtocolName());
       client = b.build();
       kuduClients_.put(kuduMasters, client);
     }
