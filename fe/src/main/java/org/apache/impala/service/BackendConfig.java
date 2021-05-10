@@ -253,6 +253,14 @@ public class BackendConfig {
 
   public String getScratchDirs() { return backendCfg_.scratch_dirs; }
 
+  public boolean getAllowOrdinalsInHaving() {
+    return backendCfg_.allow_ordinals_in_having;
+  }
+
+  public void setAllowOrdinalsInHaving(boolean allow_ordinals_in_having) {
+    backendCfg_.allow_ordinals_in_having = allow_ordinals_in_having;
+  }
+
   // Inits the auth_to_local configuration in the static KerberosName class.
   private static void initAuthToLocal() {
     // If auth_to_local is enabled, we read the configuration hadoop.security.auth_to_local
