@@ -18,7 +18,11 @@
 <configuration>
   <property>
     <name>xasecure.audit.is.enabled</name>
-    <value>false</value>
+    <value>true</value>
+  </property>
+  <property>
+    <name>xasecure.audit.destination.log4j</name>
+    <value>true</value>
   </property>
   <property>
     <name>ranger.plugin.hive.access.cluster.name</name>
