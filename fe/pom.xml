@@ -147,6 +147,14 @@ under the License.
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
         </exclusion>
+        <!-- We exclude hive-exec which this jar includes because hive-exec
+        brings with it tons of other unnecessary dependencies including thrift 0.9.3
+        which can cause build failures.
+        -->
+        <exclusion>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-exec</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 
