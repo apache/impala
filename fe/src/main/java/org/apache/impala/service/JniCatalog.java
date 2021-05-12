@@ -28,7 +28,6 @@ import java.util.UUID;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationManager;
-import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Db;
@@ -146,11 +145,14 @@ public class JniCatalog {
 
   public byte[] getCatalogDelta(byte[] thriftGetCatalogDeltaReq) throws
       ImpalaException, TException {
+    long start = System.currentTimeMillis();
     TGetCatalogDeltaRequest params = new TGetCatalogDeltaRequest();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetCatalogDeltaReq);
-    return new TSerializer(protocolFactory_).serialize(new TGetCatalogDeltaResponse(
+    byte[] res = new TSerializer(protocolFactory_).serialize(new TGetCatalogDeltaResponse(
         catalog_.getCatalogDelta(params.getNative_catalog_server_ptr(),
         params.getFrom_version())));
+    JniUtil.logResponse(res.length, start, params, "getCatalogDelta");
+    return res;
   }
 
   /**
@@ -164,11 +166,14 @@ public class JniCatalog {
    * Executes the given DDL request and returns the result.
    */
   public byte[] execDdl(byte[] thriftDdlExecReq) throws ImpalaException {
+    long start = System.currentTimeMillis();
     TDdlExecRequest params = new TDdlExecRequest();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftDdlExecReq);
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
-      return serializer.serialize(catalogOpExecutor_.execDdlRequest(params));
+      byte[] res = serializer.serialize(catalogOpExecutor_.execDdlRequest(params));
+      JniUtil.logResponse(res.length, start, params, "execDdl");
+      return res;
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
@@ -179,12 +184,15 @@ public class JniCatalog {
    */
   public byte[] resetMetadata(byte[] thriftResetMetadataReq)
       throws ImpalaException, TException {
+    long start = System.currentTimeMillis();
     TResetMetadataRequest req = new TResetMetadataRequest();
     JniUtil.deserializeThrift(protocolFactory_, req, thriftResetMetadataReq);
     TSerializer serializer = new TSerializer(protocolFactory_);
     catalogOperationUsage.increment(req);
     try {
-      return serializer.serialize(catalogOpExecutor_.execResetMetadata(req));
+      byte[] res = serializer.serialize(catalogOpExecutor_.execResetMetadata(req));
+      JniUtil.logResponse(res.length, start, req, "resetMetadata");
+      return res;
     } finally {
       catalogOperationUsage.decrement(req);
     }
@@ -197,6 +205,7 @@ public class JniCatalog {
    */
   public byte[] getDbs(byte[] thriftGetTablesParams) throws ImpalaException,
       TException {
+    long start = System.currentTimeMillis();
     TGetDbsParams params = new TGetDbsParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
     List<Db> dbs = catalog_.getDbs(PatternMatcher.MATCHER_MATCH_ALL);
@@ -205,7 +214,9 @@ public class JniCatalog {
     for (FeDb db: dbs) tDbs.add(db.toThrift());
     result.setDbs(tDbs);
     TSerializer serializer = new TSerializer(protocolFactory_);
-    return serializer.serialize(result);
+    byte[] res = serializer.serialize(result);
+    JniUtil.logResponse(res.length, start, params, "getDbs");
+    return res;
   }
 
   /**
@@ -215,6 +226,7 @@ public class JniCatalog {
    */
   public byte[] getTableNames(byte[] thriftGetTablesParams) throws ImpalaException,
       TException {
+    long start = System.currentTimeMillis();
     TGetTablesParams params = new TGetTablesParams();
     JniUtil.deserializeThrift(protocolFactory_, params, thriftGetTablesParams);
     List<String> tables = catalog_.getTableNames(params.db,
@@ -222,17 +234,21 @@ public class JniCatalog {
     TGetTablesResult result = new TGetTablesResult();
     result.setTables(tables);
     TSerializer serializer = new TSerializer(protocolFactory_);
-    return serializer.serialize(result);
+    byte[] res = serializer.serialize(result);
+    JniUtil.logResponse(res.length, start, params, "getTableNames");
+    return res;
   }
 
   /**
    * Returns the collected metrics of a table.
    */
-  public String getTableMetrics(byte[] getTableMetricsParams) throws ImpalaException,
-      TException {
+  public String getTableMetrics(byte[] getTableMetricsParams) throws ImpalaException {
+    long start = System.currentTimeMillis();
     TGetTableMetricsParams params = new TGetTableMetricsParams();
     JniUtil.deserializeThrift(protocolFactory_, params, getTableMetricsParams);
-    return catalog_.getTableMetrics(params.table_name);
+    String res = catalog_.getTableMetrics(params.table_name);
+    JniUtil.logResponse(res.length(), start, params, "getTableMetrics");
+    return res;
   }
 
   /**
@@ -240,10 +256,13 @@ public class JniCatalog {
    */
   public byte[] getCatalogObject(byte[] thriftParams) throws ImpalaException,
       TException {
+    long start = System.currentTimeMillis();
     TCatalogObject objectDescription = new TCatalogObject();
     JniUtil.deserializeThrift(protocolFactory_, objectDescription, thriftParams);
     TSerializer serializer = new TSerializer(protocolFactory_);
-    return serializer.serialize(catalog_.getTCatalogObject(objectDescription));
+    byte[] res = serializer.serialize(catalog_.getTCatalogObject(objectDescription));
+    JniUtil.logResponse(res.length, start, objectDescription, "getCatalogObject");
+    return res;
   }
 
   /**
@@ -252,19 +271,25 @@ public class JniCatalog {
    */
   public String getJsonCatalogObject(byte[] thriftParams) throws ImpalaException,
       TException {
+    long start = System.currentTimeMillis();
     TCatalogObject objectDescription = new TCatalogObject();
     JniUtil.deserializeThrift(protocolFactory_, objectDescription, thriftParams);
     TSerializer jsonSerializer = new TSerializer(new TSimpleJSONProtocol.Factory());
-    return jsonSerializer.toString(catalog_.getTCatalogObject(objectDescription));
+    String res = jsonSerializer.toString(catalog_.getTCatalogObject(objectDescription));
+    JniUtil.logResponse(res.length(), start, objectDescription, "getJsonCatalogObject");
+    return res;
   }
 
   public byte[] getPartialCatalogObject(byte[] thriftParams) throws ImpalaException,
       TException {
+    long start = System.currentTimeMillis();
     TGetPartialCatalogObjectRequest req =
         new TGetPartialCatalogObjectRequest();
     JniUtil.deserializeThrift(protocolFactory_, req, thriftParams);
     TSerializer serializer = new TSerializer(protocolFactory_);
-    return serializer.serialize(catalog_.getPartialCatalogObject(req));
+    byte[] res = serializer.serialize(catalog_.getPartialCatalogObject(req));
+    JniUtil.logResponse(res.length, start, req, "getPartialCatalogObject");
+    return res;
   }
 
   /**
@@ -272,6 +297,7 @@ public class JniCatalog {
    */
   public byte[] getFunctions(byte[] thriftParams) throws ImpalaException,
       TException {
+    long start = System.currentTimeMillis();
     TGetFunctionsRequest request = new TGetFunctionsRequest();
     JniUtil.deserializeThrift(protocolFactory_, request, thriftParams);
     TSerializer serializer = new TSerializer(protocolFactory_);
@@ -288,18 +314,22 @@ public class JniCatalog {
       response.addToFunctions(fn.toThrift());
     }
 
-    return serializer.serialize(response);
+    byte[] res = serializer.serialize(response);
+    JniUtil.logResponse(res.length, start, request, "getFunctions");
+    return res;
   }
 
-  public void prioritizeLoad(byte[] thriftLoadReq) throws ImpalaException,
-      TException  {
+  public void prioritizeLoad(byte[] thriftLoadReq) throws ImpalaException {
+    long start = System.currentTimeMillis();
     TPrioritizeLoadRequest request = new TPrioritizeLoadRequest();
     JniUtil.deserializeThrift(protocolFactory_, request, thriftLoadReq);
     catalog_.prioritizeLoad(request.getObject_descs());
+    JniUtil.logResponse(start, request, "prioritizeLoad");
   }
 
   public byte[] getPartitionStats(byte[] thriftParams)
       throws ImpalaException, TException {
+    long start = System.currentTimeMillis();
     TGetPartitionStatsRequest request = new TGetPartitionStatsRequest();
     JniUtil.deserializeThrift(protocolFactory_, request, thriftParams);
     TSerializer serializer = new TSerializer(protocolFactory_);
@@ -310,7 +340,9 @@ public class JniCatalog {
       response.setStatus(
           new TStatus(TErrorCode.INTERNAL_ERROR, ImmutableList.of(e.getMessage())));
     }
-    return serializer.serialize(response);
+    byte[] res = serializer.serialize(response);
+    JniUtil.logResponse(res.length, start, request, "getPartitionStats");
+    return res;
   }
 
   /**
@@ -319,12 +351,15 @@ public class JniCatalog {
    */
   public byte[] updateCatalog(byte[] thriftUpdateCatalog) throws ImpalaException,
       TException  {
+    long start = System.currentTimeMillis();
     TUpdateCatalogRequest request = new TUpdateCatalogRequest();
     JniUtil.deserializeThrift(protocolFactory_, request, thriftUpdateCatalog);
     TSerializer serializer = new TSerializer(protocolFactory_);
     catalogOperationUsage.increment(request);
     try {
-      return serializer.serialize(catalogOpExecutor_.updateCatalog(request));
+      byte[] res = serializer.serialize(catalogOpExecutor_.updateCatalog(request));
+      JniUtil.logResponse(res.length, start, request, "updateCatalog");
+      return res;
     } finally {
       catalogOperationUsage.decrement(request);
     }
@@ -334,35 +369,49 @@ public class JniCatalog {
    * Returns information about the current catalog usage.
    */
   public byte[] getCatalogUsage() throws ImpalaException, TException {
+    long start = System.currentTimeMillis();
     TSerializer serializer = new TSerializer(protocolFactory_);
-    return serializer.serialize(catalog_.getCatalogUsage());
+    byte[] res = serializer.serialize(catalog_.getCatalogUsage());
+    JniUtil.logResponse(res.length, start, /*thriftReq*/null, "getCatalogUsage");
+    return res;
   }
 
   /**
    * Returns information about the current catalog operation metrics.
    */
   public byte[] getOperationUsage() throws ImpalaException, TException {
+    long start = System.currentTimeMillis();
     TSerializer serializer = new TSerializer(protocolFactory_);
-    return serializer.serialize(catalog_.getOperationUsage());
+    byte[] res = serializer.serialize(catalog_.getOperationUsage());
+    JniUtil.logResponse(res.length, start, /*thriftReq*/null, "getOperationUsage");
+    return res;
   }
 
   public byte[] getEventProcessorSummary() throws TException {
+    long start = System.currentTimeMillis();
     TSerializer serializer = new TSerializer(protocolFactory_);
-    return serializer.serialize(catalog_.getEventProcessorSummary());
+    byte[] res = serializer.serialize(catalog_.getEventProcessorSummary());
+    JniUtil.logResponse(res.length, start, /*thriftReq*/null, "getEventProcessorSummary");
+    return res;
   }
 
   public void updateTableUsage(byte[] req) throws ImpalaException {
+    long start = System.currentTimeMillis();
     TUpdateTableUsageRequest thriftReq = new TUpdateTableUsageRequest();
     JniUtil.deserializeThrift(protocolFactory_, thriftReq, req);
     catalog_.updateTableUsage(thriftReq);
+    JniUtil.logResponse(start, thriftReq, "updateTableUsage");
   }
 
   public byte[] getCatalogServerMetrics() throws ImpalaException, TException {
+    long start = System.currentTimeMillis();
     TGetCatalogServerMetricsResponse response = new TGetCatalogServerMetricsResponse();
     response.setCatalog_partial_fetch_rpc_queue_len(
         catalog_.getPartialFetchRpcQueueLength());
     response.setEvent_metrics(catalog_.getEventProcessorMetrics());
     TSerializer serializer = new TSerializer(protocolFactory_);
-    return serializer.serialize(response);
+    byte[] res = serializer.serialize(response);
+    JniUtil.logResponse(res.length, start, /*thriftReq*/null, "getCatalogServerMetrics");
+    return res;
   }
 }

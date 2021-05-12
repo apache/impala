@@ -170,6 +170,12 @@ DEFINE_bool(allow_ordinals_in_having, false,
     "supported in Impala 3.x and earlier. We intend to disable it since 4.0. So it "
     "defaults to be false. See IMPALA-7844.");
 
+DEFINE_int32(warn_catalog_response_size_mb, 50,
+    "Threshold in MB to log a warning for large catalogd response size.");
+
+DEFINE_int32(warn_catalog_response_duration_s, 60,
+    "Threshold in seconds to log a warning for slow catalogd response.");
+
 namespace impala {
 
 Status GetConfigFromCommand(const string& flag_cmd, string& result) {
@@ -295,6 +301,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_fallback_to_hms_on_errors(FLAGS_fallback_to_hms_on_errors);
   cfg.__set_enable_catalogd_hms_cache(FLAGS_enable_catalogd_hms_cache);
   cfg.__set_kudu_sasl_protocol_name(FLAGS_kudu_sasl_protocol_name);
+  cfg.__set_warn_catalog_response_size_mb(FLAGS_warn_catalog_response_size_mb);
+  cfg.__set_warn_catalog_response_duration_s(FLAGS_warn_catalog_response_duration_s);
   return Status::OK();
 }
 

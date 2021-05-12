@@ -207,4 +207,8 @@ struct TBackendGflags {
   91: required bool enable_catalogd_hms_cache
 
   92: required string kudu_sasl_protocol_name
+
+  93: required i32 warn_catalog_response_size_mb
+
+  94: required i32 warn_catalog_response_duration_s
 }

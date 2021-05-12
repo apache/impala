@@ -23,6 +23,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.impala.analysis.SqlScanner;
+import org.apache.impala.common.PrintUtils;
 import org.apache.impala.thrift.TBackendGflags;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -38,8 +39,14 @@ public class BackendConfig {
 
   private TBackendGflags backendCfg_;
 
+  // Thresholds in warning slow or large catalog responses.
+  private long warnCatalogResponseSize_;
+  private long warnCatalogResponseDurationMs_;
+
   private BackendConfig(TBackendGflags cfg) {
     backendCfg_ = cfg;
+    warnCatalogResponseSize_ = cfg.warn_catalog_response_size_mb * 1024L * 1024L;
+    warnCatalogResponseDurationMs_ = cfg.warn_catalog_response_duration_s * 1000L;
   }
 
   public static void create(TBackendGflags cfg) {
@@ -262,6 +269,12 @@ public class BackendConfig {
 
   public void setAllowOrdinalsInHaving(boolean allow_ordinals_in_having) {
     backendCfg_.allow_ordinals_in_having = allow_ordinals_in_having;
+  }
+
+  public long getWarnCatalogResponseSize() { return warnCatalogResponseSize_; }
+
+  public long getWarnCatalogResponseDurationMs() {
+    return warnCatalogResponseDurationMs_;
   }
 
   // Inits the auth_to_local configuration in the static KerberosName class.

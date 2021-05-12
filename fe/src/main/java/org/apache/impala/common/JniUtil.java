@@ -31,6 +31,8 @@ import java.lang.management.ThreadInfo;
 import java.util.ArrayList;
 import java.util.Map;
 
+import org.apache.commons.lang.StringUtils;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TGetJMXJsonResponse;
 import org.apache.impala.util.JMXJsonUtil;
 import org.apache.thrift.TBase;
@@ -49,7 +51,9 @@ import org.apache.impala.thrift.TJvmMemoryPool;
 import org.apache.impala.thrift.TJvmThreadInfo;
 import org.apache.impala.util.JvmPauseMonitor;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Utility class with methods intended for JNI clients
  */
@@ -57,7 +61,7 @@ public class JniUtil {
   private final static TBinaryProtocol.Factory protocolFactory_ =
       new TBinaryProtocol.Factory();
 
-  private static final Logger LOG = Logger.getLogger(JniUtil.class);
+  private static final Logger LOG = LoggerFactory.getLogger(JniUtil.class);
 
   /**
    * Initializes the JvmPauseMonitor instance.
@@ -137,6 +141,34 @@ public class JniUtil {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  /**
+   * Warn if the result size or the response time exceeds thresholds.
+   */
+  public static void logResponse(long resultSize, long startTime, TBase<?, ?> thriftReq,
+      String methodName) {
+    long duration = System.currentTimeMillis() - startTime;
+    boolean tooLarge = (resultSize > BackendConfig.INSTANCE.getWarnCatalogResponseSize());
+    boolean tooSlow =
+        (duration > BackendConfig.INSTANCE.getWarnCatalogResponseDurationMs());
+    if (tooLarge || tooSlow) {
+      String header = (tooLarge && tooSlow) ? "Response too large and too slow" :
+          (tooLarge ? "Response too large" : "Response too slow");
+      String request = (thriftReq == null) ? "" :
+          ", request: " + StringUtils.abbreviate(thriftReq.toString(), 1000);
+      LOG.warn("{}: size={} ({}), duration={}ms ({}), method: {}{}",
+          header, resultSize, PrintUtils.printBytes(resultSize),
+          duration, PrintUtils.printTimeMs(duration), methodName, request);
+    }
+  }
+
+  public static void logResponse(long startTime, TBase<?, ?> thriftReq, String method) {
+    logResponse(0, startTime, thriftReq, method);
+  }
+
+  public static void logResponse(long startTime, String method) {
+    logResponse(startTime, null, method);
   }
 
   /**
