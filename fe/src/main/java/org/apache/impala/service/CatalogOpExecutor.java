@@ -2392,7 +2392,7 @@ public class CatalogOpExecutor {
     Preconditions.checkState(IcebergTable.isIcebergTable(msTbl));
     // Only synchronized tables can be integrated.
     if (!IcebergTable.isSynchronizedTable(msTbl)) return false;
-    return IcebergUtil.getTIcebergCatalog(msTbl) == TIcebergCatalog.HIVE_CATALOG;
+    return IcebergUtil.isHiveCatalog(msTbl);
   }
 
   /**
@@ -3361,16 +3361,18 @@ public class CatalogOpExecutor {
               newTable.getSd().setLocation(tableLoc);
             } else {
               if (location == null) {
-                if (catalog == TIcebergCatalog.HADOOP_CATALOG) {
-                  // When creating external Iceberg table with 'hadoop.catalog' we load
-                  // the Iceberg table using catalog location and table identifier to get
+                if (IcebergUtil.getUnderlyingCatalog(newTable) !=
+                    TIcebergCatalog.HADOOP_TABLES) {
+                  // When creating external Iceberg table we load
+                  // the Iceberg table using catalog and table identifier to get
                   // the actual location of the table. This way we can also get the
                   // correct location for tables stored in nested namespaces.
                   TableIdentifier identifier =
                       IcebergUtil.getIcebergTableIdentifier(newTable);
                   newTable.getSd().setLocation(IcebergUtil.loadTable(
-                      TIcebergCatalog.HADOOP_CATALOG, identifier,
-                      IcebergUtil.getIcebergCatalogLocation(newTable)).location());
+                      catalog, identifier,
+                      IcebergUtil.getIcebergCatalogLocation(newTable),
+                      newTable.getParameters()).location());
                 } else {
                   addSummary(response,
                       "Location is necessary for external iceberg table.");

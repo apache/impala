@@ -70,12 +70,12 @@ public class IcebergHiveCatalog implements IcebergCatalog {
     Preconditions.checkState(
         feTable.getIcebergCatalog() == TIcebergCatalog.HIVE_CATALOG);
     TableIdentifier tableId = IcebergUtil.getIcebergTableIdentifier(feTable);
-    return loadTable(tableId, null);
+    return loadTable(tableId, null, null);
   }
 
   @Override
-  public Table loadTable(TableIdentifier tableId, String tableLocation)
-      throws TableLoadingException {
+  public Table loadTable(TableIdentifier tableId, String tableLocation,
+      Map<String, String> properties) throws TableLoadingException {
     Preconditions.checkState(tableId != null);
     try {
       return hiveCatalog_.loadTable(tableId);

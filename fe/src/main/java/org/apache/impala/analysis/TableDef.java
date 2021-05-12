@@ -111,8 +111,8 @@ class TableDef {
   // True if analyze() has been called.
   private boolean isAnalyzed_ = false;
 
-  // Generated Kudu properties set during analysis.
-  private Map<String, String> generatedKuduProperties_ = new HashMap<>();
+  // Generated properties set during analysis. Currently used by Kudu and Iceberg.
+  private Map<String, String> generatedProperties_ = new HashMap<>();
 
   // END: Members that need to be reset()
   /////////////////////////////////////////
@@ -335,7 +335,7 @@ class TableDef {
     primaryKeyColDefs_.clear();
     columnDefs_.clear();
     isAnalyzed_ = false;
-    generatedKuduProperties_.clear();
+    generatedProperties_.clear();
   }
 
   public TableName getTblName() {
@@ -367,10 +367,10 @@ class TableDef {
   List<ColumnDef> getPrimaryKeyColumnDefs() { return primaryKeyColDefs_; }
   boolean isExternal() { return isExternal_; }
   boolean getIfNotExists() { return ifNotExists_; }
-  Map<String, String> getGeneratedKuduProperties() { return generatedKuduProperties_; }
-  void putGeneratedKuduProperty(String key, String value) {
+  Map<String, String> getGeneratedProperties() { return generatedProperties_; }
+  void putGeneratedProperty(String key, String value) {
     Preconditions.checkNotNull(key);
-    generatedKuduProperties_.put(key, value);
+    generatedProperties_.put(key, value);
   }
   List<KuduPartitionParam> getKuduPartitionParams() {
     return dataLayout_.getKuduPartitionParams();

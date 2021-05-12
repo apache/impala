@@ -71,7 +71,8 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
       TableMetadata metadata =
           IcebergUtil.getIcebergTableMetadata(params.icebergCatalog_,
               IcebergUtil.getIcebergTableIdentifier(msTable),
-              params.icebergCatalogLocation_);
+              params.icebergCatalogLocation_,
+              msTable.getParameters());
       List<Column> iceColumns =
           IcebergSchemaConverter.convertToImpalaSchema(metadata.schema());
       validateColumns(iceColumns, msTable.getSd().getCols());

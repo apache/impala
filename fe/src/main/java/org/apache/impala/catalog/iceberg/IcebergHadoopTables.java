@@ -70,12 +70,12 @@ public class IcebergHadoopTables implements IcebergCatalog {
   public Table loadTable(FeIcebergTable feTable) throws TableLoadingException {
     Preconditions.checkState(
         feTable.getIcebergCatalog() == TIcebergCatalog.HADOOP_TABLES);
-    return loadTable(null, feTable.getLocation());
+    return loadTable(null, feTable.getLocation(), null);
   }
 
   @Override
-  public Table loadTable(TableIdentifier tableId, String tableLocation)
-      throws TableLoadingException {
+  public Table loadTable(TableIdentifier tableId, String tableLocation,
+      Map<String, String> properties) throws TableLoadingException {
     Preconditions.checkState(tableLocation != null);
     final int MAX_ATTEMPTS = 5;
     final int SLEEP_MS = 500;

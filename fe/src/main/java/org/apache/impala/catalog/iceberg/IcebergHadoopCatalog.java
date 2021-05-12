@@ -18,7 +18,9 @@
 package org.apache.impala.catalog.iceberg;
 
 import java.lang.NullPointerException;
+import java.util.HashMap;
 import java.util.Map;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
@@ -45,7 +47,11 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
   private HadoopCatalog hadoopCatalog;
 
   public IcebergHadoopCatalog(String catalogLocation) {
-    hadoopCatalog = new HadoopCatalog(FileSystemUtil.getConfiguration(), catalogLocation);
+    hadoopCatalog = new HadoopCatalog();
+    Map<String, String> props = new HashMap<>();
+    props.put(CatalogProperties.WAREHOUSE_LOCATION, catalogLocation);
+    hadoopCatalog.setConf(FileSystemUtil.getConfiguration());
+    hadoopCatalog.initialize("", props);
   }
 
   @Override
@@ -65,12 +71,12 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
     Preconditions.checkState(
       feTable.getIcebergCatalog() == TIcebergCatalog.HADOOP_CATALOG);
     TableIdentifier tableId = IcebergUtil.getIcebergTableIdentifier(feTable);
-    return loadTable(tableId, null);
+    return loadTable(tableId, null, null);
   }
 
   @Override
-  public Table loadTable(TableIdentifier tableId, String tableLocation)
-      throws TableLoadingException {
+  public Table loadTable(TableIdentifier tableId, String tableLocation,
+      Map<String, String> properties) throws TableLoadingException {
     Preconditions.checkState(tableId != null);
     final int MAX_ATTEMPTS = 5;
     final int SLEEP_MS = 500;

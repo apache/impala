@@ -167,6 +167,15 @@ CONFIG.update({
  'hive.metastore.dml.events': 'true',
 })
 
+# Add Iceberg catalog configurations.
+CONFIG.update({
+  # Hive catalog:
+  'iceberg.catalog.ice_hive_cat.type': 'hive',
+  # Hadoop catalog:
+  'iceberg.catalog.ice_hadoop_cat.type': 'hadoop',
+  'iceberg.catalog.ice_hadoop_cat.warehouse': '${WAREHOUSE_LOCATION_PREFIX}/test-warehouse/ice_hadoop_cat',
+})
+
 if variant == 'without_hms_config':
   CONFIG.clear()
 

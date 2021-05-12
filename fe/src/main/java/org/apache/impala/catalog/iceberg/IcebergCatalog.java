@@ -24,6 +24,7 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.common.ImpalaRuntimeException;
 
 /**
  * Interface for Iceberg catalogs. Only contains a minimal set of methods to make
@@ -39,7 +40,7 @@ public interface IcebergCatalog {
       Schema schema,
       PartitionSpec spec,
       String location,
-      Map<String, String> properties);
+      Map<String, String> properties) throws ImpalaRuntimeException;
 
   /**
    * Loads a native Iceberg table based on the information in 'feTable'.
@@ -52,9 +53,11 @@ public interface IcebergCatalog {
    *     interface, e.g. HadoopCatalog.
    * @param tableLocation is the filesystem path to load the table via the HadoopTables
    *     interface.
+   * @param properties provides information for table loading when Iceberg Catalogs
+   *     is being used.
    */
-   Table loadTable(TableIdentifier tableId, String tableLocation)
-      throws TableLoadingException;
+   Table loadTable(TableIdentifier tableId, String tableLocation,
+      Map<String, String> properties) throws TableLoadingException;
 
   /**
    * Drops the table from this catalog.

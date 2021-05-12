@@ -25,6 +25,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
+import org.apache.iceberg.mr.Catalogs;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.IcebergTable;
@@ -129,11 +130,11 @@ public class CreateTableStmt extends StatementBase {
   Map<String, String> getSerdeProperties() { return tableDef_.getSerdeProperties(); }
   public THdfsFileFormat getFileFormat() { return tableDef_.getFileFormat(); }
   RowFormat getRowFormat() { return tableDef_.getRowFormat(); }
-  private void putGeneratedKuduProperty(String key, String value) {
-    tableDef_.putGeneratedKuduProperty(key, value);
+  private void putGeneratedProperty(String key, String value) {
+    tableDef_.putGeneratedProperty(key, value);
   }
   public Map<String, String> getGeneratedKuduProperties() {
-    return tableDef_.getGeneratedKuduProperties();
+    return tableDef_.getGeneratedProperties();
   }
 
   // Only exposed for ToSqlUtils. Returns the list of primary keys declared by the user
@@ -372,7 +373,7 @@ public class CreateTableStmt extends StatementBase {
       throw new AnalysisException("Invalid storage handler specified for Kudu table: " +
           handler);
     }
-    putGeneratedKuduProperty(KuduTable.KEY_STORAGE_HANDLER,
+    putGeneratedProperty(KuduTable.KEY_STORAGE_HANDLER,
         KuduTable.KUDU_STORAGE_HANDLER);
 
     String kuduMasters = getKuduMasters(analyzer);
@@ -381,7 +382,7 @@ public class CreateTableStmt extends StatementBase {
           "Table property '%s' is required when the impalad startup flag " +
           "-kudu_master_hosts is not used.", KuduTable.KEY_MASTER_HOSTS));
     }
-    putGeneratedKuduProperty(KuduTable.KEY_MASTER_HOSTS, kuduMasters);
+    putGeneratedProperty(KuduTable.KEY_MASTER_HOSTS, kuduMasters);
 
     // TODO: Find out what is creating a directory in HDFS and stop doing that. Kudu
     //       tables shouldn't have HDFS dirs: IMPALA-3570
@@ -497,7 +498,7 @@ public class CreateTableStmt extends StatementBase {
       throw new AnalysisException(String.format("Cannot analyze Kudu table '%s': %s",
           getTbl(), e.getMessage()));
     }
-    putGeneratedKuduProperty(KuduTable.KEY_TABLE_NAME,
+    putGeneratedProperty(KuduTable.KEY_TABLE_NAME,
         KuduUtil.getDefaultKuduTableName(getDb(), getTbl(), isHMSIntegrationEnabled));
   }
 
@@ -621,7 +622,7 @@ public class CreateTableStmt extends StatementBase {
       throw new AnalysisException("Invalid storage handler " +
           "specified for Iceberg format: " + handler);
     }
-    putGeneratedKuduProperty(IcebergTable.KEY_STORAGE_HANDLER,
+    putGeneratedProperty(IcebergTable.KEY_STORAGE_HANDLER,
         IcebergTable.ICEBERG_STORAGE_HANDLER);
 
     String fileformat = getTblProperties().get(IcebergTable.ICEBERG_FILE_FORMAT);
@@ -629,7 +630,7 @@ public class CreateTableStmt extends StatementBase {
       throw new AnalysisException("Invalid fileformat for Iceberg table: " + fileformat);
     }
     if (fileformat == null || fileformat.isEmpty()) {
-      putGeneratedKuduProperty(IcebergTable.ICEBERG_FILE_FORMAT, "parquet");
+      putGeneratedProperty(IcebergTable.ICEBERG_FILE_FORMAT, "parquet");
     }
 
     // Determine the Iceberg catalog being used. The default catalog is HiveCatalog.
@@ -637,7 +638,6 @@ public class CreateTableStmt extends StatementBase {
     TIcebergCatalog catalog;
     if (catalogStr == null || catalogStr.isEmpty()) {
       catalog = TIcebergCatalog.HIVE_CATALOG;
-      putGeneratedKuduProperty(IcebergTable.ICEBERG_CATALOG, "hive.catalog");
     } else {
       catalog = IcebergUtil.getTIcebergCatalog(catalogStr);
     }
@@ -658,6 +658,8 @@ public class CreateTableStmt extends StatementBase {
       case HADOOP_CATALOG: validateTableInHadoopCatalog();
       break;
       case HADOOP_TABLES: validateTableInHadoopTables();
+      break;
+      case CATALOGS: validateTableInCatalogs();
       break;
       default: throw new AnalysisException(String.format(
           "Unknown Iceberg catalog type: %s", catalog));
@@ -689,6 +691,13 @@ public class CreateTableStmt extends StatementBase {
     if (getTblProperties().get(IcebergTable.ICEBERG_CATALOG_LOCATION) != null) {
       throw new AnalysisException(String.format("%s cannot be set for Iceberg table " +
           "stored in hadoop.tables", IcebergTable.ICEBERG_CATALOG_LOCATION));
+    }
+  }
+
+  private void validateTableInCatalogs() {
+    String tableId = getTblProperties().get(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
+    if (tableId != null && !tableId.isEmpty()) {
+      putGeneratedProperty(Catalogs.NAME, tableId);
     }
   }
 

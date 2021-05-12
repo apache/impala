@@ -179,7 +179,6 @@ public class IcebergCatalogOpExecutor {
    */
   private static boolean isHmsOnlyProperty(String propKey) {
     if (IcebergTable.ICEBERG_FILE_FORMAT.equals(propKey)) return true;
-    if (IcebergTable.ICEBERG_CATALOG.equals(propKey)) return true;
     if (IcebergTable.ICEBERG_CATALOG_LOCATION.equals(propKey)) return true;
     if (IcebergTable.ICEBERG_TABLE_IDENTIFIER.equals(propKey)) return true;
     if (CatalogOpExecutor.CAPABILITIES_KEY.equals(propKey)) return true;

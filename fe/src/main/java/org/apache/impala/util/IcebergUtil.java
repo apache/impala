@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -49,6 +50,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.mr.Catalogs;
 import org.apache.iceberg.transforms.PartitionSpecVisitor;
 import org.apache.iceberg.transforms.Transform;
 import org.apache.iceberg.types.Conversions;
@@ -66,6 +68,7 @@ import org.apache.impala.catalog.iceberg.IcebergHadoopCatalog;
 import org.apache.impala.catalog.iceberg.IcebergHadoopTables;
 import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
+import org.apache.impala.catalog.iceberg.IcebergCatalogs;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.THdfsFileFormat;
@@ -100,6 +103,7 @@ public class IcebergUtil {
       case HADOOP_TABLES: return IcebergHadoopTables.getInstance();
       case HIVE_CATALOG: return IcebergHiveCatalog.getInstance();
       case HADOOP_CATALOG: return new IcebergHadoopCatalog(location);
+      case CATALOGS: return IcebergCatalogs.getInstance();
       default: throw new ImpalaRuntimeException (
           "Unexpected catalog type: " + catalog.toString());
     }
@@ -110,17 +114,17 @@ public class IcebergUtil {
    */
   public static Table loadTable(FeIcebergTable feTable) throws TableLoadingException {
     return loadTable(feTable.getIcebergCatalog(), getIcebergTableIdentifier(feTable),
-        feTable.getIcebergCatalogLocation());
+        feTable.getIcebergCatalogLocation(), feTable.getMetaStoreTable().getParameters());
   }
 
   /**
    * Helper method to load native Iceberg table.
    */
   public static Table loadTable(TIcebergCatalog catalog, TableIdentifier tableId,
-      String location) throws TableLoadingException {
+      String location, Map<String, String> tableProps) throws TableLoadingException {
     try {
       IcebergCatalog cat = getIcebergCatalog(catalog, location);
-      return cat.loadTable(tableId, location);
+      return cat.loadTable(tableId, location, tableProps);
     } catch (ImpalaRuntimeException e) {
       throw new TableLoadingException(String.format(
           "Failed to load Iceberg table: %s at location: %s",
@@ -142,9 +146,10 @@ public class IcebergUtil {
    * database.table
    */
   public static TableMetadata getIcebergTableMetadata(TIcebergCatalog catalog,
-      TableIdentifier tableId, String location) throws TableLoadingException {
+      TableIdentifier tableId, String location, Map<String, String> tableProps)
+      throws TableLoadingException {
     BaseTable baseTable = (BaseTable)IcebergUtil.loadTable(catalog,
-        tableId, location);
+        tableId, location, tableProps);
     return baseTable.operations().current();
   }
 
@@ -158,6 +163,10 @@ public class IcebergUtil {
   public static TableIdentifier getIcebergTableIdentifier(
       org.apache.hadoop.hive.metastore.api.Table msTable) {
     String name = msTable.getParameters().get(IcebergTable.ICEBERG_TABLE_IDENTIFIER);
+    if (name == null || name.isEmpty()) {
+      // Iceberg's Catalogs API uses table property 'name' for the table id.
+      name = msTable.getParameters().get(Catalogs.NAME);
+    }
     if (name == null || name.isEmpty()) {
       return TableIdentifier.of(msTable.getDbName(), msTable.getTableName());
     }
@@ -216,14 +225,28 @@ public class IcebergUtil {
   }
 
   /**
+   * Returns true if 'msTable' uses HiveCatalog.
+   */
+  public static boolean isHiveCatalog(
+      org.apache.hadoop.hive.metastore.api.Table msTable) {
+    TIcebergCatalog tCat = getTIcebergCatalog(msTable);
+    if (tCat == TIcebergCatalog.HIVE_CATALOG) return true;
+    if (tCat == TIcebergCatalog.CATALOGS) {
+      String catName = msTable.getParameters().get(IcebergTable.ICEBERG_CATALOG);
+      tCat = IcebergCatalogs.getInstance().getUnderlyingCatalogType(catName);
+      return tCat == TIcebergCatalog.HIVE_CATALOG;
+    }
+    return false;
+  }
+
+  /**
    * Get iceberg table catalog type from hms table properties
    * use HiveCatalog as default
    */
   public static TIcebergCatalog getTIcebergCatalog(
       org.apache.hadoop.hive.metastore.api.Table msTable) {
-    TIcebergCatalog catalog = getTIcebergCatalog(
+    return getTIcebergCatalog(
         msTable.getParameters().get(IcebergTable.ICEBERG_CATALOG));
-    return catalog == null ? TIcebergCatalog.HIVE_CATALOG : catalog;
   }
 
   /**
@@ -234,10 +257,33 @@ public class IcebergUtil {
       return TIcebergCatalog.HADOOP_TABLES;
     } else if ("hadoop.catalog".equalsIgnoreCase(catalog)) {
       return TIcebergCatalog.HADOOP_CATALOG;
-    } else if ("hive.catalog".equalsIgnoreCase(catalog)) {
+    } else if ("hive.catalog".equalsIgnoreCase(catalog) ||
+               catalog == null) {
       return TIcebergCatalog.HIVE_CATALOG;
     }
-    return null;
+    return TIcebergCatalog.CATALOGS;
+  }
+
+  /**
+   * Return the underlying Iceberg catalog when Iceberg Catalogs is being used, simply
+   * return the Iceberg catalog otherwise.
+   */
+  public static TIcebergCatalog getUnderlyingCatalog(
+      org.apache.hadoop.hive.metastore.api.Table msTable) {
+    return getUnderlyingCatalog(
+        msTable.getParameters().get(IcebergTable.ICEBERG_CATALOG));
+  }
+
+  /**
+   * Return the underlying Iceberg catalog when Iceberg Catalogs is being used, simply
+   * return the Iceberg catalog otherwise.
+   */
+  public static TIcebergCatalog getUnderlyingCatalog(String catalog) {
+    TIcebergCatalog tCat = getTIcebergCatalog(catalog);
+    if (tCat == TIcebergCatalog.CATALOGS) {
+      return IcebergCatalogs.getInstance().getUnderlyingCatalogType(catalog);
+    }
+    return tCat;
   }
 
   /**
