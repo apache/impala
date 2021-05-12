@@ -84,6 +84,19 @@ StringVal StringStreamToStringVal(FunctionContext* ctx, const stringstream& str_
   return dst;
 }
 
+bool update_sketch_to_cpc_union(FunctionContext* ctx,
+    const StringVal& serialized_sketch, datasketches::cpc_union& union_sketch) {
+  if (!serialized_sketch.is_null && serialized_sketch.len > 0) {
+    datasketches::cpc_sketch sketch(DS_CPC_SKETCH_CONFIG);
+    if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
+      LogSketchDeserializationError(ctx);
+      return false;
+    }
+    union_sketch.update(sketch);
+  }
+  return true;
+}
+
 bool update_sketch_to_theta_union(FunctionContext* ctx,
     const StringVal& serialized_sketch, datasketches::theta_union& sketch) {
   if (!serialized_sketch.is_null && serialized_sketch.len > 0) {

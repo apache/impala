@@ -22,6 +22,7 @@
 
 #include "common/status.h"
 #include "thirdparty/datasketches/hll.hpp"
+#include "thirdparty/datasketches/cpc_union.hpp"
 #include "thirdparty/datasketches/theta_union.hpp"
 #include "thirdparty/datasketches/theta_intersection.hpp"
 #include "udf/udf.h"
@@ -64,6 +65,13 @@ bool DeserializeDsSketch(const StringVal& serialized_sketch, T* sketch)
 /// 'ctx' for memory allocation.
 StringVal StringStreamToStringVal(FunctionContext* ctx,
     const std::stringstream& str_stream);
+
+/// Helper function that receives a serialized DataSketches CPC sketch in
+/// 'serialized_sketch', deserializes it and update the deserialized sketch to 'sketch'.
+/// Returns false if the deserialization fails (the error log will be written),
+/// true otherwise.
+bool update_sketch_to_cpc_union(FunctionContext* ctx, const StringVal& serialized_sketch,
+    datasketches::cpc_union& sketch);
 
 /// Helper function that receives a serialized DataSketches Theta sketch in
 /// 'serialized_sketch', deserializes it and update the deserialized sketch to 'sketch'.

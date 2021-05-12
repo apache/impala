@@ -21,6 +21,7 @@
 #include "gutil/strings/substitute.h"
 #include "thirdparty/datasketches/hll.hpp"
 #include "thirdparty/datasketches/cpc_sketch.hpp"
+#include "thirdparty/datasketches/cpc_union.hpp"
 #include "thirdparty/datasketches/theta_sketch.hpp"
 #include "thirdparty/datasketches/theta_union.hpp"
 #include "thirdparty/datasketches/theta_intersection.hpp"
@@ -132,6 +133,23 @@ StringVal DataSketchesFunctions::DsCpcStringify(
   StringVal dst(ctx, str.size());
   memcpy(dst.ptr, str.c_str(), str.size());
   return dst;
+}
+
+StringVal DataSketchesFunctions::DsCpcUnionF(FunctionContext* ctx,
+    const StringVal& first_serialized_sketch, const StringVal& second_serialized_sketch) {
+  datasketches::cpc_union union_sketch;
+  // Update two sketches to cpc_union
+  if (!update_sketch_to_cpc_union(ctx, first_serialized_sketch, union_sketch)) {
+    return StringVal::null();
+  }
+  if (!update_sketch_to_cpc_union(ctx, second_serialized_sketch, union_sketch)) {
+    return StringVal::null();
+  }
+  //  Result
+  datasketches::cpc_sketch sketch = union_sketch.get_result();
+  std::stringstream serialized_input;
+  sketch.serialize(serialized_input);
+  return StringStreamToStringVal(ctx, serialized_input);
 }
 
 BigIntVal DataSketchesFunctions::DsThetaEstimate(

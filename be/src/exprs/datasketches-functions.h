@@ -76,6 +76,13 @@ public:
   static StringVal DsCpcStringify(
       FunctionContext* ctx, const StringVal& serialized_sketch);
 
+  /// 'first_serialized_sketch' and 'second_serialized_sketch' are both expected as
+  /// serialized Apache DataSketches CPC sketches. If they are not, then the query
+  /// fails. Union two sketches and returns the resulting sketch of union.
+  static StringVal DsCpcUnionF(FunctionContext* ctx,
+      const StringVal& first_serialized_sketch,
+      const StringVal& second_serialized_sketch);
+
   /// 'serialized_sketch' is expected as a serialized Apache DataSketches Theta sketch.
   /// If it is not, then the query fails. Otherwise, returns the count(distinct) estimate
   /// from the sketch.
