@@ -742,9 +742,9 @@ public class HdfsTable extends Table implements FeFsTable {
     // we'll throw an exception here and end up bailing out of whatever catalog operation
     // we're in the middle of. This could cause a partial metadata update -- eg we may
     // have refreshed the top-level table properties without refreshing the files.
-    ParallelFileMetadataLoader loader = new ParallelFileMetadataLoader(
-        this, partBuilders, validWriteIds_, validTxnList, debugActions, logPrefix);
-    loader.load();
+    new ParallelFileMetadataLoader(getFileSystem(), partBuilders, validWriteIds_,
+        validTxnList, Utils.shouldRecursivelyListPartitions(this),
+        getHostIndex(), debugActions, logPrefix).load();
 
     // TODO(todd): would be good to log a summary of the loading process:
     // - how many block locations did we reuse/load individually/load via batch

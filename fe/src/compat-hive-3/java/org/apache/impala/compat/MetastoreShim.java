@@ -190,7 +190,7 @@ public class MetastoreShim {
    * Constant variable that stores engine value needed to store / access
    * Impala column statistics.
    */
-  protected static final String IMPALA_ENGINE = "impala";
+  public static final String IMPALA_ENGINE = "impala";
 
   /**
    * Wrapper around MetaStoreUtils.validateName() to deal with added arguments.

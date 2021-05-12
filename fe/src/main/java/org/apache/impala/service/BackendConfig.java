@@ -25,6 +25,7 @@ import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.impala.analysis.SqlScanner;
 import org.apache.impala.thrift.TBackendGflags;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
@@ -287,5 +288,26 @@ public class BackendConfig {
 
   public int getMaxWaitTimeForSyncDdlSecs() {
     return backendCfg_.max_wait_time_for_sync_ddl_s;
+  }
+
+  public boolean startHmsServer() {
+    return backendCfg_.start_hms_server;
+  }
+
+  public int getHMSPort() {
+    return backendCfg_.hms_port;
+  }
+
+  public boolean fallbackToHMSOnErrors() {
+    return backendCfg_.fallback_to_hms_on_errors;
+  }
+
+  @VisibleForTesting
+  public void setEnableCatalogdHMSCache(boolean flag) {
+    backendCfg_.enable_catalogd_hms_cache = flag;
+  }
+
+  public boolean enableCatalogdHMSCache() {
+    return backendCfg_.enable_catalogd_hms_cache;
   }
 }
