@@ -3119,3 +3119,18 @@ true,'TEST0'
 ---- TYPES
 BOOLEAN, STRING
 ====
+---- QUERY
+select sha1(s) from functional.strings_with_quotes where i = 10;
+---- RESULTS
+'dd34bd3ce9aa419f49921e5ff2e67210fe04a4e2'
+---- TYPES
+STRING
+====
+---- QUERY
+select sha2(s, 224), sha2(s, 256), sha2(s, 384),
+sha2(s, 512) from functional.strings_with_quotes where i = 10;
+---- RESULTS
+'c77557470807461a5f30c8eb5fc93147c78fa41261714d495eb871ec','738f748710e0adc2e62f2e5f9b5cec4ed12abfd7142c0bd4ff81966e5a17a278','afef2f6068e8a80c58ce141bf661255e696e5d6c436485212b0190fc36b5465ec4e86d6492e9fe94f6392462fb5fc06c','225b4d74a7697d2064ac6ff8d71bdfddea62d75ea495274fbc55dc39ff0800c85bce11992398d5dd7eabd2deffdbb56822fbb995666b78e449b2ab88ff7c8d86'
+---- TYPES
+STRING, STRING, STRING, STRING
+====

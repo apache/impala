@@ -738,6 +738,10 @@ visible_functions = [
    '_ZN6impala16UtilityFunctions19MurmurHashTimestampEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
   [['murmur_hash'], 'BIGINT', ['DECIMAL'],
    '_ZN6impala16UtilityFunctions17MurmurHashDecimalEPN10impala_udf15FunctionContextERKNS1_10DecimalValE'],
+  [['sha1'], 'STRING', ['STRING'],
+   '_ZN6impala16UtilityFunctions4Sha1EPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+  [['sha2'], 'STRING', ['STRING', 'INT'],
+   '_ZN6impala16UtilityFunctions4Sha2EPN10impala_udf15FunctionContextERKNS1_9StringValERKNS1_6IntValE'],
 
   # (Non)NullValue functions
   [['nullvalue'], 'BOOLEAN', ['BOOLEAN'], '_ZN6impala15IsNullPredicate6IsNullIN10impala_udf10BooleanValEEES3_PNS2_15FunctionContextERKT_'],

@@ -30,6 +30,7 @@
 #include <boost/unordered_map.hpp>
 
 #include <openssl/crypto.h>
+#include <openssl/sha.h>
 
 #include "codegen/llvm-codegen.h"
 #include "common/init.h"
@@ -5527,6 +5528,88 @@ TEST_P(ExprTest, MurmurHashFunction) {
 
   // Test NULL input returns NULL
   TestIsNull("murmur_hash(NULL)", TYPE_BIGINT);
+}
+
+/// Convert character array `str` of length `len` to hexadecimal.
+std::string ToHex(const unsigned char * str, int len) {
+  stringstream ss;
+  ss << hex << std::uppercase << setfill('0');
+  for (int i = 0; i < len; ++i) {
+    // setw is not sticky. stringstream only converts integral values,
+    // so a cast to int is required, but only convert the least significant byte to hex.
+    ss << setw(2) << (static_cast<int32_t>(str[i]) & 0xFF);
+  }
+  std::string result = ss.str();
+  boost::to_lower(result);
+  return result;
+}
+
+TEST_P(ExprTest, SHAFunctions) {
+  unsigned char input[] = "compute sha digest";
+  std::string sha1fn = std::string("sha1('compute sha digest')");
+  std::string sha2fn = std::string("sha2('compute sha digest'");
+  std::string expected;
+  unsigned char sha1[SHA_DIGEST_LENGTH];
+  unsigned char sha224[SHA224_DIGEST_LENGTH];
+  unsigned char sha256[SHA256_DIGEST_LENGTH];
+  unsigned char sha384[SHA384_DIGEST_LENGTH];
+  unsigned char sha512[SHA512_DIGEST_LENGTH];
+
+  if (FIPS_mode()) {
+    TestError(sha1fn);
+    TestError(sha2fn + ", 224)");
+    TestError(sha2fn + ", 256)");
+  } else {
+    SHA1(input, 18, sha1);
+    expected = ToHex(sha1, SHA_DIGEST_LENGTH);
+    TestStringValue(sha1fn, expected);
+
+    SHA224(input, 18, sha224);
+    expected = ToHex(sha224, SHA224_DIGEST_LENGTH);
+    TestStringValue(sha2fn + ", 224)", expected);
+
+    SHA256(input, 18, sha256);
+    expected = ToHex(sha256, SHA256_DIGEST_LENGTH);
+    TestStringValue(sha2fn + ", 256)", expected);
+  }
+
+  SHA384(input, 18, sha384);
+  expected = ToHex(sha384, SHA384_DIGEST_LENGTH);
+  TestStringValue(sha2fn + ", 384)", expected);
+
+  SHA512(input, 18, sha512);
+  expected = ToHex(sha512, SHA512_DIGEST_LENGTH);
+  TestStringValue(sha2fn + ", 512)", expected);
+
+  // Test empty strings. Empty string is valid input and produces hash.
+  if (!FIPS_mode()) {
+    SHA1(input, 0, sha1);
+    expected = ToHex(sha1, SHA_DIGEST_LENGTH);
+    TestStringValue("sha1('')", expected);
+
+    SHA224(input, 0, sha224);
+    expected = ToHex(sha224, SHA224_DIGEST_LENGTH);
+    TestStringValue("sha2('', 224)", expected);
+
+    SHA256(input, 0, sha256);
+    expected = ToHex(sha256, SHA256_DIGEST_LENGTH);
+    TestStringValue("sha2('', 256)", expected);
+  }
+
+  SHA384(input, 0, sha384);
+  expected = ToHex(sha384, SHA384_DIGEST_LENGTH);
+  TestStringValue("sha2('', 384)", expected);
+
+  SHA512(input, 0, sha512);
+  expected = ToHex(sha512, SHA512_DIGEST_LENGTH);
+  TestStringValue("sha2('', 512)", expected);
+
+  // Test Invalid Inputs
+  TestIsNull("sha1(NULL)", TYPE_STRING);
+  TestIsNull("sha2(NULL, 512)", TYPE_STRING);
+  TestIsNull("sha2('foo', NULL)", TYPE_STRING);
+  // 300 is invalid bit length
+  TestError(sha2fn + ", 300)");
 }
 
 TEST_P(ExprTest, SessionFunctions) {

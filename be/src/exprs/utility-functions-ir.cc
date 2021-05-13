@@ -17,8 +17,14 @@
 
 #include "exprs/utility-functions.h"
 #include <gutil/strings/substitute.h>
-
+#include "common/compiler-util.h"
 #include "exprs/anyval-util.h"
+#include "exprs/math-functions.h"
+#include "exprs/string-functions.h"
+
+#include <openssl/crypto.h>
+#include <openssl/evp.h>
+#include <openssl/sha.h>
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
 #include "util/debug-util.h"
@@ -227,4 +233,67 @@ template StringVal UtilityFunctions::TypeOf(
     FunctionContext* ctx, const DecimalVal& input_val);
 template StringVal UtilityFunctions::TypeOf(
     FunctionContext* ctx, const DateVal& input_val);
+
+StringVal UtilityFunctions::Sha1(FunctionContext* ctx, const StringVal& input_str) {
+  // Validate the input string.
+  if (input_str.is_null) {
+    return StringVal::null();
+  }
+
+  // SHA-1 is not supported for FIPS.
+  if (FIPS_mode()) {
+    ctx->SetError("sha1 is not supported in FIPS mode.");
+    return StringVal::null();
+  } else {
+    StringVal sha1_hash(ctx, SHA_DIGEST_LENGTH);
+    if (UNLIKELY(sha1_hash.is_null)) return StringVal::null();
+    SHA1(input_str.ptr, input_str.len, sha1_hash.ptr);
+    return StringFunctions::Lower(ctx, MathFunctions::HexString(ctx, sha1_hash));
+  }
+}
+
+StringVal UtilityFunctions::Sha2(FunctionContext* ctx, const StringVal& input_str,
+    const IntVal& bit_len) {
+  // Validate the input string.
+  if (input_str.is_null || bit_len.is_null) {
+    return StringVal::null();
+  }
+
+  // SHA-224 and SHA-256 are deprecated for FIPS mode.
+  if (FIPS_mode() && (bit_len.val == 224 || bit_len.val == 256)) {
+    ctx->SetError("Only bit lengths 384 and 512 are supported in FIPS mode.");
+    return StringVal::null();
+  }
+
+  StringVal sha_hash;
+
+  switch(bit_len.val) {
+    case 224:
+      sha_hash = StringVal(ctx, SHA224_DIGEST_LENGTH);
+      if (UNLIKELY(sha_hash.is_null)) return StringVal::null();
+      SHA224(input_str.ptr, input_str.len, sha_hash.ptr);
+      break;
+    case 256:
+      sha_hash = StringVal(ctx, SHA256_DIGEST_LENGTH);
+      if (UNLIKELY(sha_hash.is_null)) return StringVal::null();
+      SHA256(input_str.ptr, input_str.len, sha_hash.ptr);
+      break;
+    case 384:
+      sha_hash = StringVal(ctx, SHA384_DIGEST_LENGTH);
+      if (UNLIKELY(sha_hash.is_null)) return StringVal::null();
+      SHA384(input_str.ptr, input_str.len, sha_hash.ptr);
+      break;
+    case 512:
+      sha_hash = StringVal(ctx, SHA512_DIGEST_LENGTH);
+      if (UNLIKELY(sha_hash.is_null)) return StringVal::null();
+      SHA512(input_str.ptr, input_str.len, sha_hash.ptr);
+      break;
+    default:
+      // Unsupported bit length.
+      ctx->SetError(Substitute("Bit Length $0 is not supported", bit_len.val).c_str());
+      return StringVal::null();
+  }
+
+  return StringFunctions::Lower(ctx, MathFunctions::HexString(ctx, sha_hash));
+}
 }
