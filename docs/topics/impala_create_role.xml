@@ -45,8 +45,7 @@ under the License.
       The <codeph>CREATE ROLE</codeph> statement creates a role to which privileges can be granted. Privileges can
       be granted to roles, which can then be assigned to users. A user that has been assigned a role will only be
       able to exercise the privileges of that role. Only users that have administrative privileges can create/drop
-      roles. By default, the <codeph>hive</codeph>, <codeph>impala</codeph> and <codeph>hue</codeph> users have
-      administrative privileges in Sentry.
+      roles.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
@@ -57,8 +56,7 @@ under the License.
     <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
 
     <p>
-      Only administrative users (those with <codeph>ALL</codeph> privileges on the server, defined in the Sentry
-      policy file) can use this statement.
+      Only administrative users for Ranger can use this statement.
     </p>
 
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
@@ -66,9 +64,7 @@ under the License.
     <p>
       Impala makes use of any roles and privileges specified by the <codeph>GRANT</codeph> and
       <codeph>REVOKE</codeph> statements in Hive, and Hive makes use of any roles and privileges specified by the
-      <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in Impala. The Impala <codeph>GRANT</codeph>
-      and <codeph>REVOKE</codeph> statements for privileges do not require the <codeph>ROLE</codeph> keyword to be
-      repeated before each role name, unlike the equivalent Hive statements.
+      <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in Impala.
     </p>
 
 <!-- To do: nail down the new SHOW syntax, e.g. SHOW ROLES, SHOW CURRENT ROLES, SHOW GROUPS. -->

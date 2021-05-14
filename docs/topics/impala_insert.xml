@@ -513,8 +513,8 @@ Inserted 2 rows in 0.16s
       </p>
 
       <p>
-        The permission requirement is independent of the authorization performed by the Sentry framework. (If the
-        connected user is not authorized to insert into a table, Sentry blocks that operation immediately,
+        The permission requirement is independent of the authorization performed by the Ranger framework. (If the
+        connected user is not authorized to insert into a table, Ranger blocks that operation immediately,
         regardless of the privileges available to the <codeph>impala</codeph> user.) Files created by Impala are
         not owned by and do not inherit permissions from the connected user.
       </p>

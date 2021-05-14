@@ -57,8 +57,7 @@ under the License.
     <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
 
     <p>
-      Only administrative users (initially, a predefined set of users specified in the Sentry service configuration
-      file) can use this statement.
+      Only administrative users for Ranger can use this statement.
     </p>
 
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>

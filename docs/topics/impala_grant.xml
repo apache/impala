@@ -53,28 +53,29 @@ under the License.
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
     <p>
-      The following syntax is supported when Impala is using Sentry to manage authorization.
+      The following syntax are supported in Impala through Ranger to manage authorization.
     </p>
 
-<codeblock rev="2.3.0 collevelauth">GRANT ROLE <varname>role_name</varname> TO GROUP <varname>group_name</varname>
-
-GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
-   TO [ROLE] <varname>role_name</varname>
-   [WITH GRANT OPTION]
-
-<ph id="privileges" rev="3.0"><varname>privilege</varname> ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<varname>column_name</varname>)</ph>
-<ph id="priv_objs" rev="3.0"><varname>object_type</varname> ::= SERVER | URI | DATABASE | TABLE</ph>
-</codeblock>
-
+    <p><b><codeph>GRANT ROLE TO GROUP</codeph></b></p>
     <p>
-      The following syntax is supported when Impala is using Ranger to manage authorization.
+      For <codeph>GRANT ROLE TO GROUP</codeph>, only Ranger administrative users can grant roles to a group.
     </p>
+    <codeblock>GRANT ROLE <varname>role_name</varname> TO GROUP <varname>group_name</varname></codeblock>
 
+    <p><b><codeph>GRANT privilege ON object TO PRINCIPAL</codeph></b></p>
+    <p>
+      For GRANT privilege ON object TO principal (a user, a group, or a role), Ranger
+      administrative users can use this statement. If the privilege is granted with the clause of
+      WITH GRANT OPTION, the grantee (the user, the users belonging to the group, or the users
+      belonging to the group granted the role) is able to grant the privilege to other principals.
+    </p>
 <codeblock>GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
    TO USER <varname>user_name</varname>
 GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
    TO GROUP <varname>group_name</varname>
-
+  GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
+  TO ROLE <varname>role_name</varname>
+  
 <ph rev="3.0">privilege ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<varname>column_name</varname>)</ph>
 <ph rev="3.0">object_type ::= SERVER | URI | DATABASE | TABLE</ph></codeblock>
 
@@ -86,19 +87,18 @@ GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>ob
     <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
 
     <p>
-      Only administrative users (initially, a predefined set of users specified in the Sentry
-      service configuration file) can use this statement.
+      Only administrative users for Ranger can use this statement.
     </p>
 
     <p>
-      Only Sentry administrative users can grant roles to a group.
+      Only Ranger administrative users can grant roles to a group.
     </p>
 
     <p>
-      The <codeph>WITH GRANT OPTION</codeph> clause allows members of the specified role to
-      issue <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements for those same
-      privileges. Hence, if a role has the <codeph>ALL</codeph> privilege on a database and the
-      <codeph>WITH GRANT OPTION</codeph> set, users granted that role can execute
+      The <codeph>WITH GRANT OPTION</codeph> clause allows members of the specified role to issue
+      <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements for those same privileges.
+      Hence, if a role has the <codeph>ALL</codeph> privilege on a database and the <codeph>WITH
+      GRANT OPTION</codeph> set, users granted that role can execute
       <codeph>GRANT</codeph>/<codeph>REVOKE</codeph> statements only for that database or child
       tables of the database. This means a user could revoke the privileges of the user that
       provided them the <codeph>GRANT OPTION</codeph>.
@@ -132,16 +132,9 @@ GRANT <varname>privilege</varname> ON <varname>object_type</varname> <varname>ob
         </li>
 
         <li>
-          In <keyword keyref="impala14_full"/> and later, Impala can make use of any roles and
-          privileges specified by the <codeph>GRANT</codeph> and <codeph>REVOKE</codeph>
-          statements in Hive, when your system is configured to use the Sentry service instead
-          of the file-based policy mechanism.
-        </li>
-
-        <li>
-          The Impala <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements for
-          privileges do not require the <codeph>ROLE</codeph> keyword to be repeated before each
-          role name, unlike the equivalent Hive statements.
+          In general, Impala can make use of any roles and privileges specified by the
+          <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in Hive, when your system
+          is configured to use the Ranger service instead of the file-based policy mechanism.
         </li>
 
         <li conref="../shared/impala_common.xml#common/grant_revoke_single"/>

@@ -67,7 +67,7 @@ under the License.
         </li>
 
         <li>
-          The <codeph>SERVER</codeph> or <codeph>DATABASE</codeph> level Sentry privileges are
+          The <codeph>SERVER</codeph> or <codeph>DATABASE</codeph> level Ranger privileges are
           changed.
         </li>
 

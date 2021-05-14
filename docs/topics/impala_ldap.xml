@@ -165,7 +165,7 @@ under the License.
       <p>
         When Impala connects to LDAP it issues a bind call to the LDAP server to authenticate as
         the connected user. Impala clients, including the Impala shell, provide the short name
-        of the user to Impala. This is necessary so that Impala can use Sentry for role-based
+        of the user to Impala. This is necessary so that Impala can use Ranger for role-based
         access, which uses short names.
       </p>
 

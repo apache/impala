@@ -52,20 +52,17 @@ under the License.
     </p>
 
     <p>
-      The database owner is originally set to the user who creates the database. When object
-      ownership is enabled in Sentry, an owner of a database can have the <codeph>ALL</codeph>
-      with <codeph>GRANT</codeph> or <codeph>ALL</codeph> without <codeph>GRANT</codeph>
-      privilege. The term <codeph>OWNER</codeph> is used to differentiate between the
-      <codeph>ALL</codeph> privilege that is explicitly granted via the <codeph>GRANT</codeph>
-      statement and a privilege that is implicitly granted by the <codeph>CREATE
-      DATABASE</codeph> statement.
+      The database owner is originally set to the user who creates the database. The term
+      <codeph>OWNER</codeph> is used to differentiate between the <codeph>ALL</codeph>
+      privilege that is explicitly granted via the <codeph>GRANT</codeph> statement
+      and a privilege that is implicitly granted by the <codeph>CREATE DATABASE</codeph>
+      statement.
     </p>
 
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
 <codeblock>
 ALTER DATABASE <varname>database_name</varname> SET OWNER USER user_name;
-ALTER DATABASE <varname>database_name</varname> SET OWNER ROLE role_name;
 </codeblock>
 
     <p conref="../shared/impala_common.xml#common/ddl_blurb"/>

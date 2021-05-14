@@ -209,12 +209,12 @@ under the License.
 
       <p>
         Impala utilizes the <xref keyref="sentry">Apache
-        Sentry </xref> authorization framework, which provides fine-grained role-based access control
+        Ranger </xref> authorization framework, which provides fine-grained role-based access control
         to protect data against unauthorized access or tampering.
       </p>
 
       <p>
-        The Hive component now includes Sentry-enabled <codeph>GRANT</codeph>,
+        The Hive component now includes Ranger-enabled <codeph>GRANT</codeph>,
         <codeph>REVOKE</codeph>, and <codeph>CREATE/DROP ROLE</codeph> statements. Earlier Hive releases had a
         privilege system with <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements that were primarily
         intended to prevent accidental deletion of data, rather than a security mechanism to protect against
@@ -224,9 +224,7 @@ under the License.
       <p>
         Impala can make use of privileges set up through Hive <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements.
         Impala has its own <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> statements in Impala 2.0 and higher.
-        See <xref href="impala_authorization.xml#authorization"/> for the details of authorization in Impala, including
-        how to switch from the original policy file-based privilege model to the Sentry service using privileges
-        stored in the metastore database.
+        See <xref href="impala_authorization.xml#authorization"/> for the details of authorization in Impala.
       </p>
 
       <p>

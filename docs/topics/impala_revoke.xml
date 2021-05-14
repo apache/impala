@@ -53,28 +53,19 @@ under the License.
     <p conref="../shared/impala_common.xml#common/syntax_blurb"/>
 
     <p>
-      The following syntax is supported when Impala is using Senty to manage authorization.
-    </p>
-
-<codeblock rev="2.3.0 collevelauth">REVOKE ROLE <varname>role_name</varname> FROM GROUP <varname>group_name</varname>
-
-REVOKE [GRANT OPTION FOR] <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
-  FROM [ROLE] <varname>role_name</varname>
-
-<ph rev="3.0">
-  <varname>privilege</varname> ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<varname>column_name</varname>)
-</ph>
-<ph id="priv_objs" rev="3.0"><varname>object_type</varname> ::= SERVER | URI | DATABASE | TABLE</ph></codeblock>
-
-    <p>
       The following syntax is supported when Impala is using Ranger to manage authorization.
     </p>
 
-<codeblock>REVOKE <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
+<codeblock>REVOKE ROLE <varname>role_name</varname> FROM GROUP <varname>group_name</varname>
+
+REVOKE <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
   FROM USER <varname>user_name</varname>
 
 REVOKE <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
   FROM GROUP <varname>group_name</varname>
+
+REVOKE [GRANT OPTION FOR] <varname>privilege</varname> ON <varname>object_type</varname> <varname>object_name</varname>
+  FROM [ROLE] <varname>role_name</varname>
 <ph rev="3.0">
 
   privilege ::= ALL | ALTER | CREATE | DROP | INSERT | REFRESH | SELECT | SELECT(<varname>column_name</varname>)
@@ -125,12 +116,11 @@ REVOKE ALL ON SERVER FROM ROLE foo_role;</codeblock>
     <p conref="../shared/impala_common.xml#common/privileges_blurb"/>
 
     <p>
-      Only administrative users (those with <codeph>ALL</codeph> privileges on the server,
-      defined in the Sentry policy file) can use this statement.
+      Only administrative users for Ranger can use this statement.
     </p>
 
     <p>
-      Only Sentry administrative users can revoke the role from a group.
+      Only Ranger administrative users can revoke the role from a group.
     </p>
 
     <p conref="../shared/impala_common.xml#common/compatibility_blurb"/>
@@ -144,10 +134,9 @@ REVOKE ALL ON SERVER FROM ROLE foo_role;</codeblock>
         </li>
 
         <li>
-          In <keyword keyref="impala14_full"/> and higher, Impala makes use of any roles and
-          privileges specified by the <codeph>GRANT</codeph> and <codeph>REVOKE</codeph>
-          statements in Hive, when your system is configured to use the Sentry service instead
-          of the file-based policy mechanism.
+          Impala makes use of any roles and privileges specified by the <codeph>GRANT</codeph>
+          and <codeph>REVOKE</codeph> statements in Hive, when your system is configured to use the
+          Ranger service instead of the file-based policy mechanism.
         </li>
 
         <li>

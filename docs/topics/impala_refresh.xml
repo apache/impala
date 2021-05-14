@@ -185,7 +185,7 @@ ERROR: AnalysisException: Items in partition spec must exactly match the partiti
     <p conref="../shared/impala_common.xml#common/permissions_blurb"/>
 
     <p rev="IMPALA-1683">
-      All HDFS and Sentry permissions and privilege requirements are the same whether you
+      All HDFS and Ranger permissions and privilege requirements are the same whether you
       refresh the entire table or a single partition.
     </p>
 

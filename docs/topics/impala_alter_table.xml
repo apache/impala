@@ -71,7 +71,6 @@ ALTER TABLE <varname>name</varname> DROP [COLUMN] <varname>column_name</varname>
 ALTER TABLE <varname>name</varname> CHANGE <varname>column_name</varname> <varname>col_spec</varname>
 
 <ph rev="3.1 IMPALA-6988">ALTER TABLE <varname>name</varname> SET OWNER USER <varname>user_name</varname>
-ALTER TABLE <varname>name</varname> SET OWNER ROLE <varname>role_name</varname>
 </ph>
 <ph rev="2.10.0 IMPALA-4622">-- Kudu tables only.
 ALTER TABLE <varname>name</varname> ALTER [COLUMN] <varname>column_name</varname>
@@ -319,21 +318,18 @@ alter table d2.mobile rename to d3.mobile;</codeblock>
     </p>
 
 <codeblock>ALTER TABLE <varname>name</varname> SET OWNER USER <varname>user_name;</varname>
-ALTER TABLE <varname>name</varname> SET OWNER ROLE <varname>role_name;</varname>
 </codeblock>
 
     <p>
-      The table owner is originally set to the user who creates the table. When object ownership
-      is enabled in Sentry, an owner of a table can have the <codeph>ALL</codeph> with
-      <codeph>GRANT</codeph> or <codeph>ALL</codeph> without <codeph>GRANT</codeph> privilege.
-      The term <codeph>OWNER</codeph> is used to differentiate between the <codeph>ALL</codeph>
+      The table owner is originally set to the user who creates the table. The term
+      <codeph>OWNER</codeph> is used to differentiate between the <codeph>ALL</codeph>
       privilege that is explicitly granted via the <codeph>GRANT</codeph> statement and a
       privilege that is implicitly granted by the <codeph>CREATE TABLE</codeph> statement.
     </p>
 
     <p>
       Use the <codeph>ALTER TABLE SET OWNER</codeph> to transfer the ownership from the current
-      owner to another user or a role.
+      owner to another user.
     </p>
 
     <p>

@@ -570,7 +570,7 @@ under the License.
         </li>
 
         <li>
-          Authorization using the Sentry framework to control access to databases, tables, or columns works the
+          Authorization using the Ranger framework to control access to databases, tables, or columns works the
           same whether the data is in HDFS or in ADLS.
         </li>
 
