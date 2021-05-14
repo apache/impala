@@ -67,6 +67,9 @@ bool IsABFSPath(const char* path, bool check_default_fs = true);
 /// Returns true iff the path refers to a location on an ADL filesystem.
 bool IsADLSPath(const char* path, bool check_default_fs = true);
 
+/// Returns true iff the path refers to a location on an ADL filesystem.
+bool IsOSSPath(const char* path, bool check_default_fs = true);
+
 /// Returns true iff the path refers to a location on an GCS filesystem.
 bool IsGcsPath(const char* path, bool check_default_fs = true);
 

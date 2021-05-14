@@ -124,6 +124,9 @@ DEFINE_int32(num_s3_file_oper_io_threads, 16, "Number of S3 file operations I/O 
 // The maximum number of ABFS I/O threads. TODO: choose the default empirically.
 DEFINE_int32(num_abfs_io_threads, 16, "Number of ABFS I/O threads");
 
+// The maximum number of OSS/JindoFS I/O threads. TODO: choose the default empirically.
+DEFINE_int32(num_oss_io_threads, 16, "Number of OSS/JindoFS I/O threads");
+
 // The maximum number of ADLS I/O threads. This number is a good default to have for
 // clusters that may vary widely in size, due to an undocumented concurrency limit
 // enforced by ADLS for a cluster, which spans between 500-700. For smaller clusters
@@ -468,6 +471,9 @@ Status DiskIoMgr::Init() {
     } else if (i == RemoteAdlsDiskId()) {
       num_threads_per_disk = FLAGS_num_adls_io_threads;
       device_name = "ADLS remote";
+    } else if (i == RemoteOSSDiskId()) {
+      num_threads_per_disk = FLAGS_num_oss_io_threads;
+      device_name = "OSS remote";
     } else if (i == RemoteGcsDiskId()) {
       num_threads_per_disk = FLAGS_num_gcs_io_threads;
       device_name = "GCS remote";
@@ -826,6 +832,7 @@ int DiskIoMgr::AssignQueue(
     if (IsS3APath(file, check_default_fs)) return RemoteS3DiskId();
     if (IsABFSPath(file, check_default_fs)) return RemoteAbfsDiskId();
     if (IsADLSPath(file, check_default_fs)) return RemoteAdlsDiskId();
+    if (IsOSSPath(file, check_default_fs)) return RemoteOSSDiskId();
     if (IsGcsPath(file, check_default_fs)) return RemoteGcsDiskId();
     if (IsOzonePath(file, check_default_fs)) return RemoteOzoneDiskId();
   }
@@ -833,6 +840,7 @@ int DiskIoMgr::AssignQueue(
   DCHECK(!IsS3APath(file, check_default_fs)); // S3 is always remote.
   DCHECK(!IsABFSPath(file, check_default_fs)); // ABFS is always remote.
   DCHECK(!IsADLSPath(file, check_default_fs)); // ADLS is always remote.
+  DCHECK(!IsOSSPath(file, check_default_fs)); // OSS/JindoFS is always remote.
   DCHECK(!IsGcsPath(file, check_default_fs)); // GCS is always remote.
   DCHECK(!IsOzonePath(file, check_default_fs)); // Ozone is always remote.
   if (disk_id == -1) {

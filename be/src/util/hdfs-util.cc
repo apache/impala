@@ -36,6 +36,8 @@ const char* FILESYS_PREFIX_ABFS_SEC = "abfss://";
 const char* FILESYS_PREFIX_ADL = "adl://";
 const char* FILESYS_PREFIX_GCS = "gs://";
 const char* FILESYS_PREFIX_OZONE = "o3fs://";
+const char* FILESYS_PREFIX_OSS = "oss://";
+const char* FILESYS_PREFIX_JINDOFS = "jfs://";
 
 string GetHdfsErrorMsg(const string& prefix, const string& file) {
   string error_msg = GetStrErrMsg();
@@ -107,6 +109,11 @@ bool IsABFSPath(const char* path, bool check_default_fs) {
 
 bool IsADLSPath(const char* path, bool check_default_fs) {
   return IsSpecificPath(path, FILESYS_PREFIX_ADL, check_default_fs);
+}
+
+bool IsOSSPath(const char* path, bool check_default_fs) {
+  return IsSpecificPath(path, FILESYS_PREFIX_OSS, check_default_fs)
+      || IsSpecificPath(path, FILESYS_PREFIX_JINDOFS, check_default_fs);
 }
 
 bool IsGcsPath(const char* path, bool check_default_fs) {
