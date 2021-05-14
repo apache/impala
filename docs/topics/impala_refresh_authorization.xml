@@ -43,7 +43,7 @@ under the License.
       The <codeph>REFRESH AUTHORIZATION</codeph> statement explicitly refreshes authorization
       data, including privileges and principals. When there is an external update to
       authorization metadata, use this statement to force Impala to refresh its authorization
-      data without having to wait for the Sentry polling or run <codeph>INVALIDATE
+      data without having to wait for the Ranger polling or run <codeph>INVALIDATE
       METADATA</codeph>.
     </p>
 

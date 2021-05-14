@@ -64,7 +64,7 @@ under the License.
       <li>
       <p>
         The way to ensure that only authorized users can submit requests for databases and tables they are allowed
-        to access is to set up Sentry authorization, as explained in
+        to access is to set up Ranger authorization, as explained in
         <xref href="impala_authorization.xml#authorization"/>. With authorization enabled, the checking of the user
         ID and group is done by Impala, and unauthorized access is blocked by Impala itself. The actual low-level
         read and write requests are still done by the <codeph>impala</codeph> user, so you must have appropriate

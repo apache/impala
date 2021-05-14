@@ -73,10 +73,7 @@ under the License.
         </li>
 
         <li>
-          Impala requires Apache Sentry on the cluster to enable delegation. Without Apache
-          Sentry installed, the delegation feature will fail with the following error: User
-          <i>user1</i> is not authorized to delegate to <i>user2</i>. User/group delegation is
-          disabled.
+          Impala requires Apache Ranger on the cluster to enable delegation.
         </li>
       </ul>
     </note>
@@ -222,7 +219,7 @@ under the License.
             </li>
 
             <li>
-              In group delegate, Impala checks if <varname>delegated_user</varname> belongs to
+              In group delegation, Impala checks if <varname>delegated_user</varname> belongs to
               one of the delegated groups for the user <varname>authenticated_user</varname>,
               <varname>delegated_group</varname> in this example.
             </li>

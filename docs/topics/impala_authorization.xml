@@ -39,8 +39,8 @@ under the License.
 
     <p>
       Authorization determines which users are allowed to access which resources, and what
-      operations they are allowed to perform. You use Apache Sentry or Apache Ranger for
-      authorization. By default, when authorization is not enabled, Impala does all read and
+      operations they are allowed to perform. You use Apache Ranger for authorization.
+      By default, when authorization is not enabled, Impala does all read and
       write operations with the privileges of the <codeph>impala</codeph> user, which is
       suitable for a development/test environment but not for a secure production environment.
       When authorization is enabled, Impala uses the OS user ID of the user who runs
@@ -92,7 +92,7 @@ under the License.
 
       <p>
         Privileges are managed via the <codeph>GRANT</codeph> and <codeph>REVOKE</codeph> SQL
-        statements that require the Sentry or Ranger service enabled.
+        statements that require the Ranger service enabled.
       </p>
 
       <p>
@@ -100,45 +100,6 @@ under the License.
         modifying privileges, you must clear the Impala Catalog server cache by running the
         <codeph>REFRESH AUTHORIZATION</codeph> statement. <codeph>REFRESH AUTHORIZATION</codeph>
         is not required if you make the changes to privileges within Impala.
-      </p>
-
-    </conbody>
-
-  </concept>
-
-  <concept id="object_ownership">
-
-    <title>Object Ownership in Sentry</title>
-
-    <conbody>
-
-      <p>
-        Impala supports the ownership on databases, tables, and views. The
-        <codeph>CREATE</codeph> statements implicitly make the user running the statement the
-        owner of the object. An owner has the <codeph>OWNER</codeph> privilege if enabled in
-        Sentry. For example, if <varname>User A</varname> creates a database,
-        <varname>foo</varname>, via the <codeph>CREATE DATABASE</codeph> statement,
-        <varname>User A</varname> now owns the <varname>foo</varname> database and is authorized
-        to perform any operation on the <varname>foo</varname> database.
-      </p>
-
-      <p>
-        The <codeph>OWNER</codeph> privilege is not a grantable or revokable privilege whereas
-        the <codeph>ALL</codeph> privilege is explicitly granted via the <codeph>GRANT</codeph>
-        statement.
-      </p>
-
-      <p>
-        The object ownership feature is controlled by a Sentry configuration. The
-        <codeph>OWNER</codeph> privilege is only granted when the feature is enabled in Sentry.
-        When enabled they get the owner privilege, with or without the <codeph>GRANT
-        OPTION</codeph>, which is also controlled by the Sentry configuration.
-      </p>
-
-      <p>
-        An ownership can be transferred to another user or role via the <codeph>ALTER
-        DATABASE</codeph>, <codeph>ALTER TABLE</codeph>, or <codeph>ALTER VIEW</codeph> with the
-        <codeph>SET OWNER</codeph> clause.
       </p>
 
     </conbody>
@@ -188,50 +149,6 @@ under the License.
 
   </concept>
 
-  <concept id="secure_startup">
-
-    <title>Starting Impala with Sentry Authorization Enabled</title>
-
-    <prolog>
-      <metadata>
-        <data name="Category" value="Starting and Stopping"/>
-      </metadata>
-    </prolog>
-
-    <conbody>
-
-      <p>
-        To enable authorization in an Impala cluster using Sentry:
-        <ol>
-          <li>
-            Add the following options to the <codeph>IMPALA_SERVER_ARGS</codeph> and the
-            <codeph>IMPALA_CATALOG_ARGS</codeph> settings in the
-            <filepath>/etc/default/impala</filepath> configuration file:
-            <ul>
-              <li>
-                <codeph>-server_name</codeph>: For all <cmdname>impalad</cmdname> nodes and the
-                <codeph>catalogd</codeph> in the cluster, specify the same name set in the
-                <codeph>sentry.hive.server</codeph> property in the
-                <filepath>sentry-site.xml</filepath> configuration file for Hive.
-              </li>
-
-              <li>
-                <codeph>-sentry_config</codeph>: Specifies the local path to the
-                <codeph>sentry-site.xml</codeph> configuration file.
-              </li>
-            </ul>
-          </li>
-
-          <li>
-            Restart the <codeph>catalogd</codeph> and all <cmdname>impalad</cmdname> daemons.
-          </li>
-        </ol>
-      </p>
-
-    </conbody>
-
-  </concept>
-
   <concept id="enable_ranger_authz">
 
     <title>Starting Impala with Ranger Authorization Enabled</title>
@@ -250,17 +167,12 @@ under the License.
           <ul>
             <li>
               <codeph>-server_name</codeph>: Specify the same name for all
-              <cmdname>impalad</cmdname> nodes and the <codeph>catalogd</codeph> in the cluster.
-            </li>
-
+              <cmdname>impalad</cmdname> nodes and the <codeph>catalogd</codeph> in the cluster. </li>
             <li>
               <codeph>-ranger_service_type=hive</codeph>
             </li>
-
             <li>
-              <codeph>-ranger_app_id</codeph>: Set it to the Ranger application id.
-            </li>
-
+              <codeph>-ranger_app_id</codeph>: Set it to the Ranger application id. </li>
             <li>
               <codeph>-authorization_provider=ranger</codeph>
             </li>
@@ -284,8 +196,7 @@ under the License.
 
       <p>
         You set up privileges through the <codeph>GRANT</codeph> and <codeph>REVOKE</codeph>
-        statements in either Impala or Hive. Then both components use those same privileges
-        automatically.
+        statements in either Impala or Hive.
       </p>
 
       <p>
@@ -305,18 +216,12 @@ under the License.
       <conbody>
 
         <p>
-          If you make a change to privileges in Sentry or Ranger from outside of Impala, e.g.
+          If you make a change to privileges in Ranger from outside of Impala, e.g.
           adding a user, removing a user, modifying privileges, there are two options to
           propagate the change:
         </p>
 
         <ul>
-          <li>
-            Use the <codeph>catalogd</codeph> flag,
-            <codeph>--sentry_catalog_polling_frequency_s</codeph> to specify how often to do a
-            Sentry refresh. The flag is set to 60 seconds by default.
-          </li>
-
           <li>
             Use the <codeph>ranger.plugin.hive.policy.pollIntervalMs</codeph> property to
             specify how often to do a Ranger refresh. The property is specified in
@@ -397,60 +302,49 @@ GRANT ALL ON URI hdfs://namenode:port/path/to/dir TO &lt;role></codeblock>
       <conbody>
 
         <p>
-          The following examples show how to set up authorization to deal with various
-          scenarios.
+          The following examples show how to set up authorization to grant privileges on objects
+          to groups of users via roles.
         </p>
 
         <example>
-
           <title>A User with No Privileges</title>
-
           <p>
-            If a user has no privileges at all, that user cannot access any schema objects in
-            the system. The error messages do not disclose the names or existence of objects
-            that the user is not authorized to read.
+            If a user has no privileges at all, that user cannot access any schema objects in the
+            system. The error messages do not disclose the names or existence of objects that the
+            user is not authorized to read.
           </p>
-
           <p>
-            This is the experience you want a user to have if they somehow log into a system
-            where they are not an authorized Impala user. Or in a real deployment, a user might
-            have no privileges because they are not a member of any of the authorized groups.
+            This is the experience you want a user to have if they somehow log into a system where
+            they are not an authorized Impala user. Or in a real deployment, a user might have no
+            privileges because they are not a member of any of the authorized groups.
           </p>
-
         </example>
 
         <example>
-
           <title>Examples of Privileges for Administrative Users</title>
-
           <p>
-            In this example, the SQL statements grant the <codeph>entire_server</codeph> role
-            all privileges on both the databases and URIs within the server.
+            In this example, the SQL statements grant the <codeph>entire_server</codeph> role all
+            privileges on both the databases and URIs within the server.
           </p>
 
 <codeblock>CREATE ROLE entire_server;
 GRANT ROLE entire_server TO GROUP admin_group;
 GRANT ALL ON SERVER server1 TO ROLE entire_server;
 </codeblock>
-
         </example>
 
         <example>
-
           <title>A User with Privileges for Specific Databases and Tables</title>
-
           <p>
             If a user has privileges for specific tables in specific databases, the user can
-            access those things but nothing else. They can see the tables and their parent
-            databases in the output of <codeph>SHOW TABLES</codeph> and <codeph>SHOW
-            DATABASES</codeph>, <codeph>USE</codeph> the appropriate databases, and perform the
-            relevant actions (<codeph>SELECT</codeph> and/or <codeph>INSERT</codeph>) based on
-            the table privileges. To actually create a table requires the <codeph>ALL</codeph>
-            privilege at the database level, so you might define separate roles for the user
-            that sets up a schema and other users or applications that perform day-to-day
-            operations on the tables.
+            access those things but nothing else. They can see the tables and their parent databases
+            in the output of <codeph>SHOW TABLES</codeph> and <codeph>SHOW DATABASES</codeph>,
+            <codeph>USE</codeph> the appropriate databases, and perform the relevant actions
+            (<codeph>SELECT</codeph> and/or <codeph>INSERT</codeph>) based on the table
+            privileges. To actually create a table requires the <codeph>ALL</codeph> privilege at
+            the database level, so you might define separate roles for the user that sets up a
+            schema and other users or applications that perform day-to-day operations on the tables.
           </p>
-
 <codeblock>
 CREATE ROLE one_database;
 GRANT ROLE one_database TO GROUP admin_group;
@@ -464,99 +358,67 @@ GRANT ALL ON TABLE db1.lesson TO ROLE instructor;
 CREATE ROLE student;
 GRANT ROLE student TO GROUP visitors;
 GRANT SELECT ON TABLE db1.training TO ROLE student;</codeblock>
-
         </example>
 
         <example>
-
           <title>Privileges for Working with External Data Files</title>
-
-          <p>
-            When data is being inserted through the <codeph>LOAD DATA</codeph> statement or is
+          <p> When data is being inserted through the <codeph>LOAD DATA</codeph> statement or is
             referenced from an HDFS location outside the normal Impala database directories, the
             user also needs appropriate permissions on the URIs corresponding to those HDFS
-            locations.
-          </p>
-
-          <p>
-            In this example:
-          </p>
-
+            locations. </p>
+          <p> In this example: </p>
           <ul>
-            <li>
-              The <codeph>external_table</codeph> role can insert into and query the Impala
-              table, <codeph>external_table.sample</codeph>.
-            </li>
+            <li> The <codeph>external_table</codeph> role can insert into and query the Impala
+              table, <codeph>external_table.sample</codeph>. </li>
 
-            <li>
-              The <codeph>staging_dir</codeph> role can specify the HDFS path
-              <filepath>/user/impala-user/external_data</filepath> with the <codeph>LOAD
-              DATA</codeph> statement. When Impala queries or loads data files, it operates on
-              all the files in that directory, not just a single file, so any Impala
-              <codeph>LOCATION</codeph> parameters refer to a directory rather than an
-              individual file.
-            </li>
+            <li> The <codeph>staging_dir</codeph> role can specify the HDFS path
+                <filepath>/user/impala-user/external_data</filepath> with the <codeph>LOAD
+                DATA</codeph> statement. When Impala queries or loads data files, it operates on all
+              the files in that directory, not just a single file, so any Impala
+                <codeph>LOCATION</codeph> parameters refer to a directory rather than an individual
+              file. </li>
           </ul>
-
-<codeblock>CREATE ROLE external_table;
+          <codeblock>CREATE ROLE external_table;
 GRANT ROLE external_table TO GROUP impala_users;
 GRANT ALL ON TABLE external_table.sample TO ROLE external_table;
 
 CREATE ROLE staging_dir;
 GRANT ROLE staging TO GROUP impala_users;
 GRANT ALL ON URI 'hdfs://127.0.0.1:8020/user/impala-user/external_data' TO ROLE staging_dir;</codeblock>
-
         </example>
 
         <example>
-
           <title>Separating Administrator Responsibility from Read and Write Privileges</title>
-
-          <p>
-            To create a database, you need the full privilege on that database while day-to-day
+          <p> To create a database, you need the full privilege on that database while day-to-day
             operations on tables within that database can be performed with lower levels of
-            privilege on a specific table. Thus, you might set up separate roles for each
-            database or application: an administrative one that could create or drop the
-            database, and a user-level one that can access only the relevant tables.
-          </p>
-
-          <p>
-            In this example, the responsibilities are divided between users in 3 different
-            groups:
-          </p>
-
+            privilege on a specific table. Thus, you might set up separate roles for each database
+            or application: an administrative one that could create or drop the database, and a
+            user-level one that can access only the relevant tables. </p>
+          <p> In this example, the responsibilities are divided between users in 3 different groups: </p>
           <ul>
-            <li>
-              Members of the <codeph>supergroup</codeph> group have the
-              <codeph>training_sysadmin</codeph> role and so can set up a database named
-              <codeph>training</codeph>.
-            </li>
+            <li> Members of the <codeph>supergroup</codeph> group have the
+                <codeph>training_sysadmin</codeph> role and so can set up a database named
+                <codeph>training</codeph>. </li>
 
-            <li>
-              Members of the <codeph>impala_users</codeph> group have the
-              <codeph>instructor</codeph> role and so can create, insert into, and query any
+            <li> Members of the <codeph>impala_users</codeph> group have the
+                <codeph>instructor</codeph> role and so can create, insert into, and query any
               tables in the <codeph>training</codeph> database, but cannot create or drop the
-              database itself.
-            </li>
+              database itself. </li>
 
-            <li>
-              Members of the <codeph>visitor</codeph> group have the <codeph>student</codeph>
-              role and so can query those tables in the <codeph>training</codeph> database.
-            </li>
+            <li> Members of the <codeph>visitor</codeph> group have the <codeph>student</codeph>
+              role and so can query those tables in the <codeph>training</codeph> database. </li>
           </ul>
-
-<codeblock>CREATE ROLE training_sysadmin;
+          <codeblock>CREATE ROLE training_sysadmin;
 GRANT ROLE training_sysadmin TO GROUP supergroup;
-GRANT ALL ON DATABASE training1 TO ROLE training_sysadmin;
+GRANT ALL ON DATABASE training TO ROLE training_sysadmin;
 
 CREATE ROLE instructor;
 GRANT ROLE instructor TO GROUP impala_users;
-GRANT ALL ON TABLE training1.course1 TO ROLE instructor;
+GRANT ALL ON TABLE training.course1 TO ROLE instructor;
 
-CREATE ROLE visitor;
+CREATE ROLE student;
 GRANT ROLE student TO GROUP visitor;
-GRANT SELECT ON TABLE training1.course1 TO ROLE student;</codeblock>
-
+GRANT SELECT ON TABLE training.course1 TO ROLE student;</codeblock>
         </example>
 
       </conbody>

@@ -1348,7 +1348,7 @@ kudu.table_name  | impala::some_database.table_name_demo
       <ul>
         <li>
           <p>
-            Sentry authorization.
+            Ranger authorization.
           </p>
           <p conref="../shared/impala_common.xml#common/kudu_sentry_limitations"/>
         </li>

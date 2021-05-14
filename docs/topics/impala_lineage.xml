@@ -81,7 +81,7 @@ under the License.
       <p>
         When you have tables where you need to track or control access to sensitive information at the column
         level, see <xref href="impala_authorization.xml#authorization"/> for how to implement column-level
-        security. You set up authorization using the Sentry framework, create views that refer to specific sets of
+        security. You set up authorization using the Ranger framework, create views that refer to specific sets of
         columns, and then assign authorization privileges to those views rather than the underlying tables.
       </p>
 
