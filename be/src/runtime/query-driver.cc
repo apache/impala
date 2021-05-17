@@ -30,7 +30,10 @@
 #include "common/thread-debug-info.h"
 
 DECLARE_string(debug_actions);
+
 namespace impala {
+// A 0 unique id, which indicates that one has not been set.
+const TUniqueId ZERO_UNIQUE_ID;
 
 QueryDriver::QueryDriver(ImpalaServer* parent_server) : parent_server_(parent_server) {}
 
@@ -263,6 +266,9 @@ void QueryDriver::RetryQueryFromThread(
     HandleRetryFailure(&status, &error_msg, request_state, retry_query_id);
     return;
   }
+  // The retried query id is now registered. Remember it so we can still delete it if we
+  // fail to retry.
+  registered_retry_query_id_ = retry_query_id;
 
   // Transfer the blacklisted_executor_addresses from the original query to the query to
   // be retried.
@@ -429,6 +435,8 @@ Status QueryDriver::Unregister(ImpalaServer::QueryDriverMap* query_driver_map) {
     query_id = &client_request_state_->query_id();
     if (retried_client_request_state_ != nullptr) {
       retry_query_id = &retried_client_request_state_->query_id();
+    } else if (registered_retry_query_id_ != ZERO_UNIQUE_ID) {
+      retry_query_id = &registered_retry_query_id_;
     }
   }
   RETURN_IF_ERROR(query_driver_map->Delete(*query_id));

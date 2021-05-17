@@ -259,6 +259,11 @@ class QueryDriver {
   /// control service RPC threads.
   std::unique_ptr<Thread> retry_query_thread_;
 
+  /// The retry query id that has been registered. 0 if no retry or the retry fails before
+  /// registering the retry query id. Used to delete the retry query id in the
+  /// query_driver_map.
+  TUniqueId registered_retry_query_id_;
+
   /// True if a thread has called Finalize(). Threads calling Finalize() do a
   /// compare-and-swap on this so that only one thread can proceed.
   AtomicBool finalized_{false};

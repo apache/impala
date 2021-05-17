@@ -752,13 +752,24 @@ class TestQueryRetries(CustomClusterTestSuite):
   def test_retry_query_result_cacheing_failed(self):
     """Test setting up results cacheing failed."""
 
+    # Kill an impalad, and run a query. The query should be retried.
     self.cluster.impalads[1].kill()
     query = "select count(*) from tpch_parquet.lineitem"
     self.hs2_client.set_configuration({'retry_failed_queries': 'true'})
     self.hs2_client.set_configuration_option('impala.resultset.cache.size', '1024')
     self.hs2_client.execute_async(query)
+    # The number of in-flight queries is 0 at the beginning, then 1 when the original
+    # query is submitted. It's 2 when the retried query is registered. Although the retry
+    # will immediately fail due to the debug action and the 2 queries are unregistered,
+    # the number can't come back to 0 immediately. The reason is the registered queries
+    # are cleaned up by a backend thread. Sleep a while to make sure these finish.
+    time.sleep(2)
+    # TODO(IMPALA-10705): Verify the retry failure.
+    # No queries running at the end.
+    impala_service = self.cluster.get_first_impalad().service
     self.assert_eventually(60, 0.1,
-        lambda: self.cluster.get_first_impalad().service.get_num_in_flight_queries() == 1)
+        lambda: impala_service.get_num_in_flight_queries() == 0,
+        lambda: "in-flight queries: %d" % impala_service.get_num_in_flight_queries())
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -771,8 +782,18 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.cluster.impalads[1].kill()
     query = "select count(*) from tpch_parquet.lineitem"
     self.execute_query_async(query, query_options={'retry_failed_queries': 'true'})
+    # The number of in-flight queries is 0 at the beginning, then 1 when the original
+    # query is submitted. It's 2 when the retried query is registered. Although the retry
+    # will immediately fail due to the debug action and the 2 queries are unregistered,
+    # the number can't come back to 0 immediately. The reason is the registered queries
+    # are cleaned up by a backend thread. Sleep a while to make sure these finish.
+    time.sleep(2)
+    # TODO(IMPALA-10705): Verify the retry failure.
+    # No queries running at the end.
+    impala_service = self.cluster.get_first_impalad().service
     self.assert_eventually(60, 0.1,
-        lambda: self.cluster.get_first_impalad().service.get_num_in_flight_queries() == 1)
+        lambda: impala_service.get_num_in_flight_queries() == 0,
+        lambda: "in-flight queries: %d" % impala_service.get_num_in_flight_queries())
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
