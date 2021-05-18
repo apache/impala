@@ -27,6 +27,7 @@ from tests.common.skip import (
     SkipIfLocal,
     SkipIfS3,
     SkipIfGCS,
+    SkipIfCOS,
     SkipIfABFS,
     SkipIfADLS)
 from tests.common.test_vector import ImpalaTestDimension
@@ -81,6 +82,7 @@ class TestJoinQueries(ImpalaTestSuite):
 
   @SkipIfS3.hbase
   @SkipIfGCS.hbase
+  @SkipIfCOS.hbase
   @SkipIfABFS.hbase
   @SkipIfADLS.hbase
   @SkipIfIsilon.hbase

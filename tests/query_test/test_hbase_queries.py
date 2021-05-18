@@ -23,6 +23,7 @@ from tests.common.skip import (
     SkipIfIsilon,
     SkipIfS3,
     SkipIfGCS,
+    SkipIfCOS,
     SkipIfABFS,
     SkipIfADLS,
     SkipIfLocal)
@@ -68,6 +69,7 @@ class TestHBaseQueries(ImpalaTestSuite):
   @SkipIfIsilon.hive
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfLocal.hive

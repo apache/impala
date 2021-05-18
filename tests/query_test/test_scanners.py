@@ -36,6 +36,7 @@ from tests.common.skip import (
     SkipIf,
     SkipIfS3,
     SkipIfGCS,
+    SkipIfCOS,
     SkipIfABFS,
     SkipIfADLS,
     SkipIfEC,
@@ -470,6 +471,7 @@ class TestParquet(ImpalaTestSuite):
   @SkipIfLocal.hive
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   def test_multi_compression_types(self, vector, unique_database):
     """IMPALA-5448: Tests that parquet splits with multi compression types are counted
     correctly. Cases tested:
@@ -589,6 +591,7 @@ class TestParquet(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_block_size
   @SkipIfGCS.hdfs_block_size
+  @SkipIfCOS.hdfs_block_size
   @SkipIfABFS.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
@@ -647,6 +650,7 @@ class TestParquet(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_block_size
   @SkipIfGCS.hdfs_block_size
+  @SkipIfCOS.hdfs_block_size
   @SkipIfABFS.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
@@ -687,6 +691,7 @@ class TestParquet(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_block_size
   @SkipIfGCS.hdfs_block_size
+  @SkipIfCOS.hdfs_block_size
   @SkipIfABFS.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
@@ -704,6 +709,7 @@ class TestParquet(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_block_size
   @SkipIfGCS.hdfs_block_size
+  @SkipIfCOS.hdfs_block_size
   @SkipIfABFS.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
   @SkipIfIsilon.hdfs_block_size
@@ -1366,6 +1372,7 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
 # Missing Coverage: No coverage for truncated files errors or scans.
 @SkipIfS3.hive
 @SkipIfGCS.hive
+@SkipIfCOS.hive
 @SkipIfABFS.hive
 @SkipIfADLS.hive
 @SkipIfIsilon.hive
@@ -1450,6 +1457,7 @@ class TestOrc(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_block_size
   @SkipIfGCS.hdfs_block_size
+  @SkipIfCOS.hdfs_block_size
   @SkipIfABFS.hdfs_block_size
   @SkipIfADLS.hdfs_block_size
   @SkipIfEC.fix_later
@@ -1525,6 +1533,7 @@ class TestOrc(ImpalaTestSuite):
   @SkipIfLocal.hive
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfHive3.non_acid
   def test_type_conversions_hive2(self, vector, unique_database):
     # Create "illtypes" tables whose columns can't match the underlining ORC file's.
@@ -1575,6 +1584,7 @@ class TestOrc(ImpalaTestSuite):
   @SkipIfLocal.hive
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfHive2.acid
   def test_type_conversions_hive3(self, vector, unique_database):
     # Create "illtypes" tables whose columns can't match the underlining ORC file's.

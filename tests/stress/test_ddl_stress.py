@@ -19,7 +19,7 @@ import pytest
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfLocal)
+                               SkipIfGCS, SkipIfCOS, SkipIfLocal)
 
 # Number of tables to create per thread
 NUM_TBLS_PER_THREAD = 10
@@ -50,6 +50,7 @@ class TestDdlStress(ImpalaTestSuite):
 
   @SkipIfS3.caching
   @SkipIfGCS.caching
+  @SkipIfCOS.caching
   @SkipIfABFS.caching
   @SkipIfADLS.caching
   @SkipIfIsilon.caching

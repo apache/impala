@@ -26,8 +26,8 @@ from tests.common.environ import build_flavor_timeout, IS_DOCKERIZED_TEST_CLUSTE
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfLocal, SkipIfEC, SkipIfDockerizedCluster,
-                               SkipIfCatalogV2)
+                               SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfEC,
+                               SkipIfDockerizedCluster, SkipIfCatalogV2)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.filesystem_utils import get_fs_path
 from tests.util.shell_util import exec_process
@@ -35,6 +35,7 @@ from tests.util.shell_util import exec_process
 # End to end test that hdfs caching is working.
 @SkipIfS3.caching # S3: missing coverage: verify SET CACHED gives error
 @SkipIfGCS.caching
+@SkipIfCOS.caching
 @SkipIfABFS.caching
 @SkipIfADLS.caching
 @SkipIfIsilon.caching
@@ -116,6 +117,7 @@ class TestHdfsCaching(ImpalaTestSuite):
 # TODO: Move this to TestHdfsCaching once we make exhaustive tests run for other workloads
 @SkipIfS3.caching
 @SkipIfGCS.caching
+@SkipIfCOS.caching
 @SkipIfABFS.caching
 @SkipIfADLS.caching
 @SkipIfIsilon.caching
@@ -127,6 +129,7 @@ class TestHdfsCachingFallbackPath(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_encryption
   @SkipIfGCS.hdfs_encryption
+  @SkipIfCOS.hdfs_encryption
   @SkipIfABFS.hdfs_encryption
   @SkipIfADLS.hdfs_encryption
   @SkipIfIsilon.hdfs_encryption
@@ -180,6 +183,7 @@ class TestHdfsCachingFallbackPath(ImpalaTestSuite):
 
 @SkipIfS3.caching
 @SkipIfGCS.caching
+@SkipIfCOS.caching
 @SkipIfABFS.caching
 @SkipIfADLS.caching
 @SkipIfIsilon.caching

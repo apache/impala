@@ -22,7 +22,7 @@ from tests.common.environ import ImpalaTestClusterProperties
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfLocal, SkipIfCatalogV2)
+                               SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfCatalogV2)
 from tests.common.test_dimensions import (
     create_exec_option_dimension,
     create_single_exec_option_dimension,
@@ -115,6 +115,7 @@ class TestComputeStats(ImpalaTestSuite):
 
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -195,6 +196,7 @@ class TestComputeStats(ImpalaTestSuite):
 
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -243,6 +245,7 @@ class TestComputeStats(ImpalaTestSuite):
 
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive

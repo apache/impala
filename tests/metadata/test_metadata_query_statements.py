@@ -23,7 +23,7 @@ import re
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfIsilon, SkipIfS3, SkipIfABFS, SkipIfADLS,
-                               SkipIfGCS, SkipIfLocal, SkipIfCatalogV2)
+                               SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfCatalogV2)
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
@@ -78,6 +78,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   @SkipIfIsilon.hive
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfLocal.hive
@@ -170,6 +171,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
 
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive

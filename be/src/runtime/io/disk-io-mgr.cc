@@ -136,6 +136,9 @@ DEFINE_int32(num_adls_io_threads, 16, "Number of ADLS I/O threads");
 // The maximum number of GCS I/O threads. TODO: choose the default empirically.
 DEFINE_int32(num_gcs_io_threads, 16, "Number of GCS I/O threads");
 
+// The maximum number of GCS I/O threads. TODO: choose the default empirically.
+DEFINE_int32(num_cos_io_threads, 16, "Number of COS I/O threads");
+
 // The maximum number of Ozone I/O threads. TODO: choose the default empirically.
 DEFINE_int32(num_ozone_io_threads, 16, "Number of Ozone I/O threads");
 
@@ -477,6 +480,9 @@ Status DiskIoMgr::Init() {
     } else if (i == RemoteGcsDiskId()) {
       num_threads_per_disk = FLAGS_num_gcs_io_threads;
       device_name = "GCS remote";
+    }  else if (i == RemoteCosDiskId()) {
+      num_threads_per_disk = FLAGS_num_cos_io_threads;
+      device_name = "COS remote";
     } else if (i == RemoteOzoneDiskId()) {
       num_threads_per_disk = FLAGS_num_ozone_io_threads;
       device_name = "Ozone remote";
@@ -817,6 +823,7 @@ int DiskIoMgr::AssignQueue(
     if (IsADLSPath(file, check_default_fs)) return RemoteAdlsDiskId();
     if (IsOSSPath(file, check_default_fs)) return RemoteOSSDiskId();
     if (IsGcsPath(file, check_default_fs)) return RemoteGcsDiskId();
+    if (IsCosPath(file, check_default_fs)) return RemoteCosDiskId();
     if (IsOzonePath(file, check_default_fs)) return RemoteOzoneDiskId();
   }
   // Assign to a local disk queue.
@@ -825,6 +832,7 @@ int DiskIoMgr::AssignQueue(
   DCHECK(!IsADLSPath(file, check_default_fs)); // ADLS is always remote.
   DCHECK(!IsOSSPath(file, check_default_fs)); // OSS/JindoFS is always remote.
   DCHECK(!IsGcsPath(file, check_default_fs)); // GCS is always remote.
+  DCHECK(!IsCosPath(file, check_default_fs)); // COS is always remote.
   DCHECK(!IsOzonePath(file, check_default_fs)); // Ozone is always remote.
   if (disk_id == -1) {
     // disk id is unknown, assign it an arbitrary one.

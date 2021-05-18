@@ -18,12 +18,13 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfLocal)
+                               SkipIfGCS, SkipIfCOS, SkipIfLocal)
 from tests.util.filesystem_utils import get_fs_path
 
 
 @SkipIfS3.hive
 @SkipIfGCS.hive
+@SkipIfCOS.hive
 @SkipIfABFS.hive
 @SkipIfADLS.hive
 @SkipIfIsilon.hive

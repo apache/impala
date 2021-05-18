@@ -24,7 +24,7 @@ import re
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfLocal, SkipIfDockerizedCluster,
+                               SkipIfGCS, SkipIfCOS, SkipIfLocal, SkipIfDockerizedCluster,
                                SkipIfCatalogV2)
 from tests.util.filesystem_utils import WAREHOUSE, get_fs_path, IS_S3
 
@@ -135,6 +135,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_acls
   @SkipIfGCS.hdfs_acls
+  @SkipIfCOS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
@@ -198,6 +199,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_acls
   @SkipIfGCS.hdfs_acls
+  @SkipIfCOS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
@@ -252,6 +254,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_acls
   @SkipIfGCS.hdfs_acls
+  @SkipIfCOS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
@@ -335,6 +338,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_acls
   @SkipIfGCS.hdfs_acls
+  @SkipIfCOS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
@@ -369,6 +373,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_acls
   @SkipIfGCS.hdfs_acls
+  @SkipIfCOS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
@@ -451,6 +456,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_acls
   @SkipIfGCS.hdfs_acls
+  @SkipIfCOS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls
@@ -507,6 +513,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
     self.execute_query_expect_success(self.client, load_dir_query)
 
   @SkipIfADLS.eventually_consistent
+  @SkipIfCOS.eventually_consistent
   @pytest.mark.execute_serially
   def test_insert_select_with_empty_resultset(self):
     """Test insert/select query won't trigger partition directory or zero size data file
@@ -578,6 +585,7 @@ class TestInsertBehaviour(ImpalaTestSuite):
 
   @SkipIfS3.hdfs_acls
   @SkipIfGCS.hdfs_acls
+  @SkipIfCOS.hdfs_acls
   @SkipIfABFS.hdfs_acls
   @SkipIfADLS.hdfs_acls
   @SkipIfIsilon.hdfs_acls

@@ -24,12 +24,14 @@ from tests.common.skip import (
     SkipIfABFS,
     SkipIfADLS,
     SkipIfGCS,
+    SkipIfCOS,
     SkipIfIsilon,
     SkipIfLocal)
 from tests.util.hive_utils import HiveDbWrapper
 
 @SkipIfS3.hive
 @SkipIfGCS.hive
+@SkipIfCOS.hive
 @SkipIfABFS.hive
 @SkipIfADLS.hive
 @SkipIfIsilon.hive

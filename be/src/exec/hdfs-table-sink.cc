@@ -460,6 +460,7 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
       IsABFSPath(tmp_hdfs_file_name_cstr) ||
       IsADLSPath(tmp_hdfs_file_name_cstr) ||
       IsGcsPath(tmp_hdfs_file_name_cstr) ||
+      IsCosPath(tmp_hdfs_file_name_cstr) ||
       IsOzonePath(tmp_hdfs_file_name_cstr)) {
     // On S3A, the file cannot be stat'ed until after it's closed, and even so, the block
     // size reported will be just the filesystem default. Similarly, the block size

@@ -35,6 +35,7 @@ const char* FILESYS_PREFIX_ABFS = "abfs://";
 const char* FILESYS_PREFIX_ABFS_SEC = "abfss://";
 const char* FILESYS_PREFIX_ADL = "adl://";
 const char* FILESYS_PREFIX_GCS = "gs://";
+const char* FILESYS_PREFIX_COS = "cosn://";
 const char* FILESYS_PREFIX_OZONE = "o3fs://";
 const char* FILESYS_PREFIX_OFS = "ofs://";
 const char* FILESYS_PREFIX_OSS = "oss://";
@@ -123,6 +124,10 @@ bool IsGcsPath(const char* path, bool check_default_fs) {
 
 // o3fs and ofs uses the same transport implementation, so they should share
 // the same thread pool.
+bool IsCosPath(const char* path, bool check_default_fs) {
+  return IsSpecificPath(path, FILESYS_PREFIX_COS, check_default_fs);
+}
+
 bool IsOzonePath(const char* path, bool check_default_fs) {
   return IsSpecificPath(path, FILESYS_PREFIX_OZONE, check_default_fs)
       || IsSpecificPath(path, FILESYS_PREFIX_OFS, check_default_fs);

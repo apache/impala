@@ -68,6 +68,7 @@ public class FileSystemUtil {
   public static final String SCHEME_OFS = "ofs";
   public static final String SCHEME_ALLUXIO = "alluxio";
   public static final String SCHEME_GCS = "gs";
+  public static final String SCHEME_COS = "cosn";
 
   /**
    * Set containing all FileSystem scheme that known to supports storage UUIDs in
@@ -95,6 +96,7 @@ public class FileSystemUtil {
           .add(SCHEME_O3FS)
           .add(SCHEME_OFS)
           .add(SCHEME_GCS)
+          .add(SCHEME_COS)
           .build();
 
   /**
@@ -108,6 +110,7 @@ public class FileSystemUtil {
           .add(SCHEME_HDFS)
           .add(SCHEME_S3A)
           .add(SCHEME_GCS)
+          .add(SCHEME_COS)
           .build();
 
   /**
@@ -123,6 +126,7 @@ public class FileSystemUtil {
           .add(SCHEME_O3FS)
           .add(SCHEME_OFS)
           .add(SCHEME_GCS)
+          .add(SCHEME_COS)
           .build();
 
   /**
@@ -412,6 +416,13 @@ public class FileSystemUtil {
   }
 
   /**
+   * Returns true iff the filesystem is a CosFileSystem.
+   */
+  public static boolean isCOSFileSystem(FileSystem fs) {
+    return hasScheme(fs, SCHEME_COS);
+  }
+
+  /**
    * Returns true iff the filesystem is AdlFileSystem.
    */
   public static boolean isADLFileSystem(FileSystem fs) {
@@ -519,7 +530,8 @@ public class FileSystemUtil {
     S3,
     OZONE,
     ALLUXIO,
-    GCS;
+    GCS,
+    COS;
 
     private static final Map<String, FsType> SCHEME_TO_FS_MAPPING =
         ImmutableMap.<String, FsType>builder()
@@ -533,6 +545,7 @@ public class FileSystemUtil {
             .put(SCHEME_OFS, OZONE)
             .put(SCHEME_ALLUXIO, ALLUXIO)
             .put(SCHEME_GCS, GCS)
+            .put(SCHEME_COS, COS)
             .build();
 
     /**

@@ -790,7 +790,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * permissions Impala has on the given path. If the path does not exist, recurses up
    * the path until a existing parent directory is found, and inherit access permissions
    * from that.
-   * Always returns READ_WRITE for S3, ADLS and GCS files.
+   * Always returns READ_WRITE for S3, ADLS, GCS and COS files.
    */
   private static TAccessLevel getAvailableAccessLevel(String tableName,
       Path location, FsPermissionCache permCache) throws IOException {
@@ -844,6 +844,15 @@ public class HdfsTable extends Table implements FeFsTable {
     // So calling getPermissions() on GCS files make no sense. Assume all GCS files have
     // READ_WRITE permissions.
     if (FileSystemUtil.isGCSFileSystem(fs)) return true;
+
+    // COS have different authorization models:
+    // - Directory permissions are reported as 777.
+    // - File permissions are reported as 666.
+    // - File owner is reported as the local current user.
+    // - File group is also reported as the local current user.
+    // So calling getPermissions() on COS files make no sense. Assume all COS files have
+    // READ_WRITE permissions.
+    if (FileSystemUtil.isCOSFileSystem(fs)) return true;
     return false;
   }
 

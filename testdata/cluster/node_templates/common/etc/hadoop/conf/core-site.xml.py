@@ -98,6 +98,16 @@ CONFIG = {
   # being too restrictive for some processes performing file-based checks, e.g.
   # HiveServer2 requires permission of /tmp/hive to be at lest 733.
   'fs.gs.reported.permissions': '777',
+
+  # COS configuration
+  # Note: This is needed even when not running on COS, because some frontend tests
+  # include COS paths that require initializing an COS filesystem.
+  # See ExplainTest.testScanNodeFsScheme().
+  'fs.cosn.userinfo.secretId': '${COS_SECRET_ID}',
+  'fs.cosn.userinfo.secretKey': '${COS_SECRET_KEY}',
+  'fs.cosn.bucket.region': '${COS_REGION}',
+  'fs.cosn.impl': 'org.apache.hadoop.fs.CosFileSystem',
+  'fs.AbstractFileSystem.cosn.impl': 'org.apache.hadoop.fs.CosN',
 }
 
 if target_filesystem == 's3':

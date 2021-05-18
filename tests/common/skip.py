@@ -32,6 +32,7 @@ from tests.util.filesystem_utils import (
     IS_ABFS,
     IS_ADLS,
     IS_GCS,
+    IS_COS,
     IS_EC,
     IS_HDFS,
     IS_ISILON,
@@ -127,6 +128,28 @@ class SkipIfGCS:
   variable_listing_times = pytest.mark.skipif(IS_GCS,
       reason="Flakiness due to unpredictable listing times on GCS.")
 
+
+class SkipIfCOS:
+
+  # These are skipped due to product limitations.
+  caching = pytest.mark.skipif(IS_COS, reason="SET CACHED not implemented for COS")
+  hive = pytest.mark.skipif(IS_COS, reason="Hive doesn't work with COS")
+  hdfs_block_size = pytest.mark.skipif(IS_COS, reason="COS uses it's own block size")
+  hdfs_acls = pytest.mark.skipif(IS_COS, reason="HDFS acls are not supported on COS")
+  jira = partial(pytest.mark.skipif, IS_COS)
+  hdfs_encryption = pytest.mark.skipif(IS_COS,
+      reason="HDFS encryption is not supported with COS")
+
+  # These need test infra work to re-enable.
+  udfs = pytest.mark.skipif(IS_COS, reason="udas/udfs not copied to COS")
+  datasrc = pytest.mark.skipif(IS_COS, reason="data sources not copied to COS")
+  hbase = pytest.mark.skipif(IS_COS, reason="HBase not started with COS")
+  qualified_path = pytest.mark.skipif(IS_COS,
+      reason="Tests rely on HDFS qualified paths, IMPALA-1872")
+  variable_listing_times = pytest.mark.skipif(IS_COS,
+      reason="Flakiness due to unpredictable listing times on COS.")
+  eventually_consistent = pytest.mark.skipif(IS_COS,
+      reason="The client is slow to realize changes to file metadata")
 
 class SkipIfKudu:
   no_hybrid_clock = pytest.mark.skipif(

@@ -21,7 +21,7 @@ import pytest
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfLocal)
+                               SkipIfGCS, SkipIfCOS, SkipIfLocal)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 
 # Tests to validate HDFS partitioning.
@@ -49,6 +49,7 @@ class TestPartitioning(ImpalaTestSuite):
   # filesystem.
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive

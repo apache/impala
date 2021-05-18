@@ -28,7 +28,7 @@ from subprocess import check_call
 from getpass import getuser
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfLocal, SkipIfHive2, SkipIfGCS)
+                               SkipIfLocal, SkipIfHive2, SkipIfGCS, SkipIfCOS)
 from tests.common.test_dimensions import (create_client_protocol_dimension,
     create_exec_option_dimension, create_orc_dimension)
 from tests.util.hdfs_util import NAMENODE
@@ -1358,6 +1358,7 @@ class TestRanger(CustomClusterTestSuite):
   @SkipIfLocal.hive
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfHive2.ranger_auth
   @CustomClusterTestSuite.with_args()
   def test_hive_with_ranger_setup(self, vector):

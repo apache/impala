@@ -25,7 +25,8 @@ from hive_metastore.ttypes import CommitTxnRequest, OpenTxnRequest
 from subprocess import check_call
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIf, SkipIfHive2, SkipIfCatalogV2, SkipIfS3, SkipIfABFS,
-                               SkipIfADLS, SkipIfIsilon, SkipIfGCS, SkipIfLocal)
+                               SkipIfADLS, SkipIfIsilon, SkipIfGCS, SkipIfCOS,
+                               SkipIfLocal)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.util.acid_txn import AcidTxn
 
@@ -47,6 +48,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -65,6 +67,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -75,6 +78,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -85,6 +89,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -97,6 +102,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -107,6 +113,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -127,6 +134,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfCatalogV2.hms_event_polling_enabled()
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -141,6 +149,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -164,6 +173,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -181,6 +191,7 @@ class TestAcid(ImpalaTestSuite):
 
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -200,6 +211,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -215,6 +227,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive
@@ -294,6 +307,7 @@ class TestAcid(ImpalaTestSuite):
   @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfIsilon.hive

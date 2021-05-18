@@ -21,7 +21,7 @@ import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.environ import HIVE_MAJOR_VERSION
-from tests.common.skip import SkipIfS3, SkipIfGCS
+from tests.common.skip import SkipIfS3, SkipIfGCS, SkipIfCOS
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_result_verifier import verify_query_result_is_equal
 
@@ -53,6 +53,7 @@ class TestTextInterop(CustomClusterTestSuite):
 
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @pytest.mark.execute_serially
   def test_hive_impala_interop(self, unique_database, cluster_properties):
     """Tests compressed text file written by Hive with different codecs

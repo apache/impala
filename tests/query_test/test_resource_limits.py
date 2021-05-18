@@ -17,7 +17,7 @@
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfEC, SkipIfLocal, SkipIfS3, SkipIfABFS,
-                               SkipIfGCS, SkipIfADLS)
+                               SkipIfGCS, SkipIfCOS, SkipIfADLS)
 from tests.common.test_dimensions import create_parquet_dimension
 
 
@@ -47,6 +47,7 @@ class TestResourceLimits(ImpalaTestSuite):
 
   @SkipIfS3.hbase
   @SkipIfGCS.hbase
+  @SkipIfCOS.hbase
   @SkipIfADLS.hbase
   @SkipIfABFS.hbase
   @SkipIfLocal.multiple_impalad

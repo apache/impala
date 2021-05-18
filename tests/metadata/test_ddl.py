@@ -30,7 +30,8 @@ from tests.common.file_utils import create_table_from_orc
 from tests.common.impala_test_suite import LOG
 from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIf, SkipIfABFS, SkipIfADLS, SkipIfKudu, SkipIfLocal,
-                               SkipIfCatalogV2, SkipIfHive2, SkipIfS3, SkipIfGCS)
+                               SkipIfCatalogV2, SkipIfHive2, SkipIfS3, SkipIfGCS,
+                               SkipIfCOS)
 from tests.common.test_dimensions import create_single_exec_option_dimension
 from tests.common.test_dimensions import (create_exec_option_dimension,
     create_client_protocol_dimension)
@@ -306,6 +307,7 @@ class TestDdlStatements(TestDdlBase):
   @SkipIfHive2.orc
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @UniqueDatabase.parametrize(sync_ddl=True)
   def test_create_table_like_file_orc(self, vector, unique_database):
     COMPLEXTYPETBL_PATH = 'test-warehouse/managed/functional_orc_def.db/' \

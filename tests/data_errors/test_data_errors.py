@@ -26,7 +26,7 @@ import subprocess
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIf, SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfGCS,
-                               SkipIfLocal)
+                               SkipIfCOS, SkipIfLocal)
 from tests.common.test_dimensions import create_exec_option_dimension
 
 class TestDataErrors(ImpalaTestSuite):
@@ -108,6 +108,7 @@ class TestHdfsUnknownErrors(ImpalaTestSuite):
 
 @SkipIfS3.qualified_path
 @SkipIfGCS.qualified_path
+@SkipIfCOS.qualified_path
 @SkipIfABFS.qualified_path
 @SkipIfADLS.qualified_path
 class TestHdfsScanNodeErrors(TestDataErrors):
@@ -128,6 +129,7 @@ class TestHdfsScanNodeErrors(TestDataErrors):
 
 @SkipIfS3.qualified_path
 @SkipIfGCS.qualified_path
+@SkipIfCOS.qualified_path
 @SkipIfABFS.qualified_path
 @SkipIfADLS.qualified_path
 @SkipIfLocal.qualified_path
@@ -145,6 +147,7 @@ class TestHdfsSeqScanNodeErrors(TestHdfsScanNodeErrors):
 
 @SkipIfS3.qualified_path
 @SkipIfGCS.qualified_path
+@SkipIfCOS.qualified_path
 @SkipIfABFS.qualified_path
 @SkipIfADLS.qualified_path
 class TestHdfsRcFileScanNodeErrors(TestHdfsScanNodeErrors):

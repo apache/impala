@@ -23,7 +23,7 @@ from multiprocessing import Value
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIf, SkipIfHive2, SkipIfS3, SkipIfGCS
+from tests.common.skip import SkipIf, SkipIfHive2, SkipIfS3, SkipIfGCS, SkipIfCOS
 from tests.stress.stress_util import Task, run_tasks
 
 NUM_OVERWRITES = 2
@@ -161,6 +161,7 @@ class TestAcidInsertsBasic(TestAcidStress):
   @SkipIfHive2.acid
   @SkipIfS3.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @pytest.mark.execute_serially
   @pytest.mark.stress
   def test_read_hive_inserts(self, unique_database):
@@ -278,6 +279,7 @@ class TestConcurrentAcidInserts(TestAcidStress):
       impalad_client.close()
 
   @SkipIfGCS.jira(reason="IMPALA-10563")
+  @SkipIfCOS.jira(reason="IMPALA-10773")
   @SkipIfHive2.acid
   @pytest.mark.execute_serially
   @pytest.mark.stress
@@ -374,6 +376,7 @@ class TestFailingAcidInserts(TestAcidStress):
     run_tasks(writers + checkers)
 
   @SkipIfGCS.jira(reason="IMPALA-10563")
+  @SkipIfCOS.jira(reason="IMPALA-10773")
   @SkipIfHive2.acid
   @pytest.mark.execute_serially
   @pytest.mark.stress

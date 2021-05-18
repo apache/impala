@@ -27,7 +27,7 @@ import time
 from multiprocessing.pool import ThreadPool
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import (SkipIfHive2, SkipIfS3, SkipIfABFS, SkipIfGCS,
+from tests.common.skip import (SkipIfHive2, SkipIfS3, SkipIfABFS, SkipIfGCS, SkipIfCOS,
                                SkipIfADLS, SkipIfIsilon, SkipIfLocal)
 from tests.util.filesystem_utils import WAREHOUSE
 
@@ -535,6 +535,7 @@ class TestFullAcid(CustomClusterTestSuite):
   @SkipIfABFS.hive
   @SkipIfADLS.hive
   @SkipIfGCS.hive
+  @SkipIfCOS.hive
   @SkipIfIsilon.hive
   @SkipIfLocal.hive
   @pytest.mark.execute_serially

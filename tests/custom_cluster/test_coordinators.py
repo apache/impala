@@ -25,7 +25,7 @@ from subprocess import check_call
 from tests.util.filesystem_utils import get_fs_path
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.skip import (SkipIf, SkipIfS3, SkipIfABFS, SkipIfADLS,
-                               SkipIfIsilon, SkipIfGCS, SkipIfLocal)
+                               SkipIfIsilon, SkipIfGCS, SkipIfCOS, SkipIfLocal)
 
 LOG = logging.getLogger('test_coordinators')
 LOG.setLevel(level=logging.DEBUG)
@@ -321,6 +321,7 @@ class TestCoordinators(CustomClusterTestSuite):
 
   @SkipIfS3.hbase
   @SkipIfGCS.hbase
+  @SkipIfCOS.hbase
   @SkipIfABFS.hbase
   @SkipIfADLS.hbase
   @SkipIfIsilon.hbase

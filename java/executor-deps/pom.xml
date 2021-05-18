@@ -139,6 +139,12 @@ under the License.
     </dependency>
 
     <dependency>
+      <groupId>com.qcloud.cos</groupId>
+      <artifactId>hadoop-cos</artifactId>
+      <version>${cos.version}</version>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-client</artifactId>
       <version>${hbase.version}</version>

@@ -28,7 +28,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import (SkipIf, SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
-                               SkipIfGCS, SkipIfLocal)
+                               SkipIfGCS, SkipIfCOS, SkipIfLocal)
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_vector import ImpalaTestDimension
 from tests.verifiers.metric_verifier import MetricVerifier
@@ -64,6 +64,7 @@ QUERIES = [
 @SkipIf.skip_hbase # -skip_hbase argument specified
 @SkipIfS3.hbase # S3: missing coverage: failures
 @SkipIfGCS.hbase
+@SkipIfCOS.hbase
 @SkipIfABFS.hbase
 @SkipIfADLS.hbase
 @SkipIfIsilon.hbase # ISILON: missing coverage: failures.

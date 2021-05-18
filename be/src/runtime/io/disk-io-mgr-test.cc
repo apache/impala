@@ -53,6 +53,7 @@ DECLARE_int32(num_s3_io_threads);
 DECLARE_int32(num_adls_io_threads);
 DECLARE_int32(num_abfs_io_threads);
 DECLARE_int32(num_gcs_io_threads);
+DECLARE_int32(num_cos_io_threads);
 DECLARE_int32(num_ozone_io_threads);
 DECLARE_int32(num_oss_io_threads);
 DECLARE_int32(num_remote_hdfs_file_oper_io_threads);
@@ -1717,7 +1718,8 @@ TEST_F(DiskIoMgrTest, VerifyNumThreadsParameter) {
       + FLAGS_num_s3_io_threads + FLAGS_num_adls_io_threads + FLAGS_num_abfs_io_threads
       + FLAGS_num_ozone_io_threads + FLAGS_num_oss_io_threads
       + FLAGS_num_remote_hdfs_file_oper_io_threads
-      + FLAGS_num_s3_file_oper_io_threads + FLAGS_num_gcs_io_threads;
+      + FLAGS_num_s3_file_oper_io_threads + FLAGS_num_gcs_io_threads
+      + FLAGS_num_cos_io_threads;
 
   // Verify num_io_threads_per_rotational_disk and num_io_threads_per_solid_state_disk.
   // Since we do not have control over which disk is used, we check for either type

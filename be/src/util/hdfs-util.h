@@ -31,6 +31,7 @@ extern const char* FILESYS_PREFIX_ABFS;
 extern const char* FILESYS_PREFIX_ABFS_SEC;
 extern const char* FILESYS_PREFIX_ADL;
 extern const char* FILESYS_PREFIX_GCS;
+extern const char* FILESYS_PREFIX_COS;
 extern const char* FILESYS_PREFIX_OZONE;
 
 /// Utility function to get error messages from HDFS. This function takes prefix/file and
@@ -72,6 +73,9 @@ bool IsOSSPath(const char* path, bool check_default_fs = true);
 
 /// Returns true iff the path refers to a location on an GCS filesystem.
 bool IsGcsPath(const char* path, bool check_default_fs = true);
+
+/// Returns true iff the path refers to a location on an COS filesystem.
+bool IsCosPath(const char* path, bool check_default_fs = true);
 
 /// Returns true iff the path refers to a location on an Ozone filesystem.
 bool IsOzonePath(const char* path, bool check_default_fs = true);
