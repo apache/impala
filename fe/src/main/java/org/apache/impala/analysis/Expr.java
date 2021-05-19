@@ -1855,4 +1855,19 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
     return hasChanges;
   }
+
+  /**
+   * A slot descriptor may be associated with more than 1 source expression.
+   * This method returns the first source expr in that case or null if there
+   * are no source exprs.
+   */
+  public Expr getSlotDescFirstSourceExpr() {
+    SlotRef slotRef = unwrapSlotRef(false);
+    if (slotRef == null) return null;
+    SlotDescriptor slotDesc = slotRef.getDesc();
+    if (slotDesc.getSourceExprs().size() >= 1) {
+      return slotDesc.getSourceExprs().get(0);
+    }
+    return null;
+  }
 }

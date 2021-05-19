@@ -1242,65 +1242,66 @@ on (t3.id = t4.id)
 PLAN-ROOT SINK
 |
 12:HASH JOIN [INNER JOIN]
-|  hash predicates: t3.id = t4.id
-|  runtime filters: RF000 <- t4.id
+|  hash predicates: t4.id = t3.id
+|  runtime filters: RF000 <- t3.id
 |  row-size=28B cardinality=1
 |
-|--09:SCAN HDFS [functional.alltypestiny t4]
-|     HDFS partitions=4/4 files=4 size=460B
-|     row-size=4B cardinality=8
-|
-11:HASH JOIN [RIGHT OUTER JOIN]
-|  hash predicates: t3.id = a.id
-|  runtime filters: RF002 <- a.id
-|  row-size=24B cardinality=8
-|
-|--10:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.id = count(a.id)
-|  |  runtime filters: RF004 <- count(a.id)
-|  |  row-size=20B cardinality=8
+|--11:HASH JOIN [RIGHT OUTER JOIN]
+|  |  hash predicates: t3.id = a.id
+|  |  runtime filters: RF002 <- a.id
+|  |  row-size=24B cardinality=1
 |  |
-|  |--04:AGGREGATE [FINALIZE]
-|  |  |  output: count(a.id)
-|  |  |  row-size=8B cardinality=1
+|  |--10:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: a.id = count(a.id)
+|  |  |  runtime filters: RF004 <- count(a.id)
+|  |  |  row-size=20B cardinality=1
 |  |  |
-|  |  03:AGGREGATE
-|  |  |  group by: a.id
-|  |  |  row-size=4B cardinality=8
-|  |  |
-|  |  02:HASH JOIN [INNER JOIN]
-|  |  |  hash predicates: a.id = b.id
-|  |  |  runtime filters: RF006 <- b.id
-|  |  |  row-size=8B cardinality=8
-|  |  |
-|  |  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |  |--04:AGGREGATE [FINALIZE]
+|  |  |  |  output: count(a.id)
+|  |  |  |  row-size=8B cardinality=1
+|  |  |  |
+|  |  |  03:AGGREGATE
+|  |  |  |  group by: a.id
+|  |  |  |  row-size=4B cardinality=8
+|  |  |  |
+|  |  |  02:HASH JOIN [INNER JOIN]
+|  |  |  |  hash predicates: a.id = b.id
+|  |  |  |  runtime filters: RF006 <- b.id
+|  |  |  |  row-size=8B cardinality=8
+|  |  |  |
+|  |  |  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |  |  |     HDFS partitions=4/4 files=4 size=460B
+|  |  |  |     row-size=4B cardinality=8
+|  |  |  |
+|  |  |  00:SCAN HDFS [functional.alltypestiny a]
 |  |  |     HDFS partitions=4/4 files=4 size=460B
+|  |  |     runtime filters: RF006 -> a.id
 |  |  |     row-size=4B cardinality=8
 |  |  |
-|  |  00:SCAN HDFS [functional.alltypestiny a]
+|  |  07:HASH JOIN [LEFT OUTER JOIN]
+|  |  |  hash predicates: b.id = a.id
+|  |  |  other predicates: a.`year` < 10
+|  |  |  row-size=12B cardinality=8
+|  |  |
+|  |  |--05:SCAN HDFS [functional.alltypes a]
+|  |  |     partition predicates: a.`year` < 10
+|  |  |     partitions=0/24 files=0 size=0B
+|  |  |     runtime filters: RF004 -> a.id
+|  |  |     row-size=8B cardinality=0
+|  |  |
+|  |  06:SCAN HDFS [functional.alltypestiny b]
 |  |     HDFS partitions=4/4 files=4 size=460B
-|  |     runtime filters: RF006 -> a.id
 |  |     row-size=4B cardinality=8
 |  |
-|  07:HASH JOIN [LEFT OUTER JOIN]
-|  |  hash predicates: b.id = a.id
-|  |  other predicates: a.`year` < 10
-|  |  row-size=12B cardinality=8
-|  |
-|  |--05:SCAN HDFS [functional.alltypes a]
-|  |     partition predicates: a.`year` < 10
-|  |     partitions=0/24 files=0 size=0B
-|  |     runtime filters: RF004 -> a.id
-|  |     row-size=8B cardinality=0
-|  |
-|  06:SCAN HDFS [functional.alltypestiny b]
-|     HDFS partitions=4/4 files=4 size=460B
-|     row-size=4B cardinality=8
+|  08:SCAN HDFS [functional.alltypes t3]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF002 -> t3.id
+|     row-size=4B cardinality=7.30K
 |
-08:SCAN HDFS [functional.alltypes t3]
-   HDFS partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> t3.id, RF002 -> t3.id
-   row-size=4B cardinality=7.30K
+09:SCAN HDFS [functional.alltypestiny t4]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> t4.id
+   row-size=4B cardinality=8
 ====
 # Same as above but with full outer joins.
 select 1 from
@@ -1331,12 +1332,12 @@ PLAN-ROOT SINK
 |
 11:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: t3.id = a.id
-|  row-size=24B cardinality=7.31K
+|  row-size=24B cardinality=7.30K
 |
 |--10:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.id = count(a.id)
 |  |  runtime filters: RF002 <- count(a.id)
-|  |  row-size=20B cardinality=8
+|  |  row-size=20B cardinality=1
 |  |
 |  |--04:AGGREGATE [FINALIZE]
 |  |  |  output: count(a.id)
@@ -1399,66 +1400,67 @@ where t2.month = 1
 PLAN-ROOT SINK
 |
 12:HASH JOIN [INNER JOIN]
-|  hash predicates: b.id = t4.id
-|  runtime filters: RF000 <- t4.id
+|  hash predicates: t4.id = b.id
+|  runtime filters: RF000 <- b.id
 |  row-size=16B cardinality=1
 |
-|--09:SCAN HDFS [functional.alltypestiny t4]
-|     HDFS partitions=4/4 files=4 size=460B
-|     row-size=4B cardinality=8
-|
-11:HASH JOIN [RIGHT SEMI JOIN]
-|  hash predicates: t3.id = b.id
-|  runtime filters: RF002 <- b.id
-|  row-size=12B cardinality=8
-|
-|--10:HASH JOIN [INNER JOIN]
-|  |  hash predicates: b.id = count(a.id)
-|  |  runtime filters: RF004 <- count(a.id)
-|  |  row-size=12B cardinality=8
+|--11:HASH JOIN [RIGHT SEMI JOIN]
+|  |  hash predicates: t3.id = b.id
+|  |  runtime filters: RF002 <- b.id
+|  |  row-size=12B cardinality=1
 |  |
-|  |--04:AGGREGATE [FINALIZE]
-|  |  |  output: count(a.id)
-|  |  |  row-size=8B cardinality=1
+|  |--10:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: b.id = count(a.id)
+|  |  |  runtime filters: RF004 <- count(a.id)
+|  |  |  row-size=12B cardinality=1
 |  |  |
-|  |  03:AGGREGATE
-|  |  |  group by: a.id
-|  |  |  row-size=4B cardinality=8
-|  |  |
-|  |  02:HASH JOIN [INNER JOIN]
-|  |  |  hash predicates: a.id = b.id
-|  |  |  runtime filters: RF008 <- b.id
-|  |  |  row-size=8B cardinality=8
-|  |  |
-|  |  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |  |--04:AGGREGATE [FINALIZE]
+|  |  |  |  output: count(a.id)
+|  |  |  |  row-size=8B cardinality=1
+|  |  |  |
+|  |  |  03:AGGREGATE
+|  |  |  |  group by: a.id
+|  |  |  |  row-size=4B cardinality=8
+|  |  |  |
+|  |  |  02:HASH JOIN [INNER JOIN]
+|  |  |  |  hash predicates: a.id = b.id
+|  |  |  |  runtime filters: RF008 <- b.id
+|  |  |  |  row-size=8B cardinality=8
+|  |  |  |
+|  |  |  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |  |  |     HDFS partitions=4/4 files=4 size=460B
+|  |  |  |     row-size=4B cardinality=8
+|  |  |  |
+|  |  |  00:SCAN HDFS [functional.alltypestiny a]
 |  |  |     HDFS partitions=4/4 files=4 size=460B
+|  |  |     runtime filters: RF008 -> a.id
 |  |  |     row-size=4B cardinality=8
 |  |  |
-|  |  00:SCAN HDFS [functional.alltypestiny a]
-|  |     HDFS partitions=4/4 files=4 size=460B
-|  |     runtime filters: RF008 -> a.id
-|  |     row-size=4B cardinality=8
+|  |  07:HASH JOIN [LEFT SEMI JOIN]
+|  |  |  hash predicates: b.id = a.id
+|  |  |  runtime filters: RF006 <- a.id
+|  |  |  row-size=4B cardinality=8
+|  |  |
+|  |  |--05:SCAN HDFS [functional.alltypestiny a]
+|  |  |     HDFS partitions=4/4 files=4 size=460B
+|  |  |     runtime filters: RF004 -> a.id
+|  |  |     row-size=4B cardinality=8
+|  |  |
+|  |  06:SCAN HDFS [functional.alltypes b]
+|  |     partition predicates: b.month = 1
+|  |     HDFS partitions=2/24 files=2 size=40.32KB
+|  |     runtime filters: RF004 -> b.id, RF006 -> b.id
+|  |     row-size=4B cardinality=620
 |  |
-|  07:HASH JOIN [LEFT SEMI JOIN]
-|  |  hash predicates: b.id = a.id
-|  |  runtime filters: RF006 <- a.id
-|  |  row-size=4B cardinality=8
-|  |
-|  |--05:SCAN HDFS [functional.alltypestiny a]
-|  |     HDFS partitions=4/4 files=4 size=460B
-|  |     runtime filters: RF000 -> a.id, RF004 -> a.id
-|  |     row-size=4B cardinality=8
-|  |
-|  06:SCAN HDFS [functional.alltypes b]
-|     partition predicates: b.month = 1
-|     HDFS partitions=2/24 files=2 size=40.32KB
-|     runtime filters: RF000 -> b.id, RF004 -> b.id, RF006 -> b.id
-|     row-size=4B cardinality=620
+|  08:SCAN HDFS [functional.alltypes t3]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     runtime filters: RF002 -> t3.id
+|     row-size=4B cardinality=7.30K
 |
-08:SCAN HDFS [functional.alltypes t3]
-   HDFS partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> t3.id, RF002 -> t3.id
-   row-size=4B cardinality=7.30K
+09:SCAN HDFS [functional.alltypestiny t4]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> t4.id
+   row-size=4B cardinality=8
 ====
 # Same as above but with anti joins.
 select 1 from
@@ -1479,64 +1481,64 @@ where t2.month = 1
 PLAN-ROOT SINK
 |
 12:HASH JOIN [INNER JOIN]
-|  hash predicates: b.id = t4.id
-|  runtime filters: RF000 <- t4.id
+|  hash predicates: t4.id = b.id
+|  runtime filters: RF000 <- b.id
 |  row-size=16B cardinality=1
 |
-|--09:SCAN HDFS [functional.alltypestiny t4]
-|     HDFS partitions=4/4 files=4 size=460B
-|     row-size=4B cardinality=8
-|
-11:HASH JOIN [RIGHT ANTI JOIN]
-|  hash predicates: t3.id = b.id
-|  row-size=12B cardinality=620
-|
-|--10:HASH JOIN [INNER JOIN]
-|  |  hash predicates: b.id = count(a.id)
-|  |  runtime filters: RF002 <- count(a.id)
-|  |  row-size=12B cardinality=620
+|--11:HASH JOIN [RIGHT ANTI JOIN]
+|  |  hash predicates: t3.id = b.id
+|  |  row-size=12B cardinality=1
 |  |
-|  |--04:AGGREGATE [FINALIZE]
-|  |  |  output: count(a.id)
-|  |  |  row-size=8B cardinality=1
+|  |--10:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: b.id = count(a.id)
+|  |  |  runtime filters: RF002 <- count(a.id)
+|  |  |  row-size=12B cardinality=1
 |  |  |
-|  |  03:AGGREGATE
-|  |  |  group by: a.id
-|  |  |  row-size=4B cardinality=8
-|  |  |
-|  |  02:HASH JOIN [INNER JOIN]
-|  |  |  hash predicates: a.id = b.id
-|  |  |  runtime filters: RF004 <- b.id
-|  |  |  row-size=8B cardinality=8
-|  |  |
-|  |  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |  |--04:AGGREGATE [FINALIZE]
+|  |  |  |  output: count(a.id)
+|  |  |  |  row-size=8B cardinality=1
+|  |  |  |
+|  |  |  03:AGGREGATE
+|  |  |  |  group by: a.id
+|  |  |  |  row-size=4B cardinality=8
+|  |  |  |
+|  |  |  02:HASH JOIN [INNER JOIN]
+|  |  |  |  hash predicates: a.id = b.id
+|  |  |  |  runtime filters: RF004 <- b.id
+|  |  |  |  row-size=8B cardinality=8
+|  |  |  |
+|  |  |  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |  |  |     HDFS partitions=4/4 files=4 size=460B
+|  |  |  |     row-size=4B cardinality=8
+|  |  |  |
+|  |  |  00:SCAN HDFS [functional.alltypestiny a]
 |  |  |     HDFS partitions=4/4 files=4 size=460B
+|  |  |     runtime filters: RF004 -> a.id
 |  |  |     row-size=4B cardinality=8
 |  |  |
-|  |  00:SCAN HDFS [functional.alltypestiny a]
-|  |     HDFS partitions=4/4 files=4 size=460B
-|  |     runtime filters: RF004 -> a.id
-|  |     row-size=4B cardinality=8
+|  |  07:HASH JOIN [LEFT ANTI JOIN]
+|  |  |  hash predicates: b.id = a.id
+|  |  |  row-size=4B cardinality=620
+|  |  |
+|  |  |--05:SCAN HDFS [functional.alltypestiny a]
+|  |  |     HDFS partitions=4/4 files=4 size=460B
+|  |  |     runtime filters: RF002 -> a.id
+|  |  |     row-size=4B cardinality=8
+|  |  |
+|  |  06:SCAN HDFS [functional.alltypes b]
+|  |     partition predicates: b.month = 1
+|  |     HDFS partitions=2/24 files=2 size=40.32KB
+|  |     runtime filters: RF002 -> b.id
+|  |     row-size=4B cardinality=620
 |  |
-|  07:HASH JOIN [LEFT ANTI JOIN]
-|  |  hash predicates: b.id = a.id
-|  |  row-size=4B cardinality=620
-|  |
-|  |--05:SCAN HDFS [functional.alltypestiny a]
-|  |     HDFS partitions=4/4 files=4 size=460B
-|  |     runtime filters: RF000 -> a.id, RF002 -> a.id
-|  |     row-size=4B cardinality=8
-|  |
-|  06:SCAN HDFS [functional.alltypes b]
-|     partition predicates: b.month = 1
-|     HDFS partitions=2/24 files=2 size=40.32KB
-|     runtime filters: RF000 -> b.id, RF002 -> b.id
-|     row-size=4B cardinality=620
+|  08:SCAN HDFS [functional.alltypes t3]
+|     HDFS partitions=24/24 files=24 size=478.45KB
+|     row-size=4B cardinality=7.30K
 |
-08:SCAN HDFS [functional.alltypes t3]
-   HDFS partitions=24/24 files=24 size=478.45KB
-   runtime filters: RF000 -> t3.id
-   row-size=4B cardinality=7.30K
+09:SCAN HDFS [functional.alltypestiny t4]
+   HDFS partitions=4/4 files=4 size=460B
+   runtime filters: RF000 -> t4.id
+   row-size=4B cardinality=8
 ====
 # Regression test for IMPALA-1343.
 SELECT sum(t4.tinyint_col)

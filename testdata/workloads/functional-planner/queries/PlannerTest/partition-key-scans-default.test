@@ -305,7 +305,7 @@ PLAN-ROOT SINK
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.int_col = min(t2.`year`)
 |  runtime filters: RF000 <- min(t2.`year`)
-|  row-size=8B cardinality=8
+|  row-size=8B cardinality=4
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: min(t2.`year`)
