@@ -983,3 +983,139 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> b.id + b.int_col
    row-size=8B cardinality=11.00K
 ====
+# IMPALA-10681: Better estimate join cardinality
+# if one side is a function expr
+select ss_customer_sk from tpcds.store_sales
+ inner join
+(select max(s_store_sk) as max_store_sk
+ from tpcds.store) v
+on ss_store_sk = max_store_sk;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = max(s_store_sk)
+|  runtime filters: RF000 <- max(s_store_sk)
+|  row-size=12B cardinality=480.07K
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: max(s_store_sk)
+|  |  row-size=4B cardinality=1
+|  |
+|  01:SCAN HDFS [tpcds.store]
+|     HDFS partitions=1/1 files=1 size=3.08KB
+|     row-size=4B cardinality=12
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> ss_store_sk
+   row-size=8B cardinality=2.88M
+====
+# Modified version of above with a union all
+select ss_customer_sk from tpcds.store_sales
+ inner join
+ (select max(s_store_sk) as max_store_sk from tpcds.store
+   union all
+  select min(s_store_sk) as max_store_sk from tpcds.store) v
+ on ss_store_sk = max_store_sk;
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = max_store_sk
+|  runtime filters: RF000 <- max_store_sk
+|  row-size=12B cardinality=960.13K
+|
+|--01:UNION
+|  |  pass-through-operands: all
+|  |  row-size=4B cardinality=2
+|  |
+|  |--05:AGGREGATE [FINALIZE]
+|  |  |  output: min(s_store_sk)
+|  |  |  row-size=4B cardinality=1
+|  |  |
+|  |  04:SCAN HDFS [tpcds.store]
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
+|  |     row-size=4B cardinality=12
+|  |
+|  03:AGGREGATE [FINALIZE]
+|  |  output: max(s_store_sk)
+|  |  row-size=4B cardinality=1
+|  |
+|  02:SCAN HDFS [tpcds.store]
+|     HDFS partitions=1/1 files=1 size=3.08KB
+|     row-size=4B cardinality=12
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> ss_store_sk
+   row-size=8B cardinality=2.88M
+====
+# Semi join version of the above (for comparison purposes)
+select ss_customer_sk from tpcds.store_sales
+ left semi join
+(select max(s_store_sk) as max_store_sk from tpcds.store
+  union all
+ select min(s_store_sk) as max_store_sk from tpcds.store) v
+ on ss_store_sk = max_store_sk;
+---- PLAN
+PLAN-ROOT SINK
+|
+06:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: ss_store_sk = max_store_sk
+|  runtime filters: RF000 <- max_store_sk
+|  row-size=8B cardinality=960.13K
+|
+|--01:UNION
+|  |  pass-through-operands: all
+|  |  row-size=4B cardinality=2
+|  |
+|  |--05:AGGREGATE [FINALIZE]
+|  |  |  output: min(s_store_sk)
+|  |  |  row-size=4B cardinality=1
+|  |  |
+|  |  04:SCAN HDFS [tpcds.store]
+|  |     HDFS partitions=1/1 files=1 size=3.08KB
+|  |     row-size=4B cardinality=12
+|  |
+|  03:AGGREGATE [FINALIZE]
+|  |  output: max(s_store_sk)
+|  |  row-size=4B cardinality=1
+|  |
+|  02:SCAN HDFS [tpcds.store]
+|     HDFS partitions=1/1 files=1 size=3.08KB
+|     row-size=4B cardinality=12
+|
+00:SCAN HDFS [tpcds.store_sales]
+   HDFS partitions=1824/1824 files=1824 size=346.60MB
+   runtime filters: RF000 -> ss_store_sk
+   row-size=8B cardinality=2.88M
+====
+# Modified version above: use a non aggregate function such
+# as concat along with group-by
+select c_first_name from tpcds.customer
+ inner join
+(select concat(s_manager, s_market_manager) as mgr
+  from tpcds.store group by mgr) v
+on c_last_name = v.mgr;
+---- PLAN
+PLAN-ROOT SINK
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c_last_name = concat(s_manager, s_market_manager)
+|  runtime filters: RF000 <- concat(s_manager, s_market_manager)
+|  row-size=48B cardinality=141
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: concat(s_manager, s_market_manager)
+|  |  row-size=12B cardinality=7
+|  |
+|  01:SCAN HDFS [tpcds.store]
+|     HDFS partitions=1/1 files=1 size=3.08KB
+|     row-size=50B cardinality=12
+|
+00:SCAN HDFS [tpcds.customer]
+   HDFS partitions=1/1 files=1 size=12.60MB
+   runtime filters: RF000 -> c_last_name
+   row-size=36B cardinality=100.00K
+====

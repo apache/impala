@@ -163,121 +163,119 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 PLAN-ROOT SINK
 |
 08:HASH JOIN [INNER JOIN]
-|  hash predicates: int_col = count(a.bigint_col)
-|  runtime filters: RF000 <- count(a.bigint_col)
+|  hash predicates: int_col = functional.alltypes.id
+|  runtime filters: RF000 <- functional.alltypes.id
 |  row-size=143B cardinality=730
 |
-|--06:TOP-N [LIMIT=100]
-|  |  order by: b.string_col ASC
-|  |  row-size=21B cardinality=1
+|--07:HASH JOIN [INNER JOIN]
+|  |  hash predicates: functional.alltypes.id = count(a.bigint_col)
+|  |  runtime filters: RF002 <- count(a.bigint_col)
+|  |  row-size=110B cardinality=1
 |  |
-|  05:AGGREGATE [FINALIZE]
-|  |  output: count(a.bigint_col)
-|  |  group by: b.string_col
-|  |  having: count(a.bigint_col) > 1
-|  |  row-size=21B cardinality=1
+|  |--06:TOP-N [LIMIT=100]
+|  |  |  order by: b.string_col ASC
+|  |  |  row-size=21B cardinality=1
+|  |  |
+|  |  05:AGGREGATE [FINALIZE]
+|  |  |  output: count(a.bigint_col)
+|  |  |  group by: b.string_col
+|  |  |  having: count(a.bigint_col) > 1
+|  |  |  row-size=21B cardinality=1
+|  |  |
+|  |  04:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: a.id = b.id
+|  |  |  runtime filters: RF004 <- b.id
+|  |  |  row-size=29B cardinality=1
+|  |  |
+|  |  |--03:SCAN HDFS [functional.alltypestiny b]
+|  |  |     HDFS partitions=4/4 files=4 size=460B
+|  |  |     row-size=17B cardinality=8
+|  |  |
+|  |  02:SCAN HDFS [functional.alltypesagg a]
+|  |     HDFS partitions=11/11 files=11 size=814.73KB
+|  |     predicates: a.bigint_col < 50
+|  |     runtime filters: RF004 -> a.id
+|  |     row-size=12B cardinality=1.10K
 |  |
-|  04:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.id = b.id
-|  |  runtime filters: RF004 <- b.id
-|  |  row-size=29B cardinality=1
-|  |
-|  |--03:SCAN HDFS [functional.alltypestiny b]
-|  |     HDFS partitions=4/4 files=4 size=460B
-|  |     row-size=17B cardinality=8
-|  |
-|  02:SCAN HDFS [functional.alltypesagg a]
-|     HDFS partitions=11/11 files=11 size=814.73KB
-|     predicates: a.bigint_col < 50
-|     runtime filters: RF004 -> a.id
-|     row-size=12B cardinality=1.10K
-|
-07:HASH JOIN [INNER JOIN]
-|  hash predicates: functional.alltypes.id = int_col
-|  runtime filters: RF002 <- int_col
-|  row-size=122B cardinality=730
-|
-|--01:SCAN HDFS [functional.alltypes]
+|  00:SCAN HDFS [functional.alltypes]
 |     HDFS partitions=24/24 files=24 size=478.45KB
-|     predicates: functional.alltypes.int_col > 1
-|     runtime filters: RF000 -> int_col
-|     row-size=33B cardinality=730
+|     predicates: functional.alltypes.id > 1
+|     runtime filters: RF002 -> functional.alltypes.id
+|     row-size=89B cardinality=730
 |
-00:SCAN HDFS [functional.alltypes]
+01:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
-   predicates: functional.alltypes.id > 1
-   runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
-   row-size=89B cardinality=730
+   predicates: functional.alltypes.int_col > 1
+   runtime filters: RF000 -> int_col
+   row-size=33B cardinality=730
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
-16:EXCHANGE [UNPARTITIONED]
+15:EXCHANGE [UNPARTITIONED]
 |
-08:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: int_col = count(a.bigint_col)
-|  runtime filters: RF000 <- count(a.bigint_col)
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: int_col = functional.alltypes.id
+|  runtime filters: RF000 <- functional.alltypes.id
 |  row-size=143B cardinality=730
 |
-|--15:EXCHANGE [HASH(count(a.bigint_col))]
+|--14:EXCHANGE [BROADCAST]
 |  |
-|  14:MERGING-EXCHANGE [UNPARTITIONED]
-|  |  order by: b.string_col ASC
-|  |  limit: 100
+|  07:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: functional.alltypes.id = count(a.bigint_col)
+|  |  runtime filters: RF002 <- count(a.bigint_col)
+|  |  row-size=110B cardinality=1
 |  |
-|  06:TOP-N [LIMIT=100]
-|  |  order by: b.string_col ASC
-|  |  row-size=21B cardinality=1
-|  |
-|  13:AGGREGATE [FINALIZE]
-|  |  output: count:merge(a.bigint_col)
-|  |  group by: b.string_col
-|  |  having: count(a.bigint_col) > 1
-|  |  row-size=21B cardinality=1
-|  |
-|  12:EXCHANGE [HASH(b.string_col)]
-|  |
-|  05:AGGREGATE [STREAMING]
-|  |  output: count(a.bigint_col)
-|  |  group by: b.string_col
-|  |  row-size=21B cardinality=1
-|  |
-|  04:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: a.id = b.id
-|  |  runtime filters: RF004 <- b.id
-|  |  row-size=29B cardinality=1
-|  |
-|  |--11:EXCHANGE [BROADCAST]
+|  |--13:EXCHANGE [BROADCAST]
 |  |  |
-|  |  03:SCAN HDFS [functional.alltypestiny b]
-|  |     HDFS partitions=4/4 files=4 size=460B
-|  |     row-size=17B cardinality=8
+|  |  12:MERGING-EXCHANGE [UNPARTITIONED]
+|  |  |  order by: b.string_col ASC
+|  |  |  limit: 100
+|  |  |
+|  |  06:TOP-N [LIMIT=100]
+|  |  |  order by: b.string_col ASC
+|  |  |  row-size=21B cardinality=1
+|  |  |
+|  |  11:AGGREGATE [FINALIZE]
+|  |  |  output: count:merge(a.bigint_col)
+|  |  |  group by: b.string_col
+|  |  |  having: count(a.bigint_col) > 1
+|  |  |  row-size=21B cardinality=1
+|  |  |
+|  |  10:EXCHANGE [HASH(b.string_col)]
+|  |  |
+|  |  05:AGGREGATE [STREAMING]
+|  |  |  output: count(a.bigint_col)
+|  |  |  group by: b.string_col
+|  |  |  row-size=21B cardinality=1
+|  |  |
+|  |  04:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  |  hash predicates: a.id = b.id
+|  |  |  runtime filters: RF004 <- b.id
+|  |  |  row-size=29B cardinality=1
+|  |  |
+|  |  |--09:EXCHANGE [BROADCAST]
+|  |  |  |
+|  |  |  03:SCAN HDFS [functional.alltypestiny b]
+|  |  |     HDFS partitions=4/4 files=4 size=460B
+|  |  |     row-size=17B cardinality=8
+|  |  |
+|  |  02:SCAN HDFS [functional.alltypesagg a]
+|  |     HDFS partitions=11/11 files=11 size=814.73KB
+|  |     predicates: a.bigint_col < 50
+|  |     runtime filters: RF004 -> a.id
+|  |     row-size=12B cardinality=1.10K
 |  |
-|  02:SCAN HDFS [functional.alltypesagg a]
-|     HDFS partitions=11/11 files=11 size=814.73KB
-|     predicates: a.bigint_col < 50
-|     runtime filters: RF004 -> a.id
-|     row-size=12B cardinality=1.10K
-|
-07:HASH JOIN [INNER JOIN, PARTITIONED]
-|  hash predicates: functional.alltypes.id = int_col
-|  runtime filters: RF002 <- int_col
-|  row-size=122B cardinality=730
-|
-|--10:EXCHANGE [HASH(int_col)]
-|  |
-|  01:SCAN HDFS [functional.alltypes]
+|  00:SCAN HDFS [functional.alltypes]
 |     HDFS partitions=24/24 files=24 size=478.45KB
-|     predicates: functional.alltypes.int_col > 1
-|     runtime filters: RF000 -> int_col
-|     row-size=33B cardinality=730
+|     predicates: functional.alltypes.id > 1
+|     runtime filters: RF002 -> functional.alltypes.id
+|     row-size=89B cardinality=730
 |
-09:EXCHANGE [HASH(functional.alltypes.id)]
-|
-00:SCAN HDFS [functional.alltypes]
+01:SCAN HDFS [functional.alltypes]
    HDFS partitions=24/24 files=24 size=478.45KB
-   predicates: functional.alltypes.id > 1
-   runtime filters: RF000 -> functional.alltypes.id, RF002 -> functional.alltypes.id
-   row-size=89B cardinality=730
+   predicates: functional.alltypes.int_col > 1
+   runtime filters: RF000 -> int_col
+   row-size=33B cardinality=730
 ====
 # Self-join of view to make sure the on clause is properly set
 # in the cloned view instances.

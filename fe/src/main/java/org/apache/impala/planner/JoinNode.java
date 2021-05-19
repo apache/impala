@@ -23,9 +23,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.impala.analysis.AnalyticExpr;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
 import org.apache.impala.analysis.Expr;
+import org.apache.impala.analysis.FunctionCallExpr;
 import org.apache.impala.analysis.JoinOperator;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotRef;
@@ -245,15 +247,24 @@ public abstract class JoinNode extends PlanNode {
    * We estimate the cardinality based on equality join predicates of the form
    * "L.c = R.d", with L being a table from child(0) and R a table from child(1).
    * For each set of such join predicates between two tables, we try to determine whether
-   * the tables might have foreign/primary key (FK/PK) relationship, and either use a
-   * special FK/PK estimation or a generic estimation method. Once the estimation method
-   * has been determined we compute the final cardinality based on the single most
-   * selective join predicate. We do not attempt to estimate the joint selectivity of
-   * multiple join predicates to avoid underestimation.
+   * the tables might have foreign/primary key (FK/PK) relationship, and use one of 3
+   * estimators: (a) special FK/PK estimation (b) generic estimation method (c) an
+   * estimation for 'other' conjuncts that may involve functions or expressions - this
+   * estimation is very similar to the generic estimator.
+   *
+   * Once the estimation method has been determined we compute the final cardinality
+   * based on the single most selective join predicate. We do not attempt to estimate
+   * the joint selectivity of multiple join predicates to avoid underestimation.
    * The FK/PK detection logic is based on the assumption that most joins are FK/PK. We
    * only use the generic estimation method if we have high confidence that there is no
    * FK/PK relationship. In the absence of relevant stats, we assume FK/PK with a join
    * selectivity of 1.
+   *
+   * In some cases where a function is involved in the join predicate - e.g c = max(d),
+   * the RHS may have relevant stats. For instance if it is s scalar subquery, the RHS
+   * NDV = 1. Whenever such stats are available, we classify them into an 'other'
+   * conjuncts list and leverage the available stats. We use the same estimation
+   * formula as the generic estimator.
    *
    * FK/PK estimation:
    * cardinality = |child(0)| * (|child(1)| / |R|) * (NDV(R.d) / NDV(L.c))
@@ -288,15 +299,26 @@ public abstract class JoinNode extends PlanNode {
 
     // Collect join conjuncts that are eligible to participate in cardinality estimation.
     List<EqJoinConjunctScanSlots> eqJoinConjunctSlots = new ArrayList<>();
+    // A list of stats for 'other' join conjuncts where the slot refs on one or both
+    // sides don't directly trace back to a base table column.
+    // e.g  a = MAX(b). Here, the RHS is a function.
+    List<NdvAndRowCountStats> otherEqJoinStats = new ArrayList<>();
     for (Expr eqJoinConjunct: eqJoinConjuncts_) {
-      EqJoinConjunctScanSlots slots = EqJoinConjunctScanSlots.create(eqJoinConjunct);
-      if (slots != null) eqJoinConjunctSlots.add(slots);
+      EqJoinConjunctScanSlots slots = EqJoinConjunctScanSlots.create(eqJoinConjunct,
+          otherEqJoinStats, lhsCard, rhsCard);
+      if (slots != null) {
+        eqJoinConjunctSlots.add(slots);
+      }
     }
 
     if (eqJoinConjunctSlots.isEmpty()) {
-      // There are no eligible equi-join conjuncts. Optimistically assume FK/PK with a
-      // join selectivity of 1.
-      return lhsCard;
+      if (!otherEqJoinStats.isEmpty() && joinOp_.isInnerJoin()) {
+        return getGenericJoinCardinality2(otherEqJoinStats, lhsCard, rhsCard);
+      } else {
+        // There are no eligible equi-join conjuncts. Optimistically assume FK/PK with a
+        // join selectivity of 1.
+        return lhsCard;
+      }
     }
 
     fkPkEqJoinConjuncts_ = getFkPkEqJoinConjuncts(eqJoinConjunctSlots);
@@ -382,22 +404,58 @@ public abstract class JoinNode extends PlanNode {
       long lhsCard, long rhsCard) {
     Preconditions.checkState(joinOp_.isInnerJoin() || joinOp_.isOuterJoin());
     Preconditions.checkState(!eqJoinConjunctSlots.isEmpty());
-    Preconditions.checkState(lhsCard >= 0 && rhsCard >= 0);
 
     long result = -1;
     for (EqJoinConjunctScanSlots slots: eqJoinConjunctSlots) {
-      // Adjust the NDVs on both sides to account for predicates. Intuitively, the NDVs
-      // should only decrease. We ignore adjustments that would lead to an increase.
-      double lhsAdjNdv = slots.lhsNdv();
-      if (slots.lhsNumRows() > lhsCard) lhsAdjNdv *= lhsCard / slots.lhsNumRows();
-      double rhsAdjNdv = slots.rhsNdv();
-      if (slots.rhsNumRows() > rhsCard) rhsAdjNdv *= rhsCard / slots.rhsNumRows();
-      // A lower limit of 1 on the max Adjusted Ndv ensures we don't estimate
-      // cardinality more than the max possible. This also handles the case of
-      // null columns on both sides having an Ndv of zero (which would change
-      // after IMPALA-7310 is fixed).
-      long joinCard = Math.round((lhsCard / Math.max(1, Math.max(lhsAdjNdv, rhsAdjNdv))) *
-          rhsCard);
+      long joinCard = getGenericJoinCardinalityInternal(slots.lhsNdv(), slots.rhsNdv(),
+          slots.lhsNumRows(), slots.rhsNumRows(), lhsCard, rhsCard);
+      if (result == -1) {
+        result = joinCard;
+      } else {
+        result = Math.min(result, joinCard);
+      }
+    }
+    Preconditions.checkState(result >= 0);
+    return result;
+  }
+
+  /**
+   * An internal utility method to compute generic join cardinality as described
+   * in the comments for {@link JoinNode#getJoinCardinality}. The input
+   * cardinalities must be >= 0.
+   */
+  private long getGenericJoinCardinalityInternal(double lhsNdv, double rhsNdv,
+      double lhsNumRows, double rhsNumRows, long lhsCard, long rhsCard) {
+    Preconditions.checkState(lhsCard >= 0 && rhsCard >= 0);
+    // Adjust the NDVs on both sides to account for predicates. Intuitively, the NDVs
+    // should only decrease. We ignore adjustments that would lead to an increase.
+    double lhsAdjNdv = lhsNdv;
+    if (lhsNumRows > lhsCard) lhsAdjNdv *= lhsCard / lhsNumRows;
+    double rhsAdjNdv = rhsNdv;
+    if (rhsNumRows > rhsCard) rhsAdjNdv *= rhsCard / rhsNumRows;
+    // A lower limit of 1 on the max Adjusted Ndv ensures we don't estimate
+    // cardinality more than the max possible.
+    long joinCard = Math.round((lhsCard / Math.max(1, Math.max(lhsAdjNdv, rhsAdjNdv))) *
+        rhsCard);
+    return joinCard;
+  }
+
+  /**
+   * This function mirrors the logic for {@link JoinNode#getGenericJoinCardinality} except
+   * that instead of the EqJoinConjunctScanSlots, it uses the {@link NdvAndRowCountStats}
+   * to directly access stats that were pre-populated. Currently, this function is
+   * restricted to inner joins. In order to extend it to outer joins some more analysis is
+   * needed to ensure it works correctly for different types of outer joins.
+   */
+  private long getGenericJoinCardinality2(List<NdvAndRowCountStats> statsList,
+      long lhsCard, long rhsCard) {
+    Preconditions.checkState(joinOp_.isInnerJoin());
+    Preconditions.checkState(!statsList.isEmpty());
+
+    long result = -1;
+    for (NdvAndRowCountStats stats: statsList) {
+      long joinCard = getGenericJoinCardinalityInternal(stats.lhsNdv(), stats.rhsNdv(),
+          stats.lhsNumRows(), stats.rhsNumRows(), lhsCard, rhsCard);
       if (result == -1) {
         result = joinCard;
       } else {
@@ -440,20 +498,75 @@ public abstract class JoinNode extends PlanNode {
     /**
      * Returns a new EqJoinConjunctScanSlots for the given equi-join conjunct or null if
      * the given conjunct is not of the form <SlotRef> = <SlotRef> or if the underlying
-     * table/column of at least one side is missing stats.
+     * table/column of at least one side is missing stats. Even when the conjunct does not
+     * refer to scan slots on both sides, the NDV stats for the expr might be available
+     * and this function populates the supplied otherEqJonConjuncts list with whatever
+     * stats it can retrieve.
      */
-    public static EqJoinConjunctScanSlots create(Expr eqJoinConjunct) {
+    public static EqJoinConjunctScanSlots create(Expr eqJoinConjunct,
+      List<NdvAndRowCountStats> otherEqJoinConjuncts, long lhsCard, long rhsCard) {
       if (!Expr.IS_EQ_BINARY_PREDICATE.apply(eqJoinConjunct)) return null;
       SlotDescriptor lhsScanSlot = eqJoinConjunct.getChild(0).findSrcScanSlot();
-      if (lhsScanSlot == null || !hasNumRowsAndNdvStats(lhsScanSlot)) return null;
+      boolean hasLhs = true;
+      boolean hasRhs = true;
+      if (lhsScanSlot == null || !hasNumRowsAndNdvStats(lhsScanSlot)) hasLhs = false;
       SlotDescriptor rhsScanSlot = eqJoinConjunct.getChild(1).findSrcScanSlot();
-      if (rhsScanSlot == null || !hasNumRowsAndNdvStats(rhsScanSlot)) return null;
-      return new EqJoinConjunctScanSlots(eqJoinConjunct, lhsScanSlot, rhsScanSlot);
+      if (rhsScanSlot == null || !hasNumRowsAndNdvStats(rhsScanSlot)) hasRhs = false;
+      if (hasLhs && hasRhs) {
+        return new EqJoinConjunctScanSlots(eqJoinConjunct, lhsScanSlot, rhsScanSlot);
+      }
+
+      Expr lhsExpr = eqJoinConjunct.getChild(0);
+      Expr rhsExpr = eqJoinConjunct.getChild(1);
+      if (!hasLhs) {
+        lhsExpr = lhsExpr.getSlotDescFirstSourceExpr();
+        if (lhsExpr == null) return null;
+      }
+      if (!hasRhs) {
+        rhsExpr = rhsExpr.getSlotDescFirstSourceExpr();
+        if (rhsExpr == null) return null;
+      }
+      // For analytic exprs, the NDV is incorrect (see IMPALA-10697). Until that is
+      // fixed, we should skip assigning the stats for such conjuncts.
+      if (lhsExpr instanceof AnalyticExpr || rhsExpr instanceof AnalyticExpr) {
+        return null;
+      }
+      long lhsNdv = lhsScanSlot != null ?
+          lhsScanSlot.getStats().getNumDistinctValues() :
+          JoinNode.getNdv(eqJoinConjunct.getChild(0));
+      long rhsNdv = rhsScanSlot != null ?
+          rhsScanSlot.getStats().getNumDistinctValues() :
+          JoinNode.getNdv(eqJoinConjunct.getChild(1));
+      if (lhsNdv == -1 || rhsNdv == -1) return null;
+
+      // In the following num rows assignment, if the underlying scan slot is not
+      // available we cannot get the actual base table row count. In that case we
+      // approximate the row count as just the lhs or rhs cardinality. Since the
+      // ratio of cardinality/num_rows is used to adjust (scale down) the NDV
+      // later (when computing join cardinality), it means we would fall back to
+      // not doing the adjustment which is ok since the NDV eventually gets capped
+      // at the cardinality.
+      long lhsNumRows = lhsScanSlot != null && hasNumRowsStats(lhsScanSlot) ?
+          lhsScanSlot.getParent().getTable().getNumRows() : lhsCard;
+      long rhsNumRows = rhsScanSlot != null && hasNumRowsStats(rhsScanSlot) ?
+          rhsScanSlot.getParent().getTable().getNumRows() : rhsCard;
+      otherEqJoinConjuncts.add(new NdvAndRowCountStats(lhsNdv, rhsNdv, lhsNumRows,
+          rhsNumRows));
+
+      return null;
     }
 
     private static boolean hasNumRowsAndNdvStats(SlotDescriptor slotDesc) {
+      return (hasNdvStats(slotDesc) && hasNumRowsStats(slotDesc));
+    }
+
+    private static boolean hasNdvStats(SlotDescriptor slotDesc) {
       if (slotDesc.getColumn() == null) return false;
       if (!slotDesc.getStats().hasNumDistinctValues()) return false;
+      return true;
+    }
+
+    private static boolean hasNumRowsStats(SlotDescriptor slotDesc) {
       FeTable tbl = slotDesc.getParent().getTable();
       if (tbl == null || tbl.getNumRows() == -1) return false;
       return true;
@@ -481,6 +594,34 @@ public abstract class JoinNode extends PlanNode {
 
     @Override
     public String toString() { return eqJoinConjunct_.toSql(); }
+  }
+
+  /**
+   * A struct to pass around ndv and num rows stats during
+   * cardinality estimations. The ndv values are upper bounded
+   * by the num rows
+   */
+  public static final class NdvAndRowCountStats {
+    private final long lhsNdv_;
+    private final long rhsNdv_;
+    private final long lhsNumRows_;
+    private final long rhsNumRows_;
+
+    public NdvAndRowCountStats(long lhsNdv, long rhsNdv,
+                               long lhsNumRows, long rhsNumRows) {
+      // upper bound the ndv values since the caller may not have done
+      // the adjustment
+      lhsNdv_ = Math.min(lhsNdv, lhsNumRows);
+      rhsNdv_ = Math.min(rhsNdv, rhsNumRows);
+      lhsNumRows_ = lhsNumRows;
+      rhsNumRows_ = rhsNumRows;
+    }
+
+    // Convenience functions. They return double to avoid excessive casts in callers.
+    public double lhsNdv() { return lhsNdv_; }
+    public double rhsNdv() { return rhsNdv_; }
+    public double lhsNumRows() { return lhsNumRows_; }
+    public double rhsNumRows() { return rhsNumRows_; }
   }
 
   /**
@@ -565,7 +706,7 @@ public abstract class JoinNode extends PlanNode {
    * Unwraps the SlotRef in expr and returns the NDVs of it.
    * Returns -1 if the NDVs are unknown or if expr is not a SlotRef.
    */
-  protected long getNdv(Expr expr) {
+  public static long getNdv(Expr expr) {
     SlotRef slotRef = expr.unwrapSlotRef(false);
     if (slotRef == null) return -1;
     SlotDescriptor slotDesc = slotRef.getDesc();

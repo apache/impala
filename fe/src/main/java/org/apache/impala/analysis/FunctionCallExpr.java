@@ -266,6 +266,12 @@ public class FunctionCallExpr extends Expr {
     return fn_ instanceof AggregateFunction && !isAnalyticFnCall_;
   }
 
+  /** Returns true if this is a call to an analytic aggregate function. */
+  public boolean isAnalyticFunction() {
+    Preconditions.checkNotNull(fn_);
+    return fn_ instanceof AggregateFunction && isAnalyticFnCall_;
+  }
+
   /** Returns true if this function is a call to the built-in grouping() function. */
   public boolean isGroupingBuiltin() {
     return functionNameEqualsBuiltin(fnName_, "grouping");
