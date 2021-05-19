@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -2085,13 +2086,15 @@ public class CatalogServiceCatalog extends Catalog {
   public Table getOrLoadTable(String dbName, String tblName, String reason,
       ValidWriteIdList validWriteIdList, long tableId) throws CatalogException {
     TTableName tableName = new TTableName(dbName.toLowerCase(), tblName.toLowerCase());
-    TableLoadingMgr.LoadRequest loadReq;
+    Table tbl;
+    TableLoadingMgr.LoadRequest loadReq = null;
+    List<HdfsPartition.Builder> partsToBeRefreshed = Collections.emptyList();
 
-    long previousCatalogVersion;
+    long previousCatalogVersion = -1;
     // Return the table if it is already loaded or submit a new load request.
     versionLock_.readLock().lock();
     try {
-      Table tbl = getTable(dbName, tblName);
+      tbl = getTable(dbName, tblName);
       // tbl doesn't exist in the catalog
       if (tbl == null) return null;
       // if no validWriteIdList is provided, we return the tbl if its loaded
@@ -2114,30 +2117,51 @@ public class CatalogServiceCatalog extends Catalog {
                   .format(CatalogMetastoreServer.CATALOGD_CACHE_API_HIT_METRIC, reason))
               .inc();
         }
-        return tbl;
-      }
-      CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-          .getCounter(CatalogMetastoreServer.CATALOGD_CACHE_MISS_METRIC)
-          .inc();
-      // Update the cache stats for a HMS API from which the current method got invoked.
-      if (HmsApiNameEnum.contains(reason)) {
-        // Update the cache miss metric, as the valid write id list did not match and we
-        // have to reload the table.
+        // Check if any partition of the table has a newly compacted file.
+        // We just take the read lock here so that we don't serialize all the getTable
+        // calls for the same table. If there are concurrent calls, it is possible we
+        // refresh a partition for multiple times but that doesn't break the table's
+        // consistency because we refresh the file metadata based on the same writeIdList
+        Preconditions.checkState(
+            AcidUtils.isTransactionalTable(tbl.getMetaStoreTable().getParameters()),
+            "Compaction id check cannot be done for non-transactional table "
+                + tbl.getFullName());
+        tbl.readLock().lock();
+        try {
+          partsToBeRefreshed =
+              AcidUtils.getPartitionsForRefreshingFileMetadata(this, (HdfsTable) tbl);
+        } finally {
+          tbl.readLock().unlock();
+        }
+        // If all the partitions don't have a newly compacted file, return the table
+        if (partsToBeRefreshed.isEmpty()) return tbl;
+      } else {
         CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-            .getCounter(String
-                .format(CatalogMetastoreServer.CATALOGD_CACHE_API_MISS_METRIC, reason))
+            .getCounter(CatalogMetastoreServer.CATALOGD_CACHE_MISS_METRIC)
             .inc();
+        // Update the cache stats for a HMS API from which the current method got invoked.
+        if (HmsApiNameEnum.contains(reason)) {
+          // Update the cache miss metric, as the valid write id list did not match and we
+          // have to reload the table.
+          CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
+              .getCounter(String.format(
+                  CatalogMetastoreServer.CATALOGD_CACHE_API_MISS_METRIC, reason))
+              .inc();
+        }
+        previousCatalogVersion = tbl.getCatalogVersion();
+        loadReq = tableLoadingMgr_.loadAsync(tableName, tbl.getCreateEventId(), reason);
       }
-      previousCatalogVersion = tbl.getCatalogVersion();
-      loadReq = tableLoadingMgr_.loadAsync(tableName, tbl.getCreateEventId(), reason);
     } finally {
       versionLock_.readLock().unlock();
+    }
+    if (!partsToBeRefreshed.isEmpty()) {
+      return refreshFileMetadata((HdfsTable) tbl, partsToBeRefreshed);
     }
     Preconditions.checkNotNull(loadReq);
     try {
       // The table may have been dropped/modified while the load was in progress, so only
       // apply the update if the existing table hasn't changed.
-      return replaceTableIfUnchanged(loadReq.get(), previousCatalogVersion);
+      return replaceTableIfUnchanged(loadReq.get(), previousCatalogVersion, tableId);
     } finally {
       loadReq.close();
     }
@@ -2145,10 +2169,12 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Replaces an existing Table with a new value if it exists and has not changed
-   * (has the same catalog version as 'expectedCatalogVersion').
+   * (has the same catalog version as 'expectedCatalogVersion'). There is one exception
+   * for transactional tables, we still replace the existing table if the updatedTbl has
+   * more recent writeIdList than the existing table.
    */
-  private Table replaceTableIfUnchanged(Table updatedTbl, long expectedCatalogVersion)
-      throws DatabaseNotFoundException {
+  private Table replaceTableIfUnchanged(Table updatedTbl, long expectedCatalogVersion,
+      long tableId) throws DatabaseNotFoundException {
     versionLock_.writeLock().lock();
     try {
       Db db = getDb(updatedTbl.getDb().getName());
@@ -2159,9 +2185,22 @@ public class CatalogServiceCatalog extends Catalog {
 
       Table existingTbl = db.getTable(updatedTbl.getName());
       // The existing table does not exist or has been modified. Instead of
-      // adding the loaded value, return the existing table.
-      if (existingTbl == null ||
-          existingTbl.getCatalogVersion() != expectedCatalogVersion) return existingTbl;
+      // adding the loaded value, return the existing table. For ACID tables,
+      // we also compare the writeIdList with existing table's and return existing table
+      // when its writeIdList is more recent. The check is needed in addition to the
+      // catalogVersion check because it is possible that when table's files are
+      // refreshed to account for compaction, the table's version number is higher but
+      // ValidWriteIdList is still the same as before refresh. This could cause this
+      // method to not update the table when the updatedTbl has a higher ValidWriteIdList
+      // if we just rely on catalog version comparison which would break the logic to
+      // reload on stale ValidWriteIdList logic.
+      if (existingTbl == null
+          || (existingTbl.getCatalogVersion() != expectedCatalogVersion
+                 && (!(existingTbl instanceof HdfsTable)
+                        || AcidUtils.compare((HdfsTable) existingTbl,
+                               updatedTbl.getValidWriteIds(), tableId)
+                            >= 0)))
+        return existingTbl;
 
       if (existingTbl instanceof HdfsTable) {
         // Add the old instance to the deleteLog_ so we can send isDeleted updates for
@@ -3435,6 +3474,38 @@ public class CatalogServiceCatalog extends Catalog {
               + " {}: {} msec.", table.getFullName(), reqWriteIdList,
           timer.stop().elapsed(TimeUnit.MILLISECONDS));
     }
+  }
+
+  /**
+   * This helper function reloads file metadata for partitions passed in and updates the
+   * table in place. It doesn't reload validWriteIds so the table will be consistent
+   * even this function is called for many times.
+   *
+   * @return the updated table
+   */
+  private Table refreshFileMetadata(HdfsTable hdfsTable,
+      List<HdfsPartition.Builder> partBuilders) throws CatalogException {
+    Preconditions.checkState(!partBuilders.isEmpty());
+
+    if (!tryWriteLock(hdfsTable)) {
+      throw new CatalogException(String.format(
+          "Error during refreshing file metadata for table %s due to lock contention",
+          hdfsTable.getFullName()));
+    }
+    long newVersion = incrementAndGetCatalogVersion();
+    versionLock_.writeLock().unlock();
+    try {
+      try (MetaStoreClient client = getMetaStoreClient()) {
+        hdfsTable.loadFileMetadataForPartitions(
+            client.getHiveClient(), partBuilders, true);
+      }
+      hdfsTable.updatePartitions(partBuilders);
+      hdfsTable.setCatalogVersion(newVersion);
+    } finally {
+      hdfsTable.writeLock().unlock();
+    }
+    LOG.debug("Refreshed file metadata for table {}", hdfsTable.getFullName());
+    return hdfsTable;
   }
 
   private static List<THdfsFileDesc> transformFds(List<FileDescriptor> fds) {

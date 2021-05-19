@@ -688,6 +688,10 @@ public class HdfsPartition extends CatalogObjectImpl
   // not active this is set to -1.
   private final long createEventId_;
 
+  // The last committed compaction ID
+  // -1 means there is no previous compaction event or compaction is not supported
+  private final long lastCompactionId_;
+
   /**
    * Constructor.  Needed for third party extensions that want to use their own builder
    * to construct the object.
@@ -707,7 +711,7 @@ public class HdfsPartition extends CatalogObjectImpl
         encodedInsertFileDescriptors, encodedDeleteFileDescriptors, location,
         isMarkedCached, accessLevel, hmsParameters, cachedMsPartitionDescriptor,
         partitionStats, hasIncrementalStats, numRows, writeId,
-        inFlightEvents, /*createEventId=*/-1L);
+        inFlightEvents, /*createEventId=*/-1L, /*lastCompactionId*/-1L);
   }
 
   protected HdfsPartition(HdfsTable table, long id, long prevId, String partName,
@@ -719,7 +723,7 @@ public class HdfsPartition extends CatalogObjectImpl
       boolean isMarkedCached, TAccessLevel accessLevel, Map<String, String> hmsParameters,
       CachedHmsPartitionDescriptor cachedMsPartitionDescriptor,
       byte[] partitionStats, boolean hasIncrementalStats, long numRows, long writeId,
-      InFlightEvents inFlightEvents, long createEventId) {
+      InFlightEvents inFlightEvents, long createEventId, long lastCompactionId) {
     table_ = table;
     id_ = id;
     prevId_ = prevId;
@@ -739,6 +743,7 @@ public class HdfsPartition extends CatalogObjectImpl
     writeId_ = writeId;
     inFlightEvents_ = inFlightEvents;
     createEventId_ = createEventId;
+    lastCompactionId_ = lastCompactionId;
     if (partName == null && id_ != CatalogObjectsConstants.PROTOTYPE_PARTITION_ID) {
       partName_ = FeCatalogUtils.getPartitionName(this);
     } else {
@@ -933,6 +938,10 @@ public class HdfsPartition extends CatalogObjectImpl
   public List<HdfsPartition.FileDescriptor> getDeleteFileDescriptors() {
     // Return a lazily transformed list from our internal bytes storage.
     return Lists.transform(encodedDeleteFileDescriptors_, FileDescriptor.FROM_BYTES);
+  }
+
+  public long getLastCompactionId() {
+    return lastCompactionId_;
   }
 
   /**
@@ -1183,6 +1192,7 @@ public class HdfsPartition extends CatalogObjectImpl
     // to -1 if the partition was not created by this catalogd or if events processing
     // is not active.
     private long createEventId_ = -1L;
+    private long lastCompactionId_ = -1L;
     private InFlightEvents inFlightEvents_ = new InFlightEvents();
 
     @Nullable
@@ -1222,6 +1232,7 @@ public class HdfsPartition extends CatalogObjectImpl
       }
       // Take over the in-flight events
       inFlightEvents_ = partition.inFlightEvents_;
+      lastCompactionId_ = partition.lastCompactionId_;
     }
 
     public HdfsPartition build() {
@@ -1243,7 +1254,8 @@ public class HdfsPartition extends CatalogObjectImpl
           fileFormatDescriptor_, encodedFileDescriptors_, encodedInsertFileDescriptors_,
           encodedDeleteFileDescriptors_, location_, isMarkedCached_, accessLevel_,
           hmsParameters_, cachedMsPartitionDescriptor_, partitionStats_,
-          hasIncrementalStats_, numRows_, writeId_, inFlightEvents_, createEventId_);
+          hasIncrementalStats_, numRows_, writeId_, inFlightEvents_, createEventId_,
+          lastCompactionId_);
     }
 
     public Builder setId(long id) {
@@ -1504,6 +1516,13 @@ public class HdfsPartition extends CatalogObjectImpl
       return FeCatalogUtils.getPartitionName(this);
     }
 
+    public Builder setLastCompactionId(long compactionId) {
+      lastCompactionId_ = compactionId;
+      return this;
+    }
+
+    public long getLastCompactionId() { return lastCompactionId_; }
+
     /**
      * Adds a version number to the in-flight events of this partition
      * @param isInsertEvent if true, add eventId to list of eventIds for in-flight Insert
@@ -1656,7 +1675,8 @@ public class HdfsPartition extends CatalogObjectImpl
           && partitionStats_ == oldInstance.partitionStats_
           && hasIncrementalStats_ == oldInstance.hasIncrementalStats_
           && numRows_ == oldInstance.numRows_
-          && writeId_ == oldInstance.writeId_);
+          && writeId_ == oldInstance.writeId_
+          && lastCompactionId_ == oldInstance.lastCompactionId_);
     }
   }
 

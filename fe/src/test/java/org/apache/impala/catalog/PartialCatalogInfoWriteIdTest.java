@@ -18,6 +18,7 @@
 package org.apache.impala.catalog;
 
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
@@ -497,6 +498,115 @@ public class PartialCatalogInfoWriteIdTest {
     // we expect the miss count to increase by 1 for the only partition
     Assert.assertEquals(numMissesAfter + 1, numMisses1 );
     Assert.assertEquals(numHitsAfter, numHits1 );
+  }
+
+  @Test
+  public void testTableFileMetadataAfterMajorCompaction() throws Exception {
+    // compacted table should return only one file
+    testFileMetadataAfterCompaction(testTblName, "", true, 1);
+  }
+
+  @Test
+  public void testTableFileMetadataAfterMinorCompaction() throws Exception {
+    // compacted table should return only one file
+    testFileMetadataAfterCompaction(testTblName, "", false, 1);
+  }
+
+  @Test
+  public void testPartitionFileMetadataAfterMajorCompaction() throws Exception {
+    String partition = "partition (part=1)";
+    // compacted partition should return only one file
+    testFileMetadataAfterCompaction(testPartitionedTbl, partition, true, 1);
+  }
+
+  @Test
+  public void testPartitionFileMetadataAfterMinorCompaction() throws Exception {
+    String partition = "partition (part=1)";
+    // compacted partition should return only one file
+    testFileMetadataAfterCompaction(testPartitionedTbl, partition, false, 1);
+  }
+
+  @Test
+  public void testFullAcidFileMetadataAfterMajorCompaction() throws Exception {
+    String partition = "partition (part=1)";
+    executeHiveSql("create table " + getTestFullAcidTblName() +
+        " (c1 int) partitioned by (part int) stored as orc" +
+        " tblproperties ('transactional' = 'true')");
+    executeHiveSql(
+        "insert into " + getTestFullAcidTblName() + " " + partition + " values (1)");
+    executeHiveSql("delete from " + getTestFullAcidTblName() + " where c1 = 1");
+    // add incompleteTable so that the table will be loaded
+    catalog_.addIncompleteTable(testDbName, testAcidTblName);
+    // After major compaction, the partition should return only base file
+    testFileMetadataAfterCompaction(testAcidTblName, partition, true, 1);
+  }
+
+  @Test
+  public void testFullAcidFileMetadataAfterMinorCompaction() throws Exception {
+    String partition = "partition (part=1)";
+    executeHiveSql("create table " + getTestFullAcidTblName() +
+        " (c1 int) partitioned by (part int) stored as orc" +
+        " tblproperties ('transactional' = 'true')");
+    executeHiveSql(
+        "insert into " + getTestFullAcidTblName() + " " + partition + " values (1)");
+    executeHiveSql("delete from " + getTestFullAcidTblName() + " where c1 = 1");
+    // add incompleteTable so that the table will be loaded
+    catalog_.addIncompleteTable(testDbName, testAcidTblName);
+    // After minor compaction, the partition should return one delta file and one delete
+    // delta file
+    testFileMetadataAfterCompaction(testAcidTblName, partition, false, 2);
+  }
+
+  private void testFileMetadataAfterCompaction(String tableName, String partition,
+      boolean isMajorCompaction, int expectedFileCount) throws Exception {
+    Assume.assumeTrue(MetastoreShim.getMajorVersion() >= 3);
+    String tableOrPartition = testDbName + "." + tableName + " " + partition;
+    executeHiveSql("insert into " + tableOrPartition + " values (2)");
+    executeHiveSql("insert into " + tableOrPartition + " values (3)");
+    // load data after insertion so that writeIdList will not change afterward
+    ValidWriteIdList currentWriteIdList = getValidWriteIdList(testDbName, tableName);
+    TGetPartialCatalogObjectRequest request = new RequestBuilder()
+                                                  .db(testDbName)
+                                                  .tbl(tableName)
+                                                  .writeId(currentWriteIdList)
+                                                  .wantFiles()
+                                                  .build();
+    TGetPartialCatalogObjectResponse response = sendRequest(request);
+    TPartialPartitionInfo prePartitionInfo =
+        Iterables.getOnlyElement(response.getTable_info().getPartitions());
+    int preFileCount = prePartitionInfo.getFile_descriptorsSize()
+        + prePartitionInfo.getInsert_file_descriptorsSize()
+        + prePartitionInfo.getDelete_file_descriptorsSize();
+    Assert.assertTrue(preFileCount > 1);
+
+    String compactionType = isMajorCompaction ? "'major'" : "'minor'";
+    executeHiveSql(
+        "alter table " + tableOrPartition + " compact " + compactionType + " and wait");
+    long numMisses =
+        getMetricCount(testDbName, tableName, HdfsTable.FILEMETADATA_CACHE_MISS_METRIC);
+    long numHits =
+        getMetricCount(testDbName, tableName, HdfsTable.FILEMETADATA_CACHE_HIT_METRIC);
+    // issue a get request at current writeIdList
+    // it shouldn't trigger a table reload but file metadata refreshing
+    request = new RequestBuilder()
+                  .db(testDbName)
+                  .tbl(tableName)
+                  .writeId(currentWriteIdList)
+                  .wantFiles()
+                  .build();
+    response = sendRequest(request);
+    TPartialPartitionInfo afterPartitionInfo =
+        Iterables.getOnlyElement(response.getTable_info().getPartitions());
+    int afterFileCount = afterPartitionInfo.getFile_descriptorsSize()
+        + afterPartitionInfo.getInsert_file_descriptorsSize()
+        + afterPartitionInfo.getDelete_file_descriptorsSize();
+    Assert.assertEquals(expectedFileCount, afterFileCount);
+    long numMissesAfterMinor =
+        getMetricCount(testDbName, tableName, HdfsTable.FILEMETADATA_CACHE_MISS_METRIC);
+    long numHitsAfterMinor =
+        getMetricCount(testDbName, tableName, HdfsTable.FILEMETADATA_CACHE_HIT_METRIC);
+    Assert.assertEquals(numHits + 1, numHitsAfterMinor);
+    Assert.assertEquals(numMisses, numMissesAfterMinor);
   }
 
   /**

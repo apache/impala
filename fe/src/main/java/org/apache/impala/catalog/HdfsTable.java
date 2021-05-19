@@ -152,7 +152,7 @@ import com.google.common.collect.Sets;
  */
 public class HdfsTable extends Table implements FeFsTable {
   // Name of default partition for unpartitioned tables
-  private static final String DEFAULT_PARTITION_NAME = "";
+  public static final String DEFAULT_PARTITION_NAME = "";
 
   // Number of times to retry fetching the partitions from the HMS should an error occur.
   private final static int NUM_PARTITION_FETCH_RETRIES = 5;
@@ -721,7 +721,7 @@ public class HdfsTable extends Table implements FeFsTable {
    * {@link #loadFileMetadataForPartitions(IMetaStoreClient, Collection, boolean)}
    * but without any injecting the debug actions.
    */
-  private long loadFileMetadataForPartitions(IMetaStoreClient client,
+  public long loadFileMetadataForPartitions(IMetaStoreClient client,
       Collection<HdfsPartition.Builder> partBuilders, boolean isRefresh)
       throws CatalogException {
     return loadFileMetadataForPartitions(client, partBuilders, isRefresh, null);
