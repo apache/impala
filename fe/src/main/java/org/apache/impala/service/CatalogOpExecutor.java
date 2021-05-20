@@ -2586,6 +2586,13 @@ public class CatalogOpExecutor {
             newTable.getTableName());
         addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
       }
+    } catch (AlreadyExistsException aee) {
+        if (params.if_not_exists) {
+          addSummary(response, "Table already exists.");
+          return false;
+        }
+        throw new ImpalaRuntimeException(
+            String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), aee);
     } catch (Exception e) {
       try {
         // Error creating the table in HMS, drop the synchronized table from Kudu.
@@ -2600,10 +2607,6 @@ public class CatalogOpExecutor {
             " the Metastore and the newly created Kudu table '%s' could not be " +
             " dropped. The log contains more information.", newTable.getTableName(),
             kuduTableName), e);
-      }
-      if (e instanceof AlreadyExistsException && params.if_not_exists) {
-        addSummary(response, "Table already exists.");
-        return false;
       }
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
