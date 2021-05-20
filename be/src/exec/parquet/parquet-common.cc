@@ -80,6 +80,21 @@ void GetRowRangeForPage(const parquet::RowGroup& row_group,
   }
 }
 
+void GetRowRangeForPageRange(const parquet::RowGroup& row_group,
+    const parquet::OffsetIndex& offset_index, const PageRange& page_range,
+    RowRange* row_range) {
+  const auto& page_locations = offset_index.page_locations;
+  DCHECK_GE(page_range.first, 0);
+  DCHECK_LE(page_range.first, page_range.last);
+  DCHECK_LT(page_range.last, page_locations.size());
+  row_range->first = page_locations[page_range.first].first_row_index;
+  if (page_range.last == page_locations.size() - 1) {
+    row_range->last = row_group.num_rows - 1;
+  } else {
+    row_range->last = page_locations[page_range.last + 1].first_row_index - 1;
+  }
+}
+
 static bool ValidateRowRangesData(const vector<RowRange>& skip_ranges,
     const int64_t num_rows) {
   for (auto& range : skip_ranges) {

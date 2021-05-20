@@ -58,15 +58,16 @@ class MinMaxFilter {
   /// from the calculated min to max is outside the range for 'type'. May only be called
   /// for integer-typed filters.
   virtual bool GetCastIntMinMax(
-      const ColumnType& type, int64_t* out_min, int64_t* out_max);
+      const ColumnType& type, int64_t* out_min, int64_t* out_max) const;
 
   /// Determine whether two ranges: [data_min, data_max] and [filter_min, filter_max]
   /// overlap. Return true if the two overlaps and false otherwise. Both data_min and
   /// data_max are of type 'type'. Since the overlap result can be used to set the
   /// the always_true_ flag, the actual overlap computation ignores the flag.
-  virtual bool EvalOverlap(const ColumnType& type, void* data_min, void* data_max) = 0;
+  virtual bool EvalOverlap(
+      const ColumnType& type, void* data_min, void* data_max) const = 0;
 
-  virtual PrimitiveType type() = 0;
+  virtual PrimitiveType type() const = 0;
 
   /// Add a new value, updating the current min/max.
   virtual void Insert(const void* val) = 0;
@@ -145,7 +146,8 @@ class MinMaxFilter {
   virtual void SetAlwaysTrue() { always_true_ = true; }
 
   /// Return a debug string for 'filter'
-  static std::string DebugString(const MinMaxFilterPB& filter);
+  static std::string DebugString(
+      const MinMaxFilterPB& filter, const ColumnType& col_type);
 
   /// Test whether 'filter' is always true field is set and the field value is 'true'
   static bool AlwaysTrue(const MinMaxFilterPB& filter);
@@ -154,50 +156,51 @@ class MinMaxFilter {
   static bool AlwaysFalse(const MinMaxFilterPB& filter);
 
   /// Return a debug string for 'value'
-  static std::string DebugString(const ColumnValuePB& value);
+  static std::string DebugString(const ColumnValuePB& value, const ColumnType& col_type);
 
  protected:
   bool always_true_;
 };
 
-#define NUMERIC_MIN_MAX_FILTER(NAME, TYPE)                                             \
-  class NAME##MinMaxFilter : public MinMaxFilter {                                     \
-   public:                                                                             \
-    NAME##MinMaxFilter() {                                                             \
-      min_ = std::numeric_limits<TYPE>::max();                                         \
-      max_ = std::numeric_limits<TYPE>::lowest();                                      \
-    }                                                                                  \
-    NAME##MinMaxFilter(const MinMaxFilterPB& protobuf);                                \
-    virtual ~NAME##MinMaxFilter() {}                                                   \
-    virtual const void* GetMin() const override { return &min_; }                      \
-    virtual const void* GetMax() const override { return &max_; }                      \
-    virtual bool GetCastIntMinMax(                                                     \
-        const ColumnType& type, int64_t* out_min, int64_t* out_max) override;          \
-    bool EvalOverlap(const ColumnType& type, void* data_min, void* data_max) override; \
-    float ComputeOverlapRatio(                                                         \
-        const ColumnType& type, void* data_min, void* data_max) override;              \
-    float ComputeOverlapRatio(const ColumnType& type, const TColumnValue& data_min,    \
-      const TColumnValue& data_max) override;                                          \
-    virtual PrimitiveType type() override;                                             \
-    virtual void Insert(const void* val) override;                                     \
-    bool AlwaysTrue() const override;                                                  \
-    virtual bool AlwaysFalse() const override {                                        \
-      return min_ == std::numeric_limits<TYPE>::max()                                  \
-          && max_ == std::numeric_limits<TYPE>::lowest();                              \
-    }                                                                                  \
-    virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;                  \
-    virtual std::string DebugString() const override;                                  \
-    static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out);                     \
-    static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);                   \
-    static const char* LLVM_CLASS_NAME;                                                \
-                                                                                       \
-   private:                                                                            \
-    bool EvalOverlap(const ColumnType& type, void* data_min, void* data_max,           \
-        int64_t* filter_min64, int64_t* filter_max64);                                 \
-                                                                                       \
-   private:                                                                            \
-    TYPE min_;                                                                         \
-    TYPE max_;                                                                         \
+#define NUMERIC_MIN_MAX_FILTER(NAME, TYPE)                                          \
+  class NAME##MinMaxFilter : public MinMaxFilter {                                  \
+   public:                                                                          \
+    NAME##MinMaxFilter() {                                                          \
+      min_ = std::numeric_limits<TYPE>::max();                                      \
+      max_ = std::numeric_limits<TYPE>::lowest();                                   \
+    }                                                                               \
+    NAME##MinMaxFilter(const MinMaxFilterPB& protobuf);                             \
+    virtual ~NAME##MinMaxFilter() {}                                                \
+    virtual const void* GetMin() const override { return &min_; }                   \
+    virtual const void* GetMax() const override { return &max_; }                   \
+    virtual bool GetCastIntMinMax(                                                  \
+        const ColumnType& type, int64_t* out_min, int64_t* out_max) const override; \
+    bool EvalOverlap(                                                               \
+        const ColumnType& type, void* data_min, void* data_max) const override;     \
+    float ComputeOverlapRatio(                                                      \
+        const ColumnType& type, void* data_min, void* data_max) override;           \
+    float ComputeOverlapRatio(const ColumnType& type, const TColumnValue& data_min, \
+        const TColumnValue& data_max) override;                                     \
+    virtual PrimitiveType type() const override;                                    \
+    virtual void Insert(const void* val) override;                                  \
+    bool AlwaysTrue() const override;                                               \
+    virtual bool AlwaysFalse() const override {                                     \
+      return min_ == std::numeric_limits<TYPE>::max()                               \
+          && max_ == std::numeric_limits<TYPE>::lowest();                           \
+    }                                                                               \
+    virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;               \
+    virtual std::string DebugString() const override;                               \
+    static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out);                  \
+    static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);                \
+    static const char* LLVM_CLASS_NAME;                                             \
+                                                                                    \
+   private:                                                                         \
+    bool EvalOverlap(const ColumnType& type, void* data_min, void* data_max,        \
+        int64_t* filter_min64, int64_t* filter_max64) const;                        \
+                                                                                    \
+   private:                                                                         \
+    TYPE min_;                                                                      \
+    TYPE max_;                                                                      \
   };
 
 NUMERIC_MIN_MAX_FILTER(Bool, bool);
@@ -224,14 +227,14 @@ class StringMinMaxFilter : public MinMaxFilter {
 
   virtual const void* GetMin() const override { return &min_; }
   virtual const void* GetMax() const override { return &max_; }
-  virtual PrimitiveType type() override;
+  virtual PrimitiveType type() const override;
 
 
   virtual void Insert(const void* val) override;
   bool AlwaysTrue() const override;
   virtual bool AlwaysFalse() const override { return always_false_; }
   bool EvalOverlap(
-      const ColumnType& type, void* data_min, void* data_max) override;
+      const ColumnType& type, void* data_min, void* data_max) const override;
   virtual float ComputeOverlapRatio(
       const ColumnType& type, void* data_min, void* data_max) override;
 
@@ -278,34 +281,35 @@ class StringMinMaxFilter : public MinMaxFilter {
   bool always_false_;
 };
 
-#define DATE_TIME_MIN_MAX_FILTER(NAME, TYPE)                                           \
-  class NAME##MinMaxFilter : public MinMaxFilter {                                     \
-   public:                                                                             \
-    NAME##MinMaxFilter() { always_false_ = true; }                                     \
-    NAME##MinMaxFilter(const MinMaxFilterPB& protobuf);                                \
-    virtual ~NAME##MinMaxFilter() {}                                                   \
-    virtual const void* GetMin() const override { return &min_; }                      \
-    virtual const void* GetMax() const override { return &max_; }                      \
-    virtual PrimitiveType type() override;                                             \
-    virtual void Insert(const void* val) override;                                     \
-    bool AlwaysTrue() const override;                                                  \
-    virtual bool AlwaysFalse() const override { return always_false_; }                \
-    bool EvalOverlap(const ColumnType& type, void* data_min, void* data_max) override; \
-    virtual float ComputeOverlapRatio(                                                 \
-        const ColumnType& type, void* data_min, void* data_max) override;              \
-    virtual float ComputeOverlapRatio(const ColumnType& type,                          \
-        const TColumnValue& data_min, const TColumnValue& data_max) override;          \
-    virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;                  \
-    virtual std::string DebugString() const override;                                  \
-    static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out);                     \
-    static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);                   \
-    static const char* LLVM_CLASS_NAME;                                                \
-                                                                                       \
-   private:                                                                            \
-    TYPE min_;                                                                         \
-    TYPE max_;                                                                         \
-    /* True if no rows have been inserted. */                                          \
-    bool always_false_;                                                                \
+#define DATE_TIME_MIN_MAX_FILTER(NAME, TYPE)                                    \
+  class NAME##MinMaxFilter : public MinMaxFilter {                              \
+   public:                                                                      \
+    NAME##MinMaxFilter() { always_false_ = true; }                              \
+    NAME##MinMaxFilter(const MinMaxFilterPB& protobuf);                         \
+    virtual ~NAME##MinMaxFilter() {}                                            \
+    virtual const void* GetMin() const override { return &min_; }               \
+    virtual const void* GetMax() const override { return &max_; }               \
+    virtual PrimitiveType type() const override;                                \
+    virtual void Insert(const void* val) override;                              \
+    bool AlwaysTrue() const override;                                           \
+    virtual bool AlwaysFalse() const override { return always_false_; }         \
+    bool EvalOverlap(                                                           \
+        const ColumnType& type, void* data_min, void* data_max) const override; \
+    virtual float ComputeOverlapRatio(                                          \
+        const ColumnType& type, void* data_min, void* data_max) override;       \
+    virtual float ComputeOverlapRatio(const ColumnType& type,                   \
+        const TColumnValue& data_min, const TColumnValue& data_max) override;   \
+    virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;           \
+    virtual std::string DebugString() const override;                           \
+    static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out);              \
+    static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);            \
+    static const char* LLVM_CLASS_NAME;                                         \
+                                                                                \
+   private:                                                                     \
+    TYPE min_;                                                                  \
+    TYPE max_;                                                                  \
+    /* True if no rows have been inserted. */                                   \
+    bool always_false_;                                                         \
   };
 
 DATE_TIME_MIN_MAX_FILTER(Timestamp, TimestampValue);
@@ -359,7 +363,7 @@ class DecimalMinMaxFilter : public MinMaxFilter {
   }
 
   virtual void Insert(const void* val) override;
-  virtual PrimitiveType type() override;
+  virtual PrimitiveType type() const override;
   bool AlwaysTrue() const override;
   virtual bool AlwaysFalse() const override { return always_false_; }
   virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;
@@ -368,7 +372,7 @@ class DecimalMinMaxFilter : public MinMaxFilter {
   static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out, int precision);
   static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);
   bool EvalOverlap(
-      const ColumnType& type, void* data_min, void* data_max) override;
+      const ColumnType& type, void* data_min, void* data_max) const override;
   virtual float ComputeOverlapRatio(
       const ColumnType& type, void* data_min, void* data_max) override;
   virtual float ComputeOverlapRatio(const ColumnType& type, const TColumnValue& data_min,

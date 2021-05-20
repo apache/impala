@@ -341,7 +341,9 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testNestedCollections() {
-    runPlannerTestFile("nested-collections");
+    TQueryOptions options = new TQueryOptions();
+    options.setMinmax_filter_sorted_columns(false);
+    runPlannerTestFile("nested-collections", options);
   }
 
   @Test
@@ -552,7 +554,8 @@ public class PlannerTest extends PlannerTestBase {
   @Test
   public void testTpchNested() {
     TQueryOptions options = new TQueryOptions();
-    runPlannerTestFile("tpch-nested", "tpch_nested_parquet",
+    options.setMinmax_filter_sorted_columns(false);
+    runPlannerTestFile("tpch-nested", "tpch_nested_parquet", options,
         ImmutableSet.of(PlannerTestOption.INCLUDE_RESOURCE_HEADER,
             PlannerTestOption.VALIDATE_RESOURCES,
             PlannerTestOption.VALIDATE_CARDINALITY));

@@ -59,6 +59,7 @@ import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
@@ -739,6 +740,25 @@ public class HdfsScanNode extends ScanNode {
         return false;
     }
 
+    // Check if query option minmax_filter_sorted_columns is true and the
+    // target column is the leading sort-by column in lexical sort order.
+    // If so, allow the process to continue.
+    if (analyzer.getQueryOptions().isMinmax_filter_sorted_columns()) {
+      Column column = slotRefInScan.getDesc().getColumn();
+      if (column != null) {
+        TupleDescriptor tDesc = slotRefInScan.getDesc().getParent();
+        FeTable table = tDesc.getTable();
+        if (table != null && table instanceof FeFsTable) {
+          if (!((FeFsTable) table).isLeadingSortByColumn(column.getName())) {
+            return false;
+          }
+          if ((((FeFsTable) table).IsLexicalSortByColumn()) == false) {
+            return false;
+          }
+        }
+      }
+    }
+
     Expr srcExpr = filter.getSrcExpr();
 
     // When the target is not an implicit cast, make a type check between the type
@@ -980,7 +1000,7 @@ public class HdfsScanNode extends ScanNode {
     largestScanRangeBytes_ = 0;
     maxScanRangeNumRows_ = -1;
     fileFormats_ = new HashSet<>();
-    boolean allParquet = true;
+    boolean allParquet = (partitions_.size() > 0) ? true : false;
     long simpleLimitNumRows = 0; // only used for the simple limit case
     boolean isSimpleLimit = sampleParams_ == null &&
         (analyzer.getQueryCtx().client_request.getQuery_options()

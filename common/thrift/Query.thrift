@@ -78,6 +78,13 @@ enum TParquetTimestampType {
   INT64_NANOS
 }
 
+// The options for a minmax filter to take fast code path.
+enum TMinmaxFilterFastCodePathMode {
+  OFF=0,
+  ON=1,
+  VERIFICATION=2
+}
+
 // constants for TQueryOptions.num_nodes
 const i32 NUM_NODES_ALL = 0
 const i32 NUM_NODES_ALL_RACKS = -1
@@ -508,6 +515,13 @@ struct TQueryOptions {
 
   // See comment in ImpalaService.thrift
   130: optional bool parquet_bloom_filtering = true;
+
+  // See comment in ImpalaService.thrift
+  131: optional bool minmax_filter_sorted_columns = true;
+
+  // See comment in ImpalaService.thrift
+  132: optional TMinmaxFilterFastCodePathMode minmax_filter_fast_code_path =
+      TMinmaxFilterFastCodePathMode.ON;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

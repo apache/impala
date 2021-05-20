@@ -47,6 +47,8 @@ public class TpcdsPlannerTest extends PlannerTestBase {
     Paths.get(outDir_.toString(), "tpcds").toFile().mkdirs();
     /* Enable minmax overlap filter feature for tpcds Parquet tests. */
     options.setMinmax_filter_threshold(0.5);
+    /* Disable minmax filter on sorted columns. */
+    options.setMinmax_filter_sorted_columns(false);
   }
 
   @Test

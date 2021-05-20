@@ -1090,6 +1090,17 @@ Status impala::SetQueryOption(const string& key, const string& value,
       }
       case TImpalaQueryOptions::DELETE_STATS_IN_TRUNCATE: {
         query_options->__set_delete_stats_in_truncate(IsTrue(value));
+         break;
+      }
+      case TImpalaQueryOptions::MINMAX_FILTER_SORTED_COLUMNS: {
+         query_options->__set_minmax_filter_sorted_columns(IsTrue(value));
+         break;
+      }
+      case TImpalaQueryOptions::MINMAX_FILTER_FAST_CODE_PATH: {
+        TMinmaxFilterFastCodePathMode::type enum_type;
+        RETURN_IF_ERROR(GetThriftEnum(value, "minmax filter fast code path type",
+            _TMinmaxFilterFastCodePathMode_VALUES_TO_NAMES, &enum_type));
+        query_options->__set_minmax_filter_fast_code_path(enum_type);
         break;
       }
       default:

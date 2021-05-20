@@ -17,7 +17,9 @@
 
 #include "gen-cpp/parquet_types.h"
 #include "exec/parquet/parquet-page-index.h"
+#include "exec/parquet/hdfs-parquet-scanner.h"
 #include "testutil/gtest-util.h"
+#include "util/min-max-filter.h"
 
 #include "common/names.h"
 
@@ -103,4 +105,185 @@ TEST(ParquetPageIndex, DeterminePageIndexRangesInRowGroup) {
     {200, 10, 300, 100}}, true, 100, 110, 220, 180);
 }
 
+template <typename T>
+vector<string> ToStringVector(vector<T> vec) {
+  vector<string> result;
+  for (auto v : vec) {
+    result.emplace_back(string(reinterpret_cast<char*>(new T(v)), sizeof(v)));
+  }
+  return result;
+}
+
+template <typename T>
+void VerifyBinarySearchSortedColumn(MinMaxFilter* filter, const ColumnType& col_type,
+    vector<T> min_vals, vector<T> max_vals, int start, int end,
+    vector<PageRange>* result) {
+  result->clear();
+  HdfsParquetScanner::CollectSkippedPageRangesForSortedColumn(filter, col_type,
+      ToStringVector<T>(min_vals), ToStringVector<T>(max_vals), start, end, result);
+}
+
+bool VerifyBinarySearchSortedColumnWithDistinctValues() {
+  MemTracker mem_tracker;
+  ObjectPool obj_pool;
+  ColumnType int_type(PrimitiveType::TYPE_INT);
+  MinMaxFilter* filter = MinMaxFilter::Create(int_type, &obj_pool, &mem_tracker);
+  DCHECK(filter);
+  int32_t min = 11;
+  int32_t max = 22;
+  // Setup the filter to cover page 1 and 2 below.
+  filter->Insert(&min);
+  filter->Insert(&max);
+  vector<PageRange> page_ranges;
+
+  // Distinct rows in the column. Being sorted, rows in each page are distinct.
+  // So are the boundaries which are inclusive.
+  vector<int32_t> min_vals = {0, 10, 20, 30};
+  vector<int32_t> max_vals = {9, 19, 29, 100};
+
+  // Expect to skip the 1st and the last page from four pages.
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 0, 3, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 2);
+  EXPECT_EQ(page_ranges[0], PageRange(0, 0));
+  EXPECT_EQ(page_ranges[1], PageRange(3, 3));
+
+  // Expect to skip the 0th page.
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 0, 1, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 1);
+  EXPECT_EQ(page_ranges[0], PageRange(0, 0));
+
+  // Expect to skip the 3rd page.
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 1, 3, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 1);
+  EXPECT_EQ(page_ranges[0], PageRange(3, 3));
+
+  // Expect to skip no pages.
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 1, 2, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 0);
+
+  // Expect to skip the 3rd page.
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 3, 3, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 1);
+  EXPECT_EQ(page_ranges[0], PageRange(3, 3));
+
+  // Expect to skip the 0th page.
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 0, 0, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 1);
+  EXPECT_EQ(page_ranges[0], PageRange(0, 0));
+
+  // Expect to skip all pages.
+  filter = MinMaxFilter::Create(int_type, &obj_pool, &mem_tracker);
+  DCHECK(filter);
+  min = 111;
+  max = 222;
+  filter->Insert(&min);
+  filter->Insert(&max);
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 0, 3, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 1);
+  EXPECT_EQ(page_ranges[0], PageRange(0, 3));
+
+  // Expect to skip all pages.
+  filter = MinMaxFilter::Create(int_type, &obj_pool, &mem_tracker);
+  DCHECK(filter);
+  min = -21;
+  max = -2;
+  filter->Insert(&min);
+  filter->Insert(&max);
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 0, 3, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 1);
+  EXPECT_EQ(page_ranges[0], PageRange(0, 3));
+  return true;
+}
+
+bool VerifyBinarySearchSortedColumnWithDuplicatedValues() {
+  MemTracker mem_tracker;
+  ObjectPool obj_pool;
+  ColumnType int_type(PrimitiveType::TYPE_INT);
+
+  // Duplicated rows in the column. Being sorted, rows in each page are not
+  // necessarily distinct.
+  vector<int32_t> min_vals = {0, 9, 9, 30};
+  vector<int32_t> max_vals = {9, 9, 29, 100};
+
+  MinMaxFilter* filter = MinMaxFilter::Create(int_type, &obj_pool, &mem_tracker);
+  DCHECK(filter);
+  int32_t min = 8;
+  int32_t max = 10;
+  filter->Insert(&min);
+  filter->Insert(&max);
+
+  vector<PageRange> page_ranges;
+
+  // Expect to skip the last page.
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 0, 3, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 1);
+  EXPECT_EQ(page_ranges[0], PageRange(3, 3));
+
+  // Expect to skip the last page.
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 1, 3, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 1);
+  EXPECT_EQ(page_ranges[0], PageRange(3, 3));
+
+  // Expect to skip no pages.
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 1, 2, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 0);
+
+  // Expect to skip no pages.
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 0, 0, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 0);
+
+  // Change the range in the filter
+  filter = MinMaxFilter::Create(int_type, &obj_pool, &mem_tracker);
+  DCHECK(filter);
+  min = 10;
+  max = 10;
+  filter->Insert(&min);
+  filter->Insert(&max);
+
+  // Expect to skip 0th, 1st and 3rd page.
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 0, 3, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 2);
+  EXPECT_EQ(page_ranges[0], PageRange(0, 1));
+  EXPECT_EQ(page_ranges[1], PageRange(3, 3));
+
+  // Change the min/max values and the range in the filter:
+  min_vals = {0, 9, 9, 40};
+  max_vals = {9, 9, 29, 100};
+  filter = MinMaxFilter::Create(int_type, &obj_pool, &mem_tracker);
+  DCHECK(filter);
+  min = 30;
+  max = 39;
+  filter->Insert(&min);
+  filter->Insert(&max);
+
+  // Expect to skip all pages:
+  //   1. The filter max of 39 produces [3,3];
+  //   2. The filter min of 30 produces [0,2];
+  //   3. These two ranges are sorted at the end of the method.
+  VerifyBinarySearchSortedColumn<int32_t>(
+      filter, int_type, min_vals, max_vals, 0, 3, &page_ranges);
+  EXPECT_EQ(page_ranges.size(), 2);
+  EXPECT_EQ(page_ranges[0], PageRange(0, 2));
+  EXPECT_EQ(page_ranges[1], PageRange(3, 3));
+
+  return true;
+}
+
+TEST(ParquetPageIndex, BinarySearchSortedColumn) {
+  EXPECT_TRUE(VerifyBinarySearchSortedColumnWithDistinctValues());
+  EXPECT_TRUE(VerifyBinarySearchSortedColumnWithDuplicatedValues());
+}
 }

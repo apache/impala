@@ -145,7 +145,7 @@ int64_t GetIntTypeValue(const ColumnType& type, const void* value) {
       max_ = protobuf.max().PROTOBUF_TYPE##_val();                                     \
     }                                                                                  \
   }                                                                                    \
-  PrimitiveType NAME##MinMaxFilter::type() {                                           \
+  PrimitiveType NAME##MinMaxFilter::type() const {                                     \
     return PrimitiveType::TYPE_##PRIMITIVE_TYPE;                                       \
   }                                                                                    \
   void NAME##MinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {                \
@@ -224,7 +224,7 @@ int64_t GetIntTypeMin(const ColumnType& type) {
 
 #define NUMERIC_MIN_MAX_FILTER_CAST(NAME, TYPE)                                        \
   bool NAME##MinMaxFilter::GetCastIntMinMax(                                           \
-      const ColumnType& col_type, int64_t* out_min, int64_t* out_max) {                \
+      const ColumnType& col_type, int64_t* out_min, int64_t* out_max) const {          \
     /* If the primitive type of the filter is the same as the column type, */          \
     /* there is no chance of mis-alignment. */                                         \
     if (LIKELY(type() == col_type.type)) {                                             \
@@ -251,7 +251,7 @@ int64_t GetIntTypeMin(const ColumnType& type) {
     return true;                                                                       \
   }                                                                                    \
   bool NAME##MinMaxFilter::EvalOverlap(                                                \
-      const ColumnType& col_type, void* data_min, void* data_max) {                    \
+      const ColumnType& col_type, void* data_min, void* data_max) const {              \
     /* Apply an optimization when the column type and the filter type are the same */  \
     if (LIKELY(type() == col_type.type)) {                                             \
       return !(max_ < *reinterpret_cast<TYPE*>(data_min)                               \
@@ -262,7 +262,7 @@ int64_t GetIntTypeMin(const ColumnType& type) {
     return EvalOverlap(col_type, data_min, data_max, &int_min, &int_max);              \
   }                                                                                    \
   bool NAME##MinMaxFilter::EvalOverlap(const ColumnType& type, void* data_min,         \
-      void* data_max, int64_t* filter_min64, int64_t* filter_max64) {                  \
+      void* data_max, int64_t* filter_min64, int64_t* filter_max64) const {            \
     if (LIKELY(GetCastIntMinMax(type, filter_min64, filter_max64))) {                  \
       return !(*filter_max64 < GetIntTypeValue(type, data_min)                         \
           || GetIntTypeValue(type, data_max) < *filter_min64);                         \
@@ -339,13 +339,13 @@ float BigIntMinMaxFilter::ComputeOverlapRatio(
 
 #define NUMERIC_MIN_MAX_FILTER_NO_CAST(NAME, TYPE)                                     \
   bool NAME##MinMaxFilter::GetCastIntMinMax(                                           \
-      const ColumnType& type, int64_t* out_min, int64_t* out_max) {                    \
+      const ColumnType& type, int64_t* out_min, int64_t* out_max) const {              \
     DCHECK(false) << "Casting min-max filters of type " << #NAME << " not supported."; \
     return true;                                                                       \
   }
 
 bool BoolMinMaxFilter::EvalOverlap(
-    const ColumnType& type, void* data_min, void* data_max) {
+    const ColumnType& type, void* data_min, void* data_max) const {
   return !(max_ < *(bool*)data_min || *(bool*)data_max < min_);
 }
 
@@ -362,7 +362,7 @@ float BoolMinMaxFilter::ComputeOverlapRatio(
 
 #define APPROXIMATE_NUMERIC_MIN_MAX_FILTER_EVAL_OVERLAP(NAME, TYPE)                 \
   bool NAME##MinMaxFilter::EvalOverlap(                                             \
-      const ColumnType& type, void* data_min, void* data_max) {                     \
+      const ColumnType& type, void* data_min, void* data_max) const {               \
     return !(max_ < *(TYPE*)data_min || *(TYPE*)data_max < min_);                   \
   }                                                                                 \
   float NAME##MinMaxFilter::ComputeOverlapRatio(                                    \
@@ -411,7 +411,7 @@ StringMinMaxFilter::StringMinMaxFilter(
   }
 }
 
-PrimitiveType StringMinMaxFilter::type() {
+PrimitiveType StringMinMaxFilter::type() const {
   return PrimitiveType::TYPE_STRING;
 }
 
@@ -516,7 +516,7 @@ void StringMinMaxFilter::SetAlwaysTrue() {
 }
 
 bool StringMinMaxFilter::EvalOverlap(
-    const ColumnType& type, void* data_min, void* data_max) {
+    const ColumnType& type, void* data_min, void* data_max) const {
   return !((*(StringValue*)data_max) < min_ || max_ < (*(StringValue*)data_min));
 }
 
@@ -551,7 +551,7 @@ float StringMinMaxFilter::ComputeOverlapRatio(
       max_ = TYPE::FromColumnValuePB(protobuf.max());                                  \
     }                                                                                  \
   }                                                                                    \
-  PrimitiveType NAME##MinMaxFilter::type() {                                           \
+  PrimitiveType NAME##MinMaxFilter::type() const {                                     \
     return PrimitiveType::TYPE_##PRIMITIVE_TYPE;                                       \
   }                                                                                    \
   void NAME##MinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {                \
@@ -594,7 +594,7 @@ float StringMinMaxFilter::ComputeOverlapRatio(
     out->mutable_max()->set_##PROTOBUF_TYPE##_val(in.max().PROTOBUF_TYPE##_val());     \
   }                                                                                    \
   bool NAME##MinMaxFilter::EvalOverlap(                                                \
-      const ColumnType& type, void* data_min, void* data_max) {                        \
+      const ColumnType& type, void* data_min, void* data_max) const {                  \
     return !((*(TYPE*)data_max) < min_ || max_ < (*(TYPE*)data_min));                  \
   }
 
@@ -686,7 +686,7 @@ DecimalMinMaxFilter::DecimalMinMaxFilter(const MinMaxFilterPB& protobuf, int pre
   }
 }
 
-PrimitiveType DecimalMinMaxFilter::type() {
+PrimitiveType DecimalMinMaxFilter::type() const {
   return PrimitiveType::TYPE_DECIMAL;
 }
 
@@ -806,7 +806,7 @@ void DecimalMinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
 }
 
 bool DecimalMinMaxFilter::EvalOverlap(
-    const ColumnType& type, void* data_min, void* data_max) {
+    const ColumnType& type, void* data_min, void* data_max) const {
   bool overlap = true;
   switch (type.GetByteSize()) {
     case 4:
@@ -896,7 +896,7 @@ float DecimalMinMaxFilter::ComputeOverlapRatio(
 }
 
 bool MinMaxFilter::GetCastIntMinMax(
-    const ColumnType& type, int64_t* out_min, int64_t* out_max) {
+    const ColumnType& type, int64_t* out_min, int64_t* out_max) const {
   DCHECK(false) << "Casting min-max filters of type " << this->type()
       << " not supported.";
   return true;
@@ -1075,20 +1075,33 @@ void MinMaxFilter::Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out) {
     DecimalMinMaxFilter::Copy(in, out);
     return;
   }
-  DCHECK(false) << "Unsupported MinMaxFilter type."
-                << " input=" << MinMaxFilter::DebugString(in);
+  DCHECK(false) << "Unsupported MinMaxFilter type.";
 }
 
-string MinMaxFilter::DebugString(const ColumnValuePB& v) {
+string MinMaxFilter::DebugString(const ColumnValuePB& v, const ColumnType& col_type) {
   std::stringstream ss;
   if (v.has_string_val()) {
     ss << v.string_val();
   } else if (v.has_binary_val()) {
     ss << v.binary_val();
   } else if (v.has_timestamp_val()) {
-    ss << v.timestamp_val();
+    ss << TimestampValue::FromColumnValuePB(v).ToString();
   } else if (v.has_decimal_val()) {
-    ss << v.decimal_val();
+    double d = 0.0;
+    switch (col_type.GetByteSize()) {
+      case 4:
+        d = Decimal4Value::FromColumnValuePB(v).ToDouble(col_type.scale);
+        break;
+      case 8:
+        d = Decimal8Value::FromColumnValuePB(v).ToDouble(col_type.scale);
+        break;
+      case 16:
+        d = Decimal16Value::FromColumnValuePB(v).ToDouble(col_type.scale);
+        break;
+      default:
+        DCHECK(false) << "Unknown byte size for decimal.";
+    }
+    ss << d;
   } else if (v.has_bool_val()) {
     ss << v.bool_val();
   } else if (v.has_int_val()) {
@@ -1102,12 +1115,13 @@ string MinMaxFilter::DebugString(const ColumnValuePB& v) {
   } else if (v.has_short_val()) {
     ss << v.short_val();
   } else if (v.has_date_val()) {
-    ss << v.date_val();
+    ss << DateValue::FromColumnValuePB(v).ToString();
   }
   return ss.str();
 }
 
-string MinMaxFilter::DebugString(const MinMaxFilterPB& filter) {
+string MinMaxFilter::DebugString(
+    const MinMaxFilterPB& filter, const ColumnType& col_type) {
   std::stringstream ss;
   bool always_true = filter.has_always_true() && filter.always_true();
   bool always_false = filter.has_always_false() && filter.always_false();
@@ -1116,13 +1130,13 @@ string MinMaxFilter::DebugString(const MinMaxFilterPB& filter) {
      << ", always_false()=" << always_false;
 
   if (filter.has_min()) {
-    ss << ", min=" << DebugString(filter.min());
+    ss << ", min=" << DebugString(filter.min(), col_type);
   } else {
     ss << ", min=N/A";
   }
 
   if (filter.has_max()) {
-    ss << ", max=" << DebugString(filter.max());
+    ss << ", max=" << DebugString(filter.max(), col_type);
   } else {
     ss << ", max=N/A";
   }

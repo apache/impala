@@ -104,6 +104,8 @@ PRINT_THRIFT_ENUM_IMPL(TTransactionalType)
 PRINT_THRIFT_ENUM_IMPL(TEnabledRuntimeFilterTypes)
 PRINT_THRIFT_ENUM_IMPL(TMinmaxFilteringLevel)
 PRINT_THRIFT_ENUM_IMPL(TKuduReplicaSelection)
+PRINT_THRIFT_ENUM_IMPL(TMinmaxFilterFastCodePathMode)
+
 
 string PrintId(const TUniqueId& id, const string& separator) {
   stringstream out;

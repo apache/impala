@@ -678,6 +678,7 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
 
     VLOG(3) << "Try to filter out a rowgroup via overlap predicate filter: "
             << " fid=" << filter_id
+            << " threshold=" << threshold
             << ", Current time since reboot(ms)=" << MonotonicMillis();
 
     if (!minmax_filter) {
@@ -748,6 +749,7 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
             << ", overlap ratio=" << overlap_ratio
             << ", threshold=" << threshold
             << ", worthiness=" << worthiness
+            << ", level=" << level
             << ", enabled for page=" <<
               ((level != TMinmaxFilteringLevel::ROW_GROUP) && worthiness)
             << ", enabled for row=" <<
@@ -1013,22 +1015,76 @@ Status HdfsParquetScanner::AddToSkipRanges(void* min_slot, void* max_slot,
   return Status::OK();
 }
 
-Status HdfsParquetScanner::SkipPagesBatch(parquet::RowGroup& row_group,
-    const ColumnStatsReader& stats_reader, const parquet::ColumnIndex& column_index,
-    int start_page_idx, int end_page_idx, const ColumnType& col_type, int col_idx,
-    const parquet::ColumnChunk& col_chunk, MinMaxFilter* minmax_filter,
-    vector<RowRange>* skip_ranges, int* filtered_pages) {
+/// Define a function pointer that compares less for two std::string objects.
+typedef bool (*CompareFunc)(const std::string& v1, const std::string& v2);
 
+/// Return a lambda expression that compares less for two string objects holding raw
+/// values in Impala internal format. Examples of raw values include RawValue,
+/// StringValue, TimestampValue or DateValue.
+template <typename T>
+inline CompareFunc GetCompareLessFunc() {
+  return [](const string& v1, const string& v2) {
+    DCHECK_EQ(v1.length(), sizeof(T));
+    DCHECK_EQ(v2.length(), sizeof(T));
+    return (*reinterpret_cast<const T*>(v1.data()))
+        < (*reinterpret_cast<const T*>(v2.data()));
+  };
+}
+
+/// Return a function pointer of type 'CompareFunc', based on type 'col_type'.
+CompareFunc GetCompareLessFunc(const ColumnType& col_type) {
+  switch (col_type.type) {
+    case TYPE_NULL:
+      return nullptr;
+    case TYPE_BOOLEAN:
+      return GetCompareLessFunc<bool>();
+    case TYPE_TINYINT:
+      return GetCompareLessFunc<int8_t>();
+    case TYPE_SMALLINT:
+      return GetCompareLessFunc<int16_t>();
+    case TYPE_INT:
+      return GetCompareLessFunc<int32_t>();
+    case TYPE_BIGINT:
+      return GetCompareLessFunc<int64_t>();
+    case TYPE_FLOAT:
+      return GetCompareLessFunc<float>();
+    case TYPE_DOUBLE:
+      return GetCompareLessFunc<double>();
+    case TYPE_DATE:
+      return GetCompareLessFunc<DateValue>();
+    case TYPE_CHAR:
+      return nullptr;
+    case TYPE_STRING:
+    case TYPE_VARCHAR:
+      return GetCompareLessFunc<StringValue>();
+    case TYPE_TIMESTAMP:
+      return GetCompareLessFunc<TimestampValue>();
+    case TYPE_DECIMAL:
+      switch (col_type.GetByteSize()) {
+        case 4:
+          return GetCompareLessFunc<Decimal4Value>();
+        case 8:
+          return GetCompareLessFunc<Decimal8Value>();
+        case 16:
+          return GetCompareLessFunc<Decimal16Value>();
+        default:
+          DCHECK(false) << "Unknown decimal byte size: " << col_type.GetByteSize();
+          return nullptr;
+      }
+    default:
+      DCHECK(false) << "Invalid type: " << col_type.DebugString();
+      break;
+  }
+  return nullptr;
+}
+
+Status HdfsParquetScanner::ConvertStatsIntoInternalValuesBatch(
+    const ColumnStatsReader& stats_reader, const parquet::ColumnIndex& column_index,
+    int start_page_idx, int end_page_idx, const ColumnType& col_type,
+    uint8_t** min_values, uint8_t** max_values) {
   DCHECK_GE(end_page_idx, start_page_idx);
   int slot_size = col_type.GetSlotSize();
   int64_t total_size = (end_page_idx - start_page_idx + 1) * slot_size;
-
-  VLOG(3) << "SkiPagesBatch() called: "
-          << " start_page_idx=" << start_page_idx
-          << ", end_page_idx=" << end_page_idx
-          << ", #pages=" << (end_page_idx - start_page_idx + 1)
-          << ", slot_size=" << slot_size
-          << ", total_size=" << total_size;
 
   uint8_t* min_slots = stats_batch_read_pool_->TryAllocate(total_size);
   if (!min_slots) {
@@ -1047,10 +1103,118 @@ Status HdfsParquetScanner::SkipPagesBatch(parquet::RowGroup& row_group,
         "Fail to allocate memory to hold a batch of max column stats", total_size);
   }
   if (!stats_reader.ReadFromStringsBatch(ColumnStatsReader::StatsField::MAX,
-         column_index.max_values, start_page_idx, end_page_idx, col_type.len,
-         max_slots)) {
+          column_index.max_values, start_page_idx, end_page_idx, col_type.len,
+          max_slots)) {
     return Status("Fail to read from max stats in column index in batch");
   }
+
+  *min_values = min_slots;
+  *max_values = max_slots;
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::SkipPagesBatch(parquet::RowGroup& row_group,
+    const ColumnStatsReader& stats_reader, const parquet::ColumnIndex& column_index,
+    int start_page_idx, int end_page_idx, const ColumnType& col_type, int col_idx,
+    const parquet::ColumnChunk& col_chunk, const MinMaxFilter* minmax_filter,
+    vector<RowRange>* skip_ranges, int* filtered_pages) {
+  BaseScalarColumnReader* scalar_reader = scalar_reader_map_[col_idx];
+  parquet::OffsetIndex& offset_index = scalar_reader->offset_index_;
+  if (UNLIKELY(offset_index.page_locations.empty())) {
+    RETURN_IF_ERROR(page_index_.DeserializeOffsetIndex(col_chunk, &offset_index));
+  }
+
+  int slot_size = col_type.GetSlotSize();
+
+  VLOG(3) << "SkiPagesBatch() called: "
+          << " start_page_idx=" << start_page_idx
+          << ", end_page_idx=" << end_page_idx
+          << ", #pages=" << (end_page_idx - start_page_idx + 1)
+          << ", slot_size=" << slot_size;
+
+  bool validate_fast_code_path = false;
+
+  // Go through a fast code path to collect the skipped pages via binary search, provided
+  // that the fast code path mode is on, min/max values are sorted, and a compare less
+  // function is defined for 'col_type'.
+  TMinmaxFilterFastCodePathMode::type fast_code_path_mode =
+      state_->query_options().minmax_filter_fast_code_path;
+  // A vector of booleans used only for verification.
+  std::vector<bool> pageIndicesFromFastSearch(end_page_idx + 1, false);
+  if (fast_code_path_mode != TMinmaxFilterFastCodePathMode::OFF
+      && column_index.boundary_order == parquet::BoundaryOrder::ASCENDING
+      && col_type.type == minmax_filter->type() && GetCompareLessFunc(col_type)) {
+    validate_fast_code_path =
+        fast_code_path_mode == TMinmaxFilterFastCodePathMode::VERIFICATION;
+
+    vector<PageRange> skipped_page_ranges;
+    if (ParquetPlainEncoder::IsIdenticalToParquetStorageType(col_type)) {
+      // For those Impala types that are identical to the Parquet storage type, do
+      // the binary search directly on the min/max values.
+      const vector<string>& min_vals = column_index.min_values;
+      const vector<string>& max_vals = column_index.max_values;
+      HdfsParquetScanner::CollectSkippedPageRangesForSortedColumn(minmax_filter, col_type,
+          min_vals, max_vals, start_page_idx, end_page_idx, &skipped_page_ranges);
+    } else {
+      // Otherwise, convert the min/max values into internal format first which validate
+      // the stats and then do the binary search.
+      uint8_t* min_slots = nullptr;
+      uint8_t* max_slots = nullptr;
+      RETURN_IF_ERROR(ConvertStatsIntoInternalValuesBatch(stats_reader, column_index,
+          start_page_idx, end_page_idx, col_type, &min_slots, &max_slots));
+
+      // Prepare two string vectors that hold the converted min and max values.
+      // First allocate a total of 'start_page_idx' strings in each vectors which do not
+      // participate in the binary search. Then reserve a total of 'end_page_idx' + 1
+      // strings. Lastly, copy a total of 'sz' converted stats objects into the two
+      // vectors as strings.
+      vector<string> min_vals(start_page_idx);
+      vector<string> max_vals(start_page_idx);
+      min_vals.reserve(end_page_idx+1);
+      max_vals.reserve(end_page_idx+1);
+
+      uint8_t* min_slot = min_slots;
+      uint8_t* max_slot = max_slots;
+      int64_t sz = end_page_idx - start_page_idx + 1;
+      for (int i = 0; i <= sz; i++) {
+        min_vals.emplace_back(string(reinterpret_cast<char*>(min_slot), slot_size));
+        max_vals.emplace_back(string(reinterpret_cast<char*>(max_slot), slot_size));
+        min_slot += slot_size;
+        max_slot += slot_size;
+      }
+      // The two string vectors are ready. Perform the binary search.
+      HdfsParquetScanner::CollectSkippedPageRangesForSortedColumn(minmax_filter, col_type,
+          min_vals, max_vals, start_page_idx, end_page_idx, &skipped_page_ranges);
+      stats_batch_read_pool_->FreeAll();
+    }
+    if (UNLIKELY(validate_fast_code_path)) {
+      for (const auto& page_range : skipped_page_ranges) {
+        page_range.convertToIndices(&pageIndicesFromFastSearch);
+      }
+      skip_ranges->clear();
+    } else {
+      for (const auto& page_range : skipped_page_ranges) {
+        RowRange row_range;
+        GetRowRangeForPageRange(
+            row_group, scalar_reader->offset_index_, page_range, &row_range);
+        skip_ranges->push_back(row_range);
+        *filtered_pages += page_range.last - page_range.first + 1;
+        VLOG(3) << "Filtered out page range=[" << page_range.first << ", "
+                << page_range.last << "]"
+                << ", equivalent row range=[" << row_range.first << ", " << row_range.last
+                << "]";
+      }
+      return Status::OK();
+    }
+  }
+
+  // Go through the regular code path to collect the skipped pages. Linearly go over
+  // each page in the entire page range ([start_page_idx, end_page_idx]) which are
+  // collected with batch read.
+  uint8_t* min_slots = nullptr;
+  uint8_t* max_slots = nullptr;
+  RETURN_IF_ERROR(ConvertStatsIntoInternalValuesBatch(stats_reader,
+      column_index, start_page_idx, end_page_idx, col_type, &min_slots, &max_slots));
 
   uint8_t* min_slot = min_slots;
   uint8_t* max_slot = max_slots;
@@ -1061,11 +1225,34 @@ Status HdfsParquetScanner::SkipPagesBatch(parquet::RowGroup& row_group,
     if (!minmax_filter->EvalOverlap(col_type, min_slot, max_slot)) {
       RETURN_IF_ERROR(AddToSkipRanges(min_slot, max_slot, row_group, i, col_type,
           col_idx, col_chunk, skip_ranges, filtered_pages));
+
+      if (UNLIKELY(validate_fast_code_path)) {
+        if (!pageIndicesFromFastSearch[i]) {
+          return Status(
+              Substitute("Fast code path does not find the skipped page $0 found in the "
+                         "normal code path. The workaround is to turn it off via set "
+                         "minmax_filter_fast_code_path=false", i));
+        } else {
+          pageIndicesFromFastSearch[i] = false;
+        }
+      }
     }
 
     min_slot += slot_size;
     max_slot += slot_size;
   }
+
+  if (UNLIKELY(validate_fast_code_path)) {
+    for (int i = 0; i < pageIndicesFromFastSearch.size(); i++) {
+      if (pageIndicesFromFastSearch[i]) {
+        return Status(
+            Substitute("Fast code path finds the skipped page $0 not found in the "
+                       "normal code path. The workaround is to turn it off via set "
+                       "minmax_filter_fast_code_path=false", i));
+      }
+    }
+  }
+
   stats_batch_read_pool_->FreeAll();
   return Status::OK();
 }
@@ -1126,6 +1313,66 @@ bool HdfsParquetScanner::IsFilterWorthyForOverlapCheck(int filter_idx) {
   }
   DCHECK(false);
   return true;
+}
+
+void HdfsParquetScanner::CollectSkippedPageRangesForSortedColumn(
+    const MinMaxFilter* minmax_filter, const ColumnType& col_type,
+    const vector<string>& min_vals, const vector<string>& max_vals,
+    int start_page_idx, int end_page_idx,
+    vector<PageRange>* skipped_ranges) {
+  DCHECK(minmax_filter && col_type.type == minmax_filter->type());
+  DCHECK_EQ(min_vals.size(), max_vals.size());
+  DCHECK(skipped_ranges && skipped_ranges->size() == 0);
+  if (start_page_idx > end_page_idx) return;
+  DCHECK_LE(0, start_page_idx);
+  DCHECK_LT(end_page_idx, max_vals.size());
+  VLOG(3) << "Use fast code path to filter on the leading sort by column."
+          << " Filter=" << minmax_filter->DebugString();
+  string filter_min = string(
+      reinterpret_cast<const char*>(minmax_filter->GetMin()), col_type.GetSlotSize());
+  string filter_max = string(
+      reinterpret_cast<const char*>(minmax_filter->GetMax()), col_type.GetSlotSize());
+
+  CompareFunc compare_less = DCHECK_NOTNULL(GetCompareLessFunc(col_type));
+
+  // If the max of max values is less than the min in the filter, or the min of the min
+  // values is greater than the max in the filter, all pages can be skipped.
+  if ((*compare_less)(max_vals[end_page_idx], filter_min)
+      || (*compare_less)(filter_max, min_vals[start_page_idx])) {
+    skipped_ranges->emplace_back(PageRange(start_page_idx, end_page_idx));
+    return;
+  }
+
+  // The std::lower_bound() call below returns the 1st element in max_vals that
+  // max_vals[i] >= filter_min, or end() if no such element exists. In the former
+  // case, all pages at itor 'it' - 1 and before satisfy max_vals[i] < filter_min and
+  // can be skipped. In the latter case, no conclusion can be made.
+  vector<string>::const_iterator begin = max_vals.begin() + start_page_idx;
+  vector<string>::const_iterator end = max_vals.begin() + end_page_idx + 1;
+  auto it = std::lower_bound(begin, end, filter_min, compare_less);
+
+  int idx = start_page_idx;
+  if (it != end && it != begin) {
+    idx = it - begin + start_page_idx;
+    // skip from start_page_idx to idx - 1
+    skipped_ranges->emplace_back(PageRange(start_page_idx, idx - 1));
+  }
+
+  // The std::upper_bound() call below returns the 1st element in min_vals such that
+  // min_vals[i] > filter_max or end() if no such element is found, starting at 'idx'.
+  // In the former case, all pages at itor 'it' and after satisfy min_vals[i] > filter_max
+  // and can be skipped. In the latter case, no conclusion can be made.
+  begin = min_vals.begin() + idx;
+  end = min_vals.begin() + end_page_idx + 1;
+  it = std::upper_bound(begin, end, filter_max, compare_less);
+
+  if (it != end) {
+    idx += it - begin;
+    // skip from idx to end_page_idx
+    skipped_ranges->emplace_back(PageRange(idx, end_page_idx));
+  }
+
+  VLOG(3) << "skipped_ranges->size()=" << skipped_ranges->size();
 }
 
 Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(

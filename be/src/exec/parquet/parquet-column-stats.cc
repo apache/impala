@@ -255,8 +255,8 @@ bool ColumnStatsReader::ReadFromStringsBatch(StatsField stats_field,
         }
       break;
     case TYPE_DATE:
-      num_decoded = DecodeBatchOneBoundsCheckFastTrack<DateValue>(encoded_values,
-          start_idx, end_idx, fixed_len_size, (DateValue*)slot);
+      num_decoded = DecodeBatchOneBoundsCheck<DateValue>(encoded_values,
+          start_idx, end_idx, fixed_len_size, (DateValue*)slot, element_.type);
       break;
     default:
       DCHECK(false) << col_type_.DebugString();

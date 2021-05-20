@@ -1,0 +1,252 @@
+====
+---- QUERY
+##################################################
+# Create a new lineitem table with two sorted columns
+# l_orderkey and l_partkey and controlled number of
+# rows per page.
+###################################################
+set PARQUET_PAGE_ROW_COUNT_LIMIT=24000;
+drop table if exists lineitem_orderkey_partkey_only;
+CREATE TABLE lineitem_orderkey_partkey_only(l_orderkey bigint, l_partkey bigint)
+sort by (l_orderkey, l_partkey)
+STORED AS PARQUET;
+insert into lineitem_orderkey_partkey_only
+select l_orderkey, l_partkey from tpch_parquet.lineitem;
+====
+---- QUERY
+# Minmax filter on leading sort by column. Turn on the feature and a useful min/max
+# filter is created for the leading sort by column a.l_orderkey. The min and max of the
+# final filter is shown in the abbreviated Final filter table below.
+# Looking for 2 filters and one of them is the min/max type.
+#
+# ID   Pending (Expected)  Enabled  Bloom Size  Est fpp   Min value    Max value
+# ------------------------------------------------------------------------------
+# 0    0 (3)                 true     1.00 MB  1.75e-39
+# 1    0 (3)                 true     MIN_MAX                 224167     2630562
+set minmax_filter_sorted_columns=true;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select count(*) from
+lineitem_orderkey_partkey_only a join [SHUFFLE] tpch_parquet.orders b
+where a.l_orderkey = b.o_orderkey and a.l_partkey = b.o_orderkey
+and b.o_custkey = 5
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*Number of filters: 2.*
+row_regex: .*0.+0 \(\d+\).+true.+1.00 MB.*
+row_regex: .*1.+0 \(\d+\).+true.+MIN_MAX\s+224167\s+2630562.*
+====
+---- QUERY
+# Turn off the min/max filter on leading sort by column. Only the bloom filter will be
+# created.
+# Looking for 1 filter.
+#
+# ID   Pending (Expected)  Enabled  Bloom Size  Est fpp   Min value    Max value
+# ------------------------------------------------------------------------------
+# 0    0 (3)                 true     1.00 MB  1.75e-39
+set minmax_filter_sorted_columns=false;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select count(*) from
+lineitem_orderkey_partkey_only a join [SHUFFLE] tpch_parquet.orders b
+where a.l_orderkey = b.o_orderkey and a.l_partkey = b.o_orderkey
+and b.o_custkey = 5
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+row_regex: .*0.+0 \(\d+\).+true.+1.00 MB.*
+====
+---- QUERY
+##################################################
+# Create a new table with one sorted column of INT
+# type and controlled number of rows per page.
+###################################################
+set PARQUET_PAGE_ROW_COUNT_LIMIT=24000;
+drop table if exists lineitem_l_linenumber_only;
+create table lineitem_l_linenumber_only(l_linenumber int)
+sort by (l_linenumber)
+STORED AS PARQUET;
+insert into lineitem_l_linenumber_only
+select l_linenumber from tpch_parquet.lineitem;
+====
+---- QUERY
+# Run the join query below in verification mode which should
+# run both the fast code path and the regular code path, and
+# compare the results. Expect successful execution.
+set minmax_filter_fast_code_path=verification;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select straight_join count(a.l_linenumber) from
+lineitem_l_linenumber_only a join [SHUFFLE] tpch_parquet.lineitem b
+where a.l_linenumber = b.l_linenumber and b.l_orderkey = 4;
+---- RESULTS
+1500000
+====
+---- QUERY
+##################################################
+# Create a new table with one sorted column of
+# DECIMAL(12,2) type and controlled number of rows
+# per page.
+###################################################
+set PARQUET_PAGE_ROW_COUNT_LIMIT=24000;
+drop table if exists lineitem_l_discount_only;
+create table lineitem_l_discount_only(l_discount decimal(12,2))
+sort by (l_discount)
+STORED AS PARQUET;
+insert into lineitem_l_discount_only
+select l_discount from tpch_parquet.lineitem;
+====
+---- QUERY
+###################################################
+# Run the join query below in verification mode
+# again.
+###################################################
+set minmax_filtering_level=PAGE;
+set minmax_filter_threshold=0.999;
+set minmax_filter_fast_code_path=verification;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select straight_join count(a.l_discount) from
+lineitem_l_discount_only a join [SHUFFLE] tpch_parquet.lineitem b
+where a.l_discount = b.l_discount and b.l_orderkey = 4;
+---- RESULTS
+545293
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 225
+====
+---- QUERY
+##################################################
+# Create a new table with one sorted column of
+# SMALLINT type and controlled number of rows
+# per page.
+###################################################
+set PARQUET_PAGE_ROW_COUNT_LIMIT=100;
+drop table if exists alltypes_smallint_col_only;
+create table alltypes_smallint_col_only(smallint_col smallint)
+sort by (smallint_col)
+STORED AS PARQUET;
+insert into alltypes_smallint_col_only
+select smallint_col from functional_parquet.alltypes;
+====
+---- QUERY
+###################################################
+# Run the join query below in fast code path mode.
+# Set the threshold to 0 so that FE will select
+# the reasonable threshold and level.
+###################################################
+set minmax_filter_fast_code_path=on;
+set minmax_filter_threshold=0.0;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select straight_join count(a.smallint_col) from
+alltypes_smallint_col_only a join [SHUFFLE] functional_parquet.alltypes b
+where a.smallint_col = b.smallint_col and b.int_col = 4;
+---- RESULTS
+532900
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 63
+====
+---- QUERY
+##################################################
+# Create a new table with one sorted column of
+# TINYINT type and controlled number of rows
+# per page.
+###################################################
+set PARQUET_PAGE_ROW_COUNT_LIMIT=100;
+set MINMAX_FILTER_THRESHOLD=0.0;
+drop table if exists alltypes_tinyint_col_only;
+create table alltypes_tinyint_col_only(tinyint_col tinyint)
+sort by (tinyint_col)
+STORED AS PARQUET;
+insert into alltypes_tinyint_col_only
+select tinyint_col from functional_parquet.alltypes;
+====
+---- QUERY
+###################################################
+# Run the join query below in fast code path mode.
+###################################################
+set minmax_filter_fast_code_path=on;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select straight_join count(a.tinyint_col) from
+alltypes_tinyint_col_only a join [SHUFFLE] functional_parquet.alltypes b
+where a.tinyint_col = b.tinyint_col and b.int_col = 4;
+---- RESULTS
+532900
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 63
+====
+---- QUERY
+##################################################
+# Create a new table with one sorted column of
+# TIMESTAMP type and controlled number of rows.
+##################################################
+set PARQUET_PAGE_ROW_COUNT_LIMIT=100;
+drop table if exists alltypes_timestamp_col_only;
+create table alltypes_timestamp_col_only(timestamp_col timestamp)
+sort by (timestamp_col)
+STORED AS PARQUET;
+insert into alltypes_timestamp_col_only
+select timestamp_col from functional_parquet.alltypes;
+====
+---- QUERY
+###################################################
+# Create another table with only two columns and
+# values on column timestamp_col restricted.
+###################################################
+drop table if exists alltypes_limited;
+create table alltypes_limited(timestamp_col timestamp, tinyint_col tinyint)
+sort by (timestamp_col)
+STORED AS PARQUET;
+insert into alltypes_limited
+select timestamp_col, tinyint_col from functional_parquet.alltypes where
+timestamp_col < "2009-06-01 00:00:00";
+====
+---- QUERY
+###################################################
+# Run the join query below in fast code path mode.
+###################################################
+set minmax_filter_fast_code_path=on;
+set MINMAX_FILTER_THRESHOLD=0.0;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select straight_join count(a.timestamp_col) from
+alltypes_timestamp_col_only a join [SHUFFLE] alltypes_limited b
+where a.timestamp_col = b.timestamp_col and b.tinyint_col = 4;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 58
+====
+---- QUERY
+###################################################
+# Create another table with only one float column
+# of multiple value 'nan'.
+###################################################
+set PARQUET_PAGE_ROW_COUNT_LIMIT=5;
+drop table if exists table_with_nan_float_numbers;
+CREATE TABLE table_with_nan_float_numbers(a float)
+sort by (a)
+STORED AS PARQUET;
+insert into table_with_nan_float_numbers values
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float)),
+(cast('nan' as float)), (cast('nan' as float));
+====
+---- QUERY
+###################################################
+# Run the join query below in fast code path mode.
+###################################################
+set minmax_filter_fast_code_path=on;
+set MINMAX_FILTER_THRESHOLD=0.0;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select straight_join count(*) from
+table_with_nan_float_numbers a join [SHUFFLE] functional_parquet.alltypes b
+where a.a = b.float_col;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 0
+====

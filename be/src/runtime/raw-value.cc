@@ -20,6 +20,7 @@
 
 #include "runtime/collection-value.h"
 #include "runtime/date-value.h"
+#include "runtime/raw-value.h"
 #include "runtime/raw-value.inline.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/tuple.h"

@@ -358,6 +358,28 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// of the column.
   ParquetTimestampDecoder CreateTimestampDecoder(const parquet::SchemaElement& element);
 
+  ///  Return page ranges in 'skipped_ranges' that need to be skipped.
+  ///
+  ///  The 'min_vals' and 'max_vals' array must contain ascendingly sorted values, with
+  ///  each pair min_vals[i] and max_vals[i] defining the min and the max for the ith
+  ///  page. 'start_page_idx' and 'end_page_idx' specify the range in the two arrays for
+  ///  not-null pages from which some of them can be skipped. The min and max in
+  ///  'minmax_filter' define a range R for pages to be retained. Any pages with their
+  ///  [min, max] outside R (i.e. the complement of R) will be skipped.
+  ///
+  ///  Since the pages are sorted and filtered with min/max filters, the followings are
+  ///  possible:
+  ///    return empty, i.e. no pages can be skipped;
+  ///    return ['start_page_idx', 'end_page_idx'], i.e. every page is skipped;
+  ///    return ['start_page_idx', K], i.e. a page range at the beginning is skipped;
+  ///    return [L, 'end_page_idx'], i.e. a page range at the end is skipped;
+  ///    return ['start_page_idx', K], [L, 'end_page_idx'], i.e. some pages at the middle
+  ///    are retained.
+  static void CollectSkippedPageRangesForSortedColumn(const MinMaxFilter* minmax_filter,
+      const ColumnType& col_type, const vector<string>& min_vals,
+      const vector<string>& max_vals, int start_page_idx, int end_page_idx,
+      vector<PageRange>* skipped_ranges);
+
  private:
   friend class ParquetColumnReader;
   friend class CollectionColumnReader;
@@ -627,8 +649,21 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   Status SkipPagesBatch(parquet::RowGroup& row_group,
       const ColumnStatsReader& stats_reader, const parquet::ColumnIndex& column_index,
       int start_page_idx, int end_page_idx, const ColumnType& col_type, int col_idx,
-      const parquet::ColumnChunk& col_chunk, MinMaxFilter* minmax_filter,
+      const parquet::ColumnChunk& col_chunk, const MinMaxFilter* minmax_filter,
       vector<RowRange>* skip_ranges, int* filtered_pages);
+
+  /// Convert page column stats of column 'column_index' and type 'col_type' into internal
+  /// format. The range of the pages to convert is ['start_page_idx', 'end_page_idx'].
+  ///
+  /// On return:
+  ///   1. Status::OK() object with *min_values and *max_values pointed to memory
+  //       allocated from 'stats_batch_read_pool_' and populated with the min/max values
+  //       in runtime value format (e.g. RawValue for int32, or StringValue for string)
+  //       respectively, or
+  ///   2. An error condition.
+  Status ConvertStatsIntoInternalValuesBatch(const ColumnStatsReader& stats_reader,
+      const parquet::ColumnIndex& column_index, int start_page_idx, int end_page_idx,
+      const ColumnType& col_type, uint8_t** min_values, uint8_t** max_values);
 
   /// Resets page index filtering state, i.e. clears 'candidate_ranges_' and resets
   /// scalar readers' page filtering as well.

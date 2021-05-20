@@ -670,8 +670,10 @@ string Coordinator::FilterDebugString() {
             row.push_back("AlwaysFalse");
             row.push_back("AlwaysFalse");
           } else {
-            row.push_back(MinMaxFilter::DebugString(minmax_filterPB.min()));
-            row.push_back(MinMaxFilter::DebugString(minmax_filterPB.max()));
+            row.push_back(MinMaxFilter::DebugString(minmax_filterPB.min(),
+                ColumnType::FromThrift(state.desc().src_expr.nodes[0].type)));
+            row.push_back(MinMaxFilter::DebugString(minmax_filterPB.max(),
+                ColumnType::FromThrift(state.desc().src_expr.nodes[0].type)));
           }
         } else {
           row.push_back("PartialUpdates");
@@ -1575,12 +1577,13 @@ void Coordinator::FilterState::ApplyUpdate(
   } else {
     DCHECK(is_min_max_filter());
     DCHECK(params.has_min_max_filter());
+    ColumnType col_type = ColumnType::FromThrift(desc_.src_expr.nodes[0].type);
     VLOG(3) << "Coordinator::FilterState::ApplyUpdate() on minmax."
             << " Current accumulated filter=" << DebugString()
             << ". Incoming min/max param:"
             << " has_filter_id()=" << params.has_filter_id()
-            << ", filter_id=" << params.filter_id()
-            << ", details=" << MinMaxFilter::DebugString(params.min_max_filter());
+            << ", filter_id=" << params.filter_id() << ", details="
+            << MinMaxFilter::DebugString(params.min_max_filter(), col_type);
     if (params.min_max_filter().always_true()) {
       // An always_true filter is received. We don't need to wait for other pending
       // backends.
@@ -1591,8 +1594,7 @@ void Coordinator::FilterState::ApplyUpdate(
     } else if (min_max_filter_.always_false()) {
       MinMaxFilter::Copy(params.min_max_filter(), &min_max_filter_);
     } else {
-      MinMaxFilter::Or(params.min_max_filter(), &min_max_filter_,
-          ColumnType::FromThrift(desc_.src_expr.nodes[0].type));
+      MinMaxFilter::Or(params.min_max_filter(), &min_max_filter_, col_type);
     }
     VLOG(3) << " Updated accumulated filter=" << DebugString();
   }
@@ -1645,12 +1647,13 @@ void Coordinator::FilterState::WaitForPublishFilter() {
 string Coordinator::FilterState::DebugString() const {
   std::stringstream ss;
   if (is_min_max_filter()) {
+    ColumnType col_type = ColumnType::FromThrift(desc_.src_expr.nodes[0].type);
     ss << "Coordinator::FilterState: "
        << "filter_id=" << desc_.filter_id
        << ", all_updates_received_=" << all_updates_received_
        << ", enabled=" << enabled()
        << ", pending_count()=" << pending_count()
-       << ", " << MinMaxFilter::DebugString(min_max_filter_);
+       << ", " << MinMaxFilter::DebugString(min_max_filter_, col_type);
   }
   return ss.str();
 }

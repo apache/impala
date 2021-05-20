@@ -48,6 +48,7 @@ import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TResultSet;
 import org.apache.impala.thrift.TResultSetMetadata;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TAccessLevelUtil;
@@ -287,6 +288,45 @@ public interface FeFsTable extends FeTable {
    * @return the index of hosts that store replicas of blocks of this table.
    */
   ListMap<TNetworkAddress> getHostIndex();
+
+  /**
+   * Check if 'col_name' names the leading sort by column by searching the 'sort.columns'
+   * table property.
+   */
+  default boolean isLeadingSortByColumn(String col_name) {
+    // Get the names of all sort by columns (specified in the SORT BY clause in
+    // CREATE TABLE DDL) from TBLPROPERTIES.
+    Map<String, String> parameters = getMetaStoreTable().getParameters();
+    if (parameters == null) return false;
+    String sort_by_columns_string = parameters.get("sort.columns");
+    if (sort_by_columns_string == null) return false;
+    String[] sort_by_columns = sort_by_columns_string.split(",", -1);
+    if (sort_by_columns == null) return false;
+    return sort_by_columns.length > 0 && sort_by_columns[0].equals(col_name);
+  }
+
+  /**
+   * Return the sort order for the sort by columns if exists. Return null otherwise.
+   */
+  default TSortingOrder getSortOrderForSortByColumn() {
+    Map<String, String> parameters = getMetaStoreTable().getParameters();
+    if (parameters == null) return null;
+    String sortOrder = parameters.get("sort.order");
+    if (sortOrder == null) return null;
+    if (sortOrder.equals("LEXICAL")) return TSortingOrder.LEXICAL;
+    if (sortOrder.equals("ZORDER")) return TSortingOrder.ZORDER;
+    return null;
+  }
+
+  /**
+   * Return true if the sort order for the sort by columns is lexical. Return false
+   * otherwise.
+   */
+  default boolean IsLexicalSortByColumn() {
+    TSortingOrder sortOrder = getSortOrderForSortByColumn();
+    if (sortOrder == null) return false;
+    return sortOrder == TSortingOrder.LEXICAL;
+  }
 
   /**
    * Utility functions for operating on FeFsTable. When we move fully to Java 8,

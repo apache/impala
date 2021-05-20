@@ -43,6 +43,7 @@ import org.apache.impala.common.PrintUtils;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TMinmaxFilteringLevel;
 import org.apache.impala.thrift.TQueryCtx;
 import org.apache.impala.thrift.TQueryExecRequest;
 import org.apache.impala.thrift.TQueryOptions;
@@ -142,6 +143,8 @@ public class Planner {
     if (ctx_.getQueryOptions().getRuntime_filter_mode() != TRuntimeFilterMode.OFF) {
       RuntimeFilterGenerator.generateRuntimeFilters(ctx_, rootFragment.getPlanRoot());
       ctx_.getTimeline().markEvent("Runtime filters computed");
+
+      checkAndOverrideMinmaxFilterThresholdAndLevel(ctx_.getQueryOptions());
     }
 
     rootFragment.verifyTree();
@@ -669,6 +672,20 @@ public class Planner {
 
   private void checkForSmallQueryOptimization(PlanNode singleNodePlan) {
       checkForSmallQueryOptimization(singleNodePlan, ctx_);
+  }
+
+  /**
+   * The MINMAX_FILTER_SORTED_COLUMNS query option could override the filter threshold
+   * (query option MINMAX_FILTER_THRESHOLD) and the filtering level (query option
+   * MINMAX_FILTERING_LEVEL) if set and the threshold is 0.0.
+   */
+  private void checkAndOverrideMinmaxFilterThresholdAndLevel(TQueryOptions queryOptions) {
+    if (queryOptions.isMinmax_filter_sorted_columns()) {
+      if (queryOptions.getMinmax_filter_threshold() == 0.0) {
+        queryOptions.setMinmax_filter_threshold(0.5);
+        queryOptions.setMinmax_filtering_level(TMinmaxFilteringLevel.PAGE);
+      }
+    }
   }
 
   public static void checkForDisableCodegen(PlanNode distributedPlan,

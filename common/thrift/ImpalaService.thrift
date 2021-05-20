@@ -668,6 +668,16 @@ enum TImpalaQueryOptions {
 
   // Indicates whether to use Bloom filtering for Parquet files
   PARQUET_BLOOM_FILTERING = 129
+
+  // If true, generate min/max filters when join into sorted columns.
+  MINMAX_FILTER_SORTED_COLUMNS = 130
+
+  // Control setting for taking the fast code path when min/max filtering sorted columns.
+  //     OFF - Take the regular code path,
+  //     ON  - Take the fast code path,
+  //     VERIFICATION - Take both code paths and verify that the results from both are
+  //                    the same.
+  MINMAX_FILTER_FAST_CODE_PATH = 131
 }
 
 // The summary of a DML statement.

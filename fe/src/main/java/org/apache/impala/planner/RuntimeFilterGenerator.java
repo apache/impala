@@ -842,7 +842,8 @@ public final class RuntimeFilterGenerator {
     boolean disableRowRuntimeFiltering =
         ctx.getQueryOptions().isDisable_row_runtime_filtering();
     boolean disable_overlap_filter =
-        ctx.getQueryOptions().getMinmax_filter_threshold() == 0.0;
+        !(ctx.getQueryOptions().isMinmax_filter_sorted_columns()
+            || ctx.getQueryOptions().getMinmax_filter_threshold() > 0.0);
     TRuntimeFilterMode runtimeFilterMode = ctx.getQueryOptions().getRuntime_filter_mode();
     TEnabledRuntimeFilterTypes enabledRuntimeFilterTypes =
         ctx.getQueryOptions().getEnabled_runtime_filter_types();

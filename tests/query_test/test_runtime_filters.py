@@ -286,7 +286,13 @@ class TestOverlapMinMaxFilters(ImpalaTestSuite):
 
   def test_overlap_min_max_filters(self, vector, unique_database):
     self.execute_query("SET MINMAX_FILTER_THRESHOLD=0.5")
+    self.execute_query("SET MINMAX_FILTER_SORTED_COLUMNS=false")
     self.run_test_case('QueryTest/overlap_min_max_filters', vector, unique_database,
+        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+
+  def test_overlap_min_max_filters_on_sorted_columns(self, vector, unique_database):
+    self.run_test_case('QueryTest/overlap_min_max_filters_on_sorted_columns', vector,
+                       unique_database,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
 # Apply both Bloom filter and Minmax filters
@@ -307,6 +313,8 @@ class TestAllRuntimeFilters(ImpalaTestSuite):
 
   def test_all_runtime_filters(self, vector):
     self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=ALL")
+    # Disable generating min/max filters for sorted columns
+    self.execute_query("SET MINMAX_FILTER_SORTED_COLUMNS=false")
     self.run_test_case('QueryTest/all_runtime_filters', vector,
                        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
@@ -337,6 +345,8 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
   def test_row_filters(self, vector):
     new_vector = deepcopy(vector)
     new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
+    # Disable generating min/max filters for sorted columns
+    self.execute_query("SET MINMAX_FILTER_SORTED_COLUMNS=false")
     self.run_test_case('QueryTest/runtime_row_filters', new_vector,
                        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 

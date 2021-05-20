@@ -20,6 +20,7 @@
 #define IMPALA_EXEC_PARQUET_COMMON_H
 
 #include <boost/preprocessor/repetition/repeat_from_to.hpp>
+#include <sstream>
 
 #include "common/compiler-util.h"
 #include "gen-cpp/Descriptors_types.h"
@@ -72,6 +73,41 @@ parquet::CompressionCodec::type ConvertImpalaToParquetCodec(
 /// offset index.
 void GetRowRangeForPage(const parquet::RowGroup& row_group,
     const parquet::OffsetIndex& offset_index, int page_idx, RowRange* row_range);
+
+/// Struct that specifies an inclusive range of pages.
+struct PageRange {
+  int64_t first;
+  int64_t last;
+
+  PageRange(int64_t u, int64_t v) : first(u), last(v) {}
+  bool overlap(const PageRange& other) const {
+    return !(last < other.first || other.last < first);
+  }
+  bool operator==(const PageRange& other) const {
+    return (first == other.first && last == other.last);
+  }
+
+  std::string toString() const {
+    std::stringstream ss;
+    ss << "[" << first << ", " << last << "]";
+    return ss.str();
+  }
+
+  // Populate the bit vector 'pageIndices' by setting bits corresponding to the pages
+  // in range [first, last] to on.
+  void convertToIndices(std::vector<bool>* pageIndices) const {
+    DCHECK(pageIndices);
+    for (int i = first; i <= last; i++) {
+      (*pageIndices)[i] = true;
+    }
+  }
+};
+
+/// Returns the row range for a given page range using information from the row group
+/// and offset index.
+void GetRowRangeForPageRange(const parquet::RowGroup& row_group,
+    const parquet::OffsetIndex& offset_index, const PageRange& page_range,
+    RowRange* row_range);
 
 /// Given a column chunk containing rows in the range [0, 'num_rows'), 'skip_ranges'
 /// contains the row ranges we are not interested in. 'skip_ranges' can be redundant and
@@ -309,6 +345,13 @@ class ParquetPlainEncoder {
   static ALWAYS_INLINE inline void DecodeNoBoundsCheck(
       const std::string& source, InternalType* v);
 
+  /// Answer the question whether an Impala internal type 'type' has the same
+  /// storage type as Parquet.
+  static bool IsIdenticalToParquetStorageType(const ColumnType& type) {
+    return (type.type == TYPE_INT || type.type == TYPE_BIGINT || type.type == TYPE_FLOAT
+        || type.type == TYPE_DOUBLE);
+  }
+
  private:
   /// Decode values without bounds checking. `buffer_end` is only used for DCHECKs in
   /// DEBUG mode, it is unused in RELEASE mode.
@@ -458,7 +501,7 @@ inline void ParquetPlainEncoder::DecodeNoBoundsCheck<double, parquet::Type::FLOA
 }
 
 /// The string source version of DecodeNoBoundsCheck() which works with the following
-/// combination of internal and Parquet types requiring no conversions.
+/// combination of internal and Parquet types requiring no conversions and validation.
 /// =============================
 /// InternalType   | PARQUET_TYPE
 /// =============================
@@ -466,7 +509,6 @@ inline void ParquetPlainEncoder::DecodeNoBoundsCheck<double, parquet::Type::FLOA
 /// int64_t        | INT64
 /// float          | FLOAT
 /// double         | DOUBLE
-/// DateValue      | INT32
 template <typename InternalType>
 inline void ParquetPlainEncoder::DecodeNoBoundsCheck(
     const string& source, InternalType* v) {
