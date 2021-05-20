@@ -2552,16 +2552,18 @@ public class CatalogOpExecutor {
       TCreateTableParams params, boolean wantMinimalResult, TDdlExecResponse response)
       throws ImpalaException {
     Preconditions.checkState(KuduTable.isKuduTable(newTable));
-    boolean createHMSTable;
+    final boolean createHMSTable;
+    final boolean kuduTableCreated;
     if (!KuduTable.isSynchronizedTable(newTable)) {
       // if this is not a synchronized table, we assume that the table must be existing
       // in kudu and use the column spec from Kudu
       KuduCatalogOpExecutor.populateExternalTableColsFromKudu(newTable);
       createHMSTable = true;
+      kuduTableCreated = false;
     } else {
       // if this is a synchronized table (managed or external.purge table) then we
       // create it in Kudu first
-      KuduCatalogOpExecutor.createSynchronizedTable(newTable, params);
+      kuduTableCreated = KuduCatalogOpExecutor.createSynchronizedTable(newTable, params);
       createHMSTable = !isKuduHmsIntegrationEnabled(newTable);
     }
     try {
@@ -2570,15 +2572,7 @@ public class CatalogOpExecutor {
       synchronized (metastoreDdlLock_) {
         if (createHMSTable) {
           try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-            boolean tableInMetastore =
-                msClient.getHiveClient().tableExists(newTable.getDbName(),
-                                                     newTable.getTableName());
-            if (!tableInMetastore) {
-              msClient.getHiveClient().createTable(newTable);
-            } else {
-              addSummary(response, "Table already exists.");
-              return false;
-            }
+            msClient.getHiveClient().createTable(newTable);
           }
         }
         // Add the table to the catalog cache
@@ -2587,12 +2581,22 @@ public class CatalogOpExecutor {
         addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
       }
     } catch (AlreadyExistsException aee) {
-        if (params.if_not_exists) {
-          addSummary(response, "Table already exists.");
-          return false;
-        }
-        throw new ImpalaRuntimeException(
-            String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), aee);
+      // At this point, a Kudu table is potentially leaked if, for example,
+      // Hive table already exists in name, but its location is in HDFS.
+      // Dropping the table may cause problems if multiple clients are trying
+      // to create the same table at the same time.
+      if (kuduTableCreated) {
+        LOG.warn(String.format(
+            "Kudu table '%s' was created, but Hive table with same name aleady exists in HMS."
+                + " Kudu table has been created and leaked. Inspect HMS/Kudu manually.",
+            kuduTableName), aee);
+      }
+      if (params.if_not_exists) {
+        addSummary(response, "Table already exists.");
+        return false;
+      }
+      throw new ImpalaRuntimeException(
+          String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), aee);
     } catch (Exception e) {
       try {
         // Error creating the table in HMS, drop the synchronized table from Kudu.

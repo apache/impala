@@ -73,8 +73,9 @@ public class KuduCatalogOpExecutor {
    * Create a table in Kudu with a schema equivalent to the schema stored in 'msTbl'.
    * Throws an exception if 'msTbl' represents an external table or if the table couldn't
    * be created in Kudu.
+   * @return true if a new table was created as part of this call, false otherwise.
    */
-  static void createSynchronizedTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
+  static boolean createSynchronizedTable(org.apache.hadoop.hive.metastore.api.Table msTbl,
       TCreateTableParams params) throws ImpalaRuntimeException {
     Preconditions.checkState(KuduTable.isSynchronizedTable(msTbl));
     Preconditions.checkState(
@@ -92,8 +93,9 @@ public class KuduCatalogOpExecutor {
         // TODO: The IF NOT EXISTS case should be handled by Kudu to ensure atomicity.
         // (see KUDU-1710).
         boolean tableExists = kudu.tableExists(kuduTableName);
-        if (tableExists && params.if_not_exists) return;
-
+        if (tableExists && params.if_not_exists) {
+          return false;
+        }
         // if table is managed or external with external.purge.table = true in
         // tblproperties we should create the Kudu table if it does not exist
         if (tableExists) {
@@ -113,6 +115,7 @@ public class KuduCatalogOpExecutor {
           msTbl.getParameters().put(KuduTable.KEY_TABLE_ID, tableId);
         }
       }
+      return true;
     } catch (Exception e) {
       throw new ImpalaRuntimeException(String.format("Error creating Kudu table '%s'",
           kuduTableName), e);
