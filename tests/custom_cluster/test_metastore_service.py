@@ -27,6 +27,7 @@ from hive_metastore.ttypes import SerDeInfo
 from tests.util.event_processor_utils import EventProcessorUtils
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.util.filesystem_utils import (IS_S3, IS_ADLS, IS_GCS)
 
 
 class TestMetastoreService(CustomClusterTestSuite):
@@ -596,7 +597,10 @@ class TestMetastoreService(CustomClusterTestSuite):
       test_part_names = list(part_names)
       if expect_files:
         assert get_parts_by_names_result.dictionary is not None
-        assert len(get_parts_by_names_result.dictionary.values) > 0
+        # obj_dict will only be populated when the table is on HDFS
+        # where block locations are available.
+        if not IS_S3 and not IS_GCS and not IS_ADLS:
+          assert len(get_parts_by_names_result.dictionary.values) > 0
       else:
         assert get_parts_by_names_result.dictionary is None
       partitions = get_parts_by_names_result.partitions
@@ -621,7 +625,10 @@ class TestMetastoreService(CustomClusterTestSuite):
       assert filemetadata is not None
       assert filemetadata.data is not None
       assert obj_dict is not None
-      assert len(obj_dict.values) > 0
+      # obj_dict will only be populated when the table is on HDFS
+      # where block locations are available.
+      if not IS_S3 and not IS_GCS and not IS_ADLS:
+        assert len(obj_dict.values) > 0
 
     def __assert_no_filemd(self, filemetadata, obj_dict):
       """
