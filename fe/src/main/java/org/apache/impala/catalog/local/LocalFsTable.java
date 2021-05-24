@@ -30,7 +30,6 @@ import java.util.TreeMap;
 import org.apache.avro.Schema;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.serde.serdeConstants;
@@ -45,6 +44,7 @@ import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.SqlConstraints;
@@ -352,6 +352,7 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
       TValidWriteIdList validWriteIdList =
           db_.getCatalog().getMetaProvider().getValidWriteIdList(ref_);
       if (validWriteIdList != null) hdfsTable.setValid_write_ids(validWriteIdList);
+      hdfsTable.setPartition_prefixes(ref_.getPartitionPrefixes());
     }
     tableDesc.setHdfsTable(hdfsTable);
     return tableDesc;
@@ -370,23 +371,24 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
   }
 
   public LocalFsPartition createPrototypePartition() {
-    Partition protoMsPartition = new Partition();
-
     // The prototype partition should not have a location set in its storage
     // descriptor, or else all inserted files will end up written into the
     // table directory instead of the new partition directories.
     StorageDescriptor sd = getMetaStoreTable().getSd().deepCopy();
     sd.unsetLocation();
-    protoMsPartition.setSd(sd);
-
-    protoMsPartition.setParameters(Collections.<String, String>emptyMap());
+    HdfsStorageDescriptor hdfsStorageDescriptor = null;
+    try {
+      hdfsStorageDescriptor = HdfsStorageDescriptor.fromStorageDescriptor(name_, sd);
+    } catch (HdfsStorageDescriptor.InvalidStorageDescriptorException e) {
+      Preconditions.checkState(false, "Failed to create prototype partition " +
+          "HdfsStorageDescriptor using sd of table");
+    }
     LocalPartitionSpec spec = new LocalPartitionSpec(
         this, CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);
-    LocalFsPartition prototypePartition = new LocalFsPartition(
-        this, spec, protoMsPartition, /*fileDescriptors=*/null,
-        /*insertFileDescriptors=*/null, /*deleteFileDescriptors=*/null,
-        /*partitionStats=*/null, /*hasIncrementalStats=*/false, /*isMarkedCached=*/false);
-    return prototypePartition;
+    return new LocalFsPartition(this, spec, Collections.emptyMap(), /*writeId=*/-1,
+        hdfsStorageDescriptor, /*fileDescriptors=*/null, /*insertFileDescriptors=*/null,
+        /*deleteFileDescriptors=*/null, /*partitionStats=*/null,
+        /*hasIncrementalStats=*/false, /*isMarkedCached=*/false, /*location*/null);
   }
 
   @Override
@@ -461,10 +463,10 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
       ImmutableList<FileDescriptor> fds = p.getInsertFileDescriptors().isEmpty() ?
           p.getFileDescriptors() : ImmutableList.of();
-      LocalFsPartition part = new LocalFsPartition(this, spec, p.getHmsPartition(),
-          fds, p.getInsertFileDescriptors(),
+      LocalFsPartition part = new LocalFsPartition(this, spec, p.getHmsParameters(),
+          p.getWriteId(), p.getInputFormatDescriptor(), fds, p.getInsertFileDescriptors(),
           p.getDeleteFileDescriptors(), p.getPartitionStats(), p.hasIncrementalStats(),
-          p.isMarkedCached());
+          p.isMarkedCached(), p.getLocation());
       ret.add(part);
     }
     return ret;
@@ -580,5 +582,9 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
           + "table " + getFullName(), e);
     }
     return sqlConstraints_;
+  }
+
+  public List<String> getPartitionPrefixes() {
+    return ref_ == null ? Collections.emptyList() : ref_.getPartitionPrefixes();
   }
 }

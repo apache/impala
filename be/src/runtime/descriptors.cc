@@ -202,14 +202,15 @@ string TableDescriptor::DebugString() const {
 
 HdfsPartitionDescriptor::HdfsPartitionDescriptor(
     const THdfsTable& thrift_table, const THdfsPartition& thrift_partition)
-  : line_delim_(thrift_partition.lineDelim),
-    field_delim_(thrift_partition.fieldDelim),
-    collection_delim_(thrift_partition.collectionDelim),
-    escape_char_(thrift_partition.escapeChar),
-    block_size_(thrift_partition.blockSize),
-    id_(thrift_partition.id),
-    thrift_partition_key_exprs_(thrift_partition.partitionKeyExprs),
-    file_format_(thrift_partition.fileFormat) {
+  : id_(thrift_partition.id),
+    thrift_partition_key_exprs_(thrift_partition.partitionKeyExprs) {
+  THdfsStorageDescriptor sd = thrift_partition.hdfs_storage_descriptor;
+  line_delim_ = sd.lineDelim;
+  field_delim_ = sd.fieldDelim;
+  collection_delim_ = sd.collectionDelim;
+  escape_char_ = sd.escapeChar;
+  block_size_ = sd.blockSize;
+  file_format_ = sd.fileFormat;
   DecompressLocation(thrift_table, thrift_partition, &location_);
 }
 

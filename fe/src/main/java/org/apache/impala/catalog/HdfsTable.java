@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 import org.apache.avro.Schema;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -2056,6 +2057,12 @@ public class HdfsTable extends Table implements FeFsTable {
         req.table_info_selector.want_partition_metadata ||
         req.table_info_selector.want_partition_names ||
         req.table_info_selector.want_partition_stats;
+    if (req.table_info_selector.want_partition_metadata
+        && req.table_info_selector.want_hms_partition) {
+      LOG.warn("Bad request that has both want_partition_metadata and " +
+          "want_hms_partition set to true. Duplicated data will be returned. {}",
+          StringUtils.abbreviate(req.toString(), 1000));
+    }
 
     Collection<Long> partIds = req.table_info_selector.partition_ids;
     if (partIds == null && wantPartitionInfo) {
@@ -2087,8 +2094,11 @@ public class HdfsTable extends Table implements FeFsTable {
         }
 
         if (req.table_info_selector.want_partition_metadata) {
-          partInfo.hms_partition = part.toHmsPartition();
+          part.setPartitionMetadata(partInfo);
           partInfo.setHas_incremental_stats(part.hasIncrementalStats());
+        }
+        if (req.table_info_selector.want_hms_partition) {
+          partInfo.hms_partition = part.toHmsPartition();
         }
 
         if (req.table_info_selector.want_partition_files) {
@@ -2128,6 +2138,9 @@ public class HdfsTable extends Table implements FeFsTable {
         resp.table_info.partitions.add(partInfo);
       }
     }
+    // In most of the cases, the prefix map only contains one item for the table location.
+    // Here we always send it since it's small.
+    resp.table_info.setPartition_prefixes(partitionLocationCompressor_.getPrefixes());
 
     if (reqWriteIdList != null) {
       LOG.debug("{} files filtered out of table {} for {}. Hit rate : {}",

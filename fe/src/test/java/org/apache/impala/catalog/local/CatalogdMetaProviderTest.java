@@ -177,10 +177,12 @@ public class CatalogdMetaProviderTest {
 
     // Unfortunately Guava doesn't provide a statistic on the total weight of cached
     // elements. So, we'll just instantiate the weigher directly and sanity check
-    // the size loosely.
+    // the size loosely. The size will grow if we add more fields into
+    // TPartialPartitionInfo in future.
     SizeOfWeigher weigher = new SizeOfWeigher();
-    assertTrue(weigher.weigh(refs, null) > 3000);
-    assertTrue(weigher.weigh(refs, null) < 4000);
+    int weigh = weigher.weigh(refs, null);
+    assertTrue("Actual weigh: " + weigh, weigh > 4000);
+    assertTrue("Actual weigh: " + weigh, weigh < 5000);
   }
 
   @Test

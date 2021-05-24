@@ -61,6 +61,7 @@ import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsPartitionLocation;
 import org.apache.impala.thrift.TNetworkAddress;
+import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TPartitionStats;
 import org.apache.impala.util.HdfsCachingUtil;
 import org.apache.impala.util.ListMap;
@@ -949,6 +950,17 @@ public class HdfsPartition extends CatalogObjectImpl
     return cachedMsPartitionDescriptor_;
   }
 
+  public void setPartitionMetadata(TPartialPartitionInfo tPart) {
+    // The special "prototype partition" or the only partition of an unpartitioned table
+    // have a null cachedMsPartitionDescriptor.
+    if (cachedMsPartitionDescriptor_ == null) return;
+    // Don't need to make a copy here since the caller should not modify the parameters.
+    tPart.hms_parameters = getParameters();
+    tPart.write_id = writeId_;
+    tPart.hdfs_storage_descriptor = fileFormatDescriptor_.toThrift();
+    tPart.location = getLocationAsThrift();
+  }
+
   /**
    * Returns a Hive-compatible partition object that may be used in calls to the
    * metastore.
@@ -1529,8 +1541,8 @@ public class HdfsPartition extends CatalogObjectImpl
     }
 
     public Builder fromThrift(THdfsPartition thriftPartition) {
-      fileFormatDescriptor_ = HdfsStorageDescriptor.fromThriftPartition(
-          thriftPartition, table_.getName());
+      fileFormatDescriptor_ = HdfsStorageDescriptor.fromThrift(
+          thriftPartition.hdfs_storage_descriptor, table_.getName());
 
       partitionKeyValues_ = new ArrayList<>();
       if (id_ != CatalogObjectsConstants.PROTOTYPE_PARTITION_ID) {

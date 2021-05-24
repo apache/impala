@@ -41,7 +41,6 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -56,6 +55,8 @@ import org.apache.impala.catalog.CatalogObjectCache;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.HdfsPartitionLocationCompressor;
+import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.ImpaladCatalog.ObjectUpdateSequencer;
 import org.apache.impala.catalog.Principal;
 import org.apache.impala.catalog.PrincipalPrivilege;
@@ -729,7 +730,8 @@ public class CatalogdMetaProvider implements MetaProvider {
             return new TableMetaRefImpl(
                 dbName, tableName, resp.table_info.hms_table, resp.object_version_number,
                 new SqlConstraints(primaryKeys, foreignKeys),
-                resp.table_info.valid_write_ids, resp.table_info.is_marked_cached);
+                resp.table_info.valid_write_ids, resp.table_info.is_marked_cached,
+                resp.table_info.partition_prefixes);
            }
       });
     // The table list is populated based on tables in a given Db in catalogd. If a table
@@ -951,12 +953,28 @@ public class CatalogdMetaProvider implements MetaProvider {
     for (int i = 0; i < ids.size(); i++) {
       PartitionRef partRef = partRefs.get(i);
       TPartialPartitionInfo part = resp.table_info.partitions.get(i);
-      Partition msPart = part.getHms_partition();
-      if (msPart == null) {
+      HdfsStorageDescriptor hdfsStorageDescriptor = null;
+      HdfsPartitionLocationCompressor.Location location;
+      if (part.isSetHdfs_storage_descriptor()) {
+        Preconditions.checkNotNull(part.location, "location should not be null");
+        hdfsStorageDescriptor = HdfsStorageDescriptor.fromThrift(
+            part.hdfs_storage_descriptor, table.tableName_);
+        location = table.getPartitionLocationCompressor().new Location(part.location);
+      } else {
         checkResponse(table.msTable_.getPartitionKeysSize() == 0, req,
-            "Should not return a partition with missing HMS partition unless " +
+            "Should not return a partition with missing partition meta unless " +
             "the table is unpartitioned");
-        msPart = DirectMetaProvider.msTableToPartition(table.msTable_);
+        // For the only partition of a nonpartitioned table, reuse table-level metadata.
+        try {
+          hdfsStorageDescriptor = HdfsStorageDescriptor.fromStorageDescriptor(
+              table.tableName_, table.msTable_.getSd());
+        } catch (HdfsStorageDescriptor.InvalidStorageDescriptorException e) {
+          Preconditions.checkState(false, "Failed to create HdfsStorageDescriptor " +
+              "using sd of table");
+        }
+        location = table.getPartitionLocationCompressor().new Location(
+            table.msTable_.getSd().getLocation());
+        part.setHms_parameters(table.msTable_.getParameters());
       }
 
       // Transform the file descriptors to the caller's index.
@@ -967,9 +985,10 @@ public class CatalogdMetaProvider implements MetaProvider {
           part.insert_file_descriptors, resp.table_info.network_addresses, hostIndex);
       ImmutableList<FileDescriptor> deleteFds = convertThriftFdList(
           part.delete_file_descriptors, resp.table_info.network_addresses, hostIndex);
-      PartitionMetadataImpl metaImpl = new PartitionMetadataImpl(msPart,
+      PartitionMetadataImpl metaImpl = new PartitionMetadataImpl(part.getHms_parameters(),
+          part.write_id, hdfsStorageDescriptor,
           fds, insertFds, deleteFds, part.getPartition_stats(),
-          part.has_incremental_stats, part.is_marked_cached);
+          part.has_incremental_stats, part.is_marked_cached, location);
 
       checkResponse(partRef != null, req, "returned unexpected partition id %s", part.id);
 
@@ -1497,7 +1516,15 @@ public class CatalogdMetaProvider implements MetaProvider {
   }
 
   public static class PartitionMetadataImpl implements PartitionMetadata {
-    private final Partition msPartition_;
+    private final Map<String, String> hmsParameters_;
+    private final long writeId_;
+    private final HdfsStorageDescriptor hdfsStorageDescriptor_;
+    // Prefix-compressed location. The corresponding prefix map, i.e. the
+    // HdfsPartitionLocationCompressor object is in the corresponding TableMetaRefImpl
+    // object. TableMetaRefImpl may be evicted. But when this partition is accessed,
+    // we can assure that the table meta is already loaded, so the prefix map won't be
+    // missing.
+    private final HdfsPartitionLocationCompressor.Location location_;
     private final ImmutableList<FileDescriptor> fds_;
     private final ImmutableList<FileDescriptor> insertFds_;
     private final ImmutableList<FileDescriptor> deleteFds_;
@@ -1505,10 +1532,15 @@ public class CatalogdMetaProvider implements MetaProvider {
     private final boolean hasIncrementalStats_;
     private final boolean isMarkedCached_;
 
-    public PartitionMetadataImpl(Partition msPartition, ImmutableList<FileDescriptor> fds,
+    public PartitionMetadataImpl(Map<String, String> hmsParameters, long writeId,
+        HdfsStorageDescriptor hdfsStorageDescriptor, ImmutableList<FileDescriptor> fds,
         ImmutableList<FileDescriptor> insertFds, ImmutableList<FileDescriptor> deleteFds,
-        byte[] partitionStats, boolean hasIncrementalStats, boolean isMarkedCached) {
-      this.msPartition_ = Preconditions.checkNotNull(msPartition);
+        byte[] partitionStats, boolean hasIncrementalStats, boolean isMarkedCached,
+        HdfsPartitionLocationCompressor.Location location) {
+      this.hmsParameters_ = hmsParameters;
+      this.writeId_ = writeId;
+      this.hdfsStorageDescriptor_ = hdfsStorageDescriptor;
+      this.location_ = location;
       this.fds_ = fds;
       this.insertFds_ = insertFds;
       this.deleteFds_ = deleteFds;
@@ -1530,8 +1562,9 @@ public class CatalogdMetaProvider implements MetaProvider {
           insertFds_, origIndex, dstIndex);
       ImmutableList<FileDescriptor> deleteFds = cloneFdsRelativeToHostIndex(
           deleteFds_, origIndex, dstIndex);
-      return new PartitionMetadataImpl(msPartition_, fds, insertFds, deleteFds,
-          partitionStats_, hasIncrementalStats_, isMarkedCached_);
+      return new PartitionMetadataImpl(hmsParameters_, writeId_, hdfsStorageDescriptor_,
+          fds, insertFds, deleteFds, partitionStats_, hasIncrementalStats_,
+          isMarkedCached_, location_);
     }
 
     private static ImmutableList<FileDescriptor> cloneFdsRelativeToHostIndex(
@@ -1545,9 +1578,18 @@ public class CatalogdMetaProvider implements MetaProvider {
     }
 
     @Override
-    public Partition getHmsPartition() {
-      return msPartition_;
+    public Map<String, String> getHmsParameters() { return hmsParameters_; }
+
+    @Override
+    public long getWriteId() { return writeId_; }
+
+    @Override
+    public HdfsStorageDescriptor getInputFormatDescriptor() {
+      return hdfsStorageDescriptor_;
     }
+
+    @Override
+    public HdfsPartitionLocationCompressor.Location getLocation() { return location_; }
 
     @Override
     public ImmutableList<FileDescriptor> getFileDescriptors() {
@@ -1615,9 +1657,12 @@ public class CatalogdMetaProvider implements MetaProvider {
      */
     private final boolean isMarkedCached_;
 
+    private final HdfsPartitionLocationCompressor partitionLocationCompressor_;
+
     public TableMetaRefImpl(String dbName, String tableName,
         Table msTable, long catalogVersion, SqlConstraints sqlConstraints,
-        TValidWriteIdList validWriteIds, boolean isMarkedCached) {
+        TValidWriteIdList validWriteIds, boolean isMarkedCached,
+        List<String> locationPrefixes) {
       this.dbName_ = dbName;
       this.tableName_ = tableName;
       this.msTable_ = msTable;
@@ -1625,6 +1670,10 @@ public class CatalogdMetaProvider implements MetaProvider {
       this.sqlConstraints_ = sqlConstraints;
       this.validWriteIds_ = validWriteIds;
       this.isMarkedCached_ = isMarkedCached;
+      // Non-hdfs tables will have null locationPrefixes.
+      this.partitionLocationCompressor_ = (locationPrefixes == null) ? null :
+          new HdfsPartitionLocationCompressor(
+              msTable.getPartitionKeysSize(), locationPrefixes);
     }
 
     @Override
@@ -1633,6 +1682,14 @@ public class CatalogdMetaProvider implements MetaProvider {
     }
 
     public boolean isMarkedCached() { return isMarkedCached_; }
+
+    public HdfsPartitionLocationCompressor getPartitionLocationCompressor() {
+      return partitionLocationCompressor_;
+    }
+
+    public List<String> getPartitionPrefixes() {
+      return partitionLocationCompressor_.getPrefixes();
+    }
   }
 
   /**

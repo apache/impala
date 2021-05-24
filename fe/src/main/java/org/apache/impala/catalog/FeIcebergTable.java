@@ -36,12 +36,10 @@ import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
-import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.common.FileSystemUtil;
-import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.thrift.TColumn;
@@ -417,8 +415,8 @@ public interface FeIcebergTable extends FeFsTable {
         THdfsTable hdfsTable) {
       for (Map.Entry<Long, THdfsPartition> entry : hdfsTable.getPartitions().entrySet()) {
         THdfsPartition partition = entry.getValue();
-        partition.setFileFormat(IcebergUtil.toTHdfsFileFormat(
-            icebergTable.getIcebergFileFormat()));
+        partition.getHdfs_storage_descriptor().setFileFormat(
+            IcebergUtil.toTHdfsFileFormat(icebergTable.getIcebergFileFormat()));
       }
     }
   }

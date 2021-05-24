@@ -24,7 +24,6 @@ import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.authorization.AuthorizationPolicy;
@@ -32,6 +31,8 @@ import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.HdfsPartitionLocationCompressor;
+import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TBriefTableMeta;
@@ -130,6 +131,7 @@ public interface MetaProvider {
    */
   interface TableMetaRef {
     boolean isMarkedCached();
+    List<String> getPartitionPrefixes();
   }
 
   /**
@@ -145,7 +147,10 @@ public interface MetaProvider {
    * Partition metadata as returned by loadPartitionsByRefs().
    */
   interface PartitionMetadata {
-    Partition getHmsPartition();
+    Map<String, String> getHmsParameters();
+    long getWriteId();
+    HdfsStorageDescriptor getInputFormatDescriptor();
+    HdfsPartitionLocationCompressor.Location getLocation();
     ImmutableList<FileDescriptor> getFileDescriptors();
     ImmutableList<FileDescriptor> getInsertFileDescriptors();
     ImmutableList<FileDescriptor> getDeleteFileDescriptors();

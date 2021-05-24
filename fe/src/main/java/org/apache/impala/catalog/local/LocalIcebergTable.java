@@ -18,7 +18,6 @@
 package org.apache.impala.catalog.local;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -29,7 +28,6 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
-import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.catalog.CatalogObject;
 import org.apache.impala.catalog.Column;
@@ -37,10 +35,8 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
-import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.TableLoadingException;
-import org.apache.impala.catalog.Type;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
@@ -206,6 +202,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
         getColumnNames(), localFsTable_.getNullPartitionKeyValue(),
         FeFsTable.DEFAULT_NULL_COLUMN_VALUE, idToPartition, tPrototypePartition);
     Utils.updateIcebergPartitionFileFormat(this, hdfsTable);
+    hdfsTable.setPartition_prefixes(localFsTable_.getPartitionPrefixes());
     return hdfsTable;
   }
 
