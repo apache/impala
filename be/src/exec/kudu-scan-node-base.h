@@ -78,7 +78,7 @@ class KuduScanNodeBase : public ScanNode {
 
   /// Pointer to the KuduClient, which is stored on the QueryState and shared between
   /// scanners and fragment instances.
-  kudu::client::KuduClient* client_ = nullptr;
+  kudu::client::sp::shared_ptr<kudu::client::KuduClient> client_;
 
   /// Set of scan tokens to be deserialized into Kudu scanners.
   std::vector<std::string> scan_tokens_;
@@ -99,7 +99,7 @@ class KuduScanNodeBase : public ScanNode {
   static const std::string KUDU_REMOTE_TOKENS;
   static const std::string KUDU_CLIENT_TIME;
 
-  kudu::client::KuduClient* kudu_client() { return client_; }
+  kudu::client::KuduClient* kudu_client() { return client_.get(); }
   RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }
   RuntimeProfile::Counter* kudu_client_time() const { return kudu_client_time_; }
 };

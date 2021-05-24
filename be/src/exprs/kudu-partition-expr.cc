@@ -50,10 +50,9 @@ Status KuduPartitionExpr::Init(
   DCHECK(dynamic_cast<KuduTableDescriptor*>(table_desc))
       << "Target table for KuduPartitioner must be a Kudu table.";
   table_desc_ = static_cast<KuduTableDescriptor*>(table_desc);
-  kudu::client::KuduClient* client;
   RETURN_IF_ERROR(ExecEnv::GetInstance()->GetKuduClient(
-      table_desc_->kudu_master_addresses(), &client));
-  KUDU_RETURN_IF_ERROR(client->OpenTable(table_desc_->table_name(), &table_),
+      table_desc_->kudu_master_addresses(), &client_));
+  KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc_->table_name(), &table_),
       "Failed to open Kudu table.");
   return Status::OK();
 }

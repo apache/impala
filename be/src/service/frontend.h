@@ -20,11 +20,12 @@
 
 #include <jni.h>
 
-#include "gen-cpp/ImpalaService.h"
-#include "gen-cpp/ImpalaHiveServer2Service.h"
-#include "gen-cpp/Frontend_types.h"
-#include "gen-cpp/LineageGraph_types.h"
 #include "common/status.h"
+#include "gen-cpp/Frontend_types.h"
+#include "gen-cpp/ImpalaHiveServer2Service.h"
+#include "gen-cpp/ImpalaService.h"
+#include "gen-cpp/LineageGraph_types.h"
+#include "gen-cpp/Types_types.h"
 
 namespace impala {
 
@@ -215,6 +216,12 @@ class Frontend {
   // Fills "user" if the validation was successful.
   Status ValidateSaml2Bearer(const TWrappedHttpRequest& request, string* user);
 
+  /// Aborts Kudu transaction with the given query id.
+  Status AbortKuduTransaction(const TUniqueId& query_id);
+
+  /// Commits Kudu transaction with the given query id.
+  Status CommitKuduTransaction(const TUniqueId& query_id);
+
  private:
   jobject fe_;  // instance of org.apache.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
@@ -251,6 +258,8 @@ class Frontend {
   jmethodID get_saml2_redirect_id_; // JniFrontend.getSaml2Redirect()
   jmethodID validate_saml2_response_id_; // JniFrontend.validateSaml2Response()
   jmethodID validate_saml2_bearer_id_; // JniFrontend.validateSaml2Bearer()
+  jmethodID abort_kudu_txn_; // JniFrontend.abortKuduTransaction()
+  jmethodID commit_kudu_txn_; // JniFrontend.commitKuduTransaction()
 
   // Only used for testing.
   jmethodID build_test_descriptor_table_id_; // JniFrontend.buildTestDescriptorTable()

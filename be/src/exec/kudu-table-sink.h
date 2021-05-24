@@ -50,7 +50,7 @@ class KuduTableSinkConfig : public DataSinkConfig {
 /// buffer for a particular destination (of the 10MB of the total mutation buffer space)
 /// because Kudu currently has some 8MB buffer limits.
 ///
-/// Kudu doesn't have transactions yet, so some rows may fail to write while others are
+/// If Kudu's transaction is not enabled, some rows may fail to write while others are
 /// successful. The Kudu client reports errors, some of which are treated as warnings and
 /// will not fail the query: PK already exists on INSERT, key not found on UPDATE/DELETE,
 /// NULL in a non-nullable column, and PK specifying rows in an uncovered range.
@@ -96,11 +96,13 @@ class KuduTableSink : public DataSink {
   /// The descriptor of the KuduTable being written to. Set on Prepare().
   const KuduTableDescriptor* table_desc_;
 
-  /// The Kudu client, owned by the ExecEnv.
-  kudu::client::KuduClient* client_ = nullptr;
-  /// The Kudu table and session.
+  /// Pointer to the Kudu client, shared among ExecEnv and other actors which hold the
+  /// pointer.
+  kudu::client::sp::shared_ptr<kudu::client::KuduClient> client_;
+  /// The Kudu table, session, and transaction.
   kudu::client::sp::shared_ptr<kudu::client::KuduTable> table_;
   kudu::client::sp::shared_ptr<kudu::client::KuduSession> session_;
+  kudu::client::sp::shared_ptr<kudu::client::KuduTransaction> txn_;
 
   /// A cache of the nullability of each Kudu column. The Kudu schema accessor
   /// is not inlined and actually creates a copy (see IMPALA-8284).
@@ -133,6 +135,9 @@ class KuduTableSink : public DataSink {
   /// Rate at which the sink consumes and processes rows, i.e. writing rows to Kudu or
   /// skipping rows that are known to violate nullability constraints.
   RuntimeProfile::Counter* rows_processed_rate_ = nullptr;
+
+  /// True if it's in Kudu transaction. It's valid only after Open() succeeds.
+  bool is_transactional_ = false;
 };
 
 }  // namespace impala

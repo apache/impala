@@ -20,18 +20,20 @@
 #include <sstream>
 
 #include <boost/bind.hpp>
+#include <kudu/client/client.h>
 #include <kudu/client/write_op.h>
 #include <thrift/protocol/TDebugProtocol.h>
 
 #include "exec/kudu-util.h"
-#include "exprs/scalar-expr.h"
 #include "exprs/scalar-expr-evaluator.h"
+#include "exprs/scalar-expr.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "gutil/gscoped_ptr.h"
 #include "runtime/descriptors.h"
 #include "runtime/exec-env.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/row-batch.h"
+#include "util/debug-util.h"
 #include "util/runtime-profile-counters.h"
 
 #include "common/names.h"
@@ -58,6 +60,7 @@ using kudu::client::KuduSchema;
 using kudu::client::KuduClient;
 using kudu::client::KuduRowResult;
 using kudu::client::KuduTable;
+using kudu::client::KuduTransaction;
 using kudu::client::KuduInsert;
 using kudu::client::KuduUpdate;
 using kudu::client::KuduError;
@@ -158,7 +161,24 @@ Status KuduTableSink::Open(RuntimeState* state) {
     kudu_column_nullabilities_.push_back(table_->schema().Column(i).is_nullable());
   }
 
-  session_ = client_->NewSession();
+  // Inject failure or sleep time before creating Kudu session.
+  RETURN_IF_ERROR(
+      DebugAction(state->query_options(), "FIS_KUDU_TABLE_SINK_CREATE_SESSION"));
+
+  if (kudu_table_sink_.__isset.kudu_txn_token
+      && !kudu_table_sink_.kudu_txn_token.empty()) {
+    // Deserialize the transaction token and create a session in the context of
+    // transaction.
+    KUDU_RETURN_IF_ERROR(
+        KuduTransaction::Deserialize(client_, kudu_table_sink_.kudu_txn_token, &txn_),
+        "Couldn't deserialize metadata of Kudu transaction");
+    KUDU_RETURN_IF_ERROR(txn_->CreateSession(&session_),
+        "Couldn't create session in the context of transaction");
+    is_transactional_ = true;
+  } else {
+    session_ = client_->NewSession();
+  }
+
   session_->SetTimeoutMillis(FLAGS_kudu_operation_timeout_ms);
 
   // KuduSession Set* methods here and below return a status for API compatibility.
@@ -277,8 +297,13 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch) {
     SCOPED_TIMER(kudu_apply_timer_);
     for (auto&& write: write_ops) {
       KUDU_RETURN_IF_ERROR(session_->Apply(write.release()), "Error applying Kudu Op.");
+      // Inject failure when writing partial of row batch.
+      RETURN_IF_ERROR(
+          DebugAction(state->query_options(), "FIS_KUDU_TABLE_SINK_WRITE_PARTIAL_ROW"));
     }
   }
+  // Inject failure or sleep time in the end of writing row batch.
+  RETURN_IF_ERROR(DebugAction(state->query_options(), "FIS_KUDU_TABLE_SINK_WRITE_BATCH"));
 
   // Increment for all rows received by the sink, including errors.
   COUNTER_ADD(total_rows_, batch->num_rows());
@@ -301,7 +326,11 @@ Status KuduTableSink::CheckForErrors(RuntimeState* state) {
   // we can't be sure all errors can be ignored, so an error status will be reported.
   bool error_overflow = false;
   session_->GetPendingErrors(&errors, &error_overflow);
-  if (UNLIKELY(error_overflow)) {
+  if (is_transactional_) {
+    // Return the first error so that the transaction will be aborted.
+    status = Status(
+        strings::Substitute("Kudu reported error: $0", errors[0]->status().ToString()));
+  } else if (UNLIKELY(error_overflow)) {
     status = Status("Error overflow in Kudu session.");
   }
 
@@ -352,7 +381,8 @@ void KuduTableSink::Close(RuntimeState* state) {
   if (closed_) return;
   session_.reset();
   mem_tracker_->Release(client_tracked_bytes_);
-  client_ = nullptr;
+  txn_.reset();
+  client_.reset();
   SCOPED_TIMER(profile()->total_time_counter());
   DataSink::Close(state);
   closed_ = true;

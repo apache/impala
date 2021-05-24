@@ -18,9 +18,9 @@
 package org.apache.impala.common;
 
 /**
- * Thrown for errors that occur when interacting with ACID transactions,
- * e.g. failures to open, commit, or abort a transaction. Or, failing to
- * allocate a write id.
+ * Thrown for errors that occur when interacting with ACID transactions
+ * or Kudu transactions, e.g. failures to open, commit, or abort a transaction.
+ * Or, failing to allocate a write id with ACID transactions.
  */
 public class TransactionException extends ImpalaException {
   public TransactionException(String msg, Throwable cause) {

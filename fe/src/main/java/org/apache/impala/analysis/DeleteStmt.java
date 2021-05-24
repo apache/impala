@@ -58,7 +58,8 @@ public class DeleteStmt extends ModifyStmt {
     Preconditions.checkState(table_ != null);
     TableSink tableSink = TableSink.create(table_, TableSink.Op.DELETE,
         ImmutableList.<Expr>of(), resultExprs, referencedColumns_, false, false,
-        new Pair<>(ImmutableList.<Integer> of(), TSortingOrder.LEXICAL));
+        new Pair<>(ImmutableList.<Integer>of(), TSortingOrder.LEXICAL), -1, kuduTxnToken_,
+        0);
     Preconditions.checkState(!referencedColumns_.isEmpty());
     return tableSink;
   }

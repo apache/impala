@@ -1103,6 +1103,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_minmax_filter_fast_code_path(enum_type);
         break;
       }
+      case TImpalaQueryOptions::ENABLE_KUDU_TRANSACTION: {
+        query_options->__set_enable_kudu_transaction(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

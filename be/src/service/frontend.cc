@@ -115,7 +115,9 @@ Frontend::Frontend() {
     {"unregisterTransaction", "(J)V", &unregister_txn_},
     {"getSaml2Redirect", "([B)[B", &get_saml2_redirect_id_},
     {"validateSaml2Response", "([B)[B", &validate_saml2_response_id_},
-    {"validateSaml2Bearer", "([B)Ljava/lang/String;", &validate_saml2_bearer_id_}
+    {"validateSaml2Bearer", "([B)Ljava/lang/String;", &validate_saml2_bearer_id_},
+    {"abortKuduTransaction", "([B)V", &abort_kudu_txn_},
+    {"commitKuduTransaction", "([B)V", &commit_kudu_txn_}
   };
 
   JNIEnv* jni_env = JniUtil::GetJNIEnv();
@@ -342,4 +344,12 @@ Status Frontend::ValidateSaml2Bearer(
   const TWrappedHttpRequest& request, string* user) {
   return JniUtil::CallJniMethod(
       fe_, validate_saml2_bearer_id_, request, user);
+}
+
+Status Frontend::AbortKuduTransaction(const TUniqueId& query_id) {
+  return JniUtil::CallJniMethod(fe_, abort_kudu_txn_, query_id);
+}
+
+Status Frontend::CommitKuduTransaction(const TUniqueId& query_id) {
+  return JniUtil::CallJniMethod(fe_, commit_kudu_txn_, query_id);
 }

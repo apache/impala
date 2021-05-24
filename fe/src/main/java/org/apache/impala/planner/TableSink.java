@@ -17,6 +17,7 @@
 
 package org.apache.impala.planner;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
 import org.apache.impala.analysis.Expr;
@@ -102,27 +103,28 @@ public abstract class TableSink extends DataSink {
       List<Integer> referencedColumns, boolean overwrite,
       boolean inputIsClustered, Pair<List<Integer>, TSortingOrder> sortProperties) {
     return create(table, sinkAction, partitionKeyExprs, outputExprs, referencedColumns,
-        overwrite, inputIsClustered, sortProperties, -1, 0, false);
+        overwrite, inputIsClustered, sortProperties, -1, null, 0, false);
   }
 
   /**
-   * Same as above, plus it takes an ACID write id in parameter 'writeId'.
+   * Same as above, plus it takes an ACID write id 'writeId' and Kudu transaction token
+   * 'kuduTxnToken' in parameter.
    */
   public static TableSink create(FeTable table, Op sinkAction,
       List<Expr> partitionKeyExprs, List<Expr> outputExprs,
       List<Integer> referencedColumns, boolean overwrite, boolean inputIsClustered,
       Pair<List<Integer>, TSortingOrder> sortProperties, long writeId,
-      int maxTableSinks) {
+      java.nio.ByteBuffer kuduTxnToken, int maxTableSinks) {
     return create(table, sinkAction, partitionKeyExprs, outputExprs, referencedColumns,
-        overwrite, inputIsClustered, sortProperties, writeId, maxTableSinks, false);
+        overwrite, inputIsClustered, sortProperties, writeId, kuduTxnToken, maxTableSinks,
+        false);
   }
 
   public static TableSink create(FeTable table, Op sinkAction,
       List<Expr> partitionKeyExprs, List<Expr> outputExprs,
-      List<Integer> referencedColumns,
-      boolean overwrite, boolean inputIsClustered,
+      List<Integer> referencedColumns, boolean overwrite, boolean inputIsClustered,
       Pair<List<Integer>, TSortingOrder> sortProperties, long writeId,
-      int maxTableSinks, boolean isResultSink) {
+      java.nio.ByteBuffer kuduTxnToken, int maxTableSinks, boolean isResultSink) {
     Preconditions.checkNotNull(partitionKeyExprs);
     Preconditions.checkNotNull(referencedColumns);
     Preconditions.checkNotNull(sortProperties.first);
@@ -151,7 +153,8 @@ public abstract class TableSink extends DataSink {
       Preconditions.checkState(overwrite == false);
       // Sort columns are not supported for Kudu tables.
       Preconditions.checkState(sortProperties.first.isEmpty());
-      return new KuduTableSink(table, sinkAction, referencedColumns, outputExprs);
+      return new KuduTableSink(
+          table, sinkAction, referencedColumns, outputExprs, kuduTxnToken);
     } else {
       throw new UnsupportedOperationException(
           "Cannot create data sink into table of type: " + table.getClass().getName());

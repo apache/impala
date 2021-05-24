@@ -120,6 +120,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.KuduTransactionManager;
 import org.apache.impala.common.NotImplementedException;
 import org.apache.impala.common.TransactionException;
 import org.apache.impala.common.TransactionKeepalive;
@@ -174,6 +175,7 @@ import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TStmtType;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.thrift.TTruncateParams;
+import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
@@ -181,9 +183,13 @@ import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.EventSequence;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.impala.util.IcebergUtil;
+import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.PatternMatcher;
 import org.apache.impala.util.TResultRowBuilder;
 import org.apache.impala.util.TSessionStateUtil;
+import org.apache.kudu.client.KuduClient;
+import org.apache.kudu.client.KuduException;
+import org.apache.kudu.client.KuduTransaction;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -302,6 +308,8 @@ public class Frontend {
 
   private final ImpalaSamlClient saml2Client_;
 
+  private final KuduTransactionManager kuduTxnManager_;
+
   public Frontend(AuthorizationFactory authzFactory, boolean isBackendTest)
       throws ImpalaException {
     this(authzFactory, FeCatalogManager.createFromBackendConfig(), isBackendTest);
@@ -363,6 +371,7 @@ public class Frontend {
     } else {
       saml2Client_ = null;
     }
+    kuduTxnManager_ = new KuduTransactionManager();
   }
 
   /**
@@ -1741,6 +1750,27 @@ public class Frontend {
         return result;
       }
 
+      // Open Kudu transaction if Kudu transaction is enabled and target table is Kudu
+      // table.
+      if (!analysisResult.isExplainStmt() && queryOptions.isEnable_kudu_transaction()) {
+        if ((analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt())
+            && analysisResult.getInsertStmt().isTargetTableKuduTable()) {
+          // Open Kudu transaction for INSERT/UPSERT/CTAS statements.
+          openKuduTransaction(queryCtx, analysisResult,
+              analysisResult.getInsertStmt().getTargetTable(), timeline);
+        } else if (analysisResult.isUpdateStmt()
+            && analysisResult.getUpdateStmt().isTargetTableKuduTable()) {
+          // Open Kudu transaction for UPDATE statement.
+          openKuduTransaction(queryCtx, analysisResult,
+              analysisResult.getUpdateStmt().getTargetTable(), timeline);
+        } else if (analysisResult.isDeleteStmt()
+            && analysisResult.getDeleteStmt().isTargetTableKuduTable()) {
+          // Open Kudu transaction for DELETE statement.
+          openKuduTransaction(queryCtx, analysisResult,
+              analysisResult.getDeleteStmt().getTargetTable(), timeline);
+        }
+      }
+
       // If unset, set MT_DOP to 0 to simplify the rest of the code.
       if (!queryOptions.isSetMt_dop()) queryOptions.setMt_dop(0);
 
@@ -1792,6 +1822,14 @@ public class Frontend {
         try {
           abortTransaction(queryCtx.getTransaction_id());
           timeline.markEvent("Transaction aborted");
+        } catch (TransactionException te) {
+          LOG.error("Could not abort transaction because: " + te.getMessage());
+        }
+      } else if (queryCtx.isIs_kudu_transactional()) {
+        try {
+          abortKuduTransaction(queryCtx.getQuery_id());
+          timeline.markEvent(
+              "Kudu transaction aborted: " + queryCtx.getQuery_id().toString());
         } catch (TransactionException te) {
           LOG.error("Could not abort transaction because: " + te.getMessage());
         }
@@ -2192,6 +2230,77 @@ public class Frontend {
     try (MetaStoreClient client = metaStoreClientPool_.getClient()) {
       IMetaStoreClient hmsClient = client.getHiveClient();
       MetastoreShim.acquireLock(hmsClient, txnId, lockComponents);
+    }
+  }
+
+  /**
+   * Opens a Kudu transaction.
+   */
+  private void openKuduTransaction(TQueryCtx queryCtx, AnalysisResult analysisResult,
+      FeTable targetTable, EventSequence timeline) throws TransactionException {
+    FeKuduTable kuduTable = (FeKuduTable) targetTable;
+    KuduClient client = KuduUtil.getKuduClient(kuduTable.getKuduMasterHosts());
+    KuduTransaction txn = null;
+    try {
+      // Open Kudu transaction.
+      LOG.info("Open Kudu transaction: " + queryCtx.getQuery_id().toString());
+      txn = client.newTransaction();
+      timeline.markEvent(
+          "Kudu transaction opened with query id: " + queryCtx.getQuery_id().toString());
+      if (analysisResult.isUpdateStmt()) {
+        analysisResult.getUpdateStmt().setKuduTransactionToken(txn.serialize());
+      } else if (analysisResult.isDeleteStmt()) {
+        analysisResult.getDeleteStmt().setKuduTransactionToken(txn.serialize());
+      } else {
+        analysisResult.getInsertStmt().setKuduTransactionToken(txn.serialize());
+      }
+      kuduTxnManager_.addTransaction(queryCtx.getQuery_id(), txn);
+      queryCtx.setIs_kudu_transactional(true);
+    } catch (IOException e) {
+      if (txn != null) txn.close();
+      throw new TransactionException(e.getMessage());
+    }
+  }
+
+  /**
+   * Aborts a Kudu transaction.
+   * @param queryId is the id of the query.
+   */
+  public void abortKuduTransaction(TUniqueId queryId) throws TransactionException {
+    LOG.info("Abort Kudu transaction: " + queryId.toString());
+    KuduTransaction txn = kuduTxnManager_.deleteTransaction(queryId);
+    Preconditions.checkNotNull(txn);
+    if (txn != null) {
+      try {
+        txn.rollback();
+      } catch (KuduException e) {
+        throw new TransactionException(e.getMessage());
+      } finally {
+        // Call KuduTransaction.close() explicitly to stop sending automatic
+        // keepalive messages by the 'txn' handle.
+        txn.close();
+      }
+    }
+  }
+
+  /**
+   * Commits a Kudu transaction.
+   * @param queryId is the id of the query.
+   */
+  public void commitKuduTransaction(TUniqueId queryId) throws TransactionException {
+    LOG.info("Commit Kudu transaction: " + queryId.toString());
+    KuduTransaction txn = kuduTxnManager_.deleteTransaction(queryId);
+    Preconditions.checkNotNull(txn);
+    if (txn != null) {
+      try {
+        txn.commit();
+      } catch (KuduException e) {
+        throw new TransactionException(e.getMessage());
+      } finally {
+        // Call KuduTransaction.close() explicitly to stop sending automatic
+        // keepalive messages by the 'txn' handle.
+        txn.close();
+      }
     }
   }
 }

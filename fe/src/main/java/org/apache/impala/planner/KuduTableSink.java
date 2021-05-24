@@ -18,6 +18,7 @@
 
 package org.apache.impala.planner;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
 import org.apache.impala.analysis.DescriptorTable;
@@ -44,11 +45,17 @@ public class KuduTableSink extends TableSink {
   // expression i matches a column index into the Kudu schema at targetColdIdxs[i].
   private final List<Integer> targetColIdxs_;
 
-  public KuduTableSink(FeTable targetTable, Op sinkOp,
-      List<Integer> referencedColumns, List<Expr> outputExprs) {
+  // Serialized metadata of transaction object which is set by the Frontend if the
+  // target table is Kudu table and transaction for Kudu is enabled.
+  private java.nio.ByteBuffer txnToken_;
+
+  public KuduTableSink(FeTable targetTable, Op sinkOp, List<Integer> referencedColumns,
+      List<Expr> outputExprs, java.nio.ByteBuffer txnToken) {
     super(targetTable, sinkOp, outputExprs);
     targetColIdxs_ = referencedColumns != null
         ? Lists.newArrayList(referencedColumns) : null;
+    txnToken_ =
+        txnToken != null ? org.apache.thrift.TBaseHelper.copyBinary(txnToken) : null;
   }
 
   @Override
@@ -87,6 +94,7 @@ public class KuduTableSink extends TableSink {
         TTableSinkType.KUDU, sinkOp_.toThrift());
     TKuduTableSink tKuduSink = new TKuduTableSink();
     tKuduSink.setReferenced_columns(targetColIdxs_);
+    if (txnToken_ != null) tKuduSink.setKudu_txn_token(txnToken_);
     tTableSink.setKudu_table_sink(tKuduSink);
     tsink.table_sink = tTableSink;
     tsink.output_exprs = Expr.treesToThrift(outputExprs_);

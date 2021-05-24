@@ -90,6 +90,7 @@ import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TShowStatsParams;
 import org.apache.impala.thrift.TDescribeHistoryParams;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
 import org.apache.impala.thrift.TWrappedHttpRequest;
@@ -762,6 +763,32 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, request, serializedRequest);
     WrappedWebContext webContext = new WrappedWebContext(request, dummyResponse);
     return frontend_.getSaml2Client().validateBearer(webContext);
+  }
+
+  /**
+   * Aborts a Kudu transaction.
+   * @param queryId the id of the query.
+   * @throws TransactionException, ImpalaException
+   */
+  public void abortKuduTransaction(byte[] thriftQueryId)
+      throws TransactionException, ImpalaException {
+    Preconditions.checkNotNull(frontend_);
+    TUniqueId queryId = new TUniqueId();
+    JniUtil.deserializeThrift(protocolFactory_, queryId, thriftQueryId);
+    this.frontend_.abortKuduTransaction(queryId);
+  }
+
+  /**
+   * Commits a Kudu transaction.
+   * @param queryId the id of the query.
+   * @throws TransactionException, ImpalaException
+   */
+  public void commitKuduTransaction(byte[] thriftQueryId)
+      throws TransactionException, ImpalaException {
+    Preconditions.checkNotNull(frontend_);
+    TUniqueId queryId = new TUniqueId();
+    JniUtil.deserializeThrift(protocolFactory_, queryId, thriftQueryId);
+    this.frontend_.commitKuduTransaction(queryId);
   }
 
   /**

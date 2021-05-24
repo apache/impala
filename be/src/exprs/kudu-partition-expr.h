@@ -59,6 +59,10 @@ class KuduPartitionExpr : public ScalarExpr {
  private:
   TKuduPartitionExpr tkudu_partition_expr_;
 
+  /// Pointer to the Kudu client, shared among ExecEnv and other actors which hold the
+  /// pointer.
+  kudu::client::sp::shared_ptr<kudu::client::KuduClient> client_;
+
   /// Descriptor of the table to use the partiitoning scheme from. Set in Prepare().
   KuduTableDescriptor* table_desc_;
 

@@ -108,6 +108,9 @@ struct TKuduTableSink {
 
   // Defines if duplicate or not found keys should be ignored
   2: optional bool ignore_not_found_or_duplicate
+
+  // Serialized metadata of KuduTransaction object.
+  3: optional binary kudu_txn_token
 }
 
 // Sink to create the build side of a JoinNode.

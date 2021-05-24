@@ -14,3 +14,7 @@
 # participating Kudu masters and tablet servers are run at the same node using the same
 # local wallclock.
 -time_source=system_unsync
+
+# Enable Kudu transaction
+-txn_manager_enabled=true
+-unlock_experimental_flags

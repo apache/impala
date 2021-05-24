@@ -522,6 +522,8 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift
   132: optional TMinmaxFilterFastCodePathMode minmax_filter_fast_code_path =
       TMinmaxFilterFastCodePathMode.ON;
+
+  133: optional bool enable_kudu_transaction = false;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external
@@ -679,7 +681,8 @@ struct TQueryCtx {
 
   24: optional Descriptors.TDescriptorTableSerialized desc_tbl_serialized
 
-  // Stores the transaction id if the query is transactional.
+  // Stores the transaction id if the query is transactional. This is only used for HIVE
+  // ACID transaction.
   25: optional i64 transaction_id
 
   // If mt_dop was overridden by admission control's max mt_dop setting, then this
@@ -692,6 +695,9 @@ struct TQueryCtx {
   // True if the new runtime profile format added by IMPALA-9382 should be generated
   // by this query.
   28: optional bool gen_aggregated_profile
+
+  // True if the query is transactional for Kudu table.
+  29: required bool is_kudu_transactional = false
 }
 
 

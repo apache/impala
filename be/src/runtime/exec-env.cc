@@ -22,7 +22,6 @@
 #include <boost/algorithm/string.hpp>
 #include <gflags/gflags.h>
 #include <gutil/strings/substitute.h>
-#include <kudu/client/client.h>
 
 #include "catalog/catalog-service-client-wrapper.h"
 #include "common/logging.h"
@@ -189,10 +188,6 @@ void SendClusterMembershipToFrontend(
 }
 
 namespace impala {
-
-struct ExecEnv::KuduClientPtr {
-  kudu::client::sp::shared_ptr<kudu::client::KuduClient> kudu_client;
-};
 
 ExecEnv* ExecEnv::exec_env_ = nullptr;
 
@@ -581,20 +576,21 @@ void ExecEnv::InitSystemStateInfo() {
   });
 }
 
-Status ExecEnv::GetKuduClient(
-    const vector<string>& master_addresses, kudu::client::KuduClient** client) {
+Status ExecEnv::GetKuduClient(const vector<string>& master_addresses,
+    kudu::client::sp::shared_ptr<kudu::client::KuduClient>* client) {
   string master_addr_concat = join(master_addresses, ",");
   lock_guard<SpinLock> l(kudu_client_map_lock_);
   auto kudu_client_map_it = kudu_client_map_.find(master_addr_concat);
   if (kudu_client_map_it == kudu_client_map_.end()) {
-    // KuduClient doesn't exist, create it
-    KuduClientPtr* kudu_client_ptr = new KuduClientPtr;
-    RETURN_IF_ERROR(CreateKuduClient(master_addresses, &kudu_client_ptr->kudu_client));
-    kudu_client_map_[master_addr_concat].reset(kudu_client_ptr);
-    *client = kudu_client_ptr->kudu_client.get();
+    // KuduClient doesn't exist, create it.
+    LOG(INFO) << "Creating a new KuduClient for masters=" << master_addr_concat;
+    kudu::client::sp::shared_ptr<kudu::client::KuduClient> kudu_client;
+    RETURN_IF_ERROR(CreateKuduClient(master_addresses, &kudu_client));
+    kudu_client_map_.insert(make_pair(master_addr_concat, kudu_client));
+    *client = kudu_client;
   } else {
     // Return existing KuduClient
-    *client = kudu_client_map_it->second->kudu_client.get();
+    *client = kudu_client_map_it->second;
   }
   return Status::OK();
 }

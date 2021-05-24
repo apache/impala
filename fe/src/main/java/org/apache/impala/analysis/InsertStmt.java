@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -51,6 +52,7 @@ import org.apache.impala.rewrite.ExprRewriter;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.util.IcebergUtil;
+import org.apache.thrift.TBaseHelper;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -199,6 +201,10 @@ public class InsertStmt extends StatementBase {
   // Set by the Frontend if the target table is transactional.
   private long writeId_ = -1;
 
+  // Serialized metadata of transaction object which is set by the Frontend if the
+  // target table is Kudu table and Kudu's transaction is enabled.
+  private java.nio.ByteBuffer kuduTxnToken_ = null;
+
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -257,6 +263,7 @@ public class InsertStmt extends StatementBase {
     table_ = other.table_;
     isUpsert_ = other.isUpsert_;
     writeId_ = other.writeId_;
+    kuduTxnToken_ = org.apache.thrift.TBaseHelper.copyBinary(other.kuduTxnToken_);
   }
 
   @Override
@@ -279,6 +286,7 @@ public class InsertStmt extends StatementBase {
     mentionedColumns_.clear();
     primaryKeyExprs_.clear();
     writeId_ = -1;
+    kuduTxnToken_ = null;
   }
 
   @Override
@@ -1111,8 +1119,13 @@ public class InsertStmt extends StatementBase {
   public TableName getTargetTableName() { return targetTableName_; }
   public FeTable getTargetTable() { return table_; }
   public void setTargetTable(FeTable table) { this.table_ = table; }
+  public boolean isTargetTableKuduTable() { return (table_ instanceof FeKuduTable); }
   public void setMaxTableSinks(int maxTableSinks) { this.maxTableSinks_ = maxTableSinks; }
   public void setWriteId(long writeId) { this.writeId_ = writeId; }
+  public void setKuduTransactionToken(byte[] kuduTxnToken) {
+    Preconditions.checkNotNull(kuduTxnToken);
+    kuduTxnToken_ = java.nio.ByteBuffer.wrap(kuduTxnToken.clone());
+  }
   public boolean isOverwrite() { return overwrite_; }
   public TSortingOrder getSortingOrder() { return sortingOrder_; }
 
@@ -1129,6 +1142,9 @@ public class InsertStmt extends StatementBase {
   public List<Expr> getPrimaryKeyExprs() { return primaryKeyExprs_; }
   public List<Expr> getSortExprs() { return sortExprs_; }
   public long getWriteId() { return writeId_; }
+  public byte[] getKuduTransactionToken() {
+    return kuduTxnToken_ == null ? null : kuduTxnToken_.array();
+  }
 
   // Clustering is enabled by default. If the table has a 'sort.columns' property and the
   // query has a 'noclustered' hint, we issue a warning during analysis and ignore the
@@ -1150,7 +1166,7 @@ public class InsertStmt extends StatementBase {
     return TableSink.create(table_, isUpsert_ ? TableSink.Op.UPSERT : TableSink.Op.INSERT,
         partitionKeyExprs_, resultExprs_, mentionedColumns_, overwrite_,
         requiresClustering(), new Pair<>(sortColumns_, sortingOrder_), writeId_,
-        maxTableSinks_);
+        kuduTxnToken_, maxTableSinks_);
   }
 
   /**

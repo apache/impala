@@ -19,10 +19,12 @@ import logging
 import os
 import pytest
 from kudu.schema import INT32
+from time import sleep
 
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.kudu_test_suite import KuduTestSuite
-from tests.common.skip import SkipIfKudu, SkipIfHive3
+from tests.common.skip import SkipIfKudu, SkipIfHive3, SkipIfBuildType
 from tests.common.test_dimensions import add_exec_option_dimension
 
 KUDU_MASTER_HOSTS = pytest.config.option.kudu_master_hosts
@@ -330,3 +332,320 @@ class TestKuduHMSIntegration(CustomKuduTest):
   @SkipIfHive3.kudu_hms_notifications_not_supported
   def test_kudu_alter_table(self, vector, unique_database):
     self.run_test_case('QueryTest/kudu_hms_alter', vector, use_db=unique_database)
+
+
+class TestKuduTransaction(CustomClusterTestSuite):
+  """
+  This suite tests the Kudu transaction when inserting rows to kudu table.
+  """
+
+  # query to create Kudu table.
+  _create_kudu_table_query = "create table {0} (a int primary key, b string) " \
+      "partition by hash(a) partitions 8 stored as kudu"
+  # query to create parquet table without key column.
+  _create_parquet_table_query = "create table {0} (a int, b string) stored as parquet"
+  # queries to insert rows into Kudu table.
+  _insert_3_rows_query = "insert into {0} values (0, 'a'), (1, 'b'), (2, 'c')"
+  _insert_select_query = "insert into {0} select id, string_col from " \
+      "functional.alltypes where id > 2 limit 100"
+  _insert_select_query2 = "insert into {0} select * from {1}"
+  _insert_dup_key_query = "insert into {0} values (0, 'a'), (0, 'b'), (2, 'c')"
+  # CTAS query
+  _ctas_query = "create table {0} primary key (a) partition by hash(a) " \
+      "partitions 8 stored as kudu as select a, b from {1}"
+  # query to drop all rows from Kudu table.
+  _delete_query = "delete from {0}"
+  # query to update a row in Kudu table.
+  _update_query = "update {0} set b='test' where a=1"
+  # query to upsert a row in Kudu table.
+  _upsert_query = "upsert into {0} values (3, 'hello')"
+  # query to get number of rows.
+  _row_num_query = "select count(*) from {0}"
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_txn_succeed(self, cursor, unique_database):
+    # Create Kudu table.
+    table_name = "%s.test_kudu_txn_succeed" % unique_database
+    self.execute_query(self._create_kudu_table_query.format(table_name))
+
+    # Enable Kudu transactions and insert rows to Kudu table.
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=true")
+    self.execute_query(self._insert_3_rows_query.format(table_name))
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(3,)]
+    self.execute_query(self._insert_select_query.format(table_name))
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(103,)]
+
+    # Disable Kudu transactions and delete all rows from Kudu table.
+    # Insert rows to the Kudu table. Should get same results as transaction enabled.
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=false")
+    self.execute_query(self._delete_query.format(table_name))
+    self.execute_query(self._insert_3_rows_query.format(table_name))
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(3,)]
+    self.execute_query(self._insert_select_query.format(table_name))
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(103,)]
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_txn_not_implemented(self, cursor, unique_database):
+    # Create Kudu table.
+    table_name = "%s.test_kudu_txn_succeed" % unique_database
+    self.execute_query(self._create_kudu_table_query.format(table_name))
+
+    # Enable Kudu transactions and insert rows to Kudu table.
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=true")
+    self.execute_query(self._insert_3_rows_query.format(table_name))
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(3,)]
+
+    # Kudu only support multi-row transaction for INSERT now. Impala return an error
+    # if UPDATE/UPSERT/DELETE are performed within a transaction context.
+    try:
+      self.execute_query(self._update_query.format(table_name))
+      assert False, "query was expected to fail"
+    except ImpalaBeeswaxException as e:
+      assert "Query aborted:Kudu reported error: Not implemented" in str(e)
+
+    try:
+      self.execute_query(self._upsert_query.format(table_name))
+      assert False, "query was expected to fail"
+    except ImpalaBeeswaxException as e:
+      assert "Query aborted:Kudu reported error: Not implemented" in str(e)
+
+    try:
+      self.execute_query(self._delete_query.format(table_name))
+      assert False, "query was expected to fail"
+    except ImpalaBeeswaxException as e:
+      assert "Query aborted:Kudu reported error: Not implemented" in str(e)
+
+    # Verify that number of rows has not been changed.
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(3,)]
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_txn_abort_dup_key(self, cursor, unique_database):
+    # Create Kudu table.
+    table_name = "%s.test_kudu_txn_abort_dup_key" % unique_database
+    self.execute_query(self._create_kudu_table_query.format(table_name))
+
+    # Enable Kudu transactions and insert rows with duplicate key values.
+    # Transaction should be aborted and no rows are inserted into table.
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=true")
+    try:
+      self.execute_query(self._insert_dup_key_query.format(table_name))
+      assert False, "query was expected to fail"
+    except ImpalaBeeswaxException as e:
+      assert "Key already present in Kudu table" in str(e)
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(0,)]
+
+    # Disable Kudu transactions and run the same query. Part of rows are inserted into
+    # Kudu table.
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=false")
+    self.execute_query(self._insert_dup_key_query.format(table_name))
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(2,)]
+
+    # Delete all rows from Kudu table.
+    self.execute_query(self._delete_query.format(table_name))
+    # Create source Parquet table without primary key and insert duplicate rows.
+    table_name2 = "%s.test_kudu_txn_abort_dup_key2" % unique_database
+    self.execute_query(self._create_parquet_table_query.format(table_name2))
+    self.execute_query(self._insert_dup_key_query.format(table_name2))
+    cursor.execute(self._row_num_query.format(table_name2))
+    assert cursor.fetchall() == [(3,)]
+
+    # Enable Kudu transactions
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=true")
+    # Insert rows from source parquet table with duplicate key values.
+    # Transaction should be aborted and no rows are inserted into Kudu table.
+    try:
+      self.execute_query(self._insert_select_query2.format(table_name, table_name2))
+      assert False, "query was expected to fail"
+    except ImpalaBeeswaxException as e:
+      assert "Key already present in Kudu table" in str(e)
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(0,)]
+
+    # Disable Kudu transactions and run the same query. Part of rows are inserted into
+    # Kudu table.
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=false")
+    self.execute_query(self._insert_select_query2.format(table_name, table_name2))
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(2,)]
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  def test_kudu_txn_ctas(self, cursor, unique_database):
+    # Enable Kudu transactions
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=true")
+
+    # Create source Kudu table and insert 3 rows.
+    table_name1 = "%s.test_kudu_txn_ctas1" % unique_database
+    self.execute_query(self._create_kudu_table_query.format(table_name1))
+    self.execute_query(self._insert_3_rows_query.format(table_name1))
+    cursor.execute(self._row_num_query.format(table_name1))
+    assert cursor.fetchall() == [(3,)]
+
+    # Run CTAS query without duplicate rows in source table.
+    table_name2 = "%s.test_kudu_txn_ctas2" % unique_database
+    self.execute_query(self._ctas_query.format(table_name2, table_name1))
+    cursor.execute(self._row_num_query.format(table_name2))
+    assert cursor.fetchall() == [(3,)]
+
+    # Create source Parquet table without primary key and insert duplicate rows.
+    table_name3 = "%s.test_kudu_txn_ctas3" % unique_database
+    self.execute_query(self._create_parquet_table_query.format(table_name3))
+    self.execute_query(self._insert_dup_key_query.format(table_name3))
+    cursor.execute(self._row_num_query.format(table_name3))
+    assert cursor.fetchall() == [(3,)]
+
+    # Run CTAS query with duplicate rows in source table.
+    # Transaction should be aborted and no rows are inserted into Kudu table.
+    table_name4 = "%s.test_kudu_txn_ctas4" % unique_database
+    try:
+      self.execute_query(self._ctas_query.format(table_name4, table_name3))
+      assert False, "query was expected to fail"
+    except ImpalaBeeswaxException as e:
+      assert "Key already present in Kudu table" in str(e)
+    cursor.execute(self._row_num_query.format(table_name4))
+    assert cursor.fetchall() == [(0,)]
+
+    # Disable Kudu transactions and run the same CTAS query. Part of rows are inserted
+    # into Kudu table.
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=false")
+    table_name5 = "%s.test_kudu_txn_ctas5" % unique_database
+    self.execute_query(self._ctas_query.format(table_name5, table_name3))
+    cursor.execute(self._row_num_query.format(table_name5))
+    assert cursor.fetchall() == [(2,)]
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @SkipIfBuildType.not_dev_build
+  def test_kudu_txn_abort_row_batch(self, cursor, unique_database):
+    # Create Kudu table.
+    table_name = "%s.test_kudu_txn_abort_row_batch" % unique_database
+    self.execute_query(self._create_kudu_table_query.format(table_name))
+
+    # Enable Kudu transactions and run "insert" query with injected failure in the end
+    # of writing the row batch. Transaction should be aborted and no rows are inserted
+    # into table.
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=true")
+    query_options = {'debug_action': 'FIS_KUDU_TABLE_SINK_WRITE_BATCH:FAIL@1.0'}
+    try:
+      self.execute_query(self._insert_3_rows_query.format(table_name), query_options)
+      assert False, "query was expected to fail"
+    except ImpalaBeeswaxException as e:
+      assert "FIS_KUDU_TABLE_SINK_WRITE_BATCH" in str(e)
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(0,)]
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @SkipIfBuildType.not_dev_build
+  def test_kudu_txn_abort_partial_rows(self, cursor, unique_database):
+    # Create Kudu table.
+    table_name = "%s.test_kudu_txn_abort_partial_rows" % unique_database
+    self.execute_query(self._create_kudu_table_query.format(table_name))
+
+    # Enable Kudu transactions and run "insert" query with injected failure when writing
+    # the partial rows. Transaction should be aborted and no rows are inserted into
+    # table.
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=true")
+    query_options = {'debug_action': 'FIS_KUDU_TABLE_SINK_WRITE_PARTIAL_ROW:FAIL@1.0'}
+    try:
+      self.execute_query(self._insert_3_rows_query.format(table_name), query_options)
+      assert False, "query was expected to fail"
+    except ImpalaBeeswaxException as e:
+      assert "FIS_KUDU_TABLE_SINK_WRITE_PARTIAL_ROW" in str(e)
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(0,)]
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @SkipIfBuildType.not_dev_build
+  def test_kudu_txn_abort_partition_lock(self, cursor, unique_database):
+    # Running two separate queries that are inserting to the same Kudu partitions.
+    # Verify that one of the queries should fail, given Kudu's current implementation
+    # of partition locking.
+
+    # Create Kudu table.
+    table_name = "%s.test_kudu_txn_abort_partition_lock" % unique_database
+    self.execute_query(self._create_kudu_table_query.format(table_name))
+
+    # Enable Kudu transactions and run "insert" query with injected sleeping time for
+    # 3 seconds. The query is started asynchronously.
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=true")
+    query_options = {'debug_action': 'FIS_KUDU_TABLE_SINK_WRITE_BATCH:SLEEP@3000'}
+    query = "insert into %s values (0, 'a')" % table_name
+    handle = self.execute_query_async(query, query_options)
+    # Wait for it to start running. Kudu lock the partition for more than 3 seconds.
+    self.wait_for_state(handle, self.client.QUERY_STATES['RUNNING'], 60)
+    sleep(1)
+    # Launch the same query again. The query should fail with error message "aborted
+    # since it tries to acquire the partition lock that is held by another transaction".
+    try:
+      self.execute_query(query)
+      assert False, "query was expected to fail"
+    except ImpalaBeeswaxException as e:
+      assert "aborted since it tries to acquire the partition lock that is held by " \
+          "another transaction" in str(e)
+    # Close the first query.
+    self.client.close_query(handle)
+
+
+class TestKuduTxnKeepalive(CustomKuduTest):
+  """
+  Tests the Kudu transaction to ensure the transaction handle kept by the front-end in
+  KuduTransactionManager keeps the transaction open by heartbeating.
+  """
+  # query to create Kudu table.
+  _create_kudu_table_query = "create table {0} (a int primary key, b string) " \
+      "partition by hash(a) partitions 8 stored as kudu"
+  # queries to insert rows into Kudu table.
+  _insert_3_rows_query = "insert into {0} values (0, 'a'), (1, 'b'), (2, 'c')"
+  # query to get number of rows.
+  _row_num_query = "select count(*) from {0}"
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def setup_class(cls):
+    # Restart Kudu cluster with txn_keepalive_interval_ms as 1000 ms.
+    KUDU_ARGS = "-txn_keepalive_interval_ms=1000"
+    cls._restart_kudu_service(KUDU_ARGS)
+    super(TestKuduTxnKeepalive, cls).setup_class()
+
+  @classmethod
+  def teardown_class(cls):
+    # Restart Kudu cluster with txn_keepalive_interval_ms as default 30000 ms.
+    cls._restart_kudu_service("")
+    super(TestKuduTxnKeepalive, cls).teardown_class()
+
+  @pytest.mark.execute_serially
+  @SkipIfKudu.no_hybrid_clock
+  @SkipIfBuildType.not_dev_build
+  def test_kudu_txn_heartbeat(self, cursor, unique_database):
+    # Create Kudu table.
+    table_name = "%s.test_kudu_txn_heartbeat" % unique_database
+    self.execute_query(self._create_kudu_table_query.format(table_name))
+
+    # Enable Kudu transactions and run "insert" query with injected sleeping time for
+    # 10 seconds before creating session. Transaction should be kept alive and query
+    # is finished successfully.
+    self.execute_query("set ENABLE_KUDU_TRANSACTION=true")
+    query_options = {'debug_action': 'FIS_KUDU_TABLE_SINK_CREATE_SESSION:SLEEP@10000'}
+    self.execute_query(self._insert_3_rows_query.format(table_name), query_options)
+    cursor.execute(self._row_num_query.format(table_name))
+    assert cursor.fetchall() == [(3,)]

@@ -822,7 +822,11 @@ Status ClientRequestState::Finalize(bool check_inflight, const Status* cause) {
   }
 
   // If the transaction didn't get committed by this point then we should just abort it.
-  if (InTransaction()) AbortTransaction();
+  if (InTransaction()) {
+    AbortTransaction();
+  } else if (InKuduTransaction()) {
+    AbortKuduTransaction();
+  }
 
   UpdateEndTime();
 
@@ -947,7 +951,11 @@ Status ClientRequestState::WaitInternal() {
   if (!child_queries.empty()) query_events_->MarkEvent("Child queries finished");
 
   if (GetCoordinator() != NULL) {
-    RETURN_IF_ERROR(GetCoordinator()->Wait());
+    Status status = GetCoordinator()->Wait();
+    if (UNLIKELY(!status.ok())) {
+      if (InKuduTransaction()) AbortKuduTransaction();
+      return status;
+    }
     RETURN_IF_ERROR(UpdateCatalog());
   }
 
@@ -1332,6 +1340,17 @@ Status ClientRequestState::UpdateCatalog() {
       RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(resp.result,
           exec_request_->query_options.sync_ddl));
     }
+  } else if (InKuduTransaction()) {
+    // Commit the Kudu transaction. Clear transaction state if it's successful.
+    // Otherwise, abort the Kudu transaction and clear transaction state.
+    // Note that TQueryExecRequest.finalize_params is not set for inserting rows to Kudu
+    // table.
+    Status status = CommitKuduTransaction();
+    if (UNLIKELY(!status.ok())) {
+      AbortKuduTransaction();
+      LOG(ERROR) << "ERROR Finalizing DML: " << status.GetDetail();
+      return status;
+    }
   }
   query_events_->MarkEvent("DML Metastore update finished");
   return Status::OK();
@@ -1608,6 +1627,38 @@ void ClientRequestState::AbortTransaction() {
 void ClientRequestState::ClearTransactionState() {
   DCHECK(InTransaction());
   transaction_closed_ = true;
+}
+
+bool ClientRequestState::InKuduTransaction() const {
+  // If Kudu transaction is opened, TQueryExecRequest.query_ctx.is_kudu_transactional
+  // is set as true by Frontend.doCreateExecRequest().
+  DCHECK(exec_request_ != nullptr);
+  return (exec_request_->query_exec_request.query_ctx.is_kudu_transactional
+      && !transaction_closed_);
+}
+
+void ClientRequestState::AbortKuduTransaction() {
+  DCHECK(InKuduTransaction());
+  if (frontend_->AbortKuduTransaction(query_ctx_.query_id).ok()) {
+    query_events_->MarkEvent("Kudu transaction aborted");
+  } else {
+    VLOG(1) << Substitute("Unable to abort Kudu transaction with query-id: $0",
+        PrintId(query_ctx_.query_id));
+  }
+  transaction_closed_ = true;
+}
+
+Status ClientRequestState::CommitKuduTransaction() {
+  DCHECK(InKuduTransaction());
+  Status status = frontend_->CommitKuduTransaction(query_ctx_.query_id);
+  if (status.ok()) {
+    query_events_->MarkEvent("Kudu transaction committed");
+    transaction_closed_ = true;
+  } else {
+    VLOG(1) << Substitute("Unable to commit Kudu transaction with query-id: $0",
+        PrintId(query_ctx_.query_id));
+  }
+  return status;
 }
 
 void ClientRequestState::LogQueryEvents() {

@@ -678,6 +678,9 @@ enum TImpalaQueryOptions {
   //     VERIFICATION - Take both code paths and verify that the results from both are
   //                    the same.
   MINMAX_FILTER_FAST_CODE_PATH = 131
+
+  // If true, Kudu's multi-row transaction is enabled.
+  ENABLE_KUDU_TRANSACTION = 132
 }
 
 // The summary of a DML statement.

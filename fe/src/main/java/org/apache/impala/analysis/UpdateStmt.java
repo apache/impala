@@ -67,7 +67,8 @@ public class UpdateStmt extends ModifyStmt {
     Preconditions.checkState(table_ != null);
     DataSink dataSink = TableSink.create(table_, TableSink.Op.UPDATE,
         ImmutableList.<Expr>of(), resultExprs, referencedColumns_, false, false,
-        new Pair<>(ImmutableList.<Integer> of(), TSortingOrder.LEXICAL));
+        new Pair<>(ImmutableList.<Integer>of(), TSortingOrder.LEXICAL), -1, kuduTxnToken_,
+        0);
     Preconditions.checkState(!referencedColumns_.isEmpty());
     return dataSink;
   }

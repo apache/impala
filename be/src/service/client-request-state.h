@@ -703,7 +703,8 @@ class ClientRequestState {
 
   /// Gather and publish all required updates to the metastore.
   /// For transactional queries:
-  /// If everything goes well the transaction is committed by the Catalogd.
+  /// If everything goes well the Hive transaction is committed by the Catalogd,
+  /// but the Kudu transaction is committed by this function.
   /// If an error occurs the transaction gets aborted by this function. Either way
   /// the transaction will be closed when this function returns.
   Status UpdateCatalog() WARN_UNUSED_RESULT;
@@ -748,18 +749,27 @@ class ClientRequestState {
   /// 'SET' and all of them for 'SET ALL'
   void PopulateResultForSet(bool is_set_all);
 
-  /// Returns the transaction id for this client request. 'InTransaction()' must be
+  /// Returns the Hive transaction id for this client request. 'InTransaction()' must be
   /// true when invoked.
   int64_t GetTransactionId() const;
 
-  /// Returns true if there is an open transaction for this client request.
+  /// Returns true if there is an open Hive transaction for this client request.
   bool InTransaction() const;
 
-  /// Aborts the transaction of this client request.
+  /// Aborts the Hive transaction of this client request.
   void AbortTransaction();
 
-  /// Invoke this function when the transaction is committed or aborted.
+  /// Invoke this function when the Hive transaction is committed or aborted.
   void ClearTransactionState();
+
+  /// Returns true if there is an open Kudu transaction for this client request.
+  bool InKuduTransaction() const;
+
+  /// Aborts the Kudu transaction of this client request.
+  void AbortKuduTransaction();
+
+  /// Commits the Kudu transaction of this client request.
+  Status CommitKuduTransaction();
 
   /// helper that logs the audit record for this query id. Takes the query_status
   /// as input parameter so that it operates on the same status polled in the
