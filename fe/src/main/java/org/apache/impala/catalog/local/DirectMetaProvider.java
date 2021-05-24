@@ -41,6 +41,8 @@ import org.apache.impala.catalog.FileMetadataLoader;
 import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.HdfsCachePool;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
+import org.apache.impala.catalog.HdfsPartitionLocationCompressor;
+import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.SqlConstraints;
@@ -401,8 +403,28 @@ class DirectMetaProvider implements MetaProvider {
     }
 
     @Override
-    public Partition getHmsPartition() {
-      return msPartition_;
+    public Map<String, String> getHmsParameters() { return msPartition_.getParameters(); }
+
+    @Override
+    public long getWriteId() { return msPartition_.getWriteId(); }
+
+    @Override
+    public HdfsStorageDescriptor getInputFormatDescriptor() {
+      String tblName = msPartition_.getDbName() + "." + msPartition_.getTableName();
+      try {
+        return HdfsStorageDescriptor.fromStorageDescriptor(tblName, msPartition_.getSd());
+      } catch (HdfsStorageDescriptor.InvalidStorageDescriptorException e) {
+        throw new LocalCatalogException(String.format(
+            "Invalid input format descriptor for partition (values=%s) of table %s",
+            msPartition_.getValues(), tblName), e);
+      }
+    }
+
+    @Override
+    public HdfsPartitionLocationCompressor.Location getLocation() {
+      // Treat as no prefix compression.
+      return new HdfsPartitionLocationCompressor(0).new Location(
+          msPartition_.getSd().getLocation());
     }
 
     @Override
@@ -463,6 +485,11 @@ class DirectMetaProvider implements MetaProvider {
     public boolean isMarkedCached() {
       throw new UnsupportedOperationException("Hdfs caching not supported with " +
           "DirectMetaProvider implementation");
+    }
+
+    @Override
+    public List<String> getPartitionPrefixes() {
+      return Collections.emptyList();
     }
   }
 

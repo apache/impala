@@ -301,6 +301,18 @@ struct THdfsPartitionLocation {
   2: required string suffix
 }
 
+// Represents the file format metadata for files stored in a HDFS table or partition.
+struct THdfsStorageDescriptor {
+  1: required byte lineDelim
+  2: required byte fieldDelim
+  3: required byte collectionDelim
+  4: required byte mapKeyDelim
+  5: required byte escapeChar
+  6: required byte quoteChar
+  7: required THdfsFileFormat fileFormat
+  8: required i32 blockSize
+}
+
 // Represents an HDFS partition
 // TODO(vercegovac): rename to TFsPartition
 struct THdfsPartition {
@@ -310,16 +322,8 @@ struct THdfsPartition {
   // as part of query plans and fragments.
   // ============================================================
 
-  1: optional byte lineDelim
-  2: optional byte fieldDelim
-  3: optional byte collectionDelim
-  4: optional byte mapKeyDelim
-  5: optional byte escapeChar
-  6: optional THdfsFileFormat fileFormat
-
   // These are Literal expressions
   7: list<Exprs.TExpr> partitionKeyExprs
-  8: optional i32 blockSize
 
   10: optional THdfsPartitionLocation location
 
@@ -381,6 +385,8 @@ struct THdfsPartition {
   23: optional string db_name
   24: optional string tbl_name
   25: optional string partition_name
+
+  27: optional THdfsStorageDescriptor hdfs_storage_descriptor
 }
 
 // Constant partition ID used for THdfsPartition.prototype_partition below.

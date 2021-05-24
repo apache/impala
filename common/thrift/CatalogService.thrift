@@ -350,7 +350,9 @@ struct TTableInfoSelector {
   // ... each such partition should include its name.
   3: bool want_partition_names
 
-  // ... each such partition should include metadata (location, etc).
+  // ... each such partition should include metadata (location, etc). Note that the
+  // response won't contain hms partition structs (use want_hms_partition instead for
+  // this purpose).
   4: bool want_partition_metadata
 
   // ... each such partition should include its file info
@@ -380,6 +382,13 @@ struct TTableInfoSelector {
   // to true, the list provided in want_stats_for_column_names will be ignored and
   // stats for all columns will be returned.
   11: optional bool want_stats_for_all_columns
+
+  // The response should contain the HMS partition struct. This indicates all fields
+  // requested by want_partition_metadata will be contained in the HMS partitions.
+  // So setting both want_partition_metadata and want_hms_partition to true is a waste.
+  // Note that want_hms_partition=true will consume more space (IMPALA-7501), so only use
+  // it in cases the clients do need HMS partition structs.
+  12: bool want_hms_partition
 }
 
 // Returned information about a particular partition.
@@ -389,7 +398,7 @@ struct TPartialPartitionInfo {
   // Set if 'want_partition_names' was set in TTableInfoSelector.
   2: optional string name
 
-  // Set if 'want_partition_metadata' was set in TTableInfoSelector.
+  // Set if 'want_hms_partition' was set in TTableInfoSelector.
   3: optional hive_metastore.Partition hms_partition
 
   // Set if 'want_partition_files' was set in TTableInfoSelector.
@@ -416,6 +425,14 @@ struct TPartialPartitionInfo {
   // necessarily mean the data is cached. Set when 'want_partition_metadata' is true in
   // TTableInfoSelector.
   7: optional bool is_marked_cached
+
+  // Fields 10-13 are set if 'want_partition_metadata' was set in TTableInfoSelector.
+  // These fields are actual info of hms_partition that Impala needs, and are better
+  // compressed.
+  10: optional map<string, string> hms_parameters
+  11: optional i64 write_id
+  12: optional CatalogObjects.THdfsStorageDescriptor hdfs_storage_descriptor
+  13: optional CatalogObjects.THdfsPartitionLocation location
 }
 
 // Returned information about a Table, as selected by TTableInfoSelector.
@@ -453,6 +470,10 @@ struct TPartialTableInfo {
   // Set if this table is marked as cached by hdfs caching. Does not necessarily mean the
   // data is cached or that all/any partitions are cached. Only used in analyzing DDLs.
   10: optional bool is_marked_cached
+
+  // The prefixes of locations of partitions in this table. See THdfsPartitionLocation for
+  // the description of how a prefix is computed.
+  11: optional list<string> partition_prefixes
 }
 
 struct TBriefTableMeta {

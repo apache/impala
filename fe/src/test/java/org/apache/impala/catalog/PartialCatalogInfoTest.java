@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
@@ -47,6 +48,7 @@ import org.apache.impala.thrift.TDatabase;
 import org.apache.impala.thrift.TDbInfoSelector;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
+import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableInfoSelector;
@@ -166,14 +168,17 @@ public class PartialCatalogInfoTest {
     resp = sendRequest(req);
     assertNull(resp.table_info.hms_table);
     assertEquals(2, resp.table_info.partitions.size());
+    assertEquals(1, resp.table_info.getPartition_prefixesSize());
+    assertEquals("hdfs://localhost:20500/test-warehouse/alltypes/",
+        resp.table_info.partition_prefixes.get(0));
     partInfo = resp.table_info.partitions.get(0);
     assertNull(partInfo.name);
     assertEquals(req.table_info_selector.partition_ids.get(0), (Long)partInfo.id);
-    assertTrue(partInfo.hms_partition.getSd().getLocation().startsWith(
-        "hdfs://localhost:20500/test-warehouse/alltypes/year="));
-    // TODO(todd): we should probably transfer a compressed descriptor instead
-    // and refactor the MetaProvider interface to expose those since there is
-    // a lot of redundant info in partition descriptors.
+    assertEquals(0, partInfo.location.prefix_index);
+    assertTrue("Bad suffix " + partInfo.location.suffix,
+        partInfo.location.suffix.matches("year=\\d+/month=\\d+"));
+    assertNotNull(partInfo.hdfs_storage_descriptor);
+    assertEquals(THdfsFileFormat.TEXT, partInfo.hdfs_storage_descriptor.fileFormat);
   }
 
   @Test

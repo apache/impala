@@ -17,9 +17,6 @@
 
 package org.apache.impala.catalog;
 
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
-
 import java.sql.SQLException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -37,7 +34,6 @@ import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.THdfsFileDesc;
-import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TTable;
@@ -261,10 +257,17 @@ public class PartialCatalogInfoWriteIdTest {
       .build();
     TGetPartialCatalogObjectResponse response = sendRequest(request);
     Assert.assertEquals(1, response.getTable_info().getPartitionsSize());
+    Assert.assertEquals(1, response.getTable_info().getPartition_prefixesSize());
     Assert.assertNotNull(
-      response.getTable_info().getPartitions().get(0).getFile_descriptors());
+        response.getTable_info().getPartitions().get(0).getFile_descriptors());
     Assert.assertNotNull(
-      response.getTable_info().getPartitions().get(0).getHms_partition());
+        response.getTable_info().getPartitions().get(0).getLocation());
+    Assert.assertEquals(0,
+        response.getTable_info().getPartitions().get(0).getLocation().getPrefix_index());
+    Assert.assertNotNull(
+        response.getTable_info().getPartitions().get(0).getHdfs_storage_descriptor());
+    Assert.assertNotNull(
+        response.getTable_info().getPartitions().get(0).getHms_parameters());
 
     // skipping request for file-metadata should not affect the result
     request = new RequestBuilder()
@@ -277,7 +280,8 @@ public class PartialCatalogInfoWriteIdTest {
     Assert.assertEquals(1, response.getTable_info().getPartitionsSize());
     for (TPartialPartitionInfo partInfo : response.getTable_info().getPartitions()) {
       Assert.assertNull(partInfo.getFile_descriptors());
-      Assert.assertNull(partInfo.getHms_partition());
+      Assert.assertNull(partInfo.getHdfs_storage_descriptor());
+      Assert.assertNull(partInfo.getLocation());
     }
 
     // we request a newer WriteIdList now, and catalog needs to reload
@@ -289,10 +293,13 @@ public class PartialCatalogInfoWriteIdTest {
       .build();
     response = sendRequest(request);
     Assert.assertEquals(2, response.getTable_info().getPartitionsSize());
+    Assert.assertEquals(1, response.getTable_info().getPartition_prefixesSize());
     // we expect both the partitions to have the file-metadata in the response
     for (TPartialPartitionInfo partInfo : response.getTable_info().getPartitions()) {
       Assert.assertNotNull(partInfo.getFile_descriptors());
-      Assert.assertNotNull(partInfo.getHms_partition());
+      Assert.assertNotNull(partInfo.getHdfs_storage_descriptor());
+      Assert.assertNotNull(partInfo.getLocation());
+      Assert.assertEquals(0, partInfo.getLocation().getPrefix_index());
     }
     // table must be reloaded now
     long newerVersion = catalog_.getTable(testDbName, testPartitionedTbl)

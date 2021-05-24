@@ -18,7 +18,6 @@
 package org.apache.impala.catalog.iceberg;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -27,7 +26,6 @@ import java.util.Set;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
@@ -42,7 +40,6 @@ import org.apache.impala.catalog.CtasTargetTable;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDb;
-import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsStorageDescriptor;
@@ -54,12 +51,11 @@ import org.apache.impala.catalog.local.LocalDb;
 import org.apache.impala.catalog.local.LocalFsTable;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.catalog.StructType;
-import org.apache.impala.catalog.Table;
-import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.THdfsStorageDescriptor;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
@@ -266,8 +262,10 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
 
   private THdfsPartition createPrototypePartition() {
     THdfsPartition prototypePart = new THdfsPartition();
-    prototypePart.setFileFormat(IcebergUtil.toTHdfsFileFormat(icebergFileFormat_));
-    prototypePart.setBlockSize(hdfsSd_.getBlockSize());
+    THdfsStorageDescriptor sd = new THdfsStorageDescriptor();
+    sd.setFileFormat(IcebergUtil.toTHdfsFileFormat(icebergFileFormat_));
+    sd.setBlockSize(hdfsSd_.getBlockSize());
+    prototypePart.setHdfs_storage_descriptor(sd);
     prototypePart.setId(CatalogObjectsConstants.PROTOTYPE_PARTITION_ID);
     return prototypePart;
   }

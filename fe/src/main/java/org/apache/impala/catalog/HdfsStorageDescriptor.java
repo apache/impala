@@ -25,6 +25,7 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.impala.thrift.THdfsPartition;
+import org.apache.impala.thrift.THdfsStorageDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,7 +178,6 @@ public class HdfsStorageDescriptor {
     if (escapeChar == fieldDelim ||
         escapeChar == lineDelim ||
         escapeChar == collectionDelim) {
-      // TODO: we should output the table name here but it's hard to get to now.
       this.escapeChar_ = DEFAULT_ESCAPE_CHAR;
       LOG.warn("Escape character for table, " + tblName + " is set to "
           + "the same character as one of the delimiters.  Ignoring escape character.");
@@ -241,15 +241,17 @@ public class HdfsStorageDescriptor {
     }
   }
 
-  public static HdfsStorageDescriptor fromThriftPartition(THdfsPartition thriftPartition,
+  public static HdfsStorageDescriptor fromThrift(THdfsStorageDescriptor tDesc,
       String tableName) {
     return INTERNER.intern(new HdfsStorageDescriptor(tableName,
-        HdfsFileFormat.fromThrift(thriftPartition.getFileFormat()),
-        thriftPartition.lineDelim, thriftPartition.fieldDelim,
-        thriftPartition.collectionDelim, thriftPartition.mapKeyDelim,
-        thriftPartition.escapeChar,
-        (byte) '"', // TODO: We should probably add quoteChar to THdfsPartition.
-        thriftPartition.blockSize));
+        HdfsFileFormat.fromThrift(tDesc.getFileFormat()), tDesc.lineDelim,
+        tDesc.fieldDelim, tDesc.collectionDelim, tDesc.mapKeyDelim, tDesc.escapeChar,
+        tDesc.quoteChar, tDesc.blockSize));
+  }
+
+  public THdfsStorageDescriptor toThrift() {
+    return new THdfsStorageDescriptor(lineDelim_, fieldDelim_, collectionDelim_,
+        mapKeyDelim_, escapeChar_, quoteChar_, fileFormat_.toThrift(), blockSize_);
   }
 
   public HdfsStorageDescriptor cloneWithChangedFileFormat(HdfsFileFormat newFormat) {

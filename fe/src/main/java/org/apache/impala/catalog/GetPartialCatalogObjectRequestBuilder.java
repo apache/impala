@@ -34,7 +34,7 @@ import org.apache.impala.thrift.TTableInfoSelector;
  */
 public class GetPartialCatalogObjectRequestBuilder {
   private boolean wantFileMetadata_;
-  private boolean wantPartitionMeta_;
+  private boolean wantHmsPartition_;
   private boolean wantPartitionNames_;
   private String tblName_, dbName_;
   private boolean wantHmsTable_;
@@ -64,7 +64,7 @@ public class GetPartialCatalogObjectRequestBuilder {
    */
   public GetPartialCatalogObjectRequestBuilder wantFiles() {
     wantFileMetadata_ = true;
-    wantPartitionMeta_ = true;
+    wantHmsPartition_ = true;
     wantPartitionNames_ = true;
     return this;
   }
@@ -75,7 +75,7 @@ public class GetPartialCatalogObjectRequestBuilder {
    */
   public GetPartialCatalogObjectRequestBuilder wantPartitions() {
     wantPartitionNames_ = true;
-    wantPartitionMeta_ = true;
+    wantHmsPartition_ = true;
     return this;
   }
 
@@ -133,8 +133,8 @@ public class GetPartialCatalogObjectRequestBuilder {
     if (wantPartitionNames_) {
       req.table_info_selector.want_partition_names = true;
     }
-    if (wantPartitionMeta_) {
-      req.table_info_selector.want_partition_metadata = true;
+    if (wantHmsPartition_) {
+      req.table_info_selector.want_hms_partition = true;
     }
     if (wantFileMetadata_) {
       req.table_info_selector.want_partition_files = true;

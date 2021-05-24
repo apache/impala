@@ -350,14 +350,8 @@ public abstract class FeCatalogUtils {
       ThriftObjectType type) {
     HdfsStorageDescriptor sd = part.getInputFormatDescriptor();
     THdfsPartition thriftHdfsPart = new THdfsPartition();
-    thriftHdfsPart.setLineDelim(sd.getLineDelim());
-    thriftHdfsPart.setFieldDelim(sd.getFieldDelim());
-    thriftHdfsPart.setCollectionDelim(sd.getCollectionDelim());
-    thriftHdfsPart.setMapKeyDelim(sd.getMapKeyDelim());
-    thriftHdfsPart.setEscapeChar(sd.getEscapeChar());
-    thriftHdfsPart.setFileFormat(sd.getFileFormat().toThrift());
+    thriftHdfsPart.setHdfs_storage_descriptor(sd.toThrift());
     thriftHdfsPart.setPartitionKeyExprs(Expr.treesToThrift(part.getPartitionValues()));
-    thriftHdfsPart.setBlockSize(sd.getBlockSize());
     thriftHdfsPart.setId(part.getId());
     thriftHdfsPart.setLocation(part.getLocationAsThrift());
     if (part.getWriteId() >= 0)
