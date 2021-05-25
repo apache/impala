@@ -101,6 +101,7 @@ import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeDataSource;
 import org.apache.impala.catalog.FeDataSourceTable;
 import org.apache.impala.catalog.FeDb;
+import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
@@ -110,6 +111,7 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.ImpaladCatalog;
 import org.apache.impala.catalog.ImpaladTableUsageTracker;
 import org.apache.impala.catalog.MetaStoreClientPool;
+import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
@@ -1694,7 +1696,13 @@ public class Frontend {
           long txnId = openTransaction(queryCtx);
           timeline.markEvent("Transaction opened (" + String.valueOf(txnId) + ")");
           Collection<FeTable> tables = stmtTableCache.tables.values();
-          createLockForInsert(txnId, tables, targetTable, insertStmt.isOverwrite());
+          String staticPartitionTarget = null;
+          if (insertStmt.isStaticPartitionTarget()) {
+            staticPartitionTarget = FeCatalogUtils.getPartitionName(
+                insertStmt.getPartitionKeyValues());
+          }
+          createLockForInsert(txnId, tables, targetTable, insertStmt.isOverwrite(),
+              staticPartitionTarget);
           long writeId = allocateWriteId(queryCtx, targetTable);
           insertStmt.setWriteId(writeId);
         }
@@ -2141,11 +2149,14 @@ public class Frontend {
    * @param txnId the transaction id to be used.
    * @param tables the tables in the query.
    * @param targetTable the target table of INSERT. Must be transactional.
-   * @param isOverwrite
+   * @param isOverwrite true when the INSERT stmt is an INSERT OVERWRITE
+   * @param staticPartitionTarget the static partition target in case of static partition
+   *   INSERT
    * @throws TransactionException
    */
   private void createLockForInsert(Long txnId, Collection<FeTable> tables,
-      FeTable targetTable, boolean isOverwrite) throws TransactionException {
+      FeTable targetTable, boolean isOverwrite, String staticPartitionTarget)
+      throws TransactionException {
     Preconditions.checkState(
         AcidUtils.isTransactionalTable(targetTable.getMetaStoreTable().getParameters()));
     List<LockComponent> lockComponents = new ArrayList<>(tables.size());
@@ -2158,7 +2169,6 @@ public class Frontend {
       LockComponent lockComponent = new LockComponent();
       lockComponent.setDbname(table.getDb().getName());
       lockComponent.setTablename(table.getName());
-      lockComponent.setLevel(LockLevel.TABLE);
       if (table == targetTable) {
         if (isOverwrite) {
           lockComponent.setType(LockType.EXCLUSIVE);
@@ -2166,7 +2176,14 @@ public class Frontend {
           lockComponent.setType(LockType.SHARED_READ);
         }
         lockComponent.setOperationType(DataOperationType.INSERT);
+        if (staticPartitionTarget != null) {
+          lockComponent.setLevel(LockLevel.PARTITION);
+          lockComponent.setPartitionname(staticPartitionTarget);
+        } else {
+          lockComponent.setLevel(LockLevel.TABLE);
+        }
       } else {
+        lockComponent.setLevel(LockLevel.TABLE);
         lockComponent.setType(LockType.SHARED_READ);
         lockComponent.setOperationType(DataOperationType.SELECT);
       }

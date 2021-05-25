@@ -47,6 +47,7 @@ import org.apache.impala.thrift.TGetCatalogMetricsResult;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.AcidUtils;
+import org.apache.impala.util.MetaStoreUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -297,6 +298,18 @@ public abstract class FeCatalogUtils {
   public static String getPartitionName(FeFsTable table, List<String> partitionValues) {
     List<String> partitionKeys = table.getClusteringColumns().stream()
         .map(Column::getName)
+        .collect(Collectors.toList());
+    return FileUtils.makePartName(partitionKeys, partitionValues);
+  }
+
+  public static String getPartitionName(List<PartitionKeyValue> partitionKeyValues) {
+    List<String> partitionKeys = partitionKeyValues.stream()
+        .map(PartitionKeyValue::getColName)
+        .collect(Collectors.toList());
+    List<String> partitionValues = partitionKeyValues.stream()
+        .map(PartitionKeyValue::getLiteralValue)
+        .map(l -> PartitionKeyValue.getPartitionKeyValueString(
+             l, MetaStoreUtil.DEFAULT_NULL_PARTITION_KEY_VALUE))
         .collect(Collectors.toList());
     return FileUtils.makePartName(partitionKeys, partitionValues);
   }

@@ -23,7 +23,7 @@ from multiprocessing import Value
 
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.parametrize import UniqueDatabase
-from tests.common.skip import SkipIfHive2, SkipIfS3, SkipIfGCS
+from tests.common.skip import SkipIf, SkipIfHive2, SkipIfS3, SkipIfGCS
 from tests.stress.stress_util import Task, run_tasks
 
 NUM_OVERWRITES = 2
@@ -177,6 +177,55 @@ class TestAcidInsertsBasic(TestAcidStress):
     written by Hive."""
     for is_partitioned in [False, True]:
       self._run_test_read_impala_inserts(unique_database, is_partitioned)
+
+  def _impala_role_partition_writer(self, tbl_name, partition, is_overwrite, sleep_sec):
+    insert_op = "OVERWRITE" if is_overwrite else "INTO"
+    try:
+      impalad_client = ImpalaTestSuite.create_impala_client()
+      impalad_client.execute(
+          """insert {op} table {tbl_name} partition({partition})
+             select sleep({sleep_ms})""".format(op=insert_op, tbl_name=tbl_name,
+          partition=partition, sleep_ms=sleep_sec * 1000))
+    finally:
+      impalad_client.close()
+
+  @pytest.mark.execute_serially
+  @pytest.mark.stress
+  @SkipIf.not_hdfs
+  @UniqueDatabase.parametrize(sync_ddl=True)
+  def test_partitioned_inserts(self, unique_database):
+    """Check that the different ACID write operations take appropriate locks.
+       INSERT INTO: should take a shared lock
+       INSERT OVERWRITE: should take an exclusive lock
+       Both should take PARTITION-level lock in case of static partition insert."""
+    tbl_name = "%s.test_concurrent_partitioned_inserts" % unique_database
+    self.client.set_configuration_option("SYNC_DDL", "true")
+    self.client.execute("""
+        CREATE TABLE {0} (i int) PARTITIONED BY (p INT, q INT)
+        TBLPROPERTIES(
+        'transactional_properties'='insert_only','transactional'='true')""".format(
+        tbl_name))
+    # Warmup INSERT
+    self.execute_query("alter table {0} add partition(p=0,q=0)".format(tbl_name))
+    sleep_sec = 5
+    task_insert_into = Task(self._impala_role_partition_writer, tbl_name,
+        "p=1,q=1", False, sleep_sec)
+    # INSERT INTO the same partition can run in parallel.
+    duration = run_tasks([task_insert_into, task_insert_into])
+    assert duration < 3 * sleep_sec
+    task_insert_overwrite = Task(self._impala_role_partition_writer, tbl_name,
+      "p=1,q=1", True, sleep_sec)
+    # INSERT INTO + INSERT OVERWRITE should have mutual exclusion.
+    duration = run_tasks([task_insert_into, task_insert_overwrite])
+    assert duration > 4 * sleep_sec
+    # INSERT OVERWRITEs to the same partition should have mutual exclusion.
+    duration = run_tasks([task_insert_overwrite, task_insert_overwrite])
+    assert duration > 4 * sleep_sec
+    task_insert_overwrite_2 = Task(self._impala_role_partition_writer, tbl_name,
+      "p=1,q=2", True, sleep_sec)
+    # INSERT OVERWRITEs to different partitions can run in parallel.
+    duration = run_tasks([task_insert_overwrite, task_insert_overwrite_2])
+    assert duration < 3 * sleep_sec
 
 
 class TestConcurrentAcidInserts(TestAcidStress):

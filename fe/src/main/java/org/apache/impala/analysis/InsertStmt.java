@@ -642,12 +642,16 @@ public class InsertStmt extends StatementBase {
   /**
    * Returns true if all the partition key values of the target table are static.
    */
-  private boolean isStaticPartitionTarget() {
+  public boolean isStaticPartitionTarget() {
     if (partitionKeyValues_ == null) return false;
     for (PartitionKeyValue pkv : partitionKeyValues_) {
       if (pkv.isDynamic()) return false;
     }
     return true;
+  }
+
+  public List<PartitionKeyValue> getPartitionKeyValues() {
+    return partitionKeyValues_;
   }
 
   private boolean isIcebergTarget() {
