@@ -502,6 +502,9 @@ struct TQueryOptions {
   // See comment in ImpalaService.thrift
   128: optional TKuduReplicaSelection kudu_replica_selection =
       TKuduReplicaSelection.CLOSEST_REPLICA;
+
+  // See comment in ImpalaService.thrift
+  129: optional bool delete_stats_in_truncate = true;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

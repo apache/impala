@@ -171,6 +171,7 @@ import org.apache.impala.thrift.TShowFilesParams;
 import org.apache.impala.thrift.TShowStatsOp;
 import org.apache.impala.thrift.TStmtType;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TTruncateParams;
 import org.apache.impala.thrift.TUpdateCatalogCacheRequest;
 import org.apache.impala.thrift.TUpdateCatalogCacheResponse;
 import org.apache.impala.thrift.TUpdateExecutorMembershipRequest;
@@ -589,7 +590,14 @@ public class Frontend {
       TDdlExecRequest req = new TDdlExecRequest();
       TruncateStmt stmt = analysis.getTruncateStmt();
       req.setDdl_type(TDdlType.TRUNCATE_TABLE);
-      req.setTruncate_params(stmt.toThrift());
+      TTruncateParams truncateParams = stmt.toThrift();
+      TQueryOptions queryOptions = result.getQuery_options();
+      // if DELETE_STATS_IN_TRUNCATE option is unset forward it to catalogd
+      // so that it can skip deleting the statistics during truncate execution
+      if (!queryOptions.isDelete_stats_in_truncate()) {
+        truncateParams.setDelete_stats(false);
+      }
+      req.setTruncate_params(truncateParams);
       ddl.setDdl_params(req);
     } else if (analysis.isDropFunctionStmt()) {
       ddl.op_type = TCatalogOpType.DDL;

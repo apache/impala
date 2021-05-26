@@ -701,6 +701,10 @@ struct TTruncateParams {
 
   // If true, no error is raised if the target table does not exist
   2: required bool if_exists
+
+  // If false, table stats  will not be deleted as part of
+  // the truncate operation
+  3: optional bool delete_stats = true
 }
 
 // Parameters of DROP FUNCTION commands

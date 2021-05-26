@@ -661,6 +661,10 @@ enum TImpalaQueryOptions {
   //     LEADER_ONLY     - Select the LEADER replica.
   //     CLOSEST_REPLICA - Select the closest replica to the client (default).
   KUDU_REPLICA_SELECTION = 127
+
+  // If false, a truncate DDL operation will not delete table stats.
+  // the default value of this is true as set in Query.thrift
+  DELETE_STATS_IN_TRUNCATE = 128
 }
 
 // The summary of a DML statement.

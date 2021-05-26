@@ -1084,6 +1084,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_kudu_replica_selection(enum_type);
         break;
       }
+      case TImpalaQueryOptions::DELETE_STATS_IN_TRUNCATE: {
+        query_options->__set_delete_stats_in_truncate(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

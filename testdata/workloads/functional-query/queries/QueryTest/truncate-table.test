@@ -193,3 +193,215 @@ select count(*) from t3;
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# First create a partitioned table
+create table t4 like functional.alltypes
+location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/t4';
+insert into t4 partition(year, month) select * from functional.alltypes;
+compute incremental stats t4;
+# if DELETE_STATS_IN_TRUNCATE is unset then truncate should not
+# delete the table statistics.
+set DELETE_STATS_IN_TRUNCATE=0;
+truncate table t4;
+show table stats t4;
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'2009','1',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','2',280,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','3',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','4',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','5',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','6',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','7',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','8',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','9',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','10',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','11',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','12',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','1',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','2',280,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','3',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','4',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','5',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','6',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','7',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','8',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','9',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','10',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','11',300,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','12',310,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total','',7300,0,'0B','0B','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats t4;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
+---- RESULTS
+'id','INT',7300,0,4,4,-1,-1
+'bool_col','BOOLEAN',2,0,1,1,3650,3650
+'tinyint_col','TINYINT',10,0,1,1,-1,-1
+'smallint_col','SMALLINT',10,0,2,2,-1,-1
+'int_col','INT',10,0,4,4,-1,-1
+'bigint_col','BIGINT',10,0,8,8,-1,-1
+'float_col','FLOAT',10,0,4,4,-1,-1
+'double_col','DOUBLE',10,0,8,8,-1,-1
+'date_string_col','STRING',736,0,8,8,-1,-1
+'string_col','STRING',10,0,1,1,-1,-1
+'timestamp_col','TIMESTAMP',7300,0,16,16,-1,-1
+'year','INT',2,0,4,4,-1,-1
+'month','INT',12,0,4,4,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+#Verify that truncate was successful
+select count(*) from t4;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+insert into t4 partition(year, month) select * from functional.alltypes;
+compute incremental stats t4;
+# if DELETE_STATS_IN_TRUNCATE is set then truncate should
+# delete the statistics.
+set DELETE_STATS_IN_TRUNCATE=1;
+truncate table t4;
+show table stats t4;
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'2009','1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','3',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','4',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','5',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','6',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','7',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','8',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','9',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','10',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','11',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','12',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','1',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','3',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','4',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','5',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','6',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','7',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','8',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','9',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','10',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','11',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','12',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'Total','',-1,0,'0B','0B','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show that the truncation removed the column stats.
+show column stats t4;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
+---- RESULTS
+'id','INT',-1,-1,4,4,-1,-1
+'bool_col','BOOLEAN',-1,-1,1,1,-1,-1
+'tinyint_col','TINYINT',-1,-1,1,1,-1,-1
+'smallint_col','SMALLINT',-1,-1,2,2,-1,-1
+'int_col','INT',-1,-1,4,4,-1,-1
+'bigint_col','BIGINT',-1,-1,8,8,-1,-1
+'float_col','FLOAT',-1,-1,4,4,-1,-1
+'double_col','DOUBLE',-1,-1,8,8,-1,-1
+'date_string_col','STRING',-1,-1,-1,-1,-1,-1
+'string_col','STRING',-1,-1,-1,-1,-1,-1
+'timestamp_col','TIMESTAMP',-1,-1,16,16,-1,-1
+'year','INT',2,0,4,4,-1,-1
+'month','INT',12,0,4,4,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+#Verify that truncate was successful
+select count(*) from t4;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Unpartitioned table case: Show that if DELETE_STATS_IN_TRUNCATE is
+# unset truncation removes all files
+# but does not delete table and column stats.
+create table t6 like functional.tinytable
+location '$FILESYSTEM_PREFIX/test-warehouse/$DATABASE.db/t6';
+insert into t6 select * from functional.tinytable;
+compute incremental stats t6;
+set DELETE_STATS_IN_TRUNCATE=0;
+truncate table t6;
+show table stats t6;
+---- LABELS
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+3,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show that the truncation removed the column stats.
+show column stats t6;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
+---- RESULTS
+'a','STRING',3,0,8,6.666666507720947,-1,-1
+'b','STRING',3,0,7,4,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+#Verify that truncate was successful
+select count(*) from t6;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Unpartitioned table case: Show that if DELETE_STATS_IN_TRUNCATE is
+# set truncation removes all files and deletes stats.
+insert into t6 select * from functional.tinytable;
+compute incremental stats t6;
+# table stats should be deleted
+set DELETE_STATS_IN_TRUNCATE=1;
+truncate table t6;
+show table stats t6;
+---- LABELS
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Show that the truncation removed the column stats.
+show column stats t6;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
+---- RESULTS
+'a','STRING',-1,-1,-1,-1,-1,-1
+'b','STRING',-1,-1,-1,-1,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+#Verify that truncate was successful
+select count(*) from t6;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====

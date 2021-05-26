@@ -2173,6 +2173,7 @@ public class CatalogOpExecutor {
     Preconditions.checkState(catalog_.getLock().isWriteLockedByCurrentThread());
     catalog_.getLock().writeLock().unlock();
     TableName tblName = TableName.fromThrift(params.getTable_name());
+    Stopwatch sw = Stopwatch.createStarted();
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       long newCatalogVersion = 0;
       IMetaStoreClient hmsClient = msClient.getHiveClient();
@@ -2188,6 +2189,8 @@ public class CatalogOpExecutor {
         catalog_.lockTableInTransaction(tblName.getDb(), tblName.getTbl(), txn,
             DataOperationType.NO_TXN, ctx);
         tryWriteLock(table, "truncating");
+        LOG.trace("Time elapsed after taking write lock on table {}: {} msec",
+            table.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
         newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
         catalog_.getLock().writeLock().unlock();
         TblTransaction tblTxn = MetastoreShim.createTblTransaction(hmsClient,
@@ -2197,16 +2200,17 @@ public class CatalogOpExecutor {
         // if moves the files into in replication change manager location which is later
         // used for replication.
         if (isTableBeingReplicated(hmsClient, hdfsTable)) {
-          Stopwatch sw = Stopwatch.createStarted();
           String dbName = Preconditions.checkNotNull(hdfsTable.getDb()).getName();
           hmsClient.truncateTable(dbName, hdfsTable.getName(), null, tblTxn.validWriteIds,
               tblTxn.writeId);
-          LOG.debug("Time taken to truncate table {} using HMS API: {} msec",
-              hdfsTable.getFullName(), sw.stop().elapsed(TimeUnit.MILLISECONDS));
+          LOG.trace("Time elapsed to truncate table {} using HMS API: {} msec",
+              hdfsTable.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
         } else {
           Collection<? extends FeFsPartition> parts =
               FeCatalogUtils.loadAllPartitions(hdfsTable);
           createEmptyBaseDirectories(parts, tblTxn.writeId);
+          LOG.trace("Time elapsed after creating empty base directories for table {}: {} "
+                  + "msec", table.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
           // Currently Impala cannot update the statistics properly. So instead of
           // writing correct stats, let's just remove COLUMN_STATS_ACCURATE parameter from
           // each partition.
@@ -2230,6 +2234,8 @@ public class CatalogOpExecutor {
           }
           // Remove COLUMN_STATS_ACCURATE property from the table.
           unsetTableColStats(table.getMetaStoreTable(), tblTxn);
+          LOG.trace("Time elapsed after unset partition and column statistics for table "
+              + "{}: {} msec", table.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
         }
         txn.commit();
       }
@@ -2237,6 +2243,10 @@ public class CatalogOpExecutor {
     } catch (Exception e) {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "truncateTable"), e);
+    } finally {
+      LOG.trace("Time taken to do metastore and file system operations for"
+              + " truncating table {}: {} msec", table.getFullName(),
+          sw.stop().elapsed(TimeUnit.MILLISECONDS));
     }
   }
 
@@ -2269,8 +2279,10 @@ public class CatalogOpExecutor {
     long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
     catalog_.getLock().writeLock().unlock();
     FeIcebergTable iceTable = (FeIcebergTable)table;
-    dropColumnStats(table);
-    dropTableStats(table);
+    if (params.isDelete_stats()) {
+      dropColumnStats(table);
+      dropTableStats(table);
+    }
     IcebergCatalogOpExecutor.truncateTable(iceTable);
     return newCatalogVersion;
   }
@@ -2282,26 +2294,44 @@ public class CatalogOpExecutor {
     long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
     catalog_.getLock().writeLock().unlock();
     HdfsTable hdfsTable = (HdfsTable) table;
-    // if the table is being replicated we issue the HMS API to truncate the table
-    // since it generates additional events which are used by Hive Replication.
-    try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
-      if (isTableBeingReplicated(metaStoreClient.getHiveClient(), hdfsTable)) {
-        String dbName = Preconditions.checkNotNull(hdfsTable.getDb()).getName();
-        Stopwatch sw = Stopwatch.createStarted();
-        metaStoreClient.getHiveClient().truncateTable(dbName, hdfsTable.getName(), null);
-        LOG.debug("Time taken to truncate table {} using HMS API: {} msec",
-            hdfsTable.getFullName(), sw.stop().elapsed(TimeUnit.MILLISECONDS));
-        return newCatalogVersion;
+    boolean isTableBeingReplicated = false;
+    Stopwatch sw = Stopwatch.createStarted();
+    try {
+      // if the table is being replicated we issue the HMS API to truncate the table
+      // since it generates additional events which are used by Hive Replication.
+      try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+        if (isTableBeingReplicated(metaStoreClient.getHiveClient(), hdfsTable)) {
+          isTableBeingReplicated = true;
+          String dbName = Preconditions.checkNotNull(hdfsTable.getDb()).getName();
+          metaStoreClient.getHiveClient()
+              .truncateTable(dbName, hdfsTable.getName(), null);
+          LOG.trace("Time elapsed after truncating table {} using HMS API: {} msec",
+              hdfsTable.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
+        }
       }
+      if (!isTableBeingReplicated) {
+        // when table is replicated we let the HMS API handle the file deletion logic
+        // otherwise we delete the files.
+        Collection<? extends FeFsPartition> parts = FeCatalogUtils
+            .loadAllPartitions(hdfsTable);
+        for (FeFsPartition part : parts) {
+          FileSystemUtil.deleteAllVisibleFiles(new Path(part.getLocation()));
+        }
+        LOG.trace("Time elapsed after deleting files for table {}: {} msec",
+            table.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
+      }
+      if (params.isDelete_stats()) {
+        dropColumnStats(table);
+        dropTableStats(table);
+        LOG.trace("Time elapsed after deleting statistics for table {}: {} msec ",
+            table.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
+      }
+      return newCatalogVersion;
+    } finally {
+      LOG.debug("Time taken for metastore and filesystem operations for truncating "
+              + "table {}: {} msec", table.getFullName(),
+          sw.stop().elapsed(TimeUnit.MILLISECONDS));
     }
-    Collection<? extends FeFsPartition> parts = FeCatalogUtils
-        .loadAllPartitions(hdfsTable);
-    for (FeFsPartition part : parts) {
-      FileSystemUtil.deleteAllVisibleFiles(new Path(part.getLocation()));
-    }
-    dropColumnStats(table);
-    dropTableStats(table);
-    return newCatalogVersion;
   }
 
   /**
