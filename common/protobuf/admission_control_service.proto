@@ -224,8 +224,11 @@ message AdmissionHeartbeatRequestPB {
   // The backend id for the coordinator sending this heartbeat.
   optional UniqueIdPB host_id = 1;
 
+  // The version number of this heartbeat. Incremented every time a new heartbeat is sent.
+  optional int64 version = 2;
+
   // A list of all queries registered at this coordinator.
-  repeated UniqueIdPB query_ids = 2;
+  repeated UniqueIdPB query_ids = 3;
 }
 
 message AdmissionHeartbeatResponsePB {
@@ -268,7 +271,7 @@ service AdmissionControlService {
   /// Periodically called by each coordinator with a list of query ids for all queries at
   /// that coordinator. If the admissiond has resources allocated to a query that is not
   /// included in the list, it assumes the query has completed and releases it's remaining
-  /// resources.
+  /// resources. Stale heartbeat messages are ignored.
   rpc AdmissionHeartbeat(AdmissionHeartbeatRequestPB)
       returns (AdmissionHeartbeatResponsePB);
 }

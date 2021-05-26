@@ -2767,6 +2767,7 @@ void ImpalaServer::UnregisterSessionTimeout(int32_t session_timeout) {
     AdmissionHeartbeatRequestPB request;
     AdmissionHeartbeatResponsePB response;
     *request.mutable_host_id() = exec_env_->backend_id();
+    request.set_version(++admission_heartbeat_version_);
     query_driver_map_.DoFuncForAllEntries(
         [&](const std::shared_ptr<QueryDriver>& query_driver) {
           ClientRequestState* request_state = query_driver->GetActiveClientRequestState();

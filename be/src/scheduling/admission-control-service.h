@@ -133,6 +133,14 @@ class AdmissionControlService : public AdmissionControlServiceIf,
   /// Thread-safe map from query ids to info about the query.
   ShardedQueryPBMap<std::shared_ptr<AdmissionState>> admission_state_map_;
 
+  /// Protects 'coord_id_to_heartbeat_'.
+  std::mutex heartbeat_lock_;
+  /// Maps from coordinator ID to the latest heartbeat version number that was processed
+  /// from it. NOTE: Can contain stale data from coordinators that have restarted.
+  /// TODO: Leverage IMPALA-9155 to add coord_id the first time a coord sends a heartbeat
+  /// and delete it when goes down.
+  std::unordered_map<UniqueIdPB, int64_t> coord_id_to_heartbeat_;
+
   /// Callback for 'admission_thread_pool_'.
   void AdmitFromThreadPool(UniqueIdPB query_id);
 
@@ -141,6 +149,11 @@ class AdmissionControlService : public AdmissionControlServiceIf,
   template <typename ResponsePBType>
   void RespondAndReleaseRpc(
       const Status& status, ResponsePBType* response, kudu::rpc::RpcContext* rpc_context);
+
+  /// For the coordinator identified by 'coord_id', it updates the last processed hearbeat
+  /// version to 'update_version' if 'update_version' is higher. Returns true if update
+  /// was successful.
+  bool CheckAndUpdateHeartbeat(const UniqueIdPB& coord_id, int64_t update_version);
 };
 
 } // namespace impala

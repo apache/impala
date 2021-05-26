@@ -1626,5 +1626,9 @@ class ImpalaServer : public ImpalaServiceIf,
   /// client requests and running finstances. Set before 'shutting_down_' and updated
   /// atomically if a new shutdown command with a shorter deadline comes in.
   AtomicInt64 shutdown_deadline_{0};
+
+  /// Stores the last version number for the admission heartbeat that was sent.
+  /// Incremented every time a new admission heartbeat is sent.
+  int64_t admission_heartbeat_version_ = 0;
 };
 }

@@ -272,6 +272,11 @@ void AdmissionControlService::AdmissionHeartbeat(const AdmissionHeartbeatRequest
     AdmissionHeartbeatResponsePB* resp, kudu::rpc::RpcContext* rpc_context) {
   VLOG(2) << "AdmissionHeartbeat: host_id=" << req->host_id();
 
+  if(!CheckAndUpdateHeartbeat(req->host_id(), req->version())) {
+    VLOG(1) << "Stale heartbeat received for coord_id: "<< req->host_id();
+    RespondAndReleaseRpc(Status::OK(), resp, rpc_context);
+    return;
+  }
   std::unordered_set<UniqueIdPB> query_ids;
   for (const UniqueIdPB& query_id : req->query_ids()) {
     query_ids.insert(query_id);
@@ -346,6 +351,17 @@ void AdmissionControlService::RespondAndReleaseRpc(
   // Release the memory against the control service's memory tracker.
   mem_tracker_->Release(rpc_context->GetTransferSize());
   rpc_context->RespondSuccess();
+}
+
+bool AdmissionControlService::CheckAndUpdateHeartbeat(
+    const UniqueIdPB& coord_id, int64_t update_version) {
+  lock_guard<mutex> l(heartbeat_lock_);
+  auto& curr_version = coord_id_to_heartbeat_[coord_id];
+  if(curr_version < update_version){
+    curr_version = update_version;
+    return true;
+  }
+  return false;
 }
 
 } // namespace impala
