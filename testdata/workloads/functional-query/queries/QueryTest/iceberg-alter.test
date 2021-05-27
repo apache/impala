@@ -29,6 +29,15 @@ DESCRIBE FORMATTED iceberg_hadoop_tables;
 string, string, string
 ====
 ---- QUERY
+ALTER TABLE iceberg_hadoop_tables set TBLPROPERTIES('fake_key'='fake_value');
+ALTER TABLE iceberg_hadoop_tables unset TBLPROPERTIES('fake_key');
+DESCRIBE FORMATTED iceberg_hadoop_tables;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','fake_key            ','fake_value          '
+---- TYPES
+string, string, string
+====
+---- QUERY
 ALTER TABLE iceberg_hadoop_tables set OWNER USER fake_user;
 DESCRIBE FORMATTED iceberg_hadoop_tables;
 ---- RESULTS: VERIFY_IS_SUBSET

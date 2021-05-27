@@ -684,6 +684,17 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
         "TBLPROPERTIES ('kudu.table_id' = '1234')",
         "Property 'kudu.table_id' cannot be altered for Kudu tables");
 
+    // Unsetting kudu.table_id is not allowed for Kudu tables.
+    AnalysisError("ALTER TABLE functional_kudu.testtbl UNSET " +
+        "TBLPROPERTIES ('kudu.table_id')",
+        "Unsetting the 'kudu.table_id' table property is not supported for Kudu table");
+
+    // Unsetting kudu.master_addresses is not allowed for Kudu tables.
+    AnalysisError("ALTER TABLE functional_kudu.testtbl UNSET " +
+        "TBLPROPERTIES ('kudu.master_addresses')",
+        "Unsetting the 'kudu.master_addresses' table property is not supported for " +
+        "Kudu table");
+
     // Setting 'external.table.purge' is allowed for Kudu tables.
     AnalyzesOk("ALTER TABLE functional_kudu.testtbl SET " +
         "TBLPROPERTIES ('external.table.purge' = 'true')");
@@ -695,6 +706,13 @@ public class AnalyzeKuduDDLTest extends FrontendTestBase {
     AnalysisError("ALTER TABLE functional_kudu.testtbl SET " +
         "TBLPROPERTIES ('kudu.table_name' = 'Hans')",
         "Not allowed to set 'kudu.table_name' manually for synchronized Kudu tables");
+
+    // Unsetting the underlying Kudu table is not supported for managed Kudu tables
+    // as setting them is not allowed
+    AnalysisError("ALTER TABLE functional_kudu.testtbl UNSET " +
+        "TBLPROPERTIES ('kudu.table_name')",
+        "Unsetting the 'kudu.table_name' table property is not supported for " +
+        "synchronized Kudu table.");
 
     // TODO IMPALA-6375: Allow setting kudu.table_name for managed Kudu tables
     // if the 'EXTERNAL' property is set to TRUE in the same step.

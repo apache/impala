@@ -143,6 +143,7 @@ import org.apache.impala.thrift.TAlterTableSetLocationParams;
 import org.apache.impala.thrift.TAlterTableSetRowFormatParams;
 import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
+import org.apache.impala.thrift.TAlterTableUnSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableUpdateStatsParams;
 import org.apache.impala.thrift.TCatalogObject;
 import org.apache.impala.thrift.TCatalogObjectType;
@@ -298,6 +299,10 @@ public class CatalogOpExecutor {
       "--blacklisted_dbs may be inconsistent between catalogd and coordinators";
   private final static String BLACKLISTED_TABLES_INCONSISTENT_ERR_STR =
       "--blacklisted_tables may be inconsistent between catalogd and coordinators";
+  private final static String ALTER_TBL_UNSET_NON_EXIST_PROPERTY =
+      "Please use the following syntax if not sure whether the property existed" +
+      " or not:\nALTER TABLE tableName UNSET (TBLPROPERTIES|SERDEPROPERTIES) IF EXISTS" +
+      " (key1, key2, ...)\n";
 
   // Table default capabilities
   private static final String ACIDINSERTONLY_CAPABILITIES =
@@ -826,6 +831,17 @@ public class CatalogOpExecutor {
           if (params.getSet_tbl_properties_params().isSetPartition_set()) {
             addSummary(response,
                 "Updated " + numUpdatedPartitions.getRef() + " partition(s).");
+          } else {
+            addSummary(response, "Updated table.");
+          }
+          break;
+        case UNSET_TBL_PROPERTIES:
+          alterTableUnSetTblProperties(tbl, params.getUnset_tbl_properties_params(),
+            numUpdatedPartitions);
+          reloadTableSchema = true;
+          if (params.getUnset_tbl_properties_params().isSetPartition_set()) {
+            addSummary(response, "Updated " + numUpdatedPartitions.getRef() +
+              " partition(s).");
           } else {
             addSummary(response, "Updated table.");
           }
@@ -3725,6 +3741,87 @@ public class CatalogOpExecutor {
               "Unknown target TTablePropertyType: " + params.getTarget());
       }
       applyAlterTable(msTbl);
+    }
+  }
+
+  private void alterTableUnSetTblProperties(Table tbl,
+      TAlterTableUnSetTblPropertiesParams params, Reference<Long> numUpdatedPartitions)
+      throws ImpalaException {
+    Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
+    List<String> removeProperties = params.getProperty_keys();
+    boolean ifExists = params.isIf_exists();
+    Preconditions.checkNotNull(removeProperties);
+
+    if (params.isSetPartition_set()) {
+      Preconditions.checkArgument(tbl instanceof HdfsTable,
+          "Partition spec not allowed for non-HDFS table");
+      List<HdfsPartition> partitions =
+          ((HdfsTable) tbl).getPartitionsFromPartitionSet(params.getPartition_set());
+
+      List<HdfsPartition.Builder> modifiedParts = Lists.newArrayList();
+      for(HdfsPartition partition: partitions) {
+        HdfsPartition.Builder partBuilder = new HdfsPartition.Builder(partition);
+        Set<String> keys;
+        switch (params.getTarget()) {
+          case TBL_PROPERTY:
+            keys = partBuilder.getParameters().keySet();
+            break;
+          case SERDE_PROPERTY:
+            keys = partBuilder.getSerdeInfo().getParameters().keySet();
+            break;
+          default:
+            throw new UnsupportedOperationException(
+                "Unknown target TTablePropertyType: " + params.getTarget());
+        }
+        removeKeys(removeProperties, ifExists, keys,
+            "partition " + partition.getPartitionName());
+        modifiedParts.add(partBuilder);
+      }
+      try {
+        // Do not mark the partitions dirty here since it's done in finally clause.
+        bulkAlterPartitions(tbl, modifiedParts, null, UpdatePartitionMethod.NONE);
+      } finally {
+        ((HdfsTable) tbl).markDirtyPartitions(modifiedParts);
+      }
+      numUpdatedPartitions.setRef((long) modifiedParts.size());
+    } else {
+      // Alter table params.
+      org.apache.hadoop.hive.metastore.api.Table msTbl =
+          tbl.getMetaStoreTable().deepCopy();
+      Set<String> keys;
+      switch (params.getTarget()) {
+        case TBL_PROPERTY:
+          keys = msTbl.getParameters().keySet();
+          break;
+        case SERDE_PROPERTY:
+          keys = msTbl.getSd().getSerdeInfo().getParameters().keySet();
+          break;
+        default:
+          throw new UnsupportedOperationException(
+              "Unknown target TTablePropertyType: " + params.getTarget());
+      }
+      removeKeys(removeProperties, ifExists, keys, "table " + tbl.getFullName());
+      // Validate that the new table properties are valid and that
+      // the Kudu table is accessible.
+      if (KuduTable.isKuduTable(msTbl)) {
+        KuduCatalogOpExecutor.validateKuduTblExists(msTbl);
+      }
+      applyAlterTable(msTbl);
+    }
+  }
+
+  private void removeKeys(List<String> removeProperties, boolean ifExists,
+      Set<String> keys, String fullName) throws CatalogException {
+    if (ifExists || keys.containsAll(removeProperties)) {
+      keys.removeAll(removeProperties);
+    } else {
+      List<String> removeCopy = new ArrayList(removeProperties);
+      removeCopy.removeAll(keys);
+      throw new CatalogException(
+          String.format("These properties do not exist for %s: %s.\n%s",
+              fullName,
+              String.join(",", removeCopy),
+              ALTER_TBL_UNSET_NON_EXIST_PROPERTY));
     }
   }
 

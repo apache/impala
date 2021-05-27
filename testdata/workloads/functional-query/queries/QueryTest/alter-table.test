@@ -1778,3 +1778,146 @@ describe formatted swapping_table;
 ---- TYPES
 STRING,STRING,STRING
 ====
+---- QUERY
+# Test for UNSET TBLPROPERTIES
+create external table alltypes_unset_test like functional.alltypes;
+alter table alltypes_unset_test set TBLPROPERTIES('fake_key'='fake_value');
+alter table alltypes_unset_test unset TBLPROPERTIES('fake_key');
+DESCRIBE FORMATTED alltypes_unset_test;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','fake_key            ','fake_value          '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test for UNSET SERDEPROPERTIES
+alter table alltypes_unset_test set SERDEPROPERTIES('fake_key'='fake_value');
+alter table alltypes_unset_test unset SERDEPROPERTIES('fake_key');
+DESCRIBE FORMATTED alltypes_unset_test;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','fake_key            ','fake_value          '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test for UNSET Multiple TBLPROPERTIES (All)
+alter table alltypes_unset_test set TBLPROPERTIES('k1'='v1', 'k2'='v2', 'k3'='v3');
+alter table alltypes_unset_test unset TBLPROPERTIES('k1', 'k2', 'k3');
+DESCRIBE FORMATTED alltypes_unset_test;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','k1                  ','v1                '
+'','k2                  ','v2                '
+'','k3                  ','v3                '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test for UNSET Multiple TBLPROPERTIES (All) with one non-existing property
+alter table alltypes_unset_test set TBLPROPERTIES('k1'='v1', 'k2'='v2', 'k3'='v3');
+alter table alltypes_unset_test unset TBLPROPERTIES('k1', 'k2', 'k3', 'k4', 'k5');
+---- CATCH
+These properties do not exist for table $DATABASE.alltypes_unset_test: k4,k5.
+====
+---- QUERY
+# Check none of property is unset due to above.
+DESCRIBE FORMATTED alltypes_unset_test;
+---- RESULTS: VERIFY_IS_SUBSET
+'','k1                  ','v1                  '
+'','k2                  ','v2                  '
+'','k3                  ','v3                  '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test for UNSET Multiple TBLPROPERTIES (Subset)
+alter table alltypes_unset_test unset TBLPROPERTIES('k1', 'k2');
+DESCRIBE FORMATTED alltypes_unset_test;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','k1                  ','v1                  '
+'','k2                  ','v2                  '
+---- RESULTS: VERIFY_IS_SUBSET
+'','k3                  ','v3                  '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test for UNSET Multiple TBLPROPERTIES IF_EXISTS (Subset)
+alter table alltypes_unset_test set TBLPROPERTIES('k1'='v1', 'k2'='v2', 'k3'='v3');
+alter table alltypes_unset_test unset TBLPROPERTIES IF EXISTS('k1', 'k2');
+DESCRIBE FORMATTED alltypes_unset_test;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','k1                  ','v1                  '
+'','k2                  ','v2                  '
+---- RESULTS: VERIFY_IS_SUBSET
+'','k3                  ','v3                  '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test for UNSET Multiple TBLPROPERTIES IF_EXISTS (Subset) with non-existing
+alter table alltypes_unset_test set TBLPROPERTIES('k1'='v1', 'k2'='v2', 'k3'='v3');
+alter table alltypes_unset_test unset TBLPROPERTIES IF EXISTS('k1', 'k2', 'k4');
+DESCRIBE FORMATTED alltypes_unset_test;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','k1                  ','v1                  '
+'','k2                  ','v2                  '
+---- RESULTS: VERIFY_IS_SUBSET
+'','k3                  ','v3                  '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test for UNSET IF EXISTS Multiple TBLPROPERTIES (All)
+alter table alltypes_unset_test set TBLPROPERTIES('k1'='v1', 'k2'='v2', 'k3'='v3');
+alter table alltypes_unset_test unset TBLPROPERTIES IF EXISTS('k1', 'k2', 'k3');
+DESCRIBE FORMATTED alltypes_unset_test;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','k1                  ','v1                  '
+'','k2                  ','v2                  '
+'','k3                  ','v3                  '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test unsetting non-existing table properties
+alter table alltypes_unset_test unset TBLPROPERTIES('dummy_key');
+---- CATCH
+These properties do not exist for table $DATABASE.alltypes_unset_test: dummy_key
+====
+---- QUERY
+# Test unsetting non-existing serde properties
+alter table alltypes_unset_test unset SERDEPROPERTIES('dummy_key');
+---- CATCH
+These properties do not exist for table $DATABASE.alltypes_unset_test: dummy_key
+====
+---- QUERY
+# Test unsetting non-existing table properties using if exists
+alter table alltypes_unset_test unset TBLPROPERTIES if exists('dummy_key');
+---- RESULTS
+'Updated table.'
+---- TYPES
+string
+====
+---- QUERY
+# Test unset for Avro table
+create external table avro_unset_test like functional_avro.alltypes;
+alter table avro_unset_test set TBLPROPERTIES ('fake_key'='fake_value');
+alter table avro_unset_test unset TBLPROPERTIES ('fake_key');
+DESCRIBE FORMATTED avro_unset_test;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','fake_key            ','fake_value          '
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test unset avro.schema.literal for Avro table
+alter table avro_unset_test unset TBLPROPERTIES IF EXISTS('avro.schema.literal');
+---- CATCH
+Unsetting the 'avro.schema.literal' table property is not supported
+====
+---- QUERY
+# Test unset avro.schema.url for Avro table
+alter table avro_unset_test unset TBLPROPERTIES IF EXISTS('avro.schema.url');
+---- CATCH
+Unsetting the 'avro.schema.url' table property is not supported
+====

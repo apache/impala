@@ -112,6 +112,7 @@ enum TAlterTableType {
   RECOVER_PARTITIONS = 14
   SET_ROW_FORMAT = 15
   SET_OWNER = 16
+  UNSET_TBL_PROPERTIES = 17
 }
 
 // Parameters of CREATE DATABASE commands
@@ -387,6 +388,23 @@ struct TAlterTableSetCachedParams {
   2: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_set
 }
 
+// Parameters for ALTER TABLE UNSET [PARTITION ('p1'='a', 'p2'='b'...)]
+// TBLPROPERTIES|SERDEPROPERTIES commands.
+struct TAlterTableUnSetTblPropertiesParams {
+  // The target table property that is being altered.
+  1: required CatalogObjects.TTablePropertyType target
+
+  // List of property keys to be unset.
+  2: required list<string> property_keys
+
+  // Remove table property only if exists else fail.
+  3: required bool if_exists
+
+  // If set, alters the properties of the given partitions, otherwise
+  // those of the table.
+  4: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_set
+}
+
 // Parameters for all ALTER TABLE commands.
 struct TAlterTableParams {
   1: required TAlterTableType alter_type
@@ -438,6 +456,9 @@ struct TAlterTableParams {
 
   // Parameters for ALTER TABLE REPLACE COLUMNS
   17: optional TAlterTableReplaceColsParams replace_cols_params
+
+  // Parameters for ALTER TABLE UNSET TBLPROPERTIES
+  18: optional TAlterTableUnSetTblPropertiesParams unset_tbl_properties_params
 }
 
 // Parameters of CREATE TABLE LIKE commands

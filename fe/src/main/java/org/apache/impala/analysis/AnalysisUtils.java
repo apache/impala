@@ -40,4 +40,9 @@ class AnalysisUtils {
       throws AnalysisException {
     if (c == null || c.isEmpty()) throw new AnalysisException(message);
   }
+
+  static void throwIfTrue(boolean cond, String message)
+      throws AnalysisException {
+    if (cond) throw new AnalysisException(message);
+  }
 }

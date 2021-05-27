@@ -48,6 +48,16 @@ alter table simple set tblproperties ('kudu.master_addresses' = 'invalid_host')
 ImpalaRuntimeException: Kudu table 'impala::$DATABASE.simple' does not exist on master 'invalid_host'
 ====
 ---- QUERY
+# Test unsetting of TBLPROPERTIES
+ALTER TABLE simple set TBLPROPERTIES('fake_key'='fake_value');
+ALTER TABLE simple unset TBLPROPERTIES('fake_key');
+DESCRIBE FORMATTED simple;
+---- RESULTS: VERIFY_IS_NOT_IN
+'','fake_key            ','fake_value          '
+---- TYPES
+string, string, string
+====
+---- QUERY
 alter table simple set owner user new_owner
 ---- RESULTS
 'Updated table/view.'

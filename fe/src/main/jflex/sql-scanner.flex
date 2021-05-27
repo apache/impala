@@ -265,6 +265,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("uncached", SqlParserSymbols.KW_UNCACHED);
     keywordMap.put("union", SqlParserSymbols.KW_UNION);
     keywordMap.put("unknown", SqlParserSymbols.KW_UNKNOWN);
+    keywordMap.put("unset", SqlParserSymbols.KW_UNSET);
     keywordMap.put("update", SqlParserSymbols.KW_UPDATE);
     keywordMap.put("update_fn", SqlParserSymbols.KW_UPDATE_FN);
     keywordMap.put("upsert", SqlParserSymbols.KW_UPSERT);

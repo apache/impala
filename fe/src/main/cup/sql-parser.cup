@@ -310,7 +310,7 @@ terminal
   KW_STRING,
   KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES,
   KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS,
-  KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNKNOWN, KW_UPDATE,
+  KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNKNOWN, KW_UNSET, KW_UPDATE,
   KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_VALIDATE, KW_VALUES, KW_VARCHAR, KW_VIEW,
   KW_WHEN, KW_WHERE, KW_WITH, KW_ZORDER;
 
@@ -520,6 +520,7 @@ nonterminal TTablePropertyType table_property_type;
 nonterminal HashMap serde_properties;
 nonterminal HashMap tbl_properties;
 nonterminal HashMap properties_map;
+nonterminal List<String> properties_key_list;
 // Used to simplify commands that accept either KW_DATABASE(S) or KW_SCHEMA(S)
 nonterminal String db_or_schema_kw;
 nonterminal String dbs_or_schemas_kw;
@@ -1226,6 +1227,9 @@ alter_tbl_stmt ::=
   | KW_ALTER KW_TABLE table_name:table opt_partition_set:partitions KW_SET
     table_property_type:target LPAREN properties_map:properties RPAREN
   {: RESULT = new AlterTableSetTblProperties(table, partitions, target, properties); :}
+  | KW_ALTER KW_TABLE table_name:table opt_partition_set:partitions KW_UNSET
+    table_property_type:target if_exists_val:if_exists LPAREN properties_key_list:property_keys RPAREN
+  {: RESULT = new AlterTableUnSetTblProperties(table, partitions, if_exists, target, property_keys); :}
   | KW_ALTER KW_TABLE table_name:table KW_SORT KW_BY LPAREN opt_ident_list:col_names
     RPAREN
   {: RESULT = new AlterTableSortByStmt(table, col_names, TSortingOrder.LEXICAL); :}
@@ -2018,6 +2022,20 @@ properties_map ::=
   {:
     properties.put(key, value);
     RESULT = properties;
+  :}
+  ;
+
+properties_key_list ::=
+  STRING_LITERAL:key
+  {:
+    List<String> keys = new ArrayList<>();
+    keys.add(key);
+    RESULT = keys;
+  :}
+  | properties_key_list:keys COMMA STRING_LITERAL:key
+  {:
+    keys.add(key);
+    RESULT = keys;
   :}
   ;
 
@@ -4239,6 +4257,8 @@ word ::=
   | KW_UNION:r
   {: RESULT = r.toString(); :}
   | KW_UNKNOWN:r
+  {: RESULT = r.toString(); :}
+  | KW_UNSET:r
   {: RESULT = r.toString(); :}
   | KW_UPDATE:r
   {: RESULT = r.toString(); :}

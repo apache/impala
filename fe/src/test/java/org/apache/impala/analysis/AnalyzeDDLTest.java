@@ -718,6 +718,9 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalyzesOk("alter table functional.alltypes set location '/a/b'");
     AnalyzesOk("alter table functional.alltypes set tblproperties('a'='1')");
     AnalyzesOk("alter table functional.alltypes set serdeproperties('a'='2')");
+    AnalyzesOk("alter table functional.alltypes unset serdeproperties('a', 'b')");
+    AnalyzesOk("alter table functional.alltypes unset serdeproperties" +
+            " if exists('a', 'b')");
     AnalyzesOk("alter table functional.alltypes PARTITION (Year=2010, month=11) " +
                "set location '/a/b'");
     AnalyzesOk("alter table functional.alltypes PARTITION (month=11, year=2010) " +
@@ -732,6 +735,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
                "set tblproperties('a'='1')");
     AnalyzesOk("alter table functional.alltypes PARTITION (year<=2010, month=11) " +
                "set tblproperties('a'='1')");
+    AnalyzesOk("alter table functional.alltypes PARTITION (year=2010, month=11) " +
+            "unset tblproperties('a')");
+    AnalyzesOk("alter table functional.alltypes PARTITION (year=2010, month=11) " +
+            "unset tblproperties if exists ('a')");
     AnalyzesOk("alter table functional.alltypes PARTITION (year=2010, month=11) " +
                "set serdeproperties ('a'='2')");
     AnalyzesOk("alter table functional.alltypes PARTITION (year<=2010, month=11) " +
@@ -794,6 +801,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "Property key length must be <= " + MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + ": "
               + (MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + 1));
 
+      AnalysisError("alter table functional.alltypes unset "
+              + "tblproperties ('" + long_property_key + "')",
+              "Property key length must be <= " + MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH
+              + ": " + (MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + 1));
+
       AnalysisError("alter table functional.alltypes set "
               + "tblproperties ('key'='" + long_property_value + "')",
           "Property value length must be <= " + MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH
@@ -804,6 +816,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
           "Property key length must be <= " + MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + ": "
               + (MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + 1));
 
+      AnalysisError("alter table functional.alltypes unset "
+              + "serdeproperties ('" + long_property_key + "')",
+              "Property key length must be <= " + MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH
+              + ": " + (MetaStoreUtil.MAX_PROPERTY_KEY_LENGTH + 1));
+
       AnalysisError("alter table functional.alltypes set "
               + "serdeproperties ('key'='" + long_property_value + "')",
           "Property value length must be <= " + MetaStoreUtil.MAX_PROPERTY_VALUE_LENGTH
@@ -811,6 +828,11 @@ public class AnalyzeDDLTest extends FrontendTestBase {
 
       AnalysisError(
           "alter table functional.alltypes set tblproperties('storage_handler'='1')",
+          "Changing the 'storage_handler' table property is not supported to protect " +
+          "against metadata corruption.");
+
+      AnalysisError(
+          "alter table functional.alltypes unset tblproperties('storage_handler')",
           "Changing the 'storage_handler' table property is not supported to protect " +
           "against metadata corruption.");
     }
@@ -1128,6 +1150,21 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     AnalysisError(
         "alter table functional.alltypes set column stats string_col ('avgSize'='inf')",
         "Invalid stats value 'inf' for column stats key: avgSize");
+  }
+
+  @Test
+  public void TestAlterTableUnSetAvroProperties() {
+    //Test unset tblproperties with avro.schema.url and avro.schema.literal
+    for (String propertyType : Lists.newArrayList("tblproperties", "serdeproperties")) {
+      AnalysisError(String.format("alter table functional.alltypes unset %s " +
+          "('avro.schema.url')", propertyType),
+          "Unsetting the 'avro.schema.url' table property is not supported for" +
+          " Avro table.");
+      AnalysisError(String.format("alter table functional.alltypes unset %s " +
+          "('avro.schema.literal')", propertyType),
+          "Unsetting the 'avro.schema.literal' table property is not supported for" +
+          " Avro table.");
+    }
   }
 
   @Test

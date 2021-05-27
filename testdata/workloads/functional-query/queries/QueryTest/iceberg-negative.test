@@ -193,9 +193,19 @@ ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.catalog'='ha
 AnalysisException: Changing the 'iceberg.catalog' table property is not supported for Iceberg table.
 ====
 ---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog unset TBLPROPERTIES('iceberg.catalog');
+---- CATCH
+AnalysisException: Unsetting the 'iceberg.catalog' table property is not supported for Iceberg table.
+====
+---- QUERY
 ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.catalog_location'='/fake_location');
 ---- CATCH
 AnalysisException: Changing the 'iceberg.catalog_location' table property is not supported for Iceberg table.
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog unset TBLPROPERTIES('iceberg.catalog_location');
+---- CATCH
+AnalysisException: Unsetting the 'iceberg.catalog_location' table property is not supported for Iceberg table.
 ====
 ---- QUERY
 ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.table_identifier'='fake_db.fake_table');
@@ -203,9 +213,19 @@ ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('iceberg.table_identi
 AnalysisException: Changing the 'iceberg.table_identifier' table property is not supported for Iceberg table.
 ====
 ---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog unset TBLPROPERTIES('iceberg.table_identifier');
+---- CATCH
+AnalysisException: Unsetting the 'iceberg.table_identifier' table property is not supported for Iceberg table.
+====
+---- QUERY
 ALTER TABLE iceberg_table_hadoop_catalog set TBLPROPERTIES('metadata_location'='/test-warehouse/metadata_loc');
 ---- CATCH
 AnalysisException: Changing the 'metadata_location' table property is not supported for Iceberg table.
+====
+---- QUERY
+ALTER TABLE iceberg_table_hadoop_catalog unset TBLPROPERTIES('metadata_location');
+---- CATCH
+AnalysisException: Unsetting the 'metadata_location' table property is not supported for Iceberg table.
 ====
 ---- QUERY
 ALTER TABLE iceberg_table_hive_catalog set TBLPROPERTIES('metadata_location'='/test-warehouse/metadata_loc');
