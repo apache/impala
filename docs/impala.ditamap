@@ -185,6 +185,7 @@ under the License.
           <topicref rev="2.9.0 IMPALA-5381" href="topics/impala_default_join_distribution_mode.xml"/>
           <topicref rev="2.10.0 IMPALA-3200" href="topics/impala_default_spillable_buffer_size.xml"/>
           <topicref rev="3.3.0" href="topics/impala_default_transactional_type.xml"/>
+          <topicref href="topics/impala_delete_stats_in_truncate.xml"/>
           <topicref href="topics/impala_disable_codegen.xml"/>
           <topicref rev="2.10.0 IMPALA-5483" href="topics/impala_disable_codegen_rows_threshold.xml"/>
           <topicref href="topics/impala_disable_hbase_num_rows_estimate.xml"/>
