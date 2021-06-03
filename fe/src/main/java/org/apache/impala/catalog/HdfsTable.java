@@ -65,6 +65,8 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.PrintUtils;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.fb.FbFileBlock;
+import org.apache.impala.hive.common.MutableValidReaderWriteIdList;
+import org.apache.impala.hive.common.MutableValidWriteIdList;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.CatalogLookupStatus;
 import org.apache.impala.thrift.CatalogObjectsConstants;
@@ -285,7 +287,7 @@ public class HdfsTable extends Table implements FeFsTable {
 
   // Valid write id list for this table.
   // null in the case that this table is not transactional.
-  protected ValidWriteIdList validWriteIds_ = null;
+  protected MutableValidWriteIdList validWriteIds_ = null;
 
   // Partitions are marked as "dirty" indicating there are in-progress modifications on
   // their metadata. The corresponding partition builder contains the new version of the
@@ -1903,8 +1905,9 @@ public class HdfsTable extends Table implements FeFsTable {
     isMarkedCached_ =
         HdfsCachingUtil.validateCacheParams(getMetaStoreTable().getParameters());
     if (hdfsTable.isSetValid_write_ids()) {
-      validWriteIds_ = MetastoreShim.getValidWriteIdListFromThrift(
-          getFullName(), hdfsTable.getValid_write_ids());
+      validWriteIds_ =
+          new MutableValidReaderWriteIdList(MetastoreShim.getValidWriteIdListFromThrift(
+              getFullName(), hdfsTable.getValid_write_ids()));
     }
   }
 
@@ -2694,7 +2697,7 @@ public class HdfsTable extends Table implements FeFsTable {
         AcidUtils.isTransactionalTable(msTable_.getParameters())) {
       ValidWriteIdList writeIdList = fetchValidWriteIds(client);
       prevWriteIdChanged = writeIdList.toString().equals(validWriteIds_);
-      validWriteIds_ = writeIdList;
+      validWriteIds_ = new MutableValidReaderWriteIdList(writeIdList);
     } else {
       validWriteIds_ = null;
     }
