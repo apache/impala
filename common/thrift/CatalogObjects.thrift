@@ -88,7 +88,7 @@ enum THdfsCompression {
   LZ4_BLOCKED = 12
 }
 
-// Iceberg table file format identitied by table property 'iceberg.file_format'
+// Iceberg table file format identitied by table property 'write.format.default'
 enum TIcebergFileFormat {
   PARQUET = 0
   ORC = 1
@@ -575,6 +575,15 @@ struct TIcebergTable {
   4: optional map<string,THdfsFileDesc> path_hash_to_file_descriptor
   // Iceberg snapshot id of the table
   5: optional i64 snapshot_id
+  // Iceberg 'write.parquet.compression-codec' and 'write.parquet.compression-level' table
+  // properties
+  6: optional TCompressionCodec parquet_compression_codec
+  // Iceberg 'write.parquet.row-group-size-bytes' table property
+  7: optional i64 parquet_row_group_size
+  // Iceberg 'write.parquet.page-size-bytes' and 'write.parquet.dict-size-bytes' table
+  // properties
+  8: optional i64 parquet_plain_page_size;
+  9: optional i64 parquet_dict_page_size;
 }
 
 // Represents a table or view.

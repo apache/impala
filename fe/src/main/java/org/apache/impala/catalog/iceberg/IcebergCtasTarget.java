@@ -54,6 +54,7 @@ import org.apache.impala.catalog.StructType;
 import org.apache.impala.thrift.CatalogObjectsConstants;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.THdfsStorageDescriptor;
 import org.apache.impala.thrift.THdfsTable;
@@ -73,6 +74,10 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   private Schema iceSchema_;
   private List<IcebergPartitionSpec> partitionSpecs_ = new ArrayList<>();
   private TIcebergFileFormat icebergFileFormat_;
+  private TCompressionCodec icebergParquetCompressionCodec_;
+  private long icebergParquetRowGroupSize_;
+  private long icebergParquetPlainPageSize_;
+  private long icebergParquetDictPageSize_;
   private TIcebergCatalog icebergCatalog_;
   private String icebergTableLocation_;
   private String icebergCatalogLocation_;
@@ -88,6 +93,10 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
     icebergCatalog_ = IcebergUtil.getTIcebergCatalog(msTbl);
     setLocations();
     icebergFileFormat_ = Utils.getIcebergFileFormat(msTbl);
+    icebergParquetCompressionCodec_ = Utils.getIcebergParquetCompressionCodec(msTbl);
+    icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTbl);
+    icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTbl);
+    icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTbl);
     hdfsSd_ = HdfsStorageDescriptor.fromStorageDescriptor(name_, msTable_.getSd());
   }
 
@@ -183,6 +192,26 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   @Override
   public TIcebergFileFormat getIcebergFileFormat() {
     return icebergFileFormat_;
+  }
+
+  @Override
+  public TCompressionCodec getIcebergParquetCompressionCodec() {
+    return icebergParquetCompressionCodec_;
+  }
+
+  @Override
+  public long getIcebergParquetRowGroupSize() {
+    return icebergParquetRowGroupSize_;
+  }
+
+  @Override
+  public long getIcebergParquetPlainPageSize() {
+    return icebergParquetPlainPageSize_;
+  }
+
+  @Override
+  public long getIcebergParquetDictPageSize() {
+    return icebergParquetDictPageSize_;
   }
 
   @Override

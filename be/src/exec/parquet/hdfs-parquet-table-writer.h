@@ -76,11 +76,13 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   virtual void Close() override;
 
   /// Returns the target HDFS block size to use.
-  virtual uint64_t default_block_size() const override;
+  virtual uint64_t default_block_size() const override { return default_block_size_; }
 
   virtual std::string file_extension() const override { return "parq"; }
 
   int32_t page_row_count_limit() const { return page_row_count_limit_; }
+  int64_t default_plain_page_size() const { return default_plain_page_size_; }
+  int64_t dict_page_size() const { return dict_page_size_; }
 
  private:
   /// Default data page size. In bytes.
@@ -162,11 +164,17 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   /// new row group.  current_row_group_ will be flushed.
   Status AddRowGroup();
 
+  /// Configures writer for non-Iceberg tables:
   /// Selects the Parquet timestamp type to be used by this writer.
-  void ConfigureTimestampType();
-
   /// Sets 'string_utf8_' based on query options and table type.
-  void ConfigureStringType();
+  /// Sets 'default_block_size_', 'default_plain_page_size_' and 'dict_page_size_'.
+  void Configure();
+
+  /// Configures writer for Iceberg tables:
+  /// Selects the Parquet timestamp type to be used by this writer.
+  /// Sets 'string_utf8_' to true.
+  /// Sets 'default_block_size_', 'default_plain_page_size_' and 'dict_page_size_'.
+  void ConfigureForIceberg();
 
   /// Updates output partition with some summary about the written file.
   void FinalizePartitionInfo();
@@ -236,6 +244,15 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
 
   /// If true, STRING values are annotated with UTF8 in Parquet metadata.
   bool string_utf8_ = false;
+
+  // File block size, set in Configure() or ConfigureForIceberg().
+  int64_t default_block_size_;
+
+  // Default plain page size, set in Configure() or ConfigureForIceberg().
+  int64_t default_plain_page_size_;
+
+  // Dictionary page size, set in Configure() or ConfigureForIceberg().
+  int64_t dict_page_size_;
 };
 
 }

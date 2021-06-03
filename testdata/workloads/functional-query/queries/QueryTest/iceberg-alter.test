@@ -123,18 +123,18 @@ Could not resolve table reference: 'iceberg_rename'
 ---- QUERY
 CREATE TABLE iceberg_changing_fileformats (i int)
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg.file_format'='orc');
+TBLPROPERTIES('write.format.default'='orc');
 DESCRIBE FORMATTED iceberg_changing_fileformats;
 ---- RESULTS: VERIFY_IS_SUBSET
-'','iceberg.file_format ','orc                 '
+'','write.format.default','orc                 '
 ---- TYPES
 string, string, string
 ====
 ---- QUERY
-ALTER TABLE iceberg_changing_fileformats set TBLPROPERTIES('iceberg.file_format'='parquet');
+ALTER TABLE iceberg_changing_fileformats set TBLPROPERTIES('write.format.default'='parquet');
 DESCRIBE FORMATTED iceberg_changing_fileformats;
 ---- RESULTS: VERIFY_IS_SUBSET
-'','iceberg.file_format ','parquet             '
+'','write.format.default','parquet             '
 ---- TYPES
 string, string, string
 ====
@@ -147,14 +147,14 @@ SELECT * FROM iceberg_changing_fileformats;
 INT
 ====
 ---- QUERY
-ALTER TABLE iceberg_changing_fileformats set TBLPROPERTIES('iceberg.file_format'='ORC');
+ALTER TABLE iceberg_changing_fileformats set TBLPROPERTIES('write.format.default'='ORC');
 ---- CATCH
 Attempt to set Iceberg data file format to ORC
 ====
 ---- QUERY
 DESCRIBE FORMATTED iceberg_changing_fileformats;
 ---- RESULTS: VERIFY_IS_SUBSET
-'','iceberg.file_format ','parquet             '
+'','write.format.default','parquet             '
 ---- TYPES
 string, string, string
 ====
@@ -284,4 +284,44 @@ DESCRIBE ice_alter_cols;
 'd','decimal(22,3)','','true'
 ---- TYPES
 STRING,STRING,STRING,STRING
+====
+---- QUERY
+CREATE TABLE iceberg_changing_parq_tblprops (i int)
+STORED AS ICEBERG
+TBLPROPERTIES (
+    'write.parquet.row-group-size-bytes'='134217728',
+    'write.parquet.compression-codec'='zstd',
+    'write.parquet.compression-level'='12',
+    'write.parquet.page-size-bytes'='65536',
+    'write.parquet.dict-size-bytes'='131072'
+);
+DESCRIBE FORMATTED iceberg_changing_parq_tblprops;
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.format.default','parquet             '
+'','write.parquet.row-group-size-bytes','134217728           '
+'','write.parquet.compression-codec','zstd                '
+'','write.parquet.compression-level','12                  '
+'','write.parquet.page-size-bytes','65536               '
+'','write.parquet.dict-size-bytes','131072              '
+---- TYPES
+string, string, string
+====
+---- QUERY
+ALTER TABLE iceberg_changing_parq_tblprops set TBLPROPERTIES(
+    'write.parquet.row-group-size-bytes'='268435456',
+    'write.parquet.compression-codec'='snappy',
+    'write.parquet.compression-level'='11',
+    'write.parquet.page-size-bytes'='131072',
+    'write.parquet.dict-size-bytes'='65536'
+);
+DESCRIBE FORMATTED iceberg_changing_parq_tblprops;
+---- RESULTS: VERIFY_IS_SUBSET
+'','write.format.default','parquet             '
+'','write.parquet.row-group-size-bytes','268435456           '
+'','write.parquet.compression-codec','snappy              '
+'','write.parquet.compression-level','11                  '
+'','write.parquet.page-size-bytes','131072              '
+'','write.parquet.dict-size-bytes','65536               '
+---- TYPES
+string, string, string
 ====

@@ -31,9 +31,12 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
 
 import org.apache.impala.catalog.IcebergStructField;
 import org.apache.impala.common.Pair;
@@ -70,7 +73,9 @@ import org.apache.impala.catalog.iceberg.IcebergHiveCatalog;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.catalog.iceberg.IcebergCatalogs;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.TCreateTableParams;
+import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
@@ -306,6 +311,47 @@ public class IcebergUtil {
       return TIcebergFileFormat.ORC;
     }
     return null;
+  }
+
+  /**
+   * Map from parquet compression codec names to a compression type.
+   * The list of parquet supported compression codecs was taken from
+   * hdfs-parquet-table-writer.cc.
+   */
+  public static final ImmutableMap<String, THdfsCompression> PARQUET_CODEC_MAP =
+      ImmutableMap.<String, THdfsCompression>builder().
+          put("none", THdfsCompression.NONE).
+          put("gzip", THdfsCompression.GZIP).
+          put("snappy", THdfsCompression.SNAPPY).
+          put("lz4", THdfsCompression.LZ4).
+          put("zstd", THdfsCompression.ZSTD).
+          build();
+
+  public static THdfsCompression getIcebergParquetCompressionCodec(String codec) {
+    if (codec == null) return IcebergTable.DEFAULT_PARQUET_COMPRESSION_CODEC;
+    return PARQUET_CODEC_MAP.get(codec.toLowerCase());
+  }
+
+  public static long getIcebergParquetRowGroupSize(String rowGroupSize) {
+    if (rowGroupSize == null) return IcebergTable.UNSET_PARQUET_ROW_GROUP_SIZE;
+
+    Long rgSize = Longs.tryParse(rowGroupSize);
+    if (rgSize == null || rgSize < IcebergTable.MIN_PARQUET_ROW_GROUP_SIZE ||
+        rgSize > IcebergTable.MAX_PARQUET_ROW_GROUP_SIZE) {
+      return IcebergTable.UNSET_PARQUET_ROW_GROUP_SIZE;
+    }
+    return rgSize;
+  }
+
+  public static long getIcebergParquetPageSize(String pageSize) {
+    if (pageSize == null) return IcebergTable.UNSET_PARQUET_PAGE_SIZE;
+
+    Long pSize = Longs.tryParse(pageSize);
+    if (pSize == null || pSize < IcebergTable.MIN_PARQUET_PAGE_SIZE ||
+        pSize > IcebergTable.MAX_PARQUET_PAGE_SIZE) {
+      return IcebergTable.UNSET_PARQUET_PAGE_SIZE;
+    }
+    return pSize;
   }
 
   public static IcebergPartitionTransform getPartitionTransform(
@@ -639,5 +685,100 @@ public class IcebergUtil {
         LocalDateTime.of(year, month, day, hour, /*minute=*/0),
         ZoneOffset.UTC);
     return (int)ChronoUnit.HOURS.between(EPOCH, datetime);
+  }
+
+  public static TCompressionCodec parseParquetCompressionCodec(
+      boolean onCreateTbl, Map<String, String> tblProperties, StringBuilder errMsg) {
+    String codecTblProp = tblProperties.get(IcebergTable.PARQUET_COMPRESSION_CODEC);
+    THdfsCompression codec = getIcebergParquetCompressionCodec(codecTblProp);
+    if (codec == null) {
+      errMsg.append("Invalid parquet compression codec for Iceberg table: ")
+          .append(codecTblProp);
+      return null;
+    }
+
+    TCompressionCodec compressionCodec = new TCompressionCodec();
+    if (tblProperties.containsKey(IcebergTable.PARQUET_COMPRESSION_CODEC)) {
+      compressionCodec.setCodec(codec);
+    }
+
+    if (onCreateTbl && codec != THdfsCompression.ZSTD) {
+      if (tblProperties.containsKey(IcebergTable.PARQUET_COMPRESSION_LEVEL)) {
+        errMsg.append("Parquet compression level cannot be set for codec ")
+          .append(codec)
+          .append(". Only ZSTD codec supports compression level table property.");
+        return null;
+      }
+    } else if (tblProperties.containsKey(IcebergTable.PARQUET_COMPRESSION_LEVEL)) {
+      String clevelTblProp = tblProperties.get(IcebergTable.PARQUET_COMPRESSION_LEVEL);
+      Integer clevel = Ints.tryParse(clevelTblProp);
+      if (clevel == null) {
+        errMsg.append("Invalid parquet compression level for Iceberg table: ")
+            .append(clevelTblProp);
+        return null;
+      } else if (clevel < IcebergTable.MIN_PARQUET_COMPRESSION_LEVEL ||
+          clevel > IcebergTable.MAX_PARQUET_COMPRESSION_LEVEL) {
+        errMsg.append("Parquet compression level for Iceberg table should fall in " +
+            "the range of [")
+            .append(String.valueOf(IcebergTable.MIN_PARQUET_COMPRESSION_LEVEL))
+            .append("..")
+            .append(String.valueOf(IcebergTable.MAX_PARQUET_COMPRESSION_LEVEL))
+            .append("]");
+        return null;
+      }
+      compressionCodec.setCompression_level(clevel);
+    }
+    return compressionCodec;
+  }
+
+  public static Long parseParquetRowGroupSize(Map<String, String> tblProperties,
+      StringBuilder errMsg) {
+    if (tblProperties.containsKey(IcebergTable.PARQUET_ROW_GROUP_SIZE)) {
+      String propVal = tblProperties.get(IcebergTable.PARQUET_ROW_GROUP_SIZE);
+      Long rowGroupSize = Longs.tryParse(propVal);
+      if (rowGroupSize == null) {
+        errMsg.append("Invalid parquet row group size for Iceberg table: ")
+            .append(propVal);
+        return null;
+      } else if (rowGroupSize < IcebergTable.MIN_PARQUET_ROW_GROUP_SIZE ||
+          rowGroupSize > IcebergTable.MAX_PARQUET_ROW_GROUP_SIZE) {
+        errMsg.append("Parquet row group size for Iceberg table should ")
+            .append("fall in the range of [")
+            .append(String.valueOf(IcebergTable.MIN_PARQUET_ROW_GROUP_SIZE))
+            .append("..")
+            .append(String.valueOf(IcebergTable.MAX_PARQUET_ROW_GROUP_SIZE))
+            .append("]");
+        return null;
+      }
+      return rowGroupSize;
+    }
+    return IcebergTable.UNSET_PARQUET_ROW_GROUP_SIZE;
+  }
+
+  public static Long parseParquetPageSize(Map<String, String> tblProperties,
+      String property, String descr, StringBuilder errMsg) {
+    if (tblProperties.containsKey(property)) {
+      String propVal = tblProperties.get(property);
+      Long pageSize = Longs.tryParse(propVal);
+      if (pageSize == null) {
+        errMsg.append("Invalid parquet ")
+            .append(descr)
+            .append(" for Iceberg table: ")
+            .append(propVal);
+        return null;
+      } else if (pageSize < IcebergTable.MIN_PARQUET_PAGE_SIZE ||
+          pageSize > IcebergTable.MAX_PARQUET_PAGE_SIZE) {
+        errMsg.append("Parquet ")
+            .append(descr)
+            .append(" for Iceberg table should fall in the range of [")
+            .append(String.valueOf(IcebergTable.MIN_PARQUET_PAGE_SIZE))
+            .append("..")
+            .append(String.valueOf(IcebergTable.MAX_PARQUET_PAGE_SIZE))
+            .append("]");
+        return null;
+      }
+      return pageSize;
+    }
+    return IcebergTable.UNSET_PARQUET_PAGE_SIZE;
   }
 }

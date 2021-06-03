@@ -266,7 +266,7 @@ DESCRIBE FORMATTED iceberg_hadoop_cat_query;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test/$DATABASE/iceberg_hadoop_cat_query','NULL'
 '','iceberg.catalog_location','/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
-'','iceberg.file_format ','parquet             '
+'','write.format.default','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
 ---- TYPES
 string, string, string
@@ -283,7 +283,7 @@ DESCRIBE FORMATTED iceberg_hadoop_cat_with_ident;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test/org/db/tbl','NULL'
 '','iceberg.catalog_location','/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
-'','iceberg.file_format ','parquet             '
+'','write.format.default','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
 ---- TYPES
 string, string, string
@@ -305,7 +305,7 @@ DESCRIBE FORMATTED iceberg_hadoop_cat_with_ident_ext;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test/org/db/tbl','NULL'
 '','iceberg.catalog_location','/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test'
-'','iceberg.file_format ','parquet             '
+'','write.format.default','parquet             '
 '','iceberg.catalog     ','hadoop.catalog      '
 ---- TYPES
 string, string, string
@@ -335,7 +335,7 @@ PARTITIONED BY SPEC
   DAY(register_time)
 )
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg.file_format'='orc','iceberg.catalog'='hadoop.catalog',
+TBLPROPERTIES('write.format.default'='orc','iceberg.catalog'='hadoop.catalog',
 'iceberg.catalog_location'='/test-warehouse/$DATABASE/hadoop_catalog_test/iceberg_test');
 ---- RESULTS
 'Table has been created.'

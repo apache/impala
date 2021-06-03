@@ -329,14 +329,14 @@ Syntax error in line
 ---- QUERY
 CREATE TABLE iceberg_wrong_fileformat (i int)
 STORED AS ICEBERG
-TBLPROPERTIES('iceberg.file_format'='or');
+TBLPROPERTIES('write.format.default'='or');
 ---- CATCH
 Invalid fileformat for Iceberg table: or
 ====
 ---- QUERY
 CREATE TABLE iceberg_set_wrong_fileformat (i int)
 STORED AS ICEBERG;
-ALTER TABLE iceberg_set_wrong_fileformat SET TBLPROPERTIES ('iceberg.file_format'='parq');
+ALTER TABLE iceberg_set_wrong_fileformat SET TBLPROPERTIES ('write.format.default'='parq');
 ---- CATCH
 Invalid fileformat for Iceberg table: parq
 ====
@@ -346,4 +346,216 @@ PARTITIONED BY SPEC (wrong(i))
 STORED AS ICEBERG;
 ---- CATCH
 Unsupported iceberg partition type: WRONG
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_row_group_size1 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES(
+    'write.format.default'='orc',
+    'write.parquet.row-group-size-bytes'='134217728');
+---- CATCH
+write.parquet.row-group-size-bytes should be set only for parquet file format
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_row_group_size2 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.parquet.row-group-size-bytes'='8388607');
+---- CATCH
+Parquet row group size for Iceberg table should fall in the range of [8388608..2146435072]
+====
+---- QUERY
+CREATE TABLE iceberg_set_wrong_parquet_row_group_size2 ( i int)
+STORED AS ICEBERG;
+ALTER TABLE iceberg_set_wrong_parquet_row_group_size2 SET
+TBLPROPERTIES('write.parquet.row-group-size-bytes'='8388607');
+---- CATCH
+Parquet row group size for Iceberg table should fall in the range of [8388608..2146435072]
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_row_group_size3 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.parquet.row-group-size-bytes'='134217728a');
+---- CATCH
+Invalid parquet row group size for Iceberg table: 134217728a
+====
+---- QUERY
+CREATE TABLE iceberg_set_wrong_parquet_row_group_size3 ( i int)
+STORED AS ICEBERG;
+ALTER TABLE iceberg_set_wrong_parquet_row_group_size3 SET
+TBLPROPERTIES('write.parquet.row-group-size-bytes'='134217728a');
+---- CATCH
+Invalid parquet row group size for Iceberg table: 134217728a
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_row_group_size4 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.parquet.row-group-size-bytes'='2146435073');
+---- CATCH
+Parquet row group size for Iceberg table should fall in the range of [8388608..2146435072]
+====
+---- QUERY
+CREATE TABLE iceberg_set_wrong_parquet_row_group_size4 ( i int)
+STORED AS ICEBERG;
+ALTER TABLE iceberg_set_wrong_parquet_row_group_size4 SET
+TBLPROPERTIES('write.parquet.row-group-size-bytes'='2146435073');
+---- CATCH
+Parquet row group size for Iceberg table should fall in the range of [8388608..2146435072]
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_page_size1 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.format.default'='orc', 'write.parquet.page-size-bytes'='65536');
+---- CATCH
+write.parquet.page-size-bytes should be set only for parquet file format
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_page_size2 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.parquet.page-size-bytes'='65535');
+---- CATCH
+Parquet page size for Iceberg table should fall in the range of [65536..1073741824]
+====
+---- QUERY
+CREATE TABLE iceberg_set_wrong_parquet_page_size2 ( i int)
+STORED AS ICEBERG;
+ALTER TABLE iceberg_set_wrong_parquet_page_size2 SET
+TBLPROPERTIES('write.parquet.page-size-bytes'='65535');
+---- CATCH
+Parquet page size for Iceberg table should fall in the range of [65536..1073741824]
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_page_size3 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.parquet.page-size-bytes'='655 36');
+---- CATCH
+Invalid parquet page size for Iceberg table: 655 36
+====
+---- QUERY
+CREATE TABLE iceberg_set_wrong_parquet_page_size3 ( i int)
+STORED AS ICEBERG;
+ALTER TABLE iceberg_set_wrong_parquet_page_size3 SET
+TBLPROPERTIES('write.parquet.page-size-bytes'='655 36');
+---- CATCH
+Invalid parquet page size for Iceberg table: 655 36
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_page_size4 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.parquet.page-size-bytes'='1073741825');
+---- CATCH
+Parquet page size for Iceberg table should fall in the range of [65536..1073741824]
+====
+---- QUERY
+CREATE TABLE iceberg_set_wrong_parquet_page_size4 ( i int)
+STORED AS ICEBERG;
+ALTER TABLE iceberg_set_wrong_parquet_page_size4 SET
+TBLPROPERTIES('write.parquet.page-size-bytes'='1073741825');
+---- CATCH
+Parquet page size for Iceberg table should fall in the range of [65536..1073741824]
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_dict_size1 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.format.default'='orc', 'write.parquet.dict-size-bytes'='65536');
+---- CATCH
+write.parquet.dict-size-bytes should be set only for parquet file format
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_dict_size2 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.parquet.dict-size-bytes'='65535');
+---- CATCH
+Parquet dictionary page size for Iceberg table should fall in the range of [65536..1073741824]
+====
+---- QUERY
+CREATE TABLE iceberg_set_wrong_parquet_dict_size2 ( i int)
+STORED AS ICEBERG;
+ALTER TABLE iceberg_set_wrong_parquet_dict_size2 SET
+TBLPROPERTIES('write.parquet.dict-size-bytes'='65535');
+---- CATCH
+Parquet dictionary page size for Iceberg table should fall in the range of [65536..1073741824]
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_dict_size3 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.parquet.dict-size-bytes'='655 36');
+---- CATCH
+Invalid parquet dictionary page size for Iceberg table: 655 36
+====
+---- QUERY
+CREATE TABLE iceberg_set_wrong_parquet_dict_size3 ( i int)
+STORED AS ICEBERG;
+ALTER TABLE iceberg_set_wrong_parquet_dict_size3 SET
+TBLPROPERTIES('write.parquet.dict-size-bytes'='655 36');
+---- CATCH
+Invalid parquet dictionary page size for Iceberg table: 655 36
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_dict_size4 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.parquet.dict-size-bytes'='1073741825');
+---- CATCH
+Parquet dictionary page size for Iceberg table should fall in the range of [65536..1073741824]
+====
+---- QUERY
+CREATE TABLE iceberg_set_wrong_parquet_dict_size4 ( i int)
+STORED AS ICEBERG;
+ALTER TABLE iceberg_set_wrong_parquet_dict_size4 SET
+TBLPROPERTIES('write.parquet.dict-size-bytes'='1073741825');
+---- CATCH
+Parquet dictionary page size for Iceberg table should fall in the range of [65536..1073741824]
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_comp_codec1 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.format.default'='orc',
+'write.parquet.compression-codec'='snappy');
+---- CATCH
+write.parquet.compression-codec should be set only for parquet file format
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_comp_codec2 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.parquet.compression-codec'='snapp');
+---- CATCH
+Invalid parquet compression codec for Iceberg table: snapp
+====
+---- QUERY
+CREATE TABLE iceberg_set_wrong_parquet_comp_codec2 ( i int)
+STORED AS ICEBERG;
+ALTER TABLE iceberg_set_wrong_parquet_comp_codec2 SET
+TBLPROPERTIES('write.parquet.compression-codec'='snapp');
+---- CATCH
+Invalid parquet compression codec for Iceberg table: snapp
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_comp_level1 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.format.default'='orc',
+'write.parquet.compression-level'='2');
+---- CATCH
+write.parquet.compression-level should be set only for parquet file format
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_comp_level2 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.parquet.compression-level'='2');
+---- CATCH
+Parquet compression level cannot be set for codec SNAPPY. Only ZSTD codec supports compression level table property.
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_parquet_comp_level3 ( i int)
+STORED AS ICEBERG
+TBLPROPERTIES('write.parquet.compression-codec'='zstd',
+'write.parquet.compression-level'='0');
+---- CATCH
+Parquet compression level for Iceberg table should fall in the range of [1..22]
+====
+---- QUERY
+CREATE TABLE iceberg_set_wrong_parquet_comp_level4 ( i int)
+STORED AS ICEBERG;
+ALTER TABLE iceberg_set_wrong_parquet_comp_level4 SET
+TBLPROPERTIES('write.parquet.compression-level'='0');
+---- CATCH
+Parquet compression level for Iceberg table should fall in the range of [1..22]
 ====

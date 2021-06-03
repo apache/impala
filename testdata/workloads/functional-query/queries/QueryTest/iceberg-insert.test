@@ -269,3 +269,137 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/custom_hive_cat/data/.*.0.parq'
 ---- TYPES
 STRING, STRING, STRING
 ====
+---- QUERY
+# Create a table that is a subset of 'alltypes' table, i.e. it only
+# contains the data types supported by Iceberg.
+create table iceberg_alltypes_parq_tblprop(
+  id INT COMMENT 'Add a comment',
+  bool_col BOOLEAN,
+  int_col INT,
+  bigint_col BIGINT,
+  float_col FLOAT,
+  double_col DOUBLE,
+  date_col DATE,
+  string_col STRING,
+  timestamp_col TIMESTAMP
+)
+stored as iceberg
+tblproperties('write.format.default'='parquet',
+    'write.parquet.row-group-size-bytes'='8388608',
+    'write.parquet.compression-codec'='gzip',
+    'write.parquet.page-size-bytes'='65536',
+    'write.parquet.dict-size-bytes'='1073741824'
+);
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into iceberg_alltypes_parq_tblprop
+select id, bool_col, int_col, bigint_col, float_col, double_col,
+CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+from functional.alltypes;
+---- RESULTS
+: 7300
+====
+---- QUERY
+alter table iceberg_alltypes_parq_tblprop set tblproperties (
+    'write.parquet.row-group-size-bytes'='536870912',
+    'write.parquet.compression-codec'='none',
+    'write.parquet.page-size-bytes'='134217728',
+    'write.parquet.dict-size-bytes'='805306368');
+====
+---- QUERY
+insert into iceberg_alltypes_parq_tblprop
+select id, bool_col, int_col, bigint_col, float_col, double_col,
+CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+from functional.alltypes;
+---- RESULTS
+: 7300
+====
+---- QUERY
+alter table iceberg_alltypes_parq_tblprop set tblproperties (
+    'write.parquet.row-group-size-bytes'='1073741824',
+    'write.parquet.compression-codec'='zstd',
+    'write.parquet.compression-level'='1',
+    'write.parquet.page-size-bytes'='402653184',
+    'write.parquet.dict-size-bytes'='536870912');
+====
+---- QUERY
+insert into iceberg_alltypes_parq_tblprop
+select id, bool_col, int_col, bigint_col, float_col, double_col,
+CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+from functional.alltypes;
+---- RESULTS
+: 7300
+====
+---- QUERY
+alter table iceberg_alltypes_parq_tblprop set tblproperties (
+    'write.parquet.row-group-size-bytes'='1610612736',
+    'write.parquet.compression-codec'='zstd',
+    'write.parquet.compression-level'='13',
+    'write.parquet.page-size-bytes'='536870912',
+    'write.parquet.dict-size-bytes'='402653184');
+====
+---- QUERY
+insert into iceberg_alltypes_parq_tblprop
+select id, bool_col, int_col, bigint_col, float_col, double_col,
+CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+from functional.alltypes;
+---- RESULTS
+: 7300
+====
+---- QUERY
+alter table iceberg_alltypes_parq_tblprop set tblproperties (
+    'write.parquet.row-group-size-bytes'='1879048192',
+    'write.parquet.compression-codec'='zstd',
+    'write.parquet.compression-level'='18',
+    'write.parquet.page-size-bytes'='805306368',
+    'write.parquet.dict-size-bytes'='134217728');
+====
+---- QUERY
+insert into iceberg_alltypes_parq_tblprop
+select id, bool_col, int_col, bigint_col, float_col, double_col,
+CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+from functional.alltypes;
+---- RESULTS
+: 7300
+====
+---- QUERY
+alter table iceberg_alltypes_parq_tblprop set tblproperties (
+    'write.parquet.row-group-size-bytes'='2146435072',
+    'write.parquet.compression-codec'='zstd',
+    'write.parquet.compression-level'='22',
+    'write.parquet.page-size-bytes'='1073741824',
+    'write.parquet.dict-size-bytes'='65536');
+====
+---- QUERY
+insert into iceberg_alltypes_parq_tblprop
+select id, bool_col, int_col, bigint_col, float_col, double_col,
+CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+from functional.alltypes;
+---- RESULTS
+: 7300
+====
+---- QUERY
+alter table iceberg_alltypes_parq_tblprop unset tblproperties (
+    'write.parquet.row-group-size-bytes',
+    'write.parquet.compression-codec',
+    'write.parquet.compression-level',
+    'write.parquet.page-size-bytes',
+    'write.parquet.dict-size-bytes');
+====
+---- QUERY
+insert into iceberg_alltypes_parq_tblprop
+select id, bool_col, int_col, bigint_col, float_col, double_col,
+CAST(date_string_col as date FORMAT 'MM/DD/YY'), string_col, timestamp_col
+from functional.alltypes;
+---- RESULTS
+: 7300
+====
+---- QUERY
+select count(*) from iceberg_alltypes_parq_tblprop;
+---- RESULTS
+51100
+---- TYPES
+BIGINT
+====

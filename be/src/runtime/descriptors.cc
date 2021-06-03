@@ -253,6 +253,10 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPo
     for (const TIcebergPartitionField& spec_field : spec.partition_fields) {
       iceberg_partition_names_.push_back(spec_field.field_name);
     }
+    iceberg_parquet_compression_codec_ = tdesc.icebergTable.parquet_compression_codec;
+    iceberg_parquet_row_group_size_ = tdesc.icebergTable.parquet_row_group_size;
+    iceberg_parquet_plain_page_size_ = tdesc.icebergTable.parquet_plain_page_size;
+    iceberg_parquet_dict_page_size_ = tdesc.icebergTable.parquet_dict_page_size;
   }
 }
 

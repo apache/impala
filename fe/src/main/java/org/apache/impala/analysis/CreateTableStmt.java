@@ -35,9 +35,12 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.TCreateTableParams;
+import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergCatalog;
+import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionTransformType;
 import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableName;
@@ -54,6 +57,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
 
 /**
  * Represents a CREATE TABLE statement.
@@ -626,12 +630,20 @@ public class CreateTableStmt extends StatementBase {
         IcebergTable.ICEBERG_STORAGE_HANDLER);
 
     String fileformat = getTblProperties().get(IcebergTable.ICEBERG_FILE_FORMAT);
-    if (fileformat != null && IcebergUtil.getIcebergFileFormat(fileformat) == null) {
+    TIcebergFileFormat icebergFileFormat = IcebergUtil.getIcebergFileFormat(fileformat);
+    if (fileformat != null && icebergFileFormat == null) {
       throw new AnalysisException("Invalid fileformat for Iceberg table: " + fileformat);
     }
     if (fileformat == null || fileformat.isEmpty()) {
       putGeneratedProperty(IcebergTable.ICEBERG_FILE_FORMAT, "parquet");
     }
+
+    validateIcebergParquetCompressionCodec(icebergFileFormat);
+    validateIcebergParquetRowGroupSize(icebergFileFormat);
+    validateIcebergParquetPageSize(icebergFileFormat,
+        IcebergTable.PARQUET_PLAIN_PAGE_SIZE, "page size");
+    validateIcebergParquetPageSize(icebergFileFormat,
+        IcebergTable.PARQUET_DICT_PAGE_SIZE, "dictionary page size");
 
     // Determine the Iceberg catalog being used. The default catalog is HiveCatalog.
     String catalogStr = getTblProperties().get(IcebergTable.ICEBERG_CATALOG);
@@ -642,6 +654,57 @@ public class CreateTableStmt extends StatementBase {
       catalog = IcebergUtil.getTIcebergCatalog(catalogStr);
     }
     validateIcebergTableProperties(catalog);
+  }
+
+  private void validateIcebergParquetCompressionCodec(
+      TIcebergFileFormat icebergFileFormat) throws AnalysisException {
+    if (icebergFileFormat != TIcebergFileFormat.PARQUET) {
+      if (getTblProperties().containsKey(IcebergTable.PARQUET_COMPRESSION_CODEC)) {
+          throw new AnalysisException(IcebergTable.PARQUET_COMPRESSION_CODEC +
+              " should be set only for parquet file format");
+      }
+      if (getTblProperties().containsKey(IcebergTable.PARQUET_COMPRESSION_LEVEL)) {
+          throw new AnalysisException(IcebergTable.PARQUET_COMPRESSION_LEVEL +
+              " should be set only for parquet file format");
+      }
+    } else {
+      StringBuilder errMsg = new StringBuilder();
+      if (IcebergUtil.parseParquetCompressionCodec(true, getTblProperties(), errMsg)
+          == null) {
+        throw new AnalysisException(errMsg.toString());
+      }
+    }
+  }
+
+  private void validateIcebergParquetRowGroupSize(TIcebergFileFormat icebergFileFormat)
+      throws AnalysisException {
+    if (getTblProperties().containsKey(IcebergTable.PARQUET_ROW_GROUP_SIZE)) {
+      if (icebergFileFormat != TIcebergFileFormat.PARQUET) {
+        throw new AnalysisException(IcebergTable.PARQUET_ROW_GROUP_SIZE +
+            " should be set only for parquet file format");
+      }
+    }
+
+    StringBuilder errMsg = new StringBuilder();
+    if (IcebergUtil.parseParquetRowGroupSize(getTblProperties(), errMsg) == null) {
+      throw new AnalysisException(errMsg.toString());
+    }
+  }
+
+  private void validateIcebergParquetPageSize(TIcebergFileFormat icebergFileFormat,
+      String pageSizeTblProp, String descr) throws AnalysisException {
+    if (getTblProperties().containsKey(pageSizeTblProp)) {
+      if (icebergFileFormat != TIcebergFileFormat.PARQUET) {
+        throw new AnalysisException(pageSizeTblProp +
+            " should be set only for parquet file format");
+      }
+    }
+
+    StringBuilder errMsg = new StringBuilder();
+    if (IcebergUtil.parseParquetPageSize(getTblProperties(), pageSizeTblProp, descr,
+        errMsg) == null) {
+      throw new AnalysisException(errMsg.toString());
+    }
   }
 
   private void validateIcebergTableProperties(TIcebergCatalog catalog)

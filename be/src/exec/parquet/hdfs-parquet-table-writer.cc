@@ -124,7 +124,7 @@ class HdfsParquetTableWriter::BaseColumnWriter {
     : parent_(parent),
       expr_eval_(expr_eval),
       codec_info_(codec_info),
-      page_size_(DEFAULT_DATA_PAGE_SIZE),
+      plain_page_size_(parent->default_plain_page_size()),
       current_page_(nullptr),
       num_values_(0),
       total_compressed_byte_size_(0),
@@ -356,12 +356,14 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // compressed.
   scoped_ptr<Codec> compressor_;
 
-  // Size of newly created pages. Defaults to DEFAULT_DATA_PAGE_SIZE and is increased
-  // when pages are not big enough. This only happens when there are enough unique values
-  // such that we switch from PLAIN_DICTIONARY/RLE_DICTIONARY to PLAIN encoding and then
-  // have very large values (i.e. greater than DEFAULT_DATA_PAGE_SIZE).
+  // Size of newly created PLAIN encoded pages. Defaults to DEFAULT_DATA_PAGE_SIZE or to
+  // the value of 'write.parquet.page-size-bytes' table property for Iceberg tables.
+  // Its value is increased when pages are not big enough. This only happens when there
+  // are enough unique values such that we switch from PLAIN_DICTIONARY/RLE_DICTIONARY to
+  // PLAIN encoding and then have very large values (i.e. greater than
+  // DEFAULT_DATA_PAGE_SIZE).
   // TODO: Consider removing and only creating a single large page as necessary.
-  int64_t page_size_;
+  int64_t plain_page_size_;
 
   // Pages belong to this column chunk. We need to keep them in memory in order to write
   // them together.
@@ -506,7 +508,9 @@ class HdfsParquetTableWriter::ColumnWriter :
       if (UNLIKELY(num_values_since_dict_size_check_ >=
                    DICTIONARY_DATA_PAGE_SIZE_CHECK_PERIOD)) {
         num_values_since_dict_size_check_ = 0;
-        if (dict_encoder_->EstimatedDataEncodedSize() >= page_size_) return false;
+        if (dict_encoder_->EstimatedDataEncodedSize() >= parent_->dict_page_size()) {
+          return false;
+        }
       }
       ++num_values_since_dict_size_check_;
       *bytes_needed = dict_encoder_->Put(*val);
@@ -522,7 +526,8 @@ class HdfsParquetTableWriter::ColumnWriter :
       *bytes_needed = plain_encoded_value_size_ < 0 ?
           ParquetPlainEncoder::ByteSize<T>(*val) :
           plain_encoded_value_size_;
-      if (current_page_->header.uncompressed_page_size + *bytes_needed > page_size_) {
+      if (current_page_->header.uncompressed_page_size + *bytes_needed >
+          plain_page_size_) {
         return false;
       }
       uint8_t* dst_ptr = values_buffer_ + current_page_->header.uncompressed_page_size;
@@ -917,7 +922,7 @@ inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row)
 
     // Check how much space is needed to write this value. If that is larger than the
     // page size then increase page size and try again.
-    if (UNLIKELY(bytes_needed > page_size_)) {
+    if (UNLIKELY(bytes_needed > plain_page_size_)) {
       if (bytes_needed > MAX_DATA_PAGE_SIZE) {
         stringstream ss;
         ss << "Cannot write value of size "
@@ -926,8 +931,8 @@ inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row)
            << PrettyPrinter::Print(MAX_DATA_PAGE_SIZE , TUnit::BYTES) << ".";
         return Status(ss.str());
       }
-      page_size_ = bytes_needed;
-      values_buffer_len_ = page_size_;
+      plain_page_size_ = bytes_needed;
+      values_buffer_len_ = plain_page_size_;
       values_buffer_ = parent_->reusable_col_mem_pool_->Allocate(values_buffer_len_);
     }
     NewPage();
@@ -1205,25 +1210,72 @@ HdfsParquetTableWriter::HdfsParquetTableWriter(HdfsTableSink* parent, RuntimeSta
     file_size_limit_(0),
     reusable_col_mem_pool_(new MemPool(parent_->mem_tracker())),
     per_file_mem_pool_(new MemPool(parent_->mem_tracker())),
-    row_idx_(0) {
+    row_idx_(0),
+    default_block_size_(0),
+    default_plain_page_size_(0),
+    dict_page_size_(0) {
   is_iceberg_file_ = table_desc->IsIcebergTable();
 }
 
 HdfsParquetTableWriter::~HdfsParquetTableWriter() {
 }
 
-void HdfsParquetTableWriter::ConfigureTimestampType() {
-  if (is_iceberg_file_) {
-    // The Iceberg spec states that timestamps are stored as INT64 micros.
-    timestamp_type_ = TParquetTimestampType::INT64_MICROS;
-    return;
-  }
+void HdfsParquetTableWriter::Configure() {
+  DCHECK(!is_iceberg_file_);
+
   timestamp_type_ = state_->query_options().parquet_timestamp_type;
+
+  string_utf8_ = state_->query_options().parquet_annotate_strings_utf8;
+
+  if (state_->query_options().__isset.parquet_file_size &&
+      state_->query_options().parquet_file_size > 0) {
+    // If the user specified a value explicitly, use it. InitNewFile() will verify that
+    // the actual file's block size is sufficient.
+    default_block_size_ = state_->query_options().parquet_file_size;
+  } else {
+    default_block_size_ = HDFS_BLOCK_SIZE;
+    // Blocks are usually HDFS_BLOCK_SIZE bytes, unless there are many columns, in
+    // which case a per-column minimum kicks in.
+    default_block_size_ = max(default_block_size_, MinBlockSize(columns_.size()));
+  }
+  // HDFS does not like block sizes that are not aligned
+  default_block_size_ = BitUtil::RoundUp(default_block_size_, HDFS_BLOCK_ALIGNMENT);
+
+  default_plain_page_size_ = DEFAULT_DATA_PAGE_SIZE;
+  dict_page_size_ = DEFAULT_DATA_PAGE_SIZE;
 }
 
-void HdfsParquetTableWriter::ConfigureStringType() {
-  string_utf8_ = is_iceberg_file_ ||
-                 state_->query_options().parquet_annotate_strings_utf8;
+void HdfsParquetTableWriter::ConfigureForIceberg() {
+  DCHECK(is_iceberg_file_);
+
+  // The Iceberg spec states that timestamps are stored as INT64 micros.
+  timestamp_type_ = TParquetTimestampType::INT64_MICROS;
+
+  string_utf8_ = true;
+
+  if (state_->query_options().__isset.parquet_file_size &&
+      state_->query_options().parquet_file_size > 0) {
+    // If the user specified a value explicitly, use it. InitNewFile() will verify that
+    // the actual file's block size is sufficient.
+    default_block_size_ = state_->query_options().parquet_file_size;
+  } else if (table_desc_->IcebergParquetRowGroupSize() > 0) {
+    // If the user specified a value explicitly, use it. InitNewFile() will verify that
+    // the actual file's block size is sufficient.
+    default_block_size_ = table_desc_->IcebergParquetRowGroupSize();
+  } else {
+    default_block_size_ = HDFS_BLOCK_SIZE;
+    // Blocks are usually HDFS_BLOCK_SIZE bytes, unless there are many columns, in
+    // which case a per-column minimum kicks in.
+    default_block_size_ = max(default_block_size_, MinBlockSize(columns_.size()));
+  }
+  // HDFS does not like block sizes that are not aligned
+  default_block_size_ = BitUtil::RoundUp(default_block_size_, HDFS_BLOCK_ALIGNMENT);
+
+  default_plain_page_size_ = table_desc_->IcebergParquetPlainPageSize();
+  if (default_plain_page_size_ <= 0) default_plain_page_size_ = DEFAULT_DATA_PAGE_SIZE;
+
+  dict_page_size_ = table_desc_->IcebergParquetDictPageSize();
+  if (dict_page_size_ <= 0) dict_page_size_ = DEFAULT_DATA_PAGE_SIZE;
 }
 
 Status HdfsParquetTableWriter::Init() {
@@ -1243,6 +1295,12 @@ Status HdfsParquetTableWriter::Init() {
   if (query_options.__isset.compression_codec) {
     codec = query_options.compression_codec.codec;
     clevel = query_options.compression_codec.compression_level;
+  } else if (table_desc_->IsIcebergTable()) {
+    TCompressionCodec compression_codec = table_desc_->IcebergParquetCompressionCodec();
+    codec = compression_codec.codec;
+    if (compression_codec.__isset.compression_level) {
+      clevel = compression_codec.compression_level;
+    }
   }
 
   if (!(codec == THdfsCompression::NONE ||
@@ -1290,8 +1348,11 @@ Status HdfsParquetTableWriter::Init() {
 
   Codec::CodecInfo codec_info(codec, clevel);
 
-  ConfigureTimestampType();
-  ConfigureStringType();
+  if (is_iceberg_file_) {
+    ConfigureForIceberg();
+  } else {
+    Configure();
+  }
 
   columns_.resize(num_cols);
   // Initialize each column structure.
@@ -1437,23 +1498,6 @@ Status HdfsParquetTableWriter::AddRowGroup() {
 int64_t HdfsParquetTableWriter::MinBlockSize(int64_t num_file_cols) const {
   // See file_size_limit_ calculation in InitNewFile().
   return 3 * DEFAULT_DATA_PAGE_SIZE * num_file_cols;
-}
-
-uint64_t HdfsParquetTableWriter::default_block_size() const {
-  int64_t block_size;
-  if (state_->query_options().__isset.parquet_file_size &&
-      state_->query_options().parquet_file_size > 0) {
-    // If the user specified a value explicitly, use it. InitNewFile() will verify that
-    // the actual file's block size is sufficient.
-    block_size = state_->query_options().parquet_file_size;
-  } else {
-    block_size = HDFS_BLOCK_SIZE;
-    // Blocks are usually HDFS_BLOCK_SIZE bytes, unless there are many columns, in
-    // which case a per-column minimum kicks in.
-    block_size = max(block_size, MinBlockSize(columns_.size()));
-  }
-  // HDFS does not like block sizes that are not aligned
-  return BitUtil::RoundUp(block_size, HDFS_BLOCK_ALIGNMENT);
 }
 
 Status HdfsParquetTableWriter::InitNewFile() {

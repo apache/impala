@@ -35,6 +35,8 @@ import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.thrift.TCatalogObjectType;
+import org.apache.impala.thrift.TCompressionCodec;
+import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.TIcebergCatalog;
@@ -68,7 +70,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
       "org.apache.iceberg.mr.hive.HiveIcebergStorageHandler";
 
   // Iceberg file format key in tblproperties
-  public static final String ICEBERG_FILE_FORMAT = "iceberg.file_format";
+  public static final String ICEBERG_FILE_FORMAT = "write.format.default";
 
   // Iceberg catalog type key in tblproperties
   public static final String ICEBERG_CATALOG = "iceberg.catalog";
@@ -86,11 +88,60 @@ public class IcebergTable extends Table implements FeIcebergTable {
   // table metadata. This property is only valid for tables in 'hive.catalog'.
   public static final String METADATA_LOCATION = "metadata_location";
 
+  // Parquet compression codec and compression level table properties.
+  public static final String PARQUET_COMPRESSION_CODEC =
+      "write.parquet.compression-codec";
+  public static final String PARQUET_COMPRESSION_LEVEL =
+      "write.parquet.compression-level";
+
+  // Default values for parquet compression codec.
+  public static final THdfsCompression DEFAULT_PARQUET_COMPRESSION_CODEC =
+      THdfsCompression.SNAPPY;
+  // Default values for parquet compression level (used with ZSTD codec).
+  public static final int DEFAULT_PARQUET_ZSTD_COMPRESSION_LEVEL = 3;
+  // Valid range for parquet compression level.
+  public static final int MIN_PARQUET_COMPRESSION_LEVEL = 1;
+  public static final int MAX_PARQUET_COMPRESSION_LEVEL = 22;
+
+  // Parquet row group size table property.
+  public static final String PARQUET_ROW_GROUP_SIZE =
+      "write.parquet.row-group-size-bytes";
+  // 0 means that the table property should be ignored.
+  public static final long UNSET_PARQUET_ROW_GROUP_SIZE = 0;
+  // Valid range for parquet row group size is [8MB, 2047MB]
+  // (see HDFS_MIN_FILE_SIZE defined in hdfs-parquet-table-writer.h)
+  public static final long MIN_PARQUET_ROW_GROUP_SIZE = 8 * 1024 * 1024;
+  public static final long MAX_PARQUET_ROW_GROUP_SIZE = 2047 * 1024 * 1024;
+
+  // Parquet plain page size table property.
+  public static final String PARQUET_PLAIN_PAGE_SIZE = "write.parquet.page-size-bytes";
+  // Parquet dictionary page size table property.
+  public static final String PARQUET_DICT_PAGE_SIZE = "write.parquet.dict-size-bytes";
+  // 0 means that the table property should be ignored.
+  public static final long UNSET_PARQUET_PAGE_SIZE = 0;
+  // Valid range for parquet plain and dictionary page size [64K, 1GB]
+  // (see DEFAULT_DATA_PAGE_SIZE and MAX_DATA_PAGE_SIZE defined in
+  // hdfs-parquet-table-writer.h)
+  public static final long MIN_PARQUET_PAGE_SIZE = 64 * 1024;
+  public static final long MAX_PARQUET_PAGE_SIZE = 1024 * 1024 * 1024;
+
   // Iceberg catalog type dependend on table properties
   private TIcebergCatalog icebergCatalog_;
 
   // Iceberg file format dependend on table properties
   private TIcebergFileFormat icebergFileFormat_;
+
+  // Iceberg parquet compression codec dependent on table properties
+  private TCompressionCodec icebergParquetCompressionCodec_;
+
+  // Iceberg parquet row group size dependent on table property
+  private long icebergParquetRowGroupSize_;
+
+  // Iceberg parquet plain page size dependent on table property
+  private long icebergParquetPlainPageSize_;
+
+  // Iceberg parquet dictionary page size dependent on table property
+  private long icebergParquetDictPageSize_;
 
   // The iceberg file system table location
   private String icebergTableLocation_;
@@ -119,6 +170,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
     icebergTableLocation_ = msTable.getSd().getLocation();
     icebergCatalog_ = IcebergUtil.getTIcebergCatalog(msTable);
     icebergFileFormat_ = Utils.getIcebergFileFormat(msTable);
+    icebergParquetCompressionCodec_ = Utils.getIcebergParquetCompressionCodec(msTable);
+    icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTable);
+    icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTable);
+    icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTable);
     hdfsTable_ = new HdfsTable(msTable, db, name, owner);
   }
 
@@ -189,6 +244,26 @@ public class IcebergTable extends Table implements FeIcebergTable {
   @Override
   public TIcebergFileFormat getIcebergFileFormat() {
     return icebergFileFormat_;
+  }
+
+  @Override
+  public TCompressionCodec getIcebergParquetCompressionCodec() {
+    return icebergParquetCompressionCodec_;
+  }
+
+  @Override
+  public long getIcebergParquetRowGroupSize() {
+    return icebergParquetRowGroupSize_;
+  }
+
+  @Override
+  public long getIcebergParquetPlainPageSize() {
+    return icebergParquetPlainPageSize_;
+  }
+
+  @Override
+  public long getIcebergParquetDictPageSize() {
+    return icebergParquetDictPageSize_;
   }
 
   @Override
@@ -263,6 +338,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
         // Loading hdfs table after loaded schema from Iceberg,
         // in case we create external Iceberg table skipping column info in sql.
         icebergFileFormat_ = Utils.getIcebergFileFormat(msTbl);
+        icebergParquetCompressionCodec_ = Utils.getIcebergParquetCompressionCodec(msTbl);
+        icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTbl);
+        icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTbl);
+        icebergParquetDictPageSize_ = Utils.getIcebergParquetDictPageSize(msTbl);
         hdfsTable_
             .load(false, msClient, msTable_, true, true, false, null, null,null, reason);
         pathHashToFileDescMap_ = Utils.loadAllPartition(this);
@@ -330,6 +409,10 @@ public class IcebergTable extends Table implements FeIcebergTable {
     super.loadFromThrift(thriftTable);
     TIcebergTable ticeberg = thriftTable.getIceberg_table();
     icebergTableLocation_ = ticeberg.getTable_location();
+    icebergParquetCompressionCodec_ = ticeberg.getParquet_compression_codec();
+    icebergParquetRowGroupSize_ = ticeberg.getParquet_row_group_size();
+    icebergParquetPlainPageSize_ = ticeberg.getParquet_plain_page_size();
+    icebergParquetDictPageSize_ = ticeberg.getParquet_dict_page_size();
     partitionSpecs_ = loadPartitionBySpecsFromThrift(ticeberg.getPartition_spec());
     defaultPartitionSpecId_ = ticeberg.getDefault_partition_spec_id();
     pathHashToFileDescMap_ = loadFileDescFromThrift(

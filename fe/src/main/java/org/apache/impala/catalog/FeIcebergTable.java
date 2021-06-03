@@ -43,6 +43,8 @@ import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.thrift.TCompressionCodec;
+import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.TIcebergCatalog;
@@ -56,6 +58,7 @@ import org.apache.impala.util.ListMap;
 import org.apache.impala.util.TResultRowBuilder;
 
 import com.google.common.base.Preconditions;
+import com.google.common.primitives.Ints;
 
 /**
  * Frontend interface for interacting with an Iceberg-backed table.
@@ -88,6 +91,26 @@ public interface FeIcebergTable extends FeFsTable {
    * Return iceberg file format from table properties
    */
   TIcebergFileFormat getIcebergFileFormat();
+
+  /**
+   * Return iceberg parquet compression codec from table properties
+   */
+  TCompressionCodec getIcebergParquetCompressionCodec();
+
+  /**
+   * Return iceberg parquet row group size in bytes from table properties
+   */
+  long getIcebergParquetRowGroupSize();
+
+  /**
+   * Return iceberg parquet plain page size in bytes from table properties
+   */
+  long getIcebergParquetPlainPageSize();
+
+  /**
+   * Return iceberg parquet dictionary page size in bytes from table properties
+   */
+  long getIcebergParquetDictPageSize();
 
   /**
    * Return the table location of Iceberg table
@@ -298,11 +321,73 @@ public interface FeIcebergTable extends FeFsTable {
      */
     public static TIcebergFileFormat getIcebergFileFormat(
         org.apache.hadoop.hive.metastore.api.Table msTable) {
-      TIcebergFileFormat fileFormat = IcebergUtil.getIcebergFileFormat(
-          msTable.getParameters().get(IcebergTable.ICEBERG_FILE_FORMAT));
+      TIcebergFileFormat fileFormat = null;
+      Map<String, String> params = msTable.getParameters();
+      if (params.containsKey(IcebergTable.ICEBERG_FILE_FORMAT)) {
+        fileFormat = IcebergUtil.getIcebergFileFormat(
+            params.get(IcebergTable.ICEBERG_FILE_FORMAT));
+      } else {
+        // Accept "iceberg.file_format" for backward compatibility.
+        fileFormat = IcebergUtil.getIcebergFileFormat(params.get("iceberg.file_format"));
+      }
       return fileFormat == null ? TIcebergFileFormat.PARQUET : fileFormat;
     }
 
+    /**
+     * Get iceberg parquet compression codec from hms table properties
+     */
+    public static TCompressionCodec getIcebergParquetCompressionCodec(
+        org.apache.hadoop.hive.metastore.api.Table msTable) {
+      THdfsCompression codec = IcebergUtil.getIcebergParquetCompressionCodec(
+          msTable.getParameters().get(IcebergTable.PARQUET_COMPRESSION_CODEC));
+      if (codec == null) codec = IcebergTable.DEFAULT_PARQUET_COMPRESSION_CODEC;
+      TCompressionCodec compression = new TCompressionCodec(codec);
+
+      // Compression level is interesting only if ZSTD codec is used.
+      if (codec == THdfsCompression.ZSTD) {
+        int clevel = IcebergTable.DEFAULT_PARQUET_ZSTD_COMPRESSION_LEVEL;
+
+        String clevelTblProp = msTable.getParameters().get(
+            IcebergTable.PARQUET_COMPRESSION_LEVEL);
+        if (clevelTblProp != null) {
+          Integer cl = Ints.tryParse(clevelTblProp);
+          if (cl != null && cl >= IcebergTable.MIN_PARQUET_COMPRESSION_LEVEL &&
+              cl <= IcebergTable.MAX_PARQUET_COMPRESSION_LEVEL) {
+            clevel = cl;
+          }
+        }
+        compression.setCompression_level(clevel);
+      }
+
+      return compression;
+    }
+
+    /**
+     * Get iceberg parquet row group size from hms table properties
+     */
+    public static long getIcebergParquetRowGroupSize(
+        org.apache.hadoop.hive.metastore.api.Table msTable) {
+      return IcebergUtil.getIcebergParquetRowGroupSize(
+          msTable.getParameters().get(IcebergTable.PARQUET_ROW_GROUP_SIZE));
+    }
+
+    /**
+     * Get iceberg parquet plain page size from hms table properties
+     */
+    public static long getIcebergParquetPlainPageSize(
+        org.apache.hadoop.hive.metastore.api.Table msTable) {
+      return IcebergUtil.getIcebergParquetPageSize(
+          msTable.getParameters().get(IcebergTable.PARQUET_PLAIN_PAGE_SIZE));
+    }
+
+    /**
+     * Get iceberg parquet dictionary page size from hms table properties
+     */
+    public static long getIcebergParquetDictPageSize(
+        org.apache.hadoop.hive.metastore.api.Table msTable) {
+      return IcebergUtil.getIcebergParquetPageSize(
+          msTable.getParameters().get(IcebergTable.PARQUET_DICT_PAGE_SIZE));
+    }
 
     public static TIcebergTable getTIcebergTable(FeIcebergTable icebergTable) {
       TIcebergTable tIcebergTable = new TIcebergTable();
@@ -320,6 +405,14 @@ public interface FeIcebergTable extends FeFsTable {
           entry.getValue().toThrift());
       }
       tIcebergTable.setSnapshot_id(icebergTable.snapshotId());
+      tIcebergTable.setParquet_compression_codec(
+          icebergTable.getIcebergParquetCompressionCodec());
+      tIcebergTable.setParquet_row_group_size(
+          icebergTable.getIcebergParquetRowGroupSize());
+      tIcebergTable.setParquet_plain_page_size(
+          icebergTable.getIcebergParquetPlainPageSize());
+      tIcebergTable.setParquet_dict_page_size(
+          icebergTable.getIcebergParquetDictPageSize());
       return tIcebergTable;
     }
 

@@ -36,6 +36,7 @@ import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.TAlterTableParams;
 import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
@@ -50,6 +51,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
+import com.google.common.primitives.Longs;
 
 /**
 * Represents an ALTER TABLE SET [PARTITION ('k1'='a', 'k2'='b'...)]
@@ -157,6 +159,11 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
     if (tblProperties_.containsKey(IcebergTable.ICEBERG_FILE_FORMAT)) {
       icebergTableFormatCheck(tblProperties_.get(IcebergTable.ICEBERG_FILE_FORMAT));
     }
+    icebergParquetCompressionCodecCheck();
+    icebergParquetRowGroupSizeCheck();
+    icebergParquetPageSizeCheck(IcebergTable.PARQUET_PLAIN_PAGE_SIZE, "page size");
+    icebergParquetPageSizeCheck(IcebergTable.PARQUET_DICT_PAGE_SIZE,
+        "dictionary page size");
   }
 
   private void icebergPropertyCheck(String property) throws AnalysisException {
@@ -193,6 +200,29 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
       }
     } catch (TableLoadingException e) {
       throw new AnalysisException(e);
+    }
+  }
+
+  private void icebergParquetCompressionCodecCheck() throws AnalysisException {
+    StringBuilder errMsg = new StringBuilder();
+    if (IcebergUtil.parseParquetCompressionCodec(false, tblProperties_, errMsg) == null) {
+      throw new AnalysisException(errMsg.toString());
+    }
+  }
+
+  private void icebergParquetRowGroupSizeCheck() throws AnalysisException {
+    StringBuilder errMsg = new StringBuilder();
+    if (IcebergUtil.parseParquetRowGroupSize(tblProperties_, errMsg) == null) {
+      throw new AnalysisException(errMsg.toString());
+    }
+  }
+
+  private void icebergParquetPageSizeCheck(String property, String descr)
+      throws AnalysisException {
+    StringBuilder errMsg = new StringBuilder();
+    if (IcebergUtil.parseParquetPageSize(getTblProperties(), property, descr,
+        errMsg) == null) {
+      throw new AnalysisException(errMsg.toString());
     }
   }
 
