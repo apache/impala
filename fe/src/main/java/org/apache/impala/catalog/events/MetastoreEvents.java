@@ -559,17 +559,10 @@ public class MetastoreEvents {
      */
     protected boolean reloadTableFromCatalog(String operation, boolean isTransactional)
         throws CatalogException {
-      try {
-        if (!catalog_.reloadTableIfExists(dbName_, tblName_,
-            "Processing " + operation + " event from HMS")) {
-          debugLog("Automatic refresh on table {} failed as the table "
-              + "either does not exist anymore or is not in loaded state.",
-              getFullyQualifiedTblName());
-          return false;
-        }
-      } catch (DatabaseNotFoundException e) {
-        debugLog("Refresh table {} failed as "
-                + "the database was not present in the catalog.",
+      if (!catalog_.reloadTableIfExists(dbName_, tblName_,
+          "Processing " + operation + " event from HMS")) {
+        debugLog("Automatic refresh on table {} failed as the table "
+            + "either does not exist anymore or is not in loaded state.",
             getFullyQualifiedTblName());
         return false;
       }

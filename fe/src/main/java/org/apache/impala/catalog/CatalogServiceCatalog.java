@@ -2735,14 +2735,18 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Refresh table if exists. Returns true if reloadTable() succeeds, false
-   * otherwise. Throws CatalogException if reloadTable() is unsuccessful. Throws
-   * DatabaseNotFoundException if Db doesn't exist.
+   * otherwise.
    */
   public boolean reloadTableIfExists(String dbName, String tblName, String reason)
       throws CatalogException {
-    Table table = getTable(dbName, tblName);
-    if (table == null || table instanceof IncompleteTable) return false;
-    reloadTable(table, reason);
+    try {
+      Table table = getTable(dbName, tblName);
+      if (table == null || table instanceof IncompleteTable) return false;
+      reloadTable(table, reason);
+    } catch (DatabaseNotFoundException | TableLoadingException e) {
+      LOG.info(String.format("Reload table if exists failed with: %s", e.getMessage()));
+      return false;
+    }
     return true;
   }
 

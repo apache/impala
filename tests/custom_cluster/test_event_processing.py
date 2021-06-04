@@ -194,6 +194,35 @@ class TestEventProcessing(CustomClusterTestSuite):
   def test_event_based_replication(self):
     self.__run_event_based_replication_tests()
 
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=10")
+  def test_drop_table_events(self):
+    """IMPALA-10187: Event processing fails on multiple events + DROP TABLE.
+    This test issues ALTER TABLE + DROP in quick succession and checks whether event
+    processing still works.
+    """
+    event_proc_timeout = 15
+    db_name = self.__get_random_name("drop_event_db_")
+    with HiveDbWrapper(self, db_name):
+      tbl_name = "foo"
+      self.run_stmt_in_hive("""
+          drop table if exists {db}.{tbl};
+          create table {db}.{tbl} (id int);
+          insert into {db}.{tbl} values(1);""".format(db=db_name, tbl=tbl_name))
+      # With MetastoreEventProcessor running, the insert event will be processed. Query
+      # the table from Impala.
+      EventProcessorUtils.wait_for_event_processing(self, event_proc_timeout)
+      # Verify that the data is present in Impala.
+      data = self.execute_scalar("select * from %s.%s" % (db_name, tbl_name))
+      assert data == '1'
+      # Execute ALTER TABLE + DROP in quick succession so they will be processed in the
+      # same event batch.
+      self.run_stmt_in_hive("""
+          alter table {db}.{tbl} set tblproperties ('foo'='bar');
+          drop table {db}.{tbl};""".format(db=db_name, tbl=tbl_name))
+      EventProcessorUtils.wait_for_event_processing(self, event_proc_timeout)
+      # Check that the event processor status is still ACTIVE.
+      assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+
   def __run_event_based_replication_tests(self, transactional=True):
     """Hive Replication relies on the insert events generated on the tables.
     This test issues some basic replication commands from Hive and makes sure
