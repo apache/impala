@@ -39,6 +39,7 @@ import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.KuduColumn;
+import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.PrunablePartition;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.View;
@@ -460,7 +461,7 @@ public class InsertStmt extends StatementBase {
     }
 
     // We do not support (in|up)serting into views and iceberg table
-    if (table_ instanceof FeView) {
+    if (table_ instanceof FeView || table_ instanceof MaterializedViewHdfsTable) {
       throw new AnalysisException(
           String.format("Impala does not support %sing into views: %s", getOpName(),
               table_.getFullName()));

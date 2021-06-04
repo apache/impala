@@ -659,6 +659,11 @@ public abstract class AuthorizationTestBase extends FrontendTestBase {
         "table " + object + " that has row filtering policy.";
   }
 
+  protected static String mvSelectError(String object) {
+    return "Materialized view " +  object +
+        " references tables with column masking or row filtering policies.";
+  }
+
   protected ScalarFunction addFunction(String db, String fnName, List<Type> argTypes,
       Type retType, String uriPath, String symbolName) {
     ScalarFunction fn = ScalarFunction.createForTesting(db, fnName, argTypes, retType,

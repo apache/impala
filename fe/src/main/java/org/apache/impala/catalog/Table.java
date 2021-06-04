@@ -477,7 +477,13 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     // Create a table of appropriate type
     if (MetadataOp.TABLE_TYPE_VIEW.equals(
           MetastoreShim.mapToInternalTableType(msTbl.getTableType()))) {
-      table = new View(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+      if (msTbl.getTableType().equalsIgnoreCase("MATERIALIZED_VIEW") &&
+          HdfsFileFormat.isHdfsInputFormatClass(msTbl.getSd().getInputFormat())) {
+        table = new MaterializedViewHdfsTable(msTbl, db, msTbl.getTableName(),
+            msTbl.getOwner());
+      } else {
+        table = new View(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
+      }
     } else if (HBaseTable.isHBaseTable(msTbl)) {
       table = new HBaseTable(msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (KuduTable.isKuduTable(msTbl)) {

@@ -478,6 +478,10 @@ public class AnalysisContext {
     AuthorizationException authException = null;
     if (!disableAuthorization) {
       try {
+        if (analysisResult_.getAnalyzer().encounteredMVAuthException()) {
+          throw new AuthorizationException(
+            analysisResult_.getAnalyzer().getMVAuthExceptionMsg());
+        }
         authzChecker.authorize(authzCtx, analysisResult_, catalog_);
       } catch (AuthorizationException e) {
         authException = e;

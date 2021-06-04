@@ -35,7 +35,8 @@ ${COMPUTE_STATS_SCRIPT} --db_names=functional\
     --table_names="alltypes,alltypesagg,alltypesaggmultifilesnopart,alltypesaggnonulls,
     alltypessmall,alltypestiny,jointbl,dimtbl,stringpartitionkey,nulltable,nullrows,
     date_tbl,chars_medium,part_strings_with_quotes,alltypes_date_partition,
-    alltypes_date_partition_2"
+    alltypes_date_partition_2,alltypes_transactional,jointbl_transactional,
+    mv1_alltypes_jointbl"
 
 # We cannot load HBase on s3 and isilon yet.
 if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then

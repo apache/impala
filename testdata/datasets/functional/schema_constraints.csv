@@ -297,12 +297,20 @@ table_name:insertonly_nopart_insert, constraint:restrict_to, table_format:text/n
 table_name:insertonly_nopart_insert, constraint:restrict_to, table_format:parquet/none/none
 table_name:insertonly_part_insert, constraint:restrict_to, table_format:text/none/none
 table_name:insertonly_part_insert, constraint:restrict_to, table_format:parquet/none/none
+table_name:alltypes_transactional, constraint:restrict_to, table_format:orc/def/block
+table_name:jointbl_transactional, constraint:restrict_to, table_format:orc/def/block
+table_name:alltypes_transactional, constraint:restrict_to, table_format:parquet/none/none
+table_name:jointbl_transactional, constraint:restrict_to, table_format:parquet/none/none
 
-# 'materialized_view' is based on 'insert_only_transactional_table' from the same
-# database, so it needs to be excluded where 'insert_only_transactional_table' is
-# excluded.
+# A materialized view is based on one or more transactional (in this case insert-only)
+# base tables, so the MVs need to be excluded for the table formats where the base
+# tables are excluded
 table_name:materialized_view, constraint:exclude, table_format:hbase/none/none
 table_name:materialized_view, constraint:exclude, table_format:kudu/none/none
+table_name:mv1_alltypes_jointbl, constraint:restrict_to, table_format:orc/def/block
+table_name:mv2_alltypes_jointbl, constraint:restrict_to, table_format:orc/def/block
+table_name:mv1_alltypes_jointbl, constraint:restrict_to, table_format:parquet/none/none
+table_name:mv2_alltypes_jointbl, constraint:restrict_to, table_format:parquet/none/none
 
 table_name:insert_only_transactional_bucketed_table, constraint:exclude, table_format:hbase/none/none
 table_name:insert_only_transactional_bucketed_table, constraint:exclude, table_format:kudu/none/none

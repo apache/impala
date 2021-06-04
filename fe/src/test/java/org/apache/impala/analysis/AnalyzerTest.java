@@ -624,8 +624,8 @@ public class AnalyzerTest extends FrontendTestBase {
     Assume.assumeTrue(MetastoreShim.getMajorVersion() > 2);
     AnalysisError("alter table functional.materialized_view " +
         "set tblproperties ('foo'='bar')",
-      "ALTER TABLE not allowed on a " +
-      "view: functional.materialized_view");
+        "Write not supported. Table functional.materialized_view  " +
+        "access type is: READONLY");
 
     AnalysisError("insert into table functional.materialized_view " +
         "select * from functional.insert_only_transactional_table",
@@ -633,7 +633,8 @@ public class AnalyzerTest extends FrontendTestBase {
         " functional.materialized_view");
 
     AnalysisError("drop table functional.materialized_view ",
-      "DROP TABLE not allowed on a view: functional.materialized_view");
+        "Write not supported. Table functional.materialized_view  " +
+        "access type is: READONLY");
 
     AnalyzesOk("Select * from functional.materialized_view");
   }

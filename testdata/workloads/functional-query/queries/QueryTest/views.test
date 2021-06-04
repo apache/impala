@@ -69,3 +69,11 @@ select STRAIGHT_JOIN c.id, d.date_string_col from
 ---- TYPES
 int, STRING
 ====
+---- QUERY
+# Simple select on a materialized view
+select * from functional_orc_def.mv1_alltypes_jointbl where c3 = 1106;
+---- RESULTS
+0,true,1106,0,94612
+---- TYPES
+SMALLINT, BOOLEAN, BIGINT, BIGINT, INT
+====

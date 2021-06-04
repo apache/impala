@@ -57,6 +57,7 @@ import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.KuduTable;
+import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.LocalKuduTable;
@@ -217,6 +218,11 @@ public class Analyzer {
   // On-clause of any such semi-join is not allowed to reference other semi-joined tuples
   // except its own. Therefore, only a single semi-joined tuple can be visible at a time.
   private TupleId visibleSemiJoinedTupleId_ = null;
+
+  // During analysis if a materialized view table ref is encountered, we check
+  // authorization on its source tables and set the field below to non-null if
+  // if an exception was encountered.
+  private String mvAuthExceptionMsg_ = null;
 
   // Required Operation type: Read, write, any(read or write).
   public enum OperationType {
@@ -940,6 +946,17 @@ public class Analyzer {
               String.join(".", resolvedTableRef.getResolvedPath().getRawPath()),
               dbName, tblName));
         }
+      } else if (!(resolvedTableRef instanceof InlineViewRef) &&
+          resolvedTableRef.getTable() instanceof MaterializedViewHdfsTable &&
+          ((MaterializedViewHdfsTable) resolvedTableRef.getTable())
+            .isReferencesMaskedTables(authChecker, getCatalog(), getUser())) {
+        // If a materialized view definition references tables that have table masking
+        // policies defined, we set a flag indicating that this is an authorization
+        // exception instead of throwing an AnalysisException here. Later, during the
+        // AnalysisContext.analyzeAndAuthorize() we throw the AuthorizationException.
+        mvAuthExceptionMsg_ = String.format("Materialized view %s.%s " +
+            "references tables with column masking or " +
+            "row filtering policies.", dbName, tblName);
       } else if (tableMask.needsMaskingOrFiltering()) {
         return InlineViewRef.createTableMaskView(resolvedTableRef, tableMask,
             getAuthzCtx());
@@ -950,6 +967,14 @@ public class Analyzer {
       LOG.error(msg, e);
       throw new AnalysisException(msg, e);
     }
+  }
+
+  public boolean encounteredMVAuthException() {
+    return mvAuthExceptionMsg_ != null;
+  }
+
+  public String getMVAuthExceptionMsg() {
+    return mvAuthExceptionMsg_;
   }
 
   /**

@@ -3143,6 +3143,17 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       // Add an unmasked policy. It should not block updates.
       createColumnMaskingPolicy("alltypessmall_id_unmask", "functional", "alltypessmall",
           "id", user_.getShortName(), "MASK_NONE", /*maskExpr*/null);
+      createColumnMaskingPolicy("alltypes_transactional_sint_mask", "functional_orc_def",
+          "alltypes_transactional", "smallint_col", user_.getShortName(), "MASK_NULL",
+          /*maskExpr*/null);
+      // Create a column mask on a materialized view column. Since this
+      // MV references source table with a column masking policy (defined
+      // above), the expectation is that the MV's own column masking should
+      // not trigger but rather the authorization exception for the
+      // source table should be thrown.
+      createColumnMaskingPolicy("mv1_alltypes_jointbl_c2_mask", "functional_orc_def",
+          "mv1_alltypes_jointbl", "c2", user_.getShortName(), "MASK_NULL",
+          /*maskExpr*/null);
       rangerImpalaPlugin_.refreshPoliciesAndTags();
 
       // Select is ok.
@@ -3152,6 +3163,18 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
           .ok(onTable("functional", "alltypes_view", TPrivilegeLevel.SELECT));
       authorize("select * from functional.alltypestiny")
           .ok(onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
+
+      // Select * from materialized view is NOT OK since one of the source
+      // tables used in the join within the MV have column masking.
+      authorize("select * from functional_orc_def.mv1_alltypes_jointbl")
+        .error(mvSelectError("functional_orc_def.mv1_alltypes_jointbl"),
+        onTable("functional_orc_def", "mv1_alltypes_jointbl", TPrivilegeLevel.SELECT));
+
+      // Select <col> from MV is NOT OK even if the column being selected was
+      // originally from a non-masked table.
+      authorize("select c3 from functional_orc_def.mv1_alltypes_jointbl")
+        .error(mvSelectError("functional_orc_def.mv1_alltypes_jointbl"),
+        onTable("functional_orc_def", "mv1_alltypes_jointbl", TPrivilegeLevel.SELECT));
 
       // Block INSERT, TRUNCATE even given SERVER ALL privilege
       authorize("insert into functional.alltypes partition(year, month) " +
@@ -3261,6 +3284,8 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
       deleteRangerPolicy("alltypestiny_id_mask");
       deleteRangerPolicy("kudu_id_mask");
       deleteRangerPolicy("alltypessmall_id_unmask");
+      deleteRangerPolicy("alltypes_transactional_sint_mask");
+      deleteRangerPolicy("mv1_alltypes_jointbl_c2_mask");
     }
   }
 

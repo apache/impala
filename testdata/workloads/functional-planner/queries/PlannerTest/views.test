@@ -577,3 +577,20 @@ PLAN-ROOT SINK
    predicates: bool_col
    row-size=1B cardinality=730
 ====
+# Test simple SELECT on a materialized view
+select * from functional_orc_def.mv1_alltypes_jointbl;
+---- PLAN
+PLAN-ROOT SINK
+|
+00:SCAN HDFS [functional_orc_def.mv1_alltypes_jointbl]
+   HDFS partitions=1/1 files=1 size=1.15KB
+   row-size=23B cardinality=7
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional_orc_def.mv1_alltypes_jointbl]
+   HDFS partitions=1/1 files=1 size=1.15KB
+   row-size=23B cardinality=7
+====

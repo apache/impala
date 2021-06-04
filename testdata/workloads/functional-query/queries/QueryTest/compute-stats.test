@@ -1828,3 +1828,45 @@ compute stats tpch_parquet.customer;
 ---- CATCH
 row_regex: .*Rejected query from pool .*: minimum memory reservation is greater than memory available to the query for buffer reservations.*
 ====
+---- QUERY
+# test compute stats on a materialized view
+# NOTE: we use mv2_alltypes_jointbl here not mv1_alltypes_jointbl
+# because the latter is used for planner testing and we don't want
+# to modify its stats. Creation of MVs is not supported in Impala
+# so we do the creation only once in the initial load script.
+compute stats functional_orc_def.mv2_alltypes_jointbl;
+---- RESULTS
+'Updated 1 partition(s) and 5 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+# test show table stats on a materialized view
+show table stats functional_orc_def.mv2_alltypes_jointbl;
+---- LABELS
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+7,1,regex:.+B,'NOT CACHED','NOT CACHED','ORC','false',regex:.*
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# test show column stats on a materialized view
+show column stats functional_orc_def.mv2_alltypes_jointbl;
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE, #TRUES, #FALSES
+---- RESULTS
+'c1','SMALLINT',1,0,2,2,-1,-1
+'c2','BOOLEAN',2,0,1,1,7,0
+'c3','BIGINT',7,0,8,8,-1,-1
+'max_bigint','BIGINT',1,0,8,8,-1,-1
+'max_zip','INT',2,0,4,4,-1,-1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
+====
+---- QUERY
+# test drop stats on a materialized view
+drop stats functional_orc_def.mv2_alltypes_jointbl;
+---- RESULTS
+'Stats have been dropped.'
+====

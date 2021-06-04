@@ -34,6 +34,7 @@ import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeIncompleteTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
+import org.apache.impala.catalog.MaterializedViewHdfsTable;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
@@ -315,6 +316,11 @@ public class StmtMetadataLoader {
       loadedOrFailedTbls_.put(tblName, tbl);
       if (tbl instanceof FeView) {
         viewTbls.addAll(collectTableCandidates(((FeView) tbl).getQueryStmt()));
+      } else if (tbl instanceof MaterializedViewHdfsTable) {
+        Set<TableName> mvSrcTableNames = collectTableCandidates(
+            ((MaterializedViewHdfsTable) tbl).getQueryStmt());
+        ((MaterializedViewHdfsTable) tbl).addSrcTables(mvSrcTableNames);
+        viewTbls.addAll(mvSrcTableNames);
       }
       // Adds tables/views introduced by column-masking/row-filtering policies.
       if (!(tbl instanceof FeIncompleteTable)
