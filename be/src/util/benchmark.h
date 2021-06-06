@@ -44,6 +44,9 @@ class Benchmark {
   /// call overhead).  The second argument is opaque and is whatever data the test
   /// function needs to execute.
   typedef void (*BenchmarkFunction)(int iters, void*);
+  /// SetupFunction that might be required to be executed before every iteration of
+  /// 'BenchmarkFunction'. This function is not measured.
+  typedef void (*BenchmarkSetupFunction)(void*);
 
   /// Add a benchmark with 'name' to the suite.  The first benchmark is assumed to
   /// be the baseline.  Reporting will be done relative to that.
@@ -58,7 +61,10 @@ class Benchmark {
   /// initial_batch_size is the initial batch size to the run the function.  The
   /// harness function will automatically ramp up the batch_size.  The benchmark
   /// will take *at least* initial_batch_size * function invocation time.
-  std::string Measure(int max_time = 50, int initial_batch_size = 10);
+  /// 'fn' is the setup function to be run before every iteration if provided and
+  /// it will not be measured.
+  std::string Measure(
+      int max_time = 50, int initial_batch_size = 10, BenchmarkSetupFunction fn = NULL);
 
   /// Output machine/build configuration as a string
   static std::string GetMachineInfo();

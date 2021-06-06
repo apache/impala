@@ -47,10 +47,10 @@ ORDER BY promotions,
 LIMIT 100;
 
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=52.50MB Threads=14
-Per-Host Resource Estimates: Memory=604MB
+Max Per-Host Resource Reservation: Memory=45.00MB Threads=14
+Per-Host Resource Estimates: Memory=597MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=604.44MB mem-reservation=52.50MB thread-reservation=14 runtime-filters-memory=10.00MB
+|  Per-Host Resources: mem-estimate=596.94MB mem-reservation=45.00MB thread-reservation=14 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: promotions, total, CAST(promotions AS DECIMAL(15,4)) / CAST(total AS DECIMAL(15,4)) * CAST(100 AS DECIMAL(3,0))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -97,7 +97,7 @@ PLAN-ROOT SINK
 |  |  hash predicates: ss_customer_sk = c_customer_sk
 |  |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  |  runtime filters: RF014[bloom] <- c_customer_sk, RF015[min_max] <- c_customer_sk
-|  |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  |  tuple-ids=9,11,14,10,12 row-size=78B cardinality=17.02K
 |  |  in pipelines: 14(GETNEXT), 17(OPEN)
 |  |
@@ -218,7 +218,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  runtime filters: RF002[bloom] <- c_customer_sk, RF003[min_max] <- c_customer_sk
-|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=0,3,6,2,1,4 row-size=125B cardinality=16.91K
 |  in pipelines: 00(GETNEXT), 04(OPEN)
 |

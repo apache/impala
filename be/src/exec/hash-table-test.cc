@@ -741,4 +741,10 @@ TEST_F(HashTableTest, VeryLowMemTest) {
   VeryLowMemTest(false);
 }
 
+// Test to ensure the bucket size doesn't change accidentally.
+// On intentional changes to Bucket Size this test should be changed.
+TEST_F(HashTableTest, BucketSize) {
+  int bucket_size = HashTable::BUCKET_SIZE;
+  EXPECT_EQ(bucket_size, 8);
+}
 }

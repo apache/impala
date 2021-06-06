@@ -2409,7 +2409,7 @@ where
   )
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=96.94MB Threads=4
-Per-Host Resource Estimates: Memory=1.16GB
+Per-Host Resource Estimates: Memory=1.04GB
 PLAN-ROOT SINK
 |
 06:AGGREGATE [FINALIZE]
@@ -2448,7 +2448,7 @@ PLAN-ROOT SINK
    row-size=24B cardinality=15.00M
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=158.94MB Threads=8
-Per-Host Resource Estimates: Memory=1.01GB
+Per-Host Resource Estimates: Memory=990MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -2742,7 +2742,7 @@ where
 order by
   s_name
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=107.81MB Threads=5
+Max Per-Host Resource Reservation: Memory=90.81MB Threads=5
 Per-Host Resource Estimates: Memory=888MB
 PLAN-ROOT SINK
 |

@@ -30,9 +30,9 @@ order by count(distinct ws_order_number)
 limit 100;
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=113.88MB Threads=10
-Per-Host Resource Estimates: Memory=689MB
+Per-Host Resource Estimates: Memory=663MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=689.22MB mem-reservation=113.88MB thread-reservation=10 runtime-filters-memory=8.00MB
+|  Per-Host Resources: mem-estimate=663.16MB mem-reservation=113.88MB thread-reservation=10 runtime-filters-memory=8.00MB
 PLAN-ROOT SINK
 |  output exprs: count(ws_order_number), sum(ws_ext_ship_cost), sum(ws_net_profit)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -154,7 +154,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: none
 |  |  other predicates: ws1.ws_warehouse_sk != ws2.ws_warehouse_sk
 |  |  runtime filters: RF008[bloom] <- ws2.ws_order_number, RF009[min_max] <- ws2.ws_order_number
-|  |  mem-estimate=55.33MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=42.30MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=4,5 row-size=24B cardinality=8.66M
 |  |  in pipelines: 04(GETNEXT), 05(OPEN)
 |  |
@@ -210,7 +210,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: none
 |  other predicates: ws1.ws_warehouse_sk != ws2.ws_warehouse_sk
 |  runtime filters: RF004[bloom] <- ws2.ws_order_number, RF005[min_max] <- ws2.ws_order_number
-|  mem-estimate=55.33MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=42.30MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=9,10 row-size=24B cardinality=8.66M
 |  in pipelines: 08(GETNEXT), 09(OPEN)
 |

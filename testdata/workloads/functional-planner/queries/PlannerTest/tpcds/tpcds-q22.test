@@ -20,9 +20,9 @@ order by qoh, i_product_name, i_brand, i_class, i_category
 limit 100;
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=149.44MB Threads=5
-Per-Host Resource Estimates: Memory=16.90GB
+Per-Host Resource Estimates: Memory=16.63GB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=16.90GB mem-reservation=149.44MB thread-reservation=5 runtime-filters-memory=3.00MB
+|  Per-Host Resources: mem-estimate=16.63GB mem-reservation=149.44MB thread-reservation=5 runtime-filters-memory=3.00MB
 PLAN-ROOT SINK
 |  output exprs: CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_product_name WHEN 7 THEN i_product_name WHEN 9 THEN i_product_name WHEN 11 THEN i_product_name WHEN 13 THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_brand WHEN 7 THEN i_brand WHEN 9 THEN i_brand WHEN 11 THEN NULL WHEN 13 THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_class WHEN 7 THEN i_class WHEN 9 THEN NULL WHEN 11 THEN NULL WHEN 13 THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_category WHEN 7 THEN NULL WHEN 9 THEN NULL WHEN 11 THEN NULL WHEN 13 THEN NULL END, aggif(valid_tid(5,7,9,11,13) IN (5, 7, 9, 11, 13), CASE valid_tid(5,7,9,11,13) WHEN 5 THEN avg(inv_quantity_on_hand) WHEN 7 THEN avg(inv_quantity_on_hand) WHEN 9 THEN avg(inv_quantity_on_hand) WHEN 11 THEN avg(inv_quantity_on_hand) WHEN 13 THEN avg(inv_quantity_on_hand) END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -36,7 +36,7 @@ PLAN-ROOT SINK
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(5,7,9,11,13) IN (CAST(5 AS INT), CAST(7 AS INT), CAST(9 AS INT), CAST(11 AS INT), CAST(13 AS INT)), CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(7 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(9 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(11 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(13 AS INT) THEN avg(inv_quantity_on_hand) END)
 |  group by: CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_product_name WHEN CAST(7 AS INT) THEN i_product_name WHEN CAST(9 AS INT) THEN i_product_name WHEN CAST(11 AS INT) THEN i_product_name WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_brand WHEN CAST(7 AS INT) THEN i_brand WHEN CAST(9 AS INT) THEN i_brand WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_class WHEN CAST(7 AS INT) THEN i_class WHEN CAST(9 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_category WHEN CAST(7 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) WHEN CAST(7 AS INT) THEN CAST(7 AS INT) WHEN CAST(9 AS INT) THEN CAST(9 AS INT) WHEN CAST(11 AS INT) THEN CAST(11 AS INT) WHEN CAST(13 AS INT) THEN CAST(13 AS INT) END
-|  mem-estimate=2.50GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=2.36GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=14 row-size=60B cardinality=35.25M
 |  in pipelines: 08(GETNEXT), 07(OPEN)
 |
@@ -56,7 +56,7 @@ PLAN-ROOT SINK
 |  Class 4
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=14.40GB mem-reservation=112.44MB thread-reservation=0
+|  mem-estimate=14.27GB mem-reservation=112.44MB thread-reservation=0
 |  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=35.25M
 |  in pipelines: 07(GETNEXT), 00(OPEN)
 |
@@ -129,7 +129,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=292.57MB Threads=10
-Per-Host Resource Estimates: Memory=26.41GB
+Per-Host Resource Estimates: Memory=26.12GB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -144,7 +144,7 @@ PLAN-ROOT SINK
 |  in pipelines: 09(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_product_name) WHEN 6 THEN murmur_hash(i_product_name) WHEN 8 THEN murmur_hash(i_product_name) WHEN 10 THEN murmur_hash(i_product_name) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_brand) WHEN 6 THEN murmur_hash(i_brand) WHEN 8 THEN murmur_hash(i_brand) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_class) WHEN 6 THEN murmur_hash(i_class) WHEN 8 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END)] hosts=2 instances=2
-Per-Host Resources: mem-estimate=20.73GB mem-reservation=146.44MB thread-reservation=1
+Per-Host Resources: mem-estimate=20.49GB mem-reservation=146.44MB thread-reservation=1
 09:TOP-N [LIMIT=100]
 |  order by: aggif(valid_tid(5,7,9,11,13) IN (5, 7, 9, 11, 13), CASE valid_tid(5,7,9,11,13) WHEN 5 THEN avg(inv_quantity_on_hand) WHEN 7 THEN avg(inv_quantity_on_hand) WHEN 9 THEN avg(inv_quantity_on_hand) WHEN 11 THEN avg(inv_quantity_on_hand) WHEN 13 THEN avg(inv_quantity_on_hand) END) ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_product_name WHEN 7 THEN i_product_name WHEN 9 THEN i_product_name WHEN 11 THEN i_product_name WHEN 13 THEN NULL END ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_brand WHEN 7 THEN i_brand WHEN 9 THEN i_brand WHEN 11 THEN NULL WHEN 13 THEN NULL END ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_class WHEN 7 THEN i_class WHEN 9 THEN NULL WHEN 11 THEN NULL WHEN 13 THEN NULL END ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_category WHEN 7 THEN NULL WHEN 9 THEN NULL WHEN 11 THEN NULL WHEN 13 THEN NULL END ASC
 |  mem-estimate=5.47KB mem-reservation=0B thread-reservation=0
@@ -154,7 +154,7 @@ Per-Host Resources: mem-estimate=20.73GB mem-reservation=146.44MB thread-reserva
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(5,7,9,11,13) IN (CAST(5 AS INT), CAST(7 AS INT), CAST(9 AS INT), CAST(11 AS INT), CAST(13 AS INT)), CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(7 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(9 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(11 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(13 AS INT) THEN avg(inv_quantity_on_hand) END)
 |  group by: CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_product_name WHEN CAST(7 AS INT) THEN i_product_name WHEN CAST(9 AS INT) THEN i_product_name WHEN CAST(11 AS INT) THEN i_product_name WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_brand WHEN CAST(7 AS INT) THEN i_brand WHEN CAST(9 AS INT) THEN i_brand WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_class WHEN CAST(7 AS INT) THEN i_class WHEN CAST(9 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_category WHEN CAST(7 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) WHEN CAST(7 AS INT) THEN CAST(7 AS INT) WHEN CAST(9 AS INT) THEN CAST(9 AS INT) WHEN CAST(11 AS INT) THEN CAST(11 AS INT) WHEN CAST(13 AS INT) THEN CAST(13 AS INT) END
-|  mem-estimate=1.25GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=1.18GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=14 row-size=60B cardinality=35.25M
 |  in pipelines: 08(GETNEXT), 14(OPEN)
 |
@@ -174,7 +174,7 @@ Per-Host Resources: mem-estimate=20.73GB mem-reservation=146.44MB thread-reserva
 |  Class 4
 |    output: avg:merge(inv_quantity_on_hand)
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=19.48GB mem-reservation=112.44MB thread-reservation=0
+|  mem-estimate=19.30GB mem-reservation=112.44MB thread-reservation=0
 |  tuple-ids=5N,7N,9N,11N,13N row-size=422B cardinality=35.25M
 |  in pipelines: 14(GETNEXT), 00(OPEN)
 |
@@ -184,7 +184,7 @@ Per-Host Resources: mem-estimate=20.73GB mem-reservation=146.44MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-Per-Host Resources: mem-estimate=5.55GB mem-reservation=140.62MB thread-reservation=2 runtime-filters-memory=3.00MB
+Per-Host Resources: mem-estimate=5.50GB mem-reservation=140.62MB thread-reservation=2 runtime-filters-memory=3.00MB
 07:AGGREGATE [STREAMING]
 |  Class 0
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
@@ -201,7 +201,7 @@ Per-Host Resources: mem-estimate=5.55GB mem-reservation=140.62MB thread-reservat
 |  Class 4
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=5.41GB mem-reservation=113.00MB thread-reservation=0
+|  mem-estimate=5.36GB mem-reservation=113.00MB thread-reservation=0
 |  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=35.25M
 |  in pipelines: 00(GETNEXT)
 |
@@ -295,7 +295,7 @@ Per-Host Resources: mem-estimate=5.55GB mem-reservation=140.62MB thread-reservat
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=304.20MB Threads=9
-Per-Host Resource Estimates: Memory=26.25GB
+Per-Host Resource Estimates: Memory=25.96GB
 F05:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -310,7 +310,7 @@ PLAN-ROOT SINK
 |  in pipelines: 09(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_product_name) WHEN 6 THEN murmur_hash(i_product_name) WHEN 8 THEN murmur_hash(i_product_name) WHEN 10 THEN murmur_hash(i_product_name) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_brand) WHEN 6 THEN murmur_hash(i_brand) WHEN 8 THEN murmur_hash(i_brand) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_class) WHEN 6 THEN murmur_hash(i_class) WHEN 8 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END,CASE valid_tid(4,6,8,10,12) WHEN 4 THEN murmur_hash(i_category) WHEN 6 THEN murmur_hash(NULL) WHEN 8 THEN murmur_hash(NULL) WHEN 10 THEN murmur_hash(NULL) WHEN 12 THEN murmur_hash(NULL) END)] hosts=2 instances=2
-Per-Instance Resources: mem-estimate=20.73GB mem-reservation=146.44MB thread-reservation=1
+Per-Instance Resources: mem-estimate=20.49GB mem-reservation=146.44MB thread-reservation=1
 09:TOP-N [LIMIT=100]
 |  order by: aggif(valid_tid(5,7,9,11,13) IN (5, 7, 9, 11, 13), CASE valid_tid(5,7,9,11,13) WHEN 5 THEN avg(inv_quantity_on_hand) WHEN 7 THEN avg(inv_quantity_on_hand) WHEN 9 THEN avg(inv_quantity_on_hand) WHEN 11 THEN avg(inv_quantity_on_hand) WHEN 13 THEN avg(inv_quantity_on_hand) END) ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_product_name WHEN 7 THEN i_product_name WHEN 9 THEN i_product_name WHEN 11 THEN i_product_name WHEN 13 THEN NULL END ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_brand WHEN 7 THEN i_brand WHEN 9 THEN i_brand WHEN 11 THEN NULL WHEN 13 THEN NULL END ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_class WHEN 7 THEN i_class WHEN 9 THEN NULL WHEN 11 THEN NULL WHEN 13 THEN NULL END ASC, CASE valid_tid(5,7,9,11,13) WHEN 5 THEN i_category WHEN 7 THEN NULL WHEN 9 THEN NULL WHEN 11 THEN NULL WHEN 13 THEN NULL END ASC
 |  mem-estimate=5.47KB mem-reservation=0B thread-reservation=0
@@ -320,7 +320,7 @@ Per-Instance Resources: mem-estimate=20.73GB mem-reservation=146.44MB thread-res
 08:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(5,7,9,11,13) IN (CAST(5 AS INT), CAST(7 AS INT), CAST(9 AS INT), CAST(11 AS INT), CAST(13 AS INT)), CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(7 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(9 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(11 AS INT) THEN avg(inv_quantity_on_hand) WHEN CAST(13 AS INT) THEN avg(inv_quantity_on_hand) END)
 |  group by: CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_product_name WHEN CAST(7 AS INT) THEN i_product_name WHEN CAST(9 AS INT) THEN i_product_name WHEN CAST(11 AS INT) THEN i_product_name WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_brand WHEN CAST(7 AS INT) THEN i_brand WHEN CAST(9 AS INT) THEN i_brand WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_class WHEN CAST(7 AS INT) THEN i_class WHEN CAST(9 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN i_category WHEN CAST(7 AS INT) THEN NULL WHEN CAST(9 AS INT) THEN NULL WHEN CAST(11 AS INT) THEN NULL WHEN CAST(13 AS INT) THEN NULL END, CASE valid_tid(5,7,9,11,13) WHEN CAST(5 AS INT) THEN CAST(5 AS INT) WHEN CAST(7 AS INT) THEN CAST(7 AS INT) WHEN CAST(9 AS INT) THEN CAST(9 AS INT) WHEN CAST(11 AS INT) THEN CAST(11 AS INT) WHEN CAST(13 AS INT) THEN CAST(13 AS INT) END
-|  mem-estimate=1.25GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=1.18GB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=14 row-size=60B cardinality=35.25M
 |  in pipelines: 08(GETNEXT), 14(OPEN)
 |
@@ -340,7 +340,7 @@ Per-Instance Resources: mem-estimate=20.73GB mem-reservation=146.44MB thread-res
 |  Class 4
 |    output: avg:merge(inv_quantity_on_hand)
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=19.48GB mem-reservation=112.44MB thread-reservation=0
+|  mem-estimate=19.30GB mem-reservation=112.44MB thread-reservation=0
 |  tuple-ids=5N,7N,9N,11N,13N row-size=422B cardinality=35.25M
 |  in pipelines: 14(GETNEXT), 00(OPEN)
 |
@@ -351,7 +351,7 @@ Per-Instance Resources: mem-estimate=20.73GB mem-reservation=146.44MB thread-res
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
-Per-Instance Resources: mem-estimate=5.44GB mem-reservation=129.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=5.39GB mem-reservation=129.00MB thread-reservation=1
 07:AGGREGATE [STREAMING]
 |  Class 0
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
@@ -368,7 +368,7 @@ Per-Instance Resources: mem-estimate=5.44GB mem-reservation=129.00MB thread-rese
 |  Class 4
 |    output: avg(CAST(inv_quantity_on_hand AS BIGINT))
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=5.41GB mem-reservation=113.00MB thread-reservation=0
+|  mem-estimate=5.36GB mem-reservation=113.00MB thread-reservation=0
 |  tuple-ids=4N,6N,8N,10N,12N row-size=422B cardinality=35.25M
 |  in pipelines: 00(GETNEXT)
 |

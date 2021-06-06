@@ -892,18 +892,18 @@ public class CardinalityTest extends PlannerTestBase {
     verifyApproxMemoryEstimate("SELECT COUNT(*),MAX(B.BIGINT_COL) FROM " +
         "FUNCTIONAL.ALLTYPES A , FUNCTIONAL.ALLTYPESSMALL B, " +
         "FUNCTIONAL.NULLROWS C GROUP BY A.ID, B.TIMESTAMP_COL,C.BOOL_NULLS",
-        2190000*(4+16+1+8+8+16), true, true, ImmutableSet.of(),
+        2190000*(4+16+1+8+8+12), true, true, ImmutableSet.of(),
         pathToFirstAggregationNode, AggregationNode.class);
     verifyApproxMemoryEstimate("SELECT COUNT(*),MAX(B.BIGINT_COL) FROM " +
         "FUNCTIONAL.ALLTYPES A , FUNCTIONAL.ALLTYPESSMALL B, " +
         "FUNCTIONAL.NULLROWS C GROUP BY A.ID, B.TIMESTAMP_COL,C.BOOL_NULLS",
-        2190000*(4+16+1+8+8+16), true, false, ImmutableSet.of(),
+        2190000*(4+16+1+8+8+12), true, false, ImmutableSet.of(),
         pathToSecondAggregationNode, AggregationNode.class);
     // create a single node plan.
     verifyApproxMemoryEstimate("SELECT COUNT(*),MAX(B.BIGINT_COL) FROM " +
         "FUNCTIONAL.ALLTYPES A , FUNCTIONAL.ALLTYPESSMALL B, " +
         "FUNCTIONAL.NULLROWS C GROUP BY A.ID, B.TIMESTAMP_COL,C.BOOL_NULLS",
-        2190000*(4+16+1+8+8+16), false, false, ImmutableSet.of(),
+        2190000*(4+16+1+8+8+12), false, false, ImmutableSet.of(),
         pathToAggregationNode, AggregationNode.class);
 
     List<Integer> countFirstAggregationNode = Arrays.asList();
@@ -951,13 +951,13 @@ public class CardinalityTest extends PlannerTestBase {
     // FUNCTIONAL.ALLTYPES.DATE_STRING_COL's Ndv is 736 and avgRowSize is 8
     // Cardinality estimate of subquery is 5372800
     // BitUtil.roundUpToPowerOf2((long) Math.ceil(3 * Cardinality / 2)) is 8388608
-    // Size of Bucket is 16.
+    // Size of Bucket is 12.
     verifyApproxMemoryEstimate("SELECT A.ID FROM (SELECT A1.ID,B1.DATE_STRING_COL " +
         "IDB FROM FUNCTIONAL.ALLTYPES A1 , FUNCTIONAL.ALLTYPES B1 GROUP BY A1.ID," +
         "B1.DATE_STRING_COL) A JOIN (SELECT A1.ID,B1.DATE_STRING_COL IDB FROM " +
         "FUNCTIONAL.ALLTYPES A1,FUNCTIONAL.ALLTYPES B1 GROUP BY " +
         "A1.ID,B1.DATE_STRING_COL) B ON A.ID = B.ID AND A.IDB=B.IDB",
-        5372800*(4+8+4+8) + 8388608*16, true, true, ImmutableSet.of(),
+        5372800*(4+8+4+8) + 8388608*12, true, true, ImmutableSet.of(),
         pathToJoinNode, HashJoinNode.class);
     // create a single node plan.
     verifyApproxMemoryEstimate("SELECT A.ID FROM (SELECT A1.ID,B1.DATE_STRING_COL " +
@@ -965,27 +965,27 @@ public class CardinalityTest extends PlannerTestBase {
         "B1.DATE_STRING_COL) A JOIN (SELECT A1.ID,B1.DATE_STRING_COL IDB FROM " +
         "FUNCTIONAL.ALLTYPES A1,FUNCTIONAL.ALLTYPES B1 GROUP BY " +
         "A1.ID,B1.DATE_STRING_COL) B ON A.ID = B.ID AND A.IDB=B.IDB",
-        5372800*(4+8+4+8) + 8388608*16, false, false, ImmutableSet.of(),
+        5372800*(4+8+4+8) + 8388608*12, false, false, ImmutableSet.of(),
         pathToJoinNodeSg, HashJoinNode.class);
 
     // FUNCTIONAL.ALLTYPES.ID's Ndv is 7300 and avgRowSize is 4
     // FUNCTIONAL.ALLTYPES.DATE_STRING_COL's Ndv is 736 and avgRowSize is 8
     // Cardinality estimate of subquery is 53290000
     // BitUtil.roundUpToPowerOf2((long) Math.ceil(3 * Cardinality / 2)) is 134217728
-    // Size of Bucket is 16. Size of Duplicatenode is 24
+    // Size of Bucket is 12. Size of Duplicatenode is 16
     // Ndv estimate of subquery is 5372800
     verifyApproxMemoryEstimate("SELECT A.ID FROM (SELECT A1.ID,B1.DATE_STRING_COL " +
         "IDB FROM FUNCTIONAL.ALLTYPES A1 , FUNCTIONAL.ALLTYPES B1) A JOIN " +
         "(SELECT A1.ID,B1.DATE_STRING_COL IDB FROM FUNCTIONAL.ALLTYPES A1," +
         "FUNCTIONAL.ALLTYPES B1) B ON A.ID = B.ID AND A.IDB=B.IDB",
-        53290000L*(4L+8L+4L+8L)+134217728L*16L+(53290000L-5372800L)*24L, true, true,
+        53290000L*(4L+8L+4L+8L)+134217728L*12L+(53290000L-5372800L)*16L, true, true,
         ImmutableSet.of(), pathToJoinNode, HashJoinNode.class);
     // create a single node plan.
     verifyApproxMemoryEstimate("SELECT A.ID FROM (SELECT A1.ID,B1.DATE_STRING_COL " +
         "IDB FROM FUNCTIONAL.ALLTYPES A1 , FUNCTIONAL.ALLTYPES B1) A JOIN " +
         "(SELECT A1.ID,B1.DATE_STRING_COL IDB FROM FUNCTIONAL.ALLTYPES A1," +
         "FUNCTIONAL.ALLTYPES B1) B ON A.ID = B.ID AND A.IDB=B.IDB",
-        53290000L*(4L+8L+4L+8L)+134217728L*16L+(53290000L-5372800L)*24L, false, false,
+        53290000L*(4L+8L+4L+8L)+134217728L*12L+(53290000L-5372800L)*16L, false, false,
         ImmutableSet.of(), pathToJoinNodeSg, HashJoinNode.class);
   }
 

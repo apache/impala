@@ -61,5 +61,6 @@ ADD_BE_BENCHMARK(thread-create-benchmark)
 ADD_BE_BENCHMARK(tuple-layout-benchmark)
 ADD_BE_BENCHMARK(convert-timestamp-benchmark)
 ADD_BE_BENCHMARK(date-benchmark)
+ADD_BE_BENCHMARK(hash-table-benchmark)
 
 target_link_libraries(hash-benchmark Experiments)

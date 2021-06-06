@@ -29,9 +29,9 @@ FROM
 LIMIT 100
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=190.94MB Threads=10
-Per-Host Resource Estimates: Memory=655MB
+Per-Host Resource Estimates: Memory=623MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=655.42MB mem-reservation=190.94MB thread-reservation=10 runtime-filters-memory=10.00MB
+|  Per-Host Resources: mem-estimate=622.94MB mem-reservation=190.94MB thread-reservation=10 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: count(*)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -47,13 +47,13 @@ PLAN-ROOT SINK
 |  hash predicates: c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name, d_date IS NOT DISTINCT FROM d_date
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF000[bloom] <- c_first_name, RF001[bloom] <- c_last_name, RF002[bloom] <- d_date
-|  mem-estimate=71.77MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=63.77MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3,8,13 row-size=174B cardinality=2.88M
 |  in pipelines: 05(GETNEXT), 17(OPEN)
 |
 |--17:AGGREGATE [FINALIZE]
 |  |  group by: c_last_name, c_first_name, d_date
-|  |  mem-estimate=50.74MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=48.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=13 row-size=58B cardinality=719.38K
 |  |  in pipelines: 17(GETNEXT), 12(OPEN)
 |  |
@@ -111,13 +111,13 @@ PLAN-ROOT SINK
 |  hash predicates: c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name, d_date IS NOT DISTINCT FROM d_date
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF003[bloom] <- c_first_name, RF004[bloom] <- c_last_name, RF005[bloom] <- d_date
-|  mem-estimate=143.69MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=127.69MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3,8 row-size=116B cardinality=2.88M
 |  in pipelines: 05(GETNEXT), 11(OPEN)
 |
 |--11:AGGREGATE [FINALIZE]
 |  |  group by: c_last_name, c_first_name, d_date
-|  |  mem-estimate=101.68MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=96.18MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=8 row-size=58B cardinality=1.44M
 |  |  in pipelines: 11(GETNEXT), 06(OPEN)
 |  |
@@ -173,7 +173,7 @@ PLAN-ROOT SINK
 |
 05:AGGREGATE [FINALIZE]
 |  group by: c_last_name, c_first_name, d_date
-|  mem-estimate=203.18MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=192.19MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=58B cardinality=2.88M
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |
@@ -231,7 +231,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=340.81MB Threads=22
-Per-Host Resource Estimates: Memory=915MB
+Per-Host Resource Estimates: Memory=903MB
 F12:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -251,7 +251,7 @@ PLAN-ROOT SINK
 |  in pipelines: 20(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(c_last_name,c_first_name,d_date)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=186.11MB mem-reservation=108.00MB thread-reservation=1 runtime-filters-memory=6.00MB
+Per-Host Resources: mem-estimate=177.11MB mem-reservation=108.00MB thread-reservation=1 runtime-filters-memory=6.00MB
 20:AGGREGATE
 |  output: count(*)
 |  mem-estimate=16.00KB mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
@@ -360,7 +360,7 @@ Per-Host Resources: mem-estimate=186.11MB mem-reservation=108.00MB thread-reserv
 |  hash predicates: c_first_name IS NOT DISTINCT FROM c_first_name, c_last_name IS NOT DISTINCT FROM c_last_name, d_date IS NOT DISTINCT FROM d_date
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF003[bloom] <- c_first_name, RF004[bloom] <- c_last_name, RF005[bloom] <- d_date
-|  mem-estimate=47.90MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=42.56MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3,8 row-size=116B cardinality=2.88M
 |  in pipelines: 24(GETNEXT), 28(OPEN)
 |
@@ -456,7 +456,7 @@ Per-Host Resources: mem-estimate=186.11MB mem-reservation=108.00MB thread-reserv
 |
 24:AGGREGATE [FINALIZE]
 |  group by: c_last_name, c_first_name, d_date
-|  mem-estimate=67.73MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=64.06MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=58B cardinality=2.88M
 |  in pipelines: 24(GETNEXT), 00(OPEN)
 |
@@ -466,10 +466,10 @@ Per-Host Resources: mem-estimate=186.11MB mem-reservation=108.00MB thread-reserv
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=83.33MB mem-reservation=46.94MB thread-reservation=2 runtime-filters-memory=2.00MB
+Per-Host Resources: mem-estimate=80.58MB mem-reservation=46.94MB thread-reservation=2 runtime-filters-memory=2.00MB
 05:AGGREGATE [STREAMING]
 |  group by: c_last_name, c_first_name, d_date
-|  mem-estimate=50.79MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=48.05MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=58B cardinality=2.88M
 |  in pipelines: 00(GETNEXT)
 |

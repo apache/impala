@@ -59,9 +59,9 @@ ORDER BY inv1.w_warehouse_sk,
          inv2.cov ;
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=131.81MB Threads=9
-Per-Host Resource Estimates: Memory=913MB
+Per-Host Resource Estimates: Memory=880MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=913.32MB mem-reservation=131.81MB thread-reservation=9 runtime-filters-memory=8.00MB
+|  Per-Host Resources: mem-estimate=880.41MB mem-reservation=131.81MB thread-reservation=9 runtime-filters-memory=8.00MB
 PLAN-ROOT SINK
 |  output exprs: w_warehouse_sk, i_item_sk, d_moy, mean, cov, w_warehouse_sk, i_item_sk, d_moy, mean, cov
 |  mem-estimate=26.33MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -76,7 +76,7 @@ PLAN-ROOT SINK
 |  hash predicates: i_item_sk = i_item_sk, w_warehouse_sk = w_warehouse_sk
 |  fk/pk conjuncts: i_item_sk = i_item_sk, w_warehouse_sk = w_warehouse_sk
 |  runtime filters: RF000[bloom] <- i_item_sk, RF001[bloom] <- w_warehouse_sk, RF002[min_max] <- i_item_sk, RF003[min_max] <- w_warehouse_sk
-|  mem-estimate=49.12MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=42.51MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5,13 row-size=123B cardinality=431.40K
 |  in pipelines: 07(GETNEXT), 15(OPEN)
 |
@@ -84,7 +84,7 @@ PLAN-ROOT SINK
 |  |  output: stddev_samp(inv_quantity_on_hand), avg(CAST(inv_quantity_on_hand AS BIGINT))
 |  |  group by: w_warehouse_name, w_warehouse_sk, i_item_sk, d_moy
 |  |  having: CASE avg(inv_quantity_on_hand) WHEN CAST(0 AS DOUBLE) THEN CAST(0 AS DOUBLE) ELSE stddev_samp(inv_quantity_on_hand) * CAST(1.000 AS DOUBLE) / avg(inv_quantity_on_hand) END > CAST(1 AS DOUBLE)
-|  |  mem-estimate=318.85MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=302.39MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=13 row-size=62B cardinality=431.40K
 |  |  in pipelines: 15(GETNEXT), 08(OPEN)
 |  |
@@ -160,7 +160,7 @@ PLAN-ROOT SINK
 |  output: stddev_samp(inv_quantity_on_hand), avg(CAST(inv_quantity_on_hand AS BIGINT))
 |  group by: w_warehouse_name, w_warehouse_sk, i_item_sk, d_moy
 |  having: CASE avg(inv_quantity_on_hand) WHEN CAST(0 AS DOUBLE) THEN CAST(0 AS DOUBLE) ELSE stddev_samp(inv_quantity_on_hand) * CAST(1.000 AS DOUBLE) / avg(inv_quantity_on_hand) END > CAST(1 AS DOUBLE)
-|  mem-estimate=318.85MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=302.39MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=62B cardinality=431.40K
 |  in pipelines: 07(GETNEXT), 00(OPEN)
 |
@@ -235,7 +235,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=237.16MB Threads=20
-Per-Host Resource Estimates: Memory=1.15GB
+Per-Host Resource Estimates: Memory=1.12GB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=39.63MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -270,12 +270,12 @@ Per-Host Resources: mem-estimate=59.29MB mem-reservation=42.00MB thread-reservat
 |  |  in pipelines: 27(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [HASH(w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy)] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=169.55MB mem-reservation=34.00MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=161.32MB mem-reservation=34.00MB thread-reservation=1
 |  27:AGGREGATE [FINALIZE]
 |  |  output: stddev_samp:merge(inv_quantity_on_hand), avg:merge(inv_quantity_on_hand)
 |  |  group by: w_warehouse_name, w_warehouse_sk, i_item_sk, d_moy
 |  |  having: CASE avg(inv_quantity_on_hand) WHEN CAST(0 AS DOUBLE) THEN CAST(0 AS DOUBLE) ELSE stddev_samp(inv_quantity_on_hand) * CAST(1.000 AS DOUBLE) / avg(inv_quantity_on_hand) END > CAST(1 AS DOUBLE)
-|  |  mem-estimate=159.42MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=151.20MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=13 row-size=62B cardinality=431.40K
 |  |  in pipelines: 27(GETNEXT), 08(OPEN)
 |  |
@@ -285,11 +285,11 @@ Per-Host Resources: mem-estimate=59.29MB mem-reservation=42.00MB thread-reservat
 |  |  in pipelines: 08(GETNEXT)
 |  |
 |  F05:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=270.67MB mem-reservation=58.81MB thread-reservation=2 runtime-filters-memory=3.00MB
+|  Per-Host Resources: mem-estimate=263.77MB mem-reservation=58.81MB thread-reservation=2 runtime-filters-memory=3.00MB
 |  15:AGGREGATE [STREAMING]
 |  |  output: stddev_samp(inv_quantity_on_hand), avg(CAST(inv_quantity_on_hand AS BIGINT))
 |  |  group by: w_warehouse_name, w_warehouse_sk, i_item_sk, d_moy
-|  |  mem-estimate=133.68MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=126.78MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=12 row-size=62B cardinality=4.31M
 |  |  in pipelines: 08(GETNEXT)
 |  |
@@ -388,12 +388,12 @@ Per-Host Resources: mem-estimate=59.29MB mem-reservation=42.00MB thread-reservat
 |  in pipelines: 22(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy)] hosts=2 instances=2
-Per-Host Resources: mem-estimate=169.55MB mem-reservation=34.00MB thread-reservation=1
+Per-Host Resources: mem-estimate=161.32MB mem-reservation=34.00MB thread-reservation=1
 22:AGGREGATE [FINALIZE]
 |  output: stddev_samp:merge(inv_quantity_on_hand), avg:merge(inv_quantity_on_hand)
 |  group by: w_warehouse_name, w_warehouse_sk, i_item_sk, d_moy
 |  having: CASE avg(inv_quantity_on_hand) WHEN CAST(0 AS DOUBLE) THEN CAST(0 AS DOUBLE) ELSE stddev_samp(inv_quantity_on_hand) * CAST(1.000 AS DOUBLE) / avg(inv_quantity_on_hand) END > CAST(1 AS DOUBLE)
-|  mem-estimate=159.42MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=151.20MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=62B cardinality=431.40K
 |  in pipelines: 22(GETNEXT), 00(OPEN)
 |
@@ -403,11 +403,11 @@ Per-Host Resources: mem-estimate=169.55MB mem-reservation=34.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-Per-Host Resources: mem-estimate=272.67MB mem-reservation=60.81MB thread-reservation=2 runtime-filters-memory=5.00MB
+Per-Host Resources: mem-estimate=265.77MB mem-reservation=60.81MB thread-reservation=2 runtime-filters-memory=5.00MB
 07:AGGREGATE [STREAMING]
 |  output: stddev_samp(inv_quantity_on_hand), avg(CAST(inv_quantity_on_hand AS BIGINT))
 |  group by: w_warehouse_name, w_warehouse_sk, i_item_sk, d_moy
-|  mem-estimate=133.68MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=126.78MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=62B cardinality=4.31M
 |  in pipelines: 00(GETNEXT)
 |
@@ -503,7 +503,7 @@ Per-Host Resources: mem-estimate=272.67MB mem-reservation=60.81MB thread-reserva
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=254.78MB Threads=19
-Per-Host Resource Estimates: Memory=915MB
+Per-Host Resource Estimates: Memory=885MB
 F11:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=39.63MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -546,12 +546,12 @@ Per-Instance Resources: mem-estimate=23.29MB mem-reservation=6.00MB thread-reser
 |  |  in pipelines: 27(GETNEXT)
 |  |
 |  F09:PLAN FRAGMENT [HASH(w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy)] hosts=2 instances=2
-|  Per-Instance Resources: mem-estimate=169.55MB mem-reservation=34.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=161.32MB mem-reservation=34.00MB thread-reservation=1
 |  27:AGGREGATE [FINALIZE]
 |  |  output: stddev_samp:merge(inv_quantity_on_hand), avg:merge(inv_quantity_on_hand)
 |  |  group by: w_warehouse_name, w_warehouse_sk, i_item_sk, d_moy
 |  |  having: CASE avg(inv_quantity_on_hand) WHEN CAST(0 AS DOUBLE) THEN CAST(0 AS DOUBLE) ELSE stddev_samp(inv_quantity_on_hand) * CAST(1.000 AS DOUBLE) / avg(inv_quantity_on_hand) END > CAST(1 AS DOUBLE)
-|  |  mem-estimate=159.42MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=151.20MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=13 row-size=62B cardinality=431.40K
 |  |  in pipelines: 27(GETNEXT), 08(OPEN)
 |  |
@@ -562,11 +562,11 @@ Per-Instance Resources: mem-estimate=23.29MB mem-reservation=6.00MB thread-reser
 |  |
 |  F05:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 |  Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
-|  Per-Instance Resources: mem-estimate=165.68MB mem-reservation=50.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=158.78MB mem-reservation=50.00MB thread-reservation=1
 |  15:AGGREGATE [STREAMING]
 |  |  output: stddev_samp(inv_quantity_on_hand), avg(CAST(inv_quantity_on_hand AS BIGINT))
 |  |  group by: w_warehouse_name, w_warehouse_sk, i_item_sk, d_moy
-|  |  mem-estimate=133.68MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=126.78MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=12 row-size=62B cardinality=4.31M
 |  |  in pipelines: 08(GETNEXT)
 |  |
@@ -689,12 +689,12 @@ Per-Instance Resources: mem-estimate=23.29MB mem-reservation=6.00MB thread-reser
 |  in pipelines: 22(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(w_warehouse_name,w_warehouse_sk,i_item_sk,d_moy)] hosts=2 instances=2
-Per-Instance Resources: mem-estimate=169.55MB mem-reservation=34.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=161.32MB mem-reservation=34.00MB thread-reservation=1
 22:AGGREGATE [FINALIZE]
 |  output: stddev_samp:merge(inv_quantity_on_hand), avg:merge(inv_quantity_on_hand)
 |  group by: w_warehouse_name, w_warehouse_sk, i_item_sk, d_moy
 |  having: CASE avg(inv_quantity_on_hand) WHEN CAST(0 AS DOUBLE) THEN CAST(0 AS DOUBLE) ELSE stddev_samp(inv_quantity_on_hand) * CAST(1.000 AS DOUBLE) / avg(inv_quantity_on_hand) END > CAST(1 AS DOUBLE)
-|  mem-estimate=159.42MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=151.20MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=62B cardinality=431.40K
 |  in pipelines: 22(GETNEXT), 00(OPEN)
 |
@@ -705,11 +705,11 @@ Per-Instance Resources: mem-estimate=169.55MB mem-reservation=34.00MB thread-res
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
 Per-Host Shared Resources: mem-estimate=5.00MB mem-reservation=5.00MB thread-reservation=0 runtime-filters-memory=5.00MB
-Per-Instance Resources: mem-estimate=165.68MB mem-reservation=50.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=158.78MB mem-reservation=50.00MB thread-reservation=1
 07:AGGREGATE [STREAMING]
 |  output: stddev_samp(inv_quantity_on_hand), avg(CAST(inv_quantity_on_hand AS BIGINT))
 |  group by: w_warehouse_name, w_warehouse_sk, i_item_sk, d_moy
-|  mem-estimate=133.68MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=126.78MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=4 row-size=62B cardinality=4.31M
 |  in pipelines: 00(GETNEXT)
 |

@@ -23,10 +23,10 @@ WHERE ctr1.ctr_total_return >
 ORDER BY c_customer_id
 LIMIT 100
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=30.33MB Threads=7
+Max Per-Host Resource Reservation: Memory=26.58MB Threads=7
 Per-Host Resource Estimates: Memory=331MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=330.81MB mem-reservation=30.33MB thread-reservation=7 runtime-filters-memory=5.00MB
+|  Per-Host Resources: mem-estimate=330.81MB mem-reservation=26.58MB thread-reservation=7 runtime-filters-memory=5.00MB
 PLAN-ROOT SINK
 |  output exprs: c_customer_id
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -55,7 +55,7 @@ PLAN-ROOT SINK
 |  09:AGGREGATE [FINALIZE]
 |  |  output: sum(sr_return_amt)
 |  |  group by: sr_customer_sk, sr_store_sk
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=8 row-size=24B cardinality=53.81K
 |  |  in pipelines: 09(GETNEXT), 06(OPEN)
 |  |
@@ -124,7 +124,7 @@ PLAN-ROOT SINK
 |--03:AGGREGATE [FINALIZE]
 |  |  output: sum(sr_return_amt)
 |  |  group by: sr_customer_sk, sr_store_sk
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=2 row-size=24B cardinality=53.81K
 |  |  in pipelines: 03(GETNEXT), 00(OPEN)
 |  |
@@ -171,7 +171,7 @@ PLAN-ROOT SINK
    tuple-ids=5 row-size=32B cardinality=100.00K
    in pipelines: 05(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=54.95MB Threads=16
+Max Per-Host Resource Reservation: Memory=49.20MB Threads=16
 Per-Host Resource Estimates: Memory=408MB
 F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
@@ -222,7 +222,7 @@ Per-Host Resources: mem-estimate=44.92MB mem-reservation=13.62MB thread-reservat
 |  |  in pipelines: 22(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [HASH(sr_customer_sk,sr_store_sk)] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=21.26MB mem-reservation=6.75MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=21.26MB mem-reservation=4.88MB thread-reservation=1
 |  10:AGGREGATE [STREAMING]
 |  |  output: avg(sum(sr_return_amt))
 |  |  group by: sr_store_sk
@@ -233,7 +233,7 @@ Per-Host Resources: mem-estimate=44.92MB mem-reservation=13.62MB thread-reservat
 |  22:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(sr_return_amt)
 |  |  group by: sr_customer_sk, sr_store_sk
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=8 row-size=24B cardinality=53.81K
 |  |  in pipelines: 22(GETNEXT), 06(OPEN)
 |  |
@@ -243,11 +243,11 @@ Per-Host Resources: mem-estimate=44.92MB mem-reservation=13.62MB thread-reservat
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=108.95MB mem-reservation=9.94MB thread-reservation=2 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=108.95MB mem-reservation=8.94MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  09:AGGREGATE [STREAMING]
 |  |  output: sum(sr_return_amt)
 |  |  group by: sr_customer_sk, sr_store_sk
-|  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=8 row-size=24B cardinality=53.81K
 |  |  in pipelines: 06(GETNEXT)
 |  |
@@ -333,11 +333,11 @@ Per-Host Resources: mem-estimate=44.92MB mem-reservation=13.62MB thread-reservat
 |  |  in pipelines: 17(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [HASH(sr_customer_sk,sr_store_sk)] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=11.26MB mem-reservation=4.75MB thread-reservation=1
+|  Per-Host Resources: mem-estimate=11.26MB mem-reservation=2.88MB thread-reservation=1
 |  17:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(sr_return_amt)
 |  |  group by: sr_customer_sk, sr_store_sk
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=2 row-size=24B cardinality=53.81K
 |  |  in pipelines: 17(GETNEXT), 00(OPEN)
 |  |
@@ -347,11 +347,11 @@ Per-Host Resources: mem-estimate=44.92MB mem-reservation=13.62MB thread-reservat
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=110.95MB mem-reservation=11.94MB thread-reservation=2 runtime-filters-memory=3.00MB
+|  Per-Host Resources: mem-estimate=110.95MB mem-reservation=10.94MB thread-reservation=2 runtime-filters-memory=3.00MB
 |  03:AGGREGATE [STREAMING]
 |  |  output: sum(sr_return_amt)
 |  |  group by: sr_customer_sk, sr_store_sk
-|  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=2 row-size=24B cardinality=53.81K
 |  |  in pipelines: 00(GETNEXT)
 |  |
@@ -405,7 +405,7 @@ Per-Host Resources: mem-estimate=44.92MB mem-reservation=13.62MB thread-reservat
    tuple-ids=5 row-size=32B cardinality=100.00K
    in pipelines: 05(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=70.45MB Threads=15
+Max Per-Host Resource Reservation: Memory=64.70MB Threads=15
 Per-Host Resource Estimates: Memory=216MB
 F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
@@ -465,7 +465,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=2.00MB thread-reser
 |  |  in pipelines: 22(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [HASH(sr_customer_sk,sr_store_sk)] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=21.26MB mem-reservation=6.75MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=21.26MB mem-reservation=4.88MB thread-reservation=1
 |  10:AGGREGATE [STREAMING]
 |  |  output: avg(sum(sr_return_amt))
 |  |  group by: sr_store_sk
@@ -476,7 +476,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=2.00MB thread-reser
 |  22:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(sr_return_amt)
 |  |  group by: sr_customer_sk, sr_store_sk
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=8 row-size=24B cardinality=53.81K
 |  |  in pipelines: 22(GETNEXT), 06(OPEN)
 |  |
@@ -487,11 +487,11 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=2.00MB thread-reser
 |  |
 |  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  Per-Instance Resources: mem-estimate=34.00MB mem-reservation=7.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=34.00MB mem-reservation=6.00MB thread-reservation=1
 |  09:AGGREGATE [STREAMING]
 |  |  output: sum(sr_return_amt)
 |  |  group by: sr_customer_sk, sr_store_sk
-|  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=8 row-size=24B cardinality=53.81K
 |  |  in pipelines: 06(GETNEXT)
 |  |
@@ -602,11 +602,11 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=2.00MB thread-reser
 |  |  in pipelines: 17(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [HASH(sr_customer_sk,sr_store_sk)] hosts=1 instances=1
-|  Per-Instance Resources: mem-estimate=11.26MB mem-reservation=4.75MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=11.26MB mem-reservation=2.88MB thread-reservation=1
 |  17:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(sr_return_amt)
 |  |  group by: sr_customer_sk, sr_store_sk
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=2 row-size=24B cardinality=53.81K
 |  |  in pipelines: 17(GETNEXT), 00(OPEN)
 |  |
@@ -617,11 +617,11 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=2.00MB thread-reser
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
-|  Per-Instance Resources: mem-estimate=34.00MB mem-reservation=7.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=34.00MB mem-reservation=6.00MB thread-reservation=1
 |  03:AGGREGATE [STREAMING]
 |  |  output: sum(sr_return_amt)
 |  |  group by: sr_customer_sk, sr_store_sk
-|  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=2 row-size=24B cardinality=53.81K
 |  |  in pipelines: 00(GETNEXT)
 |  |

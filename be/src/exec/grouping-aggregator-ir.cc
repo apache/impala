@@ -24,6 +24,8 @@
 
 using namespace impala;
 
+typedef HashTable::BucketType BucketType;
+
 template <bool AGGREGATED_ROWS>
 Status GroupingAggregator::AddBatchImpl(RowBatch* batch,
     TPrefetchMode::type prefetch_mode, HashTableCtx* __restrict__ ht_ctx,
@@ -110,7 +112,8 @@ Status GroupingAggregator::ProcessRow(
   bool found;
   // Find the appropriate bucket in the hash table. There will always be a free
   // bucket because we checked the size above.
-  HashTable::Iterator it = hash_tbl->FindBuildRowBucket(ht_ctx, &found);
+  HashTable::Iterator it =
+      hash_tbl->FindBuildRowBucket<BucketType::MATCH_UNSET>(ht_ctx, &found);
   DCHECK(!it.AtEnd()) << "Hash table had no free buckets";
   if (AGGREGATED_ROWS) {
     // If the row is already an aggregate row, it cannot match anything in the
@@ -119,7 +122,8 @@ Status GroupingAggregator::ProcessRow(
     DCHECK(!found);
   } else if (found) {
     // Row is already in hash table. Do the aggregation and we're done.
-    UpdateTuple(dst_partition->agg_fn_evals.data(), it.GetTuple(), row);
+    UpdateTuple(
+        dst_partition->agg_fn_evals.data(), it.GetTuple<BucketType::MATCH_UNSET>(), row);
     return Status::OK();
   }
 
@@ -232,11 +236,12 @@ bool GroupingAggregator::TryAddToHashTable(HashTableCtx* __restrict__ ht_ctx,
   DCHECK_EQ(hash_tbl, partition->hash_tbl.get());
   DCHECK_GE(*remaining_capacity, 0);
   bool found;
-  // This is called from ProcessBatchStreaming() so the rows are not aggregated.
-  HashTable::Iterator it = hash_tbl->FindBuildRowBucket(ht_ctx, &found);
   Tuple* intermediate_tuple;
+  // This is called from ProcessBatchStreaming() so the rows are not aggregated.
+  HashTable::Iterator it =
+      hash_tbl->FindBuildRowBucket<BucketType::MATCH_UNSET>(ht_ctx, &found);
   if (found) {
-    intermediate_tuple = it.GetTuple();
+    intermediate_tuple = it.GetTuple<BucketType::MATCH_UNSET>();
   } else if (*remaining_capacity == 0) {
     return false;
   } else {

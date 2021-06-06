@@ -292,7 +292,7 @@ PLAN-ROOT SINK
 |  hash predicates: sr_returned_date_sk = d2.d_date_sk
 |  fk/pk conjuncts: sr_returned_date_sk = d2.d_date_sk
 |  runtime filters: RF002[bloom] <- d2.d_date_sk
-|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=1,0,3,4 row-size=56B cardinality=8.13K
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |
@@ -454,7 +454,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: assumed fk/pk
 |  runtime filters: RF000[bloom] <- c_customer_sk
-|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=8B cardinality=unavailable
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
@@ -497,7 +497,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_sold_time_sk = ws_sold_time_sk
 |  fk/pk conjuncts: none
 |  runtime filters: RF000[bloom] <- ws_sold_time_sk
-|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,2 row-size=104B cardinality=2.44M
 |  in pipelines: 00(GETNEXT), 02(OPEN)
 |

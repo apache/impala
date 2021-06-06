@@ -110,7 +110,7 @@ PLAN-ROOT SINK
 38:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(26,27,28) IN (CAST(26 AS INT), CAST(27 AS INT), CAST(28 AS INT)), CASE valid_tid(26,27,28) WHEN CAST(26 AS INT) THEN sum(sales) WHEN CAST(27 AS INT) THEN sum(sales) WHEN CAST(28 AS INT) THEN sum(sales) END), aggif(valid_tid(26,27,28) IN (CAST(26 AS INT), CAST(27 AS INT), CAST(28 AS INT)), CASE valid_tid(26,27,28) WHEN CAST(26 AS INT) THEN sum(`returns`) WHEN CAST(27 AS INT) THEN sum(`returns`) WHEN CAST(28 AS INT) THEN sum(`returns`) END), aggif(valid_tid(26,27,28) IN (CAST(26 AS INT), CAST(27 AS INT), CAST(28 AS INT)), CASE valid_tid(26,27,28) WHEN CAST(26 AS INT) THEN sum(profit) WHEN CAST(27 AS INT) THEN sum(profit) WHEN CAST(28 AS INT) THEN sum(profit) END)
 |  group by: CASE valid_tid(26,27,28) WHEN CAST(26 AS INT) THEN channel WHEN CAST(27 AS INT) THEN channel WHEN CAST(28 AS INT) THEN NULL END, CASE valid_tid(26,27,28) WHEN CAST(26 AS INT) THEN id WHEN CAST(27 AS INT) THEN NULL WHEN CAST(28 AS INT) THEN NULL END, CASE valid_tid(26,27,28) WHEN CAST(26 AS INT) THEN CAST(26 AS INT) WHEN CAST(27 AS INT) THEN CAST(27 AS INT) WHEN CAST(28 AS INT) THEN CAST(28 AS INT) END
-|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=29 row-size=76B cardinality=11.56K
 |  in pipelines: 38(GETNEXT), 37(OPEN)
 |
@@ -253,7 +253,7 @@ PLAN-ROOT SINK
 |--24:AGGREGATE [FINALIZE]
 |  |  output: sum(cs_ext_sales_price), sum(coalesce(cr_return_amount, CAST(0 AS DECIMAL(7,2)))), sum(cs_net_profit - coalesce(cr_net_loss, CAST(0 AS DECIMAL(7,2))))
 |  |  group by: cp_catalog_page_id
-|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=14 row-size=76B cardinality=11.54K
 |  |  in pipelines: 24(GETNEXT), 13(OPEN)
 |  |
@@ -485,7 +485,7 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=36B cardinality=2.88M
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=147.31MB Threads=39
+Max Per-Host Resource Reservation: Memory=146.31MB Threads=39
 Per-Host Resource Estimates: Memory=1.45GB
 F23:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
@@ -734,11 +734,11 @@ Per-Host Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reservati
 |  |  in pipelines: 13(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=370.23MB mem-reservation=39.25MB thread-reservation=2 runtime-filters-memory=4.00MB
+|  Per-Host Resources: mem-estimate=370.23MB mem-reservation=38.25MB thread-reservation=2 runtime-filters-memory=4.00MB
 |  24:AGGREGATE [STREAMING]
 |  |  output: sum(cs_ext_sales_price), sum(coalesce(cr_return_amount, CAST(0 AS DECIMAL(7,2)))), sum(cs_net_profit - coalesce(cr_net_loss, CAST(0 AS DECIMAL(7,2))))
 |  |  group by: cp_catalog_page_id
-|  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=14 row-size=76B cardinality=11.54K
 |  |  in pipelines: 13(GETNEXT)
 |  |
@@ -1054,7 +1054,7 @@ Per-Host Resources: mem-estimate=141.64MB mem-reservation=34.75MB thread-reserva
    tuple-ids=0 row-size=36B cardinality=2.88M
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=232.50MB Threads=39
+Max Per-Host Resource Reservation: Memory=231.50MB Threads=39
 Per-Host Resource Estimates: Memory=716MB
 F23:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.05MB mem-reservation=4.00MB thread-reservation=1
@@ -1346,11 +1346,11 @@ Per-Instance Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reser
 |  |
 |  F07:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |  Per-Host Shared Resources: mem-estimate=4.00MB mem-reservation=4.00MB thread-reservation=0 runtime-filters-memory=4.00MB
-|  Per-Instance Resources: mem-estimate=58.00MB mem-reservation=19.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=58.00MB mem-reservation=18.00MB thread-reservation=1
 |  24:AGGREGATE [STREAMING]
 |  |  output: sum(cs_ext_sales_price), sum(coalesce(cr_return_amount, CAST(0 AS DECIMAL(7,2)))), sum(cs_net_profit - coalesce(cr_net_loss, CAST(0 AS DECIMAL(7,2))))
 |  |  group by: cp_catalog_page_id
-|  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=14 row-size=76B cardinality=11.54K
 |  |  in pipelines: 13(GETNEXT)
 |  |

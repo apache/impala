@@ -66,7 +66,7 @@ PLAN-ROOT SINK
 34:HASH JOIN [INNER JOIN]
 |  hash predicates: rank() = rank() - 1, s_store_name = s_store_name, i_category = i_category, s_company_name = s_company_name, i_brand = i_brand
 |  fk/pk conjuncts: none
-|  mem-estimate=104.50MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=95.70MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=45,44,37,32,53,52 row-size=356B cardinality=1.09G
 |  in pipelines: 21(GETNEXT), 31(OPEN)
 |
@@ -88,7 +88,7 @@ PLAN-ROOT SINK
 |  30:AGGREGATE [FINALIZE]
 |  |  output: sum(ss_sales_price)
 |  |  group by: i_category, i_brand, s_store_name, s_company_name, d_year, d_moy
-|  |  mem-estimate=79.31MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=76.70MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=20 row-size=105B cardinality=685.36K
 |  |  in pipelines: 30(GETNEXT), 24(OPEN)
 |  |
@@ -203,7 +203,7 @@ PLAN-ROOT SINK
 |  07:AGGREGATE [FINALIZE]
 |  |  output: sum(ss_sales_price)
 |  |  group by: i_category, i_brand, s_store_name, s_company_name, d_year, d_moy
-|  |  mem-estimate=79.31MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=76.70MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=4 row-size=105B cardinality=685.36K
 |  |  in pipelines: 07(GETNEXT), 01(OPEN)
 |  |
@@ -292,7 +292,7 @@ PLAN-ROOT SINK
 20:AGGREGATE [FINALIZE]
 |  output: sum(ss_sales_price)
 |  group by: i_category, i_brand, s_store_name, s_company_name, d_year, d_moy
-|  mem-estimate=79.31MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=76.70MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=12 row-size=105B cardinality=685.36K
 |  in pipelines: 20(GETNEXT), 14(OPEN)
 |
@@ -364,7 +364,7 @@ PLAN-ROOT SINK
    in pipelines: 14(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=330.51MB Threads=29
-Per-Host Resource Estimates: Memory=960MB
+Per-Host Resource Estimates: Memory=959MB
 F16:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.04MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -379,7 +379,7 @@ PLAN-ROOT SINK
 |  in pipelines: 35(GETNEXT)
 |
 F15:PLAN FRAGMENT [HASH(rank(),s_store_name,i_category,s_company_name,i_brand)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=55.95MB mem-reservation=34.00MB thread-reservation=1
+Per-Host Resources: mem-estimate=55.11MB mem-reservation=34.00MB thread-reservation=1
 35:TOP-N [LIMIT=100]
 |  order by: sum_sales - avg_monthly_sales ASC, d_year ASC
 |  mem-estimate=11.14KB mem-reservation=0B thread-reservation=0
@@ -389,7 +389,7 @@ Per-Host Resources: mem-estimate=55.95MB mem-reservation=34.00MB thread-reservat
 34:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: rank() = rank() - 1, s_store_name = s_store_name, i_category = i_category, s_company_name = s_company_name, i_brand = i_brand
 |  fk/pk conjuncts: none
-|  mem-estimate=34.83MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=45,44,37,32,53,52 row-size=356B cardinality=1.09G
 |  in pipelines: 21(GETNEXT), 31(OPEN)
 |
@@ -812,8 +812,8 @@ Per-Host Resources: mem-estimate=92.77MB mem-reservation=44.75MB thread-reservat
    tuple-ids=9 row-size=20B cardinality=2.88M
    in pipelines: 14(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=450.70MB Threads=36
-Per-Host Resource Estimates: Memory=731MB
+Max Per-Host Resource Reservation: Memory=416.70MB Threads=36
+Per-Host Resource Estimates: Memory=697MB
 F16:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.07MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -839,16 +839,16 @@ Per-Instance Resources: mem-estimate=11.53MB mem-reservation=0B thread-reservati
 |  hash-table-id=00
 |  hash predicates: rank() = rank() - 1, s_store_name = s_store_name, i_category = i_category, s_company_name = s_company_name, i_brand = i_brand
 |  fk/pk conjuncts: none
-|  mem-estimate=0B mem-reservation=0B spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
 |  tuple-ids=45,44,37,32,53,52 row-size=356B cardinality=1.09G
 |  in pipelines: 21(GETNEXT), 31(OPEN)
 |
 |--F17:PLAN FRAGMENT [HASH(rank(),s_store_name,i_category,s_company_name,i_brand)] hosts=3 instances=6
-|  |  Per-Instance Resources: mem-estimate=44.71MB mem-reservation=34.00MB thread-reservation=1
+|  |  Per-Instance Resources: mem-estimate=27.71MB mem-reservation=17.00MB thread-reservation=1
 |  JOIN BUILD
 |  |  join-table-id=00 plan-id=01 cohort-id=01
 |  |  build expressions: rank() - 1, s_store_name, i_category, s_company_name, i_brand
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
 |  |
 |  53:EXCHANGE [HASH(rank() - 1,s_store_name,i_category,s_company_name,i_brand)]
 |  |  mem-estimate=10.71MB mem-reservation=0B thread-reservation=0

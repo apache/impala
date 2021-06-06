@@ -39,9 +39,11 @@ public class PlannerContext {
   public final static double HASH_TBL_SPACE_OVERHEAD = 1.1;
 
   // Bucket is defined in the be/src/exec/hash-table.h
-  public final static double SIZE_OF_BUCKET = 16;
+  // Also includes size of hash. Hash is stored in seperate array for
+  // every bucket of HashTable.
+  public final static double SIZE_OF_BUCKET = 12;
   // DuplicateNode is defined in the be/src/exec/hash-table.h
-  public final static double SIZE_OF_DUPLICATENODE = 24;
+  public final static double SIZE_OF_DUPLICATENODE = 16;
 
   // Assumed average number of items in a nested collection, since we currently have no
   // statistics on nested fields. The motivation for this constant is to avoid

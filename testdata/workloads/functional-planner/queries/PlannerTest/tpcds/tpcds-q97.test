@@ -36,9 +36,9 @@ LIMIT 100;
 
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=106.94MB Threads=5
-Per-Host Resource Estimates: Memory=297MB
+Per-Host Resource Estimates: Memory=282MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=297.28MB mem-reservation=106.94MB thread-reservation=5 runtime-filters-memory=2.00MB
+|  Per-Host Resources: mem-estimate=281.80MB mem-reservation=106.94MB thread-reservation=5 runtime-filters-memory=2.00MB
 PLAN-ROOT SINK
 |  output exprs: sum(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NULL THEN 1 ELSE 0 END), sum(CASE WHEN ssci.customer_sk IS NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END), sum(CASE WHEN ssci.customer_sk IS NOT NULL AND csci.customer_sk IS NOT NULL THEN 1 ELSE 0 END)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -53,13 +53,13 @@ PLAN-ROOT SINK
 08:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: ss_customer_sk = cs_bill_customer_sk, ss_item_sk = cs_item_sk
 |  fk/pk conjuncts: ss_customer_sk = cs_bill_customer_sk, ss_item_sk = cs_item_sk
-|  mem-estimate=80.50MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=64.50MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2N,6N row-size=24B cardinality=4.32M
 |  in pipelines: 03(GETNEXT), 07(OPEN)
 |
 |--07:AGGREGATE [FINALIZE]
 |  |  group by: cs_bill_customer_sk, cs_item_sk
-|  |  mem-estimate=38.49MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  |  tuple-ids=6 row-size=12B cardinality=1.44M
 |  |  in pipelines: 07(GETNEXT), 04(OPEN)
 |  |
@@ -97,7 +97,7 @@ PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
 |  group by: ss_customer_sk, ss_item_sk
-|  mem-estimate=76.92MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=65.93MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=2 row-size=12B cardinality=2.88M
 |  in pipelines: 03(GETNEXT), 00(OPEN)
 |

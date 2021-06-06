@@ -59,7 +59,7 @@ PLAN-ROOT SINK
 05:AGGREGATE [FINALIZE]
 |  output: sum(cs_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
-|  mem-estimate=88.30MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=86.65MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=198B cardinality=432.46K
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |

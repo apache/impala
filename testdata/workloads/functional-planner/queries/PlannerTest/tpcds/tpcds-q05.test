@@ -142,7 +142,7 @@ PLAN-ROOT SINK
 28:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(27,28,29) IN (CAST(27 AS INT), CAST(28 AS INT), CAST(29 AS INT)), CASE valid_tid(27,28,29) WHEN CAST(27 AS INT) THEN sum(sales) WHEN CAST(28 AS INT) THEN sum(sales) WHEN CAST(29 AS INT) THEN sum(sales) END), aggif(valid_tid(27,28,29) IN (CAST(27 AS INT), CAST(28 AS INT), CAST(29 AS INT)), CASE valid_tid(27,28,29) WHEN CAST(27 AS INT) THEN sum(`returns`) WHEN CAST(28 AS INT) THEN sum(`returns`) WHEN CAST(29 AS INT) THEN sum(`returns`) END), aggif(valid_tid(27,28,29) IN (CAST(27 AS INT), CAST(28 AS INT), CAST(29 AS INT)), CASE valid_tid(27,28,29) WHEN CAST(27 AS INT) THEN sum(profit) WHEN CAST(28 AS INT) THEN sum(profit) WHEN CAST(29 AS INT) THEN sum(profit) END)
 |  group by: CASE valid_tid(27,28,29) WHEN CAST(27 AS INT) THEN channel WHEN CAST(28 AS INT) THEN channel WHEN CAST(29 AS INT) THEN NULL END, CASE valid_tid(27,28,29) WHEN CAST(27 AS INT) THEN id WHEN CAST(28 AS INT) THEN NULL WHEN CAST(29 AS INT) THEN NULL END, CASE valid_tid(27,28,29) WHEN CAST(27 AS INT) THEN CAST(27 AS INT) WHEN CAST(28 AS INT) THEN CAST(28 AS INT) WHEN CAST(29 AS INT) THEN CAST(29 AS INT) END
-|  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=30 row-size=76B cardinality=11.56K
 |  in pipelines: 28(GETNEXT), 27(OPEN)
 |

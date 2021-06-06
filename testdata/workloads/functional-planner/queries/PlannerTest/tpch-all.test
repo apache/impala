@@ -1253,7 +1253,7 @@ order by
   l_year
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=79.33MB Threads=7
-Per-Host Resource Estimates: Memory=706MB
+Per-Host Resource Estimates: Memory=690MB
 PLAN-ROOT SINK
 |
 12:SORT
@@ -1570,7 +1570,7 @@ group by
 order by
   o_year
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=51.21MB Threads=9
+Max Per-Host Resource Reservation: Memory=50.71MB Threads=9
 Per-Host Resource Estimates: Memory=713MB
 PLAN-ROOT SINK
 |
@@ -1957,7 +1957,7 @@ order by
   o_year desc
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=114.76MB Threads=7
-Per-Host Resource Estimates: Memory=914MB
+Per-Host Resource Estimates: Memory=890MB
 PLAN-ROOT SINK
 |
 12:SORT
@@ -2023,7 +2023,7 @@ PLAN-ROOT SINK
    row-size=48B cardinality=6.00M
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=145.63MB Threads=15
-Per-Host Resource Estimates: Memory=918MB
+Per-Host Resource Estimates: Memory=909MB
 PLAN-ROOT SINK
 |
 21:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2110,8 +2110,8 @@ PLAN-ROOT SINK
    runtime filters: RF002 -> l_partkey, RF003 -> l_suppkey, RF006 -> l_suppkey, RF008 -> l_orderkey, RF010 -> l_partkey
    row-size=48B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=248.38MB Threads=18
-Per-Host Resource Estimates: Memory=702MB
+Max Per-Host Resource Reservation: Memory=214.38MB Threads=18
+Per-Host Resource Estimates: Memory=668MB
 PLAN-ROOT SINK
 |
 21:MERGING-EXCHANGE [UNPARTITIONED]
@@ -2803,7 +2803,7 @@ order by
   l_shipmode
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=51.00MB Threads=3
-Per-Host Resource Estimates: Memory=477MB
+Per-Host Resource Estimates: Memory=475MB
 PLAN-ROOT SINK
 |
 04:SORT
@@ -2872,8 +2872,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> l_orderkey
    row-size=90B cardinality=320.78K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=130.88MB Threads=10
-Per-Host Resource Estimates: Memory=443MB
+Max Per-Host Resource Reservation: Memory=96.88MB Threads=10
+Per-Host Resource Estimates: Memory=409MB
 PLAN-ROOT SINK
 |
 09:MERGING-EXCHANGE [UNPARTITIONED]
@@ -3677,8 +3677,8 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_partkey
    row-size=16B cardinality=6.00M
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=49.56MB Threads=8
-Per-Host Resource Estimates: Memory=626MB
+Max Per-Host Resource Reservation: Memory=46.75MB Threads=8
+Per-Host Resource Estimates: Memory=625MB
 PLAN-ROOT SINK
 |
 12:AGGREGATE [FINALIZE]
@@ -3733,7 +3733,7 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> tpch.lineitem.l_partkey
    row-size=16B cardinality=6.00M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=80.50MB Threads=11
+Max Per-Host Resource Reservation: Memory=78.62MB Threads=11
 Per-Host Resource Estimates: Memory=445MB
 PLAN-ROOT SINK
 |
@@ -3835,7 +3835,7 @@ order by
 limit 100
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=120.50MB Threads=5
-Per-Host Resource Estimates: Memory=977MB
+Per-Host Resource Estimates: Memory=955MB
 PLAN-ROOT SINK
 |
 09:TOP-N [LIMIT=100]
@@ -3887,7 +3887,7 @@ PLAN-ROOT SINK
    row-size=16B cardinality=6.00M
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=217.75MB Threads=11
-Per-Host Resource Estimates: Memory=1.00GB
+Per-Host Resource Estimates: Memory=1016MB
 PLAN-ROOT SINK
 |
 17:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4592,7 +4592,7 @@ PLAN-ROOT SINK
    predicates: l3.l_receiptdate > l3.l_commitdate
    row-size=60B cardinality=600.12K
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=72.76MB Threads=15
+Max Per-Host Resource Reservation: Memory=64.26MB Threads=15
 Per-Host Resource Estimates: Memory=1.09GB
 PLAN-ROOT SINK
 |
@@ -4685,8 +4685,8 @@ PLAN-ROOT SINK
    predicates: l3.l_receiptdate > l3.l_commitdate
    row-size=60B cardinality=600.12K
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=112.38MB Threads=22
-Per-Host Resource Estimates: Memory=807MB
+Max Per-Host Resource Reservation: Memory=104.88MB Threads=22
+Per-Host Resource Estimates: Memory=800MB
 PLAN-ROOT SINK
 |
 21:MERGING-EXCHANGE [UNPARTITIONED]
@@ -4835,7 +4835,7 @@ group by
 order by
   cntrycode
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=28.75MB Threads=4
+Max Per-Host Resource Reservation: Memory=26.88MB Threads=4
 Per-Host Resource Estimates: Memory=314MB
 PLAN-ROOT SINK
 |
@@ -4878,7 +4878,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=1 size=162.56MB
    row-size=8B cardinality=1.50M
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=53.75MB Threads=10
+Max Per-Host Resource Reservation: Memory=50.81MB Threads=10
 Per-Host Resource Estimates: Memory=364MB
 PLAN-ROOT SINK
 |
@@ -4947,7 +4947,7 @@ PLAN-ROOT SINK
    HDFS partitions=1/1 files=1 size=162.56MB
    row-size=8B cardinality=1.50M
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=53.75MB Threads=9
+Max Per-Host Resource Reservation: Memory=50.81MB Threads=9
 Per-Host Resource Estimates: Memory=212MB
 PLAN-ROOT SINK
 |

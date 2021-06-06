@@ -75,10 +75,10 @@ where i_category in ('Music'))
       ,total_sales
  limit 100;
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=29.38MB Threads=6
+Max Per-Host Resource Reservation: Memory=28.44MB Threads=6
 Per-Host Resource Estimates: Memory=362MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=361.81MB mem-reservation=29.38MB thread-reservation=6 runtime-filters-memory=10.00MB
+|  Per-Host Resources: mem-estimate=361.81MB mem-reservation=28.44MB thread-reservation=6 runtime-filters-memory=10.00MB
 PLAN-ROOT SINK
 |  output exprs: i_item_id, sum(total_sales)
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -231,7 +231,7 @@ PLAN-ROOT SINK
 |  |  hash predicates: i_item_sk = cs_item_sk
 |  |  fk/pk conjuncts: i_item_sk = cs_item_sk
 |  |  runtime filters: RF011[min_max] <- cs_item_sk
-|  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=11,8,9,10 row-size=76B cardinality=14.35K
 |  |  in pipelines: 14(GETNEXT), 11(OPEN)
 |  |
@@ -330,7 +330,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_item_sk = i_item_sk
 |  fk/pk conjuncts: ss_item_sk = i_item_sk
 |  runtime filters: RF003[min_max] <- i_item_sk
-|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1,2,3 row-size=76B cardinality=27.62K
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |

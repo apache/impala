@@ -180,6 +180,7 @@ add_library(UtilTests STATIC
   symbols-util-test.cc
   sys-info-test.cc
   system-state-info-test.cc
+  tagged-ptr-test.cc
   thread-pool-test.cc
   time-test.cc
   tuple-row-compare-test.cc
@@ -259,3 +260,4 @@ ADD_UNIFIED_BE_LSAN_TEST(uid-util-test "UidUtil.*")
 ADD_BE_LSAN_TEST(webserver-test)
 TARGET_LINK_LIBRARIES(webserver-test mini_kdc)
 ADD_UNIFIED_BE_LSAN_TEST(zip-util-test "ZipUtilTest.*")
+ADD_UNIFIED_BE_LSAN_TEST(tagged-ptr-test "TaggedPtrTest.*")

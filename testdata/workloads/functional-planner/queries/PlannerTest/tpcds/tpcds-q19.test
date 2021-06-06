@@ -167,8 +167,8 @@ PLAN-ROOT SINK
    tuple-ids=4 row-size=21B cardinality=50.00K
    in pipelines: 04(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=32.02MB Threads=16
-Per-Host Resource Estimates: Memory=351MB
+Max Per-Host Resource Reservation: Memory=31.08MB Threads=16
+Per-Host Resource Estimates: Memory=350MB
 F09:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -203,7 +203,7 @@ Per-Host Resources: mem-estimate=10.27MB mem-reservation=1.94MB thread-reservati
 |  in pipelines: 01(GETNEXT)
 |
 F06:PLAN FRAGMENT [HASH(c_current_addr_sk)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=18.30MB mem-reservation=8.81MB thread-reservation=1 runtime-filters-memory=2.00MB
+Per-Host Resources: mem-estimate=17.36MB mem-reservation=7.88MB thread-reservation=1 runtime-filters-memory=2.00MB
 11:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: i_brand, i_brand_id, i_manufact_id, i_manufact
@@ -241,7 +241,7 @@ Per-Host Resources: mem-estimate=18.30MB mem-reservation=8.81MB thread-reservati
 |  hash predicates: c_current_addr_sk = ca_address_sk
 |  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
 |  runtime filters: RF002[bloom] <- ca_address_sk, RF003[min_max] <- ca_address_sk
-|  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=1,2,0,3,4 row-size=137B cardinality=1.72K
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |

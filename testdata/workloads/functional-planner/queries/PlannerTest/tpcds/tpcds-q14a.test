@@ -118,7 +118,7 @@ PLAN-ROOT SINK
 128:AGGREGATE [FINALIZE]
 |  output: aggif(valid_tid(104,105,106,107,108) IN (CAST(104 AS INT), CAST(105 AS INT), CAST(106 AS INT), CAST(107 AS INT), CAST(108 AS INT)), CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN sum(sales) WHEN CAST(105 AS INT) THEN sum(sales) WHEN CAST(106 AS INT) THEN sum(sales) WHEN CAST(107 AS INT) THEN sum(sales) WHEN CAST(108 AS INT) THEN sum(sales) END), aggif(valid_tid(104,105,106,107,108) IN (CAST(104 AS INT), CAST(105 AS INT), CAST(106 AS INT), CAST(107 AS INT), CAST(108 AS INT)), CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN sum(number_sales) WHEN CAST(105 AS INT) THEN sum(number_sales) WHEN CAST(106 AS INT) THEN sum(number_sales) WHEN CAST(107 AS INT) THEN sum(number_sales) WHEN CAST(108 AS INT) THEN sum(number_sales) END)
 |  group by: CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN channel WHEN CAST(105 AS INT) THEN channel WHEN CAST(106 AS INT) THEN channel WHEN CAST(107 AS INT) THEN channel WHEN CAST(108 AS INT) THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN i_brand_id WHEN CAST(105 AS INT) THEN i_brand_id WHEN CAST(106 AS INT) THEN i_brand_id WHEN CAST(107 AS INT) THEN NULL WHEN CAST(108 AS INT) THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN i_class_id WHEN CAST(105 AS INT) THEN i_class_id WHEN CAST(106 AS INT) THEN NULL WHEN CAST(107 AS INT) THEN NULL WHEN CAST(108 AS INT) THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN i_category_id WHEN CAST(105 AS INT) THEN NULL WHEN CAST(106 AS INT) THEN NULL WHEN CAST(107 AS INT) THEN NULL WHEN CAST(108 AS INT) THEN NULL END, CASE valid_tid(104,105,106,107,108) WHEN CAST(104 AS INT) THEN CAST(104 AS INT) WHEN CAST(105 AS INT) THEN CAST(105 AS INT) WHEN CAST(106 AS INT) THEN CAST(106 AS INT) WHEN CAST(107 AS INT) THEN CAST(107 AS INT) WHEN CAST(108 AS INT) THEN CAST(108 AS INT) END
-|  mem-estimate=36.47MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=34.32MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=109 row-size=52B cardinality=562.30K
 |  in pipelines: 128(GETNEXT), 127(OPEN)
 |
@@ -138,7 +138,7 @@ PLAN-ROOT SINK
 |  Class 4
 |    output: sum(sales), sum(number_sales)
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=165.24MB mem-reservation=76.62MB thread-reservation=0
+|  mem-estimate=163.12MB mem-reservation=76.62MB thread-reservation=0
 |  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=562.30K
 |  in pipelines: 127(GETNEXT), 30(OPEN), 72(OPEN), 114(OPEN)
 |
@@ -262,7 +262,7 @@ PLAN-ROOT SINK
 |  114:AGGREGATE [FINALIZE]
 |  |  output: sum(CAST(ws_quantity AS DECIMAL(10,0)) * ws_list_price), count(*)
 |  |  group by: i_brand_id, i_class_id, i_category_id
-|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |  tuple-ids=88 row-size=36B cardinality=42.85K
 |  |  in pipelines: 114(GETNEXT), 85(OPEN)
 |  |
@@ -644,7 +644,7 @@ PLAN-ROOT SINK
 |  72:AGGREGATE [FINALIZE]
 |  |  output: sum(CAST(cs_quantity AS DECIMAL(10,0)) * cs_list_price), count(*)
 |  |  group by: i_brand_id, i_class_id, i_category_id
-|  |  mem-estimate=10.00MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
 |  |  tuple-ids=54 row-size=36B cardinality=85.31K
 |  |  in pipelines: 72(GETNEXT), 43(OPEN)
 |  |
@@ -1295,7 +1295,7 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=20B cardinality=2.88M
    in pipelines: 01(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=430.00MB Threads=120
+Max Per-Host Resource Reservation: Memory=427.00MB Threads=120
 Per-Host Resource Estimates: Memory=3.56GB
 F80:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.02MB mem-reservation=4.00MB thread-reservation=1
@@ -1311,7 +1311,7 @@ PLAN-ROOT SINK
 |  in pipelines: 129(GETNEXT)
 |
 F79:PLAN FRAGMENT [HASH(CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(channel) WHEN 105 THEN murmur_hash(channel) WHEN 106 THEN murmur_hash(channel) WHEN 107 THEN murmur_hash(channel) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_brand_id) WHEN 105 THEN murmur_hash(i_brand_id) WHEN 106 THEN murmur_hash(i_brand_id) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_class_id) WHEN 105 THEN murmur_hash(i_class_id) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END,CASE valid_tid(104,105,106,107,108) WHEN 104 THEN murmur_hash(i_category_id) WHEN 105 THEN murmur_hash(NULL) WHEN 106 THEN murmur_hash(NULL) WHEN 107 THEN murmur_hash(NULL) WHEN 108 THEN murmur_hash(NULL) END)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=138.52MB mem-reservation=93.62MB thread-reservation=1
+Per-Host Resources: mem-estimate=137.09MB mem-reservation=93.62MB thread-reservation=1
 129:TOP-N [LIMIT=100]
 |  order by: CASE valid_tid(104,105,106,107,108) WHEN 104 THEN channel WHEN 105 THEN channel WHEN 106 THEN channel WHEN 107 THEN channel WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_brand_id WHEN 105 THEN i_brand_id WHEN 106 THEN i_brand_id WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_class_id WHEN 105 THEN i_class_id WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC, CASE valid_tid(104,105,106,107,108) WHEN 104 THEN i_category_id WHEN 105 THEN NULL WHEN 106 THEN NULL WHEN 107 THEN NULL WHEN 108 THEN NULL END ASC
 |  mem-estimate=4.69KB mem-reservation=0B thread-reservation=0
@@ -1341,7 +1341,7 @@ Per-Host Resources: mem-estimate=138.52MB mem-reservation=93.62MB thread-reserva
 |  Class 4
 |    output: sum:merge(sales), sum:merge(number_sales)
 |    group by: NULL, NULL, NULL, NULL
-|  mem-estimate=121.52MB mem-reservation=76.62MB thread-reservation=0
+|  mem-estimate=120.09MB mem-reservation=76.62MB thread-reservation=0
 |  tuple-ids=104N,105N,106N,107N,108N row-size=240B cardinality=562.30K
 |  in pipelines: 215(GETNEXT), 151(OPEN), 179(OPEN), 207(OPEN)
 |
@@ -2116,11 +2116,11 @@ Per-Host Resources: mem-estimate=109.84MB mem-reservation=81.75MB thread-reserva
 |  |  in pipelines: 43(GETNEXT)
 |  |
 |  F26:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=209.37MB mem-reservation=13.81MB thread-reservation=2 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=209.37MB mem-reservation=12.81MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  72:AGGREGATE [STREAMING]
 |  |  output: sum(CAST(cs_quantity AS DECIMAL(10,0)) * cs_list_price), count(*)
 |  |  group by: i_brand_id, i_class_id, i_category_id
-|  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=54 row-size=36B cardinality=85.31K
 |  |  in pipelines: 43(GETNEXT)
 |  |
@@ -2689,11 +2689,11 @@ Per-Host Resources: mem-estimate=109.84MB mem-reservation=81.75MB thread-reserva
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=67.37MB mem-reservation=14.81MB thread-reservation=2 runtime-filters-memory=3.00MB
+Per-Host Resources: mem-estimate=67.37MB mem-reservation=12.81MB thread-reservation=2 runtime-filters-memory=3.00MB
 30:AGGREGATE [STREAMING]
 |  output: sum(CAST(ss_quantity AS DECIMAL(10,0)) * ss_list_price), count(*)
 |  group by: i_brand_id, i_class_id, i_category_id
-|  mem-estimate=10.00MB mem-reservation=5.00MB spill-buffer=256.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
 |  tuple-ids=20 row-size=36B cardinality=148.80K
 |  in pipelines: 01(GETNEXT)
 |
@@ -3098,7 +3098,7 @@ Per-Host Resources: mem-estimate=67.37MB mem-reservation=14.81MB thread-reservat
    tuple-ids=0 row-size=20B cardinality=2.88M
    in pipelines: 01(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=665.12MB Threads=141
+Max Per-Host Resource Reservation: Memory=662.12MB Threads=141
 Per-Host Resource Estimates: Memory=2.26GB
 F80:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.03MB mem-reservation=4.00MB thread-reservation=1
@@ -4079,11 +4079,11 @@ Per-Instance Resources: mem-estimate=75.94MB mem-reservation=45.88MB thread-rese
 |  |
 |  F26:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
 |  Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-reservation=0 runtime-filters-memory=1.00MB
-|  Per-Instance Resources: mem-estimate=58.00MB mem-reservation=7.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=58.00MB mem-reservation=6.00MB thread-reservation=1
 |  72:AGGREGATE [STREAMING]
 |  |  output: sum(CAST(cs_quantity AS DECIMAL(10,0)) * cs_list_price), count(*)
 |  |  group by: i_brand_id, i_class_id, i_category_id
-|  |  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=54 row-size=36B cardinality=85.31K
 |  |  in pipelines: 43(GETNEXT)
 |  |
@@ -4780,11 +4780,11 @@ Per-Instance Resources: mem-estimate=75.94MB mem-reservation=45.88MB thread-rese
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
 Per-Host Shared Resources: mem-estimate=3.00MB mem-reservation=3.00MB thread-reservation=0 runtime-filters-memory=3.00MB
-Per-Instance Resources: mem-estimate=26.00MB mem-reservation=4.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=26.00MB mem-reservation=3.00MB thread-reservation=1
 30:AGGREGATE [STREAMING]
 |  output: sum(CAST(ss_quantity AS DECIMAL(10,0)) * ss_list_price), count(*)
 |  group by: i_brand_id, i_class_id, i_category_id
-|  mem-estimate=10.00MB mem-reservation=3.00MB spill-buffer=128.00KB thread-reservation=0
+|  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=20 row-size=36B cardinality=148.80K
 |  in pipelines: 01(GETNEXT)
 |

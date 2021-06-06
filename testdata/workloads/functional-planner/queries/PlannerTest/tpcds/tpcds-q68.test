@@ -48,10 +48,10 @@ order by
   ss_ticket_number
 limit 100
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=78.81MB Threads=8
-Per-Host Resource Estimates: Memory=406MB
+Max Per-Host Resource Reservation: Memory=70.31MB Threads=8
+Per-Host Resource Estimates: Memory=398MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=406.31MB mem-reservation=78.81MB thread-reservation=8 runtime-filters-memory=6.00MB
+|  Per-Host Resources: mem-estimate=397.81MB mem-reservation=70.31MB thread-reservation=8 runtime-filters-memory=6.00MB
 PLAN-ROOT SINK
 |  output exprs: c_last_name, c_first_name, ca_city, bought_city, ss_ticket_number, extended_price, extended_tax, list_price
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -85,7 +85,7 @@ PLAN-ROOT SINK
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  runtime filters: RF002[bloom] <- c_customer_sk, RF003[min_max] <- c_customer_sk
-|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=5,7 row-size=129B cardinality=702.92K
 |  in pipelines: 09(GETNEXT), 10(OPEN)
 |
@@ -103,7 +103,7 @@ PLAN-ROOT SINK
 09:AGGREGATE [FINALIZE]
 |  output: sum(ss_ext_sales_price), sum(ss_ext_list_price), sum(ss_ext_tax)
 |  group by: ss_ticket_number, ss_customer_sk, ss_addr_sk, ca_city
-|  mem-estimate=67.67MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=64.99MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=5 row-size=85B cardinality=702.92K
 |  in pipelines: 09(GETNEXT), 00(OPEN)
 |
@@ -198,8 +198,8 @@ PLAN-ROOT SINK
    tuple-ids=0 row-size=40B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
-Max Per-Host Resource Reservation: Memory=120.39MB Threads=16
-Per-Host Resource Estimates: Memory=498MB
+Max Per-Host Resource Reservation: Memory=111.89MB Threads=16
+Per-Host Resource Estimates: Memory=489MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.04MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -214,7 +214,7 @@ PLAN-ROOT SINK
 |  in pipelines: 14(GETNEXT)
 |
 F05:PLAN FRAGMENT [HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,ca_city)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=73.47MB mem-reservation=57.75MB thread-reservation=1 runtime-filters-memory=2.00MB
+Per-Host Resources: mem-estimate=64.97MB mem-reservation=49.25MB thread-reservation=1 runtime-filters-memory=2.00MB
 14:TOP-N [LIMIT=100]
 |  order by: c_last_name ASC, ss_ticket_number ASC
 |  mem-estimate=13.07KB mem-reservation=0B thread-reservation=0
@@ -251,7 +251,7 @@ Per-Host Resources: mem-estimate=73.47MB mem-reservation=57.75MB thread-reservat
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  runtime filters: RF002[bloom] <- c_customer_sk, RF003[min_max] <- c_customer_sk
-|  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=1.00MB thread-reservation=0
+|  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=5,7 row-size=129B cardinality=702.92K
 |  in pipelines: 20(GETNEXT), 10(OPEN)
 |
@@ -413,8 +413,8 @@ Per-Host Resources: mem-estimate=179.04MB mem-reservation=53.56MB thread-reserva
    tuple-ids=0 row-size=40B cardinality=2.88M
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
-Max Per-Host Resource Reservation: Memory=160.70MB Threads=17
-Per-Host Resource Estimates: Memory=305MB
+Max Per-Host Resource Reservation: Memory=143.70MB Threads=17
+Per-Host Resource Estimates: Memory=288MB
 F08:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=4.08MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -474,17 +474,17 @@ Per-Instance Resources: mem-estimate=27.52MB mem-reservation=17.00MB thread-rese
 |  hash-table-id=01
 |  hash predicates: ss_customer_sk = c_customer_sk
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
-|  mem-estimate=0B mem-reservation=0B spill-buffer=1.00MB thread-reservation=0
+|  mem-estimate=0B mem-reservation=0B spill-buffer=512.00KB thread-reservation=0
 |  tuple-ids=5,7 row-size=129B cardinality=702.92K
 |  in pipelines: 20(GETNEXT), 10(OPEN)
 |
 |--F10:PLAN FRAGMENT [HASH(ss_ticket_number,ss_customer_sk,ss_addr_sk,ca_city)] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=39.24MB mem-reservation=35.00MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=22.24MB mem-reservation=18.00MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: c_customer_sk
 |  |  runtime filters: RF002[bloom] <- c_customer_sk, RF003[min_max] <- c_customer_sk
-|  |  mem-estimate=34.00MB mem-reservation=34.00MB spill-buffer=1.00MB thread-reservation=0
+|  |  mem-estimate=17.00MB mem-reservation=17.00MB spill-buffer=512.00KB thread-reservation=0
 |  |
 |  21:EXCHANGE [BROADCAST]
 |  |  mem-estimate=4.24MB mem-reservation=0B thread-reservation=0

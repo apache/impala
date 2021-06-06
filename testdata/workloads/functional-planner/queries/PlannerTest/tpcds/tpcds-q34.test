@@ -43,10 +43,10 @@ order by
   c_preferred_cust_flag desc
 limit 100000
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=15.69MB Threads=6
+Max Per-Host Resource Reservation: Memory=14.75MB Threads=6
 Per-Host Resource Estimates: Memory=298MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=297.81MB mem-reservation=15.69MB thread-reservation=6 runtime-filters-memory=4.00MB
+|  Per-Host Resources: mem-estimate=297.81MB mem-reservation=14.75MB thread-reservation=6 runtime-filters-memory=4.00MB
 PLAN-ROOT SINK
 |  output exprs: c_last_name, c_first_name, c_salutation, c_preferred_cust_flag, ss_ticket_number, cnt
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -69,7 +69,7 @@ PLAN-ROOT SINK
 |  |  output: count(*)
 |  |  group by: ss_ticket_number, ss_customer_sk
 |  |  having: count(*) <= CAST(20 AS BIGINT), count(*) >= CAST(15 AS BIGINT)
-|  |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
+|  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  tuple-ids=4 row-size=20B cardinality=3.15K
 |  |  in pipelines: 07(GETNEXT), 00(OPEN)
 |  |

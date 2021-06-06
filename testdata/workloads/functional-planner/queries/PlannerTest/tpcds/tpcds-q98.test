@@ -31,9 +31,9 @@ order by
 limit 1000
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=52.00MB Threads=4
-Per-Host Resource Estimates: Memory=346MB
+Per-Host Resource Estimates: Memory=342MB
 F00:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=345.70MB mem-reservation=52.00MB thread-reservation=4 runtime-filters-memory=2.00MB
+|  Per-Host Resources: mem-estimate=342.41MB mem-reservation=52.00MB thread-reservation=4 runtime-filters-memory=2.00MB
 PLAN-ROOT SINK
 |  output exprs: i_item_desc, i_category, i_class, i_current_price, sum(ss_ext_sales_price), sum(ss_ext_sales_price) * CAST(100 AS DECIMAL(3,0)) / sum(sum(ss_ext_sales_price))
 |  mem-estimate=4.00MB mem-reservation=4.00MB spill-buffer=2.00MB thread-reservation=0
@@ -60,7 +60,7 @@ PLAN-ROOT SINK
 05:AGGREGATE [FINALIZE]
 |  output: sum(ss_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
-|  mem-estimate=176.44MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=173.15MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=198B cardinality=864.12K
 |  in pipelines: 05(GETNEXT), 00(OPEN)
 |
@@ -118,7 +118,7 @@ PLAN-ROOT SINK
    in pipelines: 00(GETNEXT)
 ---- DISTRIBUTEDPLAN
 Max Per-Host Resource Reservation: Memory=98.81MB Threads=8
-Per-Host Resource Estimates: Memory=334MB
+Per-Host Resource Estimates: Memory=332MB
 F04:PLAN FRAGMENT [UNPARTITIONED] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=4.69MB mem-reservation=4.00MB thread-reservation=1
 PLAN-ROOT SINK
@@ -133,7 +133,7 @@ PLAN-ROOT SINK
 |  in pipelines: 08(GETNEXT)
 |
 F03:PLAN FRAGMENT [HASH(i_class)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=117.23MB mem-reservation=50.00MB thread-reservation=1
+Per-Host Resources: mem-estimate=116.13MB mem-reservation=50.00MB thread-reservation=1
 08:TOP-N [LIMIT=1000]
 |  order by: i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, sum(ss_ext_sales_price) * 100 / sum(sum(ss_ext_sales_price)) ASC
 |  mem-estimate=209.09KB mem-reservation=0B thread-reservation=0
@@ -156,7 +156,7 @@ Per-Host Resources: mem-estimate=117.23MB mem-reservation=50.00MB thread-reserva
 12:AGGREGATE [FINALIZE]
 |  output: sum:merge(ss_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
-|  mem-estimate=58.81MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=57.72MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=198B cardinality=864.12K
 |  in pipelines: 12(GETNEXT), 00(OPEN)
 |
@@ -166,11 +166,11 @@ Per-Host Resources: mem-estimate=117.23MB mem-reservation=50.00MB thread-reserva
 |  in pipelines: 00(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=84.30MB mem-reservation=41.81MB thread-reservation=2 runtime-filters-memory=2.00MB
+Per-Host Resources: mem-estimate=83.48MB mem-reservation=41.81MB thread-reservation=2 runtime-filters-memory=2.00MB
 05:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: i_item_id, i_item_desc, i_category, i_class, i_current_price
-|  mem-estimate=44.11MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
+|  mem-estimate=43.29MB mem-reservation=34.00MB spill-buffer=2.00MB thread-reservation=0
 |  tuple-ids=3 row-size=198B cardinality=864.12K
 |  in pipelines: 00(GETNEXT)
 |

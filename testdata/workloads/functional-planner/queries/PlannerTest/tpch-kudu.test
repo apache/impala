@@ -250,8 +250,8 @@ order by
   o_orderdate
 limit 10
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=24.75MB Threads=4
-Per-Host Resource Estimates: Memory=36MB
+Max Per-Host Resource Reservation: Memory=23.81MB Threads=4
+Per-Host Resource Estimates: Memory=35MB
 PLAN-ROOT SINK
 |
 06:TOP-N [LIMIT=10]
@@ -310,8 +310,8 @@ group by
 order by
   o_orderpriority
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=19.94MB Threads=3
-Per-Host Resource Estimates: Memory=32MB
+Max Per-Host Resource Reservation: Memory=17.00MB Threads=3
+Per-Host Resource Estimates: Memory=24MB
 PLAN-ROOT SINK
 |
 04:SORT
@@ -490,7 +490,7 @@ order by
   l_year
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=55.25MB Threads=7
-Per-Host Resource Estimates: Memory=126MB
+Per-Host Resource Estimates: Memory=110MB
 PLAN-ROOT SINK
 |
 12:SORT
@@ -706,7 +706,7 @@ order by
   o_year desc
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=85.50MB Threads=7
-Per-Host Resource Estimates: Memory=200MB
+Per-Host Resource Estimates: Memory=176MB
 PLAN-ROOT SINK
 |
 12:SORT
@@ -800,8 +800,8 @@ order by
   revenue desc
 limit 20
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=72.94MB Threads=5
-Per-Host Resource Estimates: Memory=94MB
+Max Per-Host Resource Reservation: Memory=55.94MB Threads=5
+Per-Host Resource Estimates: Memory=77MB
 PLAN-ROOT SINK
 |
 08:TOP-N [LIMIT=20]
@@ -975,7 +975,7 @@ order by
   l_shipmode
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=36.94MB Threads=3
-Per-Host Resource Estimates: Memory=55MB
+Per-Host Resource Estimates: Memory=53MB
 PLAN-ROOT SINK
 |
 04:SORT
@@ -1069,8 +1069,8 @@ where
   and l_shipdate >= '1995-09-01'
   and l_shipdate < '1995-10-01'
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=35.00MB Threads=3
-Per-Host Resource Estimates: Memory=42MB
+Max Per-Host Resource Reservation: Memory=18.00MB Threads=3
+Per-Host Resource Estimates: Memory=26MB
 PLAN-ROOT SINK
 |
 03:AGGREGATE [FINALIZE]
@@ -1328,7 +1328,7 @@ order by
 limit 100
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=96.50MB Threads=5
-Per-Host Resource Estimates: Memory=236MB
+Per-Host Resource Estimates: Memory=214MB
 PLAN-ROOT SINK
 |
 09:TOP-N [LIMIT=100]
@@ -1576,8 +1576,8 @@ order by
   s_name
 limit 100
 ---- PLAN
-Max Per-Host Resource Reservation: Memory=44.75MB Threads=7
-Per-Host Resource Estimates: Memory=64MB
+Max Per-Host Resource Reservation: Memory=27.75MB Threads=7
+Per-Host Resource Estimates: Memory=47MB
 PLAN-ROOT SINK
 |
 12:TOP-N [LIMIT=100]
@@ -1677,7 +1677,7 @@ order by
   cntrycode
 ---- PLAN
 Max Per-Host Resource Reservation: Memory=16.00MB Threads=4
-Per-Host Resource Estimates: Memory=26MB
+Per-Host Resource Estimates: Memory=22MB
 PLAN-ROOT SINK
 |
 08:SORT

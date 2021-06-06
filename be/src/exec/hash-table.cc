@@ -475,14 +475,20 @@ HashTable::HashTable(bool quadratic_probing, Suballocator* allocator,
 
 Status HashTable::Init(bool* got_memory) {
   int64_t buckets_byte_size = num_buckets_ * sizeof(Bucket);
+  int64_t hash_byte_size = num_buckets_ * sizeof(uint32_t);
   RETURN_IF_ERROR(allocator_->Allocate(buckets_byte_size, &bucket_allocation_));
-  if (bucket_allocation_ == nullptr) {
+  RETURN_IF_ERROR(allocator_->Allocate(hash_byte_size, &hash_allocation_));
+  if (bucket_allocation_ == nullptr || hash_allocation_ == nullptr) {
     num_buckets_ = 0;
     *got_memory = false;
+    if (bucket_allocation_ != nullptr) allocator_->Free(move(bucket_allocation_));
+    if (hash_allocation_ != nullptr) allocator_->Free(move(hash_allocation_));
     return Status::OK();
   }
   buckets_ = reinterpret_cast<Bucket*>(bucket_allocation_->data());
   memset(buckets_, 0, buckets_byte_size);
+  hash_array_ = reinterpret_cast<uint32_t*>(hash_allocation_->data());
+  memset(hash_array_, 0, hash_byte_size);
   *got_memory = true;
   return Status::OK();
 }
@@ -513,6 +519,19 @@ void HashTable::Close() {
   for (auto& data_page : data_pages_) allocator_->Free(move(data_page));
   data_pages_.clear();
   if (bucket_allocation_ != nullptr) allocator_->Free(move(bucket_allocation_));
+  if (hash_allocation_ != nullptr) allocator_->Free(move(hash_allocation_));
+  ResetState();
+}
+
+void HashTable::ResetState() {
+  num_filled_buckets_ = 0;
+  num_buckets_with_duplicates_ = 0;
+  has_matches_ = false;
+  num_resizes_ = 0;
+  total_data_page_size_ = 0;
+  next_node_ = nullptr;
+  node_remaining_current_page_ = 0;
+  num_duplicate_nodes_ = 0;
 }
 
 void HashTable::StatsCountersAdd(HashTableStatsProfile* profile) {
@@ -553,15 +572,26 @@ Status HashTable::ResizeBuckets(
   // of the old hash table.
   // int64_t old_size = num_buckets_ * sizeof(Bucket);
   int64_t new_size = num_buckets * sizeof(Bucket);
-
+  int64_t new_hash_size = num_buckets * sizeof(uint32_t);
   unique_ptr<Suballocation> new_allocation;
+  unique_ptr<Suballocation> new_hash_allocation;
   RETURN_IF_ERROR(allocator_->Allocate(new_size, &new_allocation));
-  if (new_allocation == NULL) {
+  Status hash_allocation_status =
+      allocator_->Allocate(new_hash_size, &new_hash_allocation);
+  if (!hash_allocation_status.ok()) {
+    if (new_allocation != NULL) allocator_->Free(move(new_allocation));
+    return hash_allocation_status;
+  }
+  if (new_allocation == NULL || new_hash_allocation == NULL) {
+    if (new_allocation != NULL) allocator_->Free(move(new_allocation));
+    if (new_hash_allocation != NULL) allocator_->Free(move(new_hash_allocation));
     *got_memory = false;
     return Status::OK();
   }
   Bucket* new_buckets = reinterpret_cast<Bucket*>(new_allocation->data());
   memset(new_buckets, 0, new_size);
+  uint32_t* new_hash_array = reinterpret_cast<uint32_t*>(new_hash_allocation->data());
+  memset(new_hash_array, 0, new_hash_size);
 
   // Walk the old table and copy all the filled buckets to the new (resized) table.
   // We do not have to do anything with the duplicate nodes. This operation is expected
@@ -569,20 +599,26 @@ Status HashTable::ResizeBuckets(
   for (HashTable::Iterator iter = Begin(ht_ctx); !iter.AtEnd();
        NextFilledBucket(&iter.bucket_idx_, &iter.node_)) {
     Bucket* bucket_to_copy = &buckets_[iter.bucket_idx_];
+    uint32_t hash = hash_array_[iter.bucket_idx_];
     bool found = false;
-    int64_t bucket_idx = Probe<true, false>(
-        new_buckets, num_buckets, ht_ctx, bucket_to_copy->hash, &found);
+    BucketData bd;
+    int64_t bucket_idx = Probe<true, false, HashTable::BucketType::MATCH_UNSET>(
+        new_buckets, new_hash_array, num_buckets, ht_ctx, hash, &found, &bd);
     DCHECK(!found);
     DCHECK_NE(bucket_idx, Iterator::BUCKET_NOT_FOUND) << " Probe failed even though "
         " there are free buckets. " << num_buckets << " " << num_filled_buckets_;
     Bucket* dst_bucket = &new_buckets[bucket_idx];
+    new_hash_array[bucket_idx] = hash;
     *dst_bucket = *bucket_to_copy;
   }
 
   num_buckets_ = num_buckets;
   allocator_->Free(move(bucket_allocation_));
+  allocator_->Free(move(hash_allocation_));
   bucket_allocation_ = move(new_allocation);
-  buckets_ = reinterpret_cast<Bucket*>(bucket_allocation_->data());
+  hash_allocation_ = move(new_hash_allocation);
+  buckets_ = new_buckets;
+  hash_array_ = new_hash_array;
   *got_memory = true;
   return Status::OK();
 }
@@ -616,29 +652,30 @@ string HashTable::DebugString(bool skip_empty, bool show_match,
   stringstream ss;
   ss << endl;
   for (int i = 0; i < num_buckets_; ++i) {
-    if (skip_empty && !buckets_[i].filled) continue;
+    if (skip_empty && !buckets_[i].IsFilled()) continue;
     ss << i << ": ";
     if (show_match) {
-      if (buckets_[i].matched) {
+      if (buckets_[i].IsMatched()) {
         ss << " [M]";
       } else {
         ss << " [U]";
       }
     }
-    if (buckets_[i].hasDuplicates) {
-      DuplicateNode* node = buckets_[i].bucketData.duplicates;
+    if (buckets_[i].HasDuplicates()) {
+      DuplicateNode* node = buckets_[i].GetDuplicate();
       bool first = true;
       ss << " [D] ";
       while (node != NULL) {
         if (!first) ss << ",";
         DebugStringTuple(ss, node->htdata, desc);
-        node = node->next;
+        node = node->Next();
         first = false;
       }
     } else {
       ss << " [B] ";
-      if (buckets_[i].filled) {
-        DebugStringTuple(ss, buckets_[i].bucketData.htdata, desc);
+      if (buckets_[i].IsFilled()) {
+        HtData htdata = buckets_[i].GetBucketData().htdata;
+        DebugStringTuple(ss, htdata, desc);
       } else {
         ss << " - ";
       }

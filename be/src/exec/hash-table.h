@@ -35,6 +35,7 @@
 #include "util/bitmap.h"
 #include "util/hash-util.h"
 #include "util/runtime-profile.h"
+#include "util/tagged-ptr.h"
 
 namespace llvm {
   class Function;
@@ -271,7 +272,8 @@ class HashTableCtx {
   /// followed by a read pass. We refrain from providing an interface for random accesses
   /// as there isn't a use case for it now and we want to avoid expensive multiplication
   /// as the buffer size of each row is not necessarily power of two:
-  /// - Reset(), ResetForRead(): reset the iterators before writing / reading cached values.
+  /// - Reset(), ResetForRead(): reset the iterators before writing / reading cached
+  /// values.
   /// - NextRow(): moves the iterators to point to the next row of cached values.
   /// - AtEnd(): returns true if all cached rows have been read. Valid in read mode only.
   ///
@@ -327,8 +329,8 @@ class HashTableCtx {
       return cur_expr_values_hash_ == cur_expr_values_hash_end_;
     }
 
-    /// Returns true if the current row is null but nulls are not considered in the current
-    /// phase (build or probe).
+    /// Returns true if the current row is null but nulls are not considered in the
+    /// current phase (build or probe).
     bool ALWAYS_INLINE IsRowNull() const { return null_bitmap_.Get(CurIdx()); }
 
     /// Record in a bitmap that the current row is null but nulls are not considered in
@@ -593,7 +595,7 @@ class HashTableCtx {
 
   /// Total distance traveled for each probe. That is the sum of the diff between the end
   /// position of a probe (find/insert) and its start position
-  /// (hash & (num_buckets_ - 1)).
+  /// '(hash & (num_buckets_ - 1))'.
   int64_t travel_length_ = 0;
 
   /// The number of cases where we had to compare buckets with the same hash value, but
@@ -645,54 +647,148 @@ class HashTable {
     Tuple* tuple;
   };
 
+  struct DuplicateNode; // Forward Declaration
+  class TaggedDuplicateNode : public TaggedPtr<DuplicateNode, false> {
+   public:
+    ALWAYS_INLINE bool IsMatched() { return IsTagBitSet<0>(); }
+    ALWAYS_INLINE void SetMatched() { SetTagBit<0>(); }
+    ALWAYS_INLINE void SetNode(DuplicateNode* node) { SetPtr(node); }
+    // Set Node and UnsetMatched
+    ALWAYS_INLINE void SetNodeUnMatched(DuplicateNode* node) {
+      SetData(reinterpret_cast<uintptr_t>(node));
+      DCHECK(!IsMatched());
+    }
+  };
   /// struct DuplicateNode is referenced by SIZE_OF_DUPLICATENODE of
   /// planner/PlannerContext.java. If struct DuplicateNode is modified, please modify
   /// SIZE_OF_DUPLICATENODE synchronously.
   /// Linked list of entries used for duplicates.
   struct DuplicateNode {
-    /// Used for full outer and right {outer, anti, semi} joins. Indicates whether the
-    /// row in the DuplicateNode has been matched.
-    /// From an abstraction point of view, this is an awkward place to store this
-    /// information.
-    /// TODO: Fold this flag in the next pointer below.
-    bool matched;
-
-    /// Chain to next duplicate node, NULL when end of list.
-    DuplicateNode* next;
     HtData htdata;
+    ALWAYS_INLINE DuplicateNode* Next() { return tdn.GetPtr(); }
+    ALWAYS_INLINE void SetNext(DuplicateNode* node) { tdn.SetNode(node); }
+    ALWAYS_INLINE bool IsMatched() { return tdn.IsMatched(); }
+    ALWAYS_INLINE void SetMatched() { tdn.SetMatched(); }
+    ALWAYS_INLINE void SetNextUnMatched(DuplicateNode* node) {
+      tdn.SetNodeUnMatched(node);
+    }
+
+   private:
+    /// Chain to next duplicate node, NULL when end of list.
+    /// 'bool matched' is folded into this next pointer. Tag bit 0 represents it.
+    TaggedDuplicateNode tdn;
+  };
+
+  union BucketData {
+    HtData htdata;
+    DuplicateNode* duplicates;
+  };
+
+  /// 'TaggedPtr' for 'BucketData'.
+  /// This doesn't own BucketData* so Allocation and Deallocation is not its
+  /// responsibility.
+  /// Following fields are also folded in the TagggedPtr below:
+  /// 1. bool matched: (Tag bit 0) Used for full outer and right {outer, anti, semi}
+  ///    joins. Indicates whether the row in the bucket has been matched.
+  ///    From an abstraction point of view, this is an awkward place to store this
+  ///    information but it is efficient. This space is otherwise unused.
+  /// 2. bool hasDuplicates: (Tag bit 1) Used in case of duplicates. If true, then
+  ///    the bucketData union should be used as 'duplicates'.
+  ///
+  /// 'TAGGED': Methods to fetch or set data might have template parameter TAGGED.
+  /// It can be set to 'false' only when tag fields above are not set. This avoids
+  /// extra bit operations.
+  class TaggedBucketData : public TaggedPtr<uint8, false> {
+   public:
+    TaggedBucketData() = default;
+    ALWAYS_INLINE bool IsFilled() { return GetData() != 0; }
+    ALWAYS_INLINE bool IsMatched() { return IsTagBitSet<0>(); }
+    ALWAYS_INLINE bool HasDuplicates() { return IsTagBitSet<1>(); }
+    ALWAYS_INLINE void SetMatched() { SetTagBit<0>(); }
+    ALWAYS_INLINE void SetHasDuplicates() { SetTagBit<1>(); }
+    /// Set 'data' as BucketData. 'TAGGED' is described in class description.
+    template <class T, const bool TAGGED>
+    ALWAYS_INLINE void SetBucketData(T* data) {
+      (TAGGED) ? SetPtr(reinterpret_cast<uint8*>(data)) :
+                 SetData(reinterpret_cast<uintptr_t>(data));
+    }
+    /// Get tuple pointer stored. 'TAGGED' is described in class description.
+    template <bool TAGGED>
+    ALWAYS_INLINE Tuple* GetTuple() {
+      return (TAGGED) ? reinterpret_cast<Tuple*>(GetPtr()) :
+                        reinterpret_cast<Tuple*>(GetData());
+    }
+    ALWAYS_INLINE DuplicateNode* GetDuplicate() {
+      return reinterpret_cast<DuplicateNode*>(GetPtr());
+    }
+    ALWAYS_INLINE void PrepareBucketForInsert() { SetData(0); }
+    TaggedBucketData& operator=(const TaggedBucketData& bd) = default;
   };
 
   /// struct Bucket is referenced by SIZE_OF_BUCKET of planner/PlannerContext.java.
   /// If struct Bucket is modified, please modify SIZE_OF_BUCKET synchronously.
+  /// TaggedPtr is used to store BucketData. 2 booleans are folded into
+  /// TaggedPtr. Check comments for TaggedBucketData for details on booleans
+  /// stored.
   struct Bucket {
+    /// Return the BucketData.
+    /// 'TAGGED' is described in the comments for 'TaggedBucketData'.
+    template <bool TAGGED = true>
+    ALWAYS_INLINE BucketData GetBucketData() {
+      BucketData bucket_data;
+      bucket_data.htdata.tuple = bd.GetTuple<TAGGED>();
+      return bucket_data;
+    }
+    /// Get Tuple pointer stored in bucket.
+    /// 'TAGGED' is described in the comments for 'TaggedBucketData'.
+    template <bool TAGGED = true>
+    ALWAYS_INLINE Tuple* GetTuple() {
+      return bd.GetTuple<TAGGED>();
+    }
+    /// Get Duplicate Node
+    ALWAYS_INLINE DuplicateNode* GetDuplicate() { return bd.GetDuplicate(); }
     /// Whether this bucket contains a vaild entry, or it is empty.
-    bool filled;
+    ALWAYS_INLINE bool IsFilled() { return bd.IsFilled(); }
+    /// Indicates whether the row in the bucket has been matched.
+    /// For more details read the comment for TaggedBucketData.
+    ALWAYS_INLINE bool IsMatched() { return bd.IsMatched(); }
+    /// Indicates if bucket has duplicates instead of data for bucket.
+    ALWAYS_INLINE bool HasDuplicates() { return bd.HasDuplicates(); }
 
-    /// Used for full outer and right {outer, anti, semi} joins. Indicates whether the
-    /// row in the bucket has been matched.
-    /// From an abstraction point of view, this is an awkward place to store this
-    /// information but it is efficient. This space is otherwise unused.
-    bool matched;
+    /// Set/Unset methods corresponding to above.
+    ALWAYS_INLINE void SetMatched() { bd.SetMatched(); }
+    ALWAYS_INLINE void SetHasDuplicates() { bd.SetHasDuplicates(); }
+    /// Set DuplicateNode pointer as data.
+    /// 'TAGGED' is described in the comments for 'TaggedBucketData'.
+    template <bool TAGGED = true>
+    ALWAYS_INLINE void SetDuplicate(DuplicateNode* node) {
+      bd.SetBucketData<DuplicateNode, TAGGED>(node);
+    }
+    /// Set Tuple pointer as data.
+    /// 'TAGGED' is described in the comments for 'TaggedBucketData'.
+    template <bool TAGGED = true>
+    ALWAYS_INLINE void SetTuple(Tuple* tuple) {
+      bd.SetBucketData<Tuple, TAGGED>(tuple);
+    }
+    /// Set FlatRowPtr as data.
+    /// 'TAGGED' is described in the comments for 'TaggedBucketData'.
+    template <bool TAGGED = true>
+    ALWAYS_INLINE void SetFlatRow(BufferedTupleStream::FlatRowPtr flat_row) {
+      bd.SetBucketData<uint8_t, TAGGED>(flat_row);
+    }
+    ALWAYS_INLINE void PrepareBucketForInsert() { bd.PrepareBucketForInsert(); }
 
-    /// Used in case of duplicates. If true, then the bucketData union should be used as
-    /// 'duplicates'.
-    bool hasDuplicates;
-
-    /// Cache of the hash for data.
-    /// TODO: Do we even have to cache the hash value?
-    uint32_t hash;
-
-    /// Either the data for this bucket or the linked list of duplicates.
-    union {
-      HtData htdata;
-      DuplicateNode* duplicates;
-    } bucketData;
+   private:
+    // This should not be exposed outside as implementation details
+    // can change.
+    TaggedBucketData bd;
   };
 
-  static_assert(BitUtil::IsPowerOf2(sizeof(Bucket)),
-      "We assume that Hash-table bucket directories are a power-of-two sizes because "
-      "allocating only bucket directories with power-of-two byte sizes avoids internal "
-      "fragmentation in the simple buddy allocator.");
+  static_assert(BitUtil::IsPowerOf2(sizeof(Bucket) && sizeof(Bucket) == 8),
+      "We assume that Hash-table bucket directories are a power-of-two (8 bytes "
+      "currently) sizes because allocating only bucket directories with power-of-two "
+      "byte sizes avoids internal fragmentation in the simple buddy allocator. Assert "
+      "checks for fixed size to avoid accidental changes.");
 
  public:
   class Iterator;
@@ -766,13 +862,24 @@ class HashTable {
   /// Thread-safe for read-only hash tables.
   Iterator IR_ALWAYS_INLINE FindProbeRow(HashTableCtx* __restrict__ ht_ctx);
 
+  /// Enum for the type of Bucket
+  enum BucketType : bool {
+    MATCH_SET = true, // matched flag is not set for the bucket
+    MATCH_UNSET = false // matched flag is not set for the bucket
+  };
+
   /// If a match is found in the table, return an iterator as in FindProbeRow(). If a
   /// match was not present, return an iterator pointing to the empty bucket where the key
   /// should be inserted. Returns End() if the table is full. The caller can set the data
   /// in the bucket using a Set*() method on the iterator.
+  /// 'MATCH' is set true if Buckets of HashTable can have matched flag set.
   /// Thread-safe for read-only hash tables.
+  template <BucketType TYPE = MATCH_SET>
   Iterator IR_ALWAYS_INLINE FindBuildRowBucket(
       HashTableCtx* __restrict__ ht_ctx, bool* found);
+
+  /// Find slot for 'hash' from 0 to 'num_buckets'.
+  int64_t getBucketId(uint32_t hash, int64_t num_buckets);
 
   /// Returns number of elements inserted in the hash table
   /// Thread-safe for read-only hash tables.
@@ -807,7 +914,7 @@ class HashTable {
   }
 
   /// Return the size of a hash table bucket in bytes.
-  static int64_t BucketSize() { return sizeof(Bucket); }
+  static const int64_t BUCKET_SIZE = sizeof(Bucket);
 
   /// Returns the memory occupied by the hash table, takes into account the number of
   /// duplicates.
@@ -899,8 +1006,10 @@ class HashTable {
     /// Return the current row or tuple. Callers must check the iterator is not AtEnd()
     /// before calling them.  The returned row is owned by the iterator and valid until
     /// the next call to GetRow(). It is safe to advance the iterator.
+    /// 'MATCH' is true when current node has 'IsMatched()' flag true.
     /// Thread-safe for read-only hash tables.
     TupleRow* IR_ALWAYS_INLINE GetRow() const;
+    template <BucketType TYPE = MATCH_SET>
     Tuple* IR_ALWAYS_INLINE GetTuple() const;
 
     /// Set the current tuple for an empty bucket. Designed to be used with the iterator
@@ -988,19 +1097,24 @@ class HashTable {
   /// 'INCLUSIVE_EQUALITY' is true if NULLs and NaNs should always be
   /// considered equal when comparing two rows.
   ///
+  /// 'MATCH' is false if none of 'buckets' has matched (IsMatched) flag set. For
+  /// instance in the case of Grouping Aggregate it would be false.
+  ///
   /// 'hash' is the hash computed by EvalAndHashBuild() or EvalAndHashProbe().
   /// 'found' indicates that a bucket that contains an equal row is found.
   ///
   /// There are wrappers of this function that perform the Find and Insert logic.
-  template <bool INCLUSIVE_EQUALITY, bool COMPARE_ROW>
-  int64_t IR_ALWAYS_INLINE Probe(Bucket* buckets, int64_t num_buckets,
-      HashTableCtx* __restrict__ ht_ctx, uint32_t hash, bool* found);
+  template <bool INCLUSIVE_EQUALITY, bool COMPARE_ROW, BucketType TYPE = MATCH_SET>
+  int64_t IR_ALWAYS_INLINE Probe(Bucket* buckets, uint32_t* hash_array,
+      int64_t num_buckets, HashTableCtx* __restrict__ ht_ctx, uint32_t hash, bool* found,
+      BucketData* bd);
 
-  /// Performs the insert logic. Returns the HtData* of the bucket or duplicate node
-  /// where the data should be inserted. Returns NULL if the insert was not successful
-  /// and either sets 'status' to OK if it failed because not enough reservation was
-  /// available or the error if an error was encountered.
-  HtData* IR_ALWAYS_INLINE InsertInternal(
+  /// Performs the insert logic. Returns the Bucket* of the bucket where the data
+  /// should be inserted either in the bucket itself or in it's DuplicateNode.
+  /// Returns NULL if the insert was not successful and either sets 'status' to OK
+  /// if it failed because not enough reservation was available or the error if an
+  /// error was encountered.
+  Bucket* IR_ALWAYS_INLINE InsertInternal(
       HashTableCtx* __restrict__ ht_ctx, Status* status);
 
   /// Updates 'bucket_idx' to the index of the next non-empty bucket. If the bucket has
@@ -1027,7 +1141,8 @@ class HashTable {
   /// Returns NULL and sets 'status' to OK if the node array could not grow, i.e. there
   /// was not enough memory to allocate a new DuplicateNode. Returns NULL and sets
   /// 'status' to an error if another error was encountered.
-  DuplicateNode* IR_ALWAYS_INLINE InsertDuplicateNode(int64_t bucket_idx, Status* status);
+  DuplicateNode* IR_ALWAYS_INLINE InsertDuplicateNode(
+      int64_t bucket_idx, Status* status, BucketData* bucket_data);
 
   /// Resets the contents of the empty bucket with index 'bucket_idx', in preparation for
   /// an insert. Sets all the fields of the bucket other than 'data'.
@@ -1038,12 +1153,20 @@ class HashTable {
 
   /// Returns the TupleRow of the pointed 'bucket'. In case of duplicates, it
   /// returns the content of the first chained duplicate node of the bucket.
-  TupleRow* GetRow(Bucket* bucket, TupleRow* row) const;
+  /// It also fills 'bd' with the BucketData of 'bucket'.
+  /// 'MATCH' is set true if 'bucket' can have matched flag set i.e.,
+  /// 'IsMatched()' returns true.
+  /// They can either have duplicates or matched buckets.
+  template <BucketType TYPE = MATCH_SET>
+  TupleRow* GetRow(Bucket* bucket, TupleRow* row, BucketData* bd) const;
 
   /// Grow the node array. Returns true and sets 'status' to OK on success. Returns false
   /// and set 'status' to OK if we can't get sufficient reservation to allocate the next
   /// data page. Returns false and sets 'status' if another error is encountered.
   bool GrowNodeArray(Status* status);
+
+  /// Reset HashTable's internal state to Default State
+  void ResetState();
 
   /// Functions to be replaced by codegen to specialize the hash table.
   bool IR_NO_INLINE stores_tuples() const { return stores_tuples_; }
@@ -1104,6 +1227,14 @@ class HashTable {
   /// Pointer to the 'buckets_' array from 'bucket_allocation_'.
   Bucket* buckets_ = nullptr;
 
+  /// Allocation containing the cached hash value for every bucket.
+  std::unique_ptr<Suballocation> hash_allocation_;
+
+  /// Cache of the hash for data. It is an array of hash values where ith value
+  /// corresponds to hash value of ith bucket in 'buckets_' array.
+  /// This is not part of struct 'Bucket' to make sure 'sizeof(Bucket)' is power of 2.
+  uint32_t* hash_array_;
+
   /// Total number of buckets (filled and empty).
   int64_t num_buckets_;
 
@@ -1125,4 +1256,4 @@ class HashTable {
   int64_t num_resizes_ = 0;
 };
 
-}
+} // namespace impala

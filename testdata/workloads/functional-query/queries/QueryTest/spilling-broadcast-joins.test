@@ -70,7 +70,7 @@ row_regex: .*NumRepartitions: .* \([1-9][0-9]*\)
 ====
 ---- QUERY
 # Spilling broadcast join with empty probe-side partitions.
-set buffer_pool_limit=50m;
+set buffer_pool_limit=46m;
 select straight_join count(*)
 from
 lineitem a join /*+broadcast*/ lineitem b on a.l_orderkey = b.l_orderkey
