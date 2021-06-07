@@ -581,43 +581,49 @@ public class RangerAuditLogTest extends AuthorizationTestBase {
         assertNotEquals("Illegal policy id", -1, policyIds[i]);
       }
 
-      // Verify row filter audits. Note that columns used in the row filter won't create
+      // Verify row filter audits. Note that columns used in the row filter also creates
       // column access audits.
       authzOk(events -> {
-        assertEquals(3, events.size());
+        assertEquals(4, events.size());
         assertEquals("select bool_col from functional.alltypestiny",
             events.get(0).getRequestData());
         assertEventEquals("@table", "select", "functional/alltypestiny", 1,
             events.get(0));
         assertEventEquals("@column", "select", "functional/alltypestiny/bool_col", 1,
             events.get(1));
-        assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
+        assertEventEquals("@column", "select", "functional/alltypestiny/id", 1,
             events.get(2));
-        assertEquals(events.get(2).getPolicyId(), policyIds[0]);
+        assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
+            events.get(3));
+        assertEquals(events.get(3).getPolicyId(), policyIds[0]);
       }, "select bool_col from functional.alltypestiny",
           onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
 
       authzOk(events -> {
-        assertEquals(2, events.size());
+        assertEquals(3, events.size());
         assertEquals("select 1 from functional.alltypestiny",
             events.get(0).getRequestData());
         assertEventEquals("@table", "select", "functional/alltypestiny", 1,
             events.get(0));
-        assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
+        assertEventEquals("@column", "select", "functional/alltypestiny/id", 1,
             events.get(1));
-        assertEquals(events.get(1).getPolicyId(), policyIds[0]);
+        assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
+            events.get(2));
+        assertEquals(events.get(2).getPolicyId(), policyIds[0]);
       }, "select 1 from functional.alltypestiny",
           onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
 
       authzOk(events -> {
-        assertEquals(2, events.size());
+        assertEquals(3, events.size());
         assertEquals("select count(*) from functional.alltypestiny",
             events.get(0).getRequestData());
         assertEventEquals("@table", "select", "functional/alltypestiny", 1,
             events.get(0));
-        assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
+        assertEventEquals("@column", "select", "functional/alltypestiny/id", 1,
             events.get(1));
-        assertEquals(events.get(1).getPolicyId(), policyIds[0]);
+        assertEventEquals("@table", "row_filter", "functional/alltypestiny", 1,
+            events.get(2));
+        assertEquals(events.get(2).getPolicyId(), policyIds[0]);
       }, "select count(*) from functional.alltypestiny",
           onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT));
 

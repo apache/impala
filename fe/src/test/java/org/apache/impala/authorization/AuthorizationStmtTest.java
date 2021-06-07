@@ -3212,6 +3212,68 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
   }
 
   /**
+   * Validates access privileges are checked inside column-masking/row-filtering
+   * expressions (IMPALA-10728).
+   */
+  @Test
+  public void testPrivInMaskingExprs() throws Exception {
+    // Create a row-filter that contains a subquery on another table. Verify that accesses
+    // inside the subquery are also checked.
+    try {
+      createRowFilteringPolicy("alltypes_subquery_filter", "functional", "alltypes",
+          user_.getShortName(), "id in (select id from functional.alltypestiny)");
+      String[] queries = {
+          "select * from functional.alltypes",
+          "select id from functional.alltypes",
+          "select int_col from functional.alltypes"
+      };
+      for (String q : queries) {
+        authorize(q)
+            .ok(onTable("functional", "alltypes", TPrivilegeLevel.SELECT),
+                onTable("functional", "alltypestiny", TPrivilegeLevel.SELECT))
+            .ok(onTable("functional", "alltypes", TPrivilegeLevel.SELECT),
+                onColumn("functional", "alltypestiny", "id", TPrivilegeLevel.SELECT))
+            // Can't read the table if missing SELECT privilege on column "id" of table
+            // "functional.alltypestiny".
+            .error(selectError("functional.alltypestiny"),
+                onTable("functional", "alltypes", TPrivilegeLevel.SELECT))
+            .error(selectError("functional.alltypestiny"),
+                onTable("functional", "alltypes", TPrivilegeLevel.SELECT),
+                onColumn("functional", "alltypestiny", "int_col",
+                    TPrivilegeLevel.SELECT));
+      }
+    } finally {
+      deleteRangerPolicy("alltypes_subquery_filter");
+    }
+    // Create a column-masking policy that masks a column using another column. Verify
+    // that accesses on both columns are checked. Create a column-masking policy that
+    // masks a column to NULL. Verify that access on the column are still checked.
+    try {
+      createColumnMaskingPolicy("alltypes_replace_id", "functional", "alltypes", "id",
+          user_.getShortName(), "CUSTOM", "int_col");
+      createColumnMaskingPolicy("alltypes_nullify_str", "functional", "alltypes",
+          "string_col", user_.getShortName(), "MASK_NULL", /*maskExpr*/null);
+      authorize("select id from functional.alltypes")
+          .ok(onTable("functional", "alltypes", TPrivilegeLevel.SELECT))
+          .ok(onColumn("functional", "alltypes", "id", TPrivilegeLevel.SELECT),
+              onColumn("functional", "alltypes", "int_col", TPrivilegeLevel.SELECT))
+          .error(selectError("functional.alltypes"),
+              onColumn("functional", "alltypes", "id", TPrivilegeLevel.SELECT))
+          .error(selectError("functional.alltypes"),
+              onColumn("functional", "alltypes", "int_col", TPrivilegeLevel.SELECT));
+      // Although string_col is masked as NULL, we still require access privilege on it.
+      authorize("select bool_col, string_col from functional.alltypes")
+          .ok(onColumn("functional", "alltypes", "bool_col", TPrivilegeLevel.SELECT),
+              onColumn("functional", "alltypes", "string_col", TPrivilegeLevel.SELECT))
+          .error(selectError("functional.alltypes"),
+              onColumn("functional", "alltypes", "bool_col", TPrivilegeLevel.SELECT));
+    } finally {
+      deleteRangerPolicy("alltypes_replace_id");
+      deleteRangerPolicy("alltypes_nullify_str");
+    }
+  }
+
+  /**
    * Validates Ranger's object ownership privileges. Note that we no longer have to add a
    * policy to the Ranger server to explicitly grant a user the access privileges of the
    * resources if the user is the owner of the resources.

@@ -501,37 +501,39 @@ public class AnalysisContext {
         Lists.newArrayList(analysisResult_.stmt_.getColLabels());
 
     // Apply column/row masking, expr, setop, and subquery rewrites.
-    boolean reAnalyze = false;
+    boolean shouldReAnalyze = false;
     if (authzFactory_.getAuthorizationConfig().isEnabled()) {
-      reAnalyze = analysisResult_.stmt_.resolveTableMask(analysisResult_.analyzer_);
+      shouldReAnalyze = analysisResult_.stmt_.resolveTableMask(analysisResult_.analyzer_);
       // If any catalog table/view is replaced by table masking views, we need to
       // resolve them. Also re-analyze the SlotRefs to reference the output exprs of
       // the table masking views.
-      if (reAnalyze) {
-        reAnalyzeWithoutPrivChecks(stmtTableCache, authzCtx, origResultTypes,
-            origColLabels);
+      if (shouldReAnalyze) {
+        // To be consistent with Hive, privilege requests introduced by the masking views
+        // should also be collected (IMPALA-10728).
+        reAnalyze(stmtTableCache, authzCtx, origResultTypes, origColLabels,
+            /*collectPrivileges*/ true);
       }
-      reAnalyze = false;
+      shouldReAnalyze = false;
     }
     ExprRewriter rewriter = analysisResult_.analyzer_.getExprRewriter();
     if (analysisResult_.requiresExprRewrite()) {
       rewriter.reset();
       analysisResult_.stmt_.rewriteExprs(rewriter);
-      reAnalyze = rewriter.changed();
+      shouldReAnalyze = rewriter.changed();
     }
     if (analysisResult_.requiresSubqueryRewrite()) {
       new StmtRewriter.SubqueryRewriter().rewrite(analysisResult_);
-      reAnalyze = true;
+      shouldReAnalyze = true;
     }
     if (analysisResult_.requiresSetOperationRewrite()) {
       new StmtRewriter().rewrite(analysisResult_);
-      reAnalyze = true;
+      shouldReAnalyze = true;
     }
     if (analysisResult_.requiresAcidComplexScanRewrite()) {
       new StmtRewriter.AcidRewriter().rewrite(analysisResult_);
-      reAnalyze = true;
+      shouldReAnalyze = true;
     }
-    if (!reAnalyze) return;
+    if (!shouldReAnalyze) return;
 
     // For SetOperationStmt we must replace the query statement with the rewritten version
     // before re-analysis.
@@ -544,13 +546,14 @@ public class AnalysisContext {
       }
     }
 
-    reAnalyzeWithoutPrivChecks(stmtTableCache, authzCtx, origResultTypes, origColLabels);
+    reAnalyze(stmtTableCache, authzCtx, origResultTypes, origColLabels,
+        /*collectPrivileges*/ false);
     Preconditions.checkState(!analysisResult_.requiresSubqueryRewrite());
   }
 
-  private void reAnalyzeWithoutPrivChecks(StmtTableCache stmtTableCache,
-      AuthorizationContext authzCtx, List<Type> origResultTypes,
-      List<String> origColLabels) throws AnalysisException {
+  private void reAnalyze(StmtTableCache stmtTableCache, AuthorizationContext authzCtx,
+      List<Type> origResultTypes, List<String> origColLabels, boolean collectPrivileges)
+      throws AnalysisException {
     boolean isExplain = analysisResult_.isExplainStmt();
     // Some expressions, such as function calls with constant arguments, can get
     // folded into literals. Since literals do not require privilege requests, we
@@ -561,17 +564,20 @@ public class AnalysisContext {
 
     // Re-analyze the stmt with a new analyzer.
     analysisResult_.analyzer_ = createAnalyzer(stmtTableCache, authzCtx);
-    // We restore the privileges collected in the first pass below. So, no point in
-    // collecting them again.
-    analysisResult_.analyzer_.setEnablePrivChecks(false);
+    // Restore privilege requests found during the previous pass
+    for (PrivilegeRequest req : origPrivReqs) {
+      analysisResult_.analyzer_.registerPrivReq(req);
+    }
+    // Only collect privilege requests in need.
+    analysisResult_.analyzer_.setEnablePrivChecks(collectPrivileges);
     analysisResult_.stmt_.reset();
     try {
       analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
-      analysisResult_.analyzer_.setEnablePrivChecks(true); // restore
+      analysisResult_.analyzer_.setEnablePrivChecks(true); // Always restore
     } catch (AnalysisException e) {
       LOG.error(String.format("Error analyzing the rewritten query.\n" +
           "Original SQL: %s\nRewritten SQL: %s", analysisResult_.stmt_.toSql(),
-          analysisResult_.stmt_.toSql(REWRITTEN)));
+          analysisResult_.stmt_.toSql(REWRITTEN)), e);
       throw e;
     }
     // Restore the original result types and column labels.
@@ -579,11 +585,6 @@ public class AnalysisContext {
     analysisResult_.stmt_.setColLabels(origColLabels);
     if (LOG.isTraceEnabled()) {
       LOG.trace("Rewritten SQL: " + analysisResult_.stmt_.toSql(REWRITTEN));
-    }
-
-    // Restore privilege requests found during the first pass
-    for (PrivilegeRequest req : origPrivReqs) {
-      analysisResult_.analyzer_.registerPrivReq(req);
     }
     if (isExplain) analysisResult_.stmt_.setIsExplain();
   }

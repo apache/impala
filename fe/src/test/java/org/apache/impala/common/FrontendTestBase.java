@@ -61,6 +61,7 @@ import org.apache.impala.thrift.TAccessEvent;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TSessionState;
 import org.apache.impala.util.EventSequence;
+import org.apache.impala.util.TSessionStateUtil;
 import org.junit.Assert;
 
 import com.google.common.base.Preconditions;
@@ -315,8 +316,9 @@ public class FrontendTestBase extends AbstractFrontendTest {
     try (FrontendProfile.Scope scope = FrontendProfile.createNewWithScope()) {
       ctx.getQueryCtx().getClient_request().setStmt(stmt);
       StatementBase parsedStmt = Parser.parse(stmt, ctx.getQueryOptions());
+      User user = new User(TSessionStateUtil.getEffectiveUser(ctx.getQueryCtx().session));
       StmtMetadataLoader mdLoader =
-          new StmtMetadataLoader(fe, ctx.getQueryCtx().session.database, null);
+          new StmtMetadataLoader(fe, ctx.getQueryCtx().session.database, null, user);
       StmtTableCache stmtTableCache = mdLoader.loadTables(parsedStmt);
       return ctx.analyzeAndAuthorize(parsedStmt, stmtTableCache, fe.getAuthzChecker());
     }
