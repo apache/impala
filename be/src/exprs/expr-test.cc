@@ -10714,6 +10714,70 @@ TEST_P(ExprTest, Utf8Test) {
       "\U0001f468\u200d\U0001f468\u200d\U0001f467\u200d\U0001f467')",
       "\U0001f467\u200d\U0001f467\u200d\U0001f468\u200d\U0001f468"
       "\u0bbf\u0ba8\u0940\u0928");
+
+  executor_->PushExecOption("utf8_mode=true");
+  // Each Chinese character is encoded into 3 bytes. But in UTF-8 mode, the positions
+  // are counted by UTF-8 characters.
+  TestValue("instr('最快的SQL引擎', 'SQL')", TYPE_INT, 4);
+  TestValue("instr('最快的SQL引擎', '引擎')", TYPE_INT, 7);
+  TestValue("instr('最快的SQL引擎', 'SQL', 1)", TYPE_INT, 4);
+  TestValue("instr('最快的SQL引擎', 'SQL', 4)", TYPE_INT, 4);
+  TestValue("instr('最快的SQL引擎', 'SQL', 5)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎', 'SQL', 500)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎', 'SQL', -1)", TYPE_INT, 4);
+  TestValue("instr('最快的SQL引擎', 'SQL', -2)", TYPE_INT, 4);
+  TestValue("instr('最快的SQL引擎', 'SQL', -3)", TYPE_INT, 4);
+  TestValue("instr('最快的SQL引擎', 'SQL', -5)", TYPE_INT, 4);
+  TestValue("instr('最快的SQL引擎', 'SQL', -6)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎', 'SQL', -600)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎跑SQL', '引擎', 1)", TYPE_INT, 7);
+  TestValue("instr('最快的SQL引擎跑SQL', '引擎', 7)", TYPE_INT, 7);
+  TestValue("instr('最快的SQL引擎跑SQL', '引擎', 8)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎跑SQL', '引擎', -1)", TYPE_INT, 7);
+  TestValue("instr('最快的SQL引擎跑SQL', '引擎', -6)", TYPE_INT, 7);
+  TestValue("instr('最快的SQL引擎跑SQL', '引擎', -7)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎跑SQL', '引擎', -700)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎跑SQL', 'SQL', 1, 1)", TYPE_INT, 4);
+  TestValue("instr('最快的SQL引擎跑SQL', 'SQL', 1, 2)", TYPE_INT, 10);
+  TestValue("instr('最快的SQL引擎跑SQL', 'SQL', 1, 3)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎跑SQL', 'SQL', 100, 3)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎跑SQL', 'SQL', -1, 1)", TYPE_INT, 10);
+  TestValue("instr('最快的SQL引擎跑SQL', 'SQL', -1, 2)", TYPE_INT, 4);
+  TestValue("instr('最快的SQL引擎跑SQL', 'SQL', -1, 3)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎跑SQL', 'SQL', -100, 3)", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎跑SQL', 'SQL引擎')", TYPE_INT, 4);
+  TestValue("instr('最快的SQL引擎跑SQL', 'SQL引擎', -1)", TYPE_INT, 4);
+  TestValue("instr('最快的SQL引擎跑SQL', 'SQL引擎, 1, 2')", TYPE_INT, 0);
+  TestValue("instr('最快的SQL引擎跑SQL', '跑SQL')", TYPE_INT, 9);
+  TestValue("instr('最快的SQL引擎跑SQL', '跑SQL', -1)", TYPE_INT, 9);
+  TestValue("instr('最快的SQL引擎跑SQL', '跑SQL', 1, 2)", TYPE_INT, 0);
+  TestValue("instr('你好你好你好你好', '好', 1, 1)", TYPE_INT, 2);
+  TestValue("instr('你好你好你好你好', '好', 1, 2)", TYPE_INT, 4);
+  TestValue("instr('你好你好你好你好', '好', 1, 3)", TYPE_INT, 6);
+  TestValue("instr('你好你好你好你好', '好', 1, 4)", TYPE_INT, 8);
+  TestValue("instr('你好你好你好你好', '好', 1, 5)", TYPE_INT, 0);
+  TestValue("instr('你好你好你好你好', '好', 4, 2)", TYPE_INT, 6);
+  TestValue("instr('你好你好你好你好', '好', -1, 1)", TYPE_INT, 8);
+  TestValue("instr('你好你好你好你好', '好', -1, 2)", TYPE_INT, 6);
+  TestValue("instr('你好你好你好你好', '好', -1, 3)", TYPE_INT, 4);
+  TestValue("instr('你好你好你好你好', '好', -1, 4)", TYPE_INT, 2);
+  TestValue("instr('你好你好你好你好', '好', -1, 5)", TYPE_INT, 0);
+  TestValue("instr('你好你好你好你好', '好', -4, 2)", TYPE_INT, 2);
+  TestIsNull("instr('最快的SQL引擎跑SQL', 'SQL', 1, NULL)", TYPE_INT);
+  TestIsNull("instr('最快的SQL引擎跑SQL', 'SQL', NULL, 1)", TYPE_INT);
+  TestIsNull("instr('最快的SQL引擎跑SQL', NULL, 1, 1)", TYPE_INT);
+  TestIsNull("instr(NULL, 'SQL', 1, 1)", TYPE_INT);
+
+  TestValue("locate('SQL', '最快的SQL引擎跑SQL')", TYPE_INT, 4);
+  TestValue("locate('SQL', '最快的SQL引擎跑SQL', 4)", TYPE_INT, 4);
+  TestValue("locate('SQL', '最快的SQL引擎跑SQL', 5)", TYPE_INT, 10);
+  TestValue("locate('SQL', '最快的SQL引擎跑SQL', 10)", TYPE_INT, 10);
+  TestValue("locate('SQL', '最快的SQL引擎跑SQL', 11)", TYPE_INT, 0);
+  // locate() only allow positive position.
+  TestValue("locate('SQL', '最快的SQL引擎跑SQL', 0)", TYPE_INT, 0);
+  TestValue("locate('SQL', '最快的SQL引擎跑SQL', -1)", TYPE_INT, 0);
+  TestIsNull("locate('SQL', '最快的SQL引擎跑SQL', NULL)", TYPE_INT);
+  executor_->PopExecOption();
 }
 
 } // namespace impala

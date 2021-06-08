@@ -125,6 +125,19 @@ class BitUtil {
     return (b & 0xC0) != 0x80;
   }
 
+  /// Returns the byte length of a *legal* UTF-8 character (code point) given its first
+  /// byte. If the first byte is between 0xC0 and 0xDF, the UTF-8 character has two
+  /// bytes; if it is between 0xE0 and 0xEF, the UTF-8 character has 3 bytes; and if it
+  /// is 0xF0 and 0xFF, the UTF-8 character has 4 bytes.
+  constexpr static inline int NumBytesInUTF8Encoding(int8_t first_byte) {
+    if (first_byte >= 0) return 1;
+    switch (first_byte & 0xF0) {
+      case 0xE0: return 3;
+      case 0xF0: return 4;
+      default: return 2;
+    }
+  }
+
   /// Non hw accelerated pop count.
   /// TODO: we don't use this in any perf sensitive code paths currently.  There
   /// might be a much faster way to implement this.

@@ -34,6 +34,7 @@
 #include "util/bit-util.h"
 #include "util/coding-util.h"
 #include "util/pretty-printer.h"
+#include "util/string-util.h"
 #include "util/ubsan.h"
 #include "util/url-parser.h"
 
@@ -265,13 +266,18 @@ IntVal StringFunctions::CharLength(FunctionContext* context, const StringVal& st
   return StringValue::UnpaddedCharLength(reinterpret_cast<char*>(str.ptr), t->len);
 }
 
+static int CountUtf8Chars(uint8_t* ptr, int len) {
+  if (ptr == nullptr) return 0;
+  int cnt = 0;
+  for (int i = 0; i < len; ++i) {
+    if (BitUtil::IsUtf8StartByte(ptr[i])) ++cnt;
+  }
+  return cnt;
+}
+
 IntVal StringFunctions::Utf8Length(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return IntVal::null();
-  int len = 0;
-  for (int i = 0; i < str.len; ++i) {
-    if (BitUtil::IsUtf8StartByte(str.ptr[i])) ++len;
-  }
-  return IntVal(len);
+  return IntVal(CountUtf8Chars(str.ptr, str.len));
 }
 
 StringVal StringFunctions::Lower(FunctionContext* context, const StringVal& str) {
@@ -657,14 +663,18 @@ IntVal StringFunctions::Instr(FunctionContext* context, const StringVal& str,
   }
   if (start_position.val == 0) return IntVal(0);
 
+  bool utf8_mode = context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE);
   StringValue haystack = StringValue::FromStringVal(str);
   StringValue needle = StringValue::FromStringVal(substr);
   StringSearch search(&needle);
+  int match_pos = -1;
   if (start_position.val > 0) {
     // A positive starting position indicates regular searching from the left.
     int search_start_pos = start_position.val - 1;
+    if (utf8_mode) {
+      search_start_pos = FindUtf8PosForward(str.ptr, str.len, search_start_pos);
+    }
     if (search_start_pos >= haystack.len) return IntVal(0);
-    int match_pos = -1;
     for (int match_num = 0; match_num < occurrence.val; ++match_num) {
       DCHECK_LE(search_start_pos, haystack.len);
       StringValue haystack_substring = haystack.Substring(search_start_pos);
@@ -673,17 +683,16 @@ IntVal StringFunctions::Instr(FunctionContext* context, const StringVal& str,
       match_pos = search_start_pos + match_pos_in_substring;
       search_start_pos = match_pos + 1;
     }
-    // Return positions starting from 1 at the leftmost position.
-    return IntVal(match_pos + 1);
   } else {
     // A negative starting position indicates searching from the right.
-    int search_start_pos = haystack.len + start_position.val;
+    int search_start_pos = utf8_mode ?
+        FindUtf8PosBackward(str.ptr, str.len, -start_position.val - 1) :
+        haystack.len + start_position.val;
     // The needle must fit between search_start_pos and the end of the string
     if (search_start_pos + needle.len > haystack.len) {
       search_start_pos = haystack.len - needle.len;
     }
     if (search_start_pos < 0) return IntVal(0);
-    int match_pos = -1;
     for (int match_num = 0; match_num < occurrence.val; ++match_num) {
       DCHECK_GE(search_start_pos + needle.len, 0);
       DCHECK_LE(search_start_pos + needle.len, haystack.len);
@@ -693,9 +702,11 @@ IntVal StringFunctions::Instr(FunctionContext* context, const StringVal& str,
       if (match_pos < 0) return IntVal(0);
       search_start_pos = match_pos - 1;
     }
-    // Return positions starting from 1 at the leftmost position.
-    return IntVal(match_pos + 1);
   }
+  // In UTF8 mode, positions are counted by Unicode characters in UTF8 encoding.
+  // If not in UTF8 mode, return positions starting from 1 at the leftmost position.
+  return utf8_mode ? IntVal(CountUtf8Chars(str.ptr, match_pos) + 1) :
+      IntVal(match_pos + 1);
 }
 
 IntVal StringFunctions::Instr(FunctionContext* context, const StringVal& str,
@@ -720,18 +731,7 @@ IntVal StringFunctions::LocatePos(FunctionContext* context, const StringVal& sub
   // but throws an exception for *start_pos > str->len.
   // Since returning 0 seems to be Hive's error condition, return 0.
   if (start_pos.val <= 0 || start_pos.val > str.len) return IntVal(0);
-  StringValue substr_sv = StringValue::FromStringVal(substr);
-  StringSearch search(&substr_sv);
-  // Input start_pos.val starts from 1.
-  StringValue adjusted_str(reinterpret_cast<char*>(str.ptr) + start_pos.val - 1,
-       str.len - start_pos.val + 1);
-  int32_t match_pos = search.Search(&adjusted_str);
-  if (match_pos >= 0) {
-    // Hive returns the position in the original string starting from 1.
-    return IntVal(start_pos.val + match_pos);
-  } else {
-    return IntVal(0);
-  }
+  return Instr(context, str, substr, start_pos);
 }
 
 // The caller owns the returned regex. Returns NULL if the pattern could not be compiled.

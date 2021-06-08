@@ -114,3 +114,57 @@ having length(group_concat(name)) = 7;
 ---- TYPES
 STRING,INT
 ====
+---- QUERY
+# Each Chinese character is encoded into 3 bytes in UTF-8.
+set utf8_mode=false;
+select instr('最快的SQL引擎跑SQL', 'SQL'),
+       instr('最快的SQL引擎跑SQL', '引擎'),
+       instr('最快的SQL引擎跑SQL', 'SQL引擎'),
+       instr('最快的SQL引擎跑SQL', '跑SQL'),
+       instr('最快的SQL引擎跑SQL', 'SQL', 1, 2),
+       instr('最快的SQL引擎跑SQL', 'SQL', -1, 2);
+---- RESULTS
+10,13,10,19,22,10
+---- TYPES
+INT,INT,INT,INT,INT,INT
+====
+---- QUERY
+set utf8_mode=true;
+select instr('最快的SQL引擎跑SQL', 'SQL'),
+       instr('最快的SQL引擎跑SQL', '引擎'),
+       instr('最快的SQL引擎跑SQL', 'SQL引擎'),
+       instr('最快的SQL引擎跑SQL', '跑SQL'),
+       instr('最快的SQL引擎跑SQL', 'SQL', 1, 2),
+       instr('最快的SQL引擎跑SQL', 'SQL', -1, 2);
+---- RESULTS
+4,7,4,9,10,4
+---- TYPES
+INT,INT,INT,INT,INT,INT
+====
+---- QUERY
+# Each Chinese character is encoded into 3 bytes in UTF-8.
+set utf8_mode=false;
+select locate('SQL', '最快的SQL引擎跑SQL'),
+       locate('引擎', '最快的SQL引擎跑SQL'),
+       locate('SQL引擎', '最快的SQL引擎跑SQL'),
+       locate('跑SQL', '最快的SQL引擎跑SQL'),
+       locate('SQL', '最快的SQL引擎跑SQL', 4),
+       locate('SQL', '最快的SQL引擎跑SQL', 11);
+---- RESULTS
+10,13,10,19,10,22
+---- TYPES
+INT,INT,INT,INT,INT,INT
+====
+---- QUERY
+set utf8_mode=true;
+select locate('SQL', '最快的SQL引擎跑SQL'),
+       locate('引擎', '最快的SQL引擎跑SQL'),
+       locate('SQL引擎', '最快的SQL引擎跑SQL'),
+       locate('跑SQL', '最快的SQL引擎跑SQL'),
+       locate('SQL', '最快的SQL引擎跑SQL', 4),
+       locate('SQL', '最快的SQL引擎跑SQL', 10);
+---- RESULTS
+4,7,4,9,4,10
+---- TYPES
+INT,INT,INT,INT,INT,INT
+====

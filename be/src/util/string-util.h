@@ -52,6 +52,47 @@ bool EndsWith(const std::string& full_string, const std::string& end);
 /// the given string is located at [start, end)
 const uint8_t* FindEndOfIdentifier(const uint8_t* start, const uint8_t* end);
 
+/// Finds the N-th (0-based) Unicode character in the string, returns the start byte
+/// position of it. The input string 'str_ptr' is viewed logically as sequence of Unicode
+/// characters encoded in UTF8. 'index' is the index (0-based) of Unicode character whose
+/// byte position in 'str_ptr' is to be found. If there are not enough characters, return
+/// 'str_len'. E.g.
+///  - If index is 0, returns 0.
+///  - If the string is "你好" and index is 1, returns 3. (Each Chinese character is
+///    encoded into 3 bytes in UTF-8, so the second character starts at pos 3).
+///  - If the string is "你好" and index > 1, returns 6.
+///  - If the string is "你好Bob" and index is 4, returns 8.
+/// Error handling:
+/// Bytes that don't belong any UTF8 characters are considered malformed UTF8 characters
+/// as one byte per character. This is consistent with Hive since Hive replaces each of
+/// those bytes to U+FFFD (REPLACEMENT CHARACTER). E.g. GenericUDFInstr calls
+/// Text#toString(), which performs the replacement.
+/// TODO(IMPALA-10761): Add query option to control the error handling.
+int FindUtf8PosForward(const uint8_t* str_ptr, const int str_len, const int index);
+inline int FindUtf8PosForward(const char* str_ptr, const int str_len, const int index) {
+  return FindUtf8PosForward(reinterpret_cast<const uint8_t*>(str_ptr), str_len, index);
+}
+
+/// Counting backwards to find the last N-th Unicode character in the string, returns
+/// the start byte position of it. The input string 'str_ptr' is viewed logically as
+/// sequence of Unicode characters encoded in UTF8. 'index' is the backward index
+/// (0-based) of Unicode character whose byte position in 'str_ptr' is to be found. E.g.
+/// 0 means the last character, 1 means the second last one and so on. If there are not
+/// enough characters, return -1. E.g.
+///  - If the string is "你好" and index is 0, returns 3. (Each Chinese character is
+///    encoded into 3 bytes in UTF-8, so the second character starts at pos 3).
+///  - If the string is "你好Bob" and index is 1, returns 7.
+///  - If the string is "你好Bob" and index > 4, return -1.
+/// Error handling:
+/// Bytes that don't belong any UTF8 characters are considered malformed UTF8 characters
+/// as one byte per character. This is consistent with Hive since Hive replaces each of
+/// those bytes to U+FFFD (REPLACEMENT CHARACTER). E.g. GenericUDFInstr calls
+/// Text#toString(), which performs the replacement.
+/// TODO(IMPALA-10761): Add query option to control the error handling.
+int FindUtf8PosBackward(const uint8_t* str_ptr, const int str_len, const int index);
+inline int FindUtf8PosBackward(const char* str_ptr, const int str_len, const int index) {
+  return FindUtf8PosBackward(reinterpret_cast<const uint8_t*>(str_ptr), str_len, index);
+}
 }
 
 #endif
