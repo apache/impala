@@ -4890,7 +4890,7 @@ public class CatalogOpExecutor {
       Map<String, TUpdatedPartition> updatedPartitions,
       Map<String, List<String>> addedPartitionNames,
       boolean isInsertOverwrite, TblTransaction tblTxn) throws CatalogException {
-    if (!shouldGenerateInsertEvents()) {
+    if (!shouldGenerateInsertEvents(table)) {
       return;
     }
     long txnId = tblTxn == null ? -1 : tblTxn.txnId;
@@ -4987,9 +4987,11 @@ public class CatalogOpExecutor {
     }
   }
 
-  private boolean shouldGenerateInsertEvents() {
-    return catalog_.isEventProcessingActive() && BackendConfig.INSTANCE
-        .isInsertEventsEnabled();
+  private boolean shouldGenerateInsertEvents(FeFsTable table) {
+    if (table instanceof FeIcebergTable) return false;
+    if (!BackendConfig.INSTANCE.isInsertEventsEnabled()) return false;
+    if (!catalog_.isEventProcessingActive()) return false;
+    return true;
   }
 
   private InsertEventRequestData makeInsertEventData(FeFsTable tbl, List<String> partVals,
