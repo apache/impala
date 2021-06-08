@@ -172,6 +172,26 @@ class TestEventProcessing(CustomClusterTestSuite):
       assert data.split('\t') == ['101', 'z', '28', '3', '2019']
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
+  def test_iceberg_inserts(self):
+    """IMPALA-10735: INSERT INTO Iceberg table fails during INSERT event generation
+    This test doesn't test event processing. It tests that Iceberg INSERTs still work
+    when HMS event polling is enabled.
+    IMPALA-10736 tracks adding proper support for Hive Replication."""
+    db_name = self.__get_random_name("iceberg_insert_event_db_")
+    tbl_name = "ice_test"
+    try:
+      self.execute_query("create database if not exists {0}".format(db_name))
+      self.execute_query("""
+          create table {0}.{1} (i int)
+          partition by spec (i bucket 5)
+          stored as iceberg;""".format(db_name, tbl_name))
+      self.execute_query("insert into {0}.{1} values (1)".format(db_name, tbl_name))
+      data = self.execute_scalar("select * from {0}.{1}".format(db_name, tbl_name))
+      assert data == '1'
+    finally:
+      self.execute_query("drop database if exists {0} cascade".format(db_name))
+
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
   @SkipIfHive2.acid
   def test_empty_partition_events_transactional(self, unique_database):
     self._run_test_empty_partition_events(unique_database, True)
