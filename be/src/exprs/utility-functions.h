@@ -110,6 +110,10 @@ class UtilityFunctions {
   static StringVal Sha2(FunctionContext* ctx, const StringVal& input_str,
       const IntVal& bit_len);
 
+  /// Implementation of MD5 function. Returns the 128-bit MD5 checksum for a given
+  /// string.
+  static StringVal Md5(FunctionContext* ctx, const StringVal& input_str);
+
  private:
   static StringVal GenUuid(FunctionContext* ctx);
 };

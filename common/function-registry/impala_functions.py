@@ -742,6 +742,8 @@ visible_functions = [
    '_ZN6impala16UtilityFunctions4Sha1EPN10impala_udf15FunctionContextERKNS1_9StringValE'],
   [['sha2'], 'STRING', ['STRING', 'INT'],
    '_ZN6impala16UtilityFunctions4Sha2EPN10impala_udf15FunctionContextERKNS1_9StringValERKNS1_6IntValE'],
+  [['md5'], 'STRING', ['STRING'],
+   '_ZN6impala16UtilityFunctions3Md5EPN10impala_udf15FunctionContextERKNS1_9StringValE'],
 
   # (Non)NullValue functions
   [['nullvalue'], 'BOOLEAN', ['BOOLEAN'], '_ZN6impala15IsNullPredicate6IsNullIN10impala_udf10BooleanValEEES3_PNS2_15FunctionContextERKT_'],

@@ -24,6 +24,7 @@
 
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
+#include <openssl/md5.h>
 #include <openssl/sha.h>
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
@@ -295,5 +296,21 @@ StringVal UtilityFunctions::Sha2(FunctionContext* ctx, const StringVal& input_st
   }
 
   return StringFunctions::Lower(ctx, MathFunctions::HexString(ctx, sha_hash));
+}
+
+StringVal UtilityFunctions::Md5(FunctionContext* ctx, const StringVal& input_str) {
+  // Validate the input string.
+  if (input_str.is_null) {
+    return StringVal::null();
+  }
+  if (UNLIKELY(FIPS_mode())) {
+    ctx->SetError("MD5 is not supported in FIPS mode.");
+    return StringVal::null();
+  } else {
+    StringVal md5 = StringVal(ctx, MD5_DIGEST_LENGTH);
+    if (UNLIKELY(md5.is_null)) return StringVal::null();
+    MD5(input_str.ptr, input_str.len, md5.ptr);
+    return StringFunctions::Lower(ctx, MathFunctions::HexString(ctx, md5));
+  }
 }
 }

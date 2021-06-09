@@ -5612,6 +5612,20 @@ TEST_P(ExprTest, SHAFunctions) {
   TestError(sha2fn + ", 300)");
 }
 
+TEST_P(ExprTest, MD5Function) {
+  if (FIPS_mode()) {
+    TestError("md5('foo')");
+  } else {
+    std::string expected("1fdf956bdad98101171512d18eec3bcf");
+    TestStringValue("md5('compute md5 checksum')", expected);
+    // Test empty string
+    expected = std::string("d41d8cd98f00b204e9800998ecf8427e");
+    TestStringValue("md5('')", expected);
+    // Test null input
+    TestIsNull("md5(NULL)", TYPE_STRING);
+  }
+}
+
 TEST_P(ExprTest, SessionFunctions) {
   enum Session {S1, S2};
   enum Query {Q1, Q2};

@@ -3134,3 +3134,10 @@ sha2(s, 512) from functional.strings_with_quotes where i = 10;
 ---- TYPES
 STRING, STRING, STRING, STRING
 ====
+---- QUERY
+select md5(s) from functional.strings_with_quotes where i = 10;
+---- RESULTS
+'ba6d5d4549e4799ceab221c63fa54203'
+---- TYPES
+STRING
+====
