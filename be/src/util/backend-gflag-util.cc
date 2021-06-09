@@ -177,6 +177,12 @@ DEFINE_int32(warn_catalog_response_size_mb, 50,
 DEFINE_int32(warn_catalog_response_duration_s, 60,
     "Threshold in seconds to log a warning for slow catalogd response.");
 
+DEFINE_string(startup_filesystem_check_directories, "/",
+    "Comma separated list of directories to list on startup to verify access to the "
+    "filesystem. The default is to list the root of the filesytem. This can be "
+    "specified to a subdirectory to avoid accesses to the root of the filesystem. "
+    "To disable the startup check, specify the empty string.");
+
 namespace impala {
 
 Status GetConfigFromCommand(const string& flag_cmd, string& result) {
@@ -305,6 +311,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_warn_catalog_response_size_mb(FLAGS_warn_catalog_response_size_mb);
   cfg.__set_warn_catalog_response_duration_s(FLAGS_warn_catalog_response_duration_s);
   cfg.__set_invalidate_hms_cache_on_ddls(FLAGS_invalidate_hms_cache_on_ddls);
+  cfg.__set_startup_filesystem_check_directories(
+      FLAGS_startup_filesystem_check_directories);
   return Status::OK();
 }
 

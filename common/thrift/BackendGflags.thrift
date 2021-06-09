@@ -213,4 +213,6 @@ struct TBackendGflags {
   94: required i32 warn_catalog_response_duration_s
 
   95: required bool invalidate_hms_cache_on_ddls
+
+  96: required string startup_filesystem_check_directories
 }

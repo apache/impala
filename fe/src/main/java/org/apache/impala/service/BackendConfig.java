@@ -329,4 +329,8 @@ public class BackendConfig {
   public boolean invalidateCatalogdHMSCacheOnDDLs() {
     return backendCfg_.invalidate_hms_cache_on_ddls;
   }
+
+  public String getStartupFilesystemCheckDirectories() {
+    return backendCfg_.startup_filesystem_check_directories;
+  }
 }

@@ -109,6 +109,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.IllegalArgumentException;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
@@ -898,12 +899,35 @@ public class JniFrontend {
       return "couldn't retrieve FileSystem:\n" + e.getMessage();
     }
 
-    try {
-      FileSystemUtil.getTotalNumVisibleFiles(new Path("/"));
-    } catch (IOException e) {
-      return "Could not read the root directory at " +
-          CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) +
-          ". Error was: \n" + e.getMessage();
+    String startup_filesystem_check_dirs =
+        BackendConfig.INSTANCE.getStartupFilesystemCheckDirectories();
+    String[] path_strings = startup_filesystem_check_dirs.split(",");
+    for (String path_string : path_strings) {
+      // Skip empty strings (or if there are no paths to check)
+      if (path_string.isEmpty()) {
+        continue;
+      }
+      try {
+        LOG.info("Verifying access to " + path_string);
+        Path path = new Path(path_string);
+        FileSystem fs = path.getFileSystem(CONF);
+        if (!fs.exists(path)) {
+          return "Invalid path specified for startup_filesystem_check_directories: " +
+              path_string + " does not exist.";
+        }
+        if (!fs.isDirectory(path)) {
+          return "Invalid path specified for startup_filesystem_check_directories: " +
+              path_string + " is not a directory.";
+        }
+        FileSystemUtil.getTotalNumVisibleFiles(path);
+        LOG.info("Successfully listed " + path_string);
+      } catch (IllegalArgumentException e) {
+        return "Invalid path specified for startup_filesystem_check_directories: " +
+            path_string + ". Error was: \n" + e.getMessage();
+      } catch (IOException e) {
+        return "Could not read the path at " + path_string +
+            ". Error was: \n" + e.getMessage();
+      }
     }
     return "";
   }
