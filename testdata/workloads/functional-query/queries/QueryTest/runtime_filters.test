@@ -187,6 +187,7 @@ row_regex: .*FiltersReceived: 0 .*
 # be created, only min-max filter will be created.
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
 SET RUNTIME_FILTER_MODE=GLOBAL;
+SET MINMAX_FILTER_PARTITION_COLUMNS=FALSE;
 select STRAIGHT_JOIN count(*) from alltypes a
     join [SHUFFLE] alltypestiny b
     on a.month = b.month + 10000;

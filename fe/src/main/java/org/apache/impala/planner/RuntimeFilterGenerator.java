@@ -707,6 +707,19 @@ public final class RuntimeFilterGenerator {
   }
 
   /**
+   * Returns true if filter type 'filterType' is enabled in the context of the enabled
+   * runtime types 'enabledRuntimeFilterTypes'. Return false otherwise.
+   */
+  public boolean isRuntimeFilterTypeEnabled(TRuntimeFilterType filterType,
+      TEnabledRuntimeFilterTypes enabledRuntimeFilterTypes) {
+    if (enabledRuntimeFilterTypes == TEnabledRuntimeFilterTypes.ALL) return true;
+    return (filterType == TRuntimeFilterType.BLOOM
+            && enabledRuntimeFilterTypes == TEnabledRuntimeFilterTypes.BLOOM
+        || filterType == TRuntimeFilterType.MIN_MAX
+            && enabledRuntimeFilterTypes == TEnabledRuntimeFilterTypes.MIN_MAX);
+  }
+
+  /**
    * Generates the runtime filters for a query by recursively traversing the distributed
    * plan tree rooted at 'root'. In the top-down traversal of the plan tree, candidate
    * runtime filters are generated from equi-join predicates assigned to hash-join nodes.
@@ -728,7 +741,10 @@ public final class RuntimeFilterGenerator {
       joinConjuncts.addAll(joinNode.getConjuncts());
 
       List<RuntimeFilter> filters = new ArrayList<>();
+      TEnabledRuntimeFilterTypes enabledRuntimeFilterTypes =
+          ctx.getQueryOptions().getEnabled_runtime_filter_types();
       for (TRuntimeFilterType filterType : TRuntimeFilterType.values()) {
+        if (!isRuntimeFilterTypeEnabled(filterType, enabledRuntimeFilterTypes)) continue;
         for (Expr conjunct : joinConjuncts) {
           RuntimeFilter filter =
               RuntimeFilter.create(filterIdGenerator, ctx.getRootAnalyzer(), conjunct,
@@ -842,8 +858,9 @@ public final class RuntimeFilterGenerator {
     boolean disableRowRuntimeFiltering =
         ctx.getQueryOptions().isDisable_row_runtime_filtering();
     boolean disable_overlap_filter =
-        !(ctx.getQueryOptions().isMinmax_filter_sorted_columns()
-            || ctx.getQueryOptions().getMinmax_filter_threshold() > 0.0);
+        !ctx.getQueryOptions().isMinmax_filter_sorted_columns()
+        && !ctx.getQueryOptions().isMinmax_filter_partition_columns()
+        && ctx.getQueryOptions().getMinmax_filter_threshold() == 0.0;
     TRuntimeFilterMode runtimeFilterMode = ctx.getQueryOptions().getRuntime_filter_mode();
     TEnabledRuntimeFilterTypes enabledRuntimeFilterTypes =
         ctx.getQueryOptions().getEnabled_runtime_filter_types();
@@ -875,16 +892,13 @@ public final class RuntimeFilterGenerator {
           if (!allow_min_max) {
             continue;
           }
-          // TODO: Apply min/max filters on partition columns.
-          if (isBoundByPartitionColumns) {
-            continue;
-          }
           if (!disable_overlap_filter) {
-            // If the filter is not defined on partition columns, try to compute
-            // an overlap predicate for it. This predicate will be used to filter
-            // out row groups or pages in Parquet data files.
+            // Try to compute an overlap predicate for the filter. This predicate will be
+            // used to filter out partitions, or row groups, pages or rows in Parquet data
+            // files.
             if (!((HdfsScanNode) scanNode)
-                .tryToComputeOverlapPredicate(analyzer, filter, targetExpr)) {
+                     .tryToComputeOverlapPredicate(
+                         analyzer, filter, targetExpr, isBoundByPartitionColumns)) {
               continue;
             }
           } else {

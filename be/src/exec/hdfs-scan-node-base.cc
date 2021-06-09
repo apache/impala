@@ -919,8 +919,7 @@ bool HdfsScanNodeBase::PartitionPassesFilters(int32_t partition_id,
   if (template_tuple == nullptr) return true;
   TupleRow* tuple_row_mem = reinterpret_cast<TupleRow*>(&template_tuple);
   for (const FilterContext& ctx: filter_ctxs) {
-    int target_ndx = ctx.filter->filter_desc().planid_to_target_ndx.at(id_);
-    if (!ctx.filter->filter_desc().targets[target_ndx].is_bound_by_partition_columns) {
+    if (!ctx.filter->IsBoundByPartitionColumn(id_)) {
       continue;
     }
 

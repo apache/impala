@@ -686,6 +686,11 @@ public class Planner {
         queryOptions.setMinmax_filtering_level(TMinmaxFilteringLevel.PAGE);
       }
     }
+    if (queryOptions.isMinmax_filter_partition_columns()) {
+      if (queryOptions.getMinmax_filter_threshold() == 0.0) {
+        queryOptions.setMinmax_filter_threshold(0.5);
+      }
+    }
   }
 
   public static void checkForDisableCodegen(PlanNode distributedPlan,

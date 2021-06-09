@@ -614,6 +614,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Return nullptr if no min/max filter is found at that location.
   MinMaxFilter* FindMinMaxFilter(int filter_idx);
 
+  /// Return true when the filter at filter_ctx_[filter_idx] is bound by a
+  /// partition column and false otherwise.
+  bool IsBoundByPartitionColumn(int filter_idx);
+
   /// Return the memory addresses of the min and the max slot in min_max_tuple_ at
   /// location overlap_slot_idx and overlap_slot_idx+1.
   void GetMinMaxSlotsForOverlapPred(

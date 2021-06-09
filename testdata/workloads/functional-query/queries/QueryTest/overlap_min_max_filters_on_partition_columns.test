@@ -1,0 +1,61 @@
+====
+---- QUERY
+# Run an equi hash join query with the first partitioned column a.year on
+# the fact table side. Only the min/max filters are allowed. Expect to see
+# all files # are rejected by the min/max filter.
+set runtime_filter_wait_time_ms=$RUNTIME_FILTER_WAIT_TIME_MS;
+set enabled_runtime_filter_types=MIN_MAX;
+select straight_join count(*) from
+functional_parquet.alltypes a join [SHUFFLE] functional_parquet.alltypes b
+where a.year = b.int_col;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, Files processed): 24
+aggregation(SUM, Files rejected): 24
+====
+---- QUERY
+# Run an equi hash join query with the 2nd partitioned column a.month on
+# the fact table side. Only the min/max filters are allowed. Expect to see
+# all files are rejected by the min/max filter.
+set runtime_filter_wait_time_ms=$RUNTIME_FILTER_WAIT_TIME_MS;
+set enabled_runtime_filter_types=MIN_MAX;
+select straight_join count(*) from
+functional_parquet.alltypes a join [SHUFFLE] functional_parquet.dimtbl b
+where a.month = b.zip;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, Files processed): 24
+aggregation(SUM, Files rejected): 24
+====
+---- QUERY
+# Explain a hash join query with min/max filter on partition columns turned off. Expect
+# one bloom filter only.
+set runtime_filter_wait_time_ms=$RUNTIME_FILTER_WAIT_TIME_MS;
+set minmax_filter_partition_columns=false;
+set explain_level=2;
+explain
+select straight_join count(*) from
+functional_parquet.alltypes a join [SHUFFLE] functional_parquet.alltypes b
+where a.year = b.int_col;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:|   runtime filters: RF000[bloom] -> a.`year`
+====
+---- QUERY
+# Setup a hash join query with min/max filter on the partition column 'month' only.
+# Expect 6 files rejected by the filter, as there are a total of 24 months worth of
+# data is stored in 'alltypes' and there are two data files per month. The range in
+# the filter built from b.int_col is [0, 9].
+set runtime_filter_wait_time_ms=$RUNTIME_FILTER_WAIT_TIME_MS;
+set enabled_runtime_filter_types=MIN_MAX;
+set minmax_filter_threshold=0.9;
+select straight_join count(*) from
+functional_parquet.alltypes a join [SHUFFLE] functional_parquet.alltypes b
+where a.month= b.int_col;
+---- RESULTS
+3985800
+---- RUNTIME_PROFILE
+aggregation(SUM, Files processed): 24
+aggregation(SUM, Files rejected): 6
+====

@@ -674,6 +674,11 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
     /// filter_ctxs_ and filter_stats_.
     int idx = FindFilterIndex(filter_id);
     DCHECK(idx >= 0);
+
+    if (IsBoundByPartitionColumn(idx)) {
+      continue;
+    }
+
     MinMaxFilter* minmax_filter = FindMinMaxFilter(idx);
 
     VLOG(3) << "Try to filter out a rowgroup via overlap predicate filter: "
@@ -1304,6 +1309,13 @@ MinMaxFilter* HdfsParquetScanner::FindMinMaxFilter(int filter_idx) {
     }
   }
   return nullptr;
+}
+
+bool HdfsParquetScanner::IsBoundByPartitionColumn(int filter_idx) {
+  DCHECK_LE(0, filter_idx);
+  DCHECK_LT(filter_idx,filter_ctxs_.size());
+  const RuntimeFilter* filter = filter_ctxs_[filter_idx]->filter;
+  return filter->IsBoundByPartitionColumn(GetScanNodeId());
 }
 
 bool HdfsParquetScanner::IsFilterWorthyForOverlapCheck(int filter_idx) {

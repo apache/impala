@@ -623,6 +623,9 @@ public class PlannerTest extends PlannerTestBase {
 
   @Test
   public void testBloomFilterAssignment() {
+    TQueryOptions options = defaultQueryOptions();
+    options.setMinmax_filter_sorted_columns(false);
+    options.setMinmax_filter_partition_columns(false);
     runPlannerTestFile("bloom-filter-assignment",
         ImmutableSet.of(
             PlannerTestOption.DO_NOT_VALIDATE_ROWCOUNT_ESTIMATION_FOR_PARTITIONS));
@@ -903,6 +906,7 @@ public class PlannerTest extends PlannerTestBase {
     TQueryOptions options = defaultQueryOptions();
     options.setExplain_level(TExplainLevel.EXTENDED);
     options.setDisable_hdfs_num_rows_estimate(true);
+    options.setMinmax_filter_partition_columns(false);
     options.setEnabled_runtime_filter_types(TEnabledRuntimeFilterTypes.MIN_MAX);
     runPlannerTestFile("min-max-runtime-filters", options);
   }

@@ -286,12 +286,20 @@ class TestOverlapMinMaxFilters(ImpalaTestSuite):
 
   def test_overlap_min_max_filters(self, vector, unique_database):
     self.execute_query("SET MINMAX_FILTER_THRESHOLD=0.5")
-    self.execute_query("SET MINMAX_FILTER_SORTED_COLUMNS=false")
+    # disable min/max filters on partition columns and allow min/max filters
+    # on sorted columns (by default).
+    self.execute_query("SET MINMAX_FILTER_PARTITION_COLUMNS=false")
     self.run_test_case('QueryTest/overlap_min_max_filters', vector, unique_database,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+    self.execute_query("SET MINMAX_FILTER_PARTITION_COLUMNS=true")
 
   def test_overlap_min_max_filters_on_sorted_columns(self, vector, unique_database):
     self.run_test_case('QueryTest/overlap_min_max_filters_on_sorted_columns', vector,
+                       unique_database,
+        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
+
+  def test_overlap_min_max_filters_on_partition_columns(self, vector, unique_database):
+    self.run_test_case('QueryTest/overlap_min_max_filters_on_partition_columns', vector,
                        unique_database,
         test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
@@ -315,6 +323,7 @@ class TestAllRuntimeFilters(ImpalaTestSuite):
     self.execute_query("SET ENABLED_RUNTIME_FILTER_TYPES=ALL")
     # Disable generating min/max filters for sorted columns
     self.execute_query("SET MINMAX_FILTER_SORTED_COLUMNS=false")
+    self.execute_query("SET MINMAX_FILTER_PARTITION_COLUMNS=false")
     self.run_test_case('QueryTest/all_runtime_filters', vector,
                        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 
@@ -347,6 +356,7 @@ class TestRuntimeRowFilters(ImpalaTestSuite):
     new_vector.get_value('exec_option')['mt_dop'] = vector.get_value('mt_dop')
     # Disable generating min/max filters for sorted columns
     self.execute_query("SET MINMAX_FILTER_SORTED_COLUMNS=false")
+    self.execute_query("SET MINMAX_FILTER_PARTITION_COLUMNS=false")
     self.run_test_case('QueryTest/runtime_row_filters', new_vector,
                        test_file_vars={'$RUNTIME_FILTER_WAIT_TIME_MS': str(WAIT_TIME_MS)})
 

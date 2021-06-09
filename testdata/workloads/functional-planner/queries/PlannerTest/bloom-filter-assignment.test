@@ -313,7 +313,7 @@ PLAN-ROOT SINK
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.int_col = b.int_col
 |  fk/pk conjuncts: assumed fk/pk
-|  runtime filters: RF002[bloom] <- b.int_col
+|  runtime filters: RF001[bloom] <- b.int_col
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=8B cardinality=12.79K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -326,7 +326,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes a]
    HDFS partitions=24/24 files=24 size=201.11KB
-   runtime filters: RF000[bloom] -> a.int_col, RF002[bloom] -> a.int_col
+   runtime filters: RF000[bloom] -> a.int_col, RF001[bloom] -> a.int_col
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=12.84K
@@ -384,7 +384,7 @@ PLAN-ROOT SINK
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.int_col = b.int_col
 |  fk/pk conjuncts: assumed fk/pk
-|  runtime filters: RF002[bloom] <- b.int_col
+|  runtime filters: RF001[bloom] <- b.int_col
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=8B cardinality=12.79K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -396,7 +396,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes a]
    HDFS partitions=24/24 files=24 size=201.11KB
-   runtime filters: RF000[bloom] -> a.int_col + 1, RF002[bloom] -> a.int_col
+   runtime filters: RF000[bloom] -> a.int_col + 1, RF001[bloom] -> a.int_col
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=12.84K
@@ -454,7 +454,7 @@ PLAN-ROOT SINK
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.timestamp_col = b.timestamp_col
 |  fk/pk conjuncts: assumed fk/pk
-|  runtime filters: RF003[bloom] <- b.timestamp_col
+|  runtime filters: RF002[bloom] <- b.timestamp_col
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=32B cardinality=12.88K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -467,7 +467,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes a]
    HDFS partitions=24/24 files=24 size=202.50KB
-   runtime filters: RF000[bloom] -> a.timestamp_col, RF003[bloom] -> a.timestamp_col
+   runtime filters: RF000[bloom] -> a.timestamp_col, RF002[bloom] -> a.timestamp_col
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=12.84K
@@ -517,7 +517,7 @@ PLAN-ROOT SINK
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.timestamp_col = b.timestamp_col
 |  fk/pk conjuncts: assumed fk/pk
-|  runtime filters: RF003[bloom] <- b.timestamp_col
+|  runtime filters: RF002[bloom] <- b.timestamp_col
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=32B cardinality=12.88K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -530,7 +530,7 @@ PLAN-ROOT SINK
 |
 00:SCAN HDFS [functional_parquet.alltypes a]
    HDFS partitions=24/24 files=24 size=202.50KB
-   runtime filters: RF000[bloom] -> a.timestamp_col, RF003[bloom] -> a.timestamp_col
+   runtime filters: RF000[bloom] -> a.timestamp_col, RF002[bloom] -> a.timestamp_col
    stored statistics:
      table: rows=unavailable size=unavailable
      partitions: 0/24 rows=12.84K

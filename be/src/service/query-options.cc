@@ -1093,8 +1093,8 @@ Status impala::SetQueryOption(const string& key, const string& value,
          break;
       }
       case TImpalaQueryOptions::MINMAX_FILTER_SORTED_COLUMNS: {
-         query_options->__set_minmax_filter_sorted_columns(IsTrue(value));
-         break;
+        query_options->__set_minmax_filter_sorted_columns(IsTrue(value));
+        break;
       }
       case TImpalaQueryOptions::MINMAX_FILTER_FAST_CODE_PATH: {
         TMinmaxFilterFastCodePathMode::type enum_type;
@@ -1107,6 +1107,9 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_enable_kudu_transaction(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::MINMAX_FILTER_PARTITION_COLUMNS:
+        query_options->__set_minmax_filter_partition_columns(IsTrue(value));
+        break;
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

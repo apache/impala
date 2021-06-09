@@ -523,7 +523,11 @@ struct TQueryOptions {
   132: optional TMinmaxFilterFastCodePathMode minmax_filter_fast_code_path =
       TMinmaxFilterFastCodePathMode.ON;
 
+  // See comment in ImpalaService.thrift
   133: optional bool enable_kudu_transaction = false;
+
+  // See comment in ImpalaService.thrift
+  134: optional bool minmax_filter_partition_columns = true;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

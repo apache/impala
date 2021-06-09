@@ -49,6 +49,8 @@ public class TpcdsPlannerTest extends PlannerTestBase {
     options.setMinmax_filter_threshold(0.5);
     /* Disable minmax filter on sorted columns. */
     options.setMinmax_filter_sorted_columns(false);
+    /* Disable minmax filter on partition columns. */
+    options.setMinmax_filter_partition_columns(false);
   }
 
   @Test

@@ -175,6 +175,9 @@ class HdfsScanner {
     return eos_;
   }
 
+  /// Return the plan id of the scan node that this scanner is associated with.
+  int GetScanNodeId() const { return scan_node_->id(); }
+
   /// Not inlined in IR so it can be replaced with a constant.
   int IR_NO_INLINE tuple_byte_size() const { return tuple_byte_size_; }
   int IR_NO_INLINE tuple_byte_size(const TupleDescriptor& desc) const {

@@ -726,7 +726,7 @@ PLAN-ROOT SINK
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
 |  fk/pk conjuncts: a.id = b.id
-|  runtime filters: RF001[min_max] <- b.id
+|  runtime filters: RF000[min_max] <- b.id
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  tuple-ids=0,1 row-size=8B cardinality=7.30K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
@@ -737,7 +737,7 @@ PLAN-ROOT SINK
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN KUDU [functional_kudu.alltypes a]
-   runtime filters: RF001[min_max] -> a.id
+   runtime filters: RF000[min_max] -> a.id
    mem-estimate=768.00KB mem-reservation=0B thread-reservation=1
    tuple-ids=0 row-size=4B cardinality=7.30K
    in pipelines: 00(GETNEXT)

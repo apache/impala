@@ -681,6 +681,9 @@ enum TImpalaQueryOptions {
 
   // If true, Kudu's multi-row transaction is enabled.
   ENABLE_KUDU_TRANSACTION = 132
+
+  // Indicates whether to use min/max filtering on partition columns
+  MINMAX_FILTER_PARTITION_COLUMNS = 133
 }
 
 // The summary of a DML statement.

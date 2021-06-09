@@ -140,11 +140,12 @@ aggregation(SUM, NumRuntimeFilteredPages): 120
 ---- QUERY
 ###################################################
 # Repeat the above test with the overlap filtering
-# disabled. Should return the same number of rows.
-# Expect to see 0 pages filtered out.
+# on sorted columns disabled. Should return the
+# same number of rows. Expect to see 0 pages
+# filtered out.
 ###################################################
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
-SET MINMAX_FILTER_THRESHOLD=0.0;
+SET MINMAX_FILTER_SORTED_COLUMNS=false;
 select straight_join count(*)
 from lineitem_sorted_l_shipdate a join [SHUFFLE]
 tpch_parquet.orders b
@@ -185,11 +186,12 @@ aggregation(SUM, NumRuntimeFilteredPages): 255
 ---- QUERY
 ###################################################
 # Join the above sorted column with itself with
-# overlap filtering disabled. Expect to see the same
-# result with 0 pages filtered out.
+# overlap filtering on sorted columns disabled.
+# Expect to see the same result with 0 pages
+# filtered out.
 ###################################################
 SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
-SET MINMAX_FILTER_THRESHOLD=0.0;
+SET MINMAX_FILTER_SORTED_COLUMNS=false;
 select straight_join count(*)
 from lineitem_sorted_l_extendedprice a join [SHUFFLE]
 lineitem_sorted_l_extendedprice b

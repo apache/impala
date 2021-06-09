@@ -658,7 +658,9 @@ public class HdfsScanNode extends ScanNode {
     minMaxTuple_.computeMemLayout();
   }
 
-  // Init the necessary data structures prior to the detection of overlap predicates.
+  /**
+   * Init the necessary data structures prior to the detection of overlap predicates.
+   */
   public void initOverlapPredicate(Analyzer analyzer) {
     if (!allParquet_) return;
     Preconditions.checkNotNull(minMaxTuple_);
@@ -668,7 +670,9 @@ public class HdfsScanNode extends ScanNode {
     overlap_first_slot_idx_ = minMaxTuple_.getSlots().size();
   }
 
-  // Data type check on the slot type and the join column type.
+  /**
+   * Data type check on the slot type and the join column type.
+   */
   private boolean checkTypeForOverlapPredicate(Type slotType, Type joinType) {
     // Both slotType and joinType must be Boolean at the same time.
     if (slotType.isBoolean() && joinType.isBoolean()) {
@@ -718,11 +722,33 @@ public class HdfsScanNode extends ScanNode {
     return false;
   }
 
+  /**
+   * Determine if a runtime filter should be allowed given the relevant query options.
+   */
+  private boolean allowRuntimeFilter(TQueryOptions queryOptions,
+      boolean isBoundByPartitionColumns, boolean isLeadingLexicalSortedColumn) {
+    boolean minmaxOnPartitionColumns = queryOptions.isMinmax_filter_partition_columns();
+    boolean minmaxOnSortedColumns = queryOptions.isMinmax_filter_sorted_columns();
+
+    // Allow min/max filters on partition columns only when enabled.
+    if (isBoundByPartitionColumns) {
+      return minmaxOnPartitionColumns;
+    }
+
+    // Allow min/max filters on sorted columns only when enabled.
+    if (isLeadingLexicalSortedColumn) {
+      return minmaxOnSortedColumns;
+    }
+
+    // Allow min/max filters if the threshold value > 0.0.
+    return queryOptions.getMinmax_filter_threshold() > 0.0;
+  }
+
   // Try to compute the overlap predicate for the filter. Return true if an overlap
   // predicate can be formed utilizing the min/max filter 'filter' against the
   // target expr 'targetExpr'. Return false otherwise.
-  public Boolean tryToComputeOverlapPredicate(
-      Analyzer analyzer, RuntimeFilter filter, Expr targetExpr) {
+  public Boolean tryToComputeOverlapPredicate(Analyzer analyzer, RuntimeFilter filter,
+      Expr targetExpr, boolean isBoundByPartitionColumns) {
     // This optimization is only valid for min/max filters and Parquet tables.
     if (filter.getType() != TRuntimeFilterType.MIN_MAX) return false;
     if (!allParquet_) return false;
@@ -740,23 +766,20 @@ public class HdfsScanNode extends ScanNode {
         return false;
     }
 
-    // Check if query option minmax_filter_sorted_columns is true and the
-    // target column is the leading sort-by column in lexical sort order.
-    // If so, allow the process to continue.
-    if (analyzer.getQueryOptions().isMinmax_filter_sorted_columns()) {
-      Column column = slotRefInScan.getDesc().getColumn();
-      if (column != null) {
-        TupleDescriptor tDesc = slotRefInScan.getDesc().getParent();
-        FeTable table = tDesc.getTable();
-        if (table != null && table instanceof FeFsTable) {
-          if (!((FeFsTable) table).isLeadingSortByColumn(column.getName())) {
-            return false;
-          }
-          if ((((FeFsTable) table).IsLexicalSortByColumn()) == false) {
-            return false;
-          }
-        }
+    boolean isLeadingLexicalSortedColumn = false;
+    Column column = slotRefInScan.getDesc().getColumn();
+    if (column != null) {
+      TupleDescriptor tDesc = slotRefInScan.getDesc().getParent();
+      FeTable table = tDesc.getTable();
+      if (table != null && table instanceof FeFsTable) {
+        isLeadingLexicalSortedColumn =
+            ((FeFsTable) table).isLeadingSortByColumn(column.getName())
+            && ((FeFsTable) table).IsLexicalSortByColumn();
       }
+    }
+    if (!allowRuntimeFilter(analyzer.getQueryOptions(), isBoundByPartitionColumns,
+            isLeadingLexicalSortedColumn)) {
+      return false;
     }
 
     Expr srcExpr = filter.getSrcExpr();
