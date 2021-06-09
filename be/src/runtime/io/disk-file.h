@@ -30,6 +30,7 @@
 namespace impala {
 class TmpFileMgr;
 class TmpFileRemote;
+class TmpFileMgrTest;
 namespace io {
 class RemoteOperRange;
 class ScanRange;
@@ -147,6 +148,7 @@ class DiskFile {
   friend class WriteRange;
   friend class impala::TmpFileMgr;
   friend class impala::TmpFileRemote;
+  friend class impala::TmpFileMgrTest;
 
   /// Path of the physical file in the filesystem.
   const std::string path_;

@@ -521,8 +521,14 @@ void TmpFileMgr::RemoveRemoteDir(TmpFileGroup* file_group, DeviceId device_id) {
   hdfsFS hdfs_conn;
   Status status =
       HdfsFsCache::instance()->GetConnection(files_dir.str(), &hdfs_conn, &hdfs_conns_);
-  DCHECK(hdfs_conn != nullptr);
-  hdfsDelete(hdfs_conn, files_dir.str().c_str(), 1);
+  if (status.ok()) {
+    DCHECK(hdfs_conn != nullptr);
+    hdfsDelete(hdfs_conn, files_dir.str().c_str(), 1);
+  } else {
+    LOG(WARNING) << "Failed to remove the remote directory because unable to create a "
+                    "connection to "
+                 << files_dir.str();
+  }
 }
 
 Status TmpFileMgr::AsyncWriteRange(WriteRange* write_range, TmpFile* tmp_file) {

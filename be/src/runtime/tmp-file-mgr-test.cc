@@ -22,7 +22,10 @@
 #include <numeric>
 
 #include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/uuid/random_generator.hpp>
+#include <boost/uuid/uuid_io.hpp>
 #include <gtest/gtest.h>
 
 #include "common/init.h"
@@ -44,6 +47,7 @@
 #include "common/names.h"
 
 using boost::filesystem::path;
+using boost::uuids::random_generator;
 
 DECLARE_bool(disk_spill_encryption);
 DECLARE_int64(disk_spill_compression_buffer_limit_bytes);
@@ -54,6 +58,7 @@ DECLARE_int32(stress_scratch_write_delay_ms);
 #endif
 DECLARE_string(remote_tmp_file_size);
 DECLARE_bool(allow_spill_to_hdfs);
+DECLARE_int32(wait_for_spill_buffer_timeout_s);
 
 namespace impala {
 
@@ -191,6 +196,35 @@ class TmpFileMgrTest : public ::testing::Test {
   /// Helper to cancel the FileGroup RequestContext.
   static void CancelIoContext(TmpFileGroup* group) {
     group->io_ctx_->Cancel();
+  }
+
+  /// Helper to set an invalid remote path to create an error.
+  static void SetInvalidRemotePath(TmpFileMgr* tmp_file_mgr, TmpFileGroup* group) {
+    string dir = tmp_file_mgr->tmp_dirs_remote_->path;
+    int dev_id = 0;
+    string invalid_path = "";
+    std::vector<std::shared_ptr<TmpFile>> tmp_files_remote;
+    std::unordered_map<TmpFile*, std::shared_ptr<TmpFile>> tmp_files_remote_ptrs;
+    for (auto tmp_file_shared_ptr : group->tmp_files_remote_) {
+      auto org_tmp_file = static_cast<TmpFileRemote*>(tmp_file_shared_ptr.get());
+      auto local_path = org_tmp_file->local_buffer_path_;
+      TmpFileRemote* tmp_file_r =
+          new TmpFileRemote(group, dev_id, invalid_path, local_path, false, dir.c_str());
+      tmp_file_r->at_capacity_ = org_tmp_file->at_capacity_;
+      tmp_file_r->enqueued_ = org_tmp_file->enqueued_;
+      tmp_file_r->local_buffer_path_ = org_tmp_file->local_buffer_path_;
+      tmp_file_r->file_size_ = org_tmp_file->file_size_;
+      tmp_file_r->allocation_offset_ = org_tmp_file->allocation_offset_;
+      tmp_file_r->disk_buffer_file_.swap(org_tmp_file->disk_buffer_file_);
+      // Set buffer returned to avoid DCHECK failure while destruction.
+      org_tmp_file->buffer_returned_ = true;
+      shared_ptr<TmpFile> tmp_file_remote(move(tmp_file_r));
+      tmp_files_remote.emplace_back(move(tmp_file_remote));
+      tmp_files_remote_ptrs.emplace(
+          tmp_files_remote.back().get(), tmp_files_remote.back());
+    }
+    group->tmp_files_remote_.swap(tmp_files_remote);
+    group->tmp_files_remote_ptrs_.swap(tmp_files_remote_ptrs);
   }
 
   static void SetWriteRangeContext(WriteRange* write_range, TmpFileGroup* group) {
@@ -1688,7 +1722,7 @@ void TmpFileMgrTest::TestTmpFileBufferPoolHelper(TmpFileMgr& tmp_file_mgr,
   write_range->SetDiskFile(file3->GetWriteFile());
   SetWriteRangeContext(write_range.get(), file_group);
   // The space hasn't been reserved for file3 because the pool size is 2K, and there are
-  // two files in use, we use the AsyncWriteRange() function to wait untial a file is
+  // two files in use, we use the AsyncWriteRange() function to wait until a file is
   // available to be evicted, then finish the writing of file3.
   EXPECT_FALSE(file3->GetWriteFile()->IsSpaceReserved());
   ASSERT_OK(tmp_file_mgr.AsyncWriteRange(write_range.get(), file3));
@@ -1818,4 +1852,84 @@ TEST_F(TmpFileMgrTest, TestRemoteRemoveBuffer) {
   file_group.Close();
   test_env_->TearDownQueries();
 }
+
+/// Test config a non-existent remote path.
+TEST_F(TmpFileMgrTest, TestRemoteUploadToNonExistentPath) {
+  TmpFileMgr tmp_file_mgr;
+  vector<string> tmp_dirs{{LOCAL_BUFFER_PATH}};
+  RemoveAndCreateDirs(tmp_dirs);
+  // Create a non-existent remote path.
+  string random_name = lexical_cast<string>(random_generator()());
+  string remote_file_path_to_crt = "s3a://non-existent_" + random_name + "/tmp/test";
+  tmp_dirs.push_back(remote_file_path_to_crt);
+
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  string data = "arbitrary data";
+  MemRange data_mem_range(reinterpret_cast<uint8_t*>(&data[0]), data.size());
+  unique_ptr<TmpWriteHandle> handle;
+  WriteRange::WriteDoneCallback callback = [](const Status& status) {};
+  Status status = file_group.Write(data_mem_range, callback, &handle);
+  // Failed to create the connection to a non-existent remote path.
+  EXPECT_FALSE(status.ok());
+  file_group.Close();
+  test_env_->TearDownQueries();
+}
+
+/// Test upload failure and lead to query cancelled due to timeout.
+TEST_F(TmpFileMgrTest, TestRemoteUploadFailed) {
+  TmpFileMgr tmp_file_mgr;
+  int64_t buffer_limit = 2048;
+  int64_t alloc_size = 512;
+  // Set the timeout value to the minimum, 1 second. Because otherwise, the testcase
+  // needs to wait for the default timeout interval, which is much larger than 1, before
+  // the testcase can end and exit.
+  FLAGS_wait_for_spill_buffer_timeout_s = 1;
+  // The file size is the same as file_size, so each write uses one file.
+  FLAGS_remote_tmp_file_size = "1KB";
+  vector<string> tmp_create_dirs{{LOCAL_BUFFER_PATH}};
+  vector<string> tmp_dirs{{Substitute(LOCAL_BUFFER_PATH + ":$0", buffer_limit)}};
+  RemoveAndCreateDirs(tmp_create_dirs);
+  tmp_dirs.push_back(HDFS_LOCAL_URL);
+
+  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
+  TUniqueId id;
+  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
+  uint8_t* data = (uint8_t*)malloc(alloc_size);
+  ASSERT_TRUE(data != nullptr);
+  MemRange data_mem_range(data, alloc_size);
+
+  int write_times = buffer_limit / alloc_size;
+
+  // We set invalid remote paths to the tmp files, so that the upload of
+  // the tmp files would fail. Because all of the uploads fail, the query
+  // should be cancelled in the end due to timeout (the local buffer is full,
+  // the later file waits for the buffer till timeout happens).
+  for (int i = 0; i < write_times + 1; i++) {
+    // Set the remote paths to invalid paths to create upload failures.
+    if (i != write_times) SetInvalidRemotePath(&tmp_file_mgr, &file_group);
+    unique_ptr<TmpWriteHandle> handle;
+    WriteRange::WriteDoneCallback callback = [this, i, write_times](
+                                                 const Status& status) {
+      // The first several pages have been successfully written because the local
+      // buffer isn't full. However, because all of the uploads fail, the existing
+      // local buffer can't be evicted and would be full eventually. In the end, the
+      // query is cancelled because of the timeout.
+      if (i < write_times) {
+        EXPECT_OK(status);
+      } else {
+        EXPECT_EQ(status.code(), TErrorCode::CANCELLED_INTERNALLY);
+      }
+      SignalCallback(status);
+    };
+    EXPECT_OK(file_group.Write(data_mem_range, callback, &handle));
+    WaitForWrite(handle.get());
+    WaitForCallbacks(1);
+  }
+
+  file_group.Close();
+  test_env_->TearDownQueries();
+}
+
 } // namespace impala

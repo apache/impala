@@ -263,6 +263,7 @@ class TmpFileRemote : public TmpFile {
   friend class TmpFileMgr;
   friend class TmpFileGroup;
   friend class TmpFileBufferPool;
+  friend class TmpFileMgrTest;
 
   /// The default file size of the temporary file, but the actual file size can be a
   /// little over it if the size of the last page written to the file is over the
