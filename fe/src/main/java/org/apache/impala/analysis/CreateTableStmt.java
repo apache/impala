@@ -298,7 +298,7 @@ public class CreateTableStmt extends StatementBase {
       List<IcebergPartitionSpec> iceSpec = tableDef_.getIcebergPartitionSpecs();
       if (iceSpec != null && !iceSpec.isEmpty()) {
         throw new AnalysisException(
-            "PARTITION BY SPEC is only valid for Iceberg tables.");
+            "PARTITIONED BY SPEC is only valid for Iceberg tables.");
       }
     }
 

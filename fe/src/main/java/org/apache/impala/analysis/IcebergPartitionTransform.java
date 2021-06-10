@@ -87,6 +87,25 @@ public class IcebergPartitionTransform extends StmtNode {
     return builder.toString();
   }
 
+  public final String toSql(String colName) {
+    return toSql(colName, ToSqlOptions.DEFAULT);
+  }
+
+  public String toSql(String colName, ToSqlOptions options) {
+    StringBuilder builder = new StringBuilder();
+    if (transformType_ != TIcebergPartitionTransformType.IDENTITY) {
+      builder.append(transformType_.toString()).append ("(");
+      if (transformParam_ != null) {
+        builder.append(transformParam_.toString()).append(", ");
+      }
+    }
+    builder.append(colName);
+    if (transformType_ != TIcebergPartitionTransformType.IDENTITY) {
+      builder.append(")");
+    }
+    return builder.toString();
+  }
+
   public TIcebergPartitionTransform toThrift() {
     TIcebergPartitionTransform transform = new TIcebergPartitionTransform();
     transform.setTransform_type(transformType_);

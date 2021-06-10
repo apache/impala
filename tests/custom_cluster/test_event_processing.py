@@ -224,7 +224,7 @@ class TestEventProcessing(CustomClusterTestSuite):
       self.execute_query("create database if not exists {0}".format(db_name))
       self.execute_query("""
           create table {0}.{1} (i int)
-          partition by spec (i bucket 5)
+          partitioned by spec (bucket(5, i))
           stored as iceberg;""".format(db_name, tbl_name))
       self.execute_query("insert into {0}.{1} values (1)".format(db_name, tbl_name))
       data = self.execute_scalar("select * from {0}.{1}".format(db_name, tbl_name))

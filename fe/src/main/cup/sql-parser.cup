@@ -1776,7 +1776,7 @@ iceberg_partition_spec_def ::=
   ;
 
 iceberg_partition_field_list ::=
-  KW_PARTITION KW_BY KW_SPEC LPAREN iceberg_partition_field_defs:cols RPAREN
+  KW_PARTITIONED KW_BY KW_SPEC LPAREN iceberg_partition_field_defs:cols RPAREN
   {: RESULT = cols; :}
   ;
 
@@ -1795,16 +1795,26 @@ iceberg_partition_field_defs ::=
   ;
 
 iceberg_partition_field_def ::=
-  IDENT:col_name iceberg_partition_transform:partition_transform
-  {: RESULT = new IcebergPartitionField(col_name, partition_transform); :}
-  ;
-
-iceberg_partition_transform ::=
-  iceberg_partition_transform_type:transfrom_type INTEGER_LITERAL:transform_param
-  {: RESULT = IcebergUtil.getPartitionTransform(transfrom_type,
-      transform_param.intValue()); :}
-  | IDENT:transfrom_type
-  {: RESULT = IcebergUtil.getPartitionTransform(transfrom_type); :}
+  IDENT:col_name
+  {:
+    RESULT = new IcebergPartitionField(col_name,
+                                       IcebergUtil.getPartitionTransform("IDENTITY"));
+  :}
+  |
+  iceberg_partition_transform_type:partition_transform
+  LPAREN IDENT:col_name RPAREN
+  {:
+    RESULT = new IcebergPartitionField(col_name, IcebergUtil.getPartitionTransform(
+                                       partition_transform));
+  :}
+  | iceberg_partition_transform_type:partition_transform
+    LPAREN
+      INTEGER_LITERAL:transform_param COMMA IDENT:col_name
+    RPAREN
+  {:
+    RESULT = new IcebergPartitionField(col_name, IcebergUtil.getPartitionTransform(
+                                       partition_transform, transform_param.intValue()));
+  :}
   ;
 
 iceberg_partition_transform_type ::=

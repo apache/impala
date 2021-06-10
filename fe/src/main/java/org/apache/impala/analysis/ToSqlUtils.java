@@ -419,7 +419,7 @@ public class ToSqlUtils {
         properties.remove(StatsSetupConst.DO_NOT_UPDATE_STATS);
         properties.remove(IcebergTable.METADATA_LOCATION);
 
-        // Fill "PARTITION BY SPEC" part if the Iceberg table is partitioned.
+        // Fill "PARTITIONED BY SPEC" part if the Iceberg table is partitioned.
         FeIcebergTable feIcebergTable= (FeIcebergTable)table;
         if (!feIcebergTable.getPartitionSpecs().isEmpty()) {
           IcebergPartitionSpec latestPartitionSpec =
@@ -503,7 +503,7 @@ public class ToSqlUtils {
           Joiner.on(", \n  ").join(sortProperties.first)));
     }
     if (icebergPartitions != null && !icebergPartitions.isEmpty()) {
-      sb.append("PARTITION BY SPEC\n");
+      sb.append("PARTITIONED BY SPEC\n");
       sb.append(icebergPartitions);
       sb.append("\n");
     }

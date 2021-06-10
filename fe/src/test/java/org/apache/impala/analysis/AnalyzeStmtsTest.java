@@ -4858,21 +4858,30 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   public void testCreatePartitionedIcebergTable() throws ImpalaException {
     String tblProperties = " TBLPROPERTIES ('iceberg.catalog'='hadoop.tables')";
     AnalyzesOk("CREATE TABLE tbl1 (i int, p1 int, p2 timestamp) " +
-        "PARTITION BY SPEC (p1 BUCKET 10, p1 TRUNCATE 5, p2 DAY) STORED AS ICEBERG" +
-            tblProperties);
+        "PARTITIONED BY SPEC (BUCKET(10, p1), TRUNCATE(5, p1), DAY(p2)) " +
+        "STORED AS ICEBERG" + tblProperties);
+    AnalyzesOk("CREATE TABLE tbl1 (ts timestamp) " +
+        "PARTITIONED BY SPEC (YEAR(ts), MONTH(ts), DAY(ts), HOUR(ts)) " +
+        "STORED AS ICEBERG" + tblProperties);
+    AnalyzesOk("CREATE TABLE tbl1 (ts timestamp) " +
+        "PARTITIONED BY SPEC (YEARS(ts), MONTHS(ts), DAYS(ts), HOURS(ts)) " +
+        "STORED AS ICEBERG" + tblProperties);
     AnalysisError("CREATE TABLE tbl1 (i int, p1 int, p2 timestamp) " +
-        "PARTITION BY SPEC (p1 BUCKET, p2 DAY) STORED AS ICEBERG" + tblProperties,
+        "PARTITIONED BY SPEC (BUCKET(p1), DAY(p2)) STORED AS ICEBERG" + tblProperties,
+        "BUCKET and TRUNCATE partition transforms should have a parameter.");
+    AnalysisError("CREATE TABLE tbl1 (i int, p1 int) " +
+        "PARTITIONED BY SPEC (TRUNCATE(p1)) STORED AS ICEBERG",
         "BUCKET and TRUNCATE partition transforms should have a parameter.");
     AnalysisError("CREATE TABLE tbl1 (i int, p1 int, p2 timestamp) " +
-        "PARTITION BY SPEC (p1 BUCKET 0, p2 DAY) STORED AS ICEBERG" + tblProperties,
+        "PARTITIONED BY SPEC (BUCKET(0, p1), DAY(p2)) STORED AS ICEBERG" + tblProperties,
         "The parameter of a partition transform should be greater than zero.");
     AnalysisError("CREATE TABLE tbl1 (i int, p1 int, p2 timestamp) " +
-        "PARTITION BY SPEC (p1 TRUNCATE 0, p2 DAY) STORED AS ICEBERG" + tblProperties,
+        "PARTITIONED BY SPEC (TRUNCATE(0, p1), DAY(p2)) STORED AS ICEBERG" +
+        tblProperties,
         "The parameter of a partition transform should be greater than zero.");
-
     AnalysisError("CREATE TABLE tbl1 (i int, p1 int, p2 timestamp) " +
-        "PARTITION BY SPEC (p1 BUCKET 10, p2 DAY 10) STORED AS ICEBERG" + tblProperties,
+        "PARTITIONED BY SPEC (BUCKET(10, p1), DAY(10, p2)) STORED AS ICEBERG" +
+        tblProperties,
         "Only BUCKET and TRUNCATE partition transforms accept a parameter.");
   }
-
 }

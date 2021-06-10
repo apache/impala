@@ -3,7 +3,7 @@
 # Test partitioned INSERTs with single column that is also
 # the partitioned column.
 create table ice_only_part (i int)
-partition by spec (i identity)
+partitioned by spec (i)
 stored as iceberg;
 ---- RESULTS
 'Table has been created.'
@@ -44,7 +44,7 @@ aggregation(SUM, RowsRead): 1
 ---- QUERY
 # Test inserts with multple partition columns.
 create table ice_multi_part (i int, d date, s string)
-partition by spec(i identity, d identity)
+partitioned by spec(i, d)
 stored as iceberg;
 ---- RESULTS
 'Table has been created.'
@@ -72,7 +72,7 @@ aggregation(SUM, RowsRead): 1
 ---- QUERY
 # Test that Impala only writes one file per partitions.
 create table ice_bigints (i BIGINT, j BIGINT, k BIGINT)
-partition by spec (i identity, j identity)
+partitioned by spec (i, j)
 stored as iceberg;
 ---- RESULTS
 'Table has been created.'
@@ -110,15 +110,15 @@ create table alltypes_part (
   date_col DATE,
   string_col STRING,
   timestamp_col TIMESTAMP)
-partition by spec (
-  id identity,
-  bool_col identity,
-  int_col identity,
-  bigint_col identity,
-  float_col identity,
-  double_col identity,
-  date_col identity,
-  string_col identity)
+partitioned by spec (
+  id,
+  bool_col,
+  int_col,
+  bigint_col,
+  float_col,
+  double_col,
+  date_col,
+  string_col)
 stored as iceberg;
 ---- RESULTS
 'Table has been created.'
@@ -226,7 +226,7 @@ aggregation(SUM, NumRowGroups): 8
 ---- QUERY
 # Test inserts with multple partition columns.
 create table ice_part_non_order (i int, d date, s string)
-partition by spec(s identity, d identity)
+partitioned by spec(s, d)
 stored as iceberg;
 ---- RESULTS
 'Table has been created.'

@@ -57,8 +57,8 @@ STRING, STRING, STRING
 ---- QUERY
 # Test CTAS in Iceberg HadoopTables catalog.
 # Set table location to custom location.
-# Use PARTITION BY SPEC
-CREATE TABLE ice_ctas_hadoop_tables_part PARTITION BY SPEC (d month)
+# Use PARTITIONED BY SPEC
+CREATE TABLE ice_ctas_hadoop_tables_part PARTITIONED BY SPEC (month(d))
 STORED AS ICEBERG
 LOCATION '/test-warehouse/$DATABASE.db/loc_test'
 TBLPROPERTIES ('iceberg.catalog'='hadoop.tables') AS SELECT s, ts, d FROM value_tbl;
@@ -78,10 +78,10 @@ STRING, STRING, STRING
 ---- QUERY
 # Test CTAS in Iceberg HadoopCatalog catalog.
 # Set 'iceberg.catalog_location' and 'iceberg.table_identifier'
-# Partition by TRUNCATE
+# Partitioned by TRUNCATE
 # Cast TINYINT to INT.
 # INSERT additional row.
-CREATE TABLE ice_ctas_hadoop_catalog_part PARTITION BY SPEC (s truncate 3)
+CREATE TABLE ice_ctas_hadoop_catalog_part PARTITIONED BY SPEC (truncate(3, s))
 STORED AS ICEBERG
 TBLPROPERTIES ('iceberg.catalog'='hadoop.catalog',
                'iceberg.catalog_location'='/test-warehouse/$DATABASE.db/cat_loc',

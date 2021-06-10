@@ -3,7 +3,7 @@
 # Test partitioned INSERTs with single column that is also
 # the partitioned column. Partition transform is BUCKET.
 create table single_col_bucket (s string)
-partition by spec (s bucket 7)
+partitioned by spec (bucket(7, s))
 stored as iceberg;
 ====
 ---- QUERY
@@ -56,7 +56,7 @@ aggregation(SUM, NumRowGroups): 1
 ---- QUERY
 # Bucket transform for multiple columns.
 create table multi_col_bucket (i int, s string, d date, t timestamp)
-partition by spec (i bucket 3, s bucket 5, d bucket 5, t bucket 5)
+partitioned by spec (bucket(3, i), bucket(5, s), bucket(5, d), bucket(5, t))
 stored as iceberg;
 ====
 ---- QUERY
@@ -147,7 +147,7 @@ aggregation(SUM, NumRowGroups): 2
 ---- QUERY
 # Test single col TRUNCATE
 create table single_col_truncate (d decimal(10, 4))
-partition by spec (d truncate 100)
+partitioned by spec (truncate(100, d))
 stored as iceberg;
 ====
 ---- QUERY
@@ -227,7 +227,7 @@ aggregation(SUM, NumRowGroups): 3
 ---- QUERY
 # Test single col TRUNCATE
 create table multi_col_truncate (i int, b bigint, d decimal(16, 6), s string)
-partition by spec (s truncate 15, i truncate 5, b truncate 11, d truncate 100000)
+partitioned by spec (truncate(15, s), truncate(5, i), truncate(11, b), truncate(100000, d))
 stored as iceberg;
 ====
 ---- QUERY
@@ -337,7 +337,7 @@ aggregation(SUM, NumRowGroups): 1
 ---- QUERY
 # Create table with YEAR partition transform
 create table year_transform(t timestamp, d date)
-partition by spec (t year, d year)
+partitioned by spec (year(t), year(d))
 stored as iceberg;
 ====
 ---- QUERY
@@ -457,7 +457,7 @@ aggregation(SUM, NumRowGroups): 2
 ---- QUERY
 # Create table with MONTH partition transform
 create table month_transform(t timestamp, d date)
-partition by spec (t month, d month)
+partitioned by spec (month(t), month(d))
 stored as iceberg;
 ====
 ---- QUERY
@@ -565,7 +565,7 @@ aggregation(SUM, NumRowGroups): 2
 ---- QUERY
 # Create table with DAY partition transform
 create table day_transform(t timestamp, d date)
-partition by spec (t day, d day)
+partitioned by spec (day(t), day(d))
 stored as iceberg;
 ====
 ---- QUERY
@@ -689,7 +689,7 @@ aggregation(SUM, NumRowGroups): 1
 ---- QUERY
 # Create table with HOUR partition transform
 create table hour_transform(t timestamp)
-partition by spec (t hour)
+partitioned by spec (hour(t))
 stored as iceberg;
 ====
 ---- QUERY
@@ -786,7 +786,7 @@ aggregation(SUM, NumRowGroups): 3
 ====
 ---- QUERY
 create table mixed_and_shuffled (s string, b bigint, de decimal(6, 2), t timestamp, da date)
-partition by spec (t day, da year, s truncate 5, b bucket 3, de truncate 100)
+partitioned by spec (day(t), year(da), truncate(5, s), bucket(3, b), truncate(100, de))
 stored as iceberg;
 ====
 ---- QUERY

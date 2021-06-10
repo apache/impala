@@ -9,14 +9,14 @@ CREATE TABLE iceberg_hadoop_tables(
   map_test MAP <STRING, array <STRING>>,
   struct_test STRUCT <f1: BIGINT, f2: BIGINT>
 )
-PARTITION BY SPEC
+PARTITIONED BY SPEC
 (
-  level IDENTITY,
-  level TRUNCATE 10,
-  event_time IDENTITY,
-  event_time HOUR,
-  event_time BUCKET 1000,
-  register_time DAY
+  level,
+  TRUNCATE(10, level),
+  event_time,
+  HOURS(event_time),
+  BUCKET(1000, event_time),
+  DAY(register_time)
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
@@ -78,11 +78,11 @@ TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 CREATE TABLE iceberg_hadoop_tbls_with_loc(
   level STRING
 )
-PARTITION BY SPEC
+PARTITIONED BY SPEC
 (
-  level IDENTITY,
-  level BUCKET 12345,
-  level TRUNCATE 15
+  level,
+  BUCKET(12345, level),
+  TRUNCATE(15, level)
 )
 STORED AS ICEBERG
 LOCATION '/$DATABASE.iceberg_test_with_location'
@@ -153,14 +153,14 @@ CREATE TABLE iceberg_hadoop_catalog(
   map_test MAP <STRING, array <STRING>>,
   struct_test STRUCT <f1: BIGINT, f2: BIGINT>
 )
-PARTITION BY SPEC
+PARTITIONED BY SPEC
 (
-  level IDENTITY,
-  level TRUNCATE 10,
-  event_time IDENTITY,
-  event_time HOUR,
-  event_time BUCKET 1000,
-  register_time DAY
+  level,
+  TRUNCATE(10, level),
+  event_time,
+  HOUR(event_time),
+  BUCKET(1000, event_time),
+  DAYS(register_time)
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
@@ -202,11 +202,11 @@ DROP TABLE iceberg_hadoop_catalog;
 CREATE TABLE iceberg_hadoop_catalog(
   level STRING
 )
-PARTITION BY SPEC
+PARTITIONED BY SPEC
 (
-  level IDENTITY,
-  level BUCKET 12345,
-  level TRUNCATE 10
+  level,
+  BUCKET(12345, level),
+  TRUNCATE(10, level)
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.catalog',
@@ -327,12 +327,12 @@ CREATE TABLE iceberg_hadoop_cat_with_orc(
   map_test MAP <STRING, array <STRING>>,
   struct_test STRUCT <f1: BIGINT, f2: BIGINT>
 )
-PARTITION BY SPEC
+PARTITIONED BY SPEC
 (
-  level IDENTITY,
-  event_time IDENTITY,
-  event_time HOUR,
-  register_time DAY
+  level,
+  event_time,
+  HOUR(event_time),
+  DAY(register_time)
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.file_format'='orc','iceberg.catalog'='hadoop.catalog',
@@ -395,12 +395,12 @@ CREATE TABLE iceberg_part_hive_cat(
   map_test MAP <STRING, array <STRING>>,
   struct_test STRUCT <f1: BIGINT, f2: BIGINT>
 )
-PARTITION BY SPEC
+PARTITIONED BY SPEC
 (
-  level IDENTITY,
-  event_time IDENTITY,
-  event_time HOUR,
-  register_time DAY
+  level,
+  event_time,
+  HOUR(event_time),
+  DAY(register_time)
 )
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hive.catalog')

@@ -85,7 +85,7 @@ INT,INT
 ---- QUERY
 # Create DAY-partitioned table for INSERT OVERWRITE
 create table ice_day (ts timestamp)
-partition by spec (ts DAY)
+partitioned by spec (DAY(ts))
 stored as iceberg;
 ---- RESULTS
 'Table has been created.'
@@ -131,7 +131,7 @@ TIMESTAMP
 ---- QUERY
 # Create TRUNCATE-partitioned table for INSERT OVERWRITE
 create table ice_trunc (d decimal(10, 2))
-partition by spec (d TRUNCATE 100)
+partitioned by spec (TRUNCATE(100, d))
 stored as iceberg;
 ---- RESULTS
 'Table has been created.'

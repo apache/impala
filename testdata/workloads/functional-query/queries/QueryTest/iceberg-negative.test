@@ -9,20 +9,16 @@ AnalysisException: Table requires at least 1 column for managed iceberg table.
 CREATE TABLE iceberg_test(
   level STRING
 )
-PARTITION BY SPEC
-(
-  level IDENTITY,
-  event_time HOUR
-)
+PARTITIONED BY SPEC(level, hour(event_time))
 STORED AS ICEBERG;
 ---- CATCH
 AnalysisException: Cannot find source column: event_time
 ====
 ---- QUERY
 CREATE TABLE non_iceberg_table_with_spec (i INT)
-PARTITION BY SPEC (i identity);
+PARTITIONED BY SPEC (i);
 ---- CATCH
-AnalysisException: PARTITION BY SPEC is only valid for Iceberg tables.
+AnalysisException: PARTITIONED BY SPEC is only valid for Iceberg tables.
 ====
 ---- QUERY
 CREATE TABLE iceberg_table_hadoop_tables(
@@ -94,7 +90,7 @@ row_regex:.*CAUSED BY: TableLoadingException: Table does not exist: fake_db.fake
 ====
 ---- QUERY
 CREATE TABLE iceberg_overwrite_bucket (i int)
-PARTITION BY SPEC (i bucket 3)
+PARTITIONED BY SPEC (bucket(3, i))
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 INSERT OVERWRITE iceberg_overwrite_bucket VALUES (1), (2), (3);
@@ -139,10 +135,7 @@ CREATE TABLE iceberg_partitioned_insert(
   level STRING,
   event_time TIMESTAMP
 )
-PARTITION BY SPEC
-(
-  level IDENTITY
-)
+PARTITIONED BY SPEC(level)
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='hadoop.tables');
 ---- RESULTS
@@ -155,8 +148,8 @@ Static partitioning is not supported for Iceberg tables.
 ====
 ---- QUERY
 CREATE TABLE all_colss_needed_for_insert (i int, j int, k int)
-partition by spec (j identity, k identity)
-stored as iceberg;
+PARTITIONED BY SPEC (j, k)
+STORED AS ICEBERG;
 ---- RESULTS
 'Table has been created.'
 ====
@@ -316,18 +309,18 @@ STORED AS ICEBERG
 AnalysisException: Unsupported column options for file format 'ICEBERG': 'id INT PRIMARY KEY'
 ====
 ---- QUERY
-# PARTITIONED BY and PARTITION BY SPEC is not allowed in same statement.
+# PARTITIONED BY and PARTITIONED BY SPEC is not allowed in same statement.
 CREATE TABLE iceberg_part_spec_part (i INT)
 PARTITIONED BY (p INT)
-PARTITION BY SPEC (i TRUNCATE 10)
+PARTITIONED BY SPEC (TRUNCATE(10, i))
 STORED AS ICEBERG;
 ---- CATCH
 Syntax error in line
 ====
 ---- QUERY
-# PARTITION BY SPEC and PARTITIONED BY is not allowed in same statement.
+# PARTITIONED BY SPEC and PARTITIONED BY is not allowed in same statement.
 CREATE TABLE iceberg_part_part_spec (i INT)
-PARTITION BY SPEC (i TRUNCATE 10)
+PARTITIONED BY SPEC (TRUNCATE(10, i))
 PARTITIONED BY (p INT)
 STORED AS ICEBERG;
 ---- CATCH
@@ -346,4 +339,11 @@ STORED AS ICEBERG;
 ALTER TABLE iceberg_set_wrong_fileformat SET TBLPROPERTIES ('iceberg.file_format'='parq');
 ---- CATCH
 Invalid fileformat for Iceberg table: parq
+====
+---- QUERY
+CREATE TABLE iceberg_wrong_partition (i int)
+PARTITIONED BY SPEC (wrong(i))
+STORED AS ICEBERG;
+---- CATCH
+Unsupported iceberg partition type: WRONG
 ====

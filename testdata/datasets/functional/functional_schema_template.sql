@@ -3050,7 +3050,7 @@ functional
 iceberg_int_partitioned
 ---- CREATE
 CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (i INT, j INT, k INT)
-PARTITION BY SPEC (i identity, j identity)
+PARTITIONED BY SPEC (i, j)
 STORED AS ICEBERG;
 ====
 ---- DATASET
@@ -3060,7 +3060,7 @@ iceberg_partition_transforms_zorder
 ---- CREATE
 CREATE TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 (ts timestamp, s string, i int, j int)
-PARTITION BY SPEC (ts year, s bucket 5)
+PARTITIONED BY SPEC (year(ts), bucket(5, s))
 SORT BY ZORDER (i, j)
 STORED AS ICEBERG;
 ====

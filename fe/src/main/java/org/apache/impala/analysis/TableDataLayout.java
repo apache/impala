@@ -22,7 +22,7 @@ import java.util.List;
 
 /**
  * Represents the PARTITION BY and PARTITIONED BY clauses of a DDL statement.
- * We can use PARTITION BY SPEC clause to create iceberg table partitions.
+ * We can use PARTITIONED BY SPEC clause to create iceberg table partitions.
  */
 class TableDataLayout {
 

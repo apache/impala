@@ -27,15 +27,15 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 
 /**
- * Represents the partitioning of a Iceberg table as defined in the PARTITION BY SPEC
+ * Represents the partitioning of a Iceberg table as defined in the PARTITIONED BY SPEC
  * clause of a CREATE TABLE statement. Iceberg supported kinds of partition.
  * Examples:
- * PARTITION BY SPEC
+ * PARTITIONED BY SPEC
  * (
- * dt identity,
- * event_time hour,
- * event_time day,
- * event_time month
+ * dt,
+ * hour(event_time),
+ * day(event_time),
+ * month(event_time)
  * )
  */
 public class IcebergPartitionSpec extends StmtNode {

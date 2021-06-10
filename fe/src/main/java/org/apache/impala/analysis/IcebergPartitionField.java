@@ -85,9 +85,7 @@ public class IcebergPartitionField extends StmtNode {
 
   @Override
   public String toSql(ToSqlOptions options) {
-    StringBuilder builder = new StringBuilder();
-    builder.append(origFieldName_+ " " + transform_.toSql());
-    return builder.toString();
+    return transform_.toSql(origFieldName_);
   }
 
   public TIcebergPartitionField toThrift() {

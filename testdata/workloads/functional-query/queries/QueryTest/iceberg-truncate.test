@@ -38,7 +38,7 @@ STRING, STRING, BIGINT, BIGINT, BIGINT, DOUBLE, BIGINT, BIGINT
 ---- QUERY
 # Create partitioned Iceberg table
 create table ice_part (i int, s string, t timestamp)
-partition by spec (t year, i bucket 10)
+partitioned by spec (year(t), bucket(10, i))
 stored as iceberg;
 insert into ice_part
 values (1, 'ice',  '2021-01-27 18:57:25.155746000'),

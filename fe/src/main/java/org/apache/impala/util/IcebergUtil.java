@@ -284,24 +284,23 @@ public class IcebergUtil {
 
   public static TIcebergPartitionTransformType getPartitionTransformType(
       String transformType) throws TableLoadingException {
+    Preconditions.checkNotNull(transformType);
     transformType = transformType.toUpperCase();
     if ("IDENTITY".equals(transformType)) {
       return TIcebergPartitionTransformType.IDENTITY;
-    } else if ("HOUR".equals(transformType)) {
-      return TIcebergPartitionTransformType.HOUR;
-    } else if ("DAY".equals(transformType)) {
-      return TIcebergPartitionTransformType.DAY;
-    } else if ("MONTH".equals(transformType)) {
-      return TIcebergPartitionTransformType.MONTH;
-    } else if ("YEAR".equals(transformType)) {
-      return TIcebergPartitionTransformType.YEAR;
     } else if (transformType != null && transformType.startsWith("BUCKET")) {
       return TIcebergPartitionTransformType.BUCKET;
     } else if (transformType != null && transformType.startsWith("TRUNCATE")) {
       return TIcebergPartitionTransformType.TRUNCATE;
-    } else {
-      throw new TableLoadingException("Unsupported iceberg partition type: " +
-      transformType);
+    }
+    switch (transformType) {
+      case "HOUR":  case "HOURS":  return TIcebergPartitionTransformType.HOUR;
+      case "DAY":   case "DAYS":   return TIcebergPartitionTransformType.DAY;
+      case "MONTH": case "MONTHS": return TIcebergPartitionTransformType.MONTH;
+      case "YEAR":  case "YEARS":  return TIcebergPartitionTransformType.YEAR;
+      default:
+        throw new TableLoadingException("Unsupported iceberg partition type: " +
+            transformType);
     }
   }
 
