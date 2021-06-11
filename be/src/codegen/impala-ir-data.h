@@ -25,4 +25,7 @@
 extern const unsigned char impala_llvm_ir[];
 extern const size_t impala_llvm_ir_len;
 
+extern const unsigned char impala_legacy_avx_llvm_ir[];
+extern const size_t impala_legacy_avx_llvm_ir_len;
+
 #endif
