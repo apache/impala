@@ -46,6 +46,15 @@ Impala supports x86_64 and has experimental support for arm64 (as of Impala 4.0)
 [Impala Requirements](https://impala.apache.org/docs/build/html/topics/impala_prereqs.html)
 contains more detailed information on the minimum CPU requirements.
 
+## Supported OS Distributions
+
+Impala runs on Linux systems only. The supported distros are
+
+* Ubuntu 16.04/18.04
+* CentOS/RHEL 7/8
+
+Other systems, e.g. SLES12, may also be supported but are not tested by the community.
+
 ## Export Control Notice
 
 This distribution uses cryptographic software and may be subject to export controls.
