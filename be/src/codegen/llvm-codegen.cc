@@ -126,6 +126,7 @@ DEFINE_string_hidden(llvm_cpu_attr_whitelist, "adx,aes,avx,avx2,bmi,bmi2,cmov,cx
     "routinely tested. This flag is provided to enable additional LLVM CPU attribute "
     "flags for testing.");
 #endif
+DECLARE_bool(enable_legacy_avx_support);
 
 namespace impala {
 
@@ -261,17 +262,34 @@ Status LlvmCodeGen::CreateFromMemory(FragmentState* state, ObjectPool* pool,
   SCOPED_TIMER((*codegen)->prepare_module_timer_);
   SCOPED_THREAD_COUNTER_MEASUREMENT((*codegen)->llvm_thread_counters());
 
-  // On x86_64, Impala now requires AVX2 support. This must have already been enforced
-  // prior to this call.
+  llvm::StringRef module_ir;
+  string module_name;
+
 #if __x86_64__
-  CHECK(IsCPUFeatureEnabled(CpuInfo::AVX2));
-#endif
-  llvm::StringRef module_ir = llvm::StringRef(
+  // By default, Impala now requires AVX2 support, but the enable_legacy_avx_support
+  // flag can allow running on AVX machines. The minimum requirement must have already
+  // been enforced prior to this call, so this only needs to select the appropriate
+  // LLVM IR to use.
+  if (IsCPUFeatureEnabled(CpuInfo::AVX2)) {
+    // Use the default IR that supports AVX2
+    module_ir = llvm::StringRef(
         reinterpret_cast<const char*>(impala_llvm_ir), impala_llvm_ir_len);
-#if __x86_64__
-  string module_name = "Impala IR with AVX2 support";
+    module_name = "Impala IR with AVX2 support";
+  } else if (FLAGS_enable_legacy_avx_support && IsCPUFeatureEnabled(CpuInfo::AVX)) {
+    // If there is no AVX but legacy mode is enabled, use legacy IR with AVX support
+    module_ir = llvm::StringRef(
+        reinterpret_cast<const char*>(impala_legacy_avx_llvm_ir),
+        impala_legacy_avx_llvm_ir_len);
+    module_name = "Legacy Impala IR with AVX support";
+  } else {
+    // This should have been enforced earlier.
+    CHECK(false) << "CPU is missing AVX/AVX2 support";
+  }
 #else
-  string module_name = "Impala IR";
+  // Non-x86_64 always use the default IR
+  module_ir = llvm::StringRef(
+      reinterpret_cast<const char*>(impala_llvm_ir), impala_llvm_ir_len);
+  module_name = "Impala IR";
 #endif
 
   unique_ptr<llvm::MemoryBuffer> module_ir_buf(

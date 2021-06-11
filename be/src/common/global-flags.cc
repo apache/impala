@@ -346,6 +346,12 @@ DEFINE_bool(enable_incremental_metadata_updates, true,
     "propagated as a whole object in the statestore topic updates. Note that legacy "
     "coordinators can apply incremental or full table updates so don't need this flag.");
 
+DEFINE_bool(enable_legacy_avx_support, false,
+    "If true, Impala relaxes its x86_64 CPU feature requirement to allow running on "
+    "machines with AVX but no AVX2. This allows running Impala on older machines "
+    "without AVX2 support. This is a legacy mode that will be removed in a "
+    "future release.");
+
 // ++========================++
 // || Startup flag graveyard ||
 // ++========================++
