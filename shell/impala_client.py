@@ -671,6 +671,28 @@ class ImpalaHS2Client(ImpalaClient):
     # TODO: ensure it's closed if needed
     self.session_handle = resp.sessionHandle
 
+    self._populate_query_options()
+
+  def close_connection(self):
+    if self.session_handle is not None:
+      # Attempt to close session explicitly. Do not fail if there is an error
+      # doing so. We still need to close the transport and we can rely on the
+      # server to clean up the session.
+      try:
+        req = TCloseSessionReq(self.session_handle)
+
+        def CloseSession():
+          return self.imp_service.CloseSession(req)
+        # CloseSession rpcs don't need retries since we catch all exceptions and close
+        # transport.
+        resp = self._do_hs2_rpc(CloseSession)
+        self._check_hs2_rpc_status(resp.status)
+      except Exception as e:
+        print("Warning: close session RPC failed: {0}, {1}".format(str(e), type(e)))
+      self.session_handle = None
+    self._close_transport()
+
+  def _populate_query_options(self):
     # List all of the query options and their levels.
     # Retrying "set all" should be idempotent
     num_tries = 1
@@ -709,27 +731,9 @@ class ImpalaHS2Client(ImpalaClient):
       finally:
         if set_all_handle is not None:
           self.close_query(set_all_handle)
+
       time.sleep(self._get_sleep_interval_for_retries(num_tries))
       num_tries += 1
-
-  def close_connection(self):
-    if self.session_handle is not None:
-      # Attempt to close session explicitly. Do not fail if there is an error
-      # doing so. We still need to close the transport and we can rely on the
-      # server to clean up the session.
-      try:
-        req = TCloseSessionReq(self.session_handle)
-
-        def CloseSession():
-          return self.imp_service.CloseSession(req)
-        # CloseSession rpcs don't need retries since we catch all exceptions and close
-        # transport.
-        resp = self._do_hs2_rpc(CloseSession)
-        self._check_hs2_rpc_status(resp.status)
-      except Exception as e:
-        print("Warning: close session RPC failed: {0}, {1}".format(str(e), type(e)))
-      self.session_handle = None
-    self._close_transport()
 
   def _ping_impala_service(self):
     req = TPingImpalaHS2ServiceReq(self.session_handle)
@@ -845,11 +849,19 @@ class ImpalaHS2Client(ImpalaClient):
       # Skip stringification if not needed. This makes large extracts of tpch.orders
       # ~8% faster according to benchmarks.
       if stringifier is None:
-        for row_idx, row in enumerate(rows):
-          row[col_idx] = 'NULL' if is_null[row_idx] else tcol.values[row_idx]
+        bitset_len = min(len(is_null), len(rows))
+        for current_row in xrange(bitset_len):
+          rows[current_row][col_idx] = 'NULL' if is_null[current_row] \
+              else tcol.values[current_row]
+        for current_row in xrange(bitset_len, len(rows)):
+          rows[current_row][col_idx] = tcol.values[current_row]
       else:
-        for row_idx, row in enumerate(rows):
-          row[col_idx] = 'NULL' if is_null[row_idx] else stringifier(tcol.values[row_idx])
+        bitset_len = min(len(is_null), len(rows))
+        for current_row in xrange(bitset_len):
+          rows[current_row][col_idx] = 'NULL' if is_null[current_row] \
+              else stringifier(tcol.values[current_row])
+        for current_row in xrange(bitset_len, len(rows)):
+          rows[current_row][col_idx] = stringifier(tcol.values[current_row])
     return rows
 
   def close_dml(self, last_query_handle):
