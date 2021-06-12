@@ -22,7 +22,7 @@
 # "-INTERNAL" appended. Parts of the code will look for this to distinguish
 # between released and internal versions.
 VERSION=4.0.0-RELEASE
-GIT_HASH=676f79aa81d02c8638439edf6a43841fb0a7671e
+GIT_HASH=5c77156fddca53f1240ff38a1df966bb6a49c1a1
 if [ -z $GIT_HASH ]
 then
   GIT_HASH="Could not obtain git hash"
