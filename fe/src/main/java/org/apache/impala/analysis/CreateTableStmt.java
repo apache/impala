@@ -262,6 +262,26 @@ public class CreateTableStmt extends StatementBase {
         THdfsFileFormat.ICEBERG) {
       throw new AnalysisException("Table requires at least 1 column");
     }
+    if (getRowFormat() != null) {
+      String fieldDelimiter = getRowFormat().getFieldDelimiter();
+      String lineDelimiter = getRowFormat().getLineDelimiter();
+      String escapeChar = getRowFormat().getEscapeChar();
+      if (getFileFormat() != THdfsFileFormat.TEXT
+          || getFileFormat() != THdfsFileFormat.SEQUENCE_FILE) {
+        if (fieldDelimiter != null) {
+          analyzer.addWarning("'ROW FORMAT DELIMITED FIELDS TERMINATED BY '"
+              + fieldDelimiter + "'' is ignored.");
+        }
+        if (lineDelimiter != null) {
+          analyzer.addWarning("'ROW FORMAT DELIMITED LINES TERMINATED BY '"
+              + lineDelimiter + "'' is ignored.");
+        }
+        if (escapeChar != null) {
+          analyzer.addWarning(
+              "'ROW FORMAT DELIMITED ESCAPED BY '" + escapeChar + "'' is ignored.");
+        }
+      }
+    }
     if (getFileFormat() == THdfsFileFormat.AVRO) {
       setColumnDefs(analyzeAvroSchema(analyzer));
       if (getColumnDefs().isEmpty()) {
