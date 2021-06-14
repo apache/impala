@@ -983,32 +983,36 @@ public class CatalogOpExecutor {
       IcebergTable tbl, long newCatalogVersion, boolean wantMinimalResult)
       throws ImpalaException {
     Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
-    switch (params.getAlter_type()) {
-      case ADD_COLUMNS:
-        TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
-        IcebergCatalogOpExecutor.addColumn(tbl, addColParams.getColumns());
-        addSummary(response, "Column(s) have been added.");
-        break;
-      case REPLACE_COLUMNS:
-        //TODO: we need support resolve column by field id at first, and then
-        // support this statement
-      case DROP_COLUMN:
-        //TODO: we need support resolve column by field id at first, and then
-        // support this statement
-        //TAlterTableDropColParams dropColParams = params.getDrop_col_params();
-        //IcebergCatalogOpExecutor.dropColumn(tbl, dropColParams.getCol_name());
-        //addSummary(response, "Column has been dropped.");
-      case ALTER_COLUMN:
-        //TODO: we need support resolve column by field id at first, and then
-        // support this statement
-        //TAlterTableAlterColParams alterColParams = params.getAlter_col_params();
-        //IcebergCatalogOpExecutor.alterColumn(tbl, alterColParams.getCol_name(),
-        //    alterColParams.getNew_col_def());
-        //addSummary(response, "Column has been altered.");
-      default:
-        throw new UnsupportedOperationException(
-            "Unsupported ALTER TABLE operation for Iceberg tables: " +
-            params.getAlter_type());
+    try {
+      switch (params.getAlter_type()) {
+        case ADD_COLUMNS:
+          TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
+          IcebergCatalogOpExecutor.addColumn(tbl, addColParams.getColumns());
+          addSummary(response, "Column(s) have been added.");
+          break;
+        case DROP_COLUMN:
+          TAlterTableDropColParams dropColParams = params.getDrop_col_params();
+          IcebergCatalogOpExecutor.dropColumn(tbl, dropColParams.getCol_name());
+          addSummary(response, "Column has been dropped.");
+          break;
+        case ALTER_COLUMN:
+          TAlterTableAlterColParams alterColParams = params.getAlter_col_params();
+          IcebergCatalogOpExecutor.alterColumn(tbl, alterColParams.getCol_name(),
+             alterColParams.getNew_col_def());
+          addSummary(response, "Column has been altered.");
+          break;
+        case REPLACE_COLUMNS:
+          // It doesn't make sense to replace all the columns of an Iceberg table as it
+          // would basically make all existing data unaccessible.
+        default:
+          throw new UnsupportedOperationException(
+              "Unsupported ALTER TABLE operation for Iceberg tables: " +
+              params.getAlter_type());
+      }
+    } catch (IllegalArgumentException ex) {
+      throw new ImpalaRuntimeException(String.format(
+          "Failed to ALTER table '%s': %s", params.getTable_name().table_name,
+          ex.getMessage()));
     }
 
     loadTableMetadata(tbl, newCatalogVersion, true, true, null, "ALTER Iceberg TABLE " +

@@ -263,19 +263,15 @@ ALTER TABLE iceberg_table_hadoop_catalog RECOVER PARTITIONS;
 AnalysisException: ALTER TABLE RECOVER PARTITIONS is not supported on Iceberg tables: $DATABASE.iceberg_table_hadoop_catalog
 ====
 ---- QUERY
-ALTER TABLE iceberg_table_hadoop_catalog DROP COLUMN level;
----- CATCH
-UnsupportedOperationException: Unsupported ALTER TABLE operation for Iceberg tables: DROP_COLUMN
-====
----- QUERY
-ALTER TABLE iceberg_table_hadoop_catalog CHANGE COLUMN level level1 STRING;
----- CATCH
-UnsupportedOperationException: Unsupported ALTER TABLE operation for Iceberg tables: ALTER_COLUMN
-====
----- QUERY
 ALTER TABLE iceberg_table_hadoop_catalog REPLACE COLUMNS(level INT, register_time DATE);
 ---- CATCH
-UnsupportedOperationException: Unsupported ALTER TABLE operation for Iceberg tables: REPLACE_COLUMNS
+AnalysisException: ALTER TABLE REPLACE COLUMNS is not supported on Iceberg tables.
+====
+---- QUERY
+CREATE TABLE test_decimal_conversion (d decimal(6,2)) STORED AS ICEBERG;
+ALTER TABLE test_decimal_conversion CHANGE COLUMN d d decimal(8,2);
+---- CATCH
+Cannot change DECIMAL column of Iceberg table.
 ====
 ---- QUERY
 CREATE TABLE iceberg_transactional(i int)

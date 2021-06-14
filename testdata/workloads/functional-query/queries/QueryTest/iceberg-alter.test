@@ -158,3 +158,109 @@ DESCRIBE FORMATTED iceberg_changing_fileformats;
 ---- TYPES
 string, string, string
 ====
+---- QUERY
+CREATE TABLE ice_alter_cols (f float)
+STORED AS ICEBERG;
+INSERT INTO ice_alter_cols VALUES (2.718);
+SELECT * FROM ice_alter_cols;
+---- RESULTS
+2.718
+---- TYPES
+FLOAT
+====
+---- QUERY
+# Promoting float -> double is allowed by Iceberg.
+ALTER TABLE ice_alter_cols CHANGE COLUMN f d double;
+DESCRIBE ice_alter_cols;
+---- RESULTS
+'d','double','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+INSERT INTO ice_alter_cols VALUES (3.14);
+SELECT round(d, 3) FROM ice_alter_cols;
+---- RESULTS
+2.718
+3.140
+---- TYPES
+DOUBLE
+====
+---- QUERY
+# Demoting double -> float is not allowed.
+ALTER TABLE ice_alter_cols CHANGE COLUMN d f float;
+---- CATCH
+Failed to ALTER table 'ice_alter_cols'
+====
+---- QUERY
+ALTER TABLE ice_alter_cols ADD COLUMN x decimal(10, 3);
+INSERT INTO ice_alter_cols VALUES (1.618, 1.618);
+SELECT round(d, 3), x FROM ice_alter_cols;
+---- RESULTS
+2.718,NULL
+3.140,NULL
+1.618,1.618
+---- TYPES
+DOUBLE,DECIMAL
+====
+---- QUERY
+# Drop first column and check if data is still correctly read.
+ALTER TABLE ice_alter_cols DROP COLUMN d;
+DESCRIBE ice_alter_cols;
+---- RESULTS
+'x','decimal(10,3)','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+SELECT * FROM ice_alter_cols;
+---- RESULTS
+NULL
+NULL
+1.618
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# Add column with same name as dropped column creates a different,
+# brand new column.
+ALTER TABLE ice_alter_cols ADD COLUMN d double;
+SELECT * FROM ice_alter_cols;
+---- RESULTS
+NULL,NULL
+NULL,NULL
+1.618,NULL
+---- TYPES
+DECIMAL,DOUBLE
+====
+---- QUERY
+# Test type conversion INT -> BIGINT
+# BIGNT -> INT should fail.
+ALTER TABLE ice_alter_cols DROP COLUMN d;
+ALTER TABLE ice_alter_cols ADD COLUMN i int;
+INSERT INTO TABLE ice_alter_cols VALUES (1.11, 11);
+ALTER TABLE ice_alter_cols CHANGE COLUMN i bi bigint;
+INSERT INTO TABLE ice_alter_cols VALUES (2.345, 111222333444555666);
+ALTER TABLE ice_alter_cols CHANGE COLUMN bi i int;
+---- CATCH
+Failed to ALTER table 'ice_alter_cols'
+====
+---- QUERY
+DESCRIBE ice_alter_cols;
+---- RESULTS
+'x','decimal(10,3)','','true'
+'bi','bigint','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====
+---- QUERY
+SELECT * FROM ice_alter_cols;
+---- RESULTS
+NULL,NULL
+NULL,NULL
+1.618,NULL
+1.110,11
+2.345,111222333444555666
+---- TYPES
+DECIMAL,BIGINT
+====

@@ -118,10 +118,16 @@ public class IcebergCatalogOpExecutor {
    * Iceberg only supports these type conversions:
    *   INTEGER -> LONG
    *   FLOAT -> DOUBLE
-   *   DECIMAL(s1,p1) -> DECIMAL(s1,p2), same scale, p1<=p2
+   *   DECIMAL(p1,s1) -> DECIMAL(p1,s2), same scale, p1<=p2 // But we disable DECIMAL
+   *                                                        // conversions due to
+   *                                                        // IMPALA-7087
    */
   public static void alterColumn(FeIcebergTable feTable, String colName, TColumn newCol)
       throws TableLoadingException, ImpalaRuntimeException {
+    if (Type.fromThrift(newCol.getColumnType()).isDecimal()) {
+      // TODO: remove this if stmt when IMPALA-7087 is fixed.
+      throw new ImpalaRuntimeException("Cannot change DECIMAL column of Iceberg table.");
+    }
     UpdateSchema schema = IcebergUtil.getIcebergUpdateSchema(feTable);
     org.apache.iceberg.types.Type type =
         IcebergSchemaConverter.fromImpalaColumnType(newCol.getColumnType());

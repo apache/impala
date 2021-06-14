@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeHBaseTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
@@ -60,6 +61,11 @@ public class AlterTableReplaceColsStmt extends AlterTableStmt {
     if (isKuduTable) {
       throw new AnalysisException("ALTER TABLE REPLACE COLUMNS is not " +
           "supported on Kudu tables.");
+    }
+
+    if (t instanceof FeIcebergTable) {
+      throw new AnalysisException("ALTER TABLE REPLACE COLUMNS is not " +
+          "supported on Iceberg tables.");
     }
 
     // Build a set of the partition keys for the table.
