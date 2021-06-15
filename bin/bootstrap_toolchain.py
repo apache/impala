@@ -65,6 +65,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import sh
 
 from collections import namedtuple
 from string import Template
@@ -98,6 +99,7 @@ OS_MAPPING = [
   OsMapping('ubuntu18.04', "ec2-package-ubuntu-18-04", "ubuntu1804"),
   OsMapping('ubuntu20.04', "ec2-package-ubuntu-18-04", "ubuntu1804")
 ]
+deps_directory = "{0}/toolchain_deps".format(os.environ.get("DEPENDENCIES_PACKAGE_DIRECTORY"))
 
 
 def check_output(cmd_args):
@@ -145,6 +147,47 @@ def wget_and_unpack_package(download_path, file_name, destination, wget_no_clobb
                 "--directory={0}".format(destination)])
   os.unlink(os.path.join(destination, file_name))
 
+def check_dependencies(components_needing_download):
+  isMissing = False
+  with open("{0}/missing_dependencies.txt".format(os.environ.get("IMPALA_HOME")), "a") as f:
+      for d in components_needing_download:
+        if not os.path.exists("{0}/{1}".format(deps_directory, d.archive_name)):
+          isMissing = True
+          f.write("toolchain_dep##{0} {1}\n".format(d.archive_basename, d.url))
+  if isMissing:
+    logging.error("Missing some toolchain dependencies.See {} file for more details.".format(
+      "{0}/missing_dependencies.txt".format(os.environ.get("IMPALA_HOME"))))
+    raise
+
+def cp_and_unpack_package(d):
+  url = d.url
+  file_name = d.archive_name
+  unpack_dir = d.pkg_directory()
+  if d.makedir:
+    # Download and unpack in a temp directory, which we'll later move into place
+    destination = tempfile.mkdtemp(dir=d.destination_basedir)
+  else:
+    destination = d.destination_basedir
+  try:
+    logging.info("copying {0} to {1}".format(file_name, destination))
+    if os.path.exists("{0}/{1}".format(deps_directory, file_name)):
+      if os.path.exists("{0}/{1}".format(destination, file_name)):
+        os.remove("{0}/{1}".format(destination, file_name))
+      if not os.path.exists(destination):
+        os.makedirs(destination)
+      shutil.copy2("{0}/{1}".format(deps_directory, file_name), destination)
+      logging.info("Extracting {0}".format(file_name))
+      sh.tar(z=True, x=True, f=os.path.join(destination, file_name), directory=destination)
+      sh.rm(os.path.join(destination, file_name))
+    else:
+      logging.error(
+        "Missing.Please download the dependence package of {0} from {1}! Then put it in {2} directory".
+          format(file_name, url, "<dependencies_package_directory>/toolchain_deps"))
+      raise
+  except:
+    if os.path.isdir(unpack_dir):
+      shutil.rmtree(unpack_dir)
+    raise
 
 class DownloadUnpackTarball(object):
   """
@@ -523,12 +566,23 @@ def main():
       downloads += get_kudu_downloads()
     downloads += get_hadoop_downloads()
 
+  if len(sys.argv) == 2 and sys.argv[1].__eq__("fetch_download_info"):
+    with open("{0}/download_deps_info.txt".format(os.environ.get("IMPALA_HOME")), "a+") as f:
+      for d in downloads:
+        f.write("toolchain_dep##{0} {1}\n".format(d.archive_basename, d.url))
+    return
+
   components_needing_download = [d for d in downloads if d.needs_download()]
 
-  def download(component):
-    component.download()
-
-  execute_many(download, components_needing_download)
+  if os.environ.get("DEPENDENCIES_PACKAGE_DIRECTORY") is not None\
+          and len(os.environ.get("DEPENDENCIES_PACKAGE_DIRECTORY")) > 0:
+    check_dependencies(components_needing_download)
+    for d in components_needing_download:
+        cp_and_unpack_package(d)
+  else:
+    def download(component):
+      component.download()
+    execute_many(download, components_needing_download)
 
 
 if __name__ == "__main__": main()

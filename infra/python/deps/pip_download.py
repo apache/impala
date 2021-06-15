@@ -31,6 +31,7 @@ import sys
 from random import randint
 from time import sleep
 import subprocess
+import shutil
 
 NUM_DOWNLOAD_ATTEMPTS = 8
 
@@ -40,6 +41,7 @@ PYPI_MIRROR = os.environ.get('PYPI_MIRROR', 'https://pypi.python.org')
 REQUIREMENTS_FILES = ['requirements.txt', 'setuptools-requirements.txt',
                       'kudu-requirements.txt', 'adls-requirements.txt']
 
+deps_directory = "{0}/python_deps".format(os.environ.get("DEPENDENCIES_PACKAGE_DIRECTORY"))
 
 def check_digest(filename, algorithm, expected_digest):
   try:
@@ -125,7 +127,15 @@ def download_package(pkg_name, pkg_version):
     print('Hash digest check failed in file {0}.'.format(file_name))
     return False
 
-def main():
+def cp_package(dep):
+  try:
+    os.remove("{0}/{1}".format(os.getcwd(), dep))
+  except:
+    pass
+  print("copying {0} to {1}".format(dep, os.getcwd()))
+  shutil.copy2("{0}/{1}".format(deps_directory, dep), os.getcwd())
+
+def online_main():
   if len(sys.argv) > 1:
     _, pkg_name, pkg_version = sys.argv
     download_package(pkg_name, pkg_version)
@@ -155,5 +165,38 @@ def main():
     for x in results:
       x.get()
 
+def offline_main():
+  if os.path.exists("{0}/python_deps_index.txt".format(deps_directory)):
+    python_deps_index = {}
+    for line in open("{0}/python_deps_index.txt".format(deps_directory)):
+        name_version, file_name = line.split("##")
+        python_deps_index[name_version] = file_name
+
+    isMissing = False
+    for requirements_file in REQUIREMENTS_FILES:
+      for line in open(requirements_file):
+        # A hash symbol ("#") represents a comment that should be ignored.
+        line = line.split("#")[0]
+        l = line.split(";")[0].strip()
+        if not l:
+          continue
+        pkg_name, pkg_version = l.split('==')
+        if python_deps_index.__contains__("{0}_{1}".format(pkg_name.strip(), pkg_version.strip())):
+          cp_package(python_deps_index["{0}_{1}".format(pkg_name.strip(), pkg_version.strip())].strip())
+        else:
+          isMissing = True
+          with open("{0}/missing_dependencies.txt".format(os.environ.get("IMPALA_HOME")), "w") as f:
+            print("Missing pkg_name:{0} pkg_version:{1}\n".format(pkg_name.strip(), pkg_version.strip()))
+            f.write("python_dep##{0}=={1}\n".format(pkg_name.strip(), pkg_version.strip()))
+    if isMissing:
+      raise Exception("Missing some python dependencies.See {} for more details.".format(
+        "{0}/missing_dependencies.txt".format(os.environ.get("IMPALA_HOME"))))
+  else:
+    raise Exception("file:python_deps_index.txt does not exist.")
+
 if __name__ == '__main__':
-  main()
+  if os.environ.get("DEPENDENCIES_PACKAGE_DIRECTORY") is not None \
+          and len(os.environ.get("DEPENDENCIES_PACKAGE_DIRECTORY")) > 0:
+    offline_main()
+  else:
+    online_main()
