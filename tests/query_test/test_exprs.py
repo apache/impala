@@ -39,8 +39,8 @@ class TestExprs(ImpalaTestSuite):
         ImpalaTestDimension('enable_expr_rewrites', *[0,1]))
     if cls.exploration_strategy() == 'core':
       # Test with file format that supports codegen
-      cls.ImpalaTestMatrix.add_constraint(lambda v:\
-          v.get_value('table_format').file_format == 'text' and\
+      cls.ImpalaTestMatrix.add_constraint(lambda v:
+          v.get_value('table_format').file_format == 'parquet' and
           v.get_value('table_format').compression_codec == 'none')
 
   def test_exprs(self, vector):

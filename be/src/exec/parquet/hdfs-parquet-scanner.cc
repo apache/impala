@@ -1901,12 +1901,13 @@ Status HdfsParquetScanner::CreateColIdx2EqConjunctMap() {
       // At the moment we do not support Parquet Bloom filtering for types for which this
       // is relevant, so if we encounter an implicit cast here, we can discard the
       // conjunct.
-      if (child_slot_ref == nullptr)
-        continue;
+      if (child_slot_ref == nullptr) continue;
 
       const ScalarExpr* child1 = expr.GetChild(1);
       const Literal* child_literal = dynamic_cast<const Literal*>(child1);
-      DCHECK(child_literal != nullptr);
+      // Expression rewrites should always simplify the right side to a Literal, but if
+      // expr rewrites are disabled, we can see a cast there (IMPALA-10742).
+      if (child_literal == nullptr) continue;
 
       // Convert the slot_id of 'child_slot_ref' to a column index.
       SlotDescriptor* slot_desc = scan_node_->runtime_state()->desc_tbl().
@@ -1931,8 +1932,9 @@ Status HdfsParquetScanner::CreateColIdx2EqConjunctMap() {
             PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path()), filename()));
       }
 
-      if (!IsParquetBloomFilterSupported(node->element->type, child_slot_ref->type()))
+      if (!IsParquetBloomFilterSupported(node->element->type, child_slot_ref->type())) {
         continue;
+      }
 
       const int col_idx = node->col_idx;
 
