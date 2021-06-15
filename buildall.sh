@@ -197,6 +197,15 @@ do
     -cmake_only)
       GEN_CMAKE_ONLY=1
       ;;
+    -dependencies_package_directory)
+      DEPENDENCIES_PACKAGE_DIRECTORY="${2-}"
+      if [[ ! -d "$DEPENDENCIES_PACKAGE_DIRECTORY" ]]; then
+        echo "-dependencies_package_directory does not exist: $DEPENDENCIES_PACKAGE_DIRECTORY"
+        exit 1
+      fi
+      export DEPENDENCIES_PACKAGE_DIRECTORY=$DEPENDENCIES_PACKAGE_DIRECTORY
+      shift;
+      ;;
     -help|*)
       echo "buildall.sh - Builds Impala and runs all tests."
       echo "[-noclean] : Omits cleaning all packages before building. Will not kill"\
