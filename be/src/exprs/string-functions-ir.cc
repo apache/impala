@@ -286,6 +286,14 @@ IntVal StringFunctions::Utf8Length(FunctionContext* context, const StringVal& st
 
 StringVal StringFunctions::Lower(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
+  if (context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE)) {
+    return LowerUtf8(context, str);
+  }
+  return LowerAscii(context, str);
+}
+
+StringVal StringFunctions::LowerAscii(FunctionContext* context, const StringVal& str) {
+  // Not in UTF-8 mode, only English alphabetic characters will be converted.
   StringVal result(context, str.len);
   if (UNLIKELY(result.is_null)) return StringVal::null();
   for (int i = 0; i < str.len; ++i) {
@@ -296,6 +304,14 @@ StringVal StringFunctions::Lower(FunctionContext* context, const StringVal& str)
 
 StringVal StringFunctions::Upper(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
+  if (context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE)) {
+    return UpperUtf8(context, str);
+  }
+  return UpperAscii(context, str);
+}
+
+StringVal StringFunctions::UpperAscii(FunctionContext* context, const StringVal& str) {
+  // Not in UTF-8 mode, only English alphabetic characters will be converted.
   StringVal result(context, str.len);
   if (UNLIKELY(result.is_null)) return StringVal::null();
   for (int i = 0; i < str.len; ++i) {
@@ -310,6 +326,13 @@ StringVal StringFunctions::Upper(FunctionContext* context, const StringVal& str)
 // will return NULL
 StringVal StringFunctions::InitCap(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
+  if (context->impl()->GetConstFnAttr(FunctionContextImpl::UTF8_MODE)) {
+    return InitCapUtf8(context, str);
+  }
+  return InitCapAscii(context, str);
+}
+
+StringVal StringFunctions::InitCapAscii(FunctionContext* context, const StringVal& str) {
   StringVal result(context, str.len);
   if (UNLIKELY(result.is_null)) return StringVal::null();
   uint8_t* result_ptr = result.ptr;
@@ -324,6 +347,115 @@ StringVal StringFunctions::InitCap(FunctionContext* context, const StringVal& st
     }
   }
   return result;
+}
+
+/// Reports the error in parsing multibyte characters with leading bytes and current
+/// locale. Used in Utf8CaseConversion().
+static void ReportErrorBytes(FunctionContext* context, const StringVal& str,
+    int current_idx) {
+  DCHECK_LT(current_idx, str.len);
+  stringstream ss;
+  ss << "[0x" << std::hex << (int)DCHECK_NOTNULL(str.ptr)[current_idx];
+  for (int k = 1; k < 4 && current_idx + k < str.len; ++k) {
+    ss << ", 0x" << std::hex << (int)str.ptr[current_idx + k];
+  }
+  ss << "]";
+  context->AddWarning(Substitute(
+      "Illegal multi-byte character in string. Leading bytes: $0. Current locale: $1",
+      ss.str(), std::locale("").name()).c_str());
+}
+
+/// Converts string based on the transform function 'fn'. The unit of the conversion is
+/// a wchar_t (i.e. uint32_t) which is parsed from multi bytes using std::mbtowc().
+/// The transform function 'fn' accepts two parameters: the original wchar_t and a flag
+/// indicating whether it's the first character of a word.
+/// After the transformation, the wchar_t is converted back to bytes.
+static StringVal Utf8CaseConversion(FunctionContext* context, const StringVal& str,
+    uint32_t (*fn)(uint32_t, bool*)) {
+  // Usually the upper/lower cases have the same size in bytes. Here we add 4 bytes
+  // buffer in case of illegal Unicodes.
+  int max_result_bytes = str.len + 4;
+  StringVal result(context, max_result_bytes);
+  if (UNLIKELY(result.is_null)) return StringVal::null();
+  wchar_t wc;
+  int wc_bytes;
+  bool word_start = true;
+  uint8_t* result_ptr = result.ptr;
+  std::mbstate_t wc_state{};
+  std::mbstate_t mb_state{};
+  for (int i = 0; i < str.len; i += wc_bytes) {
+    // std::mbtowc converts a multibyte sequence to a wide character. It's not
+    // thread safe. Here we use std::mbrtowc instead.
+    wc_bytes = std::mbrtowc(&wc, reinterpret_cast<char*>(str.ptr + i), str.len - i,
+        &wc_state);
+    bool needs_conversion = true;
+    if (wc_bytes == 0) {
+      // std::mbtowc returns 0 when hitting '\0'.
+      wc = 0;
+      wc_bytes = 1;
+    } else if (wc_bytes < 0) {
+      ReportErrorBytes(context, str, i);
+      // Replace it to the replacement character (U+FFFD)
+      wc = 0xFFFD;
+      needs_conversion = false;
+      // Jump to the next legal UTF-8 start byte.
+      wc_bytes = 1;
+      while (i + wc_bytes < str.len && !BitUtil::IsUtf8StartByte(str.ptr[i + wc_bytes])) {
+        wc_bytes++;
+      }
+    }
+    if (needs_conversion) wc = fn(wc, &word_start);
+    // std::wctomb converts a wide character to a multibyte sequence. It's not
+    // thread safe. Here we use std::wcrtomb instead.
+    int res_bytes = std::wcrtomb(reinterpret_cast<char*>(result_ptr), wc, &mb_state);
+    if (res_bytes <= 0) {
+      if (needs_conversion) {
+        context->AddWarning(Substitute(
+            "Ignored illegal wide character in results: $0. Current locale: $1",
+            wc, std::locale("").name()).c_str());
+      }
+      continue;
+    }
+    result_ptr += res_bytes;
+    if (result_ptr - result.ptr > max_result_bytes - 4) {
+      // Double the result buffer for overflow
+      max_result_bytes *= 2;
+      max_result_bytes = min<int>(StringVal::MAX_LENGTH,
+          static_cast<int>(BitUtil::RoundUpToPowerOfTwo(max_result_bytes)));
+      int offset = result_ptr - result.ptr;
+      if (UNLIKELY(!result.Resize(context, max_result_bytes))) return StringVal::null();
+      result_ptr = result.ptr + offset;
+    }
+  }
+  result.len = result_ptr - result.ptr;
+  return result;
+}
+
+StringVal StringFunctions::LowerUtf8(FunctionContext* context, const StringVal& str) {
+  return Utf8CaseConversion(context, str,
+      [](uint32_t wide_char, bool* word_start) {
+        return std::towlower(wide_char);
+      });
+}
+
+StringVal StringFunctions::UpperUtf8(FunctionContext* context, const StringVal& str) {
+  return Utf8CaseConversion(context, str,
+      [](uint32_t wide_char, bool* word_start) {
+        return std::towupper(wide_char);
+      });
+}
+
+StringVal StringFunctions::InitCapUtf8(FunctionContext* context, const StringVal& str) {
+  return Utf8CaseConversion(context, str,
+      [](uint32_t wide_char, bool* word_start) {
+        if (UNLIKELY(iswspace(wide_char))) {
+          *word_start = true;
+          return wide_char;
+        }
+        uint32_t res = *word_start ? std::towupper(wide_char) : std::towlower(wide_char);
+        *word_start = false;
+        return res;
+      });
 }
 
 struct ReplaceContext {

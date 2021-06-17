@@ -386,6 +386,7 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
 
   LOG(INFO) << impala::GetVersionString();
   LOG(INFO) << "Using hostname: " << FLAGS_hostname;
+  LOG(INFO) << "Using locale: " << std::locale("").name();
   impala::LogCommandLineFlags();
 
   // When a process calls send(2) on a socket closed on the other end, linux generates

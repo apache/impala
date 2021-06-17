@@ -66,4 +66,7 @@ fi
 # Set ulimit core file size 0.
 ulimit -c 0
 
+# Set a UTF-8 locale to enable upper/lower/initcap functions with UTF-8 mode.
+export LC_ALL=C.UTF-8
+
 exec "$@"

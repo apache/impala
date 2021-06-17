@@ -10854,6 +10854,56 @@ TEST_P(ExprTest, Utf8Test) {
   TestValue("locate('SQL', '最快的SQL引擎跑SQL', 0)", TYPE_INT, 0);
   TestValue("locate('SQL', '最快的SQL引擎跑SQL', -1)", TYPE_INT, 0);
   TestIsNull("locate('SQL', '最快的SQL引擎跑SQL', NULL)", TYPE_INT);
+
+  TestStringValue("upper('abcd áäèü')", "ABCD ÁÄÈÜ");
+  TestStringValue("lower('ABCD ÁÄÈÜ')", "abcd áäèü");
+  TestStringValue("initcap('abcd áäèü ABCD ÁÄÈÜ')",
+      "Abcd Áäèü Abcd Áäèü");
+
+  TestStringValue("upper('aáàâãäăāåąæ')", "AÁÀÂÃÄĂĀÅĄÆ");
+  TestStringValue("lower('AÁÀÂÃÄĂĀÅĄÆ')", "aáàâãäăāåąæ");
+  TestStringValue("initcap('AÁÀÂÃÄĂĀÅĄÆ')", "Aáàâãäăāåąæ");
+
+  TestStringValue("upper('eéèêëěēėę')", "EÉÈÊËĚĒĖĘ");
+  TestStringValue("lower('EÉÈÊËĚĒĖĘ')", "eéèêëěēėę");
+  TestStringValue("initcap('EÉÈÊËĚĒĖĘ')", "Eéèêëěēėę");
+
+  // The uppercase of "i" and "ı" are both "I". However, the lowercase of "I" is "i"
+  // because we don't support Turkish locale yet (IMPALA-11080).
+  // Due to the same reason, the lowercase of "İ" and "I" are both "i", but the uppercase
+  // of "i" is "I".
+  TestStringValue("upper('iíìîïīįı')", "IÍÌÎÏĪĮI");
+  TestStringValue("lower('IÍÌÎÏĪĮIİ')", "iíìîïīįii");
+  TestStringValue("initcap('IÍÌÎÏĪĮIİ')", "Iíìîïīįii");
+
+  TestStringValue("upper('oóòôõöőøœ')", "OÓÒÔÕÖŐØŒ");
+  TestStringValue("lower('OÓÒÔÕÖŐØŒ')", "oóòôõöőøœ");
+  TestStringValue("initcap('OÓÒÔÕÖŐØŒ')", "Oóòôõöőøœ");
+
+  TestStringValue("upper('uúùûüűū')", "UÚÙÛÜŰŪ");
+  TestStringValue("lower('UÚÙÛÜŰŪ')", "uúùûüűū");
+  TestStringValue("initcap('UÚÙÛÜŰŪ')", "Uúùûüűū");
+
+  // The uppercase of "đ" and "ð" are both "Đ", but the lowercase of "Đ" is "đ"
+  // due to the hard-coded locale, i.e. "en_US.UTF-8".
+  TestStringValue("upper('ýćčďđðģğķłļ')", "ÝĆČĎĐÐĢĞĶŁĻ");
+  TestStringValue("lower('ÝĆČĎĐĢĞĶŁĻ')", "ýćčďđģğķłļ");
+  TestStringValue("initcap('ÝĆČĎĐĢĞĶŁĻ')", "Ýćčďđģğķłļ");
+
+  TestStringValue("upper('ńñňņŋ')", "ŃÑŇŅŊ");
+  TestStringValue("lower('ŃÑŇŅŊ')", "ńñňņŋ");
+  TestStringValue("initcap('ŃÑŇŅŊ')", "Ńñňņŋ");
+
+  TestStringValue("upper('řśšşťŧþţżźž')", "ŘŚŠŞŤŦÞŢŻŹŽ");
+  TestStringValue("lower('ŘŚŠŞŤŦÞŢŻŹŽ')", "řśšşťŧþţżźž");
+  TestStringValue("initcap('ŘŚŠŞŤŦÞŢŻŹŽ')", "Řśšşťŧþţżźž");
+
+  // Tests with the null byte ('\0') in the middle. Explicitly create the expected
+  // results as std::string in case they are truncated at '\0'.
+  TestStringValue("upper('ábć\\0èfğ')", string("ÁBĆ\0ÈFĞ", 11));
+  TestStringValue("lower('ÁBĆ\\0ÈFĞ')", string("ábć\0èfğ", 11));
+  TestStringValue("initcap('ábć\\0ÈFĞ')", string("Ábć\0èfğ", 11));
+
   executor_->PopExecOption();
 }
 

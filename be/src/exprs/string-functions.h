@@ -77,8 +77,14 @@ class StringFunctions {
   static IntVal CharLength(FunctionContext*, const StringVal& str);
   static IntVal Utf8Length(FunctionContext*, const StringVal& str);
   static StringVal Lower(FunctionContext*, const StringVal& str);
+  static StringVal LowerAscii(FunctionContext*, const StringVal& str);
+  static StringVal LowerUtf8(FunctionContext*, const StringVal& str);
   static StringVal Upper(FunctionContext*, const StringVal& str);
+  static StringVal UpperAscii(FunctionContext*, const StringVal& str);
+  static StringVal UpperUtf8(FunctionContext*, const StringVal& str);
   static StringVal InitCap(FunctionContext*, const StringVal& str);
+  static StringVal InitCapAscii(FunctionContext*, const StringVal& str);
+  static StringVal InitCapUtf8(FunctionContext*, const StringVal& str);
   static void ReplacePrepare(FunctionContext*, FunctionContext::FunctionStateScope);
   static void ReplaceClose(FunctionContext*, FunctionContext::FunctionStateScope);
   static StringVal Replace(FunctionContext*, const StringVal& str,

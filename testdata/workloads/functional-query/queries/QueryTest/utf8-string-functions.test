@@ -180,3 +180,53 @@ select mask('SQL引擎', 'x', 'x', 'x', 'x'),
 ---- TYPES
 STRING,STRING,STRING,STRING,STRING
 ====
+---- QUERY
+set utf8_mode=false;
+select upper('abcd áäèü'), lower('ABCD ÁÄÈÜ'), initcap('abcd áäèü ABCD ÁÄÈÜ');
+---- RESULTS: RAW_STRING
+'ABCD áäèü','abcd ÁÄÈÜ','Abcd áäèü Abcd ÁÄÈÜ'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
+select upper('abcd áäèü'), lower('ABCD ÁÄÈÜ'), initcap('abcd áäèü ABCD ÁÄÈÜ');
+---- RESULTS: RAW_STRING
+'ABCD ÁÄÈÜ','abcd áäèü','Abcd Áäèü Abcd Áäèü'
+---- TYPES
+STRING,STRING,STRING
+====
+---- QUERY
+set utf8_mode=false;
+select id, upper(name), lower(name), initcap(name) from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','张三','张三'
+2,'李四','李四','李四'
+3,'王五','王五','王五'
+4,'李小龙','李小龙','李小龙'
+5,'ALICE','alice','Alice'
+6,'陈BOB','陈bob','陈bob'
+7,'БOPиC','Бopиc','Бopиc'
+8,'JöRG','jörg','Jörg'
+9,'ひなた','ひなた','ひなた'
+10,'서연','서연','서연'
+---- TYPES
+INT,STRING,STRING,STRING
+====
+---- QUERY
+set utf8_mode=true;
+select id, upper(name), lower(name), initcap(name) from utf8_str_tiny;
+---- RESULTS: RAW_STRING
+1,'张三','张三','张三'
+2,'李四','李四','李四'
+3,'王五','王五','王五'
+4,'李小龙','李小龙','李小龙'
+5,'ALICE','alice','Alice'
+6,'陈BOB','陈bob','陈bob'
+7,'БOPИC','бopиc','Бopиc'
+8,'JÖRG','jörg','Jörg'
+9,'ひなた','ひなた','ひなた'
+10,'서연','서연','서연'
+---- TYPES
+INT,STRING,STRING,STRING
+====
