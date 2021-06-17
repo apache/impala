@@ -1858,3 +1858,34 @@ PLAN-ROOT SINK
    runtime filters: RF000 -> functional.alltypes.id
    row-size=24B cardinality=10
 ====
+# Regression test for IMPALA-9338. The following query duplicates the same condition
+# with different letter cases. With the fix, the plan should flip the JOIN order and
+# reference the proper columns in the predicate.
+select * from tpch.customer c
+left outer join
+tpch.lineitem l
+ON c.c_custkey = l.l_orderkey
+and c.C_CUSTKEY = l.L_ORDERKEY
+---- DISTRIBUTEDPLAN
+PLAN-ROOT SINK
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash predicates: l.L_ORDERKEY = c.C_CUSTKEY, l.l_orderkey = c.c_custkey
+|  runtime filters: RF000 <- c.C_CUSTKEY, RF001 <- c.c_custkey
+|  row-size=448B cardinality=150.00K
+|
+|--04:EXCHANGE [HASH(c.C_CUSTKEY,c.c_custkey)]
+|  |
+|  00:SCAN HDFS [tpch.customer c]
+|     HDFS partitions=1/1 files=1 size=23.08MB
+|     row-size=218B cardinality=150.00K
+|
+03:EXCHANGE [HASH(l.L_ORDERKEY,l.l_orderkey)]
+|
+01:SCAN HDFS [tpch.lineitem l]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   runtime filters: RF000 -> l.L_ORDERKEY, RF001 -> l.l_orderkey
+   row-size=231B cardinality=6.00M
+====

@@ -1008,8 +1008,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     while (!remaining.isEmpty()) {
       double smallestCost = Float.MAX_VALUE;
       T bestConjunct =  null;
+      // IMPALA-9338: The bestConjunctIdx indicates the index of the bestConjunct in
+      // the remaining list.
+      int bestConjunctIdx = 0;
       double backoffExp = 1.0 / (double) (sortedConjuncts.size() + 1);
-      for (T e : remaining) {
+      for (int i = 0; i < remaining.size(); i++) {
+        T e = remaining.get(i);
         double sel = Math.pow(e.hasSelectivity() ? e.getSelectivity() : defaultSel,
             backoffExp);
 
@@ -1021,17 +1025,18 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
         if (cost < smallestCost) {
           smallestCost = cost;
           bestConjunct = e;
+          bestConjunctIdx = i;
         } else if (cost == smallestCost) {
           // Break ties based on toSql() to get a consistent display in explain plans.
           if (e.toSql().compareTo(bestConjunct.toSql()) < 0) {
-            smallestCost = cost;
             bestConjunct = e;
+            bestConjunctIdx = i;
           }
         }
       }
 
       sortedConjuncts.add(bestConjunct);
-      remaining.remove(bestConjunct);
+      remaining.remove(bestConjunctIdx);
       totalCost -= bestConjunct.getCost();
     }
 

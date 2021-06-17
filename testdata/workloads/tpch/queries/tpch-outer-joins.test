@@ -47,3 +47,44 @@ ON cast(t1.o_comment as char(120)) = cast(t2.o_comment as char(120))
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Regression test for IMPALA-9338. The following query duplicates the same condition
+# with different letter cases. Without the fix of IMPALA-9338, the query should crash.
+SET mem_limit = 300m;
+SELECT c_custkey from customer c left outer join lineitem l
+ON c.c_custkey = l.l_orderkey and c.C_CUSTKEY = l.L_ORDERKEY
+ORDER BY c_custkey limit 1
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Regression test for IMPALA-9338. The following query uses reserved key as columns,
+# and duplicates the same condition with different letter cases, should provide a
+# correct plan after the fix.
+drop table if exists default.t1;
+drop table if exists default.t2;
+create table default.t1(`insert` bigint);
+create table default.t2(`select` bigint);
+insert into default.t1(`insert`)
+select c_custkey
+from tpch_parquet.customer
+limit 100;
+insert into default.t2(`select`)
+select o_custkey
+from tpch_parquet.orders
+limit 100000;
+explain select * from default.t1 b
+left join default.t2 a
+ON b.`insert` = a.`select`
+AND a.`SELECT` = b.`INSERT`;
+---- RESULTS: VERIFY_IS_SUBSET
+'PLAN-ROOT SINK'
+'05:EXCHANGE [UNPARTITIONED]'
+'02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]'
+'|--04:EXCHANGE [HASH(b.`INSERT`,b.`insert`)]'
+'|  00:SCAN HDFS [default.t1 b]'
+'03:EXCHANGE [HASH(a.`SELECT`,a.`select`)]'
+'01:SCAN HDFS [default.t2 a]'
+====
