@@ -121,9 +121,10 @@ public class FunctionName {
     // Resolve the database for this function.
     Db builtinDb = BuiltinsDb.getInstance();
     if (!isFullyQualified()) {
-      db_ = analyzer.getDefaultDb();
       if (preferBuiltinsDb && builtinDb.containsFunction(fn_)) {
         db_ = BuiltinsDb.NAME;
+      } else {
+        db_ = analyzer.getDefaultDb();
       }
     }
     Preconditions.checkNotNull(db_);
