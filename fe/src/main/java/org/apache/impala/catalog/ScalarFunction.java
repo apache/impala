@@ -266,6 +266,8 @@ public class ScalarFunction extends Function {
   public void setCloseFnSymbol(String s) { closeFnSymbol_ = s; }
 
   public String getSymbolName() { return symbolName_; }
+  public String getPrepareFnSymbol() { return prepareFnSymbol_; }
+  public String getCloseFnSymbol() { return closeFnSymbol_; }
 
   @Override
   protected TSymbolLookupParams getLookupParams() {

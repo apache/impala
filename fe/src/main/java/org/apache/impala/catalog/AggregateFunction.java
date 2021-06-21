@@ -211,6 +211,8 @@ public class AggregateFunction extends Function {
   public String getSerializeFnSymbol() { return serializeFnSymbol_; }
   public String getMergeFnSymbol() { return mergeFnSymbol_; }
   public String getFinalizeFnSymbol() { return finalizeFnSymbol_; }
+  public String getRemoveFnSymbol() { return removeFnSymbol_; }
+  public String getValueFnSymbol() { return getValueFnSymbol_; }
   public boolean ignoresDistinct() { return ignoresDistinct_; }
   public boolean isAnalyticFn() { return isAnalyticFn_; }
   public boolean isAggregateFn() { return isAggregateFn_; }
