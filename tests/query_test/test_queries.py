@@ -363,3 +363,19 @@ class TestTopNReclaimQuery(ImpalaTestSuite):
     # Tuple pool is expected to be reclaimed for this query
     for n in num_of_times_tuple_pool_reclaimed:
       assert int(n) > 0
+
+
+class TestAnalyticFnsTpch(ImpalaTestSuite):
+
+  @classmethod
+  def get_workload(cls):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestAnalyticFnsTpch, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet'])
+
+  def test_analytic_predicate(self, vector):
+    self.run_test_case('analytic-fns', vector)

@@ -1392,10 +1392,17 @@ public class SingleNodePlanner {
     // to be evaluated earlier in the plan (which could produce incorrect results).
     TupleDescriptor analyticTuple = selectStmt.getAnalyticInfo().getOutputTupleDesc();
     List<Expr> analyticPreds = new ArrayList<>();
-    for (int i = 0; i < conjuncts.size(); ++i) {
-      Expr pred = conjuncts.get(i);
+    List<TupleId> tupleIds = new ArrayList<>();
+    for (Expr pred : conjuncts) {
       Expr viewPred = pred.substitute(inlineViewRef.getSmap(), analyzer, false);
-      if (viewPred.referencesTuple(analyticTuple.getId())) {
+      tupleIds.clear();
+      viewPred.getIds(tupleIds, null);
+      // Only consider analytic conjuncts which are referencing the analytic tuple
+      // and skip the ones which are referencing more than 1 tuple.
+      // Example: a = MAX(b) (where MAX(b) is an analytic function). In this case,
+      // the left side may not be referencing analytic tuple and it would not
+      // be safe to migrate such predicates into the inline view.
+      if (viewPred.referencesTuple(analyticTuple.getId()) && tupleIds.size() <= 1) {
         analyticPreds.add(pred);
       }
     }

@@ -1,0 +1,62 @@
+====
+---- QUERY
+# IMPALA-10755: Predicate on analytic function should
+# be evaluated in a SELECT node
+select *
+  FROM (
+    SELECT
+      l_quantity, l_linenumber,
+      nr_pvp,
+      max(nr_pvp) over (partition BY l_quantity) max_nr_pvp
+    FROM (
+      SELECT
+        l_quantity, l_linenumber,
+        count(1) AS nr_pvp
+      FROM
+        tpch.lineitem, tpch.partsupp
+        where l_partkey = ps_partkey
+        and ps_suppkey = 10 and  l_quantity in (1, 2)
+        GROUP BY l_quantity, l_linenumber
+    ) a
+  ) b
+  WHERE nr_pvp = max_nr_pvp
+---- RESULTS
+1.00,2,12,12
+2.00,1,12,12
+2.00,2,12,12
+---- TYPES
+DECIMAL, INT, BIGINT, BIGINT
+====
+---- QUERY
+# IMPALA-10755: Predicate on analytic function should
+# be evaluated in a SELECT node
+select *
+  FROM (
+    SELECT
+      l_quantity, l_linenumber,
+      nr_pvp,
+      avg(nr_pvp) over (partition BY l_quantity) avg_nr_pvp,
+      max(nr_pvp) over (partition BY l_quantity) max_nr_pvp
+    FROM (
+      SELECT
+        l_quantity, l_linenumber,
+        count(1) AS nr_pvp
+      FROM
+        tpch.lineitem, tpch.partsupp
+        where l_partkey = ps_partkey
+        and ps_suppkey = 10 and  l_quantity in (1, 2)
+        GROUP BY l_quantity, l_linenumber
+    ) a
+  ) b
+  WHERE cast(avg_nr_pvp as bigint) = max_nr_pvp - 5
+---- RESULTS
+1.00,1,11,7,12
+1.00,2,12,7,12
+1.00,3,10,7,12
+1.00,4,5,7,12
+1.00,5,4,7,12
+1.00,6,5,7,12
+1.00,7,2,7,12
+---- TYPES
+DECIMAL, INT, BIGINT, DOUBLE, BIGINT
+====

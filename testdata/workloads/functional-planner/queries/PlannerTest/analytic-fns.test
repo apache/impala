@@ -1554,7 +1554,7 @@ where
 PLAN-ROOT SINK
 |
 07:SELECT
-|  predicates: avg(int_col) < 5, count(int_col) < 3, max(int_col) < 2, min(int_col) < 1, sum(int_col) < 4, bigint_col > 10, max(int_col) != count(int_col), min(int_col) != avg(int_col), min(int_col) != count(int_col), count(int_col) < bigint_col + 3, sum(int_col) < bigint_col + 4, avg(int_col) < bigint_col + 5, max(int_col) < bigint_col + 2, min(int_col) < bigint_col + 1
+|  predicates: avg(int_col) < 5, count(int_col) < 3, max(int_col) < 2, min(int_col) < 1, sum(int_col) < 4, bigint_col > 10, max(int_col) != count(int_col), min(int_col) != avg(int_col), min(int_col) != count(int_col), count(int_col) < bigint_col + 3, sum(int_col) < bigint_col + 4, min(int_col) < bigint_col + 1, max(int_col) < bigint_col + 2, avg(int_col) < bigint_col + 5
 |  row-size=49B cardinality=73
 |
 06:ANALYTIC
@@ -1596,7 +1596,7 @@ PLAN-ROOT SINK
 PLAN-ROOT SINK
 |
 07:SELECT
-|  predicates: avg(int_col) < 5, count(int_col) < 3, max(int_col) < 2, min(int_col) < 1, sum(int_col) < 4, bigint_col > 10, max(int_col) != count(int_col), min(int_col) != avg(int_col), min(int_col) != count(int_col), count(int_col) < bigint_col + 3, sum(int_col) < bigint_col + 4, avg(int_col) < bigint_col + 5, max(int_col) < bigint_col + 2, min(int_col) < bigint_col + 1
+|  predicates: avg(int_col) < 5, count(int_col) < 3, max(int_col) < 2, min(int_col) < 1, sum(int_col) < 4, bigint_col > 10, max(int_col) != count(int_col), min(int_col) != avg(int_col), min(int_col) != count(int_col), count(int_col) < bigint_col + 3, sum(int_col) < bigint_col + 4, min(int_col) < bigint_col + 1, max(int_col) < bigint_col + 2, avg(int_col) < bigint_col + 5
 |  row-size=49B cardinality=73
 |
 06:ANALYTIC
@@ -3380,4 +3380,119 @@ PLAN-ROOT SINK
    HDFS partitions=24/24 files=24 size=478.45KB
    runtime filters: RF000 -> t1.id
    row-size=4B cardinality=7.30K
+====
+# IMPALA-10755: Predicate on analytic function should
+# be evaluated in a SELECT node
+select *
+  FROM (
+    SELECT
+      l_quantity, l_linenumber,
+      nr_pvp,
+      max(nr_pvp) over (partition BY l_quantity) max_nr_pvp
+    FROM (
+      SELECT
+        l_quantity, l_linenumber,
+        count(1) AS nr_pvp
+      FROM
+        tpch.lineitem, tpch.partsupp
+        where l_partkey	= ps_partkey
+        and ps_suppkey = 10 and  l_quantity in (1, 2)
+        GROUP BY l_quantity, l_linenumber
+    ) a
+  ) b
+  WHERE nr_pvp = max_nr_pvp
+---- PLAN
+PLAN-ROOT SINK
+|
+06:SELECT
+|  predicates: count(*) = max(nr_pvp)
+|  row-size=28B cardinality=36
+|
+05:ANALYTIC
+|  functions: max(count(*))
+|  partition by: l_quantity
+|  row-size=28B cardinality=357
+|
+04:SORT
+|  order by: l_quantity ASC NULLS LAST
+|  row-size=20B cardinality=357
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: l_quantity, l_linenumber
+|  row-size=20B cardinality=357
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_partkey = ps_partkey
+|  runtime filters: RF000 <- ps_partkey
+|  row-size=36B cardinality=2.45K
+|
+|--01:SCAN HDFS [tpch.partsupp]
+|     HDFS partitions=1/1 files=1 size=112.71MB
+|     predicates: ps_suppkey = 10
+|     row-size=16B cardinality=82
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: l_quantity IN (1, 2)
+   runtime filters: RF000 -> l_partkey
+   row-size=20B cardinality=235.34K
+====
+# IMPALA-10755: Equality predicate where both
+# sides refer to analytic function.
+select *
+  FROM (
+    SELECT
+      l_quantity, l_linenumber,
+      nr_pvp,
+      min(nr_pvp) over (partition BY l_quantity) min_nr_pvp,
+      max(nr_pvp) over (partition BY l_quantity) max_nr_pvp
+    FROM (
+      SELECT
+        l_quantity, l_linenumber,
+        count(1) AS nr_pvp
+      FROM
+        tpch.lineitem, tpch.partsupp
+        where l_partkey	= ps_partkey
+        and ps_suppkey = 10 and  l_quantity in (1, 2)
+        GROUP BY l_quantity, l_linenumber
+    ) a
+  ) b
+  WHERE min_nr_pvp = max_nr_pvp
+---- PLAN
+PLAN-ROOT SINK
+|
+06:SELECT
+|  predicates: min(nr_pvp) = max(nr_pvp)
+|  row-size=36B cardinality=36
+|
+05:ANALYTIC
+|  functions: min(count(*)), max(count(*))
+|  partition by: l_quantity
+|  row-size=36B cardinality=357
+|
+04:SORT
+|  order by: l_quantity ASC NULLS LAST
+|  row-size=20B cardinality=357
+|
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: l_quantity, l_linenumber
+|  row-size=20B cardinality=357
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_partkey = ps_partkey
+|  runtime filters: RF000 <- ps_partkey
+|  row-size=36B cardinality=2.45K
+|
+|--01:SCAN HDFS [tpch.partsupp]
+|     HDFS partitions=1/1 files=1 size=112.71MB
+|     predicates: ps_suppkey = 10
+|     row-size=16B cardinality=82
+|
+00:SCAN HDFS [tpch.lineitem]
+   HDFS partitions=1/1 files=1 size=718.94MB
+   predicates: l_quantity IN (1, 2)
+   runtime filters: RF000 -> l_partkey
+   row-size=20B cardinality=235.34K
 ====
