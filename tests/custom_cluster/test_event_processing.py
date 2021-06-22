@@ -244,7 +244,6 @@ class TestEventProcessing(CustomClusterTestSuite):
     self.__run_self_events_test(unique_database, True)
     self.__run_self_events_test(unique_database, False)
 
-  @pytest.mark.xfail(run=False, reason="This is failing due to HIVE-23995")
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
   def test_event_based_replication(self):
     self.__run_event_based_replication_tests()

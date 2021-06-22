@@ -32,6 +32,7 @@ IMPALA_REMOTE_URL = os.environ.get("IMPALA_REMOTE_URL", "")
 
 # Default web UI URL for local test cluster
 DEFAULT_LOCAL_WEB_UI_URL = "http://localhost:25000"
+DEFAULT_LOCAL_CATALOGD_WEB_UI_URL = "http://localhost:25020"
 
 # Find the local build version. May be None if Impala wasn't built locally.
 IMPALA_LOCAL_BUILD_VERSION = None
@@ -223,12 +224,16 @@ class ImpalaTestClusterProperties(object):
   """
   Acquires and provides characteristics about the way the Impala under test was compiled
   and its likely effects on its responsiveness to automated test timings.
-  """
-  def __init__(self, build_flavor, library_link_type, web_ui_url):
+  TODO: Support remote urls for catalogd web UI."""
+
+  def __init__(self, build_flavor, library_link_type, web_ui_url,
+      catalogd_web_ui_url=DEFAULT_LOCAL_CATALOGD_WEB_UI_URL):
     self._build_flavor = build_flavor
     self._library_link_type = library_link_type
     self._web_ui_url = web_ui_url
+    self._catalogd_web_ui_url = catalogd_web_ui_url
     self._runtime_flags = None  # Lazily populated to avoid unnecessary web UI calls.
+    self._catalogd_runtime_flags = None  # Lazily populated
 
   @classmethod
   def get_instance(cls):
@@ -336,12 +341,26 @@ class ImpalaTestClusterProperties(object):
     if self._runtime_flags is None:
       response = requests.get(self._web_ui_url + "/varz?json")
       assert response.status_code == requests.codes.ok,\
-              "Offending url: " + impala_url
+              "Offending url: " + self._web_ui_url
       assert "application/json" in response.headers['Content-Type']
       self._runtime_flags = {}
       for flag_dict in json.loads(response.text)["flags"]:
         self._runtime_flags[flag_dict["name"]] = flag_dict
     return self._runtime_flags
+
+  @property
+  def catalogd_runtime_flags(self):
+    """Return the command line flags from the catalogd web UI. Returns a Python map with
+    the flag name as the key and a dictionary of flag properties as the value."""
+    if self._catalogd_runtime_flags is None:
+      response = requests.get(self._catalogd_web_ui_url + "/varz?json")
+      assert response.status_code == requests.codes.ok,\
+              "Offending url: " + self._catalogd_web_ui_url
+      assert "application/json" in response.headers['Content-Type']
+      self._catalogd_runtime_flags = {}
+      for flag_dict in json.loads(response.text)["flags"]:
+        self._catalogd_runtime_flags[flag_dict["name"]] = flag_dict
+    return self._catalogd_runtime_flags
 
   def is_catalog_v2_cluster(self):
     """Checks whether we use local catalog."""
@@ -361,12 +380,13 @@ class ImpalaTestClusterProperties(object):
     Checks if --hms_event_polling_interval_s is set to non-zero value"""
     try:
       key = "hms_event_polling_interval_s"
-      # --use_local_catalog is hidden so does not appear in JSON if disabled.
-      return key in self.runtime_flags and int(self.runtime_flags[key]["current"]) > 0
+      return key in self.catalogd_runtime_flags and int(
+        self._catalogd_runtime_flags[key]["current"]) > 0
     except Exception:
       if self.is_remote_cluster():
         # IMPALA-8553: be more tolerant of failures on remote cluster builds.
-        LOG.exception("Failed to get flags from web UI, assuming catalog V1")
+        LOG.exception(
+          "Failed to get flags from web UI, assuming event polling is disabled")
         return False
 
 def build_flavor_timeout(default_timeout, slow_build_timeout=None,

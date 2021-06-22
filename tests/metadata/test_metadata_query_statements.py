@@ -28,6 +28,7 @@ from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.filesystem_utils import get_fs_path
+from tests.util.event_processor_utils import EventProcessorUtils
 
 # TODO: For these tests to pass, all table metadata must be created exhaustively.
 # the tests should be modified to remove that requirement.
@@ -192,13 +193,11 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
                            "managedlocation '" + get_fs_path("/test2.db") + "'")
       if cluster_properties.is_event_polling_enabled():
         # Using HMS event processor - wait until the database shows up.
-        self.wait_for_db_to_appear("hive_test_desc_db", timeout_s=30)
+        EventProcessorUtils.wait_for_event_processing(self)
       else:
         # Invalidate metadata to pick up hive-created db.
         self.client.execute("invalidate metadata")
       self.run_test_case('QueryTest/describe-db', vector)
-      if not cluster_properties.is_catalog_v2_cluster():
-        self.run_test_case('QueryTest/describe-hive-db', vector)
     finally:
       self.__test_describe_db_cleanup()
 

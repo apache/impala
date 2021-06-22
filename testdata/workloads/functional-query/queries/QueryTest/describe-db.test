@@ -4,7 +4,6 @@
 describe database default
 ---- RESULTS
 'default','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR','Default Hive database'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR',''
 ---- TYPES
 string, string, string
 ====
@@ -14,7 +13,6 @@ describe database extended impala_test_desc_db1
 '','$USER','USER'
 'Owner: ','',''
 'impala_test_desc_db1','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db1.db',''
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/impala_test_desc_db1.db',''
 ---- TYPES
 string, string, string
 ====
@@ -24,7 +22,6 @@ describe database extended impala_test_desc_db2
 '','$USER','USER'
 'Owner: ','',''
 'impala_test_desc_db2','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db2.db','test comment'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/impala_test_desc_db2.db',''
 ---- TYPES
 string, string, string
 ====
@@ -34,7 +31,6 @@ describe database extended impala_test_desc_db3
 '','$USER','USER'
 'Owner: ','',''
 'impala_test_desc_db3','$NAMENODE/testdb',''
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/impala_test_desc_db3.db',''
 ---- TYPES
 string, string, string
 ====
@@ -44,18 +40,14 @@ describe database extended impala_test_desc_db4
 '','$USER','USER'
 'Owner: ','',''
 'impala_test_desc_db4','$NAMENODE/test2.db','test comment'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/impala_test_desc_db4.db',''
 ---- TYPES
 string, string, string
 ====
 ---- QUERY
-# TODO: Currently Hive ignores the specified managedlocation due to HIVE-24175,
-# so we are using the default locations in the checks. Restore the specified
-# location once HIVE-24175 is resolved.
 describe database impala_test_desc_db5
 ---- RESULTS
 'impala_test_desc_db5','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db5.db','test comment'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/impala_test_desc_db5.db',''
+'managedlocation:','$NAMENODE/test2.db',''
 ---- TYPES
 string, string, string
 ====
@@ -65,7 +57,7 @@ describe database extended impala_test_desc_db5
 '','$USER','USER'
 'Owner: ','',''
 'impala_test_desc_db5','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db5.db','test comment'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/impala_test_desc_db5.db',''
+'managedlocation:','$NAMENODE/test2.db',''
 ---- TYPES
 string, string, string
 ====
@@ -75,7 +67,7 @@ describe database extended impala_test_desc_db5
 '','$USER','USER'
 'Owner: ','',''
 'impala_test_desc_db5','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db5.db','test comment'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/impala_test_desc_db5.db',''
+'managedlocation:','$NAMENODE/test2.db',''
 ---- TYPES
 string, string, string
 ====
@@ -85,7 +77,54 @@ describe database formatted impala_test_desc_db5
 '','$USER','USER'
 'Owner: ','',''
 'impala_test_desc_db5','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/impala_test_desc_db5.db','test comment'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/impala_test_desc_db5.db',''
+'managedlocation:','$NAMENODE/test2.db',''
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test printing of default database.
+describe database default
+---- RESULTS
+'default','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR','Default Hive database'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test printing of hive_test_desc_db database.
+describe database hive_test_desc_db
+---- RESULTS
+'hive_test_desc_db','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/hive_test_desc_db.db','test comment'
+---- TYPES
+string, string, string
+====
+---- QUERY
+# Test printing of hive_test_desc_db database with extended information.
+describe database extended hive_test_desc_db
+---- RESULTS
+'hive_test_desc_db','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/hive_test_desc_db.db','test comment'
+'Parameter: ','',''
+'','$USER','USER'
+'Owner: ','',''
+'','e','2.82'
+'','pi','3.14'
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe database hive_test_desc_db2
+---- RESULTS
+'hive_test_desc_db2','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/hive_test_desc_db2.db','test comment'
+'managedlocation:','$NAMENODE/test2.db',''
+---- TYPES
+string, string, string
+====
+---- QUERY
+describe database extended hive_test_desc_db2
+---- RESULTS
+'hive_test_desc_db2','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/hive_test_desc_db2.db','test comment'
+'managedlocation:','$NAMENODE/test2.db',''
+'','$USER','USER'
+'Owner: ','',''
 ---- TYPES
 string, string, string
 ====

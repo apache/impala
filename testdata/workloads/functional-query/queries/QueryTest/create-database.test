@@ -14,10 +14,11 @@ STRING, STRING
 ---- QUERY
 # Test that DESCRIBE shows the proper database location
 # for a newly created database (regression test for IMPALA-7439)
+# After HIVE-24175 the managed location is only available when
+# explicitly set in the create database statement.
 describe database $DATABASE_2
 ---- RESULTS
 '$DATABASE_2','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/$DATABASE_2.db','For testing'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE_2.db',''
 ---- TYPES
 string, string, string
 ====
@@ -26,7 +27,6 @@ string, string, string
 describe database extended $DATABASE_2
 ---- RESULTS
 '$DATABASE_2','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/$DATABASE_2.db','For testing'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE_2.db',''
 'Owner: ','',''
 '','$USER','USER'
 ---- TYPES
@@ -70,7 +70,6 @@ create database if not exists $DATABASE_loc comment "For testing"
 describe database $DATABASE_loc
 ---- RESULTS
 '$DATABASE_loc','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/specified_location','For testing'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE_loc.db',''
 ---- TYPES
 string, string, string
 ====
@@ -79,7 +78,6 @@ string, string, string
 describe database extended $DATABASE_loc
 ---- RESULTS
 '$DATABASE_loc','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/specified_location','For testing'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE_loc.db',''
 'Owner: ','',''
 '','$USER','USER'
 ---- TYPES
@@ -168,10 +166,6 @@ show databases like '$DATABASE_restrict'
 ====
 ---- QUERY
 # Test CREATE DATABASE ... MANAGEDLOCATION
-#
-# TODO: Currently Hive ignores the specified managedlocation due to HIVE-24175,
-# so we are using the default locations in the checks. Restore the specified
-# location once HIVE-24175 is resolved.
 create database if not exists $DATABASE_loc comment "For testing"
   managedlocation '$NAMENODE/$MANAGED_WAREHOUSE_DIR/specified_managedlocation'
 ---- RESULTS
@@ -183,7 +177,7 @@ create database if not exists $DATABASE_loc comment "For testing"
 describe database $DATABASE_loc
 ---- RESULTS
 '$DATABASE_loc','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/$DATABASE_loc.db','For testing'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE_loc.db',''
+'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/specified_managedlocation',''
 ---- TYPES
 string, string, string
 ====
@@ -192,7 +186,7 @@ string, string, string
 describe database extended $DATABASE_loc
 ---- RESULTS
 '$DATABASE_loc','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/$DATABASE_loc.db','For testing'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE_loc.db',''
+'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/specified_managedlocation',''
 'Owner: ','',''
 '','$USER','USER'
 ---- TYPES
@@ -217,7 +211,7 @@ create database if not exists $DATABASE_loc comment "For testing"
 describe database $DATABASE_loc
 ---- RESULTS
 '$DATABASE_loc','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/specified_location','For testing'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE_loc.db',''
+'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/specified_managedlocation',''
 ---- TYPES
 string, string, string
 ====
@@ -226,7 +220,7 @@ string, string, string
 describe database extended $DATABASE_loc
 ---- RESULTS
 '$DATABASE_loc','$NAMENODE/$EXTERNAL_WAREHOUSE_DIR/specified_location','For testing'
-'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/$DATABASE_loc.db',''
+'managedlocation:','$NAMENODE/$MANAGED_WAREHOUSE_DIR/specified_managedlocation',''
 'Owner: ','',''
 '','$USER','USER'
 ---- TYPES
