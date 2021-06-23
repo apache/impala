@@ -1176,7 +1176,7 @@ Status HdfsParquetScanner::SkipPagesBatch(parquet::RowGroup& row_group,
       uint8_t* min_slot = min_slots;
       uint8_t* max_slot = max_slots;
       int64_t sz = end_page_idx - start_page_idx + 1;
-      for (int i = 0; i <= sz; i++) {
+      for (int i = 0; i < sz; i++) {
         min_vals.emplace_back(string(reinterpret_cast<char*>(min_slot), slot_size));
         max_vals.emplace_back(string(reinterpret_cast<char*>(max_slot), slot_size));
         min_slot += slot_size;
