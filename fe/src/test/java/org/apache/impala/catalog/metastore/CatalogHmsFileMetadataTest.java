@@ -23,11 +23,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.Iterables;
-import java.io.IOException;
-import java.net.Inet4Address;
-import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
@@ -131,9 +129,14 @@ public class CatalogHmsFileMetadataTest {
   public static void assertFdsAreSame(List<FileDescriptor> fdsFromCatalog,
       List<FileDescriptor> fdsFromHMS) {
     assertEquals(fdsFromCatalog.size(), fdsFromHMS.size());
-    for (int i=0; i<fdsFromCatalog.size(); i++) {
-      FileDescriptor fdFromCatalog = fdsFromCatalog.get(i);
-      FileDescriptor fdFromHMS = fdsFromHMS.get(i);
+    List<FileDescriptor> fds1 = new ArrayList<>(fdsFromCatalog);
+    List<FileDescriptor> fds2 = new ArrayList<>(fdsFromHMS);
+    // we sort the two list in case they are same but in different order
+    fds1.sort(Comparator.comparing(FileDescriptor::getRelativePath));
+    fds2.sort(Comparator.comparing(FileDescriptor::getRelativePath));
+    for (int i=0; i<fds1.size(); i++) {
+      FileDescriptor fdFromCatalog = fds1.get(i);
+      FileDescriptor fdFromHMS = fds2.get(i);
       assertEquals(fdFromCatalog.getRelativePath(), fdFromHMS.getRelativePath());
       assertEquals(fdFromCatalog.getFileCompression(), fdFromHMS.getFileCompression());
       assertEquals(fdFromCatalog.getFileLength(), fdFromHMS.getFileLength());
