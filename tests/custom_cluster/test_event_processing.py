@@ -119,6 +119,12 @@ class TestEventProcessing(CustomClusterTestSuite):
       self.run_stmt_in_hive("drop table if exists %s.%s" % (db_name, test_tbl_name))
       self.run_stmt_in_hive("create table %s.%s (id int, val int) %s"
          % (db_name, test_tbl_name, tblproperties))
+      EventProcessorUtils.wait_for_event_processing(self)
+      # Test CTAS and insert by Impala with empty results (IMPALA-10765).
+      self.execute_query("create table {db}.ctas_tbl {prop} as select * from {db}.{tbl}"
+                         .format(db=db_name, tbl=test_tbl_name, prop=tblproperties))
+      self.execute_query("insert into {db}.ctas_tbl select * from {db}.{tbl}"
+                         .format(db=db_name, tbl=test_tbl_name))
       # Test insert into table, this will fire an insert event.
       self.run_stmt_in_hive("insert into %s.%s values(101, 200)"
          % (db_name, test_tbl_name))
@@ -137,6 +143,12 @@ class TestEventProcessing(CustomClusterTestSuite):
       # Verify that the data is present in Impala.
       data = self.execute_scalar("select * from %s.%s" % (db_name, test_tbl_name))
       assert data.split('\t') == ['101', '201']
+      # Test insert overwrite by Impala with empty results (IMPALA-10765).
+      self.execute_query("insert overwrite {db}.{tbl} select * from {db}.ctas_tbl"
+                         .format(db=db_name, tbl=test_tbl_name))
+      result = self.execute_query("select * from {db}.{tbl}"
+                                  .format(db=db_name, tbl=test_tbl_name))
+      assert len(result.data) == 0
 
       # Test partitioned table.
       test_part_tblname = 'tbl_insert_part'
@@ -144,6 +156,14 @@ class TestEventProcessing(CustomClusterTestSuite):
       self.run_stmt_in_hive("create table %s.%s (id int, name string) "
          "partitioned by(day int, month int, year int) %s"
          % (db_name, test_part_tblname, tblproperties))
+      EventProcessorUtils.wait_for_event_processing(self)
+      # Test insert overwrite by Impala with empty results (IMPALA-10765).
+      self.execute_query("create table {db}.ctas_part partitioned by (day, month, year) "
+                         "{prop} as select * from {db}.{tbl}"
+                         .format(db=db_name, tbl=test_part_tblname, prop=tblproperties))
+      self.execute_query("insert into {db}.ctas_part partition(day=0, month=0, year=0) "
+                         "select id, name from {db}.{tbl}"
+                         .format(db=db_name, tbl=test_part_tblname))
       # Insert data into partitions.
       self.run_stmt_in_hive("insert into %s.%s partition(day=28, month=03, year=2019)"
          "values(101, 'x')" % (db_name, test_part_tblname))
@@ -161,6 +181,11 @@ class TestEventProcessing(CustomClusterTestSuite):
       data = self.execute_scalar("select count(*) from %s.%s where day=28 and month=3 "
          "and year=2019" % (db_name, test_part_tblname))
       assert data.split('\t') == ['2']
+      # Test inserting into existing partitions by Impala with empty results
+      # (IMPALA-10765).
+      self.execute_query("insert into {db}.{tbl} partition(day=28, month=03, year=2019) "
+                         "select id, name from {db}.ctas_part"
+                         .format(db=db_name, tbl=test_part_tblname))
 
       # Test insert overwrite into existing partitions
       self.run_stmt_in_hive("insert overwrite table %s.%s partition(day=28, month=03, "
@@ -170,6 +195,16 @@ class TestEventProcessing(CustomClusterTestSuite):
       data = self.execute_scalar("select * from %s.%s where day=28 and month=3 and"
          " year=2019 and id=101" % (db_name, test_part_tblname))
       assert data.split('\t') == ['101', 'z', '28', '3', '2019']
+      # Test insert overwrite into existing partitions by Impala with empty results
+      # (IMPALA-10765).
+      self.execute_query("insert overwrite {db}.{tbl} "
+                         "partition(day=28, month=03, year=2019) "
+                         "select id, name from {db}.ctas_part"
+                         .format(db=db_name, tbl=test_part_tblname))
+      result = self.execute_query("select * from {db}.{tbl} "
+                                  "where day=28 and month=3 and year=2019"
+                                  .format(db=db_name, tbl=test_part_tblname))
+      assert len(result.data) == 0
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
   def test_iceberg_inserts(self):

@@ -5053,7 +5053,6 @@ public class CatalogOpExecutor {
       // see HdfsTable.DEFAULT_PARTITION_NAME.
       List<String> newFiles = updatedPartitions.get("").getFiles();
       List<String> partVals = new ArrayList<>();
-      Preconditions.checkState(!newFiles.isEmpty() || isInsertOverwrite);
       LOG.info(String.format("%s new files detected for table %s", newFiles.size(),
           table.getFullName()));
       insertEventReqDatas.add(
@@ -5064,7 +5063,6 @@ public class CatalogOpExecutor {
     for (HdfsPartition part : existingPartitions) {
       List<String> newFiles = updatedPartitions.get(part.getPartitionName()).getFiles();
       List<String> partVals  = part.getPartitionValuesAsStrings(true);
-      Preconditions.checkState(!newFiles.isEmpty() || isInsertOverwrite);
       Preconditions.checkState(!partVals.isEmpty());
       LOG.info(String.format("%s new files detected for table %s partition %s",
           newFiles.size(), table.getFullName(), part.getPartitionName()));
@@ -5077,7 +5075,6 @@ public class CatalogOpExecutor {
       for (Map.Entry<String, List<String>> part : addedPartitionNames.entrySet()) {
         List<String> newFiles = updatedPartitions.get(part.getKey()).getFiles();
         List<String> partVals  = part.getValue();
-        Preconditions.checkState(!newFiles.isEmpty() || isInsertOverwrite);
         Preconditions.checkState(!partVals.isEmpty());
         LOG.info(String.format("%s new files detected for table %s new partition %s",
             newFiles.size(), table.getFullName(), part.getKey()));
@@ -5120,9 +5117,7 @@ public class CatalogOpExecutor {
 
   private boolean shouldGenerateInsertEvents(FeFsTable table) {
     if (table instanceof FeIcebergTable) return false;
-    if (!BackendConfig.INSTANCE.isInsertEventsEnabled()) return false;
-    if (!catalog_.isEventProcessingActive()) return false;
-    return true;
+    return BackendConfig.INSTANCE.isInsertEventsEnabled();
   }
 
   private InsertEventRequestData makeInsertEventData(FeFsTable tbl, List<String> partVals,
