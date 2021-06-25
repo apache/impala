@@ -252,3 +252,98 @@ where a.a = b.float_col;
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRuntimeFilteredPages): 0
 ====
+---- QUERY
+###################################################
+# Create a version of store_sales with z-order sort
+# on primary key and load it with 27587 rows.
+###################################################
+drop table if exists store_sales_zorder;
+create table store_sales_zorder (
+ss_sold_time_sk INT,
+ss_item_sk BIGINT,
+ss_customer_sk INT,
+ss_cdemo_sk INT,
+ss_hdemo_sk INT,
+ss_addr_sk INT,
+ss_store_sk INT,
+ss_promo_sk INT,
+ss_ticket_number BIGINT,
+ss_quantity INT,
+ss_wholesale_cost DECIMAL(7,2),
+ss_list_price DECIMAL(7,2),
+ss_sales_price DECIMAL(7,2),
+ss_ext_discount_amt DECIMAL(7,2),
+ss_ext_sales_price DECIMAL(7,2),
+ss_ext_wholesale_cost DECIMAL(7,2),
+ss_ext_list_price DECIMAL(7,2),
+ss_ext_tax DECIMAL(7,2),
+ss_coupon_amt DECIMAL(7,2),
+ss_net_paid DECIMAL(7,2),
+ss_net_paid_inc_tax DECIMAL(7,2),
+ss_net_profit DECIMAL(7,2),
+PRIMARY KEY (ss_item_sk, ss_ticket_number)
+)
+PARTITIONED BY (ss_sold_date_sk INT)
+sort by zorder(ss_item_sk, ss_ticket_number)
+STORED AS PARQUET;
+set PARQUET_PAGE_ROW_COUNT_LIMIT=1000;
+insert into store_sales_zorder partition (ss_sold_date_sk)
+select * from tpcds_parquet.store_sales;
+====
+---- QUERY
+###################################################
+# A minmax filter should be generated for the
+# z-order column ss_item_sk out of box.
+###################################################
+set explain_level=3;
+explain select straight_join a.ss_sold_time_sk from
+store_sales_zorder a join [SHUFFLE] tpcds_parquet.store_sales b
+on a.ss_item_sk = b.ss_item_sk
+where b.ss_customer_sk < 10 and b.ss_addr_sk < 20;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.* RF001\[min_max\] -. .\.ss_item_sk.*
+====
+---- QUERY
+###################################################
+# A minmax filter should be generated for the
+# z-order column ss_ticket_number out of box.
+###################################################
+set explain_level=3;
+explain select straight_join a.ss_sold_time_sk from
+store_sales_zorder a join [SHUFFLE] tpcds_parquet.store_sales b
+on a.ss_ticket_number = b.ss_ticket_number
+where b.ss_customer_sk < 10 and b.ss_addr_sk < 20;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:.* RF001\[min_max\] -. .\.ss_ticket_number.*
+====
+---- QUERY
+###################################################
+# A minmax filter should not be generated for
+# column ss_item_sk which is not z-ordered.
+###################################################
+set explain_level=3;
+explain select straight_join a.ss_sold_time_sk from
+store_sales_zorder a join [SHUFFLE] tpcds_parquet.store_sales b
+on a.ss_cdemo_sk = b.ss_cdemo_sk
+where b.ss_customer_sk < 10 and b.ss_addr_sk < 20;
+---- RESULTS: VERIFY_IS_NOT_IN
+row_regex:.* RF001\[min_max\] -. .\.ss_cdemo_sk.*
+====
+---- QUERY
+###################################################
+# Run a query that demonstrates the min/max filter
+# helps reduces # of pages:
+# sum(NumRuntimeFilteredPages) = 28
+###################################################
+set minmax_filtering_level=page;
+set minmax_filter_threshold=0.9;
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select straight_join count(a.ss_sold_time_sk) from
+store_sales_zorder a join [SHUFFLE] tpcds_parquet.item b
+on a.ss_item_sk = b.i_item_sk
+where i_manufact_id = 1 and i_current_price < 1.0;
+---- RESULTS
+540
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredPages): 28
+====

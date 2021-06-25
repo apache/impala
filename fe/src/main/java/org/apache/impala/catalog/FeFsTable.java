@@ -290,19 +290,37 @@ public interface FeFsTable extends FeTable {
   ListMap<TNetworkAddress> getHostIndex();
 
   /**
-   * Check if 'col_name' names the leading sort by column by searching the 'sort.columns'
-   * table property.
+   * Check if 'col_name' appears in the list of sort-by columns by searching the
+   * 'sort.columns' table property and return the index in the list if so. Return
+   * -1 otherwise.
    */
-  default boolean isLeadingSortByColumn(String col_name) {
+  default int getSortByColumnIndex(String col_name) {
     // Get the names of all sort by columns (specified in the SORT BY clause in
     // CREATE TABLE DDL) from TBLPROPERTIES.
     Map<String, String> parameters = getMetaStoreTable().getParameters();
-    if (parameters == null) return false;
+    if (parameters == null) return -1;
     String sort_by_columns_string = parameters.get("sort.columns");
-    if (sort_by_columns_string == null) return false;
-    String[] sort_by_columns = sort_by_columns_string.split(",", -1);
-    if (sort_by_columns == null) return false;
-    return sort_by_columns.length > 0 && sort_by_columns[0].equals(col_name);
+    if (sort_by_columns_string == null) return -1;
+    String[] sort_by_columns = sort_by_columns_string.split(",");
+    if (sort_by_columns == null) return -1;
+    for (int i = 0; i < sort_by_columns.length; i++) {
+      if (sort_by_columns[i].equals(col_name)) return i;
+    }
+    return -1;
+  }
+
+  /**
+   * Check if 'col_name' names the leading sort-by column.
+   */
+  default boolean isLeadingSortByColumn(String col_name) {
+    return getSortByColumnIndex(col_name) == 0;
+  }
+
+  /**
+   * Check if 'col_name' appears in the list of sort-by columns.
+   */
+  default boolean isSortByColumn(String col_name) {
+    return getSortByColumnIndex(col_name) >= 0;
   }
 
   /**

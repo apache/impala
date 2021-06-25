@@ -91,6 +91,7 @@ import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TScanRangeSpec;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.BitUtil;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
@@ -725,19 +726,32 @@ public class HdfsScanNode extends ScanNode {
   /**
    * Determine if a runtime filter should be allowed given the relevant query options.
    */
-  private boolean allowRuntimeFilter(TQueryOptions queryOptions,
-      boolean isBoundByPartitionColumns, boolean isLeadingLexicalSortedColumn) {
+  private boolean allowMinMaxFilter(FeTable table, Column column,
+      TQueryOptions queryOptions, boolean isBoundByPartitionColumns) {
+    if (column == null || table == null || !(table instanceof FeFsTable)) return false;
+    FeFsTable feFsTable = (FeFsTable) table;
+
     boolean minmaxOnPartitionColumns = queryOptions.isMinmax_filter_partition_columns();
     boolean minmaxOnSortedColumns = queryOptions.isMinmax_filter_sorted_columns();
+
+    TSortingOrder sortOrder = feFsTable.getSortOrderForSortByColumn();
+    if (sortOrder != null) {
+      // The table is sorted.
+      if (sortOrder == TSortingOrder.LEXICAL) {
+        // If the table is sorted in lexical order, allow it if the column is a
+        // leading sort-by column and filtering on sorted column is enabled.
+        return feFsTable.isLeadingSortByColumn(column.getName()) && minmaxOnSortedColumns;
+      } else {
+        // Must be Z-order. Allow it if it is one of the sort-by columns and filtering
+        // on sorted column is enabled.
+        Preconditions.checkState(sortOrder == TSortingOrder.ZORDER);
+        return feFsTable.isSortByColumn(column.getName()) && minmaxOnSortedColumns;
+      }
+    }
 
     // Allow min/max filters on partition columns only when enabled.
     if (isBoundByPartitionColumns) {
       return minmaxOnPartitionColumns;
-    }
-
-    // Allow min/max filters on sorted columns only when enabled.
-    if (isLeadingLexicalSortedColumn) {
-      return minmaxOnSortedColumns;
     }
 
     // Allow min/max filters if the threshold value > 0.0.
@@ -766,19 +780,10 @@ public class HdfsScanNode extends ScanNode {
         return false;
     }
 
-    boolean isLeadingLexicalSortedColumn = false;
     Column column = slotRefInScan.getDesc().getColumn();
-    if (column != null) {
-      TupleDescriptor tDesc = slotRefInScan.getDesc().getParent();
-      FeTable table = tDesc.getTable();
-      if (table != null && table instanceof FeFsTable) {
-        isLeadingLexicalSortedColumn =
-            ((FeFsTable) table).isLeadingSortByColumn(column.getName())
-            && ((FeFsTable) table).IsLexicalSortByColumn();
-      }
-    }
-    if (!allowRuntimeFilter(analyzer.getQueryOptions(), isBoundByPartitionColumns,
-            isLeadingLexicalSortedColumn)) {
+    FeTable table = slotRefInScan.getDesc().getParent().getTable();
+    if (!allowMinMaxFilter(
+            table, column, analyzer.getQueryOptions(), isBoundByPartitionColumns)) {
       return false;
     }
 

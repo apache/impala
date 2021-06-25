@@ -1097,7 +1097,7 @@ Status impala::SetQueryOption(const string& key, const string& value,
       }
       case TImpalaQueryOptions::DELETE_STATS_IN_TRUNCATE: {
         query_options->__set_delete_stats_in_truncate(IsTrue(value));
-         break;
+        break;
       }
       case TImpalaQueryOptions::MINMAX_FILTER_SORTED_COLUMNS: {
         query_options->__set_minmax_filter_sorted_columns(IsTrue(value));
