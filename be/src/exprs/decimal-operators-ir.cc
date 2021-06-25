@@ -116,21 +116,21 @@ IR_ALWAYS_INLINE DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext*
   switch (ColumnType::GetDecimalByteSize(output_precision)) {
     case 4: {
       Decimal4Value scaled_val = val.ScaleTo(
-          val_scale, output_scale, output_precision, &overflow);
+          val_scale, output_scale, output_precision, /*round=*/false, &overflow);
       RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(scaled_val.value());
     }
     case 8: {
       Decimal8Value val8 = ToDecimal8(val, &overflow);
       Decimal8Value scaled_val = val8.ScaleTo(
-          val_scale, output_scale, output_precision, &overflow);
+          val_scale, output_scale, output_precision, /*round=*/false, &overflow);
       RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(scaled_val.value());
     }
     case 16: {
       Decimal16Value val16 = ToDecimal16(val, &overflow);
       Decimal16Value scaled_val = val16.ScaleTo(
-          val_scale, output_scale, output_precision, &overflow);
+          val_scale, output_scale, output_precision, /*round=*/false, &overflow);
       RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(scaled_val.value());
     }
@@ -146,21 +146,21 @@ IR_ALWAYS_INLINE DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext*
   switch (ColumnType::GetDecimalByteSize(output_precision)) {
     case 4: {
       Decimal8Value scaled_val = val.ScaleTo(
-          val_scale, output_scale, output_precision, &overflow);
+          val_scale, output_scale, output_precision, /*round=*/false, &overflow);
       Decimal4Value val4 = ToDecimal4(scaled_val, &overflow);
       RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(val4.value());
     }
     case 8: {
       Decimal8Value scaled_val = val.ScaleTo(
-          val_scale, output_scale, output_precision, &overflow);
+          val_scale, output_scale, output_precision, /*round=*/false, &overflow);
       RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(scaled_val.value());
     }
     case 16: {
       Decimal16Value val16 = ToDecimal16(val, &overflow);
       Decimal16Value scaled_val = val16.ScaleTo(
-          val_scale, output_scale, output_precision, &overflow);
+          val_scale, output_scale, output_precision, /*round=*/false, &overflow);
       RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(scaled_val.value());
     }
@@ -176,21 +176,21 @@ IR_ALWAYS_INLINE DecimalVal DecimalOperators::ScaleDecimalValue(FunctionContext*
   switch (ColumnType::GetDecimalByteSize(output_precision)) {
     case 4: {
       Decimal16Value scaled_val = val.ScaleTo(
-          val_scale, output_scale, output_precision, &overflow);
+          val_scale, output_scale, output_precision, /*round=*/false, &overflow);
       Decimal4Value val4 = ToDecimal4(scaled_val, &overflow);
       RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(val4.value());
     }
     case 8: {
       Decimal16Value scaled_val = val.ScaleTo(
-          val_scale, output_scale, output_precision, &overflow);
+          val_scale, output_scale, output_precision, /*round=*/false, &overflow);
       Decimal8Value val8 = ToDecimal8(scaled_val, &overflow);
       RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(val8.value());
     }
     case 16: {
       Decimal16Value scaled_val = val.ScaleTo(
-          val_scale, output_scale, output_precision, &overflow);
+          val_scale, output_scale, output_precision, /*round=*/false, &overflow);
       RETURN_IF_OVERFLOW(ctx, overflow, DecimalVal);
       return DecimalVal(scaled_val.value());
     }

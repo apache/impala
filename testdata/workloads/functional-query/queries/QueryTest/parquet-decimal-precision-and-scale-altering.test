@@ -1,0 +1,236 @@
+====
+---- QUERY
+CREATE TABLE test_dec (d decimal(6, 3)) STORED AS PARQUET;
+INSERT INTO test_dec VALUES (23.633), (11.151), (-23.672), (-23.154);
+SELECT * FROM test_dec;
+---- RESULTS
+23.633
+11.151
+-23.672
+-23.154
+---- TYPES
+DECIMAL
+====
+---- QUERY
+ALTER TABLE test_dec CHANGE COLUMN d d DECIMAL(8, 3);
+SELECT * FROM test_dec where d = 23.633;
+---- RESULTS
+23.633
+---- TYPES
+DECIMAL
+====
+---- QUERY
+ALTER TABLE test_dec CHANGE COLUMN d d DECIMAL(8, 4);
+SELECT * FROM test_dec where d != 0;
+---- RESULTS
+23.6330
+11.1510
+-23.6720
+-23.1540
+---- TYPES
+DECIMAL
+====
+---- QUERY
+ALTER TABLE test_dec CHANGE COLUMN d d DECIMAL(10, 3);
+SELECT * FROM test_dec where d < 0;
+---- RESULTS
+-23.672
+-23.154
+---- TYPES
+DECIMAL
+====
+---- QUERY
+ALTER TABLE test_dec CHANGE COLUMN d d DECIMAL(10, 5);
+SELECT * FROM test_dec where d > 23.63;
+---- RESULTS
+23.63300
+---- TYPES
+DECIMAL
+====
+---- QUERY
+ALTER TABLE test_dec CHANGE COLUMN d d DECIMAL(32, 8);
+SELECT * FROM test_dec where d > 0;
+---- RESULTS
+23.63300000
+11.15100000
+---- TYPES
+DECIMAL
+====
+---- QUERY
+SELECT * FROM test_dec where d < 0;
+---- RESULTS
+-23.67200000
+-23.15400000
+---- TYPES
+DECIMAL
+====
+---- QUERY
+ALTER TABLE test_dec CHANGE COLUMN d d DECIMAL(10, 2);
+SELECT * FROM test_dec where d = 11.15;
+---- RESULTS
+11.15
+---- TYPES
+DECIMAL
+====
+---- QUERY
+SELECT * FROM test_dec;
+---- RESULTS
+23.63
+11.15
+-23.67
+-23.15
+---- TYPES
+DECIMAL
+====
+---- QUERY
+ALTER TABLE test_dec CHANGE COLUMN d d DECIMAL(10, 1);
+SELECT * FROM test_dec where d = 11.2;
+---- RESULTS
+11.2
+---- TYPES
+DECIMAL
+====
+---- QUERY
+ALTER TABLE test_dec CHANGE COLUMN d d DECIMAL(10, 1);
+SELECT * FROM test_dec where d < 0;
+---- RESULTS
+-23.7
+-23.2
+---- TYPES
+DECIMAL
+====
+---- QUERY
+SELECT * FROM test_dec where d = -23.7;
+---- RESULTS
+-23.7
+---- TYPES
+DECIMAL
+====
+---- QUERY
+ALTER TABLE test_dec CHANGE COLUMN d d DECIMAL(20, 0);
+SELECT * FROM test_dec where d = 24;
+---- RESULTS
+24
+---- TYPES
+DECIMAL
+====
+---- QUERY
+SELECT * FROM test_dec where d = -23;
+---- RESULTS
+-23
+---- TYPES
+DECIMAL
+====
+---- QUERY
+ALTER TABLE test_dec CHANGE COLUMN d d DECIMAL(32, 8);
+INSERT INTO test_dec values (100000000.9999);
+SELECT * FROM test_dec where d > 0;
+---- RESULTS
+23.63300000
+11.15100000
+100000000.99990000
+---- TYPES
+DECIMAL
+====
+---- QUERY
+# Test runtime filters with equi-joins.
+set parquet_page_row_count_limit=1;
+create table deci_left (d decimal(6,3)) sort by (d) stored as parquet;
+create table deci_right (d decimal (6, 3), b boolean) stored as parquet;
+insert into deci_left values (123.123), (222.566), (-123.971);
+insert into deci_right values (123.123, false), (222.566, true), (-123.97, true);
+====
+---- QUERY
+# At first only change the left side.
+set minmax_filter_threshold=1.0;
+set minmax_filtering_level=row;
+alter table deci_left change column d d decimal(6, 2);
+select deci_left.d, deci_right.b
+from deci_left join deci_right on (deci_left.d = deci_right.d)
+where b = true;
+---- RESULTS
+-123.97,true
+---- TYPES
+DECIMAL,BOOLEAN
+====
+---- QUERY
+set minmax_filter_threshold=1.0;
+set minmax_filtering_level=row;
+alter table deci_right change column d d decimal(6, 2);
+select deci_left.d, deci_right.b
+from deci_left join deci_right on (deci_left.d = deci_right.d)
+where b = true;
+---- RESULTS
+-123.97,true
+222.57,true
+---- TYPES
+DECIMAL, BOOLEAN
+====
+---- QUERY
+set minmax_filter_threshold=1.0;
+set minmax_filtering_level=row;
+select deci_left.d, deci_right.b
+from deci_left join deci_right on (deci_left.d = deci_right.d)
+where b = false;
+---- RESULTS
+123.12,false
+---- TYPES
+DECIMAL, BOOLEAN
+====
+---- QUERY
+set minmax_filter_threshold=1.0;
+set minmax_filtering_level=row;
+alter table deci_left change column d d decimal (6, 1);
+alter table deci_right change column d d decimal (6, 1);
+select deci_left.d, deci_right.b
+from deci_left join deci_right on (deci_left.d = deci_right.d)
+where b = true;
+---- RESULTS
+-124.0,true
+222.6,true
+---- TYPES
+DECIMAL, BOOLEAN
+====
+---- QUERY
+set minmax_filter_threshold=1.0;
+set minmax_filtering_level=row;
+select deci_left.d, deci_right.b
+from deci_left join deci_right on (deci_left.d = deci_right.d)
+where b = false;
+---- RESULTS
+123.1,false
+---- TYPES
+DECIMAL, BOOLEAN
+====
+---- QUERY
+set parquet_page_row_count_limit=1;
+set minmax_filter_threshold=1.0;
+set minmax_filtering_level=row;
+insert into deci_left values (356.7), (-200.9);
+insert into deci_right values (356.7, true), (-200.9, true);
+select deci_left.d, deci_right.b
+from deci_left join deci_right on (deci_left.d = deci_right.d)
+where b = true;
+---- RESULTS
+-124.0,true
+222.6,true
+-200.9,true
+356.7,true
+---- TYPES
+DECIMAL, BOOLEAN
+====
+---- QUERY
+set minmax_filter_threshold=1.0;
+set minmax_filtering_level=row;
+alter table deci_left change column d d decimal (8, 4);
+alter table deci_right change column d d decimal (8, 4);
+select deci_left.d, deci_right.b
+from deci_left join deci_right on (deci_left.d = deci_right.d)
+where b = true;
+---- RESULTS
+-200.9000,true
+356.7000,true
+222.5660,true
+---- TYPES
+DECIMAL, BOOLEAN
+====

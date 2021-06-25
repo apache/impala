@@ -656,3 +656,8 @@ https://github.com/apache/parquet-mr/blob/master/parquet-hadoop/src/test/java/or
 (65b95fb72be8f5a8a193a6f7bc4560fdcd742fc7).
 The schema was completely changed to allow us to test types supported in Parquet Bloom
 filters.
+
+binary_decimal_precision_and_scale_widening.parquet
+Parquet file written with schema (decimal(9,2), decimal(18,2), decimal(38,2)). The rows
+inside the file are carefully chosen so that they don't cause an overflow when being read
+by an Impala table with a higher precision/scale.

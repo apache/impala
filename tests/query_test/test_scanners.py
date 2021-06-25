@@ -1051,6 +1051,61 @@ class TestParquet(ImpalaTestSuite):
         else:
           assert summary.total_num_values == 11
 
+  def test_decimal_precision_and_scale_widening(self, vector, unique_database):
+    """IMPALA-7087: Tests that Parquet files stored with a lower precision or scale than
+       the table metadata can be read by Impala.
+    """
+    # The file binary_decimal_precision_widening is written with schema (decimal(9,2),
+    # decimal(18,2), decimal(38,2))
+    binary_decimal_test_files =\
+        ["testdata/data/binary_decimal_precision_and_scale_widening.parquet"]
+
+    # Test reading Parquet files when the table has a higher precision than the file
+    create_table_and_copy_files(self.client, """create table if not exists {db}.{tbl}
+        (small_dec decimal(38,2), med_dec decimal(38,2), large_dec decimal(38,2))
+        STORED AS PARQUET""", unique_database, "binary_decimal_precision_widening",
+        binary_decimal_test_files)
+
+    # Test reading Parquet files when the table has a higher scale than the file
+    create_table_and_copy_files(self.client, """create table if not exists {db}.{tbl}
+        (small_dec decimal(9,4), med_dec decimal(18,4), large_dec decimal(38,4))
+        STORED AS PARQUET""", unique_database, "binary_decimal_scale_widening",
+        binary_decimal_test_files)
+
+    # Test reading Parquet files when the table has a higher precision and scale than the
+    # file
+    create_table_and_copy_files(self.client, """create table if not exists {db}.{tbl}
+        (small_dec decimal(38,4), med_dec decimal(38,4), large_dec decimal(38,4))
+        STORED AS PARQUET""", unique_database,
+        "binary_decimal_precision_and_scale_widening", binary_decimal_test_files)
+
+    # Test Parquet precision and scale widening when decimals are stored as INT32
+    create_table_and_copy_files(self.client, """create table if not exists {db}.{tbl}
+        (team string, score decimal(12, 6)) STORED AS PARQUET""", unique_database,
+        "int32_decimal_precision_and_scale_widening",
+        ["testdata/data/decimal_stored_as_int32.parquet"])
+
+    # Test Parquet precision and scale widening when decimals are stored as INT64
+    create_table_and_copy_files(self.client, """create table if not exists {db}.{tbl}
+        (team string, score decimal(32, 8)) STORED AS PARQUET""", unique_database,
+        "int64_decimal_precision_and_scale_widening",
+        ["testdata/data/decimal_stored_as_int64.parquet"])
+
+    # Unlike the file binary_decimal_precision_and_scale_widening.parquet, all the values
+    # in binary_decimal_no_dictionary.parquet cannot be converted to a higher scale
+    # without overflowing
+    create_table_and_copy_files(self.client, """create table if not exists {db}.{tbl}
+        (small_dec decimal(9,4), med_dec decimal(18,4), large_dec decimal(38,4))
+        STORED AS PARQUET""", unique_database, "scale_overflow",
+        ["testdata/data/binary_decimal_no_dictionary.parquet"])
+
+    self.run_test_case("QueryTest/parquet-decimal-precision-and-scale-widening", vector,
+                       unique_database)
+
+  def test_decimal_precision_and_scale_altering(self, vector, unique_database):
+    self.run_test_case(
+        "QueryTest/parquet-decimal-precision-and-scale-altering", vector, unique_database)
+
 
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:

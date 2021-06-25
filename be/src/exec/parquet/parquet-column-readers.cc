@@ -22,6 +22,7 @@
 
 #include "exec/parquet/hdfs-parquet-scanner.h"
 #include "exec/parquet/parquet-bool-decoder.h"
+#include "exec/parquet/parquet-data-converter.h"
 #include "exec/parquet/parquet-level-decoder.h"
 #include "exec/parquet/parquet-metadata-utils.h"
 #include "exec/scratch-tuple-batch.h"
@@ -208,10 +209,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
   /// Most column readers never require conversion, so we can avoid branches by
   /// returning constant false. Column readers for types that require conversion
   /// must specialize this function.
-  inline bool NeedsConversionInline() const {
-    DCHECK(!needs_conversion_);
-    return false;
-  }
+  inline bool NeedsConversionInline() const;
 
   /// Similar to NeedsConversion(), most column readers do not require validation,
   /// so to avoid branches, we return constant false. In general, types where not
@@ -223,8 +221,7 @@ class ScalarColumnReader : public BaseScalarColumnReader {
 
   /// Converts and writes 'src' into 'slot' based on desc_->type()
   bool ConvertSlot(const InternalType* src, void* slot) {
-    DCHECK(false);
-    return false;
+    return data_converter_.ConvertSlot(src, slot);
   }
 
   /// Checks if 'val' is invalid, e.g. due to being out of the valid value range. If it
@@ -251,21 +248,22 @@ class ScalarColumnReader : public BaseScalarColumnReader {
         PrintThriftEnum(page_encoding_), col_chunk_reader_.stream()->file_offset());
   }
 
+  ParquetTimestampDecoder& GetTimestampDecoder() {
+    return data_converter_.timestamp_decoder();
+  }
+
   /// Dictionary decoder for decoding column values.
   DictDecoder<InternalType> dict_decoder_;
 
   /// True if dict_decoder_ has been initialized with a dictionary page.
   bool dict_decoder_init_ = false;
 
-  /// true if decoded values must be converted before being written to an output tuple.
-  bool needs_conversion_ = false;
-
   /// The size of this column with plain encoding for FIXED_LEN_BYTE_ARRAY, or
   /// the max length for VARCHAR columns. Unused otherwise.
   int fixed_len_size_;
 
-  /// Contains extra data needed for Timestamp decoding.
-  ParquetTimestampDecoder timestamp_decoder_;
+  /// Converts values if needed.
+  ParquetDataConverter<InternalType, MATERIALIZED> data_converter_;
 
   /// Contains extra state required to decode boolean values. Only initialised for
   /// BOOLEAN columns.
@@ -279,7 +277,9 @@ template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIAL
 ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ScalarColumnReader(
     HdfsParquetScanner* parent, const SchemaNode& node, const SlotDescriptor* slot_desc)
   : BaseScalarColumnReader(parent, node, slot_desc),
-    dict_decoder_(parent->scan_node_->mem_tracker()) {
+    dict_decoder_(parent->scan_node_->mem_tracker()),
+    data_converter_(node.element,
+                    MATERIALIZED ? &slot_desc->type() : nullptr) {
   if (!MATERIALIZED) {
     // We're not materializing any values, just counting them. No need (or ability) to
     // initialize state used to materialize values.
@@ -297,16 +297,41 @@ ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ScalarColumnReader
     fixed_len_size_ = -1;
   }
 
-  needs_conversion_ = slot_desc_->type().type == TYPE_CHAR;
-
   if (slot_desc_->type().type == TYPE_TIMESTAMP) {
-    timestamp_decoder_ = parent->CreateTimestampDecoder(*node.element);
-    dict_decoder_.SetTimestampHelper(timestamp_decoder_);
-    needs_conversion_ = timestamp_decoder_.NeedsConversion();
+    data_converter_.SetTimestampDecoder(parent->CreateTimestampDecoder(*node.element));
+    dict_decoder_.SetTimestampHelper(GetTimestampDecoder());
   }
   if (slot_desc_->type().type == TYPE_BOOLEAN) {
     bool_decoder_ = make_unique<ParquetBoolDecoder>();
   }
+}
+
+template <typename T>
+struct IsDecimalValue {
+  static constexpr bool value =
+    std::is_same<T, Decimal4Value>::value ||
+    std::is_same<T, Decimal8Value>::value ||
+    std::is_same<T, Decimal16Value>::value;
+};
+
+template <typename InternalType, parquet::Type::type PARQUET_TYPE, bool MATERIALIZED>
+inline bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>
+::NeedsConversionInline() const {
+  //TODO: use constexpr ifs when we switch to C++17.
+  if /* constexpr */ (MATERIALIZED) {
+    if /* constexpr */ (IsDecimalValue<InternalType>::value) {
+      return data_converter_.NeedsConversion();
+    }
+    if /* constexpr */ (std::is_same<InternalType, TimestampValue>::value) {
+      return data_converter_.NeedsConversion();
+    }
+    if /* constexpr */ (std::is_same<InternalType, StringValue>::value &&
+                        PARQUET_TYPE == parquet::Type::BYTE_ARRAY) {
+      return data_converter_.NeedsConversion();
+    }
+  }
+  DCHECK(!data_converter_.NeedsConversion());
+  return false;
 }
 
 // TODO: consider performing filter selectivity checks in this function.
@@ -675,14 +700,14 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadSlot(
       reinterpret_cast<InternalType*>(NEEDS_CONVERSION ? val_buf : slot);
 
   if (UNLIKELY(!DecodeValue<ENCODING>(&data_, data_end_, val_ptr))) return false;
-  if (UNLIKELY(NeedsValidationInline() && !ValidateValue(val_ptr))) {
+  if (UNLIKELY(NeedsValidationInline() && !ValidateValue(val_ptr)) ||
+      (NEEDS_CONVERSION && UNLIKELY(!ConvertSlot(val_ptr, slot)))) {
     if (UNLIKELY(!parent_->parse_status_.ok())) return false;
     // The value is invalid but execution should continue - set the null indicator and
     // skip conversion.
     tuple->SetNull(null_indicator_offset_);
     return true;
   }
-  if (NEEDS_CONVERSION && UNLIKELY(!ConvertSlot(val_ptr, slot))) return false;
   return true;
 }
 
@@ -709,15 +734,13 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadAndConver
   uint8_t* curr_tuple = tuple_mem;
   for (int64_t i = 0; i < num_to_read; ++i, ++curr_val, curr_tuple += tuple_size) {
     Tuple* tuple = reinterpret_cast<Tuple*>(curr_tuple);
-    if (NeedsValidationInline() && UNLIKELY(!ValidateValue(curr_val))) {
+    if ((NeedsValidationInline() && UNLIKELY(!ValidateValue(curr_val))) ||
+        UNLIKELY(!ConvertSlot(curr_val, tuple->GetSlot(tuple_offset_)))) {
       if (UNLIKELY(!parent_->parse_status_.ok())) return false;
-      // The value is invalid but execution should continue - set the null indicator and
-      // skip conversion.
+      // The value or the conversion is invalid but execution should continue - set the
+      // null indicator.
       tuple->SetNull(null_indicator_offset_);
       continue;
-    }
-    if (UNLIKELY(!ConvertSlot(curr_val, tuple->GetSlot(tuple_offset_)))) {
-      return false;
     }
   }
   return true;
@@ -772,14 +795,15 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::DecodeValue(
 }
 
 // Specialise for decoding INT64 timestamps from PLAIN decoding, which need to call
-// out to 'timestamp_decoder_'.
+// out to the timestamp decoder.
 template <>
 template <>
 bool ScalarColumnReader<TimestampValue, parquet::Type::INT64,
     true>::DecodeValue<Encoding::PLAIN>(uint8_t** RESTRICT data,
     const uint8_t* RESTRICT data_end, TimestampValue* RESTRICT val) RESTRICT {
   DCHECK_EQ(page_encoding_, Encoding::PLAIN);
-  int encoded_len = timestamp_decoder_.Decode<parquet::Type::INT64>(*data, data_end, val);
+  int encoded_len =
+      GetTimestampDecoder().Decode<parquet::Type::INT64>(*data, data_end, val);
   if (UNLIKELY(encoded_len < 0)) {
     SetPlainDecodeError();
     return false;
@@ -834,14 +858,14 @@ bool ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::DecodeValues(
 }
 
 // Specialise for decoding INT64 timestamps from PLAIN decoding, which need to call
-// out to 'timestamp_decoder_'.
+// out to the timestamp decoder.
 template <>
 template <>
 bool ScalarColumnReader<TimestampValue, parquet::Type::INT64,
     true>::DecodeValues<Encoding::PLAIN>(int64_t stride, int64_t count,
     TimestampValue* RESTRICT out_vals) RESTRICT {
   DCHECK_EQ(page_encoding_, Encoding::PLAIN);
-  int64_t encoded_len = timestamp_decoder_.DecodeBatch<parquet::Type::INT64>(
+  int64_t encoded_len = GetTimestampDecoder().DecodeBatch<parquet::Type::INT64>(
       data_, data_end_, count, stride, out_vals);
   if (UNLIKELY(encoded_len < 0)) {
     SetPlainDecodeError();
@@ -878,64 +902,6 @@ void ScalarColumnReader<InternalType, PARQUET_TYPE, MATERIALIZED>::ReadPositions
   for (int64_t i = 0; i < num_to_read; ++i) {
     ReadPositionBatched(rep_levels_.CacheGetNext(), out.Advance());
   }
-}
-
-template <>
-inline bool ScalarColumnReader<StringValue, parquet::Type::BYTE_ARRAY,
-    true>::NeedsConversionInline() const {
-  return needs_conversion_;
-}
-
-template <>
-bool ScalarColumnReader<StringValue, parquet::Type::BYTE_ARRAY, true>::ConvertSlot(
-    const StringValue* src, void* slot) {
-  DCHECK(slot_desc() != nullptr);
-  DCHECK(slot_desc()->type().type == TYPE_CHAR);
-  int char_len = slot_desc()->type().len;
-  int unpadded_len = min(char_len, src->len);
-  char* dst_char = reinterpret_cast<char*>(slot);
-  memcpy(dst_char, src->ptr, unpadded_len);
-  StringValue::PadWithSpaces(dst_char, char_len, unpadded_len);
-  return true;
-}
-
-template <>
-inline bool ScalarColumnReader<TimestampValue, parquet::Type::INT96, true>
-::NeedsConversionInline() const {
-  return needs_conversion_;
-}
-
-template <>
-inline bool ScalarColumnReader<TimestampValue, parquet::Type::INT64, true>
-::NeedsConversionInline() const {
-  return needs_conversion_;
-}
-
-template <>
-bool ScalarColumnReader<TimestampValue, parquet::Type::INT96, true>::ConvertSlot(
-    const TimestampValue* src, void* slot) {
-  // Conversion should only happen when this flag is enabled.
-  DCHECK(timestamp_decoder_.NeedsConversion());
-  TimestampValue* dst_ts = reinterpret_cast<TimestampValue*>(slot);
-  *dst_ts = *src;
-  // TODO: IMPALA-7862: converting timestamps after validating them can move them out of
-  // range. We should either validate after conversion or require conversion to produce an
-  // in-range value.
-  timestamp_decoder_.ConvertToLocalTime(dst_ts);
-  return true;
-}
-
-template <>
-bool ScalarColumnReader<TimestampValue, parquet::Type::INT64, true>::ConvertSlot(
-    const TimestampValue* src, void* slot) {
-  DCHECK(timestamp_decoder_.NeedsConversion());
-  TimestampValue* dst_ts = reinterpret_cast<TimestampValue*>(slot);
-  *dst_ts = *src;
-  // TODO: IMPALA-7862: converting timestamps after validating them can move them out of
-  // range. We should either validate after conversion or require conversion to produce an
-  // in-range value.
-  timestamp_decoder_.ConvertToLocalTime(static_cast<TimestampValue*>(dst_ts));
-  return true;
 }
 
 template <>
@@ -1457,11 +1423,9 @@ static ParquetColumnReader* CreateDecimalColumnReader(
       }
       break;
     case parquet::Type::INT32:
-      DCHECK_EQ(sizeof(Decimal4Value::StorageType), slot_desc->type().GetByteSize());
       return new ScalarColumnReader<Decimal4Value, parquet::Type::INT32, true>(
           parent, node, slot_desc);
     case parquet::Type::INT64:
-      DCHECK_EQ(sizeof(Decimal8Value::StorageType), slot_desc->type().GetByteSize());
       return new ScalarColumnReader<Decimal8Value, parquet::Type::INT64, true>(
           parent, node, slot_desc);
     default:

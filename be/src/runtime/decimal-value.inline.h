@@ -129,17 +129,19 @@ inline typename RESULT_T::underlying_type_t DecimalValue<T>::ToInt(int scale,
 
 template<typename T>
 inline DecimalValue<T> DecimalValue<T>::ScaleTo(int src_scale, int dst_scale,
-    int dst_precision, bool* overflow) const {
+    int dst_precision, bool round, bool* overflow) const {
   int delta_scale = src_scale - dst_scale;
   T result = value();
   T max_value = DecimalUtil::GetScaleMultiplier<T>(dst_precision);
   if (delta_scale >= 0) {
-    if (delta_scale != 0) result /= DecimalUtil::GetScaleMultiplier<T>(delta_scale);
+    if (delta_scale != 0) {
+      result = DecimalUtil::ScaleDownAndRound(result, delta_scale, round);
+    }
     // Even if we are decreasing the absolute unscaled value, we can still overflow.
     // This path is also used to convert between precisions so for example, converting
     // from 100 as decimal(3,0) to decimal(2,0) should be considered an overflow.
     *overflow |= abs(result) >= max_value;
-  } else if (delta_scale < 0) {
+  } else {
     T mult = DecimalUtil::GetScaleMultiplier<T>(-delta_scale);
     *overflow |= abs(result) >= max_value / mult;
     result = ArithmeticUtil::AsUnsigned<std::multiplies>(result, mult);

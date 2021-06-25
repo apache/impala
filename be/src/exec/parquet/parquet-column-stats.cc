@@ -21,6 +21,8 @@
 #include <cmath>
 #include <limits>
 
+#include "exec/parquet/parquet-data-converter.h"
+
 #include "common/names.h"
 
 namespace impala {
@@ -162,14 +164,14 @@ bool ColumnStatsReader::ReadFromString(StatsField stats_field,
     case TYPE_DECIMAL:
       switch (col_type_.GetByteSize()) {
         case 4:
-          return ColumnStats<Decimal4Value>::DecodePlainValue(encoded_value, slot,
-              element_.type);
+          return DecodeDecimal<Decimal4Value>(encoded_value,
+              static_cast<Decimal4Value*>(slot));
         case 8:
-          return ColumnStats<Decimal8Value>::DecodePlainValue(encoded_value, slot,
-              element_.type);
+          return DecodeDecimal<Decimal8Value>(encoded_value,
+              static_cast<Decimal8Value*>(slot));
         case 16:
-          return ColumnStats<Decimal16Value>::DecodePlainValue(encoded_value, slot,
-              element_.type);
+          return DecodeDecimal<Decimal16Value>(encoded_value,
+              static_cast<Decimal16Value*>(slot));
         }
       DCHECK(false) << "Unknown decimal byte size: " << col_type_.GetByteSize();
     case TYPE_DATE:
@@ -273,6 +275,8 @@ inline int64_t ColumnStatsReader::DecodeBatchOneBoundsCheck(
 
   int64_t pos = start_idx;
   InternalType* output = v;
+  ParquetDataConverter<InternalType, true> data_converter(&element_, &col_type_);
+  //TODO (IMPALA-10793): set timestamp decoder to correctly convert timestamps.
 
   /// We unroll the loop manually in batches of 8.
   constexpr int batch = 8;
@@ -281,9 +285,12 @@ inline int64_t ColumnStatsReader::DecodeBatchOneBoundsCheck(
 
   for (int64_t b = 0; b < full_batches; b++) {
 #pragma push_macro("DECODE_NO_CHECK_UNROLL")
-#define DECODE_NO_CHECK_UNROLL(ignore1, i, ignore2) \
-    ColumnStats<InternalType>::DecodePlainValue( \
-        source[pos + i], output + i, PARQUET_TYPE);
+#define DECODE_NO_CHECK_UNROLL(ignore1, i, ignore2)           \
+    ColumnStats<InternalType>::DecodePlainValue(              \
+        source[pos + i], output + i, PARQUET_TYPE);           \
+    if (UNLIKELY(data_converter.NeedsConversion())) {         \
+      data_converter.ConvertSlot(output + i, output + i);     \
+    }
 
     BOOST_PP_REPEAT_FROM_TO(0, 8 /* The value of `batch` */,
         DECODE_NO_CHECK_UNROLL, ignore);
@@ -295,6 +302,9 @@ inline int64_t ColumnStatsReader::DecodeBatchOneBoundsCheck(
 
   for (; pos < num_values; ++pos) {
     ColumnStats<InternalType>::DecodePlainValue(source[pos], output, PARQUET_TYPE);
+    if (UNLIKELY(data_converter.NeedsConversion())) {
+      data_converter.ConvertSlot(output, output);
+    }
     output++;
   }
 
@@ -338,6 +348,21 @@ inline int64_t ColumnStatsReader::DecodeBatchOneBoundsCheckFastTrack(
 
   DCHECK_EQ(pos, num_values);
   return num_values;
+}
+
+template <typename DecimalType>
+bool ColumnStatsReader::DecodeDecimal(const std::string& stat_value,
+    DecimalType* slot) const {
+  bool ret = ColumnStats<DecimalType>::DecodePlainValue(stat_value, slot,
+      element_.type);
+  if (!ret) return false;
+  ParquetDataConverter<DecimalType, true> data_converter(&element_, &col_type_);
+  if (LIKELY(!data_converter.NeedsConversion())) return true;
+  // Let's convert the decimal value to the table's decimal type. It's OK to evaluate
+  // filters and min/max conjuncts against the converted values as later we'd also
+  // use the converted values anyways.
+  // No need for an extra buffer, we can do the conversion in-place.
+  return data_converter.ConvertSlot(slot, slot);
 }
 
 bool ColumnStatsReader::DecodeTimestamp(const std::string& stat_value,

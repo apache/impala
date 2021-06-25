@@ -110,8 +110,10 @@ class __attribute__ ((packed)) DecimalValue {
   /// Returns a new decimal scaled by from src_type to dst_type.
   /// e.g. If this value was 1100 at scale 3 and the dst_type had scale two, the
   /// result would be 110. (In both cases representing the decimal 1.1).
+  /// 'round' determines the behavior in case of scaling down, i.e. whether 11.56 should
+  /// be 11.5 or 11.6.
   inline DecimalValue ScaleTo(int src_scale, int dst_scale, int dst_precision,
-      bool* overflow) const;
+      bool round, bool* overflow) const;
 
   /// Implementations of the basic arithmetic operators. In all these functions,
   /// we take the precision and scale of both inputs. The return type is assumed

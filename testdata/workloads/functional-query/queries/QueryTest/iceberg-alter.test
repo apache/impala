@@ -264,3 +264,24 @@ NULL,NULL
 ---- TYPES
 DECIMAL,BIGINT
 ====
+---- QUERY
+# Iceberg allows changing precision to a higher value.
+ALTER TABLE ice_alter_cols DROP COLUMN bi;
+ALTER TABLE ice_alter_cols CHANGE COLUMN x d DECIMAL (22, 3);
+SELECT * FROM ice_alter_cols;
+---- RESULTS
+1.618
+1.110
+2.345
+NULL
+NULL
+---- TYPES
+DECIMAL
+====
+---- QUERY
+DESCRIBE ice_alter_cols;
+---- RESULTS
+'d','decimal(22,3)','','true'
+---- TYPES
+STRING,STRING,STRING,STRING
+====

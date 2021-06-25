@@ -252,8 +252,9 @@ public:
   /// the minimum or maximum value.
   enum class StatsField { MIN, MAX };
 
-  ColumnStatsReader(const parquet::ColumnChunk& col_chunk,  const ColumnType& col_type,
-      const parquet::ColumnOrder* col_order, const parquet::SchemaElement& element)
+  ColumnStatsReader(const parquet::ColumnChunk& col_chunk,
+      const ColumnType& col_type, const parquet::ColumnOrder* col_order,
+      const parquet::SchemaElement& element)
   : col_chunk_(col_chunk),
     col_type_(col_type),
     col_order_(col_order),
@@ -346,6 +347,10 @@ private:
   /// 'max' in parquet::Statistics to be correct for the type 'col_type_' and the column
   /// order 'col_order_'. Otherwise, returns false.
   bool CanUseDeprecatedStats() const;
+
+  /// Decodes decimal value into slot. Does conversion if needed.
+  template <typename DecimalType>
+  bool DecodeDecimal(const std::string& stat_value, DecimalType* slot) const;
 
   /// Decodes 'stat_value' and does INT64->TimestampValue and timezone conversions if
   /// necessary. Returns true if the decoding and conversions were successful.

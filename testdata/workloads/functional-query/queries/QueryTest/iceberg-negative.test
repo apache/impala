@@ -268,12 +268,6 @@ ALTER TABLE iceberg_table_hadoop_catalog REPLACE COLUMNS(level INT, register_tim
 AnalysisException: ALTER TABLE REPLACE COLUMNS is not supported on Iceberg tables.
 ====
 ---- QUERY
-CREATE TABLE test_decimal_conversion (d decimal(6,2)) STORED AS ICEBERG;
-ALTER TABLE test_decimal_conversion CHANGE COLUMN d d decimal(8,2);
----- CATCH
-Cannot change DECIMAL column of Iceberg table.
-====
----- QUERY
 CREATE TABLE iceberg_transactional(i int)
 STORED AS ICEBERG
 tblproperties('iceberg.catalog'='hadoop.tables', 'transactional'='true');
