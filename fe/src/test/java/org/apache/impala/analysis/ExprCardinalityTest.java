@@ -263,11 +263,11 @@ public class ExprCardinalityTest {
     verifySelectExpr("alltypes", "int_col = 10", 3, 1.0/10);
 
     verifySelectExpr("nullrows", "id = 'foo'", 3, 1.0/26);
-    verifySelectExpr("nullrows", "null_str = 'foo'", 3, 1.0/1);
+    verifySelectExpr("nullrows", "null_str = 'foo'", 3, 0);
     verifySelectExpr("nullrows", "group_str = 'foo'", 3, 1.0/6);
-    // Bug: nulls should count to NDV
-    //verifySelectExpr("nullrows", "some_nulls = 'foo'", 3, 1.0/7);
-    verifySelectExpr("nullrows", "some_nulls = 'foo'", 3, 1.0/6);
+
+    verifySelectExpr("nullrows", "some_nulls = 'foo'", 3, 1.0/6 * 6/26);
+    verifySelectExpr("nullrows", "some_nulls = null", 3, 0);
 
     // Bug: Sel should default to good old 0.1
     verifySelectExpr("manynulls", "id = 10", 3, -1);
@@ -282,28 +282,25 @@ public class ExprCardinalityTest {
   @Test
   public void testNotDistinctSelectivity() throws ImpalaException {
     verifySelectExpr("alltypes", "id is not distinct from 10", 3, 1.0/7300);
-    // Bug: does not treat NULL specially
-    // Bug: NDV sould be 2 since IS NOT DISTINCT won't return NULL
-    //verifySelectExpr("alltypes", "id is not distinct from null", 2, 0);
-    verifySelectExpr("alltypes", "id is not distinct from null", 3, 1.0/7300);
+
+    verifySelectExpr("alltypes", "id is not distinct from null", 3, 0);
     verifySelectExpr("alltypes", "bool_col is not distinct from true", 3, 1.0/2);
-    //verifySelectExpr("alltypes", "bool_col is not distinct from null", 2, 0);
-    verifySelectExpr("alltypes", "bool_col is not distinct from null", 3, 1.0/2);
+    verifySelectExpr("alltypes", "bool_col is not distinct from null", 3, 0);
     verifySelectExpr("alltypes", "int_col is not distinct from 10", 3, 1.0/10);
-    //verifySelectExpr("alltypes", "int_col is not distinct from null", 2, 0);
-    verifySelectExpr("alltypes", "int_col is not distinct from null", 3, 1.0/10);
+
+    verifySelectExpr("alltypes", "int_col is not distinct from null", 3, 0);
 
     verifySelectExpr("nullrows", "id is not distinct from 'foo'", 3, 1.0/26);
-    //verifySelectExpr("nullrows", "id is not distinct from null", 2, 0);
-    verifySelectExpr("nullrows", "id is not distinct from null", 3, 1.0/26);
-    // Bug: All nulls, so NDV should = 1, so Sel should be 1.0/1
-    verifySelectExpr("nullrows", "null_str is not distinct from 'foo'", 3, 1.0/1);
+
+    verifySelectExpr("nullrows", "id is not distinct from null", 3, 0);
+
+    verifySelectExpr("nullrows", "null_str is not distinct from 'foo'", 3, 0);
     verifySelectExpr("nullrows", "null_str is not distinct from null", 3, 1.0/1);
     verifySelectExpr("nullrows", "group_str is not distinct from 'foo'", 3, 1.0/6);
-    //verifySelectExpr("nullrows", "group_str is not distinct from null", 2, 1);
-    verifySelectExpr("nullrows", "group_str is not distinct from null", 3, 1.0/6);
-    //verifySelectExpr("nullrows", "some_nulls is not distinct from 'foo'", 3, 1.0/7);
-    verifySelectExpr("nullrows", "some_nulls is not distinct from 'foo'", 3, 1.0/6);
+
+    verifySelectExpr("nullrows", "group_str is not distinct from null", 3, 0);
+
+    verifySelectExpr("nullrows", "some_nulls is not distinct from 'foo'", 3, 1.0/6*6/26);
 
     // Bug: Sel should default to good old 0.1
     verifySelectExpr("manynulls", "id is not distinct from 10", 3, -1);
@@ -321,6 +318,7 @@ public class ExprCardinalityTest {
     verifySelectExpr("nullrows", "null_str != 'foo'", 3, 1 - 1.0/1);
     verifySelectExpr("nullrows", "group_str != 'foo'", 3, 1 - 1.0/6);
     verifySelectExpr("nullrows", "some_nulls != 'foo'", 3, (1 - 1.0/6)*6/26);
+    verifySelectExpr("nullrows", "some_nulls != null", 3, 0);
     // field has no statistics.
     verifySelectExpr("emptytable", "field != 'foo'", 3, -1);
     verifySelectExpr("emptytable", "f2 != 10", 3, 0.0);
@@ -351,12 +349,13 @@ public class ExprCardinalityTest {
     verifySelectExpr("nullrows", "id is distinct from 'foo'", 3, 1 - 1.0/26);
 
     verifySelectExpr("nullrows", "id is distinct from null", 3, 1);
-    verifySelectExpr("nullrows", "null_str is distinct from 'foo'", 3, 1 - 1.0/1);
+    // For is distinct from non-null, all null values are true
+    verifySelectExpr("nullrows", "null_str is distinct from 'foo'", 3, 1);
     verifySelectExpr("nullrows", "null_str is distinct from null", 3, 0);
     verifySelectExpr("nullrows", "group_str is distinct from 'foo'", 3, 1 - 1.0/6);
     verifySelectExpr("nullrows", "group_str is distinct from null", 3, 1);
     verifySelectExpr("nullrows", "group_str is distinct from null", 3, 1);
-    verifySelectExpr("nullrows", "some_nulls is not distinct from 'foo'", 3, 1.0/6);
+    verifySelectExpr("nullrows", "some_nulls is not distinct from 'foo'", 3, 1.0/6*6/26);
     verifySelectExpr("nullrows", "some_nulls is distinct from null", 3, 6.0/26.0);
 
     // Bug: Sel should default to 1 - good old 0.1

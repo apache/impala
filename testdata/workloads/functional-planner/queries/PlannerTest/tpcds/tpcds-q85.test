@@ -85,7 +85,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: wr_reason_sk = r_reason_sk
 |  runtime filters: RF000[bloom] <- r_reason_sk, RF001[min_max] <- r_reason_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,5,3,1,0,6,2,7 row-size=241B cardinality=365
+|  tuple-ids=4,5,3,1,0,6,2,7 row-size=241B cardinality=359
 |  in pipelines: 04(GETNEXT), 07(OPEN)
 |
 |--07:SCAN HDFS [tpcds_parquet.reason]
@@ -103,7 +103,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: cd2.cd_demo_sk = wr_returning_cdemo_sk
 |  runtime filters: RF002[bloom] <- wr_returning_cdemo_sk, RF003[bloom] <- cd1.cd_marital_status, RF004[bloom] <- cd1.cd_education_status, RF005[min_max] <- wr_returning_cdemo_sk, RF006[min_max] <- cd1.cd_marital_status, RF007[min_max] <- cd1.cd_education_status
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,5,3,1,0,6,2 row-size=208B cardinality=365
+|  tuple-ids=4,5,3,1,0,6,2 row-size=208B cardinality=359
 |  in pipelines: 04(GETNEXT), 05(OPEN)
 |
 |--12:HASH JOIN [INNER JOIN]
@@ -111,7 +111,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: ws_web_page_sk = wp_web_page_sk
 |  |  runtime filters: RF008[bloom] <- wp_web_page_sk, RF009[min_max] <- wp_web_page_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=5,3,1,0,6,2 row-size=170B cardinality=365
+|  |  tuple-ids=5,3,1,0,6,2 row-size=170B cardinality=359
 |  |  in pipelines: 05(GETNEXT), 02(OPEN)
 |  |
 |  |--02:SCAN HDFS [tpcds_parquet.web_page]
@@ -130,7 +130,7 @@ PLAN-ROOT SINK
 |  |  other predicates: ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY') OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY') OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ca_state IN ('LA', 'IA', 'AR')
 |  |  runtime filters: RF010[bloom] <- wr_refunded_addr_sk, RF011[min_max] <- wr_refunded_addr_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=5,3,1,0,6 row-size=166B cardinality=365
+|  |  tuple-ids=5,3,1,0,6 row-size=166B cardinality=359
 |  |  in pipelines: 05(GETNEXT), 03(OPEN)
 |  |
 |  |--10:HASH JOIN [INNER JOIN]
@@ -218,7 +218,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY', 'LA', 'IA', 'AR'), ca_country = 'United States'
 |     parquet dictionary predicates: ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY', 'LA', 'IA', 'AR'), ca_country = 'United States'
 |     mem-estimate=48.00MB mem-reservation=256.00KB thread-reservation=1
-|     tuple-ids=5 row-size=43B cardinality=8.82K
+|     tuple-ids=5 row-size=43B cardinality=8.69K
 |     in pipelines: 05(GETNEXT)
 |
 04:SCAN HDFS [tpcds_parquet.customer_demographics cd2]
@@ -283,7 +283,7 @@ Per-Host Resources: mem-estimate=66.08MB mem-reservation=17.88MB thread-reservat
 |  fk/pk conjuncts: wr_reason_sk = r_reason_sk
 |  runtime filters: RF000[bloom] <- r_reason_sk, RF001[min_max] <- r_reason_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,0,3,1,6,5,2,7 row-size=241B cardinality=365
+|  tuple-ids=4,0,3,1,6,5,2,7 row-size=241B cardinality=359
 |  in pipelines: 04(GETNEXT), 07(OPEN)
 |
 |--25:EXCHANGE [BROADCAST]
@@ -308,12 +308,12 @@ Per-Host Resources: mem-estimate=66.08MB mem-reservation=17.88MB thread-reservat
 |  fk/pk conjuncts: cd2.cd_demo_sk = wr_returning_cdemo_sk
 |  runtime filters: RF002[bloom] <- wr_returning_cdemo_sk, RF003[bloom] <- cd1.cd_marital_status, RF004[bloom] <- cd1.cd_education_status, RF005[min_max] <- wr_returning_cdemo_sk, RF006[min_max] <- cd1.cd_marital_status, RF007[min_max] <- cd1.cd_education_status
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,0,3,1,6,5,2 row-size=208B cardinality=365
+|  tuple-ids=4,0,3,1,6,5,2 row-size=208B cardinality=359
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
 |--24:EXCHANGE [BROADCAST]
-|  |  mem-estimate=198.44KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=0,3,1,6,5,2 row-size=170B cardinality=365
+|  |  mem-estimate=195.18KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=0,3,1,6,5,2 row-size=170B cardinality=359
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [HASH(wr_refunded_addr_sk)] hosts=2 instances=2
@@ -323,7 +323,7 @@ Per-Host Resources: mem-estimate=66.08MB mem-reservation=17.88MB thread-reservat
 |  |  fk/pk conjuncts: ws_web_page_sk = wp_web_page_sk
 |  |  runtime filters: RF008[bloom] <- wp_web_page_sk, RF009[min_max] <- wp_web_page_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,3,1,6,5,2 row-size=170B cardinality=365
+|  |  tuple-ids=0,3,1,6,5,2 row-size=170B cardinality=359
 |  |  in pipelines: 00(GETNEXT), 02(OPEN)
 |  |
 |  |--23:EXCHANGE [BROADCAST]
@@ -349,12 +349,12 @@ Per-Host Resources: mem-estimate=66.08MB mem-reservation=17.88MB thread-reservat
 |  |  other predicates: ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY') OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY') OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ca_state IN ('LA', 'IA', 'AR')
 |  |  runtime filters: RF010[bloom] <- ca_address_sk, RF011[min_max] <- ca_address_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,3,1,6,5 row-size=166B cardinality=365
+|  |  tuple-ids=0,3,1,6,5 row-size=166B cardinality=359
 |  |  in pipelines: 00(GETNEXT), 05(OPEN)
 |  |
 |  |--22:EXCHANGE [HASH(ca_address_sk)]
-|  |  |  mem-estimate=417.54KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=5 row-size=43B cardinality=8.82K
+|  |  |  mem-estimate=411.83KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=5 row-size=43B cardinality=8.69K
 |  |  |  in pipelines: 05(GETNEXT)
 |  |  |
 |  |  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -369,7 +369,7 @@ Per-Host Resources: mem-estimate=66.08MB mem-reservation=17.88MB thread-reservat
 |  |     parquet statistics predicates: ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY', 'LA', 'IA', 'AR'), ca_country = 'United States'
 |  |     parquet dictionary predicates: ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY', 'LA', 'IA', 'AR'), ca_country = 'United States'
 |  |     mem-estimate=48.00MB mem-reservation=256.00KB thread-reservation=1
-|  |     tuple-ids=5 row-size=43B cardinality=8.82K
+|  |     tuple-ids=5 row-size=43B cardinality=8.69K
 |  |     in pipelines: 05(GETNEXT)
 |  |
 |  21:EXCHANGE [HASH(wr_refunded_addr_sk)]
@@ -544,7 +544,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=10.00MB thread-rese
 |  hash predicates: wr_reason_sk = r_reason_sk
 |  fk/pk conjuncts: wr_reason_sk = r_reason_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,0,3,1,6,5,2,7 row-size=241B cardinality=365
+|  tuple-ids=4,0,3,1,6,5,2,7 row-size=241B cardinality=359
 |  in pipelines: 04(GETNEXT), 07(OPEN)
 |
 |--F12:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -577,7 +577,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=10.00MB thread-rese
 |  hash predicates: cd2.cd_demo_sk = wr_returning_cdemo_sk, cd2.cd_marital_status = cd1.cd_marital_status, cd2.cd_education_status = cd1.cd_education_status
 |  fk/pk conjuncts: cd2.cd_demo_sk = wr_returning_cdemo_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,0,3,1,6,5,2 row-size=208B cardinality=365
+|  tuple-ids=4,0,3,1,6,5,2 row-size=208B cardinality=359
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
 |--F13:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -589,8 +589,8 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=10.00MB thread-rese
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  24:EXCHANGE [BROADCAST]
-|  |  mem-estimate=198.44KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=0,3,1,6,5,2 row-size=170B cardinality=365
+|  |  mem-estimate=195.18KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=0,3,1,6,5,2 row-size=170B cardinality=359
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [HASH(wr_refunded_addr_sk)] hosts=2 instances=2
@@ -600,7 +600,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=10.00MB thread-rese
 |  |  hash predicates: ws_web_page_sk = wp_web_page_sk
 |  |  fk/pk conjuncts: ws_web_page_sk = wp_web_page_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,3,1,6,5,2 row-size=170B cardinality=365
+|  |  tuple-ids=0,3,1,6,5,2 row-size=170B cardinality=359
 |  |  in pipelines: 00(GETNEXT), 02(OPEN)
 |  |
 |  |--F14:PLAN FRAGMENT [HASH(wr_refunded_addr_sk)] hosts=2 instances=2
@@ -634,11 +634,11 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=10.00MB thread-rese
 |  |  fk/pk conjuncts: wr_refunded_addr_sk = ca_address_sk
 |  |  other predicates: ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY') OR ws_net_profit <= CAST(250 AS DECIMAL(5,0)), ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY') OR ws_net_profit >= CAST(50 AS DECIMAL(3,0)), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit <= CAST(300 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ca_state IN ('IN', 'OH', 'NJ') OR ws_net_profit >= CAST(150 AS DECIMAL(5,0)) OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit <= CAST(200 AS DECIMAL(5,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ca_state IN ('LA', 'IA', 'AR'), ws_net_profit >= CAST(100 AS DECIMAL(3,0)) OR ca_state IN ('WI', 'CT', 'KY') OR ca_state IN ('LA', 'IA', 'AR')
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,3,1,6,5 row-size=166B cardinality=365
+|  |  tuple-ids=0,3,1,6,5 row-size=166B cardinality=359
 |  |  in pipelines: 00(GETNEXT), 05(OPEN)
 |  |
 |  |--F15:PLAN FRAGMENT [HASH(wr_refunded_addr_sk)] hosts=2 instances=2
-|  |  |  Per-Instance Resources: mem-estimate=3.35MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  Per-Instance Resources: mem-estimate=3.34MB mem-reservation=2.94MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  JOIN BUILD
 |  |  |  join-table-id=03 plan-id=04 cohort-id=02
 |  |  |  build expressions: ca_address_sk
@@ -646,8 +646,8 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=10.00MB thread-rese
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  22:EXCHANGE [HASH(ca_address_sk)]
-|  |  |  mem-estimate=417.54KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=5 row-size=43B cardinality=8.82K
+|  |  |  mem-estimate=411.83KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=5 row-size=43B cardinality=8.69K
 |  |  |  in pipelines: 05(GETNEXT)
 |  |  |
 |  |  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -662,7 +662,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=10.00MB thread-rese
 |  |     parquet statistics predicates: ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY', 'LA', 'IA', 'AR'), ca_country = 'United States'
 |  |     parquet dictionary predicates: ca_state IN ('IN', 'OH', 'NJ', 'WI', 'CT', 'KY', 'LA', 'IA', 'AR'), ca_country = 'United States'
 |  |     mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
-|  |     tuple-ids=5 row-size=43B cardinality=8.82K
+|  |     tuple-ids=5 row-size=43B cardinality=8.69K
 |  |     in pipelines: 05(GETNEXT)
 |  |
 |  21:EXCHANGE [HASH(wr_refunded_addr_sk)]

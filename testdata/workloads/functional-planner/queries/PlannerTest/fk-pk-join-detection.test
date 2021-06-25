@@ -15,7 +15,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  runtime filters: RF000[bloom] <- c_customer_sk
 |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=0,1 row-size=319B cardinality=529.70K
+|  tuple-ids=0,1 row-size=319B cardinality=511.62K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.customer]
@@ -26,7 +26,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=100.00K
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=1 row-size=219B cardinality=16.67K
+|     tuple-ids=1 row-size=219B cardinality=16.10K
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -70,7 +70,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=100.00K
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=1 row-size=219B cardinality=16.67K
+|     tuple-ids=1 row-size=219B cardinality=16.10K
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]
@@ -102,7 +102,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ss_customer_sk = c_customer_sk
 |  runtime filters: RF000[bloom] <- c_customer_sk
 |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=0N,1 row-size=319B cardinality=529.70K
+|  tuple-ids=0N,1 row-size=319B cardinality=511.62K
 |  in pipelines: 00(GETNEXT), 01(OPEN)
 |
 |--01:SCAN HDFS [tpcds.customer]
@@ -113,7 +113,7 @@ PLAN-ROOT SINK
 |       columns: all
 |     extrapolated-rows=disabled max-scan-range-rows=100.00K
 |     mem-estimate=48.00MB mem-reservation=8.00MB thread-reservation=1
-|     tuple-ids=1 row-size=219B cardinality=16.67K
+|     tuple-ids=1 row-size=219B cardinality=16.10K
 |     in pipelines: 01(GETNEXT)
 |
 00:SCAN HDFS [tpcds.store_sales]

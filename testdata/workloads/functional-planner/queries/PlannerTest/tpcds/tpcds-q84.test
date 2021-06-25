@@ -26,8 +26,8 @@ PLAN-ROOT SINK
 |
 09:TOP-N [LIMIT=100]
 |  order by: c_customer_id ASC
-|  mem-estimate=1.25KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=64B cardinality=20
+|  mem-estimate=1.19KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=64B cardinality=19
 |  in pipelines: 09(GETNEXT), 04(OPEN)
 |
 08:HASH JOIN [INNER JOIN]
@@ -35,7 +35,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: none
 |  runtime filters: RF000[bloom] <- c_current_cdemo_sk, RF001[min_max] <- c_current_cdemo_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,2,0,1,3 row-size=125B cardinality=20
+|  tuple-ids=4,2,0,1,3 row-size=125B cardinality=19
 |  in pipelines: 04(GETNEXT), 02(OPEN)
 |
 |--07:HASH JOIN [INNER JOIN]
@@ -43,7 +43,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: hd_income_band_sk = ib_income_band_sk
 |  |  runtime filters: RF002[bloom] <- ib_income_band_sk, RF003[min_max] <- ib_income_band_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=18
+|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=17
 |  |  in pipelines: 02(GETNEXT), 03(OPEN)
 |  |
 |  |--03:SCAN HDFS [tpcds_parquet.income_band]
@@ -64,7 +64,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: hd_demo_sk = c_current_hdemo_sk
 |  |  runtime filters: RF004[bloom] <- c_current_hdemo_sk, RF005[min_max] <- c_current_hdemo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2,0,1 row-size=109B cardinality=173
+|  |  tuple-ids=2,0,1 row-size=109B cardinality=166
 |  |  in pipelines: 02(GETNEXT), 00(OPEN)
 |  |
 |  |--05:HASH JOIN [INNER JOIN]
@@ -72,7 +72,7 @@ PLAN-ROOT SINK
 |  |  |  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
 |  |  |  runtime filters: RF006[bloom] <- ca_address_sk, RF007[min_max] <- ca_address_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=0,1 row-size=101B cardinality=177
+|  |  |  tuple-ids=0,1 row-size=101B cardinality=170
 |  |  |  in pipelines: 00(GETNEXT), 01(OPEN)
 |  |  |
 |  |  |--01:SCAN HDFS [tpcds_parquet.customer_address]
@@ -85,7 +85,7 @@ PLAN-ROOT SINK
 |  |  |     parquet statistics predicates: ca_city = 'Edgewood'
 |  |  |     parquet dictionary predicates: ca_city = 'Edgewood'
 |  |  |     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
-|  |  |     tuple-ids=1 row-size=25B cardinality=76
+|  |  |     tuple-ids=1 row-size=25B cardinality=73
 |  |  |     in pipelines: 01(GETNEXT)
 |  |  |
 |  |  00:SCAN HDFS [tpcds_parquet.customer]
@@ -133,15 +133,15 @@ PLAN-ROOT SINK
 |  order by: c_customer_id ASC
 |  limit: 100
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=64B cardinality=20
+|  tuple-ids=5 row-size=64B cardinality=19
 |  in pipelines: 09(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 Per-Host Resources: mem-estimate=26.95MB mem-reservation=4.94MB thread-reservation=2 runtime-filters-memory=1.00MB
 09:TOP-N [LIMIT=100]
 |  order by: c_customer_id ASC
-|  mem-estimate=1.25KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=64B cardinality=20
+|  mem-estimate=1.19KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=64B cardinality=19
 |  in pipelines: 09(GETNEXT), 04(OPEN)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -149,22 +149,22 @@ Per-Host Resources: mem-estimate=26.95MB mem-reservation=4.94MB thread-reservati
 |  fk/pk conjuncts: none
 |  runtime filters: RF000[bloom] <- c_current_cdemo_sk, RF001[min_max] <- c_current_cdemo_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,2,0,1,3 row-size=125B cardinality=20
+|  tuple-ids=4,2,0,1,3 row-size=125B cardinality=19
 |  in pipelines: 04(GETNEXT), 02(OPEN)
 |
 |--13:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=18
+|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=17
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  Per-Host Resources: mem-estimate=37.93MB mem-reservation=5.94MB thread-reservation=2 runtime-filters-memory=2.00MB
+|  Per-Host Resources: mem-estimate=37.92MB mem-reservation=5.94MB thread-reservation=2 runtime-filters-memory=2.00MB
 |  07:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: hd_income_band_sk = ib_income_band_sk
 |  |  fk/pk conjuncts: hd_income_band_sk = ib_income_band_sk
 |  |  runtime filters: RF002[bloom] <- ib_income_band_sk, RF003[min_max] <- ib_income_band_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=18
+|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=17
 |  |  in pipelines: 02(GETNEXT), 03(OPEN)
 |  |
 |  |--12:EXCHANGE [BROADCAST]
@@ -192,12 +192,12 @@ Per-Host Resources: mem-estimate=26.95MB mem-reservation=4.94MB thread-reservati
 |  |  fk/pk conjuncts: hd_demo_sk = c_current_hdemo_sk
 |  |  runtime filters: RF004[bloom] <- c_current_hdemo_sk, RF005[min_max] <- c_current_hdemo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2,0,1 row-size=109B cardinality=173
+|  |  tuple-ids=2,0,1 row-size=109B cardinality=166
 |  |  in pipelines: 02(GETNEXT), 00(OPEN)
 |  |
 |  |--11:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=36.27KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=0,1 row-size=101B cardinality=177
+|  |  |  mem-estimate=34.83KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=0,1 row-size=101B cardinality=170
 |  |  |  in pipelines: 00(GETNEXT)
 |  |  |
 |  |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -207,12 +207,12 @@ Per-Host Resources: mem-estimate=26.95MB mem-reservation=4.94MB thread-reservati
 |  |  |  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
 |  |  |  runtime filters: RF006[bloom] <- ca_address_sk, RF007[min_max] <- ca_address_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=0,1 row-size=101B cardinality=177
+|  |  |  tuple-ids=0,1 row-size=101B cardinality=170
 |  |  |  in pipelines: 00(GETNEXT), 01(OPEN)
 |  |  |
 |  |  |--10:EXCHANGE [BROADCAST]
 |  |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=1 row-size=25B cardinality=76
+|  |  |  |  tuple-ids=1 row-size=25B cardinality=73
 |  |  |  |  in pipelines: 01(GETNEXT)
 |  |  |  |
 |  |  |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -227,7 +227,7 @@ Per-Host Resources: mem-estimate=26.95MB mem-reservation=4.94MB thread-reservati
 |  |  |     parquet statistics predicates: ca_city = 'Edgewood'
 |  |  |     parquet dictionary predicates: ca_city = 'Edgewood'
 |  |  |     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
-|  |  |     tuple-ids=1 row-size=25B cardinality=76
+|  |  |     tuple-ids=1 row-size=25B cardinality=73
 |  |  |     in pipelines: 01(GETNEXT)
 |  |  |
 |  |  00:SCAN HDFS [tpcds_parquet.customer, RANDOM]
@@ -275,7 +275,7 @@ PLAN-ROOT SINK
 |  order by: c_customer_id ASC
 |  limit: 100
 |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=64B cardinality=20
+|  tuple-ids=5 row-size=64B cardinality=19
 |  in pipelines: 09(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -283,8 +283,8 @@ Per-Host Shared Resources: mem-estimate=1.00MB mem-reservation=1.00MB thread-res
 Per-Instance Resources: mem-estimate=24.00MB mem-reservation=2.00MB thread-reservation=1
 09:TOP-N [LIMIT=100]
 |  order by: c_customer_id ASC
-|  mem-estimate=1.25KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=5 row-size=64B cardinality=20
+|  mem-estimate=1.19KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=5 row-size=64B cardinality=19
 |  in pipelines: 09(GETNEXT), 04(OPEN)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -292,7 +292,7 @@ Per-Instance Resources: mem-estimate=24.00MB mem-reservation=2.00MB thread-reser
 |  hash predicates: sr_cdemo_sk = c_current_cdemo_sk
 |  fk/pk conjuncts: none
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=4,2,0,1,3 row-size=125B cardinality=20
+|  tuple-ids=4,2,0,1,3 row-size=125B cardinality=19
 |  in pipelines: 04(GETNEXT), 02(OPEN)
 |
 |--F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -305,7 +305,7 @@ Per-Instance Resources: mem-estimate=24.00MB mem-reservation=2.00MB thread-reser
 |  |
 |  13:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=18
+|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=17
 |  |  in pipelines: 02(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -316,7 +316,7 @@ Per-Instance Resources: mem-estimate=24.00MB mem-reservation=2.00MB thread-reser
 |  |  hash predicates: hd_income_band_sk = ib_income_band_sk
 |  |  fk/pk conjuncts: hd_income_band_sk = ib_income_band_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=18
+|  |  tuple-ids=2,0,1,3 row-size=121B cardinality=17
 |  |  in pipelines: 02(GETNEXT), 03(OPEN)
 |  |
 |  |--F07:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -352,7 +352,7 @@ Per-Instance Resources: mem-estimate=24.00MB mem-reservation=2.00MB thread-reser
 |  |  hash predicates: hd_demo_sk = c_current_hdemo_sk
 |  |  fk/pk conjuncts: hd_demo_sk = c_current_hdemo_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=2,0,1 row-size=109B cardinality=173
+|  |  tuple-ids=2,0,1 row-size=109B cardinality=166
 |  |  in pipelines: 02(GETNEXT), 00(OPEN)
 |  |
 |  |--F08:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -364,8 +364,8 @@ Per-Instance Resources: mem-estimate=24.00MB mem-reservation=2.00MB thread-reser
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  11:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=36.27KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=0,1 row-size=101B cardinality=177
+|  |  |  mem-estimate=34.83KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=0,1 row-size=101B cardinality=170
 |  |  |  in pipelines: 00(GETNEXT)
 |  |  |
 |  |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -376,7 +376,7 @@ Per-Instance Resources: mem-estimate=24.00MB mem-reservation=2.00MB thread-reser
 |  |  |  hash predicates: c_current_addr_sk = ca_address_sk
 |  |  |  fk/pk conjuncts: c_current_addr_sk = ca_address_sk
 |  |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=0,1 row-size=101B cardinality=177
+|  |  |  tuple-ids=0,1 row-size=101B cardinality=170
 |  |  |  in pipelines: 00(GETNEXT), 01(OPEN)
 |  |  |
 |  |  |--F09:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -389,7 +389,7 @@ Per-Instance Resources: mem-estimate=24.00MB mem-reservation=2.00MB thread-reser
 |  |  |  |
 |  |  |  10:EXCHANGE [BROADCAST]
 |  |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=1 row-size=25B cardinality=76
+|  |  |  |  tuple-ids=1 row-size=25B cardinality=73
 |  |  |  |  in pipelines: 01(GETNEXT)
 |  |  |  |
 |  |  |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -404,7 +404,7 @@ Per-Instance Resources: mem-estimate=24.00MB mem-reservation=2.00MB thread-reser
 |  |  |     parquet statistics predicates: ca_city = 'Edgewood'
 |  |  |     parquet dictionary predicates: ca_city = 'Edgewood'
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|  |  |     tuple-ids=1 row-size=25B cardinality=76
+|  |  |     tuple-ids=1 row-size=25B cardinality=73
 |  |  |     in pipelines: 01(GETNEXT)
 |  |  |
 |  |  00:SCAN HDFS [tpcds_parquet.customer, RANDOM]

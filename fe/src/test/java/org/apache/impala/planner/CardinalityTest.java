@@ -115,9 +115,11 @@ public class CardinalityTest extends PlannerTestBase {
     // f repeats for 5 rows, so NDV=7, 26/7 =~ 4
     verifyCardinality("SELECT null_int FROM functional.nullrows WHERE group_str = 'x'",
         4);
-    // null_str is all nulls, NDV = 1, selectivity = 1/1, cardinality = 26
+    // null_str is all nulls, NDV = 1, selectivity =0, cardinality = 0
+    // PlanNode#applySelectivity, If cardinality is 0, set cardinality to 1
+    // IMPALA-8647: don't round cardinality down to zero for safety.
     verifyCardinality(
-          "SELECT null_int FROM functional.nullrows WHERE null_str = 'x'", 26);
+          "SELECT null_int FROM functional.nullrows WHERE null_str = 'x'", 1);
   }
 
   @Test

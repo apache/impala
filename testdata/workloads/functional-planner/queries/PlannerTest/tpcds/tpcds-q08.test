@@ -126,7 +126,7 @@ PLAN-ROOT SINK
 |  |  |  fk/pk conjuncts: none
 |  |  |  runtime filters: RF006[bloom] <- c_current_addr_sk, RF007[min_max] <- c_current_addr_sk
 |  |  |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  tuple-ids=6,7 row-size=38B cardinality=51.30K
+|  |  |  tuple-ids=6,7 row-size=38B cardinality=49.54K
 |  |  |  in pipelines: 05(GETNEXT), 06(OPEN)
 |  |  |
 |  |  |--06:SCAN HDFS [tpcds_parquet.customer]
@@ -139,7 +139,7 @@ PLAN-ROOT SINK
 |  |  |     parquet statistics predicates: c_preferred_cust_flag = 'Y'
 |  |  |     parquet dictionary predicates: c_preferred_cust_flag = 'Y'
 |  |  |     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
-|  |  |     tuple-ids=7 row-size=17B cardinality=50.00K
+|  |  |     tuple-ids=7 row-size=17B cardinality=48.29K
 |  |  |     in pipelines: 06(GETNEXT)
 |  |  |
 |  |  05:SCAN HDFS [tpcds_parquet.customer_address]
@@ -302,7 +302,7 @@ Per-Host Resources: mem-estimate=50.86MB mem-reservation=11.81MB thread-reservat
 |  |  |  in pipelines: 05(GETNEXT)
 |  |  |
 |  |  F05:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  Per-Host Resources: mem-estimate=48.58MB mem-reservation=8.25MB thread-reservation=2 runtime-filters-memory=1.00MB
+|  |  Per-Host Resources: mem-estimate=48.55MB mem-reservation=8.25MB thread-reservation=2 runtime-filters-memory=1.00MB
 |  |  08:AGGREGATE [STREAMING]
 |  |  |  output: count(*)
 |  |  |  group by: substring(ca_zip, CAST(1 AS BIGINT), CAST(5 AS BIGINT))
@@ -315,12 +315,12 @@ Per-Host Resources: mem-estimate=50.86MB mem-reservation=11.81MB thread-reservat
 |  |  |  fk/pk conjuncts: none
 |  |  |  runtime filters: RF006[bloom] <- c_current_addr_sk, RF007[min_max] <- c_current_addr_sk
 |  |  |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  |  |  tuple-ids=6,7 row-size=38B cardinality=51.30K
+|  |  |  tuple-ids=6,7 row-size=38B cardinality=49.54K
 |  |  |  in pipelines: 05(GETNEXT), 06(OPEN)
 |  |  |
 |  |  |--19:EXCHANGE [BROADCAST]
-|  |  |  |  mem-estimate=851.08KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=7 row-size=17B cardinality=50.00K
+|  |  |  |  mem-estimate=822.64KB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=7 row-size=17B cardinality=48.29K
 |  |  |  |  in pipelines: 06(GETNEXT)
 |  |  |  |
 |  |  |  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -335,7 +335,7 @@ Per-Host Resources: mem-estimate=50.86MB mem-reservation=11.81MB thread-reservat
 |  |  |     parquet statistics predicates: c_preferred_cust_flag = 'Y'
 |  |  |     parquet dictionary predicates: c_preferred_cust_flag = 'Y'
 |  |  |     mem-estimate=32.00MB mem-reservation=512.00KB thread-reservation=1
-|  |  |     tuple-ids=7 row-size=17B cardinality=50.00K
+|  |  |     tuple-ids=7 row-size=17B cardinality=48.29K
 |  |  |     in pipelines: 06(GETNEXT)
 |  |  |
 |  |  05:SCAN HDFS [tpcds_parquet.customer_address, RANDOM]
@@ -556,11 +556,11 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=3.00MB thread-reser
 |  |  |  hash predicates: ca_address_sk = c_current_addr_sk
 |  |  |  fk/pk conjuncts: none
 |  |  |  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
-|  |  |  tuple-ids=6,7 row-size=38B cardinality=51.30K
+|  |  |  tuple-ids=6,7 row-size=38B cardinality=49.54K
 |  |  |  in pipelines: 05(GETNEXT), 06(OPEN)
 |  |  |
 |  |  |--F12:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
-|  |  |  |  Per-Instance Resources: mem-estimate=11.33MB mem-reservation=10.50MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  |  |  Per-Instance Resources: mem-estimate=11.30MB mem-reservation=10.50MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  |  |  JOIN BUILD
 |  |  |  |  join-table-id=02 plan-id=03 cohort-id=03
 |  |  |  |  build expressions: c_current_addr_sk
@@ -568,8 +568,8 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=3.00MB thread-reser
 |  |  |  |  mem-estimate=9.50MB mem-reservation=9.50MB spill-buffer=256.00KB thread-reservation=0
 |  |  |  |
 |  |  |  19:EXCHANGE [BROADCAST]
-|  |  |  |  mem-estimate=851.08KB mem-reservation=0B thread-reservation=0
-|  |  |  |  tuple-ids=7 row-size=17B cardinality=50.00K
+|  |  |  |  mem-estimate=822.64KB mem-reservation=0B thread-reservation=0
+|  |  |  |  tuple-ids=7 row-size=17B cardinality=48.29K
 |  |  |  |  in pipelines: 06(GETNEXT)
 |  |  |  |
 |  |  |  F06:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -584,7 +584,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=3.00MB thread-reser
 |  |  |     parquet statistics predicates: c_preferred_cust_flag = 'Y'
 |  |  |     parquet dictionary predicates: c_preferred_cust_flag = 'Y'
 |  |  |     mem-estimate=16.00MB mem-reservation=512.00KB thread-reservation=0
-|  |  |     tuple-ids=7 row-size=17B cardinality=50.00K
+|  |  |     tuple-ids=7 row-size=17B cardinality=48.29K
 |  |  |     in pipelines: 06(GETNEXT)
 |  |  |
 |  |  05:SCAN HDFS [tpcds_parquet.customer_address, RANDOM]

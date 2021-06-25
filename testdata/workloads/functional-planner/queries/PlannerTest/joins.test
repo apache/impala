@@ -175,7 +175,7 @@ PLAN-ROOT SINK
    HDFS partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.id, RF001 -> a.int_col
-   row-size=95B cardinality=556
+   row-size=95B cardinality=455
 ---- DISTRIBUTEDPLAN
 PLAN-ROOT SINK
 |
@@ -202,7 +202,7 @@ PLAN-ROOT SINK
    HDFS partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.id, RF001 -> a.int_col
-   row-size=95B cardinality=556
+   row-size=95B cardinality=455
 ====
 # same as before, with 3 tables;
 # non-eq join predicates are evaluated at the correct join node
@@ -228,7 +228,7 @@ PLAN-ROOT SINK
 |
 |--03:HASH JOIN [FULL OUTER JOIN]
 |  |  hash predicates: a.id = b.id, a.int_col = b.int_col
-|  |  row-size=184B cardinality=561
+|  |  row-size=184B cardinality=460
 |  |
 |  |--01:SCAN HDFS [functional.alltypessmall b]
 |  |     partition predicates: b.`month` > 2
@@ -240,7 +240,7 @@ PLAN-ROOT SINK
 |     partition predicates: a.`day` >= 6
 |     HDFS partitions=5/11 files=5 size=372.38KB
 |     predicates: a.tinyint_col = 15
-|     row-size=95B cardinality=556
+|     row-size=95B cardinality=455
 |
 02:SCAN HDFS [functional.alltypesaggnonulls c]
    partition predicates: c.`day` < 3
@@ -268,7 +268,7 @@ PLAN-ROOT SINK
 |
 03:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
 |  hash predicates: a.id = b.id, a.int_col = b.int_col
-|  row-size=184B cardinality=561
+|  row-size=184B cardinality=460
 |
 |--06:EXCHANGE [HASH(b.id,b.int_col)]
 |  |
@@ -286,7 +286,7 @@ PLAN-ROOT SINK
    HDFS partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.id
-   row-size=95B cardinality=556
+   row-size=95B cardinality=455
 ====
 # equi join with constants in the on clause are not supported
 select a.id, b.id from
@@ -417,7 +417,7 @@ PLAN-ROOT SINK
    HDFS partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.int_col, RF001 -> a.id
-   row-size=95B cardinality=556
+   row-size=95B cardinality=455
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
@@ -452,7 +452,7 @@ PLAN-ROOT SINK
    HDFS partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.int_col, RF001 -> a.id
-   row-size=95B cardinality=556
+   row-size=95B cardinality=455
 ====
 # hbase-hdfs join with scan filtering (bogus)
 select *
@@ -480,7 +480,7 @@ PLAN-ROOT SINK
    HDFS partitions=5/11 files=5 size=372.38KB
    predicates: a.tinyint_col = 15
    runtime filters: RF000 -> a.int_col, RF001 -> a.id
-   row-size=95B cardinality=556
+   row-size=95B cardinality=455
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
@@ -2533,7 +2533,7 @@ PLAN-ROOT SINK
 |
 06:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: a.bigint_col > c.bigint_col
-|  row-size=192B cardinality=1.22K
+|  row-size=192B cardinality=1.00K
 |
 |--02:NESTED LOOP JOIN [INNER JOIN]
 |  |  predicates: a.id <= b.id
@@ -2550,7 +2550,7 @@ PLAN-ROOT SINK
 |
 05:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: c.int_col != d.int_col
-|  row-size=99B cardinality=1.22K
+|  row-size=99B cardinality=1.00K
 |
 |--04:SCAN HDFS [functional.alltypes d]
 |     HDFS partitions=24/24 files=24 size=478.45KB
@@ -2559,7 +2559,7 @@ PLAN-ROOT SINK
 03:SCAN HDFS [functional.alltypesagg c]
    HDFS partitions=11/11 files=11 size=814.73KB
    predicates: c.tinyint_col = 10
-   row-size=95B cardinality=1.22K
+   row-size=95B cardinality=1.00K
 ====
 # Inner, left-outer, left-semi and left-anti joins with non-equi join
 # predicates
@@ -2761,7 +2761,7 @@ PLAN-ROOT SINK
 |
 |--03:HASH JOIN [FULL OUTER JOIN]
 |  |  hash predicates: a.id IS NOT DISTINCT FROM b.id, a.int_col = b.int_col
-|  |  row-size=184B cardinality=561
+|  |  row-size=184B cardinality=460
 |  |
 |  |--01:SCAN HDFS [functional.alltypessmall b]
 |  |     partition predicates: b.`month` > 2
@@ -2773,7 +2773,7 @@ PLAN-ROOT SINK
 |     partition predicates: a.`day` >= 6
 |     HDFS partitions=5/11 files=5 size=372.38KB
 |     predicates: a.tinyint_col = 15
-|     row-size=95B cardinality=556
+|     row-size=95B cardinality=455
 |
 02:SCAN HDFS [functional.alltypesaggnonulls c]
    partition predicates: c.`day` < 3

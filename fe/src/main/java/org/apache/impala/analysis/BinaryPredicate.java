@@ -241,13 +241,16 @@ public class BinaryPredicate extends Predicate {
     if (!isSingleColumnPredicate(slotRefRef, null)) {
       return;
     }
+    boolean rChildIsNull = Expr.IS_NULL_LITERAL.apply(getChild(1));
     long distinctValues = slotRefRef.getRef().getNumDistinctValues();
     if (distinctValues < 0) {
       // Lack of statistics to estimate the selectivity.
       return;
-    } else if (distinctValues == 0 && (op_ == Operator.EQ || op_ == Operator.NE)) {
+    } else if ((distinctValues == 0 && (op_ == Operator.EQ || op_ == Operator.NE))
+        || (rChildIsNull && (op_ == Operator.EQ || op_ == Operator.NE))) {
       // If the table is empty, then distinctValues is 0. This case is equivalent
       // to selectivity is 0.
+      // For case <column> = NULL or <column> != NULL, all values are false
       selectivity_ = 0.0;
       return;
     }
@@ -256,23 +259,38 @@ public class BinaryPredicate extends Predicate {
       selectivity_ = 1.0 / distinctValues;
     } else if (op_ == Operator.NE || op_ == Operator.DISTINCT_FROM) {
       // For case <column> IS DISTINCT FROM NULL, all non-null values are true
-      if (Expr.IS_NULL_LITERAL.apply(getChild(1)) && op_ == Operator.DISTINCT_FROM) {
+      if (op_ == Operator.DISTINCT_FROM && rChildIsNull) {
         selectivity_ = 1.0;
       } else {
         selectivity_ = 1.0 - 1.0 / distinctValues;
       }
-      SlotDescriptor slotDesc = slotRefRef.getRef().getDesc();
-      if (slotDesc.getStats().hasNullsStats()) {
-        FeTable table = slotDesc.getParent().getTable();
-        if (table != null && table.getNumRows() > 0) {
-          long numRows = table.getNumRows();
-          selectivity_ *=
-              (double) (numRows - slotDesc.getStats().getNumNulls()) / numRows;
-        }
-      }
     } else {
       return;
     }
+
+    SlotDescriptor slotDesc = slotRefRef.getRef().getDesc();
+    if (slotDesc.getStats().hasNullsStats()) {
+      FeTable table = slotDesc.getParent().getTable();
+      if (table != null && table.getNumRows() > 0) {
+        long numRows = table.getNumRows();
+        long numNulls = slotDesc.getStats().getNumNulls();
+        if (op_ == Operator.EQ || op_ == Operator.NE
+            || (op_ == Operator.DISTINCT_FROM && rChildIsNull)
+            || (op_ == Operator.NOT_DISTINCT && !rChildIsNull)) {
+          // For =, !=, "is distinct from null" and "is not distinct from non-null",
+          // all null values are false.
+          selectivity_ *= (double) (numRows - numNulls) / numRows;
+        } else if (op_ == Operator.NOT_DISTINCT && rChildIsNull) {
+          // For is not distinct from null, only null values are true
+          selectivity_ = numNulls / numRows;
+        } else if (op_ == Operator.DISTINCT_FROM && !rChildIsNull) {
+          // For is distinct from not-null, null values are true, So need to add it
+          selectivity_ = selectivity_ * (double) (numRows - numNulls) / numRows +
+              numNulls / numRows;
+        }
+      }
+    }
+
     selectivity_ = Math.max(0, Math.min(1, selectivity_));
   }
 

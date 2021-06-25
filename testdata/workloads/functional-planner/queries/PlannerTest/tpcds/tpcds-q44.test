@@ -129,7 +129,7 @@ PLAN-ROOT SINK
 |  |  |     parquet statistics predicates: ss_store_sk = CAST(4 AS INT)
 |  |  |     parquet dictionary predicates: ss_store_sk = CAST(4 AS INT)
 |  |  |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|  |  |     tuple-ids=17 row-size=12B cardinality=53.06K
+|  |  |     tuple-ids=17 row-size=12B cardinality=51.85K
 |  |  |     in pipelines: 11(GETNEXT)
 |  |  |
 |  |  10:AGGREGATE [FINALIZE]
@@ -150,7 +150,7 @@ PLAN-ROOT SINK
 |  |     parquet statistics predicates: ss_store_sk = CAST(4 AS INT)
 |  |     parquet dictionary predicates: ss_store_sk = CAST(4 AS INT)
 |  |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|  |     tuple-ids=13 row-size=16B cardinality=480.07K
+|  |     tuple-ids=13 row-size=16B cardinality=458.39K
 |  |     in pipelines: 09(GETNEXT)
 |  |
 |  20:HASH JOIN [INNER JOIN]
@@ -214,7 +214,7 @@ PLAN-ROOT SINK
 |  |  |     parquet statistics predicates: ss_store_sk = CAST(4 AS INT)
 |  |  |     parquet dictionary predicates: ss_store_sk = CAST(4 AS INT)
 |  |  |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|  |  |     tuple-ids=4 row-size=12B cardinality=53.06K
+|  |  |     tuple-ids=4 row-size=12B cardinality=51.85K
 |  |  |     in pipelines: 02(GETNEXT)
 |  |  |
 |  |  01:AGGREGATE [FINALIZE]
@@ -235,7 +235,7 @@ PLAN-ROOT SINK
 |  |     parquet statistics predicates: ss_store_sk = CAST(4 AS INT)
 |  |     parquet dictionary predicates: ss_store_sk = CAST(4 AS INT)
 |  |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|  |     tuple-ids=0 row-size=16B cardinality=480.07K
+|  |     tuple-ids=0 row-size=16B cardinality=458.39K
 |  |     in pipelines: 00(GETNEXT)
 |  |
 |  18:SCAN HDFS [tpcds_parquet.item i1]
@@ -408,7 +408,7 @@ PLAN-ROOT SINK
 |  |     parquet statistics predicates: ss_store_sk = CAST(4 AS INT)
 |  |     parquet dictionary predicates: ss_store_sk = CAST(4 AS INT)
 |  |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|  |     tuple-ids=17 row-size=12B cardinality=53.06K
+|  |     tuple-ids=17 row-size=12B cardinality=51.85K
 |  |     in pipelines: 11(GETNEXT)
 |  |
 |  34:AGGREGATE [FINALIZE]
@@ -443,7 +443,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: ss_store_sk = CAST(4 AS INT)
 |     parquet dictionary predicates: ss_store_sk = CAST(4 AS INT)
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=13 row-size=16B cardinality=480.07K
+|     tuple-ids=13 row-size=16B cardinality=458.39K
 |     in pipelines: 09(GETNEXT)
 |
 20:HASH JOIN [INNER JOIN, BROADCAST]
@@ -566,7 +566,7 @@ Per-Host Resources: mem-estimate=10.17MB mem-reservation=1.94MB thread-reservati
 |     parquet statistics predicates: ss_store_sk = CAST(4 AS INT)
 |     parquet dictionary predicates: ss_store_sk = CAST(4 AS INT)
 |     mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-|     tuple-ids=4 row-size=12B cardinality=53.06K
+|     tuple-ids=4 row-size=12B cardinality=51.85K
 |     in pipelines: 02(GETNEXT)
 |
 25:AGGREGATE [FINALIZE]
@@ -601,7 +601,7 @@ Per-Host Resources: mem-estimate=58.00MB mem-reservation=3.00MB thread-reservati
    parquet statistics predicates: ss_store_sk = CAST(4 AS INT)
    parquet dictionary predicates: ss_store_sk = CAST(4 AS INT)
    mem-estimate=48.00MB mem-reservation=1.00MB thread-reservation=1
-   tuple-ids=0 row-size=16B cardinality=480.07K
+   tuple-ids=0 row-size=16B cardinality=458.39K
    in pipelines: 00(GETNEXT)
 ---- PARALLELPLANS
 Max Per-Host Resource Reservation: Memory=63.88MB Threads=27
@@ -775,7 +775,7 @@ PLAN-ROOT SINK
 |  |     parquet statistics predicates: ss_store_sk = CAST(4 AS INT)
 |  |     parquet dictionary predicates: ss_store_sk = CAST(4 AS INT)
 |  |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|  |     tuple-ids=17 row-size=12B cardinality=53.06K
+|  |     tuple-ids=17 row-size=12B cardinality=51.85K
 |  |     in pipelines: 11(GETNEXT)
 |  |
 |  34:AGGREGATE [FINALIZE]
@@ -810,7 +810,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: ss_store_sk = CAST(4 AS INT)
 |     parquet dictionary predicates: ss_store_sk = CAST(4 AS INT)
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=13 row-size=16B cardinality=480.07K
+|     tuple-ids=13 row-size=16B cardinality=458.39K
 |     in pipelines: 09(GETNEXT)
 |
 20:HASH JOIN [INNER JOIN, BROADCAST]
@@ -948,7 +948,7 @@ Per-Instance Resources: mem-estimate=10.21MB mem-reservation=1.94MB thread-reser
 |     parquet statistics predicates: ss_store_sk = CAST(4 AS INT)
 |     parquet dictionary predicates: ss_store_sk = CAST(4 AS INT)
 |     mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-|     tuple-ids=4 row-size=12B cardinality=53.06K
+|     tuple-ids=4 row-size=12B cardinality=51.85K
 |     in pipelines: 02(GETNEXT)
 |
 25:AGGREGATE [FINALIZE]
@@ -983,6 +983,6 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=3.00MB thread-reser
    parquet statistics predicates: ss_store_sk = CAST(4 AS INT)
    parquet dictionary predicates: ss_store_sk = CAST(4 AS INT)
    mem-estimate=16.00MB mem-reservation=1.00MB thread-reservation=0
-   tuple-ids=0 row-size=16B cardinality=480.07K
+   tuple-ids=0 row-size=16B cardinality=458.39K
    in pipelines: 00(GETNEXT)
 ====

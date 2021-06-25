@@ -92,26 +92,26 @@ PLAN-ROOT SINK
 |  output: sum(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=3.52K
+|  tuple-ids=26 row-size=44B cardinality=3.41K
 |  in pipelines: 31(GETNEXT), 10(OPEN), 20(OPEN), 30(OPEN)
 |
 00:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=24 row-size=44B cardinality=3.52K
+|  tuple-ids=24 row-size=44B cardinality=3.41K
 |  in pipelines: 10(GETNEXT), 20(GETNEXT), 30(GETNEXT)
 |
 |--30:AGGREGATE [FINALIZE]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: i_item_id
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=22 row-size=44B cardinality=650
+|  |  tuple-ids=22 row-size=44B cardinality=630
 |  |  in pipelines: 30(GETNEXT), 24(OPEN)
 |  |
 |  29:HASH JOIN [LEFT SEMI JOIN]
 |  |  hash predicates: i_item_id = i_item_id
 |  |  runtime filters: RF016[bloom] <- i_item_id, RF017[min_max] <- i_item_id
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=19,16,17,18 row-size=76B cardinality=650
+|  |  tuple-ids=19,16,17,18 row-size=76B cardinality=630
 |  |  in pipelines: 24(GETNEXT), 25(OPEN)
 |  |
 |  |--25:SCAN HDFS [tpcds_parquet.item]
@@ -132,7 +132,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: i_item_sk = ws_item_sk
 |  |  runtime filters: RF018[bloom] <- ws_item_sk, RF019[min_max] <- ws_item_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=19,16,17,18 row-size=76B cardinality=9.81K
+|  |  tuple-ids=19,16,17,18 row-size=76B cardinality=9.51K
 |  |  in pipelines: 24(GETNEXT), 21(OPEN)
 |  |
 |  |--27:HASH JOIN [INNER JOIN]
@@ -140,7 +140,7 @@ PLAN-ROOT SINK
 |  |  |  fk/pk conjuncts: ws_bill_addr_sk = ca_address_sk
 |  |  |  runtime filters: RF020[bloom] <- ca_address_sk, RF021[min_max] <- ca_address_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=16,17,18 row-size=40B cardinality=9.81K
+|  |  |  tuple-ids=16,17,18 row-size=40B cardinality=9.51K
 |  |  |  in pipelines: 21(GETNEXT), 23(OPEN)
 |  |  |
 |  |  |--23:SCAN HDFS [tpcds_parquet.customer_address]
@@ -153,7 +153,7 @@ PLAN-ROOT SINK
 |  |  |     parquet statistics predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |  |  |     parquet dictionary predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |  |  |     mem-estimate=32.00MB mem-reservation=256.00KB thread-reservation=1
-|  |  |     tuple-ids=18 row-size=8B cardinality=8.33K
+|  |  |     tuple-ids=18 row-size=8B cardinality=8.07K
 |  |  |     in pipelines: 23(GETNEXT)
 |  |  |
 |  |  26:HASH JOIN [INNER JOIN]
@@ -203,14 +203,14 @@ PLAN-ROOT SINK
 |  |  output: sum(cs_ext_sales_price)
 |  |  group by: i_item_id
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=44B cardinality=982
+|  |  tuple-ids=14 row-size=44B cardinality=951
 |  |  in pipelines: 20(GETNEXT), 14(OPEN)
 |  |
 |  19:HASH JOIN [LEFT SEMI JOIN]
 |  |  hash predicates: i_item_id = i_item_id
 |  |  runtime filters: RF008[bloom] <- i_item_id, RF009[min_max] <- i_item_id
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=11,8,9,10 row-size=76B cardinality=982
+|  |  tuple-ids=11,8,9,10 row-size=76B cardinality=951
 |  |  in pipelines: 14(GETNEXT), 15(OPEN)
 |  |
 |  |--15:SCAN HDFS [tpcds_parquet.item]
@@ -231,7 +231,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: i_item_sk = cs_item_sk
 |  |  runtime filters: RF011[min_max] <- cs_item_sk
 |  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  |  tuple-ids=11,8,9,10 row-size=76B cardinality=14.81K
+|  |  tuple-ids=11,8,9,10 row-size=76B cardinality=14.35K
 |  |  in pipelines: 14(GETNEXT), 11(OPEN)
 |  |
 |  |--17:HASH JOIN [INNER JOIN]
@@ -239,7 +239,7 @@ PLAN-ROOT SINK
 |  |  |  fk/pk conjuncts: cs_bill_addr_sk = ca_address_sk
 |  |  |  runtime filters: RF012[bloom] <- ca_address_sk, RF013[min_max] <- ca_address_sk
 |  |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  |  tuple-ids=8,9,10 row-size=40B cardinality=14.81K
+|  |  |  tuple-ids=8,9,10 row-size=40B cardinality=14.35K
 |  |  |  in pipelines: 11(GETNEXT), 13(OPEN)
 |  |  |
 |  |  |--13:SCAN HDFS [tpcds_parquet.customer_address]
@@ -252,7 +252,7 @@ PLAN-ROOT SINK
 |  |  |     parquet statistics predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |  |  |     parquet dictionary predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |  |  |     mem-estimate=32.00MB mem-reservation=256.00KB thread-reservation=1
-|  |  |     tuple-ids=10 row-size=8B cardinality=8.33K
+|  |  |     tuple-ids=10 row-size=8B cardinality=8.07K
 |  |  |     in pipelines: 13(GETNEXT)
 |  |  |
 |  |  16:HASH JOIN [INNER JOIN]
@@ -302,14 +302,14 @@ PLAN-ROOT SINK
 |  output: sum(ss_ext_sales_price)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=44B cardinality=1.89K
+|  tuple-ids=6 row-size=44B cardinality=1.83K
 |  in pipelines: 10(GETNEXT), 01(OPEN)
 |
 09:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: i_item_id = i_item_id
 |  runtime filters: RF000[bloom] <- i_item_id, RF001[min_max] <- i_item_id
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1,2,3 row-size=76B cardinality=1.89K
+|  tuple-ids=0,1,2,3 row-size=76B cardinality=1.83K
 |  in pipelines: 01(GETNEXT), 05(OPEN)
 |
 |--05:SCAN HDFS [tpcds_parquet.item]
@@ -330,7 +330,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ss_item_sk = i_item_sk
 |  runtime filters: RF003[min_max] <- i_item_sk
 |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=0,1,2,3 row-size=76B cardinality=28.50K
+|  tuple-ids=0,1,2,3 row-size=76B cardinality=27.62K
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |
 |--04:SCAN HDFS [tpcds_parquet.item]
@@ -349,7 +349,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ss_addr_sk = ca_address_sk
 |  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1,2 row-size=40B cardinality=28.50K
+|  tuple-ids=0,1,2 row-size=40B cardinality=27.62K
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpcds_parquet.customer_address]
@@ -362,7 +362,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |     parquet dictionary predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |     mem-estimate=32.00MB mem-reservation=256.00KB thread-reservation=1
-|     tuple-ids=2 row-size=8B cardinality=8.33K
+|     tuple-ids=2 row-size=8B cardinality=8.07K
 |     in pipelines: 03(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN]
@@ -425,12 +425,12 @@ Per-Host Resources: mem-estimate=10.19MB mem-reservation=1.94MB thread-reservati
 |  output: sum:merge(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=3.52K
+|  tuple-ids=26 row-size=44B cardinality=3.41K
 |  in pipelines: 55(GETNEXT), 39(OPEN), 46(OPEN), 53(OPEN)
 |
 54:EXCHANGE [HASH(i_item_id)]
-|  mem-estimate=194.45KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=3.52K
+|  mem-estimate=192.87KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=26 row-size=44B cardinality=3.41K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 F21:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -439,24 +439,24 @@ Per-Host Resources: mem-estimate=20.17MB mem-reservation=3.94MB thread-reservati
 |  output: sum(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=3.52K
+|  tuple-ids=26 row-size=44B cardinality=3.41K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 00:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=24 row-size=44B cardinality=3.52K
+|  tuple-ids=24 row-size=44B cardinality=3.41K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 |--53:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ws_ext_sales_price)
 |  |  group by: i_item_id
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=22 row-size=44B cardinality=650
+|  |  tuple-ids=22 row-size=44B cardinality=630
 |  |  in pipelines: 53(GETNEXT), 21(OPEN)
 |  |
 |  52:EXCHANGE [HASH(i_item_id)]
-|  |  mem-estimate=74.90KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=22 row-size=44B cardinality=650
+|  |  mem-estimate=72.60KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=22 row-size=44B cardinality=630
 |  |  in pipelines: 21(GETNEXT)
 |  |
 |  F18:PLAN FRAGMENT [HASH(ws_item_sk)] hosts=2 instances=2
@@ -465,14 +465,14 @@ Per-Host Resources: mem-estimate=20.17MB mem-reservation=3.94MB thread-reservati
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: i_item_id
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=22 row-size=44B cardinality=650
+|  |  tuple-ids=22 row-size=44B cardinality=630
 |  |  in pipelines: 21(GETNEXT)
 |  |
 |  29:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  |  hash predicates: i_item_id = i_item_id
 |  |  runtime filters: RF016[bloom] <- i_item_id, RF017[min_max] <- i_item_id
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17,18,19 row-size=76B cardinality=650
+|  |  tuple-ids=16,17,18,19 row-size=76B cardinality=630
 |  |  in pipelines: 21(GETNEXT), 25(OPEN)
 |  |
 |  |--51:EXCHANGE [BROADCAST]
@@ -500,7 +500,7 @@ Per-Host Resources: mem-estimate=20.17MB mem-reservation=3.94MB thread-reservati
 |  |  fk/pk conjuncts: ws_item_sk = i_item_sk
 |  |  runtime filters: RF019[min_max] <- i_item_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17,18,19 row-size=76B cardinality=9.81K
+|  |  tuple-ids=16,17,18,19 row-size=76B cardinality=9.51K
 |  |  in pipelines: 21(GETNEXT), 24(OPEN)
 |  |
 |  |--50:EXCHANGE [HASH(i_item_sk)]
@@ -522,23 +522,23 @@ Per-Host Resources: mem-estimate=20.17MB mem-reservation=3.94MB thread-reservati
 |  |     in pipelines: 24(GETNEXT)
 |  |
 |  49:EXCHANGE [HASH(ws_item_sk)]
-|  |  mem-estimate=295.62KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=16,17,18 row-size=40B cardinality=9.81K
+|  |  mem-estimate=289.66KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=16,17,18 row-size=40B cardinality=9.51K
 |  |  in pipelines: 21(GETNEXT)
 |  |
 |  F14:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
-|  Per-Host Resources: mem-estimate=133.97MB mem-reservation=13.88MB thread-reservation=2 runtime-filters-memory=2.00MB
+|  Per-Host Resources: mem-estimate=133.96MB mem-reservation=13.88MB thread-reservation=2 runtime-filters-memory=2.00MB
 |  27:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ws_bill_addr_sk = ca_address_sk
 |  |  fk/pk conjuncts: ws_bill_addr_sk = ca_address_sk
 |  |  runtime filters: RF020[bloom] <- ca_address_sk, RF021[min_max] <- ca_address_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17,18 row-size=40B cardinality=9.81K
+|  |  tuple-ids=16,17,18 row-size=40B cardinality=9.51K
 |  |  in pipelines: 21(GETNEXT), 23(OPEN)
 |  |
 |  |--48:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=77.10KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=18 row-size=8B cardinality=8.33K
+|  |  |  mem-estimate=75.08KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=18 row-size=8B cardinality=8.07K
 |  |  |  in pipelines: 23(GETNEXT)
 |  |  |
 |  |  F16:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -553,7 +553,7 @@ Per-Host Resources: mem-estimate=20.17MB mem-reservation=3.94MB thread-reservati
 |  |     parquet statistics predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |  |     parquet dictionary predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |  |     mem-estimate=32.00MB mem-reservation=256.00KB thread-reservation=1
-|  |     tuple-ids=18 row-size=8B cardinality=8.33K
+|  |     tuple-ids=18 row-size=8B cardinality=8.07K
 |  |     in pipelines: 23(GETNEXT)
 |  |
 |  26:HASH JOIN [INNER JOIN, BROADCAST]
@@ -599,28 +599,28 @@ Per-Host Resources: mem-estimate=20.17MB mem-reservation=3.94MB thread-reservati
 |  |  output: sum:merge(cs_ext_sales_price)
 |  |  group by: i_item_id
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=44B cardinality=982
+|  |  tuple-ids=14 row-size=44B cardinality=951
 |  |  in pipelines: 46(GETNEXT), 11(OPEN)
 |  |
 |  45:EXCHANGE [HASH(i_item_id)]
-|  |  mem-estimate=152.16KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=14 row-size=44B cardinality=982
+|  |  mem-estimate=147.36KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=14 row-size=44B cardinality=951
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  F11:PLAN FRAGMENT [HASH(cs_item_sk)] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=15.93MB mem-reservation=6.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  Per-Host Resources: mem-estimate=15.92MB mem-reservation=6.88MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  20:AGGREGATE [STREAMING]
 |  |  output: sum(cs_ext_sales_price)
 |  |  group by: i_item_id
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=44B cardinality=982
+|  |  tuple-ids=14 row-size=44B cardinality=951
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  19:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  |  hash predicates: i_item_id = i_item_id
 |  |  runtime filters: RF008[bloom] <- i_item_id, RF009[min_max] <- i_item_id
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9,10,11 row-size=76B cardinality=982
+|  |  tuple-ids=8,9,10,11 row-size=76B cardinality=951
 |  |  in pipelines: 11(GETNEXT), 15(OPEN)
 |  |
 |  |--44:EXCHANGE [BROADCAST]
@@ -648,7 +648,7 @@ Per-Host Resources: mem-estimate=20.17MB mem-reservation=3.94MB thread-reservati
 |  |  fk/pk conjuncts: cs_item_sk = i_item_sk
 |  |  runtime filters: RF011[min_max] <- i_item_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9,10,11 row-size=76B cardinality=14.81K
+|  |  tuple-ids=8,9,10,11 row-size=76B cardinality=14.35K
 |  |  in pipelines: 11(GETNEXT), 14(OPEN)
 |  |
 |  |--43:EXCHANGE [HASH(i_item_sk)]
@@ -670,23 +670,23 @@ Per-Host Resources: mem-estimate=20.17MB mem-reservation=3.94MB thread-reservati
 |  |     in pipelines: 14(GETNEXT)
 |  |
 |  42:EXCHANGE [HASH(cs_item_sk)]
-|  |  mem-estimate=348.84KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=8,9,10 row-size=40B cardinality=14.81K
+|  |  mem-estimate=342.84KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=8,9,10 row-size=40B cardinality=14.35K
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=197.97MB mem-reservation=13.88MB thread-reservation=2 runtime-filters-memory=2.00MB
+|  Per-Host Resources: mem-estimate=197.96MB mem-reservation=13.88MB thread-reservation=2 runtime-filters-memory=2.00MB
 |  17:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: cs_bill_addr_sk = ca_address_sk
 |  |  fk/pk conjuncts: cs_bill_addr_sk = ca_address_sk
 |  |  runtime filters: RF012[bloom] <- ca_address_sk, RF013[min_max] <- ca_address_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9,10 row-size=40B cardinality=14.81K
+|  |  tuple-ids=8,9,10 row-size=40B cardinality=14.35K
 |  |  in pipelines: 11(GETNEXT), 13(OPEN)
 |  |
 |  |--41:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=77.10KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=10 row-size=8B cardinality=8.33K
+|  |  |  mem-estimate=75.08KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=10 row-size=8B cardinality=8.07K
 |  |  |  in pipelines: 13(GETNEXT)
 |  |  |
 |  |  F09:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -701,7 +701,7 @@ Per-Host Resources: mem-estimate=20.17MB mem-reservation=3.94MB thread-reservati
 |  |     parquet statistics predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |  |     parquet dictionary predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |  |     mem-estimate=32.00MB mem-reservation=256.00KB thread-reservation=1
-|  |     tuple-ids=10 row-size=8B cardinality=8.33K
+|  |     tuple-ids=10 row-size=8B cardinality=8.07K
 |  |     in pipelines: 13(GETNEXT)
 |  |
 |  16:HASH JOIN [INNER JOIN, BROADCAST]
@@ -747,28 +747,28 @@ Per-Host Resources: mem-estimate=20.17MB mem-reservation=3.94MB thread-reservati
 |  output: sum:merge(ss_ext_sales_price)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=44B cardinality=1.89K
+|  tuple-ids=6 row-size=44B cardinality=1.83K
 |  in pipelines: 39(GETNEXT), 01(OPEN)
 |
 38:EXCHANGE [HASH(i_item_id)]
-|  mem-estimate=171.07KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=44B cardinality=1.89K
+|  mem-estimate=170.22KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=44B cardinality=1.83K
 |  in pipelines: 01(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(ss_item_sk)] hosts=3 instances=3
-Per-Host Resources: mem-estimate=17.10MB mem-reservation=7.88MB thread-reservation=1 runtime-filters-memory=2.00MB
+Per-Host Resources: mem-estimate=17.09MB mem-reservation=7.88MB thread-reservation=1 runtime-filters-memory=2.00MB
 10:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=44B cardinality=1.89K
+|  tuple-ids=6 row-size=44B cardinality=1.83K
 |  in pipelines: 01(GETNEXT)
 |
 09:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: i_item_id = i_item_id
 |  runtime filters: RF000[bloom] <- i_item_id, RF001[min_max] <- i_item_id
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1,2,3 row-size=76B cardinality=1.89K
+|  tuple-ids=0,1,2,3 row-size=76B cardinality=1.83K
 |  in pipelines: 01(GETNEXT), 05(OPEN)
 |
 |--37:EXCHANGE [BROADCAST]
@@ -796,7 +796,7 @@ Per-Host Resources: mem-estimate=17.10MB mem-reservation=7.88MB thread-reservati
 |  fk/pk conjuncts: ss_item_sk = i_item_sk
 |  runtime filters: RF002[bloom] <- i_item_sk, RF003[min_max] <- i_item_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1,2,3 row-size=76B cardinality=28.50K
+|  tuple-ids=0,1,2,3 row-size=76B cardinality=27.62K
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |
 |--36:EXCHANGE [HASH(i_item_sk)]
@@ -818,23 +818,23 @@ Per-Host Resources: mem-estimate=17.10MB mem-reservation=7.88MB thread-reservati
 |     in pipelines: 04(GETNEXT)
 |
 35:EXCHANGE [HASH(ss_item_sk)]
-|  mem-estimate=527.13KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,1,2 row-size=40B cardinality=28.50K
+|  mem-estimate=515.61KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0,1,2 row-size=40B cardinality=27.62K
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-Per-Host Resources: mem-estimate=54.97MB mem-reservation=8.88MB thread-reservation=2 runtime-filters-memory=3.00MB
+Per-Host Resources: mem-estimate=54.96MB mem-reservation=8.88MB thread-reservation=2 runtime-filters-memory=3.00MB
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_addr_sk = ca_address_sk
 |  fk/pk conjuncts: ss_addr_sk = ca_address_sk
 |  runtime filters: RF004[bloom] <- ca_address_sk, RF005[min_max] <- ca_address_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1,2 row-size=40B cardinality=28.50K
+|  tuple-ids=0,1,2 row-size=40B cardinality=27.62K
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
 |--34:EXCHANGE [BROADCAST]
-|  |  mem-estimate=77.10KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2 row-size=8B cardinality=8.33K
+|  |  mem-estimate=75.08KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=8B cardinality=8.07K
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -849,7 +849,7 @@ Per-Host Resources: mem-estimate=54.97MB mem-reservation=8.88MB thread-reservati
 |     parquet statistics predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |     parquet dictionary predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |     mem-estimate=32.00MB mem-reservation=256.00KB thread-reservation=1
-|     tuple-ids=2 row-size=8B cardinality=8.33K
+|     tuple-ids=2 row-size=8B cardinality=8.07K
 |     in pipelines: 03(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
@@ -919,12 +919,12 @@ Per-Instance Resources: mem-estimate=10.33MB mem-reservation=1.94MB thread-reser
 |  output: sum:merge(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=3.52K
+|  tuple-ids=26 row-size=44B cardinality=3.41K
 |  in pipelines: 55(GETNEXT), 39(OPEN), 46(OPEN), 53(OPEN)
 |
 54:EXCHANGE [HASH(i_item_id)]
-|  mem-estimate=338.45KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=3.52K
+|  mem-estimate=336.87KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=26 row-size=44B cardinality=3.41K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 F21:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -933,40 +933,40 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  output: sum(total_sales)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=26 row-size=44B cardinality=3.52K
+|  tuple-ids=26 row-size=44B cardinality=3.41K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 00:UNION
 |  mem-estimate=0B mem-reservation=0B thread-reservation=0
-|  tuple-ids=24 row-size=44B cardinality=3.52K
+|  tuple-ids=24 row-size=44B cardinality=3.41K
 |  in pipelines: 39(GETNEXT), 46(GETNEXT), 53(GETNEXT)
 |
 |--53:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ws_ext_sales_price)
 |  |  group by: i_item_id
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=22 row-size=44B cardinality=650
+|  |  tuple-ids=22 row-size=44B cardinality=630
 |  |  in pipelines: 53(GETNEXT), 21(OPEN)
 |  |
 |  52:EXCHANGE [HASH(i_item_id)]
-|  |  mem-estimate=74.90KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=22 row-size=44B cardinality=650
+|  |  mem-estimate=72.60KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=22 row-size=44B cardinality=630
 |  |  in pipelines: 21(GETNEXT)
 |  |
 |  F18:PLAN FRAGMENT [HASH(ws_item_sk)] hosts=2 instances=2
-|  Per-Instance Resources: mem-estimate=10.29MB mem-reservation=2.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.28MB mem-reservation=2.00MB thread-reservation=1
 |  30:AGGREGATE [STREAMING]
 |  |  output: sum(ws_ext_sales_price)
 |  |  group by: i_item_id
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=22 row-size=44B cardinality=650
+|  |  tuple-ids=22 row-size=44B cardinality=630
 |  |  in pipelines: 21(GETNEXT)
 |  |
 |  29:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  |  hash-table-id=08
 |  |  hash predicates: i_item_id = i_item_id
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17,18,19 row-size=76B cardinality=650
+|  |  tuple-ids=16,17,18,19 row-size=76B cardinality=630
 |  |  in pipelines: 21(GETNEXT), 25(OPEN)
 |  |
 |  |--F32:PLAN FRAGMENT [HASH(ws_item_sk)] hosts=2 instances=2
@@ -1002,7 +1002,7 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  |  hash predicates: ws_item_sk = i_item_sk
 |  |  fk/pk conjuncts: ws_item_sk = i_item_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17,18,19 row-size=76B cardinality=9.81K
+|  |  tuple-ids=16,17,18,19 row-size=76B cardinality=9.51K
 |  |  in pipelines: 21(GETNEXT), 24(OPEN)
 |  |
 |  |--F33:PLAN FRAGMENT [HASH(ws_item_sk)] hosts=2 instances=2
@@ -1033,8 +1033,8 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  |     in pipelines: 24(GETNEXT)
 |  |
 |  49:EXCHANGE [HASH(ws_item_sk)]
-|  |  mem-estimate=295.62KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=16,17,18 row-size=40B cardinality=9.81K
+|  |  mem-estimate=289.66KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=16,17,18 row-size=40B cardinality=9.51K
 |  |  in pipelines: 21(GETNEXT)
 |  |
 |  F14:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -1045,7 +1045,7 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  |  hash predicates: ws_bill_addr_sk = ca_address_sk
 |  |  fk/pk conjuncts: ws_bill_addr_sk = ca_address_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17,18 row-size=40B cardinality=9.81K
+|  |  tuple-ids=16,17,18 row-size=40B cardinality=9.51K
 |  |  in pipelines: 21(GETNEXT), 23(OPEN)
 |  |
 |  |--F34:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -1057,8 +1057,8 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  48:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=77.10KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=18 row-size=8B cardinality=8.33K
+|  |  |  mem-estimate=75.08KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=18 row-size=8B cardinality=8.07K
 |  |  |  in pipelines: 23(GETNEXT)
 |  |  |
 |  |  F16:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -1073,7 +1073,7 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  |     parquet statistics predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |  |     parquet dictionary predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |  |     mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
-|  |     tuple-ids=18 row-size=8B cardinality=8.33K
+|  |     tuple-ids=18 row-size=8B cardinality=8.07K
 |  |     in pipelines: 23(GETNEXT)
 |  |
 |  26:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1127,28 +1127,28 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  |  output: sum:merge(cs_ext_sales_price)
 |  |  group by: i_item_id
 |  |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=44B cardinality=982
+|  |  tuple-ids=14 row-size=44B cardinality=951
 |  |  in pipelines: 46(GETNEXT), 11(OPEN)
 |  |
 |  45:EXCHANGE [HASH(i_item_id)]
-|  |  mem-estimate=152.16KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=14 row-size=44B cardinality=982
+|  |  mem-estimate=147.36KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=14 row-size=44B cardinality=951
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  F11:PLAN FRAGMENT [HASH(cs_item_sk)] hosts=3 instances=3
-|  Per-Instance Resources: mem-estimate=10.34MB mem-reservation=2.00MB thread-reservation=1
+|  Per-Instance Resources: mem-estimate=10.33MB mem-reservation=2.00MB thread-reservation=1
 |  20:AGGREGATE [STREAMING]
 |  |  output: sum(cs_ext_sales_price)
 |  |  group by: i_item_id
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=44B cardinality=982
+|  |  tuple-ids=14 row-size=44B cardinality=951
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  19:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  |  hash-table-id=04
 |  |  hash predicates: i_item_id = i_item_id
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9,10,11 row-size=76B cardinality=982
+|  |  tuple-ids=8,9,10,11 row-size=76B cardinality=951
 |  |  in pipelines: 11(GETNEXT), 15(OPEN)
 |  |
 |  |--F28:PLAN FRAGMENT [HASH(cs_item_sk)] hosts=3 instances=3
@@ -1184,7 +1184,7 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  |  hash predicates: cs_item_sk = i_item_sk
 |  |  fk/pk conjuncts: cs_item_sk = i_item_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9,10,11 row-size=76B cardinality=14.81K
+|  |  tuple-ids=8,9,10,11 row-size=76B cardinality=14.35K
 |  |  in pipelines: 11(GETNEXT), 14(OPEN)
 |  |
 |  |--F29:PLAN FRAGMENT [HASH(cs_item_sk)] hosts=3 instances=3
@@ -1215,8 +1215,8 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  |     in pipelines: 14(GETNEXT)
 |  |
 |  42:EXCHANGE [HASH(cs_item_sk)]
-|  |  mem-estimate=348.84KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=8,9,10 row-size=40B cardinality=14.81K
+|  |  mem-estimate=342.84KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=8,9,10 row-size=40B cardinality=14.35K
 |  |  in pipelines: 11(GETNEXT)
 |  |
 |  F07:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1227,7 +1227,7 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  |  hash predicates: cs_bill_addr_sk = ca_address_sk
 |  |  fk/pk conjuncts: cs_bill_addr_sk = ca_address_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9,10 row-size=40B cardinality=14.81K
+|  |  tuple-ids=8,9,10 row-size=40B cardinality=14.35K
 |  |  in pipelines: 11(GETNEXT), 13(OPEN)
 |  |
 |  |--F30:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1239,8 +1239,8 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  41:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=77.10KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=10 row-size=8B cardinality=8.33K
+|  |  |  mem-estimate=75.08KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=10 row-size=8B cardinality=8.07K
 |  |  |  in pipelines: 13(GETNEXT)
 |  |  |
 |  |  F09:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -1255,7 +1255,7 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  |     parquet statistics predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |  |     parquet dictionary predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |  |     mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
-|  |     tuple-ids=10 row-size=8B cardinality=8.33K
+|  |     tuple-ids=10 row-size=8B cardinality=8.07K
 |  |     in pipelines: 13(GETNEXT)
 |  |
 |  16:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1309,28 +1309,28 @@ Per-Instance Resources: mem-estimate=20.31MB mem-reservation=3.94MB thread-reser
 |  output: sum:merge(ss_ext_sales_price)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=44B cardinality=1.89K
+|  tuple-ids=6 row-size=44B cardinality=1.83K
 |  in pipelines: 39(GETNEXT), 01(OPEN)
 |
 38:EXCHANGE [HASH(i_item_id)]
-|  mem-estimate=315.07KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=6 row-size=44B cardinality=1.89K
+|  mem-estimate=314.22KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=6 row-size=44B cardinality=1.83K
 |  in pipelines: 01(GETNEXT)
 |
 F04:PLAN FRAGMENT [HASH(ss_item_sk)] hosts=3 instances=6
-Per-Instance Resources: mem-estimate=10.67MB mem-reservation=2.00MB thread-reservation=1
+Per-Instance Resources: mem-estimate=10.66MB mem-reservation=2.00MB thread-reservation=1
 10:AGGREGATE [STREAMING]
 |  output: sum(ss_ext_sales_price)
 |  group by: i_item_id
 |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=6 row-size=44B cardinality=1.89K
+|  tuple-ids=6 row-size=44B cardinality=1.83K
 |  in pipelines: 01(GETNEXT)
 |
 09:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash-table-id=00
 |  hash predicates: i_item_id = i_item_id
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1,2,3 row-size=76B cardinality=1.89K
+|  tuple-ids=0,1,2,3 row-size=76B cardinality=1.83K
 |  in pipelines: 01(GETNEXT), 05(OPEN)
 |
 |--F24:PLAN FRAGMENT [HASH(ss_item_sk)] hosts=3 instances=3
@@ -1366,7 +1366,7 @@ Per-Instance Resources: mem-estimate=10.67MB mem-reservation=2.00MB thread-reser
 |  hash predicates: ss_item_sk = i_item_sk
 |  fk/pk conjuncts: ss_item_sk = i_item_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1,2,3 row-size=76B cardinality=28.50K
+|  tuple-ids=0,1,2,3 row-size=76B cardinality=27.62K
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |
 |--F25:PLAN FRAGMENT [HASH(ss_item_sk)] hosts=3 instances=6
@@ -1397,8 +1397,8 @@ Per-Instance Resources: mem-estimate=10.67MB mem-reservation=2.00MB thread-reser
 |     in pipelines: 04(GETNEXT)
 |
 35:EXCHANGE [HASH(ss_item_sk)]
-|  mem-estimate=683.13KB mem-reservation=0B thread-reservation=0
-|  tuple-ids=0,1,2 row-size=40B cardinality=28.50K
+|  mem-estimate=671.61KB mem-reservation=0B thread-reservation=0
+|  tuple-ids=0,1,2 row-size=40B cardinality=27.62K
 |  in pipelines: 01(GETNEXT)
 |
 F00:PLAN FRAGMENT [RANDOM] hosts=3 instances=6
@@ -1409,7 +1409,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=2.00MB thread-reser
 |  hash predicates: ss_addr_sk = ca_address_sk
 |  fk/pk conjuncts: ss_addr_sk = ca_address_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1,2 row-size=40B cardinality=28.50K
+|  tuple-ids=0,1,2 row-size=40B cardinality=27.62K
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
 |--F26:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1421,8 +1421,8 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=2.00MB thread-reser
 |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |
 |  34:EXCHANGE [BROADCAST]
-|  |  mem-estimate=77.10KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=2 row-size=8B cardinality=8.33K
+|  |  mem-estimate=75.08KB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=2 row-size=8B cardinality=8.07K
 |  |  in pipelines: 03(GETNEXT)
 |  |
 |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -1437,7 +1437,7 @@ Per-Instance Resources: mem-estimate=16.00MB mem-reservation=2.00MB thread-reser
 |     parquet statistics predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |     parquet dictionary predicates: ca_gmt_offset = CAST(-5 AS DECIMAL(3,0))
 |     mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
-|     tuple-ids=2 row-size=8B cardinality=8.33K
+|     tuple-ids=2 row-size=8B cardinality=8.07K
 |     in pipelines: 03(GETNEXT)
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]

@@ -145,7 +145,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: ws_web_site_sk = web_site_sk
 |  |  runtime filters: RF017[min_max] <- web_site_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17N,20,21,18,19 row-size=147B cardinality=71.46K
+|  |  tuple-ids=16,17N,20,21,18,19 row-size=147B cardinality=70.03K
 |  |  in pipelines: 25(GETNEXT), 28(OPEN)
 |  |
 |  |--28:SCAN HDFS [tpcds_parquet.web_site]
@@ -163,7 +163,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: ws_sold_date_sk = d_date_sk
 |  |  runtime filters: RF019[min_max] <- d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17N,20,21,18 row-size=115B cardinality=71.46K
+|  |  tuple-ids=16,17N,20,21,18 row-size=115B cardinality=70.03K
 |  |  in pipelines: 25(GETNEXT), 27(OPEN)
 |  |
 |  |--27:SCAN HDFS [tpcds_parquet.date_dim]
@@ -184,7 +184,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: ws_promo_sk = p_promo_sk
 |  |  runtime filters: RF020[bloom] <- p_promo_sk, RF021[min_max] <- p_promo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17N,20,21 row-size=89B cardinality=71.46K
+|  |  tuple-ids=16,17N,20,21 row-size=89B cardinality=70.03K
 |  |  in pipelines: 25(GETNEXT), 30(OPEN)
 |  |
 |  |--30:SCAN HDFS [tpcds_parquet.promotion]
@@ -197,7 +197,7 @@ PLAN-ROOT SINK
 |  |     parquet statistics predicates: p_channel_tv = 'N'
 |  |     parquet dictionary predicates: p_channel_tv = 'N'
 |  |     mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=1
-|  |     tuple-ids=21 row-size=17B cardinality=300
+|  |     tuple-ids=21 row-size=17B cardinality=294
 |  |     in pipelines: 30(GETNEXT)
 |  |
 |  32:HASH JOIN [INNER JOIN]
@@ -262,7 +262,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: cs_catalog_page_sk = cp_catalog_page_sk
 |  |  runtime filters: RF008[bloom] <- cp_catalog_page_sk, RF009[min_max] <- cp_catalog_page_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9N,12,13,10,11 row-size=147B cardinality=143.20K
+|  |  tuple-ids=8,9N,12,13,10,11 row-size=147B cardinality=140.34K
 |  |  in pipelines: 13(GETNEXT), 16(OPEN)
 |  |
 |  |--16:SCAN HDFS [tpcds_parquet.catalog_page]
@@ -280,7 +280,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
 |  |  runtime filters: RF010[bloom] <- d_date_sk, RF011[min_max] <- d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9N,12,13,10 row-size=115B cardinality=143.20K
+|  |  tuple-ids=8,9N,12,13,10 row-size=115B cardinality=140.34K
 |  |  in pipelines: 13(GETNEXT), 15(OPEN)
 |  |
 |  |--15:SCAN HDFS [tpcds_parquet.date_dim]
@@ -301,7 +301,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: cs_promo_sk = p_promo_sk
 |  |  runtime filters: RF012[bloom] <- p_promo_sk, RF013[min_max] <- p_promo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9N,12,13 row-size=89B cardinality=143.20K
+|  |  tuple-ids=8,9N,12,13 row-size=89B cardinality=140.34K
 |  |  in pipelines: 13(GETNEXT), 18(OPEN)
 |  |
 |  |--18:SCAN HDFS [tpcds_parquet.promotion]
@@ -314,7 +314,7 @@ PLAN-ROOT SINK
 |  |     parquet statistics predicates: p_channel_tv = 'N'
 |  |     parquet dictionary predicates: p_channel_tv = 'N'
 |  |     mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=1
-|  |     tuple-ids=13 row-size=17B cardinality=300
+|  |     tuple-ids=13 row-size=17B cardinality=294
 |  |     in pipelines: 18(GETNEXT)
 |  |
 |  20:HASH JOIN [INNER JOIN]
@@ -379,7 +379,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ss_store_sk = s_store_sk
 |  runtime filters: RF000[bloom] <- s_store_sk, RF001[min_max] <- s_store_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1N,4,5,2,3 row-size=147B cardinality=286.13K
+|  tuple-ids=0,1N,4,5,2,3 row-size=147B cardinality=280.41K
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |
 |--04:SCAN HDFS [tpcds_parquet.store]
@@ -397,7 +397,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
 |  runtime filters: RF002[bloom] <- d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1N,4,5,2 row-size=115B cardinality=286.13K
+|  tuple-ids=0,1N,4,5,2 row-size=115B cardinality=280.41K
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
 |--03:SCAN HDFS [tpcds_parquet.date_dim]
@@ -418,7 +418,7 @@ PLAN-ROOT SINK
 |  fk/pk conjuncts: ss_promo_sk = p_promo_sk
 |  runtime filters: RF004[bloom] <- p_promo_sk, RF005[min_max] <- p_promo_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1N,4,5 row-size=89B cardinality=286.13K
+|  tuple-ids=0,1N,4,5 row-size=89B cardinality=280.41K
 |  in pipelines: 01(GETNEXT), 06(OPEN)
 |
 |--06:SCAN HDFS [tpcds_parquet.promotion]
@@ -431,7 +431,7 @@ PLAN-ROOT SINK
 |     parquet statistics predicates: p_channel_tv = 'N'
 |     parquet dictionary predicates: p_channel_tv = 'N'
 |     mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=1
-|     tuple-ids=5 row-size=17B cardinality=300
+|     tuple-ids=5 row-size=17B cardinality=294
 |     in pipelines: 06(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN]
@@ -581,7 +581,7 @@ Per-Host Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reservati
 |  |  fk/pk conjuncts: ws_web_site_sk = web_site_sk
 |  |  runtime filters: RF017[min_max] <- web_site_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17N,20,21,18,19 row-size=147B cardinality=71.46K
+|  |  tuple-ids=16,17N,20,21,18,19 row-size=147B cardinality=70.03K
 |  |  in pipelines: 25(GETNEXT), 28(OPEN)
 |  |
 |  |--58:EXCHANGE [BROADCAST]
@@ -606,7 +606,7 @@ Per-Host Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reservati
 |  |  fk/pk conjuncts: ws_sold_date_sk = d_date_sk
 |  |  runtime filters: RF019[min_max] <- d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17N,20,21,18 row-size=115B cardinality=71.46K
+|  |  tuple-ids=16,17N,20,21,18 row-size=115B cardinality=70.03K
 |  |  in pipelines: 25(GETNEXT), 27(OPEN)
 |  |
 |  |--57:EXCHANGE [BROADCAST]
@@ -634,12 +634,12 @@ Per-Host Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reservati
 |  |  fk/pk conjuncts: ws_promo_sk = p_promo_sk
 |  |  runtime filters: RF020[bloom] <- p_promo_sk, RF021[min_max] <- p_promo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17N,20,21 row-size=89B cardinality=71.46K
+|  |  tuple-ids=16,17N,20,21 row-size=89B cardinality=70.03K
 |  |  in pipelines: 25(GETNEXT), 30(OPEN)
 |  |
 |  |--56:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=21 row-size=17B cardinality=300
+|  |  |  tuple-ids=21 row-size=17B cardinality=294
 |  |  |  in pipelines: 30(GETNEXT)
 |  |  |
 |  |  F17:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -654,7 +654,7 @@ Per-Host Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reservati
 |  |     parquet statistics predicates: p_channel_tv = 'N'
 |  |     parquet dictionary predicates: p_channel_tv = 'N'
 |  |     mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=1
-|  |     tuple-ids=21 row-size=17B cardinality=300
+|  |     tuple-ids=21 row-size=17B cardinality=294
 |  |     in pipelines: 30(GETNEXT)
 |  |
 |  32:HASH JOIN [INNER JOIN, BROADCAST]
@@ -747,7 +747,7 @@ Per-Host Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reservati
 |  |  fk/pk conjuncts: cs_catalog_page_sk = cp_catalog_page_sk
 |  |  runtime filters: RF008[bloom] <- cp_catalog_page_sk, RF009[min_max] <- cp_catalog_page_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9N,12,13,10,11 row-size=147B cardinality=143.20K
+|  |  tuple-ids=8,9N,12,13,10,11 row-size=147B cardinality=140.34K
 |  |  in pipelines: 13(GETNEXT), 16(OPEN)
 |  |
 |  |--51:EXCHANGE [BROADCAST]
@@ -772,7 +772,7 @@ Per-Host Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reservati
 |  |  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
 |  |  runtime filters: RF010[bloom] <- d_date_sk, RF011[min_max] <- d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9N,12,13,10 row-size=115B cardinality=143.20K
+|  |  tuple-ids=8,9N,12,13,10 row-size=115B cardinality=140.34K
 |  |  in pipelines: 13(GETNEXT), 15(OPEN)
 |  |
 |  |--50:EXCHANGE [BROADCAST]
@@ -800,12 +800,12 @@ Per-Host Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reservati
 |  |  fk/pk conjuncts: cs_promo_sk = p_promo_sk
 |  |  runtime filters: RF012[bloom] <- p_promo_sk, RF013[min_max] <- p_promo_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9N,12,13 row-size=89B cardinality=143.20K
+|  |  tuple-ids=8,9N,12,13 row-size=89B cardinality=140.34K
 |  |  in pipelines: 13(GETNEXT), 18(OPEN)
 |  |
 |  |--49:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=13 row-size=17B cardinality=300
+|  |  |  tuple-ids=13 row-size=17B cardinality=294
 |  |  |  in pipelines: 18(GETNEXT)
 |  |  |
 |  |  F10:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -820,7 +820,7 @@ Per-Host Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reservati
 |  |     parquet statistics predicates: p_channel_tv = 'N'
 |  |     parquet dictionary predicates: p_channel_tv = 'N'
 |  |     mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=1
-|  |     tuple-ids=13 row-size=17B cardinality=300
+|  |     tuple-ids=13 row-size=17B cardinality=294
 |  |     in pipelines: 18(GETNEXT)
 |  |
 |  20:HASH JOIN [INNER JOIN, BROADCAST]
@@ -913,7 +913,7 @@ Per-Host Resources: mem-estimate=141.64MB mem-reservation=34.75MB thread-reserva
 |  fk/pk conjuncts: ss_store_sk = s_store_sk
 |  runtime filters: RF000[bloom] <- s_store_sk, RF001[min_max] <- s_store_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1N,4,5,2,3 row-size=147B cardinality=286.13K
+|  tuple-ids=0,1N,4,5,2,3 row-size=147B cardinality=280.41K
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |
 |--44:EXCHANGE [BROADCAST]
@@ -938,7 +938,7 @@ Per-Host Resources: mem-estimate=141.64MB mem-reservation=34.75MB thread-reserva
 |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
 |  runtime filters: RF002[bloom] <- d_date_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1N,4,5,2 row-size=115B cardinality=286.13K
+|  tuple-ids=0,1N,4,5,2 row-size=115B cardinality=280.41K
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
 |--43:EXCHANGE [BROADCAST]
@@ -966,12 +966,12 @@ Per-Host Resources: mem-estimate=141.64MB mem-reservation=34.75MB thread-reserva
 |  fk/pk conjuncts: ss_promo_sk = p_promo_sk
 |  runtime filters: RF004[bloom] <- p_promo_sk, RF005[min_max] <- p_promo_sk
 |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1N,4,5 row-size=89B cardinality=286.13K
+|  tuple-ids=0,1N,4,5 row-size=89B cardinality=280.41K
 |  in pipelines: 01(GETNEXT), 06(OPEN)
 |
 |--42:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=5 row-size=17B cardinality=300
+|  |  tuple-ids=5 row-size=17B cardinality=294
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -986,7 +986,7 @@ Per-Host Resources: mem-estimate=141.64MB mem-reservation=34.75MB thread-reserva
 |     parquet statistics predicates: p_channel_tv = 'N'
 |     parquet dictionary predicates: p_channel_tv = 'N'
 |     mem-estimate=32.00MB mem-reservation=32.00KB thread-reservation=1
-|     tuple-ids=5 row-size=17B cardinality=300
+|     tuple-ids=5 row-size=17B cardinality=294
 |     in pipelines: 06(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1151,7 +1151,7 @@ Per-Instance Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reser
 |  |  hash predicates: ws_web_site_sk = web_site_sk
 |  |  fk/pk conjuncts: ws_web_site_sk = web_site_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17N,20,21,18,19 row-size=147B cardinality=71.46K
+|  |  tuple-ids=16,17N,20,21,18,19 row-size=147B cardinality=70.03K
 |  |  in pipelines: 25(GETNEXT), 28(OPEN)
 |  |
 |  |--F34:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -1184,7 +1184,7 @@ Per-Instance Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reser
 |  |  hash predicates: ws_sold_date_sk = d_date_sk
 |  |  fk/pk conjuncts: ws_sold_date_sk = d_date_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17N,20,21,18 row-size=115B cardinality=71.46K
+|  |  tuple-ids=16,17N,20,21,18 row-size=115B cardinality=70.03K
 |  |  in pipelines: 25(GETNEXT), 27(OPEN)
 |  |
 |  |--F35:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -1220,7 +1220,7 @@ Per-Instance Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reser
 |  |  hash predicates: ws_promo_sk = p_promo_sk
 |  |  fk/pk conjuncts: ws_promo_sk = p_promo_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=16,17N,20,21 row-size=89B cardinality=71.46K
+|  |  tuple-ids=16,17N,20,21 row-size=89B cardinality=70.03K
 |  |  in pipelines: 25(GETNEXT), 30(OPEN)
 |  |
 |  |--F36:PLAN FRAGMENT [RANDOM] hosts=2 instances=2
@@ -1233,7 +1233,7 @@ Per-Instance Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reser
 |  |  |
 |  |  56:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=21 row-size=17B cardinality=300
+|  |  |  tuple-ids=21 row-size=17B cardinality=294
 |  |  |  in pipelines: 30(GETNEXT)
 |  |  |
 |  |  F17:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -1248,7 +1248,7 @@ Per-Instance Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reser
 |  |     parquet statistics predicates: p_channel_tv = 'N'
 |  |     parquet dictionary predicates: p_channel_tv = 'N'
 |  |     mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
-|  |     tuple-ids=21 row-size=17B cardinality=300
+|  |     tuple-ids=21 row-size=17B cardinality=294
 |  |     in pipelines: 30(GETNEXT)
 |  |
 |  32:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1359,7 +1359,7 @@ Per-Instance Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reser
 |  |  hash predicates: cs_catalog_page_sk = cp_catalog_page_sk
 |  |  fk/pk conjuncts: cs_catalog_page_sk = cp_catalog_page_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9N,12,13,10,11 row-size=147B cardinality=143.20K
+|  |  tuple-ids=8,9N,12,13,10,11 row-size=147B cardinality=140.34K
 |  |  in pipelines: 13(GETNEXT), 16(OPEN)
 |  |
 |  |--F29:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1392,7 +1392,7 @@ Per-Instance Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reser
 |  |  hash predicates: cs_sold_date_sk = d_date_sk
 |  |  fk/pk conjuncts: cs_sold_date_sk = d_date_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9N,12,13,10 row-size=115B cardinality=143.20K
+|  |  tuple-ids=8,9N,12,13,10 row-size=115B cardinality=140.34K
 |  |  in pipelines: 13(GETNEXT), 15(OPEN)
 |  |
 |  |--F30:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1428,7 +1428,7 @@ Per-Instance Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reser
 |  |  hash predicates: cs_promo_sk = p_promo_sk
 |  |  fk/pk conjuncts: cs_promo_sk = p_promo_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=8,9N,12,13 row-size=89B cardinality=143.20K
+|  |  tuple-ids=8,9N,12,13 row-size=89B cardinality=140.34K
 |  |  in pipelines: 13(GETNEXT), 18(OPEN)
 |  |
 |  |--F31:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1441,7 +1441,7 @@ Per-Instance Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reser
 |  |  |
 |  |  49:EXCHANGE [BROADCAST]
 |  |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=13 row-size=17B cardinality=300
+|  |  |  tuple-ids=13 row-size=17B cardinality=294
 |  |  |  in pipelines: 18(GETNEXT)
 |  |  |
 |  |  F10:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -1456,7 +1456,7 @@ Per-Instance Resources: mem-estimate=40.51MB mem-reservation=7.94MB thread-reser
 |  |     parquet statistics predicates: p_channel_tv = 'N'
 |  |     parquet dictionary predicates: p_channel_tv = 'N'
 |  |     mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
-|  |     tuple-ids=13 row-size=17B cardinality=300
+|  |     tuple-ids=13 row-size=17B cardinality=294
 |  |     in pipelines: 18(GETNEXT)
 |  |
 |  20:HASH JOIN [INNER JOIN, BROADCAST]
@@ -1567,7 +1567,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reser
 |  hash predicates: ss_store_sk = s_store_sk
 |  fk/pk conjuncts: ss_store_sk = s_store_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1N,4,5,2,3 row-size=147B cardinality=286.13K
+|  tuple-ids=0,1N,4,5,2,3 row-size=147B cardinality=280.41K
 |  in pipelines: 01(GETNEXT), 04(OPEN)
 |
 |--F24:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1600,7 +1600,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reser
 |  hash predicates: ss_sold_date_sk = d_date_sk
 |  fk/pk conjuncts: ss_sold_date_sk = d_date_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1N,4,5,2 row-size=115B cardinality=286.13K
+|  tuple-ids=0,1N,4,5,2 row-size=115B cardinality=280.41K
 |  in pipelines: 01(GETNEXT), 03(OPEN)
 |
 |--F25:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1636,7 +1636,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reser
 |  hash predicates: ss_promo_sk = p_promo_sk
 |  fk/pk conjuncts: ss_promo_sk = p_promo_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=0,1N,4,5 row-size=89B cardinality=286.13K
+|  tuple-ids=0,1N,4,5 row-size=89B cardinality=280.41K
 |  in pipelines: 01(GETNEXT), 06(OPEN)
 |
 |--F26:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -1649,7 +1649,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reser
 |  |
 |  42:EXCHANGE [BROADCAST]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=5 row-size=17B cardinality=300
+|  |  tuple-ids=5 row-size=17B cardinality=294
 |  |  in pipelines: 06(GETNEXT)
 |  |
 |  F03:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -1664,7 +1664,7 @@ Per-Instance Resources: mem-estimate=26.00MB mem-reservation=6.00MB thread-reser
 |     parquet statistics predicates: p_channel_tv = 'N'
 |     parquet dictionary predicates: p_channel_tv = 'N'
 |     mem-estimate=16.00MB mem-reservation=32.00KB thread-reservation=0
-|     tuple-ids=5 row-size=17B cardinality=300
+|     tuple-ids=5 row-size=17B cardinality=294
 |     in pipelines: 06(GETNEXT)
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]

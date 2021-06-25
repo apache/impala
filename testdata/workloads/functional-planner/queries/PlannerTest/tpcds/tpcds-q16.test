@@ -48,13 +48,13 @@ PLAN-ROOT SINK
 |  output: sum(cs_ext_ship_cost), sum(cs_net_profit)
 |  group by: cs_order_number
 |  mem-estimate=10.00MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=8 row-size=40B cardinality=30.02K
+|  tuple-ids=8 row-size=40B cardinality=29.10K
 |  in pipelines: 11(GETNEXT), 04(OPEN)
 |
 10:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: cs1.cs_order_number = cr1.cr_order_number
 |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=0,2,1,3 row-size=109B cardinality=30.02K
+|  tuple-ids=0,2,1,3 row-size=109B cardinality=29.10K
 |  in pipelines: 04(GETNEXT), 05(OPEN)
 |
 |--05:SCAN HDFS [tpcds_parquet.catalog_returns cr1]
@@ -72,7 +72,7 @@ PLAN-ROOT SINK
 |  other join predicates: cs1.cs_warehouse_sk != cs2.cs_warehouse_sk
 |  runtime filters: RF000[bloom] <- cs1.cs_order_number, RF001[min_max] <- cs1.cs_order_number
 |  mem-estimate=8.50MB mem-reservation=8.50MB spill-buffer=512.00KB thread-reservation=0
-|  tuple-ids=0,2,1,3 row-size=109B cardinality=30.02K
+|  tuple-ids=0,2,1,3 row-size=109B cardinality=29.10K
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
 |--08:HASH JOIN [INNER JOIN]
@@ -80,7 +80,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: cs1.cs_call_center_sk = cc_call_center_sk
 |  |  runtime filters: RF002[bloom] <- cc_call_center_sk, RF003[min_max] <- cc_call_center_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,2,1,3 row-size=109B cardinality=30.02K
+|  |  tuple-ids=0,2,1,3 row-size=109B cardinality=29.10K
 |  |  in pipelines: 00(GETNEXT), 03(OPEN)
 |  |
 |  |--03:SCAN HDFS [tpcds_parquet.call_center]
@@ -101,7 +101,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: cs1.cs_ship_date_sk = d_date_sk
 |  |  runtime filters: RF004[bloom] <- d_date_sk, RF005[min_max] <- d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,2,1 row-size=76B cardinality=30.02K
+|  |  tuple-ids=0,2,1 row-size=76B cardinality=29.10K
 |  |  in pipelines: 00(GETNEXT), 01(OPEN)
 |  |
 |  |--01:SCAN HDFS [tpcds_parquet.date_dim]
@@ -122,7 +122,7 @@ PLAN-ROOT SINK
 |  |  fk/pk conjuncts: cs1.cs_ship_addr_sk = ca_address_sk
 |  |  runtime filters: RF006[bloom] <- ca_address_sk, RF007[min_max] <- ca_address_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,2 row-size=50B cardinality=30.02K
+|  |  tuple-ids=0,2 row-size=50B cardinality=29.10K
 |  |  in pipelines: 00(GETNEXT), 02(OPEN)
 |  |
 |  |--02:SCAN HDFS [tpcds_parquet.customer_address]
@@ -135,7 +135,7 @@ PLAN-ROOT SINK
 |  |     parquet statistics predicates: ca_state = 'GA'
 |  |     parquet dictionary predicates: ca_state = 'GA'
 |  |     mem-estimate=32.00MB mem-reservation=256.00KB thread-reservation=1
-|  |     tuple-ids=2 row-size=18B cardinality=980
+|  |     tuple-ids=2 row-size=18B cardinality=950
 |  |     in pipelines: 02(GETNEXT)
 |  |
 |  00:SCAN HDFS [tpcds_parquet.catalog_sales cs1]
@@ -197,13 +197,13 @@ Per-Host Resources: mem-estimate=24.17MB mem-reservation=10.56MB thread-reservat
 |  output: sum(cs_ext_ship_cost), sum(cs_net_profit)
 |  group by: cs_order_number
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=8 row-size=40B cardinality=30.02K
+|  tuple-ids=8 row-size=40B cardinality=29.10K
 |  in pipelines: 11(GETNEXT), 04(OPEN)
 |
 10:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
 |  hash predicates: cs1.cs_order_number = cr1.cr_order_number
 |  mem-estimate=4.75MB mem-reservation=4.75MB spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=0,2,1,3 row-size=109B cardinality=30.02K
+|  tuple-ids=0,2,1,3 row-size=109B cardinality=29.10K
 |  in pipelines: 04(GETNEXT), 05(OPEN)
 |
 |--19:EXCHANGE [HASH(cr1.cr_order_number)]
@@ -228,22 +228,22 @@ Per-Host Resources: mem-estimate=24.17MB mem-reservation=10.56MB thread-reservat
 |  other join predicates: cs1.cs_warehouse_sk != cs2.cs_warehouse_sk
 |  runtime filters: RF000[bloom] <- cs1.cs_order_number, RF001[min_max] <- cs1.cs_order_number
 |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=0,2,1,3 row-size=109B cardinality=30.02K
+|  tuple-ids=0,2,1,3 row-size=109B cardinality=29.10K
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
 |--18:EXCHANGE [HASH(cs1.cs_order_number)]
-|  |  mem-estimate=1.41MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=0,2,1,3 row-size=109B cardinality=30.02K
+|  |  mem-estimate=1.37MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=0,2,1,3 row-size=109B cardinality=29.10K
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
-|  Per-Host Resources: mem-estimate=345.08MB mem-reservation=24.81MB thread-reservation=2 runtime-filters-memory=3.00MB
+|  Per-Host Resources: mem-estimate=345.07MB mem-reservation=24.81MB thread-reservation=2 runtime-filters-memory=3.00MB
 |  08:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: cs1.cs_call_center_sk = cc_call_center_sk
 |  |  fk/pk conjuncts: cs1.cs_call_center_sk = cc_call_center_sk
 |  |  runtime filters: RF002[bloom] <- cc_call_center_sk, RF003[min_max] <- cc_call_center_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,2,1,3 row-size=109B cardinality=30.02K
+|  |  tuple-ids=0,2,1,3 row-size=109B cardinality=29.10K
 |  |  in pipelines: 00(GETNEXT), 03(OPEN)
 |  |
 |  |--16:EXCHANGE [BROADCAST]
@@ -271,7 +271,7 @@ Per-Host Resources: mem-estimate=24.17MB mem-reservation=10.56MB thread-reservat
 |  |  fk/pk conjuncts: cs1.cs_ship_date_sk = d_date_sk
 |  |  runtime filters: RF004[bloom] <- d_date_sk, RF005[min_max] <- d_date_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,2,1 row-size=76B cardinality=30.02K
+|  |  tuple-ids=0,2,1 row-size=76B cardinality=29.10K
 |  |  in pipelines: 00(GETNEXT), 01(OPEN)
 |  |
 |  |--15:EXCHANGE [BROADCAST]
@@ -299,12 +299,12 @@ Per-Host Resources: mem-estimate=24.17MB mem-reservation=10.56MB thread-reservat
 |  |  fk/pk conjuncts: cs1.cs_ship_addr_sk = ca_address_sk
 |  |  runtime filters: RF006[bloom] <- ca_address_sk, RF007[min_max] <- ca_address_sk
 |  |  mem-estimate=1.94MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,2 row-size=50B cardinality=30.02K
+|  |  tuple-ids=0,2 row-size=50B cardinality=29.10K
 |  |  in pipelines: 00(GETNEXT), 02(OPEN)
 |  |
 |  |--14:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=38.28KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=2 row-size=18B cardinality=980
+|  |  |  mem-estimate=37.11KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=2 row-size=18B cardinality=950
 |  |  |  in pipelines: 02(GETNEXT)
 |  |  |
 |  |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -319,7 +319,7 @@ Per-Host Resources: mem-estimate=24.17MB mem-reservation=10.56MB thread-reservat
 |  |     parquet statistics predicates: ca_state = 'GA'
 |  |     parquet dictionary predicates: ca_state = 'GA'
 |  |     mem-estimate=32.00MB mem-reservation=256.00KB thread-reservation=1
-|  |     tuple-ids=2 row-size=18B cardinality=980
+|  |     tuple-ids=2 row-size=18B cardinality=950
 |  |     in pipelines: 02(GETNEXT)
 |  |
 |  00:SCAN HDFS [tpcds_parquet.catalog_sales cs1, RANDOM]
@@ -388,14 +388,14 @@ Per-Instance Resources: mem-estimate=15.55MB mem-reservation=1.94MB thread-reser
 |  output: sum(cs_ext_ship_cost), sum(cs_net_profit)
 |  group by: cs_order_number
 |  mem-estimate=10.00MB mem-reservation=1.94MB spill-buffer=64.00KB thread-reservation=0
-|  tuple-ids=8 row-size=40B cardinality=30.02K
+|  tuple-ids=8 row-size=40B cardinality=29.10K
 |  in pipelines: 11(GETNEXT), 04(OPEN)
 |
 10:HASH JOIN [LEFT ANTI JOIN, PARTITIONED]
 |  hash-table-id=00
 |  hash predicates: cs1.cs_order_number = cr1.cr_order_number
 |  mem-estimate=0B mem-reservation=0B spill-buffer=256.00KB thread-reservation=0
-|  tuple-ids=0,2,1,3 row-size=109B cardinality=30.02K
+|  tuple-ids=0,2,1,3 row-size=109B cardinality=29.10K
 |  in pipelines: 04(GETNEXT), 05(OPEN)
 |
 |--F08:PLAN FRAGMENT [HASH(cs1.cs_order_number)] hosts=3 instances=3
@@ -427,11 +427,11 @@ Per-Instance Resources: mem-estimate=15.55MB mem-reservation=1.94MB thread-reser
 |  hash predicates: cs2.cs_order_number = cs1.cs_order_number
 |  other join predicates: cs1.cs_warehouse_sk != cs2.cs_warehouse_sk
 |  mem-estimate=0B mem-reservation=0B spill-buffer=128.00KB thread-reservation=0
-|  tuple-ids=0,2,1,3 row-size=109B cardinality=30.02K
+|  tuple-ids=0,2,1,3 row-size=109B cardinality=29.10K
 |  in pipelines: 04(GETNEXT), 00(OPEN)
 |
 |--F09:PLAN FRAGMENT [HASH(cs1.cs_order_number)] hosts=3 instances=3
-|  |  Per-Instance Resources: mem-estimate=5.28MB mem-reservation=3.88MB thread-reservation=1 runtime-filters-memory=1.00MB
+|  |  Per-Instance Resources: mem-estimate=5.25MB mem-reservation=3.88MB thread-reservation=1 runtime-filters-memory=1.00MB
 |  JOIN BUILD
 |  |  join-table-id=01 plan-id=02 cohort-id=01
 |  |  build expressions: cs1.cs_order_number
@@ -439,8 +439,8 @@ Per-Instance Resources: mem-estimate=15.55MB mem-reservation=1.94MB thread-reser
 |  |  mem-estimate=2.88MB mem-reservation=2.88MB spill-buffer=128.00KB thread-reservation=0
 |  |
 |  18:EXCHANGE [HASH(cs1.cs_order_number)]
-|  |  mem-estimate=1.41MB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=0,2,1,3 row-size=109B cardinality=30.02K
+|  |  mem-estimate=1.37MB mem-reservation=0B thread-reservation=0
+|  |  tuple-ids=0,2,1,3 row-size=109B cardinality=29.10K
 |  |  in pipelines: 00(GETNEXT)
 |  |
 |  F01:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -451,7 +451,7 @@ Per-Instance Resources: mem-estimate=15.55MB mem-reservation=1.94MB thread-reser
 |  |  hash predicates: cs1.cs_call_center_sk = cc_call_center_sk
 |  |  fk/pk conjuncts: cs1.cs_call_center_sk = cc_call_center_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,2,1,3 row-size=109B cardinality=30.02K
+|  |  tuple-ids=0,2,1,3 row-size=109B cardinality=29.10K
 |  |  in pipelines: 00(GETNEXT), 03(OPEN)
 |  |
 |  |--F10:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -487,7 +487,7 @@ Per-Instance Resources: mem-estimate=15.55MB mem-reservation=1.94MB thread-reser
 |  |  hash predicates: cs1.cs_ship_date_sk = d_date_sk
 |  |  fk/pk conjuncts: cs1.cs_ship_date_sk = d_date_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,2,1 row-size=76B cardinality=30.02K
+|  |  tuple-ids=0,2,1 row-size=76B cardinality=29.10K
 |  |  in pipelines: 00(GETNEXT), 01(OPEN)
 |  |
 |  |--F11:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -523,7 +523,7 @@ Per-Instance Resources: mem-estimate=15.55MB mem-reservation=1.94MB thread-reser
 |  |  hash predicates: cs1.cs_ship_addr_sk = ca_address_sk
 |  |  fk/pk conjuncts: cs1.cs_ship_addr_sk = ca_address_sk
 |  |  mem-estimate=0B mem-reservation=0B spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=0,2 row-size=50B cardinality=30.02K
+|  |  tuple-ids=0,2 row-size=50B cardinality=29.10K
 |  |  in pipelines: 00(GETNEXT), 02(OPEN)
 |  |
 |  |--F12:PLAN FRAGMENT [RANDOM] hosts=3 instances=3
@@ -535,8 +535,8 @@ Per-Instance Resources: mem-estimate=15.55MB mem-reservation=1.94MB thread-reser
 |  |  |  mem-estimate=3.88MB mem-reservation=3.88MB spill-buffer=64.00KB thread-reservation=0
 |  |  |
 |  |  14:EXCHANGE [BROADCAST]
-|  |  |  mem-estimate=38.28KB mem-reservation=0B thread-reservation=0
-|  |  |  tuple-ids=2 row-size=18B cardinality=980
+|  |  |  mem-estimate=37.11KB mem-reservation=0B thread-reservation=0
+|  |  |  tuple-ids=2 row-size=18B cardinality=950
 |  |  |  in pipelines: 02(GETNEXT)
 |  |  |
 |  |  F02:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
@@ -551,7 +551,7 @@ Per-Instance Resources: mem-estimate=15.55MB mem-reservation=1.94MB thread-reser
 |  |     parquet statistics predicates: ca_state = 'GA'
 |  |     parquet dictionary predicates: ca_state = 'GA'
 |  |     mem-estimate=16.00MB mem-reservation=256.00KB thread-reservation=0
-|  |     tuple-ids=2 row-size=18B cardinality=980
+|  |     tuple-ids=2 row-size=18B cardinality=950
 |  |     in pipelines: 02(GETNEXT)
 |  |
 |  00:SCAN HDFS [tpcds_parquet.catalog_sales cs1, RANDOM]
