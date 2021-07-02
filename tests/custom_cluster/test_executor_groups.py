@@ -43,7 +43,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     method.func_dict["cluster_size"] = 1
     method.func_dict["num_exclusive_coordinators"] = 1
     self.num_groups = 1
-    self.num_executors = 1
+    self.num_impalads = 1
     super(TestExecutorGroups, self).setup_method(method)
     self.coordinator = self.cluster.impalads[0]
 
@@ -53,7 +53,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     return "default-pool-%s" % name
 
   def _add_executor_group(self, name_suffix, min_size, num_executors=0,
-                          admission_control_slots=0):
+                          admission_control_slots=0, extra_args=None):
     """Adds an executor group to the cluster. 'min_size' specifies the minimum size for
     the new group to be considered healthy. 'num_executors' specifies the number of
     executors to start and defaults to 'min_size' but can be different from 'min_size' to
@@ -63,7 +63,7 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self.num_groups += 1
     if num_executors == 0:
       num_executors = min_size
-    self.num_executors += num_executors
+    self.num_impalads += num_executors
     name = self._group_name(name_suffix)
     LOG.info("Adding %s executors to group %s with minimum size %s" %
              (num_executors, name, min_size))
@@ -71,11 +71,29 @@ class TestExecutorGroups(CustomClusterTestSuite):
                     admission_control_slots]
     if len(name_suffix) > 0:
       cluster_args.append("--impalad_args=-executor_groups=%s:%s" % (name, min_size))
+    if extra_args:
+      cluster_args.append("--impalad_args=%s" % extra_args)
     self._start_impala_cluster(options=cluster_args,
                                cluster_size=num_executors,
                                num_coordinators=0,
                                add_executors=True,
-                               expected_num_executors=self.num_executors)
+                               expected_num_impalads=self.num_impalads)
+
+  def _restart_coordinators(self, num_coordinators, extra_args=None):
+    """Restarts the coordinator spawned in setup_method and enables the caller to start
+    more than one coordinator by specifying 'num_coordinators'"""
+    LOG.info("Adding a coordinator")
+    cluster_args = ["--impalad_args=-executor_groups=coordinator"]
+    if extra_args:
+      cluster_args.append("--impalad_args=%s" % extra_args)
+    self._start_impala_cluster(options=cluster_args,
+                               cluster_size=num_coordinators,
+                               num_coordinators=num_coordinators,
+                               add_executors=False,
+                               expected_num_impalads=num_coordinators,
+                               use_exclusive_coordinators=True)
+    self.coordinator = self.cluster.impalads[0]
+    self.num_impalads = 2
 
   def _get_total_admitted_queries(self):
     """Returns the total number of queries that have been admitted to the default resource
@@ -513,3 +531,56 @@ class TestExecutorGroups(CustomClusterTestSuite):
     self.coordinator.service.wait_for_metric_value("cluster-membership.backends.total", 2,
                                                    timeout=20)
     assert_hash_join()
+
+  @pytest.mark.execute_serially
+  def test_admission_control_with_multiple_coords(self):
+    """This test verifies that host level metrics like the num of admission slots used
+    and memory admitted is disseminated correctly across the cluster and accounted for
+    while making admission decisions. We run a query that takes up all of a particular
+    resource (slots or memory) and check if attempting to run a query on the other
+    coordinator results in queuing."""
+    # A long running query that runs on every executor
+    QUERY = "select * from functional_parquet.alltypes \
+                 where month < 3 and id + random() < sleep(100);"
+    # default_pool_mem_limit is set to enable mem based admission.
+    self._restart_coordinators(num_coordinators=2,
+                               extra_args="-default_pool_mem_limit=100g")
+    # Create fresh clients
+    second_coord_client = self.create_client_for_nth_impalad(1)
+    self.create_impala_clients()
+    # Add an exec group with a 4gb mem_limit.
+    self._add_executor_group("group1", 2, admission_control_slots=2,
+                             extra_args="-mem_limit=4g")
+    assert self._get_num_executor_groups(only_healthy=True) == 1
+    second_coord_client.set_configuration({'mt_dop': '2'})
+    handle_for_second = second_coord_client.execute_async(QUERY)
+    # Verify that the first coordinator knows about the query running on the second
+    self.coordinator.service.wait_for_metric_value(
+      "admission-controller.agg-num-running.default-pool", 1, timeout=30)
+    handle_for_first = self.execute_query_async(TEST_QUERY)
+    self.coordinator.service.wait_for_metric_value(
+      "admission-controller.local-num-queued.default-pool", 1, timeout=30)
+    profile = self.client.get_runtime_profile(handle_for_first)
+    assert "queue reason: Not enough admission control slots available on host" in \
+           profile, profile
+    self.close_query(handle_for_first)
+    second_coord_client.close_query(handle_for_second)
+    # Wait for first coordinator to get the admission update.
+    self.coordinator.service.wait_for_metric_value(
+      "admission-controller.agg-num-running.default-pool", 0, timeout=30)
+    # Now verify that mem based admission also works as intended. A max of mem_reserved
+    # and mem_admitted is used for this. Since mem_limit is being used here, both will be
+    # identical but this will at least test that code path as a sanity check.
+    second_coord_client.clear_configuration()
+    second_coord_client.set_configuration({'mem_limit': '4g'})
+    handle_for_second = second_coord_client.execute_async(QUERY)
+    # Verify that the first coordinator knows about the query running on the second
+    self.coordinator.service.wait_for_metric_value(
+      "admission-controller.agg-num-running.default-pool", 1, timeout=30)
+    handle_for_first = self.execute_query_async(TEST_QUERY)
+    self.coordinator.service.wait_for_metric_value(
+      "admission-controller.local-num-queued.default-pool", 1, timeout=30)
+    profile = self.client.get_runtime_profile(handle_for_first)
+    assert "queue reason: Not enough memory available on host" in profile, profile
+    self.close_query(handle_for_first)
+    second_coord_client.close_query(handle_for_second)

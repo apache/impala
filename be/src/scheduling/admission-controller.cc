@@ -71,11 +71,16 @@ string PrintBytes(int64_t value) {
   return PrettyPrinter::Print(value, TUnit::BYTES);
 }
 
-// Delimiter used for topic keys of the form "<pool_name><delimiter><backend_id>".
-// "!" is used because the backend id contains a colon, but it should not contain "!".
-// When parsing the topic key we need to be careful to find the last instance in
-// case the pool name contains it as well.
+// Delimiter used for pool topic keys of the form
+// "<prefix><pool_name><delimiter><backend_id>". "!" is used because the backend id
+// contains a colon, but it should not contain "!". When parsing the topic key we need to
+// be careful to find the last instance in case the pool name contains it as well.
 const char TOPIC_KEY_DELIMITER = '!';
+
+// Prefix used by topic keys for pool stat updates.
+const string TOPIC_KEY_POOL_PREFIX = "POOL:";
+// Prefix used by topic keys for PerHostStat updates.
+const string TOPIC_KEY_STAT_PREFIX = "STAT:";
 
 // Delimiter used for the resource pool prefix of executor groups. In order to be used for
 // queries in "resource-pool-A", an executor group name must start with
@@ -236,21 +241,30 @@ const string HOST_SLOT_NOT_AVAILABLE = "Not enough admission control slots avail
                                        "host $0. Needed $1 slots but $2/$3 are already "
                                        "in use.";
 
-// Parses the pool name and backend_id from the topic key if it is valid.
-// Returns true if the topic key is valid and pool_name and backend_id are set.
-static inline bool ParsePoolTopicKey(const string& topic_key, string* pool_name,
-    string* backend_id) {
-  // Topic keys will look something like: poolname!hostname:22000
-  // The '!' delimiter should always be present, the pool name must be
-  // at least 1 character, and network address must be at least 3 characters (including
-  // ':' and if the hostname and port are each only 1 character). Then the topic_key must
-  // be at least 5 characters (1 + 1 + 3).
-  const int MIN_TOPIC_KEY_SIZE = 5;
+// Parses the topic key to separate the prefix that helps recognize the kind of update
+// received.
+static inline bool ParseTopicKey(
+    const string& topic_key, string* prefix, string* suffix) {
+  // The prefix should always be present and the network address must be at least 3
+  // characters (including ':' and if the hostname and port are each only 1 character).
+  // Then the topic_key must be at least 8 characters (5 + 3).
+  const int MIN_TOPIC_KEY_SIZE = 8;
   if (topic_key.length() < MIN_TOPIC_KEY_SIZE) {
     VLOG_QUERY << "Invalid topic key for pool: " << topic_key;
     return false;
   }
+  DCHECK_EQ(TOPIC_KEY_POOL_PREFIX.size(), TOPIC_KEY_STAT_PREFIX.size())
+      << "All admission topic key prefixes should be of the same size";
+  *prefix = topic_key.substr(0, TOPIC_KEY_POOL_PREFIX.size());
+  *suffix = topic_key.substr(TOPIC_KEY_POOL_PREFIX.size());
+  return true;
+}
 
+// Parses the pool name and backend_id from the topic key if it is valid.
+// Returns true if the topic key is valid and pool_name and backend_id are set.
+static inline bool ParsePoolTopicKey(const string& topic_key, string* pool_name,
+    string* backend_id) {
+  // Pool topic keys will look something like: poolname!hostname:22000
   size_t pos = topic_key.find_last_of(TOPIC_KEY_DELIMITER);
   if (pos == string::npos || pos >= topic_key.size() - 1) {
     VLOG_QUERY << "Invalid topic key for pool: " << topic_key;
@@ -851,16 +865,25 @@ bool AdmissionController::HasAvailableMemResources(const ScheduleState& state,
     const NetworkAddressPB& host = entry.first;
     const string host_id = NetworkAddressPBToString(host);
     int64_t admit_mem_limit = entry.second.be_desc.admit_mem_limit();
-    const HostStats& host_stats = host_stats_[host_id];
+    const THostStats& host_stats = host_stats_[host_id];
     int64_t mem_reserved = host_stats.mem_reserved;
-    int64_t mem_admitted = host_stats.mem_admitted;
+    int64_t agg_mem_admitted_on_host = host_stats.mem_admitted;
+    // Aggregate the mem admitted across all queries admitted by other coordinators.
+    for (const auto& remote_entry : remote_per_host_stats_) {
+      auto remote_stat_itr = remote_entry.second.find(host_id);
+      if (remote_stat_itr != remote_entry.second.end()) {
+        agg_mem_admitted_on_host += remote_stat_itr->second.mem_admitted;
+      }
+    }
     int64_t mem_to_admit = GetMemToAdmit(state, entry.second);
     VLOG_ROW << "Checking memory on host=" << host_id
              << " mem_reserved=" << PrintBytes(mem_reserved)
-             << " mem_admitted=" << PrintBytes(mem_admitted)
+             << " mem_admitted=" << PrintBytes(host_stats.mem_admitted)
+             << " agg_mem_admitted_on_host=" << PrintBytes(agg_mem_admitted_on_host)
              << " needs=" << PrintBytes(mem_to_admit)
              << " admit_mem_limit=" << PrintBytes(admit_mem_limit);
-    int64_t effective_host_mem_reserved = std::max(mem_reserved, mem_admitted);
+    int64_t effective_host_mem_reserved =
+        std::max(mem_reserved, agg_mem_admitted_on_host);
     if (effective_host_mem_reserved + mem_to_admit > admit_mem_limit) {
       *mem_unavailable_reason =
           Substitute(HOST_MEM_NOT_AVAILABLE, host_id, PrintBytes(mem_to_admit),
@@ -894,14 +917,23 @@ bool AdmissionController::HasAvailableSlots(const ScheduleState& state,
     const NetworkAddressPB& host = entry.first;
     const string host_id = NetworkAddressPBToString(host);
     int64_t admission_slots = entry.second.be_desc.admission_slots();
-    int64_t slots_in_use = host_stats_[host_id].slots_in_use;
+    int64_t agg_slots_in_use_on_host = host_stats_[host_id].slots_in_use;
+    // Aggregate num of slots in use across all queries admitted by other coordinators.
+    for (const auto& remote_entry : remote_per_host_stats_) {
+      auto remote_stat_itr = remote_entry.second.find(host_id);
+      if (remote_stat_itr != remote_entry.second.end()) {
+        agg_slots_in_use_on_host += remote_stat_itr->second.slots_in_use;
+      }
+    }
     VLOG_ROW << "Checking available slot on host=" << host_id
-             << " slots_in_use=" << slots_in_use
-             << " needs=" << slots_in_use + entry.second.exec_params->slots_to_use()
+             << " slots_in_use=" << agg_slots_in_use_on_host << " needs="
+             << agg_slots_in_use_on_host + entry.second.exec_params->slots_to_use()
              << " executor admission_slots=" << admission_slots;
-    if (slots_in_use + entry.second.exec_params->slots_to_use() > admission_slots) {
+    if (agg_slots_in_use_on_host + entry.second.exec_params->slots_to_use()
+        > admission_slots) {
       *unavailable_reason = Substitute(HOST_SLOT_NOT_AVAILABLE, host_id,
-          entry.second.exec_params->slots_to_use(), slots_in_use, admission_slots);
+          entry.second.exec_params->slots_to_use(), agg_slots_in_use_on_host,
+          admission_slots);
       if (entry.second.be_desc.is_coordinator()) {
         coordinator_resource_limited = true;
       }
@@ -1544,7 +1576,7 @@ void AdmissionController::UpdatePoolStats(
     vector<TTopicDelta>* subscriber_topic_updates) {
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
-    AddPoolUpdates(subscriber_topic_updates);
+    AddPoolAndPerHostStatsUpdates(subscriber_topic_updates);
 
     StatestoreSubscriber::TopicDeltaMap::const_iterator topic =
         incoming_topic_deltas.find(Statestore::IMPALA_REQUEST_QUEUE_TOPIC);
@@ -1590,26 +1622,54 @@ void AdmissionController::PoolStats::UpdateRemoteStats(const string& host_id,
 }
 
 void AdmissionController::HandleTopicUpdates(const vector<TTopicItem>& topic_updates) {
-  for (const TTopicItem& item: topic_updates) {
-    string pool_name;
-    string topic_backend_id;
-    if (!ParsePoolTopicKey(item.key, &pool_name, &topic_backend_id)) continue;
-    // The topic entry from this subscriber is handled specially; the stats coming
-    // from the statestore are likely already outdated.
-    if (topic_backend_id == host_id_) continue;
-    if (item.deleted) {
-      GetPoolStats(pool_name)->UpdateRemoteStats(topic_backend_id, nullptr);
-      continue;
+  string topic_key_prefix;
+  string topic_key_suffix;
+  string pool_name;
+  string topic_backend_id;
+  for (const TTopicItem& item : topic_updates) {
+    if (!ParseTopicKey(item.key, &topic_key_prefix, &topic_key_suffix)) continue;
+    if (topic_key_prefix == TOPIC_KEY_POOL_PREFIX) {
+      if (!ParsePoolTopicKey(topic_key_suffix, &pool_name, &topic_backend_id)) continue;
+      // The topic entry from this subscriber is handled specially; the stats coming
+      // from the statestore are likely already outdated.
+      if (topic_backend_id == host_id_) continue;
+      if (item.deleted) {
+        GetPoolStats(pool_name)->UpdateRemoteStats(topic_backend_id, nullptr);
+        continue;
+      }
+      TPoolStats remote_update;
+      uint32_t len = item.value.size();
+      Status status =
+          DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(item.value.data()), &len,
+              false, &remote_update);
+      if (!status.ok()) {
+        VLOG_QUERY << "Error deserializing pool update with key: " << item.key;
+        continue;
+      }
+      GetPoolStats(pool_name)->UpdateRemoteStats(topic_backend_id, &remote_update);
+    } else if (topic_key_prefix == TOPIC_KEY_STAT_PREFIX) {
+      topic_backend_id = topic_key_suffix;
+      if (topic_backend_id == host_id_) continue;
+      if (item.deleted) {
+        remote_per_host_stats_.erase(topic_backend_id);
+        continue;
+      }
+      TPerHostStatsUpdate remote_update;
+      uint32_t len = item.value.size();
+      Status status =
+          DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(item.value.data()), &len,
+              false, &remote_update);
+      if (!status.ok()) {
+        VLOG_QUERY << "Error deserializing stats update with key: " << item.key;
+        continue;
+      }
+      PerHostStats& stats = remote_per_host_stats_[topic_backend_id];
+      for(const auto& elem: remote_update.per_host_stats) {
+        stats[elem.host_addr] = elem.stats;
+      }
+    } else {
+      VLOG_QUERY << "Invalid topic key prefix: " << topic_key_prefix;
     }
-    TPoolStats remote_update;
-    uint32_t len = item.value.size();
-    Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
-          item.value.data()), &len, false, &remote_update);
-    if (!status.ok()) {
-      VLOG_QUERY << "Error deserializing pool update with key: " << item.key;
-      continue;
-    }
-    GetPoolStats(pool_name)->UpdateRemoteStats(topic_backend_id, &remote_update);
   }
 }
 
@@ -1873,13 +1933,17 @@ void AdmissionController::PoolStats::UpdateMemTrackerStats() {
   metrics_.local_backend_mem_usage->SetValue(current_usage);
 }
 
-void AdmissionController::AddPoolUpdates(vector<TTopicDelta>* topic_updates) {
+void AdmissionController::AddPoolAndPerHostStatsUpdates(
+    vector<TTopicDelta>* topic_updates) {
   // local_stats_ are updated eagerly except for backend_mem_reserved (which isn't used
   // for local admission control decisions). Update that now before sending local_stats_.
   for (auto& entry : pool_stats_) {
     entry.second.UpdateMemTrackerStats();
   }
-  if (pools_for_updates_.empty()) return;
+  if (pools_for_updates_.empty()) {
+    // No pool updates means no changes to host stats as well, so just return.
+    return;
+  }
   topic_updates->push_back(TTopicDelta());
   TTopicDelta& topic_delta = topic_updates->back();
   topic_delta.topic_name = Statestore::IMPALA_REQUEST_QUEUE_TOPIC;
@@ -1894,10 +1958,28 @@ void AdmissionController::AddPoolUpdates(vector<TTopicDelta>* topic_updates) {
         &topic_item.value);
     if (!status.ok()) {
       LOG(WARNING) << "Failed to serialize query pool stats: " << status.GetDetail();
-      topic_updates->pop_back();
+      topic_delta.topic_entries.pop_back();
     }
   }
   pools_for_updates_.clear();
+
+  // Now add the host stats
+  topic_delta.topic_entries.push_back(TTopicItem());
+  TTopicItem& topic_item = topic_delta.topic_entries.back();
+  topic_item.key = Substitute("$0$1", TOPIC_KEY_STAT_PREFIX, host_id_);
+  TPerHostStatsUpdate update;
+  for (const auto& elem : host_stats_) {
+    update.per_host_stats.emplace_back();
+    TPerHostStatsUpdateElement& inserted_elem = update.per_host_stats.back();
+    inserted_elem.__set_host_addr(elem.first);
+    inserted_elem.__set_stats(elem.second);
+  }
+  Status status =
+      thrift_serializer_.SerializeToString(&update, &topic_item.value);
+  if (!status.ok()) {
+    LOG(WARNING) << "Failed to serialize host stats: " << status.GetDetail();
+    topic_delta.topic_entries.pop_back();
+  }
 }
 
 void AdmissionController::DequeueLoop() {
@@ -2362,7 +2444,8 @@ string AdmissionController::MakePoolTopicKey(
   // Ensure the backend_id does not contain the delimiter to ensure that the topic key
   // can be parsed properly by finding the last instance of the delimiter.
   DCHECK_EQ(backend_id.find(TOPIC_KEY_DELIMITER), string::npos);
-  return Substitute("$0$1$2", pool_name, TOPIC_KEY_DELIMITER, backend_id);
+  return Substitute(
+      "$0$1$2$3", TOPIC_KEY_POOL_PREFIX, pool_name, TOPIC_KEY_DELIMITER, backend_id);
 }
 
 vector<const ExecutorGroup*> AdmissionController::GetExecutorGroupsForQuery(

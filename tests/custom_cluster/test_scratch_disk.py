@@ -213,7 +213,7 @@ class TestScratchDir(CustomClusterTestSuite):
     self._start_impala_cluster([
       '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
       '--impalad_args=--allow_multiple_scratch_dirs_per_device=true'], cluster_size=1,
-      expected_num_executors=1)
+      expected_num_impalads=1)
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
                                     expected_count=len(normal_dirs))
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
@@ -247,7 +247,7 @@ class TestScratchDir(CustomClusterTestSuite):
     self._start_impala_cluster([
       '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
       '--impalad_args=--allow_multiple_scratch_dirs_per_device=true'], cluster_size=1,
-      expected_num_executors=1)
+      expected_num_impalads=1)
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
                                     expected_count=len(normal_dirs))
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
@@ -281,7 +281,7 @@ class TestScratchDir(CustomClusterTestSuite):
       '--impalad_args=--allow_multiple_scratch_dirs_per_device=true',
       '--impalad_args=--allow_spill_to_hdfs=true'],
       cluster_size=1,
-      expected_num_executors=1)
+      expected_num_impalads=1)
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
                                     expected_count=len(normal_dirs) - 1)
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
@@ -313,7 +313,7 @@ class TestScratchDir(CustomClusterTestSuite):
       '--impalad_args=--allow_multiple_scratch_dirs_per_device=true',
       '--impalad_args=--allow_spill_to_hdfs=true'],
       cluster_size=1,
-      expected_num_executors=1)
+      expected_num_impalads=1)
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
                                     expected_count=len(normal_dirs) - 1)
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
@@ -347,7 +347,7 @@ class TestScratchDir(CustomClusterTestSuite):
       '--impalad_args=--allow_multiple_scratch_dirs_per_device=true',
       '--impalad_args=--allow_spill_to_hdfs=true'],
       cluster_size=1,
-      expected_num_executors=1)
+      expected_num_impalads=1)
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
                                     expected_count=len(normal_dirs) - 1)
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
@@ -380,7 +380,7 @@ class TestScratchDir(CustomClusterTestSuite):
       '--impalad_args=--allow_spill_to_hdfs=true',
       '--impalad_args=--remote_tmp_file_size=8M',
       '--impalad_args=--remote_tmp_file_block_size=1m'],
-      cluster_size=1, expected_num_executors=1)
+      cluster_size=1, expected_num_impalads=1)
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
                                     expected_count=len(normal_dirs) - 1)
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit
@@ -413,7 +413,7 @@ class TestScratchDir(CustomClusterTestSuite):
       '--impalad_args=--allow_spill_to_hdfs=true',
       '--impalad_args=--remote_tmp_file_size=8M',
       '--impalad_args=--remote_tmp_file_block_size=1m'],
-      cluster_size=num, num_coordinators=num, expected_num_executors=num)
+      cluster_size=num, num_coordinators=num, expected_num_impalads=num)
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
                                     expected_count=len(normal_dirs) - 1)
     vector.get_value('exec_option')['buffer_pool_limit'] = self.buffer_pool_limit

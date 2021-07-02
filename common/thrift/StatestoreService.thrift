@@ -74,6 +74,34 @@ struct TPoolStats {
   8: required i64 num_running;
 }
 
+struct THostStats {
+  // The mem reserved for a query that is currently executing is its memory limit, if
+  // set (which should be the common case with admission control). Otherwise, if the
+  // query has no limit or the query is finished executing, the current consumption
+  // (tracked by its query mem tracker) is used.
+  1: required i64 mem_reserved;
+
+  // The per host mem admitted only for the queries admitted locally.
+  2: required i64 mem_admitted;
+
+  // The per host number of queries admitted only for the queries admitted locally.
+  3: required i64 num_admitted;
+
+  // The per host number of slots in use for the queries admitted locally.
+  4: required i64 slots_in_use;
+}
+
+struct TPerHostStatsUpdateElement {
+    1: required string host_addr;
+    2: required THostStats stats;
+}
+
+struct TPerHostStatsUpdate {
+  // This stores per-host statistics which are used during admission and by HTTP
+  // handlers to query admission control statistics for currently registered backends.
+  1: required list<TPerHostStatsUpdateElement> per_host_stats;
+}
+
 // Description of a single entry in a topic
 struct TTopicItem {
   // Human-readable topic entry identifier

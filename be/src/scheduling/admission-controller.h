@@ -437,23 +437,10 @@ class AdmissionController {
   /// Calls ResetInformationalStats on all pools.
   void ResetAllPoolInformationalStats();
 
-  // This struct stores per-host statistics which are used during admission and by HTTP
-  // handlers to query admission control statistics for currently registered backends.
-  struct HostStats {
-    /// The mem reserved for a query that is currently executing is its memory limit, if
-    /// set (which should be the common case with admission control). Otherwise, if the
-    /// query has no limit or the query is finished executing, the current consumption
-    /// (tracked by its query mem tracker) is used.
-    int64_t mem_reserved = 0;
-    /// The per host mem admitted only for the queries admitted locally.
-    int64_t mem_admitted = 0;
-    /// The per host number of queries admitted only for the queries admitted locally.
-    int64_t num_admitted = 0;
-    /// The per host number of slots in use for the queries admitted locally.
-    int64_t slots_in_use = 0;
-  };
-
-  typedef std::unordered_map<std::string, HostStats> PerHostStats;
+  // This maps a backends's id(host/port id) to its host level statistics which are used
+  // during admission and by HTTP handlers to query admission control statistics for
+  // currently registered backends.
+  typedef std::unordered_map<std::string, THostStats> PerHostStats;
 
   // Populates the input map with the per host memory reserved and admitted in the
   // following format: <host_address_str, pair<mem_reserved, mem_admitted>>.
@@ -509,6 +496,11 @@ class AdmissionController {
   int64_t last_topic_update_time_ms_ = 0;
 
   PerHostStats host_stats_;
+
+  /// A map from other coordinator's host_id (host/port id) -> their view of the
+  /// PerHostStats. Used to get a full view of the cluster state while making admission
+  /// decisions. Updated via statestore updates.
+  std::unordered_map<std::string, PerHostStats> remote_per_host_stats_;
 
   /// Counter of the number of times dequeuing a query failed because of a resource
   /// issue on the coordinator (which therefore cannot be resolved by adding more
@@ -908,9 +900,10 @@ class AdmissionController {
       std::vector<TTopicDelta>* subscriber_topic_updates);
 
   /// Adds outgoing topic updates to subscriber_topic_updates for pools that have changed
-  /// since the last call to AddPoolUpdates(). Called by UpdatePoolStats() before
-  /// UpdateClusterAggregates(). Must hold admission_ctrl_lock_.
-  void AddPoolUpdates(std::vector<TTopicDelta>* subscriber_topic_updates);
+  /// since the last call to AddPoolUpdates(). Also adds the complete local view of
+  /// per-host statistics. Called by UpdatePoolStats() before UpdateClusterAggregates().
+  /// Must hold admission_ctrl_lock_.
+  void AddPoolAndPerHostStatsUpdates(std::vector<TTopicDelta>* subscriber_topic_updates);
 
   /// Updates the remote stats with per-host topic_updates coming from the statestore.
   /// Removes remote stats identified by topic deletions coming from the

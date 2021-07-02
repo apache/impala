@@ -167,7 +167,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     kwargs = {
       "cluster_size": cluster_size,
       "num_coordinators": num_coordinators,
-      "expected_num_executors": cluster_size,
+      "expected_num_impalads": cluster_size,
       "default_query_options": method.func_dict.get(DEFAULT_QUERY_OPTIONS),
       "use_exclusive_coordinators": use_exclusive_coordinators
     }
@@ -233,7 +233,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
                             use_exclusive_coordinators=False,
                             add_executors=False,
                             log_level=1,
-                            expected_num_executors=DEFAULT_CLUSTER_SIZE,
+                            expected_num_impalads=DEFAULT_CLUSTER_SIZE,
                             expected_subscribers=0,
                             default_query_options=None,
                             statestored_timeout_s=60,
@@ -285,12 +285,12 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     # The number of statestore subscribers is
     # cluster_size (# of impalad) + 1 (for catalogd).
     if expected_subscribers == 0:
-      expected_subscribers = expected_num_executors + 1
+      expected_subscribers = expected_num_impalads + 1
       if "--enable_admission_service" in options:
         expected_subscribers += 1
 
     statestored.service.wait_for_live_subscribers(expected_subscribers,
                                                   timeout=statestored_timeout_s)
     for impalad in cls.cluster.impalads:
-      impalad.service.wait_for_num_known_live_backends(expected_num_executors,
+      impalad.service.wait_for_num_known_live_backends(expected_num_impalads,
                                                        timeout=impalad_timeout_s)

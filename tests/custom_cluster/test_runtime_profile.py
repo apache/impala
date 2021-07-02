@@ -44,5 +44,5 @@ class TestRuntimeProfile(CustomClusterTestSuite):
                                cluster_size=1,
                                num_coordinators=0,
                                add_executors=True,
-                               expected_num_executors=4)
+                               expected_num_impalads=4)
     self.run_test_case('runtime-profile-aggregated', vector)
