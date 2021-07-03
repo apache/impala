@@ -2126,19 +2126,52 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
       WaitForCatalogUpdateTopicPropagation(catalog_service_id);
     }
   } else {
-    CatalogUpdateResultIterator callback_ctx(catalog_update_result);
-    TUpdateCatalogCacheRequest update_req;
-    update_req.__set_is_delta(true);
-    update_req.__set_native_iterator_ptr(reinterpret_cast<int64_t>(&callback_ctx));
-    // The catalog version is updated in WaitForCatalogUpdate below. So we need a
-    // standalone field in the request to update the service ID without touching the
-    // catalog version.
-    update_req.__set_catalog_service_id(catalog_update_result.catalog_service_id);
-    // Apply the changes to the local catalog cache.
-    TUpdateCatalogCacheResponse resp;
-    Status status = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
-    if (!status.ok()) LOG(ERROR) << status.GetDetail();
-    RETURN_IF_ERROR(status);
+    TUniqueId cur_service_id;
+    {
+      unique_lock<mutex> ver_lock(catalog_version_lock_);
+      cur_service_id = catalog_update_info_.catalog_service_id;
+      if (catalog_update_info_.catalog_service_id != catalog_service_id) {
+        LOG(INFO) << "Catalog service ID mismatch. Current ID: "
+            << PrintId(cur_service_id) << ". ID in response: "
+            << PrintId(catalog_service_id) << ". Catalogd may be restarted. Waiting for"
+            " new catalog update from statestore.";
+        // Catalog service ID has been changed, and impalad request a full topic update.
+        // When impalad completes the full topic update, it will exit this loop.
+        while (cur_service_id == catalog_update_info_.catalog_service_id) {
+          catalog_version_update_cv_.Wait(ver_lock);
+        }
+        cur_service_id = catalog_update_info_.catalog_service_id;
+      }
+    }
+
+    if (cur_service_id == catalog_service_id) {
+      CatalogUpdateResultIterator callback_ctx(catalog_update_result);
+      TUpdateCatalogCacheRequest update_req;
+      update_req.__set_is_delta(true);
+      update_req.__set_native_iterator_ptr(reinterpret_cast<int64_t>(&callback_ctx));
+      // The catalog version is updated in WaitForCatalogUpdate below. So we need a
+      // standalone field in the request to update the service ID without touching the
+      // catalog version.
+      update_req.__set_catalog_service_id(catalog_update_result.catalog_service_id);
+      // Apply the changes to the local catalog cache.
+      TUpdateCatalogCacheResponse resp;
+      Status status = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
+      if (!status.ok()) LOG(ERROR) << status.GetDetail();
+      RETURN_IF_ERROR(status);
+    } else {
+      // We can't apply updates on another service id, because the local catalog is still
+      // inconsistent with the catalogd that executes the DDL. Catalogd may be restarted
+      // more than once inside a statestore update cycle. 'cur_service_id' could belong
+      // to 1) a stale update from the previous restarted catalogd, or 2) a newer update
+      // from next restarted catalogd. We are good to ignore the DDL result at the second
+      // case. However, in the first case clients may see stale catalog until the
+      // expected catalog topic update comes.
+      // TODO: handle the first case in IMPALA-10875.
+      LOG(WARNING) << "Ignoring catalog update result of catalog service ID: "
+          << PrintId(catalog_service_id) << ". The expected catalog service ID: "
+          << PrintId(catalog_service_id) << ". Current catalog service ID: "
+          << PrintId(cur_service_id) <<". Catalogd may be restarted more than once.";
+    }
     if (!wait_for_all_subscribers) return Status::OK();
     // Wait until we receive and process the catalog update that covers the effects
     // (catalog objects) of this operation.

@@ -163,6 +163,110 @@ class TestRestart(CustomClusterTestSuite):
     thread.join()
     self.wait_for_state(query_handle[0], QueryState.FINISHED, 30000)
 
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--statestore_update_frequency_ms=5000")
+  def test_restart_catalogd(self):
+    self.execute_query_expect_success(self.client, "drop table if exists join_aa")
+    self.execute_query_expect_success(self.client, "create table join_aa(id int)")
+    # Make the catalog object version grow large enough
+    self.execute_query_expect_success(self.client, "invalidate metadata")
+
+    # No need to care whether the dll is executed successfully, it is just to make
+    # the local catalog catche of impalad out of sync
+    for i in range(0, 10):
+      try:
+        query = "alter table join_aa add columns (age" + str(i) + " int)"
+        self.execute_query_async(query)
+      except Exception, e:
+        LOG.info(str(e))
+      if i == 5:
+        self.cluster.catalogd.restart()
+
+    self.execute_query_expect_success(self.client,
+        "alter table join_aa add columns (name string)")
+    self.execute_query_expect_success(self.client, "select name from join_aa")
+    self.execute_query_expect_success(self.client, "drop table join_aa")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--statestore_update_frequency_ms=5000")
+  def test_restart_catalogd_sync_ddl(self):
+    self.execute_query_expect_success(self.client, "drop table if exists join_aa")
+    self.execute_query_expect_success(self.client, "create table join_aa(id int)")
+    # Make the catalog object version grow large enough
+    self.execute_query_expect_success(self.client, "invalidate metadata")
+    query_options = {"sync_ddl": "true"}
+
+    # No need to care whether the dll is executed successfully, it is just to make
+    # the local catalog catche of impalad out of sync
+    for i in range(0, 10):
+      try:
+        query = "alter table join_aa add columns (age" + str(i) + " int)"
+        self.execute_query_async(query, query_options)
+      except Exception, e:
+        LOG.info(str(e))
+      if i == 5:
+        self.cluster.catalogd.restart()
+
+    self.execute_query_expect_success(self.client,
+        "alter table join_aa add columns (name string)", query_options)
+    self.execute_query_expect_success(self.client, "select name from join_aa")
+    self.execute_query_expect_success(self.client, "drop table join_aa")
+
+  UPDATE_FREQUENCY_S = 10
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    statestored_args="--statestore_update_frequency_ms={frequency_ms}"
+    .format(frequency_ms=(UPDATE_FREQUENCY_S * 1000)))
+  def test_restart_catalogd_twice(self):
+    self.execute_query_expect_success(self.client, "drop table if exists join_aa")
+    self.cluster.catalogd.restart()
+    query = "create table join_aa(id int)"
+    query_handle = []
+
+    def execute_query_async():
+      query_handle.append(self.execute_query(query))
+
+    thread = threading.Thread(target=execute_query_async)
+    thread.start()
+    sleep(self.UPDATE_FREQUENCY_S - 5)
+    self.cluster.catalogd.restart()
+    thread.join()
+    self.execute_query_expect_success(self.client,
+        "alter table join_aa add columns (name string)")
+    self.execute_query_expect_success(self.client, "select name from join_aa")
+    self.execute_query_expect_success(self.client, "drop table join_aa")
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--use_local_catalog=true",
+      catalogd_args="--catalog_topic_mode=minimal",
+      statestored_args="--statestore_update_frequency_ms=5000")
+  def test_restart_catalogd_with_local_catalog(self):
+    self.execute_query_expect_success(self.client, "drop table if exists join_aa")
+    self.execute_query_expect_success(self.client, "create table join_aa(id int)")
+    # Make the catalog object version grow large enough
+    self.execute_query_expect_success(self.client, "invalidate metadata")
+
+    # No need to care whether the dll is executed successfully, it is just to make
+    # the local catalog catche of impalad out of sync
+    for i in range(0, 10):
+      try:
+        query = "alter table join_aa add columns (age" + str(i) + " int)"
+        self.execute_query_async(query)
+      except Exception, e:
+        LOG.info(str(e))
+      if i == 5:
+        self.cluster.catalogd.restart()
+
+    self.execute_query_expect_success(self.client,
+        "alter table join_aa add columns (name string)")
+    self.execute_query_expect_success(self.client, "select name from join_aa")
+    self.execute_query_expect_success(self.client, "select age0 from join_aa")
+    self.execute_query_expect_success(self.client, "drop table join_aa")
+
   SUBSCRIBER_TIMEOUT_S = 2
   CANCELLATION_GRACE_PERIOD_S = 5
 
