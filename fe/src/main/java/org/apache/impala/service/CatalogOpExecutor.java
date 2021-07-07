@@ -2099,6 +2099,8 @@ public class CatalogOpExecutor {
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
+      addCatalogServiceIdentifiers(table, catalog_.getCatalogServiceId(),
+          newCatalogVersion);
       if (params.getPartition_set() == null) {
         // TODO: Report the number of updated partitions/columns to the user?
         // TODO: bulk alter the partitions.
@@ -2124,6 +2126,7 @@ public class CatalogOpExecutor {
       }
       loadTableMetadata(table, newCatalogVersion, /*reloadFileMetadata=*/false,
           /*reloadTableSchema=*/true, /*partitionsToUpdate=*/null, "DROP STATS");
+      catalog_.addVersionsForInflightEvents(false, table, newCatalogVersion);
       addTableToCatalogUpdate(table, wantMinimalResult, resp.result);
       addSummary(resp, "Stats have been dropped.");
     } finally {
@@ -2667,6 +2670,7 @@ public class CatalogOpExecutor {
       Preconditions.checkState(newCatalogVersion > 0);
       addSummary(resp, "Table has been truncated.");
       loadTableMetadata(table, newCatalogVersion, true, true, null, "TRUNCATE");
+      catalog_.addVersionsForInflightEvents(false, table, newCatalogVersion);
       addTableToCatalogUpdate(table, wantMinimalResult, resp.result);
     } finally {
       UnlockWriteLockIfErronouslyLocked();
@@ -2710,6 +2714,8 @@ public class CatalogOpExecutor {
             table.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
         newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
         catalog_.getLock().writeLock().unlock();
+        addCatalogServiceIdentifiers(table, catalog_.getCatalogServiceId(),
+            newCatalogVersion);
         TblTransaction tblTxn = MetastoreShim.createTblTransaction(hmsClient,
             table.getMetaStoreTable(), txn.getId());
         HdfsTable hdfsTable = (HdfsTable) table;
@@ -2810,6 +2816,8 @@ public class CatalogOpExecutor {
     Preconditions.checkState(catalog_.getLock().isWriteLockedByCurrentThread());
     long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
     catalog_.getLock().writeLock().unlock();
+    addCatalogServiceIdentifiers(table, catalog_.getCatalogServiceId(),
+        newCatalogVersion);
     HdfsTable hdfsTable = (HdfsTable) table;
     boolean isTableBeingReplicated = false;
     Stopwatch sw = Stopwatch.createStarted();
@@ -6334,6 +6342,7 @@ public class CatalogOpExecutor {
       }
       applyAlterTable(msTbl);
       loadTableMetadata(tbl, newCatalogVersion, false, false, null, "ALTER COMMENT");
+      catalog_.addVersionsForInflightEvents(false, tbl, newCatalogVersion);
       addTableToCatalogUpdate(tbl, wantMinimalResult, response.result);
       addSummary(response, String.format("Updated %s.", (isView) ? "view" : "table"));
     } finally {
@@ -6350,6 +6359,8 @@ public class CatalogOpExecutor {
     try {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
+      addCatalogServiceIdentifiers(tbl, catalog_.getCatalogServiceId(),
+          newCatalogVersion);
       if (tbl instanceof KuduTable) {
         TColumn new_col = new TColumn(columnName,
             tbl.getColumn(columnName).getType().toThrift());
@@ -6369,6 +6380,7 @@ public class CatalogOpExecutor {
       }
       loadTableMetadata(tbl, newCatalogVersion, false, true, null,
           "ALTER COLUMN COMMENT");
+      catalog_.addVersionsForInflightEvents(false, tbl, newCatalogVersion);
       addTableToCatalogUpdate(tbl, wantMinimalResult, response.result);
       addSummary(response, "Column has been altered.");
     } finally {

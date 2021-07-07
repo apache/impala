@@ -659,7 +659,10 @@ class TestEventProcessing(CustomClusterTestSuite):
           "alter table {0}.{1} set TBLPROPERTIES ('k'='v')".format(db_name, tbl_name),
           "alter table {0}.{1} ADD COLUMN c1 int".format(db_name, tbl_name),
           "alter table {0}.{1} ALTER COLUMN C1 set comment 'c1 comment'".format(db_name,
-                                                                                tbl_name),
+            tbl_name),
+          "comment on table {0}.{1} IS 'table level comment'".format(db_name, tbl_name),
+          "comment on column {0}.{1}.C1 IS 'column level comment'".format(db_name,
+            tbl_name),
           "alter table {0}.{1} ADD COLUMNS (c2 int, c3 string)".format(db_name, tbl_name),
           "alter table {0}.{1} DROP COLUMN c1".format(db_name, tbl_name),
           "alter table {0}.{1} DROP COLUMN c2".format(db_name, tbl_name),
@@ -670,6 +673,8 @@ class TestEventProcessing(CustomClusterTestSuite):
           "alter view {0}.{1} set owner role `test-view-role`".format(db_name, view_name),
           # compute stats will generates ALTER_PARTITION
           "compute stats {0}.{1}".format(db_name, tbl_name),
+          "compute incremental stats {0}.{1}".format(db_name, tbl_name),
+          "drop stats {0}.{1}".format(db_name, tbl_name),
           # insert into a existing partition; generates INSERT self-event
           "insert into table {0}.{1} partition "
           "(year, month) select * from functional.alltypessmall where year=2009 "
@@ -677,8 +682,14 @@ class TestEventProcessing(CustomClusterTestSuite):
           # insert overwrite query from Impala also generates a INSERT self-event
           "insert overwrite table {0}.{1} partition "
           "(year, month) select * from functional.alltypessmall where year=2009 "
-          "and month=1".format(db_name, tbl_name)],
-      # Queries which will not increment the events-skipped counter
+          "and month=1".format(db_name, tbl_name),
+          # events processor doesn't process delete column stats events currently,
+          # however, in case of incremental stats, there could be alter table and
+          # alter partition events which should be ignored. Hence we run compute stats
+          # before to make sure that the truncate table command generated alter events
+          # are ignored.
+          "compute incremental stats {0}.{1}".format(db_name, tbl_name),
+          "truncate table {0}.{1}".format(db_name, tbl_name)],
       False: [
           "create table {0}.{1} like functional.alltypessmall "
           "stored as parquet".format(db_name, tbl_name),
