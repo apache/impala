@@ -25,15 +25,18 @@ import sys
 import warnings
 import base64
 import datetime
+from collections import namedtuple
 
 from six.moves import urllib, http_client
 
 from thrift.transport.TTransport import TTransportBase
 from shell_exceptions import HttpError
-from cookie_util import get_first_matching_cookie, get_cookie_expiry
+from cookie_util import get_all_matching_cookies, get_cookie_expiry
 
 import six
 
+# Declare namedtuple for Cookie with named fields - cookie and expiry_time
+Cookie = namedtuple('Cookie', ['cookie', 'expiry_time'])
 
 # This was taken from THttpClient.py in Thrift to allow making changes Impala needs.
 # The current changes that have been applied:
@@ -49,20 +52,21 @@ class ImpalaHttpClient(TTransportBase):
   MIN_REQUEST_SIZE_FOR_EXPECT = 1024
 
   def __init__(self, uri_or_host, port=None, path=None, cafile=None, cert_file=None,
-      key_file=None, ssl_context=None, auth_cookie_names=None):
+      key_file=None, ssl_context=None, http_cookie_names=None):
     """ImpalaHttpClient supports two different types of construction:
 
     ImpalaHttpClient(host, port, path) - deprecated
     ImpalaHttpClient(uri, [port=<n>, path=<s>, cafile=<filename>, cert_file=<filename>,
-        key_file=<filename>, ssl_context=<context>], auth_cookie_names=<cookienamelist>])
+        key_file=<filename>, ssl_context=<context>], http_cookie_names=<cookienamelist>])
 
     Only the second supports https.  To properly authenticate against the server,
     provide the client's identity by specifying cert_file and key_file.  To properly
     authenticate the server, specify either cafile or ssl_context with a CA defined.
     NOTE: if both cafile and ssl_context are defined, ssl_context will override cafile.
-    auth_cookie_names is used to specify the list of possible cookie names used for
-    cookie-based authentication. If there's only one name in the cookie name list, a str
-    value can be specified instead of the list.
+    http_cookie_names is used to specify a comma-separated list of possible cookie names
+    used for cookie-based authentication or session management. If a cookie with one of
+    these names is returned in an http response by the server or an intermediate proxy
+    then it will be included in each subsequent request for the same connection.
     """
     if port is not None:
       warnings.warn(
@@ -106,9 +110,14 @@ class ImpalaHttpClient(TTransportBase):
       self.proxy_auth = self.basic_proxy_auth_header(parsed)
     else:
       self.realhost = self.realport = self.proxy_auth = None
-    self.__auth_cookie_names = auth_cookie_names
-    self.__auth_cookie = None
-    self.__auth_cookie_expiry = None
+    if (http_cookie_names is None) or (str(http_cookie_names).strip() == ""):
+      self.__http_cookie_dict = None
+    else:
+      # Build a dictionary that maps cookie name to namedtuple.
+      self.__http_cookie_dict = dict()
+      cookie_names = http_cookie_names.split(',')
+      for cn in cookie_names:
+        self.__http_cookie_dict[cn] = Cookie(cookie=None, expiry_time=None)
     self.__wbuf = BytesIO()
     self.__http = None
     self.__http_response = None
@@ -158,26 +167,35 @@ class ImpalaHttpClient(TTransportBase):
   def setCustomHeaders(self, headers):
     self.__custom_headers = headers
 
-  def updateAuthCookie(self, headers):
-    if self.__auth_cookie_names:
-      c = get_first_matching_cookie(self.__auth_cookie_names, self.path, headers)
-      if c:
-        self.__auth_cookie = c
-        self.__auth_cookie_expiry = get_cookie_expiry(c)
+  def updateHttpCookies(self, headers):
+    if self.__http_cookie_dict:
+      matching_cookies = \
+          get_all_matching_cookies(self.__http_cookie_dict.keys(), self.path, headers)
+      if matching_cookies:
+        for c in matching_cookies:
+          self.__http_cookie_dict[c.key] = Cookie(c, get_cookie_expiry(c))
 
-  def getAuthCookie(self):
-    if self.__auth_cookie and self.__auth_cookie_expiry and \
-        self.__auth_cookie_expiry <= datetime.datetime.now():
-      self.__auth_cookie = None
-      self.__auth_cookie_expiry = None
-    return self.__auth_cookie
+  def getHttpCookieHeaders(self):
+    cookie_headers = None
+    for cn, c_tuple in self.__http_cookie_dict.items():
+      if c_tuple.cookie and c_tuple.expiry_time:
+        cookie = c_tuple.cookie
+        if c_tuple.expiry_time <= datetime.datetime.now():
+          self.__http_cookie_dict[cn] = Cookie(cookie=None, expiry_time=None)
+          cookie = None
+        if (cookie):
+          cookie_header = cookie.output(attrs=['value'], header='').strip()
+          if (cookie_headers):
+            cookie_headers = cookie_headers + "; " + cookie_header
+          else:
+            cookie_headers = cookie_header
+    return cookie_headers
 
-  def addAuthCookieToRequestHeaders(self):
-    auth_cookie = self.getAuthCookie()
-    if auth_cookie:
-      cookie_header = auth_cookie.output(attrs=['value'], header='').strip()
-      if cookie_header:
-        self.__http.putheader('Cookie', cookie_header)
+  def addHttpCookiesToRequestHeaders(self):
+    if self.__http_cookie_dict:
+      cookie_headers = self.getHttpCookieHeaders()
+      if cookie_headers:
+        self.__http.putheader('Cookie', cookie_headers)
 
   def read(self, sz):
     return self.__http_response.read(sz)
@@ -228,7 +246,7 @@ class ImpalaHttpClient(TTransportBase):
       for key, val in six.iteritems(self.__custom_headers):
         self.__http.putheader(key, val)
 
-    self.addAuthCookieToRequestHeaders()
+    self.addHttpCookiesToRequestHeaders()
     self.__http.endheaders()
 
     # Write payload
@@ -239,7 +257,7 @@ class ImpalaHttpClient(TTransportBase):
     self.code = self.__http_response.status
     self.message = self.__http_response.reason
     self.headers = self.__http_response.msg
-    self.updateAuthCookie(self.headers)
+    self.updateHttpCookies(self.headers)
 
     if self.code >= 300:
       # Report any http response code that is not 1XX (informational response) or

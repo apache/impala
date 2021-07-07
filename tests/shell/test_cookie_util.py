@@ -22,7 +22,7 @@ import unittest
 
 from datetime import datetime, timedelta
 from shell.cookie_util import (cookie_matches_path, get_cookie_expiry,
-                               get_first_matching_cookie)
+                               get_all_matching_cookies)
 
 
 class TestCookieUtil(unittest.TestCase):
@@ -80,50 +80,58 @@ class TestCookieUtil(unittest.TestCase):
                get_cookie_expiry({'max-age': '172800000'}) <= \
                now + days2k + sec
 
-    def test_get_first_matching_cookie(self):
-        assert get_first_matching_cookie(['a', 'b'], '/path', {}) is None
+    def test_get_all_matching_cookies(self):
+        assert get_all_matching_cookies(['a', 'b'], '/path', {}) is None
 
         headers = {'Set-Cookie': '''c_cookie=c_value
         b_cookie=b_value
         a_cookie=a_value'''}
-        c = get_first_matching_cookie(['a_cookie', 'b_cookie'], '/path', headers)
-        assert c.key == 'a_cookie' and c.value == 'a_value'
-        c = get_first_matching_cookie(['b_cookie', 'a_cookie'], '/path', headers)
-        assert c.key == 'b_cookie' and c.value == 'b_value'
+        cookies = get_all_matching_cookies(['a_cookie', 'b_cookie'], '/path', headers)
+        assert len(cookies) == 2
+        assert cookies[0].key == 'a_cookie' and cookies[0].value == 'a_value'
+        assert cookies[1].key == 'b_cookie' and cookies[1].value == 'b_value'
+        cookies = get_all_matching_cookies(['b_cookie', 'a_cookie'], '/path', headers)
+        assert len(cookies) == 2
+        assert cookies[0].key == 'b_cookie' and cookies[0].value == 'b_value'
+        assert cookies[1].key == 'a_cookie' and cookies[1].value == 'a_value'
 
         headers = {'Set-Cookie': '''c_cookie=c_value;Path=/
         b_cookie=b_value;Path=/path
         a_cookie=a_value;Path=/'''}
-        c = get_first_matching_cookie(['a_cookie', 'b_cookie'], '/path', headers)
-        assert c.key == 'a_cookie' and c.value == 'a_value'
-        c = get_first_matching_cookie(['b_cookie', 'a_cookie'], '/path', headers)
-        assert c.key == 'b_cookie' and c.value == 'b_value'
+        cookies = get_all_matching_cookies(['a_cookie', 'b_cookie'], '/path', headers)
+        assert len(cookies) == 2
+        assert cookies[0].key == 'a_cookie' and cookies[0].value == 'a_value'
+        assert cookies[1].key == 'b_cookie' and cookies[1].value == 'b_value'
 
         headers = {'Set-Cookie': '''c_cookie=c_value;Path=/
         b_cookie=b_value;Path=/path
         a_cookie=a_value;Path=/path/path2'''}
-        c = get_first_matching_cookie(['a_cookie', 'b_cookie'], '/path', headers)
-        assert c.key == 'b_cookie' and c.value == 'b_value'
-        c = get_first_matching_cookie(['b_cookie', 'a_cookie'], '/path', headers)
-        assert c.key == 'b_cookie' and c.value == 'b_value'
+        cookies = get_all_matching_cookies(['a_cookie', 'b_cookie'], '/path', headers)
+        assert len(cookies) == 1
+        assert cookies[0].key == 'b_cookie' and cookies[0].value == 'b_value'
+        cookies = get_all_matching_cookies(['b_cookie', 'a_cookie'], '/path', headers)
+        assert len(cookies) == 1
+        assert cookies[0].key == 'b_cookie' and cookies[0].value == 'b_value'
 
         headers = {'Set-Cookie': '''c_cookie=c_value;Path=/
         b_cookie=b_value;Path=/path
         a_cookie=a_value;Path=/path'''}
-        c = get_first_matching_cookie(['a_cookie', 'b_cookie'], '/path/path1', headers)
-        assert c.key == 'a_cookie' and c.value == 'a_value'
-        c = get_first_matching_cookie(['b_cookie', 'a_cookie'], '/path/path1', headers)
-        assert c.key == 'b_cookie' and c.value == 'b_value'
+        cookies = get_all_matching_cookies(['a_cookie', 'b_cookie'], '/path/path1',
+            headers)
+        assert len(cookies) == 2
+        assert cookies[0].key == 'a_cookie' and cookies[0].value == 'a_value'
+        assert cookies[1].key == 'b_cookie' and cookies[1].value == 'b_value'
 
         headers = {'Set-Cookie': '''c_cookie=c_value;Path=/
         b_cookie=b_value;Path=/path1
         a_cookie=a_value;Path=/path2'''}
-        c = get_first_matching_cookie(['a_cookie', 'b_cookie'], '/path', headers)
-        assert c is None
+        cookies = get_all_matching_cookies(['a_cookie', 'b_cookie'], '/path', headers)
+        assert cookies is None
 
         headers = {'Set-Cookie': '''c_cookie=c_value;Path=/
         b_cookie=b_value;Path=/path1
         a_cookie=a_value;Path=/path2'''}
-        c = get_first_matching_cookie(['a_cookie', 'b_cookie', 'c_cookie'], '/path',
-                                      headers)
-        assert c.key == 'c_cookie' and c.value == 'c_value'
+        cookies = get_all_matching_cookies(['a_cookie', 'b_cookie', 'c_cookie'], '/path',
+            headers)
+        assert len(cookies) == 1
+        assert cookies[0].key == 'c_cookie' and cookies[0].value == 'c_value'

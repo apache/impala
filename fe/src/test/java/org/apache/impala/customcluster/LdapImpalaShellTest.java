@@ -113,16 +113,38 @@ public class LdapImpalaShellTest {
   protected void testShellLdapAuthImpl() throws Exception {
     String query = "select logged_in_user()";
     // Templated shell commands to test a simple 'show tables' command.
-    // 1. Valid username and password. Should succeed.
+    // 1. Valid username, password and default http_cookie_names. Should succeed with
+    // cookies are being used.
     String[] validCommand = {"impala-shell.sh", "", "--ldap", "--auth_creds_ok_in_clear",
         String.format("--user=%s", TEST_USER_1),
         String.format("--ldap_password_cmd=printf %s", TEST_PASSWORD_1),
         String.format("--query=%s", query)};
-    // 2. Invalid username password combination. Should fail.
+    // 2. Valid username, password and matching http_cookie_names. Should succeed with
+    // cookies are being used.
+    String[] validCommandMatchingCookieNames = {"impala-shell.sh", "", "--ldap",
+        "--auth_creds_ok_in_clear", "--http_cookie_names=impala.auth",
+        String.format("--user=%s", TEST_USER_1),
+        String.format("--ldap_password_cmd=printf %s", TEST_PASSWORD_1),
+        String.format("--query=%s", query)};
+    // 3. Valid username and password, but not matching http_cookie_names. Should succeed
+    // with cookies are not being used.
+    String[] validCommandMismatchingCookieNames = {"impala-shell.sh", "", "--ldap",
+        "--auth_creds_ok_in_clear", "--http_cookie_names=impala.conn",
+        String.format("--user=%s", TEST_USER_1),
+        String.format("--ldap_password_cmd=printf %s", TEST_PASSWORD_1),
+        String.format("--query=%s", query)};
+    // 4. Valid username and password, but empty http_cookie_names. Should succeed with
+    // cookies are not being used.
+    String[] validCommandEmptyCookieNames = {"impala-shell.sh", "", "--ldap",
+        "--auth_creds_ok_in_clear", "--http_cookie_names=",
+        String.format("--user=%s", TEST_USER_1),
+        String.format("--ldap_password_cmd=printf %s", TEST_PASSWORD_1),
+        String.format("--query=%s", query)};
+    // 5. Invalid username password combination. Should fail.
     String[] invalidCommand = {"impala-shell.sh", "", "--ldap",
         "--auth_creds_ok_in_clear", "--user=foo", "--ldap_password_cmd=printf bar",
         String.format("--query=%s", query)};
-    // 3. Without username and password. Should fail.
+    // 6. Without username and password. Should fail.
     String[] commandWithoutAuth = {
         "impala-shell.sh", "", String.format("--query=%s", query)};
     String protocolTemplate = "--protocol=%s";
@@ -141,6 +163,28 @@ public class LdapImpalaShellTest {
         // Check that cookies are being used.
         verifyMetrics(Range.atLeast(1L), zero, Range.atLeast(1L), zero);
       }
+      validCommandMatchingCookieNames[1] = protocol;
+      RunShellCommand.Run(validCommandMatchingCookieNames, /*shouldSucceed*/ true,
+          TEST_USER_1, "Starting Impala Shell with LDAP-based authentication");
+      if (p.equals("hs2-http")) {
+        // Check that cookies are being used.
+        verifyMetrics(Range.atLeast(2L), zero, Range.atLeast(2L), zero);
+      }
+      validCommandMismatchingCookieNames[1] = protocol;
+      RunShellCommand.Run(validCommandMismatchingCookieNames, /*shouldSucceed*/ true,
+          TEST_USER_1, "Starting Impala Shell with LDAP-based authentication");
+      if (p.equals("hs2-http")) {
+        // Check that cookies are NOT being used.
+        verifyMetrics(Range.atLeast(2L), zero, Range.atLeast(2L), zero);
+      }
+      validCommandEmptyCookieNames[1] = protocol;
+      RunShellCommand.Run(validCommandEmptyCookieNames, /*shouldSucceed*/ true,
+          TEST_USER_1, "Starting Impala Shell with LDAP-based authentication");
+      if (p.equals("hs2-http")) {
+        // Check that cookies are NOT being used.
+        verifyMetrics(Range.atLeast(2L), zero, Range.atLeast(2L), zero);
+      }
+
       invalidCommand[1] = protocol;
       RunShellCommand.Run(
           invalidCommand, /*shouldSucceed*/ false, "", "Not connected to Impala");

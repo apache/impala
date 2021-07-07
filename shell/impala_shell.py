@@ -230,6 +230,7 @@ class ImpalaShell(cmd.Cmd, object):
 
     self.http_path = options.http_path
     self.fetch_size = options.fetch_size
+    self.http_cookie_names = options.http_cookie_names
 
     # Due to a readline bug in centos/rhel7, importing it causes control characters to be
     # printed. This breaks any scripting against the shell in non-interactive mode. Since
@@ -567,14 +568,14 @@ class ImpalaShell(cmd.Cmd, object):
                           self.ca_cert, self.user, self.ldap_password, self.use_ldap,
                           self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=False, http_path=self.http_path,
-                          auth_cookie_names=None)
+                          http_cookie_names=None)
     elif protocol == 'hs2-http':
       return ImpalaHS2Client(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,
                           self.ca_cert, self.user, self.ldap_password, self.use_ldap,
                           self.client_connect_timeout_ms, self.verbose,
                           use_http_base_transport=True, http_path=self.http_path,
-                          auth_cookie_names='impala.auth')
+                          http_cookie_names=self.http_cookie_names)
     elif protocol == 'beeswax':
       return ImpalaBeeswaxClient(self.impalad, self.fetch_size, self.kerberos_host_fqdn,
                           self.use_kerberos, self.kerberos_service_name, self.use_ssl,

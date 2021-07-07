@@ -296,6 +296,13 @@ def get_option_parser(defaults):
                     "batches (assuming the default batch size). Note that if result "
                     "spooling is disabled only a single row batch can be fetched at a "
                     "time regardless of the specified fetch_size.")
+  parser.add_option("--http_cookie_names", dest="http_cookie_names",
+                    default="impala.auth,impala.session.id",
+                    help="A comma-separated list of HTTP cookie names that are supported "
+                    "by the impala-shell. If a cookie with one of these names is "
+                    "returned in an http response by the server or an intermediate proxy "
+                    "then it will be included in each subsequent request for the same "
+                    "connection.")
 
 
   # add default values to the help text
