@@ -364,6 +364,31 @@ bool HdfsOrcScanner::IsMissingField(const SlotDescriptor* slot) {
   return missing_field_slots_.find(slot) != missing_field_slots_.end();
 }
 
+// Fetch fully qualified name for 'col_path' by converting it into non-canonical
+// table path.
+string PrintColPath(const HdfsTableDescriptor& hdfs_table, const SchemaPath& col_path,
+  const unique_ptr<OrcSchemaResolver>& schema_resolver) {
+  SchemaPath table_col_path, file_col_path;
+  if (col_path.size() > 0) {
+    DCHECK(schema_resolver != nullptr);
+    // Convert 'col_path' to non-canonical table path 'table_col_path'.
+    schema_resolver->TranslateColPaths(col_path, &table_col_path, &file_col_path);
+    auto it = table_col_path.begin();
+    // remove initial -1s from the table_col_path
+    // -1 is present to represent some of the constructs in ACID table which are not
+    // present in table schema
+    while (it != table_col_path.end()) {
+      if (*it == -1) {
+        it = table_col_path.erase(it);
+      } else {
+        break;
+      }
+    }
+  }
+
+  return PrintPath(hdfs_table, table_col_path);
+}
+
 Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
     list<const orc::Type*>* selected_nodes, stack<const SlotDescriptor*>* pos_slots) {
   const orc::Type* node = nullptr;
@@ -374,7 +399,8 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
       &pos_field, &missing_field));
   if (missing_field) {
     return Status(Substitute("Could not find nested column '$0' in file '$1'.",
-        PrintPath(*scan_node_->hdfs_table(), tuple_desc.tuple_path()), filename()));
+        PrintColPath(*scan_node_->hdfs_table(), tuple_desc.tuple_path(),
+        schema_resolver_), filename()));
   }
   tuple_to_col_id_.insert({&tuple_desc, node->getColumnId()});
   if (tuple_desc.byte_size() == 0) {
@@ -388,7 +414,8 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
     // will skip the whole array column. So we select 'c3' for this case.
     selected_type_ids_.push_back(node->getMaximumColumnId());
     VLOG(3) << "Add ORC column " << node->getMaximumColumnId() << " for empty tuple "
-        << PrintPath(*scan_node_->hdfs_table(), tuple_desc.tuple_path());
+        << PrintColPath(*scan_node_->hdfs_table(), tuple_desc.tuple_path(),
+           schema_resolver_);
     return Status::OK();
   }
 
@@ -413,7 +440,8 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
         // If the collection column is missing, the whole scan range should return 0 rows
         // since we're selecting children column(s) of the collection.
         return Status(Substitute("Could not find nested column '$0' in file '$1'.",
-            PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path()), filename()));
+            PrintColPath(*scan_node_->hdfs_table(), slot_desc->col_path(),
+            schema_resolver_), filename()));
       }
       // In this case, we are selecting a column/subcolumn that is not in the file.
       // Update the template tuple to put a NULL in this slot.
@@ -449,7 +477,8 @@ Status HdfsOrcScanner::ResolveColumns(const TupleDescriptor& tuple_desc,
       RETURN_IF_ERROR(ResolveColumns(*item_tuple_desc, selected_nodes, pos_slots));
     } else {
       VLOG(3) << "Add ORC column " << node->getColumnId() << " for "
-          << PrintPath(*scan_node_->hdfs_table(), slot_desc->col_path());
+          << PrintColPath(*scan_node_->hdfs_table(), slot_desc->col_path(),
+             schema_resolver_);
       selected_nodes->push_back(node);
     }
   }
@@ -518,7 +547,8 @@ Status HdfsOrcScanner::SelectColumns(const TupleDescriptor& tuple_desc) {
     if (HasChildrenSelected(*array_node, selected_type_ids_)) continue;
     selected_type_ids_.push_back(array_node->getMaximumColumnId());
     VLOG(3) << "Add ORC column " << array_node->getMaximumColumnId() << " for "
-        << PrintPath(*scan_node_->hdfs_table(), pos_slot_desc->col_path());
+        << PrintColPath(*scan_node_->hdfs_table(), pos_slot_desc->col_path(),
+           schema_resolver_);
     selected_nodes.push_back(array_node);
   }
 

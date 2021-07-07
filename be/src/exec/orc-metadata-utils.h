@@ -58,24 +58,6 @@ class OrcSchemaResolver {
   /// Returns true if 'col_path' refers to an ACID column.
   bool IsAcidColumn(const SchemaPath& col_path) const;
 
- private:
-  TSchemaResolutionStrategy::type schema_resolution_strategy_;
-
-  /// Resolve column based on position. This only works when the fields in the HMS
-  /// table schema match the file schema (apart from Hive ACID schema differences which
-  /// are being handled).
-  Status ResolveColumnByPosition(const SchemaPath& col_path, const orc::Type** node,
-      bool* pos_field, bool* missing_field) const;
-
-  /// Resolve column based on the Iceberg field ids. This way we will retrieve the
-  /// Iceberg field ids from the HMS table via 'col_path', then find the corresponding
-  /// field in the ORC file.
-  Status ResolveColumnByIcebergFieldId(const SchemaPath& col_path, const orc::Type** node,
-      bool* pos_field, bool* missing_field) const;
-
-  /// Finds child of 'node' that has Iceberg field id equals to 'field_id'.
-  const orc::Type* FindChildWithFieldId(const orc::Type* node, const int field_id) const;
-
   /// Translates 'col_path' to non-canonical table and file paths. These non-canonical
   /// paths have the same lengths. To achieve that they might contain -1 values that must
   /// be ignored. These paths are useful for tables that have different table and file
@@ -102,6 +84,24 @@ class OrcSchemaResolver {
   /// These non-canonical paths are easier to be processed by ResolveColumn().
   void TranslateColPaths(const SchemaPath& col_path,
       SchemaPath* table_col_path, SchemaPath* file_col_path) const;
+
+ private:
+  TSchemaResolutionStrategy::type schema_resolution_strategy_;
+
+  /// Resolve column based on position. This only works when the fields in the HMS
+  /// table schema match the file schema (apart from Hive ACID schema differences which
+  /// are being handled).
+  Status ResolveColumnByPosition(const SchemaPath& col_path, const orc::Type** node,
+      bool* pos_field, bool* missing_field) const;
+
+  /// Resolve column based on the Iceberg field ids. This way we will retrieve the
+  /// Iceberg field ids from the HMS table via 'col_path', then find the corresponding
+  /// field in the ORC file.
+  Status ResolveColumnByIcebergFieldId(const SchemaPath& col_path, const orc::Type** node,
+      bool* pos_field, bool* missing_field) const;
+
+  /// Finds child of 'node' that has Iceberg field id equals to 'field_id'.
+  const orc::Type* FindChildWithFieldId(const orc::Type* node, const int field_id) const;
 
   SchemaPath GetCanonicalSchemaPath(const SchemaPath& col_path, int last_idx) const;
 
