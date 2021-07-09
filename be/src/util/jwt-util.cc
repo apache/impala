@@ -149,14 +149,18 @@ class JWKSetParser {
 
     Status status;
     string key_type = boost::algorithm::to_lower_copy(it_kty->second);
-    if (key_type.compare("oct") == 0) {
+    if (key_type == "oct") {
       JWTPublicKey* jwt_pub_key;
       status = HSJWTPublicKeyBuilder::CreateJWKPublicKey(kv_map, &jwt_pub_key);
       if (status.ok()) jwks_->AddHSKey(key_id, jwt_pub_key);
-    } else if (key_type.compare("rsa") == 0) {
+    } else if (key_type == "rsa") {
       JWTPublicKey* jwt_pub_key;
       status = RSAJWTPublicKeyBuilder::CreateJWKPublicKey(kv_map, &jwt_pub_key);
       if (status.ok()) jwks_->AddRSAPublicKey(key_id, jwt_pub_key);
+    } else if (key_type == "ec") {
+      JWTPublicKey* jwt_pub_key;
+      status = ECJWTPublicKeyBuilder::CreateJWKPublicKey(kv_map, &jwt_pub_key);
+      if (status.ok()) jwks_->AddECPublicKey(key_id, jwt_pub_key);
     } else {
       return Status(Substitute("Unsupported kty: '$0'", key_type));
     }
@@ -253,11 +257,11 @@ Status HSJWTPublicKeyBuilder::CreateJWKPublicKey(
   Status status;
   JWTPublicKey* jwt_pub_key = nullptr;
   try {
-    if (algorithm.compare("hs256") == 0) {
+    if (algorithm == "hs256") {
       jwt_pub_key = new HS256JWTPublicKey(algorithm, it_k->second);
-    } else if (algorithm.compare("hs384") == 0) {
+    } else if (algorithm == "hs384") {
       jwt_pub_key = new HS384JWTPublicKey(algorithm, it_k->second);
-    } else if (algorithm.compare("hs512") == 0) {
+    } else if (algorithm == "hs512") {
       jwt_pub_key = new HS512JWTPublicKey(algorithm, it_k->second);
     } else {
       return Status(Substitute("Invalid 'alg' property value: '$0'", algorithm));
@@ -306,12 +310,18 @@ Status RSAJWTPublicKeyBuilder::CreateJWKPublicKey(
   Status status;
   JWTPublicKey* jwt_pub_key = nullptr;
   try {
-    if (algorithm.compare("rs256") == 0) {
+    if (algorithm == "rs256") {
       jwt_pub_key = new RS256JWTPublicKey(algorithm, pub_key);
-    } else if (algorithm.compare("rs384") == 0) {
+    } else if (algorithm == "rs384") {
       jwt_pub_key = new RS384JWTPublicKey(algorithm, pub_key);
-    } else if (algorithm.compare("rs512") == 0) {
+    } else if (algorithm == "rs512") {
       jwt_pub_key = new RS512JWTPublicKey(algorithm, pub_key);
+    } else if (algorithm == "ps256") {
+      jwt_pub_key = new PS256JWTPublicKey(algorithm, pub_key);
+    } else if (algorithm == "ps384") {
+      jwt_pub_key = new PS384JWTPublicKey(algorithm, pub_key);
+    } else if (algorithm == "ps512") {
+      jwt_pub_key = new PS512JWTPublicKey(algorithm, pub_key);
     } else {
       return Status(Substitute("Invalid 'alg' property value: '$0'", algorithm));
     }
@@ -356,8 +366,129 @@ bool RSAJWTPublicKeyBuilder::ConvertJwkToPem(
   }
   BIO_free(bio);
   RSA_free(rsa);
-  if (pub_key.empty()) return false;
-  return true;
+  return !pub_key.empty();
+}
+
+// Create a JWKPublicKey of EC (ES256, ES384 or ES512) from the JWK.
+Status ECJWTPublicKeyBuilder::CreateJWKPublicKey(
+    JsonKVMap& kv_map, JWTPublicKey** pub_key_out) {
+  // JWK Sample:
+  // {
+  //   "kty":"EC",
+  //   "crv":"P-256",
+  //   "x":"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+  //   "y":"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
+  //   "kid":"Id that can be uniquely Identified"
+  // }
+  string algorithm;
+  int eccgrp;
+  auto it_crv = kv_map.find("crv");
+  if (it_crv != kv_map.end()) {
+    string curve = boost::algorithm::to_upper_copy(it_crv->second);
+    if (curve == "P-256") {
+      algorithm = "es256";
+      eccgrp = NID_X9_62_prime256v1;
+    } else if (curve == "P-384") {
+      algorithm = "es384";
+      eccgrp = NID_secp384r1;
+    } else if (curve == "P-521") {
+      algorithm = "es512";
+      eccgrp = NID_secp521r1;
+    } else {
+      return Status(Substitute("Unsupported crv: '$0'", curve));
+    }
+  } else {
+    auto it_alg = kv_map.find("alg");
+    if (it_alg == kv_map.end()) {
+      return Status("'alg' or 'crv' property is required");
+    }
+    algorithm = boost::algorithm::to_lower_copy(it_alg->second);
+    if (algorithm.empty()) {
+      return Status(Substitute("'alg' property must be a non-empty string"));
+    } else if (algorithm == "es256") {
+      // ECDSA using P-256 and SHA-256 (OBJ_txt2nid("prime256v1")).
+      eccgrp = NID_X9_62_prime256v1;
+    } else if (algorithm == "es384") {
+      // ECDSA using P-384 and SHA-384 (OBJ_txt2nid("secp384r1")).
+      eccgrp = NID_secp384r1;
+    } else if (algorithm == "es512") {
+      // ECDSA using P-521 and SHA-512 (OBJ_txt2nid("secp521r1")).
+      eccgrp = NID_secp521r1;
+    } else {
+      return Status(Substitute("Unsupported alg: '$0'", algorithm));
+    }
+  }
+
+  auto it_x = kv_map.find("x");
+  auto it_y = kv_map.find("y");
+  if (it_x == kv_map.end() || it_y == kv_map.end()) {
+    return Status("'x' and 'y' properties are required");
+  } else if (it_x->second.empty() || it_y->second.empty()) {
+    return Status("'x' and 'y' properties must be a non-empty string");
+  }
+  // Converts public key to PEM encoded form.
+  string pub_key;
+  if (!ConvertJwkToPem(eccgrp, it_x->second, it_y->second, pub_key)) {
+    return Status(
+        Substitute("Invalid public key 'x':'$0', 'y':'$1'", it_x->second, it_y->second));
+  }
+
+  Status status;
+  JWTPublicKey* jwt_pub_key = nullptr;
+  try {
+    if (algorithm == "es256") {
+      jwt_pub_key = new ES256JWTPublicKey(algorithm, pub_key);
+    } else if (algorithm == "es384") {
+      jwt_pub_key = new ES384JWTPublicKey(algorithm, pub_key);
+    } else {
+      DCHECK(algorithm == "es512");
+      jwt_pub_key = new ES512JWTPublicKey(algorithm, pub_key);
+    }
+  } catch (const jwt::error::ecdsa_exception& e) {
+    status = Status(TErrorCode::JWT_VERIFY_FAILED, Substitute("EC error: $0", e.what()));
+  } catch (const std::exception& e) {
+    status = Status(TErrorCode::JWT_VERIFY_FAILED,
+        Substitute("Failed to initialize verifier, error: $0", e.what()));
+  }
+  if (!status.ok()) return status;
+  *pub_key_out = jwt_pub_key;
+  return Status::OK();
+}
+
+// Convert public key of EC from JWK format to PEM encoded format by using OpenSSL APIs.
+bool ECJWTPublicKeyBuilder::ConvertJwkToPem(int eccgrp, const std::string& base64_x,
+    const std::string& base64_y, std::string& pub_key) {
+  pub_key.clear();
+  string ascii_x, ascii_y;
+  if (!WebSafeBase64Unescape(base64_x, &ascii_x)) return false;
+  if (!WebSafeBase64Unescape(base64_y, &ascii_y)) return false;
+  BIGNUM* x = BN_bin2bn((const unsigned char*)ascii_x.c_str(), ascii_x.size(), nullptr);
+  BIGNUM* y = BN_bin2bn((const unsigned char*)ascii_y.c_str(), ascii_y.size(), nullptr);
+
+  BIO* bio = nullptr;
+  EC_KEY* ecKey = EC_KEY_new_by_curve_name(eccgrp);
+  EC_KEY_set_asn1_flag(ecKey, OPENSSL_EC_NAMED_CURVE);
+  if (EC_KEY_set_public_key_affine_coordinates(ecKey, x, y) == 0) goto cleanup;
+
+  unsigned char desc[1024];
+  memset(desc, 0, 1024);
+  bio = BIO_new(BIO_s_mem());
+  if (PEM_write_bio_EC_PUBKEY(bio, ecKey) != 0) {
+    if (BIO_read(bio, desc, 1024) > 0) {
+      pub_key = (char*)desc;
+      // Remove last '\n'.
+      if (pub_key.length() > 0 && pub_key[pub_key.length() - 1] == '\n') {
+        pub_key.pop_back();
+      }
+    }
+  }
+
+cleanup:
+  if (bio != nullptr) BIO_free(bio);
+  EC_KEY_free(ecKey);
+  BN_free(x);
+  BN_free(y);
+  return !pub_key.empty();
 }
 
 //
@@ -422,6 +553,14 @@ void JsonWebKeySet::AddRSAPublicKey(std::string key_id, JWTPublicKey* jwk_pub_ke
   }
 }
 
+void JsonWebKeySet::AddECPublicKey(std::string key_id, JWTPublicKey* jwk_pub_key) {
+  if (ec_pub_key_map_.find(key_id) == ec_pub_key_map_.end()) {
+    ec_pub_key_map_[key_id].reset(jwk_pub_key);
+  } else {
+    LOG(WARNING) << "Duplicate key ID of JWK for EC public key: " << key_id;
+  }
+}
+
 const JWTPublicKey* JsonWebKeySet::LookupHSKey(const std::string& kid) const {
   auto find_it = hs_key_map_.find(kid);
   if (find_it == hs_key_map_.end()) {
@@ -434,6 +573,15 @@ const JWTPublicKey* JsonWebKeySet::LookupHSKey(const std::string& kid) const {
 const JWTPublicKey* JsonWebKeySet::LookupRSAPublicKey(const std::string& kid) const {
   auto find_it = rsa_pub_key_map_.find(kid);
   if (find_it == rsa_pub_key_map_.end()) {
+    // Could not find key for the given key ID.
+    return nullptr;
+  }
+  return find_it->second.get();
+}
+
+const JWTPublicKey* JsonWebKeySet::LookupECPublicKey(const std::string& kid) const {
+  auto find_it = ec_pub_key_map_.find(kid);
+  if (find_it == ec_pub_key_map_.end()) {
     // Could not find key for the given key ID.
     return nullptr;
   }
@@ -509,15 +657,18 @@ Status JWTHelper::Verify(const JWTDecodedToken* decoded_token) const {
   try {
     string algorithm =
         boost::algorithm::to_lower_copy(decoded_token->decoded_jwt_.get_algorithm());
+    string prefix = algorithm.substr(0, 2);
     if (decoded_token->decoded_jwt_.has_key_id()) {
       // Get key id from token's header and use it to retrieve the public key from JWKS.
       std::string key_id = decoded_token->decoded_jwt_.get_key_id();
 
       const JWTPublicKey* pub_key = nullptr;
-      if (algorithm.substr(0, 2).compare("hs") == 0) {
+      if (prefix == "hs") {
         pub_key = jwks_->LookupHSKey(key_id);
-      } else if (algorithm.substr(0, 2).compare("rs") == 0) {
+      } else if (prefix == "rs" || prefix == "ps") {
         pub_key = jwks_->LookupRSAPublicKey(key_id);
+      } else if (prefix == "es") {
+        pub_key = jwks_->LookupECPublicKey(key_id);
       } else {
         return Status(TErrorCode::JWT_VERIFY_FAILED,
             Substitute("Unsupported cryptographic algorithm '$0' for JWT", algorithm));
@@ -532,10 +683,12 @@ Status JWTHelper::Verify(const JWTDecodedToken* decoded_token) const {
       // is no key id in the token's header. In this case, get all of public keys from
       // JWKS for the family of algorithms.
       const JsonWebKeySet::JWTPublicKeyMap* key_map = nullptr;
-      if (algorithm.substr(0, 2).compare("hs") == 0) {
+      if (prefix == "hs") {
         key_map = jwks_->GetAllHSKeys();
-      } else if (algorithm.substr(0, 2).compare("rs") == 0) {
+      } else if (prefix == "rs" || prefix == "ps") {
         key_map = jwks_->GetAllRSAPublicKeys();
+      } else if (prefix == "es") {
+        key_map = jwks_->GetAllECPublicKeys();
       } else {
         return Status(TErrorCode::JWT_VERIFY_FAILED,
             Substitute("Unsupported cryptographic algorithm '$0' for JWT", algorithm));
