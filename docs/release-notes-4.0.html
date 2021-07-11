@@ -1,0 +1,154 @@
+<html>
+<head>
+<title>Impala 4.0 Release Notes</title>
+</head>
+<body>
+<h1>Impala 4.0 Release Notes</h1>
+<h2>Breaking Changes</h2>
+<ul>
+<li>Remove support for Hive 2.x</li>
+<li>Remove support for Impala-lzo</li>
+<ul>
+<li>Impala-lzo provides code to allow Impala to read the LZO compressed tables. LZO is GPL licensed, which is why this support is not included directly. The Impala-lzo code interacts with internal Impala code at a level that is error prone and intricate. Given the low adoption of LZO and the other compression options available, Impala removes Impala-lzo support along with the low level interface it used.</li>
+</ul>
+<li>Remove support for Sentry</li>
+<ul>
+<li>Starting from 4.0, Impala will only support Ranger in authorization.</li>
+</ul>
+<li>Set minimum CPU requirement to AVX for x86_64 (<a href="https://issues.apache.org/jira/browse/IMPALA-9690">IMPALA-9690</a>)</li>
+<ul>
+<li>Before 4.0, the minimum CPU requirement is SSSE3. Now we bump it to AVX. For machines that only support AVX but not AVX2, please use --enable_legacy_avx_support flag to launch Impala. We may bump the minimum CPU requirement to AVX2 in near future.</li>
+</ul>
+<li>Dropped support for dateless timestamps (<a href="https://issues.apache.org/jira/browse/IMPALA-9531">IMPALA-9531</a>)</li>
+<li>Add support for string concatenation operator using ||</li>
+<ul>
+<li>(<a href="https://issues.apache.org/jira/browse/IMPALA-452">IMPALA-452</a>) Previously, "||" means "OR" for logical OR expressions. Now if the type of the left operand is STRING, "||" means "concat" for string concatenations.</li>
+</ul>
+<li>Default to not allow ordinals in HAVING clause (<a href="https://issues.apache.org/jira/browse/IMPALA-7844">IMPALA-7844</a>)</li>
+</ul>
+<h2>New Features</h2>
+<ul>
+<li>Multi-threading (MT_DOP) support in all operators (<a href="https://issues.apache.org/jira/browse/IMPALA-3902">IMPALA-3902</a>)</li>
+<ul>
+<li>The MT_DOP query option sets the degree of parallelism used for certain operations that can benefit from multithreaded execution.</li>
+<li>Previously Impala only supported setting MT_DOP in queries that have only scans and aggregates. Now we can set MT_DOP for all kinds of queries.</li>
+</ul>
+<li>Denser (aggregated) runtime profile, i.e. profile-v2 (experimental, <a href="https://issues.apache.org/jira/browse/IMPALA-9378">IMPALA-9378</a>)</li>
+<ul>
+<li>Impala can produce a denser runtime profile which reduces a lot of cpu and mem consumption, especially for large clusters or queries with MT_DOP &gt; 1.</li>
+<li>Enabled by setting --gen_experimental_profile=true.</li>
+</ul>
+<li>Support all TPC-DS 99 queries without manual rewrites</li>
+<ul>
+<li>Support ROLLUP, CUBE and GROUPING SETS (<a href="https://issues.apache.org/jira/browse/IMPALA-7204">IMPALA-7204</a>)</li>
+<li>Support uncorrelated subqueries in SelectList (<a href="https://issues.apache.org/jira/browse/IMPALA-8954">IMPALA-8954</a>)</li>
+<li>Support INTERSECT and EXCEPT set operations (<a href="https://issues.apache.org/jira/browse/IMPALA-9943">IMPALA-9943</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-4974">IMPALA-4974</a>)</li>
+</ul>
+<li>Transparent Query Retry (<a href="https://issues.apache.org/jira/browse/IMPALA-9124">IMPALA-9124</a>)</li>
+<ul>
+<li>Queries that fail due to cluster membership changes can be transparently retried by the coordinator. Enabled by setting retry_failed_queries query option to true.</li>
+</ul>
+<li>Support sorting by Z-Order (<a href="https://issues.apache.org/jira/browse/IMPALA-8755">IMPALA-8755</a>)</li>
+<li>Support Async Codegen (<a href="https://issues.apache.org/jira/browse/IMPALA-5444">IMPALA-5444</a>)</li>
+<li>Read support on Hive full-ACID ORC table (<a href="https://issues.apache.org/jira/browse/IMPALA-9042">IMPALA-9042</a>)</li>
+<li>Builtin functions with Apache DataSketches (<a href="https://issues.apache.org/jira/browse/IMPALA-9593">IMPALA-9593</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-10281">IMPALA-10281</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-10439">IMPALA-10439</a>)</li>
+<li>Iceberg support (experimental, some syntax might change, <a href="https://issues.apache.org/jira/browse/IMPALA-10149">IMPALA-10149</a>)</li>
+<li>Support spilling to S3 (<a href="https://issues.apache.org/jira/browse/IMPALA-9867">IMPALA-9867</a>)</li>
+<li>Impala quickstart cluster with docker-compose (<a href="https://issues.apache.org/jira/browse/IMPALA-9793">IMPALA-9793</a>)</li>
+<li>aarch64 (ARM) support (<a href="https://issues.apache.org/jira/browse/IMPALA-9376">IMPALA-9376</a>)</li>
+<li>Support more storage engines: Ozone, GCS (Google Cloud Storage).</li>
+<li>Authentication &amp; Authorization</li>
+<ul>
+<li>Support integration with Apache Knox</li>
+<li>Support SAML authentication</li>
+<li>FIPS Compliance</li>
+<li>More LDAP features</li>
+<ul>
+<li>Support LDAP search bind operations (<a href="https://issues.apache.org/jira/browse/IMPALA-2563">IMPALA-2563</a>)</li>
+<li>User LDAP search bind support (<a href="https://issues.apache.org/jira/browse/IMPALA-10161">IMPALA-10161</a>)</li>
+</ul>
+<li>Support Ranger row-filtering policies (<a href="https://issues.apache.org/jira/browse/IMPALA-9234">IMPALA-9234</a>)</li>
+<li>Support basic role-related statements with Ranger (<a href="https://issues.apache.org/jira/browse/IMPALA-10211">IMPALA-10211</a>)</li>
+<li>Support Kudu table ownership (<a href="https://issues.apache.org/jira/browse/IMPALA-9990">IMPALA-9990</a>)</li>
+</ul>
+<li>Extend 'compute incremental stats' to support a list of columns (<a href="https://issues.apache.org/jira/browse/IMPALA-10435">IMPALA-10435</a>)</li>
+<li>More ndv() features</li>
+<ul>
+<li>Extend the NDV function to accept a precision (<a href="https://issues.apache.org/jira/browse/IMPALA-2658">IMPALA-2658</a>)</li>
+<li>Adjust NDV's scale with query option (<a href="https://issues.apache.org/jira/browse/IMPALA-6034">IMPALA-6034</a>)</li>
+</ul>
+<li>&hellip; (See more in <a href="./changelog-4.0.html">change log</a>)</li>
+</ul>
+<h2>Improvements</h2>
+<ul>
+<li>Planner &amp; Optimizer &amp; Performance improvements</li>
+<ul>
+<li>Push down filters on rank similar to limit (<a href="https://issues.apache.org/jira/browse/IMPALA-2783">IMPALA-2783</a>)</li>
+<li>Add partitioned top-n operator in Backend (<a href="https://issues.apache.org/jira/browse/IMPALA-9979">IMPALA-9979</a>)</li>
+<li>Push rank() predicates into sort (<a href="https://issues.apache.org/jira/browse/IMPALA-9853">IMPALA-9853</a>)</li>
+<li>Support constant propagation for eligible range predicates (<a href="https://issues.apache.org/jira/browse/IMPALA-10064">IMPALA-10064</a>)</li>
+<li>Short-circuit partition key scan (<a href="https://issues.apache.org/jira/browse/IMPALA-8834">IMPALA-8834</a>)</li>
+<li>Support min-max runtime filter on Parquet tables (<a href="https://issues.apache.org/jira/browse/IMPALA-10325">IMPALA-10325</a>)</li>
+<li>&hellip; (See more in <a href="./changelog-4.0.html">change log</a>)</li>
+</ul>
+<li>Many improvements in metadata management</li>
+<ul>
+<li>Skip locked tables from topic updates (<a href="https://issues.apache.org/jira/browse/IMPALA-6671">IMPALA-6671</a>)</li>
+<ul>
+<li>Previously, long running operations on a locked table (refresh, recover partitions, compute stats) may block the topic update thread, which causes unrelated queries that are waiting on metadata updates to unnecessarily block. We now add a mechanism for topic-update thread to skip a table which is locked for more than a configurable interval.</li>
+</ul>
+<li>Partition-level metadata propagation (<a href="https://issues.apache.org/jira/browse/IMPALA-3127">IMPALA-3127</a>)</li>
+<ul>
+<li>In the legacy catalog mode, previously table updates are propagated in a new snapshot of the table metadata, now they are populated in partition level deltas. This helps to avoid OOM errors of hitting JVM array limit (2GB) in sending catalog updates. Note that DDL/DML responses still contain the whole snapshot of table metadata. This will be tracked in <a href="https://issues.apache.org/jira/browse/IMPALA-9937">IMPALA-9937</a>.</li>
+<li>In the LocalCatalog mode, previously when a table is updated, all the partitions in the coordinator&rsquo;s local cache will be invalidated. Now only updated partitions will be invalidated.</li>
+</ul>
+<li>Slim down metastore Partition objects in LocalCatalog cache (<a href="https://issues.apache.org/jira/browse/IMPALA-7501">IMPALA-7501</a>)</li>
+<ul>
+<li>This helps to avoid OOM errors of hitting JVM array limit (2GB) in LocalCatalog mode. Also improve cache efficiency.</li>
+</ul>
+</ul>
+<li>Kudu integration</li>
+<ul>
+<li>Push bloom filters to Kudu scanners (<a href="https://issues.apache.org/jira/browse/IMPALA-3741">IMPALA-3741</a>)</li>
+<li>Support Kudu Timestamp and Date Bloom Filter (<a href="https://issues.apache.org/jira/browse/IMPALA-9691">IMPALA-9691</a>)</li>
+<li>Support DATE for min-max runtime filters (<a href="https://issues.apache.org/jira/browse/IMPALA-9294">IMPALA-9294</a>)</li>
+<li>Query with analytic functions doesn't need to materialize the predicates bounded to kudu (<a href="https://issues.apache.org/jira/browse/IMPALA-10406">IMPALA-10406</a>)</li>
+</ul>
+<li>Spilling improvements</li>
+<ul>
+<li>Optionally compress spilled data (<a href="https://issues.apache.org/jira/browse/IMPALA-3766">IMPALA-3766</a>)</li>
+<li>Allow limiting memory consumed by preaggregation (<a href="https://issues.apache.org/jira/browse/IMPALA-9530">IMPALA-9530</a>)</li>
+</ul>
+<li>Codegen improvements</li>
+<ul>
+<li>Codegen perf-critical loops in Sorter (<a href="https://issues.apache.org/jira/browse/IMPALA-3816">IMPALA-3816</a>)</li>
+</ul>
+<li>ORC scanner improvements</li>
+<ul>
+<li>Codegen in ORC scanner (<a href="https://issues.apache.org/jira/browse/IMPALA-6506">IMPALA-6506</a>)</li>
+<li>Improve string allocations of the ORC scanner (<a href="https://issues.apache.org/jira/browse/IMPALA-9226">IMPALA-9226</a>)</li>
+<li>Vectorize ORC scanner (<a href="https://issues.apache.org/jira/browse/IMPALA-9228">IMPALA-9228</a>)</li>
+<li>&hellip; (See more in <a href="./changelog-4.0.html">change log</a>)</li>
+</ul>
+<li>Data cache improvements</li>
+<ul>
+<li>Add LIRS cache eviction algorithm (<a href="https://issues.apache.org/jira/browse/IMPALA-8690">IMPALA-8690</a>)</li>
+<li>Improve data cache metrics (<a href="https://issues.apache.org/jira/browse/IMPALA-9435">IMPALA-9435</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-9472">IMPALA-9472</a>, <a href="https://issues.apache.org/jira/browse/IMPALA-9473">IMPALA-9473</a>)</li>
+</ul>
+<li>Node Blacklisting - Coordinator will blacklist unhealthy nodes</li>
+<ul>
+<li>Blacklist nodes with faulty disks (<a href="https://issues.apache.org/jira/browse/IMPALA-9224">IMPALA-9224</a>)</li>
+<li>Blacklist node if a DataStreamService RPC to the node fails (<a href="https://issues.apache.org/jira/browse/IMPALA-9137">IMPALA-9137</a>)</li>
+<li>&hellip; (See more in <a href="./changelog-4.0.html">change log</a>)</li>
+</ul>
+<li>Observibility</li>
+<ul>
+<li>Expose current DDL metrics (grouped by type) in the Catalog web UI (<a href="https://issues.apache.org/jira/browse/IMPALA-6663">IMPALA-6663</a>)</li>
+<li>Expose JSON catalog objects in catalogd's debug page (<a href="https://issues.apache.org/jira/browse/IMPALA-10168">IMPALA-10168</a>)</li>
+</ul>
+<li>&hellip; (See more in <a href="./changelog-4.0.html">change log</a>)</li>
+</ul>
+<h2>Fixed Issues</h2>
+<p>See <a href="./changelog-4.0.html">change log</a></p>
+</body>
+</html>
