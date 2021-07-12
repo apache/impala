@@ -10610,6 +10610,8 @@ under the License.
   <keydef keys="impala13_full"><topicmeta><keywords><keyword>Impala 1.3</keyword></keywords></topicmeta></keydef>
 
 <!-- Pointers to changelog pages -->
+  <keydef keys="release_notes_40" href="https://impala.apache.org/docs/release-notes-4.0.html" scope="external" format="html"/>
+  <keydef keys="changelog_40" href="https://impala.apache.org/docs/changelog-4.0.html" scope="external" format="html"/>
   <keydef keys="changelog_34" href="https://impala.apache.org/docs/changelog-3.4.html" scope="external" format="html"/>
   <keydef keys="changelog_33" href="https://impala.apache.org/docs/changelog-3.3.html" scope="external" format="html"/>
   <keydef keys="changelog_32" href="https://impala.apache.org/docs/changelog-3.2.html" scope="external" format="html"/>

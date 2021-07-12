@@ -45,7 +45,19 @@ under the License.
     <p outputclass="toc inpage"/>
 
   </conbody>
-  <concept rev="3.2.0" id="new_features_34">
+  <concept rev="4.0.0" id="new_features_400">
+    <title>New Features in <keyword keyref="impala40"/></title>
+    <conbody>
+      <p>
+        For the full list of issues closed in this release, including the
+        issues marked as <q>new features</q> or <q>improvements</q>, see the
+        <xref keyref="release_notes_40">release notes</xref> or
+        <xref keyref="changelog_40">changelog</xref> for
+        <keyword keyref="impala40"/>.
+      </p>
+    </conbody>
+  </concept>
+  <concept rev="3.4.0" id="new_features_34">
     <title>New Features in <keyword keyref="impala34"/></title>
     <conbody>
       <p> The following sections describe the noteworthy improvements made in
@@ -224,7 +236,7 @@ under the License.
       </section>
     </conbody>
   </concept>
-  <concept rev="3.2.0" id="new_features_33">
+  <concept rev="3.3.0" id="new_features_33">
     <title>New Features in <keyword keyref="impala33"/></title>
     <conbody>
       <p> The following sections describe the noteworthy improvements made in

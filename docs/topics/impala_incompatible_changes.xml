@@ -50,6 +50,15 @@ under the License.
     </p>
     <p outputclass="toc inpage"/>
   </conbody>
+  <concept id="incompatible_changes_400x">
+    <title>Incompatible Changes Introduced in Impala 4.0.x</title>
+    <conbody>
+      <p> For the full list of incompatible changes introduced in this release,
+        see the <xref keyref="release_notes_40">release notes for <keyword
+        keyref="impala40"/></xref>.
+      </p>
+    </conbody>
+  </concept>
   <concept id="incompatible_changes_340x">
     <title>Incompatible Changes Introduced in Impala 3.4.x</title>
     <conbody>
