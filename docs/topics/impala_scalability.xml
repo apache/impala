@@ -307,6 +307,71 @@ Memory Usage: Additional Notes
           </dd>
 
         </dlentry>
+
+        <dlentry id="statestore_heartbeat_tcp_timeout_seconds">
+
+          <dt>
+            <codeph>-statestore_heartbeat_tcp_timeout_seconds</codeph>
+          </dt>
+
+          <dd>
+            The time after which a heartbeat RPC to a subscriber will timeout. This setting
+            protects against badly hung machines that are not able to respond to the heartbeat
+            RPC in short order. Increase this if there are intermittent heartbeat RPC timeouts
+            shown in statestore's log. You can reference the max value of
+            "statestore.priority-topic-update-durations" metric on statestore to get a
+            reasonable value. Note that priority topic updates are assumed to be small amounts
+            of data that take a small amount of time to process (similar to the heartbeat
+            complexity).
+            <p>
+              <b>Default:</b> 3
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="statestore_max_missed_heartbeats">
+
+          <dt>
+            <codeph>-statestore_max_missed_heartbeats</codeph>
+          </dt>
+
+          <dd>
+            Maximum number of consecutive heartbeat messages an impalad can miss before being
+            declared failed by the statestore. You should not typically need to change this
+            value.
+            <p>
+              <b>Default:</b> 10
+            </p>
+          </dd>
+
+        </dlentry>
+
+        <dlentry id="statestore_subscriber_timeout_secs">
+
+          <dt>
+            <codeph>-statestore_subscriber_timeout_secs</codeph>
+          </dt>
+
+          <dd>
+            The amount of time (in seconds) that may elapse before the connection with the
+            statestore is considered lost by subscribers (impalad/catalogd). Impalad will
+            reregister itself to statestore, which may cause its absence in the next round of
+            cluster membership update. This will cause query failures like "Cancelled due to
+            unreachable impalad(s)". The value of this flag should be comparable to
+            <codeph>
+            (statestore_heartbeat_frequency_ms / 1000 + statestore_heartbeat_tcp_timeout_seconds)
+            * statestore_max_missed_heartbeats</codeph>,
+            so subscribers won't reregister themselves too early and allow statestore to
+            resend heartbeats. You can also reference the max value of
+            "statestore-subscriber.heartbeat-interval-time" metrics on impalads to get a
+            reasonable value.
+            <p>
+              <b>Default:</b> 30
+            </p>
+          </dd>
+
+        </dlentry>
       </dl>
 
       <p>
