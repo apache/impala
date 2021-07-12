@@ -2350,6 +2350,38 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestAlterTableSetPartitionSpec() {
+    ParserError("ALTER TABLE t SET PARTITION SPEC",
+        "Syntax error in line 1:\n" +
+        "ALTER TABLE t SET PARTITION SPEC\n" +
+        "                                ^\n" +
+        "Encountered: EOF\n" +
+        "Expected: (");
+
+    ParserError("ALTER TABLE t SET PARTITION SPEC ()",
+        "Syntax error in line 1:\n" +
+        "ALTER TABLE t SET PARTITION SPEC ()\n" +
+        "                                  ^\n" +
+        "Encountered: )\n" +
+        "Expected: TRUNCATE, IDENTIFIER");
+
+    ParserError("ALTER TABLE t PARTITION (c) SET PARTITION SPEC (c)",
+        "Syntax error in line 1:\n" +
+        "ALTER TABLE t PARTITION (c) SET PARTITION SPEC (c)\n" +
+        "                                                 ^\n" +
+        "Encountered: PARTITION\n" +
+        "Expected: SET");
+
+    String partTransf[] = new String[] {"c", "year(c)", "month(c)", "day(c)", "hour(c)",
+        "truncate(5, c)", "bucket(5, c)",
+        "year(c), day(c), truncate(5, c)",
+        "c, month(c), hour(c), bucket(15, c), year(c)"};
+    for (String pt: partTransf) {
+      ParsesOk("alter table t set partition spec (" + pt + ")");
+    }
+  }
+
+  @Test
   public void TestAlterTableDropColumn() {
     // KW_COLUMN is optional
     String[] columnKw = {"COLUMN", ""};

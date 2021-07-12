@@ -113,6 +113,7 @@ enum TAlterTableType {
   SET_ROW_FORMAT = 15
   SET_OWNER = 16
   UNSET_TBL_PROPERTIES = 17
+  SET_PARTITION_SPEC = 18
 }
 
 // Parameters of CREATE DATABASE commands
@@ -405,6 +406,11 @@ struct TAlterTableUnSetTblPropertiesParams {
   4: optional list<list<CatalogObjects.TPartitionKeyValue>> partition_set
 }
 
+// Parameters for ALTER TABLE SET PARTITION SPEC partitionSpec.
+struct TAlterTableSetPartitionSpecParams {
+  1: required CatalogObjects.TIcebergPartitionSpec partition_spec
+}
+
 // Parameters for all ALTER TABLE commands.
 struct TAlterTableParams {
   1: required TAlterTableType alter_type
@@ -459,6 +465,9 @@ struct TAlterTableParams {
 
   // Parameters for ALTER TABLE UNSET TBLPROPERTIES
   18: optional TAlterTableUnSetTblPropertiesParams unset_tbl_properties_params
+
+  // Parameters for ALTER TABLE SET PARTITION SPEC
+  19: optional TAlterTableSetPartitionSpecParams set_partition_spec_params
 }
 
 // Parameters of CREATE TABLE LIKE commands

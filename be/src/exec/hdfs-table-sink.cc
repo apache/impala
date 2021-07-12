@@ -139,9 +139,9 @@ Status HdfsTableSink::Prepare(RuntimeState* state, MemTracker* parent_mem_tracke
     }
   }
   // Sanity check.
-  DCHECK_LE(partition_key_expr_evals_.size(), table_desc_->num_cols())
-      << DebugString();
   if (!IsIceberg()) {
+    DCHECK_LE(partition_key_expr_evals_.size(), table_desc_->num_cols())
+        << DebugString();
     DCHECK_EQ(partition_key_expr_evals_.size(), table_desc_->num_clustering_cols())
         << DebugString();
   }

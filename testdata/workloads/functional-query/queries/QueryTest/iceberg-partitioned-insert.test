@@ -250,3 +250,67 @@ row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_part_non_order/data/s=secon
 ---- TYPES
 STRING, STRING, STRING
 ====
+---- QUERY
+# Test inserts with different partition specs.
+create table ice_alter_part (i int, d date, s string)
+stored as iceberg;
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_alter_part
+values (1, '2020-12-07', 'first'), (2, '2020-12-08', 'second');
+select * from ice_alter_part;
+---- RESULTS
+1,2020-12-07,'first'
+2,2020-12-08,'second'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+alter table ice_alter_part set partition spec(i, d);
+---- RESULTS
+'Updated partition spec.'
+====
+---- QUERY
+insert into ice_alter_part
+values (3, '2020-12-09', 'third'), (4, '2020-12-10', 'fourth');
+select * from ice_alter_part;
+---- RESULTS
+1,2020-12-07,'first'
+2,2020-12-08,'second'
+3,2020-12-09,'third'
+4,2020-12-10,'fourth'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+alter table ice_alter_part set partition spec(year(d), i, bucket(5, s));
+---- RESULTS
+'Updated partition spec.'
+====
+---- QUERY
+insert into ice_alter_part
+values (5, '2020-12-11', 'fifth'), (6, '2020-12-12', 'sixth');
+select * from ice_alter_part;
+---- RESULTS
+1,2020-12-07,'first'
+2,2020-12-08,'second'
+3,2020-12-09,'third'
+4,2020-12-10,'fourth'
+5,2020-12-11,'fifth'
+6,2020-12-12,'sixth'
+---- TYPES
+INT, DATE, STRING
+====
+---- QUERY
+show files in ice_alter_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/[^=]*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/i=3/d=2020-12-09/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/i=4/d=2020-12-10/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/d_year=2020/i=5/s_bucket=2/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_alter_part/data/d_year=2020/i=6/s_bucket=0/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====

@@ -33,6 +33,8 @@ import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.ReplacePartitions;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.types.Types;
@@ -50,6 +52,7 @@ import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergOperationParam;
+import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.util.IcebergSchemaConverter;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.log4j.Logger;
@@ -139,6 +142,23 @@ public class IcebergCatalogOpExecutor {
       schema.updateColumnDoc(colName, newCol.getComment());
     }
     schema.commit();
+  }
+
+  /**
+   * Sets new default partition spec for an Iceberg table.
+   */
+  public static void alterTableSetPartitionSpec(FeIcebergTable feTable,
+      TIcebergPartitionSpec partSpec) throws TableLoadingException,
+                                             ImpalaRuntimeException {
+    BaseTable iceTable = (BaseTable)IcebergUtil.loadTable(feTable);
+    TableOperations tableOp = iceTable.operations();
+    TableMetadata metadata = tableOp.current();
+
+    Schema schema = metadata.schema();
+    PartitionSpec newPartSpec = IcebergUtil.createIcebergPartition(schema, partSpec);
+    TableMetadata newMetadata = metadata.updatePartitionSpec(newPartSpec);
+
+    tableOp.commit(metadata, newMetadata);
   }
 
   /**

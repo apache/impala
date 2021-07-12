@@ -159,6 +159,7 @@ import org.apache.impala.thrift.TAlterTableReplaceColsParams;
 import org.apache.impala.thrift.TAlterTableSetCachedParams;
 import org.apache.impala.thrift.TAlterTableSetFileFormatParams;
 import org.apache.impala.thrift.TAlterTableSetLocationParams;
+import org.apache.impala.thrift.TAlterTableSetPartitionSpecParams;
 import org.apache.impala.thrift.TAlterTableSetRowFormatParams;
 import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
@@ -1200,7 +1201,8 @@ public class CatalogOpExecutor {
     return type == TAlterTableType.ADD_COLUMNS
         || type == TAlterTableType.REPLACE_COLUMNS
         || type == TAlterTableType.DROP_COLUMN
-        || type == TAlterTableType.ALTER_COLUMN;
+        || type == TAlterTableType.ALTER_COLUMN
+        || type == TAlterTableType.SET_PARTITION_SPEC;
   }
 
   /**
@@ -1227,6 +1229,13 @@ public class CatalogOpExecutor {
           IcebergCatalogOpExecutor.alterColumn(tbl, alterColParams.getCol_name(),
              alterColParams.getNew_col_def());
           addSummary(response, "Column has been altered.");
+          break;
+        case SET_PARTITION_SPEC:
+          TAlterTableSetPartitionSpecParams setPartSpecParams =
+              params.getSet_partition_spec_params();
+          IcebergCatalogOpExecutor.alterTableSetPartitionSpec(tbl,
+              setPartSpecParams.getPartition_spec());
+          addSummary(response, "Updated partition spec.");
           break;
         case REPLACE_COLUMNS:
           // It doesn't make sense to replace all the columns of an Iceberg table as it
