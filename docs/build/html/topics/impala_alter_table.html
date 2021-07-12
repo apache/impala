@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="ALTER TABLE Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
@@ -60,7 +60,6 @@ ALTER TABLE <var class="keyword varname">name</var> DROP [COLUMN] <var class="ke
 ALTER TABLE <var class="keyword varname">name</var> CHANGE <var class="keyword varname">column_name</var> <var class="keyword varname">col_spec</var>
 
 <span class="ph">ALTER TABLE <var class="keyword varname">name</var> SET OWNER USER <var class="keyword varname">user_name</var>
-ALTER TABLE <var class="keyword varname">name</var> SET OWNER ROLE <var class="keyword varname">role_name</var>
 </span>
 <span class="ph">-- Kudu tables only.
 ALTER TABLE <var class="keyword varname">name</var> ALTER [COLUMN] <var class="keyword varname">column_name</var>
@@ -360,14 +359,11 @@ alter table d2.mobile rename to d3.mobile;</code></pre>
 
 
 <pre class="pre codeblock"><code>ALTER TABLE <var class="keyword varname">name</var> SET OWNER USER <var class="keyword varname">user_name;</var>
-ALTER TABLE <var class="keyword varname">name</var> SET OWNER ROLE <var class="keyword varname">role_name;</var>
 </code></pre>
 
     <p class="p">
-      The table owner is originally set to the user who creates the table. When object ownership
-      is enabled in Sentry, an owner of a table can have the <code class="ph codeph">ALL</code> with
-      <code class="ph codeph">GRANT</code> or <code class="ph codeph">ALL</code> without <code class="ph codeph">GRANT</code> privilege.
-      The term <code class="ph codeph">OWNER</code> is used to differentiate between the <code class="ph codeph">ALL</code>
+      The table owner is originally set to the user who creates the table. The term
+      <code class="ph codeph">OWNER</code> is used to differentiate between the <code class="ph codeph">ALL</code>
       privilege that is explicitly granted via the <code class="ph codeph">GRANT</code> statement and a
       privilege that is implicitly granted by the <code class="ph codeph">CREATE TABLE</code> statement.
     </p>
@@ -375,7 +371,7 @@ ALTER TABLE <var class="keyword varname">name</var> SET OWNER ROLE <var class="k
 
     <p class="p">
       Use the <code class="ph codeph">ALTER TABLE SET OWNER</code> to transfer the ownership from the current
-      owner to another user or a role.
+      owner to another user.
     </p>
 
 

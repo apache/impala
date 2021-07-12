@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="RETRY_FAILED_QUERIES Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="RETRY_FAILED_QUERIES" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>RETRY_FAILED_QUERIES Query Option</title>
+</head>
+<body id="RETRY_FAILED_QUERIES">
+
+  <h1 class="title topictitle1" id="ariaid-title1">RETRY_FAILED_QUERIES Query Option</h1>
+
+  
+  
+  <div class="body conbody">
+    <p class="p">Use the <code class="ph codeph">RETRY_FAILED_QUERIES</code> query option to control
+      whether or not queries are transparently retried on cluster membership
+      changes. </p>
+
+    <p class="p">Cluster membership changes typically occur when an impalad crashes, or if the node is
+      blacklisted by the Impala Coordinator. If a SELECT query fails due to a cluster membership
+      change, the Coordinator will cancel and unregister the running query and then launch a retry
+      of the query. For example, if one of the executor nodes fails during query execution, the query
+      fails but is transparently re-executed, either with the executor node immediately replaced, or
+      with a temporarily reduced number of executor nodes. This feature supports retrying the
+      entire query and NOT the individual query fragments. INSERT and DDL queries will NOT be
+      retried.</p>
+
+    <p class="p">Note that query retry will be skipped if the query has returned any results to the client. To
+      avoid this, enable <code class="ph codeph">Result Spooling</code> and set the
+        <code class="ph codeph">spool_all_results_for_retries</code> query option.</p>
+
+    <p class="p"><strong class="ph b">Type:</strong>
+      <code class="ph codeph">BOOLEAN</code></p>
+
+    <p class="p"><strong class="ph b">Default:</strong>
+      <code class="ph codeph">TRUE</code></p>
+
+    <p class="p"><strong class="ph b">Added in:</strong>
+      <span class="keyword">Impala 4.0</span></p>
+
+    <p class="p"><strong class="ph b">Related information:</strong>
+      <a class="xref" href="impala_transparent_query_retries.html">Impala Transparent Query Retries</a></p>
+
+  </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

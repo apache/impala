@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Configuring TLS/SSL for Impala" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_security.html" />
@@ -31,7 +31,7 @@
     <p class="p">
       Impala supports TLS/SSL network encryption, between Impala and client programs, and
       between the Impala-related daemons running on different nodes in the cluster. This feature
-      is important when you also use other features such as Kerberos authentication or Sentry
+      is important when you also use other features such as Kerberos authentication or Ranger
       authorization, where credentials are being transmitted back and forth.
     </p>
 
@@ -202,8 +202,7 @@
       <ul class="ul">
         <li class="li">
           <p class="p">
-            <code class="ph codeph">tlsv1</code>: Allow any TLS version of 1.0 or higher. This setting is the
-            default when TLS/SSL is enabled.
+            <code class="ph codeph">tlsv1</code>: Allow any TLS version of 1.0 or higher.
           </p>
 
         </li>
@@ -225,6 +224,11 @@
         </li>
 
       </ul>
+
+
+      <p class="p">
+        The default version was changed from 'tlsv1' to 'tlsv1.2' starting in <span class="keyword">Impala 4.0</span>
+      </p>
 
 
       <p class="p">

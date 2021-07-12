@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Data Cache for Remote Reads" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_performance.html" />
@@ -29,11 +29,6 @@
       requirement goes up as the network traffic includes the data fetch as well as the
       shuffling exchange traffic of intermediate results.
     </p>
-
-
-    <div class="note note"><span class="notetitle">Note:</span> 
-      This is an experimental feature in Impala 3.3 and is not generally supported.
-    </div>
 
 
     <p class="p">
@@ -96,6 +91,22 @@
 
 
 <pre class="pre codeblock"><code>--data_cache=/data/0,/data/1:500GB</code></pre>
+
+    <div class="p"> In Impala 3.4 and higher, you can configure one of the following cache eviction policies for
+      the data cache: <ul class="ul">
+        <li class="li">LRU (Least Recently Used--the default)</li>
+
+        <li class="li">LIRS (Inter-referenece Recency Set)</li>
+
+      </ul>
+ LIRS is a scan-resistent, low performance-overhead policy. You configure a cache
+      eviction policy using the <code class="ph codeph">--data_cache_eviction_policy</code> Impala Daemon start-up
+      flag: </div>
+
+    <div class="p">
+<pre class="pre codeblock"><code>--data_cache_eviction_policy=<var class="keyword varname">policy</var>
+</code></pre>
+    </div>
 
   </div>
 

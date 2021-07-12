@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="ALTER DATABASE Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
@@ -40,13 +40,11 @@
 
 
     <p class="p">
-      The database owner is originally set to the user who creates the database. When object
-      ownership is enabled in Sentry, an owner of a database can have the <code class="ph codeph">ALL</code>
-      with <code class="ph codeph">GRANT</code> or <code class="ph codeph">ALL</code> without <code class="ph codeph">GRANT</code>
-      privilege. The term <code class="ph codeph">OWNER</code> is used to differentiate between the
-      <code class="ph codeph">ALL</code> privilege that is explicitly granted via the <code class="ph codeph">GRANT</code>
-      statement and a privilege that is implicitly granted by the <code class="ph codeph">CREATE
-      DATABASE</code> statement.
+      The database owner is originally set to the user who creates the database. The term
+      <code class="ph codeph">OWNER</code> is used to differentiate between the <code class="ph codeph">ALL</code>
+      privilege that is explicitly granted via the <code class="ph codeph">GRANT</code> statement
+      and a privilege that is implicitly granted by the <code class="ph codeph">CREATE DATABASE</code>
+      statement.
     </p>
 
 
@@ -57,7 +55,6 @@
 
 <pre class="pre codeblock"><code>
 ALTER DATABASE <var class="keyword varname">database_name</var> SET OWNER USER user_name;
-ALTER DATABASE <var class="keyword varname">database_name</var> SET OWNER ROLE role_name;
 </code></pre>
 
     <p class="p">

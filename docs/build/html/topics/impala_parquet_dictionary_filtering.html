@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="PARQUET_DICTIONARY_FILTERING Query Option (Impala 2.9 or higher only)" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
@@ -48,7 +48,8 @@
         <li class="li">
           If the <code class="ph codeph">encoding_stats</code> is in the Parquet file, dictionary filtering
           uses it to determine if there are only dictionary encoded pages (i.e. there are no
-          data pages with an encoding other than PLAIN_DICTIONARY).
+          data pages with an encoding other than <code class="ph codeph">RLE_DICTIONARY</code> or
+          <code class="ph codeph">PLAIN_DICTIONARY</code>).
         </li>
 
 
@@ -57,12 +58,13 @@
           The column is purely dictionary encoded if both of the conditions satisfy:
           <ul class="ul">
             <li class="li">
-              PLAIN_DICTIONARY is present.
+              <code class="ph codeph">PLAIN_DICTIONARY</code> or <code class="ph codeph">RLE_DICTIONARY</code> is present.
             </li>
 
 
             <li class="li">
-              Only PLAIN_DICTIONARY, RLE, or BIT_PACKED encodings are listed.
+              Only <code class="ph codeph">PLAIN_DICTIONARY</code>, <code class="ph codeph">RLE_DICTIONARY</code>,
+              <code class="ph codeph">RLE</code>, or <code class="ph codeph">BIT_PACKED</code> encodings are listed.
             </li>
 
           </ul>

@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="CREATE FUNCTION Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
@@ -204,7 +204,7 @@
         <strong class="ph b">Serialize:</strong> The function you specify with the <code class="ph codeph">SERIALIZE_FN</code> clause frees memory
         allocated to intermediate results. It is required if any memory was allocated by the Allocate function in
         the Init, Update, or Merge functions, or if the intermediate type contains any pointers. See
-        <span class="xref">the UDA code samples</span> for details.
+        <a class="xref" href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.cc" target="_blank">the UDA code samples</a> for details.
       </li>
 
 
@@ -214,7 +214,7 @@
         opened any files, and so on. This function is often a stub for simple UDAs. You can omit this clause and a
         default (no-op) function will be used. It is required in UDAs where the final return type is different than
         the intermediate type. or if any memory was allocated by the Allocate function in the Init, Update, or
-        Merge functions. See <span class="xref">the UDA code samples</span> for details.
+        Merge functions. See <a class="xref" href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.cc" target="_blank">the UDA code samples</a> for details.
       </li>
 
     </ul>

@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="ALTER VIEW Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
@@ -61,7 +61,6 @@ ALTER VIEW [<var class="keyword varname">database_name</var>.]<var class="keywor
    RENAME TO [<var class="keyword varname">database_name</var>.]<var class="keyword varname">view_name</var>;
 
 ALTER VIEW [<var class="keyword varname">database_name</var>.]<var class="keyword varname">view_name</var> SET OWNER USER user_name;
-ALTER VIEW [<var class="keyword varname">database_name</var>.]<var class="keyword varname">view_name</var> SET OWNER ROLE role_name;
 </code></pre>
 
     <ul class="ul">
@@ -100,12 +99,10 @@ ALTER VIEW db1.v1 RENAME TO db2.v1; -- Move the view to a difference database wi
 
       <li class="li">
         The <code class="ph codeph">SET OWNER</code> clause transfers the ownership of the view from the
-        current owner to another user or a role.
+        current owner to another user.
         <p class="p">
-          The view owner is originally set to the user who creates the view. When object
-          ownership is enabled in Sentry, an owner of a view can have the <code class="ph codeph">ALL</code>
-          with <code class="ph codeph">GRANT</code> or <code class="ph codeph">ALL</code> without <code class="ph codeph">GRANT</code>
-          privilege. The term <code class="ph codeph">OWNER</code> is used to differentiate between the
+          The view owner is originally set to the user who creates the view.
+          The term <code class="ph codeph">OWNER</code> is used to differentiate between the
           <code class="ph codeph">ALL</code> privilege that is explicitly granted via the
           <code class="ph codeph">GRANT</code> statement and a privilege that is implicitly granted by the
           <code class="ph codeph">CREATE VIEW</code> statement.

@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="SHOW Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
@@ -74,24 +74,19 @@ SHOW FILES IN [<var class="keyword varname">database_name</var>.]<var class="key
 SHOW CURRENT ROLES
 SHOW ROLE GRANT GROUP <var class="keyword varname">group_name</var></span>
 
-<span class="ph">SHOW GRANT USER <var class="keyword varname">user_name</var> ON SERVER
+<span class="ph">SHOW GRANT USER <var class="keyword varname">user_name</var>
+SHOW GRANT USER <var class="keyword varname">user_name</var> ON SERVER
 SHOW GRANT USER <var class="keyword varname">user_name</var> ON DATABASE <var class="keyword varname">database_name</var>
 SHOW GRANT USER <var class="keyword varname">user_name</var> ON TABLE <var class="keyword varname">database_name.table_name</var>
 SHOW GRANT USER <var class="keyword varname">user_name</var> ON URI <var class="keyword varname">uri</var></span>
 SHOW GRANT USER <var class="keyword varname">user_name</var> ON COLUMN <var class="keyword varname">database_name.table_name.column_name</var></code></pre>
-    <p class="p">The following statements are supported only when Impala uses Sentry to
-      manage authorization.</p>
 
-    <pre class="pre codeblock"><code>SHOW GRANT USER <var class="keyword varname">user_name</var>
-
-SHOW GRANT ROLE <var class="keyword varname">role_name</var>
+<pre class="pre codeblock"><code>SHOW GRANT ROLE <var class="keyword varname">role_name</var>
 SHOW GRANT ROLE <var class="keyword varname">role_name</var> ON SERVER
 SHOW GRANT ROLE <var class="keyword varname">role_name</var> ON DATABASE <var class="keyword varname">database_name</var>
 SHOW GRANT ROLE <var class="keyword varname">role_name</var> ON TABLE <var class="keyword varname">database_name.table_name</var>
 SHOW GRANT ROLE <var class="keyword varname">role_name</var> ON URI <var class="keyword varname">uri</var>
 SHOW GRANT ROLE <var class="keyword varname">role_name</var> ON COLUMN <var class="keyword varname">database_name.table_name.column_name</var></code></pre>
-    <p class="p">The following statements are supported only when Impala uses
-      Ranger to manage authorization.</p>
 
     <pre class="pre codeblock"><code>SHOW GRANT GROUP <var class="keyword varname">group_name</var> ON SERVER
 SHOW GRANT GROUP <var class="keyword varname">group_name</var> ON DATABASE <var class="keyword varname">database_name</var>
@@ -226,11 +221,11 @@ show files in sample_table partition (month like 'J%');
 [localhost:21000] &gt; insert into unpart_text (x, s) select id, name
                   &gt; from oreilly.sample_data limit 20e6;
 [localhost:21000] &gt; show files in unpart_text;
-+------------------------------------------------------------------------------+----------+-----------+
-| path                                                                         | size     | partition |
-+------------------------------------------------------------------------------+----------+-----------+
++--------------------------------------------------------------------------------------+----------+-----------+
+| path                                                                                 | size     | partition |
++--------------------------------------------------------------------------------------+----------+-----------+
 | hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/unpart_text/35665776ef85cfaf_1012432410_data.0. | 448.31MB |           |
-+------------------------------------------------------------------------------+----------+-----------+
++--------------------------------------------------------------------------------------+----------+-----------+
 [localhost:21000] &gt; insert into unpart_text (x, s) select id, name from oreilly.sample_data limit 100e6;
 [localhost:21000] &gt; show files in unpart_text;
 +--------------------------------------------------------------------------------------+----------+-----------+
@@ -252,14 +247,14 @@ show files in sample_table partition (month like 'J%');
 <pre class="pre codeblock"><code>[localhost:21000] &gt; insert into unpart_text values (10,'hello'), (20, 'world');
 [localhost:21000] &gt; insert into unpart_text values (-1,'foo'), (-1000, 'bar');
 [localhost:21000] &gt; show files in unpart_text;
-+--------------------------------------------------------------------------------------+----------+
-| path                                                                                 | size     |
-+--------------------------------------------------------------------------------------+----------+
-| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/unpart_text/4f11b8bdf8b6aa92_238145083_data.0.  | 18B
-| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/unpart_text/35665776ef85cfaf_1012432410_data.0. | 448.31MB
-| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/unpart_text/ac3dba252a8952b8_1663177415_data.0. | 2.19GB
-| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/unpart_text/cfb8252452445682_1868457216_data.0. | 17B
-+--------------------------------------------------------------------------------------+----------+
++--------------------------------------------------------------------------------------+----------+-----------+
+| path                                                                                 | size     | partition |
++--------------------------------------------------------------------------------------+----------+-----------+
+| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/unpart_text/4f11b8bdf8b6aa92_238145083_data.0.  | 18B      |           |
+| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/unpart_text/35665776ef85cfaf_1012432410_data.0. | 448.31MB |           |
+| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/unpart_text/ac3dba252a8952b8_1663177415_data.0. | 2.19GB   |           |
+| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/unpart_text/cfb8252452445682_1868457216_data.0. | 17B      |           |
++--------------------------------------------------------------------------------------+----------+-----------+
 [localhost:21000] &gt; create table unpart_parq stored as parquet as select * from unpart_text;
 +---------------------------+
 | summary                   |
@@ -308,18 +303,18 @@ where id between 1 and 1000000;
 | Total |       |     | -1    | 8      | 51.38MB | 0B           |                   |        |                   |
 +-------+-------+-----+-------+--------+---------+--------------+-------------------+--------+-------------------+
 [localhost:21000] &gt; show files in part_text;
-+---------------------------------------------------------------------------------------------------------+--------+-------------------------+
-| path                                                                                                    | size   | partition               |
-+---------------------------------------------------------------------------------------------------------+--------+-------------------------+
-| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc80689f_1418645991_data.0.  | 5.77MB | year=2014/month=1/day=1 |
-| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a0_1418645991_data.0.  | 6.25MB | year=2014/month=1/day=1 |
-| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a1_147082319_data.0.   | 7.16MB | year=2014/month=1/day=1 |
-| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a2_2111411753_data.0.  | 5.98MB | year=2014/month=1/day=1 |
-| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbb_501271652_data.0.  | 6.42MB | year=2014/month=1/day=2 |
-| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbc_501271652_data.0.  | 6.62MB | year=2014/month=1/day=2 |
-| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbd_1393490200_data.0. | 6.98MB | year=2014/month=1/day=2 |
-| hdfs://<var class="keyword varname">impala_data_dir</var>/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbe_1393490200_data.0. | 6.20MB | year=2014/month=1/day=2 |
-+---------------------------------------------------------------------------------------------------------+--------+-------------------------+
++-----------------------------------------------------------------------------------------------------------------------+--------+-------------------------+
+| path                                                                                                                  | size   | partition               |
++-----------------------------------------------------------------------------------------------------------------------+--------+-------------------------+
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc80689f_1418645991_data.0.  | 5.77MB | year=2014/month=1/day=1 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a0_1418645991_data.0.  | 6.25MB | year=2014/month=1/day=1 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a1_147082319_data.0.   | 7.16MB | year=2014/month=1/day=1 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=1/80732d9dc8068a2_2111411753_data.0.  | 5.98MB | year=2014/month=1/day=1 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbb_501271652_data.0.  | 6.42MB | year=2014/month=1/day=2 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbc_501271652_data.0.  | 6.62MB | year=2014/month=1/day=2 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbd_1393490200_data.0. | 6.98MB | year=2014/month=1/day=2 |
+| hdfs://&lt;impala_data_dir&gt;/show_files.db/part_text/year=2014/month=1/day=2/21a828cf494b5bbe_1393490200_data.0. | 6.20MB | year=2014/month=1/day=2 |
++-----------------------------------------------------------------------------------------------------------------------+--------+-------------------------+
 </code></pre>
       <p class="p">
         The following example shows a <code class="ph codeph">SHOW FILES</code> statement for a partitioned Parquet table.
@@ -380,7 +375,7 @@ where id between 1 and 1000000;
       <p class="p">
         The <code class="ph codeph">SHOW ROLES</code> statement displays roles. This syntax
         is available in <span class="keyword">Impala 2.0</span> and later only, when
-        you are using the Sentry authorization framework along with the Sentry
+        you are using the Ranger authorization framework along with the Ranger
         service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Managing Privileges</a>.
       </p>
 
@@ -453,8 +448,8 @@ where id between 1 and 1000000;
 
       <p class="p">
         The <code class="ph codeph">SHOW CURRENT ROLES</code> statement displays
-        roles assigned to the current user. This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Sentry
-        authorization framework along with the Sentry service, as described in
+        roles assigned to the current user. This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Ranger
+        authorization framework along with the Ranger service, as described in
           <a class="xref" href="impala_authorization.html#sentry_service">Managing Privileges</a>.
       </p>
 
@@ -526,9 +521,9 @@ where id between 1 and 1000000;
       <p class="p">
         The <code class="ph codeph">SHOW ROLE GRANT GROUP</code> statement lists
         all the roles assigned to the specified group. This statement is only
-        allowed for Sentry administrative users and others users that are part
-        of the specified group. This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Sentry
-        authorization framework along with the Sentry service, as described in
+        allowed for Ranger administrative users and others users that are part
+        of the specified group. This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Ranger
+        authorization framework along with the Ranger service, as described in
           <a class="xref" href="impala_authorization.html#sentry_service">Managing Privileges</a>.
       </p>
 
@@ -580,10 +575,10 @@ where id between 1 and 1000000;
       <p class="p">
         
         The <code class="ph codeph">SHOW GRANT ROLE</code> statement list all the grants for
-        the given role name. This statement is only allowed for Sentry
+        the given role name. This statement is only allowed for Ranger
         administrative users and other users that have been granted the
-        specified role. This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Sentry
-        authorization framework along with the Sentry service, as described in
+        specified role. This syntax is available in <span class="keyword">Impala 2.0</span> and later only, when you are using the Ranger
+        authorization framework along with the Ranger service, as described in
           <a class="xref" href="impala_authorization.html#sentry_service">Managing Privileges</a>.
       </p>
 
@@ -631,15 +626,15 @@ where id between 1 and 1000000;
     <div class="body conbody">
       <p class="p">
         The <code class="ph codeph">SHOW GRANT USER</code> statement shows the list of
-        privileges for a given user. This statement is only allowed for Sentry
+        privileges for a given user. This statement is only allowed for Ranger
         administrative users. However, the current user can run <code class="ph codeph">SHOW
           GRANT USER</code> for themselves.
       </p>
 
       <p class="p">
         This syntax is available in <span class="keyword">Impala 3.1</span> and later
-        only, when you are using the Sentry authorization framework along with
-        the Sentry service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Managing Privileges</a>.
+        only, when you are using the Ranger authorization framework along with
+        the Ranger service, as described in <a class="xref" href="impala_authorization.html#sentry_service">Managing Privileges</a>.
       </p>
 
       <p class="p">
@@ -1028,20 +1023,20 @@ show CREATE TABLE numeric_grades_default_letter;
 |   student STRING NULL ENCODING AUTO_ENCODING COMPRESSION DEFAULT_COMPRESSION,                  |
 |   PRIMARY KEY (score)                                                                          |
 | )                                                                                              |
-| PARTITION BY <strong class="ph b">RANGE (score) (...)</strong>                                                          |
+| PARTITION BY RANGE (score) (...) .                                                             |
 | STORED AS KUDU                                                                                 |
 | TBLPROPERTIES ('kudu.master_addresses'='vd0342.example.com:7051')                              |
 +------------------------------------------------------------------------------------------------+
 
 show range partitions numeric_grades_default_letter;
-+--------------------+
-| RANGE (score)      |
-+--------------------+
-| 0 &lt;= VALUES &lt; 50   |
-| 50 &lt;= VALUES &lt; 65  |
-| 65 &lt;= VALUES &lt; 80  |
-| 80 &lt;= VALUES &lt; 100 |
-+--------------------+
++--------------------------+
+| RANGE (score)            |
++--------------------------+
+| 0 &lt;= VALUES &lt; 50         |
+| 50 &lt;= VALUES &lt; 65        |
+| 65 &lt;= VALUES &lt; 80        |
+| 80 &lt;= VALUES &lt; 100       |
++--------------------------+
 </code></pre>
 
       <p class="p">
@@ -1209,36 +1204,20 @@ show create table show_create_table_demo;
 
       <p class="p">
         Because Kudu tables do not have characteristics derived from HDFS, such
-        as number of files, file format, and HDFS cache status, the output of
+        as number of files and HDFS cache status, the output of
         <code class="ph codeph">SHOW TABLE STATS</code> reflects different characteristics
-        that apply to Kudu tables. If the Kudu table is created with the
-        clause <code class="ph codeph">PARTITIONS 20</code>, then the result set of
-        <code class="ph codeph">SHOW TABLE STATS</code> consists of 20 rows, each representing
-        one of the numbered partitions. For example:
+        that apply to Kudu tables.
       </p>
 
 
 <pre class="pre codeblock"><code>
 show table stats kudu_table;
-+--------+-----------+----------+-----------------------+------------+
-| # Rows | Start Key | Stop Key | Leader Replica        | # Replicas |
-+--------+-----------+----------+-----------------------+------------+
-| -1     |           | 00000001 | host.example.com:7050 | 3          |
-| -1     | 00000001  | 00000002 | host.example.com:7050 | 3          |
-| -1     | 00000002  | 00000003 | host.example.com:7050 | 3          |
-| -1     | 00000003  | 00000004 | host.example.com:7050 | 3          |
-| -1     | 00000004  | 00000005 | host.example.com:7050 | 3          |
-...
++-------+-------------+---------+--------+------------------------------+
+| #Rows | #Partitions | Size    | Format | Location                     |
++-------+-------------+---------+--------+------------------------------+
+| 100   | 7           | 56.16MB | KUDU   | kudu-master.example.com:7051 |
++-------+-------------+---------+--------+------------------------------+
 </code></pre>
-
-      <p class="p">
-        Impala does not compute the number of rows for each partition for
-        Kudu tables. Therefore, you do not need to re-run <code class="ph codeph">COMPUTE STATS</code>
-        when you see -1 in the <code class="ph codeph"># Rows</code> column of the output from
-        <code class="ph codeph">SHOW TABLE STATS</code>. That column always shows -1 for
-        all Kudu tables.
-      </p>
-
 
       <p class="p">
         <strong class="ph b">Examples:</strong>
@@ -1638,34 +1617,42 @@ show column stats store_sales;
 </code></pre>
 
       <p class="p">
-        The following example shows the output for a Kudu table
-        using the hash partitioning mechanism. The number of
-        rows in the result set corresponds to the values used
-        in the <code class="ph codeph">PARTITIONS <var class="keyword varname">N</var></code>
-        clause of <code class="ph codeph">CREATE TABLE</code>.
+        The following example shows the output for a Kudu table using the hash
+        partitioning mechanism. The number of rows in the result set corresponds to the
+        values used in the <code class="ph codeph">PARTITIONS <var class="keyword varname">N</var></code> clause of
+        <code class="ph codeph">CREATE TABLE</code>. If the Kudu table is created with the clause
+        <code class="ph codeph">PARTITIONS 20</code>, then the result set of
+        <code class="ph codeph">SHOW PARTITIONS</code> consists of 20 rows, each representing one of
+        the numbered partitions. For example:
       </p>
 
 
 <pre class="pre codeblock"><code>
 show partitions million_rows_hash;
 
-+--------+-----------+----------+-----------------------+--
-| # Rows | Start Key | Stop Key | Leader Replica        | # Replicas
-+--------+-----------+----------+-----------------------+--
-| -1     |           | 00000001 | n236.example.com:7050 | 3
-| -1     | 00000001  | 00000002 | n236.example.com:7050 | 3
-| -1     | 00000002  | 00000003 | n336.example.com:7050 | 3
-| -1     | 00000003  | 00000004 | n238.example.com:7050 | 3
-| -1     | 00000004  | 00000005 | n338.example.com:7050 | 3
-....
-| -1     | 0000002E  | 0000002F | n240.example.com:7050 | 3
-| -1     | 0000002F  | 00000030 | n336.example.com:7050 | 3
-| -1     | 00000030  | 00000031 | n240.example.com:7050 | 3
-| -1     | 00000031  |          | n334.example.com:7050 | 3
-+--------+-----------+----------+-----------------------+--
++--------+-----------+----------+-----------------------+------------+
+| # Rows | Start Key | Stop Key | Leader Replica        | # Replicas |
++--------+-----------+----------+-----------------------+------------+
+| -1     |           | 00000001 | n236.example.com:7050 | 3          |
+| -1     | 00000001  | 00000002 | n236.example.com:7050 | 3          |
+| -1     | 00000002  | 00000003 | n336.example.com:7050 | 3          |
+| -1     | 00000003  | 00000004 | n238.example.com:7050 | 3          |
+| -1     | 00000004  | 00000005 | n338.example.com:7050 | 3          |
+...
+| -1     | 0000002E  | 0000002F | n240.example.com:7050 | 3          |
+| -1     | 0000002F  | 00000030 | n336.example.com:7050 | 3          |
+| -1     | 00000030  | 00000031 | n240.example.com:7050 | 3          |
+| -1     | 00000031  |          | n334.example.com:7050 | 3          |
++--------+-----------+----------+-----------------------+------------+
 Fetched 50 row(s) in 0.05s
 
 </code></pre>
+
+      <p class="p">
+        Impala only computes the number of rows for the whole Kudu table, partition level
+        row counts are not available.
+      </p>
+
 
       <p class="p">
         The following example shows the output for a Kudu table
@@ -1796,8 +1783,7 @@ show range partitions million_rows_range;
 | DECIMAL(*,*) | abs(DECIMAL(*,*))                               | BUILTIN     | true          |
 | DOUBLE       | abs(DOUBLE)                                     | BUILTIN     | true          |
 | FLOAT        | abs(FLOAT)                                      | BUILTIN     | true          |
-+----------------+----------------------------------------+
-...
++----------------+-----------------------------------------------+-------------+---------------+
 
 show functions in _impala_builtins like '*week*';
 +-------------+------------------------------+-------------+---------------+

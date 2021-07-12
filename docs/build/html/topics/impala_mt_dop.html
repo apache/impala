@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="MT_DOP Query Option" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
@@ -47,8 +47,7 @@
 
 
       <p class="p">
-        Currently, the operations affected by the <code class="ph codeph">MT_DOP</code>
-        query option are:
+        Currently, <code class="ph codeph">MT_DOP</code> support varies by statement type:
       </p>
 
       <ul class="ul">
@@ -63,11 +62,32 @@
 
         <li class="li">
           <p class="p">
-            Queries with execution plans containing only scan and aggregation operators,
-            or local joins that do not need data exchanges (such as for nested types).
-            Other queries produce an error if <code class="ph codeph">MT_DOP</code> is set to a non-zero
-            value. Therefore, this query option is typically only set for the duration of
-            specific long-running, CPU-intensive queries.
+            <code class="ph codeph">SELECT</code> statements. <code class="ph codeph">MT_DOP</code> is 0 by default
+            for <code class="ph codeph">SELECT</code> statements but can be set to a value greater
+            than 0 to control intra-node parallelism. This may be useful to tune
+            query performance and in particular to reduce execution time of
+            long-running, CPU-intensive queries.
+          </p>
+
+        </li>
+
+        <li class="li">
+          <p class="p">
+            <code class="ph codeph">DML</code> statements. <code class="ph codeph">MT_DOP</code> values greater
+            than zero are not currently supported for DML statements. DML statements
+            will produce an error if <code class="ph codeph">MT_DOP</code> is set to a non-zero value.
+          </p>
+
+        </li>
+
+        <li class="li">
+          <p class="p">
+            In <span class="keyword">Impala 3.4</span> and earlier, not all <code class="ph codeph">SELECT</code>
+            statements support setting <code class="ph codeph">MT_DOP</code>. Specifically, only
+            scan and aggregation operators, and
+            local joins that do not need data exchanges (such as for nested types) are
+            supported. Other <code class="ph codeph">SELECT</code> statements produce an error if
+            <code class="ph codeph">MT_DOP</code> is set to a non-zero value.
           </p>
 
         </li>
@@ -166,7 +186,7 @@ compute stats billion_rows_parquet;
 
     <p class="p">
       The following example shows the effects of setting <code class="ph codeph">MT_DOP</code>
-      for a query involving only scan and aggregation operations for a Parquet table:
+      for a query on a Parquet table:
     </p>
 
 
@@ -210,10 +230,9 @@ Fetched 1 row(s) in 17.19s
 set mt_dop=1;
 MT_DOP set to 1
 
-select * from a1 inner join a2
-  on a1.id = a2.id limit 4;
-ERROR: NotImplementedException: MT_DOP not supported for plans with
-  base table joins or table sinks.
+insert into a1
+select * from a2;
+ERROR: NotImplementedException: MT_DOP not supported for DML statements.
 
 </code></pre>
 

@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Impala Security" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_security_guidelines.html" />
@@ -37,9 +37,9 @@
   <div class="body conbody">
 
     <p class="p">
-      Impala includes a fine-grained authorization framework for Hadoop, based on Apache Sentry.
-      Sentry authorization was added in Impala 1.1.0. Together with the Kerberos
-      authentication framework, Sentry takes Hadoop security to a new level needed for the requirements of
+      Impala includes a fine-grained authorization framework for Hadoop, based on Apache Ranger.
+      Ranger authorization was added in Impala 3.3.0. Together with the Kerberos
+      authentication framework, Ranger takes Hadoop security to a new level needed for the requirements of
       highly regulated industries such as healthcare, financial services, and government. Impala also includes
       an auditing capability which was added in Impala 1.1.1; Impala generates the audit data which can be
       consumed, filtered, and visualized by cluster-management components focused on governance.
@@ -83,7 +83,7 @@
 
         <dd class="dd">
           Which users are allowed to access which resources, and what operations are they allowed to perform?
-          Impala relies on the open source Sentry project for authorization. By default (when authorization is not
+          Impala relies on the open source Ranger project for authorization. By default (when authorization is not
           enabled), Impala does all read and write operations with the privileges of the <code class="ph codeph">impala</code>
           user, which is suitable for a development/test environment but not for a secure production environment.
           When authorization is enabled, Impala uses the OS user ID of the user who runs

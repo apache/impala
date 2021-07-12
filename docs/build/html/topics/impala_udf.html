@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="User-Defined Functions (UDFs)" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref.html" />
@@ -1108,6 +1108,15 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
 
 
         <p class="p">
+          Intermediate values returned by the init, update and merge functions that referred to allocations
+          must be allocated using <code class="ph codeph">FunctionContext::Allocate()</code> and freed using <code class="ph codeph">FunctionContext::Free()</code>.
+          Both serialize and finalize functions are responsible for cleaning up the intermediate value and freeing such allocations.
+          StringVals returned to Impala directly by Serialize(), Finalize() or GetValue() functions should be backed by
+          temporary results memory allocated using the <code class="ph codeph">StringVal(FunctionContext*, int) constructor</code>,
+          <code class="ph codeph">StringVal::CopyFrom(FunctionContext*, const uint8_t*, size_t)</code>, or <code class="ph codeph">StringVal::Resize()</code>.
+        </p>
+
+        <p class="p">
           In the SQL syntax, you create a UDAF by using the statement <code class="ph codeph">CREATE AGGREGATE FUNCTION</code>.
           You specify the entry points of the underlying C++ functions using the clauses <code class="ph codeph">INIT_FN</code>,
           <code class="ph codeph">UPDATE_FN</code>, <code class="ph codeph">MERGE_FN</code>, <code class="ph codeph">SERIALIZE_FN</code>, and
@@ -1128,14 +1137,14 @@ IntVal AddUdf(FunctionContext* context, const IntVal&amp; arg1, const IntVal&amp
 
 
         <p class="p">
-          <span class="xref"><span class="ph filepath">uda-sample.h</span></span>:
+          <a class="xref" href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.h" target="_blank"><span class="ph filepath">uda-sample.h</span></a>:
         </p>
 
 
 
 
         <p class="p">
-          <span class="xref"><span class="ph filepath">uda-sample.cc</span></span>:
+          <a class="xref" href="https://github.com/cloudera/impala-udf-samples/blob/master/uda-sample.cc" target="_blank"><span class="ph filepath">uda-sample.cc</span></a>:
         </p>
 
 

@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="COMPUTE STATS Statement" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
@@ -697,11 +697,8 @@ show table stats item_partitioned;
 
     <p class="p">
       The <code class="ph codeph">COMPUTE STATS</code> statement applies to Kudu tables.
-      Impala does not compute the number of rows for each partition for
-      Kudu tables. Therefore, you do not need to re-run the operation when
-      you see -1 in the <code class="ph codeph"># Rows</code> column of the output from
-      <code class="ph codeph">SHOW TABLE STATS</code>. That column always shows -1 for
-      all Kudu tables.
+      Impala only computes the number of rows for the whole Kudu table,
+      partition level row counts are not available.
     </p>
 
 

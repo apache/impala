@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="CREATE ROLE Statement (Impala 2.0 or higher only)" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref_sql.html" />
@@ -34,8 +34,7 @@
       The <code class="ph codeph">CREATE ROLE</code> statement creates a role to which privileges can be granted. Privileges can
       be granted to roles, which can then be assigned to users. A user that has been assigned a role will only be
       able to exercise the privileges of that role. Only users that have administrative privileges can create/drop
-      roles. By default, the <code class="ph codeph">hive</code>, <code class="ph codeph">impala</code> and <code class="ph codeph">hue</code> users have
-      administrative privileges in Sentry.
+      roles.
     </p>
 
 
@@ -53,8 +52,7 @@
 
 
     <p class="p">
-      Only administrative users (those with <code class="ph codeph">ALL</code> privileges on the server, defined in the Sentry
-      policy file) can use this statement.
+      Only administrative users for Ranger can use this statement.
     </p>
 
 
@@ -66,9 +64,7 @@
     <p class="p">
       Impala makes use of any roles and privileges specified by the <code class="ph codeph">GRANT</code> and
       <code class="ph codeph">REVOKE</code> statements in Hive, and Hive makes use of any roles and privileges specified by the
-      <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements in Impala. The Impala <code class="ph codeph">GRANT</code>
-      and <code class="ph codeph">REVOKE</code> statements for privileges do not require the <code class="ph codeph">ROLE</code> keyword to be
-      repeated before each role name, unlike the equivalent Hive statements.
+      <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements in Impala.
     </p>
 
 

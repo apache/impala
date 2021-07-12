@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="SQL Differences Between Impala and Hive" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_langref.html" />
@@ -241,13 +241,13 @@
 
       <p class="p">
         Impala utilizes the <a class="xref" href="http://sentry.apache.org/" target="_blank">Apache
-        Sentry </a> authorization framework, which provides fine-grained role-based access control
+        Ranger </a> authorization framework, which provides fine-grained role-based access control
         to protect data against unauthorized access or tampering.
       </p>
 
 
       <p class="p">
-        The Hive component now includes Sentry-enabled <code class="ph codeph">GRANT</code>,
+        The Hive component now includes Ranger-enabled <code class="ph codeph">GRANT</code>,
         <code class="ph codeph">REVOKE</code>, and <code class="ph codeph">CREATE/DROP ROLE</code> statements. Earlier Hive releases had a
         privilege system with <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements that were primarily
         intended to prevent accidental deletion of data, rather than a security mechanism to protect against
@@ -258,9 +258,7 @@
       <p class="p">
         Impala can make use of privileges set up through Hive <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements.
         Impala has its own <code class="ph codeph">GRANT</code> and <code class="ph codeph">REVOKE</code> statements in Impala 2.0 and higher.
-        See <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a> for the details of authorization in Impala, including
-        how to switch from the original policy file-based privilege model to the Sentry service using privileges
-        stored in the metastore database.
+        See <a class="xref" href="impala_authorization.html#authorization">Impala Authorization</a> for the details of authorization in Impala.
       </p>
 
 

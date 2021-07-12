@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="SYNC_DDL Query Option" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
@@ -40,13 +40,13 @@
     </p>
 
 
-    <p class="p">
-      Although <code class="ph codeph">INSERT</code> is classified as a DML statement, when the <code class="ph codeph">SYNC_DDL</code> option
-      is enabled, <code class="ph codeph">INSERT</code> statements also delay their completion until all the underlying data and
-      metadata changes are propagated to all Impala nodes. Internally, Impala inserts have similarities with DDL
-      statements in traditional database systems, because they create metadata needed to track HDFS block locations
-      for new files and they potentially add new partitions to partitioned tables.
-    </p>
+    <p class="p"> Although <code class="ph codeph">INSERT</code> is classified as a DML statement, when the
+        <code class="ph codeph">SYNC_DDL</code> option is enabled, <code class="ph codeph">INSERT</code> statements also delay
+      their completion until all the underlying data and metadata changes are propagated to all
+      Impala nodes and this option applies to all filesystem-based tables. Internally, Impala
+      inserts have similarities with DDL statements in traditional database systems, because they
+      create metadata needed to track HDFS block locations for new files and they potentially add
+      new partitions to partitioned tables. </p>
 
 
     <div class="note note"><span class="notetitle">Note:</span> 

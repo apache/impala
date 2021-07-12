@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Configuring Impala Delegation for Clients" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_authentication.html" />
@@ -69,10 +69,7 @@
 
 
         <li class="li">
-          Impala requires Apache Sentry on the cluster to enable delegation. Without Apache
-          Sentry installed, the delegation feature will fail with the following error: User
-          <em class="ph i">user1</em> is not authorized to delegate to <em class="ph i">user2</em>. User/group delegation is
-          disabled.
+          Impala requires Apache Ranger on the cluster to enable delegation.
         </li>
 
       </ul>
@@ -248,7 +245,7 @@
 
 
             <li class="li">
-              In group delegate, Impala checks if <var class="keyword varname">delegated_user</var> belongs to
+              In group delegation, Impala checks if <var class="keyword varname">delegated_user</var> belongs to
               one of the delegated groups for the user <var class="keyword varname">authenticated_user</var>,
               <var class="keyword varname">delegated_group</var> in this example.
             </li>

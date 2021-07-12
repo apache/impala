@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Using the Avro File Format with Impala Tables" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html" />
@@ -55,23 +55,23 @@
     
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><caption><span class="tablecap"><span class="table--title-label">Table 1. </span>Avro Format Support in Impala</span></caption><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d25374e170">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d25117e170">
               File Type
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d25374e173">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d25117e173">
               Format
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d25374e176">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d25117e176">
               Compression Codecs
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d25374e179">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d25117e179">
               Impala Can CREATE?
             </th>
 
-            <th class="entry cell-norowborder" style="vertical-align:top;" id="d25374e182">
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d25117e182">
               Impala Can INSERT?
             </th>
 
@@ -80,23 +80,23 @@
         </thead>
 <tbody class="tbody">
           <tr class="row">
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d25374e170 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d25117e170 ">
               <a class="xref" href="impala_avro.html#avro">Avro</a>
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d25374e173 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d25117e173 ">
               Structured
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d25374e176 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d25117e176 ">
               Snappy, gzip, deflate
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d25374e179 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d25117e179 ">
               Yes, in Impala 1.4.0 and higher. In lower versions, create the table using Hive.
             </td>
 
-            <td class="entry cellrowborder" style="vertical-align:top;" headers="d25374e182 ">
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d25117e182 ">
               No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
               right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
               <var class="keyword varname">table_name</var></code> in Impala.
@@ -611,67 +611,67 @@ ALTER TABLE avro_table SET TBLPROPERTIES (
       
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="avro_data_types__table_uvv_plj_gjb" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:143.44pt" /><col style="width:165.77pt" /></colgroup><thead class="thead" style="text-align:left;">
             <tr class="row">
-              <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d25374e848">Avro type</th>
+              <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d25117e848">Avro type</th>
 
-              <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d25374e851">Impala type</th>
+              <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d25117e851">Impala type</th>
 
             </tr>
 
           </thead>
 <tbody class="tbody">
             <tr class="row">
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">STRING</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e848 ">STRING</td>
 
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">STRING</td>
-
-            </tr>
-
-            <tr class="row">
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">STRING</td>
-
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">CHAR</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e851 ">STRING</td>
 
             </tr>
 
             <tr class="row">
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">STRING</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e848 ">STRING</td>
 
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">VARCHAR</td>
-
-            </tr>
-
-            <tr class="row">
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">INT</td>
-
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">INT</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e851 ">CHAR</td>
 
             </tr>
 
             <tr class="row">
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">BOOLEAN</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e848 ">STRING</td>
 
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">BOOLEAN</td>
-
-            </tr>
-
-            <tr class="row">
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">LONG</td>
-
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">BIGINT</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e851 ">VARCHAR</td>
 
             </tr>
 
             <tr class="row">
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">FLOAT</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e848 ">INT</td>
 
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">FLOAT</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e851 ">INT</td>
 
             </tr>
 
             <tr class="row">
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e848 ">DOUBLE</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e848 ">BOOLEAN</td>
 
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e851 ">DOUBLE</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e851 ">BOOLEAN</td>
+
+            </tr>
+
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e848 ">LONG</td>
+
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e851 ">BIGINT</td>
+
+            </tr>
+
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e848 ">FLOAT</td>
+
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e851 ">FLOAT</td>
+
+            </tr>
+
+            <tr class="row">
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e848 ">DOUBLE</td>
+
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e851 ">DOUBLE</td>
 
             </tr>
 
@@ -695,25 +695,25 @@ ALTER TABLE avro_table SET TBLPROPERTIES (
       
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" id="avro_data_types__table_ch2_1mj_gjb" class="table" frame="border" border="1" rules="all"><colgroup><col style="width:151.26pt" /><col style="width:149.58pt" /></colgroup><thead class="thead" style="text-align:left;">
             <tr class="row">
-              <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d25374e969">Avro type</th>
+              <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d25117e969">Avro type</th>
 
-              <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d25374e972">Impala type</th>
+              <th class="entry cellrowborder" style="text-align:left;vertical-align:top;" id="d25117e972">Impala type</th>
 
             </tr>
 
           </thead>
 <tbody class="tbody">
             <tr class="row">
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e969 ">BYTES annotated</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e969 ">BYTES annotated</td>
 
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e972 ">DECIMAL</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e972 ">DECIMAL</td>
 
             </tr>
 
             <tr class="row">
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e969 ">INT32 annotated</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e969 ">INT32 annotated</td>
 
-              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25374e972 ">DATE</td>
+              <td class="entry cellrowborder" style="text-align:left;vertical-align:top;" headers="d25117e972 ">DATE</td>
 
             </tr>
 

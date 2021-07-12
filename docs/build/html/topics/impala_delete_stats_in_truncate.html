@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="DELETE_STATS_IN_TRUNCATE Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="delete_stats_in_truncate" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>DELETE_STATS_IN_TRUNCATE Query Option</title>
+</head>
+<body id="delete_stats_in_truncate">
+
+
+ <h1 class="title topictitle1" id="ariaid-title1">DELETE_STATS_IN_TRUNCATE Query Option</h1>
+
+ 
+ 
+ 
+ <div class="body conbody">
+
+  <p class="p">
+   This query option <code class="ph codeph">DELETE_STATS_IN_TRUNCATE</code> can be used to delete or retain
+   table statistics. The default value of this option is 1 or true which means table statistics will
+   be deleted as part of truncate operation. However the default may not be an ideal solution in
+   case of non-transactional tables when the table and column statistics for the table are also
+   deleted by default. This can be an expensive operation especially when many truncate table
+   commands are running concurrently. In cases where truncate operation is used to remove the
+   existing data and then reload new data, it is likely that you will compute stats again as soon as
+   the new data is reloaded. This would overwrite the existing statistics and hence the additional
+   time spent by the truncate operation to delete column and table statistics becomes obsolete. To
+   avoid this expensive operation and to improve performance, you can set this query option to false
+   or 0. When set to false, a truncate operation will not delete the table and column statistics for
+   the table.
+  </p>
+
+  
+  <p class="p">
+   <strong class="ph b">Type:</strong><code class="ph codeph">BOOLEAN</code>; recognized values are 1 and 0, or true and false;
+  </p>
+
+  
+  <p class="p">
+   <strong class="ph b">Default:</strong><code class="ph codeph">TRUE</code> (shown as 1 in output of SET statement).
+  </p>
+
+  
+  <p class="p"><strong class="ph b">Added in:</strong>
+   <span class="keyword">Impala 4.0</span></p>
+
+  
+ </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

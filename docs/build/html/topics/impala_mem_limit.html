@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="MEM_LIMIT Query Option" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
@@ -20,24 +20,18 @@
 </head>
 <body id="mem_limit">
 
+ <h1 class="title topictitle1" id="ariaid-title1">MEM_LIMIT Query Option</h1>
 
-  <h1 class="title topictitle1" id="ariaid-title1">MEM_LIMIT Query Option</h1>
-
-
-  
-
-  
-
-  <div class="body conbody">
-
-    <p class="p">
+ 
+ 
+ <div class="body conbody">
+  <p class="p">
       The MEM_LIMIT query option defines the maximum amount of memory a query can allocate on
       each node. The total memory that can be used by a query is the <code class="ph codeph">MEM_LIMIT</code>
       times the number of nodes.
     </p>
 
-
-    <p class="p">
+  <p class="p">
       There are two levels of memory limit for Impala. The
       <code class="ph codeph">‑‑mem_limit</code> startup option sets an overall limit for the
       <span class="keyword cmdname">impalad</span> process (which handles multiple queries concurrently). That
@@ -50,8 +44,7 @@
       limit, whichever is less.
     </p>
 
-
-    <p class="p">
+  <p class="p">
       The <code class="ph codeph">MEM_LIMIT</code> query option, which you set through
       <span class="keyword cmdname">impala-shell</span> or the <code class="ph codeph">SET</code> statement in a JDBC or ODBC
       application, applies to each individual query. The <code class="ph codeph">MEM_LIMIT</code> query option
@@ -59,47 +52,45 @@
       less than the <span class="keyword cmdname">impalad</span> memory limit.
     </p>
 
-
-    <p class="p">
-      If query processing exceeds the specified memory limit on any node, either the per-query
-      limit or the <span class="keyword cmdname">impalad</span> limit, Impala cancels the query automatically.
-      Memory limits are checked periodically during query processing, so the actual memory in
-      use might briefly exceed the limit without the query being cancelled.
+  <p class="p">
+      If query processing approaches the specified memory limit on any node, either the
+      per-query limit or the impalad limit, then the SQL operations will start to reduce
+      their memory consumption, for example by writing the temporary data to disk (known as spilling to disk).
+      The result is a query that completes successfully, rather than failing with an out-of-memory error.
+      The tradeoff is decreased performance due to the extra disk I/O to write the temporary data and
+      read it back in. The slowdown could potentially be significant. Thus, while this feature improves
+      reliability, you should optimize your queries, system parameters, and hardware configuration to
+      make this spilling a rare occurrence.
     </p>
 
-
-    <p class="p">
-      <strong class="ph b">Type:</strong> numeric
+  <p class="p">
+   <strong class="ph b">Type:</strong> numeric
     </p>
 
-
-    <p class="p">
-      <strong class="ph b">Units:</strong> A numeric argument represents memory size in bytes; you can also use a
+  <p class="p">
+   <strong class="ph b">Units:</strong> A numeric argument represents memory size in bytes; you can also use a
       suffix of <code class="ph codeph">m</code> or <code class="ph codeph">mb</code> for megabytes, or more commonly
       <code class="ph codeph">g</code> or <code class="ph codeph">gb</code> for gigabytes. If you specify a value with
       unrecognized formats, subsequent queries fail with an error.
     </p>
 
-
-    <p class="p">
-      <strong class="ph b">Default:</strong> 0 (unlimited)
+  <p class="p">
+   <strong class="ph b">Default:</strong> 0 (unlimited)
     </p>
 
-
-    <p class="p">
+  <p class="p">
         <strong class="ph b">Usage notes:</strong>
       </p>
 
-
-    <p class="p">
-      The <code class="ph codeph">MEM_LIMIT</code> setting is primarily useful in a high-concurrency setting,
-      or on a cluster with a workload shared between Impala and other data processing
-      components. You can prevent any query from accidentally using much more memory than
-      expected, which could negatively impact other Impala queries.
+  <p class="p">
+      The <code class="ph codeph">MEM_LIMIT</code> setting is primarily useful for production workloads.
+      Impala's Admission Controller can be configured to automatically assign memory limits to
+      queries and limit memory consumption of resource pools. See <a class="xref" href="impala_admission.html#admission_concurrency">Concurrent Queries and Admission Control</a>
+      and <a class="xref" href="impala_admission.html#admission_memory">Memory Limits and Admission Control</a> for more information on configuring
+      the resource usage through admission control.
     </p>
 
-
-    <p class="p">
+  <p class="p">
       Use the output of the <code class="ph codeph">SUMMARY</code> command in <span class="keyword cmdname">impala-shell</span>
       to get a report of memory used for each phase of your most heavyweight queries on each
       node, and then set a <code class="ph codeph">MEM_LIMIT</code> somewhat higher than that. See
@@ -107,19 +98,16 @@
       <code class="ph codeph">SUMMARY</code> command.
     </p>
 
-
-    <p class="p">
+  <p class="p">
         <strong class="ph b">Examples:</strong>
       </p>
 
-
-    <p class="p">
+  <p class="p">
       The following examples show how to set the <code class="ph codeph">MEM_LIMIT</code> query option using a
       fixed number of bytes, or suffixes representing gigabytes or megabytes.
     </p>
 
-
-<pre class="pre codeblock"><code>
+  <pre class="pre codeblock"><code>
 [localhost:21000] &gt; set mem_limit=3000000000;
 MEM_LIMIT set to 3000000000
 [localhost:21000] &gt; select 5;
@@ -164,14 +152,12 @@ MEM_LIMIT set to 3mb
 | 5 |
 +---+
 </code></pre>
-
-    <p class="p">
+  <p class="p">
       The following examples show how unrecognized <code class="ph codeph">MEM_LIMIT</code> values lead to
       errors for subsequent queries.
     </p>
 
-
-<pre class="pre codeblock"><code>
+  <pre class="pre codeblock"><code>
 [localhost:21000] &gt; set mem_limit=3pb;
 MEM_LIMIT set to 3pb
 [localhost:21000] &gt; select 5;
@@ -183,8 +169,7 @@ MEM_LIMIT set to xyz
 Query: select 5
 ERROR: Failed to parse query memory limit from 'xyz'.
 </code></pre>
-
-    <p class="p">
+  <p class="p">
       The following examples shows the automatic query cancellation when the
       <code class="ph codeph">MEM_LIMIT</code> value is exceeded on any host involved in the Impala query.
       First it runs a successful query and checks the largest amount of memory used on any node
@@ -192,8 +177,7 @@ ERROR: Failed to parse query memory limit from 'xyz'.
       setting so that the same query cannot run.
     </p>
 
-
-<pre class="pre codeblock"><code>
+  <pre class="pre codeblock"><code>
 [localhost:21000] &gt; select count(*) from customer;
 Query: select count(*) from customer
 +----------+
@@ -228,12 +212,12 @@ MEM_LIMIT set to 15mb
 [localhost:21000] &gt; select count(distinct c_name) from customer;
 Query: select count(distinct c_name) from customer
 ERROR:
-Memory limit exceeded
-Query did not have enough memory to get the minimum required buffers in the block manager.
-</code></pre>
-
-  </div>
-
+Rejected query from pool default-pool: minimum memory reservation is greater than memory available to the query
+for buffer reservations. Memory reservation needed given the current plan: 38.00 MB. Adjust either the mem_limit
+or the pool config (max-query-mem-limit, min-query-mem-limit) for the query to allow the query memory limit to be
+at least 70.00 MB. Note that changing the mem_limit may also change the plan. See the query profile for more
+information about the per-node memory requirements.</code></pre>
+ </div>
 
 <div class="related-links">
 <div class="familylinks">

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="Impala Transparent Query Retries" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_fault_tolerance.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="transparent_query_retries" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>Impala Transparent Query Retries</title>
+</head>
+<body id="transparent_query_retries">
+
+  <h1 class="title topictitle1" id="ariaid-title1">Impala Transparent Query Retries</h1>
+
+  <div class="body conbody">
+    <p class="p">Transparent query retries will automatically retry any queries that fail
+      due to cluster membership changes. A cluster membership change typically
+      entails a node leaving the cluster before it crashed or for some other
+      reason stopped responding to statestore heartbeats.</p>
+
+    <p class="p">Traditionally, if a query runs on a node in the Impala cluster, and that
+      node crashes, then the query will fail and it is up to the user to retry
+      the query. With transparent query retries, the query will be automatically
+      retried.</p>
+
+    <ul class="ul">
+      <li class="li">Queries are only retried if the query failed due to a cluster membership
+        change. Trivial failures, like SQL parsing exceptions are <strong class="ph b">not</strong>
+        retried.</li>
+
+      <li class="li">Cluster membership changes fall into two categories: membership updates
+        from the statestore or node blacklisting events. <p class="p">impalads periodically
+        send heartbeats to the statestore, if an impalad stops sending heartbeats
+        to the statestore then that impalad is removed from the cluster
+        membership</p>
+<p class="p">Node blacklisting events occur when a query fails and as
+        a result, an impalad in the cluster is added to the Coordinator's node
+        blacklist. In this scenario, the query is retried.</p>
+</li>
+
+      <li class="li">For most users, query retries will be completely transparent, but
+        users who want to know why a retry was necessary can use runtime profiles.
+        Each query attempt is modelled as a completely new query. Thus, each query
+        attempt has its own runtime profiles. Users can look through the profiles
+        of the failed query attempts to determine why the query was retried.</li>
+
+    </ul>
+
+    <p class="p">Transparent query retries are turned off by default, but can be enabled via
+      the <code class="ph codeph">RETRY_FAILED_QUERIES</code> query option.</p>
+
+    <div class="section">
+      <p class="p"><strong class="ph b">Related information:</strong>
+        <a class="xref" href="impala_retry_failed_queries.html#RETRY_FAILED_QUERIES">RETRY_FAILED_QUERIES Query Option</a></p>
+
+    </div>
+
+  </div>
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_fault_tolerance.html">Impala Fault Tolerance</a></div>
+</div>
+</div></body>
+</html>

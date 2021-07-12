@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
+<meta name="DC.Type" content="concept" />
+<meta name="DC.Title" content="REFRESH_UPDATED_HMS_PARTITIONS Query Option" />
+<meta name="DC.Relation" scheme="URI" content="../topics/impala_query_options.html" />
+<meta name="prodname" content="Impala" />
+<meta name="version" content="Impala 3.4.x" />
+<meta name="DC.Format" content="XHTML" />
+<meta name="DC.Identifier" content="refresh_updated_hms" />
+<link rel="stylesheet" type="text/css" href="../commonltr.css" />
+<title>REFRESH_UPDATED_HMS_PARTITIONS Query Option</title>
+</head>
+<body id="refresh_updated_hms">
+
+
+ <h1 class="title topictitle1" id="ariaid-title1">REFRESH_UPDATED_HMS_PARTITIONS Query Option</h1>
+
+
+ 
+
+ 
+
+ <div class="body conbody">
+
+  <p class="p">
+   As the name implies the query option <code class="ph codeph">REFRESH_UPDATED_HMS_PARTITIONS</code> is used
+   to refresh any updated HMS partitions.
+  </p>
+
+
+  <p class="p">This option is disabled by default so that the performance is not compromised when refreshing a
+   table. However, for certain corner case scenarios refresh table command does not detect changed
+   partitions. In case of the default refresh, catalogd detects, adds any new partitions and removes
+   any partitions which are not present in HMS anymore. However, it does not update any partitions
+   that changed (eg. change of location). When this query option is enabled, the refresh table
+   command will detect certain changes to the partitions and update them accordingly. Currently,
+   catalogd will update the partitions if any of the following StorageDescriptor properties have
+   been modified. 1. Partition Location 2. Partition Fileformat. 3 SerdeInfo. 4. Partition schema
+   changes. 5. Partition bucketInfo.</p>
+
+
+  <p class="p">
+   <strong class="ph b">Type:</strong><code class="ph codeph">BOOLEAN</code>; recognized values are 1 and 0, or true and false; any other
+   value will be interpreted as false.
+  </p>
+
+
+  <p class="p">
+   <strong class="ph b">Default:</strong><code class="ph codeph">FALSE</code> (shown as 0 in output of SET statement).
+  </p>
+
+
+  <p class="p"><strong class="ph b">Added in:</strong>
+   <span class="keyword">Impala 4.0</span></p>
+
+
+  </div>
+
+
+<div class="related-links">
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a class="link" href="../topics/impala_query_options.html">Query Options for the SET Statement</a></div>
+</div>
+</div></body>
+</html>

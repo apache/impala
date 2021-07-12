@@ -4,8 +4,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-<meta name="copyright" content="(C) Copyright 2020" />
-<meta name="DC.rights.owner" content="(C) Copyright 2020" />
+<meta name="copyright" content="(C) Copyright 2021" />
+<meta name="DC.rights.owner" content="(C) Copyright 2021" />
 <meta name="DC.Type" content="concept" />
 <meta name="DC.Title" content="Using the ORC File Format with Impala Tables" />
 <meta name="DC.Relation" scheme="URI" content="../topics/impala_file_formats.html" />
@@ -35,23 +35,23 @@
     
 <div class="tablenoborder"><table cellpadding="4" cellspacing="0" summary="" class="table" frame="border" border="1" rules="all"><caption><span class="tablecap"><span class="table--title-label">Table 1. </span>ORC Format Support in Impala</span></caption><colgroup><col style="width:10%" /><col style="width:10%" /><col style="width:20%" /><col style="width:30%" /><col style="width:30%" /></colgroup><thead class="thead" style="text-align:left;">
           <tr class="row">
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d144278e70">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d145238e70">
               File Type
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d144278e73">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d145238e73">
               Format
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d144278e76">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d145238e76">
               Compression Codecs
             </th>
 
-            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d144278e79">
+            <th class="entry nocellnorowborder" style="vertical-align:top;" id="d145238e79">
               Impala Can CREATE?
             </th>
 
-            <th class="entry cell-norowborder" style="vertical-align:top;" id="d144278e82">
+            <th class="entry cell-norowborder" style="vertical-align:top;" id="d145238e82">
               Impala Can INSERT?
             </th>
 
@@ -60,25 +60,25 @@
         </thead>
 <tbody class="tbody">
           <tr class="row">
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d144278e70 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d145238e70 ">
               <a class="xref" href="impala_orc.html#orc">ORC</a>
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d144278e73 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d145238e73 ">
               Structured
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d144278e76 ">
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d145238e76 ">
               gzip, Snappy, LZO, LZ4; currently gzip by default
             </td>
 
-            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d144278e79 "> Yes, in Impala 2.12.0 and higher. <p class="p">By default, ORC reads are enabled in Impala
+            <td class="entry row-nocellborder" style="vertical-align:top;" headers="d145238e79 "> Yes, in Impala 2.12.0 and higher. <p class="p">By default, ORC reads are enabled in Impala
               3.4.0 and higher. To disable, set <code class="ph codeph">--enable_orc_scanner</code> to 
               <code class="ph codeph">false</code> when starting the cluster. </p>
 
             </td>
 
-            <td class="entry cellrowborder" style="vertical-align:top;" headers="d144278e82 ">
+            <td class="entry cellrowborder" style="vertical-align:top;" headers="d145238e82 ">
               No. Import data by using <code class="ph codeph">LOAD DATA</code> on data files already in the
               right format, or use <code class="ph codeph">INSERT</code> in Hive followed by <code class="ph codeph">REFRESH
               <var class="keyword varname">table_name</var></code> in Impala.
