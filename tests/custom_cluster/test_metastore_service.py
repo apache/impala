@@ -20,6 +20,7 @@ from hive_metastore.ttypes import Database
 from hive_metastore.ttypes import FieldSchema
 from hive_metastore.ttypes import GetTableRequest
 from hive_metastore.ttypes import GetPartitionsByNamesRequest
+from hive_metastore.ttypes import TruncateTableRequest
 from hive_metastore.ttypes import Table
 from hive_metastore.ttypes import StorageDescriptor
 from hive_metastore.ttypes import SerDeInfo
@@ -439,6 +440,13 @@ class TestMetastoreService(CustomClusterTestSuite):
               and then subsequent get_partitions_by_names_req should load table from HMS
               If invalidateCache is False, the get_partitions_by_names_req
               should be served from the already cached table
+        2. Truncate table remove partition:
+              If invalidateCache is True, then table should be removed from cache
+              and then subsequent get_partitions_by_names_req should load table from HMS
+              and the file metadata for the truncated partition should be none
+              If invalidateCache is False, the get_partitions_by_names_req
+              should be served from the already cached table which has stale
+              partition file metadata
         2. Alter table rename :
               If invalidateCache is True, this should remove the old table from the cache
               and add new table. Subsequent get_table req on old table should throw an
@@ -476,6 +484,8 @@ class TestMetastoreService(CustomClusterTestSuite):
                 "insert into {0}.{1} PARTITION (part_col=1) VALUES (1)".format(
                     db_name, tbl_name),
                 "insert into {0}.{1} PARTITION (part_col=2) VALUES (2)".format(
+                    db_name, tbl_name),
+                "insert into {0}.{1} PARTITION (part_col=3) VALUES (3)".format(
                     db_name, tbl_name)
             ]
             for query in insert_queries:
@@ -492,11 +502,11 @@ class TestMetastoreService(CustomClusterTestSuite):
             partitions_response = catalog_hms_client.get_partition_names(
                 db_name, tbl_name, -1)
             assert partitions_response is not None
-            assert len(partitions_response) == 2
+            assert len(partitions_response) == 3
 
             # drop a partition
             catalog_hms_client.drop_partition_by_name(
-                db_name, tbl_name, "part_col=2", True)
+                db_name, tbl_name, "part_col=3", True)
 
             # save cur_get_table_response in prev_get_table_response
             # before calling get_table_req HMS api
@@ -508,21 +518,49 @@ class TestMetastoreService(CustomClusterTestSuite):
                 new_get_table_request)
             assert cur_get_table_response.table is not None
 
-            part_col_names = ["part_col=1", "part_col=2"]
+            part_col_names = ["part_col=1", "part_col=2", "part_col=3"]
             get_parts_req = GetPartitionsByNamesRequest()
             get_parts_req.db_name = db_name
             get_parts_req.tbl_name = tbl_name
             get_parts_req.names = part_col_names
+            get_parts_req.getFileMetadata = True
             parts_response = catalog_hms_client.get_partitions_by_names_req(
                 get_parts_req)
             if invalidateCache:
                 # drop_partition_by_name hms api should invalidate
                 # table from cache and reload new table from HMS
-                len(parts_response.partitions) == 1
+                len(parts_response.partitions) == 2
             else:
                 # table should be served from the cache
-                # and the cached table has 2 partitions
-                len(parts_response.partitions) == 2
+                # and the cached table has 3 partitions
+                len(parts_response.partitions) == 3
+
+            # Truncate table by removing a partition
+            part_to_truncate = ["part_col=2"]
+            truncate_table_req = TruncateTableRequest()
+            truncate_table_req.dbName = db_name
+            truncate_table_req.tableName = tbl_name
+            truncate_table_req.partNames = part_to_truncate
+            catalog_hms_client.truncate_table_req(truncate_table_req)
+
+            # Check partition's file metadata after truncating it
+            # for table invalidated from cache, partition
+            # file metadata is none whereas it is not none
+            # for stale table present in cache
+            get_parts_req = GetPartitionsByNamesRequest()
+            get_parts_req.db_name = db_name
+            get_parts_req.tbl_name = tbl_name
+            get_parts_req.names = part_to_truncate
+            get_parts_req.getFileMetadata = True
+            parts_response = catalog_hms_client.get_partitions_by_names_req(
+                get_parts_req)
+            assert len(parts_response.partitions) == 1
+            for part in parts_response.partitions:
+                assert part.fileMetadata is not None
+                if invalidateCache:
+                    assert part.fileMetadata.data is None
+                else:
+                    assert part.fileMetadata.data is not None
 
             # alter current table by renaming
             # the table name

@@ -673,15 +673,19 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       throws MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient().truncate_table(dbName, tblName, partNames);
+      invalidateNonTransactionalTableIfExists(dbName, tblName, "truncate_table");
     }
   }
 
   @Override
   public TruncateTableResponse truncate_table_req(
-      TruncateTableRequest truncateTableRequest) throws MetaException, TException {
+      TruncateTableRequest req) throws MetaException, TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getThriftClient()
-          .truncate_table_req(truncateTableRequest);
+      TruncateTableResponse resp = client.getHiveClient().getThriftClient()
+          .truncate_table_req(req);
+      invalidateNonTransactionalTableIfExists(req.getDbName(),
+          req.getTableName(), "truncate_table_req");
+      return resp;
     }
   }
 
