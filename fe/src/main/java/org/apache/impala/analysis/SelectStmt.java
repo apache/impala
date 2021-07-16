@@ -20,7 +20,9 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.impala.analysis.Path.PathType;
@@ -326,6 +328,9 @@ public class SelectStmt extends QueryStmt {
       selectList_.analyzePlanHints(analyzer_);
 
       // populate resultExprs_, aliasSmap_, and colLabels_
+      // This additional map is used for performance reasons and not for finding
+      // ambiguous alias.
+      Map<String, Expr> existingAliasExprs = new LinkedHashMap<>();
       for (int i = 0; i < selectList_.getItems().size(); ++i) {
         SelectListItem item = selectList_.getItems().get(i);
         if (item.isStar()) {
@@ -361,11 +366,13 @@ public class SelectStmt extends QueryStmt {
           resultExprs_.add(item.getExpr());
           String label = item.toColumnLabel(i, analyzer_.useHiveColLabels());
           SlotRef aliasRef = new SlotRef(label);
-          Expr existingAliasExpr = aliasSmap_.get(aliasRef);
+          Expr existingAliasExpr = existingAliasExprs.get(label);
           if (existingAliasExpr != null && !existingAliasExpr.equals(item.getExpr())) {
             // If we have already seen this alias, it refers to more than one column and
             // therefore is ambiguous.
             ambiguousAliasList_.add(aliasRef);
+          } else {
+            existingAliasExprs.put(label, item.getExpr());
           }
           aliasSmap_.put(aliasRef, item.getExpr().clone());
           colLabels_.add(label);
