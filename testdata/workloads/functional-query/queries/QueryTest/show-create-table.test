@@ -819,12 +819,12 @@ TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='parquet',
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_catalogs_hive (i int)
-PARTITION BY SPEC (i bucket 3)
+PARTITIONED BY SPEC (bucket(3, i))
 STORED AS ICEBERG
 TBLPROPERTIES ('iceberg.catalog'='ice_hive_cat')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_catalogs_hive (i INT NULL)
-PARTITION BY SPEC (i BUCKET 3)
+PARTITIONED BY SPEC (BUCKET(3, i))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='parquet',
@@ -832,12 +832,12 @@ TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='parquet',
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_catalogs_hadoop (i int)
-PARTITION BY SPEC (i bucket 3)
+PARTITIONED BY SPEC (bucket(3, i))
 STORED AS ICEBERG
 TBLPROPERTIES ('iceberg.catalog'='ice_hadoop_cat')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_catalogs_hadoop (i INT NULL)
-PARTITION BY SPEC (i BUCKET 3)
+PARTITIONED BY SPEC (BUCKET(3, i))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'iceberg.file_format'='parquet',

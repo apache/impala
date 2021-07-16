@@ -4,7 +4,7 @@ CREATE TABLE iceberg_hadoop_catalogs(
   label STRING,
   val decimal(10,2)
 )
-PARTITION BY SPEC(label IDENTITY)
+PARTITIONED BY SPEC(label)
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='ice_hadoop_cat');
 ====
@@ -22,7 +22,7 @@ CREATE TABLE iceberg_hadoop_catalogs_with_id(
   label STRING,
   val decimal(10,2)
 )
-PARTITION BY SPEC(label IDENTITY)
+PARTITIONED BY SPEC(label)
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='ice_hadoop_cat',
 'iceberg.table_identifier'='org.db.tbl');
@@ -95,7 +95,7 @@ CREATE TABLE iceberg_hive_catalogs(
   label STRING,
   val decimal(10,2)
 )
-PARTITION BY SPEC(label IDENTITY)
+PARTITIONED BY SPEC(label)
 STORED AS ICEBERG
 TBLPROPERTIES('iceberg.catalog'='ice_hive_cat');
 ====
