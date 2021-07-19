@@ -44,29 +44,4 @@ public class SynchronousHMSEventProcessorForTests extends MetastoreEventsProcess
   public void startScheduler() {
     // nothing to do here; there is no background thread for this processor
   }
-
-  public List<NotificationEvent> getNextNotificationEvents(long eventId)
-      throws MetastoreNotificationFetchException {
-    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-      // fetch the current notification event id. We assume that the polling interval
-      // is small enough that most of these polling operations result in zero new
-      // events. In such a case, fetching current notification event id is much faster
-      // (and cheaper on HMS side) instead of polling for events directly
-      CurrentNotificationEventId currentNotificationEventId =
-          msClient.getHiveClient().getCurrentNotificationEventId();
-      long currentEventId = currentNotificationEventId.getEventId();
-
-      // no new events since we last polled
-      if (currentEventId <= eventId) {
-        return Collections.emptyList();
-      }
-
-      NotificationEventResponse response = msClient.getHiveClient()
-          .getNextNotification(eventId, 1000, null);
-      return response.getEvents();
-    } catch (TException e) {
-      throw new MetastoreNotificationFetchException(
-          "Unable to fetch notifications from metastore", e);
-    }
-  }
 }

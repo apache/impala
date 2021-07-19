@@ -247,6 +247,16 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public static final String DELETE_EVENT_LOG_SIZE = "delete-event-log-size";
 
   /**
+   * Wrapper around {@link MetastoreEventsProcessor#getNextMetastoreEvents} which passes
+   * the default batch size.
+   */
+  public static List<NotificationEvent> getNextMetastoreEvents(
+      CatalogServiceCatalog catalog, long eventId, NotificationFilter filter)
+      throws ImpalaRuntimeException {
+    return getNextMetastoreEvents(catalog, eventId, filter, EVENTS_BATCH_SIZE_PER_RPC);
+  }
+
+  /**
    * Gets the next list of {@link NotificationEvent} from Hive Metastore which are
    * greater than the given eventId and filtered according to the provided filter.
    * @param catalog The CatalogServiceCatalog used to get the metastore client
@@ -255,15 +265,33 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    *               events. Note that this is a client side filter not a server side
    *               filter. Unfortunately, HMS doesn't provide a similar mechanism to
    *               do server side filtering.
+   * @param eventsBatchSize the batch size for fetching the events from metastore.
    * @return List of {@link NotificationEvent} which are all greater than eventId and
    * satisfy the given filter.
    * @throws ImpalaRuntimeException in case of RPC errors to metastore.
    */
+  @VisibleForTesting
   public static List<NotificationEvent> getNextMetastoreEvents(
-      CatalogServiceCatalog catalog, long eventId, NotificationFilter filter)
-      throws ImpalaRuntimeException {
+      CatalogServiceCatalog catalog, long eventId, NotificationFilter filter,
+      int eventsBatchSize) throws ImpalaRuntimeException {
+    Preconditions.checkArgument(eventsBatchSize > 0);
+    List<NotificationEvent> result = new ArrayList<>();
     try (MetaStoreClient msc = catalog.getMetaStoreClient()) {
-      return msc.getHiveClient().getNextNotification(eventId, -1, filter).getEvents();
+      long toEventId = msc.getHiveClient().getCurrentNotificationEventId()
+          .getEventId();
+      if (toEventId <= eventId) return result;
+      long currentEventId = eventId;
+      while (currentEventId < toEventId) {
+        int batchSize = Math
+            .min(eventsBatchSize, (int)(toEventId - currentEventId));
+        for (NotificationEvent event : msc.getHiveClient()
+            .getNextNotification(currentEventId, batchSize, null).getEvents()) {
+          // if no filter is provided we add all the events
+          if (filter == null || filter.accept(event)) result.add(event);
+          currentEventId = event.getEventId();
+        }
+      }
+      return result;
     } catch (TException e) {
       throw new ImpalaRuntimeException(String.format(
           CatalogOpExecutor.HMS_RPC_ERROR_FORMAT_STR, "getNextNotification"), e);
@@ -429,6 +457,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       return MetaStoreUtil.getMetastoreConfigValue(iMetaStoreClient, config, defaultVal);
     }
   }
+
   /**
    * returns the current value of LastSyncedEventId. This method is not thread-safe and
    * only to be used for testing purposes

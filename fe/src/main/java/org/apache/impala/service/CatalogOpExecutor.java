@@ -3253,6 +3253,7 @@ public class CatalogOpExecutor {
       }
       Table newTbl = catalog_.addIncompleteTable(msTable.getDbName(),
           msTable.getTableName(), eventIdTblPair.first);
+      Preconditions.checkNotNull(newTbl);
       LOG.debug("Created catalog table {} with create event id {}", newTbl.getFullName(),
           eventIdTblPair.first);
       // Submit the cache request and update the table metadata.

@@ -180,9 +180,6 @@ public class MetastoreEventsProcessorTest {
   private static CatalogOpExecutor catalogOpExecutor_;
   private static MetastoreEventsProcessor eventsProcessor_;
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(MetastoreEventsProcessorTest.class);
-
   @BeforeClass
   public static void setUpTestEnvironment() throws TException, ImpalaException {
     catalog_ = CatalogServiceTestCatalog.create();
@@ -285,6 +282,26 @@ public class MetastoreEventsProcessorTest {
       assertTrue(e.getMessage().contains(String.format(errorMessage,
           MetastoreEventsProcessor.getEventProcessorConfigsToValidate().size())));
     }
+  }
+
+  @Test
+  public void testNextMetastoreEvents() throws Exception {
+    long currentEventId = eventsProcessor_.getCurrentEventId();
+    createDatabaseFromImpala(TEST_DB_NAME, null);
+    createTableFromImpala(TEST_DB_NAME, "testNextMetastoreEvents1", false);
+    createTable("testNextMetastoreEvents2", false);
+    List<NotificationEvent> events = MetastoreEventsProcessor.getNextMetastoreEvents(
+        eventsProcessor_.catalog_, currentEventId, null, 2);
+    assertEquals(3, events.size());
+    events = MetastoreEventsProcessor.getNextMetastoreEvents(
+        eventsProcessor_.catalog_, currentEventId+1, null, 10);
+    assertEquals(2, events.size());
+    events = MetastoreEventsProcessor.getNextMetastoreEvents(
+        eventsProcessor_.catalog_, currentEventId, null, 3);
+    assertEquals(3, events.size());
+    events = MetastoreEventsProcessor.getNextMetastoreEvents(
+        eventsProcessor_.catalog_, currentEventId+3, null, 3);
+    assertEquals(0, events.size());
   }
 
   /**
