@@ -277,6 +277,45 @@ under the License.
 
     </section>
     <section>
+      <title>Priority Based Scratch Directory Selection</title>
+      <p>The location of the intermediate files are configured by starting the impalad daemon with
+        the flag ‑‑scratch_dirs="path_to_directory". Currently this startup flag uses the configured
+        scratch directories in a round robin fashion. Automatic selection of scratch directories in
+        a round robin fashion may not always be ideal in every situation since these directories
+        could come from different classes of storage system volumes having different performance
+        characteristics (SSD vs HDD, local storage vs network attached storage, etc.). To optimize
+        your workload, you have an option to configure the priority of the scratch directories based
+        on your storage system configuration.</p>
+      <p>The scratch directories will be selected for spilling based on how you configure the
+        priorities of the directories and if you provide the same priority for multiple directories
+        then the directories will be selected in a round robin fashion.</p>
+      <p>The valid formats for specifying the priority directories are as shown here:
+        <codeblock>
+          &lt;dir-path>:&lt;limit>:&lt;priority>
+          &lt;dir-path>::&lt;priority>
+</codeblock></p>
+        <p>Example:</p>
+      <p>
+        <codeblock>
+        /dir1:200GB:0
+        /dir1::0
+</codeblock>
+      </p>
+      <p>The following formats use the default priority:
+        <codeblock>
+        /dir1
+        /dir1:200GB
+        /dir1:200GB:
+</codeblock>
+      </p>
+      <p>In the example below, dir1 will be used as a spill victim until it is full and then dir2, dir3,
+        and dir4 will be used in a round robin fashion.</p>
+      <p>
+        <codeblock>‑‑scratch_dirs="/dir1:200GB:0, /dir2:1024GB:1, /dir3:1024GB:1, /dir4:1024GB:1"
+</codeblock>
+      </p>
+    </section>
+    <section>
       <title>Increasing Scratch Capacity</title>
       <p> You can compress the data spilled to disk to increase the effective scratch capacity. You
         typically more than double capacity using compression and reduce spilling to disk. Use the
