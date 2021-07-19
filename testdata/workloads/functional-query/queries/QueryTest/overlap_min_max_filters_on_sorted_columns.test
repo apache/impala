@@ -201,7 +201,7 @@ timestamp_col < "2009-06-01 00:00:00";
 ###################################################
 # Run the join query below in fast code path mode
 # and expect the sum of NumRuntimeFilteredPages
-# counter to be >= 58.
+# counter to be >= 50.
 ###################################################
 set minmax_filter_fast_code_path=on;
 set MINMAX_FILTER_THRESHOLD=0.0;
@@ -210,7 +210,7 @@ select straight_join count(a.timestamp_col) from
 alltypes_timestamp_col_only a join [SHUFFLE] alltypes_limited b
 where a.timestamp_col = b.timestamp_col and b.tinyint_col = 4;
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRuntimeFilteredPages)> 57
+aggregation(SUM, NumRuntimeFilteredPages)> 49
 ====
 ---- QUERY
 ###################################################
