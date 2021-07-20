@@ -55,6 +55,7 @@ import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.TableNotLoadedException;
 import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Reference;
+import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TTableName;
@@ -222,11 +223,21 @@ public class MetastoreEvents {
       int i = 0;
       while (i < metastoreEvents.size()) {
         MetastoreEvent currentEvent = metastoreEvents.get(i);
+        String catalogName = currentEvent.getCatalogName();
         String eventDb = currentEvent.getDbName();
         String eventTbl = currentEvent.getTableName();
-        // if the event is on blacklisted db or table we should filter it out
-        if ((eventDb != null && catalog_.isBlacklistedDb(eventDb)) || (eventTbl != null
-            && catalog_.isBlacklistedTable(eventDb, eventTbl))) {
+        if (catalogName != null && !MetastoreShim.getDefaultCatalogName()
+            .equalsIgnoreCase(catalogName)) {
+          // currently Impala doesn't support custom hive catalogs and hence we should
+          // ignore all the events which are on non-default catalog namespaces.
+          LOG.debug(currentEvent.debugString(
+              "Filtering out this event since it is on a non-default hive catalog %s",
+              catalogName));
+          metastoreEvents.remove(i);
+          numFilteredEvents++;
+        } else if ((eventDb != null && catalog_.isBlacklistedDb(eventDb)) || (
+            eventTbl != null && catalog_.isBlacklistedTable(eventDb, eventTbl))) {
+          // if the event is on blacklisted db or table we should filter it out
           String blacklistedObject = eventTbl != null ? new TableName(eventDb,
               eventTbl).toString() : eventDb;
           LOG.info(currentEvent.debugString("Filtering out this event since it is on a "
@@ -272,6 +283,9 @@ public class MetastoreEvents {
     // Logger available for all the sub-classes
     protected final Logger LOG = LoggerFactory.getLogger(this.getClass());
 
+    // catalog name from the event
+    protected final String catalogName_;
+
     // dbName from the event
     protected final String dbName_;
 
@@ -290,7 +304,6 @@ public class MetastoreEvents {
     // metrics registry so that events can add metrics
     protected final Metrics metrics_;
 
-
     MetastoreEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
         NotificationEvent event) {
       this.catalogOpExecutor_ = catalogOpExecutor;
@@ -299,6 +312,7 @@ public class MetastoreEvents {
       this.eventId_ = event_.getEventId();
       this.eventType_ = MetastoreEventType.from(event.getEventType());
       // certain event types in Hive-3 like COMMIT_TXN may not have dbName set
+      this.catalogName_ = event.getCatName();
       this.dbName_ = event.getDbName();
       this.tblName_ = event.getTableName();
       this.metastoreNotificationEvent_ = event;
@@ -306,6 +320,8 @@ public class MetastoreEvents {
     }
 
     public long getEventId() { return eventId_; }
+
+    public String getCatalogName() { return catalogName_; }
 
     public String getDbName() { return dbName_; }
 

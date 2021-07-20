@@ -19,6 +19,7 @@ package org.apache.impala.catalog.events;
 
 import com.google.common.base.Preconditions;
 import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
+import org.apache.impala.compat.MetastoreShim;
 
 /**
  * Metastore configurations and their expected values for event processing.
@@ -28,11 +29,9 @@ import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
  * validate depending on the hive version.
  */
 public enum MetastoreEventProcessorConfig {
-  ADD_THRIFT_OBJECTS("hive.metastore.notifications.add.thrift.objects", "true"),
-  ALTER_NOTIFICATIONS_BASIC("hive.metastore.alter.notifications.basic", "false"),
   FIRE_EVENTS_FOR_DML("hive.metastore.dml.events", "true"),
-  METASTORE_PARAMETER_EXCLUDE_PATTERNS(new EventPropertyRegexValidator(
-      "hive.metastore.notification.parameters.exclude.patterns"));
+  METASTORE_DEFAULT_CATALOG_NAME("metastore.catalog.default",
+      MetastoreShim.getDefaultCatalogName());
 
   private final ConfigValidator validator_;
 

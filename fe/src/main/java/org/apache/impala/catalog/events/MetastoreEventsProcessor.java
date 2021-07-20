@@ -17,7 +17,6 @@
 
 package org.apache.impala.catalog.events;
 
-
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
@@ -373,16 +372,16 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         LOG.error(msg, e);
         throw new CatalogException(msg);
       }
-      if (!validationErrors.isEmpty()) {
-        LOG.error("Found {} incorrect metastore configuration(s).",
-            validationErrors.size());
-        for (ValidationResult invalidConfig: validationErrors) {
-          LOG.error(invalidConfig.getReason());
-        }
-        throw new CatalogException(String.format("Found %d incorrect metastore "
-            + "configuration(s). Events processor cannot start. See ERROR log for more "
-            + "details.", validationErrors.size()));
+    }
+    if (!validationErrors.isEmpty()) {
+      LOG.error("Found {} incorrect metastore configuration(s).",
+          validationErrors.size());
+      for (ValidationResult invalidConfig: validationErrors) {
+        LOG.error(invalidConfig.getReason());
       }
+      throw new CatalogException(String.format("Found %d incorrect metastore "
+          + "configuration(s). Events processor cannot start. See ERROR log for more "
+          + "details.", validationErrors.size()));
     }
   }
 
@@ -393,10 +392,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
    * version
    */
   public static List<MetastoreEventProcessorConfig> getEventProcessorConfigsToValidate() {
-    if (MetastoreShim.getMajorVersion() >= 2) {
-      return Arrays.asList(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML);
-    }
-    return Arrays.asList(MetastoreEventProcessorConfig.values());
+    return Arrays.asList(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML,
+        MetastoreEventProcessorConfig.METASTORE_DEFAULT_CATALOG_NAME);
   }
 
   private void initMetrics() {

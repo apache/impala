@@ -396,6 +396,16 @@ public class MetastoreShim {
     }
   }
 
+  // hive-3 introduces a catalog object in hive
+  // Impala only supports the default catalog of hive
+  private static final String defaultCatalogName_ = MetaStoreUtils
+      .getDefaultCatalog(MetastoreConf.newMetastoreConf());
+
+  /**
+   * Gets the name of the default catalog from metastore configuration.
+   */
+  public static String getDefaultCatalogName() { return defaultCatalogName_; }
+
   //hive-3 has a different class to encode and decode event messages
   private static final MessageEncoder eventMessageEncoder_ =
       MessageFactory.getDefaultInstance(MetastoreConf.newMetastoreConf());

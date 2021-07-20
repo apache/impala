@@ -17,11 +17,6 @@
 
 package org.apache.impala.catalog.events;
 
-import static java.lang.Thread.sleep;
-import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.ALTER_TABLE;
-import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.CREATE_DATABASE;
-import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.DROP_DATABASE;
-import static org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType.DROP_TABLE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -31,6 +26,7 @@ import static org.junit.Assert.fail;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
+import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,7 +34,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -51,8 +46,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.hive.metastore.api.Catalog;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -88,7 +85,6 @@ import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
 import org.apache.impala.catalog.events.MetastoreEvents.AlterTableEvent;
-import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
@@ -155,6 +151,7 @@ import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.google.common.collect.Lists;
@@ -221,6 +218,13 @@ public class MetastoreEventsProcessorTest {
     }
   }
 
+  private static void dropDatabaseCascade(String catName, String dbName)
+      throws TException {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      msClient.getHiveClient().dropDatabase(catName, dbName, true, true, true);
+    }
+  }
+
   /**
    * Cleans up the test database from both metastore and catalog
    * @throws TException
@@ -273,6 +277,10 @@ public class MetastoreEventsProcessorTest {
       String configKey = config.getValidator().getConfigKey();
       Mockito.when(mockMetastoreEventsProcessor.getConfigValueFromMetastore(configKey,
           "")).thenReturn("false");
+      if (config.equals(MetastoreEventProcessorConfig.METASTORE_DEFAULT_CATALOG_NAME)) {
+        Mockito.when(mockMetastoreEventsProcessor.getConfigValueFromMetastore(configKey,
+            "")).thenReturn("test_custom_catalog");
+      }
     }
     try {
       mockMetastoreEventsProcessor.validateConfigs();
@@ -311,55 +319,20 @@ public class MetastoreEventsProcessorTest {
   @Test
   public void testConfigValidationWithIncorrectValues() {
     Map<MetastoreEventProcessorConfig, String> incorrectValues = new HashMap<>();
-    incorrectValues.put(MetastoreEventProcessorConfig.ADD_THRIFT_OBJECTS, "false");
-    incorrectValues.put(MetastoreEventProcessorConfig.ALTER_NOTIFICATIONS_BASIC, "true");
     incorrectValues.put(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML, "false");
+    incorrectValues
+        .put(MetastoreEventProcessorConfig.METASTORE_DEFAULT_CATALOG_NAME, "custom");
     for (MetastoreEventProcessorConfig config : incorrectValues.keySet()) {
       testConfigValidation(config, incorrectValues.get(config), false);
     }
-    testConfigValidation(
-        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, "^impala",
-        false);
-    testConfigValidation(
-        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, "impala*",
-        false);
-    testConfigValidation(
-        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS,
-        "randomString1, impala.disableHmsSync, randomString2", false);
-    testConfigValidation(
-        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS,
-        MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), false);
-    testConfigValidation(
-        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS,
-        "^impala.events.catalogServiceId", false);
-    testConfigValidation(
-        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, ".*", false);
-    testConfigValidation(
-        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, ".+", false);
-    testConfigValidation(
-        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, ".*disable.*",
-        false);
-
-    // check validation succeeds for correct values
-    testConfigValidation(MetastoreEventProcessorConfig.ADD_THRIFT_OBJECTS, "true", true);
-    testConfigValidation(MetastoreEventProcessorConfig.ADD_THRIFT_OBJECTS, "TRUE", true);
-    testConfigValidation(MetastoreEventProcessorConfig.ADD_THRIFT_OBJECTS, "True", true);
-
-    testConfigValidation(MetastoreEventProcessorConfig.ALTER_NOTIFICATIONS_BASIC, "false",
-        true);
-    testConfigValidation(MetastoreEventProcessorConfig.ALTER_NOTIFICATIONS_BASIC, "FALSE",
-        true);
-    testConfigValidation(MetastoreEventProcessorConfig.ALTER_NOTIFICATIONS_BASIC, "fAlse",
-        true);
-
-    testConfigValidation(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML, "true", true);
-    testConfigValidation(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML, "TRUE", true);
-    testConfigValidation(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML, "tRue", true);
-    testConfigValidation(
-        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, "", true);
-    testConfigValidation(
-        MetastoreEventProcessorConfig.METASTORE_PARAMETER_EXCLUDE_PATTERNS, "random",
-        true);
+    testConfigValidation(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML,
+        "true", true);
+    testConfigValidation(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML,
+        "TRUE", true);
+    testConfigValidation(MetastoreEventProcessorConfig.FIRE_EVENTS_FOR_DML,
+        "tRue", true);
+    testConfigValidation(MetastoreEventProcessorConfig.METASTORE_DEFAULT_CATALOG_NAME,
+        "hIve", true);
   }
 
   private void testConfigValidation(MetastoreEventProcessorConfig config,
@@ -382,6 +355,39 @@ public class MetastoreEventsProcessorTest {
     createDatabase(TEST_DB_NAME, null);
     eventsProcessor_.processEvents();
     assertNotNull(catalog_.getDb(TEST_DB_NAME));
+  }
+
+  @Test
+  public void testIgnoreNonDefaultCatalogs() throws Exception {
+    String catName = "custom_hive_catalog";
+    try {
+      dropHiveCatalogIfExists(catName);
+      createHiveCatalog(catName);
+      createDatabase(TEST_DB_NAME, null);
+      String tblName = "test";
+      createTable(tblName, false);
+      eventsProcessor_.processEvents();
+      // create a database and table in the custom hive catalog whose name matches
+      // with one already existing in Impala
+      createDatabase(catName, TEST_DB_NAME, null);
+      createTable(catName, TEST_DB_NAME, tblName, null, false);
+      eventsProcessor_.processEvents();
+      assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
+      // assert that dbname and table in the default catalog exist
+      assertNotNull(catalog_.getDb(TEST_DB_NAME));
+      assertNotNull(catalog_.getTable(TEST_DB_NAME, tblName));
+      dropDatabaseCascade(catName, TEST_DB_NAME);
+      // when a catalog is created a default database is also created within it
+      dropDatabaseCascade(catName, "default");
+      dropHiveCatalogIfExists(catName);
+      eventsProcessor_.processEvents();
+      assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
+      // assert that dbname and table in the default catalog exist
+      assertNotNull(catalog_.getDb(TEST_DB_NAME));
+      assertNotNull(catalog_.getTable(TEST_DB_NAME, tblName));
+    } finally {
+      dropHiveCatalogIfExists(catName);
+    }
   }
 
   /**
@@ -706,12 +712,12 @@ public class MetastoreEventsProcessorTest {
     // Test insert into partition
     createDatabase(TEST_DB_NAME, null);
     String tableToInsertPart = "tbl_to_insert_part";
-    createTable(TEST_DB_NAME, tableToInsertPart, null, true);
+    createTable(TEST_DB_NAME, tableToInsertPart, true);
     testInsertEvents(TEST_DB_NAME, tableToInsertPart, true);
 
     // Test insert into table
     String tableToInsertNoPart = "tbl_to_insert_no_part";
-    createTable(TEST_DB_NAME, tableToInsertNoPart, null, false);
+    createTable(TEST_DB_NAME, tableToInsertNoPart, false);
     testInsertEvents(TEST_DB_NAME, tableToInsertNoPart,false);
   }
 
@@ -1554,7 +1560,7 @@ public class MetastoreEventsProcessorTest {
               tblTransition.first);
         }
         createDatabase(TEST_DB_NAME, dbParams);
-        createTable(TEST_DB_NAME, testTblName, tblParams, false);
+        createTable(null, TEST_DB_NAME, testTblName, tblParams, false);
         eventsProcessor_.processEvents();
         // table creation is skipped since the flag says so
         assertNull(catalog_.getTable(TEST_DB_NAME, testTblName));
@@ -1682,9 +1688,9 @@ public class MetastoreEventsProcessorTest {
     }
 
     org.apache.hadoop.hive.metastore.api.Table tableBefore =
-        getTestTable(dbName, tblName, beforeParams, false);
+        getTestTable(null, dbName, tblName, beforeParams, false);
     org.apache.hadoop.hive.metastore.api.Table tableAfter =
-        getTestTable(dbName, tblName, afterParams, false);
+        getTestTable(null, dbName, tblName, afterParams, false);
 
     Map<String, String> dbParams = new HashMap<>(1);
     if (dbFlag != null) {
@@ -1708,7 +1714,7 @@ public class MetastoreEventsProcessorTest {
     // issue a dummy alter table by adding a param
     afterParams.put("dummy", "value");
     org.apache.hadoop.hive.metastore.api.Table nextTable =
-        getTestTable(dbName, tblName, afterParams, false);
+        getTestTable(null, dbName, tblName, afterParams, false);
     NotificationEvent nextNotification =
         createFakeAlterTableNotification(dbName, tblName, tableAfter, nextTable);
     alterTableEvent =
@@ -1769,9 +1775,9 @@ public class MetastoreEventsProcessorTest {
     Map<String, String> tblParams = new HashMap<>(1);
     tblParams.put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(), "true");
     // event 2
-    createTable(TEST_DB_NAME, "tbl_should_skipped", tblParams, true);
+    createTable(null, TEST_DB_NAME, "tbl_should_skipped", tblParams, true);
     // event 3
-    createTable(TEST_DB_NAME, testTblName, null, true);
+    createTable(null, TEST_DB_NAME, testTblName, null, true);
     List<List<String>> partitionVals = new ArrayList<>();
     partitionVals.add(Arrays.asList("1"));
     partitionVals.add(Arrays.asList("2"));
@@ -1929,7 +1935,7 @@ public class MetastoreEventsProcessorTest {
       Map<String, String> dbParams, Map<String, String> tblParams) throws Exception {
     assertNull(catalog_.getDb(dbName));
     createDatabase(dbName, dbParams);
-    createTable(dbName, tblName, tblParams, true);
+    createTable(null, dbName, tblName, tblParams, true);
     List<List<String>> partVals = new ArrayList<>(3);
     partVals.add(Arrays.asList("1"));
     partVals.add(Arrays.asList("2"));
@@ -2417,7 +2423,13 @@ public class MetastoreEventsProcessorTest {
 
   private void createDatabase(String dbName, Map<String, String> params)
       throws TException {
+    createDatabase(null, dbName, params);
+  }
+
+  private void createDatabase(String catName, String dbName, Map<String, String> params)
+      throws TException {
     Database database = new Database();
+    if (catName != null) database.setCatalogName(catName);
     database.setName(dbName);
     database.setDescription("Notification test database");
     database.setOwnerName("NotificationOwner");
@@ -2427,6 +2439,27 @@ public class MetastoreEventsProcessorTest {
     }
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       msClient.getHiveClient().createDatabase(database);
+    }
+  }
+
+  private void createHiveCatalog(String catName) throws TException {
+    Catalog catalog = new Catalog();
+    catalog.setName(catName);
+    catalog.setLocationUri(Files.createTempDir().getAbsolutePath());
+    try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+      metaStoreClient.getHiveClient().createCatalog(catalog);
+    }
+  }
+
+  private void dropHiveCatalogIfExists(String catName) throws TException {
+    try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+      // unfortunately the dropCatalog API doesn't seem to take ifExists or cascade flag
+      if (msClient.getHiveClient().getCatalogs().contains(catName)) {
+        for (String db : msClient.getHiveClient().getAllDatabases(catName)) {
+          msClient.getHiveClient().dropDatabase(catName, db, true, true, true);
+        }
+        msClient.getHiveClient().dropCatalog(catName);
+      }
     }
   }
 
@@ -2447,21 +2480,22 @@ public class MetastoreEventsProcessorTest {
     }
   }
 
-  private void createTable(String dbName, String tblName, Map<String, String> params,
-      boolean isPartitioned) throws TException {
+  private void createTable(String catName, String dbName, String tblName,
+      Map<String, String> params, boolean isPartitioned) throws TException {
     org.apache.hadoop.hive.metastore.api.Table
-        tbl = getTestTable(dbName, tblName, params, isPartitioned);
+        tbl = getTestTable(catName, dbName, tblName, params, isPartitioned);
 
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       msClient.getHiveClient().createTable(tbl);
     }
   }
 
-  private org.apache.hadoop.hive.metastore.api.Table getTestTable(String dbName,
-      String tblName, Map<String, String> params, boolean isPartitioned)
+  private org.apache.hadoop.hive.metastore.api.Table getTestTable(String catName,
+      String dbName, String tblName, Map<String, String> params, boolean isPartitioned)
       throws MetaException {
     org.apache.hadoop.hive.metastore.api.Table tbl =
         new org.apache.hadoop.hive.metastore.api.Table();
+    if (catName != null) tbl.setCatName(catName);
     tbl.setDbName(dbName);
     tbl.setTableName(tblName);
     tbl.putToParameters("tblParamKey", "tblParamValue");
@@ -2973,8 +3007,13 @@ public class MetastoreEventsProcessorTest {
     return partitionDef;
   }
 
+  private void createTable(String dbName, String tblName, boolean isPartitioned)
+      throws TException {
+    createTable(null, dbName, tblName, null, isPartitioned);
+  }
+
   private void createTable(String tblName, boolean isPartitioned) throws TException {
-    createTable(TEST_DB_NAME, tblName, null, isPartitioned);
+    createTable(null, TEST_DB_NAME, tblName, null, isPartitioned);
   }
 
   private void dropTable(String tableName) throws TException {
