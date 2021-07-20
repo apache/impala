@@ -23,9 +23,12 @@ import logging
 import requests
 import time
 import json
+from tests.common.impala_cluster import ImpalaCluster
+from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 LOG = logging.getLogger('event_processor_utils')
 LOG.setLevel(level=logging.DEBUG)
+
 class EventProcessorUtils(object):
 
   DEFAULT_CATALOG_URL = "http://localhost:25020"
@@ -34,6 +37,8 @@ class EventProcessorUtils(object):
   def wait_for_event_processing(test_suite, timeout=10):
       """Waits till the event processor has synced to the latest event id from metastore
          or the timeout value in seconds whichever is earlier"""
+      if EventProcessorUtils.get_event_processor_status() == "DISABLED":
+        return
       success = False
       assert timeout > 0
       assert test_suite.hive_client is not None
@@ -54,10 +59,15 @@ class EventProcessorUtils(object):
         raise Exception(
           "Event processor did not sync till last known event id {0} \
           within {1} seconds".format(current_event_id, timeout))
+      if isinstance(test_suite, CustomClusterTestSuite):
+        impala_cluster = test_suite.cluster
+      else:
+        impala_cluster = ImpalaCluster.get_e2e_test_cluster()
       # Wait until the impalad catalog versions agree with the catalogd's version.
-      catalogd_version = test_suite.cluster.catalogd.service.get_catalog_version()
-      for impalad in test_suite.cluster.impalads:
-        impalad.service.wait_for_metric_value("catalog.curr-version", catalogd_version)
+      catalogd_version = impala_cluster.catalogd.service.get_catalog_version()
+      for impalad in impala_cluster.impalads:
+        impalad.service.wait_for_metric_value("catalog.curr-version", catalogd_version,
+          allow_greater=True)
       return success
 
   @staticmethod

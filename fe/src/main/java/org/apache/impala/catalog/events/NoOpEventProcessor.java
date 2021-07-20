@@ -17,7 +17,14 @@
 
 package org.apache.impala.catalog.events;
 
+import com.codahale.metrics.Gauge;
+import org.apache.hadoop.hive.metastore.api.NotificationEvent;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.events.MetastoreEvents.IgnoredEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
+import org.apache.impala.common.Metrics;
 import org.apache.impala.thrift.TEventProcessorMetrics;
 import org.apache.impala.thrift.TEventProcessorMetricsSummaryResponse;
 
@@ -43,7 +50,10 @@ public class NoOpEventProcessor implements ExternalEventsProcessor {
   private NoOpEventProcessor() {
     // prevents instantiation
     DEFAULT_METRICS_RESPONSE.setStatus(EventProcessorStatus.DISABLED.toString());
-    DEFAULT_SUMMARY_RESPONSE.setSummary("");
+    Metrics metrics = new Metrics();
+    metrics.addGauge(MetastoreEventsProcessor.STATUS_METRIC,
+        (Gauge<String>) EventProcessorStatus.DISABLED::toString);
+    DEFAULT_SUMMARY_RESPONSE.setSummary(metrics.toString());
   }
 
   @Override

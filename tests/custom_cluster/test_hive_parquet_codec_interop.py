@@ -20,6 +20,7 @@
 import pytest
 
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.util.event_processor_utils import EventProcessorUtils
 from tests.common.environ import HIVE_MAJOR_VERSION
 from tests.common.skip import SkipIfS3, SkipIfGCS
 from tests.common.test_dimensions import create_exec_option_dimension
@@ -96,8 +97,10 @@ class TestParquetInterop(CustomClusterTestSuite):
           .format(codec, external, hive_table, tblproperties, impala_table))
 
       # Make sure Impala's metadata is in sync.
-      if cluster_properties.is_catalog_v2_cluster():
-        self.wait_for_table_to_appear(unique_database, hive_table, timeout_s=10)
+      if cluster_properties.is_event_polling_enabled():
+        assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
+        EventProcessorUtils.wait_for_event_processing(self)
+        self.confirm_table_exists(unique_database, "t1_hive")
       else:
         self.client.execute("invalidate metadata {0}".format(hive_table))
 

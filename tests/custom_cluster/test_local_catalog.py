@@ -444,7 +444,6 @@ class TestLocalCatalogRetries(CustomClusterTestSuite):
     for i in t.imap_unordered(do_table, xrange(NUM_ITERS)):
       pass
 
-
 class TestObservability(CustomClusterTestSuite):
   def get_catalog_cache_metrics(self, impalad):
     """ Returns catalog cache metrics as a dict by scraping the json metrics page on the

@@ -193,7 +193,9 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
                            "managedlocation '" + get_fs_path("/test2.db") + "'")
       if cluster_properties.is_event_polling_enabled():
         # Using HMS event processor - wait until the database shows up.
+        assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
         EventProcessorUtils.wait_for_event_processing(self)
+        self.confirm_db_exists("hive_test_desc_db")
       else:
         # Invalidate metadata to pick up hive-created db.
         self.client.execute("invalidate metadata")

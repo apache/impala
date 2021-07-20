@@ -109,7 +109,7 @@ class TestHiveMetaStoreFailure(CustomClusterTestSuite):
     # Wait for the query to complete, assert that the HMS client retried the connection.
     thread.join()
     self.assert_catalogd_log_contains("INFO",
-        "MetaStoreClient lost connection. Attempting to reconnect")
+        "MetaStoreClient lost connection. Attempting to reconnect", expected_count=-1)
 
 
 class TestCatalogHMSFailures(CustomClusterTestSuite):

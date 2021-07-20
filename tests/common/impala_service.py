@@ -111,7 +111,8 @@ class BaseImpalaService(object):
         return var["current"]
     return None
 
-  def wait_for_metric_value(self, metric_name, expected_value, timeout=10, interval=1):
+  def wait_for_metric_value(self, metric_name, expected_value, timeout=10, interval=1,
+      allow_greater=False):
     start_time = time()
     while (time() - start_time < timeout):
       LOG.info("Getting metric: %s from %s:%s" %
@@ -122,12 +123,18 @@ class BaseImpalaService(object):
       except Exception, e:
         LOG.error(e)
 
-      if value == expected_value:
+      # if allow_greater is True we wait until the metric value becomes >= the expected
+      # value.
+      if allow_greater:
+        if value >= expected_value:
+          LOG.info("Metric '%s' has reached desired value: %s" % (metric_name, value))
+          return value
+      elif value == expected_value:
         LOG.info("Metric '%s' has reached desired value: %s" % (metric_name, value))
         return value
       else:
-        LOG.info("Waiting for metric value '%s'=%s. Current value: %s" %
-            (metric_name, expected_value, value))
+        LOG.info("Waiting for metric value '%s'%s%s. Current value: %s" %
+            (metric_name, '>=' if allow_greater else '=', expected_value, value))
       LOG.info("Sleeping %ds before next retry." % interval)
       sleep(interval)
 

@@ -1111,6 +1111,19 @@ class ImpalaTestSuite(BaseTestSuite):
         continue
     raise Exception("DB {0} didn't show up after {1}s", db_name, timeout_s)
 
+  def confirm_db_exists(self, db_name):
+    """Confirm the database with 'db_name' is present in the impalad's local catalog.
+       Fail if the db is not present"""
+    # This will throw an exception if the database is not present.
+    self.client.execute("describe database `{db_name}`".format(db_name=db_name))
+    return
+
+  def confirm_table_exists(self, db_name, tbl_name):
+    """Confirms if the table exists. The describe table command will fail if the table
+       does not exist."""
+    self.client.execute("describe `{0}`.`{1}`".format(db_name, tbl_name))
+    return
+
   def wait_for_table_to_appear(self, db_name, table_name, timeout_s):
     """Wait until the table with 'table_name' in 'db_name' is present in the
     impalad's local catalog. Fail after timeout_s if the doesn't appear."""

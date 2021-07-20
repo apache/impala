@@ -302,6 +302,11 @@ class SkipIfCatalogV2:
       IMPALA_TEST_CLUSTER_PROPERTIES.is_catalog_v2_cluster(),
       reason="Table isn't invalidated with Local catalog and enabled hms_event_polling.")
 
+  @classmethod
+  def hms_event_polling_disabled(self):
+    return pytest.mark.skipif(
+      not IMPALA_TEST_CLUSTER_PROPERTIES.is_event_polling_enabled(),
+      reason="Test expects event polling to be enabled.")
 
 class SkipIfOS:
   redhat6 = pytest.mark.skipif(IS_REDHAT_6_DERIVATIVE,
