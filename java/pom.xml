@@ -71,6 +71,7 @@ under the License.
     <xmlsec.version>2.2.1</xmlsec.version>
     <bcprov-jdk15on.version>1.64</bcprov-jdk15on.version>
     <springframework.version>4.3.29.RELEASE</springframework.version>
+    <json-smart.version>2.4.7</json-smart.version>
   </properties>
 
   <repositories>
