@@ -45,11 +45,11 @@ under the License.
 
   <dependencies>
 
-    <!-- Pin json-smart dependency to version 2.3 -->
+    <!-- Pin json-smart dependency. -->
     <dependency>
       <groupId>net.minidev</groupId>
       <artifactId>json-smart</artifactId>
-      <version>2.3</version>
+      <version>${json-smart.version}</version>
     </dependency>
 
     <dependency>
