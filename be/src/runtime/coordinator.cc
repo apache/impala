@@ -381,10 +381,11 @@ void Coordinator::InitFilterRoutingTable() {
       if (!plan_node.__isset.runtime_filters) continue;
       for (const TRuntimeFilterDesc& filter: plan_node.runtime_filters) {
         DCHECK(filter_mode_ == TRuntimeFilterMode::GLOBAL || filter.has_local_targets);
-        // Currently hash joins are the only filter sources. Otherwise it must be
-        // a filter consumer.
-        if (plan_node.__isset.join_node &&
-            plan_node.join_node.__isset.hash_join_node) {
+        // Currently either hash or nested loop joins are the only filter sources.
+        // Otherwise it must be a filter consumer.
+        if (plan_node.__isset.join_node
+            && (plan_node.join_node.__isset.hash_join_node
+                || plan_node.join_node.__isset.nested_loop_join_node)) {
           AddFilterSource(
               fragment_params, num_instances, num_backends, filter, plan_node.node_id);
         } else if (plan_node.__isset.hdfs_scan_node || plan_node.__isset.kudu_scan_node) {

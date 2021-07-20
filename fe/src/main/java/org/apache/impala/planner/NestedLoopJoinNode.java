@@ -116,6 +116,10 @@ public class NestedLoopJoinNode extends JoinNode {
         output.append(detailPrefix + "predicates: ")
             .append(Expr.getExplainString(conjuncts_, detailLevel) + "\n");
       }
+      if (!runtimeFilters_.isEmpty()) {
+        output.append(detailPrefix + "runtime filters: ");
+        output.append(getRuntimeFilterExplainString(true, detailLevel));
+      }
     }
     return output.toString();
   }

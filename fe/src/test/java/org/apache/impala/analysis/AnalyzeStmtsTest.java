@@ -4556,7 +4556,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Also check TableRefs.
     testNumberOfMembers(TableRef.class, 26);
     testNumberOfMembers(BaseTableRef.class, 0);
-    testNumberOfMembers(InlineViewRef.class, 9);
+    testNumberOfMembers(InlineViewRef.class, 10);
   }
 
   @SuppressWarnings("rawtypes")

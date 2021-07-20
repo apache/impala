@@ -120,6 +120,14 @@ struct FilterContext {
   /// or 'local_min_max_filter' as appropriate.
   void Insert(TupleRow* row) const noexcept;
 
+  /// Implements different flavors of insertion based on filter type and comparison
+  /// op in filter desc.
+  ///  1). When the op is EQ, regardless of filter type, call this->Insert(TupleRow* row);
+  ///  2). When the op is LE, LT, GE or GT and the filter type is min/max, call
+  //       MinMaxFilter::InsertFor<op>(TupleRow* row);
+  ///  3). DCHECK(false) otherwise.
+  void InsertPerCompareOp(TupleRow* row) const noexcept;
+
   /// Materialize filter values by copying any values stored by filters into memory owned
   /// by the filter. Filters may assume that the memory for Insert()-ed values stays valid
   /// until this is called.

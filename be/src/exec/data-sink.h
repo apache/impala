@@ -146,6 +146,7 @@ class DataSink {
 
   MemTracker* mem_tracker() const { return mem_tracker_.get(); }
   RuntimeProfile* profile() const { return profile_; }
+  const std::string& name() const { return name_; }
   const std::vector<ScalarExprEvaluator*>& output_expr_evals() const {
     return output_expr_evals_;
   }

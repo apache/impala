@@ -1332,7 +1332,7 @@ PLAN-ROOT SINK
 07:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t.bigint_col = g.bigint_col
 |  other join predicates: a.int_col < min(int_col)
-|  runtime filters: RF000 <- g.bigint_col
+|  runtime filters: RF001 <- g.bigint_col
 |  row-size=184B cardinality=781
 |
 |--03:AGGREGATE [FINALIZE]
@@ -1347,18 +1347,18 @@ PLAN-ROOT SINK
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = t.id
-|  runtime filters: RF002 <- t.id
+|  runtime filters: RF003 <- t.id
 |  row-size=184B cardinality=3.91K
 |
 |--01:SCAN HDFS [functional.alltypes t]
 |     HDFS partitions=24/24 files=24 size=478.45KB
 |     predicates: t.bool_col = FALSE
-|     runtime filters: RF000 -> t.bigint_col
+|     runtime filters: RF001 -> t.bigint_col
 |     row-size=89B cardinality=3.65K
 |
 00:SCAN HDFS [functional.alltypesagg a]
    HDFS partitions=11/11 files=11 size=814.73KB
-   runtime filters: RF002 -> a.id
+   runtime filters: RF003 -> a.id
    row-size=95B cardinality=11.00K
 ====
 # Multiple nesting levels with aggregation subqueries

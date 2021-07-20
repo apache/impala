@@ -125,6 +125,13 @@ struct __attribute__((__packed__)) StringValue {
   /// Returns number of characters in a char array (ignores trailing spaces)
   inline static int64_t UnpaddedCharLength(const char* cptr, int64_t len);
 
+  // Return the least smaller string 'result' such that 'result' < 'this'.
+  // The smallest string is "\x00". If no such string exists, return an empty string.
+  std::string LeastSmallerString() const;
+
+  // Return the least larger string 'result' such that 'this' < 'result'.
+  std::string LeastLargerString() const;
+
   /// For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
 };

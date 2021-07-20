@@ -87,6 +87,9 @@ public class AggregationNode extends PlanNode {
   // Peak memory is at least 16k, which is an empirical value
   protected final static long MIN_PLAIN_AGG_MEM = 16L * 1024L;
 
+  // The output is from a non-correlated scalar subquery returning at most one value.
+  protected boolean isNonCorrelatedScalarSubquery_ = false;
+
   public AggregationNode(
       PlanNodeId id, PlanNode input, MultiAggregateInfo multiAggInfo, AggPhase aggPhase) {
     super(id, "AGGREGATE");
@@ -108,6 +111,7 @@ public class AggregationNode extends PlanNode {
     aggInfos_ = src.aggInfos_;
     needsFinalize_ = src.needsFinalize_;
     useIntermediateTuple_ = src.useIntermediateTuple_;
+    isNonCorrelatedScalarSubquery_ = src.isNonCorrelatedScalarSubquery_;
   }
 
   @Override
@@ -628,5 +632,13 @@ public class AggregationNode extends PlanNode {
           Math.min(perInstanceMemEstimate, maxReservationBytes));
     }
     return builder.build();
+  }
+
+  public void setIsNonCorrelatedScalarSubquery(boolean val) {
+    isNonCorrelatedScalarSubquery_ = val;
+  }
+
+  public boolean isNonCorrelatedScalarSubquery() {
+    return isNonCorrelatedScalarSubquery_;
   }
 }

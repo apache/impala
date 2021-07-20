@@ -131,5 +131,40 @@ TEST(StringValueTest, TestConvertToUInt64) {
   EXPECT_EQ(StringValue("\1\2\3\4\5\6\7\7\7").ToUInt64(), 0x102030405060707);
 }
 
+// Test finding the least smaller strings.
+TEST(StringValueTest, TestLeastSmallerString) {
+  string oneKbNullStr(1024, 0x00);
+  string a1023NullStr(1023, 0x00);
+  EXPECT_EQ(StringValue(oneKbNullStr).LeastSmallerString(), a1023NullStr);
+
+  EXPECT_EQ(
+      StringValue(string("\x12\xef", 2)).LeastSmallerString(), string("\x12\xee"));
+  EXPECT_EQ(
+      StringValue(string("\x12\x00", 2)).LeastSmallerString(), string("\x12"));
+
+  // "0x00" is the smallest string.
+  string oneNullStr("\00", 1);
+  EXPECT_EQ(StringValue(oneNullStr).LeastSmallerString(), "");
+}
+
+// Test finding the least larger strings.
+TEST(StringValueTest, TestLeastLargerString) {
+  string nullStr("\x00", 1);
+  EXPECT_EQ(StringValue(nullStr).LeastLargerString(), string("\x01", 1));
+
+  string a10230xFFStr(1023, 0xff);
+  string oneKbStr(1023, 0xff);
+  oneKbStr.append(1, 0x00);
+  EXPECT_EQ(StringValue(a10230xFFStr).LeastLargerString(), oneKbStr);
+
+  EXPECT_EQ(
+      StringValue(string("\x12\xef", 2)).LeastLargerString(), string("\x12\xf0"));
+  EXPECT_EQ(StringValue(string("\x12\xff", 2)).LeastLargerString(),
+      string("\x13"));
+
+  string emptyStr("", 0);
+  EXPECT_EQ(StringValue(emptyStr).LeastLargerString(), string("\00", 1));
+}
+
 }
 

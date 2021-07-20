@@ -394,6 +394,12 @@ APPROXIMATE_NUMERIC_MIN_MAX_FILTER_EVAL_OVERLAP(Double, double);
 const char* StringMinMaxFilter::LLVM_CLASS_NAME = "class.impala::StringMinMaxFilter";
 const int StringMinMaxFilter::MAX_BOUND_LENGTH = 1024;
 
+const std::string StringMinMaxFilter::min_string("\0", 1);
+const std::string StringMinMaxFilter::max_string(MAX_BOUND_LENGTH, (uint8_t)0xff);
+
+const StringValue StringMinMaxFilter::MIN_BOUND_STRING(min_string);
+const StringValue StringMinMaxFilter::MAX_BOUND_STRING(max_string);
+
 StringMinMaxFilter::StringMinMaxFilter(
     const MinMaxFilterPB& protobuf, MemTracker* mem_tracker)
   : mem_pool_(mem_tracker), min_buffer_(&mem_pool_), max_buffer_(&mem_pool_) {
@@ -415,37 +421,41 @@ PrimitiveType StringMinMaxFilter::type() const {
   return PrimitiveType::TYPE_STRING;
 }
 
+void StringMinMaxFilter::MaterializeMinValue() {
+  if (min_.len > MAX_BOUND_LENGTH) {
+    // Truncating 'value' gives a valid min bound as the result will be <= 'value'.
+    CopyToBuffer(&min_buffer_, &min_, MAX_BOUND_LENGTH);
+  } else {
+    CopyToBuffer(&min_buffer_, &min_, min_.len);
+  }
+}
+
+void StringMinMaxFilter::MaterializeMaxValue() {
+  if (max_.len > MAX_BOUND_LENGTH) {
+    CopyToBuffer(&max_buffer_, &max_, MAX_BOUND_LENGTH);
+    if (always_true_) return;
+    // After truncating 'value', to still have a valid max bound we add 1 to one char in
+    // the string, so that the result will be > 'value'. If the entire string is already
+    // the max char, then disable this filter by making it always_true.
+    int i = MAX_BOUND_LENGTH - 1;
+    while (i >= 0 && static_cast<int32_t>(max_buffer_.buffer()[i]) == -1) {
+      max_buffer_.buffer()[i] = max_buffer_.buffer()[i] + 1;
+      --i;
+    }
+    if (i == -1) {
+      SetAlwaysTrue();
+      return;
+    }
+    max_buffer_.buffer()[i] = max_buffer_.buffer()[i] + 1;
+  } else {
+    CopyToBuffer(&max_buffer_, &max_, max_.len);
+  }
+}
+
 void StringMinMaxFilter::MaterializeValues() {
   if (always_true_ || always_false_) return;
-  if (min_buffer_.IsEmpty()) {
-    if (min_.len > MAX_BOUND_LENGTH) {
-      // Truncating 'value' gives a valid min bound as the result will be <= 'value'.
-      CopyToBuffer(&min_buffer_, &min_, MAX_BOUND_LENGTH);
-    } else {
-      CopyToBuffer(&min_buffer_, &min_, min_.len);
-    }
-  }
-  if (max_buffer_.IsEmpty()) {
-    if (max_.len > MAX_BOUND_LENGTH) {
-      CopyToBuffer(&max_buffer_, &max_, MAX_BOUND_LENGTH);
-      if (always_true_) return;
-      // After truncating 'value', to still have a valid max bound we add 1 to one char in
-      // the string, so that the result will be > 'value'. If the entire string is already
-      // the max char, then disable this filter by making it always_true.
-      int i = MAX_BOUND_LENGTH - 1;
-      while (i >= 0 && static_cast<int32_t>(max_buffer_.buffer()[i]) == -1) {
-        max_buffer_.buffer()[i] = max_buffer_.buffer()[i] + 1;
-        --i;
-      }
-      if (i == -1) {
-        SetAlwaysTrue();
-        return;
-      }
-      max_buffer_.buffer()[i] = max_buffer_.buffer()[i] + 1;
-    } else {
-      CopyToBuffer(&max_buffer_, &max_, max_.len);
-    }
-  }
+  if (min_buffer_.IsEmpty()) MaterializeMinValue();
+  if (max_buffer_.IsEmpty()) MaterializeMaxValue();
 }
 
 void StringMinMaxFilter::ToProtobuf(MinMaxFilterPB* protobuf) const {
@@ -729,6 +739,74 @@ void DecimalMinMaxFilter::Insert(const void* val) {
       break;
     case 16:
       Insert16(val);
+      break;
+    default:
+      DCHECK(false) << "Unknown decimal size: " << size_;
+  }
+}
+
+void DecimalMinMaxFilter::InsertForLE(const void* val) {
+  if (val == nullptr) return;
+  switch (size_) {
+    case 4:
+      Insert4ForLE(val);
+      break;
+    case 8:
+      Insert8ForLE(val);
+      break;
+    case 16:
+      Insert16ForLE(val);
+      break;
+    default:
+      DCHECK(false) << "Unknown decimal size: " << size_;
+  }
+}
+
+void DecimalMinMaxFilter::InsertForGE(const void* val) {
+  if (val == nullptr) return;
+  switch (size_) {
+    case 4:
+      Insert4ForGE(val);
+      break;
+    case 8:
+      Insert8ForGE(val);
+      break;
+    case 16:
+      Insert16ForGE(val);
+      break;
+    default:
+      DCHECK(false) << "Unknown decimal size: " << size_;
+  }
+}
+
+void DecimalMinMaxFilter::InsertForLT(const void* val) {
+  if (val == nullptr) return;
+  switch (size_) {
+    case 4:
+      Insert4ForLT(val);
+      break;
+    case 8:
+      Insert8ForLT(val);
+      break;
+    case 16:
+      Insert16ForLT(val);
+      break;
+    default:
+      DCHECK(false) << "Unknown decimal size: " << size_;
+  }
+}
+
+void DecimalMinMaxFilter::InsertForGT(const void* val) {
+  if (val == nullptr) return;
+  switch (size_) {
+    case 4:
+      Insert4ForGT(val);
+      break;
+    case 8:
+      Insert8ForGT(val);
+      break;
+    case 16:
+      Insert16ForGT(val);
       break;
     default:
       DCHECK(false) << "Unknown decimal size: " << size_;

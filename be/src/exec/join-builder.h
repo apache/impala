@@ -20,6 +20,8 @@
 #include <mutex>
 
 #include "exec/data-sink.h"
+#include "exec/filter-context.h"
+#include "runtime/runtime-state.h"
 #include "util/condition-variable.h"
 
 namespace impala {
@@ -140,6 +142,10 @@ class JoinBuilder : public DataSink {
 
   int num_probe_threads() const { return num_probe_threads_; }
 
+  static string ConstructBuilderName(const char* name, int join_node_id) {
+    return strings::Substitute("$0 Join Builder (join_node_id=$1)", name, join_node_id);
+  }
+
  protected:
   /// ID of the join node that this builder is associated with.
   const int join_node_id_;
@@ -205,5 +211,13 @@ class JoinBuilder : public DataSink {
   /// TODO: IMPALA-9255: reconsider this so that the build-side thread can exit instead
   /// of being blocked indefinitely.
   void HandoffToProbesAndWait(RuntimeState* build_side_state);
+
+  /// Publish the runtime filters as described in 'filter_ctxs' to the fragment-local
+  /// RuntimeFilterBank in 'runtime_state'. 'minmax_filter_threshold' specifies the
+  /// threshold to determine the usefulness of a min/max filter. 'num_build_rows' is used
+  /// to determine whether the computed filters have an unacceptably high false-positive
+  /// rate.
+  void PublishRuntimeFilters(const std::vector<FilterContext>& filter_ctxs,
+      RuntimeState* runtime_state, float minmax_filter_threshold, int64_t num_build_rows);
 };
 }

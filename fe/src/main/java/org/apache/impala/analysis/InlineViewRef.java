@@ -78,6 +78,10 @@ public class InlineViewRef extends TableRef {
   // Whether this is an inline view generated for table masking.
   private boolean isTableMaskingView_ = false;
 
+  // Whether this is an inline view generated for a non-correlated scalar subquery
+  // returning at most one value.
+  private boolean isNonCorrelatedScalarSubquery_ = false;
+
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -445,5 +449,12 @@ public class InlineViewRef extends TableRef {
       sql.append(")");
     }
     return sql.toString();
+  }
+
+  public void setIsNonCorrelatedScalarSubquery() {
+    isNonCorrelatedScalarSubquery_ = true;
+  }
+  public boolean isNonCorrelatedScalarSubquery() {
+    return isNonCorrelatedScalarSubquery_;
   }
 }

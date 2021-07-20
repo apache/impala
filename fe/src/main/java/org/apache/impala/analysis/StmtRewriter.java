@@ -799,6 +799,9 @@ public class StmtRewriter {
         stmt.whereClause_ =
             CompoundPredicate.createConjunction(onClausePredicate, stmt.whereClause_);
         inlineView.setJoinOp(JoinOperator.CROSS_JOIN);
+        // Indicate this inline view returns at most one value through a
+        // non-correlated scalar subquery.
+        if (isScalarSubquery) inlineView.setIsNonCorrelatedScalarSubquery();
         // Indicate that the CROSS JOIN may add a new visible tuple to stmt's
         // select list (if the latter contains an unqualified star item '*')
         return true;

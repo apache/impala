@@ -940,6 +940,10 @@ public class DistributedPlanner {
         mergeFragment.getPlanRoot(), node.getMultiAggInfo(), AggPhase.FIRST_MERGE);
     mergeAggNode.init(ctx_.getRootAnalyzer());
     mergeAggNode.setLimit(limit);
+    // Carry the IsNonCorrelatedSclarSubquery_ flag to the merge node. This flag is
+    // applicable regardless of the partition scheme for the children since it is a
+    // logical property.
+    mergeAggNode.setIsNonCorrelatedScalarSubquery(node.isNonCorrelatedScalarSubquery());
     // Merge of non-grouping agg only processes one tuple per Impala daemon - codegen
     // will cost more than benefit.
     if (!hasGrouping) {

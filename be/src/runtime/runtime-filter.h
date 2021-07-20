@@ -19,6 +19,7 @@
 
 #include <mutex>
 
+#include "gen-cpp/ExternalDataSource_types.h"
 #include "runtime/raw-value.h"
 #include "runtime/runtime-filter-bank.h"
 #include "util/bloom-filter.h"
@@ -62,6 +63,10 @@ class RuntimeFilter {
   bool is_bloom_filter() const { return filter_desc().type == TRuntimeFilterType::BLOOM; }
   bool is_min_max_filter() const {
     return filter_desc().type == TRuntimeFilterType::MIN_MAX;
+  }
+
+  extdatasource::TComparisonOp::type getCompareOp() const {
+    return filter_desc().compareOp;
   }
 
   BloomFilter* get_bloom_filter() const { return bloom_filter_.Load(); }

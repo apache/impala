@@ -92,6 +92,11 @@ public abstract class Predicate extends Expr {
         && ((BinaryPredicate) expr).getOp().isSqlEquivalence();
   }
 
+  public static boolean isSingleRangePredicate(Expr expr) {
+    return (expr instanceof BinaryPredicate)
+        && ((BinaryPredicate) expr).getOp().isSingleRange();
+  }
+
   /**
    * If predicate is of the form "<slotref> = <slotref>", returns both SlotRefs,
    * otherwise returns null.

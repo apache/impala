@@ -259,6 +259,14 @@ public class ScalarType extends Type {
     return scale_;
   }
 
+  public int storageBytesForDecimal() {
+    if (type_ != PrimitiveType.DECIMAL) return -1;
+    if (precision_ <= 9) return 4;
+    if (precision_ <= 18) return 8;
+    if (precision_ <= 38) return 16;
+    return -1;
+  }
+
   @Override
   public PrimitiveType getPrimitiveType() { return type_; }
   public int ordinal() { return type_.ordinal(); }

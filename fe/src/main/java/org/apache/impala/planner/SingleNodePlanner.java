@@ -1244,6 +1244,13 @@ public class SingleNodePlanner {
       rootNode = addUnassignedConjuncts(
           analyzer, inlineViewRef.getDesc().getId().asList(), rootNode);
     }
+    // Transfer whether the inline view is for a non-correlated subquery returning at
+    // most one value to the root node when it is an AggregationNode.
+    if (rootNode instanceof AggregationNode) {
+      ((AggregationNode) rootNode)
+          .setIsNonCorrelatedScalarSubquery(
+              inlineViewRef.isNonCorrelatedScalarSubquery());
+    }
     return rootNode;
   }
 
@@ -1912,6 +1919,28 @@ public class SingleNodePlanner {
     if (!pred.getOp().isEquivalence() && pred.getOp() != Operator.NULL_MATCHING_EQ) {
       return null;
     }
+    if (pred.getChild(0).isConstant() || pred.getChild(1).isConstant()) return null;
+
+    Expr lhsExpr = Expr.getFirstBoundChild(pred, lhsTids);
+    Expr rhsExpr = Expr.getFirstBoundChild(pred, rhsTids);
+    if (lhsExpr == null || rhsExpr == null || lhsExpr == rhsExpr) return null;
+
+    BinaryPredicate result = new BinaryPredicate(pred.getOp(), lhsExpr, rhsExpr);
+    result.analyzeNoThrow(analyzer);
+    return result;
+  }
+
+  /**
+   * Similar to getNormalizedEqPred(), except returns a normalized version of a binary
+   * single range predicate 'expr'. A single range predicate is defined as one with
+   * pred.getOp() being =, <, <=, > or >=.
+   */
+  public static BinaryPredicate getNormalizedSingleRangePred(
+      Expr expr, List<TupleId> lhsTids, List<TupleId> rhsTids, Analyzer analyzer) {
+    if (!(expr instanceof BinaryPredicate)) return null;
+    BinaryPredicate pred = (BinaryPredicate) expr;
+    if (!pred.getOp().isSingleRange()) return null;
+
     if (pred.getChild(0).isConstant() || pred.getChild(1).isConstant()) return null;
 
     Expr lhsExpr = Expr.getFirstBoundChild(pred, lhsTids);

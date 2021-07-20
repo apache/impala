@@ -55,10 +55,6 @@ static const string PREPARE_FOR_READ_FAILED_ERROR_MSG =
 using namespace impala;
 using strings::Substitute;
 
-static string ConstructBuilderName(int join_node_id) {
-  return Substitute("Hash Join Builder (join_node_id=$0)", join_node_id);
-}
-
 DataSink* PhjBuilderConfig::CreateSink(RuntimeState* state) const {
   // We have one fragment per sink, so we can use the fragment index as the sink ID.
   TDataSinkId sink_id = state->fragment().idx;
@@ -162,8 +158,8 @@ const char* PhjBuilder::LLVM_CLASS_NAME = "class.impala::PhjBuilder";
 
 PhjBuilder::PhjBuilder(
     TDataSinkId sink_id, const PhjBuilderConfig& sink_config, RuntimeState* state)
-  : JoinBuilder(
-        sink_id, sink_config, ConstructBuilderName(sink_config.join_node_id_), state),
+  : JoinBuilder(sink_id, sink_config,
+      ConstructBuilderName("Hash", sink_config.join_node_id_), state),
     runtime_state_(state),
     hash_seed_(sink_config.hash_seed_),
     resource_profile_(sink_config.resource_profile_),
@@ -200,7 +196,8 @@ PhjBuilder::PhjBuilder(
 PhjBuilder::PhjBuilder(const PhjBuilderConfig& sink_config,
     BufferPool::ClientHandle* buffer_pool_client, int64_t spillable_buffer_size,
     int64_t max_row_buffer_size, RuntimeState* state)
-  : JoinBuilder(-1, sink_config, ConstructBuilderName(sink_config.join_node_id_), state),
+  : JoinBuilder(
+      -1, sink_config, ConstructBuilderName("Hash", sink_config.join_node_id_), state),
     runtime_state_(state),
     hash_seed_(sink_config.hash_seed_),
     resource_profile_(nullptr),
@@ -965,69 +962,8 @@ void PhjBuilder::InsertRuntimeFilters(
 }
 
 void PhjBuilder::PublishRuntimeFilters(int64_t num_build_rows) {
-  VLOG(3) << "Join builder (join_node_id_=" << join_node_id_ << ") publishing "
-          << filter_ctxs_.size() << " filters.";
-  int32_t num_enabled_filters = 0;
-  for (const FilterContext& ctx : filter_ctxs_) {
-    BloomFilter* bloom_filter = nullptr;
-    if (ctx.local_bloom_filter != nullptr) {
-      bloom_filter = ctx.local_bloom_filter;
-      ++num_enabled_filters;
-    } else if (ctx.local_min_max_filter != nullptr) {
-      /// Apply the column min/max stats (if applicable) to shut down the min/max
-      /// filter early by setting always true flag for the filter. Do this only if
-      /// the min/max filter is too close in area to the column stats of all target
-      /// scan columns.
-      const TRuntimeFilterDesc& filter_desc = ctx.filter->filter_desc();
-      VLOG(3) << "Check out the usefulness of the local minmax filter:"
-              << " id=" << ctx.filter->id()
-              << ", fillter details=" << ctx.local_min_max_filter->DebugString()
-              << ", column stats:"
-              << " low=" << PrintTColumnValue(filter_desc.targets[0].low_value)
-              << ", high=" << PrintTColumnValue(filter_desc.targets[0].high_value)
-              << ", threshold=" << minmax_filter_threshold_
-              << ", #targets=" << filter_desc.targets.size();
-      bool all_overlap = true;
-      for (const auto& target_desc : filter_desc.targets) {
-        if (!FilterContext::ShouldRejectFilterBasedOnColumnStats(
-                target_desc, ctx.local_min_max_filter, minmax_filter_threshold_)) {
-          all_overlap = false;
-          break;
-        }
-      }
-      if (all_overlap) {
-        ctx.local_min_max_filter->SetAlwaysTrue();
-        VLOG(3) << "The local minmax filter is set to always true:"
-                << " id=" << ctx.filter->id();
-      }
-
-      if (!ctx.local_min_max_filter->AlwaysTrue()) {
-        ++num_enabled_filters;
-      }
-    }
-
-    runtime_state_->filter_bank()->UpdateFilterFromLocal(
-        ctx.filter->id(), bloom_filter, ctx.local_min_max_filter);
-
-    if ( ctx.local_min_max_filter != nullptr ) {
-      VLOG(3) << "HJBuilder published min/max filter: "
-              << " id=" << ctx.filter->id()
-              << ", details=" << ctx.local_min_max_filter->DebugString();
-    }
-  }
-
-  if (filter_ctxs_.size() > 0) {
-    string info_string;
-    if (num_enabled_filters == filter_ctxs_.size()) {
-      info_string = Substitute("$0 of $0 Runtime Filter$1 Published", filter_ctxs_.size(),
-          filter_ctxs_.size() == 1 ? "" : "s");
-    } else {
-      info_string = Substitute("$0 of $1 Runtime Filter$2 Published, $3 Disabled",
-          num_enabled_filters, filter_ctxs_.size(), filter_ctxs_.size() == 1 ? "" : "s",
-          filter_ctxs_.size() - num_enabled_filters);
-    }
-    profile()->AddInfoString("Runtime filters", info_string);
-  }
+  JoinBuilder::PublishRuntimeFilters(
+      filter_ctxs_, runtime_state_, minmax_filter_threshold_, num_build_rows);
 }
 
 Status PhjBuilder::BeginSpilledProbe(BufferPool::ClientHandle* probe_client,

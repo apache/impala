@@ -60,11 +60,12 @@ public class JoinBuildSink extends DataSink {
     joinNode_ = joinNode;
     Preconditions.checkNotNull(joinNode);
     Preconditions.checkState(joinNode instanceof JoinNode);
-    if (!(joinNode instanceof HashJoinNode)) return;
-    for (Expr eqJoinConjunct: joinNode.getEqJoinConjuncts()) {
-      BinaryPredicate p = (BinaryPredicate) eqJoinConjunct;
-      // by convention the build exprs are the rhs of the join conjuncts
-      buildExprs_.add(p.getChild(1).clone());
+    if (joinNode instanceof HashJoinNode) {
+      for (Expr eqJoinConjunct: joinNode.getEqJoinConjuncts()) {
+        BinaryPredicate p = (BinaryPredicate) eqJoinConjunct;
+        // by convention the build exprs are the rhs of the join conjuncts
+        buildExprs_.add(p.getChild(1).clone());
+      }
     }
     runtimeFilters_.addAll(joinNode.getRuntimeFilters());
   }

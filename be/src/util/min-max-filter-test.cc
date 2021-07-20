@@ -89,9 +89,33 @@ TEST(MinMaxFilterTest, TestBoolMinMaxFilter) {
   EXPECT_FALSE(f1->AlwaysTrue());
   EXPECT_FALSE(f1->AlwaysFalse());
 
+  MinMaxFilter* f3= MinMaxFilter::Create(bool_column_type, &obj_pool, &mem_tracker);
+  f3->InsertForLE(&b2 /*false, update max*/);
+  EXPECT_EQ(*reinterpret_cast<const bool*>(f3->GetMin()), false);
+  EXPECT_EQ(*reinterpret_cast<const bool*>(f3->GetMax()), false);
+
+  MinMaxFilter* f4= MinMaxFilter::Create(bool_column_type, &obj_pool, &mem_tracker);
+  f4->InsertForLT(&b1 /*true, update max with false*/);
+  EXPECT_EQ(*reinterpret_cast<const bool*>(f4->GetMin()), false);
+  EXPECT_EQ(*reinterpret_cast<const bool*>(f4->GetMax()), false);
+
+  MinMaxFilter* f5= MinMaxFilter::Create(bool_column_type, &obj_pool, &mem_tracker);
+  f5->InsertForGE(&b2 /*false, update min */);
+  EXPECT_EQ(*reinterpret_cast<const bool*>(f5->GetMin()), false);
+  EXPECT_EQ(*reinterpret_cast<const bool*>(f5->GetMax()), true);
+
+  MinMaxFilter* f6= MinMaxFilter::Create(bool_column_type, &obj_pool, &mem_tracker);
+  f6->InsertForGT(&b1 /*true, update min with true */);
+  EXPECT_EQ(*reinterpret_cast<const bool*>(f6->GetMin()), true);
+  EXPECT_EQ(*reinterpret_cast<const bool*>(f6->GetMax()), true);
+
   filter->Close();
   f1->Close();
   f2->Close();
+  f3->Close();
+  f4->Close();
+  f5->Close();
+  f6->Close();
 }
 
 void CheckIntVals(MinMaxFilter* filter, int32_t min, int32_t max) {
@@ -192,11 +216,38 @@ TEST(MinMaxFilterTest, TestNumericMinMaxFilter) {
   MinMaxFilter::Or(pFilter2, &pFilter3, int_type);
   EXPECT_EQ(pFilter3.always_true(), true);
 
+  // Test single range inserts for LE and LT
+  MinMaxFilter* int_filter_L = MinMaxFilter::Create(int_type, &obj_pool, &mem_tracker);
+  int_filter_L->InsertForLE(&i1);
+  MinMaxFilterPB pFilterL;
+  int_filter_L->ToProtobuf(&pFilterL);
+  EXPECT_EQ(pFilterL.min().int_val(), std::numeric_limits<int32_t>::lowest());
+  EXPECT_EQ(pFilterL.max().int_val(), i1);
+
+  int_filter_L->InsertForLT(&i2);
+  int_filter_L->ToProtobuf(&pFilterL);
+  EXPECT_EQ(pFilterL.min().int_val(), std::numeric_limits<int32_t>::lowest());
+  EXPECT_EQ(pFilterL.max().int_val(), i2-1);
+
+  // Test single range inserts for GE and GT
+  MinMaxFilter* int_filter_R = MinMaxFilter::Create(int_type, &obj_pool, &mem_tracker);
+  int_filter_R->InsertForGE(&i2);
+  MinMaxFilterPB pFilterR;
+  int_filter_R->ToProtobuf(&pFilterR);
+  EXPECT_EQ(pFilterR.min().int_val(), i2);
+  EXPECT_EQ(pFilterR.max().int_val(), std::numeric_limits<int32_t>::max());
+  int_filter_R->InsertForGT(&i1);
+  int_filter_R->ToProtobuf(&pFilterR);
+  EXPECT_EQ(pFilterR.min().int_val(), i1+1);
+  EXPECT_EQ(pFilterR.max().int_val(), std::numeric_limits<int32_t>::max());
+
   int_filter->Close();
   empty_filter->Close();
   int_filter2->Close();
   f1->Close();
   f2->Close();
+  int_filter_L->Close();
+  int_filter_R->Close();
 }
 
 // Make a string that is compared less than 'str'
@@ -221,7 +272,8 @@ string make_greater_than(const string& str) {
   return result;
 }
 
-void CheckStringVals(MinMaxFilter* filter, const string& min, const string& max) {
+void CheckStringVals(MinMaxFilter* filter, const string& min, const string& max,
+    bool check_overlap = true) {
   StringValue actual_min = *reinterpret_cast<const StringValue*>(filter->GetMin());
   StringValue actual_max = *reinterpret_cast<const StringValue*>(filter->GetMax());
   StringValue expected_min(min);
@@ -230,6 +282,8 @@ void CheckStringVals(MinMaxFilter* filter, const string& min, const string& max)
   EXPECT_EQ(actual_max, expected_max);
   EXPECT_FALSE(filter->AlwaysTrue());
   EXPECT_FALSE(filter->AlwaysFalse());
+
+  if (!check_overlap) return;
 
   // Check overlaps. The range is [min, max] in filter.
   ColumnType string_type(PrimitiveType::TYPE_STRING);
@@ -463,6 +517,70 @@ TEST(MinMaxFilterTest, TestStringMinMaxFilter) {
   f2->Close();
   always_false->Close();
   f3->Close();
+
+  // Test single range insertion
+  string s("abcdefg");
+  StringValue stringVal(s);
+  f1 = MinMaxFilter::Create(string_type, &obj_pool, &mem_tracker);
+  f1->InsertForLE(&stringVal);
+  CheckStringVals(f1, StringMinMaxFilter::min_string, s, false);
+  f1->Close();
+
+  f2 = MinMaxFilter::Create(string_type, &obj_pool, &mem_tracker);
+  f2->InsertForGE(&stringVal);
+  CheckStringVals(f2, s, StringMinMaxFilter::max_string, false);
+  f2->Close();
+
+  f3 = MinMaxFilter::Create(string_type, &obj_pool, &mem_tracker);
+  f3->InsertForLT(&stringVal);
+  string less("abcdeff", 7);
+  CheckStringVals(f3, StringMinMaxFilter::min_string, less, false);
+  f3->Close();
+
+  f1 = MinMaxFilter::Create(string_type, &obj_pool, &mem_tracker);
+  f1->InsertForGT(&stringVal);
+  string more("abcdefh", 7);
+  CheckStringVals(f1, more, StringMinMaxFilter::max_string, false);
+  f1->Close();
+
+  // Insertions leading to out of boundary situations should turn off the
+  // filters.
+  f1 = MinMaxFilter::Create(string_type, &obj_pool, &mem_tracker);
+  f1->InsertForLT(&StringMinMaxFilter::MIN_BOUND_STRING);
+  EXPECT_TRUE(f1->AlwaysTrue());
+  f1->Close();
+
+  // The least larger string for MAX_BOUND_STRING does not exist since MAX_BOUND_STRING
+  // is the largest string.
+  f1 = MinMaxFilter::Create(string_type, &obj_pool, &mem_tracker);
+  f1->InsertForGT(&StringMinMaxFilter::MAX_BOUND_STRING);
+  EXPECT_TRUE(f1->AlwaysTrue());
+  f1->Close();
+
+  // Insert a string of 3 nulls with LT will change the max value to a string with two
+  // 0x00 chars.
+  string twoNulls(2, 0x00);
+  string threeNulls(3, 0x00);
+  StringValue twoNullVal(twoNulls);
+  StringValue threeNullVal(threeNulls);
+
+  string two0xffChars(2, 0xff);
+  string three0xffChars(3, 0xff);
+  StringValue two0xFFVal(two0xffChars);
+  StringValue three0xFFVal(three0xffChars);
+
+  f1 = MinMaxFilter::Create(string_type, &obj_pool, &mem_tracker);
+  f1->InsertForLT(&threeNullVal);
+  CheckStringVals(f1, StringMinMaxFilter::min_string, twoNulls, false);
+  f1->Close();
+
+  // Insert a string of 2 0xff chars with GT will change the min value to a string with
+  // two 0xff char and one 0x00 char.
+  f1 = MinMaxFilter::Create(string_type, &obj_pool, &mem_tracker);
+  f1->InsertForGT(&two0xFFVal);
+  CheckStringVals(f1, string("\xff\xff\x00", 3), StringMinMaxFilter::max_string, false);
+  f1->Close();
+
 }
 
 static TimestampValue ParseSimpleTimestamp(const char* s) {
@@ -537,12 +655,14 @@ void CheckOverlapForTimestamp(MinMaxFilter* filter, const ColumnType& col_type,
 
 #define DATE_TIME_CHECK_VALS(NAME, TYPE)                                   \
   void Check##NAME##Vals(MinMaxFilter* filter, const ColumnType& col_type, \
-      const TYPE& min, const TYPE& max) {                                  \
+      const TYPE& min, const TYPE& max, bool checkOverlap = true) {        \
     EXPECT_EQ(*reinterpret_cast<const TYPE*>(filter->GetMin()), min);      \
     EXPECT_EQ(*reinterpret_cast<const TYPE*>(filter->GetMax()), max);      \
     EXPECT_FALSE(filter->AlwaysFalse());                                   \
     EXPECT_FALSE(filter->AlwaysTrue());                                    \
-    CheckOverlapFor##NAME(filter, col_type, min, max);                     \
+    if (checkOverlap) {                                                    \
+      CheckOverlapFor##NAME(filter, col_type, min, max);                   \
+    }                                                                      \
   }
 
 DATE_TIME_CHECK_VALS(Timestamp, TimestampValue);
@@ -617,6 +737,71 @@ TEST(MinMaxFilterTest, TestDateMinMaxFilter) {
   DATE_TIME_CHECK_FUNCS(Date, DateValue, date, DATE);
 }
 
+TEST(MinMaxFilterTest, TestDateMinMaxFilterSingleRange) {
+  ObjectPool obj_pool;
+  MemTracker mem_tracker;
+  ColumnType col_type(PrimitiveType::TYPE_DATE);
+
+  MinMaxFilter* filter = MinMaxFilter::Create(col_type, &obj_pool, &mem_tracker);
+  DateValue d1 = ParseSimpleDate("2001-04-30 05:00:00");
+  filter->InsertForLE(&d1);
+  CheckDateVals(filter, col_type, DateValue::MIN_DATE, d1);
+  filter->Close();
+
+  filter = MinMaxFilter::Create(col_type, &obj_pool, &mem_tracker);
+  DateValue d2 = ParseSimpleDate("2021-01-01 05:00:00");
+  filter->InsertForLT(&d2);
+  DateValue d3 = ParseSimpleDate("2020-12-31 05:00:00");
+  CheckDateVals(
+      filter, col_type, DateValue::MIN_DATE, d3, false /* do not check overlap*/);
+  filter->Close();
+
+  filter = MinMaxFilter::Create(col_type, &obj_pool, &mem_tracker);
+  filter->InsertForGE(&d1);
+  CheckDateVals(filter, col_type, d1, DateValue::MAX_DATE);
+  filter->Close();
+
+  filter = MinMaxFilter::Create(col_type, &obj_pool, &mem_tracker);
+  filter->InsertForGT(&d3);
+  CheckDateVals(
+      filter, col_type, d2, DateValue::MAX_DATE, false /* do not check overlap*/);
+  filter->Close();
+}
+
+TEST(MinMaxFilterTest, TestTimestampMinMaxFilterSingleRange) {
+  ObjectPool obj_pool;
+  MemTracker mem_tracker;
+  ColumnType col_type(PrimitiveType::TYPE_TIMESTAMP);
+
+  MinMaxFilter* filter = MinMaxFilter::Create(col_type, &obj_pool, &mem_tracker);
+  TimestampValue t1 = ParseSimpleTimestamp("2001-04-30 05:00:00");
+  filter->InsertForLE(&t1);
+
+  CheckTimestampVals(filter, col_type, TimestampValue::GetMinValue(), t1,
+      false /* do not check overlap*/);
+  filter->Close();
+
+  filter = MinMaxFilter::Create(col_type, &obj_pool, &mem_tracker);
+  TimestampValue t2 = ParseSimpleTimestamp("2021-01-01 05:00:00");
+  filter->InsertForLT(&t2);
+  TimestampValue t3 = t2.Subtract(boost::posix_time::time_duration(0, 0, 0, 1));
+  CheckTimestampVals(filter, col_type, TimestampValue::GetMinValue(), t3,
+      false /* do not check overlap*/);
+  filter->Close();
+
+  filter = MinMaxFilter::Create(col_type, &obj_pool, &mem_tracker);
+  filter->InsertForGE(&t1);
+  CheckTimestampVals(filter, col_type, t1, TimestampValue::GetMaxValue(),
+      false /* do not check overlap*/);
+  filter->Close();
+
+  filter = MinMaxFilter::Create(col_type, &obj_pool, &mem_tracker);
+  filter->InsertForGT(&t3);
+  CheckTimestampVals(filter, col_type, t2, TimestampValue::GetMaxValue(),
+      false /* do not check overlap*/);
+  filter->Close();
+}
+
 #define DECIMAL_ADD(SIZE, result_type)                                                 \
   Decimal##SIZE##Value Decimal##SIZE##Add(const Decimal##SIZE##Value& value,           \
       int precision, int scale, double x, bool* overflow) {                            \
@@ -637,6 +822,7 @@ DECIMAL_ADD(16, __int128_t);
     EXPECT_EQ(*reinterpret_cast<const Decimal##SIZE##Value*>(filter->GetMax()), max); \
     EXPECT_FALSE(filter->AlwaysFalse());                                              \
     EXPECT_FALSE(filter->AlwaysTrue());                                               \
+    if (!check_overlap) return;                                                       \
     /* Check overlaps. The range is [min, max] in filter.*/                           \
     /* Check overlapping with [min-10, min-1], which should be false.*/               \
     const int& precision = col_type.precision;                                        \
@@ -664,17 +850,17 @@ DECIMAL_ADD(16, __int128_t);
   } while (false)
 
 void CheckDecimalVals(MinMaxFilter* filter, const ColumnType& col_type,
-    const Decimal4Value& min, const Decimal4Value& max) {
+    const Decimal4Value& min, const Decimal4Value& max, bool check_overlap = true) {
   DECIMAL_CHECK(4);
 }
 
 void CheckDecimalVals(MinMaxFilter* filter, const ColumnType& col_type,
-    const Decimal8Value& min, const Decimal8Value& max) {
+    const Decimal8Value& min, const Decimal8Value& max, bool check_overlap = true) {
   DECIMAL_CHECK(8);
 }
 
 void CheckDecimalVals(MinMaxFilter* filter, const ColumnType& col_type,
-    const Decimal16Value& min, const Decimal16Value& max) {
+    const Decimal16Value& min, const Decimal16Value& max, bool check_overlap = true) {
   DECIMAL_CHECK(16);
 }
 
@@ -741,6 +927,36 @@ void CheckDecimalEmptyFilter(MinMaxFilter* filter, const ColumnType& column_type
     EXPECT_EQ(Decimal##SIZE##Value::FromColumnValuePB(pFilter2##SIZE.max()), d2##SIZE); \
   } while (false)
 
+#define DECIMAL_SINGLE_RANGE_INSERT_AND_CHECK(                                        \
+    PRIMITIVE_TYPE, SIZE, PRECISION, SCALE, VALUE)                                    \
+  do {                                                                                \
+    d1##SIZE =                                                                        \
+        Decimal##SIZE##Value::FromDouble(PRECISION, SCALE, VALUE, false, &overflow);  \
+                                                                                      \
+    ((DecimalMinMaxFilter*)filter##SIZE)->SetAlwaysFalse();                           \
+    filter##SIZE->InsertForLE(&d1##SIZE);                                             \
+    Decimal##SIZE##Value min##SIZE =                                                  \
+        Decimal##SIZE##Value(std::numeric_limits<PRIMITIVE_TYPE>::lowest());          \
+    CheckDecimalVals(filter##SIZE, decimal##SIZE##_type, min##SIZE, d1##SIZE, false); \
+                                                                                      \
+    ((DecimalMinMaxFilter*)filter##SIZE)->SetAlwaysFalse();                           \
+    filter##SIZE->InsertForLT(&d1##SIZE);                                             \
+    Decimal##SIZE##Value d1_minus_one##SIZE =                                         \
+        Decimal##SIZE##Value(d1##SIZE.value() - 1);                                   \
+    CheckDecimalVals(                                                                 \
+        filter##SIZE, decimal##SIZE##_type, min##SIZE, d1_minus_one##SIZE, false);    \
+                                                                                      \
+    ((DecimalMinMaxFilter*)filter##SIZE)->SetAlwaysFalse();                           \
+    filter##SIZE->InsertForGE(&d1##SIZE);                                             \
+    Decimal##SIZE##Value max##SIZE =                                                  \
+        Decimal##SIZE##Value(std::numeric_limits<PRIMITIVE_TYPE>::max());             \
+    CheckDecimalVals(filter##SIZE, decimal##SIZE##_type, d1##SIZE, max##SIZE, false); \
+                                                                                      \
+    ((DecimalMinMaxFilter*)filter##SIZE)->SetAlwaysFalse();                           \
+    filter##SIZE->InsertForGT(&d1_minus_one##SIZE);                                   \
+    CheckDecimalVals(filter##SIZE, decimal##SIZE##_type, d1##SIZE, max##SIZE, false); \
+  } while (false)
+
 // Tests that a DecimalMinMaxFilter returns the expected min/max after having values
 // inserted into it, and that MinMaxFilter::Or works for decimal values.
 TEST(MinMaxFilterTest, TestDecimalMinMaxFilter) {
@@ -787,6 +1003,13 @@ TEST(MinMaxFilterTest, TestDecimalMinMaxFilter) {
   DECIMAL_CHECK_OR(4);
   DECIMAL_CHECK_OR(8);
   DECIMAL_CHECK_OR(16);
+
+  // Single range insert and check
+  DECIMAL_SINGLE_RANGE_INSERT_AND_CHECK(int32_t, 4, 9, 5, 2345.67891);
+  DECIMAL_SINGLE_RANGE_INSERT_AND_CHECK(int64_t, 8, 18, 9, 234567891.123456789);
+
+  // Testing of 16-byte DECIMALs is ignored since FE disables the min/max filtering
+  // against single ranges for such decimals.
 
   // Close all filters
   filter4->Close();

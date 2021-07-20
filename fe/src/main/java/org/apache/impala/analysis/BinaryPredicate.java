@@ -77,6 +77,14 @@ public class BinaryPredicate extends Predicate {
     public boolean isEquivalence() { return this == EQ || this == NOT_DISTINCT; }
     public boolean isSqlEquivalence() { return this == EQ; }
 
+
+    /**
+     * Test if the operator specifies a single range.
+    **/
+    public boolean isSingleRange() {
+      return this == EQ || this == LE || this == GE || this == LT || this == GT;
+    }
+
     public Operator converse() {
       switch (this) {
         case EQ: return EQ;

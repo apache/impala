@@ -36,8 +36,9 @@ class ObjectPool;
 /// runtime filters.
 ///
 /// Filters are constructed using MinMaxFilter::Create() which returns a MinMaxFilter of
-/// the appropriate type. Values can then be added using Insert(), and the min and max can
-/// be retrieved using GetMin()/GetMax().
+/// the appropriate type. Values can then be added using Insert(), InsertForLE(),
+/// InsertForLT(), InsertForGE() or InsertForGT, and the min and max can be retrieved
+/// using GetMin()/GetMax().
 ///
 /// MinMaxFilters ignore NULL values, and so are only appropriate to use as a runtime
 /// filter if the join predicate is '=' and not 'is not distinct from'.
@@ -71,6 +72,22 @@ class MinMaxFilter {
 
   /// Add a new value, updating the current min/max.
   virtual void Insert(const void* val) = 0;
+
+  /// Add a new value, updating the current min/max when always false is true, or
+  /// only the current max otherwise.
+  virtual void InsertForLE(const void* val) = 0;
+
+  /// Add a new value which is 'val'-1, updating the current min/max when always false is
+  /// true, or only the current max otherwise.
+  virtual void InsertForLT(const void* val) = 0;
+
+  /// Add a new value, updating the current min/max when always false is true, or
+  /// only the current min otherwise.
+  virtual void InsertForGE(const void* val) = 0;
+
+  /// Add a new value which is 'val'-1, updating the current min/max when always false is
+  /// true, or only the current min otherwise.
+  virtual void InsertForGT(const void* val) = 0;
 
   /// If true, this filter doesn't allow any rows to pass.
   virtual bool AlwaysFalse() const = 0;
@@ -183,6 +200,10 @@ class MinMaxFilter {
         const TColumnValue& data_max) override;                                     \
     virtual PrimitiveType type() const override;                                    \
     virtual void Insert(const void* val) override;                                  \
+    virtual void InsertForLE(const void* val) override;                             \
+    virtual void InsertForLT(const void* val) override;                             \
+    virtual void InsertForGE(const void* val) override;                             \
+    virtual void InsertForGT(const void* val) override;                             \
     bool AlwaysTrue() const override;                                               \
     virtual bool AlwaysFalse() const override {                                     \
       return min_ == std::numeric_limits<TYPE>::max()                               \
@@ -223,14 +244,28 @@ class StringMinMaxFilter : public MinMaxFilter {
       always_false_(true) {}
   StringMinMaxFilter(const MinMaxFilterPB& protobuf, MemTracker* mem_tracker);
   virtual ~StringMinMaxFilter() {}
+
+  static const std::string min_string; // a string of 1 byte of 0x0.
+  static const std::string max_string; // a string of MAX_BOUND_LENGTH bytes of 0xff.
+  static const StringValue MIN_BOUND_STRING;
+  static const StringValue MAX_BOUND_STRING;
+
   virtual void Close() override { mem_pool_.FreeAll(); }
 
   virtual const void* GetMin() const override { return &min_; }
   virtual const void* GetMax() const override { return &max_; }
   virtual PrimitiveType type() const override;
 
-
   virtual void Insert(const void* val) override;
+
+  // These four version of insert methods materialize the min_ and max_
+  // by making them pointing at min_buffer/max_buffer_.
+  virtual void InsertForLE(const void* val) override;
+  virtual void InsertForLT(const void* val) override;
+  virtual void InsertForGE(const void* val) override;
+  virtual void InsertForGT(const void* val) override;
+
+
   bool AlwaysTrue() const override;
   virtual bool AlwaysFalse() const override { return always_false_; }
   bool EvalOverlap(
@@ -253,6 +288,18 @@ class StringMinMaxFilter : public MinMaxFilter {
 
  protected:
   virtual void SetAlwaysTrue() override;
+
+  // Update min_ and max_ to [value, MAX_BOUND_STRING]
+  void UpdateMin(const StringValue& value);
+
+  // Update min_ and max_ to [MIN_BOUND_STRING, value]
+  void UpdateMax(const StringValue& value);
+
+  // Perform the real work to materialize the min value to min_buffer_;
+  void MaterializeMinValue();
+
+  // Perform the real work to materialize the max value to max_buffer_;
+  void MaterializeMaxValue();
 
  private:
   /// Copies the contents of 'value' into 'buffer', up to 'len', and reassignes 'value' to
@@ -291,6 +338,10 @@ class StringMinMaxFilter : public MinMaxFilter {
     virtual const void* GetMax() const override { return &max_; }               \
     virtual PrimitiveType type() const override;                                \
     virtual void Insert(const void* val) override;                              \
+    virtual void InsertForLE(const void* val) override;                         \
+    virtual void InsertForLT(const void* val) override;                         \
+    virtual void InsertForGE(const void* val) override;                         \
+    virtual void InsertForGT(const void* val) override;                         \
     bool AlwaysTrue() const override;                                           \
     virtual bool AlwaysFalse() const override { return always_false_; }         \
     bool EvalOverlap(                                                           \
@@ -304,6 +355,10 @@ class StringMinMaxFilter : public MinMaxFilter {
     static void Or(const MinMaxFilterPB& in, MinMaxFilterPB* out);              \
     static void Copy(const MinMaxFilterPB& in, MinMaxFilterPB* out);            \
     static const char* LLVM_CLASS_NAME;                                         \
+                                                                                \
+   private:                                                                     \
+    void UpdateMin(const TYPE& val);                                            \
+    void UpdateMax(const TYPE& val);                                            \
                                                                                 \
    private:                                                                     \
     TYPE min_;                                                                  \
@@ -363,9 +418,14 @@ class DecimalMinMaxFilter : public MinMaxFilter {
   }
 
   virtual void Insert(const void* val) override;
+  virtual void InsertForLE(const void* val) override;
+  virtual void InsertForLT(const void* val) override;
+  virtual void InsertForGE(const void* val) override;
+  virtual void InsertForGT(const void* val) override;
   virtual PrimitiveType type() const override;
   bool AlwaysTrue() const override;
   virtual bool AlwaysFalse() const override { return always_false_; }
+  virtual void SetAlwaysFalse() { always_false_ = true; }
   virtual void ToProtobuf(MinMaxFilterPB* protobuf) const override;
   virtual std::string DebugString() const override;
 
@@ -381,6 +441,30 @@ class DecimalMinMaxFilter : public MinMaxFilter {
   void Insert4(const void* val);
   void Insert8(const void* val);
   void Insert16(const void* val);
+
+  void Insert4ForLE(const void* val);
+  void Insert8ForLE(const void* val);
+  void Insert16ForLE(const void* val);
+
+  void Insert4ForGE(const void* val);
+  void Insert8ForGE(const void* val);
+  void Insert16ForGE(const void* val);
+
+  void Insert4ForLT(const void* val);
+  void Insert8ForLT(const void* val);
+  void Insert16ForLT(const void* val);
+
+  void Insert4ForGT(const void* val);
+  void Insert8ForGT(const void* val);
+  void Insert16ForGT(const void* val);
+
+  void UpdateMin(const Decimal4Value&);
+  void UpdateMin(const Decimal8Value&);
+  void UpdateMin(const Decimal16Value&);
+
+  void UpdateMax(const Decimal4Value&);
+  void UpdateMax(const Decimal8Value&);
+  void UpdateMax(const Decimal16Value&);
 
   /// Struct name in LLVM IR.
   static const char* LLVM_CLASS_NAME;

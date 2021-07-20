@@ -38,6 +38,7 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TExecNodePhase;
+import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TJoinDistributionMode;
 import org.apache.impala.thrift.TJoinNode;
 import org.apache.impala.thrift.TQueryOptions;
@@ -929,4 +930,11 @@ public abstract class JoinNode extends PlanNode {
    */
   public abstract Pair<ResourceProfile, ResourceProfile> computeJoinResourceProfile(
       TQueryOptions queryOptions);
+
+  /* Helper to return all predicates as a string. */
+  public String getAllPredicatesAsString(TExplainLevel level) {
+    return "Conjuncts=" + Expr.getExplainString(getConjuncts(), level)
+        + ", EqJoinConjuncts=" + Expr.getExplainString(getEqJoinConjuncts(), level)
+        + ", EqJoinConjuncts=" + Expr.getExplainString(getOtherJoinConjuncts(), level);
+  }
 }

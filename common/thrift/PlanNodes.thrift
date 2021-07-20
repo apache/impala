@@ -146,7 +146,7 @@ struct TRuntimeFilterDesc {
   // Filter unique id (within a query)
   1: required i32 filter_id
 
-  // Expr on which the filter is built on a hash join.
+  // Expr on which the filter is built on a hash or nested loop join.
   2: required Exprs.TExpr src_expr
 
   // List of targets for this runtime filter
@@ -177,12 +177,15 @@ struct TRuntimeFilterDesc {
   // The type of runtime filter to build.
   10: required TRuntimeFilterType type
 
+  // The comparison operator between targets and src_expr
+  11: required ExternalDataSource.TComparisonOp compareOp
+
   // The size of the filter based on the ndv estimate and the min/max limit specified in
   // the query options. Should be greater than zero for bloom filters, zero otherwise.
-  11: optional i64 filter_size_bytes
+  12: optional i64 filter_size_bytes
 
   // The ID of the plan node that produces this filter.
-  12: optional Types.TPlanNodeId src_node_id
+  13: optional Types.TPlanNodeId src_node_id
 }
 
 // The information contained in subclasses of ScanNode captured in two separate

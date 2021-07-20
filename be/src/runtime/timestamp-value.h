@@ -24,6 +24,7 @@
 
 #include <boost/date_time/gregorian/greg_date.hpp>
 #include <boost/date_time/posix_time/posix_time_config.hpp>
+#include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <boost/date_time/posix_time/ptime.hpp>
 #include <boost/date_time/special_defs.hpp>
 #include <boost/date_time/time_duration.hpp>
@@ -196,6 +197,18 @@ class TimestampValue {
 
     return date.day_number() >= MIN_DAY_NUMBER
         && date.day_number() <= MAX_DAY_NUMBER;
+  }
+
+  static inline TimestampValue GetMinValue() {
+    return TimestampValue(
+        boost::gregorian::date(boost::date_time::min_date_time),
+        boost::posix_time::time_duration(0, 0, 0, 0));
+  }
+
+  static inline TimestampValue GetMaxValue() {
+    return TimestampValue(
+        boost::gregorian::date(boost::date_time::max_date_time),
+        boost::posix_time::nanoseconds(NANOS_PER_DAY - 1));
   }
 
   /// Verifies that the time is not negative and is less than a whole day.

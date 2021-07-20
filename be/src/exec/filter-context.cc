@@ -94,6 +94,33 @@ void FilterContext::Insert(TupleRow* row) const noexcept {
   }
 }
 
+void FilterContext::InsertPerCompareOp(TupleRow* row) const noexcept {
+  if (filter->getCompareOp() == extdatasource::TComparisonOp::type::EQ) {
+    Insert(row);
+  } else {
+    DCHECK(filter->is_min_max_filter());
+    if (local_min_max_filter == nullptr || local_min_max_filter->AlwaysTrue()) return;
+    void* val = expr_eval->GetValue(row);
+    switch (filter->getCompareOp()) {
+      case extdatasource::TComparisonOp::type::LE:
+        local_min_max_filter->InsertForLE(val);
+        break;
+      case extdatasource::TComparisonOp::type::LT:
+        local_min_max_filter->InsertForLT(val);
+        break;
+      case extdatasource::TComparisonOp::type::GE:
+        local_min_max_filter->InsertForGE(val);
+        break;
+      case extdatasource::TComparisonOp::type::GT:
+        local_min_max_filter->InsertForGT(val);
+        break;
+      default:
+        DCHECK(false)
+            << "Unsupported comparison op in FilterContext::InsertPerCompareOp()";
+    }
+  }
+}
+
 void FilterContext::MaterializeValues() const {
   if (filter->is_min_max_filter() && local_min_max_filter != nullptr) {
     local_min_max_filter->MaterializeValues();

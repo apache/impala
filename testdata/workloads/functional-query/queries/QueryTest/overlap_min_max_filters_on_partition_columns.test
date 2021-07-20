@@ -59,3 +59,15 @@ where a.month= b.int_col;
 aggregation(SUM, Files processed): 24
 aggregation(SUM, Files rejected): 6
 ====
+---- QUERY
+# Setup a join query with min/max filter on the partition column 'month' again.
+# The filter built from the subquery is [0, 2].
+set runtime_filter_wait_time_ms=$RUNTIME_FILTER_WAIT_TIME_MS;
+select count(*) from functional_parquet.alltypes where month <=
+(select max(int_col) from functional_parquet.alltypes where int_col <= 2);
+---- RESULTS
+1180
+---- RUNTIME_PROFILE
+aggregation(SUM, Files processed): 24
+aggregation(SUM, Files rejected): 20
+====

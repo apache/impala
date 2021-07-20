@@ -332,7 +332,7 @@ row_regex:.* RF001\[min_max\] -. .\.ss_cdemo_sk.*
 ---- QUERY
 ###################################################
 # Run a query that demonstrates the min/max filter
-# helps reduces # of pages:
+# helps reduce the number of pages:
 # sum(NumRuntimeFilteredPages) = 28
 ###################################################
 set minmax_filtering_level=page;
@@ -346,4 +346,25 @@ where i_manufact_id = 1 and i_current_price < 1.0;
 540
 ---- RUNTIME_PROFILE
 aggregation(SUM, NumRuntimeFilteredPages): 28
+====
+---- QUERY
+###################################################
+# Run a query with inequality predicate involving
+# a non-correlated subquery that demonstrates the
+# min/max filter helps reduce the number of row
+# groups and pages.
+# sum(NumRuntimeFilteredRowGroups) = 2
+# sum(NumRuntimeFilteredPages) > 200
+###################################################
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+set mt_dop=2;
+select count(*) from lineitem_orderkey_partkey_only
+where l_orderkey < (select min(l_partkey) from
+lineitem_orderkey_partkey_only where l_orderkey < 3000);
+---- RESULTS
+92
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRuntimeFilteredRowGroups): 2
+aggregation(SUM, NumRuntimeFilteredPages)> 200
+row_regex:.*NESTED LOOP JOIN.*
 ====

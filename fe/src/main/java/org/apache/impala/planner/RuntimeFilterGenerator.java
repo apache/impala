@@ -47,6 +47,7 @@ import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.KuduColumn;
+import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.IdGenerator;
@@ -56,6 +57,7 @@ import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumnValue;
 import org.apache.impala.thrift.TEnabledRuntimeFilterTypes;
+import org.apache.impala.thrift.TExplainLevel;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TRuntimeFilterDesc;
 import org.apache.impala.thrift.TRuntimeFilterMode;
@@ -335,6 +337,7 @@ public final class RuntimeFilterGenerator {
       tFilter.setNdv_estimate(ndvEstimate_);
       tFilter.setHas_local_targets(hasLocalTargets_);
       tFilter.setHas_remote_targets(hasRemoteTargets_);
+      tFilter.setCompareOp(exprCmpOp_.getThriftOp());
       boolean appliedOnPartitionColumns = true;
       for (int i = 0; i < targets_.size(); ++i) {
         RuntimeFilterTarget target = targets_.get(i);
@@ -361,18 +364,61 @@ public final class RuntimeFilterGenerator {
       Preconditions.checkNotNull(idGen);
       Preconditions.checkNotNull(joinPredicate);
       Preconditions.checkNotNull(filterSrcNode);
-      // Only consider binary equality predicates
-      if (type == TRuntimeFilterType.BLOOM
-          && !Predicate.isEquivalencePredicate(joinPredicate)) {
-        return null;
+      // Only consider binary equality predicates under hash joins
+      if (type == TRuntimeFilterType.BLOOM) {
+        if (!Predicate.isEquivalencePredicate(joinPredicate)
+            || filterSrcNode instanceof NestedLoopJoinNode) {
+          return null;
+        }
       }
-      if (type == TRuntimeFilterType.MIN_MAX
-          && !Predicate.isSqlEquivalencePredicate(joinPredicate)) {
-        return null;
-      }
-      BinaryPredicate normalizedJoinConjunct = SingleNodePlanner.getNormalizedEqPred(
+
+      BinaryPredicate normalizedJoinConjunct = null;
+      if (type == TRuntimeFilterType.MIN_MAX) {
+        if (filterSrcNode instanceof HashJoinNode) {
+          if (!Predicate.isSqlEquivalencePredicate(joinPredicate)) {
+            return null;
+          } else {
+            normalizedJoinConjunct = SingleNodePlanner.getNormalizedEqPred(joinPredicate,
+                filterSrcNode.getChild(0).getTupleIds(),
+                filterSrcNode.getChild(1).getTupleIds(), analyzer);
+          }
+        } else if (filterSrcNode instanceof NestedLoopJoinNode) {
+          if (Predicate.isSingleRangePredicate(joinPredicate)) {
+            PlanNode child1 = filterSrcNode.getChild(1);
+            if (child1 instanceof ExchangeNode) {
+              child1 = child1.getChild(0);
+            }
+            // When immediate or the indirect child below an Exchange is an
+            // AggregationNode that implements a non-correlated scalar subquery
+            // returning at most one value, a min/max filter can be generated.
+            if (!(child1 instanceof AggregationNode)
+                || !((AggregationNode) (child1)).isNonCorrelatedScalarSubquery()) {
+              return null;
+            }
+          } else {
+            return null;
+          }
+          normalizedJoinConjunct = SingleNodePlanner.getNormalizedSingleRangePred(
+                joinPredicate, filterSrcNode.getChild(0).getTupleIds(),
+                filterSrcNode.getChild(1).getTupleIds(), analyzer);
+          if (normalizedJoinConjunct != null) {
+            // MinMaxFilter can't handle range predicates with decimals stored
+            // in __int128_t for the following reason:
+            //  1) Both numeric_limits<__int128_t>::min() and
+            //     numeric_limits<__int128_t>::max() return 0.
+            if (normalizedJoinConjunct.getChild(0).getType().isDecimal()) {
+              ScalarType decimalType =
+                  (ScalarType) (normalizedJoinConjunct.getChild(0).getType());
+              if (decimalType.storageBytesForDecimal() == 16) return null;
+            }
+          }
+        }
+      } else {
+        normalizedJoinConjunct = SingleNodePlanner.getNormalizedEqPred(
           joinPredicate, filterSrcNode.getChild(0).getTupleIds(),
           filterSrcNode.getChild(1).getTupleIds(), analyzer);
+      }
+
       if (normalizedJoinConjunct == null) return null;
 
       // Ensure that the target expr does not contain TupleIsNull predicates as these
@@ -623,6 +669,7 @@ public final class RuntimeFilterGenerator {
     public String debugString() {
       StringBuilder output = new StringBuilder();
       return output.append("FilterID: " + id_ + " ")
+          .append("Type: " + type_ + " ")
           .append("Source: " + src_.getId() + " ")
           .append("SrcExpr: " + getSrcExpr().debugString() +  " ")
           .append("Target(s): ")
@@ -727,8 +774,8 @@ public final class RuntimeFilterGenerator {
    * (scan) nodes. Filters that cannot be assigned to a scan node are discarded.
    */
   private void generateFilters(PlannerContext ctx, PlanNode root) {
-    if (root instanceof HashJoinNode) {
-      HashJoinNode joinNode = (HashJoinNode) root;
+    if (root instanceof HashJoinNode || root instanceof NestedLoopJoinNode) {
+      JoinNode joinNode = (JoinNode) root;
       List<Expr> joinConjuncts = new ArrayList<>();
       if (!joinNode.getJoinOp().isLeftOuterJoin()
           && !joinNode.getJoinOp().isFullOuterJoin()

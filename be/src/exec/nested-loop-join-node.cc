@@ -121,11 +121,13 @@ Status NestedLoopJoinNode::Open(RuntimeState* state) {
 Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
+
   RETURN_IF_ERROR(ScalarExprEvaluator::Create(join_conjuncts_, state,
       pool_, expr_perm_pool(), expr_results_pool(), &join_conjunct_evals_));
 
   if (!UseSeparateBuild(state->query_options())) {
-    builder_ = NljBuilder::CreateEmbeddedBuilder(&build_row_desc(), state, id_);
+    RETURN_IF_ERROR(NljBuilder::CreateEmbeddedBuilder(
+        &build_row_desc(), state, id_, plan_node().tnode_->runtime_filters, &builder_));
     RETURN_IF_ERROR(builder_->Prepare(state, mem_tracker()));
     runtime_profile()->PrependChild(builder_->profile());
   }

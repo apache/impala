@@ -284,6 +284,13 @@ class QueryState {
   /// The default BATCH_SIZE.
   static const int DEFAULT_BATCH_SIZE = 1024;
 
+  /// Given a fragment index 'fragmentIdx', return its corresponding FragmentState from
+  /// the map 'fragment_state_map_'. Return nullptr if the index is not in the map.
+  FragmentState* findFragmentState(TFragmentIdx fragmentIdx) {
+    auto it = fragment_state_map_.find(fragmentIdx);
+    return (it != fragment_state_map_.end()) ? it->second : nullptr;
+  }
+
  private:
   friend class QueryExecMgr;
 
