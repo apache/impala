@@ -1205,8 +1205,12 @@ public class SingleNodePlanner {
     // of the inline view's plan root. This ensures that all downstream exprs referencing
     // the inline view are replaced with exprs referencing the physical output of the
     // inline view's plan.
-    ExprSubstitutionMap outputSmap = ExprSubstitutionMap.compose(
-        inlineViewRef.getSmap(), rootNode.getOutputSmap(), analyzer);
+    ExprSubstitutionMap outputSmap = inlineViewRef.getSmap();
+    if (outputSmap != null && !inlineViewRef.isTableMaskingView()) {
+      outputSmap.trim(inlineViewRef.getBaseTblSmap(), analyzer);
+    }
+    outputSmap = ExprSubstitutionMap.compose(
+        outputSmap, rootNode.getOutputSmap(), analyzer);
     if (analyzer.isOuterJoined(inlineViewRef.getId())) {
       // Exprs against non-matched rows of an outer join should always return NULL.
       // Make the rhs exprs of the output smap nullable, if necessary. This expr wrapping

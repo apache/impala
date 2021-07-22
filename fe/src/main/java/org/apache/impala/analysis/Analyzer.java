@@ -385,6 +385,11 @@ public class Analyzer {
     // preserve the order in which conjuncts are added.
     public final Map<ExprId, Expr> conjuncts = new LinkedHashMap<>();
 
+    // all registered conjuncts without auxiliary predicate. This additional map is used
+    // for performance reasons of getUnassignedConjuncts(List<TupleId> tupleIds,
+    // boolean inclOjConjuncts).
+    public final Map<ExprId, Expr> conjunctsFromQuery = new LinkedHashMap<>();
+
     // all registered inferred conjuncts (map from tuple id to conjuncts). This map is
     // used to make sure that slot equivalences are not enforced multiple times (e.g.
     // duplicated to previously inferred conjuncts).
@@ -1483,6 +1488,10 @@ public class Analyzer {
     e.setId(globalState_.conjunctIdGenerator.getNextId());
     globalState_.conjuncts.put(e.getId(), e);
 
+    if (!e.isAuxExpr()) {
+      globalState_.conjunctsFromQuery.put(e.getId(), e);
+    }
+
     List<TupleId> tupleIds = new ArrayList<>();
     List<SlotId> slotIds = new ArrayList<>();
     e.getIds(tupleIds, slotIds);
@@ -1574,9 +1583,8 @@ public class Analyzer {
   public List<Expr> getUnassignedConjuncts(
       List<TupleId> tupleIds, boolean inclOjConjuncts) {
     List<Expr> result = new ArrayList<>();
-    for (Expr e: globalState_.conjuncts.values()) {
+    for (Expr e: globalState_.conjunctsFromQuery.values()) {
       if (e.isBoundByTupleIds(tupleIds)
-          && !e.isAuxExpr()
           && !globalState_.assignedConjuncts.contains(e.getId())
           && ((inclOjConjuncts && !e.isConstant())
               || !globalState_.ojClauseByConjunct.containsKey(e.getId()))) {

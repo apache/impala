@@ -227,4 +227,22 @@ public final class ExprSubstitutionMap {
     }
     return true;
   }
+
+  /**
+   * Remove expressions that are not used according to baseTblSMap
+   */
+  public void trim(ExprSubstitutionMap baseTblSMap, Analyzer analyzer) {
+      Preconditions.checkState(size() == baseTblSMap.size());
+      for (int i = size() - 1; i >= 0; --i) {
+        List<SlotId> slotIds = new ArrayList<>();
+        baseTblSMap.getRhs().get(i).getIds(null, slotIds);
+        for (SlotId id: slotIds) {
+          if (!analyzer.getSlotDesc(id).isMaterialized()) {
+            lhs_.remove(i);
+            rhs_.remove(i);
+            break;
+          }
+        }
+      }
+  }
 }
