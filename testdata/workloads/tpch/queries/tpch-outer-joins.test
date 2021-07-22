@@ -84,7 +84,7 @@ AND a.`SELECT` = b.`INSERT`;
 '05:EXCHANGE [UNPARTITIONED]'
 '02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]'
 '|--04:EXCHANGE [HASH(b.`INSERT`,b.`insert`)]'
-'|  00:SCAN HDFS [default.t1 b]'
+'|  00:SCAN $FILESYSTEM_NAME [default.t1 b]'
 '03:EXCHANGE [HASH(a.`SELECT`,a.`select`)]'
-'01:SCAN HDFS [default.t2 a]'
+'01:SCAN $FILESYSTEM_NAME [default.t2 a]'
 ====
