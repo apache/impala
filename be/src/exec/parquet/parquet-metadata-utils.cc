@@ -324,6 +324,10 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
         return Status(Substitute("File '$0' column '$1' does not have type_length set.",
             filename, schema_element.name));
       }
+      if (schema_element.type_length <= 0) {
+        return Status(Substitute("File '$0' column '$1' has invalid type length: $2",
+            filename, schema_element.name, schema_element.type_length));
+      }
     }
     if (!schema_element.__isset.scale) {
       return Status(Substitute("File '$0' column '$1' does not have the scale set.",
@@ -341,6 +345,12 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
         ErrorMsg msg(TErrorCode::PARQUET_WRONG_PRECISION, filename, schema_element.name,
             schema_element.precision, slot_desc->type().precision);
         RETURN_IF_ERROR(state->LogOrReturnError(msg));
+      }
+      if (schema_element.scale < 0 || schema_element.scale > schema_element.precision) {
+        return Status(
+            Substitute("File '$0' column '$1' has invalid scale: $2. Precision is $3.",
+                filename, schema_element.name, schema_element.scale,
+                schema_element.precision));
       }
     }
 
