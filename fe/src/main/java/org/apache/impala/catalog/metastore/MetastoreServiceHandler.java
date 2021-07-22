@@ -21,6 +21,8 @@ import com.facebook.fb303.fb_status;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
@@ -355,6 +357,8 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
         BackendConfig.INSTANCE.invalidateCatalogdHMSCacheOnDDLs();
     LOG.info("Invalidate catalogd cache for DDLs on non transactional tables " +
         "is set to {}",invalidateCacheOnDDLs_);
+    // make sure catalogOpExecutor's metastoreHmsDdlLock is not null
+    Preconditions.checkNotNull(catalogOpExecutor_.getMetastoreDdlLock());
   }
 
   @Override
@@ -421,8 +425,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   @Override
   public void create_database(Database database)
       throws AlreadyExistsException, InvalidObjectException, MetaException, TException {
+    catalogOpExecutor_.getMetastoreDdlLock().lock();
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient().create_database(database);
+    } finally {
+      catalogOpExecutor_.getMetastoreDdlLock().unlock();
     }
   }
 
@@ -447,9 +454,12 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   public void drop_database(String databaseName, boolean deleteData,
       boolean ignoreUnknownDb)
       throws NoSuchObjectException, InvalidOperationException, MetaException, TException {
+    catalogOpExecutor_.getMetastoreDdlLock().lock();
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient()
           .drop_database(databaseName, deleteData, ignoreUnknownDb);
+    } finally {
+      catalogOpExecutor_.getMetastoreDdlLock().unlock();
     }
   }
 
@@ -545,8 +555,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   @Override
   public void create_table(Table table)
       throws TException {
+    catalogOpExecutor_.getMetastoreDdlLock().lock();
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient().create_table(table);
+    } finally {
+      catalogOpExecutor_.getMetastoreDdlLock().unlock();
     }
   }
 
@@ -554,9 +567,12 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   public void create_table_with_environment_context(Table table,
       EnvironmentContext environmentContext)
       throws TException {
+    catalogOpExecutor_.getMetastoreDdlLock().lock();
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient()
           .create_table_with_environment_context(table, environmentContext);
+    } finally {
+      catalogOpExecutor_.getMetastoreDdlLock().unlock();
     }
   }
 
@@ -568,18 +584,24 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       List<SQLDefaultConstraint> sqlDefaultConstraints,
       List<SQLCheckConstraint> sqlCheckConstraints)
       throws TException {
+    catalogOpExecutor_.getMetastoreDdlLock().lock();
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient().create_table_with_constraints(table,
           sqlPrimaryKeys, sqlForeignKeys, sqlUniqueConstraints, sqlNotNullConstraints,
           sqlDefaultConstraints, sqlCheckConstraints);
+    } finally {
+      catalogOpExecutor_.getMetastoreDdlLock().unlock();
     }
   }
 
   @Override
   public void create_table_req(CreateTableRequest createTableRequest)
       throws TException {
+    catalogOpExecutor_.getMetastoreDdlLock().lock();
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       client.getHiveClient().getThriftClient().create_table_req(createTableRequest);
+    } finally {
+      catalogOpExecutor_.getMetastoreDdlLock().unlock();
     }
   }
 
@@ -648,10 +670,13 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   @Override
   public void drop_table(String dbname, String tblname, boolean deleteData)
       throws NoSuchObjectException, MetaException, TException {
+    catalogOpExecutor_.getMetastoreDdlLock().lock();
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       long eventId = getCurrentEventId(client);
       client.getHiveClient().getThriftClient().drop_table(dbname, tblname, deleteData);
       removeNonTransactionalTableIfExists(eventId, dbname, tblname, "drop_table");
+    } finally {
+      catalogOpExecutor_.getMetastoreDdlLock().unlock();
     }
   }
 
@@ -660,6 +685,7 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       boolean deleteData,
       EnvironmentContext environmentContext)
       throws NoSuchObjectException, MetaException, TException {
+    catalogOpExecutor_.getMetastoreDdlLock().lock();
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       long eventId = getCurrentEventId(client);
       client.getHiveClient().getThriftClient()
@@ -667,6 +693,8 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
               environmentContext);
       removeNonTransactionalTableIfExists(eventId, dbname, tblname,
           "drop_table_with_environment_context");
+    } finally {
+      catalogOpExecutor_.getMetastoreDdlLock().unlock();
     }
   }
 

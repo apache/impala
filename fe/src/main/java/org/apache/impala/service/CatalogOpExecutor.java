@@ -44,6 +44,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 import javax.annotation.Nullable;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -351,7 +352,7 @@ public class CatalogOpExecutor {
 
   // Lock used to ensure that CREATE[DROP] TABLE[DATABASE] operations performed in
   // catalog_ and the corresponding RPC to apply the change in HMS are atomic.
-  private final Object metastoreDdlLock_ = new Object();
+  private final ReentrantLock metastoreDdlLock_ = new ReentrantLock();
 
   public CatalogOpExecutor(CatalogServiceCatalog catalog, AuthorizationConfig authzConfig,
       AuthorizationManager authzManager) throws ImpalaException {
@@ -681,7 +682,8 @@ public class CatalogOpExecutor {
   public boolean removeTableIfNotAddedLater(long eventId,
       String dbName, String tblName, Reference<Boolean> tblAddedLater) {
     tblAddedLater.setRef(false);
-    synchronized (metastoreDdlLock_) {
+    getMetastoreDdlLock().lock();
+    try {
       Db db = catalog_.getDb(dbName);
       if (db == null) {
         LOG.debug("EventId: {} Not removing the table since database {} does not exist",
@@ -708,6 +710,8 @@ public class CatalogOpExecutor {
       removedTbl.setCatalogVersion(catalog_.incrementAndGetCatalogVersion());
       catalog_.getDeleteLog().addRemovedObject(removedTbl.toMinimalTCatalogObject());
       return true;
+    } finally {
+      getMetastoreDdlLock().unlock();
     }
   }
 
@@ -719,7 +723,8 @@ public class CatalogOpExecutor {
    */
   public boolean addTableIfNotRemovedLater(long eventId,
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws DatabaseNotFoundException {
-    synchronized (metastoreDdlLock_) {
+    getMetastoreDdlLock().lock();
+    try {
       String dbName = msTbl.getDbName();
       Db db = catalog_.getDb(dbName);
       DeleteEventLog deleteEventLog = catalog_.getMetastoreEventProcessor()
@@ -757,6 +762,8 @@ public class CatalogOpExecutor {
       incompleteTable.setCreateEventId(eventId);
       db.addTable(incompleteTable);
       return true;
+    } finally {
+      getMetastoreDdlLock().unlock();
     }
   }
 
@@ -778,7 +785,8 @@ public class CatalogOpExecutor {
       org.apache.hadoop.hive.metastore.api.Table msTblAfter,
       Reference<Boolean> oldTblRemoved, Reference<Boolean> newTblAdded)
       throws CatalogException {
-    synchronized (metastoreDdlLock_) {
+    getMetastoreDdlLock().lock();
+    try {
       Table tblBefore = null;
       try {
         tblBefore = catalog_
@@ -814,6 +822,8 @@ public class CatalogOpExecutor {
         UnlockWriteLockIfErronouslyLocked();
         if (beforeTblLocked) tblBefore.releaseWriteLock();
       }
+    } finally {
+      getMetastoreDdlLock().unlock();
     }
   }
 
@@ -826,7 +836,8 @@ public class CatalogOpExecutor {
    */
   public boolean addDbIfNotRemovedLater(
       long eventId, org.apache.hadoop.hive.metastore.api.Database msDb) {
-    synchronized (metastoreDdlLock_) {
+    getMetastoreDdlLock().lock();
+    try {
       String dbName = msDb.getName();
       Db db = catalog_.getDb(dbName);
       DeleteEventLog deleteEventLog = catalog_.getMetastoreEventProcessor()
@@ -838,6 +849,8 @@ public class CatalogOpExecutor {
         }
       }
       return false;
+    } finally {
+      getMetastoreDdlLock().unlock();
     }
   }
 
@@ -850,7 +863,8 @@ public class CatalogOpExecutor {
    */
   public boolean removeDbIfNotAddedLater(long eventId,
       org.apache.hadoop.hive.metastore.api.Database msDb) {
-    synchronized (metastoreDdlLock_) {
+    getMetastoreDdlLock().lock();
+    try {
       String dbName = msDb.getName();
       Db catalogDb = catalog_.getDb(dbName);
       if (catalogDb == null) {
@@ -871,6 +885,8 @@ public class CatalogOpExecutor {
       }
       catalog_.removeDb(dbName);
       return true;
+    } finally {
+      getMetastoreDdlLock().unlock();
     }
   }
 
@@ -1700,7 +1716,8 @@ public class CatalogOpExecutor {
     db.setOwnerType(PrincipalType.USER);
     if (LOG.isTraceEnabled()) LOG.trace("Creating database " + dbName);
     Db newDb = null;
-    synchronized (metastoreDdlLock_) {
+    getMetastoreDdlLock().lock();
+    try {
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
         try {
           long eventId = getCurrentEventId(msClient);
@@ -1762,6 +1779,8 @@ public class CatalogOpExecutor {
             newDb.getMetaStoreDb().getOwnerName(), newDb.getMetaStoreDb().getOwnerType(),
             resp);
       }
+    } finally {
+      getMetastoreDdlLock().unlock();
     }
   }
 
@@ -2259,7 +2278,8 @@ public class CatalogOpExecutor {
     }
 
     TCatalogObject removedObject = null;
-    synchronized (metastoreDdlLock_) {
+    getMetastoreDdlLock().lock();
+    try {
       // Remove all the Kudu tables of 'db' from the Kudu storage engine.
       if (db != null && params.cascade) dropTablesFromKudu(db);
 
@@ -2306,6 +2326,8 @@ public class CatalogOpExecutor {
             db.getMetaStoreDb().getOwnerName(), db.getMetaStoreDb().getOwnerType(),
             /* newOwner */ null, /* newOwnerType */ null, resp);
       }
+    } finally {
+      getMetastoreDdlLock().unlock();
     }
 
     Preconditions.checkNotNull(removedObject);
@@ -2469,7 +2491,8 @@ public class CatalogOpExecutor {
   private void dropTableOrViewInternal(TDropTableOrViewParams params,
       TableName tableName, TDdlExecResponse resp) throws ImpalaException {
     TCatalogObject removedObject = new TCatalogObject();
-    synchronized (metastoreDdlLock_) {
+    getMetastoreDdlLock().lock();
+    try {
       Db db = catalog_.getDb(params.getTable_name().db_name);
       if (db == null) {
         String dbNotExist = "Database does not exist: " + params.getTable_name().db_name;
@@ -2586,6 +2609,8 @@ public class CatalogOpExecutor {
               /* newOwnerType */ null, resp);
         }
       }
+    } finally {
+      getMetastoreDdlLock().unlock();
     }
     removedObject.setType(TCatalogObjectType.TABLE);
     removedObject.setTable(new TTable());
@@ -3136,41 +3161,40 @@ public class CatalogOpExecutor {
       // Add the table to the HMS and the catalog cache. Acquire metastoreDdlLock_ to
       // ensure the atomicity of these operations.
       List<NotificationEvent> events = Collections.EMPTY_LIST;
-      synchronized (metastoreDdlLock_) {
-        if (createHMSTable) {
-          try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-            boolean tableInMetastore =
-                msClient.getHiveClient().tableExists(newTable.getDbName(),
-                                                     newTable.getTableName());
-            if (!tableInMetastore) {
-              msClient.getHiveClient().createTable(newTable);
-            } else {
-              addSummary(response, "Table already exists.");
-              return false;
-            }
-            events = getNextMetastoreEventsIfEnabled(eventId,
-                    event -> CreateTableEvent.CREATE_TABLE_EVENT_TYPE
-                        .equals(event.getEventType())
-                        && newTable.getDbName().equalsIgnoreCase(event.getDbName())
-                        && newTable.getTableName()
-                        .equalsIgnoreCase(event.getTableName()));
+      getMetastoreDdlLock().lock();
+      if (createHMSTable) {
+        try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+          boolean tableInMetastore =
+              msClient.getHiveClient().tableExists(newTable.getDbName(),
+                                                   newTable.getTableName());
+          if (!tableInMetastore) {
+            msClient.getHiveClient().createTable(newTable);
+          } else {
+            addSummary(response, "Table already exists.");
+            return false;
           }
+          events = getNextMetastoreEventsIfEnabled(eventId,
+                  event -> CreateTableEvent.CREATE_TABLE_EVENT_TYPE
+                      .equals(event.getEventType())
+                      && newTable.getDbName().equalsIgnoreCase(event.getDbName())
+                      && newTable.getTableName()
+                      .equalsIgnoreCase(event.getTableName()));
         }
-        // in case of synchronized tables it is possible that Kudu doesn't generate
-        // any metastore events.
-        long createEventId = -1;
-        Pair<Long, org.apache.hadoop.hive.metastore.api.Table> eventTblPair =
-            getTableFromEvents(events, params.if_not_exists);
-        createEventId = eventTblPair == null ? -1 : eventTblPair.first;
-
-        // Add the table to the catalog cache
-        Table newTbl = catalog_
-            .addIncompleteTable(newTable.getDbName(), newTable.getTableName(),
-                createEventId);
-        LOG.debug("Created a Kudu table {} with create event id {}", newTbl.getFullName(),
-            createEventId);
-        addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
       }
+      // in case of synchronized tables it is possible that Kudu doesn't generate
+      // any metastore events.
+      long createEventId = -1;
+      Pair<Long, org.apache.hadoop.hive.metastore.api.Table> eventTblPair =
+          getTableFromEvents(events, params.if_not_exists);
+      createEventId = eventTblPair == null ? -1 : eventTblPair.first;
+
+      // Add the table to the catalog cache
+      Table newTbl = catalog_
+          .addIncompleteTable(newTable.getDbName(), newTable.getTableName(),
+              createEventId);
+      LOG.debug("Created a Kudu table {} with create event id {}", newTbl.getFullName(),
+          createEventId);
+      addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
     } catch (Exception e) {
       try {
         // Error creating the table in HMS, drop the synchronized table from Kudu.
@@ -3192,6 +3216,8 @@ public class CatalogOpExecutor {
       }
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
+    } finally {
+      getMetastoreDdlLock().unlock();
     }
     addSummary(response, "Table has been created.");
     return true;
@@ -3208,7 +3234,8 @@ public class CatalogOpExecutor {
       List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys,
       boolean wantMinimalResult, TDdlExecResponse response) throws ImpalaException {
     Preconditions.checkState(!KuduTable.isKuduTable(newTable));
-    synchronized (metastoreDdlLock_) {
+    getMetastoreDdlLock().lock();
+    try {
       org.apache.hadoop.hive.metastore.api.Table msTable;
       Pair<Long, org.apache.hadoop.hive.metastore.api.Table> eventIdTblPair = null;
       try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
@@ -3290,6 +3317,8 @@ public class CatalogOpExecutor {
             /* oldOwnerType */ null, msTable.getOwner(), msTable.getOwnerType(),
             response);
       }
+    } finally {
+      getMetastoreDdlLock().unlock();
     }
     return true;
   }
@@ -3336,102 +3365,101 @@ public class CatalogOpExecutor {
       throws ImpalaException {
     Preconditions.checkState(IcebergTable.isIcebergTable(newTable));
 
+    getMetastoreDdlLock().lock();
     try {
       // Add the table to the HMS and the catalog cache. Acquire metastoreDdlLock_ to
       // ensure the atomicity of these operations.
       List<NotificationEvent> events = Collections.emptyList();
-      synchronized (metastoreDdlLock_) {
-        try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-          boolean tableInMetastore =
-              msClient.getHiveClient().tableExists(newTable.getDbName(),
-                  newTable.getTableName());
-          if (!tableInMetastore) {
-            long eventId = getCurrentEventId(msClient);
-            TIcebergCatalog catalog = IcebergUtil.getTIcebergCatalog(newTable);
-            String location = newTable.getSd().getLocation();
-            //Create table in iceberg if necessary
-            if (IcebergTable.isSynchronizedTable(newTable)) {
-              //Set location here if not been specified in sql
-              if (location == null) {
-                if (catalog == TIcebergCatalog.HADOOP_CATALOG) {
-                  // Using catalog location to create table
-                  // We cannot set location for 'hadoop.catalog' table in SQL
-                  location = IcebergUtil.getIcebergCatalogLocation(newTable);
-                } else {
-                  // Using normal location as 'hadoop.tables' table location and create
-                  // table
-                  location = MetastoreShim.getPathForNewTable(
-                      msClient.getHiveClient().getDatabase(newTable.getDbName()),
-                      newTable);
-                }
-              }
-              String tableLoc = IcebergCatalogOpExecutor.createTable(catalog,
-                  IcebergUtil.getIcebergTableIdentifier(newTable), location, params)
-                  .location();
-              newTable.getSd().setLocation(tableLoc);
-            } else {
-              if (location == null) {
-                if (IcebergUtil.getUnderlyingCatalog(newTable) !=
-                    TIcebergCatalog.HADOOP_TABLES) {
-                  // When creating external Iceberg table we load
-                  // the Iceberg table using catalog and table identifier to get
-                  // the actual location of the table. This way we can also get the
-                  // correct location for tables stored in nested namespaces.
-                  TableIdentifier identifier =
-                      IcebergUtil.getIcebergTableIdentifier(newTable);
-                  newTable.getSd().setLocation(IcebergUtil.loadTable(
-                      catalog, identifier,
-                      IcebergUtil.getIcebergCatalogLocation(newTable),
-                      newTable.getParameters()).location());
-                } else {
-                  addSummary(response,
-                      "Location is necessary for external iceberg table.");
-                  return false;
-                }
+      try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
+        boolean tableInMetastore =
+            msClient.getHiveClient().tableExists(newTable.getDbName(),
+                newTable.getTableName());
+        if (!tableInMetastore) {
+          long eventId = getCurrentEventId(msClient);
+          TIcebergCatalog catalog = IcebergUtil.getTIcebergCatalog(newTable);
+          String location = newTable.getSd().getLocation();
+          //Create table in iceberg if necessary
+          if (IcebergTable.isSynchronizedTable(newTable)) {
+            //Set location here if not been specified in sql
+            if (location == null) {
+              if (catalog == TIcebergCatalog.HADOOP_CATALOG) {
+                // Using catalog location to create table
+                // We cannot set location for 'hadoop.catalog' table in SQL
+                location = IcebergUtil.getIcebergCatalogLocation(newTable);
+              } else {
+                // Using normal location as 'hadoop.tables' table location and create
+                // table
+                location = MetastoreShim.getPathForNewTable(
+                    msClient.getHiveClient().getDatabase(newTable.getDbName()),
+                    newTable);
               }
             }
-
-            // Iceberg tables are always unpartitioned. The partition columns are
-            // derived from the TCreateTableParams.partition_spec field, and could
-            // include one or more of the table columns
-            Preconditions.checkState(newTable.getPartitionKeys() == null ||
-                newTable.getPartitionKeys().isEmpty());
-            if (!isIcebergHmsIntegrationEnabled(newTable)) {
-              msClient.getHiveClient().createTable(newTable);
-            } else {
-              // Currently HiveCatalog doesn't set the table property
-              // 'external.table.purge' during createTable().
-              org.apache.hadoop.hive.metastore.api.Table msTbl =
-                  msClient.getHiveClient().getTable(
-                      newTable.getDbName(), newTable.getTableName());
-              msTbl.putToParameters("external.table.purge", "TRUE");
-              // HiveCatalog also doesn't set the table properties either.
-              for (Map.Entry<String, String> entry :
-                  params.getTable_properties().entrySet()) {
-                msTbl.putToParameters(entry.getKey(), entry.getValue());
-              }
-              msClient.getHiveClient().alter_table(
-                  newTable.getDbName(), newTable.getTableName(), msTbl);
-            }
-            events = getNextMetastoreEventsIfEnabled(eventId, event ->
-                CreateTableEvent.CREATE_TABLE_EVENT_TYPE.equals(event.getEventType())
-                    && newTable.getDbName().equalsIgnoreCase(event.getDbName())
-                    && newTable.getTableName().equalsIgnoreCase(event.getTableName()));
+            String tableLoc = IcebergCatalogOpExecutor.createTable(catalog,
+                IcebergUtil.getIcebergTableIdentifier(newTable), location, params)
+                .location();
+            newTable.getSd().setLocation(tableLoc);
           } else {
-            addSummary(response, "Table already exists.");
-            return false;
+            if (location == null) {
+              if (IcebergUtil.getUnderlyingCatalog(newTable) !=
+                  TIcebergCatalog.HADOOP_TABLES) {
+                // When creating external Iceberg table we load
+                // the Iceberg table using catalog and table identifier to get
+                // the actual location of the table. This way we can also get the
+                // correct location for tables stored in nested namespaces.
+                TableIdentifier identifier =
+                    IcebergUtil.getIcebergTableIdentifier(newTable);
+                newTable.getSd().setLocation(IcebergUtil.loadTable(
+                    catalog, identifier,
+                    IcebergUtil.getIcebergCatalogLocation(newTable),
+                    newTable.getParameters()).location());
+              } else {
+                addSummary(response,
+                    "Location is necessary for external iceberg table.");
+                return false;
+              }
+            }
           }
+
+          // Iceberg tables are always unpartitioned. The partition columns are
+          // derived from the TCreateTableParams.partition_spec field, and could
+          // include one or more of the table columns
+          Preconditions.checkState(newTable.getPartitionKeys() == null ||
+              newTable.getPartitionKeys().isEmpty());
+          if (!isIcebergHmsIntegrationEnabled(newTable)) {
+            msClient.getHiveClient().createTable(newTable);
+          } else {
+            // Currently HiveCatalog doesn't set the table property
+            // 'external.table.purge' during createTable().
+            org.apache.hadoop.hive.metastore.api.Table msTbl =
+                msClient.getHiveClient().getTable(
+                    newTable.getDbName(), newTable.getTableName());
+            msTbl.putToParameters("external.table.purge", "TRUE");
+            // HiveCatalog also doesn't set the table properties either.
+            for (Map.Entry<String, String> entry :
+                params.getTable_properties().entrySet()) {
+              msTbl.putToParameters(entry.getKey(), entry.getValue());
+            }
+            msClient.getHiveClient().alter_table(
+                newTable.getDbName(), newTable.getTableName(), msTbl);
+          }
+          events = getNextMetastoreEventsIfEnabled(eventId, event ->
+              CreateTableEvent.CREATE_TABLE_EVENT_TYPE.equals(event.getEventType())
+                  && newTable.getDbName().equalsIgnoreCase(event.getDbName())
+                  && newTable.getTableName().equalsIgnoreCase(event.getTableName()));
+        } else {
+          addSummary(response, "Table already exists.");
+          return false;
         }
-        Pair<Long, org.apache.hadoop.hive.metastore.api.Table> eventTblPair
-            = getTableFromEvents(events, params.if_not_exists);
-        long createEventId = eventTblPair == null ? -1 : eventTblPair.first;
-        // Add the table to the catalog cache
-        Table newTbl = catalog_.addIncompleteTable(newTable.getDbName(),
-            newTable.getTableName(), createEventId);
-        LOG.debug("Created a iceberg table {} in catalog with create event Id {} ",
-            newTbl.getFullName(), createEventId);
-        addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
       }
+      Pair<Long, org.apache.hadoop.hive.metastore.api.Table> eventTblPair
+          = getTableFromEvents(events, params.if_not_exists);
+      long createEventId = eventTblPair == null ? -1 : eventTblPair.first;
+      // Add the table to the catalog cache
+      Table newTbl = catalog_.addIncompleteTable(newTable.getDbName(),
+          newTable.getTableName(), createEventId);
+      LOG.debug("Created a iceberg table {} in catalog with create event Id {} ",
+          newTbl.getFullName(), createEventId);
+      addTableToCatalogUpdate(newTbl, wantMinimalResult, response.result);
     } catch (Exception e) {
       if (e instanceof AlreadyExistsException && params.if_not_exists) {
         addSummary(response, "Table already exists.");
@@ -3439,6 +3467,8 @@ public class CatalogOpExecutor {
       }
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
+    } finally {
+      getMetastoreDdlLock().unlock();
     }
 
     addSummary(response, "Table has been created.");
@@ -4104,6 +4134,10 @@ public class CatalogOpExecutor {
       UnlockWriteLockIfErronouslyLocked();
       table.releaseWriteLock();
     }
+  }
+
+  public ReentrantLock getMetastoreDdlLock() {
+    return metastoreDdlLock_;
   }
 
   /**
@@ -5602,18 +5636,21 @@ public class CatalogOpExecutor {
           String.format("Can't refresh functions in blacklisted database: %s. %s",
               req.getDb_name(), BLACKLISTED_DBS_INCONSISTENT_ERR_STR));
       // This is a "refresh functions" operation.
-      synchronized (metastoreDdlLock_) {
+      getMetastoreDdlLock().lock();
+      try {
+        List<TCatalogObject> addedFuncs = Lists.newArrayList();
+        List<TCatalogObject> removedFuncs = Lists.newArrayList();
         try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
-          List<TCatalogObject> addedFuncs = Lists.newArrayList();
-          List<TCatalogObject> removedFuncs = Lists.newArrayList();
           catalog_.refreshFunctions(msClient, req.getDb_name(), addedFuncs, removedFuncs);
-          resp.result.setUpdated_catalog_objects(addedFuncs);
-          resp.result.setRemoved_catalog_objects(removedFuncs);
-          resp.result.setVersion(catalog_.getCatalogVersion());
-          for (TCatalogObject removedFn: removedFuncs) {
-            catalog_.getDeleteLog().addRemovedObject(removedFn);
-          }
         }
+        resp.result.setUpdated_catalog_objects(addedFuncs);
+        resp.result.setRemoved_catalog_objects(removedFuncs);
+        resp.result.setVersion(catalog_.getCatalogVersion());
+        for (TCatalogObject removedFn: removedFuncs) {
+          catalog_.getDeleteLog().addRemovedObject(removedFn);
+        }
+      } finally {
+        getMetastoreDdlLock().unlock();
       }
     } else if (req.isSetTable_name()) {
       // Results of an invalidate operation, indicating whether the table was removed
