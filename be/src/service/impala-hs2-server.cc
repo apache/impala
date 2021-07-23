@@ -556,7 +556,8 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
 void ImpalaServer::ExecutePlannedStatement(
       TExecuteStatementResp& return_val,
       const TExecutePlannedStatementReq& request) {
-  VLOG_QUERY << "ExecutePlannedStatement(): request=" << ThriftDebugString(request);
+  VLOG_QUERY << "ExecutePlannedStatement(): request=" << RedactedDebugString(request);
+  VLOG(3) << "ExecutePlannedStatement(): plan=" << ThriftDebugString(request.plan);
   const ThriftServer::ConnectionContext* connection_context =
       ThriftServer::GetThreadConnectionContext();
   // This RPC is only supported on the external frontend service and should only be

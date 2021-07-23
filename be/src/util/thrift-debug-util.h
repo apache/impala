@@ -18,6 +18,8 @@
 #pragma once
 #include <string>
 #include <thrift/protocol/TDebugProtocol.h>
+
+#include "gutil/strings/substitute.h"
 #include "util/debug-util.h"
 
 DECLARE_string(debug_actions);
@@ -61,7 +63,8 @@ struct HasSecret {
   static constexpr bool value =
       HasSessionHandle<T>::value ||
       HasOperationHandle<T>::value ||
-      std::is_same<T, apache::hive::service::cli::thrift::THandleIdentifier>::value;
+      std::is_same<T, apache::hive::service::cli::thrift::THandleIdentifier>::value ||
+      std::is_same<T, impala::TExecutePlannedStatementReq>::value;
 };
 
 template <typename T,
@@ -130,6 +133,15 @@ inline std::string RedactedDebugString(const T& t) {
   T copy = t;
   RemoveAnySecret(copy);
   return apache::thrift::ThriftDebugString(copy);
+}
+
+inline std::string RedactedDebugString(const TExecutePlannedStatementReq& req) {
+  static const char* ret_pattern =
+      "TExecutePlannedStatementReq {\n"
+      "  01: statementReq (struct) = $0,\n"
+      "  *** OTHER FIELDS ARE OMITTED ***\n"
+      "}";
+  return strings::Substitute(ret_pattern, RedactedDebugString(req.statementReq));
 }
 
 /// Raise compile-time error when ThriftDebugStringNoThrow() is used on an object that has
