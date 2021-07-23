@@ -57,7 +57,6 @@ DECLARE_bool(disk_spill_punch_holes);
 DECLARE_int32(stress_scratch_write_delay_ms);
 #endif
 DECLARE_string(remote_tmp_file_size);
-DECLARE_bool(allow_spill_to_hdfs);
 DECLARE_int32(wait_for_spill_buffer_timeout_s);
 
 namespace impala {
@@ -70,7 +69,7 @@ static const int64_t GIGABYTE = 1024L * MEGABYTE;
 static const int64_t TERABYTE = 1024L * GIGABYTE;
 
 /// For testing spill to remote.
-static const string HDFS_LOCAL_URL = "hdfs://localhost";
+static const string HDFS_LOCAL_URL = "hdfs://localhost:20500/tmp";
 static const string REMOTE_URL = HDFS_LOCAL_URL;
 static const string LOCAL_BUFFER_PATH = "/tmp/tmp-file-mgr-test-buffer";
 
@@ -86,7 +85,6 @@ class TmpFileMgrTest : public ::testing::Test {
     FLAGS_stress_scratch_write_delay_ms = 0;
 #endif
     FLAGS_remote_tmp_file_size = "8MB";
-    FLAGS_allow_spill_to_hdfs = true;
 
     metrics_.reset(new MetricGroup("tmp-file-mgr-test"));
     profile_ = RuntimeProfile::Create(&obj_pool_, "tmp-file-mgr-test");
@@ -106,12 +104,19 @@ class TmpFileMgrTest : public ::testing::Test {
   /// Helper to create a TmpFileMgr and initialise it with InitCustom(). Adds the mgr to
   /// 'obj_pool_' for automatic cleanup at the end of each test. Fails the test if
   /// InitCustom() fails.
-  TmpFileMgr* CreateTmpFileMgr(const string& tmp_dirs_spec) {
+  TmpFileMgr* CreateTmpFileMgr(const string& tmp_dirs_spec, bool expect_ok = true,
+      HdfsFsCache::HdfsFsMap* hdfs_conn_map = nullptr) {
     // Allocate a new metrics group for each TmpFileMgr so they don't get confused by
     // the pre-existing metrics (TmpFileMgr assumes it's a singleton in product code).
     MetricGroup* metrics = obj_pool_.Add(new MetricGroup(""));
     TmpFileMgr* mgr = obj_pool_.Add(new TmpFileMgr());
-    EXPECT_OK(mgr->InitCustom(tmp_dirs_spec, false, "", false, metrics));
+    if (hdfs_conn_map != nullptr) mgr->hdfs_conns_ = *hdfs_conn_map;
+    Status status = mgr->InitCustom(tmp_dirs_spec, false, "", false, metrics);
+    if (expect_ok) {
+      EXPECT_TRUE(status.ok());
+    } else {
+      EXPECT_FALSE(status.ok());
+    }
     return mgr;
   }
 
@@ -170,6 +175,11 @@ class TmpFileMgrTest : public ::testing::Test {
     return mgr->tmp_dirs_;
   }
 
+  /// Helper to get the private tmp_remote_dirs_ pointer.
+  static const TmpFileMgr::TmpDir* GetTmpRemoteDir(TmpFileMgr* mgr) {
+    return mgr->tmp_dirs_remote_.get();
+  }
+
   /// Helper to call the private TmpFileMgr::NewFile() method.
   static void NewFile(TmpFileMgr* mgr, TmpFileGroup* group,
       TmpFileMgr::DeviceId device_id, unique_ptr<TmpFile>* new_file) {
@@ -199,32 +209,29 @@ class TmpFileMgrTest : public ::testing::Test {
   }
 
   /// Helper to set an invalid remote path to create an error.
-  static void SetInvalidRemotePath(TmpFileMgr* tmp_file_mgr, TmpFileGroup* group) {
+  static void SetInvalidRemotePath(
+      TmpFileMgr* tmp_file_mgr, TmpFileGroup* group, int tmp_file_idx) {
     string dir = tmp_file_mgr->tmp_dirs_remote_->path;
     int dev_id = 0;
     string invalid_path = "";
-    std::vector<std::shared_ptr<TmpFile>> tmp_files_remote;
-    std::unordered_map<TmpFile*, std::shared_ptr<TmpFile>> tmp_files_remote_ptrs;
-    for (auto tmp_file_shared_ptr : group->tmp_files_remote_) {
-      auto org_tmp_file = static_cast<TmpFileRemote*>(tmp_file_shared_ptr.get());
-      auto local_path = org_tmp_file->local_buffer_path_;
-      TmpFileRemote* tmp_file_r =
-          new TmpFileRemote(group, dev_id, invalid_path, local_path, false, dir.c_str());
-      tmp_file_r->at_capacity_ = org_tmp_file->at_capacity_;
-      tmp_file_r->enqueued_ = org_tmp_file->enqueued_;
-      tmp_file_r->local_buffer_path_ = org_tmp_file->local_buffer_path_;
-      tmp_file_r->file_size_ = org_tmp_file->file_size_;
-      tmp_file_r->allocation_offset_ = org_tmp_file->allocation_offset_;
-      tmp_file_r->disk_buffer_file_.swap(org_tmp_file->disk_buffer_file_);
-      // Set buffer returned to avoid DCHECK failure while destruction.
-      org_tmp_file->buffer_returned_ = true;
-      shared_ptr<TmpFile> tmp_file_remote(move(tmp_file_r));
-      tmp_files_remote.emplace_back(move(tmp_file_remote));
-      tmp_files_remote_ptrs.emplace(
-          tmp_files_remote.back().get(), tmp_files_remote.back());
-    }
-    group->tmp_files_remote_.swap(tmp_files_remote);
-    group->tmp_files_remote_ptrs_.swap(tmp_files_remote_ptrs);
+    auto tmp_file_shared_ptr = group->tmp_files_remote_[tmp_file_idx];
+    auto org_tmp_file = static_cast<TmpFileRemote*>(tmp_file_shared_ptr.get());
+    auto local_path = org_tmp_file->local_buffer_path_;
+    TmpFileRemote* tmp_file_r =
+        new TmpFileRemote(group, dev_id, invalid_path, local_path, false, dir.c_str());
+    tmp_file_r->at_capacity_ = org_tmp_file->at_capacity_;
+    tmp_file_r->enqueued_ = org_tmp_file->enqueued_;
+    tmp_file_r->local_buffer_path_ = org_tmp_file->local_buffer_path_;
+    tmp_file_r->file_size_ = org_tmp_file->file_size_;
+    tmp_file_r->allocation_offset_ = org_tmp_file->allocation_offset_;
+    tmp_file_r->hdfs_conn_ = org_tmp_file->hdfs_conn_;
+    tmp_file_r->disk_file_->hdfs_conn_ = org_tmp_file->disk_file_->hdfs_conn_;
+    tmp_file_r->disk_buffer_file_.swap(org_tmp_file->disk_buffer_file_);
+    // Set buffer returned to avoid DCHECK failure while destruction.
+    org_tmp_file->buffer_returned_ = true;
+    shared_ptr<TmpFile> tmp_file_remote(move(tmp_file_r));
+    group->tmp_files_remote_[tmp_file_idx] = tmp_file_remote;
+    group->tmp_files_remote_ptrs_.emplace(tmp_file_remote.get(), tmp_file_remote);
   }
 
   static void SetWriteRangeContext(WriteRange* write_range, TmpFileGroup* group) {
@@ -999,6 +1006,108 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsing) {
   EXPECT_EQ(0, nodirs.size());
   auto& empty_paths = GetTmpDirs(CreateTmpFileMgr(","));
   EXPECT_EQ(2, empty_paths.size());
+}
+
+// Test the scratch directory parsing logic with remote paths.
+TEST_F(TmpFileMgrTest, TestDirectoryLimitParsingRemotePath) {
+  // Create a local directory for the local buffer.
+  RemoveAndCreateDirs({"/tmp/local-buffer-dir", "/tmp/local-buffer-dir1",
+      "/tmp/local-buffer-dir2", "/tmp/local-buffer-dir3"});
+
+  // Successful cases for HDFS paths.
+  auto dirs1 = GetTmpRemoteDir(
+      CreateTmpFileMgr("hdfs://localhost:20500/tmp,/tmp/local-buffer-dir"));
+  EXPECT_NE(nullptr, dirs1);
+
+  auto dirs2 = GetTmpRemoteDir(
+      CreateTmpFileMgr("hdfs://localhost:20500/tmp:100,/tmp/local-buffer-dir"));
+  EXPECT_NE(nullptr, dirs2);
+  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs2->path);
+  EXPECT_EQ(100, dirs2->bytes_limit);
+
+  auto dirs3 = GetTmpRemoteDir(
+      CreateTmpFileMgr("hdfs://localhost:20500/tmp:1KB:1,/tmp/local-buffer-dir"));
+  EXPECT_NE(nullptr, dirs3);
+  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs3->path);
+  EXPECT_EQ(1024, dirs3->bytes_limit);
+
+  // Multiple local paths with one remote path.
+  auto tmp_mgr_4 = CreateTmpFileMgr("hdfs://localhost:20500/tmp,/tmp/local-buffer-dir1,"
+                                    "/tmp/local-buffer-dir2,/tmp/local-buffer-dir3");
+  auto dirs4_local = GetTmpDirs(tmp_mgr_4);
+  auto dirs4_remote = GetTmpRemoteDir(tmp_mgr_4);
+  EXPECT_NE(nullptr, dirs4_remote);
+  EXPECT_EQ(2, dirs4_local.size());
+  EXPECT_EQ("/tmp/local-buffer-dir2/impala-scratch", dirs4_local[0].path);
+  EXPECT_EQ("/tmp/local-buffer-dir3/impala-scratch", dirs4_local[1].path);
+
+  // Fails the parsing due to no port number for the HDFS path.
+  auto tmp_mgr_5 = CreateTmpFileMgr("hdfs://localhost/tmp,/tmp/local-buffer-dir");
+  auto dirs5_local = GetTmpDirs(tmp_mgr_5);
+  auto dirs5_remote = GetTmpRemoteDir(tmp_mgr_5);
+  EXPECT_EQ(1, dirs5_local.size());
+  EXPECT_EQ(nullptr, dirs5_remote);
+
+  // Fails to init due to no local buffer for the remote scratch space.
+  // We expect a non-null tmp_mgr, but the init process should fail.
+  EXPECT_NE(nullptr, CreateTmpFileMgr("hdfs://localhost:20500/tmp", false));
+
+  // Parse successfully, but the parsed HDFS path is unable to connect.
+  // These cases would fail the initialization of TmpFileMgr.
+  auto dirs7 = GetTmpRemoteDir(
+      CreateTmpFileMgr("hdfs://localhost:1/tmp::1,/tmp/local-buffer-dir", false));
+  EXPECT_EQ(nullptr, dirs7);
+
+  auto dirs8 = GetTmpRemoteDir(
+      CreateTmpFileMgr("hdfs://localhost:/tmp::,/tmp/local-buffer-dir", false));
+  EXPECT_EQ(nullptr, dirs8);
+
+  auto dirs9 = GetTmpRemoteDir(
+      CreateTmpFileMgr("hdfs://localhost/tmp::1,/tmp/local-buffer-dir", false));
+  EXPECT_EQ(nullptr, dirs9);
+
+  auto dirs10 = GetTmpRemoteDir(
+      CreateTmpFileMgr("hdfs://localhost/tmp:1,/tmp/local-buffer-dir", false));
+  EXPECT_EQ(nullptr, dirs10);
+
+  // Multiple remote paths, should support only one.
+  auto dirs11 = GetTmpRemoteDir(
+      CreateTmpFileMgr("hdfs://localhost:20500/tmp,hdfs://localhost:20501/tmp,"
+                       "/tmp/local-buffer-dir"));
+  EXPECT_NE(nullptr, dirs11);
+  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs11->path);
+
+  // The order of the buffer and the remote dir should not affect the result.
+  auto dirs12 = GetTmpRemoteDir(
+      CreateTmpFileMgr("/tmp/local-buffer-dir, hdfs://localhost:20500/tmp,"
+                       "hdfs://localhost:20501/tmp"));
+  EXPECT_NE(nullptr, dirs12);
+  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs12->path);
+
+  // Successful cases for parsing S3 paths.
+  // Create a fake s3 connection in order to pass the connection verification.
+  HdfsFsCache::HdfsFsMap fake_hdfs_conn_map;
+  hdfsFS fake_conn = reinterpret_cast<hdfsFS>(1);
+  fake_hdfs_conn_map.insert(make_pair("s3a://fake_host/", fake_conn));
+  auto dirs13 = GetTmpRemoteDir(
+      CreateTmpFileMgr("/tmp/local-buffer-dir, s3a://fake_host/for-parsing-test-only",
+          true, &fake_hdfs_conn_map));
+  EXPECT_NE(nullptr, dirs13);
+  EXPECT_EQ("s3a://fake_host/for-parsing-test-only/impala-scratch", dirs13->path);
+
+  auto dirs14 = GetTmpRemoteDir(
+      CreateTmpFileMgr("/tmp/local-buffer-dir, s3a://fake_host/for-parsing-test-only:100",
+          true, &fake_hdfs_conn_map));
+  EXPECT_NE(nullptr, dirs14);
+  EXPECT_EQ("s3a://fake_host/for-parsing-test-only/impala-scratch", dirs14->path);
+  EXPECT_EQ(100, dirs14->bytes_limit);
+
+  auto dirs15 = GetTmpRemoteDir(CreateTmpFileMgr(
+      "/tmp/local-buffer-dir, s3a://fake_host/for-parsing-test-only:1KB:1", true,
+      &fake_hdfs_conn_map));
+  EXPECT_NE(nullptr, dirs15);
+  EXPECT_EQ("s3a://fake_host/for-parsing-test-only/impala-scratch", dirs15->path);
+  EXPECT_EQ(1024, dirs15->bytes_limit);
 }
 
 // Test compression buffer memory management for reads and writes.
@@ -1862,18 +1971,9 @@ TEST_F(TmpFileMgrTest, TestRemoteUploadToNonExistentPath) {
   string random_name = lexical_cast<string>(random_generator()());
   string remote_file_path_to_crt = "s3a://non-existent_" + random_name + "/tmp/test";
   tmp_dirs.push_back(remote_file_path_to_crt);
-
-  ASSERT_OK(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()));
-  TUniqueId id;
-  TmpFileGroup file_group(&tmp_file_mgr, io_mgr(), profile_, id);
-  string data = "arbitrary data";
-  MemRange data_mem_range(reinterpret_cast<uint8_t*>(&data[0]), data.size());
-  unique_ptr<TmpWriteHandle> handle;
-  WriteRange::WriteDoneCallback callback = [](const Status& status) {};
-  Status status = file_group.Write(data_mem_range, callback, &handle);
-  // Failed to create the connection to a non-existent remote path.
-  EXPECT_FALSE(status.ok());
-  file_group.Close();
+  // Failed to initialize because unable to get a connection to the non-existent path
+  // during verification.
+  EXPECT_FALSE(tmp_file_mgr.InitCustom(tmp_dirs, true, "", false, metrics_.get()).ok());
   test_env_->TearDownQueries();
 }
 
@@ -1882,6 +1982,9 @@ TEST_F(TmpFileMgrTest, TestRemoteUploadFailed) {
   TmpFileMgr tmp_file_mgr;
   int64_t buffer_limit = 2048;
   int64_t alloc_size = 512;
+  // The file size should be aligned with the FLAGS_remote_tmp_file_size.
+  int64_t file_size = 1024;
+  int64_t per_file_page_num = file_size / alloc_size;
   // Set the timeout value to the minimum, 1 second. Because otherwise, the testcase
   // needs to wait for the default timeout interval, which is much larger than 1, before
   // the testcase can end and exit.
@@ -1907,8 +2010,11 @@ TEST_F(TmpFileMgrTest, TestRemoteUploadFailed) {
   // should be cancelled in the end due to timeout (the local buffer is full,
   // the later file waits for the buffer till timeout happens).
   for (int i = 0; i < write_times + 1; i++) {
-    // Set the remote paths to invalid paths to create upload failures.
-    if (i != write_times) SetInvalidRemotePath(&tmp_file_mgr, &file_group);
+    // Set the remote paths of current TmpFile to invalid paths to create upload failures.
+    if (i != write_times && ((i + 1) % per_file_page_num == 0)) {
+      int cur_tmp_file_idx = i / per_file_page_num;
+      SetInvalidRemotePath(&tmp_file_mgr, &file_group, cur_tmp_file_idx);
+    }
     unique_ptr<TmpWriteHandle> handle;
     WriteRange::WriteDoneCallback callback = [this, i, write_times](
                                                  const Status& status) {

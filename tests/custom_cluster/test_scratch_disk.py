@@ -275,11 +275,10 @@ class TestScratchDir(CustomClusterTestSuite):
     # Test one remote directory with one its local buffer directory.
     normal_dirs = self.generate_dirs(1)
     # Use local hdfs for testing. Could be changed to S3.
-    normal_dirs.append('hdfs://localhost')
+    normal_dirs.append('hdfs://localhost:20500/tmp')
     self._start_impala_cluster([
       '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
-      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true',
-      '--impalad_args=--allow_spill_to_hdfs=true'],
+      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true'],
       cluster_size=1,
       expected_num_impalads=1)
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
@@ -307,11 +306,10 @@ class TestScratchDir(CustomClusterTestSuite):
     normal_dirs = self.generate_dirs(2)
     normal_dirs[0] = '{0}::{1}'.format(normal_dirs[0], 1)
     normal_dirs[1] = '{0}:2GB:{1}'.format(normal_dirs[1], 0)
-    normal_dirs.append('hdfs://localhost')
+    normal_dirs.append('hdfs://localhost:20500/tmp')
     self._start_impala_cluster([
       '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
-      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true',
-      '--impalad_args=--allow_spill_to_hdfs=true'],
+      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true'],
       cluster_size=1,
       expected_num_impalads=1)
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
@@ -341,11 +339,10 @@ class TestScratchDir(CustomClusterTestSuite):
     normal_dirs = self.generate_dirs(2)
     normal_dirs[0] = '{0}:32MB:{1}'.format(normal_dirs[0], 0)
     normal_dirs[1] = '{0}:4MB:{1}'.format(normal_dirs[1], 1)
-    normal_dirs.append('hdfs://localhost')
+    normal_dirs.append('hdfs://localhost:20500/tmp')
     self._start_impala_cluster([
       '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
-      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true',
-      '--impalad_args=--allow_spill_to_hdfs=true'],
+      '--impalad_args=--allow_multiple_scratch_dirs_per_device=true'],
       cluster_size=1,
       expected_num_impalads=1)
     self.assert_impalad_log_contains("INFO", "Using scratch directory ",
@@ -373,11 +370,10 @@ class TestScratchDir(CustomClusterTestSuite):
     # One local buffer directory and one remote directory.
     normal_dirs = self.generate_dirs(1)
     normal_dirs[0] = '{0}:16MB:{1}'.format(normal_dirs[0], 0)
-    normal_dirs.append('hdfs://localhost')
+    normal_dirs.append('hdfs://localhost:20500/tmp')
     self._start_impala_cluster([
       '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
       '--impalad_args=--allow_multiple_scratch_dirs_per_device=true',
-      '--impalad_args=--allow_spill_to_hdfs=true',
       '--impalad_args=--remote_tmp_file_size=8M',
       '--impalad_args=--remote_tmp_file_block_size=1m'],
       cluster_size=1, expected_num_impalads=1)
@@ -405,12 +401,11 @@ class TestScratchDir(CustomClusterTestSuite):
     directory to test if there is a deadlock issue.'''
     normal_dirs = self.generate_dirs(1)
     normal_dirs[0] = '{0}:16MB:{1}'.format(normal_dirs[0], 0)
-    normal_dirs.append('hdfs://localhost')
+    normal_dirs.append('hdfs://localhost:20500/tmp')
     num = 5
     self._start_impala_cluster([
       '--impalad_args=-logbuflevel=-1 -scratch_dirs={0}'.format(','.join(normal_dirs)),
       '--impalad_args=--allow_multiple_scratch_dirs_per_device=true',
-      '--impalad_args=--allow_spill_to_hdfs=true',
       '--impalad_args=--remote_tmp_file_size=8M',
       '--impalad_args=--remote_tmp_file_block_size=1m'],
       cluster_size=num, num_coordinators=num, expected_num_impalads=num)

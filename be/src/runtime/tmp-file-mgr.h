@@ -177,10 +177,6 @@ class TmpFileMgr {
     /// If false, the file would be placed in the last of the pool.
     bool remote_tmp_files_avail_pool_lifo_;
 
-    /// The spill to hdfs is a test-only feature, and is not allowed unless the option of
-    /// allow_spill_to_hdfs is set true.
-    bool allow_spill_to_hdfs_;
-
     /// Temporary file buffer pool managed by TmpFileMgr, is only activated when there is
     /// a remote scratch space is registered. So, if TmpFileMgr::HasRemoteDir() is true,
     /// the tmp_file_pool_ is non-null. Otherwise, it is null.
@@ -212,6 +208,11 @@ class TmpFileMgr {
   Status InitCustom(const std::vector<std::string>& tmp_dir_specifiers,
       bool one_dir_per_device, const std::string& compression_codec, bool punch_holes,
       MetricGroup* metrics) WARN_UNUSED_RESULT;
+
+  /// A helper function for InitCustom() to parse the options of the scratch directory.
+  Status ParseScratchPathToks(const string& tmp_dir_spec,
+      const string& tmp_dirs_without_prefix, bool is_hdfs, string* path,
+      int64_t* bytes_limit, int* priority) WARN_UNUSED_RESULT;
 
   /// A helper function for InitCustom() to create a scratch directory.
   Status CreateDirectory(const string& scratch_subdir_path, const string& tmp_path,

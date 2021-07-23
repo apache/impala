@@ -64,7 +64,6 @@ DECLARE_int32(stress_disk_read_delay_ms);
 
 DECLARE_string(remote_tmp_file_size);
 DECLARE_string(remote_tmp_file_block_size);
-DECLARE_bool(allow_spill_to_hdfs);
 
 const int MIN_BUFFER_SIZE = 128;
 const int MAX_BUFFER_SIZE = 1024;
@@ -73,7 +72,7 @@ const int64_t LARGE_INITIAL_RESERVATION = 128L * 1024L * 1024L;
 const int64_t BUFFER_POOL_CAPACITY = LARGE_RESERVATION_LIMIT;
 
 /// For testing spill to remote.
-static const string HDFS_LOCAL_URL = "hdfs://localhost:20500";
+static const string HDFS_LOCAL_URL = "hdfs://localhost:20500/tmp";
 static const string REMOTE_URL = HDFS_LOCAL_URL;
 static const string LOCAL_BUFFER_PATH = "/tmp/tmp-file-mgr-test-buffer";
 
@@ -87,7 +86,6 @@ class DiskIoMgrTest : public testing::Test {
  public:
   virtual void SetUp() {
     FLAGS_remote_tmp_file_block_size = "1K";
-    FLAGS_allow_spill_to_hdfs = true;
 
     test_env_.reset(new TestEnv);
     // Tests try to allocate arbitrarily small buffers. Ensure Buffer Pool allows it.
@@ -1931,7 +1929,7 @@ TEST_F(DiskIoMgrTest, MetricsOfWriteIoError) {
 TEST_F(DiskIoMgrTest, WriteToRemoteSuccess) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
   num_ranges_written_ = 0;
-  string remote_file_path = REMOTE_URL + "/tmp/test";
+  string remote_file_path = REMOTE_URL + "/test";
   string new_file_path_local_buffer = LOCAL_BUFFER_PATH + "/test";
   int32_t file_size = 1024;
   FLAGS_remote_tmp_file_size = "1K";
@@ -2109,7 +2107,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteSuccess) {
 TEST_F(DiskIoMgrTest, WriteToRemotePartialFileSuccess) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
   num_ranges_written_ = 0;
-  string remote_file_path = REMOTE_URL + "/tmp/test";
+  string remote_file_path = REMOTE_URL + "/test";
   string new_file_path_local_buffer = LOCAL_BUFFER_PATH + "/test";
   FLAGS_remote_tmp_file_size = "1K";
 
@@ -2190,7 +2188,7 @@ TEST_F(DiskIoMgrTest, WriteToRemotePartialFileSuccess) {
 TEST_F(DiskIoMgrTest, WriteToRemoteUploadFailed) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
   num_oper_ = 0;
-  string remote_file_path = REMOTE_URL + "/tmp/test";
+  string remote_file_path = REMOTE_URL + "/test";
   string non_existent_dir = "/non-existent-dir/test";
   FLAGS_remote_tmp_file_size = "1K";
   int64_t file_size = 1024;
@@ -2248,7 +2246,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteUploadFailed) {
 TEST_F(DiskIoMgrTest, WriteToRemoteEvictLocal) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
   num_ranges_written_ = 0;
-  string remote_file_path = REMOTE_URL + "/tmp/test1";
+  string remote_file_path = REMOTE_URL + "/test1";
   string local_buffer_file_path = LOCAL_BUFFER_PATH + "/test1";
   int32_t file_size = 1024;
   FLAGS_remote_tmp_file_size = "1K";
@@ -2346,7 +2344,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteEvictLocal) {
 // Use an invalid block size to emulate the case when memory allocation failed.
 TEST_F(DiskIoMgrTest, WriteToRemoteFailMallocBlock) {
   num_ranges_written_ = 0;
-  string remote_file_path = REMOTE_URL + "/tmp/test1";
+  string remote_file_path = REMOTE_URL + "/test1";
   string local_buffer_file_path = LOCAL_BUFFER_PATH + "/test1";
   int64_t invalid_block_size = -1;
 
@@ -2394,7 +2392,7 @@ TEST_F(DiskIoMgrTest, WriteToRemoteFailMallocBlock) {
 TEST_F(DiskIoMgrTest, WriteToRemoteDiffPagesSuccess) {
   InitRootReservation(LARGE_RESERVATION_LIMIT);
   num_ranges_written_ = 0;
-  string remote_file_path = REMOTE_URL + "/tmp/test";
+  string remote_file_path = REMOTE_URL + "/test";
   string new_file_path_local_buffer = LOCAL_BUFFER_PATH + "/test";
   int32_t block_size = 1024;
   FLAGS_remote_tmp_file_size = "1K";

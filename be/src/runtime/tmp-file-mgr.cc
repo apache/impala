@@ -106,9 +106,6 @@ DEFINE_string(remote_tmp_file_block_size, "1M",
 DEFINE_bool(remote_tmp_files_avail_pool_lifo, false,
     "If true, lifo is the algo to evict the local buffer files during spilling "
     "to the remote. Otherwise, fifo would be used.");
-DEFINE_bool(allow_spill_to_hdfs, false,
-    "Spill to HDFS is a test-only feature, only when set true, the user can configure "
-    "a HDFS scratch path.");
 DEFINE_int32(wait_for_spill_buffer_timeout_s, 60,
     "Specify the timeout duration waiting for the buffer to write (second). If a spilling"
     "opertion fails to get a buffer from the pool within the duration, the operation"
@@ -135,12 +132,6 @@ constexpr int64_t TmpFileMgr::HOLE_PUNCH_BLOCK_SIZE_BYTES;
 const string TMP_SUB_DIR_NAME = "impala-scratch";
 const uint64_t AVAILABLE_SPACE_THRESHOLD_MB = 1024;
 const uint64_t MAX_REMOTE_TMPFILE_SIZE_THRESHOLD_MB = 256;
-
-// Default path for Spill to HDFS.
-// The Spill to HDFS is only supported for testing, and a fixed default HDFS path is used,
-// To support a flexible HDFS path input, we may need some modifications, Jira
-// IMPALA-10429 is tracking the limitation.
-const string TMP_DIR_HDFS_LOCAL_DEFAULT = "hdfs://localhost:20500/tmp";
 
 // Metric keys
 const string TMP_FILE_MGR_ACTIVE_SCRATCH_DIRS = "tmp-file-mgr.active-scratch-dirs";
@@ -248,7 +239,6 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
   // spilling to the remote.
   tmp_dirs_remote_ctrl_.remote_tmp_files_avail_pool_lifo_ =
       FLAGS_remote_tmp_files_avail_pool_lifo;
-  tmp_dirs_remote_ctrl_.allow_spill_to_hdfs_ = FLAGS_allow_spill_to_hdfs;
 
   vector<std::unique_ptr<TmpDir>> tmp_dirs;
   // need_local_buffer_dir indicates if currently we need to a directory in local scratch
@@ -261,19 +251,18 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
   for (const string& tmp_dir_spec : tmp_dir_specifiers) {
     string tmp_dirs_without_prefix, prefix;
     string tmp_dir_spec_trimmed(boost::algorithm::trim_left_copy(tmp_dir_spec));
+    bool is_hdfs = false;
+    bool is_remote = false;
 
     if (IsHdfsPath(tmp_dir_spec_trimmed.c_str(), false)) {
-      if (!tmp_dirs_remote_ctrl_.allow_spill_to_hdfs_) {
-        return Status("HDFS scratch space is not allowed. Please set allow_spill_to_hdfs "
-                      "if HDFS path is needed.");
-      }
       prefix = FILESYS_PREFIX_HDFS;
       tmp_dirs_without_prefix = tmp_dir_spec_trimmed.substr(strlen(FILESYS_PREFIX_HDFS));
-      need_local_buffer_dir = true;
-    } else if (IsS3APath(tmp_dir_spec.c_str(), false)) {
+      is_hdfs = true;
+      is_remote = true;
+    } else if (IsS3APath(tmp_dir_spec_trimmed.c_str(), false)) {
       prefix = FILESYS_PREFIX_S3;
       tmp_dirs_without_prefix = tmp_dir_spec_trimmed.substr(strlen(FILESYS_PREFIX_S3));
-      need_local_buffer_dir = true;
+      is_remote = true;
       // Initialize the S3 options for later getting S3 connection.
       s3a_options_ = {make_pair("fs.s3a.fast.upload", "true"),
           make_pair("fs.s3a.fast.upload.buffer", "disk")};
@@ -283,38 +272,33 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
       tmp_dirs_without_prefix = tmp_dir_spec_trimmed.substr(0);
     }
 
-    vector<string> toks;
-    split(toks, tmp_dirs_without_prefix, is_any_of(":"), token_compress_off);
-    if (toks.size() > 3) {
-      LOG(ERROR) << "Could not parse temporary dir specifier, too many colons: '"
-                 << tmp_dir_spec << "'";
+    string parsed_path;
+    int64_t bytes_limit = numeric_limits<int64_t>::max();
+    int priority = numeric_limits<int>::max();
+    Status parse_status = ParseScratchPathToks(tmp_dir_spec, tmp_dirs_without_prefix,
+        is_hdfs, &parsed_path, &bytes_limit, &priority);
+    if (!parse_status.ok()) {
+      LOG(WARNING) << "Directory " << tmp_dir_spec.c_str() << " is not used because "
+                   << parse_status.msg().msg();
       continue;
     }
-    int64_t bytes_limit = numeric_limits<int64_t>::max();
-    if (toks.size() >= 2) {
-      bool is_percent;
-      bytes_limit = ParseUtil::ParseMemSpec(toks[1], &is_percent, 0);
-      if (bytes_limit < 0 || is_percent) {
-        LOG(ERROR) << "Malformed scratch directory capacity configuration '"
-                   << tmp_dirs_without_prefix << "'";
+
+    if (is_remote) {
+      // Set the flag to reserve a local dir for buffer.
+      // If the flag has been set, meaning that there is already one remote dir
+      // registered, since we only support one remote dir, this remote dir will be
+      // abandoned.
+      if (need_local_buffer_dir) {
+        LOG(WARNING) << "Only one remote directory is supported. Extra remote directory "
+                     << tmp_dir_spec.c_str() << " is not used.";
         continue;
-      } else if (bytes_limit == 0) {
-        // Interpret -1, 0 or empty string as no limit.
-        bytes_limit = numeric_limits<int64_t>::max();
+      } else {
+        need_local_buffer_dir = true;
       }
     }
-    int priority = numeric_limits<int>::max();
-    if (toks.size() == 3 && !toks[2].empty()) {
-      StringParser::ParseResult result;
-      priority = StringParser::StringToInt<int>(toks[2].data(), toks[2].size(), &result);
-      if (result != StringParser::PARSE_SUCCESS) {
-        LOG(ERROR) << "Malformed scratch directory priority configuration '"
-                   << tmp_dir_spec << "'";
-        continue;
-      }
-    }
+
     tmp_dirs.emplace_back(
-        new TmpDir(prefix.append(toks[0]), bytes_limit, priority, nullptr));
+        new TmpDir(prefix.append(parsed_path), bytes_limit, priority, nullptr));
   }
 
   vector<bool> is_tmp_dir_on_disk(DiskInfo::num_disks(), false);
@@ -326,18 +310,18 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
     bool is_hdfs_path = IsHdfsPath(tmp_path.c_str(), false);
     bool is_s3a_path = IsS3APath(tmp_path.c_str(), false);
     if (is_hdfs_path || is_s3a_path) {
-      // Only support one remote dir.
-      if (HasRemoteDir()) {
-        LOG(WARNING) << "Only one remote directory is supported. Directory "
-                     << tmp_path.c_str() << " is abandoned.";
-        continue;
-      }
-      string scratch_subdir_path_str;
+      // Should be only one remote dir.
+      DCHECK(!HasRemoteDir());
+      path scratch_subdir_path(tmp_path / TMP_SUB_DIR_NAME);
+      string scratch_subdir_path_str = scratch_subdir_path.string();
+      hdfsFS hdfs_conn;
+      // If the HDFS path doesn't exist, it would fail while uploading, so we
+      // create the HDFS path if it doesn't exist.
+      // For the S3 path, it doesn't need to create the directory for the uploading
+      // as long as the S3 address is correct.
       if (is_hdfs_path) {
-        hdfsFS hdfs_conn;
         RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
-            TMP_DIR_HDFS_LOCAL_DEFAULT, &hdfs_conn, &hdfs_conns_));
-        scratch_subdir_path_str = TMP_DIR_HDFS_LOCAL_DEFAULT + "/" + TMP_SUB_DIR_NAME;
+            tmp_path.string(), &hdfs_conn, &hdfs_conns_));
         if (hdfsExists(hdfs_conn, scratch_subdir_path_str.c_str()) != 0) {
           if (hdfsCreateDirectory(hdfs_conn, scratch_subdir_path_str.c_str()) != 0) {
             return Status(
@@ -346,8 +330,8 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
         }
       } else {
         DCHECK(is_s3a_path);
-        path scratch_subdir_path(tmp_path / TMP_SUB_DIR_NAME);
-        scratch_subdir_path_str = scratch_subdir_path.string();
+        RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
+            tmp_path.string(), &hdfs_conn, &hdfs_conns_, s3a_options()));
       }
       tmp_dirs_remote_ =
           std::make_unique<TmpDir>(scratch_subdir_path_str, tmp_dirs[i]->bytes_limit,
@@ -430,6 +414,68 @@ Status TmpFileMgr::InitCustom(const vector<string>& tmp_dir_specifiers,
                << "directories in list: " << join(tmp_dir_specifiers, ",")
                << ". See previous warnings for information on causes.";
   }
+  return Status::OK();
+}
+
+Status TmpFileMgr::ParseScratchPathToks(const string& tmp_dir_spec,
+    const string& tmp_dirs_without_prefix, bool is_hdfs, string* path,
+    int64_t* bytes_limit, int* priority) {
+  vector<string> toks;
+  split(toks, tmp_dirs_without_prefix, is_any_of(":"), token_compress_off);
+  // The scratch path may have two options "bytes limit" and "priority".
+  // toks_option_st_idx indicates, after the split by colon, from which index on,
+  // the content should be the options.
+  int toks_option_st_idx = 1;
+  // The max size after the split by colon.
+  int max_num_tokens = 3;
+  if (is_hdfs) {
+    // We force the HDFS path to contain the port number, so the
+    // first ":" should be a part of the hdfs path.
+    if (toks.size() < 2) {
+      return Status(
+          Substitute("Hdfs path should have the port number: '$0'", tmp_dir_spec));
+    }
+    *path = toks[0].append(":").append(toks[1]);
+    toks_option_st_idx++;
+    max_num_tokens++;
+  } else {
+    *path = toks[0];
+  }
+
+  if (toks.size() > max_num_tokens) {
+    return Status(Substitute(
+        "Could not parse temporary dir specifier, too many colons: '$0'", tmp_dir_spec));
+  }
+
+  for (int i = toks_option_st_idx; i < toks.size(); i++) {
+    if (i == toks_option_st_idx) {
+      // Parse option byte_limit.
+      bool is_percent;
+      int64_t tmp_bytes_limit = ParseUtil::ParseMemSpec(toks[i], &is_percent, 0);
+      if (tmp_bytes_limit < 0 || is_percent) {
+        return Status(Substitute(
+            "Malformed scratch directory capacity configuration '$0'", tmp_dir_spec));
+      } else if (tmp_bytes_limit == 0) {
+        // Interpret -1, 0 or empty string as no limit.
+        tmp_bytes_limit = numeric_limits<int64_t>::max();
+      }
+      *bytes_limit = tmp_bytes_limit;
+    } else if (i == (toks_option_st_idx + 1)) {
+      // Parse option priority.
+      if (toks[i].empty()) continue;
+      StringParser::ParseResult result;
+      int tmp_priority =
+          StringParser::StringToInt<int>(toks[i].data(), toks[i].size(), &result);
+      if (result != StringParser::PARSE_SUCCESS) {
+        return Status(Substitute(
+            "Malformed scratch directory priority configuration '$0'", tmp_dir_spec));
+      }
+      *priority = tmp_priority;
+    } else {
+      DCHECK(false) << "Invalid temporary dir specifier: " << tmp_dir_spec;
+    }
+  }
+
   return Status::OK();
 }
 
@@ -757,17 +803,17 @@ TmpFileRemote::TmpFileRemote(TmpFileGroup* file_group, TmpFileMgr::DeviceId devi
   : TmpFile(file_group, device_id, path, expected_local) {
   DCHECK(hdfs_url != nullptr);
   hdfs_conn_ = nullptr;
+  const HdfsFsCache::HdfsConnOptions* options = nullptr;
   if (IsHdfsPath(hdfs_url, false)) {
-    hdfs_conn_ = hdfsConnect("default", 0);
     disk_type_ = io::DiskFileType::DFS;
     disk_id_ = file_group->io_mgr_->RemoteDfsDiskId();
   } else if (IsS3APath(hdfs_url, false)) {
     disk_type_ = io::DiskFileType::S3;
     disk_id_ = file_group->io_mgr_->RemoteS3DiskId();
-    Status status = HdfsFsCache::instance()->GetConnection(hdfs_url, &hdfs_conn_,
-        &file_group_->tmp_file_mgr_->hdfs_conns_,
-        file_group_->tmp_file_mgr_->s3a_options());
+    options = file_group_->tmp_file_mgr_->s3a_options();
   }
+  Status status = HdfsFsCache::instance()->GetConnection(
+      hdfs_url, &hdfs_conn_, &file_group_->tmp_file_mgr_->hdfs_conns_, options);
   file_size_ = file_group_->tmp_file_mgr_->GetRemoteTmpFileSize();
   local_buffer_path_ = local_buffer_path;
   disk_file_ = make_unique<io::DiskFile>(path_, file_group->io_mgr_,

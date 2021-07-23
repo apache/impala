@@ -61,13 +61,12 @@ DECLARE_string(disk_spill_compression_codec);
 DECLARE_bool(disk_spill_punch_holes);
 DECLARE_string(remote_tmp_file_block_size);
 DECLARE_string(remote_tmp_file_size);
-DECLARE_bool(allow_spill_to_hdfs);
 
 // This suffix is appended to a tmp dir
 const string SCRATCH_SUFFIX = "/impala-scratch";
 
 /// For testing spill to remote.
-static const string HDFS_LOCAL_URL = "hdfs://localhost";
+static const string HDFS_LOCAL_URL = "hdfs://localhost:20500/tmp";
 static const string REMOTE_URL = HDFS_LOCAL_URL;
 static const string LOCAL_BUFFER_PATH = "/tmp/buffer-pool-test-buffer";
 
@@ -81,7 +80,6 @@ class BufferPoolTest : public ::testing::Test {
  public:
   virtual void SetUp() {
     test_env_.reset(new TestEnv);
-    FLAGS_allow_spill_to_hdfs = true;
     FLAGS_remote_tmp_file_size = "512KB";
 
     // Don't create global buffer pool in 'test_env_' - we'll create a buffer pool in
