@@ -730,6 +730,9 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
     req.query_string = request_info->query_string;
     BuildArgumentMap(request_info->query_string, &req.parsed_args);
   }
+  if (request_info->remote_user != nullptr) {
+    req.source_user = request_info->remote_user;
+  }
 
   HttpStatusCode response = HttpStatusCode::Ok;
   ContentType content_type = HTML;

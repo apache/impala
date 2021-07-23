@@ -28,16 +28,22 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.Range;
+import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.directory.server.core.annotations.CreateDS;
 import org.apache.directory.server.core.annotations.CreatePartition;
 import org.apache.directory.server.annotations.CreateLdapServer;
 import org.apache.directory.server.annotations.CreateTransport;
 import org.apache.directory.server.core.annotations.ApplyLdifFiles;
 import org.apache.directory.server.core.integ.CreateLdapServerRule;
+import org.apache.hive.service.rpc.thrift.*;
 import org.apache.impala.util.Metrics;
 import org.apache.log4j.Logger;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.transport.THttpClient;
 import org.junit.After;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -297,6 +303,56 @@ public class LdapWebserverTest {
     verifyJwtAuthMetrics(Range.closed(1L, 1L), Range.closed(1L, 1L));
   }
 
+  /**
+   * Print the username closing a session or cancelling a query from the WebUI.
+   */
+  @Test
+  public void testDisplaySrcUsernameInQueryCause() throws Exception {
+    setUp("", "");
+    // Create client
+    THttpClient transport = new THttpClient("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+    // Authenticate as 'Test1Ldap' with password '12345'
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOjEyMzQ1");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    // Open a session which will get username 'Test1Ldap'.
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    TOpenSessionResp openResp = client.OpenSession(openReq);
+
+    // Execute a long running query then cancel it from the WebUI.
+    // Check the runtime profile and the INFO logs for the cause message.
+    TOperationHandle operationHandle = LdapHS2Test.execQueryAsync(
+        client, openResp.getSessionHandle(), "select sleep(10000)");
+    String queryId = PrintId(operationHandle.getOperationId());
+    String cancelQueryUrl = String.format("/cancel_query?query_id=%s", queryId);
+    String textProfileUrl = String.format("/query_profile_plain_text?query_id=%s",
+            queryId);
+    metrics_.readContent(cancelQueryUrl);
+    String response =  metrics_.readContent(textProfileUrl);
+    String cancelStatus = String.format("Cancelled from Impala&apos;s debug web interface"
+        + " by user: &apos;%s&apos; at", TEST_USER_1);
+    assertTrue(response.contains(cancelStatus));
+    // Wait for logs to flush
+    TimeUnit.SECONDS.sleep(6);
+    response = metrics_.readContent("/logs");
+    assertTrue(response.contains(cancelStatus));
+
+    // Session closing from the WebUI does not produce the cause message in the profile,
+    // so we will skip checking the runtime profile.
+    String sessionId = PrintId(openResp.getSessionHandle().getSessionId());
+    String closeSessionUrl =  String.format("/close_session?session_id=%s", sessionId);
+    metrics_.readContent(closeSessionUrl);
+    // Wait for logs to flush
+    TimeUnit.SECONDS.sleep(6);
+    String closeStatus = String.format("Session closed from Impala&apos;s debug web"
+        + " interface by user: &apos;%s&apos; at", TEST_USER_1);
+    response = metrics_.readContent("/logs");
+    assertTrue(response.contains(closeStatus));
+  }
+
   // Helper method to make a get call to the webserver using the input basic
   // auth token and x-forward-for token.
   private void attemptConnection(String basic_auth_token, String xff_address)
@@ -310,5 +366,18 @@ public class LdapWebserverTest {
       connection.setRequestProperty("X-Forwarded-For", xff_address);
     }
     connection.getInputStream();
+  }
+
+  // Helper method to get query id or session id
+  private static String PrintId(THandleIdentifier handle) {
+    // The binary representation is present in the query handle but we need to
+    // massage it into the expected string representation.
+    byte[] guid_bytes = handle.getGuid();
+    assertEquals(guid_bytes.length,16);
+    byte[] low_bytes = ArrayUtils.subarray(guid_bytes, 0, 8);
+    byte[] high_bytes = ArrayUtils.subarray(guid_bytes, 8, 16);
+    ArrayUtils.reverse(low_bytes);
+    ArrayUtils.reverse(high_bytes);
+    return Hex.encodeHexString(low_bytes) + ":" + Hex.encodeHexString(high_bytes);
   }
 }

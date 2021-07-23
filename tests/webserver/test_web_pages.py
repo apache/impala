@@ -823,10 +823,11 @@ class TestWebPage(ImpalaTestSuite):
       .format("25000"), query_id)
     requests.get(cancel_query_url)
     response = requests.get(text_profile_url)
-    cancel_status = "Cancelled from Impala&apos;s debug web interface by client at"
+    cancel_status = "Cancelled from Impala&apos;s debug web interface by user: " \
+                    "&apos;anonymous&apos; at"
     assert cancel_status in response.text
     self.assert_impalad_log_contains("INFO", "Cancelled from Impala\'s debug web "
-      "interface by client at", expected_count=-1)
+      "interface by user: 'anonymous' at", expected_count=-1)
     # Session closing from the WebUI does not produce the cause message in the profile,
     # so we will skip checking the runtime profile.
     results = self.execute_query("select current_session()")
@@ -835,7 +836,7 @@ class TestWebPage(ImpalaTestSuite):
       ("25000"), session_id)
     requests.get(close_session_url)
     self.assert_impalad_log_contains("INFO", "Session closed from Impala\'s debug "
-      "web interface by client at", expected_count=-1)
+      "web interface by user: 'anonymous' at", expected_count=-1)
 
   def test_catalog_operations_endpoint(self):
     """Test to check that the /operations endpoint returns 200 OK."""

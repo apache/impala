@@ -97,6 +97,19 @@ public class LdapHS2Test {
     return execResp.getOperationHandle();
   }
 
+  /**
+   * Executes async 'query'.
+   */
+  static TOperationHandle execQueryAsync(TCLIService.Iface client,
+      TSessionHandle sessionHandle, String query)
+      throws Exception {
+    TExecuteStatementReq execReq = new TExecuteStatementReq(sessionHandle, query);
+    TExecuteStatementResp execResp = client.ExecuteStatement(execReq);
+    verifySuccess(execResp.getStatus());
+
+    return execResp.getOperationHandle();
+  }
+
   private void verifyMetrics(long expectedBasicAuthSuccess, long expectedBasicAuthFailure)
       throws Exception {
     long actualBasicAuthSuccess = (long) metrics.getMetric(

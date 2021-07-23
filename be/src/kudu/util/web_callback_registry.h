@@ -68,6 +68,9 @@ class WebCallbackRegistry {
 
     // The socket address of the requester, <host>:<port>.
     std::string source_socket;
+
+    // Authenticated user, or 'anonymous' if no auth used
+    std::string source_user = "anonymous";
   };
 
   // A response to an HTTP request whose body is rendered by template.
