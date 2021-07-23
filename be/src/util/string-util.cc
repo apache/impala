@@ -115,7 +115,7 @@ int FindUtf8PosBackward(const uint8_t* ptr, const int len, int index) {
   int last_pos = len;
   while (pos >= 0) {
     // Point to the start byte of the last character.
-    while (!BitUtil::IsUtf8StartByte(ptr[pos]) && pos >= 0) --pos;
+    while (pos >= 0 && !BitUtil::IsUtf8StartByte(ptr[pos])) --pos;
     if (pos < 0) {
       // Can't find any legal characters. Count each byte from last_pos as one character.
       // Note that index is 0-based.
