@@ -54,6 +54,7 @@ namespace io {
 }
 struct BufferPoolClientCounters;
 class MemTracker;
+class TmpDir;
 class TmpFile;
 class TmpFileRemote;
 class TmpFileBufferPool;
@@ -132,33 +133,6 @@ class TmpFileMgr {
   /// Same typedef as io::WriteRange::WriteDoneCallback.
   typedef std::function<void(const Status&)> WriteDoneCallback;
 
-  /// A configured temporary directory that TmpFileMgr allocates files in.
-  struct TmpDir {
-    TmpDir(const std::string& path, int64_t bytes_limit, int priority,
-        IntGauge* bytes_used_metric, bool is_local_dir = true)
-      : path(path),
-        bytes_limit(bytes_limit),
-        priority(priority),
-        bytes_used_metric(bytes_used_metric),
-        is_local_dir(is_local_dir) {}
-
-    /// Path to the temporary directory.
-    std::string path;
-
-    /// Limit on bytes that should be written to this path. Set to maximum value
-    /// of int64_t if there is no limit.
-    int64_t bytes_limit;
-
-    /// Scratch directory priority.
-    int priority;
-
-    /// The current bytes of scratch used for this temporary directory.
-    IntGauge* bytes_used_metric;
-
-    /// If the dir is expected in the local file system or in the remote.
-    bool is_local_dir;
-  };
-
   /// A configuration for the control parameters of remote temporary directories.
   /// The struct is used by TmpFileMgr and has the same lifecycle as TmpFileMgr.
   struct TmpDirRemoteCtrl {
@@ -208,18 +182,6 @@ class TmpFileMgr {
   Status InitCustom(const std::vector<std::string>& tmp_dir_specifiers,
       bool one_dir_per_device, const std::string& compression_codec, bool punch_holes,
       MetricGroup* metrics) WARN_UNUSED_RESULT;
-
-  /// A helper function for InitCustom() to parse the options of the scratch directory.
-  Status ParseScratchPathToks(const string& tmp_dir_spec,
-      const string& tmp_dirs_without_prefix, bool is_hdfs, string* path,
-      int64_t* bytes_limit, int* priority) WARN_UNUSED_RESULT;
-
-  /// A helper function for InitCustom() to create a scratch directory.
-  Status CreateDirectory(const string& scratch_subdir_path, const string& tmp_path,
-      const std::unique_ptr<TmpDir>& tmp_dir, MetricGroup* metrics,
-      vector<bool>* is_tmp_dir_on_disk, bool* has_remote_dir,
-      int disk_id) WARN_UNUSED_RESULT;
-
   // Create the TmpFile buffer pool thread for async buffer file reservation.
   Status CreateTmpFileBufferPoolThread(MetricGroup* metrics) WARN_UNUSED_RESULT;
 
@@ -328,6 +290,9 @@ class TmpFileMgr {
   friend class TmpFileRemote;
   friend class TmpFileGroup;
   friend class TmpFileMgrTest;
+  friend class TmpDirLocal;
+  friend class TmpDirHdfs;
+  friend class TmpDirS3;
 
   /// Return a new TmpFile handle with a path based on file_group->unique_id. The file is
   /// associated with the 'file_group' and the file path is within the (single) scratch
@@ -353,9 +318,12 @@ class TmpFileMgr {
   /// Whether hole punching is enabled.
   bool punch_holes_ = false;
 
+  /// Whether one local scratch directory per device.
+  bool one_dir_per_device_ = false;
+
   /// The paths of the created tmp directories, which are used for spilling to local
   /// filesystem.
-  std::vector<TmpDir> tmp_dirs_;
+  std::vector<std::unique_ptr<TmpDir>> tmp_dirs_;
 
   /// The paths of remote directories, which are used for spilling to remote filesystem.
   std::unique_ptr<TmpDir> tmp_dirs_remote_;
@@ -469,7 +437,7 @@ class TmpFileGroup {
   void UpdateScratchSpaceMetrics(int64_t num_bytes, bool is_remote = false);
 
   /// Assemble and return a new path.
-  std::string GenerateNewPath(string& dir, string& unique_name);
+  std::string GenerateNewPath(const string& dir, const string& unique_name);
 
   std::string DebugString();
 

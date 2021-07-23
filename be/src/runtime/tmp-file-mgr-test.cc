@@ -171,13 +171,13 @@ class TmpFileMgrTest : public ::testing::Test {
   }
 
   /// Helper to get the private tmp_dirs_ member.
-  static const vector<TmpFileMgr::TmpDir>& GetTmpDirs(TmpFileMgr* mgr) {
+  static const vector<unique_ptr<TmpDir>>& GetTmpDirs(TmpFileMgr* mgr) {
     return mgr->tmp_dirs_;
   }
 
   /// Helper to get the private tmp_remote_dirs_ pointer.
-  static const TmpFileMgr::TmpDir* GetTmpRemoteDir(TmpFileMgr* mgr) {
-    return mgr->tmp_dirs_remote_.get();
+  static const unique_ptr<TmpDir>& GetTmpRemoteDir(TmpFileMgr* mgr) {
+    return mgr->tmp_dirs_remote_;
   }
 
   /// Helper to call the private TmpFileMgr::NewFile() method.
@@ -211,7 +211,7 @@ class TmpFileMgrTest : public ::testing::Test {
   /// Helper to set an invalid remote path to create an error.
   static void SetInvalidRemotePath(
       TmpFileMgr* tmp_file_mgr, TmpFileGroup* group, int tmp_file_idx) {
-    string dir = tmp_file_mgr->tmp_dirs_remote_->path;
+    const string& dir = tmp_file_mgr->tmp_dirs_remote_->path();
     int dev_id = 0;
     string invalid_path = "";
     auto tmp_file_shared_ptr = group->tmp_files_remote_[tmp_file_idx];
@@ -968,12 +968,12 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsing) {
                        "/tmp/tmp-file-mgr-test5:200tb:5,"
                        "/tmp/tmp-file-mgr-test6:100MB:6"));
   EXPECT_EQ(6, dirs.size());
-  EXPECT_EQ(5 * GIGABYTE, dirs[0].bytes_limit);
-  EXPECT_EQ(numeric_limits<int64_t>::max(), dirs[1].bytes_limit);
-  EXPECT_EQ(1234, dirs[2].bytes_limit);
-  EXPECT_EQ(99999999, dirs[3].bytes_limit);
-  EXPECT_EQ(200 * TERABYTE, dirs[4].bytes_limit);
-  EXPECT_EQ(100 * MEGABYTE, dirs[5].bytes_limit);
+  EXPECT_EQ(5 * GIGABYTE, dirs[0]->bytes_limit());
+  EXPECT_EQ(numeric_limits<int64_t>::max(), dirs[1]->bytes_limit());
+  EXPECT_EQ(1234, dirs[2]->bytes_limit());
+  EXPECT_EQ(99999999, dirs[3]->bytes_limit());
+  EXPECT_EQ(200 * TERABYTE, dirs[4]->bytes_limit());
+  EXPECT_EQ(100 * MEGABYTE, dirs[5]->bytes_limit());
 
   // Various invalid limit formats result in the directory getting skipped.
   // Include a valid dir on the end to ensure that we don't short-circuit all
@@ -984,8 +984,8 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsing) {
                        "/tmp/tmp-file-mgr-test5:5pb,/tmp/tmp-file-mgr-test6:10%,"
                        "/tmp/tmp-file-mgr-test1:100"));
   EXPECT_EQ(1, dirs2.size());
-  EXPECT_EQ("/tmp/tmp-file-mgr-test1/impala-scratch", dirs2[0].path);
-  EXPECT_EQ(100, dirs2[0].bytes_limit);
+  EXPECT_EQ("/tmp/tmp-file-mgr-test1/impala-scratch", dirs2[0]->path());
+  EXPECT_EQ(100, dirs2[0]->bytes_limit());
 
   // Various valid ways of specifying "unlimited".
   auto& dirs3 =
@@ -993,7 +993,7 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsing) {
                                   "/tmp/tmp-file-mgr-test3,/tmp/tmp-file-mgr-test4:0"));
   EXPECT_EQ(4, dirs3.size());
   for (const auto& dir : dirs3) {
-    EXPECT_EQ(numeric_limits<int64_t>::max(), dir.bytes_limit);
+    EXPECT_EQ(numeric_limits<int64_t>::max(), dir->bytes_limit());
   }
 
   // Extra colons
@@ -1015,36 +1015,36 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsingRemotePath) {
       "/tmp/local-buffer-dir2", "/tmp/local-buffer-dir3"});
 
   // Successful cases for HDFS paths.
-  auto dirs1 = GetTmpRemoteDir(
+  auto& dirs1 = GetTmpRemoteDir(
       CreateTmpFileMgr("hdfs://localhost:20500/tmp,/tmp/local-buffer-dir"));
   EXPECT_NE(nullptr, dirs1);
 
-  auto dirs2 = GetTmpRemoteDir(
+  auto& dirs2 = GetTmpRemoteDir(
       CreateTmpFileMgr("hdfs://localhost:20500/tmp:100,/tmp/local-buffer-dir"));
   EXPECT_NE(nullptr, dirs2);
-  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs2->path);
-  EXPECT_EQ(100, dirs2->bytes_limit);
+  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs2->path());
+  EXPECT_EQ(100, dirs2->bytes_limit());
 
-  auto dirs3 = GetTmpRemoteDir(
+  auto& dirs3 = GetTmpRemoteDir(
       CreateTmpFileMgr("hdfs://localhost:20500/tmp:1KB:1,/tmp/local-buffer-dir"));
   EXPECT_NE(nullptr, dirs3);
-  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs3->path);
-  EXPECT_EQ(1024, dirs3->bytes_limit);
+  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs3->path());
+  EXPECT_EQ(1024, dirs3->bytes_limit());
 
   // Multiple local paths with one remote path.
   auto tmp_mgr_4 = CreateTmpFileMgr("hdfs://localhost:20500/tmp,/tmp/local-buffer-dir1,"
                                     "/tmp/local-buffer-dir2,/tmp/local-buffer-dir3");
-  auto dirs4_local = GetTmpDirs(tmp_mgr_4);
-  auto dirs4_remote = GetTmpRemoteDir(tmp_mgr_4);
+  auto& dirs4_local = GetTmpDirs(tmp_mgr_4);
+  auto& dirs4_remote = GetTmpRemoteDir(tmp_mgr_4);
   EXPECT_NE(nullptr, dirs4_remote);
   EXPECT_EQ(2, dirs4_local.size());
-  EXPECT_EQ("/tmp/local-buffer-dir2/impala-scratch", dirs4_local[0].path);
-  EXPECT_EQ("/tmp/local-buffer-dir3/impala-scratch", dirs4_local[1].path);
+  EXPECT_EQ("/tmp/local-buffer-dir2/impala-scratch", dirs4_local[0]->path());
+  EXPECT_EQ("/tmp/local-buffer-dir3/impala-scratch", dirs4_local[1]->path());
 
   // Fails the parsing due to no port number for the HDFS path.
   auto tmp_mgr_5 = CreateTmpFileMgr("hdfs://localhost/tmp,/tmp/local-buffer-dir");
-  auto dirs5_local = GetTmpDirs(tmp_mgr_5);
-  auto dirs5_remote = GetTmpRemoteDir(tmp_mgr_5);
+  auto& dirs5_local = GetTmpDirs(tmp_mgr_5);
+  auto& dirs5_remote = GetTmpRemoteDir(tmp_mgr_5);
   EXPECT_EQ(1, dirs5_local.size());
   EXPECT_EQ(nullptr, dirs5_remote);
 
@@ -1054,60 +1054,76 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsingRemotePath) {
 
   // Parse successfully, but the parsed HDFS path is unable to connect.
   // These cases would fail the initialization of TmpFileMgr.
-  auto dirs7 = GetTmpRemoteDir(
+  auto& dirs7 = GetTmpRemoteDir(
       CreateTmpFileMgr("hdfs://localhost:1/tmp::1,/tmp/local-buffer-dir", false));
   EXPECT_EQ(nullptr, dirs7);
 
-  auto dirs8 = GetTmpRemoteDir(
+  auto& dirs8 = GetTmpRemoteDir(
       CreateTmpFileMgr("hdfs://localhost:/tmp::,/tmp/local-buffer-dir", false));
   EXPECT_EQ(nullptr, dirs8);
 
-  auto dirs9 = GetTmpRemoteDir(
+  auto& dirs9 = GetTmpRemoteDir(
       CreateTmpFileMgr("hdfs://localhost/tmp::1,/tmp/local-buffer-dir", false));
   EXPECT_EQ(nullptr, dirs9);
 
-  auto dirs10 = GetTmpRemoteDir(
+  auto& dirs10 = GetTmpRemoteDir(
       CreateTmpFileMgr("hdfs://localhost/tmp:1,/tmp/local-buffer-dir", false));
   EXPECT_EQ(nullptr, dirs10);
 
   // Multiple remote paths, should support only one.
-  auto dirs11 = GetTmpRemoteDir(
+  auto& dirs11 = GetTmpRemoteDir(
       CreateTmpFileMgr("hdfs://localhost:20500/tmp,hdfs://localhost:20501/tmp,"
                        "/tmp/local-buffer-dir"));
   EXPECT_NE(nullptr, dirs11);
-  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs11->path);
+  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs11->path());
 
   // The order of the buffer and the remote dir should not affect the result.
-  auto dirs12 = GetTmpRemoteDir(
+  auto& dirs12 = GetTmpRemoteDir(
       CreateTmpFileMgr("/tmp/local-buffer-dir, hdfs://localhost:20500/tmp,"
                        "hdfs://localhost:20501/tmp"));
   EXPECT_NE(nullptr, dirs12);
-  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs12->path);
+  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs12->path());
 
   // Successful cases for parsing S3 paths.
   // Create a fake s3 connection in order to pass the connection verification.
   HdfsFsCache::HdfsFsMap fake_hdfs_conn_map;
   hdfsFS fake_conn = reinterpret_cast<hdfsFS>(1);
   fake_hdfs_conn_map.insert(make_pair("s3a://fake_host/", fake_conn));
-  auto dirs13 = GetTmpRemoteDir(
+  auto& dirs13 = GetTmpRemoteDir(
       CreateTmpFileMgr("/tmp/local-buffer-dir, s3a://fake_host/for-parsing-test-only",
           true, &fake_hdfs_conn_map));
   EXPECT_NE(nullptr, dirs13);
-  EXPECT_EQ("s3a://fake_host/for-parsing-test-only/impala-scratch", dirs13->path);
+  EXPECT_EQ("s3a://fake_host/for-parsing-test-only/impala-scratch", dirs13->path());
 
-  auto dirs14 = GetTmpRemoteDir(
+  auto& dirs14 = GetTmpRemoteDir(
       CreateTmpFileMgr("/tmp/local-buffer-dir, s3a://fake_host/for-parsing-test-only:100",
           true, &fake_hdfs_conn_map));
   EXPECT_NE(nullptr, dirs14);
-  EXPECT_EQ("s3a://fake_host/for-parsing-test-only/impala-scratch", dirs14->path);
-  EXPECT_EQ(100, dirs14->bytes_limit);
+  EXPECT_EQ("s3a://fake_host/for-parsing-test-only/impala-scratch", dirs14->path());
+  EXPECT_EQ(100, dirs14->bytes_limit());
 
-  auto dirs15 = GetTmpRemoteDir(CreateTmpFileMgr(
+  auto& dirs15 = GetTmpRemoteDir(CreateTmpFileMgr(
       "/tmp/local-buffer-dir, s3a://fake_host/for-parsing-test-only:1KB:1", true,
       &fake_hdfs_conn_map));
   EXPECT_NE(nullptr, dirs15);
-  EXPECT_EQ("s3a://fake_host/for-parsing-test-only/impala-scratch", dirs15->path);
-  EXPECT_EQ(1024, dirs15->bytes_limit);
+  EXPECT_EQ("s3a://fake_host/for-parsing-test-only/impala-scratch", dirs15->path());
+  EXPECT_EQ(1024, dirs15->bytes_limit());
+
+  // Failure cases for parsing S3 paths.
+  auto& dirs16 = GetTmpRemoteDir(CreateTmpFileMgr(
+      "/tmp/local-buffer-dir, s3a://fake_host:1234/for-parsing-test-only:1KB:1", true,
+      &fake_hdfs_conn_map));
+  EXPECT_EQ(nullptr, dirs16);
+
+  auto& dirs17 = GetTmpRemoteDir(CreateTmpFileMgr(
+      "/tmp/local-buffer-dir, s3a://fake_host:1234/for-parsing-test-only:1KB", true,
+      &fake_hdfs_conn_map));
+  EXPECT_EQ(nullptr, dirs17);
+
+  auto& dirs18 = GetTmpRemoteDir(CreateTmpFileMgr(
+      "/tmp/local-buffer-dir, s3a://fake_host:1234/for-parsing-test-only", true,
+      &fake_hdfs_conn_map));
+  EXPECT_EQ(nullptr, dirs18);
 }
 
 // Test compression buffer memory management for reads and writes.
@@ -1268,18 +1284,18 @@ TEST_F(TmpFileMgrTest, TestDirectoryPriorityParsing) {
                        "/tmp/tmp-file-mgr-test2::2,/tmp/tmp-file-mgr-test4:99999999:4,"
                        "/tmp/tmp-file-mgr-test5:200tb:5,/tmp/tmp-file-mgr-test1:5g:1"));
   EXPECT_EQ(6, dirs.size());
-  EXPECT_EQ(5 * GIGABYTE, dirs[0].bytes_limit);
-  EXPECT_EQ(1, dirs[0].priority);
-  EXPECT_EQ(numeric_limits<int64_t>::max(), dirs[1].bytes_limit);
-  EXPECT_EQ(2, dirs[1].priority);
-  EXPECT_EQ(1234, dirs[2].bytes_limit);
-  EXPECT_EQ(3, dirs[2].priority);
-  EXPECT_EQ(99999999, dirs[3].bytes_limit);
-  EXPECT_EQ(4, dirs[3].priority);
-  EXPECT_EQ(200 * TERABYTE, dirs[4].bytes_limit);
-  EXPECT_EQ(5, dirs[4].priority);
-  EXPECT_EQ(100 * MEGABYTE, dirs[5].bytes_limit);
-  EXPECT_EQ(numeric_limits<int>::max(), dirs[5].priority);
+  EXPECT_EQ(5 * GIGABYTE, dirs[0]->bytes_limit());
+  EXPECT_EQ(1, dirs[0]->priority());
+  EXPECT_EQ(numeric_limits<int64_t>::max(), dirs[1]->bytes_limit());
+  EXPECT_EQ(2, dirs[1]->priority());
+  EXPECT_EQ(1234, dirs[2]->bytes_limit());
+  EXPECT_EQ(3, dirs[2]->priority());
+  EXPECT_EQ(99999999, dirs[3]->bytes_limit());
+  EXPECT_EQ(4, dirs[3]->priority());
+  EXPECT_EQ(200 * TERABYTE, dirs[4]->bytes_limit());
+  EXPECT_EQ(5, dirs[4]->priority());
+  EXPECT_EQ(100 * MEGABYTE, dirs[5]->bytes_limit());
+  EXPECT_EQ(numeric_limits<int>::max(), dirs[5]->priority());
 
   // Various invalid limit formats result in the directory getting skipped.
   // Include a valid dir on the end to ensure that we don't short-circuit all
@@ -1290,9 +1306,9 @@ TEST_F(TmpFileMgrTest, TestDirectoryPriorityParsing) {
                        "/tmp/tmp-file-mgr-test5::p0,/tmp/tmp-file-mgr-test6::10%,"
                        "/tmp/tmp-file-mgr-test1:100:-1"));
   EXPECT_EQ(1, dirs2.size());
-  EXPECT_EQ("/tmp/tmp-file-mgr-test1/impala-scratch", dirs2[0].path);
-  EXPECT_EQ(100, dirs2[0].bytes_limit);
-  EXPECT_EQ(-1, dirs2[0].priority);
+  EXPECT_EQ("/tmp/tmp-file-mgr-test1/impala-scratch", dirs2[0]->path());
+  EXPECT_EQ(100, dirs2[0]->bytes_limit());
+  EXPECT_EQ(-1, dirs2[0]->priority());
 }
 
 // Tests that when TmpFileGroup is constructed, the priority based index ranges are

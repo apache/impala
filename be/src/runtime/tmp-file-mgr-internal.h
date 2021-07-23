@@ -27,6 +27,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/io/file-writer.h"
 #include "runtime/tmp-file-mgr.h"
+#include "util/hdfs-util.h"
 
 namespace impala {
 
@@ -94,7 +95,7 @@ class TmpFile {
   std::string DebugString();
 
   /// Helper to get the TmpDir that this file is associated with.
-  TmpFileMgr::TmpDir* GetDir();
+  TmpDir* GetDir();
 
   /// Helper to get the TmpFileGroup that this file is associated with.
   TmpFileGroup* FileGroup() const { return file_group_; }
@@ -213,7 +214,7 @@ class TmpFileRemote : public TmpFile {
 
   bool AllocateSpace(int64_t num_bytes, int64_t* offset);
   io::DiskFile* GetWriteFile();
-  TmpFileMgr::TmpDir* GetLocalBufferDir() const;
+  TmpDir* GetLocalBufferDir() const;
   Status Remove();
 
   /// Returns the size of the file.
@@ -306,6 +307,115 @@ class TmpFileDummy : public TmpFile {
   bool AllocateSpace(int64_t num_bytes, int64_t* offset) { return true; }
   io::DiskFile* GetWriteFile() { return nullptr; }
   Status Remove() { return Status::OK(); }
+};
+
+/// A configured temporary directory that TmpFileMgr allocates files in.
+class TmpDir {
+ public:
+  TmpDir(const std::string& raw_path, const std::string& prefix, bool is_local);
+  virtual ~TmpDir() {}
+
+  /// Parse the raw path and identify the scratch directory options.
+  virtual Status Parse();
+
+  /// Verify the scratch path and create the directory.
+  virtual Status VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
+      bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) = 0;
+
+  int64_t bytes_limit() { return bytes_limit_; }
+  int priority() { return priority_; }
+  const string& path() { return path_; }
+  IntGauge* bytes_used_metric() const { return bytes_used_metric_; }
+  bool is_local() { return is_local_dir_; }
+
+ private:
+  friend class TmpFileMgr;
+  friend class TmpDirHdfs;
+  friend class TmpDirS3;
+  friend class TmpDirLocal;
+
+  /// Raw path of the temporary directory.
+  const std::string raw_path_;
+
+  /// Parsed raw path of the temporary directory, e.g, trimmed.
+  std::string parsed_raw_path_;
+
+  /// The prefix of the path.
+  std::string prefix_;
+
+  /// The complete path to the temporary directory.
+  std::string path_;
+
+  /// Limit on bytes that should be written to this path. Set to maximum value
+  /// of int64_t if there is no limit.
+  int64_t bytes_limit_;
+
+  /// Scratch directory priority.
+  int priority_;
+
+  /// The current bytes of scratch used for this temporary directory.
+  IntGauge* bytes_used_metric_;
+
+  /// If the dir is expected in the local file system or in the remote.
+  const bool is_local_dir_;
+
+  /// Indicate if the TmpDir is parsed.
+  bool is_parsed_;
+
+  /// Return the directory path by parsing the input tokens.
+  /// "Path" is the path generated from the tokens.
+  /// "Offset" indicates the number of elements has been read in the tokens.
+  virtual Status GetPathFromToks(
+      const std::vector<string>& tokens, string* path, int* offset);
+
+  /// A helper function for ParseTokens() to parse the raw path and generate the complete
+  /// path of the scratch directory.
+  /// "Offset" indicates the number of elements has been read in the tokens.
+  Status ParsePath(const std::vector<string>& tokens, int* offset);
+
+  /// A helper function for ParseTokens() to parse the byte limit of the scratch
+  /// directory. "Index" indicates the position of the byte_limit in the tokens.
+  Status ParseByteLimit(const std::vector<string>& tokens, int index);
+
+  /// A helper function for ParseTokens() to parse the priorify of the scratch directory.
+  /// "Index" indicates the position of the priority in the tokens.
+  Status ParsePriority(const std::vector<string>& tokens, int index);
+
+  /// A helper function for Parse() to parse raw input of the scratch directory.
+  Status ParseTokens();
+};
+
+class TmpDirLocal : public TmpDir {
+ public:
+  TmpDirLocal(const std::string& path) : TmpDir(path, "", true /*is_local*/) {}
+  Status VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
+      bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) override;
+
+ private:
+  /// A helper function for VerifyAndCreate() to create a local scratch directory.
+  Status CreateLocalDirectory(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
+      bool need_local_buffer_dir, int disk_id, TmpFileMgr* tmp_mgr);
+};
+
+class TmpDirS3 : public TmpDir {
+ public:
+  TmpDirS3(const std::string& path)
+    : TmpDir(path, FILESYS_PREFIX_S3, false /*is_local*/) {}
+  Status VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
+      bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) override;
+};
+
+class TmpDirHdfs : public TmpDir {
+ public:
+  TmpDirHdfs(const std::string& path)
+    : TmpDir(path, FILESYS_PREFIX_HDFS, false /*is_local*/) {}
+  Status Parse() override;
+  Status VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_on_disk,
+      bool need_local_buffer_dir, TmpFileMgr* tmp_mgr) override;
+
+ private:
+  virtual Status GetPathFromToks(
+      const std::vector<string>& tokens, string* path, int* offset) override;
 };
 
 /// Temporary file buffer pool allows the temporary files to return their buffer to the
