@@ -1220,7 +1220,7 @@ HdfsParquetTableWriter::HdfsParquetTableWriter(HdfsTableSink* parent, RuntimeSta
 HdfsParquetTableWriter::~HdfsParquetTableWriter() {
 }
 
-void HdfsParquetTableWriter::Configure() {
+void HdfsParquetTableWriter::Configure(int num_cols) {
   DCHECK(!is_iceberg_file_);
 
   timestamp_type_ = state_->query_options().parquet_timestamp_type;
@@ -1236,7 +1236,7 @@ void HdfsParquetTableWriter::Configure() {
     default_block_size_ = HDFS_BLOCK_SIZE;
     // Blocks are usually HDFS_BLOCK_SIZE bytes, unless there are many columns, in
     // which case a per-column minimum kicks in.
-    default_block_size_ = max(default_block_size_, MinBlockSize(columns_.size()));
+    default_block_size_ = max(default_block_size_, MinBlockSize(num_cols));
   }
   // HDFS does not like block sizes that are not aligned
   default_block_size_ = BitUtil::RoundUp(default_block_size_, HDFS_BLOCK_ALIGNMENT);
@@ -1245,7 +1245,7 @@ void HdfsParquetTableWriter::Configure() {
   dict_page_size_ = DEFAULT_DATA_PAGE_SIZE;
 }
 
-void HdfsParquetTableWriter::ConfigureForIceberg() {
+void HdfsParquetTableWriter::ConfigureForIceberg(int num_cols) {
   DCHECK(is_iceberg_file_);
 
   // The Iceberg spec states that timestamps are stored as INT64 micros.
@@ -1266,7 +1266,7 @@ void HdfsParquetTableWriter::ConfigureForIceberg() {
     default_block_size_ = HDFS_BLOCK_SIZE;
     // Blocks are usually HDFS_BLOCK_SIZE bytes, unless there are many columns, in
     // which case a per-column minimum kicks in.
-    default_block_size_ = max(default_block_size_, MinBlockSize(columns_.size()));
+    default_block_size_ = max(default_block_size_, MinBlockSize(num_cols));
   }
   // HDFS does not like block sizes that are not aligned
   default_block_size_ = BitUtil::RoundUp(default_block_size_, HDFS_BLOCK_ALIGNMENT);
@@ -1349,9 +1349,9 @@ Status HdfsParquetTableWriter::Init() {
   Codec::CodecInfo codec_info(codec, clevel);
 
   if (is_iceberg_file_) {
-    ConfigureForIceberg();
+    ConfigureForIceberg(num_cols);
   } else {
-    Configure();
+    Configure(num_cols);
   }
 
   columns_.resize(num_cols);

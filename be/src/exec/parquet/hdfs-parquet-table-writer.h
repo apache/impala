@@ -164,17 +164,19 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   /// new row group.  current_row_group_ will be flushed.
   Status AddRowGroup();
 
-  /// Configures writer for non-Iceberg tables:
+  /// Configures writer for non-Iceberg tables.
+  /// 'num_cols' is the number of non-partitioning columns in the target table.
   /// Selects the Parquet timestamp type to be used by this writer.
   /// Sets 'string_utf8_' based on query options and table type.
   /// Sets 'default_block_size_', 'default_plain_page_size_' and 'dict_page_size_'.
-  void Configure();
+  void Configure(int num_cols);
 
-  /// Configures writer for Iceberg tables:
+  /// Configures writer for Iceberg tables.
+  /// 'num_cols' is the number of non-partitioning columns in the target table.
   /// Selects the Parquet timestamp type to be used by this writer.
   /// Sets 'string_utf8_' to true.
   /// Sets 'default_block_size_', 'default_plain_page_size_' and 'dict_page_size_'.
-  void ConfigureForIceberg();
+  void ConfigureForIceberg(int num_cols);
 
   /// Updates output partition with some summary about the written file.
   void FinalizePartitionInfo();
