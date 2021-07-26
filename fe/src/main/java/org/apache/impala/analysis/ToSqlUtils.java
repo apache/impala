@@ -431,7 +431,8 @@ public class ToSqlUtils {
       }
 
       String inputFormat = msTable.getSd().getInputFormat();
-      format = HdfsFileFormat.fromHdfsInputFormatClass(inputFormat);
+      String serDeLib = msTable.getSd().getSerdeInfo().getSerializationLib();
+      format = HdfsFileFormat.fromHdfsInputFormatClass(inputFormat, serDeLib);
       compression = HdfsCompression.fromHdfsInputFormatClass(inputFormat);
       try {
         primaryKeySql = ((FeFsTable) table).getPrimaryKeyColumnNames();

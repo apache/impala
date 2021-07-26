@@ -170,6 +170,7 @@ import org.apache.impala.thrift.TReservedWordsVersion;
     keywordMap.put("iregexp", SqlParserSymbols.KW_IREGEXP);
     keywordMap.put("is", SqlParserSymbols.KW_IS);
     keywordMap.put("join", SqlParserSymbols.KW_JOIN);
+    keywordMap.put("jsonfile", SqlParserSymbols.KW_JSONFILE);
     keywordMap.put("kudu", SqlParserSymbols.KW_KUDU);
     keywordMap.put("last", SqlParserSymbols.KW_LAST);
     keywordMap.put("left", SqlParserSymbols.KW_LEFT);

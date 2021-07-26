@@ -1721,7 +1721,8 @@ public class HdfsTable extends Table implements FeFsTable {
       org.apache.hadoop.hive.metastore.api.Table msTbl) throws Exception {
     Preconditions.checkState(isSchemaLoaded_);
     String inputFormat = msTbl.getSd().getInputFormat();
-    if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO
+    String serDeLib = msTbl.getSd().getSerdeInfo().getSerializationLib();
+    if (HdfsFileFormat.fromJavaClassName(inputFormat, serDeLib) == HdfsFileFormat.AVRO
         || hasAvroData_) {
       // Look for Avro schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
       // taking precedence.

@@ -2568,10 +2568,10 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     }
 
     // Supported file formats. Exclude Avro since it is tested separately.
-    String [] fileFormats =
-        {"TEXTFILE", "SEQUENCEFILE", "PARQUET", "PARQUETFILE", "RCFILE"};
-    String [] fileFormatsStr =
-        {"TEXT", "SEQUENCE_FILE", "PARQUET", "PARQUET", "RC_FILE"};
+    String[] fileFormats = {
+        "TEXTFILE", "SEQUENCEFILE", "PARQUET", "PARQUETFILE", "RCFILE", "JSONFILE"};
+    String[] fileFormatsStr = {
+        "TEXT", "SEQUENCE_FILE", "PARQUET", "PARQUET", "RC_FILE", "JSON"};
     int formatIndx = 0;
     for (String format: fileFormats) {
       for (String create: ImmutableList.of("create table", "create external table")) {

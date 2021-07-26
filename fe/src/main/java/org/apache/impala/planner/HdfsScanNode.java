@@ -188,11 +188,12 @@ public class HdfsScanNode extends ScanNode {
 
   private static Set<HdfsFileFormat> VALID_LEGACY_FORMATS =
       ImmutableSet.<HdfsFileFormat>builder()
-      .add(HdfsFileFormat.RC_FILE)
-      .add(HdfsFileFormat.TEXT)
-      .add(HdfsFileFormat.SEQUENCE_FILE)
-      .add(HdfsFileFormat.AVRO)
-      .build();
+          .add(HdfsFileFormat.RC_FILE)
+          .add(HdfsFileFormat.TEXT)
+          .add(HdfsFileFormat.SEQUENCE_FILE)
+          .add(HdfsFileFormat.AVRO)
+          .add(HdfsFileFormat.JSON)
+          .build();
 
   private static Set<HdfsFileFormat> VALID_COLUMNAR_FORMATS =
       ImmutableSet.<HdfsFileFormat>builder()
@@ -1482,7 +1483,7 @@ public class HdfsScanNode extends ScanNode {
     for (FeFsPartition p : partitions) {
       HdfsFileFormat format = p.getFileFormat();
       long estimatedPartitionSize = 0;
-      if (format == HdfsFileFormat.TEXT) {
+      if (format == HdfsFileFormat.TEXT || format == HdfsFileFormat.JSON) {
         for (FileDescriptor desc : p.getFileDescriptors()) {
           HdfsCompression compression
             = HdfsCompression.fromFileName(desc.getRelativePath().toString());

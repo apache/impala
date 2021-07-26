@@ -49,6 +49,9 @@ public enum HdfsFileFormat {
       "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
       "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
       false, false, true),
+  JSON("org.apache.hadoop.mapred.TextInputFormat",
+      "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+      "org.apache.hadoop.hive.serde2.lazy.JsonSerDe", false, false, true),
   // LZO_TEXT is never used as an actual HdfsFileFormat. It is used only to store the
   // input format class and match against it (e.g. in HdfsCompression). Outside of this
   // file, tables that use the LZO input format class use HdfsFileFormat.TEXT.
@@ -119,6 +122,8 @@ public enum HdfsFileFormat {
       "parquet.hive.MapredParquetInputFormat"
   };
 
+  private static final String JSON_SERDE = "org.apache.hadoop.hive.serde2.lazy.JsonSerDe";
+
   private static Map<String, HdfsFileFormat> VALID_INPUT_FORMATS =
       ImmutableMap.<String, HdfsFileFormat>builder()
           .put(RC_FILE.inputFormat(), RC_FILE)
@@ -147,8 +152,15 @@ public enum HdfsFileFormat {
    * Returns the file format associated with the input format class, or null if
    * the input format class is not supported.
    */
-  public static HdfsFileFormat fromHdfsInputFormatClass(String inputFormatClass) {
+
+  public static HdfsFileFormat fromHdfsInputFormatClass(
+      String inputFormatClass, String serDe) {
     Preconditions.checkNotNull(inputFormatClass);
+    if (serDe != null && inputFormatClass.equals(TEXT.inputFormat())) {
+      if (JSON_SERDE.equals(serDe)) {
+        return HdfsFileFormat.JSON;
+      }
+    }
     return VALID_INPUT_FORMATS.get(inputFormatClass);
   }
 
@@ -156,8 +168,14 @@ public enum HdfsFileFormat {
    * Returns the corresponding enum for a SerDe class name. If classname is not one
    * of our supported formats, throws an IllegalArgumentException like Enum.valueOf
    */
-  public static HdfsFileFormat fromJavaClassName(String className) {
+
+  public static HdfsFileFormat fromJavaClassName(String className, String serDe) {
     Preconditions.checkNotNull(className);
+    if (serDe != null && className.equals(TEXT.inputFormat())) {
+      if (JSON_SERDE.equals(serDe)) {
+        return HdfsFileFormat.JSON;
+      }
+    }
     if (isHdfsInputFormatClass(className)) return VALID_INPUT_FORMATS.get(className);
     throw new IllegalArgumentException(className);
   }
@@ -173,6 +191,7 @@ public enum HdfsFileFormat {
       case PARQUET: return HdfsFileFormat.PARQUET;
       case KUDU: return HdfsFileFormat.KUDU;
       case ICEBERG: return HdfsFileFormat.ICEBERG;
+      case JSON: return HdfsFileFormat.JSON;
       default:
         throw new RuntimeException("Unknown THdfsFileFormat: "
             + thriftFormat + " - should never happen!");
@@ -190,6 +209,7 @@ public enum HdfsFileFormat {
       case PARQUET: return THdfsFileFormat.PARQUET;
       case KUDU: return THdfsFileFormat.KUDU;
       case ICEBERG: return THdfsFileFormat.ICEBERG;
+      case JSON: return THdfsFileFormat.JSON;
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
@@ -215,6 +235,7 @@ public enum HdfsFileFormat {
       case KUDU: return "KUDU";
       case HUDI_PARQUET: return "HUDIPARQUET";
       case ICEBERG: return "ICEBERG";
+      case JSON: return "JSONFILE";
       default:
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
@@ -228,6 +249,7 @@ public enum HdfsFileFormat {
     switch (this) {
       case TEXT:
         return compression == HdfsCompression.NONE;
+      case JSON:
       case RC_FILE:
       case SEQUENCE_FILE:
       case AVRO:

@@ -360,7 +360,8 @@ public class LocalFsTable extends LocalTable implements FeFsTable {
 
   private static boolean isAvroFormat(Table msTbl) {
     String inputFormat = msTbl.getSd().getInputFormat();
-    return HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO;
+    String serDeLib = msTbl.getSd().getSerdeInfo().getSerializationLib();
+    return HdfsFileFormat.fromJavaClassName(inputFormat, serDeLib) == HdfsFileFormat.AVRO;
   }
 
   private static boolean hasAnyAvroPartition(List<? extends FeFsPartition> partitions) {
