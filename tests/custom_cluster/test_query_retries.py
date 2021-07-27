@@ -747,6 +747,32 @@ class TestQueryRetries(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
+      impalad_args="--debug_actions=RETRY_DELAY_GET_QUERY_DRIVER:SLEEP@2000",
+      statestored_args="--statestore_heartbeat_frequency_ms=60000")
+  def test_retry_query_close_before_getting_query_driver(self):
+    """Trigger a query retry, and then close the retried query before getting
+    the query driver. Validate that it doesn't crash the impalad.
+    Set a really high statestore heartbeat frequency so that killed impalads are not
+    removed from the cluster membership."""
+
+    # Kill an impalad, and run a query. The query should be retried.
+    self.cluster.impalads[1].kill()
+    query = "select count(*) from tpch_parquet.lineitem"
+    handle = self.execute_query_async(query,
+        query_options={'retry_failed_queries': 'true'})
+
+    time.sleep(1)
+    # close the query
+    self.client.close_query(handle)
+
+    time.sleep(2)
+    impala_service = self.cluster.get_first_impalad().service
+    self.assert_eventually(60, 0.1,
+        lambda: impala_service.get_num_in_flight_queries() == 0,
+        lambda: "in-flight queries: %d" % impala_service.get_num_in_flight_queries())
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
       impalad_args="--debug_actions=QUERY_RETRY_SET_RESULT_CACHE:FAIL",
       statestored_args="--statestore_heartbeat_frequency_ms=60000")
   def test_retry_query_result_cacheing_failed(self):

@@ -174,14 +174,21 @@ void QueryDriver::TryQueryRetry(
         << Substitute("Cannot retry a that has already been retried query_id = $0",
             PrintId(query_id));
 
-    // Update the state and then schedule the retry asynchronously.
-    client_request_state_->MarkAsRetrying(*error);
-
     // Another reference to this QueryDriver (via the shared_ptr) needs to be created and
     // passed to the thread so that a valid shared_ptr exists while the thread is running.
     // Otherwise it is possible that the user cancels the query and this QueryDriver gets
     // deleted by the shared_ptr.
+    DebugActionNoFail(FLAGS_debug_actions, "RETRY_DELAY_GET_QUERY_DRIVER");
     shared_ptr<QueryDriver> query_driver = parent_server_->GetQueryDriver(query_id);
+    if (query_driver.get() == nullptr) {
+      VLOG_QUERY << Substitute(
+          "Skipping retry of query_id=$0 because it has already been unregistered",
+          PrintId(query_id));
+      return;
+    }
+
+    // Update the state and then schedule the retry asynchronously.
+    client_request_state_->MarkAsRetrying(*error);
 
     // Launch the query retry in a separate thread, 'was_retried' is set to true
     // if the query retry was successfully launched.
