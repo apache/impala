@@ -73,6 +73,7 @@ impala-config.sh, they may cause confusion when switching between branches or ve
 Apache Impala.
 
 | Environment variable | Description |
+|----------------------|-------------|
 | HIVE_VERSION_OVERRIDE | Used to specify different Hive version from default |
 | HIVE_STORAGE_API_VERSION_OVERRIDE | Used to specify different Hive Storage API version from default |
 | HIVE_METASTORE_THRIFT_DIR_OVERRIDE | Used to specify location of metastore thrift files to use during Thrift compilation |
