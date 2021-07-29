@@ -127,6 +127,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     # state since it asserts that no queries are in flight.
     self.client.close_query(handle)
     self.__validate_web_ui_state()
+    self.__validate_memz()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -175,6 +176,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     # state since it asserts that no queries are in flight.
     self.client.close_query(handle)
     self.__validate_web_ui_state()
+    self.__validate_memz()
 
     # Assert that the web ui shows all queries are complete.
     completed_queries = self.cluster.get_first_impalad().service.get_completed_queries()
@@ -237,6 +239,7 @@ class TestQueryRetries(CustomClusterTestSuite):
 
     # Validate the state of the Web UI.
     self.__validate_web_ui_state()
+    self.__validate_memz()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -287,6 +290,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     # state since it asserts that no queries are in flight.
     self.client.close_query(handle)
     self.__validate_web_ui_state()
+    self.__validate_memz()
 
   @SkipIfGCS.jira(reason="IMPALA-10562")
   @SkipIfCOS.jira(reason="IMPALA-10562")
@@ -479,6 +483,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     # Validate the state of the web ui. The query must be closed before validating the
     # state since it asserts that no queries are in flight.
     self.__validate_web_ui_state()
+    self.__validate_memz()
 
   @pytest.mark.execute_serially
   def test_retry_fetched_rows(self):
@@ -722,6 +727,7 @@ class TestQueryRetries(CustomClusterTestSuite):
       assert False
     except Exception, e:
         assert "Cancelled" in str(e)
+    self.__validate_memz()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -751,6 +757,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.client.close_query(handle)
     time.sleep(2)
     assert self.cluster.impalads[0].get_pid() is not None, "Coordinator crashed"
+    self.__validate_memz()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -777,6 +784,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.assert_eventually(60, 0.1,
         lambda: impala_service.get_num_in_flight_queries() == 0,
         lambda: "in-flight queries: %d" % impala_service.get_num_in_flight_queries())
+    self.__validate_memz()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -803,6 +811,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.assert_eventually(60, 0.1,
         lambda: impala_service.get_num_in_flight_queries() == 0,
         lambda: "in-flight queries: %d" % impala_service.get_num_in_flight_queries())
+    self.__validate_memz()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -827,6 +836,7 @@ class TestQueryRetries(CustomClusterTestSuite):
     self.assert_eventually(60, 0.1,
         lambda: impala_service.get_num_in_flight_queries() == 0,
         lambda: "in-flight queries: %d" % impala_service.get_num_in_flight_queries())
+    self.__validate_memz()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args(
@@ -1117,6 +1127,17 @@ class TestQueryRetries(CustomClusterTestSuite):
         if query_id_search:
           return query_id_search.group(1)
     return None
+
+  def __exist_queries_in_web_ui_memz(self):
+    memz_breakdown = self.cluster.get_first_impalad() \
+      .service.get_debug_webpage_json('memz')['detailed']
+    query = re.compile("Query\([0-9a-f]{16}:[0-9a-f]{16}")
+    return query.search(memz_breakdown)
+
+  def __validate_memz(self):
+    # Validate that all queries are released
+    self.assert_eventually(60, 0.1,
+        lambda: self.__exist_queries_in_web_ui_memz() is None)
 
 
 # Tests that verify the query-retries are properly triggered by disk IO failure.

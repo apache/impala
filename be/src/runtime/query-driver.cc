@@ -363,6 +363,9 @@ void QueryDriver::RetryQueryFromThread(
   // Close the original query.
   QueryHandle query_handle;
   query_handle.SetHandle(query_driver, request_state);
+  // Do the work of close that needs to be done synchronously, otherwise we'll
+  // hit some illegal states in destroying the request_state.
+  RETURN_VOID_IF_ERROR(query_handle->Finalize(true, nullptr));
   parent_server_->CloseClientRequestState(query_handle);
   parent_server_->MarkSessionInactive(session);
 }
@@ -430,6 +433,13 @@ Status QueryDriver::Finalize(
 
 Status QueryDriver::Unregister(ImpalaServer::QueryDriverMap* query_driver_map) {
   DCHECK(finalized_.Load());
+  // Wait until retry_query_thread_ finishes, otherwise the resources for this thread
+  // may not be released.
+  if (retry_query_thread_.get() != nullptr) {
+    retry_query_thread_->Join();
+    retry_query_thread_.reset();
+  }
+  DCHECK(retry_query_thread_.get() == nullptr);
   const TUniqueId* query_id = nullptr;
   const TUniqueId* retry_query_id = nullptr;
   {
