@@ -531,11 +531,13 @@ public class FunctionCallExpr extends Expr {
   protected void analyzeImpl(Analyzer analyzer) throws AnalysisException {
     fnName_.analyze(analyzer);
     if (!fnName_.isBuiltin()) {
-      FrontendProfile profile = FrontendProfile.getCurrent();
-      String udfInfoStringKey = "User Defined Functions (UDFs)";
-      String functionName = fnName_.toString();
-      if (!profile.getInfoString(udfInfoStringKey).contains(functionName)) {
-        profile.appendInfoString(udfInfoStringKey, functionName);
+      FrontendProfile profile = FrontendProfile.getCurrentOrNull();
+      if (profile != null) {
+        String udfInfoStringKey = "User Defined Functions (UDFs)";
+        String functionName = fnName_.toString();
+        if (!profile.getInfoString(udfInfoStringKey).contains(functionName)) {
+          profile.appendInfoString(udfInfoStringKey, functionName);
+        }
       }
     }
 
