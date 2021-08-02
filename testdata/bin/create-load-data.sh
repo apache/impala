@@ -386,8 +386,8 @@ function setup-ranger {
 
   curl -f -u admin:admin -H "Accept: application/json" \
     -H "Content-Type: application/json" \
-    -X PUT http://localhost:6080/service/public/v2/api/policy/4 \
-    -d @"${RANGER_SETUP_DIR}/policy_4_revised.json"
+    -X PUT http://localhost:6080/service/public/v2/api/policy/5 \
+    -d @"${RANGER_SETUP_DIR}/policy_5_revised.json"
 }
 
 function copy-and-load-dependent-tables {

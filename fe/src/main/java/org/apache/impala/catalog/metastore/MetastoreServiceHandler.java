@@ -98,6 +98,8 @@ import org.apache.hadoop.hive.metastore.api.GetFileMetadataByExprRequest;
 import org.apache.hadoop.hive.metastore.api.GetFileMetadataByExprResult;
 import org.apache.hadoop.hive.metastore.api.GetFileMetadataRequest;
 import org.apache.hadoop.hive.metastore.api.GetFileMetadataResult;
+import org.apache.hadoop.hive.metastore.api.GetLatestCommittedCompactionInfoRequest;
+import org.apache.hadoop.hive.metastore.api.GetLatestCommittedCompactionInfoResponse;
 import org.apache.hadoop.hive.metastore.api.GetOpenTxnsInfoResponse;
 import org.apache.hadoop.hive.metastore.api.GetOpenTxnsResponse;
 import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesRequest;
@@ -2185,6 +2187,15 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       throws TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       return client.getHiveClient().getThriftClient().show_compact(showCompactRequest);
+    }
+  }
+
+  @Override
+  public GetLatestCommittedCompactionInfoResponse get_latest_committed_compaction_info(
+      GetLatestCommittedCompactionInfoRequest request) throws TException {
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      return client.getHiveClient().getThriftClient()
+          .get_latest_committed_compaction_info(request);
     }
   }
 
