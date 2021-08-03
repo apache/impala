@@ -3141,3 +3141,63 @@ select md5(s) from functional.strings_with_quotes where i = 10;
 ---- TYPES
 STRING
 ====
+---- QUERY: IMPALA-10849
+# Check that an escaped % is not treated as a wildcard character in a like
+# predicate. Note this test cannot be part of the LikeTbl tests as the
+# like predicate optimizations are only applied when the like predicate is a
+# string literal.
+select 'escape%' like 'escape\%'
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY: IMPALA-10849
+# Check that an escaped % is not treated as a wildcard character in a like
+# predicate. Note this test cannot be part of the LikeTbl tests as the
+# like predicate optimizations are only applied when the like predicate is a
+# string literal.
+select 'esc\\ape' not like 'esc\%'
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY: IMPALA-10849
+# Check that an escaped _ is not treated as a wildcard character in a like
+# predicate. Note this test cannot be part of the LikeTbl tests as the
+# like predicate optimizations are only applied when the like predicate is a
+# string literal.
+select 'escape_' like 'escape\_'
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY: IMPALA-10849
+# Check that an escaped _ is not treated as a wildcard character in a like
+# predicate. Note this test cannot be part of the LikeTbl tests as the
+# like predicate optimizations are only applied when the like predicate is a
+# string literal.
+select 'esca' not like 'esc\_'
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY: IMPALA-10849
+# Check that unescaped % is evaluated correctly.
+select 'escape' like 'esc%'
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY: IMPALA-10849
+# Check that unescaped _ is evaluated correctly.
+select 'escape' like 'escap_'
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
