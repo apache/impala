@@ -101,3 +101,51 @@ STRING
 File '$NAMENODE/test-warehouse/bad_parquet_strings_out_of_bounds_parquet/plain-encoded-out-of-bounds.parq' is corrupt: error decoding value of type STRING at offset 58
 File '$NAMENODE/test-warehouse/bad_parquet_strings_out_of_bounds_parquet/dict-encoded-out-of-bounds.parq' is corrupt: error reading dictionary for data of type STRING: could not decode dictionary
 ====
+---- QUERY
+# IMPALA-10808, IMPALA-10814: Check illegal decimal file schemas
+select d1 from bad_parquet_decimals
+---- CATCH
+File '$NAMENODE/test-warehouse/bad_parquet_decimals_parquet/illegal_decimals.parq' column 'd1' does not have the decimal precision set.
+====
+---- QUERY
+# IMPALA-10808, IMPALA-10814: Check illegal decimal file schemas
+select d2 from bad_parquet_decimals
+---- CATCH
+File '$NAMENODE/test-warehouse/bad_parquet_decimals_parquet/illegal_decimals.parq' column 'd2' has a precision that does not match the table metadata precision. File metadata precision: 20, table metadata precision: 4.
+====
+---- QUERY
+# IMPALA-10808, IMPALA-10814: Check illegal decimal file schemas
+select d3 from functional_parquet.bad_parquet_decimals;
+---- CATCH
+File '$NAMENODE/test-warehouse/bad_parquet_decimals_parquet/illegal_decimals.parq' column 'd3' has a precision that does not match the table metadata precision. File metadata precision: -1, table metadata precision: 4.
+====
+---- QUERY
+# IMPALA-10808, IMPALA-10814: Check illegal decimal file schemas
+select d4 from functional_parquet.bad_parquet_decimals
+---- CATCH
+File '$NAMENODE/test-warehouse/bad_parquet_decimals_parquet/illegal_decimals.parq' column 'd4' does not have the scale set.
+====
+---- QUERY
+# IMPALA-10808, IMPALA-10814: Check illegal decimal file schemas
+select d5 from functional_parquet.bad_parquet_decimals
+---- CATCH
+File '$NAMENODE/test-warehouse/bad_parquet_decimals_parquet/illegal_decimals.parq' column 'd5' does not have type_length set.
+====
+---- QUERY
+# IMPALA-10808, IMPALA-10814: Check illegal decimal file schemas
+select d6 from functional_parquet.bad_parquet_decimals
+---- CATCH
+File '$NAMENODE/test-warehouse/bad_parquet_decimals_parquet/illegal_decimals.parq' column 'd6' has invalid type length: 0
+====
+---- QUERY
+# IMPALA-10808, IMPALA-10814: Check illegal decimal file schemas
+select d7 from functional_parquet.bad_parquet_decimals
+---- CATCH
+File '$NAMENODE/test-warehouse/bad_parquet_decimals_parquet/illegal_decimals.parq' column 'd7' has invalid scale: -1. Precision is 4.
+====
+---- QUERY
+# IMPALA-10808, IMPALA-10814: Check illegal decimal file schemas
+select d8 from functional_parquet.bad_parquet_decimals;
+---- CATCH
+File '$NAMENODE/test-warehouse/bad_parquet_decimals_parquet/illegal_decimals.parq' column 'd8' has invalid scale: 4. Precision is 2.
+====

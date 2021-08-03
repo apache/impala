@@ -338,13 +338,13 @@ Status ParquetMetadataUtils::ValidateColumn(const char* filename,
     // precision in table schema.
     if (!schema_element.__isset.precision) {
       ErrorMsg msg(TErrorCode::PARQUET_MISSING_PRECISION, filename, schema_element.name);
-      RETURN_IF_ERROR(state->LogOrReturnError(msg));
+      return Status(msg);
     } else {
       if (schema_element.precision > slot_desc->type().precision
           || schema_element.precision <= 0) {
         ErrorMsg msg(TErrorCode::PARQUET_WRONG_PRECISION, filename, schema_element.name,
             schema_element.precision, slot_desc->type().precision);
-        RETURN_IF_ERROR(state->LogOrReturnError(msg));
+        return Status(msg);
       }
       if (schema_element.scale < 0 || schema_element.scale > schema_element.precision) {
         return Status(

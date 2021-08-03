@@ -68,7 +68,7 @@ error_codes = (
 
   ("PARQUET_WRONG_PRECISION", 17,
     "File '$0' column '$1' has a precision that does not match the table metadata "
-    " precision. File metadata precision: $2, table metadata precision: $3."),
+    "precision. File metadata precision: $2, table metadata precision: $3."),
 
   ("PARQUET_BAD_CONVERTED_TYPE", 18,
    "File '$0' column '$1' does not have converted type set to DECIMAL"),

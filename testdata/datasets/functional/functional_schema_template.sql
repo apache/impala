@@ -1796,6 +1796,25 @@ LOAD DATA LOCAL INPATH
 INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
+functional
+---- BASE_TABLE_NAME
+bad_parquet_decimals
+---- COLUMNS
+d1 DECIMAL(4, 2)
+d2 DECIMAL(4, 2)
+d3 DECIMAL(4, 2)
+d4 DECIMAL(4, 2)
+d5 DECIMAL(4, 2)
+d6 DECIMAL(4, 2)
+d7 DECIMAL(4, 2)
+d8 DECIMAL(4, 2)
+---- DEPENDENT_LOAD_HIVE
+-- IMPALA-10808: parquet files with illegal decimal schemas
+LOAD DATA LOCAL INPATH
+'{impala_home}/testdata/bad_parquet_data/illegal_decimals.parq'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
 -- IMPALA-2130: Wrong verification of parquet file version
 functional
 ---- BASE_TABLE_NAME
