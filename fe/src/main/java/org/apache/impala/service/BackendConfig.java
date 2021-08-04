@@ -333,4 +333,8 @@ public class BackendConfig {
   public String getStartupFilesystemCheckDirectories() {
     return backendCfg_.startup_filesystem_check_directories;
   }
+
+  public boolean getHMSEventIncrementalRefreshTransactionalTable() {
+    return backendCfg_.hms_event_incremental_refresh_transactional_table;
+  }
 }

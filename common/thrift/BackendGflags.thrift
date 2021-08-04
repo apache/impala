@@ -215,4 +215,6 @@ struct TBackendGflags {
   95: required bool invalidate_hms_cache_on_ddls
 
   96: required string startup_filesystem_check_directories
+
+  97: required bool hms_event_incremental_refresh_transactional_table
 }

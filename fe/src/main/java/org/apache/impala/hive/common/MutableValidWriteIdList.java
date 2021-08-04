@@ -25,21 +25,33 @@ import java.util.List;
  * This is the mutable version of ValidWriteIdList
  */
 public interface MutableValidWriteIdList extends ValidWriteIdList {
+  enum WriteIdStatus {
+    OPEN, ABORTED, COMMITTED
+  }
+
   /**
    * This method will mark write ids between highWatermark + 1 and writeId inclusive as
    * open.
+   * @return True if the write id is added and false otherwise.
    */
-  void addOpenWriteId(long writeId);
+  boolean addOpenWriteId(long writeId);
 
   /**
    * This method will mark the writeIds as aborted.
    * Note that we cannot abort a write id that is committed.
+   * @return True if any write id is added and false otherwise.
    */
-  void addAbortedWriteIds(List<Long> writeIds);
+  boolean addAbortedWriteIds(List<Long> writeIds);
 
   /**
    * This method will mark the writeIds as committed.
    * Note that we cannot commit a write id that is aborted.
+   * @return True if any write id is added and false otherwise.
    */
-  void addCommittedWriteIds(List<Long> writeIds);
+  boolean addCommittedWriteIds(List<Long> writeIds);
+
+  /**
+   * @return True if the write id is open and false otherwise.
+   */
+  boolean isWriteIdOpen(long writeId);
 }

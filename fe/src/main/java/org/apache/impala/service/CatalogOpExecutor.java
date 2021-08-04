@@ -31,7 +31,6 @@ import com.google.common.collect.Sets;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -40,6 +39,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
@@ -54,6 +54,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StatsSetupConst;
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient.NotificationFilter;
@@ -90,7 +91,6 @@ import org.apache.impala.authorization.AuthorizationManager;
 import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogObject;
-import org.apache.impala.catalog.CatalogObject.ThriftObjectType;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.ColumnNotFoundException;
@@ -146,6 +146,7 @@ import org.apache.impala.common.Reference;
 import org.apache.impala.common.TransactionException;
 import org.apache.impala.common.TransactionKeepalive.HeartbeatContext;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.hive.common.MutableValidWriteIdList;
 import org.apache.impala.thrift.JniCatalogConstants;
 import org.apache.impala.thrift.TAlterDbParams;
 import org.apache.impala.thrift.TAlterDbSetOwnerParams;
@@ -4145,7 +4146,7 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Reloads the given partitions if the exists and have not been removed since the event
+   * Reloads the given partitions if they exist and have not been removed since the event
    * was generated.
    *
    * @param eventId EventId being processed.
@@ -4157,9 +4158,8 @@ public class CatalogOpExecutor {
    * @return the number of partitions which were reloaded. If the table does not exist,
    * returns 0. Some partitions could be skipped if they don't exist anymore.
    */
-  public int reloadPartitionsIfExist(long eventId, String dbName,
-      String tblName, List<Partition> partsFromEvent, String reason)
-      throws CatalogException {
+  public int reloadPartitionsIfExist(long eventId, String dbName, String tblName,
+      List<Partition> partsFromEvent, String reason) throws CatalogException {
     Table table = catalog_.getTable(dbName, tblName);
     if (table == null) {
       DeleteEventLog deleteEventLog = catalog_.getMetastoreEventProcessor()
@@ -4214,6 +4214,175 @@ public class CatalogOpExecutor {
       table.releaseWriteLock();
     }
     return 0;
+  }
+
+  /**
+   * Reloads the given partitions if they exist and have not been removed since the event
+   * was generated. We don't retrieve partitions from HMS but use partitions from event.
+   *
+   * @param eventId EventId being processed.
+   * @param dbName Database name for the partition
+   * @param tblName Table name for the partition
+   * @param partsFromEvent List of {@link Partition} objects from the events to be
+   *                       reloaded.
+   * @param reason Reason for reloading the partitions for logging purposes.
+   * @param loadFileMetadata If true, reload file metadata. Otherwise, just reload
+   *                         partitions metadata.
+   * @return the number of partitions which were reloaded. If the table does not exist,
+   * returns 0. Some partitions could be skipped if they don't exist anymore.
+   */
+  public int reloadPartitionsFromEvent(long eventId, String dbName, String tblName,
+      List<Partition> partsFromEvent, boolean loadFileMetadata, String reason)
+      throws CatalogException {
+    Table table = catalog_.getTable(dbName, tblName);
+    if (table == null) {
+      DeleteEventLog deleteEventLog = catalog_.getMetastoreEventProcessor()
+          .getDeleteEventLog();
+      if (deleteEventLog
+          .wasRemovedAfter(eventId, DeleteEventLog.getTblKey(dbName, tblName))) {
+        LOG.info(
+            "Not reloading the partition of table {} since it was removed "
+                + "later in catalog", new TableName(dbName, tblName));
+        return 0;
+      } else {
+        throw new TableNotFoundException(
+            "Table " + dbName + "." + tblName + " not found");
+      }
+    }
+    if (table instanceof IncompleteTable) {
+      LOG.info("Table {} is not loaded. Skipping drop partition event {}",
+          table.getFullName(), eventId);
+      return 0;
+    }
+    if (!(table instanceof HdfsTable)) {
+      throw new CatalogException("Partition event received on a non-hdfs table");
+    }
+    try {
+      tryWriteLock(table, reason);
+      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+      catalog_.getLock().writeLock().unlock();
+      HdfsTable hdfsTable = (HdfsTable) table;
+      int numOfPartsReloaded;
+      try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+        numOfPartsReloaded = hdfsTable.reloadPartitionsFromEvent(
+            metaStoreClient.getHiveClient(), partsFromEvent, loadFileMetadata, reason);
+      }
+      hdfsTable.setCatalogVersion(newCatalogVersion);
+      return numOfPartsReloaded;
+    } catch (InternalException e) {
+      throw new CatalogException(
+          "Could not acquire lock on the table " + table.getFullName(), e);
+    } finally {
+      UnlockWriteLockIfErronouslyLocked();
+      table.releaseWriteLock();
+    }
+  }
+
+  /**
+   * This function is only used by CommitTxnEvent to mark write ids as committed and
+   * reload partitions from events atomically.
+   *
+   * @param eventId EventId being processed
+   * @param dbName Database name for the partition
+   * @param tblName Table name for the partition
+   * @param writeIds List of write ids for this transaction
+   * @param partsFromEvent List of Partition objects from the events to be reloaded
+   * @param reason Reason for reloading the partitions for logging purposes.
+   * @return the number of partitions which were reloaded. Some partitions can be
+   * skipped if they don't exist anymore, or they have stale write ids.
+   */
+  public int addCommittedWriteIdsAndReloadPartitionsIfExist(long eventId, String dbName,
+      String tblName, List<Long> writeIds, List<Partition> partsFromEvent, String reason)
+      throws CatalogException {
+    Table table = catalog_.getTable(dbName, tblName);
+    if (table == null) {
+      DeleteEventLog deleteEventLog = catalog_.getMetastoreEventProcessor()
+          .getDeleteEventLog();
+      if (deleteEventLog
+          .wasRemovedAfter(eventId, DeleteEventLog.getTblKey(dbName, tblName))) {
+        LOG.info(
+            "Not reloading partitions of table {} for event {} since it was removed "
+                + "later in catalog", new TableName(dbName, tblName), eventId);
+        return 0;
+      } else {
+        throw new TableNotFoundException(
+            "Table " + dbName + "." + tblName + " not found");
+      }
+    }
+    if (table instanceof IncompleteTable) {
+      LOG.info("Table {} is not loaded. Skipping partition event {}",
+          table.getFullName(), eventId);
+      return 0;
+    }
+    if (!(table instanceof HdfsTable)) {
+      throw new CatalogException("Partition event received on a non-hdfs table");
+    }
+
+    HdfsTable hdfsTable = (HdfsTable) table;
+    ValidWriteIdList previousWriteIdList = hdfsTable.getValidWriteIds();
+    try {
+      tryWriteLock(table, reason);
+      long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
+      catalog_.getLock().writeLock().unlock();
+      Preconditions.checkState(previousWriteIdList != null,
+          "Write id list of table %s should not be null", table.getFullName());
+      // get a copy of previous write id list
+      previousWriteIdList = MetastoreShim.getValidWriteIdListFromString(
+          previousWriteIdList.toString());
+      // some partitions from the event or the table itself
+      // may not exist in HMS anymore. Hence, we collect the names here and re-fetch
+      // the partitions from HMS.
+      List<Partition> partsToRefresh = new ArrayList<>();
+      List<Long> writeIdsToRefresh = new ArrayList<>();
+      ListIterator<Partition> it = partsFromEvent.listIterator();
+      while (it.hasNext()) {
+        // The partition objects from HMS event was persisted when transaction was not
+        // committed, so its write id is smaller than the write id of the write event.
+        // Since the event is committed at this point, we need to update the partition
+        // object's write id by event's write id.
+        long writeId = writeIds.get(it.nextIndex());
+        Partition part = it.next();
+        // Aborted write id is not allowed. The write id can be committed if the table
+        // in cache is ahead of this commit event.
+        Preconditions.checkState(!previousWriteIdList.isWriteIdAborted(writeId),
+            "Write id %d of Table %s should not be aborted",
+            writeId, table.getFullName());
+        // Valid write id means committed write id here.
+        if (!previousWriteIdList.isWriteIdValid(writeId)) {
+          part.setWriteId(writeId);
+          partsToRefresh.add(part);
+          writeIdsToRefresh.add(writeId);
+        }
+      }
+      if (partsToRefresh.isEmpty()) {
+        LOG.info("Not reloading partitions of table {} for event {} since the cache is "
+            + "already up-to-date", table.getFullName(), eventId);
+        return 0;
+      }
+      // set write id as committed before reload the partitions so that we can get
+      // up-to-date filemetadata.
+      hdfsTable.addWriteIds(writeIdsToRefresh,
+          MutableValidWriteIdList.WriteIdStatus.COMMITTED);
+      int numOfPartsReloaded;
+      try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+        numOfPartsReloaded = hdfsTable.reloadPartitionsFromEvent(
+            metaStoreClient.getHiveClient(), partsToRefresh, true, reason);
+      }
+      hdfsTable.setCatalogVersion(newCatalogVersion);
+      return numOfPartsReloaded;
+    } catch (InternalException e) {
+      throw new CatalogException(
+          "Could not acquire lock on the table " + table.getFullName(), e);
+    } catch (Exception e) {
+      LOG.info("Rolling back the write id list of table {} because reloading "
+          + "for event {} is failed: {}", table.getFullName(), eventId, e.getMessage());
+      // roll back the original writeIdList
+      hdfsTable.setValidWriteIds(previousWriteIdList);
+      throw e;
+    } finally {
+      UnlockWriteLockIfErronouslyLocked();
+      table.releaseWriteLock();
+    }
   }
 
   public ReentrantLock getMetastoreDdlLock() {

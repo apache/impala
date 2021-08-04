@@ -46,7 +46,7 @@ public class MutableValidReaderWriteIdListTest {
 
   @Test
   public void exceptions() {
-    ValidReaderWriteIdList writeIdList =
+    ValidWriteIdList writeIdList =
         new ValidReaderWriteIdList(tableName, new long[] {2L, 4L}, new BitSet(), 5, 4L);
     MutableValidReaderWriteIdList mutableWriteIdList =
         new MutableValidReaderWriteIdList(writeIdList);
@@ -66,7 +66,7 @@ public class MutableValidReaderWriteIdListTest {
     for (int i = 0; i < 1000; i++) {
       exceptions[i] = i + 100;
     }
-    ValidReaderWriteIdList writeIdList =
+    ValidWriteIdList writeIdList =
         new ValidReaderWriteIdList(tableName, exceptions, new BitSet(), 2000, 900);
     MutableValidReaderWriteIdList mutableWriteIdList =
         new MutableValidReaderWriteIdList(writeIdList);
@@ -118,7 +118,7 @@ public class MutableValidReaderWriteIdListTest {
     BitSet bitSet = new BitSet(exceptions.length);
     bitSet.set(0); // mark writeId "2L" aborted
     bitSet.set(3); // mark writeId "8L" aborted
-    ValidReaderWriteIdList writeIdList =
+    ValidWriteIdList writeIdList =
         new ValidReaderWriteIdList(tableName, exceptions, bitSet, 11, 4);
     MutableValidReaderWriteIdList mutableWriteIdList =
         new MutableValidReaderWriteIdList(writeIdList);
@@ -132,16 +132,17 @@ public class MutableValidReaderWriteIdListTest {
 
   @Test
   public void testAddOpenWriteId() {
-    long[] exceptions = {2, 4, 6, 8, 10};
+    long[] exceptions = {2L, 4L, 6L, 8L, 10L};
     BitSet bitSet = new BitSet(exceptions.length);
     bitSet.set(0); // mark writeId "2L" aborted
     bitSet.set(3); // mark writeId "8L" aborted
-    ValidReaderWriteIdList writeIdList =
+    ValidWriteIdList writeIdList =
         new ValidReaderWriteIdList(tableName, exceptions, bitSet, 11, 4);
     MutableValidReaderWriteIdList mutableWriteIdList =
         new MutableValidReaderWriteIdList(writeIdList);
 
-    mutableWriteIdList.addOpenWriteId(13);
+    assertFalse(mutableWriteIdList.addOpenWriteId(4));
+    assertTrue(mutableWriteIdList.addOpenWriteId(13));
     String str = mutableWriteIdList.writeToString();
     assertEquals(tableName + ":13:4:4,6,10,12,13:2,8", str);
     assertTrue(mutableWriteIdList.isWriteIdValid(11));
@@ -157,14 +158,14 @@ public class MutableValidReaderWriteIdListTest {
     BitSet bitSet = new BitSet(exceptions.length);
     bitSet.set(0); // mark writeId "2L" aborted
     bitSet.set(3); // mark writeId "8L" aborted
-    ValidReaderWriteIdList writeIdList =
+    ValidWriteIdList writeIdList =
         new ValidReaderWriteIdList(tableName, exceptions, bitSet, 11, 4);
     MutableValidReaderWriteIdList mutableWriteIdList =
         new MutableValidReaderWriteIdList(writeIdList);
 
     mutableWriteIdList.addOpenWriteId(13);
-    mutableWriteIdList.addAbortedWriteIds(Collections.singletonList(4L));
-    mutableWriteIdList.addAbortedWriteIds(Collections.singletonList(12L));
+    assertFalse(mutableWriteIdList.addAbortedWriteIds(Collections.singletonList(2L)));
+    assertTrue(mutableWriteIdList.addAbortedWriteIds(Arrays.asList(4L, 12L)));
     String str = mutableWriteIdList.writeToString();
     assertEquals(tableName + ":13:6:6,10,13:2,4,8,12", str);
     assertFalse(mutableWriteIdList.isWriteIdValid(4));
@@ -181,12 +182,13 @@ public class MutableValidReaderWriteIdListTest {
     BitSet bitSet = new BitSet(exceptions.length);
     bitSet.set(0); // mark writeId "2L" aborted
     bitSet.set(3); // mark writeId "8L" aborted
-    ValidReaderWriteIdList writeIdList =
+    ValidWriteIdList writeIdList =
         new ValidReaderWriteIdList(tableName, exceptions, bitSet, 11, 4);
     MutableValidReaderWriteIdList mutableWriteIdList =
         new MutableValidReaderWriteIdList(writeIdList);
 
-    mutableWriteIdList.addCommittedWriteIds(Arrays.asList(4L, 10L));
+    assertFalse(mutableWriteIdList.addCommittedWriteIds(Collections.singletonList(1L)));
+    assertTrue(mutableWriteIdList.addCommittedWriteIds(Arrays.asList(4L, 10L)));
     String str = mutableWriteIdList.writeToString();
     assertEquals(tableName + ":11:6:6:2,8", str);
     assertTrue(mutableWriteIdList.isWriteIdAborted(2));
@@ -202,10 +204,50 @@ public class MutableValidReaderWriteIdListTest {
     BitSet bitSet = new BitSet(exceptions.length);
     bitSet.set(0); // mark writeId "2L" aborted
     bitSet.set(3); // mark writeId "8L" aborted
-    ValidReaderWriteIdList writeIdList =
+    ValidWriteIdList writeIdList =
         new ValidReaderWriteIdList(tableName, exceptions, bitSet, 11, 4);
     MutableValidReaderWriteIdList mutableWriteIdList =
         new MutableValidReaderWriteIdList(writeIdList);
     mutableWriteIdList.addCommittedWriteIds(Collections.singletonList(2L));
+  }
+
+  @Test
+  public void testAddNotOpenToCommitted() {
+    long[] exceptions = {2L, 4L, 6L, 8L, 10L};
+    BitSet bitSet = new BitSet(exceptions.length);
+    bitSet.set(0); // mark writeId "2L" aborted
+    bitSet.set(3); // mark writeId "8L" aborted
+    ValidWriteIdList writeIdList =
+        new ValidReaderWriteIdList(tableName, exceptions, bitSet, 11, 4);
+    MutableValidReaderWriteIdList mutableWriteIdList =
+        new MutableValidReaderWriteIdList(writeIdList);
+
+    // write id "13L" is not open before, it should mark "12L" & "13L" open and then
+    // mark "13L" committed
+    assertTrue(mutableWriteIdList.addCommittedWriteIds(Collections.singletonList(13L)));
+    String str = mutableWriteIdList.writeToString();
+    assertEquals(tableName + ":13:4:4,6,10,12:2,8", str);
+    assertTrue(mutableWriteIdList.isWriteIdOpen(12));
+    assertTrue(mutableWriteIdList.isWriteIdValid(13));
+  }
+
+  @Test
+  public void testAddNotOpenToAborted() {
+    long[] exceptions = {2L, 4L, 6L, 8L, 10L};
+    BitSet bitSet = new BitSet(exceptions.length);
+    bitSet.set(0); // mark writeId "2L" aborted
+    bitSet.set(3); // mark writeId "8L" aborted
+    ValidWriteIdList writeIdList =
+        new ValidReaderWriteIdList(tableName, exceptions, bitSet, 11, 4);
+    MutableValidReaderWriteIdList mutableWriteIdList =
+        new MutableValidReaderWriteIdList(writeIdList);
+
+    // write id "13L" is not open before, it should mark "12L" & "13L" open and then
+    // mark "13L" committed
+    assertTrue(mutableWriteIdList.addAbortedWriteIds(Collections.singletonList(13L)));
+    String str = mutableWriteIdList.writeToString();
+    assertEquals(tableName + ":13:4:4,6,10,12:2,8,13", str);
+    assertTrue(mutableWriteIdList.isWriteIdOpen(12));
+    assertTrue(mutableWriteIdList.isWriteIdAborted(13));
   }
 }

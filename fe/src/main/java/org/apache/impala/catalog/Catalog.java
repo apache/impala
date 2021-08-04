@@ -21,8 +21,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -90,6 +92,15 @@ public abstract class Catalog implements AutoCloseable {
 
   // Cache of data sources.
   protected final CatalogObjectCache<DataSource> dataSources_;
+
+  // Cache of transaction to write id mapping for the open transactions which are detected
+  // by the catalogd via events processor. The entries get cleaned up on receiving commit
+  // transaction or abort transaction events.
+  // We need this mapping because not all the write ids for a commit event can be
+  // retrieved from HMS. We can fetch write id for write events via getAllWriteEventInfo.
+  // However, we don't have API to fetch write ids for DDL events.
+  protected final ConcurrentHashMap<Long, Set<TableWriteId>> txnToWriteIds_ =
+      new ConcurrentHashMap<>();
 
   // Cache of known HDFS cache pools. Allows for checking the existence
   // of pools without hitting HDFS.
@@ -757,5 +768,41 @@ public abstract class Catalog implements AutoCloseable {
       transactionKeepalive_.deleteLock(lockId);
       MetastoreShim.releaseLock(client.getHiveClient(), lockId);
     }
+  }
+
+  /**
+   * Returns write ids for an open txn from the Catalog. If there is no write id
+   * associated with the txnId, it returns empty set.
+   */
+  public Set<TableWriteId> getWriteIds(Long txnId) {
+    Preconditions.checkNotNull(txnId);
+    return Collections.unmodifiableSet(txnToWriteIds_.getOrDefault(txnId,
+        Collections.emptySet()));
+  }
+
+  /**
+   * Adds a mapping from txnId to tableWriteId to the Catalog.
+   */
+  public void addWriteId(Long txnId, TableWriteId tableWriteId) {
+    Preconditions.checkNotNull(txnId);
+    Preconditions.checkNotNull(tableWriteId);
+    txnToWriteIds_.computeIfAbsent(txnId, k -> new HashSet<>()).add(tableWriteId);
+  }
+
+  /**
+   * Removes and returns all write id records for a transaction. If there is no write id
+   * associated with the txnId, it returns empty set.
+   */
+  public Set<TableWriteId> removeWriteIds(Long txnId) {
+    Preconditions.checkNotNull(txnId);
+    Set<TableWriteId> resultSet = txnToWriteIds_.remove(txnId);
+    return resultSet != null ? resultSet : Collections.emptySet();
+  }
+
+  /**
+   * Clears all write id records.
+   */
+  public void clearWriteIds() {
+    txnToWriteIds_.clear();
   }
 }

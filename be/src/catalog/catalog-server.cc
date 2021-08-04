@@ -113,6 +113,11 @@ DEFINE_bool(invalidate_hms_cache_on_ddls, true, "This configuration is used "
     "for non transactional tables if alter/create/delete table hms apis are "
      "invoked over catalogd's metastore endpoint");
 
+DEFINE_bool(hms_event_incremental_refresh_transactional_table, true, "When set to true "
+    "events processor will refresh transactional tables incrementally for partition "
+    "level events. Otherwise, it will always reload the whole table for transactional "
+    "tables.");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_int32(state_store_port);

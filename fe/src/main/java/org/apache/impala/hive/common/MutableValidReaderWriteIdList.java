@@ -235,46 +235,60 @@ public class MutableValidReaderWriteIdList implements MutableValidWriteIdList {
     return RangeResponse.SOME;
   }
 
+  @Override
   public boolean isWriteIdOpen(long writeId) {
     int index = Collections.binarySearch(exceptions, writeId);
     return index >= 0 && !abortedBits.get(index);
   }
 
   @Override
-  public void addOpenWriteId(long writeId) {
+  public boolean addOpenWriteId(long writeId) {
     if (writeId <= highWatermark) {
-      LOG.debug("Not adding open write id: {} {}", writeId, highWatermark);
-      return;
+      LOG.debug("Not adding open write id: {} since high water mark: {}", writeId,
+          highWatermark);
+      return false;
     }
     for (long currentId = highWatermark + 1; currentId <= writeId; currentId++) {
       exceptions.add(currentId);
     }
     highWatermark = writeId;
+    return true;
   }
 
   @Override
-  public void addAbortedWriteIds(List<Long> writeIds) {
+  public boolean addAbortedWriteIds(List<Long> writeIds) {
     Preconditions.checkNotNull(writeIds);
     Preconditions.checkArgument(writeIds.size() > 0);
+    // used to track if any of the writeIds is added
+    boolean added = false;
     long maxWriteId = Collections.max(writeIds);
-    Preconditions.checkArgument(maxWriteId <= highWatermark,
-        "Should mark write id as open before abort it: %s", maxWriteId);
+    if (maxWriteId > highWatermark) {
+      LOG.trace("Current high water mark: {} and max aborted write id: {}, so mark them "
+          + "as open first", highWatermark, maxWriteId);
+      addOpenWriteId(maxWriteId);
+      added = true;
+    }
     for (long writeId : writeIds) {
       int index = Collections.binarySearch(exceptions, writeId);
       // make sure the write id is not committed
       Preconditions.checkState(index >= 0);
+      added = added || !abortedBits.get(index);
       abortedBits.set(index);
     }
     updateMinOpenWriteId();
+    return added;
   }
 
   @Override
-  public void addCommittedWriteIds(List<Long> writeIds) {
+  public boolean addCommittedWriteIds(List<Long> writeIds) {
     Preconditions.checkNotNull(writeIds);
     Preconditions.checkArgument(writeIds.size() > 0);
     long maxWriteId = Collections.max(writeIds);
-    Preconditions.checkArgument(maxWriteId <= highWatermark,
-        "Should mark write id (%s) as open before commit it", maxWriteId);
+    if (maxWriteId > highWatermark) {
+      LOG.trace("Current high water mark: {} and max committed write id: {}, so mark "
+          + "them as open first", highWatermark, maxWriteId);
+      addOpenWriteId(maxWriteId);
+    }
     List<Long> updatedExceptions = new ArrayList<>();
     BitSet updatedAbortedBits = new BitSet();
 
@@ -283,7 +297,8 @@ public class MutableValidReaderWriteIdList implements MutableValidWriteIdList {
       int idx = Collections.binarySearch(exceptions, writeId);
       if (idx >= 0) {
         // make sure the write id is open rather than aborted
-        Preconditions.checkState(!abortedBits.get(idx));
+        Preconditions.checkState(!abortedBits.get(idx),
+            "write id %d is expected to be open but is aborted", writeId);
         idxToRemove.add(idx);
       }
     }
@@ -297,6 +312,7 @@ public class MutableValidReaderWriteIdList implements MutableValidWriteIdList {
     exceptions = updatedExceptions;
     abortedBits = updatedAbortedBits;
     updateMinOpenWriteId();
+    return !idxToRemove.isEmpty();
   }
 
   private void updateMinOpenWriteId() {

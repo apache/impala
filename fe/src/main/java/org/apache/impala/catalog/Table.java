@@ -139,7 +139,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
 
   // Represents the event id in the metastore which pertains to the creation of this
   // table. Defaults to -1 for a preexisting table or if events processing is not active.
-  protected long createEventId_ = -1;
+  protected volatile long createEventId_ = -1;
 
   // tracks the in-flight metastore events for this table. Used by Events processor to
   // avoid unnecessary refresh when the event is received

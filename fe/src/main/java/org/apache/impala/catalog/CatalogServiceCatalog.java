@@ -20,7 +20,6 @@ package org.apache.impala.catalog;
 import static org.apache.impala.thrift.TCatalogObjectType.HDFS_PARTITION;
 import static org.apache.impala.thrift.TCatalogObjectType.TABLE;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -75,6 +74,7 @@ import org.apache.impala.common.Pair;
 import org.apache.impala.common.Reference;
 import org.apache.impala.common.RuntimeEnv;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.hive.common.MutableValidWriteIdList;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.CatalogLookupStatus;
@@ -1957,6 +1957,9 @@ public class CatalogServiceCatalog extends Catalog {
       // bumped. Don't need to update it in this case.
       if (lastResetStartVersion_ < startVersion) lastResetStartVersion_ = startVersion;
       versionLock_.writeLock().unlock();
+      // clear all txn to write ids mapping so that there is no memory leak for previous
+      // events
+      clearWriteIds();
       // restart the event processing for id just before the reset
       metastoreEventProcessor_.start(currentEventId);
     }
@@ -2401,7 +2404,7 @@ public class CatalogServiceCatalog extends Catalog {
       return tbl.toTCatalogObject(resultType);
     } finally {
       context.stop();
-      Preconditions.checkState(!versionLock_.isWriteLockedByCurrentThread());
+      UnlockWriteLockIfErroneouslyLocked();
       tbl.releaseWriteLock();
     }
   }
@@ -2573,11 +2576,16 @@ public class CatalogServiceCatalog extends Catalog {
    * Refresh table if exists. Returns true if reloadTable() succeeds, false
    * otherwise.
    */
-  public boolean reloadTableIfExists(String dbName, String tblName, String reason)
-      throws CatalogException {
+  public boolean reloadTableIfExists(String dbName, String tblName, long eventId,
+      String reason) throws CatalogException {
     try {
       Table table = getTable(dbName, tblName);
       if (table == null || table instanceof IncompleteTable) return false;
+      if (eventId > 0 && eventId <= table.getCreateEventId()) {
+        LOG.debug("Not reloading the table {}.{} for event {} since it is recreated at "
+            + "event {}.", dbName, tblName, eventId, table.getCreateEventId());
+        return false;
+      }
       reloadTable(table, reason);
     } catch (DatabaseNotFoundException | TableLoadingException e) {
       LOG.info(String.format("Reload table if exists failed with: %s", e.getMessage()));
@@ -2922,7 +2930,7 @@ public class CatalogServiceCatalog extends Catalog {
       return reloadHdfsPartition(hdfsTable, partitionName, wasPartitionReloaded,
           resultType, reason, newCatalogVersion, hdfsPartition);
     } finally {
-      Preconditions.checkState(!versionLock_.isWriteLockedByCurrentThread());
+      UnlockWriteLockIfErroneouslyLocked();
       tbl.releaseWriteLock();
     }
   }
@@ -2968,7 +2976,7 @@ public class CatalogServiceCatalog extends Catalog {
       // note that hdfsPartition can be null here which is a valid input argument
       // in such a case a new hdfsPartition is added and nothing is removed.
       hmsPartToHdfsPart.put(hmsPartition, hdfsPartition);
-      hdfsTable.reloadPartitions(msClient.getHiveClient(), hmsPartToHdfsPart);
+      hdfsTable.reloadPartitions(msClient.getHiveClient(), hmsPartToHdfsPart, true);
     }
     hdfsTable.setCatalogVersion(newCatalogVersion);
     wasPartitionReloaded.setRef(true);
@@ -3536,6 +3544,80 @@ public class CatalogServiceCatalog extends Catalog {
         // do nothing
       }
       if (table != null) table.refreshLastUsedTime();
+    }
+  }
+
+  /**
+   * Marks write ids with corresponding status for the table if it is loaded HdfsTable.
+   */
+  public void addWriteIdsToTable(String dbName, String tblName, long eventId,
+      List<Long> writeIds, MutableValidWriteIdList.WriteIdStatus status)
+    throws CatalogException {
+    Table tbl;
+    try {
+      tbl = getTable(dbName, tblName);
+    } catch (DatabaseNotFoundException e) {
+      LOG.debug("Not adding write ids to table {}.{} for event {} " +
+          "since database was not found", dbName, tblName, eventId);
+      return;
+    }
+    if (tbl == null) {
+      LOG.debug("Not adding write ids to table {}.{} for event {} since it was not found",
+          dbName, tblName, eventId);
+      return;
+    }
+    if (!tbl.isLoaded()) {
+      LOG.debug("Not adding write ids to table {}.{} for event {} " +
+          "since it was not loaded" , dbName, tblName, eventId);
+      return;
+    }
+    if (!(tbl instanceof HdfsTable)) {
+      LOG.debug("Not adding write ids to table {}.{} for event {} " +
+          "since it is not HdfsTable", dbName, tblName, eventId);
+      return;
+    }
+    if (eventId > 0 && eventId <= tbl.getCreateEventId()) {
+      LOG.debug("Not adding write ids to table {}.{} for event {} since it is recreated.",
+          dbName, tblName, eventId);
+      return;
+    }
+    if (!tryWriteLock(tbl)) {
+      throw new CatalogException(String.format(
+          "Error locking table %s for event %d", tbl.getFullName(), eventId));
+    }
+    try {
+      long newCatalogVersion = incrementAndGetCatalogVersion();
+      versionLock_.writeLock().unlock();
+      HdfsTable hdfsTable = (HdfsTable) tbl;
+      // A non-acid table could be upgraded to an acid table, and its valid write id list
+      // is not yet be loaded. In this case, we just do nothing. The table should be
+      // reloaded for the AlterTable event that sets the table as transactional.
+      if (hdfsTable.getValidWriteIds() == null) {
+        LOG.debug("Not adding write ids to table {}.{} for event {} since it was just "
+            + "upgraded to an acid table and it's valid write id list is not loaded",
+            dbName, tblName, eventId);
+        return;
+      }
+      if (!hdfsTable.addWriteIds(writeIds, status)) {
+        return;
+      }
+      tbl.setCatalogVersion(newCatalogVersion);
+      LOG.debug("Added {} writeId to table {}: {} for event {}", status,
+          tbl.getFullName(), writeIds, eventId);
+    } finally {
+      UnlockWriteLockIfErroneouslyLocked();
+      tbl.releaseWriteLock();
+    }
+  }
+
+  /**
+   * This method checks if the version lock is unlocked. If it's still locked then it
+   * logs an error and unlocks it.
+   */
+  private void UnlockWriteLockIfErroneouslyLocked() {
+    if (versionLock_.isWriteLockedByCurrentThread()) {
+      LOG.error("Write lock should have been released.");
+      versionLock_.writeLock().unlock();
     }
   }
 

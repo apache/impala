@@ -42,7 +42,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -193,6 +192,8 @@ public class HdfsTable extends Table implements FeFsTable {
   // for a given ValidWriteIdList
   public static final String FILEMETADATA_CACHE_MISS_METRIC = "filemetadata-cache-miss";
   public static final String FILEMETADATA_CACHE_HIT_METRIC = "filemetadata-cache-hit";
+  // metric used to monitor the number of times method loadFileMetadata is called
+  public static final String NUM_LOAD_FILEMETADATA_METRIC = "num-load-filemetadata";
 
   // Load all partitions time, including fetching all partitions
   // from HMS and loading all partitions. The code path is
@@ -740,6 +741,7 @@ public class HdfsTable extends Table implements FeFsTable {
   private long loadFileMetadataForPartitions(IMetaStoreClient client,
       Collection<HdfsPartition.Builder> partBuilders, boolean isRefresh,
       String debugActions) throws CatalogException {
+    getMetrics().getCounter(NUM_LOAD_FILEMETADATA_METRIC).inc();
     final Clock clock = Clock.defaultClock();
     long startTime = clock.getTick();
 
@@ -2709,7 +2711,7 @@ public class HdfsTable extends Table implements FeFsTable {
           hmsPartToHdfsPart.put(partition, hdfsPartition);
         }
       }
-      reloadPartitions(client, hmsPartToHdfsPart);
+      reloadPartitions(client, hmsPartToHdfsPart, true);
       return hmsPartToHdfsPart.size();
     } catch (NoSuchObjectException e) {
       // HMS throws a NoSuchObjectException if the table does not exist
@@ -2724,6 +2726,43 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
+   * Reload the HdfsPartitions which correspond to the given partitions.
+   *
+   * @param client is the HMS client to be used.
+   * @param partsFromEvent Partition objects from the event.
+   * @param loadFileMetadata If true, file metadata will be reloaded.
+   * @param reason Reason for reloading the partitions for logging purposes.
+   * @return the number of partitions which were reloaded.
+   */
+  public int reloadPartitionsFromEvent(IMetaStoreClient client,
+      List<Partition> partsFromEvent, boolean loadFileMetadata, String reason)
+      throws CatalogException {
+    Preconditions.checkArgument(partsFromEvent != null
+        && !partsFromEvent.isEmpty());
+    Preconditions.checkState(isWriteLockedByCurrentThread(), "Write Lock should be "
+        + "held before reloadPartitionsFromEvent");
+    LOG.info("Reloading partition metadata for table: {} ({})", getFullName(), reason);
+    Map<Partition, HdfsPartition> hmsPartToHdfsPart = new HashMap<>();
+    try {
+      for (Partition partition : partsFromEvent) {
+        List<LiteralExpr> partExprs = getTypeCompatiblePartValues(partition.getValues());
+        HdfsPartition hdfsPartition = getPartition(partExprs);
+        // only reload partitions that have more recent write id
+        if (hdfsPartition != null &&
+            (!AcidUtils.isTransactionalTable(msTable_.getParameters())
+                || hdfsPartition.getWriteId() < partition.getWriteId())) {
+          hmsPartToHdfsPart.put(partition, hdfsPartition);
+        }
+      }
+      reloadPartitions(client, hmsPartToHdfsPart, loadFileMetadata);
+      return hmsPartToHdfsPart.size();
+    } catch (UnsupportedEncodingException e) {
+      throw new CatalogException(
+          "Unexpected error while retrieving partitions for table " + getFullName(), e);
+    }
+  }
+
+  /**
    * Reloads the metadata of partitions given by a map of HMS Partitions to existing (old)
    * HdfsPartitions.
    * @param hmsPartsToHdfsParts The map of HMS partition object to the old HdfsPartition.
@@ -2732,9 +2771,13 @@ public class HdfsTable extends Table implements FeFsTable {
    *                            reconstructed from the HMS partition key. If the
    *                            value for a given partition key is null then nothing is
    *                            removed and a new HdfsPartition is simply added.
+   * @param loadFileMetadata If true, file metadata will be reloaded.
    */
   public void reloadPartitions(IMetaStoreClient client,
-      Map<Partition, HdfsPartition> hmsPartsToHdfsParts) throws CatalogException {
+      Map<Partition, HdfsPartition> hmsPartsToHdfsParts, boolean loadFileMetadata)
+      throws CatalogException {
+    Preconditions.checkState(isWriteLockedByCurrentThread(), "Write Lock should be "
+        + "held before reloadPartitions");
     FsPermissionCache permissionCache = new FsPermissionCache();
     Map<HdfsPartition.Builder, HdfsPartition> partBuilderToPartitions = new HashMap<>();
     for (Map.Entry<Partition, HdfsPartition> entry : hmsPartsToHdfsParts.entrySet()) {
@@ -2750,9 +2793,11 @@ public class HdfsTable extends Table implements FeFsTable {
       }
       partBuilderToPartitions.put(partBuilder, oldPartition);
     }
-    // load file metadata in parallel
-    loadFileMetadataForPartitions(client,
-        partBuilderToPartitions.keySet(),/*isRefresh=*/true);
+    if (loadFileMetadata) {
+      // load file metadata in parallel
+      loadFileMetadataForPartitions(client, partBuilderToPartitions.keySet(),
+          /*isRefresh=*/true);
+    }
     for (Map.Entry<HdfsPartition.Builder, HdfsPartition> entry :
         partBuilderToPartitions.entrySet()) {
       if (entry.getValue() != null) {
@@ -2795,6 +2840,7 @@ public class HdfsTable extends Table implements FeFsTable {
     metrics_.addTimer(CATALOG_UPDATE_DURATION_METRIC);
     metrics_.addCounter(FILEMETADATA_CACHE_HIT_METRIC);
     metrics_.addCounter(FILEMETADATA_CACHE_MISS_METRIC);
+    metrics_.addCounter(NUM_LOAD_FILEMETADATA_METRIC);
   }
 
   /**
@@ -2838,7 +2884,7 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
-   * Set ValistWriteIdList with stored writeId
+   * Set ValidWriteIdList with stored writeId
    * @param client the client to access HMS
    */
   protected boolean loadValidWriteIdList(IMetaStoreClient client)
@@ -2861,7 +2907,49 @@ public class HdfsTable extends Table implements FeFsTable {
 
   @Override
   public ValidWriteIdList getValidWriteIds() {
-    return validWriteIds_;
+    if (validWriteIds_ == null) {
+      return null;
+    }
+    // returns a copy to avoid validWriteIds_ is modified outside
+    return MetastoreShim.getValidWriteIdListFromString(validWriteIds_.toString());
+  }
+
+  /**
+   * Sets validWriteIds of this table.
+   * @param writeIdList If the writeIdList is {@link MutableValidWriteIdList}, it is set
+   *                    as the original instance. Otherwise, a new instance is created.
+   */
+  public void setValidWriteIds(ValidWriteIdList writeIdList) {
+    if (writeIdList != null) {
+      validWriteIds_ = new MutableValidReaderWriteIdList(writeIdList);
+    } else {
+      validWriteIds_ = null;
+    }
+  }
+
+  /**
+   * Add write ids to the validWriteIdList of this table.
+   * @param writeIds a list of write ids
+   * @param status the status of the writeIds argument
+   * @return True if any of writeIds is added and false otherwise
+   */
+  public boolean addWriteIds(List<Long> writeIds,
+      MutableValidWriteIdList.WriteIdStatus status) throws CatalogException {
+    Preconditions.checkState(isWriteLockedByCurrentThread(), "Write Lock should be held "
+        + "before addWriteIds.");
+    Preconditions.checkArgument(writeIds != null, "Cannot add null write ids");
+    Preconditions.checkState(validWriteIds_ != null, "Write id list should not be null");
+    switch (status) {
+      case OPEN:
+        return validWriteIds_.addOpenWriteId(Collections.max(writeIds));
+      case COMMITTED:
+        return validWriteIds_.addCommittedWriteIds(writeIds);
+      case ABORTED:
+        return validWriteIds_.addAbortedWriteIds(writeIds);
+      default:
+        throw new CatalogException("Unknown write id status " + status + " for table "
+            + getFullName());
+    }
   }
 
   /**

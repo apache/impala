@@ -50,6 +50,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.Catalog;
 import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
@@ -63,6 +64,7 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.impala.analysis.FunctionName;
 import org.apache.impala.analysis.HdfsUri;
@@ -98,7 +100,9 @@ import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorS
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
+import org.apache.impala.common.TransactionException;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.service.BackendConfig;
 import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.testutil.CatalogServiceTestCatalog;
@@ -120,6 +124,7 @@ import org.apache.impala.thrift.TAlterTableSetRowFormatParams;
 import org.apache.impala.thrift.TAlterTableSetTblPropertiesParams;
 import org.apache.impala.thrift.TAlterTableType;
 import org.apache.impala.thrift.TAlterTableUpdateStatsParams;
+import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TCatalogServiceRequestHeader;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TColumnType;
@@ -151,6 +156,7 @@ import org.apache.impala.thrift.TTypeNodeType;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.thrift.TUpdateCatalogRequest;
 import org.apache.impala.thrift.TUpdatedPartition;
+import org.apache.impala.util.MetaStoreUtil;
 import org.apache.thrift.TException;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -374,7 +380,7 @@ public class MetastoreEventsProcessorTest {
       // create a database and table in the custom hive catalog whose name matches
       // with one already existing in Impala
       createDatabase(catName, TEST_DB_NAME, null);
-      createTable(catName, TEST_DB_NAME, tblName, null, false);
+      createTable(catName, TEST_DB_NAME, tblName, null, false, null);
       eventsProcessor_.processEvents();
       assertEquals(EventProcessorStatus.ACTIVE, eventsProcessor_.getStatus());
       // assert that dbname and table in the default catalog exist
@@ -1077,6 +1083,28 @@ public class MetastoreEventsProcessorTest {
     }
   }
 
+  private void simulateInsertIntoTransactionalTableFromFS(
+      org.apache.hadoop.hive.metastore.api.Table msTbl, Partition partition,
+      int totalNumberOfFilesToAdd, long txnId, long writeId) throws IOException {
+    Path parentPath = partition == null ?
+        new Path(msTbl.getSd().getLocation()) : new Path(partition.getSd().getLocation());
+    Path deltaPath = new Path(parentPath, String.format("delta_%d_%d", writeId, writeId));
+    List<String> newFiles = addFilesToDirectory(deltaPath, "testFile.",
+        totalNumberOfFilesToAdd, false);
+    List<InsertEventRequestData> insertEventReqDatas = new ArrayList<>();
+    InsertEventRequestData insertEventRequestData = new InsertEventRequestData();
+    if (partition != null) {
+      insertEventRequestData.setPartitionVal(partition.getValues());
+    }
+    insertEventRequestData.setFilesAdded(newFiles);
+    insertEventRequestData.setReplace(false);
+    insertEventReqDatas.add(insertEventRequestData);
+    MetaStoreUtil.TableInsertEventInfo insertEventInfo =
+        new MetaStoreUtil.TableInsertEventInfo(insertEventReqDatas, true, txnId, writeId);
+    MetastoreShim.fireInsertEvents(catalog_.getMetaStoreClient(), insertEventInfo,
+        msTbl.getDbName(), msTbl.getTableName());
+  }
+
   /**
    * Test generates ALTER_TABLE events for various cases (table rename, parameter change,
    * add/remove/change column) and makes sure that the table is updated on the CatalogD
@@ -1567,7 +1595,7 @@ public class MetastoreEventsProcessorTest {
               tblTransition.first);
         }
         createDatabase(TEST_DB_NAME, dbParams);
-        createTable(null, TEST_DB_NAME, testTblName, tblParams, false);
+        createTable(null, TEST_DB_NAME, testTblName, tblParams, false, null);
         eventsProcessor_.processEvents();
         // table creation is skipped since the flag says so
         assertNull(catalog_.getTable(TEST_DB_NAME, testTblName));
@@ -1695,9 +1723,9 @@ public class MetastoreEventsProcessorTest {
     }
 
     org.apache.hadoop.hive.metastore.api.Table tableBefore =
-        getTestTable(null, dbName, tblName, beforeParams, false);
+        getTestTable(null, dbName, tblName, beforeParams, false, null);
     org.apache.hadoop.hive.metastore.api.Table tableAfter =
-        getTestTable(null, dbName, tblName, afterParams, false);
+        getTestTable(null, dbName, tblName, afterParams, false, null);
 
     Map<String, String> dbParams = new HashMap<>(1);
     if (dbFlag != null) {
@@ -1721,7 +1749,7 @@ public class MetastoreEventsProcessorTest {
     // issue a dummy alter table by adding a param
     afterParams.put("dummy", "value");
     org.apache.hadoop.hive.metastore.api.Table nextTable =
-        getTestTable(null, dbName, tblName, afterParams, false);
+        getTestTable(null, dbName, tblName, afterParams, false, null);
     NotificationEvent nextNotification =
         createFakeAlterTableNotification(dbName, tblName, tableAfter, nextTable);
     alterTableEvent =
@@ -1782,9 +1810,9 @@ public class MetastoreEventsProcessorTest {
     Map<String, String> tblParams = new HashMap<>(1);
     tblParams.put(MetastoreEventPropertyKey.DISABLE_EVENT_HMS_SYNC.getKey(), "true");
     // event 2
-    createTable(null, TEST_DB_NAME, "tbl_should_skipped", tblParams, true);
+    createTable(null, TEST_DB_NAME, "tbl_should_skipped", tblParams, true, null);
     // event 3
-    createTable(null, TEST_DB_NAME, testTblName, null, true);
+    createTable(null, TEST_DB_NAME, testTblName, null, true, null);
     List<List<String>> partitionVals = new ArrayList<>();
     partitionVals.add(Arrays.asList("1"));
     partitionVals.add(Arrays.asList("2"));
@@ -1942,7 +1970,7 @@ public class MetastoreEventsProcessorTest {
       Map<String, String> dbParams, Map<String, String> tblParams) throws Exception {
     assertNull(catalog_.getDb(dbName));
     createDatabase(dbName, dbParams);
-    createTable(null, dbName, tblName, tblParams, true);
+    createTable(null, dbName, tblName, tblParams, true, null);
     List<List<String>> partVals = new ArrayList<>(3);
     partVals.add(Arrays.asList("1"));
     partVals.add(Arrays.asList("2"));
@@ -2444,6 +2472,153 @@ public class MetastoreEventsProcessorTest {
     return metastoreEvents;
   }
 
+  @Test
+  public void testCommitEvent() throws TException, ImpalaException, IOException {
+    // Turn on incremental refresh for transactional table
+    final TBackendGflags origCfg = BackendConfig.INSTANCE.getBackendCfg();
+    try {
+      final TBackendGflags stubCfg = origCfg.deepCopy();
+      stubCfg.setHms_event_incremental_refresh_transactional_table(true);
+      BackendConfig.create(stubCfg);
+
+      createDatabase(TEST_DB_NAME, null);
+      testInsertIntoTransactionalTable("testCommitEvent_transactional", false, false);
+      testInsertIntoTransactionalTable("testCommitEvent_transactional_part", false, true);
+    } finally {
+      // Restore original config
+      BackendConfig.create(origCfg);
+    }
+  }
+
+  @Test
+  public void testAbortEvent() throws TException, ImpalaException, IOException {
+    // Turn on incremental refresh for transactional table
+    final TBackendGflags origCfg = BackendConfig.INSTANCE.getBackendCfg();
+    try {
+      final TBackendGflags stubCfg = origCfg.deepCopy();
+      stubCfg.setHms_event_incremental_refresh_transactional_table(true);
+      BackendConfig.create(stubCfg);
+
+      createDatabase(TEST_DB_NAME, null);
+      testInsertIntoTransactionalTable("testAbortEvent_transactional", true, false);
+      testInsertIntoTransactionalTable("testAbortEvent_transactional_part", true, true);
+    } finally {
+      // Restore original config
+      BackendConfig.create(origCfg);
+    }
+  }
+
+  private void testInsertIntoTransactionalTable(String tblName, boolean toAbort
+      , boolean isPartitioned) throws TException, CatalogException,
+      TransactionException, IOException {
+    createTransactionalTable(TEST_DB_NAME, tblName, isPartitioned);
+    if (isPartitioned) {
+      List<List<String>> partVals = new ArrayList<>();
+      partVals.add(Arrays.asList("1"));
+      addPartitions(TEST_DB_NAME, tblName, partVals);
+    }
+    eventsProcessor_.processEvents();
+    loadTable(tblName);
+    Table tbl = catalog_.getTable(TEST_DB_NAME, tblName);
+
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      long txnId = MetastoreShim.openTransaction(client.getHiveClient());
+      long writeId = MetastoreShim.allocateTableWriteId(client.getHiveClient(),
+          txnId, TEST_DB_NAME, tblName);
+      eventsProcessor_.processEvents();
+      ValidWriteIdList writeIdList = tbl.getValidWriteIds();
+      assertFalse(writeIdList.isWriteIdValid(writeId));
+      assertFalse(writeIdList.isWriteIdAborted(writeId));
+      Partition partition = null;
+      if (isPartitioned) {
+        partition = client.getHiveClient().getPartition(
+            TEST_DB_NAME, tblName, Arrays.asList("1"));
+      }
+      simulateInsertIntoTransactionalTableFromFS(
+          tbl.getMetaStoreTable(), partition, 1, txnId, writeId);
+      if (toAbort) {
+        MetastoreShim.abortTransaction(client.getHiveClient(), txnId);
+      } else {
+        MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
+      }
+      eventsProcessor_.processEvents();
+      String partName = isPartitioned ? "p1=1" : "";
+      int numFiles = ((HdfsTable) tbl)
+          .getPartitionsForNames(Collections.singletonList(partName))
+          .get(0)
+          .getNumFileDescriptors();
+      writeIdList = tbl.getValidWriteIds();
+      if (toAbort) {
+        // For non-partitioned tables, we don't keep track of write ids in the Catalog
+        // to reduce memory footprint so the writeIdList won't be up-to-date until next
+        // table reloading.
+        assertEquals(0, numFiles);
+      } else {
+        assertTrue(writeIdList.isWriteIdValid(writeId));
+        assertEquals(1, numFiles);
+      }
+    }
+  }
+
+  @Test
+  public void testAlterPartitionNotReloadFMD() throws Exception {
+    // Turn on incremental refresh for transactional table
+    final TBackendGflags origCfg = BackendConfig.INSTANCE.getBackendCfg();
+    try {
+      final TBackendGflags stubCfg = origCfg.deepCopy();
+      stubCfg.setHms_event_incremental_refresh_transactional_table(true);
+      BackendConfig.create(stubCfg);
+
+      String testTblName = "testAlterPartitionNotReloadFMD";
+      createDatabase(TEST_DB_NAME, null);
+      createTransactionalTable(TEST_DB_NAME, testTblName, true);
+      List<List<String>> partVals = new ArrayList<>();
+      partVals.add(Arrays.asList("1"));
+      addPartitions(TEST_DB_NAME, testTblName, partVals);
+      try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+        long txnId = MetastoreShim.openTransaction(client.getHiveClient());
+        long writeId = MetastoreShim.allocateTableWriteId(client.getHiveClient(),
+            txnId, TEST_DB_NAME, testTblName);
+        Partition partition = client.getHiveClient().getPartition(TEST_DB_NAME,
+            testTblName, Arrays.asList("1"));
+        org.apache.hadoop.hive.metastore.api.Table table =
+            client.getHiveClient().getTable(TEST_DB_NAME, testTblName);
+        simulateInsertIntoTransactionalTableFromFS(table, partition, 1, txnId, writeId);
+        MetastoreShim.commitTransaction(client.getHiveClient(), txnId);
+      }
+      eventsProcessor_.processEvents();
+      loadTable(testTblName);
+      HdfsTable tbl = (HdfsTable) catalog_.getTable(TEST_DB_NAME, testTblName);
+
+      alterPartitionsParamsInTxn(TEST_DB_NAME, testTblName, "testAlterPartition", "true",
+          partVals);
+      assertNull(tbl.getPartitionsForNames(Collections.singletonList("p1=1")).get(0)
+          .getParameters().get("testAlterPartition"));
+      long numLoadFMDBefore =
+          tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+      List<HdfsPartition.FileDescriptor> FDbefore = tbl.getPartitionsForNames(
+          Collections.singletonList("p1=1")).get(0).getFileDescriptors();
+      eventsProcessor_.processEvents();
+      // After event processing, parameters should be updated
+      assertNotNull(tbl.getPartitionsForNames(Collections.singletonList("p1=1")).get(0)
+          .getParameters().get("testAlterPartition"));
+      // However, file metadata should not be reloaded after an alter partition event
+      long numLoadFMDAfter =
+          tbl.getMetrics().getCounter(HdfsTable.NUM_LOAD_FILEMETADATA_METRIC).getCount();
+      List<HdfsPartition.FileDescriptor> FDafter = tbl.getPartitionsForNames(
+          Collections.singletonList("p1=1")).get(0).getFileDescriptors();
+      assertEquals("File metadata should not be reloaded",
+          numLoadFMDBefore, numLoadFMDAfter);
+      // getFileDescriptors() always returns a new instance, so we need to compare the
+      // underlying array
+      assertEquals(Lists.transform(FDbefore, HdfsPartition.FileDescriptor.TO_BYTES),
+          Lists.transform(FDafter, HdfsPartition.FileDescriptor.TO_BYTES));
+    } finally {
+      // Restore original config
+      BackendConfig.create(origCfg);
+    }
+  }
+
   private abstract class AlterTableExecutor {
     protected abstract void execute() throws Exception;
 
@@ -2701,10 +2876,19 @@ public class MetastoreEventsProcessorTest {
     }
   }
 
+  private void createTransactionalTable(
+      String dbName, String tblName, boolean isPartitioned) throws TException {
+    Map<String, String> params = new HashMap<>();
+    params.put("transactional", "true");
+    params.put("transactional_properties", "insert_only");
+    createTable(null, dbName, tblName, params, isPartitioned, "MANAGED_TABLE");
+  }
+
   private void createTable(String catName, String dbName, String tblName,
-      Map<String, String> params, boolean isPartitioned) throws TException {
+      Map<String, String> params, boolean isPartitioned, String tableType)
+      throws TException {
     org.apache.hadoop.hive.metastore.api.Table
-        tbl = getTestTable(catName, dbName, tblName, params, isPartitioned);
+        tbl = getTestTable(catName, dbName, tblName, params, isPartitioned, tableType);
 
     try (MetaStoreClient msClient = catalog_.getMetaStoreClient()) {
       msClient.getHiveClient().createTable(tbl);
@@ -2712,8 +2896,8 @@ public class MetastoreEventsProcessorTest {
   }
 
   private org.apache.hadoop.hive.metastore.api.Table getTestTable(String catName,
-      String dbName, String tblName, Map<String, String> params, boolean isPartitioned)
-      throws MetaException {
+      String dbName, String tblName, Map<String, String> params, boolean isPartitioned,
+      String tableType) throws MetaException {
     org.apache.hadoop.hive.metastore.api.Table tbl =
         new org.apache.hadoop.hive.metastore.api.Table();
     if (catName != null) tbl.setCatName(catName);
@@ -2741,6 +2925,12 @@ public class MetastoreEventsProcessorTest {
       List<FieldSchema> pcols = Lists.newArrayList(
           new FieldSchema("p1","string","partition p1 description"));
       tbl.setPartitionKeys(pcols);
+    }
+    if (tableType != null) {
+      Preconditions.checkArgument(tableType.equals(TableType.MANAGED_TABLE.toString())
+              || tableType.equals(TableType.EXTERNAL_TABLE.toString()),
+          "Invalid table type " + tableType);
+      tbl.setTableType(tableType);
     }
     return tbl;
   }
@@ -3166,7 +3356,7 @@ public class MetastoreEventsProcessorTest {
     String insert_mul_part = String.format(
         "insert into table %s partition(p1, p2) select * from %s", tblName1, tblName2);
     TUpdateCatalogRequest testInsertRequest = createTestTUpdateCatalogRequest(
-        TEST_DB_NAME, tblName1, insert_mul_part, updated_partitions, overwrite);
+        TEST_DB_NAME, tblName1, insert_mul_part, updated_partitions, overwrite, -1, -1);
     catalogOpExecutor_.updateCatalog(testInsertRequest);
   }
 
@@ -3178,6 +3368,12 @@ public class MetastoreEventsProcessorTest {
    */
   private void insertFromImpala(String tblName, boolean isPartitioned, String p1val,
       String p2val, boolean isOverwrite, List<String> files) throws ImpalaException {
+    insertFromImpala(tblName, isPartitioned, p1val, p2val, isOverwrite, files, -1, -1);
+  }
+
+  private void insertFromImpala(String tblName, boolean isPartitioned, String p1val,
+      String p2val, boolean isOverwrite, List<String> files, long txnId, long writeId)
+      throws ImpalaException {
     String partition = String.format("partition (%s, %s)", p1val, p2val);
     String test_insert_tbl = String.format("insert into table %s %s values ('a','aa') ",
         tblName, isPartitioned ? partition : "");
@@ -3188,7 +3384,8 @@ public class MetastoreEventsProcessorTest {
         isPartitioned ? String.format("%s/%s", p1val, p2val) : "";
     updated_partitions.put(created_part_str, updatedPartition);
     TUpdateCatalogRequest testInsertRequest = createTestTUpdateCatalogRequest(
-        TEST_DB_NAME, tblName, test_insert_tbl, updated_partitions, isOverwrite);
+        TEST_DB_NAME, tblName, test_insert_tbl, updated_partitions, isOverwrite,
+        txnId, writeId);
     catalogOpExecutor_.updateCatalog(testInsertRequest);
   }
 
@@ -3197,7 +3394,8 @@ public class MetastoreEventsProcessorTest {
    */
   private TUpdateCatalogRequest createTestTUpdateCatalogRequest(String dBName,
       String tableName, String redacted_sql_stmt,
-      Map<String, TUpdatedPartition> updated_partitions, boolean isOverwrite) {
+      Map<String, TUpdatedPartition> updated_partitions, boolean isOverwrite,
+      long txnId, long writeId) {
     TUpdateCatalogRequest tUpdateCatalogRequest = new TUpdateCatalogRequest();
     tUpdateCatalogRequest.setDb_name(dBName);
     tUpdateCatalogRequest.setTarget_table(tableName);
@@ -3205,6 +3403,8 @@ public class MetastoreEventsProcessorTest {
     tUpdateCatalogRequest.setHeader(new TCatalogServiceRequestHeader());
     tUpdateCatalogRequest.getHeader().setRedacted_sql_stmt(redacted_sql_stmt);
     if (isOverwrite) tUpdateCatalogRequest.setIs_overwrite(true);
+    if (txnId > 0) tUpdateCatalogRequest.setTransaction_id(txnId);
+    if (writeId > 0) tUpdateCatalogRequest.setWrite_id(writeId);
     return tUpdateCatalogRequest;
   }
 
@@ -3230,11 +3430,11 @@ public class MetastoreEventsProcessorTest {
 
   private void createTable(String dbName, String tblName, boolean isPartitioned)
       throws TException {
-    createTable(null, dbName, tblName, null, isPartitioned);
+    createTable(null, dbName, tblName, null, isPartitioned, null);
   }
 
   private void createTable(String tblName, boolean isPartitioned) throws TException {
-    createTable(null, TEST_DB_NAME, tblName, null, isPartitioned);
+    createTable(null, TEST_DB_NAME, tblName, null, isPartitioned, null);
   }
 
   private void dropTable(String tableName) throws TException {
@@ -3374,12 +3574,31 @@ public class MetastoreEventsProcessorTest {
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
       List<Partition> partitions = new ArrayList<>();
       for (List<String> partVal : partVals) {
-        Partition partition = metaStoreClient.getHiveClient().getPartition(TEST_DB_NAME,
+        Partition partition = metaStoreClient.getHiveClient().getPartition(db,
             tblName, partVal);
         partition.getParameters().put(key, val);
         partitions.add(partition);
       }
-      metaStoreClient.getHiveClient().alter_partitions(TEST_DB_NAME, tblName, partitions);
+      metaStoreClient.getHiveClient().alter_partitions(db, tblName, partitions);
+    }
+  }
+
+  private void alterPartitionsParamsInTxn(String db, String tblName, String key,
+      String val, List<List<String>> partVals) throws Exception {
+    try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+      long txnId = MetastoreShim.openTransaction(metaStoreClient.getHiveClient());
+      long writeId = MetastoreShim.allocateTableWriteId(metaStoreClient.getHiveClient(),
+          txnId, db, tblName);
+      List<Partition> partitions = new ArrayList<>();
+      for (List<String> partVal : partVals) {
+        Partition partition = metaStoreClient.getHiveClient().getPartition(db,
+            tblName, partVal);
+        partition.getParameters().put(key, val);
+        partition.setWriteId(writeId);
+        partitions.add(partition);
+      }
+      metaStoreClient.getHiveClient().alter_partitions(db, tblName, partitions);
+      MetastoreShim.commitTransaction(metaStoreClient.getHiveClient(), txnId);
     }
   }
 
