@@ -25,6 +25,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
 import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
 import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.mr.Catalogs;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.KuduTable;
@@ -628,6 +629,7 @@ public class CreateTableStmt extends StatementBase {
     }
     putGeneratedProperty(IcebergTable.KEY_STORAGE_HANDLER,
         IcebergTable.ICEBERG_STORAGE_HANDLER);
+    putGeneratedProperty(TableProperties.ENGINE_HIVE_ENABLED, "true");
 
     String fileformat = getTblProperties().get(IcebergTable.ICEBERG_FILE_FORMAT);
     TIcebergFileFormat icebergFileFormat = IcebergUtil.getIcebergFileFormat(fileformat);

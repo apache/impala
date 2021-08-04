@@ -568,19 +568,6 @@ TBLPROPERTIES('write.format.default'='parquet',
     'write.parquet.page-size-bytes'='65536',
     'write.parquet.dict-size-bytes'='131072',
     'iceberg.catalog'='hadoop.tables')
----- RESULTS-HIVE
-CREATE TABLE show_create_table_test_db.iceberg_test1 (
-  level STRING NULL
-)
-STORED AS ICEBERG
-LOCATION '$$location_uri$$'
-TBLPROPERTIES('write.format.default'='parquet',
-    'write.parquet.compression-codec'='zstd',
-    'write.parquet.compression-level'='12',
-    'write.parquet.row-group-size-bytes'='134217728',
-    'write.parquet.page-size-bytes'='65536',
-    'write.parquet.dict-size-bytes'='131072',
-    'iceberg.catalog'='hadoop.tables')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test1 (
   level STRING NULL
@@ -594,24 +581,12 @@ TBLPROPERTIES ('external.table.purge'='TRUE',
     'write.parquet.row-group-size-bytes'='134217728',
     'write.parquet.page-size-bytes'='65536',
     'write.parquet.dict-size-bytes'='131072',
+    'engine.hive.enabled'='true',
     'iceberg.catalog'='hadoop.tables')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_test2 (
   level STRING
-)
-STORED AS ICEBERG
-TBLPROPERTIES('write.format.default'='parquet',
-    'write.parquet.compression-codec'='zstd',
-    'write.parquet.compression-level'='12',
-    'write.parquet.row-group-size-bytes'='134217728',
-    'write.parquet.page-size-bytes'='65536',
-    'write.parquet.dict-size-bytes'='131072',
-    'iceberg.catalog'='hadoop.catalog',
-    'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
----- RESULTS-HIVE
-CREATE TABLE show_create_table_test_db.iceberg_test2 (
-  level STRING NULL
 )
 STORED AS ICEBERG
 TBLPROPERTIES('write.format.default'='parquet',
@@ -634,26 +609,13 @@ TBLPROPERTIES ('external.table.purge'='TRUE',
     'write.parquet.row-group-size-bytes'='134217728',
     'write.parquet.page-size-bytes'='65536',
     'write.parquet.dict-size-bytes'='131072',
+    'engine.hive.enabled'='true',
     'iceberg.catalog'='hadoop.catalog',
     'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_test3 (
   level STRING
-)
-STORED AS ICEBERG
-TBLPROPERTIES('write.format.default'='parquet',
-    'write.parquet.compression-codec'='zstd',
-    'write.parquet.compression-level'='12',
-    'write.parquet.row-group-size-bytes'='134217728',
-    'write.parquet.page-size-bytes'='65536',
-    'write.parquet.dict-size-bytes'='131072',
-    'iceberg.catalog'='hadoop.catalog',
-    'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test',
-    'iceberg.table_identifier'='org.my_db.my_table')
----- RESULTS-HIVE
-CREATE TABLE show_create_table_test_db.iceberg_test3 (
-  level STRING NULL
 )
 STORED AS ICEBERG
 TBLPROPERTIES('write.format.default'='parquet',
@@ -677,6 +639,7 @@ TBLPROPERTIES ('external.table.purge'='TRUE',
     'write.parquet.row-group-size-bytes'='134217728',
     'write.parquet.page-size-bytes'='65536',
     'write.parquet.dict-size-bytes'='131072',
+    'engine.hive.enabled'='true',
     'iceberg.catalog'='hadoop.catalog',
     'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test',
     'iceberg.table_identifier'='org.my_db.my_table')
@@ -732,6 +695,7 @@ TBLPROPERTIES ('external.table.purge'='TRUE',
     'write.parquet.row-group-size-bytes'='134217728',
     'write.parquet.page-size-bytes'='65536',
     'write.parquet.dict-size-bytes'='131072',
+    'engine.hive.enabled'='true',
     'iceberg.catalog'='hadoop.catalog',
     'iceberg.catalog_location'='/test-warehouse/hadoop_catalog_test')
 ====
@@ -741,13 +705,6 @@ CREATE TABLE iceberg_test_orc (
 )
 STORED AS ICEBERG
 TBLPROPERTIES('write.format.default'='orc', 'iceberg.catalog'='hadoop.tables')
----- RESULTS-HIVE
-CREATE TABLE show_create_table_test_db.iceberg_test_orc (
-  level STRING NULL
-)
-STORED AS ICEBERG
-LOCATION '$$location_uri$$'
-TBLPROPERTIES('write.format.default'='orc', 'iceberg.catalog'='hadoop.tables')
 ---- RESULTS-HIVE-3
 CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test_orc (
   level STRING NULL
@@ -755,7 +712,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_test_orc (
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='orc',
-'iceberg.catalog'='hadoop.tables')
+'engine.hive.enabled'='true', 'iceberg.catalog'='hadoop.tables')
 ====
 ---- CREATE_TABLE
 # Default Iceberg table
@@ -769,7 +726,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_default_tbl (
 )
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('write.format.default'='parquet',
+TBLPROPERTIES ('write.format.default'='parquet', 'engine.hive.enabled'='true',
 'external.table.purge'='TRUE', 'table_type'='ICEBERG')
 ====
 ---- CREATE_TABLE
@@ -786,7 +743,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_default_tbl_orc (
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('write.format.default'='orc',
-'external.table.purge'='TRUE', 'table_type'='ICEBERG')
+'engine.hive.enabled'='true', 'external.table.purge'='TRUE', 'table_type'='ICEBERG')
 ====
 ---- CREATE_TABLE
 # Iceberg table in HiveCatalog
@@ -802,7 +759,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.iceberg_hive_cat_explicit (
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('write.format.default'='parquet', 'iceberg.catalog'='hive.catalog',
-'external.table.purge'='TRUE', 'table_type'='ICEBERG')
+'engine.hive.enabled'='true', 'external.table.purge'='TRUE', 'table_type'='ICEBERG')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_nullable_test (
@@ -811,21 +768,6 @@ CREATE TABLE iceberg_nullable_test (
   register_time DATE
 )
 STORED AS ICEBERG
-TBLPROPERTIES('write.format.default'='parquet',
-    'write.parquet.compression-codec'='zstd',
-    'write.parquet.compression-level'='12',
-    'write.parquet.row-group-size-bytes'='134217728',
-    'write.parquet.page-size-bytes'='65536',
-    'write.parquet.dict-size-bytes'='131072',
-    'iceberg.catalog'='hadoop.tables')
----- RESULTS-HIVE
-CREATE TABLE show_create_table_test_db.iceberg_nullable_test (
-  level STRING NOT NULL,
-  event_time TIMESTAMP NULL,
-  register_time DATE NULL
-)
-STORED AS ICEBERG
-LOCATION '$$location_uri$$'
 TBLPROPERTIES('write.format.default'='parquet',
     'write.parquet.compression-codec'='zstd',
     'write.parquet.compression-level'='12',
@@ -848,6 +790,7 @@ TBLPROPERTIES ('external.table.purge'='TRUE',
     'write.parquet.row-group-size-bytes'='134217728',
     'write.parquet.page-size-bytes'='65536',
     'write.parquet.dict-size-bytes'='131072',
+    'engine.hive.enabled'='true',
     'iceberg.catalog'='hadoop.tables')
 ====
 ---- CREATE_TABLE
@@ -864,7 +807,7 @@ PARTITIONED BY SPEC (p, d)
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
-'table_type'='ICEBERG')
+'engine.hive.enabled'='true', 'table_type'='ICEBERG')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_ctas
@@ -881,7 +824,7 @@ PARTITIONED BY SPEC (BUCKET(5, id))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
-'table_type'='ICEBERG')
+'engine.hive.enabled'='true', 'table_type'='ICEBERG')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_ctas_ht
@@ -899,7 +842,7 @@ PARTITIONED BY SPEC (BUCKET(5, id))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
-'iceberg.catalog'='hadoop.tables')
+'engine.hive.enabled'='true', 'iceberg.catalog'='hadoop.tables')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_catalogs_hive (i int)
@@ -912,7 +855,7 @@ PARTITIONED BY SPEC (BUCKET(3, i))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
-'iceberg.catalog'='ice_hive_cat', 'table_type'='ICEBERG')
+'engine.hive.enabled'='true', 'iceberg.catalog'='ice_hive_cat', 'table_type'='ICEBERG')
 ====
 ---- CREATE_TABLE
 CREATE TABLE iceberg_catalogs_hadoop (i int)
@@ -925,5 +868,5 @@ PARTITIONED BY SPEC (BUCKET(3, i))
 STORED AS ICEBERG
 LOCATION '$$location_uri$$'
 TBLPROPERTIES ('external.table.purge'='TRUE', 'write.format.default'='parquet',
-'iceberg.catalog'='ice_hadoop_cat')
+'engine.hive.enabled'='true', 'iceberg.catalog'='ice_hadoop_cat')
 ====
