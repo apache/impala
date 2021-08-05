@@ -1638,8 +1638,10 @@ public class CatalogOpExecutor {
                 + "maxSize=%d avgSize=%.2f minValue=%s maxValue=%s",
             colName, entry.getValue().getNum_distinct_values(),
             entry.getValue().getNum_nulls(), entry.getValue().getMax_size(),
-            entry.getValue().getAvg_size(), entry.getValue().getLow_value().toString(),
-            entry.getValue().getHigh_value().toString()));
+            entry.getValue().getAvg_size(), entry.getValue().getLow_value() != null ?
+            entry.getValue().getLow_value().toString() : -1,
+            entry.getValue().getHigh_value() != null ?
+            entry.getValue().getHigh_value().toString() : -1));
       }
       ColumnStatisticsObj colStatsObj = new ColumnStatisticsObj(colName,
           tableCol.getType().toString().toLowerCase(), colStatsData);

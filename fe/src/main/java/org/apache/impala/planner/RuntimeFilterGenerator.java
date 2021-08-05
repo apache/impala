@@ -291,8 +291,8 @@ public final class RuntimeFilterGenerator {
             .append("Target expr: " + expr.debugString() + " ")
             .append("Partition columns: " + isBoundByPartitionColumns)
             .append("Is local: " + isLocalTarget)
-            .append("lowValue: " + lowValue.toString())
-            .append("highValue: " + highValue.toString())
+            .append("lowValue: " + (lowValue != null ? lowValue.toString() : -1))
+            .append("highValue: " + (highValue != null ? highValue.toString() : -1))
             .toString();
       }
     }
