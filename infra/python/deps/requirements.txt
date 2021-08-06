@@ -34,11 +34,11 @@ hdfs == 2.0.2
   docopt == 0.6.2
   execnet == 1.4.0
     apipkg == 1.4
-impyla == 0.17a3
-  bitarray == 1.2.1
-  sasl == 0.2.1
+impyla == 0.18a1
+  bitarray == 2.3.0
+  pure-sasl == 0.6.2
   # six == 1.14.0 (specified separately)
-  thrift_sasl == 0.4.3a1
+  thrift_sasl == 0.4.3
 kazoo == 2.2.1
 pexpect == 3.3
 pg8000 == 1.10.2
@@ -60,6 +60,7 @@ requests == 2.20.0
    idna == 2.8
    urllib3 == 1.24.2
    certifi == 2020.12.5
+sasl == 0.2.1
 sh == 1.11
 six == 1.14.0
 sqlparse == 0.3.1
