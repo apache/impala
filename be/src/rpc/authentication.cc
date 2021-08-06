@@ -132,6 +132,18 @@ DEFINE_bool(trusted_domain_use_xff_header, false,
     "domain. Only used if '--trusted_domain' is specified. Warning: Only use this if you "
     "trust the incoming connection to have this set correctly.");
 
+// This flag must be used with caution to avoid security risks.
+DEFINE_string(trusted_auth_header, "",
+    "If set as non empty string, Impala will look for this header in the HTTP headers. "
+    "If the header is present, Impala will skip authentication and extract the username "
+    "directly from the authorization header. Currently, only connections over HTTP "
+    "support this. Note: It still requires the client to specify a username via the "
+    "Basic Authorization header in the format <username>:<password> where the password "
+    "is not used and can be left blank. Warning: Only use this flag if the connections "
+    "are authenticated before the requests land on Impala so that Impala can avoid the "
+    "authentication again. The system must remove the trusted HTTP headers from any "
+    "requests that come from outside the system.");
+
 DEFINE_bool_hidden(saml2_allow_without_tls_debug_only, false,
     "When this configuration is set to true, Impala allows SAML2 authentication "
     "on unsecure channel. This should be only enabled for development / testing.");
@@ -504,9 +516,8 @@ bool CookieAuth(ThriftServer::ConnectionContext* connection_context,
   return false;
 }
 
-bool TrustedDomainCheck(ThriftServer::ConnectionContext* connection_context,
-    const AuthenticationHash& hash, const std::string& origin, string auth_header) {
-  if (!IsTrustedDomain(origin, FLAGS_trusted_domain)) return false;
+bool GetUsernameFromBasicAuthHeader(
+    ThriftServer::ConnectionContext* connection_context, string& auth_header) {
   string stripped_basic_auth_token;
   StripWhiteSpace(&auth_header);
   bool got_basic_auth =
@@ -521,9 +532,26 @@ bool TrustedDomainCheck(ThriftServer::ConnectionContext* connection_context,
     return false;
   }
   connection_context->username = username;
+  return true;
+}
+
+bool TrustedDomainCheck(ThriftServer::ConnectionContext* connection_context,
+    const AuthenticationHash& hash, const std::string& origin, string auth_header) {
+  if (!IsTrustedDomain(origin, FLAGS_trusted_domain)) return false;
+
+  if (!GetUsernameFromBasicAuthHeader(connection_context, auth_header)) return false;
   // Create a cookie to return.
   connection_context->return_headers.push_back(
-      Substitute("Set-Cookie: $0", GenerateCookie(username, hash)));
+      Substitute("Set-Cookie: $0", GenerateCookie(connection_context->username, hash)));
+  return true;
+}
+
+bool HandleTrustedAuthHeader(ThriftServer::ConnectionContext* connection_context,
+    const AuthenticationHash& hash, string auth_header) {
+  if (!GetUsernameFromBasicAuthHeader(connection_context, auth_header)) return false;
+  // Create a cookie to return.
+  connection_context->return_headers.push_back(
+      Substitute("Set-Cookie: $0", GenerateCookie(connection_context->username, hash)));
   return true;
 }
 
@@ -1127,8 +1155,10 @@ Status SecureAuthProvider::GetServerTransportFactory(
     bool has_kerberos = !principal_.empty();
     bool use_cookies = FLAGS_max_cookie_lifetime_s > 0;
     bool check_trusted_domain = !FLAGS_trusted_domain.empty();
+    bool check_trusted_auth_header = !FLAGS_trusted_auth_header.empty();
     factory->reset(new THttpServerTransportFactory(server_name, metrics, has_ldap_,
-        has_kerberos, use_cookies, check_trusted_domain, has_saml_, has_jwt_));
+        has_kerberos, use_cookies, check_trusted_domain, check_trusted_auth_header,
+        has_saml_, has_jwt_));
     return Status::OK();
   }
 
@@ -1255,6 +1285,10 @@ void SecureAuthProvider::SetupConnectionContext(
       if (has_jwt_) {
         callbacks.jwt_token_auth_fn =
             std::bind(JWTTokenAuth, connection_ptr.get(), hash_, std::placeholders::_1);
+      }
+      if (!FLAGS_trusted_auth_header.empty()) {
+        callbacks.trusted_auth_header_handle_fn = std::bind(
+            HandleTrustedAuthHeader, connection_ptr.get(), hash_, std::placeholders::_1);
       }
       http_input_transport->setCallbacks(callbacks);
       http_output_transport->setCallbacks(callbacks);

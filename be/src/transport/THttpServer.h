@@ -52,6 +52,10 @@ struct HttpMetrics {
   // attempts to authorize connections originating from a trusted domain.
   impala::IntCounter* total_trusted_domain_check_success_ = nullptr;
 
+  // Metrics for the number of successful attempts to authorize connections with trusted
+  // auth header.
+  impala::IntCounter* total_trusted_auth_header_check_success_ = nullptr;
+
   impala::IntCounter* total_saml_auth_success_ = nullptr;
   impala::IntCounter* total_saml_auth_failure_ = nullptr;
 
@@ -102,6 +106,12 @@ public:
     std::function<bool(const std::string&, std::string)> trusted_domain_check_fn =
         [&](const std::string&, std::string) { return false; };
 
+    // Function that takes the connection's 'Authorization' header and returns true if
+    // the basic auth header contains a valid username.
+    std::function<bool(std::string)> trusted_auth_header_handle_fn = [&](std::string) {
+      return false;
+    };
+
     // Does the first step of SAML2 SSO browser authenticaton and sets the response to
     // redirect to the SSO service.
     std::function<impala::TWrappedHttpResponse*()> get_saml_redirect_fn =
@@ -131,8 +141,9 @@ public:
   };
 
   THttpServer(std::shared_ptr<TTransport> transport, bool has_ldap, bool has_kerberos,
-      bool has_saml, bool use_cookies, bool check_trusted_domain, bool has_jwt,
-      bool metrics_enabled, HttpMetrics* http_metrics);
+      bool has_saml, bool use_cookies, bool check_trusted_domain,
+      bool check_trusted_auth_header, bool has_jwt, bool metrics_enabled,
+      HttpMetrics* http_metrics);
 
   virtual ~THttpServer();
 
@@ -195,6 +206,14 @@ protected:
   // trusted domain.
   bool check_trusted_domain_ = false;
 
+  // If true, checks whether an incoming connection can skip auth if it has trusted auth
+  // header.
+  bool check_trusted_auth_header_ = false;
+
+  // If true, a trusted auth header was found in the connection string. Authentication
+  // could be skipped.
+  bool found_trusted_auth_header_ = false;
+
   // If set, support for trusting an authentication based on JWT token.
   bool has_jwt_ = false;
 
@@ -215,14 +234,14 @@ public:
 
  THttpServerTransportFactory(const std::string server_name, impala::MetricGroup* metrics,
      bool has_ldap, bool has_kerberos, bool use_cookies, bool check_trusted_domain,
-     bool has_saml, bool has_jwt);
+     bool check_trusted_auth_header, bool has_saml, bool has_jwt);
 
  virtual ~THttpServerTransportFactory() {}
 
  virtual std::shared_ptr<TTransport> getTransport(std::shared_ptr<TTransport> trans) {
-   return std::shared_ptr<TTransport>(
-       new THttpServer(trans, has_ldap_, has_kerberos_, has_saml_, use_cookies_,
-           check_trusted_domain_, has_jwt_, metrics_enabled_, &http_metrics_));
+   return std::shared_ptr<TTransport>(new THttpServer(trans, has_ldap_, has_kerberos_,
+       has_saml_, use_cookies_, check_trusted_domain_, check_trusted_auth_header_,
+       has_jwt_, metrics_enabled_, &http_metrics_));
   }
 
  private:
@@ -230,6 +249,7 @@ public:
   bool has_kerberos_ = false;
   bool use_cookies_ = false;
   bool check_trusted_domain_ = false;
+  bool check_trusted_auth_header_ = false;
   bool has_saml_ = false;
   bool has_jwt_ = false;
 

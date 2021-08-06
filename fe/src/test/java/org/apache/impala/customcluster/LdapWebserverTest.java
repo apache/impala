@@ -112,6 +112,14 @@ public class LdapWebserverTest {
         expectedSuccess.contains(actualSuccess));
   }
 
+  private void verifyTrustedAuthHeaderMetrics(Range<Long> expectedSuccess)
+      throws Exception {
+    long actualSuccess = (long) metrics_.getMetric(
+        "impala.webserver.total-trusted-auth-header-check-success");
+    assertTrue("Expected: " + expectedSuccess + ", Actual: " + actualSuccess,
+        expectedSuccess.contains(actualSuccess));
+  }
+
   private void verifyJwtAuthMetrics(
       Range<Long> expectedAuthSuccess, Range<Long> expectedAuthFailure) throws Exception {
     long actualAuthSuccess =
@@ -227,21 +235,21 @@ public class LdapWebserverTest {
     setUp("--trusted_domain=localhost --trusted_domain_use_xff_header=true", "");
 
     // Case 1: Authenticate as 'Test1Ldap' with the right password '12345'
-    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", "127.0.0.1");
+    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", "127.0.0.1", false);
     verifyTrustedDomainMetrics(Range.closed(1L, 1L));
 
     // Case 2: Authenticate as 'Test1Ldap' without password
-    attemptConnection("Basic VGVzdDFMZGFwOg==", "127.0.0.1");
+    attemptConnection("Basic VGVzdDFMZGFwOg==", "127.0.0.1", false);
     verifyTrustedDomainMetrics(Range.closed(2L, 2L));
 
     // Case 3: Authenticate as 'Test1Ldap' with the right password
     // '12345' but with a non trusted address in X-Forwarded-For header
-    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", "127.0.23.1");
+    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", "127.0.23.1", false);
     verifyTrustedDomainMetrics(Range.closed(2L, 2L));
 
     // Case 4: No auth header, does not work
     try {
-      attemptConnection(null, "127.0.0.1");
+      attemptConnection(null, "127.0.0.1", false);
     } catch (IOException e) {
       assertTrue(e.getMessage().contains("Server returned HTTP response code: 401"));
     }
@@ -250,7 +258,7 @@ public class LdapWebserverTest {
     // Case 5: Authenticate as 'Test1Ldap' with the no password
     // and a non trusted address in X-Forwarded-For header
     try {
-      attemptConnection("Basic VGVzdDFMZGFwOg==", "127.0.23.1");
+      attemptConnection("Basic VGVzdDFMZGFwOg==", "127.0.23.1", false);
     } catch (IOException e) {
       assertTrue(e.getMessage().contains("Server returned HTTP response code: 401"));
     }
@@ -260,8 +268,38 @@ public class LdapWebserverTest {
     // check if the X-Forwarded-For header is not present
     long successMetricBefore = (long) metrics_
         .getMetric("impala.webserver.total-trusted-domain-check-success");
-    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", null);
+    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", null, false);
     verifyTrustedDomainMetrics(Range.closed(successMetricBefore, successMetricBefore));
+  }
+
+  @Test
+  public void testWebserverTrustedAuthHeader() throws Exception {
+    setUp("--trusted_auth_header=X-Trusted-Proxy-Auth-Header", "");
+
+    // Case 1: Authenticate as 'Test1Ldap' with the right password '12345'.
+    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", null, true);
+    verifyTrustedAuthHeaderMetrics(Range.closed(1L, 1L));
+
+    // Case 2: Authenticate as 'Test1Ldap' without password.
+    // The password is ignored.
+    attemptConnection("Basic VGVzdDFMZGFwOg==", null, true);
+    verifyTrustedAuthHeaderMetrics(Range.closed(2L, 2L));
+
+    // Case 3: No Authentication header, does not work.
+    try {
+      attemptConnection(null, null, true);
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Server returned HTTP response code: 401"));
+    }
+    verifyTrustedAuthHeaderMetrics(Range.closed(2L, 2L));
+
+    // Case 4: Verify that there are no changes in metrics for trusted auth header
+    // check if the trusted auth header is not present.
+    long successMetricBefore = (long) metrics_.getMetric(
+        "impala.webserver.total-trusted-auth-header-check-success");
+    attemptConnection("Basic VGVzdDFMZGFwOjEyMzQ1", null, false);
+    verifyTrustedAuthHeaderMetrics(
+        Range.closed(successMetricBefore, successMetricBefore));
   }
 
   /**
@@ -287,7 +325,7 @@ public class LdapWebserverTest {
         + "4kc200pqbpYLhhuK4Qf7oT7y9mOrtNrUKGDCZ0Q2y_mizlbY6SMg4RWqSz0RQwJbRgXIWSgc"
         + "bZd0GbD_MQQ8x7WRE4nluU-5Fl4N2Wo8T9fNTuxALPiuVeIczO25b5n4fryfKasSgaZfmk0C"
         + "oOJzqbtmQxqiK9QNSJAiH2kaqMwLNgAdgn8fbd-lB1RAEGeyPH8Px8ipqcKsPk0bg";
-    attemptConnection("Bearer " + jwtToken, "127.0.0.1");
+    attemptConnection("Bearer " + jwtToken, "127.0.0.1", false);
     verifyJwtAuthMetrics(Range.closed(1L, 1L), zero);
 
     // Case 2: Failed with invalid JWT Token.
@@ -296,7 +334,7 @@ public class LdapWebserverTest {
         + "NzlkYTUwYjViMjEiLCJ0eXAiOiJKV1MifQ.eyJpc3MiOiJhdXRoMCIsInVzZXJuYW1lIjoia"
         + "W1wYWxhIn0.";
     try {
-      attemptConnection("Bearer " + invalidJwtToken, "127.0.0.1");
+      attemptConnection("Bearer " + invalidJwtToken, "127.0.0.1", false);
     } catch (IOException e) {
       assertTrue(e.getMessage().contains("Server returned HTTP response code: 401"));
     }
@@ -354,9 +392,9 @@ public class LdapWebserverTest {
   }
 
   // Helper method to make a get call to the webserver using the input basic
-  // auth token and x-forward-for token.
-  private void attemptConnection(String basic_auth_token, String xff_address)
-      throws Exception {
+  // auth token, x-forward-for and X-Trusted-Proxy-Auth-Header token.
+  private void attemptConnection(String basic_auth_token, String xff_address,
+      boolean add_trusted_auth_header) throws Exception {
     String url = "http://localhost:25000/?json";
     URLConnection connection = new URL(url).openConnection();
     if (basic_auth_token != null) {
@@ -364,6 +402,9 @@ public class LdapWebserverTest {
     }
     if (xff_address != null) {
       connection.setRequestProperty("X-Forwarded-For", xff_address);
+    }
+    if (add_trusted_auth_header) {
+      connection.setRequestProperty("X-Trusted-Proxy-Auth-Header", "");
     }
     connection.getInputStream();
   }

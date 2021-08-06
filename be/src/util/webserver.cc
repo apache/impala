@@ -154,6 +154,7 @@ DECLARE_bool(trusted_domain_use_xff_header);
 DECLARE_bool(jwt_token_auth);
 DECLARE_bool(jwt_validate_signature);
 DECLARE_string(jwt_custom_claim_username);
+DECLARE_string(trusted_auth_header);
 
 static const char* DOC_FOLDER = "/www/";
 static const int DOC_FOLDER_LEN = strlen(DOC_FOLDER);
@@ -287,6 +288,7 @@ Webserver::Webserver(const string& interface, const int port, MetricGroup* metri
         bind<void>(&Webserver::ErrorHandler, this, _1, _2), "error.tmpl", false)),
     use_cookies_(FLAGS_max_cookie_lifetime_s > 0),
     check_trusted_domain_(!FLAGS_trusted_domain.empty()),
+    check_trusted_auth_header_(!FLAGS_trusted_auth_header.empty()),
     use_jwt_(FLAGS_jwt_token_auth) {
   http_address_ = MakeNetworkAddress(interface.empty() ? "0.0.0.0" : interface, port);
   Init();
@@ -313,6 +315,11 @@ Webserver::Webserver(const string& interface, const int port, MetricGroup* metri
       && (auth_mode_ == AuthMode::SPNEGO || auth_mode_ == AuthMode::LDAP)) {
     total_trusted_domain_check_success_ =
         metrics->AddCounter("impala.webserver.total-trusted-domain-check-success", 0);
+  }
+  if (check_trusted_auth_header_
+      && (auth_mode_ == AuthMode::SPNEGO || auth_mode_ == AuthMode::LDAP)) {
+    total_trusted_auth_header_check_success_ = metrics->AddCounter(
+        "impala.webserver.total-trusted-auth-header-check-success", 0);
   }
   if (use_jwt_) {
     total_jwt_token_auth_success_ =
@@ -679,6 +686,21 @@ sq_callback_result_t Webserver::BeginRequestCallback(struct sq_connection* conne
     }
   }
 
+  if (!authenticated && check_trusted_auth_header_) {
+    const char* auth_header =
+        sq_get_header(connection, FLAGS_trusted_auth_header.c_str());
+    if (auth_header != nullptr) {
+      string err_msg;
+      if (GetUsernameFromAuthHeader(connection, request_info, err_msg)) {
+        total_trusted_auth_header_check_success_->Increment(1);
+        authenticated = true;
+        AddCookie(request_info, &response_headers);
+      } else {
+        LOG(ERROR) << "Found trusted auth header but " << err_msg;
+      }
+    }
+  }
+
   if (!authenticated) {
     if (auth_mode_ == AuthMode::SPNEGO) {
       sq_callback_result_t spnego_result =
@@ -849,28 +871,39 @@ sq_callback_result_t Webserver::HandleSpnego(struct sq_connection* connection,
   return SQ_CONTINUE_HANDLING;
 }
 
-bool Webserver::TrustedDomainCheck(const string& origin, struct sq_connection* connection,
-    struct sq_request_info* request_info) {
-  if (!IsTrustedDomain(origin, FLAGS_trusted_domain)) return false;
+bool Webserver::GetUsernameFromAuthHeader(struct sq_connection* connection,
+    struct sq_request_info* request_info, string& err_msg) {
   const char* authz_header = sq_get_header(connection, "Authorization");
   if (!authz_header) {
-    LOG(ERROR) << "Passed TrustedDomainCheck but no Authorization header provided.";
+    err_msg = "no Authorization header provided.";
     return false;
   }
 
   string base64;
   if (!TryStripPrefixString(authz_header, "Basic ", &base64)) {
-    LOG(ERROR) << "Passed TrustedDomainCheck but No Basic authentication provided.";
+    err_msg = "no Basic authentication provided.";
     return false;
   }
   string username, password;
   Status status = BasicAuthExtractCredentials(base64, username, password);
   if (!status.ok()) {
-    LOG(ERROR) << "Error parsing basic authentication token from: "
-               << GetRemoteAddress(request_info).ToString() << " Error: " << status;
+    err_msg = Substitute("error parsing basic authentication token from: $0, Error: $1",
+        GetRemoteAddress(request_info).ToString(), status.GetDetail());
     return false;
   }
   request_info->remote_user = strdup(username.c_str());
+  return true;
+}
+
+bool Webserver::TrustedDomainCheck(const string& origin, struct sq_connection* connection,
+    struct sq_request_info* request_info) {
+  if (!IsTrustedDomain(origin, FLAGS_trusted_domain)) return false;
+
+  string err_msg;
+  if (!GetUsernameFromAuthHeader(connection, request_info, err_msg)) {
+    LOG(ERROR) << "Passed TrustedDomainCheck but " << err_msg;
+    return false;
+  }
   return true;
 }
 

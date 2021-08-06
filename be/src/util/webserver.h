@@ -214,6 +214,10 @@ class Webserver {
   // Adds a 'Set-Cookie' header to 'response_headers', if cookie support is enabled.
   void AddCookie(struct sq_request_info* request_info, vector<string>* response_headers);
 
+  // Get username from Authorization header.
+  bool GetUsernameFromAuthHeader(struct sq_connection* connection,
+      struct sq_request_info* request_info, string& err_msg);
+
   /// Renders URLs through the Mustache templating library.
   /// - Default ContentType is HTML.
   /// - Argument 'raw' renders the page with PLAIN ContentType.
@@ -272,6 +276,10 @@ class Webserver {
   /// auth if it originates from a trusted domain.
   bool check_trusted_domain_;
 
+  /// If true and SPNEGO or LDAP is in use, checks whether an incoming connection can skip
+  /// auth if it has trusted auth header.
+  bool check_trusted_auth_header_;
+
   /// If true, the JWT token in Authorization header will be used for authentication.
   /// An incoming connection will be accepted if the JWT token could be verified.
   bool use_jwt_ = false;
@@ -297,6 +305,10 @@ class Webserver {
   /// If 'use_cookies_' is true, metrics for the number of successful
   /// attempts to authorize connections originating from a trusted domain.
   IntCounter* total_trusted_domain_check_success_ = nullptr;
+
+  /// Metrics for the number of successful attempts to authorize connections with a
+  /// trusted auth header.
+  IntCounter* total_trusted_auth_header_check_success_ = nullptr;
 
   /// If 'use_jwt_' is true, metrics for the number of successful and failed JWT auth
   /// attempts.

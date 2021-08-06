@@ -137,6 +137,13 @@ public class LdapHS2Test {
     assertEquals(expectedAuthSuccess, actualAuthSuccess);
   }
 
+  private void verifyTrustedAuthHeaderMetrics(long expectedAuthSuccess) throws Exception {
+    long actualAuthSuccess =
+        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+            + "total-trusted-auth-header-check-success");
+    assertEquals(expectedAuthSuccess, actualAuthSuccess);
+  }
+
   private void verifyJwtAuthMetrics(long expectedAuthSuccess, long expectedAuthFailure)
       throws Exception {
     long actualAuthSuccess =
@@ -429,6 +436,75 @@ public class LdapHS2Test {
     // Account for 1 successful basic auth increment.
     verifyMetrics(4, 1);
     verifyTrustedDomainMetrics(6);
+  }
+
+  /**
+   * Tests if authentication is skipped when connections to the HTTP hiveserver2
+   * endpoint have trusted auth header.
+   */
+  @Test
+  public void testHiveserver2TrustedAuthHeader() throws Exception {
+    setUp("--trusted_auth_header=X-Trusted-Proxy-Auth-Header");
+    verifyMetrics(0, 0);
+    THttpClient transport = new THttpClient("http://localhost:28000");
+    Map<String, String> headers = new HashMap<String, String>();
+
+    // Case 1: Authenticate as 'Test1Ldap' with the right password '12345'
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOjEyMzQ1");
+    headers.put("X-Trusted-Proxy-Auth-Header", "on");
+    transport.setCustomHeaders(headers);
+    transport.open();
+    TCLIService.Iface client = new TCLIService.Client(new TBinaryProtocol(transport));
+
+    // Open a session which will get username 'Test1Ldap'.
+    TOpenSessionReq openReq = new TOpenSessionReq();
+    TOpenSessionResp openResp = client.OpenSession(openReq);
+    // One successful authentication.
+    verifyMetrics(0, 0);
+    verifyTrustedAuthHeaderMetrics(1);
+    // Running a query should succeed.
+    TOperationHandle operationHandle = execAndFetch(
+        client, openResp.getSessionHandle(), "select logged_in_user()", "Test1Ldap");
+    // Two more successful authentications - for the Exec() and the Fetch().
+    verifyMetrics(0, 0);
+    verifyTrustedAuthHeaderMetrics(3);
+
+    // Case 2: Authentication as 'Test1Ldap' without password
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOg==");
+    headers.put("X-Trusted-Proxy-Auth-Header", "");
+    transport.setCustomHeaders(headers);
+    openResp = client.OpenSession(openReq);
+    verifyMetrics(0, 0);
+    verifyTrustedAuthHeaderMetrics(4);
+    operationHandle = execAndFetch(
+        client, openResp.getSessionHandle(), "select logged_in_user()", "Test1Ldap");
+    verifyMetrics(0, 0);
+    verifyTrustedAuthHeaderMetrics(6);
+
+    // Case 3: No Authorization header, does not work
+    headers.remove("Authorization");
+    headers.put("X-Trusted-Proxy-Auth-Header", "on");
+    transport.setCustomHeaders(headers);
+    try {
+      openResp = client.OpenSession(openReq);
+      fail("Exception exception.");
+    } catch (Exception e) {
+      verifyTrustedAuthHeaderMetrics(6);
+      assertEquals(e.getMessage(), "HTTP Response code: 401");
+    }
+
+    // Case 4: Verify that there are no changes in metrics for trusted auth
+    // header check if the X-Trusted-Proxy-Auth-Header header is not present
+    long successMetricBefore =
+        (long) metrics.getMetric("impala.thrift-server.hiveserver2-http-frontend."
+            + "total-trusted-auth-header-check-success");
+    headers.put("Authorization", "Basic VGVzdDFMZGFwOjEyMzQ1");
+    headers.remove("X-Trusted-Proxy-Auth-Header");
+    transport.setCustomHeaders(headers);
+    openResp = client.OpenSession(openReq);
+    // Account for 1 successful basic auth increment.
+    verifyMetrics(1, 0);
+    verifyTrustedAuthHeaderMetrics(successMetricBefore);
   }
 
   /**

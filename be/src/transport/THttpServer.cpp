@@ -36,6 +36,7 @@
 
 DECLARE_bool(trusted_domain_use_xff_header);
 DECLARE_bool(saml2_ee_test_mode);
+DECLARE_string(trusted_auth_header);
 
 namespace apache {
 namespace thrift {
@@ -46,11 +47,13 @@ using strings::Substitute;
 
 THttpServerTransportFactory::THttpServerTransportFactory(const std::string server_name,
     impala::MetricGroup* metrics, bool has_ldap, bool has_kerberos, bool use_cookies,
-    bool check_trusted_domain, bool has_saml, bool has_jwt)
+    bool check_trusted_domain, bool check_trusted_auth_header, bool has_saml,
+    bool has_jwt)
   : has_ldap_(has_ldap),
     has_kerberos_(has_kerberos),
     use_cookies_(use_cookies),
     check_trusted_domain_(check_trusted_domain),
+    check_trusted_auth_header_(check_trusted_auth_header),
     has_saml_(has_saml),
     has_jwt_(has_jwt),
     metrics_enabled_(metrics != nullptr) {
@@ -77,6 +80,10 @@ THttpServerTransportFactory::THttpServerTransportFactory(const std::string serve
       http_metrics_.total_trusted_domain_check_success_ = metrics->AddCounter(
           Substitute("$0.total-trusted-domain-check-success", server_name), 0);
     }
+    if (check_trusted_auth_header_) {
+      http_metrics_.total_trusted_auth_header_check_success_ = metrics->AddCounter(
+          Substitute("$0.total-trusted-auth-header-check-success", server_name), 0);
+    }
     if (has_saml_) {
       http_metrics_.total_saml_auth_success_ =
           metrics->AddCounter(Substitute("$0.total-saml-auth-success", server_name), 0);
@@ -94,13 +101,15 @@ THttpServerTransportFactory::THttpServerTransportFactory(const std::string serve
 
 THttpServer::THttpServer(std::shared_ptr<TTransport> transport, bool has_ldap,
     bool has_kerberos, bool has_saml, bool use_cookies, bool check_trusted_domain,
-    bool has_jwt, bool metrics_enabled, HttpMetrics* http_metrics)
+    bool check_trusted_auth_header, bool has_jwt, bool metrics_enabled,
+    HttpMetrics* http_metrics)
   : THttpTransport(transport),
     has_ldap_(has_ldap),
     has_kerberos_(has_kerberos),
     has_saml_(has_saml),
     use_cookies_(use_cookies),
     check_trusted_domain_(check_trusted_domain),
+    check_trusted_auth_header_(check_trusted_auth_header),
     has_jwt_(has_jwt),
     metrics_enabled_(metrics_enabled),
     http_metrics_(http_metrics) {}
@@ -157,6 +166,9 @@ void THttpServer::parseHeader(char* header) {
     string client_id = string(value);
     StripWhiteSpace(&client_id);
     wrapped_request_->headers[SAML2_CLIENT_IDENTIFIER] = client_id;
+  } else if (check_trusted_auth_header_
+      && THRIFT_strncasecmp(header, FLAGS_trusted_auth_header.c_str(), sz) == 0) {
+    found_trusted_auth_header_ = true;
   }
 }
 
@@ -324,6 +336,16 @@ void THttpServer::headersDone() {
         if (metrics_enabled_) {
           http_metrics_->total_trusted_domain_check_success_->Increment(1);
         }
+      }
+    }
+  }
+
+  // Bypass auth for connections if trusted auth header was found in connection string.
+  if (!authorized && found_trusted_auth_header_ && !auth_value_.empty()) {
+    if (callbacks_.trusted_auth_header_handle_fn(auth_value_)) {
+      authorized = true;
+      if (metrics_enabled_) {
+        http_metrics_->total_trusted_auth_header_check_success_->Increment(1);
       }
     }
   }
