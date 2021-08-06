@@ -41,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.PartitionExpressionProxy;
@@ -179,8 +180,19 @@ public class CatalogHmsAPIHelper {
           "Retrieving file-metadata for partitioned tables must use partition level"
               + " fetch APIs");
       FileMetadata fileMetadata = new FileMetadata();
-      for (THdfsFileDesc fd : response.table_info.partitions.get(0).file_descriptors) {
-        fileMetadata.addToData(fd.file_desc_data);
+      if (response.table_info.partitions.get(0).insert_file_descriptors.size() == 0) {
+        for (THdfsFileDesc fd : response.table_info.partitions.get(0).file_descriptors) {
+          fileMetadata.addToData(fd.file_desc_data);
+        }
+      } else {
+        for (THdfsFileDesc fd :
+            response.table_info.partitions.get(0).insert_file_descriptors) {
+          fileMetadata.addToData(fd.file_desc_data);
+        }
+        for (THdfsFileDesc fd :
+            response.table_info.partitions.get(0).delete_file_descriptors) {
+          fileMetadata.addToData(fd.file_desc_data);
+        }
       }
       retTable.setFileMetadata(fileMetadata);
       retTable.setDictionary(getSerializedNetworkAddress(
@@ -409,8 +421,17 @@ public class CatalogHmsAPIHelper {
           checkCondition(partInfo.file_descriptors != null,
               "Catalog did not return file descriptors for partition %s of table %s.%s",
               partInfo.getName(), dbName, tblName);
-          for (THdfsFileDesc fd : partInfo.file_descriptors) {
-            fileMetadata.addToData(fd.file_desc_data);
+          if (partInfo.insert_file_descriptors.isEmpty()) {
+            for (THdfsFileDesc fd : partInfo.file_descriptors) {
+              fileMetadata.addToData(fd.file_desc_data);
+            }
+          } else {
+            for (THdfsFileDesc fd : partInfo.insert_file_descriptors) {
+              fileMetadata.addToData(fd.file_desc_data);
+            }
+            for (THdfsFileDesc fd : partInfo.delete_file_descriptors) {
+              fileMetadata.addToData(fd.file_desc_data);
+            }
           }
           part.setFileMetadata(fileMetadata);
         }

@@ -1613,8 +1613,9 @@ public class SingleNodePlanner {
    * Return false means this was a no-op because the slot refs are not needed, e.g.
    * it's a non-ACID table, or there are no delete delta files.
    * Throws exception in case of errors.
+   * Purposefully made 'public' for third party usage.
    */
-  private boolean addAcidSlotsIfNeeded(Analyzer analyzer, TableRef hdfsTblRef,
+  public static boolean addAcidSlotsIfNeeded(Analyzer analyzer, TableRef hdfsTblRef,
       List<? extends FeFsPartition> partitions) throws AnalysisException {
     FeTable feTable = hdfsTblRef.getTable();
     if (!AcidUtils.isFullAcidTable(feTable.getMetaStoreTable().getParameters())) {
@@ -1632,7 +1633,8 @@ public class SingleNodePlanner {
     return true;
   }
 
-  private void addAcidSlots(Analyzer analyzer, TableRef hdfsTblRef)
+  /* Purposefully made 'public' for third party usage.*/
+  public static void addAcidSlots(Analyzer analyzer, TableRef hdfsTblRef)
       throws AnalysisException {
     FeTable feTable = hdfsTblRef.getTable();
     List<String> rawPath = new ArrayList<>();
@@ -1657,7 +1659,7 @@ public class SingleNodePlanner {
    * Adds a new slot ref with path 'rawPath' to its tuple descriptor. This is a no-op if
    * the tuple descriptor already has a slot ref with the given raw path.
    */
-  private void addSlotRefToDesc(Analyzer analyzer, List<String> rawPath)
+  private static void addSlotRefToDesc(Analyzer analyzer, List<String> rawPath)
       throws AnalysisException {
     Path resolvedPath = null;
     try {
@@ -1727,11 +1729,12 @@ public class SingleNodePlanner {
    * deltas. I.e. it adds equality predicates for the partitioning columns and
    * ACID columns. E.g. [insertDelta.part = deleteDelta.part,
    * insertDelta.row__id.rowid = deleteDelta.row__id.rowid, ...]
+   * Purposefully made 'public' for third party usage.
    *
    * @param insertTupleDesc Tuple descriptor of the insert delta scan node
    * @param deleteTupleDesc Tuple descriptor of the delete delta scan node
    */
-  List<BinaryPredicate> createAcidJoinConjuncts(Analyzer analyzer,
+  public static List<BinaryPredicate> createAcidJoinConjuncts(Analyzer analyzer,
       TupleDescriptor insertTupleDesc, TupleDescriptor deleteTupleDesc)
       throws AnalysisException {
     List<BinaryPredicate> ret = new ArrayList<>();

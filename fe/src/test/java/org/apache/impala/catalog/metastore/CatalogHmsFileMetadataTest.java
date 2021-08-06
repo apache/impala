@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hive.common.ValidWriteIdList;
 import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesRequest;
 import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesResult;
 import org.apache.hadoop.hive.metastore.api.Partition;
@@ -37,7 +38,9 @@ import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.fb.FbFileBlock;
+import org.apache.thrift.TException;
 import org.junit.Test;
 
 public class CatalogHmsFileMetadataTest extends AbstractCatalogMetastoreTest {
@@ -96,6 +99,48 @@ public class CatalogHmsFileMetadataTest extends AbstractCatalogMetastoreTest {
         fds.get(result.getPartitions().get(1)));
   }
 
+  /**
+   * The test fetches partitions of a table over HMS API and then compares if the
+   * deserialized filemetadata from the response matches with what we have in catalogd.
+   * Compares with a partition that has both insert and delete file descriptors.
+   */
+  @Test
+  public void testFileMetadataForAcidPartitions() throws Exception {
+    // get partitions from catalog directly
+    ValidWriteIdList writeIdList =
+        getValidWriteIdList("function_orc_def", "alltypes_deleted_rows");
+    HdfsTable tbl = (HdfsTable) catalog_
+        .getOrLoadTable("functional_orc_def", "alltypes_deleted_rows", "test",
+            writeIdList);
+    HdfsPartition hdfsPartition1 = tbl
+        .getPartitionsForNames(Arrays.asList("year=2010/month=10")).get(0);
+
+    // test empty partitions result case.
+    GetPartitionsByNamesRequest request = new GetPartitionsByNamesRequest();
+    String dbName = MetaStoreUtils.prependCatalogToDbName("functional_orc_def", CONF);
+    request.setDb_name(dbName);
+    request.setTbl_name("alltypes_deleted_rows");
+    request.setNames(Arrays.asList("year=2010/month=10"));
+    request.setGetFileMetadata(true);
+    request.setValidWriteIdList(tbl.getValidWriteIds().toString());
+    GetPartitionsByNamesResult result = catalogHmsClient_.getPartitionsByNames(request);
+    for (Partition part : result.getPartitions()) {
+      assertNotNull(part.getFileMetadata());
+    }
+    assertNotNull(result.getDictionary());
+    Map<Partition, List<FileDescriptor>> fds = CatalogHmsClientUtils
+        .extractFileDescriptors(result, tbl.getHostIndex());
+    assertEquals(1, fds.size());
+    for (List<FileDescriptor> partFds : fds.values()) {
+      assertFalse(partFds.isEmpty());
+      assertEquals(2, partFds.size());
+    }
+    // make sure that the FileDescriptors from catalog and over HMS API are the same
+    // for the same hostIndex
+    assertFdsAreSame(hdfsPartition1.getFileDescriptors(),
+        fds.get(result.getPartitions().get(0)));
+  }
+
   public static void assertFdsAreSame(List<FileDescriptor> fdsFromCatalog,
       List<FileDescriptor> fdsFromHMS) {
     assertEquals(fdsFromCatalog.size(), fdsFromHMS.size());
@@ -138,5 +183,11 @@ public class CatalogHmsFileMetadataTest extends AbstractCatalogMetastoreTest {
     List<FileDescriptor> hmsTblFds = CatalogHmsClientUtils
         .extractFileDescriptors(tbl, catTbl.getHostIndex());
     assertFdsAreSame(part.getFileDescriptors(), hmsTblFds);
+  }
+
+  private ValidWriteIdList getValidWriteIdList(String db, String tbl) throws TException {
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      return client.getHiveClient().getValidWriteIds(db + "." + tbl);
+    }
   }
 }

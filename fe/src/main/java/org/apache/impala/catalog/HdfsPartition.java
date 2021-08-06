@@ -1168,6 +1168,10 @@ public class HdfsPartition extends CatalogObjectImpl
         .build();
   }
 
+  protected HdfsPartitionLocationCompressor.Location getLocationStruct() {
+    return location_;
+  }
+
   public static class Builder {
     // For the meaning of these fields, see field comments of HdfsPartition.
     private HdfsTable table_;
