@@ -22,6 +22,7 @@
 #include "gen-cpp/parquet_types.h"
 #include "parquet-column-stats.h"
 #include "runtime/string-value.inline.h"
+#include "util/bit-util.h"
 
 namespace impala {
 
@@ -311,6 +312,77 @@ inline Status ColumnStats<StringValue>::MaterializeStringValuesToInternalBuffers
   }
   return Status::OK();
 }
+
+template <typename T>
+inline void ColumnStats<T>::GetIcebergStats(
+    int64_t column_size, IcebergColumnStats* out) const {
+  DCHECK(out != nullptr);
+  out->has_min_max_values = has_min_max_values_;
+  if (out->has_min_max_values) {
+    SerializeIcebergSingleValue(min_value_, &out->min_binary);
+    SerializeIcebergSingleValue(max_value_, &out->max_binary);
+  }
+  out->null_count = null_count_;
+  // Column size is not traced by ColumnStats.
+  out->column_size = column_size;
+}
+
+// Works for bool(TYPE_BOOLEAN), int32_t(TYPE_INT), int64_t(TYPE_BIGINT, TYPE_TIMESTAMP),
+// float(TYPE_FLOAT), double(TYPE_DOUBLE), DateValue (TYPE_DATE).
+// Serialize values as sizeof(T)-byte little endian.
+template <typename T>
+inline void ColumnStats<T>::SerializeIcebergSingleValue(const T& v, std::string* out) {
+  static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8);
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+  const char* data = reinterpret_cast<const char*>(&v);
+  out->assign(data, sizeof(T));
+#else
+  char little_endian[sizeof(T)] = {};
+  BitUtil::ByteSwap(little_endian, reinterpret_cast<const char*>(&v), sizeof(T));
+  out->assign(little_endian, sizeof(T));
+#endif
+}
+
+// This should never be called.
+// With iceberg timestamp values are stored as int64_t with microseconds precision
+// (HdfsParquetTableWriter::timestamp_type_ is set to INT64_MICROS).
+template <>
+inline void ColumnStats<TimestampValue>::SerializeIcebergSingleValue(
+    const TimestampValue& v, std::string* out) {
+  DCHECK(false);
+}
+
+// Serialize StringValue values as UTF-8 bytes (without length).
+template <>
+inline void ColumnStats<StringValue>::SerializeIcebergSingleValue(
+    const StringValue& v, std::string* out) {
+  // With iceberg 'v' is UTF-8 encoded (HdfsParquetTableWriter::string_utf8_ is always set
+  // to true).
+  out->assign(v.ptr, v.len);
+}
+
+// Serialize Decimal4Value / Decimal8Value / Decimal16Value: values as unscaled,
+// two’s-complement big-endian binary, using the minimum number of bytes for the value.
+#define SERIALIZE_ICEBERG_DECIMAL_SINGLE_VALUE(DecimalValue)                            \
+template <>                                                                             \
+inline void ColumnStats<DecimalValue>::SerializeIcebergSingleValue(                     \
+    const DecimalValue& v, std::string* out) {                                          \
+  const auto big_endian_val = BitUtil::ToBigEndian(v.value());                          \
+  const uint8_t* first = reinterpret_cast<const uint8_t*>(&big_endian_val);             \
+  const uint8_t* last = first + sizeof(big_endian_val) - 1;                             \
+  if ((first[0] & 0x80) != 0) {                                                         \
+    for (; first < last && first[0] == 0xFF && (first[1] & 0x80) != 0; ++first) {       \
+    }                                                                                   \
+  } else {                                                                              \
+    for (; first < last && first[0] == 0x00 && (first[1] & 0x80) == 0; ++first) {       \
+    }                                                                                   \
+  }                                                                                     \
+  out->assign(reinterpret_cast<const char*>(first), last - first + 1);                  \
+}
+
+SERIALIZE_ICEBERG_DECIMAL_SINGLE_VALUE(Decimal4Value)
+SERIALIZE_ICEBERG_DECIMAL_SINGLE_VALUE(Decimal8Value)
+SERIALIZE_ICEBERG_DECIMAL_SINGLE_VALUE(Decimal16Value)
 
 } // end ns impala
 #endif

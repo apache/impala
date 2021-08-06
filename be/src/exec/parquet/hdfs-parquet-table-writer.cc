@@ -1673,9 +1673,19 @@ Status HdfsParquetTableWriter::WriteParquetBloomFilter(BaseColumnWriter* col_wri
   return Status::OK();
 }
 
+void HdfsParquetTableWriter::CollectIcebergDmlFileColumnStats(int field_id,
+    const BaseColumnWriter* col_writer) {
+  // Each data file consists of a single row group, so row group null_count / min / max
+  // stats can be used as data file stats.
+  // Get column_size from column writer.
+  col_writer->row_group_stats_base_->GetIcebergStats(col_writer->total_compressed_size(),
+      &iceberg_file_stats_[field_id]);
+}
+
 Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
   if (current_row_group_ == nullptr) return Status::OK();
 
+  const int num_clustering_cols = table_desc_->num_clustering_cols();
   for (int i = 0; i < columns_.size(); ++i) {
     int64_t data_page_offset, dict_page_offset;
     // Flush this column.  This updates the final metadata sizes for this column.
@@ -1700,6 +1710,14 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
     google::protobuf::Map<string,int64>* column_size_map =
         parquet_dml_stats_.mutable_per_column_size();
     (*column_size_map)[col_name] += col_writer->total_compressed_size();
+
+    if (is_iceberg_file_ ) {
+      const ColumnDescriptor& col_desc =
+          table_desc_->col_descs()[i + num_clustering_cols];
+      DCHECK_EQ(col_desc.name(), col_name);
+      const int field_id = col_desc.field_id();
+      if (field_id != -1) CollectIcebergDmlFileColumnStats(field_id, col_writer);
+    }
 
     // Write encodings and encoding stats for this column
     col_metadata.encodings.clear();

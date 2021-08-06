@@ -211,7 +211,8 @@ BIGINT
 aggregation(SUM, NumRowGroups): 4
 ====
 ---- QUERY
-# 'timestamp_col' is not a partitioning column.
+# 'timestamp_col' is not a partitioning column, but min/max stats will be used to
+# eliminate row groups
 select count(*) from alltypes_part
 where timestamp_col = now();
 ---- RESULTS
@@ -219,7 +220,7 @@ where timestamp_col = now();
 ---- TYPES
 BIGINT
 ---- RUNTIME_PROFILE
-aggregation(SUM, NumRowGroups): 8
+aggregation(SUM, NumRowGroups): 0
 ====
 ---- QUERY
 # Iceberg partitions independent of column order

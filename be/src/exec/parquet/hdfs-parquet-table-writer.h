@@ -156,6 +156,9 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   Status WriteParquetBloomFilter(BaseColumnWriter* col_writer,
       parquet::ColumnMetaData* meta_data) WARN_UNUSED_RESULT;
 
+  /// Add per-column statistics to 'iceberg_file_stats_' for the current data file.
+  void CollectIcebergDmlFileColumnStats(int field_id, const BaseColumnWriter* col_writer);
+
   /// Flushes the current row group to file.  This will compute the final
   /// offsets of column chunks, updating the file metadata.
   Status FlushCurrentRowGroup();

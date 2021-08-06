@@ -24,12 +24,14 @@
 
 #include "common/hdfs.h"
 #include "common/status.h"
+#include "exec/hdfs-table-writer.h"
 
 namespace impala {
 
 class DmlExecStatusPB;
 class DmlPartitionStatusPB;
 class DmlStatsPB;
+class DmlDataFileStatsPB;
 struct OutputPartition;
 class TDmlResult;
 class TFinalizeParams;
@@ -71,7 +73,9 @@ class DmlExecState {
       int64_t num_modified_rows_delta, const DmlStatsPB* insert_stats);
 
   /// Extract information from 'partition', and add a new Iceberg data file.
-  void AddCreatedFile(const OutputPartition& partition);
+  /// 'insert_stats' contains stats for the Iceberg data file.
+  void AddCreatedFile(const OutputPartition& partition, bool is_iceberg,
+      const IcebergFileStats& insert_stats);
 
   /// Used to initialize this state when execute Kudu DML. Must be called before
   /// SetKuduDmlStats().

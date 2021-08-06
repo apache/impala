@@ -463,8 +463,66 @@ void DmlExecState::UpdatePartition(const string& partition_name,
   MergeDmlStats(*insert_stats, entry->second.mutable_stats());
 }
 
-void DmlExecState::AddCreatedFile(const OutputPartition& partition) {
+namespace {
+flatbuffers::Offset<org::apache::impala::fb::FbIcebergColumnStats>
+createIcebergColumnStats(
+    flatbuffers::FlatBufferBuilder& fbb, int field_id,
+    const IcebergColumnStats& col_stats) {
   using namespace org::apache::impala::fb;
+
+  flatbuffers::Offset<flatbuffers::Vector<uint8_t>> lower_bound;
+  flatbuffers::Offset<flatbuffers::Vector<uint8_t>> upper_bound;
+  if (col_stats.has_min_max_values) {
+    const std::string& min_binary = col_stats.min_binary;
+    const uint8_t* data = reinterpret_cast<const uint8_t*>(min_binary.data());
+    lower_bound = fbb.CreateVector(data, min_binary.size());
+
+    const std::string& max_binary = col_stats.max_binary;
+    data = reinterpret_cast<const uint8_t*>(max_binary.data());
+    upper_bound = fbb.CreateVector(data, max_binary.size());
+  }
+
+  FbIcebergColumnStatsBuilder stats_builder(fbb);
+  stats_builder.add_field_id(field_id);
+
+  stats_builder.add_total_compressed_byte_size(col_stats.column_size);
+  stats_builder.add_null_count(col_stats.null_count);
+
+  if (col_stats.has_min_max_values) {
+    stats_builder.add_lower_bound(lower_bound);
+    stats_builder.add_upper_bound(upper_bound);
+  }
+
+  return stats_builder.Finish();
+}
+
+string createIcebergDataFileString(
+    const string& partition_name, const string& final_path, int64_t num_rows,
+    int64_t file_size, const IcebergFileStats& insert_stats) {
+  using namespace org::apache::impala::fb;
+  flatbuffers::FlatBufferBuilder fbb;
+
+  vector<flatbuffers::Offset<FbIcebergColumnStats>> ice_col_stats_vec;
+  for (auto it = insert_stats.cbegin(); it != insert_stats.cend(); ++it) {
+    ice_col_stats_vec.push_back(createIcebergColumnStats(fbb, it->first, it->second));
+  }
+
+  flatbuffers::Offset<FbIcebergDataFile> data_file = CreateFbIcebergDataFile(fbb,
+      fbb.CreateString(final_path),
+      // Currently we can only write Parquet to Iceberg
+      FbFileFormat::FbFileFormat_PARQUET,
+      num_rows,
+      file_size,
+      fbb.CreateString(partition_name),
+      fbb.CreateVector(ice_col_stats_vec));
+  fbb.Finish(data_file);
+  return string(reinterpret_cast<char*>(fbb.GetBufferPointer()), fbb.GetSize());
+}
+
+}
+
+void DmlExecState::AddCreatedFile(const OutputPartition& partition, bool is_iceberg,
+    const IcebergFileStats& insert_stats) {
   lock_guard<mutex> l(lock_);
   const string& partition_name = partition.partition_name;
   PartitionStatusMap::iterator entry = per_partition_status_.find(partition_name);
@@ -478,21 +536,11 @@ void DmlExecState::AddCreatedFile(const OutputPartition& partition) {
   }
   file->set_num_rows(partition.current_file_rows);
   file->set_size(partition.current_file_bytes);
-}
-
-string createIcebergDataFileString(
-    const string& partition_name, const DmlFileStatusPb& file) {
-  using namespace org::apache::impala::fb;
-  flatbuffers::FlatBufferBuilder fbb;
-  flatbuffers::Offset<FbIcebergDataFile> data_file = CreateFbIcebergDataFile(fbb,
-      fbb.CreateString(file.final_path()),
-      // Currently we can only write Parquet to Iceberg
-      FbFileFormat::FbFileFormat_PARQUET,
-      file.num_rows(),
-      file.size(),
-      fbb.CreateString(partition_name));
-  fbb.Finish(data_file);
-  return string(reinterpret_cast<char*>(fbb.GetBufferPointer()), fbb.GetSize());
+  if (is_iceberg) {
+    file->set_iceberg_data_file_fb(
+        createIcebergDataFileString(partition_name, file->final_path(), file->num_rows(),
+        file->size(), insert_stats));
+  }
 }
 
 vector<string> DmlExecState::CreateIcebergDataFilesVector() {
@@ -501,7 +549,9 @@ vector<string> DmlExecState::CreateIcebergDataFilesVector() {
   for (const PartitionStatusMap::value_type& partition : per_partition_status_) {
     for (int i = 0; i < partition.second.created_files_size(); ++i) {
       const DmlFileStatusPb& file = partition.second.created_files(i);
-      ret.emplace_back(createIcebergDataFileString(partition.first, file));
+      if (file.has_iceberg_data_file_fb()) {
+        ret.push_back(file.iceberg_data_file_fb());
+      }
     }
   }
   return ret;

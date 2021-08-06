@@ -28,13 +28,14 @@ import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.DeleteFiles;
-import org.apache.iceberg.UpdateSchema;
+import org.apache.iceberg.Metrics;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.ReplacePartitions;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
+import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.types.Types;
@@ -47,6 +48,7 @@ import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.iceberg.IcebergCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
+import org.apache.impala.fb.FbIcebergColumnStats;
 import org.apache.impala.fb.FbIcebergDataFile;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateTableParams;
@@ -273,9 +275,12 @@ public class IcebergCatalogOpExecutor {
     }
     for (ByteBuffer buf : dataFilesFb) {
       FbIcebergDataFile dataFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
+
       PartitionSpec partSpec = nativeIcebergTable.specs().get(icebergOp.getSpec_id());
+      Metrics metrics = buildDataFileMetrics(feIcebergTable, dataFile);
       DataFiles.Builder builder =
           DataFiles.builder(partSpec)
+          .withMetrics(metrics)
           .withPath(dataFile.path())
           .withFormat(IcebergUtil.fbFileFormatToIcebergFileFormat(dataFile.format()))
           .withRecordCount(dataFile.recordCount())
@@ -287,6 +292,32 @@ public class IcebergCatalogOpExecutor {
       batchWrite.addFile(builder.build());
     }
     batchWrite.commit();
+  }
+
+  private static Metrics buildDataFileMetrics(FeIcebergTable feIcebergTable,
+      FbIcebergDataFile dataFile) {
+    Map<Integer, Long> columnSizes = new HashMap<>();
+    Map<Integer, Long> nullValueCounts = new HashMap<>();
+    Map<Integer, ByteBuffer> lowerBounds = new HashMap<>();
+    Map<Integer, ByteBuffer> upperBounds = new HashMap<>();
+    for (int i = 0; i < dataFile.perColumnStatsLength(); ++i) {
+      FbIcebergColumnStats stats = dataFile.perColumnStats(i);
+      if (stats != null) {
+        int fieldId = stats.fieldId();
+        if (fieldId != -1) {
+          columnSizes.put(fieldId, stats.totalCompressedByteSize());
+          nullValueCounts.put(fieldId, stats.nullCount());
+          if (stats.lowerBoundLength() > 0) {
+            lowerBounds.put(fieldId, stats.lowerBoundAsByteBuffer());
+          }
+          if (stats.upperBoundLength() > 0) {
+            upperBounds.put(fieldId, stats.upperBoundAsByteBuffer());
+          }
+        }
+      }
+    }
+    return new Metrics(dataFile.recordCount(), columnSizes, null,
+        nullValueCounts, null, lowerBounds, upperBounds);
   }
 
   /**

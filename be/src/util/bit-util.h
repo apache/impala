@@ -204,6 +204,11 @@ class BitUtil {
 /// Converts to big endian format (if not already in big endian) from the
 /// machine's native endian format.
 #if __BYTE_ORDER == __LITTLE_ENDIAN
+  static inline __int128_t ToBigEndian(__int128_t value) {
+    __int128_t res = 0;
+    ByteSwap(&res, &value, sizeof(__int128_t));
+    return res;
+  }
   static inline int64_t ToBigEndian(int64_t value) { return ByteSwap(value); }
   static inline uint64_t ToBigEndian(uint64_t value) { return ByteSwap(value); }
   static inline int32_t ToBigEndian(int32_t value) { return ByteSwap(value); }
@@ -211,6 +216,7 @@ class BitUtil {
   static inline int16_t ToBigEndian(int16_t value) { return ByteSwap(value); }
   static inline uint16_t ToBigEndian(uint16_t value) { return ByteSwap(value); }
 #else
+  static inline __int128_t ToBigEndian(__int128_t val) { return val; }
   static inline int64_t ToBigEndian(int64_t val) { return val; }
   static inline uint64_t ToBigEndian(uint64_t val) { return val; }
   static inline int32_t ToBigEndian(int32_t val) { return val; }
@@ -221,6 +227,11 @@ class BitUtil {
 
 /// Converts from big endian format to the machine's native endian format.
 #if __BYTE_ORDER == __LITTLE_ENDIAN
+  static inline __int128_t FromBigEndian(__int128_t value) {
+    __int128_t res = 0;
+    ByteSwap(&res, &value, sizeof(__int128_t));
+    return res;
+  }
   static inline int64_t FromBigEndian(int64_t value) { return ByteSwap(value); }
   static inline uint64_t FromBigEndian(uint64_t value) { return ByteSwap(value); }
   static inline int32_t FromBigEndian(int32_t value) { return ByteSwap(value); }
@@ -228,6 +239,7 @@ class BitUtil {
   static inline int16_t FromBigEndian(int16_t value) { return ByteSwap(value); }
   static inline uint16_t FromBigEndian(uint16_t value) { return ByteSwap(value); }
 #else
+  static inline __int128_t FromBigEndian(__int128_t val) { return val; }
   static inline int64_t FromBigEndian(int64_t val) { return val; }
   static inline uint64_t FromBigEndian(uint64_t val) { return val; }
   static inline int32_t FromBigEndian(int32_t val) { return val; }

@@ -63,6 +63,10 @@ message DmlFileStatusPb {
   // TODO: this could be merged with final_path by storing only the suffix
   //       of the path and append it to a staging/final prefix from DmlPartitionStatusPB
   optional string staging_path = 4;
+
+  // Flat buffer encoded Iceberg data file (see FbIcebergDataFile). Contains metadata and
+  // stats for the iceberg file.
+  optional bytes iceberg_data_file_fb = 5;
 }
 
 // Per-partition statistics and metadata resulting from DML statements.

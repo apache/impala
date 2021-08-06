@@ -23,6 +23,10 @@ import time
 from subprocess import check_call
 from parquet.ttypes import ConvertedType
 
+from avro.datafile import DataFileReader
+from avro.io import DatumReader
+import json
+
 from tests.common.impala_test_suite import ImpalaTestSuite, LOG
 from tests.common.skip import SkipIf
 
@@ -263,3 +267,181 @@ class TestIcebergTable(ImpalaTestSuite):
     assert a_schema_element.converted_type == ConvertedType.UTF8
 
     os.remove(local_file)
+
+  # Get hdfs path to manifest list that belongs to the sanpshot identified by
+  # 'snapshot_counter'.
+  def get_manifest_list_hdfs_path(self, tmp_path_prefix, db_name, table_name,
+      snapshot_counter):
+    local_path = '%s_%s.metadata.json' % (tmp_path_prefix, random.randint(0, 10000))
+    hdfs_path = get_fs_path('/test-warehouse/%s.db/%s/metadata/%s*.metadata.json'
+        % (db_name, table_name, snapshot_counter))
+    check_call(['hadoop', 'fs', '-copyToLocal', hdfs_path, local_path])
+
+    manifest_list_hdfs_path = None
+    try:
+      with open(local_path, 'r') as fp:
+        metadata = json.load(fp)
+        current_snapshot_id = metadata['current-snapshot-id']
+        for snapshot in metadata['snapshots']:
+          if snapshot['snapshot-id'] == current_snapshot_id:
+            manifest_list_hdfs_path = snapshot['manifest-list']
+            break
+    finally:
+      os.remove(local_path)
+    return manifest_list_hdfs_path
+
+  # Get list of hdfs paths to manifest files from the manifest list avro file.
+  def get_manifest_hdfs_path_list(self, tmp_path_prefix, manifest_list_hdfs_path):
+    local_path = '%s_%s.manifest_list.avro' % (tmp_path_prefix, random.randint(0, 10000))
+    check_call(['hadoop', 'fs', '-copyToLocal', manifest_list_hdfs_path, local_path])
+
+    manifest_hdfs_path_list = []
+    reader = None
+    try:
+      with open(local_path, 'rb') as fp:
+        reader = DataFileReader(fp, DatumReader())
+        for manifest in reader:
+          manifest_hdfs_path_list.append(manifest['manifest_path'])
+    finally:
+      if reader:
+        reader.close()
+      os.remove(local_path)
+    return manifest_hdfs_path_list
+
+  # Get 'data_file' structs from avro manifest files.
+  def get_data_file_list(self, tmp_path_prefix, manifest_hdfs_path_list):
+    datafiles = []
+    for hdfs_path in manifest_hdfs_path_list:
+      local_path = '%s_%s.manifest.avro' % (tmp_path_prefix, random.randint(0, 10000))
+      check_call(['hadoop', 'fs', '-copyToLocal', hdfs_path, local_path])
+
+      reader = None
+      try:
+        with open(local_path, 'rb') as fp:
+          reader = DataFileReader(fp, DatumReader())
+          datafiles.extend([rec['data_file'] for rec in reader])
+      finally:
+        if reader:
+          reader.close()
+        os.remove(local_path)
+    return datafiles
+
+  @SkipIf.not_hdfs
+  def test_writing_metrics_to_metadata(self, vector, unique_database):
+    # Create table
+    table_name = "ice_stats"
+    qualified_table_name = "%s.%s" % (unique_database, table_name)
+    query = 'create table %s ' \
+        '(s string, i int, b boolean, bi bigint, ts timestamp, dt date, ' \
+        'dc decimal(10, 3)) ' \
+        'stored as iceberg' \
+        % qualified_table_name
+    self.client.execute(query)
+
+    # Insert data
+    # 1st data file:
+    query = 'insert into %s values ' \
+        '("abc", 3, true, NULL, "1970-01-03 09:11:22", NULL, 56.34), ' \
+        '("def", NULL, false, NULL, "1969-12-29 14:45:59", DATE"1969-01-01", -10.0), ' \
+        '("ghij", 1, NULL, 123456789000000, "1970-01-01", DATE"1970-12-31", NULL), ' \
+        '(NULL, 0, NULL, 234567890000001, NULL, DATE"1971-01-01", NULL)' \
+        % qualified_table_name
+    self.execute_query(query)
+    # 2nd data file:
+    query = 'insert into %s values ' \
+        '(NULL, NULL, NULL, NULL, NULL, NULL, NULL), ' \
+        '(NULL, NULL, NULL, NULL, NULL, NULL, NULL)' \
+        % qualified_table_name
+    self.execute_query(query)
+
+    # Get hdfs path to manifest list file
+    manifest_list_hdfs_path = self.get_manifest_list_hdfs_path(
+        '/tmp/iceberg_metrics_test', unique_database, table_name, '00002')
+
+    # Get the list of hdfs paths to manifest files
+    assert manifest_list_hdfs_path is not None
+    manifest_hdfs_path_list = self.get_manifest_hdfs_path_list(
+        '/tmp/iceberg_metrics_test', manifest_list_hdfs_path)
+
+    # Get 'data_file' records from manifest files.
+    assert manifest_hdfs_path_list is not None and len(manifest_hdfs_path_list) > 0
+    datafiles = self.get_data_file_list('/tmp/iceberg_metrics_test',
+        manifest_hdfs_path_list)
+
+    # Check column stats in datafiles
+    assert datafiles is not None and len(datafiles) == 2
+
+    # The 1st datafile contains the 2 NULL rows
+    assert datafiles[0]['record_count'] == 2
+    assert datafiles[0]['column_sizes'] == \
+        [{'key': 1, 'value': 39},
+         {'key': 2, 'value': 39},
+         {'key': 3, 'value': 25},
+         {'key': 4, 'value': 39},
+         {'key': 5, 'value': 39},
+         {'key': 6, 'value': 39},
+         {'key': 7, 'value': 39}]
+    assert datafiles[0]['null_value_counts'] == \
+        [{'key': 1, 'value': 2},
+         {'key': 2, 'value': 2},
+         {'key': 3, 'value': 2},
+         {'key': 4, 'value': 2},
+         {'key': 5, 'value': 2},
+         {'key': 6, 'value': 2},
+         {'key': 7, 'value': 2}]
+    # Upper/lower bounds should be empty lists
+    assert datafiles[0]['lower_bounds'] == []
+    assert datafiles[0]['upper_bounds'] == []
+
+    # 2nd datafile
+    assert datafiles[1]['record_count'] == 4
+    assert datafiles[1]['column_sizes'] == \
+        [{'key': 1, 'value': 66},
+         {'key': 2, 'value': 56},
+         {'key': 3, 'value': 26},
+         {'key': 4, 'value': 59},
+         {'key': 5, 'value': 68},
+         {'key': 6, 'value': 56},
+         {'key': 7, 'value': 53}]
+    assert datafiles[1]['null_value_counts'] == \
+        [{'key': 1, 'value': 1},
+         {'key': 2, 'value': 1},
+         {'key': 3, 'value': 2},
+         {'key': 4, 'value': 2},
+         {'key': 5, 'value': 1},
+         {'key': 6, 'value': 1},
+         {'key': 7, 'value': 2}]
+    assert datafiles[1]['lower_bounds'] == \
+        [{'key': 1, 'value': 'abc'},
+         # INT is serialized as 4-byte little endian
+         {'key': 2, 'value': '\x00\x00\x00\x00'},
+         # BOOLEAN is serialized as 0x00 for FALSE
+         {'key': 3, 'value': '\x00'},
+         # BIGINT is serialized as 8-byte little endian
+         {'key': 4, 'value': '\x40\xaf\x0d\x86\x48\x70\x00\x00'},
+         # TIMESTAMP is serialized as 8-byte little endian (number of microseconds since
+         # 1970-01-01 00:00:00)
+         {'key': 5, 'value': '\xc0\xd7\xff\x06\xd0\xff\xff\xff'},
+         # DATE is serialized as 4-byte little endian (number of days since 1970-01-01)
+         {'key': 6, 'value': '\x93\xfe\xff\xff'},
+         # Unlike other numerical values, DECIMAL is serialized as big-endian.
+         {'key': 7, 'value': '\xd8\xf0'}]
+    assert datafiles[1]['upper_bounds'] == \
+        [{'key': 1, 'value': 'ghij'},
+         # INT is serialized as 4-byte little endian
+         {'key': 2, 'value': '\x03\x00\x00\x00'},
+         # BOOLEAN is serialized as 0x01 for TRUE
+         {'key': 3, 'value': '\x01'},
+         # BIGINT is serialized as 8-byte little endian
+         {'key': 4, 'value': '\x81\x58\xc2\x97\x56\xd5\x00\x00'},
+         # TIMESTAMP is serialized as 8-byte little endian (number of microseconds since
+         # 1970-01-01 00:00:00)
+         {'key': 5, 'value': '\x80\x02\x86\xef\x2f\x00\x00\x00'},
+         # DATE is serialized as 4-byte little endian (number of days since 1970-01-01)
+         {'key': 6, 'value': '\x6d\x01\x00\x00'},
+         # Unlike other numerical values, DECIMAL is serialized as big-endian.
+         {'key': 7, 'value': '\x00\xdc\x14'}]
+
+  def test_using_upper_lower_bound_metrics(self, vector, unique_database):
+    self.run_test_case('QueryTest/iceberg-upper-lower-bound-metrics', vector,
+        use_db=unique_database)

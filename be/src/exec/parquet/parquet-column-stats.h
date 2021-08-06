@@ -21,6 +21,7 @@
 #include <string>
 #include <type_traits>
 
+#include "exec/hdfs-table-writer.h"
 #include "exec/parquet/parquet-common.h"
 #include "runtime/date-value.h"
 #include "runtime/decimal-value.h"
@@ -111,6 +112,10 @@ class ColumnStatsBase {
 
   /// Encodes the current values into a Statistics thrift message.
   virtual void EncodeToThrift(parquet::Statistics* out) const = 0;
+
+  /// Writes the current values into IcebergColumnStats struct.
+  /// Min and max stats are Single-value serialized.
+  virtual void GetIcebergStats(int64_t column_size, IcebergColumnStats* out) const = 0;
 
   /// Resets the state of this object.
   void Reset();
@@ -203,6 +208,9 @@ class ColumnStats : public ColumnStatsBase {
   virtual int64_t BytesNeeded() const override;
   virtual void EncodeToThrift(parquet::Statistics* out) const override;
 
+  virtual void GetIcebergStats(int64_t column_size,
+      IcebergColumnStats* out) const override;
+
   /// Decodes the plain encoded stats value from 'buffer' and writes the result into the
   /// buffer pointed to by 'slot'. Returns true if decoding was successful, false
   /// otherwise. For timestamps and dates an additional validation will be performed.
@@ -210,10 +218,17 @@ class ColumnStats : public ColumnStatsBase {
       parquet::Type::type parquet_type);
 
  protected:
+  /// For BE tests.
+  FRIEND_TEST(SerializeSingleValueTest, Decimal);
+
   /// Encodes a single value using parquet's plain encoding and stores it into the binary
   /// string 'out'. String values are stored without additional encoding. 'bytes_needed'
   /// must be positive.
   static void EncodePlainValue(const T& v, int64_t bytes_needed, std::string* out);
+
+  /// Single-value serialize value 'v'.
+  /// https://iceberg.apache.org/spec/#appendix-d-single-value-serialization
+  static void SerializeIcebergSingleValue(const T& v, std::string* out);
 
   /// Returns the number of bytes needed to encode value 'v'.
   int64_t BytesNeeded(const T& v) const;

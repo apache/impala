@@ -20,7 +20,7 @@
 #define IMPALA_EXEC_HDFS_TABLE_WRITER_H
 
 #include <vector>
-#include <hdfs.h>
+#include "common/hdfs.h"
 
 #include "common/status.h"
 #include "gen-cpp/control_service.pb.h"
@@ -34,6 +34,20 @@ struct OutputPartition;
 class RowBatch;
 class RuntimeState;
 class ScalarExprEvaluator;
+
+/// Per column statistics to be written to Iceberg manifest files (for each data file).
+/// min_binary and max_binary members contain Single-Value serialized lower and upper
+/// column stats
+/// (https://iceberg.apache.org/spec/#appendix-d-single-value-serialization).
+struct IcebergColumnStats {
+  bool has_min_max_values;
+  std::string min_binary;
+  std::string max_binary;
+  int64_t null_count;
+  int64_t column_size;
+};
+
+typedef std::unordered_map<int, IcebergColumnStats> IcebergFileStats;
 
 /// Pure virtual class for writing to hdfs table partition files.
 /// Subclasses implement the code needed to write to a specific file type.
@@ -90,6 +104,9 @@ class HdfsTableWriter {
   /// Returns the stats for this writer.
   const DmlStatsPB& stats() const { return stats_; }
 
+  /// Returns the stats for the latest iceberg file written by this writer.
+  const IcebergFileStats& iceberg_file_stats() const { return iceberg_file_stats_; }
+
   /// Default block size to use for this file format.  If the file format doesn't
   /// care, it should return 0 and the hdfs config default will be used.
   virtual uint64_t default_block_size() const = 0;
@@ -134,6 +151,10 @@ class HdfsTableWriter {
 
   /// Subclass should populate any file format specific stats.
   DmlStatsPB stats_;
+
+  /// Contains the per-column stats for the latest file written by this writer.
+  /// Used with iceberg only.
+  IcebergFileStats iceberg_file_stats_;
 };
 }
 #endif

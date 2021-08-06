@@ -106,7 +106,7 @@ where i = 2;
 INT,STRING,DATE,TIMESTAMP
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 1
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -142,7 +142,7 @@ where t = '2021-01-03 03:03:03.030000000';
 INT,STRING,DATE,TIMESTAMP
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 1
-aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # Test single col TRUNCATE
@@ -269,7 +269,7 @@ where s = 'the quick brown fox jumps over the lazy dog';
 INT,BIGINT,DECIMAL,STRING
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 2
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 2
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -280,7 +280,7 @@ where s = 'the quick impala';
 INT,BIGINT,DECIMAL,STRING
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 0
-aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, NumRowGroups): 0
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -402,7 +402,7 @@ where t = '1969-02-15 13:55:03';
 TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 2
-aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -452,7 +452,7 @@ where d = '1969-12-15';
 TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 2
-aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # Create table with MONTH partition transform
@@ -560,7 +560,7 @@ where d = '1969-12-15';
 TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 1
-aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # Create table with DAY partition transform
@@ -739,7 +739,7 @@ where t = '1969-12-31 22:55:03';
 TIMESTAMP
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 1
-aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -751,7 +751,7 @@ where t = '1969-12-31 23:55:03';
 TIMESTAMP
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 2
-aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.
@@ -827,7 +827,7 @@ where s = 'quick brown dog';
 STRING,BIGINT,DECIMAL,TIMESTAMP,DATE
 ---- RUNTIME_PROFILE
 aggregation(SUM, RowsRead): 1
-aggregation(SUM, NumRowGroups): 3
+aggregation(SUM, NumRowGroups): 1
 ====
 ---- QUERY
 # Test partition pruning with RUNTIME_PROFILE.

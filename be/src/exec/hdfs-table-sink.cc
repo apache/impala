@@ -735,7 +735,8 @@ Status HdfsTableSink::FinalizePartitionFile(
     state->dml_exec_state()->UpdatePartition(
         partition->partition_name, partition->current_file_rows,
         &partition->writer->stats());
-    state->dml_exec_state()->AddCreatedFile(*partition);
+    state->dml_exec_state()->AddCreatedFile(*partition, IsIceberg(),
+        partition->writer->iceberg_file_stats());
   }
 
   RETURN_IF_ERROR(ClosePartitionFile(state, partition));

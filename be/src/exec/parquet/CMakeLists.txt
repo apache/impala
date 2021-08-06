@@ -48,6 +48,7 @@ add_library(ParquetTests STATIC
   parquet-page-index-test.cc
   parquet-plain-test.cc
   parquet-version-test.cc
+  serialize-single-value-test.cc
 )
 add_dependencies(ParquetTests gen-deps)
 
@@ -57,4 +58,5 @@ ADD_UNIFIED_BE_LSAN_TEST(parquet-page-index-test ParquetPageIndex.*)
 ADD_UNIFIED_BE_LSAN_TEST(parquet-plain-test PlainEncoding.*)
 ADD_UNIFIED_BE_LSAN_TEST(parquet-version-test ParquetVersionTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(hdfs-parquet-scanner-test HdfsParquetScannerTest.*)
+ADD_UNIFIED_BE_LSAN_TEST(serialize-single-value-test SerializeSingleValueTest.*)
 

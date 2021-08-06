@@ -1,0 +1,500 @@
+====
+---- QUERY
+# Test STRING/INT/BIGINT/FLOAT/DOUBLE metrics
+create table ice_types1 (p INT, s STRING, i INT, bi BIGINT, f FLOAT, db DOUBLE)
+partitioned by spec (p)
+stored as iceberg
+tblproperties ('write.format.default'='parquet');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_types1 values
+    (0, 'aluminium', 1, 1, 0.126, 0.126), (0, 'bromine',  2, 2, 0.131, 0.131), (0, 'carbon', 3, 3, 3.45, 3.45),
+    (1, 'dubnium', 4, 4, 3.567, 3.567), (1, 'europium', 5, 5, 3.99, 3.99), (1, 'fermium', 6, 6, 4.01, 4.01),
+    (2, 'fermium', 6, 6, 4.01, 4.01), (2, 'helium', 8, 8, 4.65, 4.65), (2, 'iridium', 9, 9, 4.67, 4.67);
+select count(*) from ice_types1;
+---- RESULTS
+9
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+show files in ice_types1;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types1/data/p=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types1/data/p=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types1/data/p=2/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Lower/upper bounds metrics eliminate all row groups
+select count(*) from ice_types1
+where s >= 'z';
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Where condition matches one row group's metrics
+select count(*) from ice_types1
+where s >= 'b' and s <= 'cz';
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 3
+====
+---- QUERY
+# Where condition spans over 2 row groups
+select count(*) from ice_types1
+where s >= 'b' and s <= 'dz';
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# 'fermium' is the upper bound of one row group and the lower bound of another
+select count(*) from ice_types1
+where s = 'fermium';
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# Lower/upper bounds metrics eliminate all row groups
+select count(*) from ice_types1
+where i >= 10;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Where condition matches one row group's metrics
+select count(*) from ice_types1
+where i >= 2 and i <= 3;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 3
+====
+---- QUERY
+# Where condition spans over 2 row groups
+select count(*) from ice_types1
+where i >= 2 and i <= 4;
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# 6 is the upper bound of one row group and the lower bound of another
+select count(*) from ice_types1
+where i = 6;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# Lower/upper bounds metrics eliminate all row groups
+select count(*) from ice_types1
+where bi >= 10;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Where condition matches one row group's metrics
+select count(*) from ice_types1
+where bi >= 2 and bi <= 3;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 3
+====
+---- QUERY
+# Where condition spans over 2 row groups
+select count(*) from ice_types1
+where bi >= 2 and bi <= 4;
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# 6 is the upper bound of one row group and the lower bound of another
+select count(*) from ice_types1
+where bi = 6;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# Lower/upper bounds metrics eliminate all row groups
+select count(*) from ice_types1
+where f >= 5.0;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Where condition matches one row group's metrics
+select count(*) from ice_types1
+where f >= 0.13 and f <= 3.451;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 3
+====
+---- QUERY
+# Where condition spans over 2 row groups
+select count(*) from ice_types1
+where f >= 0.13 and f <= 3.57;
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# 4.01 is the upper bound of one row group and the lower bound of another
+select count(*) from ice_types1
+where f = 4.01;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# Lower/upper bounds metrics eliminate all row groups
+select count(*) from ice_types1
+where db >= 5.0;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Where condition matches one row group's metrics
+select count(*) from ice_types1
+where db >= 0.13 and db <= 3.451;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 3
+====
+---- QUERY
+# Where condition spans over 2 row groups
+select count(*) from ice_types1
+where db >= 0.13 and db <= 3.57;
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# 4.01 is the upper bound of one row group and the lower bound of another
+select count(*) from ice_types1
+where db = 4.01;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# Test DATE/TIMESTAMP metrics
+create table ice_types2 (p INT, dt DATE, ts TIMESTAMP)
+partitioned by spec (p)
+stored as iceberg
+tblproperties ('write.format.default'='parquet');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_types2 values
+    (0, DATE'1400-01-01', '1400-01-01 00:00:00'), (0, DATE'1969-12-31', '1969-12-31 12:34:59'), (0, DATE'1970-01-01', '1969-12-31 12:35:00 '),
+    (1, DATE'1970-01-02', '1969-12-31 12:35:01'), (1, DATE'1999-12-30', '1999-12-30 01:11:35'), (1, DATE'1999-12-31', '1999-12-31 23:59:59'),
+    (2, DATE'1999-12-31', '1999-12-31 23:59:59'), (2, DATE'9999-12-30', '9999-12-30 00:23:42'), (2, DATE'9999-12-30', '9999-12-31 03:04:05');
+select count(*) from ice_types2;
+---- RESULTS
+9
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+show files in ice_types2;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types2/data/p=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types2/data/p=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types2/data/p=2/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Lower/upper bounds metrics eliminate all row groups
+select count(*) from ice_types2
+where dt >= DATE'9999-12-31';
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Where condition matches one row group's metrics
+select count(*) from ice_types2
+where dt >= DATE'1969-12-31' and dt <= DATE'1970-01-01';
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 3
+====
+---- QUERY
+# Where condition spans over 2 row groups
+select count(*) from ice_types2
+where dt >= DATE'1969-12-31' and dt <= DATE'1970-01-02';
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# 1999-12-31 is the upper bound of one row group and the lower bound of another
+select count(*) from ice_types2
+where dt = DATE'1999-12-31';
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# Lower/upper bounds metrics eliminate all row groups
+select count(*) from ice_types2
+where ts >= '9999-12-31 03:04:06';
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Where condition matches one row group's metrics
+select count(*) from ice_types2
+where dt >= '1969-12-31 12:34:59' and ts <= '1969-12-31 12:35:00';
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 3
+====
+---- QUERY
+# Where condition spans over 2 row groups
+select count(*) from ice_types2
+where ts >= '1969-12-31 12:34:59' and ts <= '1969-12-31 12:35:01';
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# '1999-12-31 23:59:59' is the upper bound of one row group and the lower bound of another
+select count(*) from ice_types2
+where ts = '1999-12-31 23:59:59';
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# Test DECIMAL metrics
+create table ice_types3 (p INT, d1 DECIMAL(9, 3), d2 DECIMAL(18, 3), d3 DECIMAL(38, 3))
+partitioned by spec (p)
+stored as iceberg
+tblproperties ('write.format.default'='parquet');
+---- RESULTS
+'Table has been created.'
+====
+---- QUERY
+insert into ice_types3 values
+    (0, 123.456, 1234567890.123, 1234567890123456789.012),
+    (0, 123.457, 1234567890.124, 1234567890123456789.013),
+    (0, 123.458, 1234567890.125, 1234567890123456789.014),
+    (1, 123.459, 1234567890.126, 1234567890123456789.015),
+    (1, 333.333, 3333333333.333, 3333333333333333333.333),
+    (1, 341.234, 3412345678.901, 3412345678901234567.89),
+    (2, 341.234, 3412345678.901, 3412345678901234567.89),
+    (2, 123456.789, 123456789012345.678, 12345678901234567890123456789012345.678),
+    (2, 123456.790, 123456789012345.679, 12345678901234567890123456789012345.68);
+select count(*) from ice_types3;
+---- RESULTS
+9
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 3
+====
+---- QUERY
+show files in ice_types3;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types3/data/p=0/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types3/data/p=1/.*.0.parq','.*',''
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/ice_types3/data/p=2/.*.0.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Lower/upper bounds metrics eliminate all row groups
+select count(*) from ice_types3
+where d1 >= 123456.791;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Where condition matches one row group's metrics
+select count(*) from ice_types3
+where d1 >= 123.457 and d1 <= 123.458;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 3
+====
+---- QUERY
+# Where condition spans over 2 row groups
+select count(*) from ice_types3
+where d1 >= 123.457 and d1 <= 123.459;
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# 341.234 is the upper bound of one row group and the lower bound of another
+select count(*) from ice_types3
+where d1 = 341.234;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# Lower/upper bounds metrics eliminate all row groups
+select count(*) from ice_types3
+where d2 >= 123456789012345.680;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Where condition matches one row group's metrics
+select count(*) from ice_types3
+where d2 >= 1234567890.124 and d2 <= 1234567890.125;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 3
+====
+---- QUERY
+# Where condition spans over 2 row groups
+select count(*) from ice_types3
+where d2 >= 1234567890.124 and d2 <= 1234567890.126;
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# 3412345678.901 is the upper bound of one row group and the lower bound of another
+select count(*) from ice_types3
+where d2 = 3412345678.901;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# Lower/upper bounds metrics eliminate all row groups
+select count(*) from ice_types3
+where d3 >= 12345678901234567890123456789012345.681;
+---- RESULTS
+0
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 0
+aggregation(SUM, RowsRead): 0
+====
+---- QUERY
+# Where condition matches one row group's metrics
+select count(*) from ice_types3
+where d3 >= 1234567890123456789.013 and d3 <= 1234567890123456789.014;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 1
+aggregation(SUM, RowsRead): 3
+====
+---- QUERY
+# Where condition spans over 2 row groups
+select count(*) from ice_types3
+where d3 >= 1234567890123456789.013 and d3 <= 1234567890123456789.015;
+---- RESULTS
+3
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
+---- QUERY
+# 3412345678901234567.89 is the upper bound of one row group and the lower bound of another
+select count(*) from ice_types3
+where d3 = 3412345678901234567.89;
+---- RESULTS
+2
+---- RUNTIME_PROFILE
+aggregation(SUM, NumRowGroups): 2
+aggregation(SUM, RowsRead): 6
+====
