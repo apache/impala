@@ -420,9 +420,9 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     CLEAN_EXIT_WITH_ERROR(error_msg.str());
   }
 
-  if (external_fe) {
-    // Explicitly load the timezone database for external FEs. Impala daemons load it
-    // through ImpaladMain
+  if (external_fe || test_mode == TestInfo::FE_TEST) {
+    // Explicitly load the timezone database for external FEs and FE tests.
+    // Impala daemons load it through ImpaladMain
     ABORT_IF_ERROR(TimezoneDatabase::Initialize());
   }
 }

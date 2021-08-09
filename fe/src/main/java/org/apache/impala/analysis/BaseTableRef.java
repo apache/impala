@@ -66,6 +66,7 @@ public class BaseTableRef extends TableRef {
     isAnalyzed_ = true;
     analyzer.checkTableCapability(getTable(), Analyzer.OperationType.ANY);
     analyzeTableSample(analyzer);
+    analyzeTimeTravel(analyzer);
     analyzeHints(analyzer);
     analyzeJoin(analyzer);
     analyzeSkipHeaderLineCount();
@@ -78,10 +79,13 @@ public class BaseTableRef extends TableRef {
     String aliasSql = "";
     String alias = getExplicitAlias();
     if (alias != null) aliasSql = " " + ToSqlUtils.getIdentSql(alias);
+    String timeTravelSql = "";
+    if (timeTravelSpec_ != null) timeTravelSql = " " + timeTravelSpec_.toSql();
     String tableSampleSql = "";
     if (sampleParams_ != null) tableSampleSql = " " + sampleParams_.toSql(options);
     String tableHintsSql = ToSqlUtils.getPlanHintsSql(options, tableHints_);
-    return getTable().getTableName().toSql() + aliasSql + tableSampleSql + tableHintsSql;
+    return getTable().getTableName().toSql() +
+        timeTravelSql + aliasSql + tableSampleSql + tableHintsSql;
   }
 
   @Override

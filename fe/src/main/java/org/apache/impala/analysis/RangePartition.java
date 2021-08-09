@@ -28,6 +28,7 @@ import org.apache.impala.common.InternalException;
 import org.apache.impala.common.Pair;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TRangePartition;
+import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.KuduUtil;
 
 import com.google.common.base.Preconditions;
@@ -210,7 +211,7 @@ public class RangePartition extends StmtNode {
     // TODO: Remove when Impala supports a 64-bit TIMESTAMP type.
     if (colType.isTimestamp()) {
       try {
-        long unixTimeMicros = KuduUtil.timestampToUnixTimeMicros(analyzer, literal);
+        long unixTimeMicros = ExprUtil.utcTimestampToUnixTimeMicros(analyzer, literal);
         literal = new NumericLiteral(BigInteger.valueOf(unixTimeMicros), Type.BIGINT);
       } catch (InternalException e) {
         throw new AnalysisException(

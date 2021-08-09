@@ -256,23 +256,6 @@ public class KuduUtil {
     }
   }
 
-  public static long timestampToUnixTimeMicros(Analyzer analyzer, Expr timestampExpr)
-      throws AnalysisException, InternalException {
-    Preconditions.checkArgument(timestampExpr.isAnalyzed());
-    Preconditions.checkArgument(timestampExpr.isConstant());
-    Preconditions.checkArgument(timestampExpr.getType() == Type.TIMESTAMP);
-    Expr toUnixTimeExpr = new FunctionCallExpr("utc_to_unix_micros",
-        Lists.newArrayList(timestampExpr));
-    toUnixTimeExpr.analyze(analyzer);
-    TColumnValue result = FeSupport.EvalExprWithoutRow(toUnixTimeExpr,
-        analyzer.getQueryCtx());
-    if (!result.isSetLong_val()) {
-      throw new InternalException("Error converting timestamp expression: " +
-          timestampExpr.debugString());
-    }
-    return result.getLong_val();
-  }
-
   public static Encoding fromThrift(TColumnEncoding encoding)
       throws ImpalaRuntimeException {
     switch (encoding) {

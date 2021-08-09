@@ -40,6 +40,7 @@ import org.apache.impala.analysis.AlterTableAddDropRangePartitionStmt.Operation;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionTransform;
+import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.catalog.ArrayType;
 import org.apache.impala.catalog.MapType;
 import org.apache.impala.catalog.RowFormat;
@@ -299,7 +300,8 @@ terminal
   KW_IS, KW_JOIN, KW_JSONFILE, KW_KUDU, KW_LAST, KW_LEFT, KW_LEXICAL, KW_LIKE, KW_LIMIT, KW_LINES,
   KW_LOAD, KW_LOCATION, KW_LOGICAL_OR,
   KW_MANAGED_LOCATION, KW_MAP, KW_MERGE_FN, KW_METADATA, KW_MINUS, KW_NORELY, KW_NOT,
-  KW_NOVALIDATE, KW_NULL, KW_NULLS, KW_OFFSET, KW_ON, KW_OR, KW_ORC, KW_ORDER, KW_OUTER,
+  KW_NOVALIDATE, KW_NULL, KW_NULLS, KW_OF, KW_OFFSET, KW_ON, KW_OR,
+  KW_ORC, KW_ORDER, KW_OUTER,
   KW_OVER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED,
   KW_PARTITIONS, KW_PRECEDING, KW_PREPARE_FN, KW_PRIMARY, KW_PRODUCED, KW_PURGE,
   KW_RANGE, KW_RCFILE, KW_RECOVER, KW_REFERENCES, KW_REFRESH, KW_REGEXP, KW_RELY,
@@ -307,8 +309,8 @@ terminal
   KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROLLUP, KW_ROW, KW_ROWS, KW_SCHEMA,
   KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES, KW_SERIALIZE_FN,
   KW_SET, KW_SHOW, KW_SMALLINT, KW_SETS, KW_SORT, KW_SPEC, KW_STORED, KW_STRAIGHT_JOIN,
-  KW_STRING,
-  KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES,
+  KW_STRING, KW_STRUCT, KW_SYMBOL, KW_SYSTEM_TIME, KW_SYSTEM_VERSION,
+  KW_TABLE, KW_TABLES, KW_TABLESAMPLE, KW_TBLPROPERTIES,
   KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP, KW_TINYINT, KW_TRUNCATE, KW_STATS,
   KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED, KW_UNION, KW_UNKNOWN, KW_UNSET, KW_UPDATE,
   KW_UPDATE_FN, KW_UPSERT, KW_USE, KW_USING, KW_VALIDATE, KW_VALUES, KW_VARCHAR, KW_VIEW,
@@ -422,6 +424,7 @@ nonterminal WithClause opt_with_clause;
 nonterminal List<View> with_view_def_list;
 nonterminal View with_view_def;
 nonterminal TableRef table_ref;
+nonterminal TimeTravelSpec opt_asof;
 nonterminal Subquery subquery;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
@@ -3054,12 +3057,31 @@ table_ref_list ::=
   ;
 
 table_ref ::=
-  dotted_path:path opt_tablesample:tblsmpl
-  {: RESULT = new TableRef(path, null, tblsmpl); :}
-  | dotted_path:path alias_clause:alias opt_tablesample:tblsmpl
-  {: RESULT = new TableRef(path, alias, tblsmpl); :}
+  dotted_path:path opt_asof:asof opt_tablesample:tblsmpl
+  {: RESULT = new TableRef(path, null, tblsmpl, asof); :}
+  | dotted_path:path opt_asof:asof alias_clause:alias opt_tablesample:tblsmpl
+  {: RESULT = new TableRef(path, alias, tblsmpl, asof); :}
   | LPAREN query_stmt:query RPAREN alias_clause:alias opt_tablesample:tblsmpl
   {: RESULT = new InlineViewRef(alias, query, tblsmpl); :}
+  ;
+
+opt_asof ::=
+  KW_FOR KW_SYSTEM_TIME KW_AS KW_OF expr:expr
+  {: RESULT = new TimeTravelSpec(TimeTravelSpec.Kind.TIME_AS_OF, expr); :}
+  | KW_FOR KW_SYSTEM_VERSION KW_AS KW_OF numeric_literal:expr
+  {: RESULT = new TimeTravelSpec(TimeTravelSpec.Kind.VERSION_AS_OF, expr); :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+opt_tablesample ::=
+  KW_TABLESAMPLE system_ident LPAREN INTEGER_LITERAL:p RPAREN
+  {: RESULT = new TableSampleClause(p.longValue(), null); :}
+  | KW_TABLESAMPLE system_ident LPAREN INTEGER_LITERAL:p RPAREN
+    KW_REPEATABLE LPAREN INTEGER_LITERAL:s RPAREN
+  {: RESULT = new TableSampleClause(p.longValue(), Long.valueOf(s.longValue())); :}
+  | /* empty */
+  {: RESULT = null; :}
   ;
 
 join_operator ::=
@@ -3140,16 +3162,6 @@ plan_hint_list ::=
     if (hint != null) hints.add(hint);
     RESULT = hints;
   :}
-  ;
-
-opt_tablesample ::=
-  KW_TABLESAMPLE system_ident LPAREN INTEGER_LITERAL:p RPAREN
-  {: RESULT = new TableSampleClause(p.longValue(), null); :}
-  | KW_TABLESAMPLE system_ident LPAREN INTEGER_LITERAL:p RPAREN
-    KW_REPEATABLE LPAREN INTEGER_LITERAL:s RPAREN
-  {: RESULT = new TableSampleClause(p.longValue(), Long.valueOf(s.longValue())); :}
-  | /* empty */
-  {: RESULT = null; :}
   ;
 
 ident_list ::=
@@ -4134,6 +4146,8 @@ word ::=
   {: RESULT = r.toString(); :}
   | KW_NULLS:r
   {: RESULT = r.toString(); :}
+  | KW_OF:r
+  {: RESULT = r.toString(); :}
   | KW_OFFSET:r
   {: RESULT = r.toString(); :}
   | KW_ON:r
@@ -4247,6 +4261,10 @@ word ::=
   | KW_STRUCT:r
   {: RESULT = r.toString(); :}
   | KW_SYMBOL:r
+  {: RESULT = r.toString(); :}
+  | KW_SYSTEM_TIME:r
+  {: RESULT = r.toString(); :}
+  | KW_SYSTEM_VERSION:r
   {: RESULT = r.toString(); :}
   | KW_TABLE:r
   {: RESULT = r.toString(); :}

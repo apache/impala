@@ -62,6 +62,8 @@ import org.apache.iceberg.types.Types;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.IcebergPartitionTransform;
+import org.apache.impala.analysis.TimeTravelSpec;
+import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.HdfsFileFormat;
@@ -506,10 +508,11 @@ public class IcebergUtil {
    * Get iceberg data file by file system table location and iceberg predicates
    */
   public static List<DataFile> getIcebergDataFiles(FeIcebergTable table,
-      List<UnboundPredicate> predicates) throws TableLoadingException {
+      List<UnboundPredicate> predicates, TimeTravelSpec timeTravelSpec)
+        throws TableLoadingException {
     if (table.snapshotId() == -1) return Collections.emptyList();
-    BaseTable baseTable =  (BaseTable)IcebergUtil.loadTable(table);
-    TableScan scan = baseTable.newScan().useSnapshot(table.snapshotId());
+
+    TableScan scan = createScanAsOf(table, timeTravelSpec);
     for (UnboundPredicate predicate : predicates) {
       scan = scan.filter(predicate);
     }
@@ -519,6 +522,23 @@ public class IcebergUtil {
       dataFileList.add(task.file());
     }
     return dataFileList;
+  }
+
+  private static TableScan createScanAsOf(FeIcebergTable table,
+      TimeTravelSpec timeTravelSpec) throws TableLoadingException {
+    BaseTable baseTable = (BaseTable)IcebergUtil.loadTable(table);
+    TableScan scan = baseTable.newScan();
+    if (timeTravelSpec == null) {
+      scan = scan.useSnapshot(table.snapshotId());
+    } else {
+      if (timeTravelSpec.getKind() == Kind.TIME_AS_OF) {
+        scan = scan.asOfTime(timeTravelSpec.getAsOfMillis());
+      } else {
+        Preconditions.checkState(timeTravelSpec.getKind() == Kind.VERSION_AS_OF);
+        scan = scan.useSnapshot(timeTravelSpec.getAsOfVersion());
+      }
+    }
+    return scan;
   }
 
   /**

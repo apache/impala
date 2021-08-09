@@ -32,6 +32,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TColumn;
+import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.MetaStoreUtil;
 import org.apache.kudu.ColumnSchema.CompressionAlgorithm;
@@ -302,7 +303,7 @@ public class ColumnDef {
       // TODO: Remove when Impala supports a 64-bit TIMESTAMP type.
       if (type_.isTimestamp()) {
         try {
-          long unixTimeMicros = KuduUtil.timestampToUnixTimeMicros(analyzer,
+          long unixTimeMicros = ExprUtil.utcTimestampToUnixTimeMicros(analyzer,
               defaultValLiteral);
           outputDefaultValue_ = new NumericLiteral(BigInteger.valueOf(unixTimeMicros),
               Type.BIGINT);

@@ -419,7 +419,7 @@ public interface FeIcebergTable extends FeFsTable {
     /**
      * Get FileDescriptor by data file location
      */
-    private static HdfsPartition.FileDescriptor getFileDescriptor(Path fileLoc,
+    public static HdfsPartition.FileDescriptor getFileDescriptor(Path fileLoc,
         Path tableLoc, ListMap<TNetworkAddress> hostIndex) throws IOException {
       FileSystem fs = FileSystemUtil.getFileSystemForPath(tableLoc);
       FileStatus fileStatus = fs.getFileStatus(fileLoc);
@@ -454,7 +454,7 @@ public interface FeIcebergTable extends FeFsTable {
         FeIcebergTable table) throws IOException, TableLoadingException {
       // Empty predicates
       List<DataFile> dataFileList = IcebergUtil.getIcebergDataFiles(table,
-          new ArrayList<>());
+          new ArrayList<>(), /*timeTravelSpecl=*/null);
 
       Map<String, HdfsPartition.FileDescriptor> fileDescMap = new HashMap<>();
       for (DataFile file : dataFileList) {

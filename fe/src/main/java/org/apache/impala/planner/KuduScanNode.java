@@ -56,6 +56,7 @@ import org.apache.impala.thrift.TScanRange;
 import org.apache.impala.thrift.TScanRangeLocation;
 import org.apache.impala.thrift.TScanRangeLocationList;
 import org.apache.impala.thrift.TScanRangeSpec;
+import org.apache.impala.util.ExprUtil;
 import org.apache.impala.util.KuduUtil;
 import org.apache.impala.util.ExecutorMembershipSnapshot;
 import org.apache.kudu.ColumnSchema;
@@ -555,8 +556,9 @@ public class KuduScanNode extends ScanNode {
       case TIMESTAMP: {
         try {
           // TODO: Simplify when Impala supports a 64-bit TIMESTAMP type.
+          // TODO(IMPALA-10850): interpret timestamps in local timezone.
           kuduPredicate = KuduPredicate.newComparisonPredicate(column, op,
-              KuduUtil.timestampToUnixTimeMicros(analyzer, literal));
+              ExprUtil.utcTimestampToUnixTimeMicros(analyzer, literal));
         } catch (Exception e) {
           LOG.info("Exception converting Kudu timestamp predicate: " + expr.toSql(), e);
           return false;
@@ -667,7 +669,7 @@ public class KuduScanNode extends ScanNode {
       case TIMESTAMP: {
         try {
           // TODO: Simplify when Impala supports a 64-bit TIMESTAMP type.
-          return KuduUtil.timestampToUnixTimeMicros(analyzer, e);
+          return ExprUtil.utcTimestampToUnixTimeMicros(analyzer, e);
         } catch (Exception ex) {
           LOG.info("Exception converting Kudu timestamp expr: " + e.toSql(), ex);
         }

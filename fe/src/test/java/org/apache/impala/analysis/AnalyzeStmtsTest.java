@@ -38,6 +38,7 @@ import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TFunctionCategory;
 import org.junit.Assert;
 import org.junit.Test;
@@ -49,6 +50,10 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 public class AnalyzeStmtsTest extends AnalyzerTest {
+
+  static {
+    FeSupport.loadLibrary();
+  }
 
   /**
    * Tests analyzing the given collection table reference and field assumed to be in
@@ -4554,7 +4559,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     testNumberOfMembers(ValuesStmt.class, 0);
 
     // Also check TableRefs.
-    testNumberOfMembers(TableRef.class, 26);
+    testNumberOfMembers(TableRef.class, 27);
     testNumberOfMembers(BaseTableRef.class, 0);
     testNumberOfMembers(InlineViewRef.class, 10);
   }
@@ -4852,6 +4857,36 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
             + "'NULL || string_col' should both return 'BOOLEAN' type "
             + "or they should both return 'STRING' or 'VARCHAR' or 'CHAR' types, "
             + "but they return types 'NULL_TYPE' and 'STRING'.");
+  }
+
+  @Test
+  public void testIcebergTimeTravel() throws ImpalaException {
+    TableName iceT = new TableName("functional_parquet", "iceberg_non_partitioned");
+    TableName nonIceT = new TableName("functional", "allcomplextypes");
+
+    TblsAnalyzeOk("select * from $TBL for system_time as of now()", iceT);
+    TblsAnalyzeOk("select * from $TBL for system_time as of '2021-08-09 15:52:45'", iceT);
+    TblsAnalyzeOk("select * from $TBL for system_time as of " +
+        "cast('2021-08-09 15:52:45' as timestamp) - interval 2 days + interval 3 hours",
+        iceT);
+    TblsAnalyzeOk("select * from $TBL for system_time as of now() + interval 3 days",
+        iceT);
+    TblsAnalyzeOk("select * from $TBL for system_version as of 123456", iceT);
+
+    TblsAnalysisError("select * from $TBL for system_time as of 42", iceT,
+        "FOR SYSTEM_TIME AS OF <expression> must be a timestamp type");
+    TblsAnalysisError("select * from $TBL for system_time as of id", iceT,
+        "FOR SYSTEM_TIME AS OF <expression> must be a constant expression");
+    TblsAnalysisError("select * from $TBL for system_time as of '2021-02-32 15:52:45'",
+        iceT, "Invalid TIMESTAMP expression");
+
+    TblsAnalysisError("select * from $TBL for system_version as of 3.14",
+        iceT, "FOR SYSTEM_VERSION AS OF <expression> must be an integer type but is");
+
+    TblsAnalysisError("select * from $TBL for system_time as of now()", nonIceT,
+        "FOR SYSTEM_TIME AS OF clause is only supported for Iceberg tables.");
+    TblsAnalysisError("select * from $TBL for system_version as of 123", nonIceT,
+        "FOR SYSTEM_VERSION AS OF clause is only supported for Iceberg tables.");
   }
 
   @Test

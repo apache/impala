@@ -17,12 +17,14 @@
 
 package org.apache.impala.planner;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.ListIterator;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.Expression.Operation;
@@ -38,6 +40,7 @@ import org.apache.impala.analysis.NumericLiteral;
 import org.apache.impala.analysis.SlotRef;
 import org.apache.impala.analysis.StringLiteral;
 import org.apache.impala.analysis.TableRef;
+import org.apache.impala.analysis.TimeTravelSpec;
 import org.apache.impala.analysis.TupleDescriptor;
 import org.apache.impala.catalog.FeCatalogUtils;
 import org.apache.impala.catalog.FeFsPartition;
@@ -51,22 +54,30 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.util.IcebergUtil;
 
 import com.google.common.base.Preconditions;
-import org.apache.impala.util.KuduUtil;
+import org.apache.impala.util.ExprUtil;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Scan of a single iceberg table
  */
 public class IcebergScanNode extends HdfsScanNode {
+  private final static Logger LOG = LoggerFactory.getLogger(TimeTravelSpec.class);
+
   private final FeIcebergTable icebergTable_;
 
   // Exprs in icebergConjuncts_ converted to UnboundPredicate.
   private final List<UnboundPredicate> icebergPredicates_ = new ArrayList<>();
 
+  private TimeTravelSpec timeTravelSpec_;
+
   public IcebergScanNode(PlanNodeId id, TupleDescriptor desc, List<Expr> conjuncts,
-      TableRef hdfsTblRef, FeFsTable feFsTable, MultiAggregateInfo aggInfo) {
-    super(id, desc, conjuncts, getIcebergPartition(feFsTable), hdfsTblRef, aggInfo,
+      TableRef tblRef, FeFsTable feFsTable, MultiAggregateInfo aggInfo) {
+    super(id, desc, conjuncts, getIcebergPartition(feFsTable), tblRef, aggInfo,
         null, false);
     icebergTable_ = (FeIcebergTable) desc_.getTable();
+    timeTravelSpec_ = tblRef.getTimeTravelSpec();
     // Hdfs table transformed from iceberg table only has one partition
     Preconditions.checkState(partitions_.size() == 1);
   }
@@ -91,27 +102,54 @@ public class IcebergScanNode extends HdfsScanNode {
    * We need prune hdfs partition FileDescriptor by iceberg predicates
    */
   public List<FileDescriptor> getFileDescriptorByIcebergPredicates()
-      throws ImpalaRuntimeException{
+      throws ImpalaRuntimeException {
     List<DataFile> dataFileList;
     try {
-      dataFileList = IcebergUtil.getIcebergDataFiles(icebergTable_, icebergPredicates_);
+      dataFileList = IcebergUtil.getIcebergDataFiles(icebergTable_, icebergPredicates_,
+          timeTravelSpec_);
     } catch (TableLoadingException e) {
       throw new ImpalaRuntimeException(String.format(
           "Failed to load data files for Iceberg table: %s", icebergTable_.getFullName()),
           e);
     }
-
+    long dataFilesCacheMisses = 0;
     List<FileDescriptor> fileDescList = new ArrayList<>();
     for (DataFile dataFile : dataFileList) {
       FileDescriptor fileDesc = icebergTable_.getPathHashToFileDescMap()
           .get(IcebergUtil.getDataFilePathHash(dataFile));
-      fileDescList.add(fileDesc);
-      //Todo: how to deal with iceberg metadata update, we need to invalidate manually now
       if (fileDesc == null) {
-        throw new ImpalaRuntimeException("Cannot find file in cache: " + dataFile.path()
-            + " with snapshot id: " + String.valueOf(icebergTable_.snapshotId()));
+        if (timeTravelSpec_ == null) {
+          // We should always find the data files in the cache when not doing time travel.
+          throw new ImpalaRuntimeException("Cannot find file in cache: " + dataFile.path()
+              + " with snapshot id: " + String.valueOf(icebergTable_.snapshotId()));
+        }
+        ++dataFilesCacheMisses;
+        try {
+          fileDesc = FeIcebergTable.Utils.getFileDescriptor(
+              new Path(dataFile.path().toString()),
+              new Path(icebergTable_.getIcebergTableLocation()),
+              icebergTable_.getHostIndex());
+        } catch (IOException ex) {
+          throw new ImpalaRuntimeException(
+              "Cannot load file descriptor for " + dataFile.path(), ex);
+        }
+        if (fileDesc == null) {
+          throw new ImpalaRuntimeException(
+              "Cannot load file descriptor for: " + dataFile.path());
+        }
+        // Add file descriptor to the cache.
+        icebergTable_.getPathHashToFileDescMap().put(
+            IcebergUtil.getDataFilePathHash(dataFile), fileDesc);
       }
+      fileDescList.add(fileDesc);
     }
+
+    if (dataFilesCacheMisses > 0) {
+      Preconditions.checkState(timeTravelSpec_ != null);
+      LOG.info("File descriptors had to be loaded on demand during time travel: " +
+          String.valueOf(dataFilesCacheMisses));
+    }
+
     return fileDescList;
   }
 
@@ -194,7 +232,8 @@ public class IcebergScanNode extends HdfsScanNode {
         break;
       }
       case TIMESTAMP: {
-        long unixMicros = KuduUtil.timestampToUnixTimeMicros(analyzer, literal);
+        // TODO(IMPALA-10850): interpret timestamps in local timezone.
+        long unixMicros = ExprUtil.utcTimestampToUnixTimeMicros(analyzer, literal);
         unboundPredicate = Expressions.predicate(op, colName, unixMicros);
         break;
       }

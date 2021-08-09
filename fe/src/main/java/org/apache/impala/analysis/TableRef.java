@@ -27,9 +27,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.impala.analysis.TimeTravelSpec.Kind;
 import org.apache.impala.authorization.Privilege;
 import org.apache.impala.catalog.Column;
 import org.apache.impala.catalog.FeFsTable;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.planner.JoinNode.DistributionMode;
@@ -147,6 +149,10 @@ public class TableRef extends StmtNode {
   // Scalar columns referenced in the query. Used in resolving column mask.
   protected Map<String, Column> scalarColumns_ = new LinkedHashMap<>();
 
+  // Time travel spec of this table ref. It contains information specified in the
+  // FOR SYSTEM_TIME AS OF <timestamp> or FOR SYSTEM_TIME AS OF <version> clause.
+  protected TimeTravelSpec timeTravelSpec_;
+
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -170,20 +176,25 @@ public class TableRef extends StmtNode {
   }
 
   public TableRef(List<String> path, String alias, TableSampleClause tableSample) {
-    this(path, alias, tableSample, Privilege.SELECT, false);
+    this(path, alias, tableSample, null);
+  }
+
+  public TableRef(List<String> path, String alias, TableSampleClause tableSample,
+      TimeTravelSpec timeTravel) {
+    this(path, alias, tableSample, timeTravel, Privilege.SELECT, false);
   }
 
   public TableRef(List<String> path, String alias, Privilege priv) {
-    this(path, alias, null, priv, false);
+    this(path, alias, null, null, priv, false);
   }
 
   public TableRef(List<String> path, String alias, Privilege priv,
       boolean requireGrantOption) {
-    this(path, alias, null, priv, requireGrantOption);
+    this(path, alias, null, null, priv, requireGrantOption);
   }
 
   public TableRef(List<String> path, String alias, TableSampleClause sampleParams,
-      Privilege priv, boolean requireGrantOption) {
+      TimeTravelSpec timeTravel, Privilege priv, boolean requireGrantOption) {
     rawPath_ = path;
     if (alias != null) {
       aliases_ = new String[] { alias.toLowerCase() };
@@ -198,6 +209,7 @@ public class TableRef extends StmtNode {
     replicaPreference_ = null;
     randomReplica_ = false;
     convertLimitToSampleHintPercent_ = -1;
+    timeTravelSpec_ = timeTravel;
   }
 
   /**
@@ -209,6 +221,8 @@ public class TableRef extends StmtNode {
     aliases_ = other.aliases_;
     hasExplicitAlias_ = other.hasExplicitAlias_;
     sampleParams_ = other.sampleParams_;
+    timeTravelSpec_ = other.timeTravelSpec_ != null ?
+                      other.timeTravelSpec_.clone() : null;
     priv_ = other.priv_;
     requireGrantOption_ = other.requireGrantOption_;
     joinOp_ = other.joinOp_;
@@ -331,6 +345,7 @@ public class TableRef extends StmtNode {
     return resolvedPath_.getRootTable();
   }
   public TableSampleClause getSampleParams() { return sampleParams_; }
+  public TimeTravelSpec getTimeTravelSpec() { return timeTravelSpec_; }
   public Privilege getPrivilege() { return priv_; }
   public boolean requireGrantOption() { return requireGrantOption_; }
   public List<PlanHint> getJoinHints() { return joinHints_; }
@@ -428,6 +443,20 @@ public class TableRef extends StmtNode {
         || !(resolvedPath_.destTable() instanceof FeFsTable)) {
       throw new AnalysisException(
           "TABLESAMPLE is only supported on HDFS tables: " + getUniqueAlias());
+    }
+  }
+
+  protected void analyzeTimeTravel(Analyzer analyzer) throws AnalysisException {
+    if (timeTravelSpec_ != null) {
+      if (!(getTable() instanceof FeIcebergTable)) {
+        throw new AnalysisException(String.format(
+            "FOR %s AS OF clause is only supported for Iceberg tables. " +
+            "%s is not an Iceberg table.",
+            timeTravelSpec_.getKind() == Kind.TIME_AS_OF ? "SYSTEM_TIME" :
+                                                           "SYSTEM_VERSION",
+            getTable().getFullName()));
+      }
+      timeTravelSpec_.analyze(analyzer);
     }
   }
 
@@ -717,6 +746,7 @@ public class TableRef extends StmtNode {
     allMaterializedTupleIds_.clear();
     correlatedTupleIds_.clear();
     desc_ = null;
+    if (timeTravelSpec_ != null) timeTravelSpec_.reset();
   }
 
   public boolean isTableMaskingView() { return false; }
@@ -736,6 +766,7 @@ public class TableRef extends StmtNode {
     other.joinOp_ = joinOp_;
     other.joinHints_ = joinHints_;
     other.tableHints_ = tableHints_;
+    other.timeTravelSpec_ = timeTravelSpec_;
     // Clear properties. Don't clear aliases_ since it's still used in resolving slots
     // in the query block of 'other'.
     onClause_ = null;
@@ -743,5 +774,6 @@ public class TableRef extends StmtNode {
     joinOp_ = null;
     joinHints_ = new ArrayList<>();
     tableHints_ = new ArrayList<>();
+    timeTravelSpec_ = null;
   }
 }

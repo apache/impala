@@ -566,6 +566,16 @@ ALTER TABLE non_iceberg_table SET PARTITION SPEC (i);
 AnalysisException: ALTER TABLE SET PARTITION SPEC is only supported for Iceberg tables: $DATABASE.non_iceberg_table
 ====
 ---- QUERY
+SELECT * FROM non_iceberg_table FOR SYSTEM_TIME AS OF now();
+---- CATCH
+AS OF clause is only supported for Iceberg tables.
+====
+---- QUERY
+SELECT * FROM non_iceberg_table FOR SYSTEM_VERSION AS OF 42;
+---- CATCH
+AS OF clause is only supported for Iceberg tables.
+====
+---- QUERY
 CREATE TABLE iceberg_alter_part ( i int, d DATE, s STRUCT<f1:BIGINT,f2:BIGINT>)
 STORED AS ICEBERG;
 ALTER TABLE iceberg_alter_part SET PARTITION SPEC (g);

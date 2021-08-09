@@ -659,6 +659,29 @@ public class ParserTest extends FrontendTestBase {
   }
 
   @Test
+  public void TestTimeTravel() {
+    String timeAsOf = "select * from a for system_time as of";
+    String aliases[] = new String[] {"", " a_snapshot", " as a_snapshot"};
+    for (String alias : aliases) {
+      ParsesOk(timeAsOf + " '2021-08-09 15:14:40'" + alias);
+      ParsesOk(timeAsOf + " days_sub('2021-08-09 15:14:40', 3)" + alias);
+      ParsesOk(timeAsOf + " now()" + alias);
+      ParsesOk(timeAsOf + " days_sub(now(), 12)" + alias);
+      ParsesOk(timeAsOf + " now() - interval 100 days" + alias);
+      // 'system_version as of' only takes numeric literals
+      ParsesOk("select * from a for system_version as of 12345" + alias);
+      ParserError("select * from a for system_version as of -12345" + alias);
+      ParserError("select * from a for system_version as of \"12345\"" + alias);
+      ParserError("select * from a for system_version as of 34 + 34" + alias);
+      ParserError("select * from a for system_version as of b" + alias);
+      ParserError("select * from a for system_version as of b + 4" + alias);
+    }
+
+    ParserError("select * from t for system_time as of");
+    ParserError("select * from t for system_version as of");
+  }
+
+  @Test
   public void TestTableSampleClause() {
     String tblRefs[] = new String[] { "tbl", "db.tbl", "db.tbl.col", "db.tbl.col.fld" };
     String tblAliases[] = new String[] { "", "t" };

@@ -15,8 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import datetime
 import os
 import random
+import time
 
 from subprocess import check_call
 from parquet.ttypes import ConvertedType
@@ -110,6 +112,128 @@ class TestIcebergTable(ImpalaTestSuite):
     assert(first_snapshot[2] == "NULL")
     # Check "is_current_ancestor" column.
     assert(first_snapshot[3] == "TRUE" and second_snapshot[3] == "TRUE")
+
+  def test_time_travel(self, vector, unique_database):
+    tbl_name = unique_database + ".time_travel"
+
+    def execute_query_ts(query):
+      self.execute_query(query)
+      return str(datetime.datetime.now())
+
+    def expect_results(query, expected_results):
+      data = self.execute_query(query)
+      assert len(data.data) == len(expected_results)
+      for r in expected_results:
+        assert r in data.data
+
+    def expect_results_t(ts, expected_results):
+      expect_results(
+          "select * from {0} for system_time as of {1}".format(tbl_name, ts),
+          expected_results)
+
+    def expect_results_v(snapshot_id, expected_results):
+      expect_results(
+          "select * from {0} for system_version as of {1}".format(tbl_name, snapshot_id),
+          expected_results)
+
+    def quote(s):
+      return "'{0}'".format(s)
+
+    def cast_ts(ts):
+        return "CAST({0} as timestamp)".format(quote(ts))
+
+    def get_snapshots():
+      data = self.execute_query("describe history {0}".format(tbl_name))
+      ret = list()
+      for row in data.data:
+        fields = row.split('\t')
+        ret.append(fields[1])
+      return ret
+
+    def impala_now():
+      now_data = self.execute_query("select now()")
+      return now_data.data[0]
+
+    # Iceberg doesn't create a snapshot entry for the initial empty table
+    self.execute_query("create table {0} (i int) stored as iceberg".format(tbl_name))
+    ts_1 = execute_query_ts("insert into {0} values (1)".format(tbl_name))
+    ts_2 = execute_query_ts("insert into {0} values (2)".format(tbl_name))
+    ts_3 = execute_query_ts("truncate table {0}".format(tbl_name))
+    time.sleep(1)
+    ts_4 = execute_query_ts("insert into {0} values (100)".format(tbl_name))
+    # Query table as of timestamps.
+    expect_results_t("now()", ['100'])
+    expect_results_t(quote(ts_1), ['1'])
+    expect_results_t(quote(ts_2), ['1', '2'])
+    expect_results_t(quote(ts_3), [])
+    expect_results_t(quote(ts_4), ['100'])
+    expect_results_t(cast_ts(ts_4) + " - interval 1 seconds", [])
+    # Future queries return the current snapshot.
+    expect_results_t(cast_ts(ts_4) + " + interval 1 hours", ['100'])
+    # Query table as of snapshot IDs.
+    snapshots = get_snapshots()
+    expect_results_v(snapshots[0], ['1'])
+    expect_results_v(snapshots[1], ['1', '2'])
+    expect_results_v(snapshots[2], [])
+    expect_results_v(snapshots[3], ['100'])
+
+    # SELECT diff
+    expect_results("""SELECT * FROM {tbl} FOR SYSTEM_TIME AS OF '{ts_new}'
+                      MINUS
+                      SELECT * FROM {tbl} FOR SYSTEM_TIME AS OF '{ts_old}'""".format(
+                   tbl=tbl_name, ts_new=ts_2, ts_old=ts_1),
+                   ['2'])
+    expect_results("""SELECT * FROM {tbl} FOR SYSTEM_VERSION AS OF {v_new}
+                      MINUS
+                      SELECT * FROM {tbl} FOR SYSTEM_VERSION AS OF {v_old}""".format(
+                   tbl=tbl_name, v_new=snapshots[1], v_old=snapshots[0]),
+                   ['2'])
+    # Mix SYSTEM_TIME ans SYSTEM_VERSION
+    expect_results("""SELECT * FROM {tbl} FOR SYSTEM_VERSION AS OF {v_new}
+                      MINUS
+                      SELECT * FROM {tbl} FOR SYSTEM_TIME AS OF '{ts_old}'""".format(
+                   tbl=tbl_name, v_new=snapshots[1], ts_old=ts_1),
+                   ['2'])
+    expect_results("""SELECT * FROM {tbl} FOR SYSTEM_TIME AS OF '{ts_new}'
+                      MINUS
+                      SELECT * FROM {tbl} FOR SYSTEM_VERSION AS OF {v_old}""".format(
+                   tbl=tbl_name, ts_new=ts_2, v_old=snapshots[0]),
+                   ['2'])
+
+    # Query old snapshot
+    try:
+      self.execute_query("SELECT * FROM {0} FOR SYSTEM_TIME AS OF {1}".format(
+          tbl_name, "now() - interval 2 years"))
+      assert False  # Exception must be thrown
+    except Exception as e:
+      assert "Cannot find a snapshot older than" in str(e)
+    # Query invalid snapshot
+    try:
+      self.execute_query("SELECT * FROM {0} FOR SYSTEM_VERSION AS OF 42".format(tbl_name))
+      assert False  # Exception must be thrown
+    except Exception as e:
+      assert "Cannot find snapshot with ID 42" in str(e)
+
+    # Check that timezone is interpreted in local timezone controlled by query option
+    # TIMEZONE
+    self.execute_query("truncate table {0}".format(tbl_name))
+    self.execute_query("insert into {0} values (1111)".format(tbl_name))
+    self.execute_query("SET TIMEZONE='Europe/Budapest'")
+    now_budapest = impala_now()
+    expect_results_t(quote(now_budapest), ['1111'])
+
+    # Let's switch to Tokyo time. Tokyo time is always greater than Budapest time.
+    self.execute_query("SET TIMEZONE='Asia/Tokyo'")
+    now_tokyo = impala_now()
+    expect_results_t(quote(now_tokyo), ['1111'])
+    try:
+      # Interpreting Budapest time in Tokyo time points to the past when the table
+      # didn't exist.
+      expect_results_t(quote(now_budapest), [])
+      assert False
+    except Exception as e:
+      assert "Cannot find a snapshot older than" in str(e)
+
 
   @SkipIf.not_hdfs
   def test_strings_utf8(self, vector, unique_database):
