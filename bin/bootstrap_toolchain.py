@@ -124,13 +124,16 @@ def wget_and_unpack_package(download_path, file_name, destination, wget_no_clobb
   if not download_path.endswith("/" + file_name):
     raise Exception("URL {0} does not match with expected file_name {1}"
         .format(download_path, file_name))
+  if "closer.cgi" in download_path:
+    download_path += "?action=download"
   NUM_ATTEMPTS = 3
   for attempt in range(1, NUM_ATTEMPTS + 1):
     logging.info("Downloading {0} to {1}/{2} (attempt {3})".format(
       download_path, destination, file_name, attempt))
     # --no-clobber avoids downloading the file if a file with the name already exists
     try:
-      cmd = ["wget", download_path, "--directory-prefix={0}".format(destination)]
+      cmd = ["wget", download_path,
+             "--output-document={0}/{1}".format(destination, file_name)]
       if wget_no_clobber:
         cmd.append("--no-clobber")
       check_output(cmd)
@@ -322,6 +325,29 @@ class CdpComponent(EnvVersionedPackage):
                                        makedir=makedir, template_subs_in=template_subs)
 
 
+class ApacheComponent(EnvVersionedPackage):
+  def __init__(self, name, explicit_version=None, archive_basename_tmpl=None,
+               unpack_directory_tmpl=None, makedir=False, component_path_tmpl=None):
+    # Compute the apache base URL (based on the APACHE_MIRROR)
+    if "APACHE_COMPONENTS_HOME" not in os.environ:
+      logging.error("Impala environment not set up correctly, make sure "
+                    "impala-config.sh is sourced.")
+      sys.exit(1)
+    template_subs = {"apache_mirror": os.environ["APACHE_MIRROR"]}
+    # Different components have different sub-paths. For example, hive is hive/hive-xxx,
+    # hadoop is hadoop/common/hadoop-xxx. The default is hive format.
+    if component_path_tmpl is None:
+      component_path_tmpl = "${name}/${name}-${version}/"
+    url_prefix_tmpl = "${apache_mirror}/" + component_path_tmpl
+
+    # Get the output base directory from APACHE_COMPONENTS_HOME
+    destination_basedir = os.environ["APACHE_COMPONENTS_HOME"]
+    super(ApacheComponent, self).__init__(name, url_prefix_tmpl, destination_basedir,
+                                       explicit_version=explicit_version,
+                                       archive_basename_tmpl=archive_basename_tmpl,
+                                       unpack_directory_tmpl=unpack_directory_tmpl,
+                                       makedir=makedir, template_subs_in=template_subs)
+
 class ToolchainKudu(ToolchainPackage):
   def __init__(self, platform_label=None):
     super(ToolchainKudu, self).__init__('kudu', platform_release=platform_label)
@@ -458,8 +484,13 @@ def get_hadoop_downloads():
   hadoop = CdpComponent("hadoop")
   hbase = CdpComponent("hbase", archive_basename_tmpl="hbase-${version}-bin",
                        unpack_directory_tmpl="hbase-${version}")
-  hive = CdpComponent("hive", archive_basename_tmpl="apache-hive-${version}-bin")
-  hive_src = CdpComponent("hive-source",
+  use_apache_hive = os.environ["USE_APACHE_HIVE"] == "true"
+  if use_apache_hive:
+    hive = ApacheComponent("hive", archive_basename_tmpl="apache-hive-${version}-bin")
+    hive_src = ApacheComponent("hive", archive_basename_tmpl="apache-hive-${version}-src")
+  else:
+    hive = CdpComponent("hive", archive_basename_tmpl="apache-hive-${version}-bin")
+    hive_src = CdpComponent("hive-source",
                           explicit_version=os.environ.get("IMPALA_HIVE_VERSION"),
                           archive_basename_tmpl="hive-${version}-source",
                           unpack_directory_tmpl="hive-${version}")
@@ -519,6 +550,7 @@ def main():
   kudu_download = None
   if os.getenv("DOWNLOAD_CDH_COMPONENTS", "false") == "true":
     create_directory_from_env_var("CDP_COMPONENTS_HOME")
+    create_directory_from_env_var("APACHE_COMPONENTS_HOME")
     if platform.processor() != "aarch64":
       downloads += get_kudu_downloads()
     downloads += get_hadoop_downloads()

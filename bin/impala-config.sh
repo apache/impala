@@ -187,6 +187,12 @@ export CDP_RANGER_VERSION=2.1.0.7.2.12.0-104
 export CDP_TEZ_VERSION=0.9.1.7.2.12.0-104
 export CDP_GCS_VERSION=2.1.2.7.2.12.0-104
 
+# Ref: https://infra.apache.org/release-download-pages.html#closer
+: ${APACHE_MIRROR:="https://www.apache.org/dyn/closer.cgi"}
+export APACHE_MIRROR
+export APACHE_HIVE_VERSION=3.1.2
+export APACHE_HIVE_STORAGE_API_VERSION=2.7.0
+
 export ARCH_NAME=$(uname -p)
 
 export IMPALA_HUDI_VERSION=0.5.0-incubating
@@ -228,6 +234,9 @@ export CDP_ICEBERG_URL=${CDP_ICEBERG_URL-}
 export CDP_RANGER_URL=${CDP_RANGER_URL-}
 export CDP_TEZ_URL=${CDP_TEZ_URL-}
 
+export APACHE_HIVE_URL=${APACHE_HIVE_URL-}
+export APACHE_HIVE_SOURCE_URL=${APACHE_HIVE_SOURCE_URL-}
+
 export CDP_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/cdp_components-$CDP_BUILD_NUMBER"
 export CDH_MAJOR_VERSION=7
 export IMPALA_AVRO_JAVA_VERSION=${CDP_AVRO_JAVA_VERSION}
@@ -236,9 +245,6 @@ export IMPALA_HADOOP_URL=${CDP_HADOOP_URL-}
 export HADOOP_HOME="$CDP_COMPONENTS_HOME/hadoop-${IMPALA_HADOOP_VERSION}/"
 export IMPALA_HBASE_VERSION=${CDP_HBASE_VERSION}
 export IMPALA_HBASE_URL=${CDP_HBASE_URL-}
-export IMPALA_HIVE_VERSION=${HIVE_VERSION_OVERRIDE:-"$CDP_HIVE_VERSION"}
-export IMPALA_HIVE_URL=${CDP_HIVE_URL-}
-export IMPALA_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
 export IMPALA_ICEBERG_VERSION=${CDP_ICEBERG_VERSION}
 export IMPALA_ICEBERG_URL=${CDP_ICEBERG_URL-}
 export IMPALA_KNOX_VERSION=${CDP_KNOX_VERSION}
@@ -248,8 +254,28 @@ export IMPALA_RANGER_VERSION=${CDP_RANGER_VERSION}
 export IMPALA_RANGER_URL=${CDP_RANGER_URL-}
 export IMPALA_TEZ_VERSION=${CDP_TEZ_VERSION}
 export IMPALA_TEZ_URL=${CDP_TEZ_URL-}
-export IMPALA_HIVE_STORAGE_API_VERSION=${HIVE_STORAGE_API_VERSION_OVERRIDE:-"2.3.0.$IMPALA_HIVE_VERSION"}
 export IMPALA_GCS_VERSION=${CDP_GCS_VERSION}
+
+export APACHE_COMPONENTS_HOME="$IMPALA_TOOLCHAIN/apache_components"
+export USE_APACHE_HIVE=${USE_APACHE_HIVE-false}
+if $USE_APACHE_HIVE; then
+  # When USE_APACHE_HIVE is set we use the apache hive version to build as well as deploy
+  # in the minicluster
+  export IMPALA_HIVE_DIST_TYPE="apache-hive"
+  export IMPALA_HIVE_VERSION=${APACHE_HIVE_VERSION}
+  export IMPALA_HIVE_URL=${APACHE_HIVE_URL-}
+  export IMPALA_HIVE_SOURCE_URL=${APACHE_HIVE_SOURCE_URL-}
+  export IMPALA_HIVE_STORAGE_API_VERSION=${APACHE_HIVE_STORAGE_API_VERSION}
+else
+  # CDP hive version is used to build and deploy in minicluster when USE_APACHE_HIVE is
+  # false
+  export IMPALA_HIVE_DIST_TYPE="hive"
+  export IMPALA_HIVE_VERSION=${HIVE_VERSION_OVERRIDE:-"$CDP_HIVE_VERSION"}
+  export IMPALA_HIVE_URL=${CDP_HIVE_URL-}
+  export IMPALA_HIVE_SOURCE_URL=${CDP_HIVE_SOURCE_URL-}
+  export IMPALA_HIVE_STORAGE_API_VERSION=${HIVE_STORAGE_API_VERSION_OVERRIDE:-\
+"2.3.0.$IMPALA_HIVE_VERSION"}
+fi
 
 # Extract the first component of the hive version.
 # Allow overriding of Hive source location in case we want to build Impala without
@@ -365,16 +391,26 @@ export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
 export IMPALA_CLUSTER_NODES_DIR="${IMPALA_CLUSTER_NODES_DIR-$IMPALA_HOME/testdata/cluster/cdh$CDH_MAJOR_VERSION}"
 
 ESCAPED_IMPALA_HOME=$(sed "s/[^0-9a-zA-Z]/_/g" <<< "$IMPALA_HOME")
-export HIVE_HOME=${HIVE_HOME_OVERRIDE:-"$CDP_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"}
-export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-"${CDP_COMPONENTS_HOME}/hive-${IMPALA_HIVE_VERSION}"}
+if $USE_APACHE_HIVE; then
+  export HIVE_HOME="$APACHE_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"
+  export HIVE_SRC_DIR="$APACHE_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-src"
+  # if apache hive is being used change the metastore db name, so we don't have to
+  # format the metastore db everytime we switch between hive versions
+  export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_IMPALA_HOME)_apache"}
+else
+  export HIVE_HOME=${HIVE_HOME_OVERRIDE:-\
+"$CDP_COMPONENTS_HOME/apache-hive-${IMPALA_HIVE_VERSION}-bin"}
+  export HIVE_SRC_DIR=${HIVE_SRC_DIR_OVERRIDE:-\
+"${CDP_COMPONENTS_HOME}/hive-${IMPALA_HIVE_VERSION}"}
+  # Previously, there were multiple configurations and the "_cdp" included below
+  # allowed the two to be distinct. We keep this "_cdp" for historical reasons.
+  export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_IMPALA_HOME)_cdp"}
+fi
 # Set the path to the hive_metastore.thrift which is used to build thrift code
 export HIVE_METASTORE_THRIFT_DIR=${HIVE_METASTORE_THRIFT_DIR_OVERRIDE:-\
 "$HIVE_SRC_DIR/standalone-metastore/src/main/thrift"}
 export TEZ_HOME="$CDP_COMPONENTS_HOME/tez-${IMPALA_TEZ_VERSION}-minimal"
 export HBASE_HOME="$CDP_COMPONENTS_HOME/hbase-${IMPALA_HBASE_VERSION}/"
-# Previously, there were multiple configurations and the "_cdp" included below
-# allowed the two to be distinct. We keep this "_cdp" for historical reasons.
-export METASTORE_DB=${METASTORE_DB-"$(cut -c-59 <<< HMS$ESCAPED_IMPALA_HOME)_cdp"}
 # Set the Hive binaries in the path
 export PATH="$HIVE_HOME/bin:$PATH"
 
@@ -737,6 +773,10 @@ echo "IMPALA_MAVEN_OPTIONS    = $IMPALA_MAVEN_OPTIONS"
 echo "IMPALA_TOOLCHAIN_HOST   = $IMPALA_TOOLCHAIN_HOST"
 echo "CDP_BUILD_NUMBER        = $CDP_BUILD_NUMBER"
 echo "CDP_COMPONENTS_HOME     = $CDP_COMPONENTS_HOME"
+if $USE_APACHE_HIVE; then
+  echo "APACHE_MIRROR           = $APACHE_MIRROR"
+  echo "APACHE_COMPONENTS_HOME  = $APACHE_COMPONENTS_HOME"
+fi
 echo "IMPALA_HADOOP_VERSION   = $IMPALA_HADOOP_VERSION"
 echo "IMPALA_AVRO_JAVA_VERSION= $IMPALA_AVRO_JAVA_VERSION"
 echo "IMPALA_PARQUET_VERSION  = $IMPALA_PARQUET_VERSION"

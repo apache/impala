@@ -419,6 +419,11 @@ bootstrap_dependencies() {
     "$IMPALA_HOME/bin/bootstrap_toolchain.py"
     echo "Toolchain bootstrap complete."
   fi
+  # HIVE-22915
+  if [[ "${USE_APACHE_HIVE}" = true ]]; then
+    rm $HIVE_HOME/lib/guava-*jar
+    cp $HADOOP_HOME/share/hadoop/hdfs/lib/guava-*.jar $HIVE_HOME/lib/
+  fi
 }
 
 # Build the Impala frontend and its dependencies.
