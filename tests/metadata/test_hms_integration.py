@@ -95,7 +95,6 @@ class TestHmsIntegrationSanity(ImpalaTestSuite):
     self.client.execute("create table if not exists hms_sanity_db.test_tbl (a int)")
     # The table should not appear in the catalog *immediately* unless invalidate
     # metadata is executed.
-    assert 'test_tbl' not in self.client.execute("show tables in hms_sanity_db").data
     if cluster_properties.is_event_polling_enabled():
       assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
       EventProcessorUtils.wait_for_event_processing(self)
