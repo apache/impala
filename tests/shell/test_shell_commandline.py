@@ -384,8 +384,10 @@ class TestImpalaShell(ImpalaTestSuite):
     query = "set num_nodes=1; set mt_dop=1; set batch_size=1; \
              select sleep(10) from functional_parquet.alltypesagg"
     p = ImpalaShell(vector, ['-q', query])
-    p.wait_for_query_start()
-    os.kill(p.pid(), signal.SIGINT)
+    try:
+      p.wait_for_query_start()
+    finally:
+      os.kill(p.pid(), signal.SIGINT)
     result = p.get_result()
     assert "Cancelling Query" in result.stderr, result.stderr
 
@@ -418,10 +420,10 @@ class TestImpalaShell(ImpalaTestSuite):
     execution in fact starts and then cancels it. Expects the query
     cancellation to succeed."""
     p = ImpalaShell(vector, ['-q', stmt])
-
-    wait_for_query_state(vector, stmt, cancel_at_state)
-
-    os.kill(p.pid(), signal.SIGINT)
+    try:
+      wait_for_query_state(vector, stmt, cancel_at_state)
+    finally:
+      os.kill(p.pid(), signal.SIGINT)
     result = p.get_result()
     assert "Cancelling Query" in result.stderr
     assert "Invalid or unknown query handle" not in result.stderr
