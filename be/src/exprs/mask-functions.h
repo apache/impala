@@ -103,6 +103,12 @@ class MaskFunctions {
       const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
       const StringVal& digit_char, const IntVal& other_char,
       const StringVal& number_char);
+  // Overload for only masking other chars. So we can support patterns like
+  //   mask_show_first_n({col}, 4, -1, -1, -1, 'x')
+  static StringVal MaskShowFirstN(FunctionContext* ctx, const StringVal& val,
+      const IntVal& char_count, const IntVal& upper_char, const IntVal& lower_char,
+      const IntVal& digit_char, const StringVal& other_char);
+  // Overload that all masked chars are given as integers.
   static StringVal MaskShowFirstN(FunctionContext* ctx, const StringVal& val,
       const IntVal& char_count, const IntVal& upper_char, const IntVal& lower_char,
       const IntVal& digit_char, const IntVal& other_char, const IntVal& number_char);
@@ -146,6 +152,12 @@ class MaskFunctions {
       const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
       const StringVal& digit_char, const IntVal& other_char,
       const StringVal& number_char);
+  // Overload for only masking other chars. So we can support patterns like
+  //   mask_show_last_n({col}, 4, -1, -1, -1, 'x')
+  static StringVal MaskShowLastN(FunctionContext* ctx, const StringVal& val,
+      const IntVal& char_count, const IntVal& upper_char, const IntVal& lower_char,
+      const IntVal& digit_char, const StringVal& other_char);
+  // Overload that all masked chars are given as integers.
   static StringVal MaskShowLastN(FunctionContext* ctx, const StringVal& val,
       const IntVal& char_count, const IntVal& upper_char, const IntVal& lower_char,
       const IntVal& digit_char, const IntVal& other_char, const IntVal& number_char);
@@ -184,6 +196,12 @@ class MaskFunctions {
       const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
       const StringVal& digit_char, const IntVal& other_char,
       const StringVal& number_char);
+  // Overload for only masking other chars. So we can support patterns like
+  //   mask_first_n({col}, 4, -1, -1, -1, 'x')
+  static StringVal MaskFirstN(FunctionContext* ctx, const StringVal& val,
+      const IntVal& char_count, const IntVal& upper_char, const IntVal& lower_char,
+      const IntVal& digit_char, const StringVal& other_char);
+  // Overload that all masked chars are given as integers.
   static StringVal MaskFirstN(FunctionContext* ctx, const StringVal& val,
       const IntVal& char_count, const IntVal& upper_char, const IntVal& lower_char,
       const IntVal& digit_char, const IntVal& other_char, const IntVal& number_char);
@@ -222,6 +240,12 @@ class MaskFunctions {
       const IntVal& char_count, const StringVal& upper_char, const StringVal& lower_char,
       const StringVal& digit_char, const IntVal& other_char,
       const StringVal& number_char);
+  // Overload for only masking other chars. So we can support patterns like
+  //   mask_first_n({col}, 4, -1, -1, -1, 'x')
+  static StringVal MaskLastN(FunctionContext* ctx, const StringVal& val,
+      const IntVal& char_count, const IntVal& upper_char, const IntVal& lower_char,
+      const IntVal& digit_char, const StringVal& other_char);
+  // Overload that all masked chars are given as integers.
   static StringVal MaskLastN(FunctionContext* ctx, const StringVal& val,
       const IntVal& char_count, const IntVal& upper_char, const IntVal& lower_char,
       const IntVal& digit_char, const IntVal& other_char, const IntVal& number_char);
@@ -271,6 +295,12 @@ class MaskFunctions {
       const StringVal& digit_char, const IntVal& other_char,
       const StringVal& number_char, const IntVal& day_value, const IntVal& month_value,
       const IntVal& year_value);
+  // Overload for only masking other chars. So we can support patterns like
+  //   mask({col}, -1, -1, -1, 'x')
+  static StringVal Mask(FunctionContext* ctx, const StringVal& val,
+      const IntVal& upper_char, const IntVal& lower_char,
+      const IntVal& digit_char, const StringVal& other_char);
+  // Overload that all masked chars are given as integers.
   static StringVal Mask(FunctionContext* ctx, const StringVal& val,
       const IntVal& upper_char, const IntVal& lower_char, const IntVal& digit_char,
       const IntVal& other_char, const IntVal& number_char, const IntVal& day_value,

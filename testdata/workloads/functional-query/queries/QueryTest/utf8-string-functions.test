@@ -168,3 +168,15 @@ select locate('SQL', '最快的SQL引擎跑SQL'),
 ---- TYPES
 INT,INT,INT,INT,INT,INT
 ====
+---- QUERY
+set utf8_mode=true;
+select mask('SQL引擎', 'x', 'x', 'x', 'x'),
+  mask_last_n('SQL引擎', 2, 'x', 'x', 'x', 'x'),
+  mask_show_first_n('SQL引擎', 2, 'x', 'x', 'x', 'x'),
+  mask_first_n('SQL引擎', 2, 'x', 'x', 'x', 'x'),
+  mask_show_last_n('SQL引擎', 2, 'x', 'x', 'x', 'x');
+---- RESULTS: RAW_STRING
+'xxxxx','SQLxx','SQxxx','xxL引擎','xxx引擎'
+---- TYPES
+STRING,STRING,STRING,STRING,STRING
+====

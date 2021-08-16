@@ -10646,6 +10646,65 @@ TEST_P(ExprTest, MaskHashTest) {
   TestIsNull("mask_hash(cast('2016-04-20' as timestamp))", TYPE_TIMESTAMP);
 }
 
+TEST_P(ExprTest, Utf8MaskTest) {
+  executor_->PushExecOption("utf8_mode=true");
+  // Default is no masking for other chars so Chinese charactors are unmasked.
+  TestStringValue("mask('hello李小龙')", "xxxxx李小龙");
+  // Keeps upper, lower, digit chars and masks other chars as 'x'.
+  TestStringValue("mask('hello李小龙', -1, -1, -1, 'X')", "helloXXX");
+  TestStringValue("mask_last_n('hello李小龙', 4, -1, -1, -1, 'x')", "helloxxx");
+  TestStringValue("mask_last_n('hello李小龙', 2, -1, -1, -1, 'x')", "hello李xx");
+  TestStringValue("mask_last_n('hello李小龙', 4, 'x', 'x', 'x', 'X')", "hellxXXX");
+  TestStringValue("mask_show_first_n('hello李小龙', 6, 'x', 'x', 'x', 'X')",
+      "hello李XX");
+  TestStringValue("mask_show_first_n('hello李小龙', 4, -1, -1, -1, 'X')", "helloXXX");
+  TestStringValue("mask_show_first_n('hello李小龙', 4, 'x', 'x', 'x', 'X')",
+      "hellxXXX");
+  TestStringValue("mask_first_n('hello李小龙', 5)", "xxxxx李小龙");
+  // Default is no masking for other chars so Chinese charactors are unmasked.
+  TestStringValue("mask_first_n('hello李小龙', 6)", "xxxxx李小龙");
+  TestStringValue("mask_first_n('hello李小龙', 6, 'x', 'x', 'x', 'X')",
+      "xxxxxX小龙");
+  TestStringValue("mask_show_last_n('hello李小龙', 2, 'x', 'x', 'x', 'X')",
+      "xxxxxX小龙");
+  TestStringValue("mask_show_last_n('hello李小龙', 4, 'x', 'x', 'x', 'X')",
+      "xxxxo李小龙");
+
+  // Test masking unicode upper/lower cases.
+  TestStringValue("mask('abcd áäèü ABCD ÁÄÈÜ')", "xxxx xxxx XXXX XXXX");
+  TestStringValue("mask('Ich möchte ein Bier. Tschüss')",
+      "Xxx xxxxxx xxx Xxxx. Xxxxxxx");
+  TestStringValue("mask('Hungarian áéíöóőüúű ÁÉÍÖÓŐÜÚŰ')",
+      "Xxxxxxxxx xxxxxxxxx XXXXXXXXX");
+  TestStringValue("mask('German äöüß ÄÖÜẞ')", "Xxxxxx xxxx XXXX");
+  TestStringValue(
+      "mask('French àâæçéèêëïîôœùûüÿ ÀÂÆÇÉÈÊËÏÎÔŒÙÛÜŸ')",
+      "Xxxxxx xxxxxxxxxxxxxxxx XXXXXXXXXXXXXXXX");
+  TestStringValue("mask('Greek αβξδ άέήώ ΑΒΞΔ ΆΈΉΏ 1234')",
+      "Xxxxx xxxx xxxx XXXX XXXX nnnn");
+  TestStringValue("mask_first_n('áéíöóőüúű')", "xxxxóőüúű");
+  TestStringValue("mask_show_first_n('áéíöóőüúű')", "áéíöxxxxx");
+  TestStringValue("mask_last_n('áéíöóőüúű')", "áéíöóxxxx");
+  TestStringValue("mask_show_last_n('áéíöóőüúű')", "xxxxxőüúű");
+
+  // Test masking to unicode code points. Specify -1(unmask) for masking upper/lower/digit
+  // chars.
+  TestStringValue("mask('hello李小龙', -1, -1, -1, '某')", "hello某某某");
+  TestStringValue("mask_last_n('hello李小龙', 4, -1, -1, -1, '某')",
+      "hello某某某");
+  TestStringValue("mask_last_n('hello李小龙', 2, -1, -1, -1, '某')",
+      "hello李某某");
+  TestStringValue("mask_show_first_n('hello李小龙', 4, -1, -1, -1, '某')",
+      "hello某某某");
+  TestStringValue("mask_show_first_n('hello李小龙', 6, -1, -1, -1, '某')",
+      "hello李某某");
+  TestStringValue("mask_first_n('李小龙hello', 4, -1, -1, -1, '某')",
+      "某某某hello");
+  TestStringValue("mask_show_last_n('李小龙hello', 5, -1, -1, -1, '某')",
+      "某某某hello");
+  executor_->PopExecOption();
+}
+
 TEST_P(ExprTest, Utf8Test) {
   // Verifies utf8_length() counts length by UTF-8 characters instead of bytes.
   // '你' and '好' are both encoded into 3 bytes.
