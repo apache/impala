@@ -42,7 +42,7 @@ INT, TIMESTAMP
 4101,2010-02-15 02:21:06.300000000
 4102,NULL
 ---- ERRORS
-Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp2_hive_211/out_of_range_timestamp2_hive_211.parquet' column 'timestamp_col' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31. (1 of 2433 similar)
+Parquet file '$NAMENODE/test-warehouse/$DATABASE.db/out_of_range_timestamp2_hive_211/out_of_range_timestamp2_hive_211.parquet' column 'timestamp_col' contains an out of range timestamp. The valid date range is 1400-01-01..9999-12-31. (1 of 4 similar)
 ====
 ---- QUERY
 set timezone="PST8PDT";

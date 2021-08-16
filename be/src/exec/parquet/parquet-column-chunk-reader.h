@@ -113,18 +113,31 @@ class ParquetColumnChunkReader {
       ScopedBuffer* uncompressed_buffer, uint8_t** dict_values,
       int64_t* data_size, int* num_entries);
 
-  /// Reads the next data page to '*data' and '*data_size'.
+  /// Reads the next data page to '*data' and '*data_size', if 'read_data' is true.
+  /// Else reads page header only, following which client should either call
+  /// 'ReadDataPageData' or 'SkipPageData'.
   /// Skips other types of pages (except for dictionary) until it finds a data page. If it
   /// finds a dictionary page, returns an error as the dictionary page should be the first
   /// page and this method should only be called if a data page is expected.
   /// If the stream reaches the end before reading a complete page header, '*eos' is set
   /// to true.
-  Status ReadNextDataPage(bool* eos, uint8_t** data, int* data_size);
+  Status ReadNextDataPage(
+      bool* eos, uint8_t** data, int* data_size, bool read_data = true);
 
   /// If the column type is a variable length string, transfers the remaining resources
   /// backing tuples to 'mem_pool' and frees up other resources. Otherwise frees all
   /// resources.
   void ReleaseResourcesOfLastPage(MemPool& mem_pool);
+
+  /// Skips the data part of the page. The header must be already read.
+  Status SkipPageData();
+
+  /// Reads the data part of the next data page. Sets '*data' to point to the buffer and
+  /// '*data_size' to its size.
+  /// If the column type is a variable length string, the buffer is allocated from
+  /// data_page_pool_. Otherwise the returned buffer will be valid only until the next
+  /// function call that advances the buffer.
+  Status ReadDataPageData(uint8_t** data, int* data_size);
 
  private:
   HdfsParquetScanner* parent_;
@@ -150,16 +163,6 @@ class ParquetColumnChunkReader {
   /// See TryReadDictionaryPage() for information about the parameters.
   Status ReadDictionaryData(ScopedBuffer* uncompressed_buffer, uint8_t** dict_values,
       int64_t* data_size, int* num_entries);
-
-  /// Reads the data part of the next data page. Sets '*data' to point to the buffer and
-  /// '*data_size' to its size.
-  /// If the column type is a variable length string, the buffer is allocated from
-  /// data_page_pool_. Otherwise the returned buffer will be valid only until the next
-  /// function call that advances the buffer.
-  Status ReadDataPageData(uint8_t** data, int* data_size);
-
-  /// Skips the data part of the page. The header must be already read.
-  Status SkipPageData();
 
   /// Allocate memory for the uncompressed contents of a data page of 'size' bytes from
   /// 'data_page_pool_'. 'err_ctx' provides context for error messages. On success,

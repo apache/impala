@@ -203,8 +203,8 @@ Status ParquetColumnChunkReader::ReadDictionaryData(ScopedBuffer* uncompressed_b
   return Status::OK();
 }
 
-Status ParquetColumnChunkReader::ReadNextDataPage(bool* eos, uint8_t** data,
-    int* data_size) {
+Status ParquetColumnChunkReader::ReadNextDataPage(
+    bool* eos, uint8_t** data, int* data_size, bool read_data) {
   // Read the next data page, skipping page types we don't care about. This method should
   // be called after we know that the first page is not a dictionary page. Therefore, if
   // we find a dictionary page, it is an error in the parquet file and we return a non-ok
@@ -227,8 +227,11 @@ Status ParquetColumnChunkReader::ReadNextDataPage(bool* eos, uint8_t** data,
       RETURN_IF_ERROR(SkipPageData());
     }
   }
-
-  return ReadDataPageData(data, data_size);
+  if (read_data) {
+    return ReadDataPageData(data, data_size);
+  } else {
+    return Status::OK();
+  }
 }
 
 Status ParquetColumnChunkReader::ReadDataPageData(uint8_t** data, int* data_size) {

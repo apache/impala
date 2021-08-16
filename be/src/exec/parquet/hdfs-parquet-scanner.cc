@@ -110,8 +110,11 @@ HdfsParquetScanner::HdfsParquetScanner(HdfsScanNodeBase* scan_node, RuntimeState
     parquet_compressed_page_size_counter_(nullptr),
     parquet_uncompressed_page_size_counter_(nullptr),
     coll_items_read_counter_(0),
-    page_index_(this) {
+    page_index_(this),
+    late_materialization_threshold_(
+      state->query_options().parquet_late_materialization_threshold) {
   assemble_rows_timer_.Stop();
+  complete_micro_batch_ = {0, state_->batch_size() - 1, state_->batch_size()};
 }
 
 Status HdfsParquetScanner::Open(ScannerContext* context) {
@@ -141,6 +144,9 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
       ADD_COUNTER(scan_node_->runtime_profile(), "NumRuntimeFilteredPages", TUnit::UNIT);
   num_pages_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumPages", TUnit::UNIT);
+  num_pages_skipped_by_late_materialization_counter_ =
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumPagesSkippedByLateMaterialization",
+          TUnit::UNIT);
   num_scanners_with_no_reads_counter_ =
       ADD_COUNTER(scan_node_->runtime_profile(), "NumScannersWithNoReads", TUnit::UNIT);
   num_dict_filtered_row_groups_counter_ =
@@ -226,6 +232,7 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   // We've processed the metadata and there are columns that need to be materialized.
   RETURN_IF_ERROR(CreateColumnReaders(
       *scan_node_->tuple_desc(), *schema_resolver_, &column_readers_));
+  InitSlotIdsForConjuncts();
   COUNTER_SET(num_cols_counter_,
       static_cast<int64_t>(CountScalarColumns(column_readers_)));
   // Set top-level template tuple.
@@ -235,7 +242,48 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   if (state_->query_options().parquet_bloom_filtering) {
     RETURN_IF_ERROR(CreateColIdx2EqConjunctMap());
   }
+  DivideFilterAndNonFilterColumnReaders(column_readers_, &filter_readers_,
+      &non_filter_readers_);
   return Status::OK();
+}
+
+// Currently, Collection Readers and scalar readers upon collection values
+// are not supported for late materialization.
+static bool DoesNotSupportLateMaterialization(ParquetColumnReader* column_reader) {
+  return column_reader->IsCollectionReader() || column_reader->max_rep_level() > 0;
+}
+
+void HdfsParquetScanner::DivideFilterAndNonFilterColumnReaders(
+    const vector<ParquetColumnReader*>& column_readers,
+    vector<ParquetColumnReader*>* filter_readers,
+    vector<ParquetColumnReader*>* non_filter_readers) const {
+  filter_readers->clear();
+  non_filter_readers->clear();
+  for (auto column_reader : column_readers) {
+    auto slot_desc = column_reader->slot_desc();
+    if (DoesNotSupportLateMaterialization(column_reader) || (slot_desc != nullptr &&
+        std::find(conjunct_slot_ids_.begin(), conjunct_slot_ids_.end(), slot_desc->id())
+            != conjunct_slot_ids_.end())) {
+      filter_readers->push_back(column_reader);
+    } else {
+      non_filter_readers->push_back(column_reader);
+    }
+  }
+}
+
+void HdfsParquetScanner::InitSlotIdsForConjuncts() {
+  conjunct_slot_ids_.reserve(scan_node_->conjuncts().size() +
+    scan_node_->filter_exprs().size());
+  vector<ScalarExpr*> conjuncts;
+  conjuncts.reserve(scan_node_->conjuncts().size() +
+    scan_node_->filter_exprs().size());
+  conjuncts.insert(std::end(conjuncts), std::begin(scan_node_->conjuncts()),
+      std::end(scan_node_->conjuncts()));
+  conjuncts.insert(std::end(conjuncts), std::begin(scan_node_->filter_exprs()),
+      std::end(scan_node_->filter_exprs()));
+  for (int conjunct_idx = 0; conjunct_idx < conjuncts.size(); ++conjunct_idx) {
+    conjuncts[conjunct_idx]->GetSlotIds(&conjunct_slot_ids_);
+  }
 }
 
 void HdfsParquetScanner::Close(RowBatch* row_batch) {
@@ -484,7 +532,12 @@ Status HdfsParquetScanner::GetNextInternal(RowBatch* row_batch) {
     return Status::OK();
   }
   assemble_rows_timer_.Start();
-  Status status = AssembleRows(column_readers_, row_batch, &advance_row_group_);
+  Status status;
+  if (filter_pages_) {
+    status = AssembleRows<true>(row_batch, &advance_row_group_);
+  } else {
+    status = AssembleRows<false>(row_batch, &advance_row_group_);
+  }
   assemble_rows_timer_.Stop();
   RETURN_IF_ERROR(status);
   if (!parse_status_.ok()) {
@@ -2093,7 +2146,7 @@ Status HdfsParquetScanner::ProcessBloomFilter(const parquet::RowGroup&
 /// TODO: Since the scratch batch is populated in a column-wise fashion, it is
 /// difficult to maintain a maximum memory footprint without throwing away at least
 /// some work. This point needs further experimentation and thought.
-Status HdfsParquetScanner::AssembleRows(
+Status HdfsParquetScanner::AssembleRowsWithoutLateMaterialization(
     const vector<ParquetColumnReader*>& column_readers, RowBatch* row_batch,
     bool* skip_row_group) {
   DCHECK(!column_readers.empty());
@@ -2131,7 +2184,7 @@ Status HdfsParquetScanner::AssembleRows(
         *skip_row_group = true;
         if (num_tuples_mismatch && continue_execution) {
           Status err(Substitute("Corrupt Parquet file '$0': column '$1' "
-              "had $2 remaining values but expected $3", filename(),
+              "had $2 remaining values but expected $3",filename(),
               col_reader->schema_element().name, last_num_tuples,
               scratch_batch_->num_tuples));
           parse_status_.MergeStatus(err);
@@ -2151,6 +2204,214 @@ Status HdfsParquetScanner::AssembleRows(
   // Merge Scanner-local counter into HdfsScanNode counter and reset.
   COUNTER_ADD(scan_node_->collection_items_read_counter(), coll_items_read_counter_);
   coll_items_read_counter_ = 0;
+  return Status::OK();
+}
+
+/// High-level steps of this function:
+/// 1. If late materialization is disabled or not applicable, use
+///    'AssembleRowsWithoutLateMaterialization'.
+/// 2. Allocate 'scratch' memory for tuples able to hold a full batch.
+/// 3. Populate the slots of all scratch tuples one column reader at a time only
+///    for 'filter_readers_', using the ColumnReader::Read*ValueBatch() functions.
+///    These column readers are based on columns used in conjuncts and runtime filters.
+/// 3. Evaluate runtime filters and conjuncts against the scratch tuples and save
+///    pointer of surviving tuples in the output batch. Note that it just saves the
+///    pointer to surviving tuples which are still part of 'scratch' memory.
+/// 4. If no tuples survive step 3, skip materializing tuples for 'non_filter_readers'.
+///    Collect the rows to be skipped and skip them later at step 5 b.
+/// 5. If surviving tuples are present then:
+///    a. Get the micro batches of surviving rows to be read by 'non_filter_readers_'.
+///    b. Skip rows collected at step 4, if needed.
+///    c. Fill 'scratch' memory by reading micro batches using 'FillScratchMicroBatches'.
+///       Only the rows in micro batches are filled in 'scratch' and other rows are
+///       ignored. Note, we don't need to filter the rows again as output batch already
+///       has pointer to surviving tuples.
+/// 6. Transfer the ownership of scratch memory to the output batch once the scratch
+///    memory is exhausted.
+/// 7. Repeat steps above until we are done with the row group or an error
+///    occurred.
+/// TODO: Since the scratch batch is populated in a column-wise fashion, it is
+/// difficult to maintain a maximum memory footprint without throwing away at least
+/// some work. This point needs further experimentation and thought.
+template <bool USES_PAGE_INDEX>
+Status HdfsParquetScanner::AssembleRows(RowBatch* row_batch, bool* skip_row_group) {
+  DCHECK(!column_readers_.empty());
+  DCHECK(row_batch != nullptr);
+  DCHECK_EQ(*skip_row_group, false);
+  DCHECK(scratch_batch_ != nullptr);
+
+  if (filter_readers_.empty() || non_filter_readers_.empty() ||
+      late_materialization_threshold_ < 0 || filter_readers_[0]->max_rep_level() > 0) {
+    // Late Materialization is either disabled or not applicable for assembling rows here.
+    return AssembleRowsWithoutLateMaterialization(column_readers_, row_batch,
+        skip_row_group);
+  }
+
+  int64_t num_rows_read = 0;
+  int64_t num_rows_to_skip = 0;
+  int64_t last_row_id_processed = -1;
+  while (!column_readers_[0]->RowGroupAtEnd()) {
+    // Start a new scratch batch.
+    RETURN_IF_ERROR(scratch_batch_->Reset(state_));
+    InitTupleBuffer(template_tuple_, scratch_batch_->tuple_mem, scratch_batch_->capacity);
+    // Late Materialization
+    // 1. Filter rows only materializing the columns in 'filter_readers_'
+    // 2. Transfer the surviving rows
+    // 3. Materialize rest of the columns only for surviving rows.
+
+    RETURN_IF_ERROR(FillScratchMicroBatches(filter_readers_, row_batch,
+        skip_row_group, &complete_micro_batch_, 1, scratch_batch_->capacity,
+        &scratch_batch_->num_tuples));
+    if (*skip_row_group) { return Status::OK(); }
+    num_rows_read += scratch_batch_->num_tuples;
+    bool row_group_end = filter_readers_[0]->RowGroupAtEnd();
+    int num_row_to_commit = FilterScratchBatch(row_batch);
+    if (num_row_to_commit == 0) {
+      // Collect the rows to skip, so that we can skip them together to avoid
+      // decompression and decoding. This ensures compressed pages that don't
+      // have any rows of interest are skiped without decompression.
+      num_rows_to_skip += scratch_batch_->num_tuples;
+      last_row_id_processed = filter_readers_[0]->LastProcessedRow();
+    } else {
+      if (num_rows_to_skip > 0) {
+        // skip reading for rest of the non-filter column readers now.
+        RETURN_IF_ERROR(SkipRowsForColumns(
+            non_filter_readers_, &num_rows_to_skip, &last_row_id_processed));
+      }
+      int num_tuples;
+      if (USES_PAGE_INDEX || !scratch_batch_->AtEnd() ||
+          num_row_to_commit == scratch_batch_->num_tuples) {
+        // When using Page Index, materialize the entire batch. Currently, only avoiding
+        // materializing only at the granularity of entire batch is supported for page
+        // indexes. Other condition is when no filtering happened.
+        RETURN_IF_ERROR(FillScratchMicroBatches(non_filter_readers_, row_batch,
+            skip_row_group, &complete_micro_batch_,
+            1 /*'complete_micro_batch' is a single batch */, scratch_batch_->capacity,
+            &num_tuples));
+      } else {
+        ScratchMicroBatch micro_batches[scratch_batch_->capacity];
+        int num_micro_batches = scratch_batch_->GetMicroBatches(
+            late_materialization_threshold_, micro_batches);
+        RETURN_IF_ERROR(FillScratchMicroBatches(non_filter_readers_, row_batch,
+            skip_row_group, micro_batches, num_micro_batches,
+            scratch_batch_->num_tuples, &num_tuples));
+      }
+      if (*skip_row_group) { return Status::OK(); }
+    }
+    // Finalize the Transfer
+    if (scratch_batch_->tuple_byte_size != 0) {
+      scratch_batch_->FinalizeTupleTransfer(row_batch, num_row_to_commit);
+    }
+    if (row_group_end) {
+      // skip reading for rest of the non-filter column readers now.
+      RETURN_IF_ERROR(SkipRowsForColumns(
+          non_filter_readers_, &num_rows_to_skip, &last_row_id_processed));
+      for (int c = 0; c < non_filter_readers_.size(); ++c) {
+        ParquetColumnReader* col_reader = non_filter_readers_[c];
+        if (UNLIKELY(!col_reader->SetRowGroupAtEnd())) {
+          return Status(
+              Substitute("Could not move to RowGroup end in file $0.", filename()));
+        }
+      }
+    }
+    if (num_row_to_commit != 0) {
+      RETURN_IF_ERROR(CheckPageFiltering());
+      RETURN_IF_ERROR(CommitRows(row_batch, num_row_to_commit));
+    }
+    if (row_batch->AtCapacity()) {
+      // skip reading for rest of the non-filter column readers now.
+      RETURN_IF_ERROR(SkipRowsForColumns(
+          non_filter_readers_, &num_rows_to_skip, &last_row_id_processed));
+      break;
+    }
+  }
+  row_group_rows_read_ += num_rows_read;
+  COUNTER_ADD(scan_node_->rows_read_counter(), num_rows_read);
+  // Merge Scanner-local counter into HdfsScanNode counter and reset.
+  COUNTER_ADD(scan_node_->collection_items_read_counter(), coll_items_read_counter_);
+  coll_items_read_counter_ = 0;
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::SkipRowsForColumns(
+    const vector<ParquetColumnReader*>& column_readers, int64_t* num_rows_to_skip,
+    int64_t* skip_to_row) {
+  if (*num_rows_to_skip > 0) {
+    for (int c = 0; c < column_readers.size(); ++c) {
+      ParquetColumnReader* col_reader = column_readers[c];
+      // Skipping may fail for corrupted Parquet file due to mismatch of rows
+      // among columns.
+      if (UNLIKELY(!col_reader->SkipRows(*num_rows_to_skip, *skip_to_row))) {
+        return Status(Substitute("Error in skipping rows in file $0.", filename()));
+      }
+    }
+    *num_rows_to_skip = 0;
+    *skip_to_row = -1;
+  }
+  return Status::OK();
+}
+
+Status HdfsParquetScanner::FillScratchMicroBatches(
+    const vector<ParquetColumnReader*>& column_readers, RowBatch* row_batch,
+    bool* skip_row_group, const ScratchMicroBatch* micro_batches, int num_micro_batches,
+    int max_num_tuples, int* num_tuples) {
+  if (UNLIKELY(num_micro_batches < 1)) {
+    return Status(Substitute("Number of batches is $0, less than 1", num_micro_batches));
+  }
+
+  // Materialize the top-level slots into the scratch batches column-by-column.
+  int last_num_tuples[num_micro_batches];
+  for (int c = 0; c < column_readers.size(); ++c) {
+    ParquetColumnReader* col_reader = column_readers[c];
+    bool continue_execution = false;
+    int last = -1;
+    for (int r = 0; r < num_micro_batches; r++) {
+      if (r == 0) {
+        if (micro_batches[0].start > 0) {
+          if (UNLIKELY(!col_reader->SkipRows(micro_batches[0].start, -1))) {
+            return Status(Substitute("Couldn't skip rows in file $0.", filename()));
+          }
+        }
+      } else {
+        if (UNLIKELY(!col_reader->SkipRows(micro_batches[r].start - last - 1, -1))) {
+          return Status(Substitute("Couldn't skip rows in file $0.", filename()));
+        }
+      }
+      uint8_t* next_tuple_mem = scratch_batch_->tuple_mem
+          + (scratch_batch_->tuple_byte_size * micro_batches[r].start);
+      if (col_reader->max_rep_level() > 0) {
+        continue_execution = col_reader->ReadValueBatch(&scratch_batch_->aux_mem_pool,
+            micro_batches[r].length, tuple_byte_size_, next_tuple_mem, num_tuples);
+      } else {
+        continue_execution =
+            col_reader->ReadNonRepeatedValueBatch(&scratch_batch_->aux_mem_pool,
+                micro_batches[r].length, tuple_byte_size_, next_tuple_mem, num_tuples);
+      }
+      last = micro_batches[r].end;
+      // Check that all column readers populated the same number of values.
+      bool num_tuples_mismatch = c != 0 && last_num_tuples[r] != *num_tuples;
+      if (UNLIKELY(!continue_execution || num_tuples_mismatch)) {
+        // Skipping this row group. Free up all the resources with this row group.
+        FlushRowGroupResources(row_batch);
+        *num_tuples = 0;
+        DCHECK(scratch_batch_->AtEnd());
+        *skip_row_group = true;
+        if (num_tuples_mismatch && continue_execution) {
+          Status err(Substitute("Corrupt Parquet file '$0': column '$1' "
+              "had $2 remaining values but expected $3",filename(),
+              col_reader->schema_element().name, last_num_tuples[r], *num_tuples));
+          parse_status_.MergeStatus(err);
+        }
+        return Status::OK();
+      }
+      last_num_tuples[r] = *num_tuples;
+    }
+    if (UNLIKELY(last < max_num_tuples - 1)) {
+      if (UNLIKELY(!col_reader->SkipRows(max_num_tuples - 1 - last, -1))) {
+        return Status(Substitute("Couldn't skip rows in file $0.", filename()));
+      }
+    }
+  }
   return Status::OK();
 }
 

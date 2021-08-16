@@ -128,5 +128,6 @@ ADD_UNIFIED_BE_LSAN_TEST(delimited-text-parser-test DelimitedTextParser.*)
 ADD_UNIFIED_BE_LSAN_TEST(read-write-util-test ReadWriteUtil.*)
 # Exception to unified be tests: Custom main with global Frontend object
 ADD_BE_LSAN_TEST(row-batch-list-test)
+ADD_BE_LSAN_TEST(scratch-tuple-batch-test)
 ADD_UNIFIED_BE_LSAN_TEST(incr-stats-util-test IncrStatsUtilTest.*)
 ADD_UNIFIED_BE_LSAN_TEST(hdfs-avro-scanner-test HdfsAvroScannerTest.*)

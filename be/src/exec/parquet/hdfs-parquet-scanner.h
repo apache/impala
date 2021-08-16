@@ -24,6 +24,7 @@
 #include "exec/parquet/parquet-common.h"
 #include "exec/parquet/parquet-metadata-utils.h"
 #include "exec/parquet/parquet-page-index.h"
+#include "exec/scratch-tuple-batch.h"
 #include "runtime/bufferpool/buffer-pool.h"
 #include "util/runtime-profile-counters.h"
 
@@ -427,6 +428,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
 
   /// Column reader for each top-level materialized slot in the output tuple.
   std::vector<ParquetColumnReader*> column_readers_;
+  /// Column readers among 'column_readers_' used for filtering
+  std::vector<ParquetColumnReader*> filter_readers_;
+  /// Column readers among 'column_readers_' not used for filtering
+  std::vector<ParquetColumnReader*> non_filter_readers_;
 
   /// File metadata thrift object
   parquet::FileMetaData file_metadata_;
@@ -473,6 +478,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
 
   /// Mapping from Parquet column indexes to scalar readers.
   std::unordered_map<int, BaseScalarColumnReader*> scalar_reader_map_;
+
+  /// List of slot ids used by conjuncts and runtime filters.
+  std::vector<SlotId> conjunct_slot_ids_;
 
   /// Memory used to store the tuples used for dictionary filtering. Tuples owned by
   /// perm_pool_.
@@ -521,6 +529,10 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// 'num_pages_counter_ - num_stats_filtered_pages_counter_' pages.
   RuntimeProfile::Counter* num_pages_counter_;
 
+  /// Number of pages skipped by late materialization as they did not have any
+  /// rows that survived filtering.
+  RuntimeProfile::Counter* num_pages_skipped_by_late_materialization_counter_;
+
   /// Number of scanners that end up doing no reads because their splits don't overlap
   /// with the midpoint of any row-group in the file.
   RuntimeProfile::Counter* num_scanners_with_no_reads_counter_;
@@ -550,6 +562,20 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   int64_t coll_items_read_counter_;
 
   ParquetPageIndex page_index_;
+
+  /// Defines late materialization threshold for column readers. While materializing
+  /// values and putting them into scratch_batch_, we try to avoid materializing values
+  /// that were filtered out already. Threshold defines minimum number of contiguous
+  /// rows that have to be filtered out to skip materializing them.
+  /// For example, if the threshold is 5 and rows surviving filters are 1-20 and 27-35,
+  /// then we can skip materializing 6 rows (21-26) as threshold 5 is less than 6. But
+  /// if threshold is 10, then rows 21-26 will be materialized instead.
+  int32_t late_materialization_threshold_;
+
+  /// In late Materializing, we try to materialize only the portition of a batch that
+  /// survive after filtering and call it micro batch. This represents a micro batch
+  /// that spans entire batch of length 'scratch_batch_->capacity'.
+  ScratchMicroBatch complete_micro_batch_;
 
   const char* filename() const { return metadata_range_->file(); }
 
@@ -724,8 +750,14 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// of this query should be terminated immediately.
   /// May set *skip_row_group to indicate that the current row group should be skipped,
   /// e.g., due to a parse error, but execution should continue.
-  Status AssembleRows(const std::vector<ParquetColumnReader*>& column_readers,
-      RowBatch* row_batch, bool* skip_row_group) WARN_UNUSED_RESULT;
+  template <bool USE_PAGE_INDEX>
+  Status AssembleRows(RowBatch* row_batch, bool* skip_row_group) WARN_UNUSED_RESULT;
+
+  /// Check 'AssembleRows' for details.
+  /// 'AssembleRows' implements late materialization whereas this function does not.
+  Status AssembleRowsWithoutLateMaterialization(
+      const vector<ParquetColumnReader*>& column_readers, RowBatch* row_batch,
+      bool* skip_row_group) WARN_UNUSED_RESULT;
 
   /// Commit num_rows to the given row batch.
   /// Returns OK if the query is not cancelled and hasn't exceeded any mem limits.
@@ -906,6 +938,30 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Updates the counter parquet_uncompressed_page_size_counter_ with the given
   /// uncompressed page size. Called by ParquetColumnReader for each page read.
   void UpdateUncompressedPageSizeCounter(int64_t uncompressed_page_size);
+
+  /// Initialize 'conjunct_slot_ids_' with the SlotIds used in the conjuncts.
+  void InitSlotIdsForConjuncts();
+
+  /// Fill 'micro_batches' with the data read by 'column_readers'.
+  /// Micro batches are sub ranges in 0..num_tuples-1 which needs to be read.
+  /// Tuple memory to write to is specified by 'scratch_batch->tuple_mem'.
+  Status FillScratchMicroBatches(const vector<ParquetColumnReader*>& column_readers,
+      RowBatch* row_batch, bool* skip_row_group, const ScratchMicroBatch* micro_batches,
+      int num_micro_batches, int max_num_tuples, int* num_tuples);
+
+  /// Partition 'column_readers' into filter and non-filter readers. All 'filter_readers'
+  /// are the readers reading columns involved in either static filter or runtime filter.
+  /// All 'non_filter_readers' are responsible for reading surviving rows from those
+  /// columns that are not involved in filtering.
+  void DivideFilterAndNonFilterColumnReaders(
+      const vector<ParquetColumnReader*>& column_readers,
+      vector<ParquetColumnReader*>* filter_readers,
+      vector<ParquetColumnReader*>* non_filter_readers) const;
+
+  /// Skip 'num_rows_to_skip' for all 'column_readers'. If Page filtering is enabled
+  /// then we skip to row index 'skip_to_row'.
+  Status SkipRowsForColumns(const vector<ParquetColumnReader*>& column_readers,
+      int64_t* num_rows_to_skip, int64_t* skip_to_row);
 };
 
 } // namespace impala

@@ -1118,11 +1118,23 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_enable_kudu_transaction(IsTrue(value));
         break;
       }
-      case TImpalaQueryOptions::MINMAX_FILTER_PARTITION_COLUMNS:
+      case TImpalaQueryOptions::MINMAX_FILTER_PARTITION_COLUMNS: {
         query_options->__set_minmax_filter_partition_columns(IsTrue(value));
         break;
+      }
       case TImpalaQueryOptions::ENABLE_ASYNC_DDL_EXECUTION: {
         query_options->__set_enable_async_ddl_execution(IsTrue(value));
+        break;
+      }
+      case TImpalaQueryOptions::PARQUET_LATE_MATERIALIZATION_THRESHOLD: {
+        StringParser::ParseResult result;
+        const int32_t threshold =
+            StringParser::StringToInt<int32_t>(value.c_str(), value.length(), &result);
+        if (value == nullptr || result != StringParser::PARSE_SUCCESS || threshold < -1) {
+          return Status(Substitute("Invalid parquet late materialization threshold: "
+              "'$0'. Only integer value -1 and above is allowed.", value));
+        }
+        query_options->__set_parquet_late_materialization_threshold(threshold);
         break;
       }
       case TImpalaQueryOptions::ENABLE_ASYNC_LOAD_DATA_EXECUTION: {

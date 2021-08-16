@@ -1134,6 +1134,65 @@ Status BaseScalarColumnReader::ReadDataPage() {
   return Status::OK();
 }
 
+Status BaseScalarColumnReader::ReadNextDataPageHeader() {
+  // We're about to move to the next data page. The previous data page is
+  // now complete, free up any memory allocated for it. If the data page contained
+  // strings we need to attach it to the returned batch.
+  col_chunk_reader_.ReleaseResourcesOfLastPage(parent_->scratch_batch_->aux_mem_pool);
+
+  DCHECK_EQ(num_buffered_values_, 0);
+  if ((DoesPageFiltering() && candidate_page_idx_ == candidate_data_pages_.size() - 1)
+      || num_values_read_ == metadata_->num_values) {
+    // No more pages to read
+    // TODO: should we check for stream_->eosr()?
+    return Status::OK();
+  } else if (num_values_read_ > metadata_->num_values) {
+    RETURN_IF_ERROR(LogCorruptNumValuesInMetadataError());
+    return Status::OK();
+  }
+
+  bool eos;
+  int data_size;
+  RETURN_IF_ERROR(col_chunk_reader_.ReadNextDataPage(&eos, &data_, &data_size,
+      false /*Read next data page's header only*/));
+  if (eos) return HandleTooEarlyEos();
+  const parquet::PageHeader& current_page_header = col_chunk_reader_.CurrentPageHeader();
+  int num_values = current_page_header.data_page_header.num_values;
+  if (UNLIKELY(num_values < 0)) {
+    return Status(Substitute("Error reading data page in Parquet file '$0'. "
+                             "Invalid number of values in metadata: $1",
+        filename(), num_values));
+  }
+  num_buffered_values_ = num_values;
+  num_values_read_ += num_buffered_values_;
+  if (parent_->candidate_ranges_.empty()) COUNTER_ADD(parent_->num_pages_counter_, 1);
+  return Status::OK();
+}
+
+Status BaseScalarColumnReader::ReadCurrentDataPage() {
+  int data_size;
+  RETURN_IF_ERROR(col_chunk_reader_.ReadDataPageData(&data_, &data_size));
+  data_end_ = data_ + data_size;
+  const parquet::PageHeader& current_page_header = col_chunk_reader_.CurrentPageHeader();
+  /// TODO: Move the level decoder initialisation to ParquetPageReader to abstract away
+  /// the differences between Parquet header V1 and V2.
+  // Initialize the repetition level data
+  RETURN_IF_ERROR(rep_levels_.Init(filename(),
+      &current_page_header.data_page_header.repetition_level_encoding,
+      parent_->perm_pool_.get(), parent_->state_->batch_size(), max_rep_level(), &data_,
+      &data_size));
+  // Initialize the definition level data
+  RETURN_IF_ERROR(def_levels_.Init(filename(),
+      &current_page_header.data_page_header.definition_level_encoding,
+      parent_->perm_pool_.get(), parent_->state_->batch_size(), max_def_level(), &data_,
+      &data_size));
+  // Data can be empty if the column contains all NULLs
+  RETURN_IF_ERROR(InitDataPage(data_, data_size));
+  // Skip rows if needed.
+  RETURN_IF_ERROR(StartPageFiltering());
+  return Status::OK();
+}
+
 template <bool ADVANCE_REP_LEVEL>
 bool BaseScalarColumnReader::NextLevels() {
   if (!ADVANCE_REP_LEVEL) DCHECK_EQ(max_rep_level(), 0) << slot_desc()->DebugString();
@@ -1149,7 +1208,9 @@ bool BaseScalarColumnReader::NextLevels() {
         auto current_range = parent_->candidate_ranges_[current_row_range_];
         int64_t skip_rows = current_range.first - current_row_ - 1;
         DCHECK_GE(skip_rows, 0);
-        if (!SkipTopLevelRows(skip_rows)) return false;
+        int64_t remaining = 0;
+        if (!SkipTopLevelRows(skip_rows, &remaining)) return false;
+        DCHECK_EQ(remaining, 0);
       } else {
         if (!JumpToNextPage()) return parent_->parse_status_.ok();
       }
@@ -1207,30 +1268,43 @@ Status BaseScalarColumnReader::StartPageFiltering() {
   int64_t range_start = candidate_row_ranges[current_row_range_].first;
   if (range_start > current_row_ + 1) {
     int64_t skip_rows = range_start - current_row_ - 1;
-    if (!SkipTopLevelRows(skip_rows)) {
+    int64_t remaining = 0;
+    if (!SkipTopLevelRows(skip_rows, &remaining)) {
       return Status(Substitute("Couldn't skip rows in file $0.", filename()));
     }
+    DCHECK_EQ(remaining, 0);
     DCHECK_EQ(current_row_, range_start - 1);
   }
   return Status::OK();
 }
 
-bool BaseScalarColumnReader::SkipTopLevelRows(int64_t num_rows) {
-  DCHECK_GE(num_buffered_values_, num_rows);
+template <bool MULTI_PAGE>
+bool BaseScalarColumnReader::SkipTopLevelRows(int64_t num_rows, int64_t* remaining) {
   DCHECK_GT(num_rows, 0);
+  DCHECK_GT(num_buffered_values_, 0);
+  if (!MULTI_PAGE) {
+    DCHECK_GE(num_buffered_values_, num_rows);
+  }
   // Fastest path: field is required and not nested.
   // So row count equals value count, and every value is stored in the page data.
   if (max_def_level() == 0 && max_rep_level() == 0) {
-    current_row_ += num_rows;
-    num_buffered_values_ -= num_rows;
-    return SkipEncodedValuesInPage(num_rows);
+    int rows_skipped;
+    if (MULTI_PAGE) {
+      rows_skipped = std::min((int64_t)num_buffered_values_, num_rows);
+    } else {
+      rows_skipped = num_rows;
+    }
+    current_row_ += rows_skipped;
+    num_buffered_values_ -= rows_skipped;
+    *remaining = num_rows - rows_skipped;
+    return SkipEncodedValuesInPage(rows_skipped);
   }
   int64_t num_values_to_skip = 0;
   if (max_rep_level() == 0) {
     // No nesting, but field is not required.
     // Skip as many values in the page data as many non-NULL values encountered.
     int i = 0;
-    while (i < num_rows) {
+    while (i < num_rows && num_buffered_values_ > 0) {
       int repeated_run_length = def_levels_.NextRepeatedRunLength();
       if (repeated_run_length > 0) {
         int read_count = min<int64_t>(num_rows - i, repeated_run_length);
@@ -1249,11 +1323,13 @@ bool BaseScalarColumnReader::SkipTopLevelRows(int64_t num_rows) {
         if (!def_levels_.CacheNextBatch(num_buffered_values_).ok()) return false;
       }
     }
-    current_row_ += num_rows;
+    DCHECK_LE(i, num_rows);
+    current_row_ += i;
+    *remaining = num_rows - i;
   } else {
     // 'rep_level_' being zero denotes the start of a new top-level row.
     // From the 'def_level_' we can determine the number of non-NULL values.
-    while (true) {
+    while (num_buffered_values_ > 0) {
       if (!def_levels_.CacheNextBatchIfEmpty(num_buffered_values_).ok()) return false;
       if (!rep_levels_.CacheNextBatchIfEmpty(num_buffered_values_).ok()) return false;
       if (num_rows == 0 && rep_levels_.PeekLevel() == 0) {
@@ -1270,8 +1346,31 @@ bool BaseScalarColumnReader::SkipTopLevelRows(int64_t num_rows) {
         --num_rows;
       }
     }
+    *remaining = num_rows;
   }
   return SkipEncodedValuesInPage(num_values_to_skip);
+}
+
+bool BaseScalarColumnReader::SetRowGroupAtEnd() {
+  if (RowGroupAtEnd()) {
+    return true;
+  }
+  if (num_buffered_values_ == 0) {
+    NextPage();
+  }
+  if (DoesPageFiltering() && RowsRemainingInCandidateRange() == 0) {
+    if (max_rep_level() == 0 || rep_levels_.PeekLevel() == 0) {
+      if (!IsLastCandidateRange()) AdvanceCandidateRange();
+      if (!PageHasRemainingCandidateRows()) {
+        JumpToNextPage();
+      }
+    }
+  }
+  bool status = RowGroupAtEnd();
+  if (!status) {
+    return false;
+  }
+  return parent_->parse_status_.ok();
 }
 
 int BaseScalarColumnReader::FillPositionsInCandidateRange(int rows_remaining,
@@ -1335,7 +1434,8 @@ bool BaseScalarColumnReader::SkipRowsInPage() {
   DCHECK_LT(current_row_, current_range.first);
   int64_t skip_rows = current_range.first - current_row_ - 1;
   DCHECK_GE(skip_rows, 0);
-  return SkipTopLevelRows(skip_rows);
+  int64_t remaining = 0;
+  return SkipTopLevelRows(skip_rows, &remaining);
 }
 
 bool BaseScalarColumnReader::JumpToNextPage() {
@@ -1377,6 +1477,21 @@ bool BaseScalarColumnReader::NextPage() {
   return true;
 }
 
+bool BaseScalarColumnReader::AdvanceNextPageHeader() {
+  num_buffered_values_ = 0;
+  parent_->assemble_rows_timer_.Stop();
+  parent_->parse_status_ = ReadNextDataPageHeader();
+  if (UNLIKELY(!parent_->parse_status_.ok())) return false;
+  if (num_buffered_values_ == 0) {
+    rep_level_ = ParquetLevel::ROW_GROUP_END;
+    def_level_ = ParquetLevel::ROW_GROUP_END;
+    pos_current_value_ = ParquetLevel::INVALID_POS;
+    return false;
+  }
+  parent_->assemble_rows_timer_.Start();
+  return true;
+}
+
 void BaseScalarColumnReader::SetLevelDecodeError(
     const char* level_name, int decoded_level, int max_level) {
   if (decoded_level < 0) {
@@ -1391,6 +1506,119 @@ void BaseScalarColumnReader::SetLevelDecodeError(
         level_name, decoded_level, max_level, schema_element().name)));
   }
 }
+
+/// Wrapper around 'SkipTopLevelRows' to skip across multiple pages.
+/// Function handles 3 scenarios:
+/// 1. Page Filtering: When this is enabled this function can be used
+///    to skip to a particular 'skip_row_id'.
+/// 2. Collection: When this scalar reader is reading elements of a collection
+/// 3. Rest of the cases.
+/// For page filtering, we keep track of first and last page indexes and keep
+/// traversing to next page until we find a page that contains 'skip_row_id'.
+/// At that point, we can just skip to the required row id.
+/// Difference between scenario 2 and 3 is that in scenario 2, we end up
+/// decompressing all the pages being skipped, whereas in scenario 3 we only
+/// decompress pages required and avoid decompression needed. This is possible
+/// because in scenario 3 'data_page_header.num_values' corresponds to number
+/// of rows stored in the page. This is not true in scenario 2 because multiple
+/// consecutive values can belong to same row.
+template <bool IN_COLLECTION>
+bool BaseScalarColumnReader::SkipRowsInternal(int64_t num_rows, int64_t skip_row_id) {
+  if (DoesPageFiltering() && skip_row_id > 0) {
+    // Checks if its the beginning of row group and advances to next page.
+    if (candidate_page_idx_ < 0) {
+      if (UNLIKELY(!NextPage())) {
+        return false;
+      }
+    }
+    int last_row_idx = LastRowIdxInCurrentPage();
+    // Keep advancing until we hit reach required page containing 'skip_row_id'
+    while (skip_row_id > last_row_idx) {
+      COUNTER_ADD(parent_->num_pages_skipped_by_late_materialization_counter_, 1);
+      if (UNLIKELY(!JumpToNextPage())) {
+        return false;
+      }
+      last_row_idx = LastRowIdxInCurrentPage();
+    }
+    DCHECK_GE(skip_row_id, FirstRowIdxInCurrentPage());
+    int64_t last_row = LastProcessedRow();
+    int64_t remaining = 0;
+    // Skip to the required row id within the page.
+    if (last_row < skip_row_id) {
+      if (UNLIKELY(!SkipTopLevelRows(skip_row_id - last_row, &remaining))) {
+        return false;
+      }
+    }
+    // also need to adjust 'candidate_row_ranges' as we skipped to new row id.
+    auto& candidate_row_ranges = parent_->candidate_ranges_;
+    while (current_row_ > candidate_row_ranges[current_row_range_].last) {
+      DCHECK_LT(current_row_range_, candidate_row_ranges.size());
+      ++current_row_range_;
+    }
+    return true;
+  } else if (IN_COLLECTION) {
+    DCHECK_GT(num_rows, 0);
+    // if all the values of current page are consumed, move to next page.
+    if (num_buffered_values_ == 0) {
+      if (!NextPage()) {
+        return false;
+      }
+    }
+    DCHECK_GT(num_buffered_values_, 0);
+    int64_t remaining = 0;
+    // Try to skip 'num_rows' and see if something remains.
+    if (!SkipTopLevelRows<true>(num_rows, &remaining)) {
+      return false;
+    }
+    // Again invoke the same method on remaining rows.
+    if (remaining > 0) {
+      return SkipRowsInternal<IN_COLLECTION>(remaining, skip_row_id);
+    }
+    return true;
+  } else {
+    // If everything consumed in current page, skip data pages (multiple skips if needed)
+    // to reach required page.
+    if (num_buffered_values_ == 0) {
+      if (!AdvanceNextPageHeader()) {
+        return false;
+      }
+      const parquet::PageHeader& current_page_header =
+          col_chunk_reader_.CurrentPageHeader();
+      int32_t current_page_values = current_page_header.data_page_header.num_values;
+      if (UNLIKELY(current_page_values <= 0)) {
+        return false;
+      }
+      // Keep advancing to next page header if rows to be skipped are more than number
+      // of values in the page. Note we will just be reading headers and skipping
+      // pages without decompressing them as we advance.
+      while (num_rows > current_page_values) {
+        COUNTER_ADD(parent_->num_pages_skipped_by_late_materialization_counter_, 1);
+        num_rows -= current_page_values;
+        if (!col_chunk_reader_.SkipPageData().ok() || !AdvanceNextPageHeader()) {
+          return false;
+        }
+        current_page_values =
+            col_chunk_reader_.CurrentPageHeader().data_page_header.num_values;
+      }
+      // Read the data page (includes decompressing them if required).
+      Status page_read = ReadCurrentDataPage();
+      if (!page_read.ok()) {
+        return false;
+      }
+    }
+
+    // Skip the remaining rows in the page.
+    DCHECK_GT(num_buffered_values_, 0);
+    int64_t remaining = 0;
+    if (!SkipTopLevelRows<true>(num_rows, &remaining)) {
+      return false;
+    }
+    if (remaining > 0) {
+      return SkipRowsInternal<IN_COLLECTION>(remaining, skip_row_id);
+    }
+    return true;
+  }
+};
 
 /// Returns a column reader for decimal types based on its size and parquet type.
 static ParquetColumnReader* CreateDecimalColumnReader(

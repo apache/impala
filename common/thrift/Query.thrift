@@ -555,6 +555,10 @@ struct TQueryOptions {
 
   // Allow load data exec request to run in a separate thread
   138: optional bool enable_async_load_data_execution = true;
+
+  // Number of minimum consecutive rows when filtered out, will avoid materialization
+  // of columns in parquet. Set it to -1 to turn off late materialization feature.
+  139: optional i32 parquet_late_materialization_threshold = 20;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

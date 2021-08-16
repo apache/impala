@@ -1,0 +1,45 @@
+# This tests pages skipped by parquet late materialization.
+====
+---- QUERY
+# Test for late materialization on page indexes
+select * from tpch_parquet.lineitem where l_orderkey=3209632;
+---- RUNTIME_PROFILE
+aggregation(SUM, NumPagesSkippedByLateMaterialization)> 0
+====
+---- QUERY
+# Test for late materialization on non-page index
+select * from tpch_parquet.lineitem
+    where l_comment like '%unusual courts. blithely final theodolit%';
+---- RUNTIME_PROFILE
+aggregation(SUM, NumPagesSkippedByLateMaterialization)> 0
+====
+---- QUERY
+# Test late materialization on runtime filters.
+SET RUNTIME_FILTER_MODE=GLOBAL;
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+select * from tpch_parquet.lineitem l
+    join tpch_parquet.orders o on l.l_orderkey = o.o_orderkey
+    where o_orderdate='1992-06-22' and o_totalprice = 153827.26;
+---- RUNTIME_PROFILE
+row_regex: .*1 of 1 Runtime Filter Published.*
+aggregation(SUM, NumPagesSkippedByLateMaterialization)> 0
+====
+---- QUERY
+# Test late materialization on min/max runtime filters.
+SET RUNTIME_FILTER_WAIT_TIME_MS=5000;
+SET MINMAX_FILTERING_LEVEL=ROW;
+SET ENABLED_RUNTIME_FILTER_TYPES=MIN_MAX;
+SET MINMAX_FILTER_THRESHOLD=0.5;
+select * from tpch_parquet.lineitem l
+    join tpch_parquet.orders o on l.l_orderkey = o.o_orderkey
+    where o_orderdate='1996-12-01' and o_totalprice >= 250000;
+---- RUNTIME_PROFILE
+row_regex:.* RF00.\[min_max\] -. .\.l_orderkey.*
+aggregation(SUM, NumPagesSkippedByLateMaterialization)> 0
+====
+---- QUERY
+# Test that late materialization on nested columns is disabled.
+select * from tpch_nested_parquet.customer where c_mktsegment = 'COMEDY';
+---- RUNTIME_PROFILE
+aggregation(SUM, NumPagesSkippedByLateMaterialization): 0
+====

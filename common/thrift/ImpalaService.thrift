@@ -702,6 +702,10 @@ enum TImpalaQueryOptions {
 
   // Indicates whether to run load data requests in async mode.
   ENABLE_ASYNC_LOAD_DATA_EXECUTION = 137
+
+  // Number of minimum consecutive rows when filtered out, will avoid materialization
+  // of columns in parquet. Set it to -1 to turn off late materialization feature.
+  PARQUET_LATE_MATERIALIZATION_THRESHOLD = 138;
 }
 
 // The summary of a DML statement.

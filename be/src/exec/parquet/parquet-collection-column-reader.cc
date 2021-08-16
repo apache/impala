@@ -157,4 +157,13 @@ void CollectionColumnReader::UpdateDerivedState() {
     pos_current_value_ = 0;
   }
 }
+
+bool CollectionColumnReader::SkipRows(int64_t num_rows, int64_t skip_row_id) {
+  DCHECK(!children_.empty());
+  for (int c = 0; c < children_.size(); ++c) {
+    if (!children_[c]->SkipRows(num_rows, skip_row_id)) return false;
+  }
+  UpdateDerivedState();
+  return true;
+}
 } // namespace impala

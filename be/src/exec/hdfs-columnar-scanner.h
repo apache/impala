@@ -54,6 +54,11 @@ class HdfsColumnarScanner : public HdfsScanner {
   /// Function type: ProcessScratchBatchFn
   const CodegenFnPtrBase* codegend_process_scratch_batch_fn_ = nullptr;
 
+  /// Filters out tuples from 'scratch_batch_' and adds the surviving tuples
+  /// to the given batch. Finalizing transfer of batch is not done here.
+  /// Returns the number of tuples that should be committed to the given batch.
+  int FilterScratchBatch(RowBatch* row_batch);
+
   /// Evaluates runtime filters and conjuncts (if any) against the tuples in
   /// 'scratch_batch_', and adds the surviving tuples to the given batch.
   /// Transfers the ownership of tuple memory to the target batch when the

@@ -232,7 +232,7 @@ class TupleRowLexicalComparator : public TupleRowComparator {
   int CompareInterpreted(const TupleRow* lhs, const TupleRow* rhs) const override;
 };
 
-/// Compares two TupleRows based on a set of exprs. The fisrt 'num_lexical_keys' exprs
+/// Compares two TupleRows based on a set of exprs. The first 'num_lexical_keys' exprs
 /// are compared lexically, while the remaining exprs are compared in Z-order.
 class TupleRowZOrderComparator : public TupleRowComparator {
  public:

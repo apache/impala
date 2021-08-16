@@ -18,11 +18,19 @@
 #ifndef IMPALA_EXEC_PARQUET_SCRATCH_TUPLE_BATCH_H
 #define IMPALA_EXEC_PARQUET_SCRATCH_TUPLE_BATCH_H
 
+#include <boost/scoped_array.hpp>
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
 
 namespace impala {
+
+/// Helper struct that represents a micro batch within 'ScratchTupleBatch'.
+struct ScratchMicroBatch {
+  int start;
+  int end;
+  int length;
+};
 
 /// Helper struct that holds a batch of tuples allocated from a mem pool, as well
 /// as state associated with iterating over its tuples and transferring
@@ -60,12 +68,18 @@ struct ScratchTupleBatch {
   // materialising them.
   const int MIN_SELECTIVITY_TO_COMPACT = 16;
 
+  // Stores bool array of size 'capacity' to signify the rows filtered out by
+  // 'ProcessScratchBatchCodegenOrInterpret'. If i'th tuple survives then
+  // 'selected_rows[i]' would be true else false.
+  boost::scoped_array<bool> selected_rows;
+
   ScratchTupleBatch(
       const RowDescriptor& row_desc, int batch_size, MemTracker* mem_tracker)
     : capacity(batch_size),
       tuple_byte_size(row_desc.GetRowSize()),
       tuple_mem_pool(mem_tracker),
-      aux_mem_pool(mem_tracker) {
+      aux_mem_pool(mem_tracker),
+      selected_rows(new bool[batch_size]) {
     DCHECK_EQ(row_desc.tuple_descriptors().size(), 1);
   }
 
@@ -150,6 +164,49 @@ struct ScratchTupleBatch {
       dst_buffer += tuple_byte_size;
     }
     return true;
+  }
+
+  /// Creates micro batches that needs to be scanned.
+  /// Bits set in 'selected_rows' are the rows that needs to be scanned. Consecutive
+  /// bits set are used to create micro batches. Micro batches that differ by less than
+  /// 'skip_length', are merged together. E.g., for micro batches 1-8, 11-20, 35-100
+  /// derived from 'selected_rows' and 'skip_length' as 10, first two micro batches would
+  /// be merged into 1-20 as they differ by 3 (11 - 8) which is less than 10
+  /// ('skip_length'). Precondition for the function is there is at least one micro batch
+  /// present i.e., atleast one of the 'selected_rows' is true.
+  int GetMicroBatches(int skip_length, ScratchMicroBatch* batches) {
+    int batch_idx = 0;
+    int start = -1;
+    int last = -1;
+    DCHECK_GT(num_tuples, 0);
+    for (size_t i = 0; i < num_tuples; ++i) {
+      if (selected_rows[i]) {
+        if (start == -1) {
+          // start the first ever micro batch.
+          start = i;
+          last = i;
+        } else if (i - last < skip_length) {
+          // continue the old micro batch as 'last' is within 'skip_length' of last
+          // micro batch.
+          last = i;
+        } else {
+          // start a new micro batch as 'last' is outside 'skip_length'.
+          batches[batch_idx] = {start, last, last - start + 1};
+          batch_idx++;
+          start = i;
+          last = i;
+        }
+      }
+    }
+    /// ensure atleast one of 'selected_rows' is true.
+    DCHECK(start != -1) << "Atleast one of the 'scratch_batch_->selected_rows'"
+                        << "should be true";
+    /// Add the last micro batch which was being built.
+    /// For instance consider batch of size 10 with all true values:
+    /// TTTTTTTTTT or even FFFFFTTTTT. In both cases we would need below.
+    batches[batch_idx] = {start, last, last - start + 1};
+    batch_idx++;
+    return batch_idx;
   }
 
   Tuple* GetTuple(int tuple_idx) const {
