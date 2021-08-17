@@ -461,6 +461,9 @@ public class SelectStmt extends QueryStmt {
           colLabels_.add(label);
         }
       }
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Analyzed select clause aliasSmap={}", aliasSmap_.debugString());
+      }
     }
 
     private void verifyResultExprs() throws AnalysisException {
@@ -967,18 +970,6 @@ public class SelectStmt extends QueryStmt {
                   + groupingExprsCopy_.get(i).toSql());
         }
       }
-      // initialize groupingExprs_ with the analyzed version
-      // use the original ordinal if the analyzed expr is a INT literal
-      List<Expr> groupingExprs = new ArrayList<>();
-      for (int i = 0; i < groupingExprsCopy_.size(); ++i) {
-        Expr expr = groupingExprsCopy_.get(i);
-        if (expr instanceof NumericLiteral && Expr.IS_INT_LITERAL.apply(expr)) {
-          groupingExprs.add(groupingExprs_.get(i).clone());
-        } else {
-          groupingExprs.add(expr);
-        }
-      }
-      groupingExprs_ = groupingExprs;
 
       if (groupByClause_ != null && groupByClause_.hasGroupingSets()) {
         groupByClause_.analyzeGroupingSets(groupingExprsCopy_);

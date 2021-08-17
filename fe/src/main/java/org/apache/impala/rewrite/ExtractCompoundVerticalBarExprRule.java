@@ -33,10 +33,12 @@ public class ExtractCompoundVerticalBarExprRule implements ExprRewriteRule {
 
   @Override
   public Expr apply(Expr expr, Analyzer analyzer) {
-    if (!expr.isAnalyzed()) return expr;
-
     if (expr instanceof CompoundVerticalBarExpr) {
       CompoundVerticalBarExpr pred = (CompoundVerticalBarExpr) expr;
+      if (!expr.isAnalyzed()) {
+        pred = (CompoundVerticalBarExpr) expr.clone();
+        pred.analyzeNoThrow(analyzer);
+      }
       return pred.getEncapsulatedExpr();
     }
     return expr;
