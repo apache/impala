@@ -1665,10 +1665,31 @@ PLAN-ROOT SINK
 |
 01:AGGREGATE [FINALIZE]
 |  output: count(*)
-|  group by: 2 + 1, id
+|  group by: 3, id
 |  row-size=18B cardinality=10
 |
 00:SCAN HDFS [functional.dimtbl]
    HDFS partitions=1/1 files=1 size=171B
    row-size=8B cardinality=10
+====
+# IMPALA-10865: Group by expr with column alias reference errors in
+# re-analyze phase.
+SELECT ss_item_sk ss_item_sk_group, ss_item_sk+300 ss_item_sk,
+    count(ss_ticket_number)
+FROM tpcds.store_sales a
+WHERE ss_sold_date_sk > cast('245263' AS INT)
+GROUP BY ss_item_sk_group,
+         ss_item_sk
+---- PLAN
+PLAN-ROOT SINK
+|
+01:AGGREGATE [FINALIZE]
+|  output: count(ss_ticket_number)
+|  group by: ss_item_sk, ss_item_sk + 300
+|  row-size=24B cardinality=2.75M
+|
+00:SCAN HDFS [tpcds.store_sales a]
+   partition predicates: ss_sold_date_sk > 245263
+   HDFS partitions=1823/1824 files=1823 size=195.68MB
+   row-size=16B cardinality=2.75M
 ====
