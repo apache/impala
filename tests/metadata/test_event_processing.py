@@ -14,6 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import pytest
 from tests.common.skip import SkipIfHive2, SkipIfCatalogV2
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.skip import (SkipIfS3, SkipIfABFS, SkipIfADLS, SkipIfIsilon,
@@ -35,6 +36,7 @@ class TestEventProcessing(ImpalaTestSuite):
   PROCESSING_TIMEOUT_S = 10
 
   @SkipIfHive2.acid
+  @pytest.mark.xfail(run=False, reason="IMPALA-9057")
   def test_transactional_insert_events(self, unique_database):
     """Executes 'run_test_insert_events' for transactional tables.
     """
