@@ -167,7 +167,7 @@ testdata/impala-profiles/impala_profile_log_tpcds_compute_stats_v2
 testdata/impala-profiles/impala_profile_log_tpcds_compute_stats_v2_default.expected.txt
 testdata/impala-profiles/impala_profile_log_tpcds_compute_stats_v2_extended.expected.txt
 testdata/hive_benchmark/grepTiny/part-00000
-testdata/jwt/jwks_rs256.json
+testdata/jwt/*.json
 testdata/tzdb/2017c.zip
 testdata/tzdb/2017c-corrupt.zip
 testdata/tzdb_tiny/*

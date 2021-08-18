@@ -18,6 +18,7 @@
 #ifndef IMPALA_JWT_UTIL_INTERNAL_H
 #define IMPALA_JWT_UTIL_INTERNAL_H
 
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
@@ -35,6 +36,7 @@
 
 #include "common/logging.h"
 #include "common/status.h"
+#include "util/thread.h"
 
 namespace impala {
 
@@ -238,17 +240,16 @@ class ECJWTPublicKeyBuilder {
       const std::string& base64_y, std::string& pub_key);
 };
 
-/// JSON Web Key Set (JWKS) conveys the public keys used by the signing party to the
-/// clients that need to validate signatures. It represents a cryptographic key set in
-/// JSON data structure.
-/// This class works as JWT provider, which load the JWKS from file, store keys in an
-/// internal maps for each family of algorithms, and provides API to retrieve key by
-/// key-id.
-/// Init() should be called during the initialization of the daemon. There is no
-/// more modification for the instance after Init() return. The class is thread safe.
-class JsonWebKeySet {
+/// This class load the JWKS from file or URL, store keys in an internal maps for each
+/// family of algorithms, and provides API to retrieve key by key-id.
+/// It's a snapshot of the current JWKS. The JWKSMgr maintains a consistent copy of this
+/// and updates it atomically when the public keys in JWKS are changed. Clients can obtain
+/// an immutable copy. Class instances can be created through the implicitly-defined
+/// default and copy constructors.
+class JWKSSnapshot {
  public:
-  explicit JsonWebKeySet() {}
+  JWKSSnapshot() = default;
+  JWKSSnapshot(const JWKSSnapshot&) = default;
 
   /// Map from a key ID (kid) to a JWTPublicKey.
   typedef std::unordered_map<std::string, std::unique_ptr<JWTPublicKey>> JWTPublicKeyMap;
@@ -256,7 +257,12 @@ class JsonWebKeySet {
   /// Load JWKS stored in a JSON file. Returns an error if problems were encountered
   /// while parsing/constructing the Json Web keys. If no keys were given in the file,
   /// the internal maps will be empty.
-  Status Init(const std::string& jwks_file_path);
+  Status LoadKeysFromFile(const std::string& jwks_file_path);
+  /// Download JWKS JSON file from the given URL, then load the public keys if the
+  /// checksum of JWKS object is changed. If no keys were given in the URL, the internal
+  /// maps will be empty.
+  Status LoadKeysFromUrl(
+      const std::string& jwks_url, uint64_t cur_jwks_hash, bool* is_changed);
 
   /// Look up the key ID in the internal key maps and returns the key if the lookup was
   /// successful, otherwise return nullptr.
@@ -283,6 +289,8 @@ class JsonWebKeySet {
     return hs_key_map_.empty() && rsa_pub_key_map_.empty() && ec_pub_key_map_.empty();
   }
 
+  uint64_t GetChecksum() const { return jwks_checksum_; }
+
  private:
   friend class JWKSetParser;
 
@@ -308,6 +316,64 @@ class JsonWebKeySet {
   /// Public keys for EC family of algorithms: ES256, ES384, ES512.
   /// kty (key type): EC.
   JWTPublicKeyMap ec_pub_key_map_;
+
+  /// 64 bit checksum of JWKS object.
+  /// This variable is only used when downloading JWKS from the given URL.
+  uint64_t jwks_checksum_ = 0;
+};
+
+/// An immutable shared JWKS snapshot.
+typedef std::shared_ptr<const JWKSSnapshot> JWKSSnapshotPtr;
+
+/// JSON Web Key Set (JWKS) conveys the public keys used by the signing party to the
+/// clients that need to validate signatures. It represents a cryptographic key set in
+/// JSON data structure.
+/// This class works as JWKS manager, which load the JWKS from local file or URL.
+/// Init() should be called during the initialization of the daemon.
+/// The class is thread safe.
+class JWKSMgr {
+ public:
+  explicit JWKSMgr() {}
+
+  /// Destructor is only called for backend tests
+  ~JWKSMgr();
+
+  /// Load JWKS stored in a JSON file. Returns an error if problems were encountered
+  /// while parsing/constructing the Json Web keys. If no keys were given in the file,
+  /// the internal maps will be empty.
+  /// If the given jwks_uri is a URL, start a working thread which will periodically
+  /// checks the JWKS URL for updates. This provides support for key rotation.
+  Status Init(const std::string& jwks_uri, bool is_local_file);
+
+  /// Returns a read only snapshot of the current JWKS. This function should be called
+  /// after calling Init().
+  JWKSSnapshotPtr GetJWKSSnapshot() const;
+
+ private:
+  /// Atomically replaces a JWKS snapshot with a new copy.
+  void SetJWKSSnapshot(const JWKSSnapshotPtr& new_jwks);
+
+  /// Helper function for working thread which periodically checks the JWKS URL for
+  /// updates.
+  void UpdateJWKSThread();
+
+  /// Thread that runs UpdateJWKSThread(). This thread will exit when the
+  /// shut_down_promise_ is set.
+  std::unique_ptr<Thread> jwks_update_thread_;
+  Promise<bool> shut_down_promise_;
+
+  /// JWKS URI.
+  std::string jwks_uri_;
+
+  /// The snapshot of the current JWKS. When the checksum of downloaded JWKS json object
+  /// has been changed, the public keys will be reloaded and the content of this pointer
+  /// will be atomically swapped.
+  JWKSSnapshotPtr current_jwks_;
+  /// 64 bit checksum of current JWKS object.
+  uint64_t current_jwks_checksum_ = 0;
+
+  /// Protects current_jwks_.
+  mutable std::mutex current_jwks_lock_;
 };
 
 } // namespace impala

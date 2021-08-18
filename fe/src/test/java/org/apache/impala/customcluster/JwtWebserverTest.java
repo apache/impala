@@ -51,7 +51,9 @@ public class JwtWebserverTest {
   }
 
   @After
-  public void cleanUp() throws IOException {
+  public void cleanUp() throws Exception {
+    // Leave a cluster running with the default configuration.
+    CustomClusterRunner.StartImpalaCluster();
     metrics_.Close();
   }
 

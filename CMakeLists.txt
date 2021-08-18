@@ -118,6 +118,7 @@ set_dep_root(SNAPPY)
 set_dep_root(THRIFT)
 set_dep_root(ZLIB)
 set_dep_root(CCTZ)
+set_dep_root(CURL)
 
 # The boost-cmake project hasn't been maintained for years. Let's make sure we
 # don't accidentally use it if it can be found.
@@ -346,6 +347,10 @@ IMPALA_ADD_THIRDPARTY_LIB(krb5 ${KERBEROS_INCLUDE_DIR} "" ${KERBEROS_LIBRARY})
 # We require certain binaries from the kerberos project for our automated kerberos
 # testing.
 find_package(KerberosPrograms REQUIRED)
+
+# find curl headers and libs
+find_package(Curl REQUIRED)
+IMPALA_ADD_THIRDPARTY_LIB(curl ${CURL_INCLUDE_DIR} ${CURL_STATIC_LIB} "")
 
 # Tests that run any security related tests need to link this in to override the
 # krb5_realm_override() implementation in krb5.

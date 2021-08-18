@@ -35,8 +35,17 @@
 #include <rapidjson/filereadstream.h>
 
 #include "common/names.h"
+#include "hash-util.h"
 #include "jwt-util-internal.h"
 #include "jwt-util.h"
+#include "kudu/util/curl_util.h"
+#include "kudu/util/faststring.h"
+#include "kudu/util/monotime.h"
+#include "util/kudu-status-util.h"
+#include "util/test-info.h"
+
+DECLARE_int32(jwks_update_frequency_s);
+DECLARE_int32(jwks_pulling_timeout_s);
 
 namespace impala {
 
@@ -47,7 +56,7 @@ using rapidjson::Value;
 // This class parses JWKS file.
 class JWKSetParser {
  public:
-  JWKSetParser(JsonWebKeySet* jwks) : jwks_(jwks) {}
+  JWKSetParser(JWKSSnapshot* jwks) : jwks_(jwks) {}
 
   // Perform the parsing and populate JWKS's internal map. Return error status if
   // encountering any error.
@@ -71,7 +80,7 @@ class JWKSetParser {
   }
 
  private:
-  JsonWebKeySet* jwks_;
+  JWKSSnapshot* jwks_;
 
   string NameOfTypeOfJsonValue(const Value& value) {
     switch (value.GetType()) {
@@ -492,10 +501,11 @@ cleanup:
 }
 
 //
-// JsonWebKeySet member functions.
+// JWKSSnapshot member functions.
 //
 
-Status JsonWebKeySet::Init(const string& jwks_file_path) {
+// Load JWKS from the given local json file.
+Status JWKSSnapshot::LoadKeysFromFile(const string& jwks_file_path) {
   hs_key_map_.clear();
   rsa_pub_key_map_.clear();
 
@@ -525,11 +535,9 @@ Status JsonWebKeySet::Init(const string& jwks_file_path) {
   if (jwks_doc.HasParseError()) {
     return Status(
         TErrorCode::JWKS_PARSE_ERROR, GetParseError_En(jwks_doc.GetParseError()));
-  }
-  if (!jwks_doc.IsObject()) {
+  } else if (!jwks_doc.IsObject()) {
     return Status(TErrorCode::JWKS_PARSE_ERROR, "root element must be a JSON Object");
-  }
-  if (!jwks_doc.HasMember("keys")) {
+  } else if (!jwks_doc.HasMember("keys")) {
     return Status(TErrorCode::JWKS_PARSE_ERROR, "keys is required");
   }
 
@@ -537,7 +545,49 @@ Status JsonWebKeySet::Init(const string& jwks_file_path) {
   return jwks_parser.Parse(jwks_doc);
 }
 
-void JsonWebKeySet::AddHSKey(std::string key_id, JWTPublicKey* jwk_pub_key) {
+// Download JWKS from the given URL with Kudu's EasyCurl wrapper.
+Status JWKSSnapshot::LoadKeysFromUrl(
+    const std::string& jwks_url, uint64_t cur_jwks_checksum, bool* is_changed) {
+  kudu::EasyCurl curl;
+  kudu::faststring dst;
+  Status status;
+
+  curl.set_timeout(
+      kudu::MonoDelta::FromMilliseconds(FLAGS_jwks_pulling_timeout_s * 1000));
+  curl.set_verify_peer(false);
+  // TODO support CurlAuthType by calling kudu::EasyCurl::set_auth().
+  KUDU_RETURN_IF_ERROR(curl.FetchURL(jwks_url, &dst),
+      Substitute("Error downloading JWKS from '$0'", jwks_url));
+  if (dst.size() > 0) {
+    // Verify if the checksum of the downloaded JWKS has been changed.
+    jwks_checksum_ = HashUtil::FastHash64(dst.data(), dst.size(), /*seed*/ 0xcafebeef);
+    if (jwks_checksum_ == cur_jwks_checksum) return Status::OK();
+    *is_changed = true;
+    // Append '\0' so that the in-memory object could be parsed as StringStream.
+    dst.push_back('\0');
+#ifndef NDEBUG
+    VLOG(3) << "JWKS: " << dst.data();
+#endif
+    // Parse in-memory JWKS JSON object as StringStream.
+    Document jwks_doc;
+    jwks_doc.Parse((char*)dst.data());
+    if (jwks_doc.HasParseError()) {
+      status = Status(
+          TErrorCode::JWKS_PARSE_ERROR, GetParseError_En(jwks_doc.GetParseError()));
+    } else if (!jwks_doc.IsObject()) {
+      status = Status(TErrorCode::JWKS_PARSE_ERROR, "root element must be a JSON Object");
+    } else if (!jwks_doc.HasMember("keys")) {
+      status = Status(TErrorCode::JWKS_PARSE_ERROR, "keys is required");
+    } else {
+      // Load and initialize public keys.
+      JWKSetParser jwks_parser(this);
+      status = jwks_parser.Parse(jwks_doc);
+    }
+  }
+  return status;
+}
+
+void JWKSSnapshot::AddHSKey(std::string key_id, JWTPublicKey* jwk_pub_key) {
   if (hs_key_map_.find(key_id) == hs_key_map_.end()) {
     hs_key_map_[key_id].reset(jwk_pub_key);
   } else {
@@ -545,7 +595,7 @@ void JsonWebKeySet::AddHSKey(std::string key_id, JWTPublicKey* jwk_pub_key) {
   }
 }
 
-void JsonWebKeySet::AddRSAPublicKey(std::string key_id, JWTPublicKey* jwk_pub_key) {
+void JWKSSnapshot::AddRSAPublicKey(std::string key_id, JWTPublicKey* jwk_pub_key) {
   if (rsa_pub_key_map_.find(key_id) == rsa_pub_key_map_.end()) {
     rsa_pub_key_map_[key_id].reset(jwk_pub_key);
   } else {
@@ -553,7 +603,7 @@ void JsonWebKeySet::AddRSAPublicKey(std::string key_id, JWTPublicKey* jwk_pub_ke
   }
 }
 
-void JsonWebKeySet::AddECPublicKey(std::string key_id, JWTPublicKey* jwk_pub_key) {
+void JWKSSnapshot::AddECPublicKey(std::string key_id, JWTPublicKey* jwk_pub_key) {
   if (ec_pub_key_map_.find(key_id) == ec_pub_key_map_.end()) {
     ec_pub_key_map_[key_id].reset(jwk_pub_key);
   } else {
@@ -561,7 +611,7 @@ void JsonWebKeySet::AddECPublicKey(std::string key_id, JWTPublicKey* jwk_pub_key
   }
 }
 
-const JWTPublicKey* JsonWebKeySet::LookupHSKey(const std::string& kid) const {
+const JWTPublicKey* JWKSSnapshot::LookupHSKey(const std::string& kid) const {
   auto find_it = hs_key_map_.find(kid);
   if (find_it == hs_key_map_.end()) {
     // Could not find key for the given key ID.
@@ -570,7 +620,7 @@ const JWTPublicKey* JsonWebKeySet::LookupHSKey(const std::string& kid) const {
   return find_it->second.get();
 }
 
-const JWTPublicKey* JsonWebKeySet::LookupRSAPublicKey(const std::string& kid) const {
+const JWTPublicKey* JWKSSnapshot::LookupRSAPublicKey(const std::string& kid) const {
   auto find_it = rsa_pub_key_map_.find(kid);
   if (find_it == rsa_pub_key_map_.end()) {
     // Could not find key for the given key ID.
@@ -579,13 +629,102 @@ const JWTPublicKey* JsonWebKeySet::LookupRSAPublicKey(const std::string& kid) co
   return find_it->second.get();
 }
 
-const JWTPublicKey* JsonWebKeySet::LookupECPublicKey(const std::string& kid) const {
+const JWTPublicKey* JWKSSnapshot::LookupECPublicKey(const std::string& kid) const {
   auto find_it = ec_pub_key_map_.find(kid);
   if (find_it == ec_pub_key_map_.end()) {
     // Could not find key for the given key ID.
     return nullptr;
   }
   return find_it->second.get();
+}
+
+//
+// JWKSMgr member functions.
+//
+
+JWKSMgr::~JWKSMgr() {
+  shut_down_promise_.Set(true);
+  if (jwks_update_thread_ != nullptr) jwks_update_thread_->Join();
+}
+
+Status JWKSMgr::Init(const std::string& jwks_uri, bool is_local_file) {
+  Status status;
+  jwks_uri_ = jwks_uri;
+  std::shared_ptr<JWKSSnapshot> new_jwks = std::make_shared<JWKSSnapshot>();
+  if (is_local_file) {
+    status = new_jwks->LoadKeysFromFile(jwks_uri);
+    if (!status.ok()) {
+      LOG(ERROR) << "Failed to load JWKS: " << status;
+      return status;
+    }
+    SetJWKSSnapshot(new_jwks);
+  } else {
+    if (FLAGS_jwks_update_frequency_s <= 0) {
+      LOG(WARNING) << "Invalid value for flag jwks_update_frequency_s: "
+                   << FLAGS_jwks_update_frequency_s << ", use default value 60.";
+      FLAGS_jwks_update_frequency_s = 60;
+    }
+    if (FLAGS_jwks_pulling_timeout_s <= 0) {
+      LOG(WARNING) << "Invalid value for flag jwks_pulling_timeout_s: "
+                   << FLAGS_jwks_pulling_timeout_s << ", use default value 10.";
+      FLAGS_jwks_pulling_timeout_s = 10;
+    }
+
+    bool is_changed = false;
+    status = new_jwks->LoadKeysFromUrl(jwks_uri, current_jwks_checksum_, &is_changed);
+    if (!status.ok()) {
+      LOG(ERROR) << "Failed to load JWKS: " << status;
+      return status;
+    }
+    DCHECK(is_changed);
+    if (is_changed) SetJWKSSnapshot(new_jwks);
+
+    // Start a working thread to periodically check the JWKS URL for updates.
+    RETURN_IF_ERROR(Thread::Create("impala-server", "JWKS-mgr",
+        &JWKSMgr::UpdateJWKSThread, this, &jwks_update_thread_));
+  }
+
+  if (new_jwks->IsEmpty()) LOG(WARNING) << "JWKS file is empty.";
+  return Status::OK();
+}
+
+void JWKSMgr::UpdateJWKSThread() {
+  std::shared_ptr<JWKSSnapshot> new_jwks;
+  int64_t timeout_millis = FLAGS_jwks_update_frequency_s * 1000;
+  while (true) {
+    // This Get() will time out until shutdown, when the promise is set.
+    bool timed_out;
+    shut_down_promise_.Get(timeout_millis, &timed_out);
+    if (!timed_out) break;
+
+    new_jwks = std::make_shared<JWKSSnapshot>();
+    bool is_changed = false;
+    Status status =
+        new_jwks->LoadKeysFromUrl(jwks_uri_, current_jwks_checksum_, &is_changed);
+    if (!status.ok()) {
+      LOG(WARNING) << "Failed to update JWKS: " << status;
+    } else if (is_changed) {
+      SetJWKSSnapshot(new_jwks);
+    }
+    new_jwks.reset();
+  }
+  // The promise must be set to true.
+  DCHECK(shut_down_promise_.IsSet());
+  DCHECK(shut_down_promise_.Get());
+}
+
+JWKSSnapshotPtr JWKSMgr::GetJWKSSnapshot() const {
+  std::lock_guard<std::mutex> l(current_jwks_lock_);
+  DCHECK(current_jwks_.get() != nullptr);
+  JWKSSnapshotPtr jwks = current_jwks_;
+  return jwks;
+}
+
+void JWKSMgr::SetJWKSSnapshot(const JWKSSnapshotPtr& new_jwks) {
+  std::lock_guard<std::mutex> l(current_jwks_lock_);
+  DCHECK(new_jwks.get() != nullptr);
+  current_jwks_ = new_jwks;
+  current_jwks_checksum_ = new_jwks->GetChecksum();
 }
 
 //
@@ -603,12 +742,16 @@ void JWTHelper::TokenDeleter::operator()(JWTHelper::JWTDecodedToken* token) cons
   if (token != nullptr) delete token;
 };
 
-Status JWTHelper::Init(const std::string& jwks_file_path) {
-  jwks_.reset(new JsonWebKeySet());
-  RETURN_IF_ERROR(jwks_->Init(jwks_file_path));
-  if (jwks_->IsEmpty()) LOG(WARNING) << "JWKS file is empty.";
-  initialized_ = true;
+Status JWTHelper::Init(const std::string& jwks_uri, bool is_local_file) {
+  jwks_mgr_.reset(new JWKSMgr());
+  RETURN_IF_ERROR(jwks_mgr_->Init(jwks_uri, is_local_file));
+  if (!initialized_) initialized_ = true;
   return Status::OK();
+}
+
+JWKSSnapshotPtr JWTHelper::GetJWKS() const {
+  DCHECK(initialized_);
+  return jwks_mgr_->GetJWKSSnapshot();
 }
 
 // Decode the given JWT token.
@@ -642,18 +785,24 @@ Status JWTHelper::Decode(const string& token, UniqueJWTDecodedToken& decoded_tok
 
 // Validate the token's signature with public key.
 Status JWTHelper::Verify(const JWTDecodedToken* decoded_token) const {
+  Status status;
   DCHECK(initialized_);
   DCHECK(decoded_token != nullptr);
 
   if (decoded_token->decoded_jwt_.get_signature().empty()) {
     // Don't accept JWT without a signature.
     return Status(TErrorCode::JWT_VERIFY_FAILED, "Unsecured JWT");
-  } else if (jwks_ == nullptr) {
-    // Skip to signature validation if there is no public key.
+  } else if (jwks_mgr_ == nullptr) {
+    // Skip to signature validation if JWKS file or url is not specified.
     return Status::OK();
   }
 
-  Status status;
+  JWKSSnapshotPtr jwks = GetJWKS();
+  if (jwks->IsEmpty()) {
+    return Status(
+        TErrorCode::JWT_VERIFY_FAILED, "Verification failed, no matching valid key");
+  };
+
   try {
     string algorithm =
         boost::algorithm::to_lower_copy(decoded_token->decoded_jwt_.get_algorithm());
@@ -664,11 +813,11 @@ Status JWTHelper::Verify(const JWTDecodedToken* decoded_token) const {
 
       const JWTPublicKey* pub_key = nullptr;
       if (prefix == "hs") {
-        pub_key = jwks_->LookupHSKey(key_id);
+        pub_key = jwks->LookupHSKey(key_id);
       } else if (prefix == "rs" || prefix == "ps") {
-        pub_key = jwks_->LookupRSAPublicKey(key_id);
+        pub_key = jwks->LookupRSAPublicKey(key_id);
       } else if (prefix == "es") {
-        pub_key = jwks_->LookupECPublicKey(key_id);
+        pub_key = jwks->LookupECPublicKey(key_id);
       } else {
         return Status(TErrorCode::JWT_VERIFY_FAILED,
             Substitute("Unsupported cryptographic algorithm '$0' for JWT", algorithm));
@@ -682,13 +831,13 @@ Status JWTHelper::Verify(const JWTDecodedToken* decoded_token) const {
       // According to RFC 7517 (JSON Web Key), 'kid' is OPTIONAL so it's possible there
       // is no key id in the token's header. In this case, get all of public keys from
       // JWKS for the family of algorithms.
-      const JsonWebKeySet::JWTPublicKeyMap* key_map = nullptr;
+      const JWKSSnapshot::JWTPublicKeyMap* key_map = nullptr;
       if (prefix == "hs") {
-        key_map = jwks_->GetAllHSKeys();
+        key_map = jwks->GetAllHSKeys();
       } else if (prefix == "rs" || prefix == "ps") {
-        key_map = jwks_->GetAllRSAPublicKeys();
+        key_map = jwks->GetAllRSAPublicKeys();
       } else if (prefix == "es") {
-        key_map = jwks_->GetAllECPublicKeys();
+        key_map = jwks->GetAllECPublicKeys();
       } else {
         return Status(TErrorCode::JWT_VERIFY_FAILED,
             Substitute("Unsupported cryptographic algorithm '$0' for JWT", algorithm));

@@ -54,9 +54,25 @@ class CustomClusterRunner {
    */
   public static int StartImpalaCluster(String args, Map<String, String> env,
       String startArgs) throws IOException, InterruptedException {
-    ProcessBuilder pb =
-        new ProcessBuilder(new String[] {"start-impala-cluster.py", "--impalad_args",
-            args, "--catalogd_args", args, "--state_store_args", args, startArgs});
+    return StartImpalaCluster(args, args, args, env, startArgs);
+  }
+
+  public static int StartImpalaCluster(String impaladArgs, String catalogdArgs,
+      String statestoredArgs) throws IOException, InterruptedException {
+    return StartImpalaCluster(
+        impaladArgs, catalogdArgs, statestoredArgs, new HashMap<String, String>(), "");
+  }
+
+  /**
+   * Starts Impala, setting environment variables in 'env', and passing 'impalad_args',
+   * 'catalogd_args', 'statestored_args', and 'startArgs' to start-impala-cluster.py.
+   */
+  public static int StartImpalaCluster(String impaladArgs, String catalogdArgs,
+      String statestoredArgs, Map<String, String> env, String startArgs)
+      throws IOException, InterruptedException {
+    ProcessBuilder pb = new ProcessBuilder(new String[] {"start-impala-cluster.py",
+        "--impalad_args", impaladArgs, "--catalogd_args", catalogdArgs,
+        "--state_store_args", statestoredArgs, startArgs});
     pb.redirectErrorStream(true);
     Map<String, String> origEnv = pb.environment();
     origEnv.putAll(env);

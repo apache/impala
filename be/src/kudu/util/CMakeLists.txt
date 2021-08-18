@@ -363,15 +363,13 @@ target_compile_definitions(kudu_util_compression PUBLIC LZ4_DISABLE_DEPRECATE_WA
 #######################################
 # kudu_curl_util
 #######################################
-# Impala doesn't have curl in its toolchain. It relies instead on the system curl, which
-# is too old on some OSes we compile on and doesn't include macros Kudu needs.
-#add_library(kudu_curl_util
-#  curl_util.cc)
-#target_link_libraries(kudu_curl_util
-#  security
-#  ${CURL_LIBRARIES}
-#  glog
-#  gutil)
+add_library(kudu_curl_util
+  curl_util.cc)
+target_link_libraries(kudu_curl_util
+  security
+  curl
+  glog
+  gutil)
 
 #######################################
 # kudu_cloud_util
@@ -607,11 +605,11 @@ endif()
 #######################################
 # curl_util-test
 #######################################
-#ADD_KUDU_TEST(curl_util-test)
-#if(NOT NO_TESTS)
-#  target_link_libraries(curl_util-test
-#    kudu_curl_util)
-#endif()
+ADD_KUDU_TEST(curl_util-test)
+if(NOT NO_TESTS)
+  target_link_libraries(curl_util-test
+    kudu_curl_util)
+endif()
 
 #######################################
 # instance_detector-test

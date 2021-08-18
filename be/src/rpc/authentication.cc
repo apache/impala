@@ -164,6 +164,14 @@ DEFINE_bool(jwt_validate_signature, true,
 // validate signatures. It represents cryptographic keys in JSON data structure.
 DEFINE_string(jwks_file_path, "",
     "File path of the pre-installed JSON Web Key Set (JWKS) for JWT verification");
+// This specifies the URL for JWKS to be downloaded.
+DEFINE_string(jwks_url, "", "URL of the JSON Web Key Set (JWKS) for JWT verification");
+DEFINE_int32(jwks_update_frequency_s, 60,
+    "(Advanced) The time in seconds to wait between downloading JWKS from the specified "
+    "URL.");
+DEFINE_int32(jwks_pulling_timeout_s, 10,
+    "(Advanced) The time in seconds for connection timed out when pulling JWKS from the "
+    "specified URL.");
 // This specifies the custom claim in the JWT that contains the "username" for the
 // session.
 DEFINE_string(jwt_custom_claim_username, "username", "Custom claim 'username'");

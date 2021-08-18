@@ -405,9 +405,9 @@ TEST(JwtUtilTest, LoadJwksFile) {
       rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS256", rsa_invalid_pub_key_jwk_n,
       rsa_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   ASSERT_FALSE(jwks->IsEmpty());
   ASSERT_EQ(2, jwks->GetRSAPublicKeyNum());
 
@@ -436,13 +436,12 @@ TEST(JwtUtilTest, LoadInvalidJwksFiles) {
       "  ]"
       "}"));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file->Filename());
+  Status status = jwt_helper.Init(jwks_file->Filename(), true);
   ASSERT_FALSE(status.ok());
   ASSERT_TRUE(status.msg().msg().find("parsing key #0") != std::string::npos)
       << " Actual error: " << status.msg().msg();
   ASSERT_TRUE(status.GetDetail().find("'kid' property is required") != std::string::npos)
       << "actual error: " << status.GetDetail();
-  ASSERT_TRUE(jwt_helper.GetJWKS()->IsEmpty());
 
   // Invalid JSON format, missing "]" and "}".
   jwks_file.reset(new TempTestDataFile(
@@ -456,7 +455,7 @@ TEST(JwtUtilTest, LoadInvalidJwksFiles) {
       "      \"n\": \"sttddbg-_yjXzcFpbMJB1fIFam9lQBeXWbTqzJwbuFbspHMsRowa8FaPw\","
       "      \"e\": \"AQAB\""
       "}"));
-  status = jwt_helper.Init(jwks_file->Filename());
+  status = jwt_helper.Init(jwks_file->Filename(), true);
   ASSERT_FALSE(status.ok());
   ASSERT_TRUE(status.GetDetail().find("Missing a comma or ']' after an array element")
       != std::string::npos)
@@ -466,7 +465,7 @@ TEST(JwtUtilTest, LoadInvalidJwksFiles) {
   jwks_file.reset(new TempTestDataFile(
       Substitute(jwks_rsa_file_format, "", "RS256", rsa_pub_key_jwk_n, rsa_pub_key_jwk_e,
           "", "RS256", rsa_invalid_pub_key_jwk_n, rsa_pub_key_jwk_e)));
-  status = jwt_helper.Init(jwks_file->Filename());
+  status = jwt_helper.Init(jwks_file->Filename(), true);
   ASSERT_FALSE(status.ok());
   ASSERT_TRUE(status.msg().msg().find("parsing key #0") != std::string::npos)
       << " Actual error: " << status.msg().msg();
@@ -477,7 +476,7 @@ TEST(JwtUtilTest, LoadInvalidJwksFiles) {
   // JWKS with empty key value.
   jwks_file.reset(new TempTestDataFile(
       Substitute(jwks_rsa_file_format, kid_1, "RS256", "", "", kid_2, "RS256", "", "")));
-  status = jwt_helper.Init(jwks_file->Filename());
+  status = jwt_helper.Init(jwks_file->Filename(), true);
   ASSERT_FALSE(status.ok());
   ASSERT_TRUE(status.msg().msg().find("parsing key #0") != std::string::npos)
       << " Actual error: " << status.msg().msg();
@@ -493,9 +492,9 @@ TEST(JwtUtilTest, VerifyJwtHS256) {
   TempTestDataFile jwks_file(
       Substitute(jwks_hs_file_format, kid_1, "HS256", shared_secret));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   EXPECT_OK(status);
   ASSERT_EQ(1, jwks->GetHSKeyNum());
 
@@ -533,9 +532,9 @@ TEST(JwtUtilTest, VerifyJwtHS384) {
   TempTestDataFile jwks_file(
       Substitute(jwks_hs_file_format, kid_1, "HS384", shared_secret));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   EXPECT_OK(status);
   ASSERT_EQ(1, jwks->GetHSKeyNum());
 
@@ -573,9 +572,9 @@ TEST(JwtUtilTest, VerifyJwtHS512) {
   TempTestDataFile jwks_file(
       Substitute(jwks_hs_file_format, kid_1, "HS512", shared_secret));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   EXPECT_OK(status);
   ASSERT_EQ(1, jwks->GetHSKeyNum());
 
@@ -611,9 +610,9 @@ TEST(JwtUtilTest, VerifyJwtRS256) {
       rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS256", rsa_invalid_pub_key_jwk_n,
       rsa_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   ASSERT_EQ(2, jwks->GetRSAPublicKeyNum());
 
   const JWTPublicKey* key1 = jwks->LookupRSAPublicKey(kid_1);
@@ -665,9 +664,9 @@ TEST(JwtUtilTest, VerifyJwtRS384) {
       rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS384", rsa_invalid_pub_key_jwk_n,
       rsa_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   ASSERT_EQ(2, jwks->GetRSAPublicKeyNum());
 
   const JWTPublicKey* key1 = jwks->LookupRSAPublicKey(kid_1);
@@ -703,9 +702,9 @@ TEST(JwtUtilTest, VerifyJwtRS512) {
       rsa512_pub_key_jwk_n, rsa512_pub_key_jwk_e, kid_2, "RS512",
       rsa512_invalid_pub_key_jwk_n, rsa512_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   ASSERT_EQ(2, jwks->GetRSAPublicKeyNum());
 
   const JWTPublicKey* key1 = jwks->LookupRSAPublicKey(kid_1);
@@ -741,9 +740,9 @@ TEST(JwtUtilTest, VerifyJwtPS256) {
       rsa1024_pub_key_jwk_n, rsa1024_pub_key_jwk_e, kid_2, "PS256",
       rsa_invalid_pub_key_jwk_n, rsa_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   ASSERT_EQ(2, jwks->GetRSAPublicKeyNum());
 
   const JWTPublicKey* key1 = jwks->LookupRSAPublicKey(kid_1);
@@ -779,9 +778,9 @@ TEST(JwtUtilTest, VerifyJwtPS384) {
       rsa2048_pub_key_jwk_n, rsa2048_pub_key_jwk_e, kid_2, "PS384",
       rsa_invalid_pub_key_jwk_n, rsa_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   ASSERT_EQ(2, jwks->GetRSAPublicKeyNum());
 
   const JWTPublicKey* key1 = jwks->LookupRSAPublicKey(kid_1);
@@ -817,9 +816,9 @@ TEST(JwtUtilTest, VerifyJwtPS512) {
       rsa4096_pub_key_jwk_n, rsa4096_pub_key_jwk_e, kid_2, "PS512",
       rsa_invalid_pub_key_jwk_n, rsa_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   ASSERT_EQ(2, jwks->GetRSAPublicKeyNum());
 
   const JWTPublicKey* key1 = jwks->LookupRSAPublicKey(kid_1);
@@ -854,9 +853,9 @@ TEST(JwtUtilTest, VerifyJwtES256) {
   TempTestDataFile jwks_file(Substitute(jwks_ec_file_format, kid_1, "P-256",
       ecdsa256_pub_key_jwk_x, ecdsa256_pub_key_jwk_y));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   ASSERT_EQ(1, jwks->GetECPublicKeyNum());
 
   const JWTPublicKey* key1 = jwks->LookupECPublicKey(kid_1);
@@ -899,9 +898,9 @@ TEST(JwtUtilTest, VerifyJwtES384) {
   TempTestDataFile jwks_file(Substitute(jwks_ec_file_format, kid_1, "P-384",
       ecdsa384_pub_key_jwk_x, ecdsa384_pub_key_jwk_y));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   ASSERT_EQ(1, jwks->GetECPublicKeyNum());
 
   const JWTPublicKey* key1 = jwks->LookupECPublicKey(kid_1);
@@ -936,9 +935,9 @@ TEST(JwtUtilTest, VerifyJwtES512) {
   TempTestDataFile jwks_file(Substitute(jwks_ec_file_format, kid_1, "P-521",
       ecdsa521_pub_key_jwk_x, ecdsa521_pub_key_jwk_y));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
-  const JsonWebKeySet* jwks = jwt_helper.GetJWKS();
+  JWKSSnapshotPtr jwks = jwt_helper.GetJWKS();
   ASSERT_EQ(1, jwks->GetECPublicKeyNum());
 
   const JWTPublicKey* key1 = jwks->LookupECPublicKey(kid_1);
@@ -994,7 +993,7 @@ TEST(JwtUtilTest, VerifyJwtFailMismatchingAlgorithms) {
       rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS256", rsa_invalid_pub_key_jwk_n,
       rsa_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
 
   // Create a JWT token, but set mismatching algorithm.
@@ -1023,7 +1022,7 @@ TEST(JwtUtilTest, VerifyJwtFailKeyNotFound) {
       rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS256", rsa_invalid_pub_key_jwk_n,
       rsa_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
 
   // Create a JWT token with a key ID which can not be found in JWKS.
@@ -1051,7 +1050,7 @@ TEST(JwtUtilTest, VerifyJwtTokenWithoutKeyId) {
       rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS256", rsa_invalid_pub_key_jwk_n,
       rsa_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
 
   // Create a JWT token without key ID.
@@ -1072,7 +1071,7 @@ TEST(JwtUtilTest, VerifyJwtFailTokenWithoutKeyId) {
       rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS256", rsa_invalid_pub_key_jwk_n,
       rsa_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
 
   // Create a JWT token without key ID.
@@ -1092,7 +1091,7 @@ TEST(JwtUtilTest, VerifyJwtFailTokenWithoutSignature) {
       rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS256", rsa_invalid_pub_key_jwk_n,
       rsa_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
 
   // Create a JWT token without signature.
@@ -1114,7 +1113,7 @@ TEST(JwtUtilTest, VerifyJwtFailExpiredToken) {
       rsa_pub_key_jwk_n, rsa_pub_key_jwk_e, kid_2, "RS256", rsa_invalid_pub_key_jwk_n,
       rsa_pub_key_jwk_e));
   JWTHelper jwt_helper;
-  Status status = jwt_helper.Init(jwks_file.Filename());
+  Status status = jwt_helper.Init(jwks_file.Filename(), true);
   EXPECT_OK(status);
 
   // Create a JWT token and sign it with RS256.

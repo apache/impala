@@ -25,7 +25,8 @@
 
 namespace impala {
 
-class JsonWebKeySet;
+class JWKSSnapshot;
+class JWKSMgr;
 
 /// JSON Web Token (JWT) is an Internet proposed standard for creating data with optional
 /// signature and/or optional encryption whose payload holds JSON that asserts some
@@ -33,7 +34,7 @@ class JsonWebKeySet;
 /// private key.
 /// This class works as wrapper for jwt-cpp. It provides APIs to decode/verify JWT token,
 /// and extracts custom claim from the payload of JWT token.
-/// JsonWebKeySet is read only after Init() is called. The class is thread safe.
+/// The class is thread safe.
 class JWTHelper {
  public:
   /// Opaque types for storing the JWT decoded token. This allows us to avoid including
@@ -53,16 +54,17 @@ class JWTHelper {
   /// Return the single instance.
   static JWTHelper* GetInstance() { return jwt_helper_; }
 
-  /// Load JWKS from a JSON file. Returns an error if problems were encountered.
-  Status Init(const std::string& jwks_file_path);
+  /// Load JWKS from a given local JSON file or URL. Returns an error if problems were
+  /// encountered.
+  Status Init(const std::string& jwks_uri, bool is_local_file);
 
   /// Decode the given JWT token. The decoding result is stored in decoded_token_.
   /// Return Status::OK if the decoding is successful.
   static Status Decode(
       const std::string& token, UniqueJWTDecodedToken& decoded_token_out);
 
-  /// Verify the token's signature with the given JWKS. The token should be already
-  /// decoded by calling Decode().
+  /// Verify the token's signature with the JWKS. The token should be already decoded by
+  /// calling Decode().
   /// Return Status::OK if the verification is successful.
   Status Verify(const JWTDecodedToken* decoded_token) const;
 
@@ -71,8 +73,8 @@ class JWTHelper {
   static Status GetCustomClaimUsername(const JWTDecodedToken* decoded_token,
       const std::string& custom_claim_username, std::string& username);
 
-  /// Return Json Web Key Set. It's called only by unit-test code.
-  const JsonWebKeySet* GetJWKS() const { return jwks_.get(); }
+  /// Return snapshot of JWKS.
+  std::shared_ptr<const JWKSSnapshot> GetJWKS() const;
 
  private:
   /// Single instance.
@@ -81,9 +83,9 @@ class JWTHelper {
   /// Set it as TRUE when Init() is called.
   bool initialized_ = false;
 
-  /// Json Web Key Set (JWKS) for Json Web Token (JWT) verification.
+  /// JWKS Manager for Json Web Token (JWT) verification.
   /// Only one instance per daemon.
-  std::unique_ptr<JsonWebKeySet> jwks_;
+  std::unique_ptr<JWKSMgr> jwks_mgr_;
 };
 
 } // namespace impala

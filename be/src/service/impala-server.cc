@@ -348,6 +348,7 @@ DEFINE_int32(admission_heartbeat_frequency_ms, 1000,
 DECLARE_bool(jwt_token_auth);
 DECLARE_bool(jwt_validate_signature);
 DECLARE_string(jwks_file_path);
+DECLARE_string(jwks_url);
 
 namespace {
 using namespace impala;
@@ -2912,7 +2913,10 @@ Status ImpalaServer::Start(int32_t beeswax_port, int32_t hs2_port,
     // Load JWKS from file if validation for signature of JWT token is enabled.
     if (FLAGS_jwt_token_auth && FLAGS_jwt_validate_signature) {
       if (!FLAGS_jwks_file_path.empty()) {
-        RETURN_IF_ERROR(JWTHelper::GetInstance()->Init(FLAGS_jwks_file_path));
+        RETURN_IF_ERROR(JWTHelper::GetInstance()->Init(FLAGS_jwks_file_path, true));
+      } else if (!FLAGS_jwks_url.empty()) {
+        if (TestInfo::is_test()) sleep(1);
+        RETURN_IF_ERROR(JWTHelper::GetInstance()->Init(FLAGS_jwks_url, false));
       } else {
         LOG(ERROR) << "JWKS file is not specified when the validation of JWT signature "
                    << " is enabled.";

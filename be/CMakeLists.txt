@@ -356,6 +356,7 @@ set(CLANG_INCLUDE_FLAGS
   "-I${LDAP_INCLUDE_DIR}"
   "-I${PROTOBUF_INCLUDE_DIR}"
   "-I${CCTZ_INCLUDE_DIR}"
+  "-I${CURL_INCLUDE_DIR}"
 )
 
 # allow linking of static libs into dynamic lib
@@ -424,6 +425,7 @@ set (IMPALA_LIBS
   histogram_proto
   ImpalaThrift
   Io
+  kudu_curl_util
   kudu_util
   krpc
   Rpc
@@ -545,7 +547,8 @@ set (IMPALA_DEPENDENCIES
   orc
   java_jvm
   kudu_client
-  cctz)
+  cctz
+  curl)
 
 # Add all external dependencies. They should come after the impala libs.
 set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}

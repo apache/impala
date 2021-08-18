@@ -1,0 +1,6 @@
+
+{
+  "keys": [
+    { "kty": "EC", "kid": "public:c424b67b-fe28-45d7-b015-f79da50b5b21", "crv": "P-256", "x": "Qgb5npLHd0Bk61bNnjK632uwmBfrF7I8hoPgaOZjyhg", "y": "fgazwzugi-g_2lv8jzm115u0qWaIJkcBkTnDgN8lJXo" }
+  ]
+}
