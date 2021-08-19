@@ -75,3 +75,9 @@ objectClass: groupOfUniqueNames
 cn: group1
 uniqueMember: cn=Test1Ldap,ou=Users,dc=myorg,dc=com
 uniqueMember: cn=Test2Ldap,ou=Users,dc=myorg,dc=com
+
+dn: cn=group2,ou=Groups,dc=myorg,dc=com
+objectClass: top
+objectClass: groupOfUniqueNames
+cn: group2
+uniqueMember: cn=Test1Ldap,ou=Users,dc=myorg,dc=com

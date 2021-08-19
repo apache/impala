@@ -67,6 +67,23 @@ public class LdapSearchBindImpalaShellTest extends LdapImpalaShellTest {
   public void testLdapFilters() throws Exception {
     // These correspond to the values in fe/src/test/resources/users.ldif
     // Sets up a cluster with user filter which forbids access only for TEST_USER_2 under
+    // 'dc=myorg,dc=com' subtree.
+    setUp(String.format("--ldap_user_search_basedn=dc=myorg,dc=com "
+            + "--ldap_group_search_basedn=ou=Groups,dc=myorg,dc=com "
+            + "--ldap_user_filter=(&(objectClass=person)(cn={0})(!(cn=%s))) "
+            + "--ldap_group_filter=(uniqueMember={1})",
+        TEST_USER_2));
+    testLdapFiltersImpl();
+  }
+
+  /**
+   * Tests the LDAP user and group filter configs, with narrow group search, only users in
+   * a specific group are allowed.
+   */
+  @Test
+  public void testLdapFiltersWithNarrowGroupSearch() throws Exception {
+    // These correspond to the values in fe/src/test/resources/users.ldif
+    // Sets up a cluster with user filter which forbids access only for TEST_USER_2 under
     // 'dc=myorg,dc=com' subtree and group filter that allows access only for users that
     // are in the TEST_USER_GROUP group.
     setUp(String.format("--ldap_user_search_basedn=dc=myorg,dc=com "

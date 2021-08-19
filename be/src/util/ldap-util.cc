@@ -183,8 +183,9 @@ bool ImpalaLdap::Bind(
   return true;
 }
 
-string ImpalaLdap::LdapSearchObject(LDAP* ld, const char* base_dn, const char* filter) {
-  string result_dn = "";
+vector<string> ImpalaLdap::LdapSearchObject(LDAP* ld, const char* base_dn,
+    const char* filter) {
+  vector<string> result_dns;
   LDAPMessage* result_msg;
   // Search through LDAP starting at a base of 'base_dn' and including the entire subtree
   // below it while applying 'filter'. This should return a list of all entries
@@ -192,22 +193,10 @@ string ImpalaLdap::LdapSearchObject(LDAP* ld, const char* base_dn, const char* f
   int rc = ldap_search_ext_s(ld, base_dn, LDAP_SCOPE_SUBTREE, filter, nullptr, false,
       nullptr, nullptr, nullptr, LDAP_MAXINT, &result_msg);
   if (rc != LDAP_SUCCESS) {
-    LOG(WARNING) << "LDAP search failed"
-                 << " with base DN=" << base_dn << " and filter=" << filter << " : "
-                 << ldap_err2string(rc);
+    LOG(WARNING) << "LDAP search failed with base DN=" << base_dn << " and filter="
+                 << filter << " : " << ldap_err2string(rc);
     ldap_msgfree(result_msg);
-    return result_dn;
-  }
-
-  // Check the number of entries returned by the LDAP server, the username should match
-  // only one LDAP object, ambiguous results are not permitted.
-  int nr_of_entries = ldap_count_entries(ld, result_msg);
-  if (nr_of_entries != 1) {
-    LOG(WARNING) << "LDAP search failed with base DN=" << base_dn
-                 << " and filter:" << filter << ". " << nr_of_entries
-                 << " entries have been found.";
-    ldap_msgfree(result_msg);
-    return result_dn;
+    return result_dns;
   }
 
   // Iterate through the result objects and retrieve the DN from the result.
@@ -218,7 +207,7 @@ string ImpalaLdap::LdapSearchObject(LDAP* ld, const char* base_dn, const char* f
       case LDAP_RES_SEARCH_ENTRY:
         char* entry_dn;
         if ((entry_dn = ldap_get_dn(ld, msg)) != nullptr) {
-          result_dn = string(entry_dn);
+          result_dns.push_back(string(entry_dn));
           ldap_memfree(entry_dn);
         } else {
           LOG(WARNING) << "LDAP search error for " << filter << " with DN=" << base_dn
@@ -251,7 +240,7 @@ string ImpalaLdap::LdapSearchObject(LDAP* ld, const char* base_dn, const char* f
   }
   ldap_msgfree(result_msg);
 
-  return result_dn;
+  return result_dns;
 }
 
 } // namespace impala

@@ -164,12 +164,14 @@ bool LdapSimpleBind::CheckGroupMembership(LDAP* ld, const string& user_dn) {
 
   VLOG(2) << "Searching for groups with filter: " << filter;
   for (const string& group_dn : group_base_dns_) {
-    string dn = LdapSearchObject(ld, group_dn.c_str(), filter.c_str());
+    vector<string> dns = LdapSearchObject(ld, group_dn.c_str(), filter.c_str());
     // Retrieve the value part of the first attribute in the provided relative DN.
-    vector<string> attributes = Split(dn, delimiter::Limit(",", 1));
-    vector<string> short_name = Split(attributes[0], delimiter::Limit("=", 1));
-    if (short_name.size() > 1 && group_filter_.count(short_name[1]) == 1) {
-      return true;
+    for(const string& dn : dns) {
+      vector<string> attributes = Split(dn, delimiter::Limit(",", 1));
+      vector<string> short_name = Split(attributes[0], delimiter::Limit("=", 1));
+      if (short_name.size() > 1 && group_filter_.count(short_name[1]) == 1) {
+        return true;
+      }
     }
   }
 

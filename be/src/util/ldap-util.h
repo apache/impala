@@ -71,7 +71,8 @@ class ImpalaLdap {
   /// ldap search for objects on the 'base_dn' with the provided 'filter'.
   /// It returns the DN of the object when succeeds or empty string if fails. Only
   /// allows one matching entry.
-  std::string LdapSearchObject(LDAP* ld, const char* base_dn, const char* filter);
+  std::vector<std::string> LdapSearchObject(LDAP* ld, const char* base_dn,
+      const char* filter);
 };
 
 } // namespace impala

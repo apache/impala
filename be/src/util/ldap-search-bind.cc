@@ -98,16 +98,22 @@ bool LdapSearchBind::LdapCheckPass(const char* user, const char* pass, unsigned 
 
   // Execute the LDAP search and try to retrieve the user dn
   VLOG(1) << "Trying LDAP user search for: " << user;
-  string user_dn = LdapSearchObject(
+  vector<string> user_dns = LdapSearchObject(
       bind_user_ld, FLAGS_ldap_user_search_basedn.c_str(), filter.c_str());
   ldap_unbind_ext(bind_user_ld, nullptr, nullptr);
-  if (user_dn.empty()) return false;
+  if (user_dns.size() != 1) {
+    LOG(WARNING) << "LDAP search failed with base DN=" << FLAGS_ldap_user_search_basedn
+                 << " and filter:" << filter << ". " << user_dns.size() << " entries "
+                 << "have been found, expected a unique result.";
+    return false;
+  }
+
   VLOG(2) << "LDAP search successful";
 
   // Bind with the found user and provided pass
   LDAP* user_ld;
-  VLOG(2) << "Trying LDAP bind with: " << user_dn;
-  success = Bind(user_dn, pass, passlen, &user_ld);
+  VLOG(2) << "Trying LDAP bind with: " << user_dns[0];
+  success = Bind(user_dns[0], pass, passlen, &user_ld);
   if (success) {
     ldap_unbind_ext(user_ld, nullptr, nullptr);
     VLOG(2) << "LDAP bind successful";
@@ -135,21 +141,25 @@ bool LdapSearchBind::LdapCheckFilters(string username) {
   if (group_filter.find(USER_DN_PATTERN) != string::npos) {
     string user_filter = user_filter_;
     replace_all(user_filter, USER_NAME_PATTERN, username);
-    string user_dn =
+    vector<string> user_dns =
         LdapSearchObject(ld, FLAGS_ldap_user_search_basedn.c_str(), user_filter.c_str());
-    if (user_dn.empty()) {
+    if (user_dns.size() != 1) {
+      LOG(WARNING) << "LDAP search failed with base DN="
+                   << FLAGS_ldap_user_search_basedn << " and filter:" << user_filter
+                   << ". " << user_dns.size() << " entries have been found, expected a "
+                   << "unique result.";
       ldap_unbind_ext(ld, nullptr, nullptr);
       return false;
     }
-    replace_all(group_filter, USER_DN_PATTERN, user_dn);
+    replace_all(group_filter, USER_DN_PATTERN, user_dns[0]);
   }
 
   // Execute LDAP search for the group
   VLOG_QUERY << "Trying LDAP group search for: " << username;
-  string filter_user_dn =
+  vector<string> filter_user_dns =
       LdapSearchObject(ld, FLAGS_ldap_group_search_basedn.c_str(), group_filter.c_str());
   ldap_unbind_ext(ld, nullptr, nullptr);
-  if (filter_user_dn.empty()) return false;
+  if (filter_user_dns.empty()) return false;
   VLOG(2) << "LDAP group search successful";
 
   return true;
