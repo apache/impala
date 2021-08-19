@@ -34,17 +34,14 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.GetAllWriteEventInfoRequest;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TxnToWriteId;
-import org.apache.hadoop.hive.metastore.api.WriteEventInfo;
 import org.apache.hadoop.hive.metastore.messaging.AbortTxnMessage;
 import org.apache.hadoop.hive.metastore.messaging.AddPartitionMessage;
 import org.apache.hadoop.hive.metastore.messaging.AllocWriteIdMessage;
 import org.apache.hadoop.hive.metastore.messaging.AlterPartitionMessage;
-import org.apache.hadoop.hive.metastore.messaging.CommitTxnMessage;
 import org.apache.hadoop.hive.metastore.messaging.CreateTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.DropPartitionMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONAlterDatabaseMessage;
@@ -61,7 +58,6 @@ import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.Db;
 import org.apache.impala.catalog.FileMetadataLoadOpts;
 import org.apache.impala.catalog.HdfsTable;
-import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.TableNotFoundException;
@@ -77,7 +73,6 @@ import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.thrift.TPartitionKeyValue;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.AcidUtils;
-import org.apache.thrift.TException;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
 
@@ -192,7 +187,7 @@ public class MetastoreEvents {
           case ALLOC_WRITE_ID_EVENT:
             return new AllocWriteIdEvent(catalogOpExecutor_, metrics, event);
           case COMMIT_TXN:
-            return new CommitTxnEvent(catalogOpExecutor_, metrics, event);
+            return new MetastoreShim.CommitTxnEvent(catalogOpExecutor_, metrics, event);
           case ABORT_TXN:
             return new AbortTxnEvent(catalogOpExecutor_, metrics, event);
         }
@@ -458,7 +453,7 @@ public class MetastoreEvents {
     // metrics registry so that events can add metrics
     protected final Metrics metrics_;
 
-    MetastoreEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
+    protected MetastoreEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
         NotificationEvent event) {
       this.catalogOpExecutor_ = catalogOpExecutor;
       this.catalog_ = catalogOpExecutor_.getCatalog();
@@ -1749,7 +1744,8 @@ public class MetastoreEvents {
               .getDropDatabaseMessage(event.getMessage());
       try {
         droppedDatabase_ =
-            Preconditions.checkNotNull(dropDatabaseMessage.getDatabaseObject());
+            Preconditions
+                .checkNotNull(MetastoreShim.getDatabaseObject(dropDatabaseMessage));
       } catch (Exception e) {
         throw new MetastoreNotificationException(debugString(
             "Database object is null in the event. "
@@ -2397,130 +2393,6 @@ public class MetastoreEvents {
         return false;
       }
       return super.isEventProcessingDisabled();
-    }
-  }
-
-  /**
-   * Metastore event handler for COMMIT_TXN events. Handles commit event for transactional
-   * tables.
-   */
-  public static class CommitTxnEvent extends MetastoreEvent {
-    private final CommitTxnMessage commitTxnMessage_;
-    private final long txnId_;
-
-    CommitTxnEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
-        NotificationEvent event) {
-      super(catalogOpExecutor, metrics, event);
-      Preconditions.checkState(getEventType().equals(MetastoreEventType.COMMIT_TXN));
-      Preconditions.checkNotNull(event.getMessage());
-      commitTxnMessage_ = MetastoreEventsProcessor.getMessageDeserializer()
-          .getCommitTxnMessage(event.getMessage());
-      txnId_ = commitTxnMessage_.getTxnId();
-    }
-
-    @Override
-    protected void process() throws MetastoreNotificationException {
-      // To ensure no memory leaking in case an exception is thrown, we remove entries
-      // at first.
-      Set<TableWriteId> committedWriteIds = catalog_.removeWriteIds(txnId_);
-      // Via getAllWriteEventInfo, we can get data insertion info for transactional tables
-      // even though there are no insert events generated for transactional tables. Note
-      // that we cannot get DDL info from this API.
-      List<WriteEventInfo> writeEventInfoList;
-      try (MetaStoreClientPool.MetaStoreClient client = catalog_.getMetaStoreClient()) {
-        writeEventInfoList = client.getHiveClient().getAllWriteEventInfo(
-            new GetAllWriteEventInfoRequest(txnId_));
-      } catch (TException e) {
-        throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
-            + "get write event infos for txn {}. Event processing cannot continue. Issue "
-            + "an invalidate metadata command to reset event processor.", txnId_), e);
-      }
-
-      try {
-        if (writeEventInfoList != null && !writeEventInfoList.isEmpty()) {
-          commitTxnMessage_.addWriteEventInfo(writeEventInfoList);
-          addCommittedWriteIdsAndRefreshPartitions();
-        }
-        // committed write ids for DDL need to be added here
-        addCommittedWriteIdsToTables(committedWriteIds);
-      } catch (Exception e) {
-        throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
-            + "mark committed write ids and refresh partitions for txn {}. Event "
-            + "processing cannot continue. Issue an invalidate metadata command to reset "
-            + "event processor.", txnId_), e);
-      }
-    }
-
-    private void addCommittedWriteIdsToTables(Set<TableWriteId> tableWriteIds)
-        throws CatalogException {
-      for (TableWriteId tableWriteId: tableWriteIds) {
-        catalog_.addWriteIdsToTable(tableWriteId.getDbName(), tableWriteId.getTblName(),
-            getEventId(),
-            Collections.singletonList(tableWriteId.getWriteId()),
-            MutableValidWriteIdList.WriteIdStatus.COMMITTED);
-      }
-    }
-
-    private void addCommittedWriteIdsAndRefreshPartitions() throws Exception {
-      Preconditions.checkNotNull(commitTxnMessage_.getWriteIds());
-      List<Long> writeIds = Collections.unmodifiableList(commitTxnMessage_.getWriteIds());
-      List<Partition> parts = new ArrayList<>();
-      // To load partitions together for the same table, indexes are grouped by table name
-      Map<TableName, List<Integer>> tableNameToIdxs = new HashMap<>();
-      for (int i = 0; i < writeIds.size(); i++) {
-        org.apache.hadoop.hive.metastore.api.Table tbl = commitTxnMessage_.getTableObj(i);
-        TableName tableName = new TableName(tbl.getDbName(), tbl.getTableName());
-        parts.add(commitTxnMessage_.getPartitionObj(i));
-        tableNameToIdxs.computeIfAbsent(tableName, k -> new ArrayList<>()).add(i);
-      }
-      for (Map.Entry<TableName, List<Integer>> entry : tableNameToIdxs.entrySet()) {
-        org.apache.hadoop.hive.metastore.api.Table tbl =
-            commitTxnMessage_.getTableObj(entry.getValue().get(0));
-        List<Long> writeIdsForTable = entry.getValue().stream()
-            .map(i -> writeIds.get(i))
-            .collect(Collectors.toList());
-        List<Partition> partsForTable = entry.getValue().stream()
-            .map(i -> parts.get(i))
-            .collect(Collectors.toList());
-        if (tbl.getPartitionKeysSize() > 0
-            && !MetaStoreUtils.isMaterializedViewTable(tbl)) {
-          try {
-            catalogOpExecutor_.addCommittedWriteIdsAndReloadPartitionsIfExist(
-                getEventId(), entry.getKey().getDb(), entry.getKey().getTbl(),
-                writeIdsForTable, partsForTable, "Processing event id: " +
-                    getEventId() + ", event type: " + getEventType());
-          } catch (TableNotLoadedException e) {
-            debugLog("Ignoring reloading since table {} is not loaded",
-                entry.getKey());
-          } catch (DatabaseNotFoundException | TableNotFoundException e) {
-            debugLog("Ignoring reloading since table {} is not found",
-                entry.getKey());
-          }
-        } else {
-          catalog_.reloadTableIfExists(entry.getKey().getDb(), entry.getKey().getTbl(),
-              "CommitTxnEvent", getEventId());
-        }
-      }
-    }
-
-    @Override
-    protected boolean isEventProcessingDisabled() {
-      return false;
-    }
-
-    @Override
-    protected SelfEventContext getSelfEventContext() {
-      throw new UnsupportedOperationException("Self-event evaluation is not needed for "
-          + "this event type");
-    }
-
-    /*
-    Not skipping the event since there can be multiple tables involved. The actual
-    processing of event would skip or process the event on a table by table basis
-     */
-    @Override
-    protected boolean shouldSkipWhenSyncingToLatestEventId() {
-      return false;
     }
   }
 

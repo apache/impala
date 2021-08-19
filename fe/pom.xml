@@ -756,7 +756,7 @@ under the License.
                         -->
                 <source>${project.basedir}/generated-sources/gen-java</source>
                 <source>${project.build.directory}/generated-sources/cup</source>
-                <source>${project.basedir}/src/compat-hive-${hive.major.version}/java</source>
+                <source>${project.basedir}/src/compat-${hive.dist.type}-${hive.major.version}/java</source>
                </sources>
             </configuration>
           </execution>
@@ -1048,6 +1048,38 @@ under the License.
                 <version>2.3.1</version>
               </dependency>
             </dependencies>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- Profile which is automatically activated based on the value of the
+         IMPALA_HIVE_DIST_TYPE environment -->
+    <profile>
+      <id>apache-hive-3</id>
+      <activation>
+        <property>
+          <name>env.IMPALA_HIVE_DIST_TYPE</name>
+          <value>apache-hive</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.3</version>
+            <configuration>
+              <excludes>
+                <exclude>**/org/apache/impala/catalog/metastore/*.java</exclude>
+                <exclude>**/org/apache/impala/catalog/CatalogHmsAPIHelper.java</exclude>
+                <exclude>**/org/apache/impala/catalog/CompactionInfoLoader.java</exclude>
+              </excludes>
+              <testExcludes>
+                <testExclude>**/org/apache/impala/catalog/metastore/*.java</testExclude>
+                <testExclude>**/org/apache/impala/testutil/Catalog*.java</testExclude>
+              </testExcludes>
+            </configuration>
           </plugin>
         </plugins>
       </build>

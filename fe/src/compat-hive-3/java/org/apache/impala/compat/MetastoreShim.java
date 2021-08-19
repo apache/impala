@@ -25,181 +25,105 @@ import static org.apache.impala.service.MetadataOp.TABLE_TYPE_TABLE;
 import static org.apache.impala.service.MetadataOp.TABLE_TYPE_VIEW;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.ImmutableMap;
-
 import com.google.common.collect.Iterables;
+
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collections;
-import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.hive.common.StatsSetupConst;
-import org.apache.hadoop.hive.common.ValidReaderWriteIdList;
-import org.apache.hadoop.hive.common.ValidTxnList;
-import org.apache.hadoop.hive.common.ValidTxnWriteIdList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
-import org.apache.hadoop.hive.metastore.LockRequestBuilder;
 import org.apache.hadoop.hive.metastore.TableType;
-import org.apache.hadoop.hive.metastore.api.SQLForeignKey;
-import org.apache.hadoop.hive.metastore.api.SQLPrimaryKey;
-import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.CompactionInfoStruct;
 import org.apache.hadoop.hive.metastore.api.Database;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.FireEventRequest;
 import org.apache.hadoop.hive.metastore.api.FireEventRequestData;
 import org.apache.hadoop.hive.metastore.api.FireEventResponse;
+import org.apache.hadoop.hive.metastore.api.GetAllWriteEventInfoRequest;
+import org.apache.hadoop.hive.metastore.api.GetLatestCommittedCompactionInfoRequest;
+import org.apache.hadoop.hive.metastore.api.GetLatestCommittedCompactionInfoResponse;
 import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
-import org.apache.hadoop.hive.metastore.api.LockComponent;
-import org.apache.hadoop.hive.metastore.api.LockRequest;
-import org.apache.hadoop.hive.metastore.api.LockResponse;
-import org.apache.hadoop.hive.metastore.api.LockState;
 import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.NoSuchTxnException;
+import org.apache.hadoop.hive.metastore.api.NotificationEvent;
+import org.apache.hadoop.hive.metastore.api.NotificationEventRequest;
+import org.apache.hadoop.hive.metastore.api.NotificationEventResponse;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.PartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.SetPartitionsStatsRequest;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.hadoop.hive.metastore.api.TableValidWriteIds;
-import org.apache.hadoop.hive.metastore.api.TxnAbortedException;
+import org.apache.hadoop.hive.metastore.api.WriteEventInfo;
 import org.apache.hadoop.hive.metastore.api.WriteNotificationLogRequest;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.messaging.AlterTableMessage;
+import org.apache.hadoop.hive.metastore.messaging.CommitTxnMessage;
 import org.apache.hadoop.hive.metastore.messaging.EventMessage;
 import org.apache.hadoop.hive.metastore.messaging.MessageBuilder;
 import org.apache.hadoop.hive.metastore.messaging.MessageDeserializer;
 import org.apache.hadoop.hive.metastore.messaging.MessageEncoder;
 import org.apache.hadoop.hive.metastore.messaging.MessageFactory;
 import org.apache.hadoop.hive.metastore.messaging.MessageSerializer;
-import org.apache.hadoop.hive.metastore.utils.FileUtils;
+import org.apache.hadoop.hive.metastore.messaging.json.JSONDropDatabaseMessage;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
-import org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo;
-import org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo;
-import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
-import org.apache.hive.service.rpc.thrift.TGetFunctionsReq;
-import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
-import org.apache.hive.service.rpc.thrift.TGetTablesReq;
-import org.apache.impala.authorization.User;
+import org.apache.impala.analysis.TableName;
+import org.apache.impala.catalog.CatalogException;
+import org.apache.impala.catalog.CatalogServiceCatalog;
+import org.apache.impala.catalog.CompactionInfoLoader;
+import org.apache.impala.catalog.DatabaseNotFoundException;
+import org.apache.impala.catalog.HdfsPartition;
+import org.apache.impala.catalog.HdfsTable;
+import org.apache.impala.catalog.Hive3MetastoreShimBase;
+import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
-import org.apache.impala.common.ImpalaException;
+import org.apache.impala.catalog.TableNotFoundException;
+import org.apache.impala.catalog.TableNotLoadedException;
+import org.apache.impala.catalog.TableWriteId;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
+import org.apache.impala.catalog.events.MetastoreEventsProcessor;
+import org.apache.impala.catalog.events.MetastoreNotificationException;
+import org.apache.impala.catalog.events.MetastoreNotificationNeedsInvalidateException;
+import org.apache.impala.catalog.events.SelfEventContext;
+import org.apache.impala.catalog.local.MetaProvider.PartitionMetadata;
+import org.apache.impala.catalog.local.MetaProvider.PartitionRef;
+import org.apache.impala.catalog.local.MetaProvider.TableMetaRef;
+import org.apache.impala.catalog.metastore.CatalogMetastoreServer;
+import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
 import org.apache.impala.common.ImpalaRuntimeException;
-import org.apache.impala.common.Pair;
-import org.apache.impala.common.TransactionException;
+import org.apache.impala.common.Metrics;
+import org.apache.impala.hive.common.MutableValidWriteIdList;
 import org.apache.impala.service.BackendConfig;
-import org.apache.impala.service.Frontend;
-import org.apache.impala.service.MetadataOp;
-import org.apache.impala.thrift.TMetadataOpRequest;
-import org.apache.impala.thrift.TResultSet;
-import org.apache.impala.thrift.TValidWriteIdList;
-import org.apache.impala.util.AcidUtils;
+import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.util.AcidUtils.TblTransaction;
 import org.apache.impala.util.MetaStoreUtil.TableInsertEventInfo;
 import org.apache.thrift.TException;
-
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * A wrapper around some of Hive's Metastore API's to abstract away differences
- * between major versions of Hive. This implements the shimmed methods for Hive 3.
+ * between major versions of Hive. This implements the shimmed methods for CDP Hive 3
+ * (using Hive 4 api).
  */
-public class MetastoreShim {
+public class MetastoreShim extends Hive3MetastoreShimBase {
   private static final Logger LOG = LoggerFactory.getLogger(MetastoreShim.class);
-
-  private static final String EXTWRITE = "EXTWRITE";
-  private static final String EXTREAD = "EXTREAD";
-  private static final String HIVEBUCKET2 = "HIVEBUCKET2";
-  private static final String HIVEFULLACIDREAD = "HIVEFULLACIDREAD";
-  private static final String HIVEFULLACIDWRITE = "HIVEFULLACIDWRITE";
-  private static final String HIVEMANAGEDINSERTREAD = "HIVEMANAGEDINSERTREAD";
-  private static final String HIVEMANAGEDINSERTWRITE = "HIVEMANAGEDINSERTWRITE";
-  private static final String HIVEMANAGESTATS = "HIVEMANAGESTATS";
-  // Materialized View
-  private static final String HIVEMQT = "HIVEMQT";
-  // Virtual View
-  private static final String HIVESQL = "HIVESQL";
-  private static final long MAJOR_VERSION = 3;
-  private static boolean capabilitiestSet_ = false;
-
-  // Number of retries to acquire an HMS ACID lock.
-  private static final int LOCK_RETRIES = 10;
-
-  // Time interval between retries of acquiring an HMS ACID lock
-  private static final int LOCK_RETRY_WAIT_SECONDS = 3;
-
-  private final static String HMS_RPC_ERROR_FORMAT_STR =
-      "Error making '%s' RPC to Hive Metastore: ";
-
-  // Id used to register transactions / locks.
-  // Not final, as it makes sense to set it based on role + instance, see IMPALA-8853.
-  public static String TRANSACTION_USER_ID = "Impala";
-
-  /**
-   * Initializes and returns a TblTransaction object for table 'tbl'.
-   * Opens a new transaction if txnId is not valid.
-   */
-  public static TblTransaction createTblTransaction(
-     IMetaStoreClient client, Table tbl, long txnId)
-     throws TransactionException {
-    TblTransaction tblTxn = new TblTransaction();
-    try {
-      if (txnId <= 0) {
-        txnId = openTransaction(client);
-        tblTxn.ownsTxn = true;
-      }
-      tblTxn.txnId = txnId;
-      tblTxn.writeId =
-          allocateTableWriteId(client, txnId, tbl.getDbName(), tbl.getTableName());
-      tblTxn.validWriteIds =
-          getValidWriteIdListInTxn(client, tbl.getDbName(), tbl.getTableName(), txnId);
-      return tblTxn;
-    }
-    catch (TException e) {
-      if (tblTxn.ownsTxn) abortTransactionNoThrow(client, tblTxn.txnId);
-      throw new TransactionException(
-          String.format(HMS_RPC_ERROR_FORMAT_STR, "createTblTransaction"), e);
-    }
-  }
-
-  static public void commitTblTransactionIfNeeded(IMetaStoreClient client,
-      TblTransaction tblTxn) throws TransactionException {
-    if (tblTxn.ownsTxn) commitTransaction(client, tblTxn.txnId);
-  }
-
-  static public void abortTblTransactionIfNeeded(IMetaStoreClient client,
-      TblTransaction tblTxn) {
-    if (tblTxn.ownsTxn) abortTransactionNoThrow(client, tblTxn.txnId);
-  }
-
-  /**
-   * Constant variable that stores engine value needed to store / access
-   * Impala column statistics.
-   */
-  public static final String IMPALA_ENGINE = "impala";
-
-  /**
-   * Wrapper around MetaStoreUtils.validateName() to deal with added arguments.
-   */
-  public static boolean validateName(String name) {
-    return MetaStoreUtils.validateName(name, null);
-  }
 
   /**
    * Wrapper around IMetaStoreClient.alter_table with validWriteIds as a param.
@@ -216,39 +140,6 @@ public class MetastoreShim {
       throw new ImpalaRuntimeException(
           String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), e);
     }
-  }
-
-
-  /**
-   * Wrapper around IMetaStoreClient.alter_partition() to deal with added
-   * arguments.
-   */
-  public static void alterPartition(IMetaStoreClient client, Partition partition)
-      throws InvalidOperationException, MetaException, TException {
-    client.alter_partition(
-        partition.getDbName(), partition.getTableName(), partition, null);
-  }
-
-  /**
-   * Wrapper around IMetaStoreClient.alter_partitions() to deal with added
-   * arguments.
-   */
-  public static void alterPartitions(IMetaStoreClient client, String dbName,
-      String tableName, List<Partition> partitions)
-      throws InvalidOperationException, MetaException, TException {
-    client.alter_partitions(dbName, tableName, partitions, null);
-  }
-
-  /**
-   * Wrapper around IMetaStoreClient.createTableWithConstraints() to deal with added
-   * arguments. Hive four new arguments are uniqueConstraints, notNullConstraints,
-   * defaultConstraints, and checkConstraints.
-   */
-  public static void createTableWithConstraints(IMetaStoreClient client,
-      Table newTbl, List<SQLPrimaryKey> primaryKeys, List<SQLForeignKey> foreignKeys)
-      throws InvalidOperationException, MetaException, TException {
-    client.createTableWithConstraints(newTbl, primaryKeys, foreignKeys, null, null,
-        null, null);
   }
 
   /**
@@ -299,78 +190,6 @@ public class MetastoreShim {
   }
 
   /**
-   * Wrapper around MetaStoreUtils.updatePartitionStatsFast() to deal with added
-   * arguments.
-   */
-  public static void updatePartitionStatsFast(Partition partition, Table tbl,
-      Warehouse warehouse) throws MetaException {
-    MetaStoreUtils.updatePartitionStatsFast(partition, tbl, warehouse, /*madeDir*/false,
-        /*forceRecompute*/false,
-        /*environmentContext*/null, /*isCreate*/false);
-  }
-
-  /**
-   * Return the maximum number of Metastore objects that should be retrieved in
-   * a batch.
-   */
-  public static String metastoreBatchRetrieveObjectsMaxConfigKey() {
-    return MetastoreConf.ConfVars.BATCH_RETRIEVE_OBJECTS_MAX.toString();
-  }
-
-  /**
-   * Return the key and value that should be set in the partition parameters to
-   * mark that the stats were generated automatically by a stats task.
-   */
-  public static Pair<String, String> statsGeneratedViaStatsTaskParam() {
-    return Pair.create(StatsSetupConst.STATS_GENERATED, StatsSetupConst.TASK);
-  }
-
-  public static TResultSet execGetFunctions(
-      Frontend frontend, TMetadataOpRequest request, User user) throws ImpalaException {
-    TGetFunctionsReq req = request.getGet_functions_req();
-    return MetadataOp.getFunctions(
-        frontend, req.getCatalogName(), req.getSchemaName(), req.getFunctionName(), user);
-  }
-
-  public static TResultSet execGetColumns(
-      Frontend frontend, TMetadataOpRequest request, User user) throws ImpalaException {
-    TGetColumnsReq req = request.getGet_columns_req();
-    return MetadataOp.getColumns(frontend, req.getCatalogName(), req.getSchemaName(),
-        req.getTableName(), req.getColumnName(), user);
-  }
-
-  public static TResultSet execGetTables(
-      Frontend frontend, TMetadataOpRequest request, User user) throws ImpalaException {
-    TGetTablesReq req = request.getGet_tables_req();
-    return MetadataOp.getTables(frontend, req.getCatalogName(), req.getSchemaName(),
-        req.getTableName(), req.getTableTypes(), user);
-  }
-
-  public static TResultSet execGetSchemas(
-      Frontend frontend, TMetadataOpRequest request, User user) throws ImpalaException {
-    TGetSchemasReq req = request.getGet_schemas_req();
-    return MetadataOp.getSchemas(
-        frontend, req.getCatalogName(), req.getSchemaName(), user);
-  }
-
-  /**
-   * Supported HMS-3 types
-   */
-  public static final EnumSet<TableType> IMPALA_SUPPORTED_TABLE_TYPES = EnumSet
-      .of(TableType.EXTERNAL_TABLE, TableType.MANAGED_TABLE, TableType.VIRTUAL_VIEW,
-          TableType.MATERIALIZED_VIEW);
-
-  /**
-   * mapping between the HMS-3 type the Impala types
-   */
-  public static final ImmutableMap<String, String> HMS_TO_IMPALA_TYPE =
-      new ImmutableMap.Builder<String, String>()
-          .put("EXTERNAL_TABLE", TABLE_TYPE_TABLE)
-          .put("MANAGED_TABLE", TABLE_TYPE_TABLE)
-          .put("INDEX_TABLE", TABLE_TYPE_TABLE)
-          .put("VIRTUAL_VIEW", TABLE_TYPE_VIEW)
-          .put("MATERIALIZED_VIEW", TABLE_TYPE_VIEW).build();
-  /**
    * Method which maps Metastore's TableType to Impala's table type. In metastore 2
    * Materialized view is not supported
    */
@@ -398,16 +217,6 @@ public class MetastoreShim {
     }
   }
 
-  // hive-3 introduces a catalog object in hive
-  // Impala only supports the default catalog of hive
-  private static final String defaultCatalogName_ = MetaStoreUtils
-      .getDefaultCatalog(MetastoreConf.newMetastoreConf());
-
-  /**
-   * Gets the name of the default catalog from metastore configuration.
-   */
-  public static String getDefaultCatalogName() { return defaultCatalogName_; }
-
   //hive-3 has a different class to encode and decode event messages
   private static final MessageEncoder eventMessageEncoder_ =
       MessageFactory.getDefaultInstance(MetastoreConf.newMetastoreConf());
@@ -426,17 +235,6 @@ public class MetastoreShim {
    */
   public static MessageSerializer getMessageSerializer() {
     return eventMessageEncoder_.getSerializer();
-  }
-
-  /**
-   * Wrapper around FileUtils.makePartName to deal with package relocation in Hive 3.
-   * This method uses the metastore's FileUtils method instead of one from hive-exec
-   * @param partitionColNames
-   * @param values
-   * @return
-   */
-  public static String makePartName(List<String> partitionColNames, List<String> values) {
-    return FileUtils.makePartName(partitionColNames, values);
   }
 
   /**
@@ -461,148 +259,6 @@ public class MetastoreShim {
   }
 
   /**
-   * Wrapper method to get the formatted string to represent the columns information of
-   * a metastore table. This method was changed in Hive-3 significantly when compared
-   * to Hive-2. In order to avoid adding unnecessary dependency to hive-exec this
-   * method copies the source code from hive-2's MetaDataFormatUtils class for this
-   * method.
-   * TODO : In order to avoid this copy, we move move this code from hive's ql module
-   * to a util method in MetastoreUtils in metastore module
-   * @return
-   */
-  public static String getAllColumnsInformation(List<FieldSchema> tabCols,
-      List<FieldSchema> partitionCols, boolean printHeader, boolean isOutputPadded,
-      boolean showPartColsSeparately) {
-    return HiveMetadataFormatUtils
-        .getAllColumnsInformation(tabCols, partitionCols, printHeader, isOutputPadded,
-            showPartColsSeparately);
-  }
-
-  /**
-   * Wrapper method around Hive's MetadataFormatUtils.getTableInformation which has
-   * changed significantly in Hive-3
-   * @return
-   */
-  public static String getTableInformation(Table table) {
-    return HiveMetadataFormatUtils.getTableInformation(table, false);
-  }
-
-  /**
-   * Wrapper method around Hive-3's MetadataFormatUtils.getConstraintsInformation
-   * @return
-   */
-  public static String getConstraintsInformation(PrimaryKeyInfo pkInfo,
-      ForeignKeyInfo fkInfo) {
-    return HiveMetadataFormatUtils.getConstraintsInformation(pkInfo, fkInfo);
-  }
-
-  /**
-   * This method has been copied from BaseSemanticAnalyzer class of Hive and is fairly
-   * stable now (last change was in mid 2016 as of April 2019). Copying is preferred over
-   * adding dependency to this class which pulls in a lot of other transitive
-   * dependencies from hive-exec
-   */
-  public static String unescapeSQLString(String stringLiteral) {
-    {
-      Character enclosure = null;
-
-      // Some of the strings can be passed in as unicode. For example, the
-      // delimiter can be passed in as \002 - So, we first check if the
-      // string is a unicode number, else go back to the old behavior
-      StringBuilder sb = new StringBuilder(stringLiteral.length());
-      for (int i = 0; i < stringLiteral.length(); i++) {
-
-        char currentChar = stringLiteral.charAt(i);
-        if (enclosure == null) {
-          if (currentChar == '\'' || stringLiteral.charAt(i) == '\"') {
-            enclosure = currentChar;
-          }
-          // ignore all other chars outside the enclosure
-          continue;
-        }
-
-        if (enclosure.equals(currentChar)) {
-          enclosure = null;
-          continue;
-        }
-
-        if (currentChar == '\\' && (i + 6 < stringLiteral.length()) && stringLiteral.charAt(i + 1) == 'u') {
-          int code = 0;
-          int base = i + 2;
-          for (int j = 0; j < 4; j++) {
-            int digit = Character.digit(stringLiteral.charAt(j + base), 16);
-            code = (code << 4) + digit;
-          }
-          sb.append((char)code);
-          i += 5;
-          continue;
-        }
-
-        if (currentChar == '\\' && (i + 4 < stringLiteral.length())) {
-          char i1 = stringLiteral.charAt(i + 1);
-          char i2 = stringLiteral.charAt(i + 2);
-          char i3 = stringLiteral.charAt(i + 3);
-          if ((i1 >= '0' && i1 <= '1') && (i2 >= '0' && i2 <= '7')
-              && (i3 >= '0' && i3 <= '7')) {
-            byte bVal = (byte) ((i3 - '0') + ((i2 - '0') * 8) + ((i1 - '0') * 8 * 8));
-            byte[] bValArr = new byte[1];
-            bValArr[0] = bVal;
-            String tmp = new String(bValArr);
-            sb.append(tmp);
-            i += 3;
-            continue;
-          }
-        }
-
-        if (currentChar == '\\' && (i + 2 < stringLiteral.length())) {
-          char n = stringLiteral.charAt(i + 1);
-          switch (n) {
-            case '0':
-              sb.append("\0");
-              break;
-            case '\'':
-              sb.append("'");
-              break;
-            case '"':
-              sb.append("\"");
-              break;
-            case 'b':
-              sb.append("\b");
-              break;
-            case 'n':
-              sb.append("\n");
-              break;
-            case 'r':
-              sb.append("\r");
-              break;
-            case 't':
-              sb.append("\t");
-              break;
-            case 'Z':
-              sb.append("\u001A");
-              break;
-            case '\\':
-              sb.append("\\");
-              break;
-            // The following 2 lines are exactly what MySQL does TODO: why do we do this?
-            case '%':
-              sb.append("\\%");
-              break;
-            case '_':
-              sb.append("\\_");
-              break;
-            default:
-              sb.append(n);
-          }
-          i++;
-        } else {
-          sb.append(currentChar);
-        }
-      }
-      return sb.toString();
-    }
-  }
-  /**
    * Get valid write ids from HMS for the acid table
    * @param client the client to access HMS
    * @param tableFullName the name for the table
@@ -611,96 +267,6 @@ public class MetastoreShim {
   public static ValidWriteIdList fetchValidWriteIds(IMetaStoreClient client,
       String tableFullName) throws TException {
     return client.getValidWriteIds(tableFullName);
-  }
-
-  /**
-   * Get ValidWriteIdList object by given string
-   * @param validWriteIds ValidWriteIdList object in String
-   * @return ValidWriteIdList object
-   */
-  public static ValidWriteIdList getValidWriteIdListFromString(String validWriteIds) {
-    Preconditions.checkNotNull(validWriteIds);
-    return new ValidReaderWriteIdList(validWriteIds);
-  }
-
-  /**
-   * Converts a TValidWriteIdList object to ValidWriteIdList.
-   * @param tableName the name of the table.
-   * @param validWriteIds the thrift object.
-   * @return ValidWriteIdList object
-   */
-  public static ValidWriteIdList getValidWriteIdListFromThrift(String tableName,
-      TValidWriteIdList validWriteIds) {
-    Preconditions.checkNotNull(validWriteIds);
-    BitSet abortedBits;
-    if (validWriteIds.getAborted_indexesSize() > 0) {
-      abortedBits = new BitSet(validWriteIds.getInvalid_write_idsSize());
-      for (int aborted_index : validWriteIds.getAborted_indexes()) {
-        abortedBits.set(aborted_index);
-      }
-    } else {
-      abortedBits = new BitSet();
-    }
-    long highWatermark = validWriteIds.isSetHigh_watermark() ?
-        validWriteIds.high_watermark : Long.MAX_VALUE;
-    long minOpenWriteId = validWriteIds.isSetMin_open_write_id() ?
-        validWriteIds.min_open_write_id : Long.MAX_VALUE;
-    return new ValidReaderWriteIdList(tableName,
-        validWriteIds.getInvalid_write_ids().stream().mapToLong(i -> i).toArray(),
-        abortedBits, highWatermark, minOpenWriteId);
-  }
-
-  /**
-   * Converts a ValidWriteIdList object to TValidWriteIdList.
-   */
-  public static TValidWriteIdList convertToTValidWriteIdList(
-      ValidWriteIdList validWriteIdList) {
-    Preconditions.checkNotNull(validWriteIdList);
-    TValidWriteIdList ret = new TValidWriteIdList();
-    long minOpenWriteId = validWriteIdList.getMinOpenWriteId() != null ?
-        validWriteIdList.getMinOpenWriteId() : Long.MAX_VALUE;
-    ret.setHigh_watermark(validWriteIdList.getHighWatermark());
-    ret.setMin_open_write_id(minOpenWriteId);
-    ret.setInvalid_write_ids(Arrays.stream(
-        validWriteIdList.getInvalidWriteIds()).boxed().collect(Collectors.toList()));
-    List<Integer> abortedIndexes = new ArrayList<>();
-    for (int i = 0; i < validWriteIdList.getInvalidWriteIds().length; ++i) {
-      long writeId = validWriteIdList.getInvalidWriteIds()[i];
-      if (validWriteIdList.isWriteIdAborted(writeId)) {
-        abortedIndexes.add(i);
-      }
-    }
-    ret.setAborted_indexes(abortedIndexes);
-    return ret;
-  }
-
-  /**
-   * Returns a ValidTxnList object that helps to identify in-progress and aborted
-   * transactions.
-   */
-  public static ValidTxnList getValidTxns(IMetaStoreClient client) throws TException {
-    return client.getValidTxns();
-  }
-
-  /**
-   * Get validWriteIds in string with txnId and table name
-   * arguments.
-   */
-  private static String getValidWriteIdListInTxn(IMetaStoreClient client, String dbName,
-      String tblName, long txnId)
-      throws TException {
-    ValidTxnList txns = client.getValidTxns(txnId);
-    String tableFullName = dbName + "." + tblName;
-    List<TableValidWriteIds> writeIdsObj = client.getValidWriteIds(
-        Lists.newArrayList(tableFullName), txns.toString());
-    ValidTxnWriteIdList validTxnWriteIdList = new ValidTxnWriteIdList(txnId);
-    for (TableValidWriteIds tableWriteIds : writeIdsObj) {
-      validTxnWriteIdList.addTableValidWriteIdList(
-          createValidReaderWriteIdList(tableWriteIds));
-    }
-    String validWriteIds =
-        validTxnWriteIdList.getTableValidWriteIdList(tableFullName).writeToString();
-    return validWriteIds;
   }
 
   /**
@@ -714,6 +280,16 @@ public class MetastoreShim {
   }
 
   /**
+   * Wrapper around HMS Partition object to set writeID
+   * WriteID is introduced in ACID 2
+   * It is used to detect changes of the partition
+   */
+  public static void setWriteIdToMSPartition(Partition partition, long writeId) {
+    Preconditions.checkNotNull(partition);
+    partition.setWriteId(writeId);
+  }
+
+  /**
    * Wrapper around HMS Table object to get writeID
    * Per table writeId is introduced in ACID 2
    * It is used to detect changes of the table
@@ -721,186 +297,6 @@ public class MetastoreShim {
   public static long getWriteIdFromMSTable(Table msTbl) {
     Preconditions.checkNotNull(msTbl);
     return msTbl.getWriteId();
-  }
-
-  /**
-   * Opens a new transaction.
-   * Sets userId to TRANSACTION_USER_ID.
-   * @param client is the HMS client to be used.
-   * @param userId of user who is opening this transaction.
-   * @return the new transaction id.
-   * @throws TransactionException
-   */
-  public static long openTransaction(IMetaStoreClient client)
-      throws TransactionException {
-    try {
-      return client.openTxn(TRANSACTION_USER_ID);
-    } catch (Exception e) {
-      throw new TransactionException(e.getMessage());
-    }
-  }
-
-  /**
-   * Commits a transaction.
-   * @param client is the HMS client to be used.
-   * @param txnId is the transaction id.
-   * @throws TransactionException
-   */
-  public static void commitTransaction(IMetaStoreClient client, long txnId)
-      throws TransactionException {
-    try {
-      client.commitTxn(txnId);
-    } catch (Exception e) {
-      throw new TransactionException(e.getMessage());
-    }
-  }
-
-  /**
-   * Aborts a transaction.
-   * @param client is the HMS client to be used.
-   * @param txnId is the transaction id.
-   * @throws TransactionException
-   */
-  public static void abortTransaction(IMetaStoreClient client, long txnId)
-      throws TransactionException {
-    try {
-      client.abortTxns(Arrays.asList(txnId));
-    } catch (Exception e) {
-      throw new TransactionException(e.getMessage());
-    }
-  }
-
-  /**
-   * Heartbeats a transaction and/or lock to keep them alive.
-   * @param client is the HMS client to be used.
-   * @param txnId is the transaction id.
-   * @param lockId is the lock id.
-   * @return True on success, false if the transaction or lock is non-existent
-   * anymore.
-   * @throws In case of any other failures.
-   */
-  public static boolean heartbeat(IMetaStoreClient client,
-      long txnId, long lockId) throws TransactionException {
-    String errorMsg = "Caught exception during heartbeating transaction " +
-        String.valueOf(txnId) + " lock " + String.valueOf(lockId);
-    LOG.info("Sending heartbeat for transaction " + String.valueOf(txnId) +
-        " lock " + String.valueOf(lockId));
-    try {
-      client.heartbeat(txnId, lockId);
-    } catch (NoSuchLockException e) {
-      LOG.info(errorMsg, e);
-      return false;
-    } catch (NoSuchTxnException e) {
-      LOG.info(errorMsg, e);
-      return false;
-    } catch (TxnAbortedException e) {
-      LOG.info(errorMsg, e);
-      return false;
-    } catch (TException e) {
-      throw new TransactionException(e.getMessage());
-    }
-    return true;
-  }
-
-  /**
-   * Creates a lock for the given lock components. Returns the acquired lock, this
-   * might involve some waiting.
-   * @param client is the HMS client to be used.
-   * @param txnId The transaction ID associated with the lock. Zero if the lock doesn't
-   * belong to a transaction.
-   * @param lockComponents the lock components to include in this lock.
-   * @return the lock id
-   * @throws TransactionException in case of failure
-   */
-  public static long acquireLock(IMetaStoreClient client, long txnId,
-      List<LockComponent> lockComponents)
-          throws TransactionException {
-    LockRequestBuilder lockRequestBuilder = new LockRequestBuilder();
-    lockRequestBuilder.setUser(TRANSACTION_USER_ID);
-    if (txnId > 0) lockRequestBuilder.setTransactionId(txnId);
-    for (LockComponent lockComponent : lockComponents) {
-      lockRequestBuilder.addLockComponent(lockComponent);
-    }
-    LockRequest lockRequest = lockRequestBuilder.build();
-    try {
-      LockResponse lockResponse = client.lock(lockRequest);
-      long lockId = lockResponse.getLockid();
-      int retries = 0;
-      while (lockResponse.getState() == LockState.WAITING && retries < LOCK_RETRIES) {
-        try {
-          //TODO: add profile counter for lock waits.
-          LOG.info("Waiting " + String.valueOf(LOCK_RETRY_WAIT_SECONDS) +
-              " seconds for lock " + String.valueOf(lockId) + " of transaction " +
-              Long.toString(txnId));
-          Thread.sleep(LOCK_RETRY_WAIT_SECONDS * 1000);
-          ++retries;
-          lockResponse = client.checkLock(lockId);
-        } catch (InterruptedException e) {
-          // Since wait time and number of retries is configurable it wouldn't add
-          // much value to make acquireLock() interruptible so we just swallow the
-          // exception here.
-        }
-      }
-      if (lockResponse.getState() == LockState.ACQUIRED) return lockId;
-      if (lockId > 0) {
-        try {
-          releaseLock(client, lockId);
-        } catch (TransactionException te) {
-          LOG.error("Failed to release lock as a cleanup step after acquiring a lock " +
-              "has failed: " + lockId + " " + te.getMessage());
-        }
-      }
-      throw new TransactionException("Failed to acquire lock for transaction " +
-          String.valueOf(txnId));
-    } catch (TException e) {
-      throw new TransactionException(e.getMessage());
-    }
-  }
-
-  /**
-   * Releases a lock in HMS.
-   * @param client is the HMS client to be used.
-   * @param lockId is the lock ID to be released.
-   * @throws TransactionException
-   */
-  public static void releaseLock(IMetaStoreClient client, long lockId)
-      throws TransactionException {
-    try {
-      client.unlock(lockId);
-    } catch (Exception e) {
-      throw new TransactionException(e.getMessage());
-    }
-  }
-
-  /**
-   * Aborts a transaction and logs the error if there is an exception.
-   * @param client is the HMS client to be used.
-   * @param txnId is the transaction id.
-   */
-  public static void abortTransactionNoThrow(IMetaStoreClient client, long txnId) {
-    try {
-      client.abortTxns(Arrays.asList(txnId));
-    } catch (Exception e) {
-      LOG.error("Error in abortTxns.", e);
-    }
-  }
-
-  /**
-   * Allocates a write id for the given table.
-   * @param client is the HMS client to be used.
-   * @param txnId is the transaction id.
-   * @param dbName is the database name.
-   * @param tableName is the target table name.
-   * @return the allocated write id.
-   * @throws TransactionException
-   */
-  public static long allocateTableWriteId(IMetaStoreClient client, long txnId,
-      String dbName, String tableName) throws TransactionException {
-    try {
-      return client.allocateTableWriteId(txnId, dbName, tableName);
-    } catch (Exception e) {
-      throw new TransactionException(e.getMessage());
-    }
   }
 
   /**
@@ -1013,65 +409,6 @@ public class MetastoreShim {
   }
 
   /**
-   * @return the hive major version
-   */
-  public static long getMajorVersion() {
-    return MAJOR_VERSION;
-  }
-
-    /**
-     * Borrowed code from hive.
-     * This assumes that the caller intends to
-     * read the files, and thus treats both open and aborted write ids as invalid.
-     * @param tableWriteIds valid write ids for the given table from the metastore
-     * @return a valid write IDs list for the input table
-     */
-  private static ValidReaderWriteIdList createValidReaderWriteIdList(
-      TableValidWriteIds tableWriteIds) {
-     String fullTableName = tableWriteIds.getFullTableName();
-     long highWater = tableWriteIds.getWriteIdHighWaterMark();
-     List<Long> invalids = tableWriteIds.getInvalidWriteIds();
-     BitSet abortedBits = BitSet.valueOf(tableWriteIds.getAbortedBits());
-     long[] exceptions = new long[invalids.size()];
-     int i = 0;
-     for (long writeId : invalids) {
-       exceptions[i++] = writeId;
-     }
-     if (tableWriteIds.isSetMinOpenWriteId()) {
-       return new ValidReaderWriteIdList(fullTableName, exceptions, abortedBits,
-         highWater, tableWriteIds.getMinOpenWriteId());
-     } else {
-       return new ValidReaderWriteIdList(fullTableName, exceptions, abortedBits,
-         highWater);
-     }
-  }
-
-  /**
-   * Return the default table path for a new table.
-   *
-   * Hive-3 doesn't allow managed table to be non transactional after HIVE-22158.
-   * Creating a non transactional managed table will finally result in an external table
-   * with table property "external.table.purge" set to true. As the table type become
-   * EXTERNAL, the location will be under "metastore.warehouse.external.dir" (HIVE-19837,
-   * introduces in hive-2.7, not in hive-2.1.x-cdh6.x yet).
-   */
-  public static String getPathForNewTable(Database db, Table tbl)
-      throws MetaException {
-    Warehouse wh = new Warehouse(new HiveConf());
-    // Non transactional tables are all translated to external tables by HMS's default
-    // transformer (HIVE-22158). Note that external tables can't be transactional.
-    // So the request and result of the default transformer is:
-    //     non transactional managed table => external table
-    //     non transactional external table => external table
-    //     transactional managed table => managed table
-    //     transactional external table (not allowed)
-    boolean isExternal = !AcidUtils.isTransactionalTable(tbl.getParameters());
-    // TODO(IMPALA-9088): deal with customized transformer in HMS.
-    return wh.getDefaultTablePath(db, tbl.getTableName().toLowerCase(), isExternal)
-        .toString();
-  }
-
-  /**
    * Fire insert events for table and partition.
    * In case of any exception, we just log the failure of firing insert events.
    */
@@ -1088,7 +425,8 @@ public class MetastoreShim {
             insertEventInfo, dbName, tableName);
       } else {
         return fireInsertEventHelper(msClient.getHiveClient(),
-            insertEventInfo.getInsertEventReqData(), dbName,
+            insertEventInfo.getInsertEventReqData(),
+            insertEventInfo.getInsertEventPartVals(), dbName,
             tableName);
       }
     } catch (Exception e) {
@@ -1141,13 +479,16 @@ public class MetastoreShim {
    * @param msClient Metastore client,
    * @param insertEventDataList A list of insert event info encapsulating the information
    *                            needed to fire insert events.
+   * @param insertEventPartValList   The partition list corresponding to
+   *                                 insertEventDataList, used by Apache Hive 3
    * @param dbName
    * @param tableName
    * @return a list of eventIds for the insert events
    */
   @VisibleForTesting
   public static List<Long> fireInsertEventHelper(IMetaStoreClient msClient,
-      List<InsertEventRequestData> insertEventDataList, String dbName, String tableName)
+      List<InsertEventRequestData> insertEventDataList,
+      List<List<String>> insertEventPartValList, String dbName, String tableName)
       throws TException {
     Preconditions.checkNotNull(msClient);
     Preconditions.checkNotNull(dbName);
@@ -1181,5 +522,328 @@ public class MetastoreShim {
       return Collections.EMPTY_LIST;
     }
     return response.getEventIds();
+  }
+
+  /**
+   * Wrapper around IMetaStoreClient.getThriftClient().get_next_notification() to deal
+   * with added arguments.
+   */
+  public static NotificationEventResponse getNextNotification(IMetaStoreClient msClient,
+      NotificationEventRequest eventRequest) throws TException {
+    return msClient.getThriftClient().get_next_notification(eventRequest);
+  }
+
+  /**
+   * Wrapper around Database.setManagedLocationUri() to deal with added arguments.
+   */
+  public static void setManagedLocationUri(Database db, String managedLocation) {
+    db.setManagedLocationUri(managedLocation);
+  }
+
+  /**
+   * Wrapper around HMS Database object to get managedLocationUri.
+   */
+  public static String getManagedLocationUri(Database db) {
+    return db.getManagedLocationUri();
+  }
+
+  /**
+   * Wrapper around HMS Table object to get table id.
+   */
+  public static long getTableId(Table tbl) {
+    return tbl.getId();
+  }
+
+  /**
+   * Wrapper around JSONDropDatabaseMessage to get database.
+   */
+  public static Database getDatabaseObject(JSONDropDatabaseMessage dropDatabaseMessage)
+      throws Exception {
+    return dropDatabaseMessage.getDatabaseObject();
+  }
+
+  /**
+   * Wrapper around IMetaStoreClient.truncateTable() to deal with added arguments.
+   */
+  public static void truncateTable(IMetaStoreClient msClient, String dbName,
+      String tableName, List<String> partNames,
+      String validWriteIds, long writeId) throws TException {
+    msClient.truncateTable(dbName, tableName, partNames, validWriteIds, writeId);
+  }
+
+  /**
+   * Wrapper around IMetaStoreClient.getPartitionsRequest() to deal with added arguments.
+   */
+  public static List<Partition> getPartitions(IMetaStoreClient msClient,
+      String testDbName, String testTblName) throws TException {
+    PartitionsRequest req = new PartitionsRequest();
+    req.setDbName(testDbName);
+    req.setTblName(testTblName);
+    return msClient.getPartitionsRequest(req).getPartitions();
+  }
+
+  /**
+   * Wrapper around InsertEventRequestData.setPartitionVal() to deal with added arguments.
+   */
+  public static void setPartitionVal(InsertEventRequestData insertEventRequestData,
+      List<String> partVals) {
+    if (partVals != null && !partVals.isEmpty()) {
+      insertEventRequestData.setPartitionVal(partVals);
+    }
+  }
+
+  /**
+   * Wrapper around InsertEventRequestData.addToSubDirectoryList() to deal with added
+   * arguments.
+   */
+  public static void addToSubDirectoryList(InsertEventRequestData insertEventRequestData,
+      String acidDirPath) {
+    insertEventRequestData.addToSubDirectoryList(acidDirPath);
+  }
+
+  /**
+   * This method fetches latest compaction id from HMS and compares it with the cached
+   * compaction id. It returns list of partitions that need to refresh file metadata due
+   * to compactions. If none of the partitions need to refresh, it returns empty list.
+   */
+  public static List<HdfsPartition.Builder> getPartitionsForRefreshingFileMetadata(
+      CatalogServiceCatalog catalog, HdfsTable hdfsTable) throws CatalogException {
+    List<HdfsPartition.Builder> partBuilders = new ArrayList<>();
+    List<HdfsPartition> hdfsPartitions = hdfsTable.getPartitions()
+        .stream()
+        .map(p -> (HdfsPartition) p)
+        .collect(Collectors.toList());
+    // fetch the latest compaction info from HMS
+    GetLatestCommittedCompactionInfoRequest request =
+        new GetLatestCommittedCompactionInfoRequest(
+            hdfsTable.getDb().getName(), hdfsTable.getName());
+    if (hdfsTable.isPartitioned()) {
+      List<String> partNames = hdfsPartitions.stream()
+          .map(HdfsPartition::getPartitionName)
+          .collect(Collectors.toList());
+      request.setPartitionnames(partNames);
+    }
+
+    GetLatestCommittedCompactionInfoResponse response;
+    try (MetaStoreClientPool.MetaStoreClient client = catalog.getMetaStoreClient()) {
+      response = CompactionInfoLoader.getLatestCompactionInfo(client, request);
+    } catch (Exception e) {
+      throw new CatalogException("Error getting latest compaction info for "
+          + hdfsTable.getFullName(), e);
+    }
+
+    Map<String, Long> partNameToCompactionId = new HashMap<>();
+    if (hdfsTable.isPartitioned()) {
+      for (CompactionInfoStruct ci : response.getCompactions()) {
+        partNameToCompactionId.put(
+            Preconditions.checkNotNull(ci.getPartitionname()), ci.getId());
+      }
+    } else {
+      CompactionInfoStruct ci = Iterables.getOnlyElement(response.getCompactions(), null);
+      if (ci != null) {
+        partNameToCompactionId.put(HdfsTable.DEFAULT_PARTITION_NAME, ci.getId());
+      }
+    }
+
+    for (HdfsPartition partition : hdfsPartitions) {
+      long latestCompactionId =
+          partNameToCompactionId.getOrDefault(partition.getPartitionName(), -1L);
+      if (partition.getLastCompactionId() >= latestCompactionId) {
+        continue;
+      }
+      HdfsPartition.Builder builder = new HdfsPartition.Builder(partition);
+      LOG.debug(
+          "Cached compaction id for {} partition {}: {} but the latest compaction id: {}",
+          hdfsTable.getFullName(), partition.getPartitionName(),
+          partition.getLastCompactionId(), latestCompactionId);
+      builder.setLastCompactionId(latestCompactionId);
+      partBuilders.add(builder);
+    }
+    return partBuilders;
+  }
+
+  /**
+   * Fetches the latest compaction id from HMS and compares with partition metadata in
+   * cache. If a partition is stale due to compaction, removes it from metas.
+   */
+  public static List<PartitionRef> checkLatestCompaction(MetaStoreClientPool msClientPool,
+      String dbName, String tableName, TableMetaRef table,
+      Map<PartitionRef, PartitionMetadata> metas, String unPartitionedName)
+      throws TException {
+    Preconditions.checkNotNull(table, "TableMetaRef must be non-null");
+    Preconditions.checkNotNull(metas, "Partition map must be non-null");
+    List<PartitionRef> stalePartitions = new ArrayList<>();
+    if (!table.isTransactional() || metas.isEmpty()) return stalePartitions;
+    GetLatestCommittedCompactionInfoRequest request =
+        new GetLatestCommittedCompactionInfoRequest(dbName, tableName);
+    if (table.isPartitioned()) {
+      request.setPartitionnames(metas.keySet().stream()
+          .map(PartitionRef::getName).collect(Collectors.toList()));
+    }
+    GetLatestCommittedCompactionInfoResponse response;
+    try (MetaStoreClientPool.MetaStoreClient client = msClientPool.getClient()) {
+      response = CompactionInfoLoader.getLatestCompactionInfo(client, request);
+    }
+    Map<String, Long> partNameToCompactionId = new HashMap<>();
+    // If the table is partitioned, we must set partition name, otherwise empty result
+    // will be returned.
+    if (table.isPartitioned()) {
+      for (CompactionInfoStruct ci : response.getCompactions()) {
+        partNameToCompactionId.put(
+            Preconditions.checkNotNull(ci.getPartitionname()), ci.getId());
+      }
+    } else {
+      CompactionInfoStruct ci = Iterables.getOnlyElement(response.getCompactions(),
+          null);
+      if (ci != null) {
+        partNameToCompactionId.put(unPartitionedName, ci.getId());
+      }
+    }
+    Iterator<Entry<PartitionRef, PartitionMetadata>> iter =
+        metas.entrySet().iterator();
+    while (iter.hasNext()) {
+      Map.Entry<PartitionRef, PartitionMetadata> entry = iter.next();
+      long latestCompactionId = partNameToCompactionId.getOrDefault(
+          entry.getKey().getName(), -1L);
+      if (entry.getValue().getLastCompactionId() < latestCompactionId) {
+        stalePartitions.add(entry.getKey());
+        iter.remove();
+      }
+    }
+    return stalePartitions;
+  }
+
+  /**
+   * Returns an instance of CatalogMetastoreServer.
+   */
+  public static ICatalogMetastoreServer getCatalogMetastoreServer(
+      CatalogOpExecutor catalogOpExecutor) {
+    int portNumber = BackendConfig.INSTANCE.getHMSPort();
+    Preconditions.checkState(portNumber > 0, "Invalid port number for HMS service.");
+    return new CatalogMetastoreServer(catalogOpExecutor);
+  }
+
+  /**
+   * Metastore event handler for COMMIT_TXN events. Handles commit event for transactional
+   * tables.
+   */
+  public static class CommitTxnEvent extends MetastoreEvent {
+    private final CommitTxnMessage commitTxnMessage_;
+    private final long txnId_;
+
+    public CommitTxnEvent(CatalogOpExecutor catalogOpExecutor, Metrics metrics,
+        NotificationEvent event) {
+      super(catalogOpExecutor, metrics, event);
+      Preconditions.checkState(getEventType().equals(MetastoreEventType.COMMIT_TXN));
+      Preconditions.checkNotNull(event.getMessage());
+      commitTxnMessage_ = MetastoreEventsProcessor.getMessageDeserializer()
+          .getCommitTxnMessage(event.getMessage());
+      txnId_ = commitTxnMessage_.getTxnId();
+    }
+
+    @Override
+    protected void process() throws MetastoreNotificationException {
+      // To ensure no memory leaking in case an exception is thrown, we remove entries
+      // at first.
+      Set<TableWriteId> committedWriteIds = catalog_.removeWriteIds(txnId_);
+      // Via getAllWriteEventInfo, we can get data insertion info for transactional tables
+      // even though there are no insert events generated for transactional tables. Note
+      // that we cannot get DDL info from this API.
+      List<WriteEventInfo> writeEventInfoList;
+      try (MetaStoreClientPool.MetaStoreClient client = catalog_.getMetaStoreClient()) {
+        writeEventInfoList = client.getHiveClient().getAllWriteEventInfo(
+            new GetAllWriteEventInfoRequest(txnId_));
+      } catch (TException e) {
+        throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
+            + "get write event infos for txn {}. Event processing cannot continue. Issue "
+            + "an invalidate metadata command to reset event processor.", txnId_), e);
+      }
+
+      try {
+        if (writeEventInfoList != null && !writeEventInfoList.isEmpty()) {
+          commitTxnMessage_.addWriteEventInfo(writeEventInfoList);
+          addCommittedWriteIdsAndRefreshPartitions();
+        }
+        // committed write ids for DDL need to be added here
+        addCommittedWriteIdsToTables(committedWriteIds);
+      } catch (Exception e) {
+        throw new MetastoreNotificationNeedsInvalidateException(debugString("Failed to "
+            + "mark committed write ids and refresh partitions for txn {}. Event "
+            + "processing cannot continue. Issue an invalidate metadata command to reset "
+            + "event processor.", txnId_), e);
+      }
+    }
+
+    private void addCommittedWriteIdsToTables(Set<TableWriteId> tableWriteIds)
+        throws CatalogException {
+      for (TableWriteId tableWriteId: tableWriteIds) {
+        catalog_.addWriteIdsToTable(tableWriteId.getDbName(), tableWriteId.getTblName(),
+            getEventId(),
+            Collections.singletonList(tableWriteId.getWriteId()),
+            MutableValidWriteIdList.WriteIdStatus.COMMITTED);
+      }
+    }
+
+    private void addCommittedWriteIdsAndRefreshPartitions() throws Exception {
+      Preconditions.checkNotNull(commitTxnMessage_.getWriteIds());
+      List<Long> writeIds = Collections.unmodifiableList(commitTxnMessage_.getWriteIds());
+      List<Partition> parts = new ArrayList<>();
+      // To load partitions together for the same table, indexes are grouped by table name
+      Map<TableName, List<Integer>> tableNameToIdxs = new HashMap<>();
+      for (int i = 0; i < writeIds.size(); i++) {
+        org.apache.hadoop.hive.metastore.api.Table tbl = commitTxnMessage_.getTableObj(i);
+        TableName tableName = new TableName(tbl.getDbName(), tbl.getTableName());
+        parts.add(commitTxnMessage_.getPartitionObj(i));
+        tableNameToIdxs.computeIfAbsent(tableName, k -> new ArrayList<>()).add(i);
+      }
+      for (Map.Entry<TableName, List<Integer>> entry : tableNameToIdxs.entrySet()) {
+        org.apache.hadoop.hive.metastore.api.Table tbl =
+            commitTxnMessage_.getTableObj(entry.getValue().get(0));
+        List<Long> writeIdsForTable = entry.getValue().stream()
+            .map(i -> writeIds.get(i))
+            .collect(Collectors.toList());
+        List<Partition> partsForTable = entry.getValue().stream()
+            .map(i -> parts.get(i))
+            .collect(Collectors.toList());
+        if (tbl.getPartitionKeysSize() > 0
+            && !MetaStoreUtils.isMaterializedViewTable(tbl)) {
+          try {
+            catalogOpExecutor_.addCommittedWriteIdsAndReloadPartitionsIfExist(
+                getEventId(), entry.getKey().getDb(), entry.getKey().getTbl(),
+                writeIdsForTable, partsForTable, "Processing event id: " +
+                            getEventId() + ", event type: " + getEventType());
+          } catch (TableNotLoadedException e) {
+            debugLog("Ignoring reloading since table {} is not loaded",
+                entry.getKey());
+          } catch (DatabaseNotFoundException | TableNotFoundException e) {
+            debugLog("Ignoring reloading since table {} is not found",
+                entry.getKey());
+          }
+        } else {
+          catalog_.reloadTableIfExists(entry.getKey().getDb(), entry.getKey().getTbl(),
+               "CommitTxnEvent", getEventId());
+        }
+      }
+    }
+
+    @Override
+    protected boolean isEventProcessingDisabled() {
+      return false;
+    }
+
+    @Override
+    protected SelfEventContext getSelfEventContext() {
+      throw new UnsupportedOperationException("Self-event evaluation is not needed for "
+          + "this event type");
+    }
+
+    /*
+    Not skipping the event since there can be multiple tables involved. The actual
+    processing of event would skip or process the event on a table by table basis
+     */
+    @Override
+    protected boolean shouldSkipWhenSyncingToLatestEventId() {
+      return false;
+    }
   }
 }

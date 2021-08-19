@@ -66,9 +66,9 @@ import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
 import org.apache.impala.catalog.events.SelfEventContext;
+import org.apache.impala.catalog.metastore.CatalogHmsUtils;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.catalog.monitor.CatalogTableMetrics;
-import org.apache.impala.catalog.metastore.CatalogMetastoreServer;
 import org.apache.impala.catalog.metastore.HmsApiNameEnum;
 import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
 import org.apache.impala.common.FileSystemUtil;
@@ -2184,13 +2184,13 @@ public class CatalogServiceCatalog extends Catalog {
       if (tbl instanceof HdfsTable
           && AcidUtils.compare((HdfsTable) tbl, validWriteIdList, tableId) >= 0) {
         CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-            .getCounter(CatalogMetastoreServer.CATALOGD_CACHE_HIT_METRIC)
+            .getCounter(CatalogHmsUtils.CATALOGD_CACHE_HIT_METRIC)
             .inc();
         // Update the cache stats for a HMS API from which the current method got invoked.
         if (HmsApiNameEnum.contains(reason)) {
           CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
               .getCounter(String
-                  .format(CatalogMetastoreServer.CATALOGD_CACHE_API_HIT_METRIC, reason))
+                  .format(CatalogHmsUtils.CATALOGD_CACHE_API_HIT_METRIC, reason))
               .inc();
         }
         // Check if any partition of the table has a newly compacted file.
@@ -2213,7 +2213,7 @@ public class CatalogServiceCatalog extends Catalog {
         if (partsToBeRefreshed.isEmpty()) return tbl;
       } else {
         CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-            .getCounter(CatalogMetastoreServer.CATALOGD_CACHE_MISS_METRIC)
+            .getCounter(CatalogHmsUtils.CATALOGD_CACHE_MISS_METRIC)
             .inc();
         // Update the cache stats for a HMS API from which the current method got invoked.
         if (HmsApiNameEnum.contains(reason)) {
@@ -2221,7 +2221,7 @@ public class CatalogServiceCatalog extends Catalog {
           // have to reload the table.
           CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
               .getCounter(String.format(
-                  CatalogMetastoreServer.CATALOGD_CACHE_API_MISS_METRIC, reason))
+                  CatalogHmsUtils.CATALOGD_CACHE_API_MISS_METRIC, reason))
               .inc();
         }
         previousCatalogVersion = tbl.getCatalogVersion();

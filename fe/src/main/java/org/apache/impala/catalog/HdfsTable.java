@@ -2773,7 +2773,8 @@ public class HdfsTable extends Table implements FeFsTable {
         // only reload partitions that have more recent write id
         if (hdfsPartition != null &&
             (!AcidUtils.isTransactionalTable(msTable_.getParameters())
-                || hdfsPartition.getWriteId() <= partition.getWriteId())) {
+                || hdfsPartition.getWriteId() <= MetastoreShim
+                .getWriteIdFromMSPartition(partition))) {
           hmsPartToHdfsPart.put(partition, hdfsPartition);
         }
       }

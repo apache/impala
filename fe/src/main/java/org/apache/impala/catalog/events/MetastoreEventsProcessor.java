@@ -297,8 +297,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
         NotificationEventRequest eventRequest = new NotificationEventRequest();
         eventRequest.setMaxEvents(batchSize);
         eventRequest.setLastEvent(currentEventId);
-        NotificationEventResponse notificationEventResponse = msc.getHiveClient()
-            .getThriftClient().get_next_notification(eventRequest);
+        NotificationEventResponse notificationEventResponse = MetastoreShim
+            .getNextNotification(msc.getHiveClient(), eventRequest);
         for (NotificationEvent event : notificationEventResponse.getEvents()) {
           // if no filter is provided we add all the events
           if (filter == null || filter.accept(event)) result.add(event);
@@ -782,8 +782,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
       NotificationEventRequest eventRequest = new NotificationEventRequest();
       eventRequest.setLastEvent(eventId);
       eventRequest.setMaxEvents(batchSize);
-      NotificationEventResponse response = msClient.getHiveClient().getThriftClient()
-          .get_next_notification(eventRequest);
+      NotificationEventResponse response = MetastoreShim
+          .getNextNotification(msClient.getHiveClient(), eventRequest);
       LOG.info(String.format("Received %d events. Start event id : %d",
           response.getEvents().size(), eventId));
       if (filter == null) return response.getEvents();

@@ -328,6 +328,8 @@ public class MetaStoreUtil {
   public static class TableInsertEventInfo {
     // list of partition level insert event info
     private final List<InsertEventRequestData> insertEventRequestData_;
+    // The partition list corresponding to insertEventRequestData, used by Apache Hive 3
+    private final List<List<String>> insertEventPartVals_;
     // transaction id in case this represents a transactional table.
     private final long txnId_;
     // writeId in case this is for a transactional table.
@@ -335,10 +337,12 @@ public class MetaStoreUtil {
     // true in case this is for transactional table.
     private final boolean isTransactional_;
 
-    public TableInsertEventInfo(
-        List<InsertEventRequestData> insertEventInfos_, boolean isTransactional,
-        long txnId, long writeId) {
+    public TableInsertEventInfo(List<InsertEventRequestData> insertEventInfos_,
+        List<List<String>> insertEventPartVals_, boolean isTransactional, long txnId,
+        long writeId) {
+      Preconditions.checkState(insertEventInfos_.size() == insertEventPartVals_.size());
       this.insertEventRequestData_ = insertEventInfos_;
+      this.insertEventPartVals_ = insertEventPartVals_;
       this.txnId_ = txnId;
       this.writeId_ = writeId;
       this.isTransactional_ = isTransactional;
@@ -350,6 +354,10 @@ public class MetaStoreUtil {
 
     public List<InsertEventRequestData> getInsertEventReqData() {
       return insertEventRequestData_;
+    }
+
+    public List<List<String>> getInsertEventPartVals() {
+      return insertEventPartVals_;
     }
 
     public long getTxnId() {

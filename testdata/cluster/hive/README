@@ -1,0 +1,6 @@
+The patches in this directory are for Apache Hive and affect system integration and
+testing.
+
+patch0-HIVE-21586.diff:
+Contains only patches for `hive_metastore.thrift` is used to solve the problem that the
+generated cpp file cannot be compiled.

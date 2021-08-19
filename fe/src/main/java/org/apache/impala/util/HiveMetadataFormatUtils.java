@@ -14,7 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-package org.apache.impala.compat;
+package org.apache.impala.util;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -402,16 +402,24 @@ public class HiveMetadataFormatUtils {
 
     constraintsInfo.append(LINE_DELIM).append("# Constraints").append(LINE_DELIM);
 
-    if (PrimaryKeyInfo.isPrimaryKeyInfoNotEmpty(pkInfo)) {
+    if (isPrimaryKeyInfoNotEmpty(pkInfo)) {
       constraintsInfo.append(LINE_DELIM).append("# Primary Key").append(LINE_DELIM);
       getPrimaryKeyInformation(constraintsInfo, pkInfo);
     }
-    if (ForeignKeyInfo.isForeignKeyInfoNotEmpty(fkInfo)) {
+    if (isForeignKeyInfoNotEmpty(fkInfo)) {
       constraintsInfo.append(LINE_DELIM).append("# Foreign Keys").append(LINE_DELIM);
       getForeignKeysInformation(constraintsInfo, fkInfo);
     }
 
     return constraintsInfo.toString();
+  }
+
+  private static boolean isPrimaryKeyInfoNotEmpty(PrimaryKeyInfo info) {
+    return info != null && !info.getColNames().isEmpty();
+  }
+
+  private static boolean isForeignKeyInfoNotEmpty(ForeignKeyInfo info) {
+    return info != null && !info.getForeignKeys().isEmpty();
   }
 
   private static void getPrimaryKeyInformation(StringBuilder constraintsInfo,

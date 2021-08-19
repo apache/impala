@@ -98,17 +98,9 @@ public class CatalogMetastoreServer extends ThriftHiveMetastore implements
 
   // Metrics for CatalogD HMS cache
   private static final String ACTIVE_CONNECTIONS_METRIC = "metastore.active.connections";
-  public static final String CATALOGD_CACHE_MISS_METRIC = "catalogd-hms-cache.miss";
-  public static final String CATALOGD_CACHE_HIT_METRIC = "catalogd-hms-cache.hit";
-  public static final String CATALOGD_CACHE_API_REQUESTS_METRIC =
-      "catalogd-hms-cache.api-requests";
 
   // CatalogD HMS Cache - API specific metrics
   private static final String RPC_DURATION_FORMAT_METRIC = "metastore.rpc.duration.%s";
-  public static final String CATALOGD_CACHE_API_MISS_METRIC =
-      "catalogd-hms-cache.cache-miss.api.%s";
-  public static final String CATALOGD_CACHE_API_HIT_METRIC =
-      "catalogd-hms-cache.cache-hit.api.%s";
 
   public static final Set<String> apiNamesSet_ = new HashSet<>();
 
@@ -132,11 +124,11 @@ public class CatalogMetastoreServer extends ThriftHiveMetastore implements
 
   private void initMetrics() {
     CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-        .addCounter(CATALOGD_CACHE_MISS_METRIC);
+        .addCounter(CatalogHmsUtils.CATALOGD_CACHE_MISS_METRIC);
     CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-        .addCounter(CATALOGD_CACHE_HIT_METRIC);
+        .addCounter(CatalogHmsUtils.CATALOGD_CACHE_HIT_METRIC);
     CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-        .addMeter(CATALOGD_CACHE_API_REQUESTS_METRIC);
+        .addMeter(CatalogHmsUtils.CATALOGD_CACHE_API_REQUESTS_METRIC);
     metricsLoggerService_.scheduleAtFixedRate(
         new MetricsLogger(this), 0, 1, TimeUnit.MINUTES);
   }
@@ -199,7 +191,7 @@ public class CatalogMetastoreServer extends ThriftHiveMetastore implements
         apiNamesSet_.add(method.getName());
       }
       CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-          .getMeter(CATALOGD_CACHE_API_REQUESTS_METRIC)
+          .getMeter(CatalogHmsUtils.CATALOGD_CACHE_API_REQUESTS_METRIC)
           .mark();
       Timer.Context context =
           CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
@@ -208,13 +200,13 @@ public class CatalogMetastoreServer extends ThriftHiveMetastore implements
                   Thread.currentThread().getId())
               .time();
       if (CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-          .getCounter(String.format(CATALOGD_CACHE_API_MISS_METRIC,
+          .getCounter(String.format(CatalogHmsUtils.CATALOGD_CACHE_API_MISS_METRIC,
               method.getName())) == null) {
         CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-            .addCounter(String.format(CATALOGD_CACHE_API_MISS_METRIC,
+            .addCounter(String.format(CatalogHmsUtils.CATALOGD_CACHE_API_MISS_METRIC,
                 method.getName()));
         CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-            .addCounter(String.format(CATALOGD_CACHE_API_HIT_METRIC,
+            .addCounter(String.format(CatalogHmsUtils.CATALOGD_CACHE_API_HIT_METRIC,
                 method.getName()));
       }
 
@@ -368,21 +360,22 @@ public class CatalogMetastoreServer extends ThriftHiveMetastore implements
   @Override
   public TCatalogdHmsCacheMetrics getCatalogdHmsCacheMetrics() {
     long apiRequests = CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-        .getMeter(CATALOGD_CACHE_API_REQUESTS_METRIC)
+        .getMeter(CatalogHmsUtils.CATALOGD_CACHE_API_REQUESTS_METRIC)
         .getCount();
     double cacheHitRatio =
-        getHitRatio(CATALOGD_CACHE_HIT_METRIC, CATALOGD_CACHE_MISS_METRIC);
+        getHitRatio(CatalogHmsUtils.CATALOGD_CACHE_HIT_METRIC,
+            CatalogHmsUtils.CATALOGD_CACHE_MISS_METRIC);
     double apiRequestsOneMinute =
         CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-            .getMeter(CATALOGD_CACHE_API_REQUESTS_METRIC)
+            .getMeter(CatalogHmsUtils.CATALOGD_CACHE_API_REQUESTS_METRIC)
             .getOneMinuteRate();
     double apiRequestsFiveMinutes =
         CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-            .getMeter(CATALOGD_CACHE_API_REQUESTS_METRIC)
+            .getMeter(CatalogHmsUtils.CATALOGD_CACHE_API_REQUESTS_METRIC)
             .getFiveMinuteRate();
     double apiRequestsFifteenMinutes =
         CatalogMonitor.INSTANCE.getCatalogdHmsCacheMetrics()
-            .getMeter(CATALOGD_CACHE_API_REQUESTS_METRIC)
+            .getMeter(CatalogHmsUtils.CATALOGD_CACHE_API_REQUESTS_METRIC)
             .getFifteenMinuteRate();
 
     TCatalogdHmsCacheMetrics catalogdHmsCacheMetrics = new TCatalogdHmsCacheMetrics();
@@ -423,8 +416,9 @@ public class CatalogMetastoreServer extends ThriftHiveMetastore implements
       // catalogd server.
       if (HmsApiNameEnum.contains(apiName)) {
         double specificApiCacheHitRatio =
-            getHitRatio(String.format(CATALOGD_CACHE_API_HIT_METRIC, apiName),
-                String.format(CATALOGD_CACHE_API_MISS_METRIC, apiName));
+            getHitRatio(
+                String.format(CatalogHmsUtils.CATALOGD_CACHE_API_HIT_METRIC, apiName),
+                String.format(CatalogHmsUtils.CATALOGD_CACHE_API_MISS_METRIC, apiName));
         apiMetrics.setCache_hit_ratio(specificApiCacheHitRatio);
       }
       double specificApiRequestsOneMinute =

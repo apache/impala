@@ -42,7 +42,6 @@ import org.apache.impala.catalog.events.MetastoreEvents.EventFactoryForSyncToLat
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.NoOpEventProcessor;
-import org.apache.impala.catalog.metastore.CatalogMetastoreServer;
 import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
 import org.apache.impala.catalog.metastore.NoOpCatalogMetastoreServer;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
@@ -180,9 +179,7 @@ public class JniCatalog {
     if (!BackendConfig.INSTANCE.startHmsServer()) {
       return NoOpCatalogMetastoreServer.INSTANCE;
     }
-    int portNumber = BackendConfig.INSTANCE.getHMSPort();
-    Preconditions.checkState(portNumber > 0, "Invalid port number for HMS service.");
-    return new CatalogMetastoreServer(catalogOpExecutor);
+    return MetastoreShim.getCatalogMetastoreServer(catalogOpExecutor);
   }
 
   /**

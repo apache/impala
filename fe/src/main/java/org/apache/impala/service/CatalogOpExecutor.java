@@ -1834,7 +1834,7 @@ public class CatalogOpExecutor {
       db.setLocationUri(params.getLocation());
     }
     if (params.getManaged_location() != null) {
-      db.setManagedLocationUri(params.getManaged_location());
+      MetastoreShim.setManagedLocationUri(db, params.getManaged_location());
     }
     db.setOwnerName(params.getOwner());
     db.setOwnerType(PrincipalType.USER);
@@ -2886,8 +2886,8 @@ public class CatalogOpExecutor {
         // used for replication.
         if (isTableBeingReplicated(hmsClient, hdfsTable)) {
           String dbName = Preconditions.checkNotNull(hdfsTable.getDb()).getName();
-          hmsClient.truncateTable(dbName, hdfsTable.getName(), null, tblTxn.validWriteIds,
-              tblTxn.writeId);
+          MetastoreShim.truncateTable(hmsClient, dbName, hdfsTable.getName(), null,
+              tblTxn.validWriteIds, tblTxn.writeId);
           LOG.trace("Time elapsed to truncate table {} using HMS API: {} msec",
               hdfsTable.getFullName(), sw.elapsed(TimeUnit.MILLISECONDS));
         } else {
@@ -4461,7 +4461,7 @@ public class CatalogOpExecutor {
             writeId, table.getFullName());
         // Valid write id means committed write id here.
         if (!previousWriteIdList.isWriteIdValid(writeId)) {
-          part.setWriteId(writeId);
+          MetastoreShim.setWriteIdToMSPartition(part, writeId);
           partsToRefresh.add(part);
           writeIdsToRefresh.add(writeId);
         }
@@ -6441,6 +6441,8 @@ public class CatalogOpExecutor {
     boolean isPartitioned = table.getNumClusteringCols() > 0;
     // List of all insert events that we call HMS fireInsertEvent() on.
     List<InsertEventRequestData> insertEventReqDatas = new ArrayList<>();
+    // The partition val list corresponding to insertEventReqDatas for Apache Hive-3
+    List<List<String>> insertEventPartVals = new ArrayList<>();
     // List of all existing partitions that we insert into.
     List<HdfsPartition> existingPartitions = new ArrayList<>();
     if (isPartitioned) {
@@ -6459,6 +6461,7 @@ public class CatalogOpExecutor {
       if (!newFiles.isEmpty() || isInsertOverwrite) {
         insertEventReqDatas.add(
             makeInsertEventData( table, partVals, newFiles, isInsertOverwrite));
+        insertEventPartVals.add(partVals);
       }
     }
 
@@ -6472,6 +6475,7 @@ public class CatalogOpExecutor {
             newFiles.size(), table.getFullName(), part.getPartitionName()));
         insertEventReqDatas.add(
             makeInsertEventData(table, partVals, newFiles, isInsertOverwrite));
+        insertEventPartVals.add(partVals);
       }
     }
 
@@ -6485,6 +6489,7 @@ public class CatalogOpExecutor {
             newFiles.size(), table.getFullName(), part.getKey()));
         insertEventReqDatas.add(
             makeInsertEventData(table, partVals, newFiles, isInsertOverwrite));
+        insertEventPartVals.add(partVals);
       }
     }
 
@@ -6494,7 +6499,7 @@ public class CatalogOpExecutor {
 
     MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient();
     TableInsertEventInfo insertEventInfo = new TableInsertEventInfo(
-        insertEventReqDatas, isTransactional, txnId, writeId);
+        insertEventReqDatas, insertEventPartVals, isTransactional, txnId, writeId);
     List<Long> eventIds = MetastoreShim.fireInsertEvents(metaStoreClient,
         insertEventInfo, table.getDb().getName(), table.getName());
     if (isTransactional) {
@@ -6535,7 +6540,9 @@ public class CatalogOpExecutor {
     boolean isTransactional = AcidUtils
         .isTransactionalTable(tbl.getMetaStoreTable().getParameters());
     // in case of unpartitioned table, partVals will be empty
-    if (!partVals.isEmpty()) insertEventRequestData.setPartitionVal(partVals);
+    if (!partVals.isEmpty()) {
+      MetastoreShim.setPartitionVal(insertEventRequestData, partVals);
+    }
     FileSystem fs = tbl.getFileSystem();
     for (String file : newFiles) {
       try {
@@ -6548,7 +6555,7 @@ public class CatalogOpExecutor {
         if (isTransactional) {
           String acidDirPath = AcidUtils.getFirstLevelAcidDirPath(filePath, fs);
           if (acidDirPath != null) {
-            insertEventRequestData.addToSubDirectoryList(acidDirPath);
+            MetastoreShim.addToSubDirectoryList(insertEventRequestData, acidDirPath);
           }
         }
         insertEventRequestData.setReplace(isInsertOverwrite);

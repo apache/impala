@@ -34,11 +34,8 @@ import com.google.common.collect.Iterables;
 import org.apache.commons.lang.NotImplementedException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
-import org.apache.hadoop.hive.metastore.api.CompactionInfoStruct;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.ForeignKeysRequest;
-import org.apache.hadoop.hive.metastore.api.GetLatestCommittedCompactionInfoRequest;
-import org.apache.hadoop.hive.metastore.api.GetLatestCommittedCompactionInfoResponse;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
@@ -47,7 +44,6 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableMeta;
 import org.apache.impala.authorization.AuthorizationPolicy;
 import org.apache.impala.catalog.CatalogException;
-import org.apache.impala.catalog.CompactionInfoLoader;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FileMetadataLoader;
 import org.apache.impala.catalog.Function;
@@ -424,7 +420,9 @@ class DirectMetaProvider implements MetaProvider {
     public Map<String, String> getHmsParameters() { return msPartition_.getParameters(); }
 
     @Override
-    public long getWriteId() { return msPartition_.getWriteId(); }
+    public long getWriteId() {
+      return MetastoreShim.getWriteIdFromMSPartition(msPartition_);
+    }
 
     @Override
     public HdfsStorageDescriptor getInputFormatDescriptor() {
@@ -538,44 +536,10 @@ class DirectMetaProvider implements MetaProvider {
     Preconditions.checkNotNull(table, "TableMetaRef must be non-null");
     Preconditions.checkNotNull(metas, "Partition map must be non-null");
     Stopwatch sw = Stopwatch.createStarted();
-    List<PartitionRef> stalePartitions = new ArrayList<>();
-    if (!table.isTransactional() || metas.isEmpty()) return stalePartitions;
-    GetLatestCommittedCompactionInfoRequest request =
-        new GetLatestCommittedCompactionInfoRequest(dbName, tableName);
-    if (table.isPartitioned()) {
-      request.setPartitionnames(metas.keySet().stream()
-          .map(PartitionRef::getName).collect(Collectors.toList()));
-    }
-    GetLatestCommittedCompactionInfoResponse response;
-    try (MetaStoreClientPool.MetaStoreClient client = msClientPool_.getClient()) {
-      response = CompactionInfoLoader.getLatestCompactionInfo(client, request);
-    }
-    Map<String, Long> partNameToCompactionId = new HashMap<>();
-    // If the table is partitioned, we must set partition name, otherwise empty result
-    // will be returned.
-    if (table.isPartitioned()) {
-      for (CompactionInfoStruct ci : response.getCompactions()) {
-        partNameToCompactionId.put(
-            Preconditions.checkNotNull(ci.getPartitionname()), ci.getId());
-      }
-    } else {
-      CompactionInfoStruct ci = Iterables.getOnlyElement(response.getCompactions(),
-          null);
-      if (ci != null) {
-        partNameToCompactionId.put(PartitionRefImpl.UNPARTITIONED_NAME, ci.getId());
-      }
-    }
-    Iterator<Map.Entry<PartitionRef, PartitionMetadata>> iter =
-        metas.entrySet().iterator();
-    while (iter.hasNext()) {
-      Map.Entry<PartitionRef, PartitionMetadata> entry = iter.next();
-      long latestCompactionId = partNameToCompactionId.getOrDefault(
-          entry.getKey().getName(), -1L);
-      if (entry.getValue().getLastCompactionId() < latestCompactionId) {
-        stalePartitions.add(entry.getKey());
-        iter.remove();
-      }
-    }
+
+    List<PartitionRef> stalePartitions = MetastoreShim.checkLatestCompaction(
+        msClientPool_, dbName, tableName, table, metas,
+        PartitionRefImpl.UNPARTITIONED_NAME);
     LOG.debug("Checked the latest compaction id for {}.{} Time taken: {}", dbName,
         tableName, PrintUtils.printTimeMs(sw.stop().elapsed(TimeUnit.MILLISECONDS)));
     return stalePartitions;

@@ -826,7 +826,7 @@ public class PartialCatalogInfoWriteIdTest {
    */
   private long getTableId(String db, String tbl) throws TException {
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
-      return client.getHiveClient().getTable(db, tbl).getId();
+      return MetastoreShim.getTableId(client.getHiveClient().getTable(db, tbl));
     }
   }
 

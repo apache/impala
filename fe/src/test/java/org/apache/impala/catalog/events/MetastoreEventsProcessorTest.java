@@ -59,7 +59,6 @@ import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
-import org.apache.hadoop.hive.metastore.api.PartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
@@ -1169,16 +1168,18 @@ public class MetastoreEventsProcessorTest {
         totalNumberOfFilesToAdd, isOverwrite);
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
       List<InsertEventRequestData> partitionInsertEventInfos = new ArrayList<>();
+      List<List<String>> partitionInsertEventVals = new ArrayList<>();
       InsertEventRequestData insertEventRequestData = new InsertEventRequestData();
       insertEventRequestData.setFilesAdded(newFiles);
       insertEventRequestData.setReplace(isOverwrite);
       if (partition != null) {
-        insertEventRequestData.setPartitionVal(partition.getValues());
+        MetastoreShim.setPartitionVal(insertEventRequestData, partition.getValues());
       }
-      partitionInsertEventInfos
-          .add(insertEventRequestData);
+      partitionInsertEventInfos.add(insertEventRequestData);
+      partitionInsertEventVals.add(partition != null ? partition.getValues() : null);
       MetastoreShim.fireInsertEventHelper(metaStoreClient.getHiveClient(),
-          partitionInsertEventInfos, msTbl.getDbName(), msTbl.getTableName());
+          partitionInsertEventInfos, partitionInsertEventVals, msTbl.getDbName(),
+          msTbl.getTableName());
     }
   }
 
@@ -1191,15 +1192,18 @@ public class MetastoreEventsProcessorTest {
     List<String> newFiles = addFilesToDirectory(deltaPath, "testFile.",
         totalNumberOfFilesToAdd, false);
     List<InsertEventRequestData> insertEventReqDatas = new ArrayList<>();
+    List<List<String>> insertEventVals = new ArrayList<>();
     InsertEventRequestData insertEventRequestData = new InsertEventRequestData();
     if (partition != null) {
-      insertEventRequestData.setPartitionVal(partition.getValues());
+      MetastoreShim.setPartitionVal(insertEventRequestData, partition.getValues());
     }
     insertEventRequestData.setFilesAdded(newFiles);
     insertEventRequestData.setReplace(false);
     insertEventReqDatas.add(insertEventRequestData);
+    insertEventVals.add(partition != null ? partition.getValues() : null);
     MetaStoreUtil.TableInsertEventInfo insertEventInfo =
-        new MetaStoreUtil.TableInsertEventInfo(insertEventReqDatas, true, txnId, writeId);
+        new MetaStoreUtil.TableInsertEventInfo(insertEventReqDatas, insertEventVals,
+            true, txnId, writeId);
     MetastoreShim.fireInsertEvents(catalog_.getMetaStoreClient(), insertEventInfo,
         msTbl.getDbName(), msTbl.getTableName());
   }
@@ -1513,12 +1517,13 @@ public class MetastoreEventsProcessorTest {
     // created table
     assertEquals(3, events.size());
     Table existingTable = catalog_.getTable(TEST_DB_NAME, testTblName);
-    long id = existingTable.getMetaStoreTable().getId();
+    long id = MetastoreShim.getTableId(existingTable.getMetaStoreTable());
     assertEquals("CREATE_TABLE", events.get(0).getEventType());
     eventsProcessor_.processEvents(Lists.newArrayList(events.get(0)));
     // after processing the create_table the original table should still remain the same
-    assertEquals(id, catalog_.getTable(TEST_DB_NAME,
-        testTblName).getMetaStoreTable().getId());
+    long testId = MetastoreShim.getTableId(catalog_.getTable(TEST_DB_NAME,
+        testTblName).getMetaStoreTable());
+    assertEquals(id, testId);
     //second event should be drop_table. This event should also be skipped since
     // catalog state is more recent than the event
     assertEquals("DROP_TABLE", events.get(1).getEventType());
@@ -1540,8 +1545,9 @@ public class MetastoreEventsProcessorTest {
         catalog_.getTable(TEST_DB_NAME,
             testTblName) instanceof IncompleteTable);
     //finally make sure the table is still the same
-    assertEquals(id, catalog_.getTable(TEST_DB_NAME,
-        testTblName).getMetaStoreTable().getId());
+    testId = MetastoreShim.getTableId(catalog_.getTable(TEST_DB_NAME,
+        testTblName).getMetaStoreTable());
+    assertEquals(id, testId);
   }
 
   /**
@@ -2415,13 +2421,10 @@ public class MetastoreEventsProcessorTest {
     // test insert event batching
     org.apache.hadoop.hive.metastore.api.Table msTbl;
     List<Partition> partitions;
-    PartitionsRequest req = new PartitionsRequest();
-    req.setDbName(TEST_DB_NAME);
-    req.setTblName(testTblName);
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
       msTbl = metaStoreClient.getHiveClient().getTable(TEST_DB_NAME, testTblName);
-      partitions = metaStoreClient.getHiveClient().getPartitionsRequest(req)
-          .getPartitions();
+      partitions = MetastoreShim
+          .getPartitions(metaStoreClient.getHiveClient(), TEST_DB_NAME, testTblName);
     }
     assertNotNull(msTbl);
     assertNotNull(partitions);
@@ -3859,7 +3862,7 @@ public class MetastoreEventsProcessorTest {
         Partition partition = metaStoreClient.getHiveClient().getPartition(db,
             tblName, partVal);
         partition.getParameters().put(key, val);
-        partition.setWriteId(writeId);
+        MetastoreShim.setWriteIdToMSPartition(partition, writeId);
         partitions.add(partition);
       }
       metaStoreClient.getHiveClient().alter_partitions(db, tblName, partitions);

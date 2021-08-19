@@ -78,7 +78,7 @@ public class DescribeResultFactory {
     String comment = null;
     if(msDb != null) {
       location = msDb.getLocationUri();
-      managedLocation = msDb.getManagedLocationUri();
+      managedLocation = MetastoreShim.getManagedLocationUri(msDb);
       comment = msDb.getDescription();
     }
 
