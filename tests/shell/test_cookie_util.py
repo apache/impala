@@ -81,7 +81,8 @@ class TestCookieUtil(unittest.TestCase):
                now + days2k + sec
 
     def test_get_all_matching_cookies(self):
-        assert get_all_matching_cookies(['a', 'b'], '/path', {}) is None
+        cookies = get_all_matching_cookies(['a', 'b'], '/path', {})
+        assert not cookies
 
         headers = {'Set-Cookie': '''c_cookie=c_value
         b_cookie=b_value
@@ -126,7 +127,7 @@ class TestCookieUtil(unittest.TestCase):
         b_cookie=b_value;Path=/path1
         a_cookie=a_value;Path=/path2'''}
         cookies = get_all_matching_cookies(['a_cookie', 'b_cookie'], '/path', headers)
-        assert cookies is None
+        assert not cookies
 
         headers = {'Set-Cookie': '''c_cookie=c_value;Path=/
         b_cookie=b_value;Path=/path1

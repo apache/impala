@@ -60,11 +60,10 @@ def get_all_matching_cookies(cookie_names, path, resp_headers):
   except Exception:
     return None
 
+  matching_cookies = []
   for cn in cookie_names:
     if cn in cookies:
       c = cookies[cn]
       if c and cookie_matches_path(c, path):
-        if matching_cookies is None:
-          matching_cookies = list()
         matching_cookies.append(c)
   return matching_cookies

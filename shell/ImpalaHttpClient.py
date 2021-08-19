@@ -110,14 +110,15 @@ class ImpalaHttpClient(TTransportBase):
       self.proxy_auth = self.basic_proxy_auth_header(parsed)
     else:
       self.realhost = self.realport = self.proxy_auth = None
-    if (http_cookie_names is None) or (str(http_cookie_names).strip() == ""):
+    if (not http_cookie_names) or (str(http_cookie_names).strip() == ""):
       self.__http_cookie_dict = None
     else:
       # Build a dictionary that maps cookie name to namedtuple.
-      self.__http_cookie_dict = dict()
       cookie_names = http_cookie_names.split(',')
-      for cn in cookie_names:
-        self.__http_cookie_dict[cn] = Cookie(cookie=None, expiry_time=None)
+      self.__http_cookie_dict = \
+        {cn: Cookie(cookie=None, expiry_time=None) for cn in cookie_names}
+    # Set __are_matching_cookies_found as True if matching cookies are found in response.
+    self.__are_matching_cookies_found = False
     self.__wbuf = BytesIO()
     self.__http = None
     self.__http_response = None
@@ -167,33 +168,41 @@ class ImpalaHttpClient(TTransportBase):
   def setCustomHeaders(self, headers):
     self.__custom_headers = headers
 
-  def updateHttpCookies(self, headers):
+  # Extract cookies from response and save those cookies for which the cookie names
+  # are in the cookie name list specified in the __init__().
+  def extractHttpCookiesFromResponse(self, headers):
     if self.__http_cookie_dict:
       matching_cookies = \
           get_all_matching_cookies(self.__http_cookie_dict.keys(), self.path, headers)
       if matching_cookies:
+        self.__are_matching_cookies_found = True
         for c in matching_cookies:
           self.__http_cookie_dict[c.key] = Cookie(c, get_cookie_expiry(c))
 
-  def getHttpCookieHeaders(self):
-    cookie_headers = None
+  # Return the value as a cookie list for Cookie header. It's a list of name-value
+  # pairs in the form of <cookie-name>=<cookie-value>. Pairs in the list are separated by
+  # a semicolon and a space ('; ').
+  def getHttpCookieHeaderForRequest(self):
+    if (self.__http_cookie_dict is None) or not self.__are_matching_cookies_found:
+      return None
+    cookie_headers = []
     for cn, c_tuple in self.__http_cookie_dict.items():
-      if c_tuple.cookie and c_tuple.expiry_time:
-        cookie = c_tuple.cookie
-        if c_tuple.expiry_time <= datetime.datetime.now():
+      if c_tuple.cookie:
+        if c_tuple.expiry_time and c_tuple.expiry_time <= datetime.datetime.now():
           self.__http_cookie_dict[cn] = Cookie(cookie=None, expiry_time=None)
-          cookie = None
-        if (cookie):
-          cookie_header = cookie.output(attrs=['value'], header='').strip()
-          if (cookie_headers):
-            cookie_headers = cookie_headers + "; " + cookie_header
-          else:
-            cookie_headers = cookie_header
-    return cookie_headers
+        else:
+          cookie_header = c_tuple.cookie.output(attrs=['value'], header='').strip()
+          cookie_headers.append(cookie_header)
+    if not cookie_headers:
+      self.__are_matching_cookies_found = False
+      return None
+    else:
+      return '; '.join(cookie_headers)
 
+  # Add HTTP cookie headers based on the saved cookies.
   def addHttpCookiesToRequestHeaders(self):
     if self.__http_cookie_dict:
-      cookie_headers = self.getHttpCookieHeaders()
+      cookie_headers = self.getHttpCookieHeaderForRequest()
       if cookie_headers:
         self.__http.putheader('Cookie', cookie_headers)
 
@@ -257,7 +266,7 @@ class ImpalaHttpClient(TTransportBase):
     self.code = self.__http_response.status
     self.message = self.__http_response.reason
     self.headers = self.__http_response.msg
-    self.updateHttpCookies(self.headers)
+    self.extractHttpCookiesFromResponse(self.headers)
 
     if self.code >= 300:
       # Report any http response code that is not 1XX (informational response) or
