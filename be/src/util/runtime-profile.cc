@@ -2732,7 +2732,7 @@ void AggregatedRuntimeProfile::PrettyPrintSubclassCounters(
         for (int idx = 0; idx < v.second.second.size(); ++idx) {
           if (v.second.second[idx] == nullptr) continue;
           const string& per_instance_prefix = Substitute("$0[$1]", prefix, idx);
-          aggregated_stats.PrettyPrint(per_instance_prefix, v.first, verbosity, s);
+          v.second.second[idx]->PrettyPrint(per_instance_prefix, v.first, verbosity, s);
         }
       }
     }
