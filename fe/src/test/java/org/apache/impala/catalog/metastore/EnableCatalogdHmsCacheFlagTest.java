@@ -79,6 +79,9 @@ public class EnableCatalogdHmsCacheFlagTest extends AbstractCatalogMetastoreTest
     request.setNames(Arrays.asList("year=2009/month=1", "year=2009/month=2"));
     request.setGetFileMetadata(true);
     result = catalogHmsClient_.getPartitionsByNames(request);
+    // sort partitions by names to avoid flakiness
+    sortPartitionsByNames(tbl.getMetaStoreTable().getPartitionKeys(),
+        result.getPartitions());
     for (Partition part : result.getPartitions()) {
       assertNotNull(part.getFileMetadata());
     }

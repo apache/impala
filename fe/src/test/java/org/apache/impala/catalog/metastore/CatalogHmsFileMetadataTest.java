@@ -23,6 +23,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -34,6 +35,7 @@ import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesResult;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
+import org.apache.impala.catalog.CatalogHmsAPIHelper;
 import org.apache.impala.catalog.HdfsPartition;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
@@ -44,6 +46,7 @@ import org.apache.thrift.TException;
 import org.junit.Test;
 
 public class CatalogHmsFileMetadataTest extends AbstractCatalogMetastoreTest {
+
   /**
    * The test fetches partitions of a table over HMS API and then compares if the
    * deserialized filemetadata from the response matches with what we have in catalogd.
@@ -80,6 +83,9 @@ public class CatalogHmsFileMetadataTest extends AbstractCatalogMetastoreTest {
     request.setNames(Arrays.asList("year=2009/month=1", "year=2009/month=2"));
     request.setGetFileMetadata(true);
     result = catalogHmsClient_.getPartitionsByNames(request);
+    // make sure that the partitions are in sorted order
+    sortPartitionsByNames(tbl.getMetaStoreTable().getPartitionKeys(),
+        result.getPartitions());
     for (Partition part : result.getPartitions()) {
       assertNotNull(part.getFileMetadata());
     }
@@ -124,6 +130,9 @@ public class CatalogHmsFileMetadataTest extends AbstractCatalogMetastoreTest {
     request.setGetFileMetadata(true);
     request.setValidWriteIdList(tbl.getValidWriteIds().toString());
     GetPartitionsByNamesResult result = catalogHmsClient_.getPartitionsByNames(request);
+    // sort partitions by names to avoid flakiness
+    sortPartitionsByNames(tbl.getMetaStoreTable().getPartitionKeys(),
+        result.getPartitions());
     for (Partition part : result.getPartitions()) {
       assertNotNull(part.getFileMetadata());
     }

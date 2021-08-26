@@ -17,6 +17,7 @@
 
 package org.apache.impala.catalog;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -48,6 +50,7 @@ import org.apache.hadoop.hive.metastore.PartitionExpressionProxy;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsDesc;
 import org.apache.hadoop.hive.metastore.api.ColumnStatisticsObj;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.FileMetadata;
 import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesRequest;
 import org.apache.hadoop.hive.metastore.api.GetPartitionsByNamesResult;
@@ -438,6 +441,10 @@ public class CatalogHmsAPIHelper {
         retPartitions.add(part);
       }
     }
+    // HMS API returns partitions sorted by partition name, however this is just a
+    // semantic behavior. We don't have any evidence of clients relying on the sortedness
+    // of returned partitions. Hence, we optimistically return the partitions without
+    // sorting by names here.
     GetPartitionsByNamesResult result = new GetPartitionsByNamesResult(retPartitions);
     if (request.isGetFileMetadata()) {
       result.setDictionary(getSerializedNetworkAddress(
