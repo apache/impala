@@ -540,7 +540,9 @@ void AggregatedRuntimeProfile::UpdateAggregatedFromInstances(
         << "Update() can only be called on root of averaged profile tree";
     DCHECK_EQ(agg_root.input_profiles.size(), agg_root.num_instances);
     for (int i = 0; i < agg_root.num_instances; ++i) {
-      input_profile_names_[start_idx + i] = agg_root.input_profiles[i];
+      if (LIKELY(!agg_root.input_profiles[i].empty())) {
+        input_profile_names_[start_idx + i] = agg_root.input_profiles[i];
+      }
     }
   }
 
@@ -623,6 +625,7 @@ void AggregatedRuntimeProfile::UpdateCountersFromInstances(
     DCHECK_EQ(tcounter.values.size(), tcounter.start_index.size()) << tcounter.name;
     for (int i = 0; i < tcounter.values.size(); ++i) {
       int idx = start_idx + i;
+      if (UNLIKELY(tcounter.values[i].empty() && !dst.values[idx].empty())) continue;
       dst.period_ms[idx] = tcounter.period_ms[i];
       dst.values[idx] = tcounter.values[i];
       dst.start_index[idx] = tcounter.start_index[i];
@@ -705,6 +708,7 @@ void AggregatedRuntimeProfile::UpdateEventSequencesFromInstances(
     DCHECK_LE(start_idx + tseq.timestamps.size(), num_input_profiles_);
     DCHECK_EQ(tseq.timestamps.size(), tseq.label_idxs.size());
     for (int i = 0; i < tseq.timestamps.size(); ++i) {
+      if (UNLIKELY(tseq.timestamps[i].empty())) continue;
       int idx = start_idx + i;
       std::vector<int32_t>& label_idxs = seq.label_idxs[idx];
       std::vector<int64_t>& timestamps = seq.timestamps[idx];
