@@ -2639,10 +2639,10 @@ void AggregatedRuntimeProfile::PrettyPrintInfoStrings(
   {
     lock_guard<SpinLock> l(input_profile_name_lock_);
     if (!input_profile_names_.empty()) {
-      // TODO: IMPALA-9846: improve pretty-printing here
-      stream << prefix
-             << "Instances: " << boost::algorithm::join(input_profile_names_, ", ")
-             << endl;
+      stream << prefix << "Instances:" << endl;
+      for (int i = 0; i < input_profile_names_.size(); ++i) {
+          stream << prefix << "  [" << i << "] " << input_profile_names_[i] << endl;
+      }
     }
   }
 

@@ -513,7 +513,8 @@ F00:EXCHANGE SENDER        3     12    1.666ms   3.999ms                     166
       completion times: min:1s203ms  max:1s203ms  mean: 1s203ms  stddev:0.000ns
       execution rates: min:0.00 /sec  max:0.00 /sec  mean:0.00 /sec  stddev:0.00 /sec
       num instances: 1
-    Instances: Instance 454fb5fa46498311:3afee31900000000 (host=tarmstrong-Precision-7540:27000)
+    Instances:
+      [0] Instance 454fb5fa46498311:3afee31900000000 (host=tarmstrong-Precision-7540:27000)
       Last report received time[0]: 2020-12-15 20:07:23.281
        - MemoryUsage[0] (500.000ms): 8.00 KB, 8.00 KB, 8.00 KB
       Fragment Instance Lifecycle Event Timeline[0]: 1s151ms
@@ -717,7 +718,19 @@ F00:EXCHANGE SENDER        3     12    1.666ms   3.999ms                     166
       completion times: min:1s191ms  max:1s203ms  mean: 1s197ms  stddev:4.149ms
       execution rates: min:0.00 /sec  max:0.00 /sec  mean:0.00 /sec  stddev:0.00 /sec
       num instances: 12
-    Instances: Instance 454fb5fa46498311:3afee3190000000d (host=tarmstrong-Precision-7540:27001), Instance 454fb5fa46498311:3afee3190000000e (host=tarmstrong-Precision-7540:27001), Instance 454fb5fa46498311:3afee3190000000f (host=tarmstrong-Precision-7540:27001), Instance 454fb5fa46498311:3afee31900000010 (host=tarmstrong-Precision-7540:27001), Instance 454fb5fa46498311:3afee31900000011 (host=tarmstrong-Precision-7540:27000), Instance 454fb5fa46498311:3afee31900000012 (host=tarmstrong-Precision-7540:27000), Instance 454fb5fa46498311:3afee31900000013 (host=tarmstrong-Precision-7540:27000), Instance 454fb5fa46498311:3afee31900000014 (host=tarmstrong-Precision-7540:27000), Instance 454fb5fa46498311:3afee31900000015 (host=tarmstrong-Precision-7540:27002), Instance 454fb5fa46498311:3afee31900000016 (host=tarmstrong-Precision-7540:27002), Instance 454fb5fa46498311:3afee31900000017 (host=tarmstrong-Precision-7540:27002), Instance 454fb5fa46498311:3afee31900000018 (host=tarmstrong-Precision-7540:27002)
+    Instances:
+      [0] Instance 454fb5fa46498311:3afee3190000000d (host=tarmstrong-Precision-7540:27001)
+      [1] Instance 454fb5fa46498311:3afee3190000000e (host=tarmstrong-Precision-7540:27001)
+      [2] Instance 454fb5fa46498311:3afee3190000000f (host=tarmstrong-Precision-7540:27001)
+      [3] Instance 454fb5fa46498311:3afee31900000010 (host=tarmstrong-Precision-7540:27001)
+      [4] Instance 454fb5fa46498311:3afee31900000011 (host=tarmstrong-Precision-7540:27000)
+      [5] Instance 454fb5fa46498311:3afee31900000012 (host=tarmstrong-Precision-7540:27000)
+      [6] Instance 454fb5fa46498311:3afee31900000013 (host=tarmstrong-Precision-7540:27000)
+      [7] Instance 454fb5fa46498311:3afee31900000014 (host=tarmstrong-Precision-7540:27000)
+      [8] Instance 454fb5fa46498311:3afee31900000015 (host=tarmstrong-Precision-7540:27002)
+      [9] Instance 454fb5fa46498311:3afee31900000016 (host=tarmstrong-Precision-7540:27002)
+      [10] Instance 454fb5fa46498311:3afee31900000017 (host=tarmstrong-Precision-7540:27002)
+      [11] Instance 454fb5fa46498311:3afee31900000018 (host=tarmstrong-Precision-7540:27002)
       Last report received time[8-11]: 2020-12-15 20:07:23.272
       Last report received time[0-3]: 2020-12-15 20:07:23.276
       Last report received time[4-7]: 2020-12-15 20:07:23.281
@@ -3290,7 +3303,19 @@ F00:EXCHANGE SENDER        3     12    1.666ms   3.999ms                     166
       completion times: min:1s191ms  max:1s203ms  mean: 1s197ms  stddev:4.149ms
       execution rates: min:13.22 MB/sec  max:17.54 MB/sec  mean:13.70 MB/sec  stddev:1.16 MB/sec
       num instances: 12
-    Instances: Instance 454fb5fa46498311:3afee31900000001 (host=tarmstrong-Precision-7540:27001), Instance 454fb5fa46498311:3afee31900000002 (host=tarmstrong-Precision-7540:27001), Instance 454fb5fa46498311:3afee31900000003 (host=tarmstrong-Precision-7540:27001), Instance 454fb5fa46498311:3afee31900000004 (host=tarmstrong-Precision-7540:27001), Instance 454fb5fa46498311:3afee31900000005 (host=tarmstrong-Precision-7540:27000), Instance 454fb5fa46498311:3afee31900000006 (host=tarmstrong-Precision-7540:27000), Instance 454fb5fa46498311:3afee31900000007 (host=tarmstrong-Precision-7540:27000), Instance 454fb5fa46498311:3afee31900000008 (host=tarmstrong-Precision-7540:27000), Instance 454fb5fa46498311:3afee31900000009 (host=tarmstrong-Precision-7540:27002), Instance 454fb5fa46498311:3afee3190000000a (host=tarmstrong-Precision-7540:27002), Instance 454fb5fa46498311:3afee3190000000b (host=tarmstrong-Precision-7540:27002), Instance 454fb5fa46498311:3afee3190000000c (host=tarmstrong-Precision-7540:27002)
+    Instances:
+      [0] Instance 454fb5fa46498311:3afee31900000001 (host=tarmstrong-Precision-7540:27001)
+      [1] Instance 454fb5fa46498311:3afee31900000002 (host=tarmstrong-Precision-7540:27001)
+      [2] Instance 454fb5fa46498311:3afee31900000003 (host=tarmstrong-Precision-7540:27001)
+      [3] Instance 454fb5fa46498311:3afee31900000004 (host=tarmstrong-Precision-7540:27001)
+      [4] Instance 454fb5fa46498311:3afee31900000005 (host=tarmstrong-Precision-7540:27000)
+      [5] Instance 454fb5fa46498311:3afee31900000006 (host=tarmstrong-Precision-7540:27000)
+      [6] Instance 454fb5fa46498311:3afee31900000007 (host=tarmstrong-Precision-7540:27000)
+      [7] Instance 454fb5fa46498311:3afee31900000008 (host=tarmstrong-Precision-7540:27000)
+      [8] Instance 454fb5fa46498311:3afee31900000009 (host=tarmstrong-Precision-7540:27002)
+      [9] Instance 454fb5fa46498311:3afee3190000000a (host=tarmstrong-Precision-7540:27002)
+      [10] Instance 454fb5fa46498311:3afee3190000000b (host=tarmstrong-Precision-7540:27002)
+      [11] Instance 454fb5fa46498311:3afee3190000000c (host=tarmstrong-Precision-7540:27002)
       Hdfs split stats (<volume id>:<# splits>/<split lengths>)[11]: 0:152/15.76 MB
       Hdfs split stats (<volume id>:<# splits>/<split lengths>)[9]: 0:152/15.86 MB
       Hdfs split stats (<volume id>:<# splits>/<split lengths>)[0]: 0:152/15.87 MB
@@ -6763,7 +6788,8 @@ F00:EXCHANGE SENDER        3     12    0.000ns    0.000ns                       
       completion times: min:3s863ms  max:3s863ms  mean: 3s863ms  stddev:0.000ns
       execution rates: min:0.00 /sec  max:0.00 /sec  mean:0.00 /sec  stddev:0.00 /sec
       num instances: 1
-    Instances: Instance da4f8f953162a9b0:9a4d93eb00000000 (host=tarmstrong-Precision-7540:27000)
+    Instances:
+      [0] Instance da4f8f953162a9b0:9a4d93eb00000000 (host=tarmstrong-Precision-7540:27000)
       Last report received time[0]: 2020-12-15 20:07:27.327
        - MemoryUsage[0] (500.000ms): 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB
       Fragment Instance Lifecycle Event Timeline[0]: 3s819ms
@@ -7006,7 +7032,19 @@ F00:EXCHANGE SENDER        3     12    0.000ns    0.000ns                       
       completion times: min:3s731ms  max:3s863ms  mean: 3s816ms  stddev:58.197ms
       execution rates: min:4.12 MB/sec  max:5.47 MB/sec  mean:4.30 MB/sec  stddev:365.33 KB/sec
       num instances: 12
-    Instances: Instance da4f8f953162a9b0:9a4d93eb00000001 (host=tarmstrong-Precision-7540:27001), Instance da4f8f953162a9b0:9a4d93eb00000002 (host=tarmstrong-Precision-7540:27001), Instance da4f8f953162a9b0:9a4d93eb00000003 (host=tarmstrong-Precision-7540:27001), Instance da4f8f953162a9b0:9a4d93eb00000004 (host=tarmstrong-Precision-7540:27001), Instance da4f8f953162a9b0:9a4d93eb00000005 (host=tarmstrong-Precision-7540:27000), Instance da4f8f953162a9b0:9a4d93eb00000006 (host=tarmstrong-Precision-7540:27000), Instance da4f8f953162a9b0:9a4d93eb00000007 (host=tarmstrong-Precision-7540:27000), Instance da4f8f953162a9b0:9a4d93eb00000008 (host=tarmstrong-Precision-7540:27000), Instance da4f8f953162a9b0:9a4d93eb00000009 (host=tarmstrong-Precision-7540:27002), Instance da4f8f953162a9b0:9a4d93eb0000000a (host=tarmstrong-Precision-7540:27002), Instance da4f8f953162a9b0:9a4d93eb0000000b (host=tarmstrong-Precision-7540:27002), Instance da4f8f953162a9b0:9a4d93eb0000000c (host=tarmstrong-Precision-7540:27002)
+    Instances:
+      [0] Instance da4f8f953162a9b0:9a4d93eb00000001 (host=tarmstrong-Precision-7540:27001)
+      [1] Instance da4f8f953162a9b0:9a4d93eb00000002 (host=tarmstrong-Precision-7540:27001)
+      [2] Instance da4f8f953162a9b0:9a4d93eb00000003 (host=tarmstrong-Precision-7540:27001)
+      [3] Instance da4f8f953162a9b0:9a4d93eb00000004 (host=tarmstrong-Precision-7540:27001)
+      [4] Instance da4f8f953162a9b0:9a4d93eb00000005 (host=tarmstrong-Precision-7540:27000)
+      [5] Instance da4f8f953162a9b0:9a4d93eb00000006 (host=tarmstrong-Precision-7540:27000)
+      [6] Instance da4f8f953162a9b0:9a4d93eb00000007 (host=tarmstrong-Precision-7540:27000)
+      [7] Instance da4f8f953162a9b0:9a4d93eb00000008 (host=tarmstrong-Precision-7540:27000)
+      [8] Instance da4f8f953162a9b0:9a4d93eb00000009 (host=tarmstrong-Precision-7540:27002)
+      [9] Instance da4f8f953162a9b0:9a4d93eb0000000a (host=tarmstrong-Precision-7540:27002)
+      [10] Instance da4f8f953162a9b0:9a4d93eb0000000b (host=tarmstrong-Precision-7540:27002)
+      [11] Instance da4f8f953162a9b0:9a4d93eb0000000c (host=tarmstrong-Precision-7540:27002)
       Hdfs split stats (<volume id>:<# splits>/<split lengths>)[11]: 0:152/15.76 MB
       Hdfs split stats (<volume id>:<# splits>/<split lengths>)[9]: 0:152/15.86 MB
       Hdfs split stats (<volume id>:<# splits>/<split lengths>)[0]: 0:152/15.87 MB

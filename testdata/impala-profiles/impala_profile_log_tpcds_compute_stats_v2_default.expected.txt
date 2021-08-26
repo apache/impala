@@ -509,7 +509,8 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
              - PrepareTime: 27.139ms
              - TotalTime: 112.612ms
     Coordinator Fragment F02:
-    Instances: Instance 874b65988023a32b:71d209e900000000 (host=tarmstrong-Precision-7540:27000)
+    Instances:
+      [0] Instance 874b65988023a32b:71d209e900000000 (host=tarmstrong-Precision-7540:27000)
       Last report received time[0]: 2021-02-09 08:53:03.675
        - MemoryUsage[0] (500.000ms): 8.00 KB, 8.00 KB, 8.00 KB
       Fragment Instance Lifecycle Event Timeline[0]: 1s208ms
@@ -608,7 +609,19 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
            - TotalRPCsDeferred: 0 (0)
            - TotalTime: 0.000ns
     Fragment F01 [12 instances]:
-    Instances: Instance 874b65988023a32b:71d209e90000000d (host=tarmstrong-Precision-7540:27002), Instance 874b65988023a32b:71d209e90000000e (host=tarmstrong-Precision-7540:27002), Instance 874b65988023a32b:71d209e90000000f (host=tarmstrong-Precision-7540:27002), Instance 874b65988023a32b:71d209e900000010 (host=tarmstrong-Precision-7540:27002), Instance 874b65988023a32b:71d209e900000011 (host=tarmstrong-Precision-7540:27000), Instance 874b65988023a32b:71d209e900000012 (host=tarmstrong-Precision-7540:27000), Instance 874b65988023a32b:71d209e900000013 (host=tarmstrong-Precision-7540:27000), Instance 874b65988023a32b:71d209e900000014 (host=tarmstrong-Precision-7540:27000), Instance 874b65988023a32b:71d209e900000015 (host=tarmstrong-Precision-7540:27001), Instance 874b65988023a32b:71d209e900000016 (host=tarmstrong-Precision-7540:27001), Instance 874b65988023a32b:71d209e900000017 (host=tarmstrong-Precision-7540:27001), Instance 874b65988023a32b:71d209e900000018 (host=tarmstrong-Precision-7540:27001)
+    Instances:
+      [0] Instance 874b65988023a32b:71d209e90000000d (host=tarmstrong-Precision-7540:27002)
+      [1] Instance 874b65988023a32b:71d209e90000000e (host=tarmstrong-Precision-7540:27002)
+      [2] Instance 874b65988023a32b:71d209e90000000f (host=tarmstrong-Precision-7540:27002)
+      [3] Instance 874b65988023a32b:71d209e900000010 (host=tarmstrong-Precision-7540:27002)
+      [4] Instance 874b65988023a32b:71d209e900000011 (host=tarmstrong-Precision-7540:27000)
+      [5] Instance 874b65988023a32b:71d209e900000012 (host=tarmstrong-Precision-7540:27000)
+      [6] Instance 874b65988023a32b:71d209e900000013 (host=tarmstrong-Precision-7540:27000)
+      [7] Instance 874b65988023a32b:71d209e900000014 (host=tarmstrong-Precision-7540:27000)
+      [8] Instance 874b65988023a32b:71d209e900000015 (host=tarmstrong-Precision-7540:27001)
+      [9] Instance 874b65988023a32b:71d209e900000016 (host=tarmstrong-Precision-7540:27001)
+      [10] Instance 874b65988023a32b:71d209e900000017 (host=tarmstrong-Precision-7540:27001)
+      [11] Instance 874b65988023a32b:71d209e900000018 (host=tarmstrong-Precision-7540:27001)
       Last report received time[0-3]: 2021-02-09 08:53:03.669
       Last report received time[8-11]: 2021-02-09 08:53:03.674
       Last report received time[4-7]: 2021-02-09 08:53:03.675
@@ -996,7 +1009,19 @@ F00:EXCHANGE SENDER        3     12    1.356ms    6.539ms                      1
            - TotalRPCsDeferred: mean=0 (0) min=0 (0) max=0 (0)
            - TotalTime: mean=0.000ns min=0.000ns max=0.000ns
     Fragment F00 [12 instances]:
-    Instances: Instance 874b65988023a32b:71d209e900000001 (host=tarmstrong-Precision-7540:27002), Instance 874b65988023a32b:71d209e900000002 (host=tarmstrong-Precision-7540:27002), Instance 874b65988023a32b:71d209e900000003 (host=tarmstrong-Precision-7540:27002), Instance 874b65988023a32b:71d209e900000004 (host=tarmstrong-Precision-7540:27002), Instance 874b65988023a32b:71d209e900000005 (host=tarmstrong-Precision-7540:27000), Instance 874b65988023a32b:71d209e900000006 (host=tarmstrong-Precision-7540:27000), Instance 874b65988023a32b:71d209e900000007 (host=tarmstrong-Precision-7540:27000), Instance 874b65988023a32b:71d209e900000008 (host=tarmstrong-Precision-7540:27000), Instance 874b65988023a32b:71d209e900000009 (host=tarmstrong-Precision-7540:27001), Instance 874b65988023a32b:71d209e90000000a (host=tarmstrong-Precision-7540:27001), Instance 874b65988023a32b:71d209e90000000b (host=tarmstrong-Precision-7540:27001), Instance 874b65988023a32b:71d209e90000000c (host=tarmstrong-Precision-7540:27001)
+    Instances:
+      [0] Instance 874b65988023a32b:71d209e900000001 (host=tarmstrong-Precision-7540:27002)
+      [1] Instance 874b65988023a32b:71d209e900000002 (host=tarmstrong-Precision-7540:27002)
+      [2] Instance 874b65988023a32b:71d209e900000003 (host=tarmstrong-Precision-7540:27002)
+      [3] Instance 874b65988023a32b:71d209e900000004 (host=tarmstrong-Precision-7540:27002)
+      [4] Instance 874b65988023a32b:71d209e900000005 (host=tarmstrong-Precision-7540:27000)
+      [5] Instance 874b65988023a32b:71d209e900000006 (host=tarmstrong-Precision-7540:27000)
+      [6] Instance 874b65988023a32b:71d209e900000007 (host=tarmstrong-Precision-7540:27000)
+      [7] Instance 874b65988023a32b:71d209e900000008 (host=tarmstrong-Precision-7540:27000)
+      [8] Instance 874b65988023a32b:71d209e900000009 (host=tarmstrong-Precision-7540:27001)
+      [9] Instance 874b65988023a32b:71d209e90000000a (host=tarmstrong-Precision-7540:27001)
+      [10] Instance 874b65988023a32b:71d209e90000000b (host=tarmstrong-Precision-7540:27001)
+      [11] Instance 874b65988023a32b:71d209e90000000c (host=tarmstrong-Precision-7540:27001)
       Hdfs split stats (<volume id>:<# splits>/<split lengths>)[11]: 0:152/15.76 MB
       Hdfs split stats (<volume id>:<# splits>/<split lengths>)[9]: 0:152/15.86 MB
       Hdfs split stats (<volume id>:<# splits>/<split lengths>)[0]: 0:152/15.87 MB
@@ -1861,7 +1886,8 @@ F00:EXCHANGE SENDER        3     12  265.136us  490.561us                       
              - PrepareTime: 16.210ms
              - TotalTime: 369.983ms
     Coordinator Fragment F01:
-    Instances: Instance 504e9a5d292585e8:7c56749700000000 (host=tarmstrong-Precision-7540:27000)
+    Instances:
+      [0] Instance 504e9a5d292585e8:7c56749700000000 (host=tarmstrong-Precision-7540:27000)
       Last report received time[0]: 2021-02-09 08:53:08.375
        - MemoryUsage[0] (500.000ms): 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB, 12.00 KB
       Fragment Instance Lifecycle Event Timeline[0]: 4s434ms
@@ -1979,7 +2005,19 @@ F00:EXCHANGE SENDER        3     12  265.136us  490.561us                       
            - TotalRPCsDeferred: 0 (0)
            - TotalTime: 0.000ns
     Fragment F00 [12 instances]:
-    Instances: Instance 504e9a5d292585e8:7c56749700000001 (host=tarmstrong-Precision-7540:27002), Instance 504e9a5d292585e8:7c56749700000002 (host=tarmstrong-Precision-7540:27002), Instance 504e9a5d292585e8:7c56749700000003 (host=tarmstrong-Precision-7540:27002), Instance 504e9a5d292585e8:7c56749700000004 (host=tarmstrong-Precision-7540:27002), Instance 504e9a5d292585e8:7c56749700000005 (host=tarmstrong-Precision-7540:27000), Instance 504e9a5d292585e8:7c56749700000006 (host=tarmstrong-Precision-7540:27000), Instance 504e9a5d292585e8:7c56749700000007 (host=tarmstrong-Precision-7540:27000), Instance 504e9a5d292585e8:7c56749700000008 (host=tarmstrong-Precision-7540:27000), Instance 504e9a5d292585e8:7c56749700000009 (host=tarmstrong-Precision-7540:27001), Instance 504e9a5d292585e8:7c5674970000000a (host=tarmstrong-Precision-7540:27001), Instance 504e9a5d292585e8:7c5674970000000b (host=tarmstrong-Precision-7540:27001), Instance 504e9a5d292585e8:7c5674970000000c (host=tarmstrong-Precision-7540:27001)
+    Instances:
+      [0] Instance 504e9a5d292585e8:7c56749700000001 (host=tarmstrong-Precision-7540:27002)
+      [1] Instance 504e9a5d292585e8:7c56749700000002 (host=tarmstrong-Precision-7540:27002)
+      [2] Instance 504e9a5d292585e8:7c56749700000003 (host=tarmstrong-Precision-7540:27002)
+      [3] Instance 504e9a5d292585e8:7c56749700000004 (host=tarmstrong-Precision-7540:27002)
+      [4] Instance 504e9a5d292585e8:7c56749700000005 (host=tarmstrong-Precision-7540:27000)
+      [5] Instance 504e9a5d292585e8:7c56749700000006 (host=tarmstrong-Precision-7540:27000)
+      [6] Instance 504e9a5d292585e8:7c56749700000007 (host=tarmstrong-Precision-7540:27000)
+      [7] Instance 504e9a5d292585e8:7c56749700000008 (host=tarmstrong-Precision-7540:27000)
+      [8] Instance 504e9a5d292585e8:7c56749700000009 (host=tarmstrong-Precision-7540:27001)
+      [9] Instance 504e9a5d292585e8:7c5674970000000a (host=tarmstrong-Precision-7540:27001)
+      [10] Instance 504e9a5d292585e8:7c5674970000000b (host=tarmstrong-Precision-7540:27001)
+      [11] Instance 504e9a5d292585e8:7c5674970000000c (host=tarmstrong-Precision-7540:27001)
       Hdfs split stats (<volume id>:<# splits>/<split lengths>)[11]: 0:152/15.76 MB
       Hdfs split stats (<volume id>:<# splits>/<split lengths>)[9]: 0:152/15.86 MB
       Hdfs split stats (<volume id>:<# splits>/<split lengths>)[0]: 0:152/15.87 MB
