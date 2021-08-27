@@ -409,9 +409,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Tuple to hold values when reading parquet::Statistics. Owned by perm_pool_.
   Tuple* min_max_tuple_;
 
-  /// Clone of Min/max statistics conjunct evaluators. Has the same life time as
-  /// the scanner. Stored in 'obj_pool_'.
-  vector<ScalarExprEvaluator*> min_max_conjunct_evals_;
+  /// Clone of statistics conjunct evaluators. Has the same life time as the scanner.
+  /// Stored in 'obj_pool_'.
+  vector<ScalarExprEvaluator*> stats_conjunct_evals_;
 
   /// A map from indices of columns that participate in an EQ conjunct to the hash of the
   /// literal value of the EQ conjunct. Used in Parquet Bloom filtering.
@@ -555,6 +555,14 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
 
   virtual Status GetNextInternal(RowBatch* row_batch) WARN_UNUSED_RESULT;
 
+  /// Return true if we can evaluate this type of predicate on parquet statistic.
+  /// FE could populate stats-predicates that can't be evaluated here if the table
+  /// contains both Parquet and ORC format partitions. Here we only pick min-max
+  /// predicates, i.e. <, >, <=, and >=.
+  bool IsSupportedStatsConjunct(std::string fn_name) {
+    return fn_name == "lt" || fn_name == "gt" || fn_name == "le" || fn_name == "ge";
+  }
+
   /// Evaluates the min/max predicates of the 'scan_node_' using the parquet::Statistics
   /// of 'row_group'. 'file_metadata' is used to determine the ordering that was used to
   /// compute the statistics. Sets 'skip_row_group' to true if the row group can be
@@ -677,7 +685,7 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Sets 'filter_pages_' to true if found any page to filter out.
   Status ProcessPageIndex();
 
-  /// Evaluates 'min_max_conjunct_evals_' against the column index and determines the row
+  /// Evaluates 'stats_conjunct_evals_' against the column index and determines the row
   /// ranges that might contain data we are looking for.
   /// Sets 'filter_pages_' to true if found any page to filter out.
   Status EvaluatePageIndex();
@@ -864,7 +872,7 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// provided buffer must be preallocated to hold at least 'size' bytes.
   Status ReadToBuffer(uint64_t offset, uint8_t* buffer, uint64_t size) WARN_UNUSED_RESULT;
 
-  /// Processes 'min_max_conjunct_evals_' to extract equality (EQ) conjuncts. These are
+  /// Processes 'stats_conjunct_evals_' to extract equality (EQ) conjuncts. These are
   /// now represented as two conjuncts: an LE and a GE. This function finds such pairs and
   /// fills the map 'eq_conjunct_info_' with the hash of the literal in the EQ conjunct.
   /// See 'eq_conjunct_info_'.

@@ -309,3 +309,6 @@ table_name:uncomp_src_alltypes, constraint:restrict_to, table_format:orc/def/blo
 table_name:uncomp_src_decimal_tbl, constraint:restrict_to, table_format:orc/def/block
 
 table_name:part_strings_with_quotes, constraint:restrict_to, table_format:text/none/none
+
+# 'alltypessmall_bool_sorted' only used in ORC tests.
+table_name:alltypessmall_bool_sorted, constraint:restrict_to, table_format:orc/def/block

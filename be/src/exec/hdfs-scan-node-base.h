@@ -276,13 +276,13 @@ class HdfsScanPlanNode : public ScanPlanNode {
   typedef std::unordered_map<TupleId, std::vector<ScalarExpr*>> ConjunctsMap;
   ConjunctsMap conjuncts_map_;
 
-  /// Conjuncts to evaluate on parquet::Statistics.
-  std::vector<ScalarExpr*> min_max_conjuncts_;
+  /// Conjuncts to evaluate on parquet::Statistics or to be pushed down to ORC reader.
+  std::vector<ScalarExpr*> stats_conjuncts_;
 
   /// The list of overlap predicate descs. Each is used to find out whether the range
   /// of values of a data item overlap with a min/max filter. Data structure wise, each
   /// desc is composed of the ID of the min/max filter, the slot index in
-  /// 'min_max_tuple_desc_' to hold the min value of the data item and the actual overlap
+  /// 'stats_tuple_desc_' to hold the min value of the data item and the actual overlap
   /// predicate. The next slot after the slot index implicitly holds the max value of
   /// the data item.
   std::vector<TOverlapPredicateDesc> overlap_predicate_descs_;
@@ -418,13 +418,13 @@ class HdfsScanNodeBase : public ScanNode {
   /// Returns number of partition key slots.
   int num_materialized_partition_keys() const { return partition_key_slots_.size(); }
 
-  int min_max_tuple_id() const { return min_max_tuple_id_; }
+  int stats_tuple_id() const { return stats_tuple_id_; }
 
-  const std::vector<ScalarExprEvaluator*>& min_max_conjunct_evals() const {
-    return min_max_conjunct_evals_;
+  const std::vector<ScalarExprEvaluator*>& stats_conjunct_evals() const {
+    return stats_conjunct_evals_;
   }
 
-  const TupleDescriptor* min_max_tuple_desc() const { return min_max_tuple_desc_; }
+  const TupleDescriptor* stats_tuple_desc() const { return stats_tuple_desc_; }
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
   const HdfsTableDescriptor* hdfs_table() const { return hdfs_table_; }
   const AvroSchemaElement& avro_schema() const { return avro_schema_; }
@@ -626,14 +626,14 @@ class HdfsScanNodeBase : public ScanNode {
   friend class HdfsScanner;
 
   /// Tuple id of the tuple used to evaluate conjuncts on parquet::Statistics.
-  const int min_max_tuple_id_;
+  const int stats_tuple_id_;
 
   /// Conjuncts to evaluate on parquet::Statistics.
-  const vector<ScalarExpr*>& min_max_conjuncts_;
-  vector<ScalarExprEvaluator*> min_max_conjunct_evals_;
+  const vector<ScalarExpr*>& stats_conjuncts_;
+  vector<ScalarExprEvaluator*> stats_conjunct_evals_;
 
   /// Descriptor for the tuple used to evaluate conjuncts on parquet::Statistics.
-  TupleDescriptor* min_max_tuple_desc_ = nullptr;
+  TupleDescriptor* stats_tuple_desc_ = nullptr;
 
   // Number of header lines to skip at the beginning of each file of this table. Only set
   // to values > 0 for hdfs text files.

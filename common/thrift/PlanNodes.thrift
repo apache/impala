@@ -304,12 +304,12 @@ struct THdfsScanNode {
   // TODO: Remove this option when the MT scan node supports all file formats.
   6: optional bool use_mt_scan_node
 
-  // Conjuncts that can be evaluated against parquet::Statistics using the tuple
-  // referenced by 'min_max_tuple_id'.
-  7: optional list<Exprs.TExpr> min_max_conjuncts
+  // Conjuncts that can be pushed down to the ORC reader, or be evaluated against
+  // parquet::Statistics using the tuple referenced by 'stats_tuple_id'.
+  7: optional list<Exprs.TExpr> stats_conjuncts
 
-  // Tuple to evaluate 'min_max_conjuncts' against.
-  8: optional Types.TTupleId min_max_tuple_id
+  // Tuple to evaluate 'stats_conjuncts' against.
+  8: optional Types.TTupleId stats_tuple_id
 
   // The conjuncts that are eligible for dictionary filtering.
   9: optional map<Types.TSlotId, list<i32>> dictionary_filter_conjuncts

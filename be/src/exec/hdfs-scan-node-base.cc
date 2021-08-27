@@ -213,15 +213,15 @@ Status HdfsScanPlanNode::Init(const TPlanNode& tnode, FragmentState* state) {
   DCHECK(conjuncts_map_[tuple_id].empty());
   conjuncts_map_[tuple_id] = conjuncts_;
 
-  // Add min max conjuncts
-  if (tnode.hdfs_scan_node.__isset.min_max_tuple_id) {
-    TupleDescriptor* min_max_tuple_desc =
-        state->desc_tbl().GetTupleDescriptor(tnode.hdfs_scan_node.min_max_tuple_id);
-    DCHECK(min_max_tuple_desc != nullptr);
-    RowDescriptor* min_max_row_desc = state->obj_pool()->Add(
-        new RowDescriptor(min_max_tuple_desc, /* is_nullable */ false));
-    RETURN_IF_ERROR(ScalarExpr::Create(tnode.hdfs_scan_node.min_max_conjuncts,
-        *min_max_row_desc, state, &min_max_conjuncts_));
+  // Add stats conjuncts
+  if (tnode.hdfs_scan_node.__isset.stats_tuple_id) {
+    TupleDescriptor* stats_tuple_desc =
+        state->desc_tbl().GetTupleDescriptor(tnode.hdfs_scan_node.stats_tuple_id);
+    DCHECK(stats_tuple_desc != nullptr);
+    RowDescriptor* stats_row_desc = state->obj_pool()->Add(
+        new RowDescriptor(stats_tuple_desc, /* is_nullable */ false));
+    RETURN_IF_ERROR(ScalarExpr::Create(tnode.hdfs_scan_node.stats_conjuncts,
+        *stats_row_desc, state, &stats_conjuncts_));
   }
 
   // Transfer overlap predicate descs.
@@ -372,7 +372,7 @@ void HdfsScanPlanNode::Close() {
     if (tid_conjunct.first == tuple_id) continue;
     ScalarExpr::Close(tid_conjunct.second);
   }
-  ScalarExpr::Close(min_max_conjuncts_);
+  ScalarExpr::Close(stats_conjuncts_);
   if (shared_state_.template_pool_.get() != nullptr) {
     shared_state_.template_pool_->FreeAll();
   }
@@ -392,11 +392,11 @@ Status HdfsScanPlanNode::CreateExecNode(RuntimeState* state, ExecNode** node) co
 HdfsScanNodeBase::HdfsScanNodeBase(ObjectPool* pool, const HdfsScanPlanNode& pnode,
     const THdfsScanNode& hdfs_scan_node, const DescriptorTbl& descs)
   : ScanNode(pool, pnode, descs),
-    min_max_tuple_id_(
-        hdfs_scan_node.__isset.min_max_tuple_id ? hdfs_scan_node.min_max_tuple_id : -1),
-    min_max_conjuncts_(pnode.min_max_conjuncts_),
-    min_max_tuple_desc_(
-        min_max_tuple_id_ == -1 ? nullptr : descs.GetTupleDescriptor(min_max_tuple_id_)),
+    stats_tuple_id_(
+        hdfs_scan_node.__isset.stats_tuple_id ? hdfs_scan_node.stats_tuple_id : -1),
+    stats_conjuncts_(pnode.stats_conjuncts_),
+    stats_tuple_desc_(
+        stats_tuple_id_ == -1 ? nullptr : descs.GetTupleDescriptor(stats_tuple_id_)),
     skip_header_line_count_(hdfs_scan_node.__isset.skip_header_line_count ?
             hdfs_scan_node.skip_header_line_count :
             0),
@@ -441,10 +441,10 @@ Status HdfsScanNodeBase::Prepare(RuntimeState* state) {
     }
   }
 
-  // Prepare min max statistics conjuncts.
-  if (min_max_tuple_id_ != -1) {
-    RETURN_IF_ERROR(ScalarExprEvaluator::Create(min_max_conjuncts_, state, pool_,
-        expr_perm_pool(), expr_results_pool(), &min_max_conjunct_evals_));
+  // Prepare stats statistics conjuncts.
+  if (stats_tuple_id_ != -1) {
+    RETURN_IF_ERROR(ScalarExprEvaluator::Create(stats_conjuncts_, state, pool_,
+        expr_perm_pool(), expr_results_pool(), &stats_conjunct_evals_));
   }
 
   // Check if reservation was enough to allocate at least one buffer. The
@@ -521,8 +521,8 @@ Status HdfsScanNodeBase::Open(RuntimeState* state) {
     RETURN_IF_ERROR(ScalarExprEvaluator::Open(entry.second, state));
   }
 
-  // Open min max conjuncts
-  RETURN_IF_ERROR(ScalarExprEvaluator::Open(min_max_conjunct_evals_, state));
+  // Open stats conjuncts
+  RETURN_IF_ERROR(ScalarExprEvaluator::Open(stats_conjunct_evals_, state));
 
   RETURN_IF_ERROR(ClaimBufferReservation(state));
   reader_context_ = ExecEnv::GetInstance()->disk_io_mgr()->RegisterContext();
@@ -630,8 +630,8 @@ void HdfsScanNodeBase::Close(RuntimeState* state) {
     ScalarExprEvaluator::Close(tid_conjunct_eval.second, state);
   }
 
-  // Close min max conjunct
-  ScalarExprEvaluator::Close(min_max_conjunct_evals_, state);
+  // Close stats conjunct
+  ScalarExprEvaluator::Close(stats_conjunct_evals_, state);
   ScanNode::Close(state);
 }
 

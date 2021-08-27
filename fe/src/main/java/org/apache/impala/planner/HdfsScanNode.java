@@ -33,16 +33,14 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.impala.analysis.Analyzer;
-import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.analysis.BinaryPredicate;
-import org.apache.impala.analysis.CompoundPredicate;
 import org.apache.impala.analysis.DescriptorTable;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.InPredicate;
 import org.apache.impala.analysis.IsNotEmptyPredicate;
+import org.apache.impala.analysis.IsNullPredicate;
 import org.apache.impala.analysis.LiteralExpr;
 import org.apache.impala.analysis.MultiAggregateInfo;
-import org.apache.impala.analysis.Path;
 import org.apache.impala.analysis.SlotDescriptor;
 import org.apache.impala.analysis.SlotId;
 import org.apache.impala.analysis.SlotRef;
@@ -59,11 +57,9 @@ import org.apache.impala.catalog.HdfsCompression;
 import org.apache.impala.catalog.HdfsFileFormat;
 import org.apache.impala.catalog.HdfsPartition.FileBlock;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
-import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.PrimitiveType;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
-import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.ImpalaRuntimeException;
@@ -103,7 +99,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.MoreObjects.ToStringHelper;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -301,25 +296,25 @@ public class HdfsScanNode extends ScanNode {
   private int numFilesNoDiskIds_ = 0;
   private int numPartitionsNoDiskIds_ = 0;
 
-  // List of conjuncts for min/max values of parquet::Statistics, that are used to skip
-  // data when scanning Parquet files.
-  private final List<Expr> minMaxConjuncts_ = new ArrayList<>();
+  // List of conjuncts for min/max values of parquet/orc statistics, that are used to skip
+  // data when scanning Parquet/ORC files.
+  private final List<Expr> statsConjuncts_ = new ArrayList<>();
 
   // Map from TupleDescriptor to list of PlanNode conjuncts that have been transformed
-  // into conjuncts in 'minMaxConjuncts_'.
-  private final Map<TupleDescriptor, List<Expr>> minMaxOriginalConjuncts_ =
+  // into conjuncts in 'statsConjuncts_'.
+  private final Map<TupleDescriptor, List<Expr>> statsOriginalConjuncts_ =
       new LinkedHashMap<>();
 
   // Tuple that is used to materialize statistics when scanning Parquet files. For each
   // column it can contain 0, 1, or 2 slots, depending on whether the column needs to be
   // evaluated against the min and/or the max value of the corresponding
   // parquet::Statistics.
-  private TupleDescriptor minMaxTuple_;
+  private TupleDescriptor statsTuple_;
 
   // The list of overlap predicate descs. See TOverlapPredicateDesc in PlanNodes.thrift.
   private ArrayList<TOverlapPredicateDesc> overlapPredicateDescs_ = new ArrayList<>();
 
-  // Index of the first slot in minMaxTuple_ for overlap predicates.
+  // Index of the first slot in statsTuple_ for overlap predicates.
   private int overlap_first_slot_idx_ = -1;
 
   // Slot that is used to record the Parquet metadata for the count(*) aggregation if
@@ -412,7 +407,7 @@ public class HdfsScanNode extends ScanNode {
       // Compute min-max conjuncts only if the PARQUET_READ_STATISTICS query option is
       // set to true.
       if (analyzer.getQueryOptions().parquet_read_statistics) {
-        computeMinMaxTupleAndConjuncts(analyzer);
+        computeStatsTupleAndConjuncts(analyzer);
       }
       // Compute dictionary conjuncts only if the PARQUET_DICTIONARY_FILTERING query
       // option is set to true.
@@ -425,7 +420,7 @@ public class HdfsScanNode extends ScanNode {
       // Compute min-max conjuncts only if the ORC_READ_STATISTICS query option is
       // set to true.
       if (analyzer.getQueryOptions().orc_read_statistics) {
-        computeMinMaxTupleAndConjuncts(analyzer);
+        computeStatsTupleAndConjuncts(analyzer);
       }
     }
 
@@ -526,25 +521,60 @@ public class HdfsScanNode extends ScanNode {
 
   /**
    * Builds a predicate to evaluate against parquet::Statistics by copying 'inputSlot'
-   * into 'minMaxTuple_', combining 'inputSlot', 'inputPred' and 'op' into a new
-   * predicate, and adding it to 'minMaxConjuncts_'.
+   * into 'statsTuple_', combining 'inputSlot', 'inputPred' and 'op' into a new
+   * predicate, and adding it to 'statsConjuncts_'.
    */
-  private void buildStatsPredicate(Analyzer analyzer, SlotRef inputSlot,
+  private void buildBinaryStatsPredicate(Analyzer analyzer, SlotRef inputSlot,
       BinaryPredicate inputPred, BinaryPredicate.Operator op) {
     // Obtain the rhs expr of the input predicate
     Expr constExpr = inputPred.getChild(1);
     Preconditions.checkState(constExpr.isConstant());
 
     // Make a new slot descriptor, which adds it to the tuple descriptor.
-    SlotDescriptor slotDesc = analyzer.getDescTbl().copySlotDescriptor(minMaxTuple_,
+    SlotDescriptor slotDesc = analyzer.getDescTbl().copySlotDescriptor(statsTuple_,
         inputSlot.getDesc());
     SlotRef slot = new SlotRef(slotDesc);
     BinaryPredicate statsPred = new BinaryPredicate(op, slot, constExpr);
     statsPred.analyzeNoThrow(analyzer);
-    minMaxConjuncts_.add(statsPred);
+    statsConjuncts_.add(statsPred);
   }
 
-  private void tryComputeBinaryMinMaxPredicate(Analyzer analyzer,
+  /**
+   * Similar to the above method but builds an IN-list predicate which can be pushed down
+   * to the ORC reader.
+   */
+  private void buildInListStatsPredicate(Analyzer analyzer, SlotRef inputSlot,
+      InPredicate inputPred) {
+    Preconditions.checkState(!inputPred.isNotIn());
+    List<Expr> children = inputPred.getChildren();
+    Preconditions.checkState(inputSlot == children.get(0).unwrapSlotRef(true));
+    List<Expr> inList = Lists.newArrayListWithCapacity(children.size() - 1);
+    for (int i = 1; i < children.size(); ++i) {
+      Expr child = children.get(i);
+      // If any child is not a literal, then nothing can be done
+      if (!Expr.IS_LITERAL.apply(child)) return;
+      if (isUnsupportedStatsType(child.getType())) return;
+      inList.add(child);
+    }
+    // Make a new slot descriptor, which adds it to the tuple descriptor.
+    SlotDescriptor slotDesc = analyzer.getDescTbl().copySlotDescriptor(statsTuple_,
+        inputSlot.getDesc());
+    SlotRef slot = new SlotRef(slotDesc);
+    InPredicate inPred = new InPredicate(slot, inList, inputPred.isNotIn());
+    inPred.analyzeNoThrow(analyzer);
+    statsConjuncts_.add(inPred);
+  }
+
+  private boolean isUnsupportedStatsType(Type type) {
+    // TODO(IMPALA-10882): Push down Min-Max predicates of CHAR/VARCHAR to ORC reader
+    // TODO(IMPALA-10915): Push down Min-Max predicates of TIMESTAMP to ORC reader
+    return fileFormats_.contains(HdfsFileFormat.ORC)
+        && (type.getPrimitiveType() == PrimitiveType.CHAR
+            || type.getPrimitiveType() == PrimitiveType.VARCHAR
+            || type.getPrimitiveType() == PrimitiveType.TIMESTAMP);
+  }
+
+  private void tryComputeBinaryStatsPredicate(Analyzer analyzer,
       BinaryPredicate binaryPred) {
     // We only support slot refs on the left hand side of the predicate, a rewriting
     // rule makes sure that all compatible exprs are rewritten into this form. Only
@@ -563,26 +593,29 @@ public class HdfsScanNode extends ScanNode {
     // LiteralExpr, but can also be an expr like "1 + 2".
     if (!constExpr.isConstant()) return;
     if (Expr.IS_NULL_VALUE.apply(constExpr)) return;
+    if (isUnsupportedStatsType(slotDesc.getType())) return;
+    if (isUnsupportedStatsType(constExpr.getType())) return;
 
-    // TODO(IMPALA-10882): Push down Min-Max predicates of CHAR/VARCHAR to ORC reader
-    // TODO(IMPALA-10915): Push down Min-Max predicates of TIMESTAMP to ORC reader
-    if (fileFormats_.contains(HdfsFileFormat.ORC) &&
-        (slotDesc.getType() == Type.CHAR || slotDesc.getType() == Type.VARCHAR ||
-            slotDesc.getType() == Type.TIMESTAMP)) {
-      return;
-    }
     if (BinaryPredicate.IS_RANGE_PREDICATE.apply(binaryPred)) {
-      addMinMaxOriginalConjunct(slotDesc.getParent(), binaryPred);
-      buildStatsPredicate(analyzer, slotRef, binaryPred, binaryPred.getOp());
+      addStatsOriginalConjunct(slotDesc.getParent(), binaryPred);
+      buildBinaryStatsPredicate(analyzer, slotRef, binaryPred, binaryPred.getOp());
     } else if (BinaryPredicate.IS_EQ_PREDICATE.apply(binaryPred)) {
-      addMinMaxOriginalConjunct(slotDesc.getParent(), binaryPred);
-      // TODO: this could be optimized for boolean columns.
-      buildStatsPredicate(analyzer, slotRef, binaryPred, BinaryPredicate.Operator.LE);
-      buildStatsPredicate(analyzer, slotRef, binaryPred, BinaryPredicate.Operator.GE);
+      addStatsOriginalConjunct(slotDesc.getParent(), binaryPred);
+      if (hasParquet(fileFormats_)) {
+        // TODO: this could be optimized for boolean columns.
+        buildBinaryStatsPredicate(analyzer, slotRef, binaryPred,
+            BinaryPredicate.Operator.LE);
+        buildBinaryStatsPredicate(analyzer, slotRef, binaryPred,
+            BinaryPredicate.Operator.GE);
+      }
+      if (fileFormats_.contains(HdfsFileFormat.ORC)) {
+        // We can push down EQ predicates to the ORC reader directly.
+        buildBinaryStatsPredicate(analyzer, slotRef, binaryPred, binaryPred.getOp());
+      }
     }
   }
 
-  private void tryComputeInListMinMaxPredicate(Analyzer analyzer, InPredicate inPred) {
+  private void tryComputeInListStatsPredicate(Analyzer analyzer, InPredicate inPred) {
     // Retrieve the left side of the IN predicate. It must be a simple slot to proceed.
     SlotRef slotRef = inPred.getBoundSlot();
     if (slotRef == null) return;
@@ -591,15 +624,14 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkState(slotDesc.isScanSlot());
     // Skip the slot ref if it refers to an array's "pos" field.
     if (slotDesc.isArrayPosRef()) return;
-    // TODO(IMPALA-10882): Push down Min-Max predicates of CHAR/VARCHAR to ORC reader
-    // TODO(IMPALA-10915): Push down Min-Max predicates of TIMESTAMP to ORC reader
-    if (fileFormats_.contains(HdfsFileFormat.ORC) &&
-        (slotDesc.getType() == Type.CHAR || slotDesc.getType() == Type.VARCHAR ||
-            slotDesc.getType() == Type.TIMESTAMP)) {
-      return;
-    }
     if (inPred.isNotIn()) return;
+    if (fileFormats_.contains(HdfsFileFormat.ORC)) {
+      if (isUnsupportedStatsType(slotDesc.getType())) return;
+      addStatsOriginalConjunct(slotDesc.getParent(), inPred);
+      buildInListStatsPredicate(analyzer, slotRef, inPred);
+    }
 
+    if (!hasParquet(fileFormats_)) return;
     List<Expr> children = inPred.getChildren();
     LiteralExpr min = null;
     LiteralExpr max = null;
@@ -623,25 +655,44 @@ public class HdfsScanNode extends ScanNode {
     BinaryPredicate maxBound = new BinaryPredicate(BinaryPredicate.Operator.LE,
         children.get(0).clone(), max.clone());
 
-    addMinMaxOriginalConjunct(slotDesc.getParent(), inPred);
-    buildStatsPredicate(analyzer, slotRef, minBound, minBound.getOp());
-    buildStatsPredicate(analyzer, slotRef, maxBound, maxBound.getOp());
+    addStatsOriginalConjunct(slotDesc.getParent(), inPred);
+    buildBinaryStatsPredicate(analyzer, slotRef, minBound, minBound.getOp());
+    buildBinaryStatsPredicate(analyzer, slotRef, maxBound, maxBound.getOp());
   }
 
-  private void addMinMaxOriginalConjunct(TupleDescriptor tupleDesc, Expr expr) {
-    List<Expr> exprs = minMaxOriginalConjuncts_.get(tupleDesc);
-    if (exprs == null) {
-      exprs = new ArrayList<>();
-      minMaxOriginalConjuncts_.put(tupleDesc, exprs);
-    }
+  private void tryComputeIsNullStatsPredicate(Analyzer analyzer,
+      IsNullPredicate isNullPred) {
+    // Currently, only ORC table can push down IS-NULL predicates.
+    if (!fileFormats_.contains(HdfsFileFormat.ORC)) return;
+    // Retrieve the left side of the IS-NULL predicate. Skip if it's not a simple slot.
+    SlotRef slotRef = isNullPred.getBoundSlot();
+    if (slotRef == null) return;
+    // This node is a table scan, so this must be a scanning slot.
+    Preconditions.checkState(slotRef.getDesc().isScanSlot());
+    // Skip the slot ref if it refers to an array's "pos" field.
+    if (slotRef.getDesc().isArrayPosRef()) return;
+    addStatsOriginalConjunct(slotRef.getDesc().getParent(), isNullPred);
+    SlotDescriptor slotDesc = analyzer.getDescTbl().copySlotDescriptor(statsTuple_,
+        slotRef.getDesc());
+    SlotRef slot = new SlotRef(slotDesc);
+    IsNullPredicate statsPred = new IsNullPredicate(slot, isNullPred.isNotNull());
+    statsPred.analyzeNoThrow(analyzer);
+    statsConjuncts_.add(statsPred);
+  }
+
+  private void addStatsOriginalConjunct(TupleDescriptor tupleDesc, Expr expr) {
+    List<Expr> exprs = statsOriginalConjuncts_.computeIfAbsent(
+        tupleDesc, k -> new ArrayList<>());
     exprs.add(expr);
   }
 
-  private void tryComputeMinMaxPredicate(Analyzer analyzer, Expr pred) {
+  private void tryComputeStatsPredicate(Analyzer analyzer, Expr pred) {
     if (pred instanceof BinaryPredicate) {
-      tryComputeBinaryMinMaxPredicate(analyzer, (BinaryPredicate) pred);
+      tryComputeBinaryStatsPredicate(analyzer, (BinaryPredicate) pred);
     } else if (pred instanceof InPredicate) {
-      tryComputeInListMinMaxPredicate(analyzer, (InPredicate) pred);
+      tryComputeInListStatsPredicate(analyzer, (InPredicate) pred);
+    } else if (pred instanceof IsNullPredicate) {
+      tryComputeIsNullStatsPredicate(analyzer, (IsNullPredicate) pred);
     }
   }
 
@@ -660,28 +711,29 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Analyzes 'conjuncts_' and 'collectionConjuncts_', populates 'minMaxTuple_' with slots
-   * for statistics values, and populates 'minMaxConjuncts_' with conjuncts pointing into
-   * the 'minMaxTuple_'. Only conjuncts of the form <slot> <op> <constant> are supported,
-   * and <op> must be one of LT, LE, GE, GT, or EQ.
+   * Analyzes 'conjuncts_' and 'collectionConjuncts_', populates 'statsTuple_' with slots
+   * for statistics values, and populates 'statsConjuncts_' with conjuncts pointing into
+   * the 'statsTuple_'. Binary conjuncts of the form <slot> <op> <constant> are supported,
+   * and <op> must be one of LT, LE, GE, GT, or EQ. IN-list and IS-NULL conjuncts are also
+   * supported.
    */
-  private void computeMinMaxTupleAndConjuncts(Analyzer analyzer) throws ImpalaException{
+  private void computeStatsTupleAndConjuncts(Analyzer analyzer) throws ImpalaException{
     Preconditions.checkNotNull(desc_.getPath());
     String tupleName = desc_.getPath().toString() + " statistics";
     DescriptorTable descTbl = analyzer.getDescTbl();
-    minMaxTuple_ = descTbl.createTupleDescriptor(tupleName);
-    minMaxTuple_.setPath(desc_.getPath());
+    statsTuple_ = descTbl.createTupleDescriptor(tupleName);
+    statsTuple_.setPath(desc_.getPath());
 
     // Adds predicates for scalar, top-level columns.
-    for (Expr pred: conjuncts_) tryComputeMinMaxPredicate(analyzer, pred);
+    for (Expr pred: conjuncts_) tryComputeStatsPredicate(analyzer, pred);
 
     // Adds predicates for collections.
     for (Map.Entry<TupleDescriptor, List<Expr>> entry: collectionConjuncts_.entrySet()) {
       if (notEmptyCollections_.contains(entry.getKey())) {
-        for (Expr pred: entry.getValue()) tryComputeMinMaxPredicate(analyzer, pred);
+        for (Expr pred: entry.getValue()) tryComputeStatsPredicate(analyzer, pred);
       }
     }
-    minMaxTuple_.computeMemLayout();
+    statsTuple_.computeMemLayout();
   }
 
   /**
@@ -689,11 +741,11 @@ public class HdfsScanNode extends ScanNode {
    */
   public void initOverlapPredicate(Analyzer analyzer) {
     if (!allParquet_) return;
-    Preconditions.checkNotNull(minMaxTuple_);
+    Preconditions.checkNotNull(statsTuple_);
     // Allow the tuple to accept new slots.
-    minMaxTuple_.resetHasMemoryLayout();
+    statsTuple_.resetHasMemoryLayout();
 
-    overlap_first_slot_idx_ = minMaxTuple_.getSlots().size();
+    overlap_first_slot_idx_ = statsTuple_.getSlots().size();
   }
 
   /**
@@ -799,7 +851,7 @@ public class HdfsScanNode extends ScanNode {
     // Check if targetExpr refers to some column in one of the min/max conjuncts
     // already formed. If so, do not add an overlap predicate as it may not be
     // as effective as the conjunct.
-    List<SlotDescriptor> slotDescs = minMaxTuple_.getSlots();
+    List<SlotDescriptor> slotDescs = statsTuple_.getSlots();
     for (int i=0; i<overlap_first_slot_idx_; i++) {
       if (slotDescs.get(i).getPath() == slotRefInScan.getDesc().getPath())
         return false;
@@ -837,13 +889,13 @@ public class HdfsScanNode extends ScanNode {
       }
     }
 
-    int firstSlotIdx = minMaxTuple_.getSlots().size();
+    int firstSlotIdx = statsTuple_.getSlots().size();
     // Make two new slot descriptors to hold data min/max values (such as from
     // row groups or pages in Parquet)) and append them to the tuple descriptor.
     SlotDescriptor slotDescDataMin =
-        analyzer.getDescTbl().copySlotDescriptor(minMaxTuple_, slotRefInScan.getDesc());
+        analyzer.getDescTbl().copySlotDescriptor(statsTuple_, slotRefInScan.getDesc());
     SlotDescriptor slotDescDataMax =
-        analyzer.getDescTbl().copySlotDescriptor(minMaxTuple_, slotRefInScan.getDesc());
+        analyzer.getDescTbl().copySlotDescriptor(statsTuple_, slotRefInScan.getDesc());
 
     overlapPredicateDescs_.add(
         new TOverlapPredicateDesc(filter.getFilterId().asInt(), firstSlotIdx));
@@ -854,7 +906,7 @@ public class HdfsScanNode extends ScanNode {
   public void finalizeOverlapPredicate() {
     if (!allParquet_) return;
     // Recompute the memory layout for the min/max tuple.
-    minMaxTuple_.computeMemLayout();
+    statsTuple_.computeMemLayout();
   }
 
   /**
@@ -1697,14 +1749,14 @@ public class HdfsScanNode extends ScanNode {
       msg.hdfs_scan_node.setParquet_count_star_slot_offset(
           countStarSlot_.getByteOffset());
     }
-    if (!minMaxConjuncts_.isEmpty()) {
-      for (Expr e: minMaxConjuncts_) {
-        msg.hdfs_scan_node.addToMin_max_conjuncts(e.treeToThrift());
+    if (!statsConjuncts_.isEmpty()) {
+      for (Expr e: statsConjuncts_) {
+        msg.hdfs_scan_node.addToStats_conjuncts(e.treeToThrift());
       }
     }
 
-    if ( minMaxTuple_ != null ) {
-      msg.hdfs_scan_node.setMin_max_tuple_id(minMaxTuple_.getId().asInt());
+    if (statsTuple_ != null) {
+      msg.hdfs_scan_node.setStats_tuple_id(statsTuple_.getId().asInt());
     }
 
     Map<Integer, List<Integer>> dictMap = new LinkedHashMap<>();
@@ -1851,7 +1903,7 @@ public class HdfsScanNode extends ScanNode {
       String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     for (Map.Entry<TupleDescriptor, List<Expr>> entry :
-        minMaxOriginalConjuncts_.entrySet()) {
+        statsOriginalConjuncts_.entrySet()) {
       TupleDescriptor tupleDesc = entry.getKey();
       List<Expr> exprs = entry.getValue();
       String fileFormatStr;

@@ -183,6 +183,35 @@ FROM {db_name}.{table_name};
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+alltypessmall_bool_sorted
+---- PARTITION_COLUMNS
+year int
+month int
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} partition (year, month)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM {db_name}.alltypessmall
+where bool_col;
+INSERT INTO TABLE {db_name}{db_suffix}.{table_name} partition (year, month)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM {db_name}.alltypessmall
+where not bool_col;
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 alltypestiny
 ---- PARTITION_COLUMNS
 year int

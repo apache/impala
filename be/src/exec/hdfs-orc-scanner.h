@@ -180,9 +180,9 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// Pool to copy values into when building search arguments. Freed on Close().
   boost::scoped_ptr<MemPool> search_args_pool_;
 
-  /// Clone of Min/max statistics conjunct evaluators. Has the same lifetime as
-  /// the scanner. Stored in 'obj_pool_'.
-  vector<ScalarExprEvaluator*> min_max_conjunct_evals_;
+  /// Clone of statistics conjunct evaluators. Has the same lifetime as the scanner.
+  /// Stored in 'obj_pool_'.
+  vector<ScalarExprEvaluator*> stats_conjunct_evals_;
 
   std::unique_ptr<OrcSchemaResolver> schema_resolver_ = nullptr;
 
@@ -318,7 +318,15 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   void SetSyntheticAcidFieldForOriginalFile(const SlotDescriptor* slot_desc,
       Tuple* template_tuple);
 
-  /// Clones the min/max conjucts into min_max_conjunct_evals_, then builds ORC search
+  bool PrepareBinaryPredicate(const string& fn_name, uint64_t orc_column_id,
+      const ColumnType& type, ScalarExprEvaluator* eval,
+      orc::SearchArgumentBuilder* sarg);
+  bool PrepareInListPredicate(uint64_t orc_column_id, const ColumnType& type,
+      ScalarExprEvaluator* eval, orc::SearchArgumentBuilder* sarg);
+  void PrepareIsNullPredicate(bool is_not_null, uint64_t orc_column_id,
+      const ColumnType& type, orc::SearchArgumentBuilder* sarg);
+
+  /// Clones the stats conjucts into stats_conjunct_evals_, then builds ORC search
   /// arguments from the conjuncts. The search arguments will exist for the lifespan of
   /// the scanner and need not to be updated.
   Status PrepareSearchArguments() WARN_UNUSED_RESULT;
@@ -333,9 +341,9 @@ class HdfsOrcScanner : public HdfsColumnarScanner {
   /// Helper function for mapping ColumnType to orc::PredicateDataType.
   static orc::PredicateDataType GetOrcPredicateDataType(const ColumnType& type);
 
-  /// Returns the literal from the min/max conjucts, with the assumption that the
-  /// evaluator has exactly two children, where the second is a literal.
-  orc::Literal GetSearchArgumentLiteral(ScalarExprEvaluator* eval,
+  /// Returns the literal specified by 'child_idx' from the stats conjuct 'eval',
+  /// with the assumption that the specifit child is a literal.
+  orc::Literal GetSearchArgumentLiteral(ScalarExprEvaluator* eval, int child_idx,
       const ColumnType& dst_type, orc::PredicateDataType* predicate_type);
 };
 

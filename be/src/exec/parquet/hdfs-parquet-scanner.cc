@@ -168,7 +168,7 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   perm_pool_.reset(new MemPool(scan_node_->mem_tracker()));
 
   // Allocate tuple buffer to evaluate conjuncts on parquet::Statistics.
-  const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
+  const TupleDescriptor* min_max_tuple_desc = scan_node_->stats_tuple_desc();
   if (min_max_tuple_desc != nullptr) {
     int64_t tuple_size = min_max_tuple_desc->byte_size();
     uint8_t* buffer = perm_pool_->TryAllocate(tuple_size);
@@ -183,7 +183,7 @@ Status HdfsParquetScanner::Open(ScannerContext* context) {
   // Clone the min/max statistics conjuncts.
   RETURN_IF_ERROR(ScalarExprEvaluator::Clone(&obj_pool_, state_,
       expr_perm_pool_.get(), context_->expr_results_pool(),
-      scan_node_->min_max_conjunct_evals(), &min_max_conjunct_evals_));
+      scan_node_->stats_conjunct_evals(), &stats_conjunct_evals_));
 
   for (int i = 0; i < context->filter_ctxs().size(); ++i) {
     const FilterContext* ctx = &context->filter_ctxs()[i];
@@ -293,7 +293,7 @@ void HdfsParquetScanner::Close(RowBatch* row_batch) {
   }
   if (schema_resolver_.get() != nullptr) schema_resolver_.reset();
 
-  ScalarExprEvaluator::Close(min_max_conjunct_evals_, state_);
+  ScalarExprEvaluator::Close(stats_conjunct_evals_, state_);
 
   for (int i = 0; i < filter_ctxs_.size(); ++i) {
     const FilterStats* stats = filter_ctxs_[i]->stats;
@@ -548,7 +548,7 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
 
   if (!state_->query_options().parquet_read_statistics) return Status::OK();
 
-  const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
+  const TupleDescriptor* min_max_tuple_desc = scan_node_->stats_tuple_desc();
   if (!min_max_tuple_desc) return Status::OK();
 
   int64_t tuple_size = min_max_tuple_desc->byte_size();
@@ -556,12 +556,13 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
   DCHECK(min_max_tuple_ != nullptr);
   min_max_tuple_->Init(tuple_size);
 
-  DCHECK_GE(min_max_tuple_desc->slots().size(), min_max_conjunct_evals_.size());
-  for (int i = 0; i < min_max_conjunct_evals_.size(); ++i) {
+  DCHECK_GE(min_max_tuple_desc->slots().size(), stats_conjunct_evals_.size());
+  for (int i = 0; i < stats_conjunct_evals_.size(); ++i) {
 
     SlotDescriptor* slot_desc = min_max_tuple_desc->slots()[i];
-    ScalarExprEvaluator* eval = min_max_conjunct_evals_[i];
-
+    ScalarExprEvaluator* eval = stats_conjunct_evals_[i];
+    const string& fn_name = eval->root().function_name();
+    if (!IsSupportedStatsConjunct(fn_name)) continue;
     bool missing_field = false;
     SchemaNode* node = nullptr;
 
@@ -585,7 +586,6 @@ Status HdfsParquetScanner::EvaluateStatsConjuncts(
       break;
     }
 
-    const string& fn_name = eval->root().function_name();
     ColumnStatsReader::StatsField stats_field;
     if (!ColumnStatsReader::GetRequiredStatsField(fn_name, &stats_field)) continue;
 
@@ -647,21 +647,21 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
 
   if (!state_->query_options().parquet_read_statistics) return Status::OK();
 
-  const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
-  if (GetOverlapPredicateDescs().size() > 0 && !min_max_tuple_desc) {
+  const TupleDescriptor* stats_tuple_desc = scan_node_->stats_tuple_desc();
+  if (GetOverlapPredicateDescs().size() > 0 && !stats_tuple_desc) {
     stringstream err;
-    err << "min_max_tuple_desc is null.";
+    err << "stats_tuple_desc is null.";
     DCHECK(false) << err.str();
     return Status(err.str());
   }
 
   DCHECK(min_max_tuple_ != nullptr);
-  min_max_tuple_->Init(min_max_tuple_desc->byte_size());
+  min_max_tuple_->Init(stats_tuple_desc->byte_size());
 
   // The total number slots in min_max_tuple_ should be equal to or larger than
   // the number of min/max conjuncts. The extra number slots are for the overlap
   // predicates. # min_max_conjuncts + 2 * # overlap predicates = # min_max_slots.
-  DCHECK_GE(min_max_tuple_desc->slots().size(), min_max_conjunct_evals_.size());
+  DCHECK_GE(stats_tuple_desc->slots().size(), stats_conjunct_evals_.size());
 
   TMinmaxFilteringLevel::type level = state_->query_options().minmax_filtering_level;
   float threshold = (float)(state_->query_options().minmax_filter_threshold);
@@ -703,7 +703,7 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
       continue;
     }
 
-    SlotDescriptor* slot_desc = min_max_tuple_desc->slots()[slot_idx];
+    SlotDescriptor* slot_desc = stats_tuple_desc->slots()[slot_idx];
 
     bool missing_field = false;
     SchemaNode* node = nullptr;
@@ -800,7 +800,7 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
 
 bool HdfsParquetScanner::ShouldProcessPageIndex() {
   if (!state_->query_options().parquet_read_page_index) return false;
-  if (!min_max_conjunct_evals_.empty()) return true;
+  if (!stats_conjunct_evals_.empty()) return true;
   for (auto desc : GetOverlapPredicateDescs()) {
     if (IsFilterWorthyForOverlapCheck(FindFilterIndex(desc.filter_id))) {
       return true;
@@ -1294,9 +1294,9 @@ void HdfsParquetScanner::GetMinMaxSlotsForOverlapPred(
   DCHECK(min_slot);
   DCHECK(max_slot);
   SlotDescriptor* min_slot_desc =
-      scan_node_->min_max_tuple_desc()->slots()[overlap_slot_idx];
+      scan_node_->stats_tuple_desc()->slots()[overlap_slot_idx];
   SlotDescriptor* max_slot_desc =
-      scan_node_->min_max_tuple_desc()->slots()[overlap_slot_idx + 1];
+      scan_node_->stats_tuple_desc()->slots()[overlap_slot_idx + 1];
   *min_slot = min_max_tuple_->GetSlot(min_slot_desc->tuple_offset());
   *max_slot = min_max_tuple_->GetSlot(max_slot_desc->tuple_offset());
 }
@@ -1390,10 +1390,10 @@ void HdfsParquetScanner::CollectSkippedPageRangesForSortedColumn(
 Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(
     vector<RowRange>* skip_ranges) {
   DCHECK(skip_ranges);
-  const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
+  const TupleDescriptor* min_max_tuple_desc = scan_node_->stats_tuple_desc();
   if (GetOverlapPredicateDescs().size() > 0 && !min_max_tuple_desc) {
     stringstream err;
-    err << "min_max_tuple_desc is null.";
+    err << "stats_tuple_desc is null.";
     DCHECK(false) << err.str();
     return Status(err.str());
   }
@@ -1495,9 +1495,11 @@ Status HdfsParquetScanner::EvaluatePageIndex() {
   parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx_];
   vector<RowRange> skip_ranges;
 
-  for (int i = 0; i < min_max_conjunct_evals_.size(); ++i) {
-    ScalarExprEvaluator* eval = min_max_conjunct_evals_[i];
-    SlotDescriptor* slot_desc = scan_node_->min_max_tuple_desc()->slots()[i];
+  for (int i = 0; i < stats_conjunct_evals_.size(); ++i) {
+    ScalarExprEvaluator* eval = stats_conjunct_evals_[i];
+    const string& fn_name = eval->root().function_name();
+    if (!IsSupportedStatsConjunct(fn_name)) continue;
+    SlotDescriptor* slot_desc = scan_node_->stats_tuple_desc()->slots()[i];
 
     bool missing_field = false;
     SchemaNode* node = nullptr;
@@ -1518,11 +1520,10 @@ Status HdfsParquetScanner::EvaluatePageIndex() {
     parquet::ColumnIndex column_index;
     RETURN_IF_ERROR(page_index_.DeserializeColumnIndex(col_chunk, &column_index));
 
-    min_max_tuple_->Init(scan_node_->min_max_tuple_desc()->byte_size());
+    min_max_tuple_->Init(scan_node_->stats_tuple_desc()->byte_size());
     void* slot = min_max_tuple_->GetSlot(slot_desc->tuple_offset());
 
     const int num_of_pages = column_index.null_pages.size();
-    const string& fn_name = eval->root().function_name();
     ColumnStatsReader::StatsField stats_field;
     if (!ColumnStatsReader::GetRequiredStatsField(fn_name, &stats_field)) continue;
 
@@ -1888,7 +1889,7 @@ Status HdfsParquetScanner::CreateColIdx2EqConjunctMap() {
   unordered_map<int, std::unordered_set<std::pair<std::string, const Literal*>>>
       conjunct_halves;
 
-  for (ScalarExprEvaluator* eval : min_max_conjunct_evals_) {
+  for (ScalarExprEvaluator* eval : stats_conjunct_evals_) {
     const ScalarExpr& expr = eval->root();
     const string& function_name = expr.function_name();
 
