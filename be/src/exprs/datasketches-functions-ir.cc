@@ -36,12 +36,13 @@ using strings::Substitute;
 BigIntVal DataSketchesFunctions::DsHllEstimate(FunctionContext* ctx,
     const StringVal& serialized_sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return BigIntVal::null();
-  datasketches::hll_sketch sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
-  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
+  try {
+    auto sketch = datasketches::hll_sketch::deserialize(serialized_sketch.ptr, serialized_sketch.len);
+    return sketch.get_estimate();
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
     return BigIntVal::null();
   }
-  return sketch.get_estimate();
 }
 
 StringVal DataSketchesFunctions::DsHllEstimateBoundsAsString(
@@ -57,82 +58,83 @@ StringVal DataSketchesFunctions::DsHllEstimateBoundsAsString(
     ctx->SetError("Kappa must be 1, 2 or 3");
     return StringVal::null();
   }
-  datasketches::hll_sketch sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
-  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
+  try {
+    auto sketch = datasketches::hll_sketch::deserialize(serialized_sketch.ptr, serialized_sketch.len);
+    std::stringstream buffer;
+    buffer << sketch.get_estimate() << "," << sketch.get_lower_bound(kappa.val) << ","
+           << sketch.get_upper_bound(kappa.val);
+    return StringStreamToStringVal(ctx, buffer);
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
     return StringVal::null();
   }
-  std::stringstream buffer;
-  buffer << sketch.get_estimate() << "," << sketch.get_lower_bound(kappa.val) << ","
-         << sketch.get_upper_bound(kappa.val);
-  return StringStreamToStringVal(ctx, buffer);
 }
 
 StringVal DataSketchesFunctions::DsHllUnionF(FunctionContext* ctx,
-    const StringVal& first_serialized_sketch, const StringVal& second_serialized_sketch) {
-  // Union
+    const StringVal& serialized_sketch1, const StringVal& serialized_sketch2) {
   datasketches::hll_union union_sketch(DS_SKETCH_CONFIG);
-  // Deserialize two sketch
-  if (!first_serialized_sketch.is_null && first_serialized_sketch.len > 0) {
-    datasketches::hll_sketch first_sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
-    if (!DeserializeDsSketch(first_serialized_sketch, &first_sketch)) {
-      LogSketchDeserializationError(ctx);
+  if (!serialized_sketch1.is_null && serialized_sketch1.len > 0) {
+    try {
+      union_sketch.update(datasketches::hll_sketch::deserialize(serialized_sketch1.ptr, serialized_sketch1.len));
+    } catch (const std::exception& e) {
+      LogSketchDeserializationError(ctx, e);
       return StringVal::null();
     }
-    union_sketch.update(first_sketch);
   }
-  if (!second_serialized_sketch.is_null && second_serialized_sketch.len > 0) {
-    datasketches::hll_sketch second_sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
-    if (!DeserializeDsSketch(second_serialized_sketch, &second_sketch)) {
-      LogSketchDeserializationError(ctx);
+  if (!serialized_sketch2.is_null && serialized_sketch2.len > 0) {
+    try {
+      union_sketch.update(datasketches::hll_sketch::deserialize(serialized_sketch2.ptr, serialized_sketch2.len));
+    } catch (const std::exception& e) {
+      LogSketchDeserializationError(ctx, e);
       return StringVal::null();
     }
-    union_sketch.update(second_sketch);
   }
-  //  Result
-  datasketches::hll_sketch sketch = union_sketch.get_result(DS_HLL_TYPE);
-  std::stringstream serialized_input;
-  sketch.serialize_compact(serialized_input);
-  return StringStreamToStringVal(ctx, serialized_input);
+  auto bytes = union_sketch.get_result(DS_HLL_TYPE).serialize_compact();
+  StringVal result(ctx, bytes.size());
+  memcpy(result.ptr, bytes.data(), bytes.size());
+  return result;
 }
 
 StringVal DataSketchesFunctions::DsHllStringify(FunctionContext* ctx,
     const StringVal& serialized_sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return StringVal::null();
-  datasketches::hll_sketch sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
-  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
+  try {
+    auto sketch = datasketches::hll_sketch::deserialize(serialized_sketch.ptr, serialized_sketch.len);
+    string str = sketch.to_string(true, false, false, false);
+    StringVal dst(ctx, str.size());
+    memcpy(dst.ptr, str.c_str(), str.size());
+    return dst;
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
     return StringVal::null();
   }
-  string str = sketch.to_string(true, false, false, false);
-  StringVal dst(ctx, str.size());
-  memcpy(dst.ptr, str.c_str(), str.size());
-  return dst;
 }
 
 BigIntVal DataSketchesFunctions::DsCpcEstimate(
     FunctionContext* ctx, const StringVal& serialized_sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return BigIntVal::null();
-  datasketches::cpc_sketch sketch(DS_CPC_SKETCH_CONFIG);
-  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
+  try {
+    auto sketch = datasketches::cpc_sketch::deserialize(serialized_sketch.ptr, serialized_sketch.len);
+    return sketch.get_estimate();
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
     return BigIntVal::null();
   }
-  return sketch.get_estimate();
 }
 
 StringVal DataSketchesFunctions::DsCpcStringify(
     FunctionContext* ctx, const StringVal& serialized_sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return StringVal::null();
-  datasketches::cpc_sketch sketch(DS_CPC_SKETCH_CONFIG);
-  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
+  try {
+    auto sketch = datasketches::cpc_sketch::deserialize(serialized_sketch.ptr, serialized_sketch.len);
+    string str = sketch.to_string();
+    StringVal dst(ctx, str.size());
+    memcpy(dst.ptr, str.c_str(), str.size());
+    return dst;
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
     return StringVal::null();
   }
-  string str = sketch.to_string();
-  StringVal dst(ctx, str.size());
-  memcpy(dst.ptr, str.c_str(), str.size());
-  return dst;
 }
 
 StringVal DataSketchesFunctions::DsCpcUnionF(FunctionContext* ctx,
@@ -145,56 +147,47 @@ StringVal DataSketchesFunctions::DsCpcUnionF(FunctionContext* ctx,
   if (!update_sketch_to_cpc_union(ctx, second_serialized_sketch, union_sketch)) {
     return StringVal::null();
   }
-  //  Result
-  datasketches::cpc_sketch sketch = union_sketch.get_result();
-  std::stringstream serialized_input;
-  sketch.serialize(serialized_input);
-  return StringStreamToStringVal(ctx, serialized_input);
+  auto bytes = union_sketch.get_result().serialize();
+  StringVal result(ctx, bytes.size());
+  memcpy(result.ptr, bytes.data(), bytes.size());
+  return result;
 }
 
 BigIntVal DataSketchesFunctions::DsThetaEstimate(
     FunctionContext* ctx, const StringVal& serialized_sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return 0;
-  std::unique_ptr<datasketches::compact_theta_sketch> sketch;
-  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
+  try {
+    auto sketch = datasketches::compact_theta_sketch::deserialize(serialized_sketch.ptr, serialized_sketch.len);
+    return sketch.get_estimate();
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
     return BigIntVal::null();
   }
-  return sketch->get_estimate();
 }
 
 StringVal DataSketchesFunctions::DsThetaExclude(FunctionContext* ctx,
-    const StringVal& first_serialized_sketch, const StringVal& second_serialized_sketch) {
-  datasketches::theta_a_not_b a_not_b;
-  // Deserialize two sketches
-  std::unique_ptr<datasketches::compact_theta_sketch> first_sketch_ptr;
-  if (!first_serialized_sketch.is_null && first_serialized_sketch.len > 0) {
-    if (!DeserializeDsSketch(first_serialized_sketch, &first_sketch_ptr)) {
-      LogSketchDeserializationError(ctx);
-      return StringVal::null();
-    }
-  }
-  std::unique_ptr<datasketches::compact_theta_sketch> second_sketch_ptr;
-  if (!second_serialized_sketch.is_null && second_serialized_sketch.len > 0) {
-    if (!DeserializeDsSketch(second_serialized_sketch, &second_sketch_ptr)) {
-      LogSketchDeserializationError(ctx);
-      return StringVal::null();
-    }
-  }
+    const StringVal& serialized_sketch1, const StringVal& serialized_sketch2) {
   // Note, A and B refer to the two input sketches in the order A-not-B.
   // if A is null return null.
   // if A is not null, B is null return copyA.
   // other return A-not-B.
-  if (first_sketch_ptr) {
-    if (!second_sketch_ptr) {
-      return StringVal::CopyFrom(
-          ctx, first_serialized_sketch.ptr, first_serialized_sketch.len);
+  if (!serialized_sketch1.is_null && serialized_sketch1.len > 0) {
+    if (serialized_sketch2.is_null || serialized_sketch2.len == 0) {
+      return StringVal::CopyFrom(ctx, serialized_sketch1.ptr, serialized_sketch1.len);
     }
     // A and B are not null, call a_not_b.compute()
-    auto result = a_not_b.compute(*first_sketch_ptr, *second_sketch_ptr);
-    std::stringstream serialized_input;
-    result.serialize(serialized_input);
-    return StringStreamToStringVal(ctx, serialized_input);
+    datasketches::theta_a_not_b a_not_b;
+    try {
+      auto bytes = a_not_b.compute(
+        datasketches::compact_theta_sketch::deserialize(serialized_sketch1.ptr, serialized_sketch1.len),
+        datasketches::compact_theta_sketch::deserialize(serialized_sketch2.ptr, serialized_sketch2.len)
+      ).serialize();
+      StringVal result(ctx, bytes.size());
+      memcpy(result.ptr, bytes.data(), bytes.size());
+      return result;
+    } catch (const std::exception& e) {
+      LogSketchDeserializationError(ctx, e);
+    }
   }
   return StringVal::null();
 }
@@ -209,11 +202,10 @@ StringVal DataSketchesFunctions::DsThetaUnionF(FunctionContext* ctx,
   if (!update_sketch_to_theta_union(ctx, second_serialized_sketch, union_sketch)) {
     return StringVal::null();
   }
-  //  Result
-  datasketches::compact_theta_sketch sketch = union_sketch.get_result();
-  std::stringstream serialized_input;
-  sketch.serialize(serialized_input);
-  return StringStreamToStringVal(ctx, serialized_input);
+  auto bytes = union_sketch.get_result().serialize();
+  StringVal result(ctx, bytes.size());
+  memcpy(result.ptr, bytes.data(), bytes.size());
+  return result;
 }
 
 StringVal DataSketchesFunctions::DsThetaIntersectF(FunctionContext* ctx,
@@ -229,10 +221,10 @@ StringVal DataSketchesFunctions::DsThetaIntersectF(FunctionContext* ctx,
           ctx, second_serialized_sketch, intersection_sketch)) {
     return StringVal::null();
   }
-  datasketches::compact_theta_sketch sketch = intersection_sketch.get_result();
-  std::stringstream serialized_input;
-  sketch.serialize(serialized_input);
-  return StringStreamToStringVal(ctx, serialized_input);
+  auto bytes = intersection_sketch.get_result().serialize();
+  StringVal result(ctx, bytes.size());
+  memcpy(result.ptr, bytes.data(), bytes.size());
+  return result;
 }
 
 FloatVal DataSketchesFunctions::DsKllQuantile(FunctionContext* ctx,
@@ -242,12 +234,8 @@ FloatVal DataSketchesFunctions::DsKllQuantile(FunctionContext* ctx,
     ctx->SetError("Rank parameter should be in the range of [0,1]");
     return FloatVal::null();
   }
-  datasketches::kll_sketch<float> sketch;
-  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
-    return FloatVal::null();
-  }
   try {
+    auto sketch = datasketches::kll_sketch<float>::deserialize(serialized_sketch.ptr, serialized_sketch.len);
     return sketch.get_quantile(rank.val);
   } catch (const std::exception& e) {
     ctx->SetError(Substitute("Error while getting quantile from DataSketches KLL. "
@@ -259,23 +247,25 @@ FloatVal DataSketchesFunctions::DsKllQuantile(FunctionContext* ctx,
 BigIntVal DataSketchesFunctions::DsKllN(FunctionContext* ctx,
     const StringVal& serialized_sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return BigIntVal::null();
-  datasketches::kll_sketch<float> sketch;
-  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
+  try {
+    auto sketch = datasketches::kll_sketch<float>::deserialize(serialized_sketch.ptr, serialized_sketch.len);
+    return sketch.get_n();
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
     return BigIntVal::null();
   }
-  return sketch.get_n();
 }
 
 DoubleVal DataSketchesFunctions::DsKllRank(FunctionContext* ctx,
     const StringVal& serialized_sketch, const FloatVal& probe_value) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return DoubleVal::null();
-  datasketches::kll_sketch<float> sketch;
-  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
+  try {
+    auto sketch = datasketches::kll_sketch<float>::deserialize(serialized_sketch.ptr, serialized_sketch.len);
+    return sketch.get_rank(probe_value.val);
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
     return DoubleVal::null();
   }
-  return sketch.get_rank(probe_value.val);
 }
 
 StringVal DataSketchesFunctions::DsKllQuantilesAsString(FunctionContext* ctx,
@@ -284,14 +274,10 @@ StringVal DataSketchesFunctions::DsKllQuantilesAsString(FunctionContext* ctx,
   if (args == nullptr) return StringVal::null();
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return StringVal::null();
   if (RaiseErrorForNullOrNaNInput(ctx, num_args, args)) return StringVal::null();
-  datasketches::kll_sketch<float> sketch;
-  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
-    return StringVal::null();
-  }
-  double quantiles_input[(unsigned int)num_args];
-  for (int i = 0; i < num_args; ++i) quantiles_input[i] = args[i].val;
   try {
+    auto sketch = datasketches::kll_sketch<float>::deserialize(serialized_sketch.ptr, serialized_sketch.len);
+    double quantiles_input[(unsigned int)num_args];
+    for (int i = 0; i < num_args; ++i) quantiles_input[i] = args[i].val;
     std::vector<float> results = sketch.get_quantiles(quantiles_input, num_args);
     return DsKllVectorResultToStringVal(ctx, results);
   } catch(const std::exception& e) {
@@ -308,14 +294,10 @@ StringVal DataSketchesFunctions::GetDsKllPMFOrCDF(FunctionContext* ctx,
   if (args == nullptr || args->is_null) return StringVal::null();
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return StringVal::null();
   if (RaiseErrorForNullOrNaNInput(ctx, num_args, args)) return StringVal::null();
-  datasketches::kll_sketch<float> sketch;
-  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
-    return StringVal::null();
-  }
-  float input_ranges[(unsigned int)num_args];
-  for (int i = 0; i < num_args; ++i) input_ranges[i] = args[i].val;
   try {
+    auto sketch = datasketches::kll_sketch<float>::deserialize(serialized_sketch.ptr, serialized_sketch.len);
+    float input_ranges[(unsigned int)num_args];
+    for (int i = 0; i < num_args; ++i) input_ranges[i] = args[i].val;
     std::vector<double> results = (mode == PMF) ?
         sketch.get_PMF(input_ranges, num_args) : sketch.get_CDF(input_ranges, num_args);
     return DsKllVectorResultToStringVal(ctx, results);
@@ -340,15 +322,16 @@ StringVal DataSketchesFunctions::DsKllCDFAsString(FunctionContext* ctx,
 StringVal DataSketchesFunctions::DsKllStringify( FunctionContext* ctx,
     const StringVal& serialized_sketch) {
   if (serialized_sketch.is_null || serialized_sketch.len == 0) return StringVal::null();
-  datasketches::kll_sketch<float> sketch;
-  if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-    LogSketchDeserializationError(ctx);
+  try {
+    auto sketch = datasketches::kll_sketch<float>::deserialize(serialized_sketch.ptr, serialized_sketch.len);
+    string str = sketch.to_string(false, false);
+    StringVal dst(ctx, str.size());
+    memcpy(dst.ptr, str.c_str(), str.size());
+    return dst;
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
     return StringVal::null();
   }
-  string str = sketch.to_string(false, false);
-  StringVal dst(ctx, str.size());
-  memcpy(dst.ptr, str.c_str(), str.size());
-  return dst;
 }
 
 }

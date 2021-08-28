@@ -19,6 +19,7 @@
 
 #include "common/logging.h"
 #include "udf/udf-internal.h"
+#include "gutil/strings/substitute.h"
 #include "thirdparty/datasketches/cpc_sketch.hpp"
 #include "thirdparty/datasketches/kll_sketch.hpp"
 #include "thirdparty/datasketches/theta_sketch.hpp"
@@ -34,48 +35,9 @@ using impala_udf::StringVal;
 using std::stringstream;
 using std::vector;
 
-void LogSketchDeserializationError(FunctionContext* ctx) {
-  ctx->SetError("Unable to deserialize sketch.");
+void LogSketchDeserializationError(FunctionContext* ctx, const std::exception& e) {
+  ctx->SetError(strings::Substitute("Unable to deserialize sketch: $0", e.what()).c_str());
 }
-
-template<class T>
-bool DeserializeDsSketch(const StringVal& serialized_sketch, T* sketch) {
-  DCHECK(sketch != nullptr);
-  if (serialized_sketch.is_null || serialized_sketch.len == 0) return false;
-  try {
-    *sketch = T::deserialize((void*)serialized_sketch.ptr, serialized_sketch.len);
-    return true;
-  } catch (const std::exception&) {
-    // One reason of throwing from deserialization is that the input string is not a
-    // serialized sketch.
-    return false;
-  }
-}
-
-// This is a specialization of the template DeserializeDsSketch() for theta sketches.
-template <>
-bool DeserializeDsSketch(const StringVal& serialized_sketch,
-    std::unique_ptr<compact_theta_sketch>* sketch_ptr) {
-  DCHECK(sketch_ptr->get() == nullptr);
-  if (serialized_sketch.is_null || serialized_sketch.len == 0) return false;
-  try {
-    auto sketch = compact_theta_sketch::deserialize(
-        (void*)serialized_sketch.ptr, serialized_sketch.len);
-    *sketch_ptr = std::make_unique<compact_theta_sketch>(sketch);
-    return true;
-  } catch (const std::exception&) {
-    // One reason of throwing from deserialization is that the input string is not a
-    // serialized sketch.
-    return false;
-  }
-}
-
-template bool DeserializeDsSketch(const StringVal& serialized_sketch,
-    hll_sketch* sketch);
-template bool DeserializeDsSketch(const StringVal& serialized_sketch,
-    cpc_sketch* sketch);
-template bool DeserializeDsSketch(const StringVal& serialized_sketch,
-    kll_sketch<float>* sketch);
 
 StringVal StringStreamToStringVal(FunctionContext* ctx, const stringstream& str_stream) {
   string str = str_stream.str();
@@ -87,12 +49,12 @@ StringVal StringStreamToStringVal(FunctionContext* ctx, const stringstream& str_
 bool update_sketch_to_cpc_union(FunctionContext* ctx,
     const StringVal& serialized_sketch, datasketches::cpc_union& union_sketch) {
   if (!serialized_sketch.is_null && serialized_sketch.len > 0) {
-    datasketches::cpc_sketch sketch(DS_CPC_SKETCH_CONFIG);
-    if (!DeserializeDsSketch(serialized_sketch, &sketch)) {
-      LogSketchDeserializationError(ctx);
+    try {
+      union_sketch.update(datasketches::cpc_sketch::deserialize(serialized_sketch.ptr, serialized_sketch.len));
+    } catch (const std::exception& e) {
+      LogSketchDeserializationError(ctx, e);
       return false;
     }
-    union_sketch.update(sketch);
   }
   return true;
 }
@@ -100,12 +62,12 @@ bool update_sketch_to_cpc_union(FunctionContext* ctx,
 bool update_sketch_to_theta_union(FunctionContext* ctx,
     const StringVal& serialized_sketch, datasketches::theta_union& sketch) {
   if (!serialized_sketch.is_null && serialized_sketch.len > 0) {
-    std::unique_ptr<datasketches::compact_theta_sketch> sketch_ptr;
-    if (!DeserializeDsSketch(serialized_sketch, &sketch_ptr)) {
-      LogSketchDeserializationError(ctx);
+    try {
+      sketch.update(datasketches::compact_theta_sketch::deserialize(serialized_sketch.ptr, serialized_sketch.len));
+    } catch (const std::exception& e) {
+      LogSketchDeserializationError(ctx, e);
       return false;
     }
-    sketch.update(*sketch_ptr);
   }
   return true;
 }
@@ -113,13 +75,12 @@ bool update_sketch_to_theta_union(FunctionContext* ctx,
 bool update_sketch_to_theta_intersection(FunctionContext* ctx,
     const StringVal& serialized_sketch, datasketches::theta_intersection& sketch) {
   if (!serialized_sketch.is_null && serialized_sketch.len > 0) {
-    std::unique_ptr<datasketches::compact_theta_sketch> sketch_ptr;
-    if (!DeserializeDsSketch(serialized_sketch, &sketch_ptr)) {
-      LogSketchDeserializationError(ctx);
-      return false;
+    try {
+      sketch.update(datasketches::compact_theta_sketch::deserialize(serialized_sketch.ptr, serialized_sketch.len));
+      return true;
+    } catch (const std::exception& e) {
+      LogSketchDeserializationError(ctx, e);
     }
-    sketch.update(*sketch_ptr);
-    return true;
   }
   return false;
 }
@@ -159,4 +120,3 @@ template bool RaiseErrorForNullOrNaNInput(FunctionContext* ctx, int num_args,
     const FloatVal* args);
 
 }
-
