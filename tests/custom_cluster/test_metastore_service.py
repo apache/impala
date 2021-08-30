@@ -223,13 +223,16 @@ class TestMetastoreService(CustomClusterTestSuite):
         catalogd_args="--catalog_topic_mode=minimal "
                       "--start_hms_server=true "
                       "--hms_port=5899 "
-                      "--fallback_to_hms_on_errors=false"
+                      "--fallback_to_hms_on_errors=false "
+                      "--hms_event_polling_interval_s=0"
     )
     def test_get_table_req_without_fallback(self):
       """
       Test the get_table_req APIs with fallback to HMS enabled. These calls
       throw exceptions since we do not fallback to HMS if the db/table is not
-      in Catalog cache.
+      in Catalog cache. We specifically disable events polling because this test
+      exercises the error code paths when table is not found in the catalogd. With
+      events processing turned on, it leads to flakiness.
       """
       catalog_hms_client = None
       db_name = ImpalaTestSuite.get_random_name(
