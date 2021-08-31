@@ -236,10 +236,6 @@ class TestQueriesTextTables(ImpalaTestSuite):
     vector.get_value('exec_option')['abort_on_error'] = 1
     self.run_test_case('QueryTest/strict-mode-abort', vector)
 
-  @SkipIfCatalogV2.data_sources_unsupported()
-  def test_data_source_tables(self, vector):
-    self.run_test_case('QueryTest/data-source-tables', vector)
-
   def test_range_constant_propagation(self, vector):
     self.run_test_case('QueryTest/range-constant-propagation', vector)
 

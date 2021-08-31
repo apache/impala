@@ -1,0 +1,105 @@
+====
+---- QUERY
+# Test the jdbc data source
+---- QUERY
+# count(*) with a predicate evaluated by Impala
+select count(*) from alltypes_jdbc_datasource
+where float_col = 0 and string_col is not NULL
+---- RESULTS
+730
+---- TYPES
+BIGINT
+====
+---- QUERY
+# count(*) with no predicates has no materialized slots
+select count(*) from alltypes_jdbc_datasource
+---- RESULTS
+7300
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Gets all types including a row with a NULL value. The predicate pushed to
+# the data source.
+select *
+from alltypes_jdbc_datasource
+where id > 10 and int_col< 5 limit 5
+---- RESULTS
+11,false,1,1,1,10,1.100000023841858,10.1,'01/02/09','1',2009-01-02 00:11:00.450000000
+12,true,2,2,2,20,2.200000047683716,20.2,'01/02/09','2',2009-01-02 00:12:00.460000000
+13,false,3,3,3,30,3.299999952316284,30.3,'01/02/09','3',2009-01-02 00:13:00.480000000
+14,true,4,4,4,40,4.400000095367432,40.4,'01/02/09','4',2009-01-02 00:14:00.510000000
+20,true,0,0,0,0,0,0,'01/03/09','0',2009-01-03 00:20:00.900000000
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP
+====
+---- QUERY
+# Gets specified columns.
+select id, bool_col, smallint_col, float_col, double_col, date_string_col
+from alltypes_jdbc_datasource
+where id > 10 and int_col< 5 limit 5
+---- RESULTS
+11,false,1,1.100000023841858,10.1,'01/02/09'
+12,true,2,2.200000047683716,20.2,'01/02/09'
+13,false,3,3.299999952316284,30.3,'01/02/09'
+14,true,4,4.400000095367432,40.4,'01/02/09'
+20,true,0,0,0,'01/03/09'
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, STRING
+====
+---- QUERY
+# Gets specified columns from external jdbc table with case sensitive column names
+# and table name.
+select id, bool_col, smallint_col, float_col, double_col, date_string_col
+from alltypes_jdbc_datasource_2
+where id > 10 and int_col< 5 limit 5
+---- RESULTS
+11,false,1,1.100000023841858,10.1,'01/02/09'
+12,true,2,2.200000047683716,20.2,'01/02/09'
+13,false,3,3.299999952316284,30.3,'01/02/09'
+14,true,4,4.400000095367432,40.4,'01/02/09'
+20,true,0,0,0,'01/03/09'
+---- TYPES
+INT, BOOLEAN, SMALLINT, FLOAT, DOUBLE, STRING
+====
+---- QUERY
+# Inner join with a non jdbc table
+select a.id, b.int_col
+from alltypes_jdbc_datasource a inner join functional.alltypes b on (a.id = b.id)
+where a.id = 1
+---- RESULTS
+1,1
+---- TYPES
+INT, INT
+====
+---- QUERY
+# Inner join with another jdbc table
+select a.id, b.int_col
+from alltypes_jdbc_datasource a inner join alltypes_jdbc_datasource_2 b on (a.id = b.id)
+where a.id < 3 group by a.id, b.int_col
+---- RESULTS
+0,0
+1,1
+2,2
+---- TYPES
+INT, INT
+====
+---- QUERY
+# Cross join
+select a.id, b.id
+from alltypes_jdbc_datasource a cross join alltypes_jdbc_datasource b
+where (a.id < 3 and b.id < 3)
+order by a.id, b.id limit 10
+---- RESULTS
+0,0
+0,1
+0,2
+1,0
+1,1
+1,2
+2,0
+2,1
+2,2
+---- TYPES
+INT, INT
+====

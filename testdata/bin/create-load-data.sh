@@ -478,10 +478,12 @@ function custom-post-load-steps {
 
 function copy-and-load-ext-data-source {
   # Copy the test data source library into HDFS
-  ${IMPALA_HOME}/testdata/bin/copy-data-sources.sh
+  ${IMPALA_HOME}/testdata/bin/copy-ext-data-sources.sh
+  # Load the underlying data of the data source
+  ${IMPALA_HOME}/testdata/bin/load-ext-data-sources.sh
   # Create data sources table.
   ${IMPALA_HOME}/bin/impala-shell.sh -i ${IMPALAD} -f\
-    ${IMPALA_HOME}/testdata/bin/create-data-source-table.sql
+    ${IMPALA_HOME}/testdata/bin/create-ext-data-source-table.sql
 }
 
 function check-hdfs-health {

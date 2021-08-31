@@ -143,13 +143,17 @@ public class FrontendTest extends FrontendTestBase {
     // HiveServer2 GetTables has 5 columns.
     assertEquals(5, resp.schema.columns.size());
     assertEquals(5, resp.rows.get(0).colVals.size());
-    assertEquals(3, resp.rows.size());
+    assertEquals(5, resp.rows.size());
     assertEquals("alltypes_datasource",
         resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
     assertEquals("alltypes_date_partition",
         resp.rows.get(1).colVals.get(2).string_val.toLowerCase());
     assertEquals("alltypes_date_partition_2",
         resp.rows.get(2).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_jdbc_datasource",
+        resp.rows.get(3).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes_jdbc_datasource_2",
+        resp.rows.get(4).colVals.get(2).string_val.toLowerCase());
   }
 
   @Test

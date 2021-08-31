@@ -18,6 +18,7 @@
 package org.apache.impala.extdatasource;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -82,6 +83,9 @@ public class ExternalDataSourceExecutor {
 
   // Protects cachedClasses_, numClassCacheHits_, and numClassCacheMisses_.
   private final static Object cachedClassesLock_ = new Object();
+
+  // setup by ctor() and cleared by release()
+  private URLClassLoader classLoader_;
 
   private final ApiVersion apiVersion_;
   private final ExternalDataSource dataSource_;
@@ -156,6 +160,8 @@ public class ExternalDataSourceExecutor {
         // Only cache the class if the init string starts with CACHE_CLASS_PREFIX
         if (initString_ != null && initString_.startsWith(CACHE_CLASS_PREFIX)) {
           cachedClasses_.put(cacheMapKey, c);
+        } else {
+          classLoader_ = loader;
         }
         if (LOG.isTraceEnabled()) {
           LOG.trace("Loaded jar for class {} at path {}", className_, jarPath_);
@@ -166,6 +172,27 @@ public class ExternalDataSourceExecutor {
       }
     }
     return c;
+  }
+
+  @Override
+  protected void finalize() throws Throwable {
+    release();
+    super.finalize();
+  }
+
+  /**
+   * Release the class loader we have created if the class is not cached.
+   */
+  public void release() {
+    if (classLoader_ != null) {
+      try {
+        classLoader_.close();
+      } catch (IOException e) {
+        // Log and ignore.
+        LOG.warn("Error closing the URLClassloader.", e);
+      }
+      classLoader_ = null;
+    }
   }
 
   public byte[] prepare(byte[] thriftParams) throws ImpalaException {

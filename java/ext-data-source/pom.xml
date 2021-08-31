@@ -33,5 +33,6 @@
     <module>api</module>
     <module>sample</module>
     <module>test</module>
+    <module>jdbc</module>
   </modules>
 </project>

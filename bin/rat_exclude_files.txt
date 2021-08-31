@@ -136,6 +136,7 @@ fe/src/test/resources/hbase-jaas-client.conf.template
 fe/src/test/resources/hbase-jaas-server.conf.template
 fe/src/test/resources/users.ldif
 java/.mvn/maven.config
+java/ext-data-source/jdbc/src/main/java/org/apache/impala/extdatasource/jdbc/README.md
 java/toolchains.xml.tmpl
 testdata/AllTypesError/*.txt
 testdata/AllTypesErrorNoNulls/*.txt
