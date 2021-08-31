@@ -22,6 +22,8 @@ import os
 from itertools import product
 
 from tests.common.test_vector import ImpalaTestDimension, ImpalaTestVector
+from tests.util.filesystem_utils import (
+    IS_HDFS)
 
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 
@@ -130,7 +132,12 @@ def create_client_protocol_dimension():
 
 
 def create_client_protocol_strict_dimension():
-  return ImpalaTestDimension('strict_hs2_protocol', False, True)
+  # only support strict dimensions if the file system is HDFS, since that is
+  # where the hive cluster is run.
+  if IS_HDFS:
+    return ImpalaTestDimension('strict_hs2_protocol', False, True)
+  else:
+    return create_client_protocol_no_strict_dimension()
 
 
 def create_client_protocol_no_strict_dimension():
