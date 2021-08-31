@@ -138,7 +138,7 @@ INT,INT,BIGINT,BIGINT
 # Check that ds_hll_estimate returns error for strings that are not serialized sketches.
 select ds_hll_estimate(date_string_col) from functional_parquet.alltypestiny;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: Attempt to deserialize unknown object type
 ====
 ---- QUERY
 # Check that ds_hll_estimate returns null for null and empty string inputs.
@@ -198,7 +198,7 @@ STRING
 # ds_hll_union() returns an error if it receives an invalid serialized sketch.
 select ds_hll_union(date_string_col) from functional_parquet.alltypestiny where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: Attempt to deserialize unknown object type
 ====
 ---- QUERY
 # Get the same sketches from Impala and Hive and put them into the same table. When we
@@ -291,7 +291,7 @@ STRING
 # serialized sketches.
 select ds_hll_estimate_bounds_as_string(date_string_col) from functional_parquet.alltypestiny;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: Attempt to deserialize unknown object type
 ====
 ---- QUERY
 # Check that ds_hll_estimate_bounds_as_string() returns error for kappa is not 1, 2, 3.
@@ -379,14 +379,14 @@ BIGINT
 select ds_hll_union_f(null, date_string_col) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: Attempt to deserialize unknown object type
 ====
 ---- QUERY
 # ds_hll_union_f() returns an error if it receives an invalid serialized sketch.
 select ds_hll_union_f(date_string_col, null) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: Attempt to deserialize unknown object type
 ====
 ---- QUERY
 # Get the same sketches from Impala and Hive and put them into the same table (different

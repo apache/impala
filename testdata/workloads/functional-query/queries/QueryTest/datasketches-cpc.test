@@ -140,7 +140,7 @@ INT,INT,BIGINT,BIGINT
 # Check that ds_cpc_estimate returns error for strings that are not serialized sketches.
 select ds_cpc_estimate(date_string_col) from functional_parquet.alltypestiny;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: Insufficient buffer size detected: bytes available 8, minimum needed 192
 ====
 ---- QUERY
 # Check that ds_cpc_estimate returns null for null and empty string inputs.
@@ -219,7 +219,7 @@ STRING
 # ds_cpc_union() returns an error if it receives an invalid serialized sketch.
 select ds_cpc_union(date_string_col) from functional_parquet.alltypestiny where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: Insufficient buffer size detected: bytes available 8, minimum needed 192
 ====
 ---- QUERY
 # Get the same sketches from Impala and Hive and put them into the same table. When we
@@ -266,7 +266,7 @@ STRING
 # Check that ds_cpc_stringify() returns error for strings that are not serialized sketches.
 select ds_cpc_stringify(date_string_col) from functional_parquet.alltypestiny;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: Insufficient buffer size detected: bytes available 8, minimum needed 192
 ====
 ---- QUERY
 # Check that ds_cpc_stringify() works on sketches created by Hive.
@@ -320,14 +320,14 @@ BIGINT
 select ds_cpc_union_f(null, date_string_col) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: Insufficient buffer size detected: bytes available 8, minimum needed 192
 ====
 ---- QUERY
 # ds_cpc_union_f() returns an error if it receives an invalid serialized sketch.
 select ds_cpc_union_f(date_string_col, null) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: Insufficient buffer size detected: bytes available 8, minimum needed 192
 ====
 ---- QUERY
 # Get the same sketches from Impala and Hive and put them into the same table (different

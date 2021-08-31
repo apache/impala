@@ -50,16 +50,17 @@ const int DS_CPC_SKETCH_CONFIG = 11;
 const int DS_DEFAULT_KAPPA = 2;
 
 /// Logs a common error message saying that sketch deserialization failed.
-void LogSketchDeserializationError(FunctionContext* ctx);
+void LogSketchDeserializationError(FunctionContext* ctx, const std::exception& e);
 
-/// Receives a serialized DataSketches sketch (either Hll or KLL) in
-/// 'serialized_sketch', deserializes it and puts the deserialized sketch into 'sketch'.
-/// The outgoing 'sketch' will hold the same configs as 'serialized_sketch' regardless of
-/// what was provided when it was constructed before this function call. Returns false if
-/// the deserialization fails, true otherwise.
-template<class T>
-bool DeserializeDsSketch(const StringVal& serialized_sketch, T* sketch)
-    WARN_UNUSED_RESULT;
+/// Auxiliary function that receives a sketch and returns the serialized version of
+/// it wrapped into a StringVal.
+template<typename Sketch>
+StringVal SerializeDsSketch(FunctionContext* ctx, const Sketch& sketch) {
+  auto bytes = sketch.serialize();
+  StringVal result(ctx, bytes.size());
+  memcpy(result.ptr, bytes.data(), bytes.size());
+  return result;
+}
 
 /// Helper function that receives an std::stringstream and converts it to StringVal. Uses
 /// 'ctx' for memory allocation.

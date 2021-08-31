@@ -1623,9 +1623,10 @@ BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
 /// functionality into the header.
 StringVal SerializeCompactDsHllSketch(FunctionContext* ctx,
     const datasketches::hll_sketch& sketch) {
-  std::stringstream serialized_input;
-  sketch.serialize_compact(serialized_input);
-  return StringStreamToStringVal(ctx, serialized_input);
+  auto bytes = sketch.serialize_compact();
+  StringVal result(ctx, bytes.size());
+  memcpy(result.ptr, bytes.data(), bytes.size());
+  return result;
 }
 
 /// Auxiliary function that receives a hll_union, gets the underlying HLL sketch from the
@@ -1634,20 +1635,8 @@ StringVal SerializeCompactDsHllSketch(FunctionContext* ctx,
 /// functionality into the header.
 StringVal SerializeDsHllUnion(FunctionContext* ctx,
     const datasketches::hll_union& ds_union) {
-  std::stringstream serialized_input;
   datasketches::hll_sketch sketch = ds_union.get_result(DS_HLL_TYPE);
   return SerializeCompactDsHllSketch(ctx, sketch);
-}
-
-/// Auxiliary function that receives a cpc_sketch and returns the serialized version of
-/// it wrapped into a StringVal.
-/// Introducing this function in the .cc to avoid including the whole DataSketches CPC
-/// functionality into the header.
-StringVal SerializeDsCpcSketch(
-    FunctionContext* ctx, const datasketches::cpc_sketch& sketch) {
-  std::stringstream serialized_input;
-  sketch.serialize(serialized_input);
-  return StringStreamToStringVal(ctx, serialized_input);
 }
 
 /// Auxiliary function that receives a cpc_union, gets the underlying CPC sketch from the
@@ -1657,18 +1646,7 @@ StringVal SerializeDsCpcSketch(
 StringVal SerializeDsCpcUnion(
     FunctionContext* ctx, const datasketches::cpc_union& ds_union) {
   datasketches::cpc_sketch sketch = ds_union.get_result();
-  return SerializeDsCpcSketch(ctx, sketch);
-}
-
-/// Auxiliary function that receives a theta_sketch and returns the serialized version of
-/// it wrapped into a StringVal.
-/// Introducing this function in the .cc to avoid including the whole DataSketches Theta
-/// functionality into the header.
-StringVal SerializeDsThetaSketch(
-    FunctionContext* ctx, const datasketches::compact_theta_sketch& sketch) {
-  std::stringstream serialized_input(std::ios::in | std::ios::out | std::ios::binary);
-  sketch.serialize(serialized_input);
-  return StringStreamToStringVal(ctx, serialized_input);
+  return SerializeDsSketch(ctx, sketch);
 }
 
 /// Auxiliary function that receives a theta_union, gets the underlying Theta sketch from
@@ -1678,7 +1656,7 @@ StringVal SerializeDsThetaSketch(
 StringVal SerializeDsThetaUnion(
     FunctionContext* ctx, const datasketches::theta_union& ds_union) {
   datasketches::compact_theta_sketch sketch = ds_union.get_result();
-  return SerializeDsThetaSketch(ctx, sketch);
+  return SerializeDsSketch(ctx, sketch);
 }
 
 /// Auxiliary function that receives a theta_intersection, gets the underlying Theta
@@ -1688,24 +1666,12 @@ StringVal SerializeDsThetaUnion(
 /// functionality into the header.
 StringVal SerializeDsThetaIntersection(
     FunctionContext* ctx, const datasketches::theta_intersection& ds_intersection) {
-  std::stringstream serialized_input;
   // Calling get_result() before calling update() is undefined, so you need to check.
   if (ds_intersection.has_result()) {
     datasketches::compact_theta_sketch sketch = ds_intersection.get_result();
-    return SerializeDsThetaSketch(ctx, sketch);
+    return SerializeDsSketch(ctx, sketch);
   }
   return StringVal::null();
-}
-
-/// Auxiliary function that receives a kll_sketch<float> and returns the serialized
-/// version of it wrapped into a StringVal.
-/// Introducing this function in the .cc to avoid including the whole DataSketches HLL
-/// functionality into the header
-StringVal SerializeDsKllSketch(FunctionContext* ctx,
-    const datasketches::kll_sketch<float>& sketch) {
-  std::stringstream serialized_sketch;
-  sketch.serialize(serialized_sketch);
-  return StringStreamToStringVal(ctx, serialized_sketch);
 }
 
 void AggregateFunctions::DsHllInit(FunctionContext* ctx, StringVal* dst) {
@@ -1814,16 +1780,12 @@ void AggregateFunctions::DsHllUnionUpdate(FunctionContext* ctx, const StringVal&
   if (src.is_null) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::hll_union));
-  // These parameters might be overwritten by DeserializeDsSketch() to use the settings
-  // from the deserialized sketch from 'src'.
-  datasketches::hll_sketch src_sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
-  if (!DeserializeDsSketch(src, &src_sketch)) {
-    LogSketchDeserializationError(ctx);
-    return;
+  try {
+    reinterpret_cast<datasketches::hll_union*>(dst->ptr)
+        ->update(datasketches::hll_sketch::deserialize(src.ptr, src.len));
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
   }
-  datasketches::hll_union* union_ptr =
-      reinterpret_cast<datasketches::hll_union*>(dst->ptr);
-  union_ptr->update(src_sketch);
 }
 
 StringVal AggregateFunctions::DsHllUnionSerialize(FunctionContext* ctx,
@@ -1842,18 +1804,13 @@ void AggregateFunctions::DsHllUnionMerge(
   DCHECK(!src.is_null);
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::hll_union));
-
   // Note, 'src' is a serialized hll_sketch and not a serialized hll_union.
-  datasketches::hll_sketch src_sketch(DS_SKETCH_CONFIG, DS_HLL_TYPE);
-  if (!DeserializeDsSketch(src, &src_sketch)) {
-    LogSketchDeserializationError(ctx);
-    return;
+  try {
+    reinterpret_cast<datasketches::hll_union*>(dst->ptr)
+        ->update(datasketches::hll_sketch::deserialize(src.ptr, src.len));
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
   }
-
-  datasketches::hll_union* dst_union_ptr =
-      reinterpret_cast<datasketches::hll_union*>(dst->ptr);
-
-  dst_union_ptr->update(src_sketch);
 }
 
 StringVal AggregateFunctions::DsHllUnionFinalize(FunctionContext* ctx,
@@ -1913,7 +1870,7 @@ StringVal AggregateFunctions::DsCpcSerialize(FunctionContext* ctx, const StringV
   DCHECK_EQ(src.len, sizeof(datasketches::cpc_sketch));
   datasketches::cpc_sketch* sketch_ptr =
       reinterpret_cast<datasketches::cpc_sketch*>(src.ptr);
-  StringVal dst = SerializeDsCpcSketch(ctx, *sketch_ptr);
+  StringVal dst = SerializeDsSketch(ctx, *sketch_ptr);
   ctx->Free(src.ptr);
   return dst;
 }
@@ -1923,19 +1880,17 @@ void AggregateFunctions::DsCpcMerge(
   DCHECK(!src.is_null);
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::cpc_sketch));
-  datasketches::cpc_sketch src_sketch;
-  if (!DeserializeDsSketch(src, &src_sketch)) {
-    LogSketchDeserializationError(ctx);
-    return;
-  }
-
-  datasketches::cpc_sketch* dst_sketch_ptr =
-      reinterpret_cast<datasketches::cpc_sketch*>(dst->ptr);
 
   datasketches::cpc_union union_sketch(DS_CPC_SKETCH_CONFIG);
-  union_sketch.update(src_sketch);
+  try {
+    union_sketch.update(datasketches::cpc_sketch::deserialize(src.ptr, src.len));
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
+    return;
+  }
+  datasketches::cpc_sketch* dst_sketch_ptr =
+      reinterpret_cast<datasketches::cpc_sketch*>(dst->ptr);
   union_sketch.update(*dst_sketch_ptr);
-
   *dst_sketch_ptr = union_sketch.get_result();
 }
 
@@ -1957,7 +1912,7 @@ StringVal AggregateFunctions::DsCpcFinalizeSketch(
       reinterpret_cast<datasketches::cpc_sketch*>(src.ptr);
   StringVal result_str = StringVal::null();
   if (sketch_ptr->get_estimate() > 0.0) {
-    result_str = SerializeDsCpcSketch(ctx, *sketch_ptr);
+    result_str = SerializeDsSketch(ctx, *sketch_ptr);
   }
   ctx->Free(src.ptr);
   return result_str;
@@ -1979,16 +1934,12 @@ void AggregateFunctions::DsCpcUnionUpdate(
   if (src.is_null) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::cpc_union));
-  // These parameters might be overwritten by DeserializeDsSketch() to use the settings
-  // from the deserialized sketch from 'src'.
-  datasketches::cpc_sketch src_sketch(DS_CPC_SKETCH_CONFIG);
-  if (!DeserializeDsSketch(src, &src_sketch)) {
-    LogSketchDeserializationError(ctx);
-    return;
+  try {
+    reinterpret_cast<datasketches::cpc_union*>(dst->ptr)
+        ->update(datasketches::cpc_sketch::deserialize(src.ptr, src.len));
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
   }
-  datasketches::cpc_union* union_ptr =
-      reinterpret_cast<datasketches::cpc_union*>(dst->ptr);
-  union_ptr->update(src_sketch);
 }
 
 StringVal AggregateFunctions::DsCpcUnionSerialize(
@@ -2007,18 +1958,13 @@ void AggregateFunctions::DsCpcUnionMerge(
   DCHECK(!src.is_null);
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::cpc_union));
-
   // Note, 'src' is a serialized Cpc_sketch and not a serialized Cpc_union.
-  datasketches::cpc_sketch src_sketch(DS_CPC_SKETCH_CONFIG);
-  if (!DeserializeDsSketch(src, &src_sketch)) {
-    LogSketchDeserializationError(ctx);
-    return;
+  try {
+    reinterpret_cast<datasketches::cpc_union*>(dst->ptr)
+        ->update(datasketches::cpc_sketch::deserialize(src.ptr, src.len));
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
   }
-
-  datasketches::cpc_union* dst_union_ptr =
-      reinterpret_cast<datasketches::cpc_union*>(dst->ptr);
-
-  dst_union_ptr->update(src_sketch);
 }
 
 StringVal AggregateFunctions::DsCpcUnionFinalize(
@@ -2032,7 +1978,7 @@ StringVal AggregateFunctions::DsCpcUnionFinalize(
     ctx->Free(src.ptr);
     return StringVal::null();
   }
-  StringVal result = SerializeDsCpcSketch(ctx, sketch);
+  StringVal result = SerializeDsSketch(ctx, sketch);
   ctx->Free(src.ptr);
   return result;
 }
@@ -2084,7 +2030,7 @@ StringVal AggregateFunctions::DsThetaSerialize(
   StringVal dst;
   if (src.len == sizeof(datasketches::update_theta_sketch)) {
     auto sketch_ptr = reinterpret_cast<datasketches::update_theta_sketch*>(src.ptr);
-    dst = SerializeDsThetaSketch(ctx, sketch_ptr->compact());
+    dst = SerializeDsSketch(ctx, sketch_ptr->compact());
   } else {
     auto union_ptr = reinterpret_cast<datasketches::theta_union*>(src.ptr);
     dst = SerializeDsThetaUnion(ctx, *union_ptr);
@@ -2101,21 +2047,27 @@ void AggregateFunctions::DsThetaMerge(
       or dst->len == sizeof(datasketches::theta_union));
 
   // Note, 'src' is a serialized compact_theta_sketch.
-  std::unique_ptr<datasketches::compact_theta_sketch> src_sketch;
-  if (!DeserializeDsSketch(src, &src_sketch)) {
-    LogSketchDeserializationError(ctx);
-    return;
-  }
-
   if (dst->len == sizeof(datasketches::theta_union)) {
     auto dst_union_ptr = reinterpret_cast<datasketches::theta_union*>(dst->ptr);
-    dst_union_ptr->update(*src_sketch);
+    try {
+      dst_union_ptr->update(datasketches::compact_theta_sketch::deserialize(src.ptr,
+          src.len));
+    } catch (const std::exception& e) {
+      LogSketchDeserializationError(ctx, e);
+      return;
+    }
   } else if (dst->len == sizeof(datasketches::update_theta_sketch)) {
     auto dst_sketch_ptr = reinterpret_cast<datasketches::update_theta_sketch*>(dst->ptr);
 
     datasketches::theta_union union_sketch = datasketches::theta_union::builder().build();
-    union_sketch.update(*src_sketch);
     union_sketch.update(*dst_sketch_ptr);
+    try {
+      union_sketch.update(datasketches::compact_theta_sketch::deserialize(src.ptr,
+          src.len));
+    } catch (const std::exception& e) {
+      LogSketchDeserializationError(ctx, e);
+      return;
+    }
 
     // theta_union.get_result() returns a compact sketch, does not support updating, and
     // is inconsistent with the initial underlying type of dst. This is different from
@@ -2157,7 +2109,7 @@ StringVal AggregateFunctions::DsThetaFinalizeSketch(
   StringVal result;
   if (src.len == sizeof(datasketches::update_theta_sketch)) {
     auto sketch_ptr = reinterpret_cast<datasketches::update_theta_sketch*>(src.ptr);
-    result = SerializeDsThetaSketch(ctx, sketch_ptr->compact());
+    result = SerializeDsSketch(ctx, sketch_ptr->compact());
   } else {
     auto union_ptr = reinterpret_cast<datasketches::theta_union*>(src.ptr);
     result = SerializeDsThetaUnion(ctx, *union_ptr);
@@ -2183,14 +2135,12 @@ void AggregateFunctions::DsThetaUnionUpdate(
   if (src.is_null) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::theta_union));
-  std::unique_ptr<datasketches::compact_theta_sketch> src_sketch;
-  if (!DeserializeDsSketch(src, &src_sketch)) {
-    LogSketchDeserializationError(ctx);
-    return;
+  try {
+    reinterpret_cast<datasketches::theta_union*>(dst->ptr)
+        ->update(datasketches::compact_theta_sketch::deserialize(src.ptr, src.len));
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
   }
-  datasketches::theta_union* union_ptr =
-      reinterpret_cast<datasketches::theta_union*>(dst->ptr);
-  union_ptr->update(*src_sketch);
 }
 
 StringVal AggregateFunctions::DsThetaUnionSerialize(
@@ -2209,18 +2159,13 @@ void AggregateFunctions::DsThetaUnionMerge(
   DCHECK(!src.is_null);
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::theta_union));
-
   // Note, 'src' is a serialized compact_theta_sketch and not a serialized theta_union.
-  std::unique_ptr<datasketches::compact_theta_sketch> src_sketch;
-  if (!DeserializeDsSketch(src, &src_sketch)) {
-    LogSketchDeserializationError(ctx);
-    return;
+  try {
+    reinterpret_cast<datasketches::theta_union*>(dst->ptr)
+        ->update(datasketches::compact_theta_sketch::deserialize(src.ptr, src.len));
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
   }
-
-  datasketches::theta_union* dst_union_ptr =
-      reinterpret_cast<datasketches::theta_union*>(dst->ptr);
-
-  dst_union_ptr->update(*src_sketch);
 }
 
 StringVal AggregateFunctions::DsThetaUnionFinalize(
@@ -2234,7 +2179,7 @@ StringVal AggregateFunctions::DsThetaUnionFinalize(
     ctx->Free(src.ptr);
     return StringVal::null();
   }
-  StringVal result = SerializeDsThetaSketch(ctx, sketch);
+  StringVal result = SerializeDsSketch(ctx, sketch);
   ctx->Free(src.ptr);
   return result;
 }
@@ -2255,14 +2200,12 @@ void AggregateFunctions::DsThetaIntersectUpdate(
   if (src.is_null) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::theta_intersection));
-  std::unique_ptr<datasketches::compact_theta_sketch> src_sketch;
-  if (!DeserializeDsSketch(src, &src_sketch)) {
-    LogSketchDeserializationError(ctx);
-    return;
+  try {
+    reinterpret_cast<datasketches::theta_intersection*>(dst->ptr)
+        ->update(datasketches::compact_theta_sketch::deserialize(src.ptr, src.len));
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
   }
-  datasketches::theta_intersection* intersection_ptr =
-      reinterpret_cast<datasketches::theta_intersection*>(dst->ptr);
-  intersection_ptr->update(*src_sketch);
 }
 
 StringVal AggregateFunctions::DsThetaIntersectSerialize(
@@ -2281,19 +2224,14 @@ void AggregateFunctions::DsThetaIntersectMerge(
   if (src.is_null) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::theta_intersection));
-
   // Note, 'src' is a serialized compact_theta_sketch and not a serialized
   // theta_intersection.
-  std::unique_ptr<datasketches::compact_theta_sketch> src_sketch;
-  if (!DeserializeDsSketch(src, &src_sketch)) {
-    LogSketchDeserializationError(ctx);
-    return;
+  try {
+    reinterpret_cast<datasketches::theta_intersection*>(dst->ptr)
+        ->update(datasketches::compact_theta_sketch::deserialize(src.ptr, src.len));
+  } catch (const std::exception& e) {
+    LogSketchDeserializationError(ctx, e);
   }
-
-  datasketches::theta_intersection* dst_intersection_ptr =
-      reinterpret_cast<datasketches::theta_intersection*>(dst->ptr);
-
-  dst_intersection_ptr->update(*src_sketch);
 }
 
 StringVal AggregateFunctions::DsThetaIntersectFinalize(
@@ -2307,7 +2245,7 @@ StringVal AggregateFunctions::DsThetaIntersectFinalize(
     return StringVal::null();
   }
   auto sketch = intersection_ptr->get_result();
-  StringVal result = SerializeDsThetaSketch(ctx, sketch);
+  StringVal result = SerializeDsSketch(ctx, sketch);
   ctx->Free(src.ptr);
   return result;
 }
@@ -2332,7 +2270,7 @@ StringVal AggregateFunctions::DsKllSerializeHelper(FunctionContext* ctx,
   DCHECK_EQ(src.len, sizeof(datasketches::kll_sketch<float>));
   datasketches::kll_sketch<float>* sketch_ptr =
       reinterpret_cast<datasketches::kll_sketch<float>*>(src.ptr);
-  StringVal dst = SerializeDsKllSketch(ctx, *sketch_ptr);
+  StringVal dst = SerializeDsSketch(ctx, *sketch_ptr);
   ctx->Free(src.ptr);
   return dst;
 }
@@ -2342,17 +2280,11 @@ void AggregateFunctions::DsKllMergeHelper(FunctionContext* ctx, const StringVal&
   DCHECK(!src.is_null);
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::kll_sketch<float>));
-  datasketches::kll_sketch<float> src_sketch;
-  if (!DeserializeDsSketch(src, &src_sketch)) {
-    LogSketchDeserializationError(ctx);
-    return;
-  }
 
   datasketches::kll_sketch<float>* dst_sketch_ptr =
       reinterpret_cast<datasketches::kll_sketch<float>*>(dst->ptr);
-
   try {
-    dst_sketch_ptr->merge(src_sketch);
+    dst_sketch_ptr->merge(datasketches::kll_sketch<float>::deserialize(src.ptr, src.len));
   } catch (const std::exception& e) {
     ctx->SetError(Substitute("Error while merging DataSketches KLL sketches. "
         "Message: $0", e.what()).c_str());
@@ -2370,7 +2302,7 @@ StringVal AggregateFunctions::DsKllFinalizeHelper(FunctionContext* ctx,
     ctx->Free(src.ptr);
     return StringVal::null();
   }
-  StringVal dst = SerializeDsKllSketch(ctx, *sketch_ptr);
+  StringVal dst = SerializeDsSketch(ctx, *sketch_ptr);
   ctx->Free(src.ptr);
   return dst;
 }
@@ -2416,15 +2348,10 @@ void AggregateFunctions::DsKllUnionUpdate(FunctionContext* ctx, const StringVal&
   if (src.is_null) return;
   DCHECK(!dst->is_null);
   DCHECK_EQ(dst->len, sizeof(datasketches::kll_sketch<float>));
-  datasketches::kll_sketch<float> src_sketch;
-  if (!DeserializeDsSketch(src, &src_sketch)) {
-    LogSketchDeserializationError(ctx);
-    return;
-  }
   datasketches::kll_sketch<float>* dst_sketch =
       reinterpret_cast<datasketches::kll_sketch<float>*>(dst->ptr);
   try {
-    dst_sketch->merge(src_sketch);
+    dst_sketch->merge(datasketches::kll_sketch<float>::deserialize(src.ptr, src.len));
   } catch (const std::exception& e) {
     ctx->SetError(Substitute("Error while merging DataSketches KLL sketches. "
         "Message: $0", e.what()).c_str());

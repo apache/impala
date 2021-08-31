@@ -3,7 +3,7 @@
 # Check that ds_kll_quantile returns error for strings that are not serialized sketches.
 select ds_kll_quantile(date_string_col, 0.5) from functional_parquet.alltypestiny;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch
+UDF ERROR: Error while getting quantile from DataSketches KLL. Message: Possible corruption: M must be 8: 48
 ====
 ---- QUERY
 select ds_kll_quantile(ds_kll_sketch(float_col), -0.1) from functional_parquet.alltypestiny;
@@ -266,7 +266,7 @@ STRING
 # ds_kll_union() returns an error if it receives an invalid serialized sketch.
 select ds_kll_union(date_string_col) from functional_parquet.alltypestiny where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Error while merging DataSketches KLL sketches. Message: Possible corruption: M must be 8: 48
 ====
 ---- QUERY
 # Get the same sketches from Impala and Hive and put them into the same table. When we
@@ -313,7 +313,7 @@ select
     ds_kll_quantiles_as_string(date_string_col, 0.5)
 from functional_parquet.alltypestiny;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch
+UDF ERROR: Error while getting quantiles from DataSketches KLL. Message: Possible corruption: M must be 8: 48
 ====
 ---- QUERY
 # Check error when rank is out of range
@@ -430,7 +430,7 @@ STRING
 # sketches.
 select ds_kll_pmf_as_string(date_string_col, 0.5) from functional_parquet.alltypestiny;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch
+UDF ERROR: Error while running DataSketches KLL function. Message: Possible corruption: M must be 8: 48
 ====
 ---- QUERY
 select
@@ -507,7 +507,7 @@ STRING
 # sketches.
 select ds_kll_cdf_as_string(date_string_col, 0.5) from functional_parquet.alltypestiny;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch
+UDF ERROR: Error while running DataSketches KLL function. Message: Possible corruption: M must be 8: 48
 ====
 ---- QUERY
 select

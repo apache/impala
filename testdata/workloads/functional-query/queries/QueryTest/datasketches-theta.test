@@ -138,17 +138,17 @@ INT,INT,BIGINT,BIGINT
 # Check that ds_theta_estimate returns error for strings that are not serialized sketches.
 select ds_theta_estimate(date_string_col) from functional_parquet.alltypestiny;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
 ====
 ---- QUERY
-# Check that ds_theta_estimate returns error for HLL serialized sketches .
+# Check that ds_theta_estimate returns error for HLL serialized sketches.
 create table hll_sketch_store (date_sketch string) stored as parquet;
 insert into hll_sketch_store
     select ds_hll_sketch(date_string_col)
     from functional_parquet.alltypessmall;
 select ds_theta_estimate(date_sketch) from hll_sketch_store;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 7
 ====
 ---- QUERY
 # Check that ds_theta_estimate returns null for null and empty string inputs.
@@ -208,7 +208,7 @@ STRING
 # ds_theta_union() returns an error if it receives an invalid serialized sketch.
 select ds_theta_union(date_string_col) from functional_parquet.alltypestiny where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
 ====
 ---- QUERY
 # Get the same sketches from Impala and Hive and put them into the same table. When we
@@ -265,7 +265,7 @@ STRING
 select ds_theta_intersect(date_string_col) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
 ====
 ---- QUERY
 # Check that sketches made by Hive for intersection and estimation, which is consistent
@@ -354,17 +354,10 @@ BIGINT
 ====
 ---- QUERY
 # ds_theta_exclude() returns an error if it receives an invalid serialized sketch.
-select ds_theta_exclude(null, date_string_col) from functional_parquet.alltypestiny
+select ds_theta_exclude(date_string_col, date_string_col) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
-====
----- QUERY
-# ds_theta_exclude() returns an error if it receives an invalid serialized sketch.
-select ds_theta_exclude(date_string_col, null) from functional_parquet.alltypestiny
-where id=1;
----- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
 ====
 ---- QUERY
 # Get the same sketches from Impala and Hive and put them into the same table (different
@@ -446,14 +439,14 @@ BIGINT
 select ds_theta_union_f(null, date_string_col) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
 ====
 ---- QUERY
 # ds_theta_union_f() returns an error if it receives an invalid serialized sketch.
 select ds_theta_union_f(date_string_col, null) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
 ====
 ---- QUERY
 # Unions the sketches from theta_sketches_impala_hive2 and checks if the union produces
@@ -520,7 +513,7 @@ BIGINT
 select ds_theta_intersect_f(date_string_col, null) from functional_parquet.alltypestiny
 where id=1;
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
 ====
 ---- QUERY
 # ds_theta_intersect_f() returns an error if it receives an invalid serialized sketch.
@@ -529,7 +522,7 @@ select ds_theta_sketch(float_col) sketch1, max(date_string_col) sketch2 from
 functional_parquet.alltypestiny
 ) t
 ---- CATCH
-UDF ERROR: Unable to deserialize sketch.
+UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actual 47
 ====
 ---- QUERY
 # Intersect the sketches from theta_sketches_impala_hive2 and checks if the intersect
