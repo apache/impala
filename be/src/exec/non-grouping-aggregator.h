@@ -97,6 +97,8 @@ class NonGroupingAggregator : public Aggregator {
   virtual std::string DebugString(int indentation_level = 0) const override;
   virtual void DebugString(int indentation_level, std::stringstream* out) const override;
 
+  virtual int64_t GetNumKeys() const override { return 1; }
+
  private:
   /// MemPool used to allocate memory for 'singleton_output_tuple_'. The ownership of the
   /// pool's memory is transferred to the output batch on eos. The pool should not be

@@ -288,7 +288,7 @@ set num_nodes=1;
 select l_orderkey, l_partkey, l_suppkey, l_linenumber, l_comment
 from tpch_parquet.lineitem
 group by 1, 2, 3, 4, 5, random()
-limit 5
+limit 50000000
 ---- RUNTIME_PROFILE
 row_regex: .*Query State: FINISHED.*
 row_regex: .*Query Status: OK.*
@@ -431,4 +431,19 @@ STRING,DECIMAL,DECIMAL,DECIMAL,DECIMAL,BIGINT
 # Verify that at least one of the Top-N operators spilled.
 row_regex: .*InMemoryHeapsEvicted: .* \([1-9][0-9]*\)
 #row_regex: .*SpilledRuns: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test spilling an agg with a LIMIT; see IMPALA-2581
+set buffer_pool_limit=136m;
+select c.c2 from
+(select distinct (a.id*10000 + b.id) c1, a.int_col c2
+from functional.alltypes a, functional.alltypes b limit 3500000) c join /* +SHUFFLE */ functional.alltypes d on c.c2 = d.int_col
+group by c.c2
+limit 5
+---- TYPES
+BIGINT
+---- RUNTIME_PROFILE
+# Verify that spilling was activated.
+row_regex: .*SpilledPartitions: .* \([1-9][0-9]*\)
+row_regex: .*FastLimitCheckExceededRows: [0-9]+
 ====

@@ -69,6 +69,18 @@ Status AggregationNode::Open(RuntimeState* state) {
     if (num_aggs == 1) {
       RETURN_IF_ERROR(aggs_[0]->AddBatch(state, &child_batch));
       child_batch.Reset();
+      if (fast_limit_check_) {
+        DCHECK(limit() > -1);
+        if (aggs_[0]->GetNumKeys() >= limit()) {
+          eos = true;
+          runtime_profile_->AddInfoString("FastLimitCheckExceededRows",
+              SimpleItoa(aggs_[0]->GetNumKeys() - limit()));
+          VLOG_QUERY << Substitute("the number of rows ($0) returned from the "
+              "aggregation node has exceeded the limit of $1", aggs_[0]->GetNumKeys(),
+              limit());
+          break;
+        }
+      }
       continue;
     }
 

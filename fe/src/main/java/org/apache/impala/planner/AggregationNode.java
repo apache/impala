@@ -429,6 +429,7 @@ public class AggregationNode extends PlanNode {
     boolean replicateInput = aggPhase_ == AggPhase.FIRST && aggInfos_.size() > 1;
     msg.agg_node.setReplicate_input(replicateInput);
     msg.agg_node.setEstimated_input_cardinality(getChild(0).getCardinality());
+    msg.agg_node.setFast_limit_check(canCompleteEarly());
     for (int i = 0; i < aggInfos_.size(); ++i) {
       AggregateInfo aggInfo = aggInfos_.get(i);
       List<TExpr> aggregateFunctions = new ArrayList<>();
@@ -640,5 +641,14 @@ public class AggregationNode extends PlanNode {
 
   public boolean isNonCorrelatedScalarSubquery() {
     return isNonCorrelatedScalarSubquery_;
+  }
+
+  // When both conditions below are true, aggregation can complete early
+  //    a) aggregation node has no aggregate function
+  //    b) aggregation node has no predicate
+  // E.g. SELECT DISTINCT f1,f2,...fn FROM t LIMIT n
+  public boolean canCompleteEarly() {
+    return isSingleClassAgg() && hasLimit() && hasGrouping()
+        && !multiAggInfo_.hasAggregateExprs() && getConjuncts().isEmpty();
   }
 }

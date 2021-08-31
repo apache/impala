@@ -931,7 +931,9 @@ public class DistributedPlanner {
     // if there is a limit, we need to transfer it from the pre-aggregation
     // node in the child fragment to the merge aggregation node in the parent
     long limit = node.getLimit();
-    node.unsetLimit();
+    if (node.getMultiAggInfo().hasAggregateExprs() || !node.getConjuncts().isEmpty()) {
+      node.unsetLimit();
+    }
     node.unsetNeedsFinalize();
 
     // place a merge aggregation step in a new fragment

@@ -134,7 +134,8 @@ static const int STREAMING_HT_MIN_REDUCTION_SIZE =
     sizeof(STREAMING_HT_MIN_REDUCTION) / sizeof(STREAMING_HT_MIN_REDUCTION[0]);
 
 GroupingAggregator::GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
-    const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality)
+    const GroupingAggregatorConfig& config, int64_t estimated_input_cardinality,
+    bool needUnsetLimit)
   : Aggregator(
         exec_node, pool, config, Substitute("GroupingAggregator $0", config.agg_idx_)),
     hash_table_config_(*config.hash_table_config_),
@@ -152,6 +153,9 @@ GroupingAggregator::GroupingAggregator(ExecNode* exec_node, ObjectPool* pool,
     estimated_input_cardinality_(estimated_input_cardinality),
     partition_pool_(new ObjectPool()) {
   DCHECK_EQ(PARTITION_FANOUT, 1 << NUM_PARTITIONING_BITS);
+  if (needUnsetLimit) {
+    UnsetLimit();
+  }
 }
 
 Status GroupingAggregator::Prepare(RuntimeState* state) {
@@ -1317,4 +1321,23 @@ Status GroupingAggregatorConfig::CodegenAddBatchStreamingImpl(
 // Instantiate required templates.
 template Status GroupingAggregator::AppendSpilledRow<false>(Partition*, TupleRow*);
 template Status GroupingAggregator::AppendSpilledRow<true>(Partition*, TupleRow*);
+
+int64_t GroupingAggregator::GetNumKeys() const {
+  int64_t num_keys = 0;
+  for (int i = 0; i < hash_partitions_.size(); ++i) {
+    Partition* partition = hash_partitions_[i];
+    if (partition == nullptr) continue;
+    // We might be dealing with a rebuilt spilled partition, where all partitions are
+    // pointing to a single in-memory partition, so make sure we only proceed for the
+    // right partition.
+    if (i != partition->idx) continue;
+    if (!partition->is_spilled()) {
+      if (partition->hash_tbl == nullptr) {
+        continue;
+      }
+      num_keys += partition->hash_tbl->size();
+    }
+  }
+  return num_keys;
+}
 } // namespace impala

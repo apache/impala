@@ -421,15 +421,16 @@ Per-Host Resources: mem-estimate=13.66MB mem-reservation=4.94MB thread-reservati
 |  |
 |  45:EXCHANGE [HASH(d_month_seq + 3)]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=17 row-size=8B cardinality=108
+|  |  tuple-ids=17 row-size=8B cardinality=2
 |  |  in pipelines: 17(GETNEXT)
 |  |
 |  F17:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=58.00MB mem-reservation=2.25MB thread-reservation=2
 |  18:AGGREGATE [STREAMING]
 |  |  group by: CAST(d_month_seq AS BIGINT) + CAST(3 AS BIGINT)
+|  |  limit: 2
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=17 row-size=8B cardinality=108
+|  |  tuple-ids=17 row-size=8B cardinality=2
 |  |  in pipelines: 17(GETNEXT)
 |  |
 |  17:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
@@ -481,15 +482,16 @@ Per-Host Resources: mem-estimate=13.66MB mem-reservation=4.94MB thread-reservati
 |  |
 |  41:EXCHANGE [HASH(d_month_seq + 1)]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=14 row-size=8B cardinality=108
+|  |  tuple-ids=14 row-size=8B cardinality=2
 |  |  in pipelines: 14(GETNEXT)
 |  |
 |  F14:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Host Resources: mem-estimate=58.00MB mem-reservation=2.25MB thread-reservation=2
 |  15:AGGREGATE [STREAMING]
 |  |  group by: CAST(d_month_seq AS BIGINT) + CAST(1 AS BIGINT)
+|  |  limit: 2
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=8B cardinality=108
+|  |  tuple-ids=14 row-size=8B cardinality=2
 |  |  in pipelines: 14(GETNEXT)
 |  |
 |  14:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
@@ -866,15 +868,16 @@ Per-Instance Resources: mem-estimate=10.24MB mem-reservation=2.00MB thread-reser
 |  |
 |  45:EXCHANGE [HASH(d_month_seq + 3)]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=17 row-size=8B cardinality=108
+|  |  tuple-ids=17 row-size=8B cardinality=2
 |  |  in pipelines: 17(GETNEXT)
 |  |
 |  F17:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.25MB thread-reservation=1
 |  18:AGGREGATE [STREAMING]
 |  |  group by: CAST(d_month_seq AS BIGINT) + CAST(3 AS BIGINT)
+|  |  limit: 2
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=17 row-size=8B cardinality=108
+|  |  tuple-ids=17 row-size=8B cardinality=2
 |  |  in pipelines: 17(GETNEXT)
 |  |
 |  17:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]
@@ -933,15 +936,16 @@ Per-Instance Resources: mem-estimate=10.24MB mem-reservation=2.00MB thread-reser
 |  |
 |  41:EXCHANGE [HASH(d_month_seq + 1)]
 |  |  mem-estimate=16.00KB mem-reservation=0B thread-reservation=0
-|  |  tuple-ids=14 row-size=8B cardinality=108
+|  |  tuple-ids=14 row-size=8B cardinality=2
 |  |  in pipelines: 14(GETNEXT)
 |  |
 |  F14:PLAN FRAGMENT [RANDOM] hosts=1 instances=1
 |  Per-Instance Resources: mem-estimate=26.00MB mem-reservation=2.25MB thread-reservation=1
 |  15:AGGREGATE [STREAMING]
 |  |  group by: CAST(d_month_seq AS BIGINT) + CAST(1 AS BIGINT)
+|  |  limit: 2
 |  |  mem-estimate=10.00MB mem-reservation=2.00MB spill-buffer=64.00KB thread-reservation=0
-|  |  tuple-ids=14 row-size=8B cardinality=108
+|  |  tuple-ids=14 row-size=8B cardinality=2
 |  |  in pipelines: 14(GETNEXT)
 |  |
 |  14:SCAN HDFS [tpcds_parquet.date_dim, RANDOM]

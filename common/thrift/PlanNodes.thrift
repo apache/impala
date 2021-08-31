@@ -475,6 +475,9 @@ struct TAggregationNode {
   // If true, this is the first AggregationNode in a aggregation plan with multiple
   // Aggregators and the entire input to this node should be passed to each Aggregator.
   3: required bool replicate_input
+
+  // Set to true if this aggregation can complete early
+  4: required bool fast_limit_check
 }
 
 struct TSortInfo {

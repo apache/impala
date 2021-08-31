@@ -734,7 +734,8 @@ PLAN-ROOT SINK
 |  |
 |  02:AGGREGATE [STREAMING]
 |  |  group by: functional.alltypestiny.id, functional.alltypestiny.bool_col, functional.alltypestiny.tinyint_col, functional.alltypestiny.smallint_col, functional.alltypestiny.int_col, functional.alltypestiny.bigint_col, functional.alltypestiny.float_col, functional.alltypestiny.double_col, functional.alltypestiny.date_string_col, functional.alltypestiny.string_col, functional.alltypestiny.timestamp_col, functional.alltypestiny.year, functional.alltypestiny.month
-|  |  row-size=89B cardinality=2
+|  |  limit: 1
+|  |  row-size=89B cardinality=1
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
 |     partition predicates: `year` = 2009, `month` = 2

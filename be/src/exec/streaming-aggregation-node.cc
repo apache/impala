@@ -36,7 +36,8 @@ StreamingAggregationNode::StreamingAggregationNode(
     ObjectPool* pool, const AggregationPlanNode& pnode, const DescriptorTbl& descs)
   : AggregationNodeBase(pool, pnode, descs) {
   DCHECK(pnode.tnode_->conjuncts.empty()) << "Preaggs have no conjuncts";
-  DCHECK(limit_ == -1) << "Preaggs have no limits";
+  DCHECK(limit_ == -1 || (limit_ != -1 && fast_limit_check_))
+      << "Preaggs have no limits";
   for (auto& t_agg : pnode.tnode_->agg_node.aggregators) {
     DCHECK(t_agg.use_streaming_preaggregation);
   }
@@ -62,7 +63,7 @@ Status StreamingAggregationNode::GetNext(
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
 
-  if (ReachedLimit()) {
+  if (!fast_limit_check_ && ReachedLimit()) {
     *eos = true;
     return Status::OK();
   }
@@ -123,6 +124,20 @@ Status StreamingAggregationNode::GetRowsStreaming(
       // and 'child_batch_' may have been referencing data that wasn't attached to it.
       if (child_batch_processed_) {
         child_batch_->Reset();
+      }
+      if (fast_limit_check_) {
+        DCHECK(limit() > -1);
+        if (aggs_[0]->GetNumKeys() >= limit()) {
+          child_eos_ = true;
+          child_batch_processed_ = true;
+          child_batch_->Reset();
+          runtime_profile_->AddInfoString("FastLimitCheckExceededRows",
+              SimpleItoa(aggs_[0]->GetNumKeys() - limit()));
+          VLOG_QUERY << Substitute("the number of rows ($0) returned from the streaming "
+              "aggregation node has exceeded the limit of $1",aggs_[0]->GetNumKeys(),
+              limit());
+          break;
+        }
       }
       continue;
     }

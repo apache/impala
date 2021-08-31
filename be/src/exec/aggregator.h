@@ -172,6 +172,9 @@ class Aggregator {
 
   static const char* LLVM_CLASS_NAME;
 
+  // The number of unique values that have been aggregated
+  virtual int64_t GetNumKeys() const = 0;
+
  protected:
   /// The id of the ExecNode this Aggregator corresponds to.
   const int id_;

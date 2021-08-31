@@ -82,7 +82,10 @@ public class ExchangeNode extends PlanNode {
     offset_ = 0;
     children_.add(input);
     // Only apply the limit at the receiver if there are multiple senders.
-    if (input.getFragment().isPartitioned()) limit_ = input.limit_;
+    if (input.getFragment().isPartitioned() &&
+        !(input instanceof AggregationNode && !input.isBlockingNode())) {
+      limit_ = input.limit_;
+    }
     computeTupleIds();
   }
 

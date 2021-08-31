@@ -67,6 +67,9 @@ class AggregationNodeBase : public ExecNode {
   /// END: Members that must be Reset()
   /////////////////////////////////////////
 
+  /// If true, aggregation can be done ahead of time without computing all the input data
+  bool fast_limit_check_ = false;
+
   /// Splits the rows of 'batch' up according to which tuple of the row is non-null such
   /// that a row with tuple 'i' non-null is copied into the batch 'mini_batches[i]'.
   /// It is expected that all rows of 'batch' have exactly 1 non-null tuple.

@@ -2978,7 +2978,8 @@ PLAN-ROOT SINK
 |  |
 |  04:AGGREGATE [STREAMING]
 |  |  group by: i
-|  |  row-size=8B cardinality=20
+|  |  limit: 2
+|  |  row-size=8B cardinality=2
 |  |
 |  01:UNION
 |  |  pass-through-operands: 02
