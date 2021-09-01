@@ -194,7 +194,19 @@ class TSaslClientTransport(TTransportBase, CReadableTransport):
     try:
       read_all = self._trans.readAll # Thrift
     except AttributeError:
-      read_all = self._trans.read # thriftpy
+      def read_all(sz): # thriftpy
+        buff = b''
+        have = 0
+        while have < sz:
+          chunk = self._trans.read(sz - have)
+          have += len(chunk)
+          buff += chunk
+
+          if len(chunk) == 0:
+            raise TTransportException(type=TTransportException.END_OF_FILE,
+                                      message="End of file reading from transport")
+
+        return buff
     return read_all(sz)
 
   def close(self):
