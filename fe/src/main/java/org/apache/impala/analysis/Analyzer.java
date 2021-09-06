@@ -68,6 +68,7 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.planner.JoinNode;
 import org.apache.impala.planner.PlanNode;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.SimplifyCastExprRule;
 import org.apache.impala.rewrite.ConvertToCNFRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
@@ -535,6 +536,7 @@ public class Analyzer {
         rules.add(SimplifyCastStringToTimestamp.INSTANCE);
         rules.add(CountDistinctToNdvRule.INSTANCE);
         rules.add(DefaultNdvScaleRule.INSTANCE);
+        rules.add(SimplifyCastExprRule.INSTANCE);
       }
       exprRewriter_ = new ExprRewriter(rules);
     }

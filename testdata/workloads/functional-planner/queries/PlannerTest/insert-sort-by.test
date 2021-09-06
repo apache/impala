@@ -387,7 +387,7 @@ WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |  partitions=1
 |
 02:SORT
-|  order by: CAST(id AS INT) ASC NULLS LAST
+|  order by: id ASC NULLS LAST
 |  row-size=1B cardinality=2
 |
 01:AGGREGATE [FINALIZE]
@@ -402,7 +402,7 @@ WRITE TO HDFS [test_sort_by.t_nopart, OVERWRITE=false]
 |  partitions=1
 |
 02:SORT
-|  order by: CAST(id AS INT) ASC NULLS LAST
+|  order by: id ASC NULLS LAST
 |  row-size=1B cardinality=2
 |
 01:AGGREGATE [FINALIZE]

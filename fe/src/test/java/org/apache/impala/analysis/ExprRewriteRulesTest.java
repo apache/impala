@@ -32,6 +32,7 @@ import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.QueryFixture;
 import org.apache.impala.common.SqlCastException;
 import org.apache.impala.rewrite.BetweenToCompoundRule;
+import org.apache.impala.rewrite.SimplifyCastExprRule;
 import org.apache.impala.rewrite.ConvertToCNFRule;
 import org.apache.impala.rewrite.EqualityDisjunctsToInRule;
 import org.apache.impala.rewrite.ExprRewriteRule;
@@ -914,5 +915,84 @@ public class ExprRewriteRulesTest extends FrontendTestBase {
 
     RewritesOk(
         "NULL || bool_col", extractCompoundVerticalBarExprRule, "NULL OR bool_col");
+  }
+
+  @Test
+  public void testSimplifyCastExprRule() throws ImpalaException {
+    ExprRewriteRule rule = SimplifyCastExprRule.INSTANCE;
+
+    //Inner expr is a column
+    RewritesOk("functional.alltypes", "CAST(int_col AS INT)", rule, "int_col");
+    RewritesOk("functional.alltypes", "CAST(date_string_col AS STRING)", rule,
+        "date_string_col");
+    RewritesOk("functional.alltypes", "CAST(timestamp_col AS TIMESTAMP)", rule,
+        "timestamp_col");
+    //Multi-layer cast
+    RewritesOk("functional.alltypes", "CAST(CAST(int_col AS INT) AS INT)", rule,
+        "int_col");
+    //No rewrite
+    RewritesOk("functional.alltypes", "CAST(int_col AS BIGINT)", rule, null);
+
+    //Inner expr is an arithmetic expr
+    RewritesOk("functional.alltypes", "CAST(bigint_col+bigint_col AS BIGINT)", rule,
+        "bigint_col + bigint_col");
+    //Multi-layer cast
+    RewritesOk("functional.alltypes", "SUM(CAST(bigint_col+bigint_col AS BIGINT))", rule,
+        "sum(bigint_col + bigint_col)");
+    //No rewrite
+    RewritesOk("functional.alltypes", "CAST(bigint_col+bigint_col AS DOUBLE)", rule,
+        null);
+
+    //Inner expr is also a cast expr
+    RewritesOk("functional.alltypes", "CAST(CAST(int_col AS BIGINT) AS BIGINT)", rule,
+        "CAST(int_col AS BIGINT)");
+    //Multi-layer cast
+    RewritesOk("functional.alltypes",
+        "CAST(CAST(CAST(int_col AS BIGINT) AS BIGINT) AS BIGINT)", rule,
+        "CAST(int_col AS BIGINT)");
+    //No rewrite
+    RewritesOk("functional.alltypes", "CAST(CAST(int_col AS BIGINT) AS INT)", rule, null);
+
+    //Decimal type, d3 type is DECIMAL(20,10)
+    RewritesOk("functional.decimal_tbl", "CAST(d3 AS DECIMAL(20,10))", rule, "d3");
+    RewritesOk("functional.decimal_tbl",
+        "CAST(CAST(d3 AS DECIMAL(10,5)) AS DECIMAL(10,5))", rule,
+        "CAST(d3 AS DECIMAL(10,5))");
+    //No rewrite
+    RewritesOk("functional.decimal_tbl", "CAST(d3 AS DECIMAL(10,5))", rule, null);
+    RewritesOk("functional.decimal_tbl", "CAST(d3 AS DECIMAL(25,15))", rule, null);
+    RewritesOk("functional.decimal_tbl",
+        "CAST(CAST(d3 AS DECIMAL(10,5)) AS DECIMAL(15,5))", rule, null);
+
+    //Varchar type, vc type is VARCHAR(32)
+    RewritesOk("functional.chars_formats", "CAST(vc AS VARCHAR(32))", rule, "vc");
+    RewritesOk("functional.chars_formats",
+        "CAST(CAST(vc AS VARCHAR(16)) AS VARCHAR(16))", rule, "CAST(vc AS VARCHAR(16))");
+    //No rewrite
+    RewritesOk("functional.chars_formats", "CAST(vc AS VARCHAR(16))", rule, null);
+    RewritesOk("functional.chars_formats", "CAST(vc AS VARCHAR(48))", rule, null);
+    RewritesOk("functional.chars_formats",
+        "CAST(CAST(vc AS VARCHAR(48)) AS VARCHAR(16))", rule, null);
+
+    //Array type
+    RewritesOk("functional.allcomplextypes.int_array_col",
+        "CAST(int_array_col.item AS INT)", rule, "int_array_col.item");
+    RewritesOk("functional.allcomplextypes.int_array_col",
+        "CAST(CAST(int_array_col.item AS BIGINT) AS BIGINT)", rule,
+        "CAST(int_array_col.item AS BIGINT)");
+
+    //Map type
+    RewritesOk("functional.allcomplextypes.int_map_col",
+        "CAST(int_map_col.key AS STRING)", rule, "int_map_col.`key`");
+    RewritesOk("functional.allcomplextypes.int_map_col",
+        "CAST(CAST(int_map_col.value AS STRING) AS STRING)", rule,
+        "CAST(int_map_col.value AS STRING)");
+
+    //Struct type
+    RewritesOk("functional.allcomplextypes", "CAST(int_struct_col.f1 AS INT)", rule,
+        "int_struct_col.f1");
+    RewritesOk("functional.allcomplextypes",
+        "CAST(CAST(int_struct_col.f1 AS BIGINT) AS BIGINT)", rule,
+        "CAST(int_struct_col.f1 AS BIGINT)");
   }
 }
