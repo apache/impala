@@ -1,0 +1,93 @@
+====
+---- QUERY
+# Write small Parquet files so we end up writing lots of files.
+SET parquet_file_size=8m;
+CREATE TABLE line_ice
+STORED AS ICEBERG
+AS SELECT * FROM tpch_parquet.lineitem;
+====
+---- QUERY
+# Test that there are multiple Parquet files in the data directory.
+# 'data/.*.10.parq' means that there are at least 10 Parquet files.
+# (3 fragment instances write files, so it means at least 30 files
+#  actually)
+SHOW FILES IN line_ice;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/line_ice/data/.*.10.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+SELECT count(*) FROM line_ice;
+---- RESULTS
+6001215
+---- TYPES
+BIGINT
+====
+---- QUERY
+SET parquet_file_size=8m;
+INSERT OVERWRITE line_ice SELECT * FROM line_ice UNION ALL SELECT * FROM line_ice;
+SELECT count(*) FROM line_ice;
+---- RESULTS
+12002430
+---- TYPES
+BIGINT
+====
+---- QUERY
+SET parquet_file_size=8m;
+INSERT INTO line_ice SELECT * FROM line_ice;
+SELECT count(*) FROM line_ice;
+---- RESULTS
+24004860
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test partitioned tables when writing multiple files.
+SET parquet_file_size=8m;
+CREATE TABLE line_ice_part
+PARTITIONED BY SPEC (l_returnflag)
+STORED AS ICEBERG
+AS SELECT * FROM tpch_parquet.lineitem;
+====
+---- QUERY
+# Test that there are multiple Parquet files in the data directory.
+SHOW FILES IN line_ice_part;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'$NAMENODE/test-warehouse/$DATABASE.db/line_ice_part/data/l_returnflag=N/.*.5.parq','.*',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+SELECT count(*) FROM line_ice_part;
+---- RESULTS
+6001215
+---- TYPES
+BIGINT
+====
+---- QUERY
+TRUNCATE TABLE line_ice_part;
+SELECT count(*) FROM line_ice_part;
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+SET parquet_file_size=8m;
+INSERT OVERWRITE line_ice_part SELECT * FROM tpch_parquet.lineitem;
+SELECT count(*) FROM line_ice_part;
+---- RESULTS
+6001215
+---- TYPES
+BIGINT
+====
+---- QUERY
+SET parquet_file_size=8m;
+INSERT INTO line_ice_part SELECT * FROM line_ice_part;
+SELECT count(*) FROM line_ice_part;
+---- RESULTS
+12002430
+---- TYPES
+BIGINT
+====
