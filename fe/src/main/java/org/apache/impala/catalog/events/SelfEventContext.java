@@ -32,21 +32,27 @@ import org.apache.impala.thrift.TPartitionKeyValue;
 public class SelfEventContext {
   private final String dbName_;
   private final String tblName_;
-  private final long insertEventId_;
+  // eventids for the insert events. In case of an un-partitioned table insert
+  // this list contains only one event id for the insert. In case of partition level
+  // inserts, this contains events 1 to 1 with the partition key values
+  // partitionKeyValues_. For example insertEventIds_.get(0) is the insert event for
+  // partition with values partitionKeyValues_.get(0) and so on
+  private final List<Long> insertEventIds_;
+  // the partition key values for self-event evaluation at the partition level.
+  private final List<List<TPartitionKeyValue>> partitionKeyValues_;
   // version number from the event object parameters used for self-event detection
   private final long versionNumberFromEvent_;
   // service id from the event object parameters used for self-event detection
   private final String serviceidFromEvent_;
-  private final List<List<TPartitionKeyValue>> partitionKeyValues_;
 
   SelfEventContext(String dbName, String tblName,
       Map<String, String> parameters) {
-    this(dbName, tblName, null, parameters, -1);
+    this(dbName, tblName, null, parameters, null);
   }
 
   SelfEventContext(String dbName, String tblName,
       List<List<TPartitionKeyValue>> partitionKeyValues, Map<String, String> parameters) {
-    this(dbName, tblName, partitionKeyValues, parameters, -1);
+    this(dbName, tblName, partitionKeyValues, parameters, null);
   }
 
   /**
@@ -58,19 +64,27 @@ public class SelfEventContext {
    * @param partitionKeyValues Partition key-values in case of self-event
    * context is for partition.
    * @param parameters this could be database, table or partition parameters.
+   * @param insertEventIds In case this is self-event context for an insert event, this
+   *                       parameter provides the list of insert event ids which map to
+   *                       the partitions. In case of unpartitioned table must contain
+   *                       only one event id.
    */
   SelfEventContext(String dbName, @Nullable String tblName,
       @Nullable List<List<TPartitionKeyValue>> partitionKeyValues,
-      Map<String, String> parameters, long eventId) {
+      Map<String, String> parameters, List<Long> insertEventIds) {
     Preconditions.checkNotNull(parameters);
+    // if this is for an insert event on partitions then the size of insertEventIds
+    // must be equal to number of TPartitionKeyValues
+    Preconditions.checkArgument((partitionKeyValues == null ||
+        insertEventIds == null) || partitionKeyValues.size() == insertEventIds.size());
     this.dbName_ = Preconditions.checkNotNull(dbName);
     this.tblName_ = tblName;
     this.partitionKeyValues_ = partitionKeyValues;
-    insertEventId_ = eventId;
-    versionNumberFromEvent_ = Long.parseLong(
+    this.insertEventIds_ = insertEventIds;
+    this.versionNumberFromEvent_ = Long.parseLong(
         MetastoreEvents.getStringProperty(parameters,
             MetastoreEventPropertyKey.CATALOG_VERSION.getKey(), "-1"));
-    serviceidFromEvent_ = MetastoreEvents.getStringProperty(
+    this.serviceidFromEvent_ = MetastoreEvents.getStringProperty(
         parameters, MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(), "");
   }
 
@@ -82,7 +96,9 @@ public class SelfEventContext {
     return tblName_;
   }
 
-  public long getIdFromEvent() { return insertEventId_; }
+  public long getInsertEventId(int idx) {
+    return insertEventIds_.get(idx);
+  }
 
   public long getVersionNumberFromEvent() {
     return versionNumberFromEvent_;
@@ -93,5 +109,9 @@ public class SelfEventContext {
   public List<List<TPartitionKeyValue>> getPartitionKeyValues() {
     return partitionKeyValues_ == null ?
      null : Collections.unmodifiableList(partitionKeyValues_);
+  }
+
+  public boolean isInsertEventContext() {
+    return insertEventIds_ != null;
   }
 }

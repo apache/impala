@@ -181,6 +181,7 @@ class TestEventProcessing(ImpalaTestSuite):
   def test_empty_partition_events(self, unique_database):
     self._run_test_empty_partition_events(unique_database, False)
 
+  @pytest.mark.xfail(run=False, reason="IMPALA-9057")
   def test_event_based_replication(self):
     self.__run_event_based_replication_tests()
 

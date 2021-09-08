@@ -87,12 +87,13 @@ class EventProcessorUtils(object):
      return dict(pairs)
 
   @staticmethod
-  def get_event_processor_metric(metric_key, default_val=None):
-    """Returns the event processor metric from the /events catalog debug page"""
+  def get_int_metric(metric_key, default_val=None):
+    """Returns the int value of event processor metric from the /events catalogd debug
+     page"""
     metrics = EventProcessorUtils.get_event_processor_metrics()
     if metric_key not in metrics:
-      return default_val
-    return metrics[metric_key]
+      return int(default_val)
+    return int(metrics[metric_key])
 
   @staticmethod
   def get_last_synced_event_id():

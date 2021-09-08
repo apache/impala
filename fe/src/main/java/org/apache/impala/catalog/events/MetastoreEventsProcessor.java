@@ -244,6 +244,8 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
   public static final String NUMBER_OF_PARTITIONS_REMOVED = "partitions-removed";
   // number of entries in the delete event log
   public static final String DELETE_EVENT_LOG_SIZE = "delete-event-log-size";
+  // number of batch events generated
+  public static final String NUMBER_OF_BATCH_EVENTS = "batch-events-created";
 
   /**
    * Wrapper around {@link MetastoreEventsProcessor#getNextMetastoreEvents} which passes
@@ -415,6 +417,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
     metrics_.addCounter(NUMBER_OF_PARTITIONS_REMOVED);
     metrics_
         .addGauge(DELETE_EVENT_LOG_SIZE, (Gauge<Integer>) deleteEventLog_::size);
+    metrics_.addCounter(NUMBER_OF_BATCH_EVENTS);
   }
 
   /**
@@ -746,7 +749,7 @@ public class MetastoreEventsProcessor implements ExternalEventsProcessor {
           lastProcessedEvent = event.metastoreNotificationEvent_;
           event.processIfEnabled();
           deleteEventLog_.garbageCollect(event.getEventId());
-          lastSyncedEventId_.set(event.eventId_);
+          lastSyncedEventId_.set(event.getEventId());
         }
       }
     } catch (CatalogException e) {

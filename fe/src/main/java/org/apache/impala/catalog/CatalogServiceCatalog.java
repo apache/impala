@@ -20,6 +20,7 @@ package org.apache.impala.catalog;
 import static org.apache.impala.thrift.TCatalogObjectType.HDFS_PARTITION;
 import static org.apache.impala.thrift.TCatalogObjectType.TABLE;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -48,9 +49,9 @@ import org.apache.hadoop.hdfs.protocol.CachePoolEntry;
 import org.apache.hadoop.hdfs.protocol.CachePoolInfo;
 import org.apache.hadoop.hive.common.ValidTxnList;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
-import org.apache.hadoop.hive.metastore.api.CurrentNotificationEventId;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.authorization.AuthorizationDelta;
@@ -62,15 +63,12 @@ import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.ExternalEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
-import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.events.SelfEventContext;
 import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.catalog.monitor.CatalogTableMetrics;
-import org.apache.impala.catalog.monitor.CatalogMonitor;
 import org.apache.impala.catalog.metastore.CatalogMetastoreServer;
 import org.apache.impala.catalog.metastore.HmsApiNameEnum;
 import org.apache.impala.catalog.metastore.ICatalogMetastoreServer;
-import org.apache.impala.catalog.metastore.NoOpCatalogMetastoreServer;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.Pair;
@@ -936,31 +934,32 @@ public class CatalogServiceCatalog extends Catalog {
    * evaluate if this is a self-event or not
    * @return true if given event information evaluates to a self-event, false otherwise
    */
-  public boolean evaluateSelfEvent(boolean isInsertEvent, SelfEventContext ctx)
-      throws CatalogException {
+  public boolean evaluateSelfEvent(SelfEventContext ctx) throws CatalogException {
     Preconditions.checkState(isEventProcessingActive(),
         "Event processing should be enabled when calling this method");
+    boolean isInsertEvent = ctx.isInsertEventContext();
     long versionNumber =
-        isInsertEvent ? ctx.getIdFromEvent() : ctx.getVersionNumberFromEvent();
+        isInsertEvent ? ctx.getInsertEventId(0) : ctx.getVersionNumberFromEvent();
     String serviceIdFromEvent = ctx.getServiceIdFromEvent();
 
     if (!isInsertEvent) {
       // no version info or service id in the event
       if (versionNumber == -1 || serviceIdFromEvent.isEmpty()) {
-        LOG.info("Not a self-event since the given version is {} and service id is {}",
+        LOG.debug("Not a self-event since the given version is {} and service id is {}",
             versionNumber, serviceIdFromEvent.isEmpty() ? "empty" : serviceIdFromEvent);
         return false;
       }
       // if the service id from event doesn't match with our service id this is not a
       // self-event
       if (!getCatalogServiceId().equals(serviceIdFromEvent)) {
-        LOG.info("Not a self-event because service id of this catalog {} does not match "
+        LOG.debug("Not a self-event because service id of this catalog {} does not match "
                 + "with one in event {}.",
             getCatalogServiceId(), serviceIdFromEvent);
+        return false;
       }
     } else if (versionNumber == -1) {
       // if insert event, we only compare eventId
-      LOG.info("Not a self-event because eventId is {}", versionNumber);
+      LOG.debug("Not a self-event because eventId is {}", versionNumber);
       return false;
     }
     Db db = getDb(ctx.getDbName());
@@ -978,7 +977,7 @@ public class CatalogServiceCatalog extends Catalog {
       try {
         boolean removed = db.removeFromVersionsForInflightEvents(versionNumber);
         if (!removed) {
-          LOG.info("Could not find version {} in the in-flight event list of database "
+          LOG.debug("Could not find version {} in the in-flight event list of database "
               + "{}", versionNumber, db.getName());
         }
         return removed;
@@ -1005,27 +1004,30 @@ public class CatalogServiceCatalog extends Catalog {
         boolean removed =
             tbl.removeFromVersionsForInflightEvents(isInsertEvent, versionNumber);
         if (!removed) {
-          LOG.info("Could not find {} {} in in-flight event list of table {}",
+          LOG.debug("Could not find {} {} in in-flight event list of table {}",
               isInsertEvent ? "eventId" : "version", versionNumber, tbl.getFullName());
         }
         return removed;
       }
       if (tbl instanceof HdfsTable) {
         List<String> failingPartitions = new ArrayList<>();
-        for (List<TPartitionKeyValue> partitionKeyValue : partitionKeyValues) {
+        int len = partitionKeyValues.size();
+        for (int i=0; i<len; ++i) {
+          List<TPartitionKeyValue> partitionKeyValue = partitionKeyValues.get(i);
+          versionNumber = isInsertEvent ? ctx.getInsertEventId(i) : versionNumber;
           HdfsPartition hdfsPartition =
               ((HdfsTable) tbl).getPartitionFromThriftPartitionSpec(partitionKeyValue);
           if (hdfsPartition == null
-              || !hdfsPartition.removeFromVersionsForInflightEvents(
-                     isInsertEvent, versionNumber)) {
+              || !hdfsPartition.removeFromVersionsForInflightEvents(isInsertEvent,
+                  versionNumber)) {
             // even if this is an error condition we should not bail out early since we
             // should clean up the self-event state on the rest of the partitions
             String partName = HdfsTable.constructPartitionName(partitionKeyValue);
             if (hdfsPartition == null) {
-              LOG.info("Partition {} not found during self-event "
-                + "evaluation for the table {}", partName, tbl.getFullName());
+              LOG.debug("Partition {} not found during self-event "
+                  + "evaluation for the table {}", partName, tbl.getFullName());
             } else {
-              LOG.info("Could not find {} in in-flight event list of the partition {} "
+              LOG.trace("Could not find {} in in-flight event list of the partition {} "
                   + "of table {}", versionNumber, partName, tbl.getFullName());
             }
             failingPartitions.add(partName);
@@ -1045,8 +1047,8 @@ public class CatalogServiceCatalog extends Catalog {
    * @param isInsertEvent if false add versionNumber for DDL Event, otherwise add eventId
    * for Insert Event.
    * @param tbl Catalog table
-   * @param versionNumber when isInsertEvent is true, it is eventId to add
-   * when isInsertEvent is false, it is version number to add
+   * @param versionNumber when isInsertEventContext is true, it is eventId to add
+   * when isInsertEventContext is false, it is version number to add
    */
   public void addVersionsForInflightEvents(
       boolean isInsertEvent, Table tbl, long versionNumber) {
@@ -2568,30 +2570,6 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Refresh partition if it exists.
-   *
-   * @return true if partition was reloaded, else false.
-   * @throws CatalogException if partition reload threw an error.
-   * @throws DatabaseNotFoundException if Db doesn't exist.
-   * @throws TableNotFoundException if table doesn't exist.
-   * @throws TableNotLoadedException if table is not loaded in Catalog.
-   */
-  public boolean reloadPartitionIfExists(String dbName, String tblName,
-      List<TPartitionKeyValue> tPartSpec, String reason) throws CatalogException {
-    Table table = getTable(dbName, tblName);
-    if (table == null) {
-      throw new TableNotFoundException(dbName + "." + tblName + " not found");
-    }
-    if (table instanceof IncompleteTable) {
-      throw new TableNotLoadedException(dbName + "." + tblName + " is not loaded");
-    }
-    Reference<Boolean> wasPartitionRefreshed = new Reference<>(false);
-    reloadPartition(table, tPartSpec, wasPartitionRefreshed,
-        CatalogObject.ThriftObjectType.NONE, reason);
-    return wasPartitionRefreshed.getRef();
-  }
-
-  /**
    * Refresh table if exists. Returns true if reloadTable() succeeds, false
    * otherwise.
    */
@@ -2986,7 +2964,11 @@ public class CatalogServiceCatalog extends Catalog {
         throw new CatalogException("Error loading metadata for partition: "
             + hdfsTable.getFullName() + " " + partitionName, e);
       }
-      hdfsTable.reloadPartition(msClient.getHiveClient(), hdfsPartition, hmsPartition);
+      Map<Partition, HdfsPartition> hmsPartToHdfsPart = new HashMap<>();
+      // note that hdfsPartition can be null here which is a valid input argument
+      // in such a case a new hdfsPartition is added and nothing is removed.
+      hmsPartToHdfsPart.put(hmsPartition, hdfsPartition);
+      hdfsTable.reloadPartitions(msClient.getHiveClient(), hmsPartToHdfsPart);
     }
     hdfsTable.setCatalogVersion(newCatalogVersion);
     wasPartitionReloaded.setRef(true);

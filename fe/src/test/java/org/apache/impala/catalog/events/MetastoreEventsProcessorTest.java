@@ -23,6 +23,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.when;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
@@ -33,6 +34,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +48,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.hive.metastore.api.Catalog;
@@ -57,6 +58,7 @@ import org.apache.hadoop.hive.metastore.api.InsertEventRequestData;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.PartitionsRequest;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
@@ -84,7 +86,12 @@ import org.apache.impala.catalog.ScalarFunction;
 import org.apache.impala.catalog.Table;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.events.ConfigValidator.ValidationResult;
+import org.apache.impala.catalog.events.MetastoreEvents.AlterPartitionEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.BatchPartitionEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.AlterTableEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.InsertEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventType;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor.EventProcessorStatus;
@@ -151,14 +158,11 @@ import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import com.google.common.collect.Lists;
 
 import org.mockito.Mockito;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Main test class to cover the functionality of MetastoreEventProcessor. In order to make
@@ -275,10 +279,10 @@ public class MetastoreEventsProcessorTest {
         Mockito.spy(eventsProcessor_);
     for (MetastoreEventProcessorConfig config: MetastoreEventProcessorConfig.values()) {
       String configKey = config.getValidator().getConfigKey();
-      Mockito.when(mockMetastoreEventsProcessor.getConfigValueFromMetastore(configKey,
+      when(mockMetastoreEventsProcessor.getConfigValueFromMetastore(configKey,
           "")).thenReturn("false");
       if (config.equals(MetastoreEventProcessorConfig.METASTORE_DEFAULT_CATALOG_NAME)) {
-        Mockito.when(mockMetastoreEventsProcessor.getConfigValueFromMetastore(configKey,
+        when(mockMetastoreEventsProcessor.getConfigValueFromMetastore(configKey,
             "")).thenReturn("test_custom_catalog");
       }
     }
@@ -1063,6 +1067,9 @@ public class MetastoreEventsProcessorTest {
       InsertEventRequestData insertEventRequestData = new InsertEventRequestData();
       insertEventRequestData.setFilesAdded(newFiles);
       insertEventRequestData.setReplace(isOverwrite);
+      if (partition != null) {
+        insertEventRequestData.setPartitionVal(partition.getValues());
+      }
       partitionInsertEventInfos
           .add(insertEventRequestData);
       MetastoreShim.fireInsertEventHelper(metaStoreClient.getHiveClient(),
@@ -2223,6 +2230,220 @@ public class MetastoreEventsProcessorTest {
         numberOfSelfEventsBefore + 9, selfEventsCountAfter);
   }
 
+  @Test
+  public void testEventBatching() throws Exception {
+    // create test table and generate a real ALTER_PARTITION and INSERT event on it
+    String testTblName = "testEventBatching";
+    createDatabaseFromImpala(TEST_DB_NAME, "test");
+    createTable(TEST_DB_NAME, testTblName, true);
+    List<List<String>> partVals = new ArrayList<>();
+    partVals.add(Collections.singletonList("1"));
+    partVals.add(Collections.singletonList("2"));
+    addPartitions(TEST_DB_NAME, testTblName, partVals);
+    eventsProcessor_.processEvents();
+    alterPartitionsParams(TEST_DB_NAME, testTblName, "testkey", "val", partVals);
+    // we fetch a real alter partition event so that we can generate mocks using its
+    // contents below
+    List<NotificationEvent> events = eventsProcessor_.getNextMetastoreEvents();
+    NotificationEvent alterPartEvent = null;
+    String alterPartitionEventType = "ALTER_PARTITION";
+    for (NotificationEvent event : events) {
+      if (event.getEventType().equalsIgnoreCase(alterPartitionEventType)) {
+        alterPartEvent = event;
+        break;
+      }
+    }
+    assertNotNull(alterPartEvent);
+    String alterPartMessage = alterPartEvent.getMessage();
+
+    // test insert event batching
+    org.apache.hadoop.hive.metastore.api.Table msTbl;
+    List<Partition> partitions;
+    PartitionsRequest req = new PartitionsRequest();
+    req.setDbName(TEST_DB_NAME);
+    req.setTblName(testTblName);
+    try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+      msTbl = metaStoreClient.getHiveClient().getTable(TEST_DB_NAME, testTblName);
+      partitions = metaStoreClient.getHiveClient().getPartitionsRequest(req)
+          .getPartitions();
+    }
+    assertNotNull(msTbl);
+    assertNotNull(partitions);
+    eventsProcessor_.processEvents();
+    // generate 2 insert event on each of the partition
+    for (Partition part : partitions) {
+      simulateInsertIntoTableFromFS(msTbl, 1, part, false);
+    }
+    List<NotificationEvent> insertEvents = eventsProcessor_.getNextMetastoreEvents();
+    NotificationEvent insertEvent = null;
+    for (NotificationEvent event : insertEvents) {
+      if (event.getEventType().equalsIgnoreCase("INSERT")) {
+        insertEvent = event;
+        break;
+      }
+    }
+    assertNotNull(insertEvent);
+    Map<String, String> eventTypeToMessage = new HashMap<>();
+    eventTypeToMessage.put("ALTER_PARTITION", alterPartMessage);
+    eventTypeToMessage.put("INSERT", insertEvent.getMessage());
+    runEventBatchingTest(testTblName, eventTypeToMessage);
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private void runEventBatchingTest(String testTblName,
+      Map<String, String> eventTypeToMessage) throws MetastoreNotificationException {
+    for (String eventType : eventTypeToMessage.keySet()) {
+      String eventMessage = eventTypeToMessage.get(eventType);
+      // we have 10 mock batchable events which should be batched into 1
+      List<MetastoreEvent> mockEvents = createMockEvents(100, 10,
+          eventType, TEST_DB_NAME, testTblName, eventMessage);
+      MetastoreEventFactory eventFactory = eventsProcessor_.getEventsFactory();
+      List<MetastoreEvent> batch = eventFactory.createBatchEvents(mockEvents);
+      assertEquals(1, batch.size());
+      assertTrue(batch.get(0) instanceof BatchPartitionEvent);
+      BatchPartitionEvent batchEvent = (BatchPartitionEvent) batch.get(0);
+      assertEquals(10, batchEvent.getBatchEvents().size());
+      // create a batch which consists of some other events
+      // only contiguous events should be batched
+      // 13-15 mock events which can be batched
+      mockEvents = createMockEvents(13, 3,
+          eventType, TEST_DB_NAME, testTblName, eventMessage);
+      // 17-18 can be batched
+      mockEvents.addAll(createMockEvents(17, 2,
+          eventType, TEST_DB_NAME, testTblName, eventMessage));
+      // event id 20 should not be batched
+      mockEvents.addAll(createMockEvents(20, 1,
+          eventType, TEST_DB_NAME, testTblName, eventMessage));
+      // events 22-24 should be batched
+      mockEvents.addAll(createMockEvents(22, 3,
+          eventType, TEST_DB_NAME, testTblName, eventMessage));
+
+      batch = eventFactory.createBatchEvents(mockEvents);
+      assertEquals(4, batch.size());
+      MetastoreEvent batch1 = batch.get(0);
+      assertEquals(3, ((BatchPartitionEvent) batch1).getBatchEvents().size());
+      MetastoreEvent batch2 = batch.get(1);
+      assertEquals(2, ((BatchPartitionEvent) batch2).getBatchEvents().size());
+      MetastoreEvent batch3 = batch.get(2);
+      if (eventType.equalsIgnoreCase("ALTER_PARTITION")) {
+        assertTrue(batch3 instanceof AlterPartitionEvent);
+      } else {
+        assertTrue(batch3 instanceof InsertEvent);
+      }
+      MetastoreEvent batch4 = batch.get(3);
+      assertEquals(3, ((BatchPartitionEvent) batch4).getBatchEvents().size());
+      // test to make sure that events which have different database name are not
+      // batched
+      mockEvents = createMockEvents(100, 1, eventType, TEST_DB_NAME,
+          testTblName, eventMessage);
+      mockEvents.addAll(createMockEvents(101, 1, eventType, "db1",
+          testTblName, eventMessage));
+
+      List<MetastoreEvent> batchEvents = eventFactory.createBatchEvents(mockEvents);
+      assertEquals(2, batchEvents.size());
+      for (MetastoreEvent event : batchEvents) {
+        if (eventType.equalsIgnoreCase("ALTER_PARTITION")) {
+          assertTrue(event instanceof AlterPartitionEvent);
+        } else {
+          assertTrue(event instanceof InsertEvent);
+        }
+      }
+
+      // test no batching when table name is different
+      mockEvents = createMockEvents(100, 1, eventType, TEST_DB_NAME,
+          testTblName, eventMessage);
+      mockEvents.addAll(createMockEvents(101, 1, eventType, TEST_DB_NAME,
+          "testtbl", eventMessage));
+      batchEvents = eventFactory.createBatchEvents(mockEvents);
+      assertEquals(2, batchEvents.size());
+      for (MetastoreEvent event : batchEvents) {
+        if (eventType.equalsIgnoreCase("ALTER_PARTITION")) {
+          assertTrue(event instanceof AlterPartitionEvent);
+        } else {
+          assertTrue(event instanceof InsertEvent);
+        }
+      }
+    }
+    // make sure 2 events of different event types are not batched together
+    long startEventId = 17;
+    // batch 1
+    List<MetastoreEvent> mockEvents = createMockEvents(startEventId, 3,
+        "ALTER_PARTITION", TEST_DB_NAME, testTblName,
+        eventTypeToMessage.get("ALTER_PARTITION"));
+    // batch 2
+    mockEvents.addAll(createMockEvents(startEventId + mockEvents.size(), 3, "INSERT",
+        TEST_DB_NAME, testTblName, eventTypeToMessage.get("INSERT")));
+    // batch 3 : single event not-batched
+    mockEvents.addAll(
+        createMockEvents(startEventId + mockEvents.size(), 1, "ALTER_PARTITION",
+        TEST_DB_NAME, testTblName, eventTypeToMessage.get("ALTER_PARTITION")));
+    // batch 4 : single event not-batched
+    mockEvents.addAll(createMockEvents(startEventId + mockEvents.size(), 1, "INSERT",
+        TEST_DB_NAME, testTblName, eventTypeToMessage.get("INSERT")));
+    // batch 5 : single event not-batched
+    mockEvents.addAll(
+        createMockEvents(startEventId + mockEvents.size(), 1, "ALTER_PARTITION",
+            TEST_DB_NAME, testTblName, eventTypeToMessage.get("ALTER_PARTITION")));
+    // batch 6
+    mockEvents.addAll(createMockEvents(startEventId + mockEvents.size(), 5, "INSERT",
+        TEST_DB_NAME, testTblName, eventTypeToMessage.get("INSERT")));
+    // batch 7
+    mockEvents.addAll(
+        createMockEvents(startEventId + mockEvents.size(), 5, "ALTER_PARTITION",
+            TEST_DB_NAME, testTblName, eventTypeToMessage.get("ALTER_PARTITION")));
+    List<MetastoreEvent> batchedEvents = eventsProcessor_.getEventsFactory()
+        .createBatchEvents(mockEvents);
+    assertEquals(7, batchedEvents.size());
+    // batch 1 should contain 3 AlterPartitionEvent
+    BatchPartitionEvent<AlterPartitionEvent> batch1 = (BatchPartitionEvent
+        <AlterPartitionEvent>) batchedEvents.get(0);
+    assertEquals(3, batch1.getNumberOfEvents());
+    // batch 2 should contain 3 InsertEvent
+    BatchPartitionEvent<InsertEvent> batch2 = (BatchPartitionEvent
+        <InsertEvent>) batchedEvents.get(1);
+    assertEquals(3, batch2.getNumberOfEvents());
+    // 3rd is a single non-batch event
+    assertTrue(batchedEvents.get(2) instanceof AlterPartitionEvent);
+    // 4th is a single non-batch insert event
+    assertTrue(batchedEvents.get(3) instanceof InsertEvent);
+    // 5th is a single non-batch alter partition event
+    assertTrue(batchedEvents.get(4) instanceof AlterPartitionEvent);
+    // 6th is batch insert event of size 5
+    BatchPartitionEvent<InsertEvent> batch6 = (BatchPartitionEvent
+        <InsertEvent>) batchedEvents.get(5);
+    assertEquals(5, batch6.getNumberOfEvents());
+    // 7th is batch of alter partitions of size 5
+    BatchPartitionEvent<AlterPartitionEvent> batch7 = (BatchPartitionEvent
+        <AlterPartitionEvent>) batchedEvents.get(6);
+    assertEquals(5, batch7.getNumberOfEvents());
+  }
+
+
+  /**
+   * Creates mock notification event from the given list of parameters. The message
+   * should be a legal parsable message from a real notification event.
+   */
+  private List<MetastoreEvent> createMockEvents(long startEventId, int numEvents,
+      String eventType, String dbName, String tblName, String message)
+      throws MetastoreNotificationException {
+    List<NotificationEvent> mockEvents = new ArrayList<>();
+    for (int i=0; i<numEvents; i++) {
+      NotificationEvent mock = Mockito.mock(NotificationEvent.class);
+      when(mock.getEventId()).thenReturn(startEventId);
+      when(mock.getEventType()).thenReturn(eventType);
+      when(mock.getDbName()).thenReturn(dbName);
+      when(mock.getTableName()).thenReturn(tblName);
+      when(mock.getMessage()).thenReturn(message);
+      mockEvents.add(mock);
+      startEventId++;
+    }
+    List<MetastoreEvent> metastoreEvents = new ArrayList<>();
+    for (NotificationEvent notificationEvent : mockEvents) {
+      metastoreEvents.add(eventsProcessor_.getEventsFactory().get(notificationEvent));
+    }
+    return metastoreEvents;
+  }
+
   private abstract class AlterTableExecutor {
     protected abstract void execute() throws Exception;
 
@@ -2391,7 +2612,7 @@ public class MetastoreEventsProcessorTest {
             + "self-event", hdfsPartition,
         catalog_.getHdfsPartition(TEST_DB_NAME, testTblName, partKeyVals));
 
-    // compute stats on the table and make sure that the table and its partittions are
+    // compute stats on the table and make sure that the table and its partitions are
     // not refreshed due to the events
     alterTableComputeStats(testTblName, Arrays.asList(Arrays.asList("1"),
         Arrays.asList("2")));
@@ -3142,6 +3363,20 @@ public class MetastoreEventsProcessorTest {
             tblName,
             partVal);
         partition.getSd().setLocation(location);
+        partitions.add(partition);
+      }
+      metaStoreClient.getHiveClient().alter_partitions(TEST_DB_NAME, tblName, partitions);
+    }
+  }
+
+  private void alterPartitionsParams(String db, String tblName, String key,
+      String val, List<List<String>> partVals) throws Exception {
+    try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+      List<Partition> partitions = new ArrayList<>();
+      for (List<String> partVal : partVals) {
+        Partition partition = metaStoreClient.getHiveClient().getPartition(TEST_DB_NAME,
+            tblName, partVal);
+        partition.getParameters().put(key, val);
         partitions.add(partition);
       }
       metaStoreClient.getHiveClient().alter_partitions(TEST_DB_NAME, tblName, partitions);

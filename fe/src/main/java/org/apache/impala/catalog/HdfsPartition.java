@@ -875,7 +875,8 @@ public class HdfsPartition extends CatalogObjectImpl
    * Insert events. If false, remove version number from list of versions for in-flight
    * DDL events.
    * @param versionNumber when isInsertEvent is true, it's eventId to remove
-   *                      when isInsertEvent is false, it's version number to remove
+   *                      when isInsertEvent is false, it's version number to
+   *                      remove.
    * @return true if the versionNumber was removed, false if it didn't exist
    */
   public boolean removeFromVersionsForInflightEvents(
@@ -885,8 +886,8 @@ public class HdfsPartition extends CatalogObjectImpl
             + "partition " + getPartitionName() + " of table " + table_.getFullName());
     boolean ret = inFlightEvents_.remove(isInsertEvent, versionNumber);
     if (!ret) {
-      LOG.debug("Remove of in-flight version number failed for {}: {}", versionNumber,
-          inFlightEvents_.print());
+      LOG.trace("Failed to remove in-flight version number {}: in-flight events: {}",
+          versionNumber, inFlightEvents_.print());
     }
     return ret;
   }

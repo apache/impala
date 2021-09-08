@@ -197,12 +197,9 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
 
     # get the metric before values
     EventProcessorUtils.wait_for_event_processing(self)
-    create_metric_val_before = EventProcessorUtils. \
-      get_event_processor_metric(create_metric_name, 0)
-    removed_metric_val_before = EventProcessorUtils. \
-      get_event_processor_metric(removed_metric_name, 0)
-    events_skipped_before = EventProcessorUtils. \
-      get_event_processor_metric('events-skipped', 0)
+    create_metric_val_before = EventProcessorUtils.get_int_metric(create_metric_name, 0)
+    removed_metric_val_before = EventProcessorUtils.get_int_metric(removed_metric_name, 0)
+    events_skipped_before = EventProcessorUtils.get_int_metric('events-skipped', 0)
     num_iters = 100
     for iter in xrange(num_iters):
       for q in queries:
@@ -212,22 +209,19 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
           print("Failed in {} iterations. Error {}".format(iter, str(e)))
           raise
     EventProcessorUtils.wait_for_event_processing(self)
-    create_metric_val_after = EventProcessorUtils. \
-      get_event_processor_metric(create_metric_name, 0)
-    removed_metric_val_after = EventProcessorUtils. \
-      get_event_processor_metric(removed_metric_name, 0)
-    events_skipped_after = EventProcessorUtils. \
-      get_event_processor_metric('events-skipped', 0)
-    num_delete_event_entries = EventProcessorUtils. \
-      get_event_processor_metric('delete-event-log-size', 0)
+    create_metric_val_after = EventProcessorUtils.get_int_metric(create_metric_name, 0)
+    removed_metric_val_after = EventProcessorUtils.get_int_metric(removed_metric_name, 0)
+    events_skipped_after = EventProcessorUtils.get_int_metric('events-skipped', 0)
+    num_delete_event_entries = EventProcessorUtils.\
+        get_int_metric('delete-event-log-size', 0)
     assert EventProcessorUtils.get_event_processor_status() == "ACTIVE"
     # None of the queries above should actually trigger a add/remove object from events
-    assert int(create_metric_val_after) == int(create_metric_val_before)
-    assert int(removed_metric_val_after) == int(removed_metric_val_before)
+    assert create_metric_val_after == create_metric_val_before
+    assert removed_metric_val_after == removed_metric_val_before
     # each query set generates 2 events and both of them should be skipped
-    assert int(events_skipped_after) == num_iters * 2 + int(events_skipped_before)
+    assert events_skipped_after == num_iters * 2 + events_skipped_before
     # make sure that there are no more entries in the delete event log
-    assert int(num_delete_event_entries) == 0
+    assert num_delete_event_entries == 0
 
   @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
   def test_self_events(self, unique_database):
@@ -237,6 +231,99 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     refreshed"""
     self.__run_self_events_test(unique_database, True)
     self.__run_self_events_test(unique_database, False)
+
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
+  def test_event_batching(self, unique_database):
+    """Runs queries which generate multiple ALTER_PARTITION events which must be
+    batched by events processor. Runs as a custom cluster test to isolate the metric
+    values from other tests."""
+    testtbl = "test_event_batching"
+    test_acid_tbl = "test_event_batching_acid"
+    acid_props = self.__get_transactional_tblproperties(True)
+    # create test tables
+    self.client.execute(
+      "create table {}.{} like functional.alltypes".format(unique_database, testtbl))
+    self.client.execute(
+      "insert into {}.{} partition (year,month) select * from functional.alltypes".format(
+        unique_database, testtbl))
+    self.client.execute(
+      "create table {}.{} (id int) partitioned by (year int, month int) {}".format(
+        unique_database, test_acid_tbl, acid_props))
+    self.client.execute(
+      "insert into {}.{} partition (year, month) "
+      "select id, year, month from functional.alltypes".format(unique_database,
+        test_acid_tbl))
+    # run compute stats from impala; this should generate 24 ALTER_PARTITION events which
+    # should be batched together into 1 or more number of events.
+    EventProcessorUtils.wait_for_event_processing(self)
+    batch_events_metric = "batch-events-created"
+    batch_events_1 = EventProcessorUtils.get_int_metric(batch_events_metric)
+    self.client.execute("compute stats {}.{}".format(unique_database, testtbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    batch_events_2 = EventProcessorUtils.get_int_metric(batch_events_metric)
+    assert batch_events_2 > batch_events_1
+    # run analyze stats event from hive which generates ALTER_PARTITION event on each
+    # partition of the table
+    self.run_stmt_in_hive(
+      "analyze table {}.{} compute statistics".format(unique_database, testtbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    batch_events_3 = EventProcessorUtils.get_int_metric(batch_events_metric)
+    assert batch_events_3 > batch_events_2
+    # in case of transactional table since we batch the events together, the number of
+    # tables refreshed must be far lower than number of events generated
+    num_table_refreshes_1 = EventProcessorUtils.get_int_metric(
+      "tables-refreshed")
+    self.client.execute("compute stats {}.{}".format(unique_database, test_acid_tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    batch_events_4 = EventProcessorUtils.get_int_metric(batch_events_metric)
+    num_table_refreshes_2 = EventProcessorUtils.get_int_metric(
+      "tables-refreshed")
+    # we should generate atleast 1 batch event if not more due to the 24 consecutive
+    # ALTER_PARTITION events
+    assert batch_events_4 > batch_events_3
+    # table should not be refreshed since this is a self-event
+    assert num_table_refreshes_2 == num_table_refreshes_1
+    self.run_stmt_in_hive(
+      "analyze table {}.{} compute statistics".format(unique_database, test_acid_tbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    batch_events_5 = EventProcessorUtils.get_int_metric(batch_events_metric)
+    assert batch_events_5 > batch_events_4
+    num_table_refreshes_2 = EventProcessorUtils.get_int_metric("tables-refreshed")
+    # the analyze table from hive generates 24 ALTER_PARTITION events which should be
+    # batched into 1-2 batches (depending on timing of the event poll thread).
+    assert num_table_refreshes_2 > num_table_refreshes_1
+    assert int(num_table_refreshes_2) - int(num_table_refreshes_1) < 24
+    EventProcessorUtils.wait_for_event_processing(self)
+    # test for batching of insert events
+    batch_events_insert = EventProcessorUtils.get_int_metric(batch_events_metric)
+    tables_refreshed_insert = EventProcessorUtils.get_int_metric("tables-refreshed")
+    partitions_refreshed_insert = EventProcessorUtils.get_int_metric(
+      "partitions-refreshed")
+    self.client.execute(
+      "insert into {}.{} partition (year,month) select * from functional.alltypes".format(
+        unique_database, testtbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    batch_events_after_insert = EventProcessorUtils.get_int_metric(batch_events_metric)
+    tables_refreshed_after_insert = EventProcessorUtils.get_int_metric("tables-refreshed")
+    partitions_refreshed_after_insert = EventProcessorUtils.get_int_metric(
+      "partitions-refreshed")
+    # this is a self-event tables or partitions should not be refreshed
+    assert batch_events_after_insert > batch_events_insert
+    assert tables_refreshed_after_insert == tables_refreshed_insert
+    assert partitions_refreshed_after_insert == partitions_refreshed_insert
+    # run the insert from hive to make sure that batch event is refreshing all the
+    # partitions
+    self.run_stmt_in_hive(
+      "SET hive.exec.dynamic.partition.mode=nonstrict; insert into {}.{} partition"
+      " (year,month) select * from functional.alltypes".format(
+        unique_database, testtbl))
+    EventProcessorUtils.wait_for_event_processing(self)
+    batch_events_after_hive = EventProcessorUtils.get_int_metric(batch_events_metric)
+    partitions_refreshed_after_hive = EventProcessorUtils.get_int_metric(
+      "partitions-refreshed")
+    assert batch_events_after_hive > batch_events_insert
+    # 24 partitions inserted and hence we must refresh 24 partitions once.
+    assert int(partitions_refreshed_after_hive) == int(partitions_refreshed_insert) + 24
 
   def __run_self_events_test(self, db_name, use_impala):
     recover_tbl_name = ImpalaTestSuite.get_random_name("tbl_")
@@ -412,8 +499,8 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     self.client.execute("refresh {0}.{1}".format(db_name, tbl_name))
     self_event_test_queries = [
       # ALTER_DATABASE cases
-      "alter database {0} set dbproperties ('comment'='self-event test database')".format(
-        db_name),
+      "alter database {0} set dbproperties ('comment'='self-event test "
+      "database')".format(db_name),
       "alter database {0} set owner user `test-user`".format(db_name),
       # ALTER_TABLE case
       "alter table {0}.{1} set tblproperties ('k'='v')".format(db_name, tbl_name),
@@ -455,12 +542,10 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     Gets the tables-refreshed, partitions-refreshed and events-skipped metric values
     from Metastore EventsProcessor
     """
-    tbls_refreshed_count = EventProcessorUtils.get_event_processor_metric(
-      'tables-refreshed', 0)
-    partitions_refreshed_count = EventProcessorUtils.get_event_processor_metric(
+    tbls_refreshed_count = EventProcessorUtils.get_int_metric('tables-refreshed', 0)
+    partitions_refreshed_count = EventProcessorUtils.get_int_metric(
       'partitions-refreshed', 0)
-    events_skipped_count = EventProcessorUtils.get_event_processor_metric(
-      'events-skipped', 0)
+    events_skipped_count = EventProcessorUtils.get_int_metric('events-skipped', 0)
     return int(tbls_refreshed_count), int(partitions_refreshed_count), \
       int(events_skipped_count)
 

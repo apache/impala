@@ -4074,17 +4074,21 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Reloads a partition if exists and has not been removed since the event was generated.
+   * Reloads the given partitions if the exists and have not been removed since the event
+   * was generated.
+   *
    * @param eventId EventId being processed.
    * @param dbName Database name for the partition
    * @param tblName Table name for the partition
-   * @param partition {@link Partition} object from the event.
+   * @param partsFromEvent List of {@link Partition} objects from the events to be
+   *                       reloaded.
    * @param reason Reason for reloading the partitions for logging purposes.
-   * @return True if the partition was reloaded; else false.
-   * @throws CatalogException
+   * @return the number of partitions which were reloaded. If the table does not exist,
+   * returns 0. Some partitions could be skipped if they don't exist anymore.
    */
-  public boolean reloadPartitionIfExists(long eventId, String dbName,
-      String tblName, Partition partition, String reason) throws CatalogException {
+  public int reloadPartitionsIfExist(long eventId, String dbName,
+      String tblName, List<Partition> partsFromEvent, String reason)
+      throws CatalogException {
     Table table = catalog_.getTable(dbName, tblName);
     if (table == null) {
       DeleteEventLog deleteEventLog = catalog_.getMetastoreEventProcessor()
@@ -4094,7 +4098,7 @@ public class CatalogOpExecutor {
         LOG.info(
             "Not reloading the partition of table {} since it was removed "
                 + "later in catalog", new TableName(dbName, tblName));
-        return false;
+        return 0;
       } else {
         throw new TableNotFoundException(
             "Table " + dbName + "." + tblName + " not found");
@@ -4103,7 +4107,7 @@ public class CatalogOpExecutor {
     if (table instanceof IncompleteTable) {
       LOG.info("Table {} is not loaded. Skipping drop partition event {}",
           table.getFullName(), eventId);
-      return false;
+      return 0;
     }
     if (!(table instanceof HdfsTable)) {
       throw new CatalogException("Partition event received on a non-hdfs table");
@@ -4113,33 +4117,32 @@ public class CatalogOpExecutor {
       long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
       catalog_.getLock().writeLock().unlock();
       HdfsTable hdfsTable = (HdfsTable) table;
-      List<LiteralExpr> partExprs = hdfsTable
-          .getTypeCompatiblePartValues(partition.getValues());
-      HdfsPartition hdfsPartition = hdfsTable.getPartition(partExprs);
-      if (hdfsPartition == null) {
-        LOG.info("Not reloading the partition {} since it does not exist anymore",
-            FileUtils.makePartName(hdfsTable.getClusteringColNames(),
-                partition.getValues()));
-        return false;
+      // some partitions from the event or the table itself
+      // may not exist in HMS anymore. Hence, we collect the names here and re-fetch
+      // the partitions from HMS.
+      List<String> partNames = new ArrayList<>();
+      for (Partition part : partsFromEvent) {
+        partNames.add(FileUtils.makePartName(hdfsTable.getClusteringColNames(),
+            part.getValues(), null));
       }
-      Reference<Boolean> wasPartitionRefreshed = new Reference<>();
-      catalog_.reloadHdfsPartition(hdfsTable, hdfsPartition.getPartitionName(),
-          wasPartitionRefreshed, ThriftObjectType.NONE, reason, newCatalogVersion,
-          hdfsPartition);
-      if (wasPartitionRefreshed.getRef()) {
-        LOG.info("EventId: {} Table {} partition {} has been refreshed", eventId,
-            hdfsTable.getFullName(),
-            FileUtils.makePartName(hdfsTable.getClusteringColNames(),
-                partition.getValues()));
+      int numOfPartsReloaded;
+      try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
+        numOfPartsReloaded = hdfsTable.reloadPartitionsFromNames(
+            metaStoreClient.getHiveClient(), partNames, reason);
       }
-      return wasPartitionRefreshed.getRef();
-    } catch (InternalException | UnsupportedEncodingException e) {
+      hdfsTable.setCatalogVersion(newCatalogVersion);
+      return numOfPartsReloaded;
+    } catch (TableLoadingException e) {
+      LOG.info("Could not reload {} partitions of table {}", partsFromEvent.size(),
+          table.getFullName(), e);
+    } catch (InternalException e) {
       throw new CatalogException(
-          "Unable to add partition for table " + table.getFullName(), e);
+          "Could not acquire lock on the table " + table.getFullName(), e);
     } finally {
       UnlockWriteLockIfErronouslyLocked();
       table.releaseWriteLock();
     }
+    return 0;
   }
 
   public ReentrantLock getMetastoreDdlLock() {

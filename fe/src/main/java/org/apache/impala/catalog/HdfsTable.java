@@ -49,6 +49,8 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.ForeignKeysRequest;
+import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.PrimaryKeysRequest;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -2674,25 +2676,90 @@ public class HdfsTable extends Table implements FeFsTable {
   }
 
   /**
-   * Reloads the metadata of partition 'oldPartition' by removing
-   * it from the table and reconstructing it from the HMS partition object
-   * 'hmsPartition'. If old partition is null then nothing is removed and
-   * and partition constructed from 'hmsPartition' is simply added.
+   * Generates a debug string useful for logging purposes. It returns a string consisting
+   * of names from the given list until the limit and then appends the count of the
+   * remaining items.
    */
-  public void reloadPartition(IMetaStoreClient client, HdfsPartition oldPartition,
-      Partition hmsPartition) throws CatalogException {
-    HdfsPartition.Builder partBuilder = createPartitionBuilder(
-        hmsPartition.getSd(), hmsPartition, new FsPermissionCache());
-    Preconditions.checkArgument(oldPartition == null
-        || HdfsPartition.comparePartitionKeyValues(
-            oldPartition.getPartitionValues(), partBuilder.getPartitionValues()) == 0);
-    if (oldPartition != null) {
-      partBuilder.setFileDescriptors(oldPartition);
+  private static String generateDebugStr(List<String> items, int limit) {
+    String result = Joiner.on(',').join(Iterables.limit(items, limit));
+    if (items.size() > limit) {
+      result = String.format("%s... and %s others", result, items.size()-limit);
     }
-    loadFileMetadataForPartitions(client, ImmutableList.of(partBuilder),
-        /*isRefresh=*/true);
-    dropPartition(oldPartition, false);
-    addPartition(partBuilder.build());
+    return result;
+  }
+
+  /**
+   * Reloads the HdfsPartitions which correspond to the given partNames. Returns the
+   * number of partitions which were reloaded.
+   */
+  public int reloadPartitionsFromNames(IMetaStoreClient client,
+      List<String> partNames, String reason) throws CatalogException {
+    Preconditions.checkState(partNames != null && !partNames.isEmpty());
+    LOG.info(String.format("Reloading partition metadata: %s %s (%s)",
+        getFullName(), generateDebugStr(partNames, 3), reason));
+    List<Partition> hmsPartitions;
+    Map<Partition, HdfsPartition> hmsPartToHdfsPart = new HashMap<>();
+    try {
+      hmsPartitions = client.getPartitionsByNames(getDb().getName(),
+          getName(), partNames);
+      for (Partition partition : hmsPartitions) {
+        List<LiteralExpr> partExprs = getTypeCompatiblePartValues(partition.getValues());
+        HdfsPartition hdfsPartition = getPartition(partExprs);
+        if (hdfsPartition != null) {
+          hmsPartToHdfsPart.put(partition, hdfsPartition);
+        }
+      }
+      reloadPartitions(client, hmsPartToHdfsPart);
+      return hmsPartToHdfsPart.size();
+    } catch (NoSuchObjectException e) {
+      // HMS throws a NoSuchObjectException if the table does not exist
+      // in HMS anymore. In case the partitions don't exist in HMS it does not include
+      // them in the result of getPartitionsByNames.
+      throw new TableLoadingException(
+          "Error when reloading partitions for table " + getFullName(), e);
+    } catch (TException | UnsupportedEncodingException e2) {
+      throw new CatalogException(
+          "Unexpected error while retrieving partitions for table " + getFullName(), e2);
+    }
+  }
+
+  /**
+   * Reloads the metadata of partitions given by a map of HMS Partitions to existing (old)
+   * HdfsPartitions.
+   * @param hmsPartsToHdfsParts The map of HMS partition object to the old HdfsPartition.
+   *                            Every key-value in this map represents the HdfsPartition
+   *                            which needs to be removed from the table and
+   *                            reconstructed from the HMS partition key. If the
+   *                            value for a given partition key is null then nothing is
+   *                            removed and a new HdfsPartition is simply added.
+   */
+  public void reloadPartitions(IMetaStoreClient client,
+      Map<Partition, HdfsPartition> hmsPartsToHdfsParts) throws CatalogException {
+    FsPermissionCache permissionCache = new FsPermissionCache();
+    Map<HdfsPartition.Builder, HdfsPartition> partBuilderToPartitions = new HashMap<>();
+    for (Map.Entry<Partition, HdfsPartition> entry : hmsPartsToHdfsParts.entrySet()) {
+      Partition hmsPartition = entry.getKey();
+      HdfsPartition oldPartition = entry.getValue();
+      HdfsPartition.Builder partBuilder = createPartitionBuilder(
+          hmsPartition.getSd(), hmsPartition, permissionCache);
+      Preconditions.checkArgument(oldPartition == null
+          || HdfsPartition.comparePartitionKeyValues(
+          oldPartition.getPartitionValues(), partBuilder.getPartitionValues()) == 0);
+      if (oldPartition != null) {
+        partBuilder.setFileDescriptors(oldPartition);
+      }
+      partBuilderToPartitions.put(partBuilder, oldPartition);
+    }
+    // load file metadata in parallel
+    loadFileMetadataForPartitions(client,
+        partBuilderToPartitions.keySet(),/*isRefresh=*/true);
+    for (Map.Entry<HdfsPartition.Builder, HdfsPartition> entry :
+        partBuilderToPartitions.entrySet()) {
+      if (entry.getValue() != null) {
+        dropPartition(entry.getValue(), false);
+      }
+      addPartition(entry.getKey().build());
+    }
   }
 
   /**
