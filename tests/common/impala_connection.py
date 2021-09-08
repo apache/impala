@@ -77,6 +77,13 @@ class OperationHandle(object):
 # Represents an Impala connection.
 class ImpalaConnection(object):
   __metaclass__ = abc.ABCMeta
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    self.close()
+
   @abc.abstractmethod
   def set_configuration_option(self, name, value):
     """Sets a configuraiton option name to the given value"""
