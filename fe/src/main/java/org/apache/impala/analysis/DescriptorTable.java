@@ -141,22 +141,21 @@ public class DescriptorTable {
       SlotDescriptor slotDesc = getSlotDesc(id);
       if (slotDesc.isMaterialized()) continue;
       slotDesc.setIsMaterialized(true);
+      // If we are inside a struct, we need to materialise all enclosing struct
+      // SlotDescriptors, otherwise these descriptors will be hanging in the air.
+      materializeParentStructSlots(slotDesc);
       // Don't add the TupleDescriptor that is for struct children.
       if (slotDesc.getParent().getParentSlotDesc() == null) {
         affectedTuples.add(slotDesc.getParent());
       }
-      if (slotDesc.getType().isStructType()) {
-        TupleDescriptor childrenTuple = slotDesc.getItemTupleDesc();
-        Preconditions.checkNotNull(childrenTuple);
-        Preconditions.checkState(childrenTuple.getSlots().size() > 0);
-        List<SlotId> childrenIds = Lists.newArrayList();
-        for (SlotDescriptor childSlot : childrenTuple.getSlots()) {
-          childrenIds.add(childSlot.getId());
-        }
-        markSlotsMaterialized(childrenIds);
-      }
     }
     return affectedTuples;
+  }
+
+  private void materializeParentStructSlots(SlotDescriptor desc) {
+    for (SlotDescriptor slotDesc : desc.getEnclosingStructSlotDescs()) {
+      slotDesc.setIsMaterialized(true);
+    }
   }
 
   /**

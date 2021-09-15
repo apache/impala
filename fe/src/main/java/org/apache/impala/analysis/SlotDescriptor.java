@@ -190,6 +190,66 @@ public class SlotDescriptor {
     return stats_;
   }
 
+  private void getEnclosingStructSlotAndTupleDescs(List<SlotDescriptor> slotDescs,
+      List<TupleDescriptor> tupleDescs) {
+    TupleDescriptor tupleDesc = getParent();
+    while (tupleDesc != null) {
+      if (tupleDescs != null) tupleDescs.add(tupleDesc);
+
+      final SlotDescriptor parentStructSlotDesc = tupleDesc.getParentSlotDesc();
+      if (parentStructSlotDesc != null && slotDescs != null) {
+        slotDescs.add(parentStructSlotDesc);
+      }
+
+      tupleDesc = parentStructSlotDesc != null ? parentStructSlotDesc.getParent() : null;
+    }
+  }
+
+  /**
+   * Returns the slot descs of the structs that contain this slot desc, recursively.
+   * For an example struct 'outer: <middle: <inner: <i: int>>>', called for the slot desc
+   * of 'i', the returned list will contain the slot descs of 'inner', 'middle' and
+   * 'outer'.
+   */
+  public List<SlotDescriptor> getEnclosingStructSlotDescs() {
+    List<SlotDescriptor> result = new ArrayList<>();
+    getEnclosingStructSlotAndTupleDescs(result, null);
+    return result;
+  }
+
+  /**
+   * Returns the tuple descs enclosing this slot desc, recursively.
+   * For an example struct 'outer: <middle: <inner: <i: int>>>', called for the slot desc
+   * of 'i', the returned list will contain the 'itemTupleDesc_'s of 'inner', 'middle'
+   * and 'outer' as well as the tuple desc of the main tuple (the 'parent_' of the slot
+   * desc of 'outer').
+   */
+  public List<TupleDescriptor> getEnclosingTupleDescs() {
+    List<TupleDescriptor> result = new ArrayList<>();
+    getEnclosingStructSlotAndTupleDescs(null, result);
+    return result;
+  }
+
+  /**
+   * Returns the size of the slot without null indicators.
+   *
+   * Takes materialisation into account: returns 0 for non-materialised slots. This is
+   * most relevant for structs as it is possible that only a subset of the fields are
+   * materialised and the size of the struct varies according to this.
+   */
+  public int getMaterializedSlotSize() {
+    if (!isMaterialized()) return 0;
+    if (!getType().isStructType()) return getType().getSlotSize();
+
+    Preconditions.checkNotNull(itemTupleDesc_);
+    int size = 0;
+    for (SlotDescriptor d : itemTupleDesc_.getSlots()) {
+      size += d.getMaterializedSlotSize();
+    }
+
+    return size;
+  }
+
   /**
    * Checks if this descriptor describes  an array "pos" pseudo-column.
    *

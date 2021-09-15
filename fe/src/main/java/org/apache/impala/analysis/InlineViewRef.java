@@ -20,7 +20,6 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.apache.impala.authorization.AuthorizationContext;
 import org.apache.impala.authorization.TableMask;
@@ -32,6 +31,7 @@ import org.apache.impala.catalog.StructField;
 import org.apache.impala.catalog.StructType;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.common.InternalException;
+import org.apache.impala.common.Pair;
 import org.apache.impala.rewrite.ExprRewriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -325,6 +325,89 @@ public class InlineViewRef extends TableRef {
         }
       }
     }
+
+    if (colExpr.getType().isStructType()) {
+      Preconditions.checkState(colExpr instanceof SlotRef);
+      Preconditions.checkState(baseTableExpr instanceof SlotRef);
+      putStructMembersIntoSmap(smap_, slotDesc, (SlotRef) colExpr);
+      putStructMembersIntoSmap(baseTblSmap_, slotDesc, (SlotRef) baseTableExpr);
+      createAuxPredicatesForStructMembers(analyzer, slotDesc, (SlotRef) colExpr);
+    }
+  }
+
+  // Puts the fields of 'rhsStruct' into 'smap' as right hand side (mapped) values,
+  // recursively. The keys (left hand side values) are constructed based on the
+  // corresponding slot descriptors in the itemTupleDesc of 'lhsSlotDesc'.
+  private void putStructMembersIntoSmap(ExprSubstitutionMap smap,
+      SlotDescriptor lhsSlotDesc, SlotRef rhsStruct) {
+    for (Pair<SlotDescriptor, SlotRef> pair :
+        getStructSlotDescSlotRefPairs(lhsSlotDesc, rhsStruct)) {
+      SlotDescriptor lhs = pair.first;
+      SlotRef rhs = pair.second;
+      smap.put(new SlotRef(lhs), rhs);
+    }
+  }
+
+  private void createAuxPredicatesForStructMembers(Analyzer analyzer,
+      SlotDescriptor structSlotDesc, SlotRef structExpr) {
+    for (Pair<SlotDescriptor, SlotRef> pair :
+        getStructSlotDescSlotRefPairs(structSlotDesc, structExpr)) {
+      SlotDescriptor structMemberSlotDesc = pair.first;
+      SlotRef structMemberExpr = pair.second;
+
+      if (createAuxPredicate(structMemberExpr)) {
+        analyzer.createAuxEqPredicate(
+            new SlotRef(structMemberSlotDesc), structMemberExpr.clone());
+      }
+    }
+  }
+
+  /**
+   * Given a slot desc and a SlotRef expression, both referring to the same struct,
+   * returns a list of corresponding SlotDescriptor/SlotRef pairs of the struct members,
+   * recursively.
+   */
+  private List<Pair<SlotDescriptor, SlotRef>> getStructSlotDescSlotRefPairs(
+      SlotDescriptor structSlotDesc, SlotRef structExpr) {
+    Preconditions.checkState(structSlotDesc.getType().isStructType());
+    Preconditions.checkState(structExpr.getType().isStructType());
+    Preconditions.checkState(structSlotDesc.getType().equals(structExpr.getType()));
+
+    List<Pair<SlotDescriptor, SlotRef>> result = new ArrayList<>();
+
+    TupleDescriptor lhsItemTupleDesc = structSlotDesc.getItemTupleDesc();
+    Preconditions.checkNotNull(lhsItemTupleDesc);
+    List<SlotDescriptor> lhsChildSlotDescs = lhsItemTupleDesc.getSlots();
+    Preconditions.checkState(
+        lhsChildSlotDescs.size() == structExpr.getChildren().size());
+    for (int i = 0; i < lhsChildSlotDescs.size(); i++) {
+      SlotDescriptor lhsChildSlotDesc = lhsChildSlotDescs.get(i);
+
+      Expr rhsChild = structExpr.getChildren().get(i);
+      Preconditions.checkState(rhsChild instanceof SlotRef);
+      SlotRef rhsChildSlotRef = (SlotRef) rhsChild;
+
+      List<String> lhsRawPath = lhsChildSlotDesc.getPath().getRawPath();
+      Path rhsPath = rhsChildSlotRef.getResolvedPath();
+
+      // The path can be null in the case of the sorting tuple.
+      if (rhsPath != null) {
+        List<String> rhsRawPath = rhsPath.getRawPath();
+
+        // Check that the children come in the same order on both lhs and rhs. If not, the
+        // last part of the paths would be different.
+        Preconditions.checkState(lhsRawPath.get(lhsRawPath.size() - 1)
+            .equals(rhsRawPath.get(rhsRawPath.size() - 1)));
+
+        result.add(new Pair(lhsChildSlotDesc, rhsChildSlotRef));
+
+        if (rhsChildSlotRef.getType().isStructType()) {
+          result.addAll(
+              getStructSlotDescSlotRefPairs(lhsChildSlotDesc, rhsChildSlotRef));
+        }
+      }
+    }
+    return result;
   }
 
   /**

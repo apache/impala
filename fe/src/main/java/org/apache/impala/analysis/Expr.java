@@ -1142,14 +1142,16 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       Expr substExpr = smap.get(this);
       if (substExpr != null) return substExpr.clone();
     }
+    substituteImplOnChildren(smap, analyzer);
+    resetAnalysisState();
+    return this;
+  }
+
+  protected final void substituteImplOnChildren(ExprSubstitutionMap smap,
+      Analyzer analyzer) {
     for (int i = 0; i < children_.size(); ++i) {
       children_.set(i, children_.get(i).substituteImpl(smap, analyzer));
     }
-    // SlotRefs must remain analyzed to support substitution across query blocks. All
-    // other exprs must be analyzed again after the substitution to add implicit casts
-    // and for resolving their correct function signature.
-    if (!(this instanceof SlotRef)) resetAnalysisState();
-    return this;
   }
 
   /**

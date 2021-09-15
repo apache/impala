@@ -258,7 +258,8 @@ public class AnalyzerTest extends FrontendTestBase {
 
   private void checkLayoutParams(String colAlias, int byteSize, int byteOffset,
       int nullIndicatorByte, int nullIndicatorBit, Analyzer analyzer) {
-    SlotDescriptor d = analyzer.getSlotDescriptor(colAlias);
+    List<String> colAliasRawPath = Arrays.asList(colAlias.split("\\."));
+    SlotDescriptor d = analyzer.getSlotDescriptor(colAliasRawPath);
     checkLayoutParams(d, byteSize, byteOffset, nullIndicatorByte, nullIndicatorBit);
   }
 

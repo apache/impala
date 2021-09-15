@@ -466,6 +466,26 @@ public class Path {
   }
 
   /**
+   * If 'prefix' is a prefix of this path, returns a list with the elements of this path
+   * that would remain after removing the prefix; otherwise returns null.
+   *
+   * Uses 'getFullyQualifiedRawPath()' to obtain the elements
+   * of the paths.
+   */
+  public List<String> getRawPathWithoutPrefix(Path prefix) {
+    final List<String> prefixPath = prefix.getFullyQualifiedRawPath();
+    final List<String> thisPath = this.getFullyQualifiedRawPath();
+    return getRawPathWithoutPrefix(thisPath, prefixPath);
+  }
+
+  public static List<String> getRawPathWithoutPrefix(List<String> path,
+      List<String> prefix) {
+    if (prefix.size() > path.size()) return null;
+    if (!prefix.equals(path.subList(0, prefix.size()))) return null;
+    return path.subList(prefix.size(), path.size());
+  }
+
+  /**
    * Converts table schema path to file schema path. Well, it's actually somewhere between
    * the two because the first column is offsetted with the number of partitions.
    */

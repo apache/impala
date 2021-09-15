@@ -135,6 +135,22 @@ public class TupleDescriptor {
   public TupleId getId() { return id_; }
   public List<SlotDescriptor> getSlots() { return slots_; }
 
+  /**
+   * Returns the slots in this 'TupleDescriptor' and if any slot is a struct slot, returns
+   * their slots as well, recursively. Does not descend into collections, only structs.
+   */
+  public List<SlotDescriptor> getSlotsRecursively() {
+    List<SlotDescriptor> res = new ArrayList();
+    for (SlotDescriptor slotDesc : slots_) {
+      res.add(slotDesc);
+      TupleDescriptor itemTupleDesc = slotDesc.getItemTupleDesc();
+      if (slotDesc.getType().isStructType() && itemTupleDesc != null) {
+        res.addAll(itemTupleDesc.getSlotsRecursively());
+      }
+    }
+    return res;
+  }
+
   public boolean hasMaterializedSlots() {
     for (SlotDescriptor slot: slots_) {
       if (slot.isMaterialized()) return true;
@@ -439,7 +455,7 @@ public class TupleDescriptor {
    * Receives a SlotDescriptor as a parameter and returns its size.
    */
   private int getSlotSize(SlotDescriptor slotDesc) {
-    int slotSize = slotDesc.getType().getSlotSize();
+    int slotSize = slotDesc.getMaterializedSlotSize();
     // Add padding for a KUDU string slot.
     if (slotDesc.isKuduStringSlot()) {
       slotSize += KUDU_STRING_PADDING;
@@ -459,7 +475,7 @@ public class TupleDescriptor {
       // Note, there are no stats for complex types slots so can't use average serialized
       // size from stats for them.
       // TODO: for computed slots, try to come up with stats estimates
-      avgSerializedSize_ += slotDesc.getType().getSlotSize();
+      avgSerializedSize_ += slotDesc.getMaterializedSlotSize();
     }
     // Add padding for a KUDU string slot.
     if (slotDesc.isKuduStringSlot()) {

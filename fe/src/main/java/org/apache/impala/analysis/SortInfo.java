@@ -258,10 +258,8 @@ public class SortInfo {
       SlotRef dstExpr = new SlotRef(dstSlotDesc);
       if (dstSlotDesc.getType().isStructType() &&
           dstSlotDesc.getItemTupleDesc() != null) {
-        dstSlotDesc.clearItemTupleDesc();
-        dstExpr.createStructTuplesAndSlots(analyzer, null);
         try {
-          dstExpr.addStructChildrenAsSlotRefs(analyzer, dstSlotDesc.getItemTupleDesc());
+          dstExpr.reExpandStruct(analyzer);
         } catch (AnalysisException ex) {
           // Adding SlotRefs shouldn't throw here as the source SlotRef had already been
           // analysed.

@@ -19,11 +19,15 @@ package org.apache.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.analysis.TableRef.ZippingUnnestType;
@@ -284,6 +288,8 @@ public class SelectStmt extends QueryStmt {
       // Start out with table refs to establish aliases.
       fromClause_.analyze(analyzer_);
 
+      registerStructSlotRefPathsWithAnalyzer();
+
       analyzeSelectClause();
       verifyResultExprs();
       registerViewColumnPrivileges();
@@ -322,6 +328,76 @@ public class SelectStmt extends QueryStmt {
 
       buildColumnLineageGraph();
       analyzer_.setSimpleLimitStatus(checkSimpleLimitStmt());
+    }
+
+    /* Register paths that point to structs. This is to unify expressions and allow
+     * embedded (struct member) expressions to share the tuple memory of their enclosing
+     * expressions.
+     */
+    private void registerStructSlotRefPathsWithAnalyzer() throws AnalysisException {
+      Preconditions.checkNotNull(selectList_);
+      // Note: if we in the future include complex types in star expressions, we will have
+      // to expand star expressions here.
+      Stream<Expr> selectListExprs = selectList_.getItems().stream()
+        .filter(elem -> !elem.isStar())
+        .map(elem -> elem.getExpr());
+      Stream<Expr> nonSelectListExprs = collectExprsOutsideSelectList();
+
+      Stream<Expr> exprs = Stream.concat(selectListExprs, nonSelectListExprs);
+
+      HashSet<SlotRef> slotRefs = new HashSet<>();
+      exprs.forEach(expr -> expr.collect(SlotRef.class, slotRefs));
+
+      List<Path> paths = slotRefs.stream().map(this::slotRefToResolvedPath)
+          .filter(path -> path != null)
+          .filter(path -> path.destType().isStructType())
+          .collect(Collectors.toList());
+      // Sort paths by length in descending order so that structs that contain other
+      // structs come before their children.
+      Collections.sort(paths,
+          Comparator.<Path>comparingInt(path -> path.getMatchedTypes().size())
+          .reversed());
+      for (Path p : paths) {
+        analyzer_.registerSlotRef(p);
+      }
+    }
+
+    private Stream<Expr> collectExprsOutsideSelectList() {
+      Stream<Expr> res = Stream.empty();
+      if (whereClause_ != null) {
+        res = Stream.concat(res, Stream.of(whereClause_));
+      }
+      if (havingClause_ != null) {
+        res = Stream.concat(res, Stream.of(havingClause_));
+      }
+      if (groupingExprs_ != null) {
+        res = Stream.concat(res, groupingExprs_.stream());
+      }
+      if (sortInfo_ != null) {
+        res = Stream.concat(res, sortInfo_.getSortExprs().stream());
+      }
+      if (analyticInfo_ != null) {
+        res = Stream.concat(res,
+            analyticInfo_.getAnalyticExprs().stream()
+            .map(analyticExpr -> (Expr) analyticExpr));
+      }
+      return res;
+    }
+
+    private Path slotRefToResolvedPath(SlotRef slotRef) {
+      try {
+        Path resolvedPath = analyzer_.resolvePathWithMasking(slotRef.getRawPath(),
+            PathType.SLOT_REF);
+        return resolvedPath;
+      } catch (TableLoadingException e) {
+        // Should never happen because we only check registered table aliases.
+        Preconditions.checkState(false);
+        return null;
+      } catch (AnalysisException e) {
+        // Return null if analysis did not succeed. This means this path will not be
+        // registered here.
+        return null;
+      }
     }
 
     private void analyzeSelectClause() throws AnalysisException {

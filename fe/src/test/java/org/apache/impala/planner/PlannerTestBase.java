@@ -18,6 +18,7 @@
 package org.apache.impala.planner;
 
 import static org.junit.Assert.fail;
+import org.junit.Assert;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -802,6 +803,30 @@ public class PlannerTestBase extends FrontendTestBase {
     }
     return builder.toString();
   }
+
+  protected int getRowSize(String query, TQueryOptions queryOptions) {
+    TQueryCtx queryCtx = TestUtils.createQueryContext(Catalog.DEFAULT_DB,
+        System.getProperty("user.name"));
+    queryCtx.client_request.setStmt(query);
+    PlanCtx planCtx = new PlanCtx(queryCtx);
+    queryCtx.client_request.query_options = queryOptions;
+
+    try {
+      TExecRequest execRequest = frontend_.createExecRequest(planCtx);
+    } catch (ImpalaException e) {
+      Assert.fail("Failed to create exec request for '" + query + "': " + e.getMessage());
+    }
+
+    String explainStr = planCtx.getExplainString();
+
+    Pattern rowSizePattern = Pattern.compile("row-size=([0-9]*)B");
+    Matcher m = rowSizePattern.matcher(explainStr);
+    boolean matchFound = m.find();
+    Assert.assertTrue("Row size not found in plan.", matchFound);
+    String rowSizeStr = m.group(1);
+    return Integer.valueOf(rowSizeStr);
+  }
+
 
   /**
    * Assorted binary options that alter the behaviour of planner tests, generally

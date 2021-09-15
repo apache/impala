@@ -35,6 +35,7 @@ import org.apache.impala.testutil.TestUtils.IgnoreValueFilter;
 import org.apache.impala.thrift.TRuntimeFilterType;
 import org.apache.impala.thrift.TExecRequest;
 import org.apache.impala.thrift.TExplainLevel;
+import org.apache.impala.thrift.TExplainResult;
 import org.apache.impala.thrift.TJoinDistributionMode;
 import org.apache.impala.thrift.TKuduReplicaSelection;
 import org.apache.impala.thrift.TQueryCtx;
@@ -789,6 +790,83 @@ public class PlannerTest extends PlannerTestBase {
     if (request.query_options.isSetMt_dop()) actualMtDop = request.query_options.mt_dop;
     // Check that the effective MT_DOP is as expected.
     Assert.assertEquals(actualMtDop, expectedMtDop);
+  }
+
+  @Test
+  public void testOnlyNeededStructFieldsMaterialized() throws ImpalaException {
+    // Tests that if a struct is selected in an inline view but only a subset of its
+    // fields are selected in the top level query, only the selected fields are
+    // materialised, not the whole struct.
+    // Also tests that selecting the whole struct or fields from an inline view or
+    // directly from the table give the same row size.
+
+    // For comlex types in the select list, we have to turn codegen off.
+    TQueryOptions queryOpts = defaultQueryOptions();
+    queryOpts.setDisable_codegen(true);
+
+    String queryWholeStruct =
+        "select outer_struct from functional_orc_def.complextypes_nested_structs";
+    int rowSizeWholeStruct = getRowSize(queryWholeStruct, queryOpts);
+
+    String queryWholeStructFromInlineView =
+        "with sub as (" +
+          "select id, outer_struct from functional_orc_def.complextypes_nested_structs)" +
+        "select sub.outer_struct from sub";
+    int rowSizeWholeStructFromInlineView = getRowSize(
+        queryWholeStructFromInlineView, queryOpts);
+
+    String queryOneField =
+        "select outer_struct.str from functional_orc_def.complextypes_nested_structs";
+    int rowSizeOneField = getRowSize(queryOneField, queryOpts);
+
+    String queryOneFieldFromInlineView =
+        "with sub as (" +
+          "select id, outer_struct from functional_orc_def.complextypes_nested_structs)" +
+        "select sub.outer_struct.str from sub";
+    int rowSizeOneFieldFromInlineView = getRowSize(
+        queryOneFieldFromInlineView, queryOpts);
+
+    String queryTwoFields =
+        "select outer_struct.str, outer_struct.inner_struct1 " +
+        "from functional_orc_def.complextypes_nested_structs";
+    int rowSizeTwoFields = getRowSize(queryTwoFields, queryOpts);
+
+    String queryTwoFieldsFromInlineView =
+        "with sub as (" +
+          "select id, outer_struct from functional_orc_def.complextypes_nested_structs)" +
+        "select sub.outer_struct.str, sub.outer_struct.inner_struct1 from sub";
+    int rowSizeTwoFieldsFromInlineView = getRowSize(
+        queryTwoFieldsFromInlineView, queryOpts);
+
+    Assert.assertEquals(rowSizeWholeStruct, rowSizeWholeStructFromInlineView);
+    Assert.assertEquals(rowSizeOneField, rowSizeOneFieldFromInlineView);
+    Assert.assertEquals(rowSizeTwoFields, rowSizeTwoFieldsFromInlineView);
+
+    Assert.assertTrue(rowSizeOneField < rowSizeTwoFields);
+    Assert.assertTrue(rowSizeTwoFields < rowSizeWholeStruct);
+  }
+
+  @Test
+  public void testStructFieldSlotSharedWithStruct() throws ImpalaException {
+    // Tests that in the case where a struct and one of its fields are both present in the
+    // select list, no extra slot is generated in the row for the struct field but the
+    // memory of the struct is reused, i.e. the row size is the same as when only the
+    // struct is queried.
+
+    // For comlex types in the select list, we have to turn codegen off.
+    TQueryOptions queryOpts = defaultQueryOptions();
+    queryOpts.setDisable_codegen(true);
+
+    String queryWithoutField =
+        "select id, outer_struct from functional_orc_def.complextypes_nested_structs";
+    int rowSizeWithoutField = getRowSize(queryWithoutField, queryOpts);
+
+    String queryWithField =
+        "select id, outer_struct, outer_struct.str " +
+        "from functional_orc_def.complextypes_nested_structs";
+    int rowSizeWithField = getRowSize(queryWithField, queryOpts);
+
+    Assert.assertEquals(rowSizeWithoutField, rowSizeWithField);
   }
 
   @Test

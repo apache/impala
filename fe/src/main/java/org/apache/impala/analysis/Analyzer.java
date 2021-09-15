@@ -30,8 +30,11 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Stream;
+import java.util.stream.Collectors;
 
 import org.apache.impala.analysis.Path.PathType;
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
@@ -58,6 +61,8 @@ import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.FeView;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.MaterializedViewHdfsTable;
+import org.apache.impala.catalog.StructField;
+import org.apache.impala.catalog.StructType;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.local.LocalKuduTable;
@@ -612,8 +617,8 @@ public class Analyzer {
   private final Set<String> ambiguousAliases_ = new HashSet<>();
 
   // Map from lowercase fully-qualified path to its slot descriptor. Only contains paths
-  // that have a scalar type as destination (see registerSlotRef()).
-  private final Map<String, SlotDescriptor> slotPathMap_ = new HashMap<>();
+  // that have a scalar or struct type as destination (see registerSlotRef()).
+  private final Map<List<String>, SlotDescriptor> slotPathMap_ = new HashMap<>();
 
   // Indicates whether this analyzer/block is guaranteed to have an empty result set
   // due to a limit 0 or constant conjunct evaluating to false.
@@ -1114,9 +1119,9 @@ public class Analyzer {
   }
 
   /**
-   * Given a "table alias"."column alias", return the SlotDescriptor
+   * Given a list of {"table alias", "column alias"}, return the SlotDescriptor.
    */
-  public SlotDescriptor getSlotDescriptor(String qualifiedColumnName) {
+  public SlotDescriptor getSlotDescriptor(List<String> qualifiedColumnName) {
     return slotPathMap_.get(qualifiedColumnName);
   }
 
@@ -1433,25 +1438,200 @@ public class Analyzer {
     if (slotPath.destType().isCollectionType() && duplicateIfCollections) {
       // Register a new slot descriptor for collection types. The BE currently
       // relies on this behavior for setting unnested collection slots to NULL.
-      return registerNewSlotRef(slotPath);
+      return createAndRegisterSlotDesc(slotPath, false);
     }
-    // SlotRefs with a scalar or struct types are registered against the slot's
+    // SlotRefs with scalar or struct types are registered against the slot's
     // fully-qualified lowercase path.
-    String key = slotPath.toString();
-    Preconditions.checkState(key.equals(key.toLowerCase()),
+    List<String> key = slotPath.getFullyQualifiedRawPath();
+    Preconditions.checkState(key.stream().allMatch(s -> s.equals(s.toLowerCase())),
         "Slot paths should be lower case: " + key);
     SlotDescriptor existingSlotDesc = slotPathMap_.get(key);
     if (existingSlotDesc != null) return existingSlotDesc;
-    SlotDescriptor result = null;
+
     if (slotPath.destType().isArrayType()) {
-      result = registerArraySlotRef(slotPath);
-    } else {
-      result = addSlotDescriptor(slotPath.getRootDesc());
+      SlotDescriptor result = registerArraySlotRef(slotPath);
+      result.setPath(slotPath);
+      slotPathMap_.put(slotPath.getFullyQualifiedRawPath(), result);
+      registerColumnPrivReq(result);
+      return result;
     }
+
+    final int highestAncestorDistance = getHighestLevelAncestorDistance(slotPath);
+    if (highestAncestorDistance > 0 && isOnlyWithinStructs(slotPath)) {
+      // 'slotPath' is within a struct that is also needed in the query.
+      return registerSlotRefWithinStruct(slotPath, highestAncestorDistance);
+    }
+
+    Preconditions.checkState(highestAncestorDistance == 0);
+    if (slotPath.destType().isStructType()) {
+      // 'slotPath' refers to a struct that has no ancestor that is also needed in the
+      // query. We also create the child slot descriptors.
+      SlotDescriptor result = createAndRegisterSlotDesc(slotPath, true);
+      createStructTuplesAndSlotDescs(result);
+      return result;
+    }
+
+    SlotDescriptor result = createAndRegisterSlotDesc(slotPath, true);
+    return result;
+  }
+
+  // Returns whether all ancestors of 'slotPath' are structs (and for example not arrays).
+  private static boolean isOnlyWithinStructs(Path slotPath) {
+    List<Type> matchedTypes = slotPath.getMatchedTypes();
+    List<Type> ancestorTypes = matchedTypes.subList(0, matchedTypes.size() - 1);
+    for (Type ancestorType : ancestorTypes) {
+      if (!ancestorType.isStructType()) return false;
+    }
+    return true;
+  }
+
+  /**
+   * If there is
+   *   a) a struct expression and
+   *   b) another expression that is a (possibly multiply) embedded field in the
+   *      struct expresssion
+   * in the select list or any other part of the query (WHERE clause, sorting etc.), we
+   * would like the tuple memory corresponding to the embedded expression to be shared
+   * between the struct expression and the embedded expression. Therefore, if we get the
+   * path of the embedded expression, we should return a slot descriptor that is within
+   * the tree of the struct expression.
+   *
+   * This is easy if we encounter the path of the struct expression first and the path of
+   * the embedded expression later: when we encounter the path of the embedded expression
+   * we simply traverse the tree of slot and tuple descriptors belonging to the struct
+   * expression and return the 'SlotDescriptor' corresponding to the embedded expression.
+   *
+   * If the order was reversed, the 'SlotDescriptor' for the ancestor struct wouldn't yet
+   * exist at the time we encountered the embedded expression. Therefore, in the
+   * 'SelectStmt' class we make sure that all struct paths are registered in descending
+   * order of raw path length (meaning the number of path elements, not string length):
+   * see 'SelectStmt.registerStructSlotRefPathsWithAnalyzer()'.
+   *
+   * If we encounter a path that is within a struct, we find the highest level enclosing
+   * struct that is needed in the query. This is not necessarily the top level struct
+   * enclosing the embedded field as that may not be used in the query - take the
+   * following example:
+   *     outer: struct<middle: struct<inner: struct<field: int>>>
+   * and suppose that 'outer' is not present in the query but 'field' and 'middle' are
+   * both in the select list. The highest level enclosing struct for 'field' that is
+   * present in the query is 'middle' in this case.
+   *
+   * We traverse the tree of the highest level enclosing struct expression ('middle' in
+   * the example) to find the 'SlotDescriptor' corresponding to the original path ('field'
+   * in the example) and return it.
+   *
+   * The parameter 'slotPath' is the path that we want to register and return the
+   * 'SlotDescriptor' for; 'highestAncestorDistance' is the distance in the expression
+   * tree from 'slotPath' to the highest level ancestor present in the query: in the
+   * example it is the distance from 'field' to 'middle', which is 1.
+   */
+  private SlotDescriptor registerSlotRefWithinStruct(Path slotPath,
+      int highestAncestorDistance) throws AnalysisException {
+    Preconditions.checkState(highestAncestorDistance > 0);
+
+    final List<String> rawPath = slotPath.getRawPath();
+    final int topStructPathLen = rawPath.size() - highestAncestorDistance;
+    Preconditions.checkState(topStructPathLen > 0);
+    final Path topStructPath = new Path(slotPath.getRootDesc(),
+        rawPath.subList(0, topStructPathLen));
+    Path topStructResolvedPath = null;
+    try {
+      topStructResolvedPath = resolvePathWithMasking(topStructPath.getRawPath(),
+          PathType.SLOT_REF);
+    } catch (TableLoadingException e) {
+      // Should never happen because we only check registered table aliases.
+      Preconditions.checkState(false);
+    }
+    Preconditions.checkState(topStructResolvedPath != null);
+    Preconditions.checkState(topStructResolvedPath.isResolved());
+    List<String> topStructKey = topStructResolvedPath.getFullyQualifiedRawPath();
+    SlotDescriptor topStructSlotDesc = slotPathMap_.get(topStructKey);
+
+    // Structs should already be registered when their members are registered.
+    Preconditions.checkNotNull(topStructSlotDesc);
+
+    List<String> remainingPath = rawPath.subList(topStructPathLen, rawPath.size());
+    SlotDescriptor childSlotRef = findChildSlotDesc(topStructSlotDesc, remainingPath);
+    Preconditions.checkState(childSlotRef != null);
+    return childSlotRef;
+  }
+
+  private SlotDescriptor createAndRegisterSlotDesc(Path slotPath,
+      boolean insertIntoSlotPathMap) {
+    Preconditions.checkState(slotPath.isRootedAtTuple());
+    final SlotDescriptor result = addSlotDescriptor(slotPath.getRootDesc());
     result.setPath(slotPath);
-    slotPathMap_.put(key, result);
+    if (insertIntoSlotPathMap) {
+      slotPathMap_.put(slotPath.getFullyQualifiedRawPath(), result);
+    }
     registerColumnPrivReq(result);
     return result;
+  }
+
+  private int getHighestLevelAncestorDistance(Path slotPath) {
+    Optional<Integer> greatestDistanceAncestor = slotPathMap_.entrySet().stream()
+      .filter(entry -> entry.getValue().getType().isStructType()) // only structs
+      .map(entry -> entry.getKey()) // take only the paths, not the SlotDescriptors
+      .map(parentPath -> Path.getRawPathWithoutPrefix(slotPath.getFullyQualifiedRawPath(),
+            parentPath)) // null for non-ancestors
+      .filter(remainingPath -> remainingPath != null) // only ancestors remain
+      .map(remainingPath -> remainingPath.size()) // distance from ancestor
+      .max(java.util.Comparator.naturalOrder());
+
+    if (greatestDistanceAncestor.isPresent()) {
+      return greatestDistanceAncestor.get();
+    } else {
+      return 0; // There is no ancestor, this is a top level path within the query.
+    }
+  }
+
+  public void createStructTuplesAndSlotDescs(SlotDescriptor desc)
+      throws AnalysisException {
+    Preconditions.checkState(desc.getType().isStructType());
+    TupleDescriptor structTuple = getDescTbl().createTupleDescriptor("struct_tuple");
+    Path slotPath = desc.getPath();
+    if (slotPath != null) structTuple.setPath(slotPath);
+    final StructType type = (StructType) desc.getType();
+    structTuple.setType(type);
+    structTuple.setParentSlotDesc(desc);
+    desc.setItemTupleDesc(structTuple);
+    for (StructField structField : type.getFields()) {
+      SlotDescriptor childDesc = getDescTbl().addSlotDescriptor(structTuple);
+      globalState_.blockBySlot.put(childDesc.getId(), this);
+      // 'slotPath' could be null e.g. when the query has an order by clause and
+      // this is the sorting tuple.
+      if (slotPath != null) {
+        Path relPath = Path.createRelPath(slotPath, structField.getName());
+        relPath.resolve();
+        childDesc.setPath(relPath);
+        registerColumnPrivReq(childDesc);
+        slotPathMap_.putIfAbsent(relPath.getFullyQualifiedRawPath(), childDesc);
+      }
+      childDesc.setType(structField.getType());
+
+      if (childDesc.getType().isStructType()) {
+        createStructTuplesAndSlotDescs(childDesc);
+      }
+    }
+  }
+
+  private SlotDescriptor findChildSlotDesc(SlotDescriptor parent, List<String> path) {
+    if (path.isEmpty()) return parent;
+
+    final TupleDescriptor tuple = parent.getItemTupleDesc();
+    if (tuple == null) return null;
+
+    final int parentPathLen = parent.getPath().getRawPath().size();
+    SlotDescriptor childSlotDesc = null;
+    for (SlotDescriptor desc : tuple.getSlots()) {
+      if (desc.getPath().getRawPath().get(parentPathLen).equals(path.get(0))) {
+        childSlotDesc = desc;
+        break;
+      }
+    }
+
+    if (childSlotDesc == null) return null;
+    return findChildSlotDesc(childSlotDesc, path.subList(1, path.size()));
   }
 
   /**
@@ -1500,14 +1680,6 @@ public class Analyzer {
     }
     registerSlotRef(resolvedPathToItem, false);
     return desc;
-  }
-
-  private SlotDescriptor registerNewSlotRef(Path slotPath) throws AnalysisException {
-    Preconditions.checkState(slotPath.isRootedAtTuple());
-    SlotDescriptor result = addSlotDescriptor(slotPath.getRootDesc());
-    result.setPath(slotPath);
-    registerColumnPrivReq(result);
-    return result;
   }
 
   /**
@@ -2556,7 +2728,7 @@ public class Analyzer {
       // columns because mappings to non-partition columns do not provide
       // a performance benefit.
       SlotId srcSid = srcSids.get(0);
-      for (SlotDescriptor destSlot: destTupleDesc.getSlots()) {
+      for (SlotDescriptor destSlot: destTupleDesc.getSlotsRecursively()) {
         if (ignoreSlots.contains(destSlot.getId())) continue;
         if (hasValueTransfer(srcSid, destSlot.getId())) {
           allDestSids.add(Lists.newArrayList(destSlot.getId()));
@@ -2578,7 +2750,7 @@ public class Analyzer {
       // The limitations are show in predicate-propagation.test.
       List<SlotId> destSids = new ArrayList<>();
       for (SlotId srcSid: srcSids) {
-        for (SlotDescriptor destSlot: destTupleDesc.getSlots()) {
+        for (SlotDescriptor destSlot: destTupleDesc.getSlotsRecursively()) {
           if (ignoreSlots.contains(destSlot.getId())) continue;
           if (hasValueTransfer(srcSid, destSlot.getId())
               && !destSids.contains(destSlot.getId())) {

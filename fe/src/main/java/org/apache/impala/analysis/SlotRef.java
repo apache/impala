@@ -181,7 +181,7 @@ public class SlotRef extends Expr {
       if (!(rootTable instanceof FeFsTable)) {
         throw new AnalysisException(String.format(
             "%s is not supported when querying STRUCT type %s",
-            rootTable.getClass().toString(), type_.toSql()));
+            rootTable, type_.toSql()));
       }
       FeFsTable feTable = (FeFsTable)rootTable;
       for (HdfsFileFormat format : feTable.getFileFormats()) {
@@ -191,21 +191,21 @@ public class SlotRef extends Expr {
         }
       }
     }
-    if (type_.isStructType()) expandSlotRefForStruct(analyzer);
+    if (type_.isStructType()) addStructChildrenAsSlotRefs(analyzer);
   }
 
-  // This function expects this SlotRef to be a Struct and creates SlotRefs to represent
-  // the children of the struct. Also creates slot and tuple descriptors for the children
-  // of the struct.
-  private void expandSlotRefForStruct(Analyzer analyzer) throws AnalysisException {
+  /**
+   * Re-expands the struct: recreates the item tuple descriptor of 'desc_' and the child
+   * 'SlotRef's, recursively.
+   * Expects this 'SlotRef' to be a struct.
+   */
+  public void reExpandStruct(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(type_ != null && type_.isStructType());
-    // If the same struct is present multiple times in the select list we create only a
-    // single TupleDescriptor instead of one for each occurence.
-    if (desc_.getItemTupleDesc() == null) {
-      checkForUnsupportedFieldsForStruct();
-      createStructTuplesAndSlots(analyzer, resolvedPath_);
-    }
-    addStructChildrenAsSlotRefs(analyzer, desc_.getItemTupleDesc());
+    desc_.clearItemTupleDesc();
+    children_.clear();
+
+    analyzer.createStructTuplesAndSlotDescs(desc_);
+    addStructChildrenAsSlotRefs(analyzer);
   }
 
   // Expects the type of this SlotRef as a StructType. Throws an AnalysisException if any
@@ -213,58 +213,30 @@ public class SlotRef extends Expr {
   private void checkForUnsupportedFieldsForStruct() throws AnalysisException {
     Preconditions.checkState(type_ instanceof StructType);
     for (StructField structField : ((StructType)type_).getFields()) {
-      if (!structField.getType().isSupported()) {
+      final Type fieldType = structField.getType();
+      if (!fieldType.isSupported()) {
         throw new AnalysisException("Unsupported type '"
-            + structField.getType().toSql() + "' in '" + toSql() + "'.");
+            + fieldType.toSql() + "' in '" + toSql() + "'.");
       }
-      if (structField.getType().isCollectionType()) {
+      if (fieldType.isCollectionType()) {
         throw new AnalysisException("Struct containing a collection type is not " +
             "allowed in the select list.");
       }
     }
   }
 
-  /**
-   * Creates a TupleDescriptor to hold the children of a struct slot and then creates and
-   * adds SlotDescriptors as struct children to this TupleDescriptor. Sets the created
-   * parent TupleDescriptor to 'desc_.itemTupleDesc_'.
-   */
-  public void createStructTuplesAndSlots(Analyzer analyzer, Path resolvedPath) {
-    TupleDescriptor structTuple =
-        analyzer.getDescTbl().createTupleDescriptor("struct_tuple");
-    if (resolvedPath != null) structTuple.setPath(resolvedPath);
-    structTuple.setType((StructType)type_);
-    structTuple.setParentSlotDesc(desc_);
-    for (StructField structField : ((StructType)type_).getFields()) {
-      SlotDescriptor slotDesc = analyzer.getDescTbl().addSlotDescriptor(structTuple);
-      // 'resolvedPath_' could be null e.g. when the query has an order by clause and
-      // this is the sorting tuple.
-      if (resolvedPath != null) {
-        Path relPath = Path.createRelPath(resolvedPath, structField.getName());
-        relPath.resolve();
-        slotDesc.setPath(relPath);
-      }
-      slotDesc.setType(structField.getType());
-      slotDesc.setIsMaterialized(true);
-    }
-    desc_.setItemTupleDesc(structTuple);
-  }
-
-  /**
-   * Assuming that 'structTuple' is the tuple for struct children this function iterates
-   * its slots, creates a SlotRef for each slot and adds them to 'children_' of this
-   * SlotRef.
-   */
-  public void addStructChildrenAsSlotRefs(Analyzer analyzer,
-      TupleDescriptor structTuple) throws AnalysisException {
+  // Assumes this 'SlotRef' is a struct and that desc_.itemTupleDesc_ has already been
+  // filled. Creates the children 'SlotRef's for the struct recursively.
+  private void addStructChildrenAsSlotRefs(Analyzer analyzer) throws AnalysisException {
+    Preconditions.checkState(desc_.getType().isStructType());
+    checkForUnsupportedFieldsForStruct();
+    TupleDescriptor structTuple = desc_.getItemTupleDesc();
     Preconditions.checkState(structTuple != null);
-    Preconditions.checkState(structTuple.getParentSlotDesc() != null);
-    Preconditions.checkState(structTuple.getParentSlotDesc().getType().isStructType());
     for (SlotDescriptor childSlot : structTuple.getSlots()) {
       SlotRef childSlotRef = new SlotRef(childSlot);
       children_.add(childSlotRef);
       if (childSlot.getType().isStructType()) {
-        childSlotRef.expandSlotRefForStruct(analyzer);
+        childSlotRef.addStructChildrenAsSlotRefs(analyzer);
       }
     }
   }
@@ -288,11 +260,15 @@ public class SlotRef extends Expr {
   @Override
   protected boolean isConstantImpl() { return false; }
 
+  public boolean hasDesc() { return desc_ != null; }
+
   public SlotDescriptor getDesc() {
     Preconditions.checkState(isAnalyzed());
     Preconditions.checkNotNull(desc_);
     return desc_;
   }
+
+  public List<String> getRawPath() { return rawPath_; }
 
   public SlotId getSlotId() {
     Preconditions.checkState(isAnalyzed());
@@ -371,6 +347,19 @@ public class SlotRef extends Expr {
   };
 
   @Override
+  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer) {
+    if (smap != null) {
+      Expr substExpr = smap.get(this);
+      if (substExpr != null) return substExpr.clone();
+    }
+
+    // SlotRefs must remain analyzed to support substitution across query blocks,
+    // therefore we do not call resetAnalysisState().
+    substituteImplOnChildren(smap, analyzer);
+    return this;
+  }
+
+  @Override
   public boolean isBoundByTupleIds(List<TupleId> tids) {
     Preconditions.checkState(desc_ != null);
     // If this SlotRef is coming from zipping unnest then try to do a similar check as
@@ -382,8 +371,8 @@ public class SlotRef extends Expr {
         if (tid.equals(parentId)) return true;
       }
     }
-    for (TupleId tid: tids) {
-      if (tid.equals(desc_.getParent().getId())) return true;
+    for (TupleDescriptor enclosingTupleDesc : desc_.getEnclosingTupleDescs()) {
+      if (tids.contains(enclosingTupleDesc.getId())) return true;
     }
     return false;
   }
@@ -391,7 +380,11 @@ public class SlotRef extends Expr {
   @Override
   public boolean isBoundBySlotIds(List<SlotId> slotIds) {
     Preconditions.checkState(isAnalyzed());
-    return slotIds.contains(desc_.getId());
+    if (slotIds.contains(desc_.getId())) return true;
+    for (SlotDescriptor enclosingSlotDesc : desc_.getEnclosingStructSlotDescs()) {
+      if (slotIds.contains(enclosingSlotDesc.getId())) return true;
+    }
+    return false;
   }
 
   @Override
@@ -400,6 +393,14 @@ public class SlotRef extends Expr {
     Preconditions.checkState(desc_ != null);
     if (slotIds != null) slotIds.add(desc_.getId());
     if (tupleIds != null) tupleIds.add(desc_.getParent().getId());
+
+    // If we are a struct, we need to add all fields recursively so they are materialised.
+    if (desc_.getType().isStructType() && slotIds != null) {
+      TupleDescriptor itemTupleDesc = desc_.getItemTupleDesc();
+      Preconditions.checkState(itemTupleDesc != null);
+      itemTupleDesc.getSlotsRecursively().stream()
+        .forEach(slotDesc -> slotIds.add(slotDesc.getId()));
+    }
   }
 
   @Override
