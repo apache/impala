@@ -484,6 +484,7 @@ class BufferedTupleStream {
 
    private:
     friend class BufferedTupleStream;
+    friend class StreamStateTest;
 
     /// True if the read iterator is currently valid
     bool valid_ = false;
@@ -560,8 +561,7 @@ class BufferedTupleStream {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(BufferedTupleStream);
-  friend class SimpleTupleStreamTest_ShortDebugString_Test;
-  friend class SimpleTupleStreamTest_DeferAdvancingReadPage_Test;
+  friend class StreamStateTest;
 
   /// Runtime state instance used to check for cancellation. Not owned.
   RuntimeState* const state_;

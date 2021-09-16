@@ -720,16 +720,24 @@ Status BufferedTupleStream::UnpinStream(UnpinMode mode) {
     bool defer_advancing_read_page = false;
     if (&*read_it_.read_page_ != write_page_ && read_it_.read_page_ != pages_.end()
         && read_it_.read_page_rows_returned_ == read_it_.read_page_->num_rows) {
-      if (read_it_.read_page_->attached_to_output_batch) {
-        if (num_pages_ <= 2) {
-          // NextReadPage will attempt to save default_page_len_ into write reservation if
-          // the stream ended up with only 1 read/write page after advancing the read
-          // page. This can potentially lead to negative unused reservation if the reader
-          // has not freed the row batch where the read page buffer is attached to. We
-          // defer advancing the read page until the next GetNext() call by the reader
-          // (see IMPALA-10584).
-          defer_advancing_read_page = true;
-        }
+      if (has_write_iterator_ && read_it_.attach_on_read_
+          && (num_pages_ <= 2 || !read_it_.read_page_->attached_to_output_batch)) {
+        // In a read-write stream + attach_on_read mode, there are cases where we should
+        // NOT advance the read page even though the page has been fully exhausted:
+        //
+        // 1. Stream has exactly 2 pages: 1 read and 1 write.
+        //    NextReadPage() will attempt to save default_page_len_ into write
+        //    reservation if the stream ended up with only 1 read/write page after
+        //    advancing the read page. This can potentially lead to negative unused
+        //    reservation if the reader has not freed the row batch where the read page
+        //    buffer is attached to (see IMPALA-10584).
+        // 2. Read page buffer has not been attached yet to the output row batch.
+        //    The previous GetNext() would not attach the read page buffer to the output
+        //    row batch if it was a read-write page (see IMPALA-10714).
+        //
+        // We defer advancing the read page for these cases until the next GetNext()
+        // call by the reader.
+        defer_advancing_read_page = true;
       }
 
       if (!defer_advancing_read_page) {
@@ -743,7 +751,7 @@ Status BufferedTupleStream::UnpinStream(UnpinMode mode) {
     std::list<Page>::iterator it = pages_.begin();
     if (defer_advancing_read_page) {
       // We skip advancing the read page earlier, so the first page must be a read page
-      // and attached_to_output_batch is true. We should keep the first page pinned. The
+      // and the reader has not done reading it. We should keep the first page pinned. The
       // next GetNext() call is the one who will be responsible to unpin the first page.
       DCHECK(read_it_.read_page_ == pages_.begin());
       ++it;

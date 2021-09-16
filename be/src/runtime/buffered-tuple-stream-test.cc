@@ -569,6 +569,38 @@ class ArrayTupleStreamTest : public SimpleTupleStreamTest {
   }
 };
 
+/// Test internal stream state under certain corner cases.
+class StreamStateTest : public SimpleTupleStreamTest {
+ protected:
+  // Test that UnpinStream defers advancing the read page when all rows from the read
+  // page are attached to a returned RowBatch but got not enough reservation.
+  void TestDeferAdvancingReadPage();
+
+  // Test unpinning a read-write stream when the read page has been fully exhausted but
+  // its buffer is not attached yet to the output row batch.
+  void TestUnpinAfterFullStreamRead(
+      bool read_write, bool attach_on_read, bool refill_before_unpin);
+
+  // Fill up the stream by repeatedly inserting write_batch into the stream until it is
+  // full. Return number of rows successfully inserted into the stream.
+  // Stream must be in pinned mode.
+  Status FillUpStream(
+      BufferedTupleStream* stream, RowBatch* write_batch, int64_t& num_inserted);
+
+  // Read out the stream until eos is reached. Return number of rows successfully read.
+  Status ReadOutStream(
+      BufferedTupleStream* stream, RowBatch* read_batch, int64_t& num_read);
+
+  // Verify that page count, pinned bytes, and unpinned bytes of the stream match the
+  // expectation.
+  void VerifyStreamState(BufferedTupleStream* stream, int num_page, int num_pinned_page,
+      int num_unpinned_page, int buffer_size);
+
+  // Test that stream's debug string is capped only for the first
+  // BufferedTupleStream::MAX_PAGE_ITER_DEBUG.
+  void TestShortDebugString();
+};
+
 // Basic API test. No data should be going to disk.
 TEST_F(SimpleTupleStreamTest, Basic) {
   Init(numeric_limits<int64_t>::max());
@@ -1297,9 +1329,7 @@ TEST_F(SimpleTupleStreamTest, UnpinReadPage) {
   write_batch->Reset();
 }
 
-// Test that UnpinStream defer advancing the read page when all rows from the read page
-// are attached to a returned RowBatch but got not enough reservation.
-TEST_F(SimpleTupleStreamTest, DeferAdvancingReadPage) {
+void StreamStateTest::TestDeferAdvancingReadPage() {
   int num_rows = 1024;
   int buffer_size = 4 * 1024;
   // Only give 2 * buffer_size for the stream initial read and write page reservation.
@@ -1315,7 +1345,7 @@ TEST_F(SimpleTupleStreamTest, DeferAdvancingReadPage) {
     // and the output batch has NOT been reset.
     BufferedTupleStream stream(
         runtime_state_, int_desc_, &client_, buffer_size, buffer_size);
-    ASSERT_OK(stream.Init("SimpleTupleStreamTest::DeferAdvancingReadPage", true));
+    ASSERT_OK(stream.Init("StreamStateTest::DeferAdvancingReadPage", true));
     ASSERT_OK(stream.PrepareForReadWrite(true, &got_reservation));
     ASSERT_TRUE(got_reservation);
 
@@ -1361,6 +1391,126 @@ TEST_F(SimpleTupleStreamTest, DeferAdvancingReadPage) {
       }
     }
     ASSERT_FALSE(stream.is_pinned());
+    stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+    read_batch.Reset();
+  }
+  write_batch->Reset();
+}
+
+void StreamStateTest::TestUnpinAfterFullStreamRead(
+    bool read_write, bool attach_on_read, bool refill_before_unpin) {
+  DCHECK(read_write || !refill_before_unpin)
+      << "Only read-write stream support refilling stream after full read.";
+
+  int num_rows = 1024;
+  int buffer_size = 4 * 1024;
+  int max_num_pages = 4;
+  Init(max_num_pages * buffer_size);
+
+  bool got_reservation;
+  RowBatch* write_batch = CreateIntBatch(0, num_rows, false);
+
+  {
+    BufferedTupleStream stream(
+        runtime_state_, int_desc_, &client_, buffer_size, buffer_size);
+    ASSERT_OK(stream.Init("StreamStateTest::TestUnpinAfterFullStreamRead", true));
+    if (read_write) {
+      ASSERT_OK(stream.PrepareForReadWrite(attach_on_read, &got_reservation));
+    } else {
+      ASSERT_OK(stream.PrepareForWrite(&got_reservation));
+    }
+    ASSERT_TRUE(got_reservation);
+    RowBatch read_batch(int_desc_, num_rows, &tracker_);
+    int64_t num_rows_written = 0;
+    int64_t num_rows_read = 0;
+
+    // Add rows into the stream until the stream is full.
+    ASSERT_OK(FillUpStream(&stream, write_batch, num_rows_written));
+    int num_pages = max_num_pages;
+    ASSERT_EQ(stream.pages_.size(), num_pages);
+    ASSERT_FALSE(stream.has_read_write_page());
+
+    // Read the entire rows out of the stream.
+    if (!read_write) {
+      ASSERT_OK(stream.PrepareForRead(attach_on_read, &got_reservation));
+      ASSERT_TRUE(got_reservation);
+    }
+    ASSERT_OK(ReadOutStream(&stream, &read_batch, num_rows_read));
+    if (attach_on_read) num_pages = 1;
+    ASSERT_EQ(stream.pages_.size(), num_pages);
+    ASSERT_EQ(stream.has_read_write_page(), read_write);
+
+    if (read_write && refill_before_unpin) {
+      // Fill the stream until it is full again.
+      ASSERT_OK(FillUpStream(&stream, write_batch, num_rows_written));
+      num_pages = max_num_pages;
+      ASSERT_EQ(stream.pages_.size(), num_pages);
+      ASSERT_EQ(stream.has_read_write_page(), !attach_on_read);
+    }
+
+    // Verify that the read page has been fully read before unpinning the stream.
+    ASSERT_EQ(
+        stream.read_it_.read_page_rows_returned_, stream.read_it_.read_page_->num_rows);
+    // read_page_ should NOT be attached to output batch unless stream is in read-only and
+    // attach_on_read mode.
+    bool attached = !read_write && attach_on_read;
+    ASSERT_EQ(stream.read_it_.read_page_->attached_to_output_batch, attached);
+
+    // Verify stream state before UnpinStream.
+    int num_pinned_pages = num_pages;
+    ASSERT_TRUE(stream.is_pinned());
+    if (attached) {
+      // In a pinned + read-only + attach_on_read stream, a fully exhausted read page is
+      // automatically unpinned and destroyed, but not yet removed from stream.pages_
+      // until the next GetNext() or UnpinStream() call.
+      ASSERT_EQ(stream.pages_.size(), 1);
+      num_pinned_pages = 0;
+    }
+    VerifyStreamState(&stream, num_pages, num_pinned_pages, 0, buffer_size);
+
+    // Unpin the stream.
+    ASSERT_OK(stream.UnpinStream(BufferedTupleStream::UNPIN_ALL_EXCEPT_CURRENT));
+    ASSERT_FALSE(stream.is_pinned());
+
+    // Verify stream state after UnpinStream. num_pages should remain unchanged after
+    // UnpinStream() except for the case of read-only + attach_on_read stream.
+    if (read_write) {
+      if (attach_on_read) {
+        if (refill_before_unpin) {
+          num_pinned_pages = 2;
+          ASSERT_TRUE(stream.pages_.begin()->is_pinned());
+          ASSERT_TRUE(stream.pages_.back().is_pinned());
+        } else {
+          num_pinned_pages = 1;
+          ASSERT_TRUE(stream.pages_.back().is_pinned());
+        }
+      } else {
+        num_pinned_pages = 1;
+        ASSERT_TRUE(stream.pages_.back().is_pinned());
+      }
+    } else {
+      if (attach_on_read) {
+        num_pages = 0;
+      }
+      num_pinned_pages = 0;
+    }
+    int num_unpinned_pages = num_pages - num_pinned_pages;
+    VerifyStreamState(
+        &stream, num_pages, num_pinned_pages, num_unpinned_pages, buffer_size);
+
+    if (read_write) {
+      // Additionally, test that write and read operation still work in read-write
+      // stream after UnpinStream.
+      Status status;
+      ASSERT_OK(ReadOutStream(&stream, &read_batch, num_rows_read));
+      for (int i = 0; i < write_batch->num_rows(); ++i) {
+        EXPECT_TRUE(stream.AddRow(write_batch->GetRow(i), &status));
+        ASSERT_OK(status);
+      }
+      ASSERT_OK(ReadOutStream(&stream, &read_batch, num_rows_read));
+      ASSERT_EQ(write_batch->num_rows(), num_rows_read);
+    }
+
     stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
     read_batch.Reset();
   }
@@ -1527,7 +1677,7 @@ TEST_F(SimpleTupleStreamTest, ConcurrentReaders) {
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
 }
 
-TEST_F(SimpleTupleStreamTest, ShortDebugString) {
+void StreamStateTest::TestShortDebugString() {
   Init(BUFFER_POOL_LIMIT);
 
   int num_batches = 50;
@@ -1539,7 +1689,7 @@ TEST_F(SimpleTupleStreamTest, ShortDebugString) {
 
   BufferedTupleStream stream(
       runtime_state_, desc, &client_, default_page_len, max_page_len);
-  ASSERT_OK(stream.Init("SimpleTupleStreamTest::ShortDebugString", true));
+  ASSERT_OK(stream.Init("StreamStateTest::ShortDebugString", true));
   bool got_write_reservation;
   ASSERT_OK(stream.PrepareForWrite(&got_write_reservation));
   ASSERT_TRUE(got_write_reservation);
@@ -2021,6 +2171,73 @@ TEST_F(ArrayTupleStreamTest, TestComputeRowSize) {
       stream.ComputeRowSize(row.get()));
 
   stream.Close(nullptr, RowBatch::FlushMode::NO_FLUSH_RESOURCES);
+}
+
+Status StreamStateTest::FillUpStream(
+    BufferedTupleStream* stream, RowBatch* write_batch, int64_t& num_inserted) {
+  DCHECK(stream->is_pinned());
+  int64_t idx = 0;
+  Status status;
+  num_inserted = 0;
+  while (stream->AddRow(write_batch->GetRow(idx), &status)) {
+    RETURN_IF_ERROR(status);
+    idx = (idx + 1) % write_batch->num_rows();
+    num_inserted++;
+  }
+  return status;
+}
+
+Status StreamStateTest::ReadOutStream(
+    BufferedTupleStream* stream, RowBatch* read_batch, int64_t& num_read) {
+  bool eos = false;
+  num_read = 0;
+  do {
+    read_batch->Reset();
+    RETURN_IF_ERROR(stream->GetNext(read_batch, &eos));
+    num_read += read_batch->num_rows();
+  } while (!eos);
+  return Status::OK();
+}
+
+void StreamStateTest::VerifyStreamState(BufferedTupleStream* stream, int num_page,
+    int num_pinned_page, int num_unpinned_page, int buffer_size) {
+  ASSERT_EQ(stream->pages_.size(), num_page);
+  ASSERT_EQ(stream->num_pages_, num_page);
+  ASSERT_EQ(stream->BytesPinned(false), buffer_size * num_pinned_page);
+  ASSERT_EQ(stream->bytes_unpinned(), buffer_size * num_unpinned_page);
+  stream->CheckConsistencyFull(stream->read_it_);
+}
+
+TEST_F(StreamStateTest, DeferAdvancingReadPage) {
+  TestDeferAdvancingReadPage();
+}
+
+TEST_F(StreamStateTest, UnpinFullyExhaustedReadPageOnReadWriteStreamNoAttachRefill) {
+  TestUnpinAfterFullStreamRead(true, false, true);
+}
+
+TEST_F(StreamStateTest, UnpinFullyExhaustedReadPageOnReadWriteStreamNoAttachNoRefill) {
+  TestUnpinAfterFullStreamRead(true, false, false);
+}
+
+TEST_F(StreamStateTest, UnpinFullyExhaustedReadPageOnReadWriteStreamAttachRefill) {
+  TestUnpinAfterFullStreamRead(true, true, true);
+}
+
+TEST_F(StreamStateTest, UnpinFullyExhaustedReadPageOnReadWriteStreamAttachNoRefill) {
+  TestUnpinAfterFullStreamRead(true, true, false);
+}
+
+TEST_F(StreamStateTest, UnpinFullyExhaustedReadPageOnReadOnlyStreamAttach) {
+  TestUnpinAfterFullStreamRead(false, true, false);
+}
+
+TEST_F(StreamStateTest, UnpinFullyExhaustedReadPageOnReadOnlyStreamNoAttach) {
+  TestUnpinAfterFullStreamRead(false, false, false);
+}
+
+TEST_F(StreamStateTest, ShortDebugString) {
+  TestShortDebugString();
 }
 }
 
