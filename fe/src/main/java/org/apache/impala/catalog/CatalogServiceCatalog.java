@@ -3363,9 +3363,8 @@ public class CatalogServiceCatalog extends Catalog {
       TGetPartialCatalogObjectResponse resp;
       table.takeReadLock();
       try {
-        if (table instanceof HdfsTable || table instanceof IcebergTable) {
-          HdfsTable hdfsTable = table instanceof HdfsTable ? (HdfsTable) table :
-              ((IcebergTable) table).getHdfsTable();
+        if (table instanceof HdfsTable) {
+          HdfsTable hdfsTable = (HdfsTable)table;
           missingPartialInfos = Maps.newHashMap();
           resp = hdfsTable.getPartialInfo(req, missingPartialInfos);
           if (missingPartialInfos.isEmpty()) return resp;

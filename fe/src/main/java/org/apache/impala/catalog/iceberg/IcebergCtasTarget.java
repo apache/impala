@@ -26,6 +26,7 @@ import java.util.Set;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
@@ -46,6 +47,7 @@ import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.HdfsTable;
 import org.apache.impala.catalog.IcebergColumn;
 import org.apache.impala.catalog.IcebergStructField;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.catalog.local.LocalDb;
 import org.apache.impala.catalog.local.LocalFsTable;
@@ -143,8 +145,15 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
   private void setLocations() {
     Preconditions.checkState(msTable_ != null);
     Preconditions.checkState(icebergCatalog_ != null);
-    if (icebergCatalog_ == TIcebergCatalog.HADOOP_CATALOG) {
-      icebergCatalogLocation_ = IcebergUtil.getIcebergCatalogLocation(msTable_);
+    TIcebergCatalog underlyingCatalog = IcebergUtil.getUnderlyingCatalog(msTable_);
+    if (underlyingCatalog == TIcebergCatalog.HADOOP_CATALOG) {
+      if (icebergCatalog_ == TIcebergCatalog.CATALOGS) {
+        String catName = msTable_.getParameters().get(IcebergTable.ICEBERG_CATALOG);
+        icebergCatalogLocation_ = IcebergCatalogs.getInstance().getCatalogProperty(
+            catName, CatalogProperties.WAREHOUSE_LOCATION);
+      } else {
+        icebergCatalogLocation_ = IcebergUtil.getIcebergCatalogLocation(msTable_);
+      }
       TableIdentifier tId = IcebergUtil.getIcebergTableIdentifier(msTable_);
       Namespace ns = tId.namespace();
       List<String> components = new ArrayList<>();
@@ -155,7 +164,8 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
       return;
     }
     Preconditions.checkState(icebergCatalog_ == TIcebergCatalog.HADOOP_TABLES ||
-                             icebergCatalog_ == TIcebergCatalog.HIVE_CATALOG);
+                             icebergCatalog_ == TIcebergCatalog.HIVE_CATALOG ||
+                             icebergCatalog_ == TIcebergCatalog.CATALOGS);
     icebergTableLocation_ = msTable_.getSd().getLocation();
     icebergCatalogLocation_ = icebergTableLocation_;
   }

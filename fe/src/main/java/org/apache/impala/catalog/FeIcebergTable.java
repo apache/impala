@@ -39,16 +39,19 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.impala.analysis.IcebergPartitionField;
 import org.apache.impala.analysis.IcebergPartitionSpec;
 import org.apache.impala.analysis.LiteralExpr;
+import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.common.FileSystemUtil;
 import org.apache.impala.common.Reference;
 import org.apache.impala.compat.HdfsShim;
 import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCompressionCodec;
 import org.apache.impala.thrift.THdfsCompression;
+import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsTable;
 import org.apache.impala.thrift.THdfsPartition;
 import org.apache.impala.thrift.TIcebergCatalog;
 import org.apache.impala.thrift.TIcebergFileFormat;
+import org.apache.impala.thrift.TIcebergSnapshot;
 import org.apache.impala.thrift.TIcebergTable;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TResultSet;
@@ -382,11 +385,9 @@ public interface FeIcebergTable extends FeFsTable {
       tIcebergTable.setDefault_partition_spec_id(
           icebergTable.getDefaultPartitionSpecId());
 
-      for (Map.Entry<String, HdfsPartition.FileDescriptor> entry :
-          icebergTable.getPathHashToFileDescMap().entrySet()) {
-        tIcebergTable.putToPath_hash_to_file_descriptor(entry.getKey(),
-          entry.getValue().toThrift());
-      }
+      tIcebergTable.setPath_hash_to_file_descriptor(
+          convertPathHashToFileDescMap(icebergTable));
+
       tIcebergTable.setSnapshot_id(icebergTable.snapshotId());
       tIcebergTable.setParquet_compression_codec(
           icebergTable.getIcebergParquetCompressionCodec());
@@ -397,6 +398,33 @@ public interface FeIcebergTable extends FeFsTable {
       tIcebergTable.setParquet_dict_page_size(
           icebergTable.getIcebergParquetDictPageSize());
       return tIcebergTable;
+    }
+
+    public static Map<String, THdfsFileDesc> convertPathHashToFileDescMap(
+        FeIcebergTable icebergTable) {
+      Map<String, THdfsFileDesc> ret = new HashMap<>();
+      for (Map.Entry<String, HdfsPartition.FileDescriptor> entry :
+          icebergTable.getPathHashToFileDescMap().entrySet()) {
+        ret.put(entry.getKey(), entry.getValue().toThrift());
+      }
+      return ret;
+    }
+
+    public static Map<String, FileDescriptor> loadFileDescMapFromThrift(
+        Map<String, THdfsFileDesc> tFileDescMap) {
+      Map<String, FileDescriptor> fileDescMap = new HashMap<>();
+      if (tFileDescMap == null) return fileDescMap;
+      for (Map.Entry<String, THdfsFileDesc> entry : tFileDescMap.entrySet()) {
+        fileDescMap.put(entry.getKey(), FileDescriptor.fromThrift(entry.getValue()));
+      }
+      return fileDescMap;
+    }
+
+    public static TIcebergSnapshot createTIcebergSnapshot(FeIcebergTable icebergTable) {
+      TIcebergSnapshot snapshot = new TIcebergSnapshot();
+      snapshot.setSnapshot_id(icebergTable.snapshotId());
+      snapshot.setIceberg_file_desc_map(convertPathHashToFileDescMap(icebergTable));
+      return snapshot;
     }
 
     /**

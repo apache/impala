@@ -31,6 +31,7 @@ import com.google.common.collect.Sets;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -213,6 +214,7 @@ import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableName;
+import org.apache.impala.thrift.TTablePropertyType;
 import org.apache.impala.thrift.TTableRowFormat;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.thrift.TTestCaseData;
@@ -946,9 +948,9 @@ public class CatalogOpExecutor {
         return;
       } else if (tbl instanceof IcebergTable &&
           altersIcebergTable(params.getAlter_type())) {
-        alterIcebergTable(params, response, (IcebergTable) tbl, newCatalogVersion,
-            wantMinimalResult);
-        return;
+        boolean needToUpdateHms = alterIcebergTable(params, response, (IcebergTable)tbl,
+            newCatalogVersion, wantMinimalResult);
+        if (!needToUpdateHms) return;
       }
       switch (params.getAlter_type()) {
         case ADD_COLUMNS:
@@ -1216,40 +1218,58 @@ public class CatalogOpExecutor {
         || type == TAlterTableType.REPLACE_COLUMNS
         || type == TAlterTableType.DROP_COLUMN
         || type == TAlterTableType.ALTER_COLUMN
-        || type == TAlterTableType.SET_PARTITION_SPEC;
+        || type == TAlterTableType.SET_PARTITION_SPEC
+        || type == TAlterTableType.SET_TBL_PROPERTIES
+        || type == TAlterTableType.UNSET_TBL_PROPERTIES;
   }
 
   /**
-   * Executes the ALTER TABLE command for a Iceberg table and reloads its metadata.
+   * Executes the ALTER TABLE command for an Iceberg table and reloads its metadata.
    */
-  private void alterIcebergTable(TAlterTableParams params, TDdlExecResponse response,
+  private boolean alterIcebergTable(TAlterTableParams params, TDdlExecResponse response,
       IcebergTable tbl, long newCatalogVersion, boolean wantMinimalResult)
       throws ImpalaException {
     Preconditions.checkState(tbl.isWriteLockedByCurrentThread());
+    boolean needsToUpdateHms = !isIcebergHmsIntegrationEnabled(tbl.getMetaStoreTable());
     try {
+      boolean needsTxn = true;
+      org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(tbl);
       switch (params.getAlter_type()) {
         case ADD_COLUMNS:
           TAlterTableAddColsParams addColParams = params.getAdd_cols_params();
-          IcebergCatalogOpExecutor.addColumn(tbl, addColParams.getColumns());
+          IcebergCatalogOpExecutor.addColumns(iceTxn, addColParams.getColumns());
           addSummary(response, "Column(s) have been added.");
           break;
         case DROP_COLUMN:
           TAlterTableDropColParams dropColParams = params.getDrop_col_params();
-          IcebergCatalogOpExecutor.dropColumn(tbl, dropColParams.getCol_name());
+          IcebergCatalogOpExecutor.dropColumn(iceTxn, dropColParams.getCol_name());
           addSummary(response, "Column has been dropped.");
           break;
         case ALTER_COLUMN:
           TAlterTableAlterColParams alterColParams = params.getAlter_col_params();
-          IcebergCatalogOpExecutor.alterColumn(tbl, alterColParams.getCol_name(),
-             alterColParams.getNew_col_def());
+          IcebergCatalogOpExecutor.alterColumn(iceTxn, alterColParams.getCol_name(),
+               alterColParams.getNew_col_def());
           addSummary(response, "Column has been altered.");
           break;
         case SET_PARTITION_SPEC:
+          // Set partition spec uses 'TableOperations', not transactions.
+          needsTxn = false;
+          // Partition spec is not stored in HMS.
+          needsToUpdateHms = false;
           TAlterTableSetPartitionSpecParams setPartSpecParams =
               params.getSet_partition_spec_params();
           IcebergCatalogOpExecutor.alterTableSetPartitionSpec(tbl,
-              setPartSpecParams.getPartition_spec());
+              setPartSpecParams.getPartition_spec(),
+              catalog_.getCatalogServiceId(), newCatalogVersion);
           addSummary(response, "Updated partition spec.");
+          break;
+        case SET_TBL_PROPERTIES:
+          needsToUpdateHms |= !setIcebergTblProperties(tbl, params, iceTxn);
+          addSummary(response, "Updated table.");
+          break;
+        case UNSET_TBL_PROPERTIES:
+          needsToUpdateHms |= !unsetIcebergTblProperties(tbl, params, iceTxn);
+          addSummary(response, "Updated table.");
           break;
         case REPLACE_COLUMNS:
           // It doesn't make sense to replace all the columns of an Iceberg table as it
@@ -1259,15 +1279,57 @@ public class CatalogOpExecutor {
               "Unsupported ALTER TABLE operation for Iceberg tables: " +
               params.getAlter_type());
       }
+      if (needsTxn) {
+        if (!needsToUpdateHms) {
+          IcebergCatalogOpExecutor.addCatalogVersionToTxn(iceTxn,
+              catalog_.getCatalogServiceId(), newCatalogVersion);
+        }
+        iceTxn.commitTransaction();
+      }
     } catch (IllegalArgumentException ex) {
       throw new ImpalaRuntimeException(String.format(
           "Failed to ALTER table '%s': %s", params.getTable_name().table_name,
           ex.getMessage()));
     }
 
-    loadTableMetadata(tbl, newCatalogVersion, true, true, null, "ALTER Iceberg TABLE " +
-        params.getAlter_type().name());
-    addTableToCatalogUpdate(tbl, wantMinimalResult, response.result);
+    if (!needsToUpdateHms) {
+      // We don't need to update HMS because either it is already done by Iceberg's
+      // HiveCatalog, or we modified the PARTITION SPEC which is not stored in HMS.
+      loadTableMetadata(tbl, newCatalogVersion, true, true, null, "ALTER Iceberg TABLE " +
+          params.getAlter_type().name());
+      catalog_.addVersionsForInflightEvents(false, tbl, newCatalogVersion);
+      addTableToCatalogUpdate(tbl, wantMinimalResult, response.result);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Sets table properties for an Iceberg table. Returns true on success, returns false
+   * if the operation is not applicable at the Iceberg table level, e.g. setting SERDE
+   * properties.
+   */
+  private boolean setIcebergTblProperties(IcebergTable tbl, TAlterTableParams params,
+      org.apache.iceberg.Transaction iceTxn) throws ImpalaException {
+    TAlterTableSetTblPropertiesParams setPropsParams =
+        params.getSet_tbl_properties_params();
+    if (setPropsParams.getTarget() != TTablePropertyType.TBL_PROPERTY) return false;
+    IcebergCatalogOpExecutor.setTblProperties(iceTxn, setPropsParams.getProperties());
+    return true;
+  }
+
+  /**
+   * Unsets table properties for an Iceberg table. Returns true on success, returns false
+   * if the operation is not applicable at the Iceberg table level, e.g. setting SERDE
+   * properties.
+   */
+  private boolean unsetIcebergTblProperties(IcebergTable tbl, TAlterTableParams params,
+      org.apache.iceberg.Transaction iceTxn) throws ImpalaException {
+    TAlterTableUnSetTblPropertiesParams unsetParams =
+        params.getUnset_tbl_properties_params();
+    if (unsetParams.getTarget() != TTablePropertyType.TBL_PROPERTY) return false;
+    IcebergCatalogOpExecutor.unsetTblProperties(iceTxn, unsetParams.getProperty_keys());
+    return true;
   }
 
   /**
@@ -2841,12 +2903,21 @@ public class CatalogOpExecutor {
     Preconditions.checkState(table instanceof FeIcebergTable);
     long newCatalogVersion = catalog_.incrementAndGetCatalogVersion();
     catalog_.getLock().writeLock().unlock();
-    FeIcebergTable iceTable = (FeIcebergTable)table;
+    addCatalogServiceIdentifiers(table, catalog_.getCatalogServiceId(),
+        newCatalogVersion);
+    FeIcebergTable iceTbl = (FeIcebergTable)table;
     if (params.isDelete_stats()) {
       dropColumnStats(table);
       dropTableStats(table);
     }
-    IcebergCatalogOpExecutor.truncateTable(iceTable);
+    org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(iceTbl);
+    IcebergCatalogOpExecutor.truncateTable(iceTxn);
+    if (isIcebergHmsIntegrationEnabled(iceTbl.getMetaStoreTable())) {
+      catalog_.addVersionsForInflightEvents(false, table, newCatalogVersion);
+      IcebergCatalogOpExecutor.addCatalogVersionToTxn(iceTxn,
+          catalog_.getCatalogServiceId(), newCatalogVersion);
+    }
+    iceTxn.commitTransaction();
     return newCatalogVersion;
   }
 
@@ -3405,24 +3476,34 @@ public class CatalogOpExecutor {
                 .location();
             newTable.getSd().setLocation(tableLoc);
           } else {
-            if (location == null) {
-              if (IcebergUtil.getUnderlyingCatalog(newTable) !=
-                  TIcebergCatalog.HADOOP_TABLES) {
-                // When creating external Iceberg table we load
-                // the Iceberg table using catalog and table identifier to get
-                // the actual location of the table. This way we can also get the
-                // correct location for tables stored in nested namespaces.
-                TableIdentifier identifier =
-                    IcebergUtil.getIcebergTableIdentifier(newTable);
-                newTable.getSd().setLocation(IcebergUtil.loadTable(
-                    catalog, identifier,
-                    IcebergUtil.getIcebergCatalogLocation(newTable),
-                    newTable.getParameters()).location());
-              } else {
+            // If this is not a synchronized table, we assume that the table must be
+            // existing in an Iceberg Catalog.
+            TIcebergCatalog underlyingCatalog =
+                IcebergUtil.getUnderlyingCatalog(newTable);
+            String locationToLoadFrom;
+            if (underlyingCatalog == TIcebergCatalog.HADOOP_TABLES) {
+              if (location == null) {
                 addSummary(response,
                     "Location is necessary for external iceberg table.");
                 return false;
               }
+              locationToLoadFrom = location;
+            } else {
+              // For HadoopCatalog tables 'locationToLoadFrom' is the location of the
+              // hadoop catalog. For HiveCatalog tables it remains null.
+              locationToLoadFrom = IcebergUtil.getIcebergCatalogLocation(newTable);
+            }
+            TableIdentifier identifier = IcebergUtil.getIcebergTableIdentifier(newTable);
+            org.apache.iceberg.Table iceTable = IcebergUtil.loadTable(
+                catalog, identifier, locationToLoadFrom, newTable.getParameters());
+            // Populate the HMS table schema based on the Iceberg table's schema because
+            // the Iceberg metadata is the source of truth. This also avoids an
+            // unnecessary ALTER TABLE.
+            IcebergCatalogOpExecutor.populateExternalTableCols(newTable, iceTable);
+            if (location == null) {
+              // Using the location of the loaded Iceberg table we can also get the
+              // correct location for tables stored in nested namespaces.
+              newTable.getSd().setLocation(iceTable.location());
             }
           }
 
@@ -3433,20 +3514,6 @@ public class CatalogOpExecutor {
               newTable.getPartitionKeys().isEmpty());
           if (!isIcebergHmsIntegrationEnabled(newTable)) {
             msClient.getHiveClient().createTable(newTable);
-          } else {
-            // Currently HiveCatalog doesn't set the table property
-            // 'external.table.purge' during createTable().
-            org.apache.hadoop.hive.metastore.api.Table msTbl =
-                msClient.getHiveClient().getTable(
-                    newTable.getDbName(), newTable.getTableName());
-            msTbl.putToParameters("external.table.purge", "TRUE");
-            // HiveCatalog also doesn't set the table properties either.
-            for (Map.Entry<String, String> entry :
-                params.getTable_properties().entrySet()) {
-              msTbl.putToParameters(entry.getKey(), entry.getValue());
-            }
-            msClient.getHiveClient().alter_table(
-                newTable.getDbName(), newTable.getTableName(), msTbl);
           }
           events = getNextMetastoreEventsIfEnabled(eventId, event ->
               CreateTableEvent.CREATE_TABLE_EVENT_TYPE.equals(event.getEventType())
@@ -6002,8 +6069,19 @@ public class CatalogOpExecutor {
       }
 
       if (table instanceof FeIcebergTable && update.isSetIceberg_operation()) {
-        IcebergCatalogOpExecutor.appendFiles((FeIcebergTable)table,
+        FeIcebergTable iceTbl = (FeIcebergTable)table;
+        org.apache.iceberg.Transaction iceTxn = IcebergUtil.getIcebergTransaction(iceTbl);
+        IcebergCatalogOpExecutor.appendFiles(iceTbl, iceTxn,
             update.getIceberg_operation());
+        if (isIcebergHmsIntegrationEnabled(iceTbl.getMetaStoreTable())) {
+          // Add catalog service id and the 'newCatalogVersion' to the table parameters.
+          // This way we can avoid reloading the table on self-events (Iceberg generates
+          // an ALTER TABLE statement to set the new metadata_location).
+          IcebergCatalogOpExecutor.addCatalogVersionToTxn(iceTxn,
+              catalog_.getCatalogServiceId(), newCatalogVersion);
+          catalog_.addVersionsForInflightEvents(false, table, newCatalogVersion);
+        }
+        iceTxn.commitTransaction();
       }
 
       loadTableMetadata(table, newCatalogVersion, true, false, partsToLoadMetadata,

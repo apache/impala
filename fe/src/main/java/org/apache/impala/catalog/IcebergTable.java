@@ -36,6 +36,8 @@ import org.apache.impala.analysis.IcebergPartitionTransform;
 import org.apache.impala.catalog.HdfsPartition.FileDescriptor;
 import org.apache.impala.thrift.TCatalogObjectType;
 import org.apache.impala.thrift.TCompressionCodec;
+import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
+import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.THdfsCompression;
 import org.apache.impala.thrift.THdfsFileDesc;
 import org.apache.impala.thrift.THdfsTable;
@@ -44,6 +46,7 @@ import org.apache.impala.thrift.TIcebergFileFormat;
 import org.apache.impala.thrift.TIcebergPartitionField;
 import org.apache.impala.thrift.TIcebergPartitionSpec;
 import org.apache.impala.thrift.TIcebergTable;
+import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TTable;
 import org.apache.impala.thrift.TTableDescriptor;
 import org.apache.impala.thrift.TTableType;
@@ -415,7 +418,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     icebergParquetDictPageSize_ = ticeberg.getParquet_dict_page_size();
     partitionSpecs_ = loadPartitionBySpecsFromThrift(ticeberg.getPartition_spec());
     defaultPartitionSpecId_ = ticeberg.getDefault_partition_spec_id();
-    pathHashToFileDescMap_ = loadFileDescFromThrift(
+    pathHashToFileDescMap_ = FeIcebergTable.Utils.loadFileDescMapFromThrift(
         ticeberg.getPath_hash_to_file_descriptor());
     snapshotId_ = ticeberg.getSnapshot_id();
     hdfsTable_.loadFromThrift(thriftTable);
@@ -450,16 +453,6 @@ public class IcebergTable extends Table implements FeIcebergTable {
     return ret;
   }
 
-  private Map<String, FileDescriptor> loadFileDescFromThrift(
-      Map<String, THdfsFileDesc> tFileDescMap) {
-    Map<String, FileDescriptor> fileDescMap = new HashMap<>();
-    if (tFileDescMap == null) return fileDescMap;
-    for (Map.Entry<String, THdfsFileDesc> entry : tFileDescMap.entrySet()) {
-      fileDescMap.put(entry.getKey(), FileDescriptor.fromThrift(entry.getValue()));
-    }
-    return fileDescMap;
-  }
-
   @Override
   public TTableDescriptor toThriftDescriptor(int tableId,
       Set<Long> referencedPartitions) {
@@ -478,5 +471,19 @@ public class IcebergTable extends Table implements FeIcebergTable {
       Utils.updateIcebergPartitionFileFormat(this, hdfsTable);
     }
     return hdfsTable;
+  }
+
+  @Override
+  public TGetPartialCatalogObjectResponse getPartialInfo(
+      TGetPartialCatalogObjectRequest req) throws CatalogException {
+    Preconditions.checkState(isLoaded(), "unloaded table: %s", getFullName());
+    Map<HdfsPartition, TPartialPartitionInfo> missingPartialInfos = new HashMap<>();
+    TGetPartialCatalogObjectResponse resp =
+        getHdfsTable().getPartialInfo(req, missingPartialInfos);
+    if (req.table_info_selector.want_iceberg_snapshot) {
+      resp.table_info.setIceberg_snapshot(
+          FeIcebergTable.Utils.createTIcebergSnapshot(this));
+    }
+    return resp;
   }
 }

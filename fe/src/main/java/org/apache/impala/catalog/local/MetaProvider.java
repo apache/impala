@@ -36,6 +36,7 @@ import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.SqlConstraints;
 import org.apache.impala.common.Pair;
 import org.apache.impala.thrift.TBriefTableMeta;
+import org.apache.impala.thrift.TIcebergSnapshot;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.ListMap;
@@ -122,6 +123,11 @@ public interface MetaProvider {
    */
   List<ColumnStatisticsObj> loadTableColumnStatistics(TableMetaRef table,
       List<String> colNames) throws TException;
+
+  /**
+   * Loads Iceberg snapshot information, i.e. snapshot id and file descriptors.
+   */
+  public TIcebergSnapshot loadIcebergSnapshot(final TableMetaRef table) throws TException;
 
   /**
    * Reference to a table as returned by loadTable(). This reference must be passed

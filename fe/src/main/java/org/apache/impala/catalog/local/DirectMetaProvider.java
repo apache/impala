@@ -51,6 +51,7 @@ import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.service.BackendConfig;
 import org.apache.impala.thrift.TBackendGflags;
 import org.apache.impala.thrift.TBriefTableMeta;
+import org.apache.impala.thrift.TIcebergSnapshot;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TValidWriteIdList;
 import org.apache.impala.util.ListMap;
@@ -497,5 +498,12 @@ class DirectMetaProvider implements MetaProvider {
   public TValidWriteIdList getValidWriteIdList(TableMetaRef ref) {
     throw new NotImplementedException(
         "getValidWriteIdList() is not implemented for DirectMetaProvider");
+  }
+
+  @Override
+  public TIcebergSnapshot loadIcebergSnapshot(final TableMetaRef table)
+      throws TException {
+    throw new NotImplementedException(
+        "loadIcebergSnapshot() is not implemented for DirectMetaProvider");
   }
 }

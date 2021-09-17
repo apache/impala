@@ -66,8 +66,8 @@ public class IcebergCatalogs implements IcebergCatalog {
   }
 
   public TIcebergCatalog getUnderlyingCatalogType(String catalogName) {
-    String catalogType = configuration_.get(catalogPropertyConfigKey(
-        catalogName, CatalogUtil.ICEBERG_CATALOG_TYPE));
+    String catalogType = getCatalogProperty(
+        catalogName, CatalogUtil.ICEBERG_CATALOG_TYPE);
     if (catalogType == null ||
         CatalogUtil.ICEBERG_CATALOG_TYPE_HIVE.equalsIgnoreCase(catalogType)) {
       return TIcebergCatalog.HIVE_CATALOG;
@@ -91,8 +91,7 @@ public class IcebergCatalogs implements IcebergCatalog {
     setContextClassLoader();
     String catName = tableProps.get(IcebergTable.ICEBERG_CATALOG);
     Preconditions.checkState(catName != null);
-    String catalogType = configuration_.get(catalogPropertyConfigKey(
-      catName, CatalogUtil.ICEBERG_CATALOG_TYPE));
+    String catalogType = getCatalogProperty(catName, CatalogUtil.ICEBERG_CATALOG_TYPE);
     if (catalogType == null) {
       throw new ImpalaRuntimeException(
           String.format("Unknown catalog name: %s", catName));
@@ -101,6 +100,7 @@ public class IcebergCatalogs implements IcebergCatalog {
     properties.setProperty(InputFormatConfig.TABLE_SCHEMA, SchemaParser.toJson(schema));
     properties.setProperty(InputFormatConfig.PARTITION_SPEC,
         PartitionSpecParser.toJson(spec));
+    properties.setProperty("external.table.purge", "TRUE");
     return Catalogs.createTable(configuration_, properties);
   }
 
@@ -138,6 +138,15 @@ public class IcebergCatalogs implements IcebergCatalog {
         "Cannot rename Iceberg tables that use 'Catalogs'.");
   }
 
+  /**
+   * Returns the value of 'catalogPropertyKey' for the given catalog.
+   */
+  public String getCatalogProperty(String catalogName, String catalogPropertyKey) {
+    String propKey = String.format("%s%s.%s", InputFormatConfig.CATALOG_CONFIG_PREFIX,
+        catalogName, catalogPropertyKey);
+    return configuration_.get(propKey);
+  }
+
   private Properties createPropsForCatalogs(TableIdentifier tableId, String location,
       Map<String, String> tableProps) {
     Properties properties = new Properties();
@@ -147,13 +156,9 @@ public class IcebergCatalogs implements IcebergCatalog {
     } else if (location != null) {
       properties.setProperty(Catalogs.LOCATION, location);
     }
+    properties.setProperty(IcebergTable.ICEBERG_CATALOG,
+                           tableProps.get(IcebergTable.ICEBERG_CATALOG));
     return properties;
-  }
-
-  private static String catalogPropertyConfigKey(String catalogName,
-      String catalogProperty) {
-    return String.format("%s%s.%s", InputFormatConfig.CATALOG_CONFIG_PREFIX,
-        catalogName, catalogProperty);
   }
 
   /**

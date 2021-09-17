@@ -41,7 +41,7 @@ import com.google.common.primitives.Longs;
 import org.apache.impala.catalog.IcebergStructField;
 import org.apache.impala.common.Pair;
 import org.apache.iceberg.BaseTable;
-import org.apache.iceberg.UpdateSchema;
+import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileScanTask;
@@ -186,12 +186,12 @@ public class IcebergUtil {
   }
 
   /**
-   * Get Iceberg UpdateSchema from 'feTable', usually use UpdateSchema to update Iceberg
+   * Get Iceberg Transaction for 'feTable', usually use Transaction to update Iceberg
    * table schema.
    */
-  public static UpdateSchema getIcebergUpdateSchema(FeIcebergTable feTable)
+  public static Transaction getIcebergTransaction(FeIcebergTable feTable)
       throws TableLoadingException, ImpalaRuntimeException {
-    return getIcebergCatalog(feTable).loadTable(feTable).updateSchema();
+    return getIcebergCatalog(feTable).loadTable(feTable).newTransaction();
   }
 
   /**

@@ -62,6 +62,7 @@ public class IcebergHiveCatalog implements IcebergCatalog {
       PartitionSpec spec,
       String location,
       Map<String, String> properties) {
+    properties.put("external.table.purge", "TRUE");
     return hiveCatalog_.createTable(identifier, schema, spec, location, properties);
   }
 

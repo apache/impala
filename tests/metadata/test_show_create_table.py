@@ -39,7 +39,9 @@ class TestShowCreateTable(ImpalaTestSuite):
                            "STATS_GENERATED_VIA_STATS_TASK", "last_modified_by",
                            "last_modified_time", "numFilesErasureCoded",
                            "bucketing_version", "OBJCAPABILITIES",
-                           "TRANSLATED_TO_EXTERNAL", "previous_metadata_location"]
+                           "TRANSLATED_TO_EXTERNAL", "previous_metadata_location",
+                           "impala.events.catalogServiceId",
+                           "impala.events.catalogVersion"]
 
   @classmethod
   def get_workload(self):

@@ -460,3 +460,26 @@ class TestIcebergTable(ImpalaTestSuite):
       pytest.skip('runs only in exhaustive')
     self.run_test_case('QueryTest/iceberg-write-many-files-stress', vector,
         use_db=unique_database)
+
+  def test_consistent_scheduling(self, vector, unique_database):
+    """IMPALA-10914: This test verifies that Impala schedules scan ranges consistently for
+    Iceberg tables."""
+    def collect_split_stats(profile):
+      splits = [l.strip() for l in profile.splitlines() if "Hdfs split stats" in l]
+      splits.sort()
+      return splits
+
+    with self.create_impala_client() as impalad_client:
+      impalad_client.execute("use " + unique_database)
+      impalad_client.execute("""create table line_ice stored as iceberg
+                                as select * from tpch_parquet.lineitem""")
+      first_result = impalad_client.execute("""select count(*) from line_ice""")
+      ref_profile = first_result.runtime_profile
+      ref_split_stats = collect_split_stats(ref_profile)
+
+      for i in range(0, 10):
+        # Subsequent executions of the same query should schedule scan ranges similarly.
+        result = impalad_client.execute("""select count(*) from line_ice""")
+        profile = result.runtime_profile
+        split_stats = collect_split_stats(profile)
+        assert ref_split_stats == split_stats

@@ -389,6 +389,10 @@ struct TTableInfoSelector {
   // Note that want_hms_partition=true will consume more space (IMPALA-7501), so only use
   // it in cases the clients do need HMS partition structs.
   12: bool want_hms_partition
+
+  // The response should contain information about the Iceberg snapshot, i.e. the snapshot
+  // id and the file descriptors.
+  13: bool want_iceberg_snapshot
 }
 
 // Returned information about a particular partition.
@@ -435,6 +439,11 @@ struct TPartialPartitionInfo {
   13: optional CatalogObjects.THdfsPartitionLocation location
 }
 
+struct TIcebergSnapshot {
+  1: required i64 snapshot_id
+  2: optional map<string, CatalogObjects.THdfsFileDesc> iceberg_file_desc_map
+}
+
 // Returned information about a Table, as selected by TTableInfoSelector.
 struct TPartialTableInfo {
   1: optional hive_metastore.Table hms_table
@@ -474,6 +483,9 @@ struct TPartialTableInfo {
   // The prefixes of locations of partitions in this table. See THdfsPartitionLocation for
   // the description of how a prefix is computed.
   11: optional list<string> partition_prefixes
+
+  // Iceberg snapshot information
+  12: optional TIcebergSnapshot iceberg_snapshot
 }
 
 struct TBriefTableMeta {

@@ -325,6 +325,64 @@ class TestEventProcessingCustomConfigs(CustomClusterTestSuite):
     # 24 partitions inserted and hence we must refresh 24 partitions once.
     assert int(partitions_refreshed_after_hive) == int(partitions_refreshed_insert) + 24
 
+  @CustomClusterTestSuite.with_args(catalogd_args="--hms_event_polling_interval_s=1")
+  def test_iceberg_self_events(self, unique_database):
+    """This test checks that Impala doesn't refresh Iceberg tables on self events."""
+    tbl_name = unique_database + ".test_iceberg_events"
+
+    def check_self_events(query, skips_events=True):
+      tbls_refreshed_before, partitions_refreshed_before, \
+          events_skipped_before = self.__get_self_event_metrics()
+      self.client.execute(query)
+      EventProcessorUtils.wait_for_event_processing(self)
+      tbls_refreshed_after, partitions_refreshed_after, \
+          events_skipped_after = self.__get_self_event_metrics()
+      assert tbls_refreshed_before == tbls_refreshed_after
+      assert partitions_refreshed_before == partitions_refreshed_after
+      if skips_events:
+        assert events_skipped_after > events_skipped_before
+
+    hadoop_tables = "'iceberg.catalog'='hadoop.tables'"
+    hadoop_catalog = ("'iceberg.catalog'='hadoop.catalog', " +
+        "'iceberg.catalog_location'='/test-warehouse/{0}/hadoop_catalog_test/'".format(
+            unique_database))
+    hive_catalog = "'iceberg.catalog'='hive.catalog'"
+    hive_catalogs = "'iceberg.catalog'='ice_hive_cat'"
+    hadoop_catalogs = "'iceberg.catalog'='ice_hadoop_cat'"
+
+    all_catalogs = [hadoop_tables, hadoop_catalog, hive_catalog, hive_catalogs,
+        hadoop_catalogs]
+
+    for catalog in all_catalogs:
+      is_hive_catalog = catalog == hive_catalog or catalog == hive_catalogs
+      self.client.execute("""
+          CREATE TABLE {0} (i int) STORED AS ICEBERG
+          TBLPROPERTIES ({1})""".format(tbl_name, catalog))
+
+      check_self_events("ALTER TABLE {0} ADD COLUMN j INT".format(tbl_name))
+      check_self_events("ALTER TABLE {0} DROP COLUMN i".format(tbl_name))
+      check_self_events("ALTER TABLE {0} CHANGE COLUMN j j BIGINT".format(tbl_name))
+      # SET PARTITION SPEC only updates HMS in case of HiveCatalog (which sets
+      # table property 'metadata_location')
+      check_self_events(
+          "ALTER TABLE {0} SET PARTITION SPEC (truncate(2, j))".format(tbl_name),
+          skips_events=is_hive_catalog)
+      check_self_events(
+          "ALTER TABLE {0} SET TBLPROPERTIES('key'='value')".format(tbl_name))
+      check_self_events("ALTER TABLE {0} UNSET TBLPROPERTIES('key')".format(tbl_name))
+      check_self_events("INSERT INTO {0} VALUES (1), (2), (3)".format(tbl_name),
+          skips_events=is_hive_catalog)
+      check_self_events("INSERT OVERWRITE {0} VALUES (4), (5), (6)".format(tbl_name),
+          skips_events=is_hive_catalog)
+      ctas_tbl = unique_database + ".ice_ctas"
+      check_self_events("""CREATE TABLE {0} STORED AS ICEBERG
+          TBLPROPERTIES ({1}) AS SELECT * FROM {2}""".format(ctas_tbl, catalog, tbl_name))
+      check_self_events("DROP TABLE {0}".format(ctas_tbl))
+      check_self_events("TRUNCATE TABLE {0}".format(tbl_name),
+          skips_events=is_hive_catalog)
+
+      self.client.execute("DROP TABLE {0}".format(tbl_name))
+
   def __run_self_events_test(self, db_name, use_impala):
     recover_tbl_name = ImpalaTestSuite.get_random_name("tbl_")
     # create a table similar to alltypes so that we can recover the partitions on it

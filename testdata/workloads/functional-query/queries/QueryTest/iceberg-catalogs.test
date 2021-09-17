@@ -104,7 +104,6 @@ DESCRIBE FORMATTED iceberg_hive_catalogs;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/iceberg_hive_catalogs','NULL'
 '','write.format.default','parquet             '
-'','iceberg.catalog     ','ice_hive_cat        '
 ---- TYPES
 string, string, string
 ====
@@ -136,7 +135,6 @@ DESCRIBE FORMATTED iceberg_hive_catalogs_ext;
 ---- RESULTS: VERIFY_IS_SUBSET
 'Location:           ','$NAMENODE/test-warehouse/$DATABASE.db/iceberg_hive_catalogs','NULL'
 '','write.format.default','parquet             '
-'','iceberg.catalog     ','ice_hive_cat        '
 '','iceberg.table_identifier','$DATABASE.iceberg_hive_catalogs'
 '','name                ','$DATABASE.iceberg_hive_catalogs'
 ---- TYPES

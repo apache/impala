@@ -35,12 +35,15 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
+import org.apache.iceberg.Transaction;
+import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.iceberg.hadoop.HadoopTables;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventPropertyKey;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
@@ -80,9 +83,20 @@ public class IcebergCatalogOpExecutor {
         params.getPartition_spec());
     IcebergCatalog icebergCatalog = IcebergUtil.getIcebergCatalog(catalog, location);
     Table iceTable = icebergCatalog.createTable(identifier, schema, spec, location,
-        excludeHmsOnlyProps(params.getTable_properties()));
+        params.getTable_properties());
     LOG.info("Create iceberg table successful.");
     return iceTable;
+  }
+
+  /**
+   * Populates HMS table schema based on the Iceberg table's schema.
+   */
+  public static void populateExternalTableCols(
+      org.apache.hadoop.hive.metastore.api.Table msTbl, Table iceTbl)
+      throws TableLoadingException {
+    TableMetadata metadata = ((BaseTable)iceTbl).operations().current();
+    Schema schema = metadata.schema();
+    msTbl.getSd().setCols(IcebergSchemaConverter.convertToHiveSchema(schema));
   }
 
   /**
@@ -107,9 +121,9 @@ public class IcebergCatalogOpExecutor {
   /**
    * Adds a column to an existing Iceberg table.
    */
-  public static void addColumn(FeIcebergTable feTable, List<TColumn> columns)
+  public static void addColumns(Transaction txn, List<TColumn> columns)
       throws TableLoadingException, ImpalaRuntimeException {
-    UpdateSchema schema = IcebergUtil.getIcebergUpdateSchema(feTable);
+    UpdateSchema schema = txn.updateSchema();
     for (TColumn column : columns) {
       org.apache.iceberg.types.Type type =
           IcebergSchemaConverter.fromImpalaColumnType(column.getColumnType());
@@ -125,9 +139,9 @@ public class IcebergCatalogOpExecutor {
    *   FLOAT -> DOUBLE
    *   DECIMAL(p1,s1) -> DECIMAL(p1,s2), same scale, p1<=p2
    */
-  public static void alterColumn(FeIcebergTable feTable, String colName, TColumn newCol)
+  public static void alterColumn(Transaction txn, String colName, TColumn newCol)
       throws TableLoadingException, ImpalaRuntimeException {
-    UpdateSchema schema = IcebergUtil.getIcebergUpdateSchema(feTable);
+    UpdateSchema schema = txn.updateSchema();
     org.apache.iceberg.types.Type type =
         IcebergSchemaConverter.fromImpalaColumnType(newCol.getColumnType());
     // Cannot change a column to complex type
@@ -150,8 +164,8 @@ public class IcebergCatalogOpExecutor {
    * Sets new default partition spec for an Iceberg table.
    */
   public static void alterTableSetPartitionSpec(FeIcebergTable feTable,
-      TIcebergPartitionSpec partSpec) throws TableLoadingException,
-                                             ImpalaRuntimeException {
+      TIcebergPartitionSpec partSpec, String catalogServiceId, long catalogVersion)
+      throws TableLoadingException, ImpalaRuntimeException {
     BaseTable iceTable = (BaseTable)IcebergUtil.loadTable(feTable);
     TableOperations tableOp = iceTable.operations();
     TableMetadata metadata = tableOp.current();
@@ -159,16 +173,21 @@ public class IcebergCatalogOpExecutor {
     Schema schema = metadata.schema();
     PartitionSpec newPartSpec = IcebergUtil.createIcebergPartition(schema, partSpec);
     TableMetadata newMetadata = metadata.updatePartitionSpec(newPartSpec);
-
+    Map<String, String> properties = new HashMap<>(newMetadata.properties());
+    properties.put(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
+                   catalogServiceId);
+    properties.put(MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
+                   String.valueOf(catalogVersion));
+    newMetadata = newMetadata.replaceProperties(properties);
     tableOp.commit(metadata, newMetadata);
   }
 
   /**
    * Drops a column from a Iceberg table.
    */
-  public static void dropColumn(FeIcebergTable feTable, String colName)
+  public static void dropColumn(Transaction txn, String colName)
       throws TableLoadingException, ImpalaRuntimeException {
-    UpdateSchema schema = IcebergUtil.getIcebergUpdateSchema(feTable);
+    UpdateSchema schema = txn.updateSchema();
     schema.deleteColumn(colName);
     schema.commit();
   }
@@ -177,34 +196,31 @@ public class IcebergCatalogOpExecutor {
    * Rename Iceberg table
    */
   public static void renameTable(FeIcebergTable feTable, TableIdentifier tableId)
-      throws ImpalaRuntimeException{
+      throws ImpalaRuntimeException {
     IcebergCatalog catalog = IcebergUtil.getIcebergCatalog(feTable);
     catalog.renameTable(feTable, tableId);
   }
 
   /**
-   * Returns a new Map without the properties that only need to be stored at the
-   * HMS level, not at the Iceberg table level.
+   * Set TBLPROPERTIES.
    */
-  private static Map<String, String> excludeHmsOnlyProps(Map<String, String> props) {
-    Map<String, String> ret = new HashMap<>();
-    for (Map.Entry<String, String> entry : props.entrySet()) {
-      if (isHmsOnlyProperty(entry.getKey())) continue;
-      ret.put(entry.getKey(), entry.getValue());
+  public static void setTblProperties(Transaction txn, Map<String, String> properties) {
+    UpdateProperties updateProps = txn.updateProperties();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      updateProps.set(entry.getKey(), entry.getValue());
     }
-    return ret;
+    updateProps.commit();
   }
 
   /**
-   * Returns true if the table property should only be stored in HMS.
-   * If false, the property is stored in HMS as well as iceberg.
+   * Unset TBLPROPERTIES
    */
-  private static boolean isHmsOnlyProperty(String propKey) {
-    if (IcebergTable.ICEBERG_FILE_FORMAT.equals(propKey)) return true;
-    if (IcebergTable.ICEBERG_CATALOG_LOCATION.equals(propKey)) return true;
-    if (IcebergTable.ICEBERG_TABLE_IDENTIFIER.equals(propKey)) return true;
-    if (CatalogOpExecutor.CAPABILITIES_KEY.equals(propKey)) return true;
-    return false;
+  public static void unsetTblProperties(Transaction txn, List<String> removeProperties) {
+    UpdateProperties updateProps = txn.updateProperties();
+    for (String prop : removeProperties) {
+      updateProps.remove(prop);
+    }
+    updateProps.commit();
   }
 
   /**
@@ -225,8 +241,8 @@ public class IcebergCatalogOpExecutor {
 
   private static class Append implements BatchWrite {
     final private AppendFiles append;
-    public Append(org.apache.iceberg.Table tbl) {
-      append = tbl.newAppend();
+    public Append(Transaction txn) {
+      append = txn.newAppend();
     }
 
     @Override
@@ -242,8 +258,8 @@ public class IcebergCatalogOpExecutor {
 
   private static class DynamicOverwrite implements BatchWrite {
     final private ReplacePartitions replace;
-    public DynamicOverwrite(org.apache.iceberg.Table tbl) {
-      replace = tbl.newReplacePartitions();
+    public DynamicOverwrite(Transaction txn) {
+      replace = txn.newReplacePartitions();
     }
 
     @Override
@@ -261,7 +277,7 @@ public class IcebergCatalogOpExecutor {
    * Append the newly inserted data files to the Iceberg table using the AppendFiles
    * API.
    */
-  public static void appendFiles(FeIcebergTable feIcebergTable,
+  public static void appendFiles(FeIcebergTable feIcebergTable, Transaction txn,
       TIcebergOperationParam icebergOp) throws ImpalaRuntimeException,
       TableLoadingException {
     org.apache.iceberg.Table nativeIcebergTable =
@@ -269,9 +285,9 @@ public class IcebergCatalogOpExecutor {
     List<ByteBuffer> dataFilesFb = icebergOp.getIceberg_data_files_fb();
     BatchWrite batchWrite;
     if (icebergOp.isIs_overwrite()) {
-      batchWrite = new DynamicOverwrite(nativeIcebergTable);
+      batchWrite = new DynamicOverwrite(txn);
     } else {
-      batchWrite = new Append(nativeIcebergTable);
+      batchWrite = new Append(txn);
     }
     for (ByteBuffer buf : dataFilesFb) {
       FbIcebergDataFile dataFile = FbIcebergDataFile.getRootAsFbIcebergDataFile(buf);
@@ -323,11 +339,24 @@ public class IcebergCatalogOpExecutor {
   /**
    * Creates new snapshot for the iceberg table by deleting all data files.
    */
-  public static void truncateTable(FeIcebergTable feIceTable)
-      throws ImpalaRuntimeException, TableLoadingException {
-    Table iceTable = IcebergUtil.loadTable(feIceTable);
-    DeleteFiles delete = iceTable.newDelete();
+  public static void truncateTable(Transaction txn)
+      throws ImpalaRuntimeException {
+    DeleteFiles delete = txn.newDelete();
     delete.deleteFromRowFilter(Expressions.alwaysTrue());
     delete.commit();
+  }
+
+  /**
+   * Sets catalog service id and the new catalog version in table properties using 'txn'.
+   * This way we can avoid reloading the table on self-events.
+   */
+  public static void addCatalogVersionToTxn(Transaction txn, String serviceId,
+      long version) {
+    UpdateProperties updateProps = txn.updateProperties();
+    updateProps.set(MetastoreEventPropertyKey.CATALOG_SERVICE_ID.getKey(),
+                    serviceId);
+    updateProps.set(MetastoreEventPropertyKey.CATALOG_VERSION.getKey(),
+                    String.valueOf(version));
+    updateProps.commit();
   }
 }

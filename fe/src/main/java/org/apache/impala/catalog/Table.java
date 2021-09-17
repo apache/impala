@@ -707,6 +707,7 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     }
     return resp;
   }
+
   /**
    * @see FeCatalogUtils#parseColumnType(FieldSchema, String)
    */

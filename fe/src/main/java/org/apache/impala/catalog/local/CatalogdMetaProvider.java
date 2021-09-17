@@ -80,6 +80,7 @@ import org.apache.impala.thrift.TFunctionName;
 import org.apache.impala.thrift.TGetPartialCatalogObjectRequest;
 import org.apache.impala.thrift.TGetPartialCatalogObjectResponse;
 import org.apache.impala.thrift.THdfsFileDesc;
+import org.apache.impala.thrift.TIcebergSnapshot;
 import org.apache.impala.thrift.TNetworkAddress;
 import org.apache.impala.thrift.TPartialPartitionInfo;
 import org.apache.impala.thrift.TTable;
@@ -999,6 +1000,16 @@ public class CatalogdMetaProvider implements MetaProvider {
       }
     }
     return ret;
+  }
+
+  @Override
+  public TIcebergSnapshot loadIcebergSnapshot(final TableMetaRef table)
+      throws TException {
+    Preconditions.checkArgument(table instanceof TableMetaRefImpl);
+    TGetPartialCatalogObjectRequest req = newReqForTable(table);
+    req.table_info_selector.want_iceberg_snapshot = true;
+    TGetPartialCatalogObjectResponse resp = sendRequest(req);
+    return resp.table_info.getIceberg_snapshot();
   }
 
   private ImmutableList<FileDescriptor> convertThriftFdList(List<THdfsFileDesc> thriftFds,

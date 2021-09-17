@@ -48,9 +48,16 @@ class TestInsertStress(ImpalaTestSuite):
     try:
       insert_cnt = 0
       while insert_cnt < num_inserts:
-        impalad_client.execute("insert into table %s values (%i, %i)" % (
-            tbl_name, wid, insert_cnt))
-        insert_cnt += 1
+        try:
+          impalad_client.execute("insert into table %s values (%i, %i)" % (
+              tbl_name, wid, insert_cnt))
+          insert_cnt += 1
+        except Exception as e:
+          # It's possible that the Iceberg table is concurrently updated in CatalogD
+          # during data load in local catalog.
+          if "InconsistentMetadataFetchException" in str(e):
+            continue
+          raise e
     finally:
       with counter.get_lock():
         counter.value += 1
@@ -72,9 +79,16 @@ class TestInsertStress(ImpalaTestSuite):
     impalad_client = ImpalaTestSuite.create_client_for_nth_impalad(target_impalad)
     try:
       while counter.value != writers:
-        result = impalad_client.execute("select * from %s" % tbl_name)
-        verify_result_set(result)
-        time.sleep(random.random())
+        try:
+          result = impalad_client.execute("select * from %s" % tbl_name)
+          verify_result_set(result)
+          time.sleep(random.random())
+        except Exception as e:
+          # It's possible that the Iceberg table is concurrently updated in CatalogD
+          # during data load in local catalog.
+          if "InconsistentMetadataFetchException" in str(e):
+            continue
+          raise e
     finally:
       impalad_client.close()
 
