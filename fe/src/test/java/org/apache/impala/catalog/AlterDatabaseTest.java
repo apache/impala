@@ -86,11 +86,9 @@ public class AlterDatabaseTest {
    */
   @BeforeClass
   public static void setUpTest() throws ImpalaException {
-    catalog_ = new ImpaladTestCatalog(CatalogServiceTestCatalog.create());
-    catalogOpExecutor_ =
-        new CatalogOpExecutor(catalog_.getSrcCatalog(),
-            new NoopAuthorizationFactory().getAuthorizationConfig(),
-            new NoopAuthorizationManager());
+    CatalogServiceTestCatalog testSrcCatalog = CatalogServiceTestCatalog.create();
+    catalog_ = new ImpaladTestCatalog(testSrcCatalog);
+    catalogOpExecutor_ = testSrcCatalog.getCatalogOpExecutor();
   }
 
   /**

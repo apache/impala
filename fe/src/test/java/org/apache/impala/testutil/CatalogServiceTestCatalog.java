@@ -17,6 +17,7 @@
 
 package org.apache.impala.testutil;
 
+import com.google.common.base.Preconditions;
 import org.apache.impala.authorization.AuthorizationFactory;
 import org.apache.impala.authorization.NoopAuthorizationFactory;
 import org.apache.impala.authorization.AuthorizationPolicy;
@@ -24,11 +25,14 @@ import org.apache.impala.authorization.NoopAuthorizationFactory.NoopAuthorizatio
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.MetaStoreClientPool;
+import org.apache.impala.catalog.TableLoadingMgr;
+import org.apache.impala.catalog.events.MetastoreEvents.EventFactoryForSyncToLatestEvent;
 import org.apache.impala.catalog.metastore.CatalogMetastoreServer;
 import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.metastore.NoOpCatalogMetastoreServer;
 import org.apache.impala.compat.MetastoreShim;
 import org.apache.impala.common.ImpalaException;
+import org.apache.impala.service.CatalogOpExecutor;
 import org.apache.impala.service.FeSupport;
 import org.apache.impala.thrift.TUniqueId;
 
@@ -41,6 +45,7 @@ import java.util.UUID;
  * for testing.
  */
 public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
+  private CatalogOpExecutor opExecutor_;
   private CatalogServiceTestCatalog(boolean loadInBackground, int numLoadingThreads,
       TUniqueId catalogServiceId, MetaStoreClientPool metaStoreClientPool)
       throws ImpalaException {
@@ -54,7 +59,7 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
     rd.run();
   }
 
-  public static CatalogServiceCatalog create() {
+  public static CatalogServiceTestCatalog create() {
     return createWithAuth(new NoopAuthorizationFactory());
   }
 
@@ -62,18 +67,23 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
    * Creates a catalog server that reads authorization policy metadata from the
    * authorization config.
    */
-  public static CatalogServiceCatalog createWithAuth(AuthorizationFactory authzFactory) {
+  public static CatalogServiceTestCatalog createWithAuth(AuthorizationFactory factory) {
     FeSupport.loadLibrary();
-    CatalogServiceCatalog cs;
+    CatalogServiceTestCatalog cs;
     try {
       if (MetastoreShim.getMajorVersion() > 2) {
         MetastoreShim.setHiveClientCapabilities();
       }
       cs = new CatalogServiceTestCatalog(false, 16, new TUniqueId(),
           new MetaStoreClientPool(0, 0));
-      cs.setAuthzManager(authzFactory.newAuthorizationManager(cs));
+      cs.setAuthzManager(factory.newAuthorizationManager(cs));
       cs.setMetastoreEventProcessor(NoOpEventProcessor.getInstance());
       cs.setCatalogMetastoreServer(NoOpCatalogMetastoreServer.INSTANCE);
+      cs.setCatalogOpExecutor(new CatalogOpExecutor(cs,
+          new NoopAuthorizationFactory().getAuthorizationConfig(),
+          new NoopAuthorizationFactory.NoopAuthorizationManager()));
+      cs.setEventFactoryForSyncToLatestEvent(new EventFactoryForSyncToLatestEvent(
+          cs.getCatalogOpExecutor()));
       cs.reset();
     } catch (ImpalaException e) {
       throw new IllegalStateException(e.getMessage(), e);
@@ -94,14 +104,28 @@ public class CatalogServiceTestCatalog extends CatalogServiceCatalog {
     if (MetastoreShim.getMajorVersion() > 2) {
       MetastoreShim.setHiveClientCapabilities();
     }
-    CatalogServiceCatalog cs = new CatalogServiceTestCatalog(false, 16,
+    CatalogServiceTestCatalog cs = new CatalogServiceTestCatalog(false, 16,
         new TUniqueId(), new EmbeddedMetastoreClientPool(0, derbyPath));
     cs.setAuthzManager(new NoopAuthorizationManager());
     cs.setMetastoreEventProcessor(NoOpEventProcessor.getInstance());
+    cs.setCatalogOpExecutor(new CatalogOpExecutor(cs,
+        new NoopAuthorizationFactory().getAuthorizationConfig(),
+        new NoopAuthorizationFactory.NoopAuthorizationManager()));
+    cs.setEventFactoryForSyncToLatestEvent(
+        new EventFactoryForSyncToLatestEvent(cs.getCatalogOpExecutor()));
     cs.reset();
     return cs;
   }
 
   @Override
   public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
+
+  private void setCatalogOpExecutor(CatalogOpExecutor opExecutor) {
+    opExecutor_ = opExecutor;
+  }
+
+  public CatalogOpExecutor getCatalogOpExecutor() {
+    Preconditions.checkNotNull(opExecutor_, "returning null opExecutor_");
+    return opExecutor_;
+  }
 }

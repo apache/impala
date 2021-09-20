@@ -44,7 +44,7 @@ import org.junit.Test;
  * server endpoint at a random available port.
  */
 public abstract class AbstractCatalogMetastoreTest {
-  protected static CatalogServiceCatalog catalog_;
+  protected static CatalogServiceTestCatalog catalog_;
   protected static CatalogOpExecutor catalogOpExecutor_;
   protected static CatalogMetastoreServer catalogMetastoreServer_;
   protected static HiveMetaStoreClient catalogHmsClient_;
@@ -53,9 +53,7 @@ public abstract class AbstractCatalogMetastoreTest {
   @BeforeClass
   public static void setup() throws Exception {
     catalog_ = CatalogServiceTestCatalog.create();
-    catalogOpExecutor_ = new CatalogOpExecutor(catalog_,
-        new NoopAuthorizationFactory().getAuthorizationConfig(),
-        new NoopAuthorizationManager());
+    catalogOpExecutor_ = catalog_.getCatalogOpExecutor();
     catalogMetastoreServer_ = new CatalogTestMetastoreServer(
         catalogOpExecutor_);
     catalog_.setCatalogMetastoreServer(catalogMetastoreServer_);

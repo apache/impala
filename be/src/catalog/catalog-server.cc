@@ -118,6 +118,12 @@ DEFINE_bool(hms_event_incremental_refresh_transactional_table, true, "When set t
     "level events. Otherwise, it will always reload the whole table for transactional "
     "tables.");
 
+DEFINE_bool(enable_sync_to_latest_event_on_ddls, false, "This configuration is "
+    "used to sync db/table in catalogd cache to latest HMS event id whenever DDL "
+    "operations are performed from Impala shell and catalog metastore server "
+    "(if enabled). If this config is enabled, then the flag invalidate_hms_cache_on_ddls "
+    "should be disabled");
+
 DECLARE_string(state_store_host);
 DECLARE_int32(state_store_subscriber_port);
 DECLARE_int32(state_store_port);

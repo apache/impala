@@ -38,6 +38,8 @@ import org.apache.impala.catalog.Function;
 import org.apache.impala.catalog.MetaStoreClientPool;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
 import org.apache.impala.catalog.events.ExternalEventsProcessor;
+import org.apache.impala.catalog.events.MetastoreEvents.EventFactoryForSyncToLatestEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
 import org.apache.impala.catalog.events.NoOpEventProcessor;
 import org.apache.impala.catalog.metastore.CatalogMetastoreServer;
@@ -148,6 +150,9 @@ public class JniCatalog {
     authzManager_ = authzFactory.newAuthorizationManager(catalog_);
     catalog_.setAuthzManager(authzManager_);
     catalogOpExecutor_ = new CatalogOpExecutor(catalog_, authzConfig, authzManager_);
+    MetastoreEventFactory eventFactory =
+        new EventFactoryForSyncToLatestEvent(catalogOpExecutor_);
+    catalog_.setEventFactoryForSyncToLatestEvent(eventFactory);
     ExternalEventsProcessor eventsProcessor = getEventsProcessor(metaStoreClientPool,
         catalogOpExecutor_);
     catalog_.setMetastoreEventProcessor(eventsProcessor);
@@ -155,6 +160,7 @@ public class JniCatalog {
     catalogMetastoreServer_ = getCatalogMetastoreServer(catalogOpExecutor_);
     catalog_.setCatalogMetastoreServer(catalogMetastoreServer_);
     catalogMetastoreServer_.start();
+
     try {
       catalog_.reset();
     } catch (CatalogException e) {

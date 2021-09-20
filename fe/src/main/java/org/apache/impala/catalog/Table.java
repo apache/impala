@@ -57,11 +57,12 @@ import org.apache.impala.thrift.TTableInfoSelector;
 import org.apache.impala.thrift.TTableStats;
 import org.apache.impala.util.AcidUtils;
 import org.apache.impala.util.HdfsCachingUtil;
-import org.apache.log4j.Logger;
 
 import com.codahale.metrics.Timer;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Base class for table metadata.
@@ -73,7 +74,7 @@ import com.google.common.collect.Lists;
  * a key range into a fixed number of buckets).
  */
 public abstract class Table extends CatalogObjectImpl implements FeTable {
-  private static final Logger LOG = Logger.getLogger(Table.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Table.class);
   protected org.apache.hadoop.hive.metastore.api.Table msTable_;
   protected final Db db_;
   protected final String name_;
@@ -183,6 +184,13 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
   // Table property key to determined if HMS translated a managed table to external table
   public static final String TBL_PROP_EXTERNAL_TABLE_PURGE = "external.table.purge";
 
+  // this field represents the last event id in metastore upto which this table is
+  // synced. It is used if the flag sync_to_latest_event_on_ddls is set to true.
+  // Making it as volatile so that read and write of this variable are thread safe.
+  // As an example, EventProcessor can check if it needs to process a table event or
+  // not by reading this flag and without acquiring read lock on table object
+  protected volatile long lastSyncedEventId_ = -1;
+
   protected Table(org.apache.hadoop.hive.metastore.api.Table msTable, Db db,
       String name, String owner) {
     msTable_ = msTable;
@@ -194,11 +202,34 @@ public abstract class Table extends CatalogObjectImpl implements FeTable {
     initMetrics();
   }
 
+  // TODO: Get rid of get and createEventId
+  // once we implement the logic of setting
+  // last synced id in full table reload
   public long getCreateEventId() { return createEventId_; }
 
   public void setCreateEventId(long eventId) {
-    this.createEventId_ = eventId;
+    // TODO: Add a preconditions check for eventId < lastSycnedEventId
+    createEventId_ = eventId;
+    LOG.debug("createEventId_ for table: {} set to: {}", getFullName(), createEventId_);
+    // TODO: Should we reset lastSyncedEvent Id if it is less than event Id?
+    // If we don't reset it - we may start syncing table from an event id which
+    // is less than create event id
+    if (lastSyncedEventId_ < eventId) {
+      setLastSyncedEventId(eventId);
+    }
   }
+
+  public long getLastSyncedEventId() {
+    return lastSyncedEventId_;
+  }
+
+  public void setLastSyncedEventId(long eventId) {
+    // TODO: Add a preconditions check for eventId >= createEventId_
+    LOG.debug("lastSyncedEventId_ for table: {} set from {} to {}", getFullName(),
+        lastSyncedEventId_, eventId);
+    lastSyncedEventId_ = eventId;
+  }
+
   /**
    * Returns if the given HMS table is an external table (uses table type if
    * available or else uses table properties). Implementation is based on org.apache

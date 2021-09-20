@@ -113,6 +113,13 @@ public class Db extends CatalogObjectImpl implements FeDb {
   // processing is disabled.
   private long createEventId_ = -1;
 
+  // this field represents the last event id in metastore upto which this db is synced
+  // It is used if the flag sync_to_latest_event_on_ddls is set to true.
+  // Making it as volatile so that read and write of this variable are thread safe.
+  // As an example, EventProcessor can check if it needs to process a db event or not
+  // by reading this flag and without acquiring read lock on db object
+  private volatile long lastSyncedEventId_ = -1;
+
   public Db(String name, org.apache.hadoop.hive.metastore.api.Database msDb) {
     setMetastoreDb(name, msDb);
     tableCache_ = new CatalogObjectCache<>();
@@ -122,7 +129,24 @@ public class Db extends CatalogObjectImpl implements FeDb {
   public long getCreateEventId() { return createEventId_; }
 
   public void setCreateEventId(long eventId) {
+    // TODO: Add a preconditions check for eventId < lastSycnedEventId
     createEventId_ = eventId;
+    LOG.debug("createEventId_ for db: {} set to: {}", getName(), createEventId_);
+    if (lastSyncedEventId_ < eventId) {
+      setLastSyncedEventId(eventId);
+    }
+  }
+
+  public long getLastSyncedEventId() {
+    return lastSyncedEventId_;
+  }
+
+  public void setLastSyncedEventId(long eventId) {
+    // TODO: Add a preconditions check for eventId >= createEventId_
+    LOG.debug("lastSyncedEventId_ for db: {} set from {} to {}", getName(),
+        lastSyncedEventId_, eventId);
+    lastSyncedEventId_ = eventId;
+
   }
 
   public void setIsSystemDb(boolean b) { isSystemDb_ = b; }
@@ -568,5 +592,13 @@ public class Db extends CatalogObjectImpl implements FeDb {
   public String getOwnerUser() {
     org.apache.hadoop.hive.metastore.api.Database db = getMetaStoreDb();
     return db == null ? null : db.getOwnerName();
+  }
+
+  /**
+   *
+   * @return True if dbLock_ is held by current thread
+   */
+  public boolean isLockHeldByCurrentThread() {
+    return dbLock_.isHeldByCurrentThread();
   }
 }

@@ -100,6 +100,7 @@ DECLARE_string(kudu_sasl_protocol_name);
 DECLARE_bool(invalidate_hms_cache_on_ddls);
 DECLARE_bool(hms_event_incremental_refresh_transactional_table);
 DECLARE_bool(auto_check_compaction);
+DECLARE_bool(enable_sync_to_latest_event_on_ddls);
 
 // HS2 SAML2.0 configuration
 // Defined here because TAG_FLAG caused issues in global-flags.cc
@@ -321,6 +322,8 @@ Status PopulateThriftBackendGflags(TBackendGflags& cfg) {
   cfg.__set_hms_event_incremental_refresh_transactional_table(
       FLAGS_hms_event_incremental_refresh_transactional_table);
   cfg.__set_auto_check_compaction(FLAGS_auto_check_compaction);
+  cfg.__set_enable_sync_to_latest_event_on_ddls(
+      FLAGS_enable_sync_to_latest_event_on_ddls);
   return Status::OK();
 }
 

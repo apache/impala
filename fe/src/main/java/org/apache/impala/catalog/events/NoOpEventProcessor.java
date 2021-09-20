@@ -99,7 +99,7 @@ public class NoOpEventProcessor implements ExternalEventsProcessor {
 
   @Override
   public EventFactory getEventsFactory() {
-    return hmsEvent -> null;
+    return (hmsEvent, metrics) -> null;
   }
 
   @Override

@@ -122,7 +122,8 @@ class TestMetastoreService(CustomClusterTestSuite):
         impalad_args="--use_local_catalog=true",
         catalogd_args="--catalog_topic_mode=minimal "
                       "--start_hms_server=true "
-                      "--hms_port=5899"
+                      "--hms_port=5899 "
+                      "--enable_sync_to_latest_event_on_ddls=false"
     )
     def test_get_table_req_with_fallback(self):
       """
@@ -224,7 +225,8 @@ class TestMetastoreService(CustomClusterTestSuite):
                       "--start_hms_server=true "
                       "--hms_port=5899 "
                       "--fallback_to_hms_on_errors=false "
-                      "--hms_event_polling_interval_s=0"
+                      "--hms_event_polling_interval_s=0 "
+                      "--enable_sync_to_latest_event_on_ddls=false"
     )
     def test_get_table_req_without_fallback(self):
       """
@@ -409,7 +411,8 @@ class TestMetastoreService(CustomClusterTestSuite):
                       "--start_hms_server=true "
                       "--hms_port=5899 "
                       "--fallback_to_hms_on_errors=true "
-                      "--invalidate_hms_cache_on_ddls=true"
+                      "--invalidate_hms_cache_on_ddls=true "
+                      "--enable_sync_to_latest_event_on_ddls=false"
     )
     def test_cache_invalidated_on_nontransactional_table_ddls(self):
         db_name = ImpalaTestSuite.get_random_name(
@@ -425,7 +428,8 @@ class TestMetastoreService(CustomClusterTestSuite):
                       "--start_hms_server=true "
                       "--hms_port=5899 "
                       "--fallback_to_hms_on_errors=true "
-                      "--invalidate_hms_cache_on_ddls=false"
+                      "--invalidate_hms_cache_on_ddls=false "
+                      "--enable_sync_to_latest_event_on_ddls=false"
     )
     def test_cache_valid_on_nontransactional_table_ddls(self):
         db_name = ImpalaTestSuite.get_random_name(
@@ -663,6 +667,7 @@ class TestMetastoreService(CustomClusterTestSuite):
                       "--hms_port=5899 "
                       "--fallback_to_hms_on_errors=true "
                       "--invalidate_hms_cache_on_ddls=true "
+                      "--enable_sync_to_latest_event_on_ddls=false "
                       "--hms_event_polling_interval_s=1"
     )
     def test_cache_invalidate_incomplete_table(self):
@@ -770,6 +775,7 @@ class TestMetastoreService(CustomClusterTestSuite):
                       "--hms_port=5899 "
                       "--fallback_to_hms_on_errors=true "
                       "--invalidate_hms_cache_on_ddls=true "
+                      "--enable_sync_to_latest_event_on_ddls=false "
                       "--hms_event_polling_interval_s=5"
     )
     def test_table_create_drop_seq(self):
@@ -886,6 +892,7 @@ class TestMetastoreService(CustomClusterTestSuite):
                       "--hms_port=5899 "
                       "--fallback_to_hms_on_errors=true "
                       "--invalidate_hms_cache_on_ddls=true "
+                      "--enable_sync_to_latest_event_on_ddls=false "
                       "--hms_event_polling_interval_s=5"
     )
     def test_database_create_drop_seq(self):

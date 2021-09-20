@@ -270,9 +270,13 @@ import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
 import org.apache.impala.catalog.IncompleteTable;
 import org.apache.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import org.apache.impala.catalog.events.EventFactory;
 import org.apache.impala.catalog.events.MetastoreEvents;
 import org.apache.impala.catalog.events.MetastoreEvents.DropTableEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
+import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEventFactory;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
+import org.apache.impala.common.Metrics;
 import org.apache.impala.common.Reference;
 import org.apache.impala.common.Pair;
 import org.apache.impala.compat.MetastoreShim;
@@ -315,7 +319,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   protected Configuration serverConf_;
   protected PartitionExpressionProxy expressionProxy_;
   protected final String defaultCatalogName_;
-  protected final boolean invalidateCacheOnDDLs_;
+
+  // Initializing metrics so that they can be tracked
+  // separately for events processed by this class
+  protected final Metrics metastoreEventsMetrics_ = new Metrics();
+  protected EventFactory metastoreEventFactory_;
 
   public MetastoreServiceHandler(CatalogOpExecutor catalogOpExecutor,
       boolean fallBackToHMSOnErrors) {
@@ -351,12 +359,26 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
     //  2. Access config directly from BackendConfig INSTANCE directly.
     //  For now, going with option #2
 
-    invalidateCacheOnDDLs_ =
+    boolean invalidateCacheOnDdlFlag =
         BackendConfig.INSTANCE.invalidateCatalogdHMSCacheOnDDLs();
-    LOG.info("Invalidate catalogd cache for DDLs on non transactional tables " +
-        "is set to {}",invalidateCacheOnDDLs_);
+    boolean syncToLatestEventIdFlag =
+        BackendConfig.INSTANCE.enableSyncToLatestEventOnDdls();
+    Preconditions.checkArgument(!(invalidateCacheOnDdlFlag && syncToLatestEventIdFlag),
+        "Configurations invalidate_hms_cache_on_ddls and "
+            + "enable_sync_to_latest_event_on_ddls can not be set to true "
+            + "at the same time");
+
+    if (BackendConfig.INSTANCE.invalidateCatalogdHMSCacheOnDDLs()) {
+      LOG.debug("Invalidate catalogd cache for DDLs on non transactional tables " +
+          "is set to true");
+    }
+    if (BackendConfig.INSTANCE.enableSyncToLatestEventOnDdls()) {
+      LOG.debug("catalogd cache sync to latest event id is set to true");
+    }
     // make sure catalogOpExecutor's metastoreHmsDdlLock is not null
     Preconditions.checkNotNull(catalogOpExecutor_.getMetastoreDdlLock());
+    initMetrics();
+    metastoreEventFactory_ = catalog_.getEventFactoryForSyncToLatestEvent();
   }
 
   @Override
@@ -461,7 +483,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
     } finally {
       catalogOpExecutor_.getMetastoreDdlLock().unlock();
     }
-    dropDbIfExists(databaseName, currentEventId, "drop_database");
+    if (!BackendConfig.INSTANCE.invalidateCatalogdHMSCacheOnDDLs() ||
+            !BackendConfig.INSTANCE.enableCatalogdHMSCache()) {
+      return;
+    }
+    dropDbIfExists(databaseName, ignoreUnknownDb, currentEventId, "drop_database");
   }
 
   @Override
@@ -676,10 +702,16 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
     long eventId = -1;
     try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
       eventId = getCurrentEventId(client);
+      // TODO: Handle NoSuchObjectException
       client.getHiveClient().getThriftClient().drop_table(dbname,
-          tblname, deleteData);
-      removeTableIfExists(eventId, dbname, tblname,
-          "drop_table");
+              tblname, deleteData);
+      if (!BackendConfig.INSTANCE.invalidateCatalogdHMSCacheOnDDLs() ||
+              !BackendConfig.INSTANCE.enableCatalogdHMSCache()) {
+        return;
+      }
+      dropTableIfExists(eventId, dbname, tblname,
+              "drop_table");
+
     } finally {
       catalogOpExecutor_.getMetastoreDdlLock().unlock();
     }
@@ -697,7 +729,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       client.getHiveClient().getThriftClient()
           .drop_table_with_environment_context(dbname, tblname, deleteData,
               environmentContext);
-      removeTableIfExists(eventId, dbname, tblname,
+      if (!BackendConfig.INSTANCE.invalidateCatalogdHMSCacheOnDDLs() ||
+              !BackendConfig.INSTANCE.enableCatalogdHMSCache()) {
+        return;
+      }
+      dropTableIfExists(eventId, dbname, tblname,
           "drop_table_with_environment_context");
     } finally {
       catalogOpExecutor_.getMetastoreDdlLock().unlock();
@@ -1432,6 +1468,11 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       throws TException {
     LOG.debug("Received exception while executing {}", apiName, cause);
     if (fallBackToHMSOnErrors_) return;
+    rethrowException(cause, apiName);
+  }
+
+  protected void rethrowException(Exception cause, String apiName)
+      throws TException {
     if (cause instanceof TException) throw (TException) cause;
     // if this is not a TException we wrap it to a MetaException
     throw new MetaException(
@@ -2915,6 +2956,13 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   }
 
   /**
+   * Gets the current event id from the hive metastore.
+   */
+  private long getCurrentEventId(MetaStoreClient msClient) throws TException {
+    return msClient.getHiveClient().getCurrentNotificationEventId().getEventId();
+  }
+
+  /**
    * For non transactional tables, invalidate the table from cache
    * if hms ddl apis are accessed from catalogd's metastore server.
    * Any subsequent get table request fetches the table from HMS and loads
@@ -2930,13 +2978,27 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
    */
   private void invalidateNonTransactionalTableIfExists(String dbNameWithCatalog,
       String tableName, String apiName) throws MetaException {
-    // return immediately if flag invalidateCacheOnDDLs_ is false
-    if (!invalidateCacheOnDDLs_) {
-      LOG.debug("Not invalidating table {}.{} from catalogd cache because " +
-              "invalidateCacheOnDDLs_ flag is set to {} ", dbNameWithCatalog,
-          tableName, invalidateCacheOnDDLs_);
+    // return immediately if
+    //     flag invalidateCacheOnDDLs_ is false
+    //                   or
+    //     catalogHMSCache is disabled
+    //                   or
+    //     syncToLatestEventId is true
+    if (BackendConfig.INSTANCE.enableSyncToLatestEventOnDdls()) {
+      LOG.debug("Skipping invalidation of table {}.{} due to metastore api {} because "
+          + "sync to latest event id is set to true", dbNameWithCatalog, tableName,
+          apiName);
       return;
     }
+
+    if (!BackendConfig.INSTANCE.invalidateCatalogdHMSCacheOnDDLs() ||
+        !BackendConfig.INSTANCE.enableCatalogdHMSCache()) {
+      LOG.debug("Skipping invalidation of table {}.{} due to metastore api {} because " +
+              "invalidate hms cache of ddl flag is set to false ", dbNameWithCatalog,
+          tableName, apiName);
+      return;
+    }
+
     String dbName = dbNameWithCatalog;
     try {
       // Parse db name. Throw error if parsing fails.
@@ -2983,42 +3045,20 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   }
 
   /**
-   * Gets the current event id from the hive metastore.
-   */
-  private long getCurrentEventId(MetaStoreClient msClient) throws TException {
-    return msClient.getHiveClient().getCurrentNotificationEventId().getEventId();
-  }
-
-  /**
    * This method is identical to invalidateNonTransactionalTableIfExists()
    * except that it
    * 1.removes both transactional and non transactional tables
    * 2.removes(and not invalidates) table from the cache on
    * DDLs like drop_table
    */
-  private void removeTableIfExists(long beforeDropEventId, String dbNameWithCatalog,
+  protected void dropTableIfExists(long beforeDropEventId, String dbNameWithCatalog,
       String tableName, String apiName) throws MetaException {
-    // return immediately if flag invalidateCacheOnDDLs_ is false
-    if (!invalidateCacheOnDDLs_) {
-      LOG.debug("Not removing table {}.{} from catalogd cache because " +
-              "invalidateCacheOnDDLs_ flag is set to {} ", dbNameWithCatalog,
-          tableName, invalidateCacheOnDDLs_);
-      return;
-    }
     // Parse db name. Throw error if parsing fails.
     String dbName;
     String catName;
-    try {
-      String[] catAndDbName = MetaStoreUtils.parseDbName(dbNameWithCatalog, serverConf_);
-      catName = catAndDbName[0];
-      dbName = catAndDbName[1];
-    } catch (MetaException ex) {
-      LOG.error("Successfully executed metastpre api: {} but encountered error " +
-              "when parsing dbName {} to invalidate/remove table from cache " +
-              "with error message: {}", apiName, dbNameWithCatalog,
-          ex.getMessage());
-      throw ex;
-    }
+    String[] catAndDbName = MetaStoreUtils.parseDbName(dbNameWithCatalog, serverConf_);
+    catName = catAndDbName[0];
+    dbName = catAndDbName[1];
     try {
       List<NotificationEvent> events = MetastoreEventsProcessor
           .getNextMetastoreEventsInBatches(catalog_, beforeDropEventId,
@@ -3045,8 +3085,7 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
       }
     } catch (Exception e) {
       String msg =
-          "Unable to process the DROP table event for table " + dbName +
-              "." + tableName;
+          "Unable to process the DROP table event for table " + dbName + "." + tableName;
       LOG.error(msg, e);
       throw new MetaException(msg);
     }
@@ -3060,13 +3099,21 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   private void renameNonTransactionalTableIfExists(String oldDbNameWithCatalog,
       String oldTableName, String newDbNameWithCatalog, String newTableName,
       String apiName) throws MetaException {
-    // return immediately if flag invalidateCacheOnDDLs_ is false
-    if (!invalidateCacheOnDDLs_) {
-      LOG.debug("invalidateCacheOnDDLs_ flag is false, skipping cache " +
-              "update for operation {} on table {}.{}", apiName,
-          oldDbNameWithCatalog, oldTableName);
+    if (BackendConfig.INSTANCE.enableSyncToLatestEventOnDdls()) {
+      LOG.debug("Skipping rename of table {}.{} due to metastore api {} because "
+          + "sync to latest event id is set to true", oldDbNameWithCatalog, oldTableName,
+          apiName);
       return;
     }
+
+    if (!BackendConfig.INSTANCE.invalidateCatalogdHMSCacheOnDDLs() ||
+        !BackendConfig.INSTANCE.enableCatalogdHMSCache()) {
+      LOG.debug("Skipping rename of table {}.{} due to metastore api {} because " +
+              "invalidate hms cache of ddl flag is set to false ", oldDbNameWithCatalog,
+          oldTableName, apiName);
+      return;
+    }
+
     String toParse = null, oldDbName, newDbName;
     // Parse old and new db names. Throw error if parsing fails
     try {
@@ -3098,14 +3145,8 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   /*
   Drops db from the cache. Also add the drop event id to deleteEventLog
    */
-  private void dropDbIfExists(String databaseName, long beforeDropEventId, String apiName)
-      throws MetaException {
-    if (!invalidateCacheOnDDLs_) {
-      LOG.debug("invalidateCacheOnDDLs_ flag is false, skipping " +
-          "cache update for hms operation" + apiName + " on db: " +
-          databaseName);
-      return;
-    }
+  protected void dropDbIfExists(String databaseName, boolean ignoreUnknownDb,
+      long beforeDropEventId, String apiName) throws MetaException {
     // Parse db name. Throw error if parsing fails.
     String dbName;
     String catName;
@@ -3122,29 +3163,66 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
                       .DROP_DATABASE_EVENT_TYPE)
                   && catName.equalsIgnoreCase(event.getCatName())
                   && dbName.equalsIgnoreCase(event.getDbName()));
-      if (events.isEmpty()) {
-        throw new MetaException(
-            "Drop database event not received. Check if notification " +
-                "events are configured in hive metastore");
+
+      if (events.size() == 0) {
+        if (ignoreUnknownDb) {
+          LOG.debug("db {} does not exist in metastore. Removing it from catalog if "
+                  + "exists ", dbName);
+          if (catalog_.removeDb(dbName) != null) {
+            LOG.info("Db {} not known to metastore, removed it from catalog", dbName);
+          }
+          return;
+        } else {
+          throw new MetaException(
+              String.format("Drop database event not received for db: %s from event "
+                      + "id: %s. Check if notification events are configured in hive"
+                      + " metastore", dbName, beforeDropEventId));
+        }
       }
       Preconditions.checkState(events.size() == 1, "Expected drop_database count " +
-          "to be 1 for db %s", databaseName);
+          "to be 1 for db %s from event id %s", databaseName, beforeDropEventId);
       long dropEventId = events.get(0).getEventId();
       boolean isRemoved =
           catalogOpExecutor_.removeDbIfNotAddedLater(dropEventId,
               dbName);
       if (isRemoved) {
-        LOG.info("Removed database: " + databaseName +
-            " from cache due to metastore API: drop_database");
+        LOG.info("Removed database: " + databaseName + " from cache due to metastore "
+            + "api: {}", apiName);
         catalogOpExecutor_.addToDeleteEventLog(events);
       }
 
     } catch (Exception e) {
-      String errorMsg = "Unable to process Drop database event for db: " +
+      String errorMsg = "Unable to process drop database event for db: " +
           databaseName + " for metastore api: " + apiName;
       LOG.error(errorMsg, e);
       throw new MetaException(errorMsg);
     }
+  }
 
+  private void initMetrics() {
+    metastoreEventsMetrics_.addTimer(
+        MetastoreEventsProcessor.EVENTS_FETCH_DURATION_METRIC);
+    metastoreEventsMetrics_.addTimer(
+        MetastoreEventsProcessor.EVENTS_PROCESS_DURATION_METRIC);
+    metastoreEventsMetrics_.addMeter(
+        MetastoreEventsProcessor.EVENTS_RECEIVED_METRIC);
+    metastoreEventsMetrics_.addCounter(
+        MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC);
+    metastoreEventsMetrics_.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_TABLE_REFRESHES);
+    metastoreEventsMetrics_.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_PARTITION_REFRESHES);
+    metastoreEventsMetrics_.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_TABLES_ADDED);
+    metastoreEventsMetrics_.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_TABLES_REMOVED);
+    metastoreEventsMetrics_.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_DATABASES_ADDED);
+    metastoreEventsMetrics_.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_DATABASES_REMOVED);
+    metastoreEventsMetrics_.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_PARTITIONS_ADDED);
+    metastoreEventsMetrics_.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_PARTITIONS_REMOVED);
   }
 }

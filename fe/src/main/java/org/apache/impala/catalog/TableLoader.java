@@ -17,16 +17,23 @@
 
 package org.apache.impala.catalog;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
+import org.apache.impala.catalog.events.EventFactory;
+import org.apache.impala.catalog.events.MetastoreEvents;
 import org.apache.impala.catalog.events.MetastoreEvents.CreateTableEvent;
 import org.apache.impala.catalog.events.MetastoreEventsProcessor;
+import org.apache.impala.common.Metrics;
 import org.apache.impala.compat.MetastoreShim;
-import org.apache.log4j.Logger;
+import org.apache.impala.service.BackendConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.apache.thrift.TException;
 
 import com.google.common.base.Stopwatch;
 
@@ -38,7 +45,7 @@ import org.apache.impala.util.ThreadNameAnnotator;
  * the Hive Metastore / HDFS / etc.
  */
 public class TableLoader {
-  private static final Logger LOG = Logger.getLogger(TableLoader.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TableLoader.class);
 
   private final CatalogServiceCatalog catalog_;
 
@@ -46,9 +53,12 @@ public class TableLoader {
   // concurrency bugs. Currently used to serialize calls to "getTable()" due to
   // HIVE-5457.
   private static final Object metastoreAccessLock_ = new Object();
+  private Metrics metrics_ = new Metrics();
 
   public TableLoader(CatalogServiceCatalog catalog) {
+    Preconditions.checkNotNull(catalog);
     catalog_ = catalog;
+    initMetrics(metrics_);
   }
 
   /**
@@ -64,7 +74,9 @@ public class TableLoader {
     String fullTblName = db.getName() + "." + tblName;
     String annotation = "Loading metadata for: " + fullTblName + " (" + reason + ")";
     LOG.info(annotation);
-    Table table;
+    Table table = null;
+    boolean syncToLatestEventId =
+        BackendConfig.INSTANCE.enableSyncToLatestEventOnDdls();
     // turn all exceptions into TableLoadingException
     List<NotificationEvent> events = null;
     try (ThreadNameAnnotator tna = new ThreadNameAnnotator(annotation);
@@ -111,8 +123,36 @@ public class TableLoader {
       }
       table.updateHMSLoadTableSchemaTime(hmsLoadTime);
       table.setCreateEventId(eventId);
+      long latestEventId = -1;
+      if (syncToLatestEventId) {
+        // acquire write lock on table since MetastoreEventProcessor.syncToLatestEventId
+        // expects current thread to have write lock on the table
+        if (!catalog_.tryWriteLock(table)) {
+          throw new CatalogException("Couldn't acquire write lock on new table object"
+              + " created when doing a full table reload of " + table.getFullName());
+        }
+        catalog_.getLock().writeLock().unlock();
+        try {
+          latestEventId = msClient.getHiveClient().
+              getCurrentNotificationEventId().getEventId();
+        } catch (TException e) {
+          throw new TableLoadingException("Failed to get latest event id from HMS "
+              + "while loading table: " + table.getFullName(), e);
+        }
+      }
+
       table.load(false, msClient.getHiveClient(), msTbl, reason);
       table.validate();
+      if (syncToLatestEventId) {
+        LOG.debug("After full reload, table {} is synced atleast till event id {}. "
+                + "Checking if there are more events generated for this table "
+                + "while the full reload was in progress", table.getFullName(),
+            latestEventId);
+        table.setLastSyncedEventId(latestEventId);
+        // write lock is not required since it is full table reload
+        MetastoreEventsProcessor.syncToLatestEventId(catalog_, table,
+            catalog_.getEventFactoryForSyncToLatestEvent(), metrics_);
+      }
     } catch (TableLoadingException e) {
       table = IncompleteTable.createFailedMetadataLoadTable(db, tblName, e);
     } catch (NoSuchObjectException e) {
@@ -127,9 +167,40 @@ public class TableLoader {
           db, tblName, new TableLoadingException(
           "Failed to load metadata for table: " + fullTblName + ". Running " +
           "'invalidate metadata " + fullTblName + "' may resolve this problem.", e));
+    } finally {
+      if (table != null && table.isWriteLockedByCurrentThread()) {
+        table.releaseWriteLock();
+      }
     }
     LOG.info("Loaded metadata for: " + fullTblName + " (" +
         sw.elapsed(TimeUnit.MILLISECONDS) + "ms)");
     return table;
+  }
+
+  private void initMetrics(Metrics metrics) {
+    metrics.addTimer(
+        MetastoreEventsProcessor.EVENTS_FETCH_DURATION_METRIC);
+    metrics.addTimer(
+        MetastoreEventsProcessor.EVENTS_PROCESS_DURATION_METRIC);
+    metrics.addMeter(
+        MetastoreEventsProcessor.EVENTS_RECEIVED_METRIC);
+    metrics.addCounter(
+        MetastoreEventsProcessor.EVENTS_SKIPPED_METRIC);
+    metrics.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_TABLE_REFRESHES);
+    metrics.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_PARTITION_REFRESHES);
+    metrics.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_TABLES_ADDED);
+    metrics.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_TABLES_REMOVED);
+    metrics.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_DATABASES_ADDED);
+    metrics.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_DATABASES_REMOVED);
+    metrics.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_PARTITIONS_ADDED);
+    metrics.addCounter(
+        MetastoreEventsProcessor.NUMBER_OF_PARTITIONS_REMOVED);
   }
 }

@@ -58,7 +58,7 @@ public class EventsProcessorStressTest {
   // use a fixed seed value to make the test repeatable
   private static final Random random = new Random(117);
 
-  private static CatalogServiceCatalog catalog_;
+  private static CatalogServiceTestCatalog catalog_;
   private static MetastoreEventsProcessor eventsProcessor_;
   private static final String testDbPrefix_ = "events_stress_db_";
   private static final String testTblPrefix_ = "stress_test_tbl_";
@@ -107,9 +107,7 @@ public class EventsProcessorStressTest {
   @BeforeClass
   public static void setupTestEnv() throws Exception {
     catalog_ = CatalogServiceTestCatalog.create();
-    CatalogOpExecutor catalogOpExecutor = new CatalogOpExecutor(catalog_,
-        new NoopAuthorizationFactory().getAuthorizationConfig(),
-        new NoopAuthorizationManager());
+    CatalogOpExecutor catalogOpExecutor = catalog_.getCatalogOpExecutor();
     try (MetaStoreClient metaStoreClient = catalog_.getMetaStoreClient()) {
       CurrentNotificationEventId currentNotificationId =
           metaStoreClient.getHiveClient().getCurrentNotificationEventId();

@@ -221,4 +221,6 @@ struct TBackendGflags {
   98: required bool enable_shell_based_groups_mapping_support
 
   99: required bool auto_check_compaction
+
+  100: required bool enable_sync_to_latest_event_on_ddls
 }

@@ -19,6 +19,7 @@ package org.apache.impala.catalog.events;
 
 import org.apache.hadoop.hive.metastore.api.NotificationEvent;
 import org.apache.impala.catalog.events.MetastoreEvents.MetastoreEvent;
+import org.apache.impala.common.Metrics;
 
 /**
  * Factory interface to generate a {@link MetastoreEvent} from a {@link NotificationEvent}
@@ -29,8 +30,11 @@ public interface EventFactory {
   /**
    * Generates a {@link MetastoreEvent} representing {@link NotificationEvent}
    * @param hmsEvent the event as received from Hive Metastore.
+   * @param metrics metrics which gets updated when MetastoreEvent from this api
+   *                is processed.
    * @return {@link MetastoreEvent} representing hmsEvent.
    * @throws MetastoreNotificationException If the hmsEvent information cannot be parsed.
    */
-  MetastoreEvent get(NotificationEvent hmsEvent) throws MetastoreNotificationException;
+  MetastoreEvent get(NotificationEvent hmsEvent, Metrics metrics)
+      throws MetastoreNotificationException;
 }
