@@ -19,6 +19,7 @@ import re
 
 from time import sleep
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfS3
 from tests.common.test_dimensions import extend_exec_option_dimension
 from tests.util.parse_util import parse_duration_string_ms
 
@@ -68,6 +69,7 @@ class TestFetch(ImpalaTestSuite):
       self.client.close_query(handle)
 
 
+@SkipIfS3.variable_listing_times
 class TestFetchAndSpooling(ImpalaTestSuite):
   """Tests that apply when result spooling is enabled or disabled."""
 
