@@ -987,7 +987,8 @@ orc::Literal HdfsOrcScanner::GetSearchArgumentLiteral(ScalarExprEvaluator* eval,
       const DateValue* dv = reinterpret_cast<const DateValue*>(val);
       int32_t value = 0;
       // The date should be valid at this point.
-      DCHECK(dv->ToDaysSinceEpoch(&value));
+      bool success = dv->ToDaysSinceEpoch(&value);
+      DCHECK(success);
       return orc::Literal(*predicate_type, value);
     }
     case TYPE_STRING: {
