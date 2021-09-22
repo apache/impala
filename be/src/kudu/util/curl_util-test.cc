@@ -17,6 +17,7 @@
 
 #include "kudu/util/curl_util.h"
 
+#include <functional>
 #include <memory>
 
 #include <gtest/gtest.h>
@@ -49,7 +50,7 @@ TEST(CurlUtilTest, NonSharedObjectsBetweenThreads) {
       .Build(&pool);
 
   for (int i = 0; i < kThreadCount; i++) {
-    ASSERT_OK(pool->SubmitFunc([&]() {
+    ASSERT_OK(pool->Submit([&]() {
       EasyCurl curl;
     }));
   }
