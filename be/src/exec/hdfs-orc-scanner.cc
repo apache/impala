@@ -708,9 +708,6 @@ Status HdfsOrcScanner::NextStripe() {
   advance_stripe_ = false;
   stripe_rows_read_ = 0;
 
-  bool first_invocation = stripe_idx_ == -1;
-  int64_t skipped_rows = 0;
-
   // Loop until we have found a non-empty stripe.
   while (true) {
     // Reset the parse status for the next stripe.
@@ -740,15 +737,9 @@ Status HdfsOrcScanner::NextStripe() {
         stripe_mid_pos < split_offset + split_length)) {
       // Middle pos not in split, this stripe will be handled by a different scanner.
       // Mark if the stripe overlaps with the split.
-      if (first_invocation) skipped_rows += stripe->getNumberOfRows();
       misaligned_stripe_skipped |= CheckStripeOverlapsSplit(stripe_offset,
           stripe_offset + stripe_len, split_offset, split_offset + split_length);
       continue;
-    }
-
-    // Set the file row index in 'orc_root_reader_' accordingly.
-    if (first_invocation && acid_synthetic_rowid_ != nullptr) {
-      orc_root_reader_->SetFileRowIndex(skipped_rows);
     }
 
     COUNTER_ADD(num_stripes_counter_, 1);
@@ -791,6 +782,11 @@ Status HdfsOrcScanner::AssembleRows(RowBatch* row_batch) {
       try {
         end_of_stripe_ |= !row_reader_->next(*orc_root_batch_);
         RETURN_IF_ERROR(orc_root_reader_->UpdateInputBatch(orc_root_batch_.get()));
+        if (acid_synthetic_rowid_ != nullptr) {
+          // Set the first row index of the batch. The ORC reader guarantees that rows
+          // are consecutive in the returned batch.
+          orc_root_reader_->SetFileRowIndex(row_reader_->getRowNumber());
+        }
         if (end_of_stripe_) break; // no more data to process
       } catch (ResourceError& e) {
         parse_status_ = e.GetStatus();
@@ -1053,14 +1049,6 @@ Status HdfsOrcScanner::PrepareSearchArguments() {
 
   const TupleDescriptor* min_max_tuple_desc = scan_node_->min_max_tuple_desc();
   if (!min_max_tuple_desc) return Status::OK();
-  // TODO(IMPALA-10894): pushing down predicates into the ORC reader will mess up the
-  //  synthetic(fake) row id, because the row index in the returned batch might differ
-  //  from the index in file (due to some rows are skipped).
-  if (acid_synthetic_rowid_ != nullptr) {
-    VLOG_FILE << "Skip pushing down predicates on non-ACID ORC files under an ACID "
-                 "table: " << filename();
-    return Status::OK();
-  }
 
   // Clone the min/max statistics conjuncts.
   RETURN_IF_ERROR(ScalarExprEvaluator::Clone(&obj_pool_, state_,
