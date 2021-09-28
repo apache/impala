@@ -88,6 +88,8 @@ import org.apache.hadoop.hive.metastore.messaging.MessageFactory;
 import org.apache.hadoop.hive.metastore.messaging.MessageSerializer;
 import org.apache.hadoop.hive.metastore.utils.FileUtils;
 import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
+import org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo;
+import org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo;
 import org.apache.hive.service.rpc.thrift.TGetColumnsReq;
 import org.apache.hive.service.rpc.thrift.TGetFunctionsReq;
 import org.apache.hive.service.rpc.thrift.TGetSchemasReq;
@@ -481,18 +483,17 @@ public class MetastoreShim {
    * changed significantly in Hive-3
    * @return
    */
-  public static String getTableInformation(
-      org.apache.hadoop.hive.ql.metadata.Table table) {
-    return HiveMetadataFormatUtils.getTableInformation(table.getTTable(), false);
+  public static String getTableInformation(Table table) {
+    return HiveMetadataFormatUtils.getTableInformation(table, false);
   }
 
   /**
    * Wrapper method around Hive-3's MetadataFormatUtils.getConstraintsInformation
    * @return
    */
-  public static String getConstraintsInformation(
-      org.apache.hadoop.hive.ql.metadata.Table table) {
-    return HiveMetadataFormatUtils.getConstraintsInformation(table);
+  public static String getConstraintsInformation(PrimaryKeyInfo pkInfo,
+      ForeignKeyInfo fkInfo) {
+    return HiveMetadataFormatUtils.getConstraintsInformation(pkInfo, fkInfo);
   }
 
   /**

@@ -396,19 +396,19 @@ public class HiveMetadataFormatUtils {
     return null;
   }
 
-  public static String getConstraintsInformation(
-      org.apache.hadoop.hive.ql.metadata.Table table) {
+  public static String getConstraintsInformation(PrimaryKeyInfo pkInfo,
+      ForeignKeyInfo fkInfo) {
     StringBuilder constraintsInfo = new StringBuilder(DEFAULT_STRINGBUILDER_SIZE);
 
     constraintsInfo.append(LINE_DELIM).append("# Constraints").append(LINE_DELIM);
 
-    if (PrimaryKeyInfo.isPrimaryKeyInfoNotEmpty(table.getPrimaryKeyInfo())) {
+    if (PrimaryKeyInfo.isPrimaryKeyInfoNotEmpty(pkInfo)) {
       constraintsInfo.append(LINE_DELIM).append("# Primary Key").append(LINE_DELIM);
-      getPrimaryKeyInformation(constraintsInfo, table.getPrimaryKeyInfo());
+      getPrimaryKeyInformation(constraintsInfo, pkInfo);
     }
-    if (ForeignKeyInfo.isForeignKeyInfoNotEmpty(table.getForeignKeyInfo())) {
+    if (ForeignKeyInfo.isForeignKeyInfoNotEmpty(fkInfo)) {
       constraintsInfo.append(LINE_DELIM).append("# Foreign Keys").append(LINE_DELIM);
-      getForeignKeysInformation(constraintsInfo, table.getForeignKeyInfo());
+      getForeignKeysInformation(constraintsInfo, fkInfo);
     }
 
     return constraintsInfo.toString();

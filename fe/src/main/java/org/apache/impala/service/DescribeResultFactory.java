@@ -220,29 +220,21 @@ public class DescribeResultFactory {
     msTable.getSd().setCols(Column.toFieldSchemas(nonClustered));
     msTable.setPartitionKeys(Column.toFieldSchemas(clustered));
 
-    // To avoid initializing any of the SerDe classes in the metastore table Thrift
-    // struct, create the ql.metadata.Table object by calling the empty c'tor and
-    // then calling setTTable().
-    org.apache.hadoop.hive.ql.metadata.Table hiveTable =
-        new org.apache.hadoop.hive.ql.metadata.Table();
-    hiveTable.setTTable(msTable);
     org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo pki =
         new org.apache.hadoop.hive.ql.metadata.PrimaryKeyInfo(
             table.getSqlConstraints().getPrimaryKeys(), table.getName(),
             table.getDb().getName());
-    hiveTable.setPrimaryKeyInfo(pki);
     org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo fki =
         new org.apache.hadoop.hive.ql.metadata.ForeignKeyInfo(
             table.getSqlConstraints().getForeignKeys(), table.getName(),
             table.getDb().getName());
-    hiveTable.setForeignKeyInfo(fki);
     StringBuilder sb = new StringBuilder();
     // First add all the columns (includes partition columns).
     sb.append(MetastoreShim.getAllColumnsInformation(msTable.getSd().getCols(),
         msTable.getPartitionKeys(), true, false, true));
     // Add the extended table metadata information.
-    sb.append(MetastoreShim.getTableInformation(hiveTable));
-    sb.append(MetastoreShim.getConstraintsInformation(hiveTable));
+    sb.append(MetastoreShim.getTableInformation(msTable));
+    sb.append(MetastoreShim.getConstraintsInformation(pki, fki));
 
     for (String line: sb.toString().split("\n")) {
       // To match Hive's HiveServer2 output, split each line into multiple column
