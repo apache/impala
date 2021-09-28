@@ -34,8 +34,17 @@ find_path(CURL_INCLUDE_DIR NAMES curl/curl.h PATHS
   NO_DEFAULT_PATH
 )
 
-find_library(CURL_STATIC_LIB NAMES libcurl.a PATHS ${CURL_SEARCH_LIB_PATH})
-find_library(CURL_SHARED_LIB NAMES libcurl.so PATHS ${CURL_SEARCH_LIB_PATH})
+find_library(CURL_STATIC_LIB NAMES libcurl.a PATHS
+  ${CURL_SEARCH_LIB_PATH}
+  # make sure we don't accidentally pick up a different version
+  NO_DEFAULT_PATH
+)
+
+find_library(CURL_SHARED_LIB NAMES libcurl.so PATHS
+  ${CURL_SEARCH_LIB_PATH}
+  # make sure we don't accidentally pick up a different version
+  NO_DEFAULT_PATH
+)
 
 if (NOT CURL_INCLUDE_DIR OR NOT CURL_STATIC_LIB)
   message(FATAL_ERROR "Curl includes and libraries NOT found. "
