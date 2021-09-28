@@ -303,6 +303,23 @@ public class IcebergUtil {
   }
 
   /**
+   * Get iceberg table file format from hms table properties
+   */
+  public static TIcebergFileFormat getIcebergFileFormat(
+      org.apache.hadoop.hive.metastore.api.Table msTable) {
+    TIcebergFileFormat fileFormat = null;
+    Map<String, String> params = msTable.getParameters();
+    if (params.containsKey(IcebergTable.ICEBERG_FILE_FORMAT)) {
+      fileFormat = IcebergUtil.getIcebergFileFormat(
+          params.get(IcebergTable.ICEBERG_FILE_FORMAT));
+    } else {
+      // Accept "iceberg.file_format" for backward compatibility.
+      fileFormat = IcebergUtil.getIcebergFileFormat(params.get("iceberg.file_format"));
+    }
+    return fileFormat == null ? TIcebergFileFormat.PARQUET : fileFormat;
+  }
+
+  /**
    * Get TIcebergFileFormat from a string, usually from table properties.
    * Returns PARQUET when 'format' is null. Returns null for invalid formats.
    */

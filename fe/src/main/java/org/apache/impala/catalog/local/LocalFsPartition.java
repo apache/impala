@@ -202,9 +202,8 @@ public class LocalFsPartition implements FeFsPartition {
   public HdfsFileFormat getFileFormat() {
     HdfsFileFormat format = getInputFormatDescriptor().getFileFormat();
     if (format == HdfsFileFormat.ICEBERG) {
-      String format_str = table_.getMetaStoreTable().getParameters().get(
-          IcebergTable.ICEBERG_FILE_FORMAT);
-      return IcebergUtil.toHdfsFileFormat(format_str);
+      return IcebergUtil.toHdfsFileFormat(
+          IcebergUtil.getIcebergFileFormat(table_.getMetaStoreTable()));
     }
     return format;
   }

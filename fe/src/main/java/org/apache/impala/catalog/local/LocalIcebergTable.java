@@ -113,7 +113,7 @@ public class LocalIcebergTable extends LocalTable implements FeIcebergTable {
           "Failed to load table: %s.%s", msTable.getDbName(), msTable.getTableName()),
           (Exception)e);
     }
-    icebergFileFormat_ = Utils.getIcebergFileFormat(msTable);
+    icebergFileFormat_ = IcebergUtil.getIcebergFileFormat(msTable);
     icebergParquetCompressionCodec_ = Utils.getIcebergParquetCompressionCodec(msTable);
     icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTable);
     icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTable);

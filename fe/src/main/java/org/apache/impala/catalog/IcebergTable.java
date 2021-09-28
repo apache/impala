@@ -169,7 +169,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
     super(msTable, db, name, owner);
     icebergTableLocation_ = msTable.getSd().getLocation();
     icebergCatalog_ = IcebergUtil.getTIcebergCatalog(msTable);
-    icebergFileFormat_ = Utils.getIcebergFileFormat(msTable);
+    icebergFileFormat_ = IcebergUtil.getIcebergFileFormat(msTable);
     icebergParquetCompressionCodec_ = Utils.getIcebergParquetCompressionCodec(msTable);
     icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTable);
     icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTable);
@@ -337,7 +337,7 @@ public class IcebergTable extends Table implements FeIcebergTable {
         loadSchemaFromIceberg(metadata);
         // Loading hdfs table after loaded schema from Iceberg,
         // in case we create external Iceberg table skipping column info in sql.
-        icebergFileFormat_ = Utils.getIcebergFileFormat(msTbl);
+        icebergFileFormat_ = IcebergUtil.getIcebergFileFormat(msTbl);
         icebergParquetCompressionCodec_ = Utils.getIcebergParquetCompressionCodec(msTbl);
         icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTbl);
         icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTbl);

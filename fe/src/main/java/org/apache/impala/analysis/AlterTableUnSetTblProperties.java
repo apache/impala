@@ -126,7 +126,6 @@ public class AlterTableUnSetTblProperties extends AlterTableStmt {
     propertyCheck(IcebergTable.ICEBERG_CATALOG_LOCATION, "Iceberg");
     propertyCheck(IcebergTable.ICEBERG_TABLE_IDENTIFIER, "Iceberg");
     propertyCheck(IcebergTable.METADATA_LOCATION, "Iceberg");
-    propertyCheck(IcebergTable.ICEBERG_FILE_FORMAT, "Iceberg");
   }
 
   private void propertyCheck(String property, String tableType) throws AnalysisException {

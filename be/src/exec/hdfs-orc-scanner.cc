@@ -234,6 +234,11 @@ Status HdfsOrcScanner::Open(ScannerContext* context) {
     row_batches_need_validation_ = rows_valid == ValidWriteIdList::SOME;
   }
 
+  if (UNLIKELY(scan_node_->optimize_parquet_count_star())) {
+    DCHECK(false);
+    return Status("Internal ERROR: ORC scanner cannot optimize count star slot.");
+  }
+
   // Update 'row_reader_options_' based on the tuple descriptor so the ORC lib can skip
   // columns we don't need.
   RETURN_IF_ERROR(SelectColumns(*scan_node_->tuple_desc()));

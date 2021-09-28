@@ -92,7 +92,7 @@ public class IcebergCtasTarget extends CtasTargetTable implements FeIcebergTable
     createPartitionSpec(partSpec);
     icebergCatalog_ = IcebergUtil.getTIcebergCatalog(msTbl);
     setLocations();
-    icebergFileFormat_ = Utils.getIcebergFileFormat(msTbl);
+    icebergFileFormat_ = IcebergUtil.getIcebergFileFormat(msTbl);
     icebergParquetCompressionCodec_ = Utils.getIcebergParquetCompressionCodec(msTbl);
     icebergParquetRowGroupSize_ = Utils.getIcebergParquetRowGroupSize(msTbl);
     icebergParquetPlainPageSize_ = Utils.getIcebergParquetPlainPageSize(msTbl);
