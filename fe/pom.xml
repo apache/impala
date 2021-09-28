@@ -119,6 +119,13 @@ under the License.
           <groupId>net.minidev</groupId>
           <artifactId>json-smart</artifactId>
         </exclusion>
+        <!-- We need to exclude ranger-plugins-audit here, or the build will fail
+        to resolve dependencies for cruise-control-metrics-reporter, which is
+        unneeded and not uploaded to toolchain. -->
+        <exclusion>
+          <groupId>org.apache.ranger</groupId>
+          <artifactId>ranger-plugins-audit</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
 

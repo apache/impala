@@ -89,6 +89,7 @@ import org.apache.hadoop.hive.metastore.api.ForeignKeysRequest;
 import org.apache.hadoop.hive.metastore.api.ForeignKeysResponse;
 import org.apache.hadoop.hive.metastore.api.Function;
 import org.apache.hadoop.hive.metastore.api.GetAllFunctionsResponse;
+import org.apache.hadoop.hive.metastore.api.GetAllWriteEventInfoRequest;
 import org.apache.hadoop.hive.metastore.api.GetCatalogRequest;
 import org.apache.hadoop.hive.metastore.api.GetCatalogResponse;
 import org.apache.hadoop.hive.metastore.api.GetCatalogsResponse;
@@ -259,6 +260,7 @@ import org.apache.hadoop.hive.metastore.api.WMGetTriggersForResourePlanRequest;
 import org.apache.hadoop.hive.metastore.api.WMGetTriggersForResourePlanResponse;
 import org.apache.hadoop.hive.metastore.api.WMValidateResourcePlanRequest;
 import org.apache.hadoop.hive.metastore.api.WMValidateResourcePlanResponse;
+import org.apache.hadoop.hive.metastore.api.WriteEventInfo;
 import org.apache.hadoop.hive.metastore.api.WriteNotificationLogRequest;
 import org.apache.hadoop.hive.metastore.api.WriteNotificationLogResponse;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
@@ -2905,6 +2907,14 @@ public abstract class MetastoreServiceHandler extends AbstractThriftHiveMetastor
   @Override
   public void shutdown() throws TException {
     // nothing to do. Use this call to clean-up any session specific clean-up.
+  }
+
+  @Override
+  public List<WriteEventInfo> get_all_write_event_info(
+      GetAllWriteEventInfoRequest request) throws MetaException, TException {
+    try (MetaStoreClient client = catalog_.getMetaStoreClient()) {
+      return client.getHiveClient().getThriftClient().get_all_write_event_info(request);
+    }
   }
 
   /**
