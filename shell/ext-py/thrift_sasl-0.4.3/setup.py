@@ -14,8 +14,10 @@
 
 from __future__ import absolute_import
 
+import sys
 from setuptools import setup
 
+PY3 = sys.version_info[0] == 3
 
 description = ("Thrift SASL Python module that implements SASL transports for "
                "Thrift (`TSaslClientTransport`).")
@@ -26,11 +28,9 @@ setup(
     description=description,
     long_description=description,
     url='https://github.com/cloudera/thrift_sasl',
-    setup_requires=['setuptools>=20.5'],
     install_requires=[
         # Python 3 support was added to thrift in version 0.10.0.
-        "thrift>=0.10.0;python_version>='3.0'",
-        "thrift>=0.9.3;python_version<'3.0'",
+        "thrift>=0.10.0" if PY3 else "thrift>=0.9.3",
         "pure-sasl>=0.6.2",
         "six>=1.13.0"
     ],
