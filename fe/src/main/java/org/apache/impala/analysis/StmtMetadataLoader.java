@@ -18,6 +18,7 @@
 package org.apache.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -44,6 +45,7 @@ import org.apache.impala.util.TUniqueIdUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 /**
@@ -315,7 +317,8 @@ public class StmtMetadataLoader {
         viewTbls.addAll(collectTableCandidates(((FeView) tbl).getQueryStmt()));
       }
       // Adds tables/views introduced by column-masking/row-filtering policies.
-      if (fe_.getAuthzFactory().getAuthorizationConfig().isEnabled()
+      if (!(tbl instanceof FeIncompleteTable)
+          && fe_.getAuthzFactory().getAuthorizationConfig().isEnabled()
           && fe_.getAuthzFactory().supportsTableMasking() && user_ != null) {
         try {
           viewTbls.addAll(collectPolicyTables(tbl));
@@ -346,8 +349,10 @@ public class StmtMetadataLoader {
     return tableNames;
   }
 
-  private Set<TableName> collectPolicyTables(FeTable tbl)
+  @VisibleForTesting
+  Set<TableName> collectPolicyTables(FeTable tbl)
       throws InternalException, AnalysisException {
+    if (tbl instanceof FeIncompleteTable) return Collections.emptySet();
     Set<TableName> tableNames = new HashSet<>();
     String dbName = tbl.getDb().getName();
     String tblName = tbl.getName();
