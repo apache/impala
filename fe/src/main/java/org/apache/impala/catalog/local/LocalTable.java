@@ -18,6 +18,7 @@
 package org.apache.impala.catalog.local;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import javax.annotation.Nullable;
@@ -210,8 +211,7 @@ abstract class LocalTable implements FeTable {
 
   @Override
   public List<Column> getColumns() {
-    // TODO(todd) why does this return ArrayList instead of List?
-    return new ArrayList<>(cols_.colsByPos_);
+    return cols_ == null ? Collections.emptyList() : cols_.colsByPos_;
   }
 
   @Override
@@ -228,37 +228,37 @@ abstract class LocalTable implements FeTable {
 
   @Override
   public List<String> getColumnNames() {
-    return cols_.getColumnNames();
+    return cols_ == null ? Collections.emptyList() : cols_.getColumnNames();
   }
 
   @Override
   public List<Column> getClusteringColumns() {
-    return cols_.getClusteringColumns();
+    return cols_ == null ? Collections.emptyList() : cols_.getClusteringColumns();
   }
 
   @Override
   public List<Column> getNonClusteringColumns() {
-    return cols_.getNonClusteringColumns();
+    return cols_ == null ? Collections.emptyList() : cols_.getNonClusteringColumns();
   }
 
   @Override
   public int getNumClusteringCols() {
-    return cols_.getNumClusteringCols();
+    return cols_ == null ? 0 : cols_.getNumClusteringCols();
   }
 
   @Override
   public boolean isClusteringColumn(Column c) {
-    return cols_.isClusteringColumn(c);
+    return cols_ != null && cols_.isClusteringColumn(c);
   }
 
   @Override
   public Column getColumn(String name) {
-    return cols_.getByName(name);
+    return cols_ == null ? null : cols_.getByName(name);
   }
 
   @Override
   public ArrayType getType() {
-    return cols_.getType();
+    return cols_ == null ? null : cols_.getType();
   }
 
   @Override

@@ -21,17 +21,24 @@ import java.util.Arrays;
 
 import org.apache.impala.analysis.StmtMetadataLoader.StmtTableCache;
 import org.apache.impala.authorization.NoopAuthorizationFactory;
+import org.apache.impala.authorization.User;
 import org.apache.impala.catalog.Catalog;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.TableLoadingException;
+import org.apache.impala.catalog.local.CatalogdMetaProvider;
+import org.apache.impala.catalog.local.FailedLoadLocalTable;
+import org.apache.impala.catalog.local.LocalCatalog;
+import org.apache.impala.catalog.local.LocalDb;
 import org.apache.impala.common.ImpalaException;
 import org.apache.impala.common.InternalException;
 import org.apache.impala.compat.MetastoreShim;
+import org.apache.impala.service.BackendConfig;
+import org.apache.impala.service.FeSupport;
 import org.apache.impala.service.Frontend;
 import org.apache.impala.testutil.ImpaladTestCatalog;
 import org.apache.impala.util.EventSequence;
 import org.junit.Assert;
 import org.junit.Assume;
-import org.junit.Ignore;
 import org.junit.Test;
 
 public class StmtMetadataLoaderTest {
@@ -231,5 +238,21 @@ public class StmtMetadataLoaderTest {
   public void testTableWriteID() throws ImpalaException {
     Assume.assumeTrue(MetastoreShim.getMajorVersion() >= 3);
     testLoadAcidTables("select * from functional.insert_only_transactional_table");
+  }
+
+  @Test
+  public void testCollectPolicyTablesOnFailedTables() throws ImpalaException {
+    FeSupport.loadLibrary();
+    CatalogdMetaProvider provider = new CatalogdMetaProvider(
+        BackendConfig.INSTANCE.getBackendCfg());
+    LocalCatalog catalog = new LocalCatalog(provider, /*defaultKuduMasterHosts=*/null);
+    Frontend fe = new Frontend(new NoopAuthorizationFactory(), catalog);
+    EventSequence timeline = new EventSequence("Test Timeline");
+    User user = new User("user");
+    StmtMetadataLoader mdLoader =
+        new StmtMetadataLoader(fe, Catalog.DEFAULT_DB, timeline, user);
+    LocalDb db = new LocalDb(catalog, "default");
+    mdLoader.collectPolicyTables(new FailedLoadLocalTable(
+        db, "tbl", new TableLoadingException("error", /*cause=*/new Exception())));
   }
 }
