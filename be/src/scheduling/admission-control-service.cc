@@ -323,7 +323,7 @@ void AdmissionControlService::AdmitFromThreadPool(UniqueIdPB query_id) {
         admission_state->blacklisted_executor_addresses};
     admission_state->admit_status =
         AdmissiondEnv::GetInstance()->admission_controller()->SubmitForAdmission(request,
-            &admission_state->admit_outcome, &admission_state->schedule, &queued,
+            &admission_state->admit_outcome, &admission_state->schedule, queued,
             &admission_state->request_pool);
     admission_state->submitted = true;
     if (!queued) {

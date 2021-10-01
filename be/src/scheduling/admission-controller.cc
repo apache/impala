@@ -1133,9 +1133,9 @@ void AdmissionController::PoolStats::UpdateConfigMetrics(const TPoolConfig& pool
 
 Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
     Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admit_outcome,
-    unique_ptr<QuerySchedulePB>* schedule_result, bool* queued,
+    unique_ptr<QuerySchedulePB>* schedule_result, bool& queued,
     std::string* request_pool) {
-  *queued = false;
+  queued = false;
   DebugActionNoFail(request.query_options, "AC_BEFORE_ADMISSION");
   DCHECK(schedule_result->get() == nullptr);
 
@@ -1249,7 +1249,7 @@ Status AdmissionController::SubmitForAdmission(const AdmissionRequest& request,
       PROFILE_INFO_KEY_INITIAL_QUEUE_REASON, queue_node->initial_queue_reason);
 
   queue_node->wait_start_ms = MonotonicMillis();
-  *queued = true;
+  queued = true;
   return Status::OK();
 }
 

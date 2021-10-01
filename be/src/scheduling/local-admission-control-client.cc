@@ -38,7 +38,7 @@ Status LocalAdmissionControlClient::SubmitForAdmission(
   query_events->MarkEvent(QUERY_EVENT_SUBMIT_FOR_ADMISSION);
   bool queued;
   Status status = ExecEnv::GetInstance()->admission_controller()->SubmitForAdmission(
-      request, &admit_outcome_, schedule_result, &queued);
+      request, &admit_outcome_, schedule_result, queued);
   if (queued) {
     query_events->MarkEvent(QUERY_EVENT_QUEUED);
     DCHECK(status.ok());
