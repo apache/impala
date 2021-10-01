@@ -369,7 +369,7 @@ class AdmissionController {
   /// cancelled to ensure that the pool statistics are updated.
   Status SubmitForAdmission(const AdmissionRequest& request,
       Promise<AdmissionOutcome, PromiseMode::MULTIPLE_PRODUCER>* admit_outcome,
-      std::unique_ptr<QuerySchedulePB>* schedule_result, bool* queued,
+      std::unique_ptr<QuerySchedulePB>* schedule_result, bool& queued,
       std::string* request_pool = nullptr);
 
   /// After SubmitForAdmission(), if the query was queued this must be called. If
