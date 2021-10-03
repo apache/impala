@@ -1015,101 +1015,108 @@ TEST_F(TmpFileMgrTest, TestDirectoryLimitParsingRemotePath) {
       "/tmp/local-buffer-dir2", "/tmp/local-buffer-dir3"});
 
   // Successful cases for HDFS paths.
-  auto& dirs1 = GetTmpRemoteDir(
-      CreateTmpFileMgr("hdfs://localhost:20500/tmp,/tmp/local-buffer-dir"));
-  EXPECT_NE(nullptr, dirs1);
+  // Two types of paths, one with directory, one without.
+  vector<string> hdfs_paths{"hdfs://localhost:20500", "hdfs://localhost:20500/tmp"};
+  for (string hdfs_path : hdfs_paths) {
+    string full_hdfs_path = hdfs_path + "/impala-scratch";
+    auto& dirs1 = GetTmpRemoteDir(CreateTmpFileMgr(hdfs_path + ",/tmp/local-buffer-dir"));
+    EXPECT_NE(nullptr, dirs1);
 
-  auto& dirs2 = GetTmpRemoteDir(
-      CreateTmpFileMgr("hdfs://localhost:20500/tmp:100,/tmp/local-buffer-dir"));
-  EXPECT_NE(nullptr, dirs2);
-  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs2->path());
-  EXPECT_EQ(100, dirs2->bytes_limit());
+    auto& dirs2 =
+        GetTmpRemoteDir(CreateTmpFileMgr(hdfs_path + ":100,/tmp/local-buffer-dir"));
+    EXPECT_NE(nullptr, dirs2);
+    EXPECT_EQ(full_hdfs_path, dirs2->path());
+    EXPECT_EQ(100, dirs2->bytes_limit());
 
-  auto& dirs3 = GetTmpRemoteDir(
-      CreateTmpFileMgr("hdfs://localhost:20500/tmp:1KB:1,/tmp/local-buffer-dir"));
-  EXPECT_NE(nullptr, dirs3);
-  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs3->path());
-  EXPECT_EQ(1024, dirs3->bytes_limit());
+    auto& dirs3 =
+        GetTmpRemoteDir(CreateTmpFileMgr(hdfs_path + ":1KB:1,/tmp/local-buffer-dir"));
+    EXPECT_NE(nullptr, dirs3);
+    EXPECT_EQ(full_hdfs_path, dirs3->path());
+    EXPECT_EQ(1024, dirs3->bytes_limit());
 
-  // Multiple local paths with one remote path.
-  auto tmp_mgr_4 = CreateTmpFileMgr("hdfs://localhost:20500/tmp,/tmp/local-buffer-dir1,"
-                                    "/tmp/local-buffer-dir2,/tmp/local-buffer-dir3");
-  auto& dirs4_local = GetTmpDirs(tmp_mgr_4);
-  auto& dirs4_remote = GetTmpRemoteDir(tmp_mgr_4);
-  EXPECT_NE(nullptr, dirs4_remote);
-  EXPECT_EQ(2, dirs4_local.size());
-  EXPECT_EQ("/tmp/local-buffer-dir2/impala-scratch", dirs4_local[0]->path());
-  EXPECT_EQ("/tmp/local-buffer-dir3/impala-scratch", dirs4_local[1]->path());
+    // Multiple local paths with one remote path.
+    auto tmp_mgr_4 = CreateTmpFileMgr(hdfs_path
+        + ",/tmp/local-buffer-dir1,"
+          "/tmp/local-buffer-dir2,/tmp/local-buffer-dir3");
+    auto& dirs4_local = GetTmpDirs(tmp_mgr_4);
+    auto& dirs4_remote = GetTmpRemoteDir(tmp_mgr_4);
+    EXPECT_NE(nullptr, dirs4_remote);
+    EXPECT_EQ(full_hdfs_path, dirs4_remote->path());
+    EXPECT_EQ(2, dirs4_local.size());
+    EXPECT_EQ("/tmp/local-buffer-dir2/impala-scratch", dirs4_local[0]->path());
+    EXPECT_EQ("/tmp/local-buffer-dir3/impala-scratch", dirs4_local[1]->path());
 
-  // Fails the parsing due to no port number for the HDFS path.
-  auto tmp_mgr_5 = CreateTmpFileMgr("hdfs://localhost/tmp,/tmp/local-buffer-dir");
-  auto& dirs5_local = GetTmpDirs(tmp_mgr_5);
-  auto& dirs5_remote = GetTmpRemoteDir(tmp_mgr_5);
-  EXPECT_EQ(1, dirs5_local.size());
-  EXPECT_EQ(nullptr, dirs5_remote);
+    // Fails the parsing due to no port number for the HDFS path.
+    auto tmp_mgr_5 = CreateTmpFileMgr("hdfs://localhost/tmp,/tmp/local-buffer-dir");
+    auto& dirs5_local = GetTmpDirs(tmp_mgr_5);
+    auto& dirs5_remote = GetTmpRemoteDir(tmp_mgr_5);
+    EXPECT_EQ(1, dirs5_local.size());
+    EXPECT_EQ(nullptr, dirs5_remote);
 
-  // Fails to init due to no local buffer for the remote scratch space.
-  // We expect a non-null tmp_mgr, but the init process should fail.
-  EXPECT_NE(nullptr, CreateTmpFileMgr("hdfs://localhost:20500/tmp", false));
+    // Fails to init due to no local buffer for the remote scratch space.
+    // We expect a non-null tmp_mgr, but the init process should fail.
+    EXPECT_NE(nullptr, CreateTmpFileMgr(hdfs_path, false));
 
-  // Parse successfully, but the parsed HDFS path is unable to connect.
-  // These cases would fail the initialization of TmpFileMgr.
-  auto& dirs7 = GetTmpRemoteDir(
-      CreateTmpFileMgr("hdfs://localhost:1/tmp::1,/tmp/local-buffer-dir", false));
-  EXPECT_EQ(nullptr, dirs7);
+    // Parse successfully, but the parsed HDFS path is unable to connect.
+    // These cases would fail the initialization of TmpFileMgr.
+    auto& dirs7 = GetTmpRemoteDir(
+        CreateTmpFileMgr("hdfs://localhost:1/tmp::1,/tmp/local-buffer-dir", false));
+    EXPECT_EQ(nullptr, dirs7);
 
-  auto& dirs8 = GetTmpRemoteDir(
-      CreateTmpFileMgr("hdfs://localhost:/tmp::,/tmp/local-buffer-dir", false));
-  EXPECT_EQ(nullptr, dirs8);
+    auto& dirs8 = GetTmpRemoteDir(
+        CreateTmpFileMgr("hdfs://localhost:/tmp::,/tmp/local-buffer-dir", false));
+    EXPECT_EQ(nullptr, dirs8);
 
-  auto& dirs9 = GetTmpRemoteDir(
-      CreateTmpFileMgr("hdfs://localhost/tmp::1,/tmp/local-buffer-dir", false));
-  EXPECT_EQ(nullptr, dirs9);
+    auto& dirs9 = GetTmpRemoteDir(
+        CreateTmpFileMgr("hdfs://localhost/tmp::1,/tmp/local-buffer-dir", false));
+    EXPECT_EQ(nullptr, dirs9);
 
-  auto& dirs10 = GetTmpRemoteDir(
-      CreateTmpFileMgr("hdfs://localhost/tmp:1,/tmp/local-buffer-dir", false));
-  EXPECT_EQ(nullptr, dirs10);
+    auto& dirs10 = GetTmpRemoteDir(
+        CreateTmpFileMgr("hdfs://localhost/tmp:1,/tmp/local-buffer-dir", false));
+    EXPECT_EQ(nullptr, dirs10);
 
-  // Multiple remote paths, should support only one.
-  auto& dirs11 = GetTmpRemoteDir(
-      CreateTmpFileMgr("hdfs://localhost:20500/tmp,hdfs://localhost:20501/tmp,"
-                       "/tmp/local-buffer-dir"));
-  EXPECT_NE(nullptr, dirs11);
-  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs11->path());
+    // Multiple remote paths, should support only one.
+    auto& dirs11 = GetTmpRemoteDir(CreateTmpFileMgr(hdfs_path
+        + ",hdfs://localhost:20501/tmp,"
+          "/tmp/local-buffer-dir"));
+    EXPECT_NE(nullptr, dirs11);
+    EXPECT_EQ(full_hdfs_path, dirs11->path());
 
-  // The order of the buffer and the remote dir should not affect the result.
-  auto& dirs12 = GetTmpRemoteDir(
-      CreateTmpFileMgr("/tmp/local-buffer-dir, hdfs://localhost:20500/tmp,"
-                       "hdfs://localhost:20501/tmp"));
-  EXPECT_NE(nullptr, dirs12);
-  EXPECT_EQ("hdfs://localhost:20500/tmp/impala-scratch", dirs12->path());
+    // The order of the buffer and the remote dir should not affect the result.
+    auto& dirs12 = GetTmpRemoteDir(CreateTmpFileMgr(
+        "/tmp/local-buffer-dir, " + hdfs_path + ",hdfs://localhost:20501/tmp"));
+    EXPECT_NE(nullptr, dirs12);
+    EXPECT_EQ(full_hdfs_path, dirs12->path());
+  }
 
   // Successful cases for parsing S3 paths.
   // Create a fake s3 connection in order to pass the connection verification.
   HdfsFsCache::HdfsFsMap fake_hdfs_conn_map;
   hdfsFS fake_conn = reinterpret_cast<hdfsFS>(1);
   fake_hdfs_conn_map.insert(make_pair("s3a://fake_host/", fake_conn));
-  auto& dirs13 = GetTmpRemoteDir(
-      CreateTmpFileMgr("/tmp/local-buffer-dir, s3a://fake_host/for-parsing-test-only",
-          true, &fake_hdfs_conn_map));
-  EXPECT_NE(nullptr, dirs13);
-  EXPECT_EQ("s3a://fake_host/for-parsing-test-only/impala-scratch", dirs13->path());
+  // Two types of paths, one with directory, one without.
+  vector<string> s3_paths{"s3a://fake_host", "s3a://fake_host/dir"};
+  for (string s3_path : s3_paths) {
+    string full_s3_path = s3_path + "/impala-scratch";
+    auto& dirs13 = GetTmpRemoteDir(
+        CreateTmpFileMgr("/tmp/local-buffer-dir, " + s3_path, true, &fake_hdfs_conn_map));
+    EXPECT_NE(nullptr, dirs13);
+    EXPECT_EQ(full_s3_path, dirs13->path());
 
-  auto& dirs14 = GetTmpRemoteDir(
-      CreateTmpFileMgr("/tmp/local-buffer-dir, s3a://fake_host/for-parsing-test-only:100",
-          true, &fake_hdfs_conn_map));
-  EXPECT_NE(nullptr, dirs14);
-  EXPECT_EQ("s3a://fake_host/for-parsing-test-only/impala-scratch", dirs14->path());
-  EXPECT_EQ(100, dirs14->bytes_limit());
+    auto& dirs14 = GetTmpRemoteDir(CreateTmpFileMgr(
+        "/tmp/local-buffer-dir, " + s3_path + ":100", true, &fake_hdfs_conn_map));
+    EXPECT_NE(nullptr, dirs14);
+    EXPECT_EQ(full_s3_path, dirs14->path());
+    EXPECT_EQ(100, dirs14->bytes_limit());
 
-  auto& dirs15 = GetTmpRemoteDir(CreateTmpFileMgr(
-      "/tmp/local-buffer-dir, s3a://fake_host/for-parsing-test-only:1KB:1", true,
-      &fake_hdfs_conn_map));
-  EXPECT_NE(nullptr, dirs15);
-  EXPECT_EQ("s3a://fake_host/for-parsing-test-only/impala-scratch", dirs15->path());
-  EXPECT_EQ(1024, dirs15->bytes_limit());
+    auto& dirs15 = GetTmpRemoteDir(CreateTmpFileMgr(
+        "/tmp/local-buffer-dir, " + s3_path + ":1KB:1", true, &fake_hdfs_conn_map));
+    EXPECT_NE(nullptr, dirs15);
+    EXPECT_EQ(full_s3_path, dirs15->path());
+    EXPECT_EQ(1024, dirs15->bytes_limit());
+  }
 
-  // Failure cases for parsing S3 paths.
+  // Failure cases for parsing S3 paths, S3 paths don't allow the port number.
   auto& dirs16 = GetTmpRemoteDir(CreateTmpFileMgr(
       "/tmp/local-buffer-dir, s3a://fake_host:1234/for-parsing-test-only:1KB:1", true,
       &fake_hdfs_conn_map));

@@ -720,7 +720,7 @@ Status TmpDirS3::VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_dir_
   DCHECK(is_parsed_);
   hdfsFS hdfs_conn;
   RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
-      parsed_raw_path_, &hdfs_conn, &(tmp_mgr->hdfs_conns_), tmp_mgr->s3a_options()));
+      path_, &hdfs_conn, &(tmp_mgr->hdfs_conns_), tmp_mgr->s3a_options()));
   return Status::OK();
 }
 
@@ -755,8 +755,8 @@ Status TmpDirHdfs::VerifyAndCreate(MetricGroup* metrics, vector<bool>* is_tmp_di
   hdfsFS hdfs_conn;
   // If the HDFS path doesn't exist, it would fail while uploading, so we
   // create the HDFS path if it doesn't exist.
-  RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
-      parsed_raw_path_, &hdfs_conn, &(tmp_mgr->hdfs_conns_)));
+  RETURN_IF_ERROR(
+      HdfsFsCache::instance()->GetConnection(path_, &hdfs_conn, &(tmp_mgr->hdfs_conns_)));
   if (hdfsExists(hdfs_conn, path_.c_str()) != 0) {
     if (hdfsCreateDirectory(hdfs_conn, path_.c_str()) != 0) {
       return Status(GetHdfsErrorMsg("HDFS create path failed: ", path_));
