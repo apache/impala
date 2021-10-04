@@ -4,13 +4,12 @@
 
 #include "gutil/cpu.h"
 
-#include <stdlib.h>
-#include <string.h>
+#ifndef __aarch64__
+#include <cstring>
+#include <utility>
 
-#include <algorithm>
-
-#include "gutil/basictypes.h"
-#include "gutil/strings/stringpiece.h"
+#include "gutil/integral_types.h"
+#endif //__aarch64__
 
 #if defined(__x86_64__)
 #if defined(_MSC_VER)
@@ -33,12 +32,16 @@ CPU::CPU()
     has_sse_(false),
     has_sse2_(false),
     has_sse3_(false),
+    has_pclmulqdq_(false),
     has_ssse3_(false),
     has_sse41_(false),
     has_sse42_(false),
+    has_popcnt_(false),
     has_avx_(false),
     has_avx2_(false),
     has_aesni_(false),
+    has_bmi_(false),
+    has_bmi2_(false),
     has_non_stop_time_stamp_counter_(false),
     has_broken_neon_(false),
     cpu_vendor_("unknown") {
@@ -222,9 +225,11 @@ void CPU::Initialize() {
     has_sse_ =   (cpu_info[3] & 0x02000000) != 0;
     has_sse2_ =  (cpu_info[3] & 0x04000000) != 0;
     has_sse3_ =  (cpu_info[2] & 0x00000001) != 0;
+    has_pclmulqdq_ = (cpu_info[2] & 0x00000002) != 0;
     has_ssse3_ = (cpu_info[2] & 0x00000200) != 0;
     has_sse41_ = (cpu_info[2] & 0x00080000) != 0;
     has_sse42_ = (cpu_info[2] & 0x00100000) != 0;
+    has_popcnt_ = (cpu_info[2] & 0x00800000) != 0;
     // AVX instructions will generate an illegal instruction exception unless
     //   a) they are supported by the CPU,
     //   b) XSAVE is supported by the CPU and
@@ -242,6 +247,8 @@ void CPU::Initialize() {
         (_xgetbv(0) & 6) == 6 /* XSAVE enabled by kernel */;
     has_aesni_ = (cpu_info[2] & 0x02000000) != 0;
     has_avx2_ = has_avx_ && (cpu_info7[1] & 0x00000020) != 0;
+    has_bmi_ = cpu_info7[1] & (1 << 3);
+    has_bmi2_ = cpu_info7[1] & (1 << 8);
   }
 
   // Get the brand string of the cpu.

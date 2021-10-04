@@ -62,16 +62,15 @@
 #ifndef UTIL_GTL_MAP_UTIL_H_
 #define UTIL_GTL_MAP_UTIL_H_
 
-#include <stddef.h>
-#include <string>
-using std::string;
+#include <cstddef>
+#include <tuple>
 #include <utility>
 using std::make_pair;
 using std::pair;
 #include <vector>
 using std::vector;
 
-#include <common/logging.h>
+#include <glog/logging.h>
 
 #include "gutil/logging-inl.h"
 
@@ -295,8 +294,7 @@ bool FindCopy(const Collection& collection,
 // Returns true iff the given collection contains the given key.
 template <class Collection, class Key>
 bool ContainsKey(const Collection& collection, const Key& key) {
-  auto it = collection.find(key);
-  return it != collection.end();
+  return collection.find(key) != collection.end();
 }
 
 // Returns true iff the given collection contains the given key-value pair.
@@ -305,7 +303,7 @@ bool ContainsKeyValuePair(const Collection& collection,
                           const Key& key,
                           const Value& value) {
   typedef typename Collection::const_iterator const_iterator;
-  pair<const_iterator, const_iterator> range = collection.equal_range(key);
+  std::pair<const_iterator, const_iterator> range = collection.equal_range(key);
   for (const_iterator it = range.first; it != range.second; ++it) {
     if (it->second == value) {
       return true;
@@ -324,7 +322,7 @@ bool ContainsKeyValuePair(const Collection& collection,
 template <class Collection>
 bool InsertOrUpdate(Collection* const collection,
                     const typename Collection::value_type& vt) {
-  pair<typename Collection::iterator, bool> ret = collection->insert(vt);
+  std::pair<typename Collection::iterator, bool> ret = collection->insert(vt);
   if (!ret.second) {
     // update
     ret.first->second = vt.second;
@@ -361,7 +359,7 @@ bool InsertAndDeleteExisting(
     Collection* const collection,
     const typename Collection::key_type& key,
     const typename Collection::mapped_type& value) {
-  pair<typename Collection::iterator, bool> ret =
+  std::pair<typename Collection::iterator, bool> ret =
       collection->insert(typename Collection::value_type(key, value));
   if (!ret.second) {
     delete ret.first->second;
@@ -435,9 +433,74 @@ typename Collection::mapped_type& InsertKeyOrDie(
     Collection* const collection,
     const typename Collection::key_type& key) {
   typedef typename Collection::value_type value_type;
-  pair<typename Collection::iterator, bool> res =
+  std::pair<typename Collection::iterator, bool> res =
       collection->insert(value_type(key, typename Collection::mapped_type()));
   CHECK(res.second) << "duplicate key: " << key;
+  return res.first->second;
+}
+
+//
+// Emplace*()
+//
+
+// Dancing with std::enable_if() is necessary to make these two functions
+// below work for both dictionary-like and set-like containers as well.
+// The idea is that for dictionary-like containers Collection::value_type
+// is always pair<const key_type, mapped_type>, so it cannot be the same
+// as key type.
+template <class Collection, class... Args>
+typename std::enable_if<
+    std::is_same<typename Collection::key_type,
+                 typename Collection::value_type>::value,
+    bool>::type
+EmplaceIfNotPresent(Collection* const collection, Args&&... args) {
+  return collection->emplace(std::forward<Args>(args)...).second;
+}
+
+template <class Collection, class... Args>
+typename std::enable_if<
+    !std::is_same<typename Collection::key_type,
+                  typename Collection::value_type>::value,
+    bool>::type
+EmplaceIfNotPresent(Collection* const collection, Args&&... args) {
+  return collection->try_emplace(std::forward<Args>(args)...).second;
+}
+
+// Emplaces the given key-value pair into the collection. Returns true if the
+// given key didn't previously exist. If the given key already existed in the
+// map, its value is changed to the given "value" and false is returned.
+template <class Collection>
+bool EmplaceOrUpdate(Collection* const collection,
+                     const typename Collection::key_type& key,
+                     typename Collection::mapped_type&& value) {
+  return collection->insert_or_assign(
+      key, std::forward<typename Collection::mapped_type>(value)).second;
+}
+
+// Given the key and parameters to construct the mapped object in-place,
+// EmplaceOrDie() returns reference to the mapped object for dictionary-like
+// containers or constant reference to the element itself for set-like ones.
+// See the comment for EmplaceIfNotPresent() for details behind the template
+// meta-programming details.
+template <class Collection, class... Args>
+typename std::enable_if<
+    std::is_same<typename Collection::key_type,
+                 typename Collection::value_type>::value,
+    const typename Collection::value_type&>::type
+EmplaceOrDie(Collection* const collection, Args&&... args) {
+  auto res = collection->emplace(std::forward<Args>(args)...);
+  CHECK(res.second) << "duplicate value";
+  return *res.first;
+}
+
+template <class Collection, class... Args>
+typename std::enable_if<
+    !std::is_same<typename Collection::key_type,
+                  typename Collection::value_type>::value,
+    typename Collection::mapped_type&>::type
+EmplaceOrDie(Collection* const collection, Args&&... args) {
+  auto res = collection->emplace(std::forward<Args>(args)...);
+  CHECK(res.second) << "duplicate value";
   return res.first->second;
 }
 
@@ -463,6 +526,21 @@ LookupOrInsert(Collection* const collection,
                const typename Collection::mapped_type& value) {
   return LookupOrInsert(
       collection, typename Collection::value_type(key, value));
+}
+
+// It's similar to LookupOrInsert() but uses the emplace and r-value mechanics
+// to achieve the desired results, constructing the element in-place in the
+// container. The constructor of the new element is called with exactly the same
+// arguments as supplied to emplace, forwarded via std::forward<Args>(args).
+// The element is constructed only if there was no element with the specified
+// key in the container.
+// For details, see
+//   https://en.cppreference.com/w/cpp/container/map/try_emplace
+//   https://en.cppreference.com/w/cpp/container/unordered_map/try_emplace
+template <class Collection, class... Args>
+typename Collection::mapped_type&
+LookupOrEmplace(Collection* const collection, Args&&... args) {
+  return collection->try_emplace(std::forward<Args>(args)...).first->second;
 }
 
 // Counts the number of equivalent elements in the given "sequence", and stores
@@ -511,7 +589,7 @@ template <class Collection>
 typename Collection::mapped_type&
 LookupOrInsertNew(Collection* const collection,
                   const typename Collection::key_type& key) {
-  pair<typename Collection::iterator, bool> ret =
+  std::pair<typename Collection::iterator, bool> ret =
       collection->insert(
           typename Collection::value_type(key,
               static_cast<typename Collection::mapped_type>(NULL)));
@@ -530,7 +608,7 @@ typename Collection::mapped_type&
 LookupOrInsertNew(Collection* const collection,
                   const typename Collection::key_type& key,
                   const Arg& arg) {
-  pair<typename Collection::iterator, bool> ret =
+  std::pair<typename Collection::iterator, bool> ret =
       collection->insert(
           typename Collection::value_type(
               key,
@@ -563,7 +641,7 @@ LookupOrInsertNewSharedPtr(
     const typename Collection::key_type& key) {
   typedef typename Collection::mapped_type SharedPtr;
   typedef typename Collection::mapped_type::element_type Element;
-  pair<typename Collection::iterator, bool> ret =
+  std::pair<typename Collection::iterator, bool> ret =
       collection->insert(typename Collection::value_type(key, SharedPtr()));
   if (ret.second) {
     ret.first->second.reset(new Element());
@@ -572,22 +650,22 @@ LookupOrInsertNewSharedPtr(
 }
 
 // A variant of LookupOrInsertNewSharedPtr where the value is constructed using
-// a single-parameter constructor.  Note: the constructor argument is computed
-// even if it will not be used, so only values cheap to compute should be passed
-// here.  On the other hand it does not matter how expensive the construction of
-// the actual stored value is, as that only occurs if necessary.
-template <class Collection, class Arg>
+// constructor arguments.  Note: the constructor arguments are computed even if
+// they will not be used, so only values cheap to compute should be passed
+// here.  On the other hand it does not matter how expensive the construction
+// of the actual stored value is, as that only occurs if necessary.
+template <class Collection, class... Args>
 typename Collection::mapped_type&
 LookupOrInsertNewSharedPtr(
     Collection* const collection,
     const typename Collection::key_type& key,
-    const Arg& arg) {
+    const Args&... args) {
   typedef typename Collection::mapped_type SharedPtr;
   typedef typename Collection::mapped_type::element_type Element;
-  pair<typename Collection::iterator, bool> ret =
+  std::pair<typename Collection::iterator, bool> ret =
       collection->insert(typename Collection::value_type(key, SharedPtr()));
   if (ret.second) {
-    ret.first->second.reset(new Element(arg));
+    ret.first->second.reset(new Element(args...));
   }
   return ret.first->second;
 }
@@ -608,7 +686,7 @@ bool UpdateReturnCopy(Collection* const collection,
                       const typename Collection::key_type& key,
                       const typename Collection::mapped_type& value,
                       typename Collection::mapped_type* previous) {
-  pair<typename Collection::iterator, bool> ret =
+  std::pair<typename Collection::iterator, bool> ret =
       collection->insert(typename Collection::value_type(key, value));
   if (!ret.second) {
     // update
@@ -626,7 +704,7 @@ template <class Collection>
 bool UpdateReturnCopy(Collection* const collection,
                       const typename Collection::value_type& vt,
                       typename Collection::mapped_type* previous) {
-  pair<typename Collection::iterator, bool> ret =
+  std::pair<typename Collection::iterator, bool> ret =
     collection->insert(vt);
   if (!ret.second) {
     // update
@@ -650,7 +728,7 @@ template <class Collection>
 typename Collection::mapped_type* const
 InsertOrReturnExisting(Collection* const collection,
                        const typename Collection::value_type& vt) {
-  pair<typename Collection::iterator, bool> ret = collection->insert(vt);
+  std::pair<typename Collection::iterator, bool> ret = collection->insert(vt);
   if (ret.second) {
     return NULL;  // Inserted, no existing previous value.
   } else {
@@ -694,7 +772,7 @@ void ReverseMap(const Collection& collection,
 //     delete EraseKeyReturnValuePtr(&my_map, "abc");
 //
 // Use returned value:
-//     gscoped_ptr<MyType> value_ptr(EraseKeyReturnValuePtr(&my_map, "abc"));
+//     unique_ptr<MyType> value_ptr(EraseKeyReturnValuePtr(&my_map, "abc"));
 //     if (value_ptr.get())
 //       value_ptr->DoSomething();
 //
@@ -750,7 +828,7 @@ void AppendKeysFromMap(const MapContainer& map_container,
 // without the complexity of a SFINAE-based solution.)
 template <class MapContainer, class KeyType>
 void AppendKeysFromMap(const MapContainer& map_container,
-                       vector<KeyType>* key_container) {
+                       std::vector<KeyType>* key_container) {
   CHECK(key_container != NULL);
   // We now have the opportunity to call reserve(). Calling reserve() every
   // time is a bad idea for some use cases: libstdc++'s implementation of
@@ -785,6 +863,19 @@ void AppendValuesFromMap(const MapContainer& map_container,
   }
 }
 
+template <class MapContainer, class ValueContainer>
+void EmplaceValuesFromMap(MapContainer&& map_container,
+                          ValueContainer* value_container) {
+  CHECK(value_container != nullptr);
+  // See AppendKeysFromMap for why this is done.
+  if (value_container->empty()) {
+    value_container->reserve(map_container.size());
+  }
+  for (auto&& entry : map_container) {
+    value_container->emplace_back(std::move(entry.second));
+  }
+}
+
 // A more specialized overload of AppendValuesFromMap to optimize reallocations
 // for the common case in which we're appending values to a vector and hence
 // can (and sometimes should) call reserve() first.
@@ -794,15 +885,8 @@ void AppendValuesFromMap(const MapContainer& map_container,
 // without the complexity of a SFINAE-based solution.)
 template <class MapContainer, class ValueType>
 void AppendValuesFromMap(const MapContainer& map_container,
-                         vector<ValueType>* value_container) {
-  CHECK(value_container != NULL);
-  // See AppendKeysFromMap for why this is done.
-  if (value_container->empty()) {
-    value_container->reserve(map_container.size());
-  }
-  for (const auto& entry : map_container) {
-    value_container->push_back(entry.second);
-  }
+                         std::vector<ValueType>* value_container) {
+  EmplaceValuesFromMap(map_container, value_container);
 }
 
 // Compute and insert new value if it's absent from the map. Return a pair with a reference to the
@@ -825,19 +909,47 @@ void AppendValuesFromMap(const MapContainer& map_container,
 // MyValue* const value = result.first;
 // if (result.second) ....
 //
+// The ComputePair* variants expect a lambda that creates a pair<k, v>. This
+// can be useful if the key is a StringPiece pointing to external state to
+// avoid excess memory for the keys, while being safer in multi-threaded
+// contexts, e.g. in case the key goes out of scope before the container does.
+//
+// Example usage:
+//
+// map<StringPiece, int, GoodFastHash<StringPiece>> string_to_idx;
+// vector<unique_ptr<StringPB>> pbs;
+// auto result = ComputePairIfAbsentReturnAbsense(&string_to_idx, my_key,
+//     [&]() {
+//       unique_ptr<StringPB> s = new StringPB();
+//       s->set_string(my_key);
+//       int idx = pbs.size();
+//       pbs.emplace_back(s.release());
+//       return make_pair(StringPiece(pbs.back()->string()), idx);
+//     });
 template <class MapContainer, typename Function>
-pair<typename MapContainer::mapped_type* const, bool>
-ComputeIfAbsentReturnAbsense(MapContainer* container,
-                             const typename MapContainer::key_type& key,
-                             Function compute_func) {
+std::pair<typename MapContainer::mapped_type* const, bool>
+ComputePairIfAbsentReturnAbsense(MapContainer* container,
+                                 const typename MapContainer::key_type& key,
+                                 Function compute_pair_func) {
   typename MapContainer::iterator iter = container->find(key);
   bool new_value = iter == container->end();
   if (new_value) {
-    pair<typename MapContainer::iterator, bool> result = container->emplace(key, compute_func());
+    auto p = compute_pair_func();
+    std::pair<typename MapContainer::iterator, bool> result =
+        container->emplace(std::move(p.first), std::move(p.second));
     DCHECK(result.second) << "duplicate key: " << key;
     iter = result.first;
   }
-  return make_pair(&iter->second, new_value);
+  return std::make_pair(&iter->second, new_value);
+}
+template <class MapContainer, typename Function>
+std::pair<typename MapContainer::mapped_type* const, bool>
+ComputeIfAbsentReturnAbsense(MapContainer* container,
+                             const typename MapContainer::key_type& key,
+                             Function compute_func) {
+  return ComputePairIfAbsentReturnAbsense(container, key, [&key, &compute_func] {
+    return std::make_pair(key, compute_func());
+  });
 };
 
 // Like the above but doesn't return a pair, just returns a pointer to the value.
@@ -853,6 +965,16 @@ ComputeIfAbsent(MapContainer* container,
                 const typename MapContainer::key_type& key,
                 Function compute_func) {
   return ComputeIfAbsentReturnAbsense(container, key, compute_func).first;
+};
+
+template <class MapContainer, typename Function>
+typename MapContainer::mapped_type* const
+ComputePairIfAbsent(MapContainer* container,
+                    const typename MapContainer::key_type& key,
+                    Function compute_pair_func) {
+  return ComputePairIfAbsentReturnAbsense<MapContainer, Function>(
+      container, key, compute_pair_func)
+      .first;
 };
 
 #endif  // UTIL_GTL_MAP_UTIL_H_

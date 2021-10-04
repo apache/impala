@@ -4,8 +4,9 @@
 // See strtoint.h for details on how to use this component.
 //
 
-#include <errno.h>
-#include "gutil/port.h"
+#include <cerrno>
+#include <climits>
+
 #include "gutil/strtoint.h"
 
 // Replacement strto[u]l functions that have identical overflow and underflow

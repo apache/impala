@@ -9,14 +9,16 @@
 #define BASE_PORT_H_
 
 #include <limits.h>         // So we can set the bounds of our types
-#include <string.h>         // for memcpy()
 #include <stdlib.h>         // for free()
+#include <string.h>         // for memcpy()
 
 #if defined(__APPLE__)
 #include <unistd.h>         // for getpagesize() on mac
 #elif defined(OS_CYGWIN)
 #include <malloc.h>         // for memalign()
 #endif
+
+#include <type_traits>
 
 #include "gutil/integral_types.h"
 
@@ -231,9 +233,6 @@ inline size_t strnlen(const char *s, size_t maxlen) {
   return maxlen;
 }
 
-namespace std {}  // Avoid error if we didn't see std.
-using namespace std;  // Just like VC++, we need a using here.
-
 // Doesn't exist on OSX; used in google.cc for send() to mean "no flags".
 #define MSG_NOSIGNAL 0
 
@@ -325,8 +324,8 @@ inline void* memrchr(const void* bytes, int find_char, size_t len) {
 // TODO(user) This is the L1 D-cache line size of our Power7 machines.
 // Need to check if this is appropriate for other PowerPC64 systems.
 #define CACHELINE_SIZE 128
-#elif defined(__aarch64__) && defined(__linux__)
-#define CACHELINE_SIZE CACHELINESIZE_AARCH64
+#elif defined(__aarch64__)
+#define CACHELINE_SIZE 64
 #elif defined(__arm__)
 // Cache line sizes for ARM: These values are not strictly correct since
 // cache line sizes depend on implementations, not architectures.  There
@@ -964,7 +963,7 @@ inline int isinf(double x) {
   return 0;
 }
 
-// #include "conflict-signal.h"
+// #include "kudu/conflict-signal.h"
 typedef void (*sig_t)(int);
 
 // These actually belong in errno.h but there's a name confilict in errno
@@ -1008,7 +1007,7 @@ typedef short int16_t;
 #endif  // _MSC_VER
 
 #ifdef STL_MSVC  // not always the same as _MSC_VER
-#include "base/port_hash.h"
+#include "kudu/base/port_hash.h"
 #else
 struct PortableHashBase { };
 #endif
@@ -1165,23 +1164,63 @@ inline void UNALIGNED_STORE64(void *p, uint64 v) {
 
 #if defined(__cplusplus)
 
-inline void UnalignedCopy16(const void *src, void *dst) {
-  UNALIGNED_STORE16(dst, UNALIGNED_LOAD16(src));
+namespace port_internal {
+
+template<class T>
+constexpr bool LoadByReinterpretCast() {
+#ifndef NEED_ALIGNED_LOADS
+  // Per above, it's safe to use reinterpret_cast on x86 for types int64 and smaller.
+  return sizeof(T) <= 8;
+#else
+  return false;
+#endif
 }
 
-inline void UnalignedCopy32(const void *src, void *dst) {
-  UNALIGNED_STORE32(dst, UNALIGNED_LOAD32(src));
+// Enable UnalignedLoad and UnalignedStore for numeric types (floats and ints) including
+// int128. We don't allow these functions for other types, even if they are POD and <= 16
+// bits.
+template<class T>
+using enable_if_numeric = std::enable_if<
+  std::is_arithmetic<T>::value || std::is_same<T, __int128>::value, T>;
+
+} // namespace port_internal
+
+
+// Load an integer from pointer 'src'.
+//
+// This is a safer equivalent of *reinterpret_cast<const T*>(src) that properly handles
+// the case of larger types such as int128 which require alignment.
+//
+// Usage:
+//   int32_t x = UnalignedLoad<int32_t>(void_ptr);
+//
+template<typename T,
+         typename port_internal::enable_if_numeric<T>::type* = nullptr>
+inline T UnalignedLoad(const void* src) {
+  if (port_internal::LoadByReinterpretCast<T>()) {
+    return *reinterpret_cast<const T*>(src);
+  }
+  T ret;
+  memcpy(&ret, src, sizeof(T));
+  return ret;
 }
 
-inline void UnalignedCopy64(const void *src, void *dst) {
-  if (sizeof(void *) == 8) {
-    UNALIGNED_STORE64(dst, UNALIGNED_LOAD64(src));
+
+// Store the integer 'src' in the pointer 'dst'.
+//
+// Usage:
+//   int32_t foo = 123;
+//   UnalignedStore(my_void_ptr, foo);
+//
+// NOTE: this reverses the usual style-guide-suggested order of arguments
+// to match the more natural "*p = v;" ordering of a normal store.
+template<typename T,
+         typename port_internal::enable_if_numeric<T>::type* = nullptr>
+inline void UnalignedStore(void* dst, const T& src) {
+  if (port_internal::LoadByReinterpretCast<T>()) {
+    *reinterpret_cast<T*>(dst) = src;
   } else {
-    const char *src_char = reinterpret_cast<const char *>(src);
-    char *dst_char = reinterpret_cast<char *>(dst);
-
-    UNALIGNED_STORE32(dst_char, UNALIGNED_LOAD32(src_char));
-    UNALIGNED_STORE32(dst_char + 4, UNALIGNED_LOAD32(src_char + 4));
+    memcpy(dst, &src, sizeof(T));
   }
 }
 

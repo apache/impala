@@ -2,14 +2,16 @@
 
 #include "gutil/stringprintf.h"
 
-#include <errno.h>
-#include <stdarg.h> // For va_list and related operations
-#include <stdio.h> // MSVC requires this for _vsnprintf
+#include <cstdio> // MSVC requires this for _vsnprintf
+#include <ostream>
 #include <vector>
-using std::vector;
-#include <common/logging.h>
-#include "gutil/logging-inl.h"
+
+#include <glog/logging.h>
+
 #include "gutil/macros.h"
+
+using std::string;
+using std::vector;
 
 #ifdef _MSC_VER
 enum { IS__MSC_VER = 1 };

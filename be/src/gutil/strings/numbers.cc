@@ -6,27 +6,32 @@
 
 #include "gutil/strings/numbers.h"
 
-#include <assert.h>
-#include <ctype.h>
-#include <errno.h>
-#include <float.h>          // for DBL_DIG and FLT_DIG
-#include <math.h>           // for HUGE_VAL
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <sys/types.h>
+
+#include <cassert>
+#include <cctype>
+#include <cerrno>
+#include <cfloat>          // for DBL_DIG and FLT_DIG
+#include <cmath>           // for HUGE_VAL
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <limits>
-using std::numeric_limits;
+#include <memory>
+#include <ostream>
 #include <string>
-using std::string;
+
+#include <glog/logging.h>
 
 #include "gutil/int128.h"
 #include "gutil/integral_types.h"
-#include <common/logging.h>
-#include "gutil/logging-inl.h"
-#include "gutil/gscoped_ptr.h"
 #include "gutil/stringprintf.h"
 #include "gutil/strtoint.h"
 #include "gutil/strings/ascii_ctype.h"
+
+using std::numeric_limits;
+using std::string;
+using std::unique_ptr;
 
 // Reads a <double> in *text, which may not be whitespace-initiated.
 // *len is the length, or -1 if text is '\0'-terminated, which is more
@@ -78,7 +83,7 @@ static inline bool EatADouble(const char** text, int* len, bool allow_question,
     retval = strtod(pos, &end_nonconst);
   } else {
     // not '\0'-terminated & no obvious terminator found. must copy.
-    gscoped_array<char> buf(new char[rem + 1]);
+    unique_ptr<char[]> buf(new char[rem + 1]);
     memcpy(buf.get(), pos, rem);
     buf[rem] = '\0';
     retval = strtod(buf.get(), &end_nonconst);
@@ -1010,10 +1015,7 @@ char* FastInt32ToBufferLeft(int32 i, char* buffer) {
   uint32 u = i;
   if (i < 0) {
     *buffer++ = '-';
-    // We need to do the negation in modular (i.e., "unsigned")
-    // arithmetic; MSVC++ apprently warns for plain "-u", so
-    // we write the equivalent expression "0 - u" instead.
-    u = 0 - u;
+    u = ~u + 1;
   }
   return FastUInt32ToBufferLeft(u, buffer);
 }
@@ -1064,9 +1066,39 @@ char* FastInt64ToBufferLeft(int64 i, char* buffer) {
   uint64 u = i;
   if (i < 0) {
     *buffer++ = '-';
-    u = 0 - u;
+    u = ~u + 1;
   }
   return FastUInt64ToBufferLeft(u, buffer);
+}
+
+char* FastUInt128ToBufferLeft(unsigned __int128 i, char* buffer) {
+  static const unsigned __int128 TWENTY_DIGITS =
+      static_cast<unsigned __int128>(10000000000)
+      * static_cast<unsigned __int128>(10000000000);
+
+  uint64 u = static_cast<uint64>(i);
+  if (u == i) return FastUInt64ToBufferLeft(u, buffer);
+
+  unsigned __int128 top_19_digits = i / TWENTY_DIGITS;
+  buffer = FastUInt64ToBufferLeft(top_19_digits, buffer);
+  unsigned __int128 rem128 = i - (top_19_digits * TWENTY_DIGITS);
+
+  unsigned __int128 middle_19_digits = rem128 / 10;
+  buffer = FastUInt64ToBufferLeft(middle_19_digits, buffer);
+  u = rem128 - (middle_19_digits * 10);
+
+  buffer = FastUInt32ToBufferLeft(u, buffer);
+
+  return buffer;
+}
+
+char* FastInt128ToBufferLeft(__int128 i, char* buffer) {
+  unsigned __int128 u = i;
+  if (i < 0) {
+    *buffer++ = '-';
+    u = ~u + 1;
+  }
+  return FastUInt128ToBufferLeft(u, buffer);
 }
 
 int HexDigitsPrefix(const char* buf, int num_digits) {
