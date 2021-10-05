@@ -196,6 +196,13 @@ class HdfsScanner {
     return -1;
   }
 
+  /// Return the runtime filter by index 'filter_idx'.
+  const RuntimeFilter* GetFilter(int filter_idx) {
+    DCHECK_GE(filter_idx, 0);
+    DCHECK_LT(filter_idx, filter_ctxs_.size());
+    return filter_ctxs_[filter_idx]->filter;
+  }
+
   /// Scanner subclasses must implement these static functions as well.  Unfortunately,
   /// c++ does not allow static virtual functions.
 

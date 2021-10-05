@@ -111,6 +111,12 @@ public interface FeTable {
   boolean isClusteringColumn(Column c);
 
   /**
+   * Return true when the column is used in a computed partition, e.g. in Iceberg
+   * partition transforms.
+   */
+  default boolean isComputedPartitionColumn(Column c) { return false; }
+
+  /**
    * Case-insensitive lookup.
    *
    * @return null if the column with 'name' is not found.

@@ -46,6 +46,7 @@ import org.apache.impala.analysis.TupleId;
 import org.apache.impala.analysis.TupleIsNullPredicate;
 import org.apache.impala.catalog.FeTable;
 import org.apache.impala.catalog.Column;
+import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.KuduColumn;
 import org.apache.impala.catalog.ScalarType;
 import org.apache.impala.catalog.Type;
@@ -232,14 +233,17 @@ public final class RuntimeFilterGenerator {
       // The low and high value of the column on which the filter is applied
       public final TColumnValue lowValue;
       public final TColumnValue highValue;
+      // Indicates if the data is actually stored in the data files
+      public final boolean isColumnInDataFile;
 
       public RuntimeFilterTarget(ScanNode targetNode, Expr targetExpr,
-          boolean isBoundByPartitionColumns, boolean isLocalTarget, TColumnValue lowValue,
-          TColumnValue highValue) {
+          boolean isBoundByPartitionColumns, boolean isColumnInDataFile,
+          boolean isLocalTarget, TColumnValue lowValue, TColumnValue highValue) {
         Preconditions.checkState(targetExpr.isBoundByTupleIds(targetNode.getTupleIds()));
         node = targetNode;
         expr = targetExpr;
         this.isBoundByPartitionColumns = isBoundByPartitionColumns;
+        this.isColumnInDataFile = isColumnInDataFile;
         this.isLocalTarget = isLocalTarget;
         this.lowValue = lowValue;
         this.highValue = highValue;
@@ -256,6 +260,9 @@ public final class RuntimeFilterGenerator {
         tFilterTarget.setTarget_expr_slotids(tSlotIds);
         tFilterTarget.setIs_bound_by_partition_columns(isBoundByPartitionColumns);
         tFilterTarget.setIs_local_target(isLocalTarget);
+        if (node instanceof HdfsScanNode) {
+          tFilterTarget.setIs_column_in_data_file(isColumnInDataFile);
+        }
         if (node instanceof KuduScanNode) {
           // assignRuntimeFilters() only assigns KuduScanNode targets if the target expr
           // is a slot ref, possibly with an implicit cast, pointing to a column.
@@ -290,6 +297,7 @@ public final class RuntimeFilterGenerator {
         return output.append("Target Id: " + node.getId() + " ")
             .append("Target expr: " + expr.debugString() + " ")
             .append("Partition columns: " + isBoundByPartitionColumns)
+            .append("Is column stored in data files: " + isColumnInDataFile)
             .append("Is local: " + isLocalTarget)
             .append("lowValue: " + (lowValue != null ? lowValue.toString() : -1))
             .append("highValue: " + (highValue != null ? highValue.toString() : -1))
@@ -924,6 +932,8 @@ public final class RuntimeFilterGenerator {
       boolean isBoundByPartitionColumns = isBoundByPartitionColumns(analyzer, targetExpr,
           scanNode);
       if (disableRowRuntimeFiltering && !isBoundByPartitionColumns) continue;
+      boolean isColumnInDataFile = isColumnInDataFile(scanNode.getTupleDesc().getTable(),
+          isBoundByPartitionColumns);
       boolean isLocalTarget = isLocalTarget(filter, scanNode);
       if (runtimeFilterMode == TRuntimeFilterMode.LOCAL && !isLocalTarget) continue;
 
@@ -1008,7 +1018,8 @@ public final class RuntimeFilterGenerator {
       }
       RuntimeFilter.RuntimeFilterTarget target =
           new RuntimeFilter.RuntimeFilterTarget(scanNode, targetExpr,
-              isBoundByPartitionColumns, isLocalTarget, lowValue, highValue);
+              isBoundByPartitionColumns, isColumnInDataFile, isLocalTarget,
+              lowValue, highValue);
       filter.addTarget(target);
     }
 
@@ -1033,17 +1044,31 @@ public final class RuntimeFilterGenerator {
     Preconditions.checkState(targetExpr.isBoundByTupleIds(targetNode.getTupleIds()));
     TupleDescriptor baseTblDesc = targetNode.getTupleDesc();
     FeTable tbl = baseTblDesc.getTable();
-    if (tbl.getNumClusteringCols() == 0) return false;
+    if (tbl.getNumClusteringCols() == 0 && !(tbl instanceof FeIcebergTable)) return false;
     List<SlotId> sids = new ArrayList<>();
     targetExpr.getIds(null, sids);
     for (SlotId sid : sids) {
-      SlotDescriptor slotDesc = analyzer.getSlotDesc(sid);
-      if (slotDesc.getColumn() == null
-          || slotDesc.getColumn().getPosition() >= tbl.getNumClusteringCols()) {
+      Column col = analyzer.getSlotDesc(sid).getColumn();
+      if (col == null) return false;
+      if (!tbl.isClusteringColumn(col) && !tbl.isComputedPartitionColumn(col)) {
         return false;
       }
     }
     return true;
+  }
+
+  /**
+   * Return true if the column is actually stored in the data file. E.g. partition
+   * columns are not stored in most cases.
+   */
+  private static boolean isColumnInDataFile(FeTable tbl,
+      boolean isBoundByPartitionColumns) {
+    // Non-partition values are always sotred in the data files.
+    if (!isBoundByPartitionColumns) return true;
+    // Iceberg uses hidden partitioning which means all columns are stored in the data
+    // files.
+    if (tbl instanceof FeIcebergTable) return true;
+    return false;
   }
 
   /**

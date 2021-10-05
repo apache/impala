@@ -644,9 +644,9 @@ class HdfsParquetScanner : public HdfsColumnarScanner {
   /// Return the overlap predicate descs from the HDFS scan plan.
   const vector<TOverlapPredicateDesc>& GetOverlapPredicateDescs();
 
-  /// Find and return the min/max filter at filter_ctx_[filter_idx].
-  /// Return nullptr if no min/max filter is found at that location.
-  MinMaxFilter* FindMinMaxFilter(int filter_idx);
+  /// Return the min/max filter of 'filter'.
+  /// Return nullptr if no min/max filter is present.
+  MinMaxFilter* GetMinMaxFilter(const RuntimeFilter* filter);
 
   /// Return true when the filter at filter_ctx_[filter_idx] is bound by a
   /// partition column and false otherwise.

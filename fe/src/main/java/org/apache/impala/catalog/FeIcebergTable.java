@@ -247,6 +247,19 @@ public interface FeIcebergTable extends FeFsTable {
     return getFeFsTable().getHostIndex();
   }
 
+  @Override /* FeTable */
+  default boolean isComputedPartitionColumn(Column col) {
+    Preconditions.checkState(col instanceof IcebergColumn);
+    IcebergColumn iceCol = (IcebergColumn)col;
+    IcebergPartitionSpec spec = getDefaultPartitionSpec();
+    if (spec == null || !spec.hasPartitionFields()) return false;
+
+    for (IcebergPartitionField partField : spec.getIcebergPartitionFields()) {
+      if (iceCol.getFieldId() == partField.getSourceId()) return true;
+    }
+    return false;
+  }
+
   /**
    * Current snapshot id of the table.
    */

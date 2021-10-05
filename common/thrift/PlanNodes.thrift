@@ -120,6 +120,10 @@ struct TRuntimeFilterTargetDesc {
 
   // Indicates if the low and high value in column stats are present
   10: optional bool is_min_max_value_present
+
+  // Indicates if the column is actually stored in the data files (unlike partition
+  // columns in regular Hive tables)
+  11: optional bool is_column_in_data_file
 }
 
 enum TRuntimeFilterType {

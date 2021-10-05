@@ -726,13 +726,12 @@ Status HdfsParquetScanner::EvaluateOverlapForRowGroup(
     /// Find the index of the filter that is common in data structure
     /// filter_ctxs_ and filter_stats_.
     int idx = FindFilterIndex(filter_id);
-    DCHECK(idx >= 0);
 
-    if (IsBoundByPartitionColumn(idx)) {
-      continue;
-    }
+    const RuntimeFilter* filter = GetFilter(idx);
+    // We skip row group filtering if the column is not present in the data files.
+    if (!filter->IsColumnInDataFile(GetScanNodeId())) continue;
 
-    MinMaxFilter* minmax_filter = FindMinMaxFilter(idx);
+    MinMaxFilter* minmax_filter = GetMinMaxFilter(filter);
 
     VLOG(3) << "Try to filter out a rowgroup via overlap predicate filter: "
             << " fid=" << filter_id
@@ -1354,12 +1353,9 @@ void HdfsParquetScanner::GetMinMaxSlotsForOverlapPred(
   *max_slot = min_max_tuple_->GetSlot(max_slot_desc->tuple_offset());
 }
 
-MinMaxFilter* HdfsParquetScanner::FindMinMaxFilter(int filter_idx) {
-  if (filter_idx >= 0 && filter_idx < filter_ctxs_.size()) {
-    const RuntimeFilter* filter = filter_ctxs_[filter_idx]->filter;
-    if (filter && filter->is_min_max_filter()) {
-      return filter->get_min_max();
-    }
+MinMaxFilter* HdfsParquetScanner::GetMinMaxFilter(const RuntimeFilter* filter) {
+  if (filter && filter->is_min_max_filter()) {
+    return filter->get_min_max();
   }
   return nullptr;
 }
@@ -1461,7 +1457,8 @@ Status HdfsParquetScanner::FindSkipRangesForPagesWithMinMaxFilters(
     int slot_idx = desc.slot_index;
 
     int filter_idx = FindFilterIndex(filter_id);
-    MinMaxFilter* minmax_filter = FindMinMaxFilter(filter_idx);
+    const RuntimeFilter* filter = GetFilter(filter_idx);
+    MinMaxFilter* minmax_filter = GetMinMaxFilter(filter);
     if (!minmax_filter || !IsFilterWorthyForOverlapCheck(filter_idx)) {
       continue;
     }

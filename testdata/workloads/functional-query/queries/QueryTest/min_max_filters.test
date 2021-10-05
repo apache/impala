@@ -425,3 +425,13 @@ on a.date_col = b.date_col and b.date_col = c.date_col;
 aggregation(SUM, ProbeRows): 48
 row_regex: .*1 of 1 Runtime Filter Published.*
 ====
+---- QUERY
+SET RUNTIME_FILTER_WAIT_TIME_MS=$RUNTIME_FILTER_WAIT_TIME_MS;
+select * from functional_parquet.iceberg_partitioned i1,
+              functional_parquet.iceberg_partitioned i2
+where i1.action = i2.action and
+      i1.id = i2.id and
+      i2.event_time = '2020-01-01 10:00:00';
+---- RUNTIME_PROFILE
+row_regex:.* RF00.\[min_max\] -> i1\.action.*
+====

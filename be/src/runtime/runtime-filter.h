@@ -122,6 +122,11 @@ class RuntimeFilter {
     return filter_desc().targets[target_ndx].is_bound_by_partition_columns;
   }
 
+  bool IsColumnInDataFile(int plan_id) const {
+    int target_ndx = filter_desc().planid_to_target_ndx.at(plan_id);
+    return filter_desc().targets[target_ndx].is_column_in_data_file;
+  }
+
   /// Frequency with which to check for filter arrival in WaitForArrival()
   static const int SLEEP_PERIOD_MS;
 
