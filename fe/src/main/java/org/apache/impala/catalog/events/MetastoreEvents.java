@@ -45,6 +45,7 @@ import org.apache.hadoop.hive.metastore.messaging.json.JSONAlterTableMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONCreateDatabaseMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONDropDatabaseMessage;
 import org.apache.hadoop.hive.metastore.messaging.json.JSONDropTableMessage;
+import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils;
 import org.apache.impala.analysis.TableName;
 import org.apache.impala.catalog.CatalogException;
 import org.apache.impala.catalog.CatalogServiceCatalog;
@@ -960,8 +961,11 @@ public class MetastoreEvents {
         infoLog("Not processing the event as it is a self-event");
         return;
       }
-      // Reload the whole table if it's a transactional table.
-      if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
+      // Reload the whole table if it's a transactional table or materialized view.
+      // Materialized views are treated as a special case because it causes problems
+      // on the reloading partition logic which expects it to be a HdfsTable.
+      if (AcidUtils.isTransactionalTable(msTbl_.getParameters())
+          || MetaStoreUtils.isMaterializedViewTable(msTbl_)) {
         insertPartition_ = null;
       }
 
@@ -1534,8 +1538,13 @@ public class MetastoreEvents {
         return;
       }
       try {
-        // Reload the whole table if it's a transactional table.
-        if (AcidUtils.isTransactionalTable(msTbl_.getParameters()) && !isSelfEvent()) {
+        // Reload the whole table if it's a transactional table or materialized view.
+        // Materialized views are treated as a special case because it's possible to
+        // receive partition event on MVs, but they are regular views in Impala. That
+        // cause problems on the reloading partition logic which expects it to be a
+        // HdfsTable.
+        if ((AcidUtils.isTransactionalTable(msTbl_.getParameters()) && !isSelfEvent())
+            || MetaStoreUtils.isMaterializedViewTable(msTbl_)) {
           reloadTableFromCatalog("ADD_PARTITION", true);
         } else {
           // HMS adds partitions in a transactional way. This means there may be multiple
@@ -1669,8 +1678,12 @@ public class MetastoreEvents {
         return;
       }
 
-      // Reload the whole table if it's a transactional table.
-      if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
+      // Reload the whole table if it's a transactional table or materialized view.
+      // Materialized views are treated as a special case because it's possible to receive
+      // partition event on MVs, but they are regular views in Impala. That cause problems
+      // on the reloading partition logic which expects it to be a HdfsTable.
+      if (AcidUtils.isTransactionalTable(msTbl_.getParameters())
+          || MetaStoreUtils.isMaterializedViewTable(msTbl_)) {
         reloadTableFromCatalog("ALTER_PARTITION", true);
       } else {
         // Refresh the partition that was altered.
@@ -1886,10 +1899,13 @@ public class MetastoreEvents {
         infoLog("Partition list is empty. Ignoring this event.");
       }
       try {
-        // Reload the whole table if it's a transactional table. In case of transactional
-        // tables we rely on the self-event evaluation since there is no fine-grained
-        // partition level refresh.
-        if (AcidUtils.isTransactionalTable(msTbl_.getParameters())) {
+        // Reload the whole table if it's a transactional table or materialized view.
+        // Materialized views are treated as a special case because it's possible to
+        // receive partition event on MVs, but they are regular views in Impala. That
+        // cause problems on the reloading partition logic which expects it to be a
+        // HdfsTable.
+        if (AcidUtils.isTransactionalTable(msTbl_.getParameters())
+            || MetaStoreUtils.isMaterializedViewTable(msTbl_)) {
           reloadTableFromCatalog("DROP_PARTITION", true);
         } else {
           int numPartsRemoved = catalogOpExecutor_
