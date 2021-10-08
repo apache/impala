@@ -696,6 +696,9 @@ enum TImpalaQueryOptions {
 
   // Indicates whether to use ORC's search argument to push down predicates.
   ORC_READ_STATISTICS = 135
+
+  // Indicates whether to run most of ddl requests in async mode.
+  ENABLE_ASYNC_DDL_EXECUTION = 136
 }
 
 // The summary of a DML statement.

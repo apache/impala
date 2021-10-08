@@ -549,6 +549,9 @@ struct TQueryOptions {
 
   // Indicates whether to use ORC's search argument to push down predicates.
   136: optional bool orc_read_statistics = true;
+
+  // Allow ddl exec request to run in a separate thread
+  137: optional bool enable_async_ddl_execution = true;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external

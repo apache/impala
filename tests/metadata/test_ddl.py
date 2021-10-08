@@ -21,6 +21,8 @@ import pytest
 import re
 import time
 
+from beeswaxd.BeeswaxService import QueryState
+from copy import deepcopy
 from test_ddl_base import TestDdlBase
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.environ import (HIVE_MAJOR_VERSION)
@@ -30,7 +32,11 @@ from tests.common.parametrize import UniqueDatabase
 from tests.common.skip import (SkipIf, SkipIfABFS, SkipIfADLS, SkipIfKudu, SkipIfLocal,
                                SkipIfCatalogV2, SkipIfHive2, SkipIfS3, SkipIfGCS)
 from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.common.test_dimensions import (create_exec_option_dimension,
+    create_client_protocol_dimension)
+from tests.common.test_vector import ImpalaTestDimension
 from tests.util.filesystem_utils import (
+    get_fs_path,
     WAREHOUSE,
     IS_HDFS,
     IS_S3,
@@ -38,6 +44,7 @@ from tests.util.filesystem_utils import (
     FILESYSTEM_NAME)
 from tests.common.impala_cluster import ImpalaCluster
 from tests.util.filesystem_utils import FILESYSTEM_PREFIX
+
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(TestDdlBase):
@@ -896,6 +903,225 @@ class TestDdlStatements(TestDdlBase):
                         .format(table))
     comment = self._get_column_comment(table, 'j')
     assert "comment4" == comment
+
+
+# IMPALA-10811: RPC to submit query getting stuck for AWS NLB forever
+# Test HS2, Beeswax and HS2-HTTP three clients.
+class TestAsyncDDL(TestDdlBase):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestAsyncDDL, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        sync_ddl=[0], disable_codegen_options=[False]))
+
+  def test_async_ddl(self, vector, unique_database):
+    self.run_test_case('QueryTest/async_ddl', vector, use_db=unique_database)
+
+  def test_async_ddl_with_JDBC(self, vector, unique_database):
+    self.exec_with_jdbc("drop table if exists {0}.test_table".format(unique_database))
+    self.exec_with_jdbc_and_compare_result(
+        "create table {0}.test_table(a int)".format(unique_database),
+        "'Table has been created.'")
+
+    self.exec_with_jdbc("drop table if exists {0}.alltypes_clone".format(unique_database))
+    self.exec_with_jdbc_and_compare_result(
+        "create table {0}.alltypes_clone as select * from\
+        functional_parquet.alltypes".format(unique_database),
+        "'Inserted 7300 row(s)'")
+
+  @classmethod
+  def test_get_operation_status_for_client(self, client, unique_database,
+          init_state, pending_state, running_state):
+    # Setup
+    client.execute("drop table if exists {0}.alltypes_clone".format(unique_database))
+    client.execute("select count(*) from functional_parquet.alltypes")
+    client.execute("set enable_async_ddl_execution=true")
+    client.execute("set debug_action=\"CRS_DELAY_BEFORE_CATALOG_OP_EXEC:SLEEP@10000\"")
+
+    # Run the test query which will only compile the DDL in execute_statement()
+    # and measure the time spent. Should be less than 3s.
+    start = time.time()
+    handle = client.execute_async(
+        "create table {0}.alltypes_clone as select * from \
+        functional_parquet.alltypes".format(unique_database))
+    end = time.time()
+    assert (end - start <= 3)
+
+    # The table creation and population part will be done in a separate thread.
+    # The repeated call below to get_operation_status() finds out the number of
+    # times that each state is reached in BE for that part of the work.
+    num_times_in_initialized_state = 0
+    num_times_in_pending_state = 0
+    num_times_in_running_state = 0
+    while not client.state_is_finished(handle):
+
+      state = client.get_state(handle)
+
+      if (state == init_state):
+        num_times_in_initialized_state += 1
+
+      if (state == pending_state):
+        num_times_in_pending_state += 1
+
+      if (state == running_state):
+        num_times_in_running_state += 1
+
+    # The query must reach INITIALIZED_STATE 0 time and PENDING_STATE at least
+    # once. The number of times in PENDING_STATE is a function of the length of
+    # the delay. The query reaches RUNNING_STATE when it populates the new table.
+    assert num_times_in_initialized_state == 0
+    assert num_times_in_pending_state > 1
+    assert num_times_in_running_state > 0
+
+  def test_get_operation_status_for_async_ddl(self, vector, unique_database):
+    """Tests that for an asynchronously executed DDL with delay, GetOperationStatus
+    must be issued repeatedly. Test client hs2-http, hs2 and beeswax"""
+
+    if vector.get_value('protocol') == 'hs2-http':
+      self.test_get_operation_status_for_client(self.hs2_http_client, unique_database,
+      "INITIALIZED_STATE", "PENDING_STATE", "RUNNING_STATE")
+
+    if vector.get_value('protocol') == 'hs2':
+      self.test_get_operation_status_for_client(self.hs2_client, unique_database,
+      "INITIALIZED_STATE", "PENDING_STATE", "RUNNING_STATE")
+
+    if vector.get_value('protocol') == 'beeswax':
+      self.test_get_operation_status_for_client(self.client, unique_database,
+      QueryState.INITIALIZED, QueryState.COMPILED, QueryState.RUNNING)
+
+
+class TestAsyncDDLTiming(TestDdlBase):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestAsyncDDLTiming, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        sync_ddl=[0], disable_codegen_options=[False]))
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('enable_async_ddl_execution', True, False))
+
+  def test_alter_table_recover(self, vector, unique_database):
+    enable_async_ddl = vector.get_value('enable_async_ddl_execution')
+    client = self.create_impala_client(protocol=vector.get_value('protocol'))
+    is_hs2 = vector.get_value('protocol') in ['hs2', 'hs2-http']
+    pending_state = "PENDING_STATE" if is_hs2 else QueryState.COMPILED
+    running_state = "RUNNING_STATE" if is_hs2 else QueryState.RUNNING
+    finished_state = "FINISHED_STATE" if is_hs2 else QueryState.FINISHED
+
+    try:
+      # Setup for the alter table case (create table that points to an existing
+      # location)
+      alltypes_location = get_fs_path("/test-warehouse/alltypes_parquet")
+      source_tbl = "functional_parquet.alltypes"
+      dest_tbl = "{0}.alltypes_clone".format(unique_database)
+      create_table_stmt = 'create external table {0} like {1} location "{2}"'.format(
+          dest_tbl, source_tbl, alltypes_location)
+      self.execute_query_expect_success(client, create_table_stmt)
+
+      # Describe the table to fetch its metadata
+      self.execute_query_expect_success(client, "describe {0}".format(dest_tbl))
+
+      # Configure whether to use async DDL and add appropriate delays
+      new_vector = deepcopy(vector)
+      new_vector.get_value('exec_option')['enable_async_ddl_execution'] = enable_async_ddl
+      new_vector.get_value('exec_option')['debug_action'] = \
+          "CRS_DELAY_BEFORE_CATALOG_OP_EXEC:SLEEP@10000"
+      exec_start = time.time()
+      alter_stmt = "alter table {0} recover partitions".format(dest_tbl)
+      handle = self.execute_query_async_using_client(client, alter_stmt, new_vector)
+      exec_end = time.time()
+      exec_time = exec_end - exec_start
+      state = client.get_state(handle)
+      if enable_async_ddl:
+        assert state == pending_state or state == running_state
+      else:
+        assert state == running_state or state == finished_state
+
+      # Wait for the statement to finish with a timeout of 20 seconds
+      wait_start = time.time()
+      self.wait_for_state(handle, finished_state, 20, client=client)
+      wait_end = time.time()
+      wait_time = wait_end - wait_start
+      self.close_query_using_client(client, handle)
+      # In sync mode:
+      #  The entire DDL is processed in the exec step with delay. exec_time should be
+      #  more than 10 seconds.
+      #
+      # In async mode:
+      #  The compilation of DDL is processed in the exec step without delay. And the
+      #  processing of the DDL plan is in wait step with delay. The wait time should
+      #  definitely take more time than 10 seconds.
+      if enable_async_ddl:
+        assert(wait_time >= 10)
+      else:
+        assert(exec_time >= 10)
+    finally:
+      client.close()
+
+  def test_ctas(self, vector, unique_database):
+    enable_async_ddl = vector.get_value('enable_async_ddl_execution')
+    client = self.create_impala_client(protocol=vector.get_value('protocol'))
+    is_hs2 = vector.get_value('protocol') in ['hs2', 'hs2-http']
+    pending_state = "PENDING_STATE" if is_hs2 else QueryState.COMPILED
+    finished_state = "FINISHED_STATE" if is_hs2 else QueryState.FINISHED
+
+    try:
+      # The CTAS is going to need the metadata of the source table in the
+      # select. To avoid flakiness about metadata loading, this selects from
+      # that source table first to get the metadata loaded.
+      self.execute_query_expect_success(client,
+          "select count(*) from functional_parquet.alltypes")
+
+      # Configure whether to use async DDL and add appropriate delays
+      new_vector = deepcopy(vector)
+      new_vector.get_value('exec_option')['enable_async_ddl_execution'] = enable_async_ddl
+      create_delay = "CRS_DELAY_BEFORE_CATALOG_OP_EXEC:SLEEP@10000"
+      insert_delay = "CRS_BEFORE_COORD_STARTS:SLEEP@2000"
+      new_vector.get_value('exec_option')['debug_action'] = \
+          "{0}|{1}".format(create_delay, insert_delay)
+      dest_tbl = "{0}.ctas_test".format(unique_database)
+      source_tbl = "functional_parquet.alltypes"
+      ctas_stmt = 'create external table {0} as select * from {1}'.format(
+          dest_tbl, source_tbl)
+      exec_start = time.time()
+      handle = self.execute_query_async_using_client(client, ctas_stmt, new_vector)
+      exec_end = time.time()
+      exec_time = exec_end - exec_start
+      # The CRS_BEFORE_COORD_STARTS delay postpones the transition from PENDING
+      # to RUNNING, so the sync case should be in PENDING state at the end of
+      # the execute call. This means that the sync and async cases are the same.
+      assert client.get_state(handle) == pending_state
+
+      # Wait for the statement to finish with a timeout of 20 seconds
+      wait_start = time.time()
+      self.wait_for_state(handle, finished_state, 20, client=client)
+      wait_end = time.time()
+      wait_time = wait_end - wait_start
+      self.close_query_using_client(client, handle)
+      # In sync mode:
+      #  The entire CTAS is processed in the exec step with delay. exec_time should be
+      #  more than 10 seconds.
+      #
+      # In async mode:
+      #  The compilation of CTAS is processed in the exec step without delay. And the
+      #  processing of the CTAS plan is in wait step with delay. The wait time should
+      #  definitely take more time than 10 seconds.
+      if enable_async_ddl:
+        assert(wait_time >= 10)
+      else:
+        assert(exec_time >= 10)
+    finally:
+      client.close()
+
 
 # IMPALA-2002: Tests repeated adding/dropping of .jar and .so in the lib cache.
 class TestLibCache(TestDdlBase):

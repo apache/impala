@@ -1121,6 +1121,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::MINMAX_FILTER_PARTITION_COLUMNS:
         query_options->__set_minmax_filter_partition_columns(IsTrue(value));
         break;
+      case TImpalaQueryOptions::ENABLE_ASYNC_DDL_EXECUTION: {
+        query_options->__set_enable_async_ddl_execution(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

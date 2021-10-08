@@ -921,6 +921,22 @@ class ImpalaTestSuite(BaseTestSuite):
     assert (impala_results is not None) and (hive_results is not None)
     assert compare(impala_results, hive_results)
 
+  def exec_with_jdbc(self, stmt):
+    """Pass 'stmt' to IMPALA via Impala JDBC client and execute it"""
+    # execute_using_jdbc expects a Query object. Convert the query string into a Query
+    # object
+    query = Query()
+    query.query_str = stmt
+    # Run the statement targeting Impala
+    exec_opts = JdbcQueryExecConfig(impalad=IMPALAD_HS2_HOST_PORT, transport='NOSASL')
+    return execute_using_jdbc(query, exec_opts).data
+
+  def exec_with_jdbc_and_compare_result(self, stmt, expected):
+    """Execute 'stmt' via Impala JDBC client and compare the result with 'expected'"""
+    result = self.exec_with_jdbc(stmt)
+    # Check the results
+    assert (result is not None) and (result == expected)
+
   def load_query_test_file(self, workload, file_name, valid_section_names=None,
       encoding=None):
     """

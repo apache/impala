@@ -494,6 +494,9 @@ class ClientRequestState {
   /// execution in the following cases:
   /// 1. exec_request().stmt_type == QUERY or DML.
   /// 2. CTAS query for creating a table that does not exist.
+  /// 3. DDLs that are not the following:
+  ///    a. Local catalog operations requiring no catalog service access;
+  ///    b. Compute Stats.
   std::unique_ptr<Thread> async_exec_thread_;
 
   /// Set by the async-exec-thread after successful admission. Accessed through
@@ -672,11 +675,13 @@ class ClientRequestState {
   /// actively processed. Takes expiration_data_lock_.
   void MarkActive();
 
-  /// Sets up profile and pre-execution counters, creates the query schedule, and spawns
-  /// a thread that calls FinishExecQueryOrDmlRequest() which contains the core logic of
-  /// executing a QUERY or DML execution request.
+  /// Sets up profile and pre-execution counters, creates the query schedule, and calls
+  /// FinishExecQueryOrDmlRequest() which contains the core logic of executing a QUERY or
+  /// DML execution request. When 'async' is true, spawn a thread to run
+  /// FinishExecQueryOrDmlRequest(). Otherwise, the method runs in the same thread as the
+  /// caller.
   /// Non-blocking.
-  Status ExecAsyncQueryOrDmlRequest(const TQueryExecRequest& query_exec_request)
+  Status ExecQueryOrDmlRequest(const TQueryExecRequest& query_exec_request, bool async)
       WARN_UNUSED_RESULT;
 
   /// Submits the exec request to the admission controller and on successful admission,
@@ -688,6 +693,21 @@ class ClientRequestState {
   /// Core logic of executing a ddl statement. May internally initiate execution of
   /// queries (e.g., compute stats) or dml (e.g., create table as select)
   Status ExecDdlRequest() WARN_UNUSED_RESULT;
+
+  /// A helper function to execute certain ddl requests synchronously.
+  Status ExecDdlRequestImplSync() WARN_UNUSED_RESULT;
+
+  /// A helper function to execute certain ddl requests optionally
+  /// asynchronously. 'exec_in_worker_thread' indicates whether the execution of
+  /// DDL is done in a worker thread or not. This flag is set to true when the
+  /// execution of the DDL request runs in 'async_exec_thread_', and set to false
+  /// otherwise.
+  void ExecDdlRequestImpl(bool exec_in_worker_thread);
+
+  /// Decide whether to call ExecDdlRequestImpl() or
+  /// ExecDdlRequestImplSync() for ExecDdlRequest(). Return true to call
+  /// ExecDdlRequestImpl() and false to call ExecDdlRequestImplSync().
+  bool ShouldRunExecDdlAsync();
 
   /// Executes a shut down request.
   Status ExecShutdownRequest() WARN_UNUSED_RESULT;

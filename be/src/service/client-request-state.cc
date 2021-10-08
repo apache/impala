@@ -239,7 +239,8 @@ Status ClientRequestState::Exec() {
     case TStmtType::QUERY:
     case TStmtType::DML:
       DCHECK(exec_request_->__isset.query_exec_request);
-      RETURN_IF_ERROR(ExecAsyncQueryOrDmlRequest(exec_request_->query_exec_request));
+      RETURN_IF_ERROR(
+          ExecQueryOrDmlRequest(exec_request_->query_exec_request, true /*async*/));
       break;
     case TStmtType::EXPLAIN: {
       request_result_set_.reset(new vector<TResultRow>(
@@ -512,8 +513,8 @@ Status ClientRequestState::ExecLocalCatalogOp(
   }
 }
 
-Status ClientRequestState::ExecAsyncQueryOrDmlRequest(
-    const TQueryExecRequest& query_exec_request) {
+Status ClientRequestState::ExecQueryOrDmlRequest(
+    const TQueryExecRequest& query_exec_request, bool isAsync) {
   // we always need at least one plan fragment
   DCHECK(query_exec_request.plan_exec_info.size() > 0);
 
@@ -574,11 +575,18 @@ Status ClientRequestState::ExecAsyncQueryOrDmlRequest(
     // Don't start executing the query if Cancel() was called concurrently with Exec().
     if (is_cancelled_) return Status::CANCELLED;
   }
-  // Don't transition to PENDING inside the FinishExecQueryOrDmlRequest thread because
-  // the query should be in the PENDING state before the Exec RPC returns.
-  UpdateNonErrorExecState(ExecState::PENDING);
-  RETURN_IF_ERROR(Thread::Create("query-exec-state", "async-exec-thread",
-      &ClientRequestState::FinishExecQueryOrDmlRequest, this, &async_exec_thread_, true));
+  if (isAsync) {
+    // Don't transition to PENDING inside the FinishExecQueryOrDmlRequest thread because
+    // the query should be in the PENDING state before the Exec RPC returns.
+    UpdateNonErrorExecState(ExecState::PENDING);
+    RETURN_IF_ERROR(Thread::Create("query-exec-state", "async-exec-thread",
+        &ClientRequestState::FinishExecQueryOrDmlRequest, this, &async_exec_thread_,
+        true));
+  } else {
+    // Update query_status_ as necessary.
+    FinishExecQueryOrDmlRequest();
+    return query_status_;
+  }
   return Status::OK();
 }
 
@@ -640,10 +648,7 @@ void ClientRequestState::FinishExecQueryOrDmlRequest() {
   UpdateNonErrorExecState(ExecState::RUNNING);
 }
 
-Status ClientRequestState::ExecDdlRequest() {
-  string op_type = catalog_op_type() == TCatalogOpType::DDL ?
-      PrintThriftEnum(ddl_type()) : PrintThriftEnum(catalog_op_type());
-  summary_profile_->AddInfoString("DDL Type", op_type);
+Status ClientRequestState::ExecDdlRequestImplSync() {
 
   if (catalog_op_type() != TCatalogOpType::DDL &&
       catalog_op_type() != TCatalogOpType::RESET_METADATA) {
@@ -683,12 +688,34 @@ Status ClientRequestState::ExecDdlRequest() {
     return Status::OK();
   }
 
+  DCHECK(false) << "Not handled sync exec ddl request.";
+  return Status::OK();
+}
+
+void ClientRequestState::ExecDdlRequestImpl(bool exec_in_worker_thread) {
+  bool is_CTAS = (catalog_op_type() == TCatalogOpType::DDL
+      && ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT);
+
   catalog_op_executor_.reset(
       new CatalogOpExecutor(ExecEnv::GetInstance(), frontend_, server_profile_));
+
+  // Indirectly check if running in thread async_exec_thread_.
+  if (exec_in_worker_thread) {
+    DCHECK(exec_state() == ExecState::PENDING);
+
+    // 1. For any non-CTAS DDLs, transition to RUNNING
+    // 2. For CTAS DDLs, transition to RUNNING during FinishExecQueryOrDmlRequest()
+    //    called by ExecQueryOrDmlRequest().
+    if (!is_CTAS) UpdateNonErrorExecState(ExecState::RUNNING);
+  }
+
+  // Optionally wait with a debug action before Exec() below.
+  DebugActionNoFail(exec_request_->query_options, "CRS_DELAY_BEFORE_CATALOG_OP_EXEC");
+
   Status status = catalog_op_executor_->Exec(exec_request_->catalog_op_request);
   {
     lock_guard<mutex> l(lock_);
-    RETURN_IF_ERROR(UpdateQueryStatus(status));
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
   }
 
   // If this is a CTAS request, there will usually be more work to do
@@ -700,27 +727,70 @@ Status ClientRequestState::ExecDdlRequest() {
       !catalog_op_executor_->ddl_exec_response()->new_table_created) {
     DCHECK(exec_request_->catalog_op_request.
         ddl_params.create_table_params.if_not_exists);
-    return Status::OK();
+    return;
   }
 
   // Add newly created table to catalog cache.
-  RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
+  status = parent_server_->ProcessCatalogUpdateResult(
       *catalog_op_executor_->update_catalog_result(),
-      exec_request_->query_options.sync_ddl));
+      exec_request_->query_options.sync_ddl);
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+  }
 
-  if (catalog_op_type() == TCatalogOpType::DDL &&
-      ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {
+  if (is_CTAS) {
     // At this point, the remainder of the CTAS request executes
     // like a normal DML request. As with other DML requests, it will
     // wait for another catalog update if any partitions were altered as a result
     // of the operation.
     DCHECK(exec_request_->__isset.query_exec_request);
-    RETURN_IF_ERROR(ExecAsyncQueryOrDmlRequest(exec_request_->query_exec_request));
+    RETURN_VOID_IF_ERROR(
+        ExecQueryOrDmlRequest(exec_request_->query_exec_request, !exec_in_worker_thread));
   }
 
   // Set the results to be reported to the client.
   SetResultSet(catalog_op_executor_->ddl_exec_response());
-  return Status::OK();
+}
+
+bool ClientRequestState::ShouldRunExecDdlAsync() {
+  // Local catalog op DDL will run synchronously.
+  if (catalog_op_type() != TCatalogOpType::DDL
+      && catalog_op_type() != TCatalogOpType::RESET_METADATA) {
+    return false;
+  }
+
+  // The exec DDL part of compute stats will run synchronously.
+  if (ddl_type() == TDdlType::COMPUTE_STATS) return false;
+
+  return true;
+}
+
+Status ClientRequestState::ExecDdlRequest() {
+  string op_type = catalog_op_type() == TCatalogOpType::DDL ?
+      PrintThriftEnum(ddl_type()) : PrintThriftEnum(catalog_op_type());
+  bool async_ddl = ShouldRunExecDdlAsync();
+  bool async_ddl_enabled = exec_request_->query_options.enable_async_ddl_execution;
+  string exec_mode = (async_ddl && async_ddl_enabled) ? "asynchronous" : "synchronous";
+
+  summary_profile_->AddInfoString("DDL Type", op_type);
+  summary_profile_->AddInfoString("DDL execution mode", exec_mode);
+  VLOG_QUERY << "DDL exec mode=" << exec_mode;
+
+  if (!async_ddl) return ExecDdlRequestImplSync();
+
+  if (async_ddl_enabled) {
+    // Transition the exec state out of INITIALIZED to PENDING to make available the
+    // runtime profile for the DDL. Later on in ExecDdlRequestImpl(), the state
+    // further transitions to RUNNING.
+    UpdateNonErrorExecState(ExecState::PENDING);
+    return Thread::Create("impala-server", "async_exec_thread_",
+        &ClientRequestState::ExecDdlRequestImpl, this, true /*exec in a worker thread*/,
+        &async_exec_thread_);
+  } else {
+    ExecDdlRequestImpl(false /*exec in the same thread as the caller*/);
+    return query_status_;
+  }
 }
 
 Status ClientRequestState::ExecShutdownRequest() {
@@ -1014,7 +1084,7 @@ Status ClientRequestState::RestartFetch() {
 void ClientRequestState::UpdateNonErrorExecState(ExecState new_state) {
   lock_guard<mutex> l(lock_);
   ExecState old_state = exec_state();
-  static string error_msg = "Illegal state transition: $0 -> $1, query_id=$3";
+  static string error_msg = "Illegal state transition: $0 -> $1, query_id=$2";
   switch (new_state) {
     case ExecState::PENDING:
       DCHECK(old_state == ExecState::INITIALIZED)

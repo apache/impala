@@ -1,0 +1,16 @@
+====
+---- QUERY
+# Clone a table and then recover partitions for it with a delay of 15s
+# for the asynchronous execution of the DDL. Expect the client to issue
+# multiple GetOperationStatus() call during the delay and to receive the
+# successful completaion status at the end.
+drop table if exists alltypes_clone;
+create external table alltypes_clone like functional_parquet.alltypes
+location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet';
+set debug_action="CRS_DELAY_BEFORE_CATALOG_OP_EXEC:SLEEP@15000";
+alter table alltypes_clone recover partitions;
+---- RESULTS
+'Partitions have been recovered.'
+---- TYPES
+STRING
+====
