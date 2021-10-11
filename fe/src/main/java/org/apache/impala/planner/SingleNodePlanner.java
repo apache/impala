@@ -914,8 +914,11 @@ public class SingleNodePlanner {
     // maintain a deterministic order of traversing the TableRefs during join
     // plan generation (helps with tests)
     List<Pair<TableRef, PlanNode>> parentRefPlans = new ArrayList<>();
+    List<CollectionTableRef> unnestCollectionRefs =
+        extractZippingUnnestTableRefs(parentRefs);
+    reduceUnnestCollectionRefs(parentRefs, unnestCollectionRefs);
     for (TableRef ref: parentRefs) {
-      PlanNode root = createTableRefNode(ref, aggInfo, analyzer);
+      PlanNode root = createTableRefNode(ref, aggInfo, analyzer, unnestCollectionRefs);
       Preconditions.checkNotNull(root);
       root = createSubplan(root, subplanRefs, true, analyzer);
       parentRefPlans.add(new Pair<TableRef, PlanNode>(ref, root));
@@ -1022,6 +1025,39 @@ public class SingleNodePlanner {
       }
     }
     return result;
+  }
+
+  /**
+   * This functions gathers and returns all the CollectionTableRefs that are for zipping
+   * unnest.
+   */
+  private List<CollectionTableRef> extractZippingUnnestTableRefs(
+      List<TableRef> refs) {
+    Preconditions.checkNotNull(refs);
+    List<CollectionTableRef> collectionRefs = Lists.newArrayList();
+    for (TableRef ref : refs) {
+      if (ref instanceof CollectionTableRef && ref.isZippingUnnest()) {
+        collectionRefs.add((CollectionTableRef)ref);
+      }
+    }
+    return collectionRefs;
+  }
+
+  /**
+   * This functions removes the items in 'unnestCollectionRefs' from 'refs' except the
+   * first item in 'unnestCollectionRefs'. This is used when the collectionTableRefs are
+   * handled by a single UNNEST node for zipping unnest. A single CollectionTableRef item
+   * has to remain in 'refs' so that the subplan creation can see that an UNNEST node has
+   * to be created.
+   */
+  private void reduceUnnestCollectionRefs(List<TableRef> refs,
+      List<CollectionTableRef> unnestCollectionRefs) {
+    Preconditions.checkNotNull(refs);
+    Preconditions.checkNotNull(unnestCollectionRefs);
+    if (unnestCollectionRefs.size() <= 1) return;
+    List<CollectionTableRef> reducedCollectionRefs =
+        unnestCollectionRefs.subList(1, unnestCollectionRefs.size());
+    refs.removeAll(reducedCollectionRefs);
   }
 
   /**
@@ -2132,19 +2168,29 @@ public class SingleNodePlanner {
    * The given 'aggInfo' is used for detecting and applying optimizations that span both
    * the scan and aggregation. Only applicable to HDFS and Kudu table refs.
    *
+   * 'collectionRefs' holds all the CollectionTableRefs that serve the purpose of zipping
+   * unnest arrays. Unlike the regular CollectionTableRefs, these will be handled by a
+   * single UnnestNode.
+   *
    * Throws if a PlanNode.init() failed or if planning of the given
    * table ref is not implemented.
    */
   private PlanNode createTableRefNode(TableRef tblRef, MultiAggregateInfo aggInfo,
-      Analyzer analyzer) throws ImpalaException {
+      Analyzer analyzer, List<CollectionTableRef> collectionRefsToZip)
+      throws ImpalaException {
     PlanNode result = null;
     if (tblRef instanceof BaseTableRef) {
       result = createScanNode(tblRef, aggInfo, analyzer);
     } else if (tblRef instanceof CollectionTableRef) {
       if (tblRef.isRelative()) {
         Preconditions.checkState(ctx_.hasSubplan());
-        result = new UnnestNode(ctx_.getNextNodeId(), ctx_.getSubplan(),
-            (CollectionTableRef) tblRef);
+        if (collectionRefsToZip != null && collectionRefsToZip.size() > 0) {
+          result = new UnnestNode(ctx_.getNextNodeId(), ctx_.getSubplan(),
+              collectionRefsToZip);
+        } else {
+          result = new UnnestNode(ctx_.getNextNodeId(), ctx_.getSubplan(),
+              (CollectionTableRef) tblRef);
+        }
         result.init(analyzer);
       } else {
         result = createScanNode(tblRef, null, analyzer);

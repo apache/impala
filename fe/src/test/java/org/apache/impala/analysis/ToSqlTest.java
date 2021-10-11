@@ -1558,6 +1558,44 @@ public class ToSqlTest extends FrontendTestBase {
         "(date_sub(timestamp_col, interval 40 hours)) from functional.alltypes",
         "SELECT DATE_SUB(timestamp_col, INTERVAL 40 hours), " +
         "(DATE_SUB(timestamp_col, INTERVAL 40 hours)) FROM functional.alltypes");
+
+    // UNNEST() operator in SELECT statement.
+    testToSql(
+        "select unnest(arr1), unnest(arr2) from functional_parquet.complextypes_arrays",
+        "SELECT UNNEST(arr1), UNNEST(arr2) FROM functional_parquet.complextypes_arrays");
+    // UNNEST() operator in SELECT statement with aliases.
+    testToSql(
+        "select unnest(arr1) a1, unnest(arr2) a2 from " +
+            "functional_parquet.complextypes_arrays",
+        "SELECT UNNEST(arr1) a1, UNNEST(arr2) a2 FROM " +
+            "functional_parquet.complextypes_arrays");
+    testToSql(
+        "select unnest(arr1) as a1, unnest(arr2) as a2 from " +
+            "functional_parquet.complextypes_arrays",
+        "SELECT UNNEST(arr1) a1, UNNEST(arr2) a2 FROM " +
+            "functional_parquet.complextypes_arrays");
+    testToSql(
+        "select unnest(t.arr1) as a1, unnest(t.arr2) as a2 from " +
+            "functional_parquet.complextypes_arrays t",
+        "SELECT UNNEST(t.arr1) a1, UNNEST(t.arr2) a2 FROM " +
+            "functional_parquet.complextypes_arrays t");
+
+    // UNNEST() operator in FROM clause.
+    testToSql(
+        "select arr1.item, arr2.item from functional_parquet.complextypes_arrays t, " +
+            "unnest(t.arr1, t.arr2)",
+        "SELECT arr1.item, arr2.item FROM functional_parquet.complextypes_arrays t, " +
+            "UNNEST(t.arr1, t.arr2)");
+    testToSql(
+        "select arr1.item, arr2.item from functional_parquet.complextypes_arrays t, " +
+            "unnest(t.arr1, t.arr2), functional_parquet.alltypes",
+        "SELECT arr1.item, arr2.item FROM functional_parquet.complextypes_arrays t, " +
+            "UNNEST(t.arr1, t.arr2), functional_parquet.alltypes");
+    testToSql(
+        "select arr1.item, arr2.item from functional_parquet.complextypes_arrays t, " +
+            "functional_parquet.alltypes, unnest(t.arr1, t.arr2)",
+        "SELECT arr1.item, arr2.item FROM functional_parquet.complextypes_arrays t, " +
+            "functional_parquet.alltypes, UNNEST(t.arr1, t.arr2)");
   }
 
   /**

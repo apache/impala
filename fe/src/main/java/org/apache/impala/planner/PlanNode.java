@@ -27,6 +27,7 @@ import java.util.Set;
 
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.BinaryPredicate;
+import org.apache.impala.analysis.CollectionTableRef;
 import org.apache.impala.analysis.Expr;
 import org.apache.impala.analysis.ExprId;
 import org.apache.impala.analysis.ExprSubstitutionMap;
@@ -155,6 +156,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this(id, displayName);
     tupleIds_.addAll(tupleIds);
     tblRefIds_.addAll(tupleIds);
+  }
+
+  protected PlanNode(PlanNodeId id, String displayName,
+      List<CollectionTableRef> tblRefs) {
+    this(id, displayName);
+    for (CollectionTableRef collRef : tblRefs) {
+      tupleIds_.add(collRef.getDesc().getId());
+      tblRefIds_.add(collRef.getDesc().getId());
+    }
   }
 
   /**

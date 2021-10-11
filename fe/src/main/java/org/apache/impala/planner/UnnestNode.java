@@ -17,6 +17,8 @@
 
 package org.apache.impala.planner;
 
+import java.util.List;
+
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.CollectionTableRef;
 import org.apache.impala.analysis.Expr;
@@ -27,34 +29,48 @@ import org.apache.impala.thrift.TPlanNodeType;
 import org.apache.impala.thrift.TQueryOptions;
 import org.apache.impala.thrift.TUnnestNode;
 import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
 import com.google.common.base.Preconditions;
 
 /**
- * An UnnestNode scans over a collection materialized in memory, and returns
- * one row per item in the collection.
+ * An UnnestNode scans over collections materialized in memory, and returns
+ * one row per item in the collection if a single collection is provided or it returns as
+ * many rows as the length of the longest collection this node handles. For the shorter
+ * collections the missing items are filled with nulls.
  * An UnnestNode can only appear in the plan tree of a SubplanNode.
  */
 public class UnnestNode extends PlanNode {
   private final SubplanNode containingSubplanNode_;
-  private final CollectionTableRef tblRef_;
-  private final Expr collectionExpr_;
+  private final List<CollectionTableRef> tblRefs_;
+  private final List<Expr> collectionExprs_;
 
   public UnnestNode(PlanNodeId id, SubplanNode containingSubplanNode,
       CollectionTableRef tblRef) {
-    super(id, tblRef.getDesc().getId().asList(), "UNNEST");
+    this(id, containingSubplanNode, Lists.newArrayList(tblRef));
+  }
+
+  public UnnestNode(PlanNodeId id, SubplanNode containingSubplanNode,
+      List<CollectionTableRef> tblRefs) {
+    super(id, "UNNEST", tblRefs);
     containingSubplanNode_ = containingSubplanNode;
-    tblRef_ = tblRef;
-    collectionExpr_ = tblRef_.getCollectionExpr();
-    // Assume the collection expr has been fully resolved in analysis.
-    Preconditions.checkState(
-        collectionExpr_.isBoundByTupleIds(containingSubplanNode.getChild(0).tupleIds_));
+    tblRefs_ = tblRefs;
+    collectionExprs_ = getCollectionExprs(tblRefs_);
+    // Assume the collection exprs have been fully resolved in analysis.
+    for (Expr collectionExpr : collectionExprs_) {
+      Preconditions.checkState(
+          collectionExpr.isBoundByTupleIds(containingSubplanNode.getChild(0).tupleIds_));
+    }
+  }
+
+  private List<Expr> getCollectionExprs(List<CollectionTableRef> collectionRefs) {
+    Preconditions.checkState(collectionRefs.size() > 0);
+    List<Expr> result = Lists.newArrayList();
+    for (CollectionTableRef ref : collectionRefs) result.add(ref.getCollectionExpr());
+    return result;
   }
 
   @Override
   public void init(Analyzer analyzer) throws ImpalaException {
-    // Do not assign binding predicates or predicates for enforcing slot equivalences
-    // because they must have been assigned in the scan node materializing the
-    // collection-typed slot.
     super.init(analyzer);
     conjuncts_ = orderConjunctsByCost(conjuncts_);
 
@@ -102,14 +118,25 @@ public class UnnestNode extends PlanNode {
   @Override
   protected String getDisplayLabelDetail() {
     StringBuilder strBuilder = new StringBuilder();
-    strBuilder.append(Joiner.on(".").join(tblRef_.getPath()));
-    if (tblRef_.hasExplicitAlias()) strBuilder.append(" " + tblRef_.getExplicitAlias());
+    boolean first = true;
+    for (CollectionTableRef tblRef : tblRefs_) {
+      if (!first) strBuilder.append(", ");
+      strBuilder.append(Joiner.on(".").join(tblRef.getPath()));
+      if (tblRef.hasExplicitAlias()) {
+        strBuilder.append(" " + tblRef.getExplicitAlias());
+      }
+      first = false;
+    }
     return strBuilder.toString();
   }
 
   @Override
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.UNNEST_NODE;
-    msg.setUnnest_node(new TUnnestNode(collectionExpr_.treeToThrift()));
+    TUnnestNode unnestNode = new TUnnestNode();
+    for (Expr expr : collectionExprs_) {
+      unnestNode.addToCollection_exprs(expr.treeToThrift());
+    }
+    msg.setUnnest_node(unnestNode);
   }
 }

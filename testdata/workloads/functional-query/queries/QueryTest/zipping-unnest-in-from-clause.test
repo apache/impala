@@ -1,0 +1,411 @@
+====
+---- QUERY
+# Zipping unnest for a single array works the same way as the traditional unnest.
+select id, int_array.item from complextypestbl t, unnest(t.int_array);
+---- RESULTS
+1,1
+1,2
+1,3
+2,NULL
+2,1
+2,2
+2,NULL
+2,3
+2,NULL
+8,-1
+---- TYPES
+BIGINT,INT
+====
+---- QUERY
+# Zipping unnest multiple arrays performs zipping instead of joining the array or in
+# other words it puts the values of each array next to each other.
+select id, a1.item, a2.item
+from complextypestbl t, unnest(t.int_array, t.int_array) as (a1, a2);
+---- RESULTS
+1,1,1
+1,2,2
+1,3,3
+2,NULL,NULL
+2,1,1
+2,2,2
+2,NULL,NULL
+2,3,3
+2,NULL,NULL
+8,-1,-1
+---- TYPES
+BIGINT,INT,INT
+====
+---- QUERY
+# Unnest 2 arrays of the same length.
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where id = 1;
+---- RESULTS
+1,'one'
+2,'two'
+3,'three'
+4,'four'
+5,'five'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest 2 arrays with the same length and they have some null item(s).
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where id = 2;
+---- RESULTS
+1,'one'
+NULL,'two'
+3,'three'
+4,'NULL'
+5,'five'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest 2 arrays where the second one has less items.
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where id = 3;
+---- RESULTS
+10,'ten'
+9,'NULL'
+8,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest 2 arrays where the first one has less items.
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where id = 4;
+---- RESULTS
+10,'ten'
+NULL,'nine'
+NULL,'eight'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest 2 arrays with different length and the first one has some null item(s).
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where id = 5;
+---- RESULTS
+10,'ten'
+NULL,'eleven'
+12,'twelve'
+NULL,'thirteen'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest 2 arrays where the first one is empty.
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where id = 6;
+---- RESULTS
+NULL,'str1'
+NULL,'str2'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest 2 arrays where the second one is empty.
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where id = 7;
+---- RESULTS
+1,'NULL'
+2,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest a single array that is empty.
+select arr1.item
+from complextypes_arrays t, unnest(t.arr1)
+where id = 6;
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Unnest 2 empty arrays.
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where id = 8;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest 2 arrays where the first one is NULL.
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where id = 9;
+---- RESULTS
+NULL,'str1'
+NULL,'str2'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest 2 arrays where the second one is NULL.
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where id = 10;
+---- RESULTS
+1,'NULL'
+2,'NULL'
+3,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest a single array that is NULL.
+select arr2.item
+from complextypes_arrays t, unnest(t.arr2)
+where id = 10;
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+# Unnest 2 NULL arrays.
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where id = 11;
+---- RESULTS
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# A non-collection field is given to UNNEST()
+select arr1.item
+from complextypes_arrays t, unnest(t.arr1, t.id);
+---- CATCH
+AnalysisException: Illegal table reference to non-collection type: 't.id'
+====
+---- QUERY
+# Multiple UNNEST() in FROM clause is not allowed.
+select arr1.item
+from complextypes_arrays t, unnest(t.arr1), unnest(t.arr2);
+---- CATCH
+Providing multiple UNNEST() in the FROM clause is not supported.
+====
+---- QUERY
+# Zipping unnest with joining unnest together is not allowed.
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1), t.arr2;
+---- CATCH
+Providing zipping and joining unnests together is not supported.
+====
+---- QUERY
+# Zipping unnest with joining unnest together is not allowed.
+select id, arr1.item
+from complextypes_arrays t, t.arr1, unnest(t.arr2);
+---- CATCH
+Providing zipping and joining unnests together is not supported.
+====
+---- QUERY
+# Arrays in the zipping unnest are from different tables.
+select arr1.item, int_array.item
+from complextypes_arrays t1,
+     complextypestbl t2,
+     unnest(t1.arr1, t2.int_array);
+---- CATCH
+AnalysisException: Not supported to do zipping unnest on arrays from different tables.
+====
+---- QUERY
+# Zipping unnest with absolute paths doesn't wotk atm. See IMPALA-10977
+select arr1.item, arr2.item
+from unnest(functional_parquet.complextypes_arrays.arr1,
+            functional_parquet.complextypes_arrays.arr2);
+---- CATCH
+IllegalStateException
+====
+---- QUERY
+# Zipping unnest for a single array with absolute path works well as it's in fact not an
+# unnest but a single scan.
+select arr1.item
+from unnest(functional_parquet.complextypes_arrays.arr1)
+where arr1.item < 2;
+---- RESULTS
+1
+1
+1
+1
+---- TYPES
+INT
+====
+---- QUERY
+# Zipping unnest for a single array should also work well even if it goes through an
+# UNNEST node.
+select arr1.item
+from functional_parquet.complextypes_arrays t, unnest(t.arr1)
+where arr1.item < 2;
+---- RESULTS
+1
+1
+1
+1
+---- TYPES
+INT
+====
+---- QUERY
+# Do an unnest on an array that is not in the select list, e.g. won't be any top level
+# tuples for it.
+select id from complextypes_arrays t, unnest(t.arr1);
+---- RESULTS
+1
+1
+1
+1
+1
+2
+2
+2
+2
+2
+3
+3
+3
+4
+5
+5
+5
+7
+7
+10
+10
+10
+---- TYPES
+INT
+====
+---- QUERY
+# Similar as above but there is a where clause on a non-array field.
+select id from complextypes_arrays t, unnest(t.arr1) where id = 7;
+---- RESULTS
+7
+7
+---- TYPES
+INT
+====
+---- QUERY
+# Similar as above but now there are more than one arrays being zipping unnested.
+select id from complextypes_arrays t, unnest(t.arr1, t.arr2) where id = 7;
+---- RESULTS
+7
+7
+---- TYPES
+INT
+====
+---- QUERY
+# WHERE filter on an unnested array in the same SELECT statement is not allowed.
+select arr1.item, arr2.item
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where arr1.item < 3;
+---- CATCH
+AnalysisException: Not allowed to add a filter on an unnested array under the same select statement: arr1.item
+====
+---- QUERY
+# Similar as above but the array.item is not present in the select list.
+select id
+from complextypes_arrays t, unnest(t.arr1, t.arr2)
+where arr1.item = 2;
+---- CATCH
+AnalysisException: Not allowed to add a filter on an unnested array under the same select statement: arr1.item
+====
+---- QUERY
+# Only arrays are allowed in a FROM clause unnest.
+select m.key, m.value from complextypestbl t, unnest(t.int_map) as (m);
+---- CATCH
+AnalysisException: Unnest operator is only supported for arrays. t.int_map
+====
+---- QUERY
+# There number of aliases is bigger than the number of arrays in an unnest.
+select a.item from functional_parquet.arr_tbl t, UNNEST(t.arr1) AS (a,b);
+---- CATCH
+The number of arrays doesn't match with the number of aliases
+====
+---- QUERY
+# There number of arrays in an unnest is bigger than the number of aliases.
+select a.item from functional_parquet.arr_tbl t, UNNEST(t.arr1, t.arr2) AS (a);
+---- CATCH
+The number of arrays doesn't match with the number of aliases
+====
+---- QUERY
+# WHERE filter on an unnested array is allowed if it's provided in an outer SELECT
+# statement. The filter predicate is not being pushed down to the scanner in this case.
+select id, a1, a2
+from (select id, arr1.item as a1, arr2.item as a2
+      from complextypes_arrays t, unnest(t.arr1, t.arr2))
+      as X
+where a1 < 3;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+2,1,'one'
+7,1,'NULL'
+7,2,'NULL'
+10,1,'NULL'
+10,2,'NULL'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Similar as above but here there is only one array being unnested. Here the filter
+# predicate is being pushed down to the scanner.
+select id, a1
+from (select id, arr1.item as a1
+      from complextypes_arrays t, unnest(t.arr1))
+      as X
+where a1 < 3;
+---- RESULTS
+1,1
+1,2
+2,1
+7,1
+7,2
+10,1
+10,2
+---- TYPES
+INT,INT
+---- RUNTIME_PROFILE
+predicates on arr1: arr1.item < CAST(3 AS INT)
+====
+---- QUERY
+# After doing a zipping unnest on two arrays, do a regular join to another table. The
+# first array has 2 items while the second array is empty.
+select t1.id, t2.id, arr1.item, arr2.item
+from complextypes_arrays t1, unnest(t1.arr1, t1.arr2), alltypestiny t2
+where t1.id = 7 and t2.id < 3;
+---- RESULTS
+7,0,1,'NULL'
+7,0,2,'NULL'
+7,1,1,'NULL'
+7,1,2,'NULL'
+7,2,1,'NULL'
+7,2,2,'NULL'
+---- TYPES
+INT,INT,INT,STRING
+====
+---- QUERY
+# Similar as above but here the first array has 3 items while the second array has one.
+select t1.id, t2.id, arr1.item, arr2.item
+from complextypes_arrays t1, unnest(t1.arr1, t1.arr2), alltypestiny t2
+where t1.id = 3 and t2.id < 3;
+---- RESULTS
+3,0,10,'ten'
+3,0,9,'NULL'
+3,0,8,'NULL'
+3,1,10,'ten'
+3,1,9,'NULL'
+3,1,8,'NULL'
+3,2,10,'ten'
+3,2,9,'NULL'
+3,2,8,'NULL'
+---- TYPES
+INT,INT,INT,STRING

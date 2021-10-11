@@ -1,0 +1,57 @@
+====
+---- QUERY
+create view view_unnested_arrays as
+    select id, unnest(arr1) as arr1_unnested, unnest(arr2) as arr2_unnested
+    from functional_orc_def.complextypes_arrays;
+---- RESULTS
+'View has been created.'
+====
+---- QUERY
+# Query unnested array items from a view that does the unnesting itself.
+select id, arr1_unnested, arr2_unnested from view_unnested_arrays;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+1,3,'three'
+1,4,'four'
+1,5,'five'
+2,1,'one'
+2,NULL,'two'
+2,3,'three'
+2,4,'NULL'
+2,5,'five'
+3,10,'ten'
+3,9,'NULL'
+3,8,'NULL'
+4,10,'ten'
+4,NULL,'nine'
+4,NULL,'eight'
+5,10,'ten'
+5,NULL,'eleven'
+5,12,'twelve'
+5,NULL,'thirteen'
+6,NULL,'str1'
+6,NULL,'str2'
+7,1,'NULL'
+7,2,'NULL'
+9,NULL,'str1'
+9,NULL,'str2'
+10,1,'NULL'
+10,2,'NULL'
+10,3,'NULL'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Same as above but there is a filter in the outer select.
+select id, arr1_unnested, arr2_unnested from view_unnested_arrays
+where arr1_unnested > 5;
+---- RESULTS
+3,10,'ten'
+3,9,'NULL'
+3,8,'NULL'
+4,10,'ten'
+5,10,'ten'
+5,12,'twelve'
+---- TYPES
+INT,INT,STRING

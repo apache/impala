@@ -1,0 +1,187 @@
+====
+---- QUERY
+# Table ref given with an alias and the unnested arrays' path contains this alias.
+select unnest(t.arr1), unnest(t.arr2) from complextypes_arrays t where id = 5;
+---- RESULTS
+10,'ten'
+NULL,'eleven'
+12,'twelve'
+NULL,'thirteen'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Similar to the above but one array is given multiple times.
+select unnest(t.arr1), unnest(t.arr2), unnest(t.arr1)
+from complextypes_arrays t
+where id = 5;
+---- RESULTS
+10,'ten',10
+NULL,'eleven',NULL
+12,'twelve',12
+NULL,'thirteen',NULL
+---- TYPES
+INT,STRING,INT
+====
+---- QUERY
+# No alias is given for the table ref but the unnested arrays' path contains a table
+# alias.
+select unnest(t.arr1) from complextypes_arrays;
+---- CATCH
+AnalysisException: Could not resolve column/field reference: 't.arr1'
+====
+---- QUERY
+# Giving arr.item to an unnest is not allowed if the item of that array is not an array
+# itself.
+select unnest(arr1.item) from complextypes_arrays;
+---- CATCH
+AnalysisException: Illegal column/field reference 'arr1.item' with intermediate collection 'arr1' of type 'ARRAY<INT>'
+====
+---- QUERY
+# No alias is given for the table ref and the unnested arrays' path doesn't contain a
+# table alias.
+select unnest(arr1) from complextypes_arrays where id = 5;
+---- RESULTS
+10
+NULL
+12
+---- TYPES
+INT
+====
+---- QUERY
+# The unnested array is given with an absolute path.
+select unnest(complextypes_arrays.arr1) from complextypes_arrays where id = 5;
+---- RESULTS
+10
+NULL
+12
+---- TYPES
+INT
+====
+---- QUERY
+# Multiple arrays are queried, with different path.
+select unnest(complextypes_arrays.arr1), unnest(arr2)
+from complextypes_arrays
+where id = 3;
+---- RESULTS
+10,'ten'
+9,'NULL'
+8,'NULL'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+# Unnest a single array that is empty.
+select unnest(arr1)
+from complextypes_arrays
+where id = 6;
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Use aliases for the unnests and use these aliases in an outer select.
+select id, a1, a2
+from (
+    select id, unnest(arr1) a1, unnest(arr2) a2
+    from complextypes_arrays
+    where id = 3 or id = 4) x;
+---- RESULTS
+3,10,'ten'
+3,9,'NULL'
+3,8,'NULL'
+4,10,'ten'
+4,NULL,'nine'
+4,NULL,'eight'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Similar as above but here is a WHERE filter on the outer select filtering by the
+# aliases.
+select id, a1, a2
+from (
+    select id, unnest(arr1) a1, unnest(arr2) a2
+    from complextypes_arrays
+    where id = 3 or id = 4) x
+where a1 > 8 and a2 = 'ten';
+---- RESULTS
+3,10,'ten'
+4,10,'ten'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# WHERE filter on an unnested array is allowed if it's provided in an outer SELECT
+# statement. The filter predicate is not being pushed down to the scanner in this case.
+select id, a1, a2
+from (select id, unnest(arr1) as a1, unnest(arr2) as a2
+      from complextypes_arrays) x
+where a1 < 3;
+---- RESULTS
+1,1,'one'
+1,2,'two'
+2,1,'one'
+7,1,'NULL'
+7,2,'NULL'
+10,1,'NULL'
+10,2,'NULL'
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+# Primitive type is given for the unnest operator.
+select unnest(complextypes_arrays.id) from complextypes_arrays;
+---- CATCH
+AnalysisException: Unnest operator is only supported for arrays. complextypes_arrays.id
+====
+---- QUERY
+# Struct type is given for the unnest operator.
+select unnest(t.alltypes) from complextypes_structs t;
+---- CATCH
+AnalysisException: Unnest operator is only supported for arrays. t.alltypes
+====
+---- QUERY
+# Map type is given for the unnest operator.
+select unnest(int_map) from complextypestbl;
+---- CATCH
+AnalysisException: Unnest operator is only supported for arrays. int_map
+====
+---- QUERY
+# Zipping and joining unnests are given together
+select unnest(arr1) from complextypes_arrays t, t.arr2;
+---- CATCH
+AnalysisException: Providing zipping and joining unnests together is not supported.
+====
+---- QUERY
+# Zipping and joining unnests are given together where a single table ref is in the FROM
+# clause with absolute path.
+select unnest(a) from complextypestbl.int_array_array;
+---- CATCH
+AnalysisException: Providing zipping and joining unnests together is not supported.
+====
+---- QUERY
+# Zipping unnest given in both select list and from clause.
+select unnest(arr1) from complextypes_arrays t, unnest(t.arr1);
+---- CATCH
+AnalysisException: Providing zipping unnest both in the SELECT list and in the FROM clause is not supported.
+====
+---- QUERY
+# Zipping unnest given in both select list and from clause.
+select unnest(arr1) from complextypes_arrays t, unnest(t.arr2);
+---- CATCH
+AnalysisException: Providing zipping unnest both in the SELECT list and in the FROM clause is not supported.
+====
+---- QUERY
+# Do an unnest on the outer layer of a nested array.
+# IMPALA-9498 Might fix this as it will allow to query arrays in the select list.
+select unnest(int_array_array) from complextypestbl;
+---- CATCH
+AnalysisException: Expr 'UNNEST(int_array_array)' in select list returns a collection type 'ARRAY<INT>'.
+====
+---- QUERY
+# Do an unnest on the inner layer of a nested array. This will give an error because the
+# inner array can't be referenced directly without having the outer array as a table ref.
+select unnest(int_array_array.item) from complextypestbl;
+---- CATCH
+AnalysisException: Illegal column/field reference 'int_array_array.item' with intermediate collection 'int_array_array' of type 'ARRAY<ARRAY<INT>>'

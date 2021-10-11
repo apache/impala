@@ -654,9 +654,9 @@ struct TExchangeNode {
 }
 
 struct TUnnestNode {
-  // Expr that returns the in-memory collection to be scanned.
-  // Currently always a SlotRef into an array-typed slot.
-  1: required Exprs.TExpr collection_expr
+  // Exprs that return the in-memory collections to be scanned.
+  // Currently always SlotRefs into array-typed slots.
+  1: required list<Exprs.TExpr> collection_exprs
 }
 
 struct TCardinalityCheckNode {

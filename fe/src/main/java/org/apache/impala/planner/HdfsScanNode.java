@@ -931,6 +931,16 @@ public class HdfsScanNode extends ScanNode {
       Preconditions.checkNotNull(slotDesc.getItemTupleDesc());
       TupleDescriptor itemTupleDesc = slotDesc.getItemTupleDesc();
       TupleId itemTid = itemTupleDesc.getId();
+
+      // If the slot is part of a collection that is given as a zipping unnest in the
+      // FROM clause then avoid pushing down conjunct for this slot to the scanner as it
+      // would result incorrect results on that slot after performing the unnest.
+      // One exception is when there is only one such table reference in the FROM clause.
+      Set<TupleId> zippingUnnestTupleIds = analyzer.getZippingUnnestTupleIds();
+      if (zippingUnnestTupleIds.size() > 1 && zippingUnnestTupleIds.contains(itemTid)) {
+        continue;
+      }
+
       // First collect unassigned and binding predicates. Then remove redundant
       // predicates based on slot equivalences and enforce slot equivalences by
       // generating new predicates.

@@ -738,6 +738,31 @@ public class AuthorizationStmtTest extends AuthorizationTestBase {
               "alltypessmall", ALLTYPES_COLUMNS, TPrivilegeLevel.SELECT));
     }
 
+    // Unnest an array.
+    authorize("select unnest(int_array_col) from functional.allcomplextypes")
+        .ok(onServer(TPrivilegeLevel.ALL))
+        .ok(onServer(TPrivilegeLevel.OWNER))
+        .ok(onServer(TPrivilegeLevel.SELECT))
+        .ok(onDatabase("functional", TPrivilegeLevel.ALL))
+        .ok(onDatabase("functional", TPrivilegeLevel.OWNER))
+        .ok(onDatabase("functional", TPrivilegeLevel.SELECT))
+        .ok(onTable("functional", "allcomplextypes", TPrivilegeLevel.ALL))
+        .ok(onTable("functional", "allcomplextypes", TPrivilegeLevel.OWNER))
+        .ok(onTable("functional", "allcomplextypes", TPrivilegeLevel.SELECT))
+        .ok(onColumn("functional", "allcomplextypes",
+            new String[]{"id", "int_array_col"}, TPrivilegeLevel.SELECT))
+        .error(selectError("functional.allcomplextypes"))
+        .error(selectError("functional.allcomplextypes"), onServer(
+            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
+            TPrivilegeLevel.SELECT)))
+        .error(selectError("functional.allcomplextypes"), onDatabase("functional",
+            allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
+            TPrivilegeLevel.SELECT)))
+        .error(selectError("functional.allcomplextypes"), onTable("functional",
+            "allcomplextypes", allExcept(TPrivilegeLevel.ALL, TPrivilegeLevel.OWNER,
+            TPrivilegeLevel.SELECT)));
+
+
     // Union on views.
     authorize("select id from functional.alltypes_view union all " +
         "select x from functional.alltypes_view_sub")

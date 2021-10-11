@@ -188,8 +188,12 @@ public class TupleDescriptor {
   public StructType getType() { return type_; }
   public int getByteSize() { return byteSize_; }
   public float getAvgSerializedSize() { return avgSerializedSize_; }
-  public boolean isMaterialized() { return isMaterialized_; }
-  public void setIsMaterialized(boolean value) { isMaterialized_ = value; }
+  public boolean isMaterialized() {
+    return isMaterialized_;
+  }
+  public void setIsMaterialized(boolean value) {
+    isMaterialized_ = value;
+  }
   public boolean hasMemLayout() { return hasMemLayout_; }
   public void setAliases(String[] aliases, boolean hasExplicitAlias) {
     aliases_ = aliases;

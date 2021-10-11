@@ -440,6 +440,29 @@ public class SelectStmt extends QueryStmt {
         throw new AnalysisException(
             "WHERE clause must not contain analytic expressions: " + e.toSql());
       }
+
+      // Don't allow a WHERE conjunct on an array item that is part of a zipping unnest.
+      // In case there is only one zipping unnested array this restriction is not needed
+      // as the UNNEST node has to handle a single array and it's safe to do the filtering
+      // in the scanner.
+      Set<TupleId> zippingUnnestTupleIds = analyzer_.getZippingUnnestTupleIds();
+      if (zippingUnnestTupleIds.size() > 1) {
+        for (Expr expr : whereClause_.getChildren()) {
+          if (expr == null || !(expr instanceof SlotRef)) continue;
+          SlotRef slotRef = (SlotRef)expr;
+          for (TupleId tid : zippingUnnestTupleIds) {
+            TupleDescriptor collTupleDesc = analyzer_.getTupleDesc(tid);
+            // If there is no slot ref for the collection tuple then there is no need to
+            // check.
+            if (collTupleDesc.getSlots().size() == 0) continue;
+            Preconditions.checkState(collTupleDesc.getSlots().size() == 1);
+            if (slotRef.getDesc().equals(collTupleDesc.getSlots().get(0))) {
+              throw new AnalysisException("Not allowed to add a filter on an unnested " +
+                  "array under the same select statement: " + expr.toSql());
+            }
+          }
+        }
+      }
       analyzer_.registerConjuncts(whereClause_, false);
     }
 
@@ -492,6 +515,11 @@ public class SelectStmt extends QueryStmt {
         // Do not generate a predicate if the parent tuple is outer joined.
         if (analyzer_.isOuterJoined(ref.getResolvedPath().getRootDesc().getId()))
           continue;
+        // Don't push down the "is not empty" predicate for zipping unnests if there are
+        // multiple zipping unnests in the FROM clause.
+        if (tblRef.isZippingUnnest() && analyzer_.getZippingUnnestTupleIds().size() > 1) {
+          continue;
+        }
         IsNotEmptyPredicate isNotEmptyPred =
             new IsNotEmptyPredicate(ref.getCollectionExpr().clone());
         isNotEmptyPred.analyze(analyzer_);

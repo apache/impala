@@ -393,6 +393,9 @@ public class AnalysisContext {
     public boolean requiresAcidComplexScanRewrite() {
       return canRewriteStatement() && analyzer_.hasTopLevelAcidCollectionTableRef();
     }
+    public boolean requiresZippingUnnestRewrite() {
+      return canRewriteStatement() && isZippingUnnestInSelectList(stmt_);
+    }
     public boolean requiresExprRewrite() {
       return isQueryStmt() || isInsertStmt() || isCreateTableAsSelectStmt()
           || isUpdateStmt() || isDeleteStmt();
@@ -406,6 +409,19 @@ public class AnalysisContext {
     }
     public void setUserHasProfileAccess(boolean value) { userHasProfileAccess_ = value; }
     public boolean userHasProfileAccess() { return userHasProfileAccess_; }
+
+    private boolean isZippingUnnestInSelectList(StatementBase stmt) {
+      if (!(stmt instanceof SelectStmt)) return false;
+      if (!stmt.analyzer_.getTableRefsFromUnnestExpr().isEmpty()) return true;
+      SelectStmt selectStmt = (SelectStmt)stmt;
+      for (TableRef tblRef : selectStmt.fromClause_.getTableRefs()) {
+        if (tblRef instanceof InlineViewRef &&
+            isZippingUnnestInSelectList(((InlineViewRef)tblRef).getViewStmt())) {
+          return true;
+        }
+      }
+      return false;
+    }
   }
 
   public Analyzer createAnalyzer(StmtTableCache stmtTableCache) {
@@ -531,6 +547,10 @@ public class AnalysisContext {
     }
     if (analysisResult_.requiresAcidComplexScanRewrite()) {
       new StmtRewriter.AcidRewriter().rewrite(analysisResult_);
+      shouldReAnalyze = true;
+    }
+    if (analysisResult_.requiresZippingUnnestRewrite()) {
+      new StmtRewriter.ZippingUnnestRewriter().rewrite(analysisResult_);
       shouldReAnalyze = true;
     }
     if (!shouldReAnalyze) return;

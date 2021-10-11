@@ -504,6 +504,10 @@ public class Analyzer {
     public final Map<String, org.apache.kudu.client.KuduTable> kuduTables =
         new HashMap<>();
 
+    // This holds the tuple id's of the arrays that are given as a zipping unnest table
+    // ref.
+    public Set<TupleId> zippingUnnestTupleIds = new HashSet<>();
+
     public GlobalState(StmtTableCache stmtTableCache, TQueryCtx queryCtx,
         AuthorizationFactory authzFactory, AuthorizationContext authzCtx) {
       this.stmtTableCache = stmtTableCache;
@@ -565,6 +569,11 @@ public class Analyzer {
 
   // Map from tuple id to its corresponding table ref.
   private final Map<TupleId, TableRef> tableRefMap_ = new HashMap<>();
+
+  // This is populated by UnnestExpr during analysis. Each UnnestExpr creates a
+  // CollectionTableRef and adds it to this set. Later on SelectStmt will add these table
+  // refs to the table refs in the FROM clause.
+  private final Set<CollectionTableRef> tableRefsFromUnnestExpr_ = new HashSet<>();
 
   // Set of lowercase ambiguous implicit table aliases.
   private final Set<String> ambiguousAliases_ = new HashSet<>();
@@ -693,6 +702,11 @@ public class Analyzer {
     }
   }
 
+  public boolean isRegisteredTableRef(TableRef ref) {
+    if (ref == null) return false;
+    String uniqueAlias = ref.getUniqueAlias();
+    return aliasMap_.containsKey(uniqueAlias);
+  }
   /**
    * Creates an returns an empty TupleDescriptor for the given table ref and registers
    * it against all its legal aliases. For tables refs with an explicit alias, only the
@@ -948,6 +962,21 @@ public class Analyzer {
     globalState_.semiJoinedTupleIds.put(tid, rhsRef);
   }
 
+  public void addZippingUnnestTupleId(CollectionTableRef tblRef) {
+    Expr collExpr = tblRef.getCollectionExpr();
+    if (!(collExpr instanceof SlotRef)) return;
+    SlotRef slotCollExpr = (SlotRef)collExpr;
+    SlotDescriptor collSlotDesc = slotCollExpr.getDesc();
+    Preconditions.checkNotNull(collSlotDesc);
+    TupleDescriptor collTupleDesc = collSlotDesc.getItemTupleDesc();
+    Preconditions.checkNotNull(collTupleDesc);
+    globalState_.zippingUnnestTupleIds.add(collTupleDesc.getId());
+  }
+
+  public Set<TupleId> getZippingUnnestTupleIds() {
+    return globalState_.zippingUnnestTupleIds;
+  }
+
   /**
    * Returns the descriptor of the given explicit or implicit table alias or null if no
    * such alias has been registered.
@@ -983,8 +1012,16 @@ public class Analyzer {
 
   public int getNumTableRefs() { return tableRefMap_.size(); }
   public TableRef getTableRef(TupleId tid) { return tableRefMap_.get(tid); }
+  public Map<TupleId, TableRef> getTableRefs() { return tableRefMap_; }
   public ExprRewriter getConstantFolder() { return globalState_.constantFolder_; }
   public ExprRewriter getExprRewriter() { return globalState_.exprRewriter_; }
+
+  public Set<CollectionTableRef> getTableRefsFromUnnestExpr() {
+    return tableRefsFromUnnestExpr_;
+  }
+  public void addTableRefFromUnnestExpr(CollectionTableRef ref) {
+    tableRefsFromUnnestExpr_.add(ref);
+  }
 
   /**
    * Given a "table alias"."column alias", return the SlotDescriptor

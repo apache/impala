@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.impala.analysis.TableRef.ZippingUnnestType;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.util.AcidUtils;
 
@@ -50,6 +52,8 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
   public FromClause() { tableRefs_ = new ArrayList<>(); }
   public List<TableRef> getTableRefs() { return tableRefs_; }
 
+  public boolean isAnalyzed() { return analyzed_; }
+
   @Override
   public boolean resolveTableMask(Analyzer analyzer) throws AnalysisException {
     boolean hasChanges = false;
@@ -74,7 +78,9 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (analyzed_) return;
 
+    TableRef firstZippingUnnestRef = null;
     TableRef leftTblRef = null;  // the one to the left of tblRef
+    boolean hasJoiningUnnest = false;
     for (int i = 0; i < tableRefs_.size(); ++i) {
       TableRef tblRef = tableRefs_.get(i);
       tblRef = analyzer.resolveTableRef(tblRef);
@@ -84,9 +90,38 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
       leftTblRef = tblRef;
       if (tblRef instanceof CollectionTableRef) {
         checkTopLevelComplexAcidScan(analyzer, (CollectionTableRef)tblRef);
+        if (firstZippingUnnestRef != null && tblRef.isZippingUnnest() &&
+            firstZippingUnnestRef.getResolvedPath().getRootTable() !=
+            tblRef.getResolvedPath().getRootTable()) {
+          throw new AnalysisException("Not supported to do zipping unnest on " +
+              "arrays from different tables.");
+        }
+        if (!tblRef.isZippingUnnest()) {
+          hasJoiningUnnest = true;
+        } else {
+          if (!isPathForArrayType(tblRef)) {
+            throw new AnalysisException("Unnest operator is only supported for arrays. " +
+                ToSqlUtils.getPathSql(tblRef.getPath()));
+          }
+          if (firstZippingUnnestRef == null) firstZippingUnnestRef = tblRef;
+          analyzer.addZippingUnnestTupleId((CollectionTableRef)tblRef);
+        }
       }
     }
+    if (hasJoiningUnnest && firstZippingUnnestRef != null) {
+      throw new AnalysisException(
+          "Providing zipping and joining unnests together is not supported.");
+    }
     analyzed_ = true;
+  }
+
+  private boolean isPathForArrayType(TableRef tblRef) {
+    Preconditions.checkNotNull(tblRef);
+    Preconditions.checkState(!tblRef.getResolvedPath().getMatchedTypes().isEmpty());
+    Type resolvedType =
+        tblRef.getResolvedPath().getMatchedTypes().get(
+            tblRef.getResolvedPath().getMatchedTypes().size() - 1);
+    return resolvedType.isArrayType();
   }
 
   public void collectFromClauseTableRefs(List<TableRef> tblRefs) {
@@ -158,7 +193,25 @@ public class FromClause extends StmtNode implements Iterable<TableRef> {
     if (!tableRefs_.isEmpty()) {
       builder.append(" FROM ");
       for (int i = 0; i < tableRefs_.size(); ++i) {
-        builder.append(tableRefs_.get(i).toSql(options));
+        TableRef tblRef = tableRefs_.get(i);
+        if (tblRef.getZippingUnnestType() ==
+            ZippingUnnestType.FROM_CLAUSE_ZIPPING_UNNEST) {
+          // Go through all the consecutive table refs for zipping unnest and put them in
+          // the same "UNNEST()".
+          if (i != 0) builder.append(", ");
+          builder.append("UNNEST(");
+          boolean first = true;
+          while(i < tableRefs_.size() && tblRef.getZippingUnnestType() ==
+              ZippingUnnestType.FROM_CLAUSE_ZIPPING_UNNEST) {
+            if (!first) builder.append(", ");
+            if (first) first = false;
+            builder.append(ToSqlUtils.getPathSql(tblRef.getPath()));
+            if (++i < tableRefs_.size()) tblRef = tableRefs_.get(i);
+          }
+          builder.append(")");
+        }
+        if (i >= tableRefs_.size()) break;
+        builder.append(tblRef.toSql(options));
       }
     }
     return builder.toString();

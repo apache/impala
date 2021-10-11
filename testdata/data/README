@@ -657,6 +657,12 @@ https://github.com/apache/parquet-mr/blob/master/parquet-hadoop/src/test/java/or
 The schema was completely changed to allow us to test types supported in Parquet Bloom
 filters.
 
+ComplexTypesTbl/arrays.orc and arrays.parq
+These tables hold 3 columns, an int ID and two arrays, one with int and the second with
+string. The purpose of introducing these tables is to give more test coverage for zipping
+unnests. There are rows where the 2 arrays are of the same lenght, or one of them is
+longer than the other plus there are NULL and empty arrays as well.
+
 binary_decimal_precision_and_scale_widening.parquet
 Parquet file written with schema (decimal(9,2), decimal(18,2), decimal(38,2)). The rows
 inside the file are carefully chosen so that they don't cause an overflow when being read

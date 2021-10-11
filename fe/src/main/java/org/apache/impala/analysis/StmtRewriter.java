@@ -20,6 +20,7 @@ package org.apache.impala.analysis;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.SetOperationStmt.SetOperand;
@@ -1851,6 +1852,23 @@ public class StmtRewriter {
       if (tblName.getDb() != null) rawTblPath.add(tblName.getDb());
       rawTblPath.add(tblName.getTbl());
       return rawTblPath;
+    }
+  }
+
+  /**
+   * The purpose of this rewriter is to add CollectionTableRefs to the FROM clause of
+   * select queries where unnest() is in the select list. One example of such a query:
+   * SELECT unnest(arr1), unnest(arr2) FROM complextypes_arrays;
+   * In the above example there will be two CollectionTableRefs added to the FROM clause,
+   * one for each unnested array.
+   */
+  static class ZippingUnnestRewriter extends StmtRewriter {
+    @Override
+    protected void rewriteSelectStmtHook(SelectStmt stmt, Analyzer analyzer)
+        throws AnalysisException {
+      Set<CollectionTableRef> unnestTableRefs = analyzer.getTableRefsFromUnnestExpr();
+      Preconditions.checkState(stmt.getResultExprs().size() >= unnestTableRefs.size());
+      for (TableRef tblRef : unnestTableRefs) stmt.fromClause_.add(tblRef);
     }
   }
 }

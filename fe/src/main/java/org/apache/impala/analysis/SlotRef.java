@@ -17,6 +17,7 @@
 
 package org.apache.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -40,14 +41,14 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class SlotRef extends Expr {
-  private final List<String> rawPath_;
+  protected List<String> rawPath_;
   private final String label_;  // printed in toSql()
 
   // Results of analysis.
   private SlotDescriptor desc_;
 
   // The resolved path after resolving 'rawPath_'.
-  private Path resolvedPath_ = null;
+  protected Path resolvedPath_ = null;
 
   public SlotRef(List<String> rawPath) {
     super();
@@ -88,10 +89,17 @@ public class SlotRef extends Expr {
   /**
    * C'tor for cloning.
    */
-  private SlotRef(SlotRef other) {
+  protected SlotRef(SlotRef other) {
     super(other);
     resolvedPath_ = other.resolvedPath_;
-    rawPath_ = other.rawPath_;
+    if (other.rawPath_ != null) {
+      // Instead of using the reference of 'other.rawPath_' clone its values into another
+      // list.
+      rawPath_ = new ArrayList<>();
+      rawPath_.addAll(other.rawPath_);
+    } else {
+      rawPath_ = null;
+    }
     label_ = other.label_;
     desc_ = other.desc_;
     type_ = other.type_;

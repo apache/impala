@@ -193,6 +193,36 @@ class TestComputeStatsWithNestedTypes(ImpalaTestSuite):
     """COMPUTE STATS and SHOW COLUMN STATS for tables with structs"""
     self.run_test_case('QueryTest/compute-stats-with-structs', vector)
 
+
+class TestZippingUnnest(ImpalaTestSuite):
+  """Functional tests for zipping unnest functionality."""
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestZippingUnnest, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format in ['parquet', 'orc'])
+
+  def test_zipping_unnest_in_from_clause(self, vector):
+    """Queries where zipping unnest is executed by providing UNNEST() in the from clause.
+    """
+    self.run_test_case('QueryTest/zipping-unnest-in-from-clause', vector)
+
+  def test_zipping_unnest_in_select_list(self, vector):
+    """Queries where zipping unnest is executed by providing UNNEST() in the select list.
+    """
+    self.run_test_case('QueryTest/zipping-unnest-in-select-list', vector)
+
+  def test_zipping_unnest_from_view(self, vector, unique_database):
+    """Zipping unnest queries where views are involved."""
+    if vector.get_value('table_format').file_format == 'orc':
+      pytest.skip('No need to run this test for multiple file formats.')
+    self.run_test_case('QueryTest/zipping-unnest-from-view', vector,
+        use_db=unique_database)
+
 class TestNestedTypesNoMtDop(ImpalaTestSuite):
   """Functional tests for nested types that do not need to be run with mt_dop > 0."""
   @classmethod

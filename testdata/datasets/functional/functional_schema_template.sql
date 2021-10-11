@@ -854,6 +854,22 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/ComplexTypesTbl/structs_nested.or
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+complextypes_arrays
+---- COLUMNS
+id int
+arr1 array<int>
+arr2 array<string>
+---- DEPENDENT_LOAD
+`hadoop fs -mkdir -p /test-warehouse/complextypes_arrays_parquet && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/ComplexTypesTbl/arrays.parq \
+/test-warehouse/complextypes_arrays_parquet/
+---- DEPENDENT_LOAD_ACID
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/ComplexTypesTbl/arrays.orc' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- LOAD
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 complextypestbl_minor_compacted
 ---- COLUMNS
 id bigint

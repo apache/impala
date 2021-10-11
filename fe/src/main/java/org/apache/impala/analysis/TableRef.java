@@ -52,7 +52,7 @@ import com.google.common.collect.Lists;
  * The analysis of table refs follows a two-step process:
  *
  * 1. Resolution: A table ref's path is resolved and then the generic TableRef is
- * replaced by a concrete table ref (a BaseTableRef, CollectionTabeRef or ViewRef)
+ * replaced by a concrete table ref (a BaseTableRef, CollectionTableRef or ViewRef)
  * in the originating stmt and that is given the resolved path. This step is driven by
  * Analyzer.resolveTableRef().
  *
@@ -109,6 +109,15 @@ public class TableRef extends StmtNode {
   // Hinted distribution mode for this table ref; set after analyzeJoinHints()
   // TODO: Move join-specific members out of TableRef.
   private DistributionMode distrMode_ = DistributionMode.NONE;
+
+  public enum ZippingUnnestType {
+    NONE,
+    FROM_CLAUSE_ZIPPING_UNNEST,
+    SELECT_LIST_ZIPPING_UNNEST
+  }
+
+  // Indicates if this TableRef is for the purpose of zipping unnest for arrays.
+  protected ZippingUnnestType zippingUnnestType_ = ZippingUnnestType.NONE;
 
   /////////////////////////////////////////
   // BEGIN: Members that need to be reset()
@@ -247,6 +256,7 @@ public class TableRef extends StmtNode {
     exposeNestedColumnsByTableMaskView_ = other.exposeNestedColumnsByTableMaskView_;
     scalarColumns_ = new LinkedHashMap<>(other.scalarColumns_);
     isHidden_ = other.isHidden_;
+    zippingUnnestType_ = other.zippingUnnestType_;
   }
 
   @Override
@@ -390,6 +400,13 @@ public class TableRef extends StmtNode {
   public List<TupleId> getCorrelatedTupleIds() { return correlatedTupleIds_; }
   public boolean isAnalyzed() { return isAnalyzed_; }
   public boolean isResolved() { return !getClass().equals(TableRef.class); }
+
+  public boolean isZippingUnnest() {
+    return zippingUnnestType_ != ZippingUnnestType.NONE;
+  }
+  public ZippingUnnestType getZippingUnnestType() { return zippingUnnestType_; }
+  public void setZippingUnnestType(ZippingUnnestType t) { zippingUnnestType_ = t; }
+
 
   /**
    * This method should only be called after the TableRef has been analyzed.
@@ -706,6 +723,7 @@ public class TableRef extends StmtNode {
 
   @Override
   public String toSql(ToSqlOptions options) {
+    if (isZippingUnnest()) return "";
     if (joinOp_ == null) {
       // prepend "," if we're part of a sequence of table refs w/o an
       // explicit JOIN clause
