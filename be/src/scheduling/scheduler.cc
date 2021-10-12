@@ -825,11 +825,13 @@ Status Scheduler::Schedule(const ExecutorConfig& executor_config, ScheduleState*
 
 bool Scheduler::IsCoordinatorOnlyQuery(const TQueryExecRequest& exec_request) {
   DCHECK_GT(exec_request.plan_exec_info.size(), 0);
+  int64_t num_parallel_plans = exec_request.plan_exec_info.size();
   const TPlanExecInfo& plan_exec_info = exec_request.plan_exec_info[0];
   int64_t num_fragments = plan_exec_info.fragments.size();
   DCHECK_GT(num_fragments, 0);
   auto type = plan_exec_info.fragments[0].partition.type;
-  return num_fragments == 1 && type == TPartitionType::UNPARTITIONED;
+  return num_parallel_plans == 1 && num_fragments == 1
+      && type == TPartitionType::UNPARTITIONED;
 }
 
 void Scheduler::ComputeBackendExecParams(

@@ -785,7 +785,9 @@ struct TFinalizeParams {
 
 // Result of call to ImpalaPlanService/JniFrontend.CreateQueryRequest()
 struct TQueryExecRequest {
-  // exec info for all plans; the first one materializes the query result
+  // exec info for all plans; the first one materializes the query result, and subsequent
+  // plans materialize the build sides of joins. Each plan appears before its
+  // dependencies in the list.
   1: optional list<TPlanExecInfo> plan_exec_info
 
   // Metadata of the query result set (only for select)

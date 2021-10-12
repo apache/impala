@@ -26,3 +26,126 @@ int
 6
 7
 ====
+---- QUERY
+# IMPALA-10970: Verify that a query plan containing 2 parallel plans
+# with the first one having a single unpartitioned fragment is
+# correctly classified as not being a coordinator only query. This
+# query create a plan with the aforementioned condition and has a
+# join build fragment that will be co-located with the root sink
+# fragment(IMPALMA-4224). This ensures that the query fails to
+# schedule and eventually times out in the queue if incorrectly
+# classified as a coordinator only query.
+# To ensure the inline left table placed at join probe side, we add
+# STRAIGHT_JOIN hint to disable join inversion optimization.
+SELECT STRAIGHT_JOIN t2.int_col
+FROM
+    ( SELECT '20210831' AS ts
+     UNION ALL SELECT '20210901' AS ts
+     UNION ALL SELECT '20210902' AS ts
+     UNION ALL SELECT '20210903' AS ts ) t1
+CROSS JOIN functional.alltypes t2
+LIMIT 100;
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+---- TYPES
+INT
+====
