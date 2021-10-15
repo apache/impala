@@ -167,15 +167,16 @@ class TestIcebergTable(ImpalaTestSuite):
       ts_1 = execute_query_ts("insert into {0} values (1)".format(tbl_name))
       ts_2 = execute_query_ts("insert into {0} values (2)".format(tbl_name))
       ts_3 = execute_query_ts("truncate table {0}".format(tbl_name))
-      time.sleep(1)
+      time.sleep(5)
       ts_4 = execute_query_ts("insert into {0} values (100)".format(tbl_name))
       # Query table as of timestamps.
       expect_results_t("now()", ['100'])
       expect_results_t(quote(ts_1), ['1'])
       expect_results_t(quote(ts_2), ['1', '2'])
       expect_results_t(quote(ts_3), [])
+      expect_results_t(cast_ts(ts_3) + " + interval 1 seconds", [])
       expect_results_t(quote(ts_4), ['100'])
-      expect_results_t(cast_ts(ts_4) + " - interval 1 seconds", [])
+      expect_results_t(cast_ts(ts_4) + " - interval 5 seconds", [])
       # Future queries return the current snapshot.
       expect_results_t(cast_ts(ts_4) + " + interval 1 hours", ['100'])
       # Query table as of snapshot IDs.
