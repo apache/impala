@@ -1,0 +1,57 @@
+====
+---- QUERY
+CREATE EXTERNAL TABLE IF NOT EXISTS iceberg_partitioned_orc_external_old_fileformat
+STORED AS ICEBERG
+TBLPROPERTIES(
+  'iceberg.file_format'='orc',
+  'iceberg.catalog'='hadoop.catalog',
+  'iceberg.catalog_location'='/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc',
+  'iceberg.table_identifier'='functional_parquet.iceberg_partitioned_orc'
+);
+ALTER TABLE iceberg_partitioned_orc_external_old_fileformat
+UNSET TBLPROPERTIES IF EXISTS ('write.format.default');
+DESCRIBE FORMATTED iceberg_partitioned_orc_external_old_fileformat;
+---- RESULTS: VERIFY_IS_SUBSET
+'Location:           ','$NAMENODE/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc/functional_parquet/iceberg_partitioned_orc','NULL'
+'','iceberg.catalog_location','/test-warehouse/iceberg_test/hadoop_catalog/iceberg_partitioned_orc'
+'','iceberg.table_identifier','functional_parquet.iceberg_partitioned_orc'
+'','iceberg.file_format','orc                 '
+'','iceberg.catalog     ','hadoop.catalog      '
+---- RESULTS: VERIFY_IS_NOT_IN
+'','write.format.default','orc                 '
+---- TYPES
+string, string, string
+====
+---- QUERY
+SELECT * FROM iceberg_partitioned_orc_external_old_fileformat;
+---- RESULTS
+7,'Lisa','download'
+16,'Lisa','download'
+13,'Alan','click'
+10,'Alan','click'
+19,'Alex','view'
+1,'Alex','view'
+4,'Alex','view'
+20,'Alex','view'
+14,'Lisa','download'
+5,'Lisa','download'
+15,'Alex','view'
+18,'Alan','click'
+9,'Alan','click'
+17,'Alex','view'
+12,'Alan','click'
+2,'Lisa','download'
+8,'Lisa','download'
+11,'Alex','view'
+6,'Alex','view'
+3,'Alan','click'
+---- TYPES
+INT, STRING, STRING
+====
+---- QUERY
+SELECT count(*) FROM iceberg_partitioned_orc_external_old_fileformat;
+---- RESULTS
+20
+---- TYPES
+BIGINT
+====
