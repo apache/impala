@@ -20,7 +20,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <mutex>
-#include <boost/thread/pthread/timespec.hpp>
+#include <boost/thread/detail/platform_time.hpp>
 
 #include "util/time.h"
 

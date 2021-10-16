@@ -610,7 +610,8 @@ TimestampValue from_subsecond_unix_time_old(const double& unix_time) {
   const time_t unix_time_whole = unix_time;
   boost::posix_time::ptime temp =
       cctz_optimized_unix_time_to_utc_ptime(unix_time_whole);
-  temp += boost::posix_time::nanoseconds((unix_time - unix_time_whole) / ONE_BILLIONTH);
+  int64_t nanos = (unix_time - unix_time_whole) / ONE_BILLIONTH;
+  temp += boost::posix_time::nanoseconds(nanos);
   return TimestampValue(temp);
 }
 

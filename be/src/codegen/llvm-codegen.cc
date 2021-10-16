@@ -23,6 +23,7 @@
 
 #include <mutex>
 #include <boost/algorithm/string.hpp>
+#include <boost/assert/source_location.hpp>
 #include <gutil/strings/substitute.h>
 
 #include <llvm/ADT/Triple.h>
@@ -1838,10 +1839,15 @@ string LlvmCodeGen::DiagnosticHandler::GetErrorString() {
 namespace boost {
 
 /// Handler for exceptions in cross-compiled functions.
-/// When boost is configured with BOOST_NO_EXCEPTIONS, it calls this handler instead of
+/// When boost is configured with BOOST_NO_EXCEPTIONS, it calls these handlers instead of
 /// throwing the exception.
 [[noreturn]] void throw_exception(std::exception const& e) {
   LOG(FATAL) << "Cannot handle exceptions in codegen'd code " << e.what();
 }
 
+[[noreturn]] void throw_exception(
+    std::exception const& e, boost::source_location const& loc) {
+  LOG(FATAL) << loc.file_name() << ":" << loc.line() << "] " << loc.function_name()
+             << ": Cannot handle exceptions in codegen'd code " << e.what();
+}
 }

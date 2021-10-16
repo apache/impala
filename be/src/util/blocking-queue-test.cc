@@ -150,14 +150,14 @@ class MultiThreadTest { // NOLINT: members are not arranged for minimal padding
   void Run() {
     for (int i = 0; i < nthreads_; ++i) {
       threads_.push_back(shared_ptr<thread>(
-          new thread(bind(&MultiThreadTest::InserterThread, this, i))));
+          new thread(boost::bind(&MultiThreadTest::InserterThread, this, i))));
       threads_.push_back(shared_ptr<thread>(
-          new thread(bind(&MultiThreadTest::RemoverThread, this))));
+          new thread(boost::bind(&MultiThreadTest::RemoverThread, this))));
     }
     // We add an extra thread to ensure that there aren't enough elements in
     // the queue to go around.  This way, we test removal after Shutdown.
     threads_.push_back(shared_ptr<thread>(
-            new thread(bind(
+            new thread(boost::bind(
               &MultiThreadTest::RemoverThread, this))));
     for (int i = 0; i < threads_.size(); ++i) {
       threads_[i]->join();

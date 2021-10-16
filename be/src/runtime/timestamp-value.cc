@@ -35,10 +35,6 @@ using boost::posix_time::ptime_from_tm;
 using boost::posix_time::time_duration;
 using boost::posix_time::to_tm;
 
-// Boost stores dates as an uint32_t. Since subtraction is needed, convert to signed.
-const int64_t EPOCH_DAY_NUMBER =
-    static_cast<int64_t>(date(1970, boost::gregorian::Jan, 1).day_number());
-
 namespace impala {
 
 using datetime_parse_util::DateTimeFormatContext;

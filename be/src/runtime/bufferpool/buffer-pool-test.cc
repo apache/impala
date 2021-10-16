@@ -568,8 +568,8 @@ TEST_F(BufferPoolTest, ConcurrentRegistration) {
   // Launch threads, each with a different set of query IDs.
   thread_group workers;
   for (int i = 0; i < num_threads; ++i) {
-    workers.add_thread(new thread(bind(&BufferPoolTest::RegisterQueriesAndClients, this,
-        &pool, i, queries_per_thread, sum_initial_reservations, reservation_limit,
+    workers.add_thread(new thread(boost::bind(&BufferPoolTest::RegisterQueriesAndClients,
+        this, &pool, i, queries_per_thread, sum_initial_reservations, reservation_limit,
         &thread_rngs[i])));
   }
   workers.join_all();
@@ -1145,8 +1145,8 @@ TEST_F(BufferPoolTest, ConcurrentPageCreation) {
   // Launch threads, each with a different set of query IDs.
   thread_group workers;
   for (int i = 0; i < num_threads; ++i) {
-    workers.add_thread(new thread(bind(&BufferPoolTest::CreatePageLoop, this, &pool,
-        file_group, &global_reservations_, ops_per_thread)));
+    workers.add_thread(new thread(boost::bind(&BufferPoolTest::CreatePageLoop, this,
+        &pool, file_group, &global_reservations_, ops_per_thread)));
   }
 
   // Build debug string to test concurrent iteration over pages_ list.
