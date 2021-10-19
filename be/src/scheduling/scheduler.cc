@@ -409,7 +409,20 @@ void Scheduler::CreateCollocatedAndScanInstances(const ExecutorConfig& executor_
   DCHECK(has_union || scan_node_ids.size() == 1) << "This method may need revisiting "
       << "for plans with no union and multiple scans per fragment";
   vector<NetworkAddressPB> scan_hosts;
-  GetScanHosts(executor_config.coord_desc, scan_node_ids, *fragment_state, &scan_hosts);
+  GetScanHosts(scan_node_ids, *fragment_state, &scan_hosts);
+  if (scan_hosts.empty()) {
+    // None of the scan nodes have any scan ranges; run it on a random executor.
+    // TODO TODO: the TODO below seems partially stale
+    // TODO: we'll need to revisit this strategy once we can partition joins
+    // (in which case this fragment might be executing a right outer join
+    // with a large build table)
+    vector<BackendDescriptorPB> all_executors =
+        executor_config.group.GetAllExecutorDescriptors();
+    int idx = std::uniform_int_distribution<int>(0, all_executors.size() - 1)(
+        *state->rng());
+    const BackendDescriptorPB& be_desc = all_executors[idx];
+    scan_hosts.push_back(be_desc.address());
+  }
   for (const NetworkAddressPB& host_addr : scan_hosts) {
     // Ensure that the num instances is at least as many as input fragments. We don't
     // want to increment if there were already some instances from the input fragment,
@@ -784,9 +797,8 @@ std::vector<TPlanNodeId> Scheduler::FindScanNodes(const TPlan& plan) {
   return FindNodes(plan, SCAN_NODE_TYPES);
 }
 
-void Scheduler::GetScanHosts(const BackendDescriptorPB& coord_desc,
-    const vector<TPlanNodeId>& scan_ids, const FragmentScheduleState& fragment_state,
-    vector<NetworkAddressPB>* scan_hosts) {
+void Scheduler::GetScanHosts(const vector<TPlanNodeId>& scan_ids,
+    const FragmentScheduleState& fragment_state, vector<NetworkAddressPB>* scan_hosts) {
   for (const TPlanNodeId& scan_id : scan_ids) {
     // Get the list of impalad host from scan_range_assignment_
     for (const FragmentScanRangeAssignment::value_type& scan_range_assignment :
@@ -795,14 +807,6 @@ void Scheduler::GetScanHosts(const BackendDescriptorPB& coord_desc,
       if (per_node_scan_ranges.find(scan_id) != per_node_scan_ranges.end()) {
         scan_hosts->push_back(scan_range_assignment.first);
       }
-    }
-
-    if (scan_hosts->empty()) {
-      // this scan node doesn't have any scan ranges; run it on the coordinator
-      // TODO: we'll need to revisit this strategy once we can partition joins
-      // (in which case this fragment might be executing a right outer join
-      // with a large build table)
-      scan_hosts->push_back(coord_desc.address());
     }
   }
 }

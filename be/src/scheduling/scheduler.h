@@ -415,8 +415,7 @@ class Scheduler {
 
   /// Add all hosts that the scans identified by 'scan_ids' are executed on to
   /// 'scan_hosts'.
-  void GetScanHosts(const BackendDescriptorPB& coord_desc,
-      const std::vector<TPlanNodeId>& scan_ids,
+  void GetScanHosts(const std::vector<TPlanNodeId>& scan_ids,
       const FragmentScheduleState& fragment_state,
       std::vector<NetworkAddressPB>* scan_hosts);
 
