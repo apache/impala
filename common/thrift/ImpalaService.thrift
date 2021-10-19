@@ -699,6 +699,9 @@ enum TImpalaQueryOptions {
 
   // Indicates whether to run most of ddl requests in async mode.
   ENABLE_ASYNC_DDL_EXECUTION = 136
+
+  // Indicates whether to run load data requests in async mode.
+  ENABLE_ASYNC_LOAD_DATA_EXECUTION = 137
 }
 
 // The summary of a DML statement.

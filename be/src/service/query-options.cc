@@ -1125,6 +1125,10 @@ Status impala::SetQueryOption(const string& key, const string& value,
         query_options->__set_enable_async_ddl_execution(IsTrue(value));
         break;
       }
+      case TImpalaQueryOptions::ENABLE_ASYNC_LOAD_DATA_EXECUTION: {
+        query_options->__set_enable_async_load_data_execution(IsTrue(value));
+        break;
+      }
       default:
         if (IsRemovedQueryOption(key)) {
           LOG(WARNING) << "Ignoring attempt to set removed query option '" << key << "'";

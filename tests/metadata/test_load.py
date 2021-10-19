@@ -17,12 +17,18 @@
 
 # Functional tests for LOAD DATA statements.
 
+import time
+from beeswaxd.BeeswaxService import QueryState
+from copy import deepcopy
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import (
+    create_client_protocol_dimension,
+    create_exec_option_dimension,
     create_single_exec_option_dimension,
     create_uncompressed_text_dimension)
 from tests.common.skip import SkipIfLocal
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.common.test_vector import ImpalaTestDimension
+from tests.util.filesystem_utils import (WAREHOUSE)
 
 TEST_TBL_PART = "test_load"
 TEST_TBL_NOPART = "test_load_nopart"
@@ -99,3 +105,99 @@ class TestLoadData(ImpalaTestSuite):
     # The hidden files should not have been moved as part of the load operation.
     for file_ in HIDDEN_FILES:
       assert self.filesystem_client.exists(file_), "{0} does not exist".format(file_)
+
+
+@SkipIfLocal.hdfs_client
+class TestAsyncLoadData(ImpalaTestSuite):
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestAsyncLoadData, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(
+        create_uncompressed_text_dimension(cls.get_workload()))
+    # Test all clients: hs2, hs2-http and beeswax
+    cls.ImpalaTestMatrix.add_dimension(create_client_protocol_dimension())
+    # Test two exec modes per client
+    cls.ImpalaTestMatrix.add_dimension(
+        ImpalaTestDimension('enable_async_load_data_execution', True, False))
+    # Disable codegen = false
+    cls.ImpalaTestMatrix.add_dimension(create_exec_option_dimension(
+        disable_codegen_options=[False]))
+
+  def test_async_load(self, vector, unique_database):
+    enable_async_load_data = vector.get_value('enable_async_load_data_execution')
+    protocol = vector.get_value('protocol')
+    client = self.create_impala_client(protocol=protocol)
+    is_hs2 = protocol in ['hs2', 'hs2-http']
+    running_state = "RUNNING_STATE" if is_hs2 else QueryState.RUNNING
+    finished_state = "FINISHED_STATE" if is_hs2 else QueryState.FINISHED
+
+    # Form a fully qualified table name with '-' in protocol 'hs2-http' dropped as
+    # '-' is not allowed in Impala table name even delimited with ``.
+    qualified_table_name = '{0}.{1}_{2}_{3}'.format(unique_database, TEST_TBL_NOPART,
+        protocol if protocol != 'hs2-http' else 'hs2http', enable_async_load_data)
+
+    # Form a staging path that is protocol and enable_async_load_data dependent to
+    # allow parallel creating distinct HDFS directories for each test object.
+    staging_path = "{0}_{1}_{2}".format(STAGING_PATH, protocol, enable_async_load_data)
+
+    # Put some data into the staging path
+    self.filesystem_client.delete_file_dir(staging_path, recursive=True)
+    self.filesystem_client.make_dir(staging_path, permission=777)
+    self.filesystem_client.copy(ALLTYPES_PATH, "{0}/100101.txt".format(staging_path))
+
+    # Create a table with the staging path
+    self.client.execute("create table {0} like functional.alltypesnopart \
+        location \'/{1}\'".format(qualified_table_name, staging_path))
+
+    try:
+
+      # The load data is going to need the metadata of the table. To avoid flakiness
+      # about metadata loading, this selects from the table first to get the metadata
+      # loaded.
+      self.execute_query_expect_success(client,
+          "select count(*) from {0}".format(qualified_table_name))
+
+      # Configure whether to use async LOAD and add an appropriate delay of 3 seconds
+      new_vector = deepcopy(vector)
+      new_vector.get_value('exec_option')['enable_async_load_data_execution'] = \
+           enable_async_load_data
+      delay = "CRS_DELAY_BEFORE_LOAD_DATA:SLEEP@3000"
+      new_vector.get_value('exec_option')['debug_action'] = "{0}".format(delay)
+      load_stmt = "load data inpath \'/{1}\' \
+          into table {0}".format(qualified_table_name, staging_path)
+      exec_start = time.time()
+      handle = self.execute_query_async_using_client(client, load_stmt, new_vector)
+      exec_end = time.time()
+      exec_time = exec_end - exec_start
+      exec_end_state = client.get_state(handle)
+
+      # Wait for the statement to finish with a timeout of 10 seconds
+      wait_start = time.time()
+      self.wait_for_state(handle, finished_state, 10, client=client)
+      wait_end = time.time()
+      wait_time = wait_end - wait_start
+      self.close_query_using_client(client, handle)
+      # In sync mode:
+      #  The entire LOAD is processed in the exec step with delay. exec_time should be
+      #  more than 3 seconds.
+      #
+      # In async mode:
+      #  The compilation of LOAD is processed in the exec step without delay. And the
+      #  processing of the LOAD plan is in wait step with delay. The wait time should
+      #  definitely take more time than 3 seconds.
+      if enable_async_load_data:
+        assert(exec_end_state == running_state)
+        assert(wait_time >= 3)
+      else:
+        assert(exec_end_state == finished_state)
+        assert(exec_time >= 3)
+    finally:
+      client.close()
+
+    self.client.execute("drop table if exists {0}".format(qualified_table_name))
+    self.filesystem_client.delete_file_dir(staging_path, recursive=True)

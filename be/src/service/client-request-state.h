@@ -709,6 +709,13 @@ class ClientRequestState {
   /// ExecDdlRequestImpl() and false to call ExecDdlRequestImplSync().
   bool ShouldRunExecDdlAsync();
 
+  /// The logic of executing a load data statement which runs ExecLoadDataRequestImpl()
+  /// in async_exec_thread_ by default.
+  Status ExecLoadDataRequest() WARN_UNUSED_RESULT;
+
+  /// Core logic of executing a load data statement.
+  void ExecLoadDataRequestImpl(bool exec_in_worker_thread);
+
   /// Executes a shut down request.
   Status ExecShutdownRequest() WARN_UNUSED_RESULT;
 

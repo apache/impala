@@ -259,35 +259,7 @@ Status ClientRequestState::Exec() {
     }
     case TStmtType::LOAD: {
       DCHECK(exec_request_->__isset.load_data_request);
-      TLoadDataResp response;
-      RETURN_IF_ERROR(
-          frontend_->LoadData(exec_request_->load_data_request, &response));
-      request_result_set_.reset(new vector<TResultRow>);
-      request_result_set_->push_back(response.load_summary);
-
-      // Now refresh the table metadata.
-      TCatalogOpRequest reset_req;
-      reset_req.__set_sync_ddl(exec_request_->query_options.sync_ddl);
-      reset_req.__set_op_type(TCatalogOpType::RESET_METADATA);
-      reset_req.__set_reset_metadata_params(TResetMetadataRequest());
-      reset_req.reset_metadata_params.__set_header(TCatalogServiceRequestHeader());
-      reset_req.reset_metadata_params.header.__set_want_minimal_response(
-          FLAGS_use_local_catalog);
-      reset_req.reset_metadata_params.__set_is_refresh(true);
-      reset_req.reset_metadata_params.__set_table_name(
-          exec_request_->load_data_request.table_name);
-      if (exec_request_->load_data_request.__isset.partition_spec) {
-        reset_req.reset_metadata_params.__set_partition_spec(
-            exec_request_->load_data_request.partition_spec);
-      }
-      reset_req.reset_metadata_params.__set_sync_ddl(
-          exec_request_->query_options.sync_ddl);
-      catalog_op_executor_.reset(
-          new CatalogOpExecutor(ExecEnv::GetInstance(), frontend_, server_profile_));
-      RETURN_IF_ERROR(catalog_op_executor_->Exec(reset_req));
-      RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
-          *catalog_op_executor_->update_catalog_result(),
-          exec_request_->query_options.sync_ddl));
+      LOG_AND_RETURN_IF_ERROR(ExecLoadDataRequest());
       break;
     }
     case TStmtType::SET: {
@@ -791,6 +763,74 @@ Status ClientRequestState::ExecDdlRequest() {
     ExecDdlRequestImpl(false /*exec in the same thread as the caller*/);
     return query_status_;
   }
+}
+
+void ClientRequestState::ExecLoadDataRequestImpl(bool exec_in_worker_thread) {
+  if (exec_in_worker_thread) {
+    DCHECK(exec_state() == ExecState::PENDING);
+    UpdateNonErrorExecState(ExecState::RUNNING);
+  }
+  DebugActionNoFail(
+      exec_request_->query_options, "CRS_DELAY_BEFORE_LOAD_DATA");
+
+  TLoadDataResp response;
+  Status status = frontend_->LoadData(exec_request_->load_data_request, &response);
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+  }
+
+  request_result_set_.reset(new vector<TResultRow>);
+  request_result_set_->push_back(response.load_summary);
+
+  // Now refresh the table metadata.
+  TCatalogOpRequest reset_req;
+  reset_req.__set_sync_ddl(exec_request_->query_options.sync_ddl);
+  reset_req.__set_op_type(TCatalogOpType::RESET_METADATA);
+  reset_req.__set_reset_metadata_params(TResetMetadataRequest());
+  reset_req.reset_metadata_params.__set_header(TCatalogServiceRequestHeader());
+  reset_req.reset_metadata_params.header.__set_want_minimal_response(
+      FLAGS_use_local_catalog);
+  reset_req.reset_metadata_params.__set_is_refresh(true);
+  reset_req.reset_metadata_params.__set_table_name(
+      exec_request_->load_data_request.table_name);
+  if (exec_request_->load_data_request.__isset.partition_spec) {
+    reset_req.reset_metadata_params.__set_partition_spec(
+        exec_request_->load_data_request.partition_spec);
+  }
+  reset_req.reset_metadata_params.__set_sync_ddl(
+      exec_request_->query_options.sync_ddl);
+  catalog_op_executor_.reset(
+      new CatalogOpExecutor(ExecEnv::GetInstance(), frontend_, server_profile_));
+
+  status = catalog_op_executor_->Exec(reset_req);
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+  }
+
+  status = parent_server_->ProcessCatalogUpdateResult(
+      *catalog_op_executor_->update_catalog_result(),
+      exec_request_->query_options.sync_ddl);
+  {
+    lock_guard<mutex> l(lock_);
+    RETURN_VOID_IF_ERROR(UpdateQueryStatus(status));
+  }
+}
+
+
+Status ClientRequestState::ExecLoadDataRequest() {
+  if (exec_request_->query_options.enable_async_load_data_execution) {
+    // Transition the exec state out of INITIALIZED to PENDING to make available the
+    // runtime profile for the DDL.
+    UpdateNonErrorExecState(ExecState::PENDING);
+    return Thread::Create("impala-server", "async_exec_thread_",
+        &ClientRequestState::ExecLoadDataRequestImpl, this, true, &async_exec_thread_);
+  }
+
+  // sync exection
+  ExecLoadDataRequestImpl(false /* not use a worker thread */);
+  return query_status_;
 }
 
 Status ClientRequestState::ExecShutdownRequest() {

@@ -552,6 +552,9 @@ struct TQueryOptions {
 
   // Allow ddl exec request to run in a separate thread
   137: optional bool enable_async_ddl_execution = true;
+
+  // Allow load data exec request to run in a separate thread
+  138: optional bool enable_async_load_data_execution = true;
 }
 
 // Impala currently has three types of sessions: Beeswax, HiveServer2 and external
