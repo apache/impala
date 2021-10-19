@@ -26,6 +26,8 @@ using boost::algorithm::iequals;
 
 namespace impala {
 
+static const std::string& ICEBERG_FIELD_ID = "iceberg.id";
+
 inline int GetFieldIdFromStr(const std::string& str) {
   try {
     return std::stoi(str);
@@ -39,10 +41,13 @@ OrcSchemaResolver::OrcSchemaResolver(const HdfsTableDescriptor& tbl_desc,
     tbl_desc_(tbl_desc), root_(root), filename_(filename),
     is_table_full_acid_(is_table_acid) {
   DetermineFullAcidSchema();
-  if (tbl_desc_.IsIcebergTable()) {
-    schema_resolution_strategy_ = TSchemaResolutionStrategy::FIELD_ID;
-  } else {
-    schema_resolution_strategy_ = TSchemaResolutionStrategy::POSITION;
+  schema_resolution_strategy_ = TSchemaResolutionStrategy::POSITION;
+  if (tbl_desc_.IsIcebergTable() && root_->getSubtypeCount() > 0) {
+    // Use FIELD_ID-based column resolution for Iceberg tables if possible.
+    const orc::Type* first_child =  root_->getSubtype(0);
+    if (first_child->hasAttributeKey(ICEBERG_FIELD_ID)) {
+      schema_resolution_strategy_ = TSchemaResolutionStrategy::FIELD_ID;
+    }
   }
 }
 
@@ -208,7 +213,6 @@ Status OrcSchemaResolver::ResolveColumnByIcebergFieldId(const SchemaPath& col_pa
 
 const orc::Type* OrcSchemaResolver::FindChildWithFieldId(const orc::Type* node,
     const int field_id) const {
-  const std::string& ICEBERG_FIELD_ID = "iceberg.id";
   for (int i = 0; i < node->getSubtypeCount(); ++i) {
     const orc::Type* child = node->getSubtype(i);
     DCHECK(child != nullptr);

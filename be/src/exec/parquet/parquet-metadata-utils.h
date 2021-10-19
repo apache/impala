@@ -145,12 +145,7 @@ class ParquetSchemaResolver {
     : tbl_desc_(tbl_desc),
       fallback_schema_resolution_(fallback_schema_resolution),
       array_resolution_(array_resolution),
-      filename_(NULL) {
-    // We set FIELD_ID for Iceberg tables.
-    if (tbl_desc_.IsIcebergTable()) {
-      fallback_schema_resolution_ = TSchemaResolutionStrategy::type::FIELD_ID;
-    }
-  }
+      filename_(NULL) {}
 
   /// Parses the schema of the given file metadata into an internal schema
   /// representation used in path resolution. Remembers the filename for error
@@ -158,6 +153,15 @@ class ParquetSchemaResolver {
   Status Init(const parquet::FileMetaData* file_metadata, const char* filename) {
     DCHECK(filename != NULL);
     filename_ = filename;
+    // Use FIELD_ID-based column resolution for Iceberg tables if possible.
+    const auto& schema = file_metadata->schema;
+    if (tbl_desc_.IsIcebergTable() && schema.size() > 1) {
+      // schema[0] is the 'root', schema[1] is the first column.
+      const parquet::SchemaElement& first_column = schema[1];
+      if (first_column.__isset.field_id) {
+        fallback_schema_resolution_ = TSchemaResolutionStrategy::type::FIELD_ID;
+      }
+    }
     return CreateSchemaTree(file_metadata->schema, &schema_);
   }
 

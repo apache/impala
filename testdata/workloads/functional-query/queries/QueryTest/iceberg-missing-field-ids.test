@@ -1,0 +1,21 @@
+====
+---- QUERY
+select * from airports_parquet where country != 'USA';
+---- RESULTS
+'ROP','Prachinburi','NA',NULL,'Thailand',14.078333,101.378334
+'ROR','Babelthoup/Koror','NA',NULL,'Palau',7.367222,134.544167
+'SPN','Tinian International Airport','NA',NULL,'N Mariana Islands',14.996111,145.621384
+'YAP','Yap International','NA',NULL,'Federated States of Micronesia',9.5167,138.1
+---- TYPES
+STRING, STRING, STRING, DOUBLE, STRING, DOUBLE, DOUBLE
+====
+---- QUERY
+select * from airports_orc where country != 'USA';
+---- RESULTS
+'ROP','Prachinburi','NA',NULL,'Thailand',14.078333,101.378334
+'ROR','Babelthoup/Koror','NA',NULL,'Palau',7.367222,134.544167
+'SPN','Tinian International Airport','NA',NULL,'N Mariana Islands',14.996111,145.621384
+'YAP','Yap International','NA',NULL,'Federated States of Micronesia',9.5167,138.1
+---- TYPES
+STRING, STRING, STRING, DOUBLE, STRING, DOUBLE, DOUBLE
+====

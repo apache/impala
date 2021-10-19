@@ -63,6 +63,8 @@ table_name:hudi_partitioned, constraint:restrict_to, table_format:parquet/none/n
 table_name:hudi_non_partitioned, constraint:restrict_to, table_format:parquet/none/none
 table_name:hudi_as_parquet, constraint:restrict_to, table_format:parquet/none/none
 # Iceberg tests are executed in the PARQUET file format dimension
+table_name:airports_orc, constraint:restrict_to, table_format:parquet/none/none
+table_name:airports_parquet, constraint:restrict_to, table_format:parquet/none/none
 table_name:complextypestbl_iceberg_orc, constraint:restrict_to, table_format:parquet/none/none
 table_name:hadoop_catalog_test_external, constraint:restrict_to, table_format:parquet/none/none
 table_name:iceberg_int_partitioned, constraint:restrict_to, table_format:parquet/none/none

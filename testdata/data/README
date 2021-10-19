@@ -661,3 +661,11 @@ binary_decimal_precision_and_scale_widening.parquet
 Parquet file written with schema (decimal(9,2), decimal(18,2), decimal(38,2)). The rows
 inside the file are carefully chosen so that they don't cause an overflow when being read
 by an Impala table with a higher precision/scale.
+
+iceberg_test/hadoop_catalog/ice/airports_parquet:
+Regular Parquet table converted to Iceberg, which means that the data file doesn't contain
+field ids.
+
+iceberg_test/hadoop_catalog/ice/airports_orc:
+Regular ORC table converted to Iceberg, which means that the data file doesn't contain
+field ids.
