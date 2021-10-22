@@ -100,6 +100,7 @@ public class FileSystemUtilTest {
     testFsType(mockLocation(FileSystemUtil.SCHEME_HDFS), FileSystemUtil.FsType.HDFS);
     testFsType(mockLocation(FileSystemUtil.SCHEME_S3A), FileSystemUtil.FsType.S3);
     testFsType(mockLocation(FileSystemUtil.SCHEME_O3FS), FileSystemUtil.FsType.OZONE);
+    testFsType(mockLocation(FileSystemUtil.SCHEME_OFS), FileSystemUtil.FsType.OZONE);
     testFsType(
         mockLocation(FileSystemUtil.SCHEME_ALLUXIO), FileSystemUtil.FsType.ALLUXIO);
   }
@@ -118,6 +119,7 @@ public class FileSystemUtilTest {
     // in impala mini cluster.
     // TODO: enable following tests if we add them into impala mini cluster.
     // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_O3FS), true);
+    // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_OFS), true);
     // testIsSupportStorageIds(mockLocation(FileSystemUtil.SCHEME_ALLUXIO), true);
   }
 
@@ -132,6 +134,7 @@ public class FileSystemUtilTest {
     testIsWritableByImpala(mockLocation(FileSystemUtil.SCHEME_HDFS), true);
     testIsWritableByImpala(mockLocation(FileSystemUtil.SCHEME_S3A), true);
     testIsWritableByImpala(mockLocation(FileSystemUtil.SCHEME_O3FS), true);
+    testIsWritableByImpala(mockLocation(FileSystemUtil.SCHEME_OFS), true);
   }
 
   @Test
@@ -148,6 +151,7 @@ public class FileSystemUtilTest {
     // in impala mini cluster.
     // TODO: enable following tests if we add them into impala mini cluster.
     // testIsSupportedDefaultFs(mockLocation(FileSystemUtil.SCHEME_O3FS), false);
+    // testIsSupportedDefaultFs(mockLocation(FileSystemUtil.SCHEME_OFS), false);
     // testIsSupportedDefaultFs(mockLocation(FileSystemUtil.SCHEME_ALLUXIO), false);
   }
 
@@ -165,6 +169,7 @@ public class FileSystemUtilTest {
     // in impala mini cluster.
     // TODO: enable following tests if we add them into impala mini cluster.
     // testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_O3FS), true);
+    // testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_OFS), true);
     // testValidLoadDataInpath(mockLocation(FileSystemUtil.SCHEME_ALLUXIO), false);
     // Also extend testIsPathOnFileSystem().
   }
@@ -230,6 +235,8 @@ public class FileSystemUtilTest {
         return "s3a://dummy-bucket/dummy-part-6";
       case FileSystemUtil.SCHEME_O3FS:
         return "o3fs://bucket.volume/key";
+      case FileSystemUtil.SCHEME_OFS:
+        return "ofs://svc1:9876/volume1/bucket2/dir3/";
       case FileSystemUtil.SCHEME_ALLUXIO:
         return "alluxio://zk@zk-1:2181,zk-2:2181,zk-3:2181/path/";
       default:

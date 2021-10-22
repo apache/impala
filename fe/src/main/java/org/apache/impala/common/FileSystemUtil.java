@@ -65,6 +65,7 @@ public class FileSystemUtil {
   public static final String SCHEME_HDFS = "hdfs";
   public static final String SCHEME_S3A = "s3a";
   public static final String SCHEME_O3FS = "o3fs";
+  public static final String SCHEME_OFS = "ofs";
   public static final String SCHEME_ALLUXIO = "alluxio";
   public static final String SCHEME_GCS = "gs";
 
@@ -76,6 +77,7 @@ public class FileSystemUtil {
       ImmutableSet.<String>builder()
           .add(SCHEME_HDFS)
           .add(SCHEME_O3FS)
+          .add(SCHEME_OFS)
           .add(SCHEME_ALLUXIO)
           .build();
 
@@ -91,6 +93,7 @@ public class FileSystemUtil {
           .add(SCHEME_HDFS)
           .add(SCHEME_S3A)
           .add(SCHEME_O3FS)
+          .add(SCHEME_OFS)
           .add(SCHEME_GCS)
           .build();
 
@@ -118,6 +121,7 @@ public class FileSystemUtil {
           .add(SCHEME_HDFS)
           .add(SCHEME_S3A)
           .add(SCHEME_O3FS)
+          .add(SCHEME_OFS)
           .add(SCHEME_GCS)
           .build();
 
@@ -472,14 +476,14 @@ public class FileSystemUtil {
    * Returns true iff the filesystem is a OzoneFileSystem.
    */
   public static boolean isOzoneFileSystem(FileSystem fs) {
-    return hasScheme(fs, SCHEME_O3FS);
+    return hasScheme(fs, SCHEME_O3FS) || hasScheme(fs, SCHEME_OFS);
   }
 
   /**
    * Returns true iff the path is on OzoneFileSystem.
    */
   public static boolean isOzoneFileSystem(Path path) throws IOException {
-    return hasScheme(path, SCHEME_O3FS);
+    return hasScheme(path, SCHEME_O3FS) || hasScheme(path, SCHEME_OFS);
   }
 
   /**
@@ -526,6 +530,7 @@ public class FileSystemUtil {
             .put(SCHEME_HDFS, HDFS)
             .put(SCHEME_S3A, S3)
             .put(SCHEME_O3FS, OZONE)
+            .put(SCHEME_OFS, OZONE)
             .put(SCHEME_ALLUXIO, ALLUXIO)
             .put(SCHEME_GCS, GCS)
             .build();
