@@ -17,8 +17,6 @@
 
 #include "runtime/date-parse-util.h"
 
-#include <boost/date_time/gregorian/gregorian.hpp>
-
 #include "cctz/civil_time.h"
 #include "runtime/datetime-iso-sql-format-parser.h"
 #include "runtime/datetime-simple-date-format-parser.h"
@@ -145,7 +143,7 @@ string DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& 
     switch (tok.type) {
       case YEAR:
       case ROUND_YEAR: {
-        num_val = AdjustYearToLength(year, tok.len);
+        num_val = AdjustYearToLength(year, tok.divisor);
         break;
       }
       case QUARTER_OF_YEAR: {
@@ -189,7 +187,7 @@ string DateParser::Format(const DateTimeFormatContext& dt_ctx, const DateValue& 
         break;
       }
       case ISO8601_WEEK_NUMBERING_YEAR: {
-        num_val = AdjustYearToLength(date.Iso8601WeekNumberingYear(), tok.len);
+        num_val = AdjustYearToLength(date.Iso8601WeekNumberingYear(), tok.divisor);
         break;
       }
       case ISO8601_WEEK_OF_YEAR: {

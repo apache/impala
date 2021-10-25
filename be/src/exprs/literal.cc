@@ -354,7 +354,7 @@ string Literal::DebugString() const {
       }
       break;
     case TYPE_TIMESTAMP:
-      out << value_.timestamp_val.ToString();
+      out << value_.timestamp_val;
       break;
     case TYPE_DATE:
       out << value_.date_val;

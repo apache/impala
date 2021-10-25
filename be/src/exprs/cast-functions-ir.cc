@@ -21,20 +21,16 @@
 #include <sstream>
 #include <string>
 
-#include <boost/date_time/gregorian/gregorian.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <gutil/strings/numbers.h>
 #include <gutil/strings/substitute.h>
 
 #include "exprs/anyval-util.h"
 #include "exprs/cast-format-expr.h"
 #include "exprs/decimal-functions.h"
-#include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 #include "util/string-parser.h"
-#include "string-functions.h"
 
 #include "common/names.h"
 
@@ -192,14 +188,8 @@ StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const TimestampVa
   const DateTimeFormatContext* format_ctx =
       reinterpret_cast<const DateTimeFormatContext*>(
           ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
-  StringVal sv;
-  if (format_ctx == nullptr) {
-    sv = AnyValUtil::FromString(ctx, tv.ToString());
-  } else {
-    string formatted_timestamp = tv.Format(*format_ctx);
-    if (formatted_timestamp.empty()) return StringVal::null();
-    sv = AnyValUtil::FromString(ctx, formatted_timestamp);
-  }
+  StringVal sv =
+      (format_ctx == nullptr) ? tv.ToStringVal(ctx) : tv.ToStringVal(ctx, *format_ctx);
   AnyValUtil::TruncateIfNecessary(ctx->GetReturnType(), &sv);
   return sv;
 }

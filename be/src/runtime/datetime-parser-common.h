@@ -204,10 +204,17 @@ struct DateTimeFormatToken {
   /// content of the token double-escaped.
   bool is_double_escaped;
 
+  /// Helper for fast div/modulo on FRACTION and YEAR tokens.
+  int divisor;
+
   DateTimeFormatToken(DateTimeFormatTokenType type, int pos, int len, const char* val)
-    : type(type), pos(pos), len(len), val(val), fm_modifier(false),
-      is_double_escaped(false) {
-  }
+    : type(type),
+      pos(pos),
+      len(len),
+      val(val),
+      fm_modifier(false),
+      is_double_escaped(false),
+      divisor(1000000000) {}
 };
 
 /// Holds metadata about the datetime format. In the format parsing process the members of
@@ -226,6 +233,8 @@ struct DateTimeFormatContext {
   ///     produces output that is longer than the format string.
   ///   - ISO SQL parsing has token types where the output length is different from the
   ///     token length like: 'MONTH', 'DAY', 'HH12', 'HH24', FF1, FF2, FF4, etc.
+  /// In those edge cases, 'fmt_out_len' will be set as maximum possible length that might
+  /// be produced from the input format string.
   int fmt_out_len;
   /// Vector of tokens found in the format string.
   std::vector<DateTimeFormatToken> toks;
@@ -368,9 +377,9 @@ int GetWeekOfYear(int year, int month, int day);
 /// month starts from the first day of the month.
 int GetWeekOfMonth(int day);
 
-/// Returns the year adjusted to 'len' digits.
-/// E.g. AdjustYearToLength(1789, 3) returns 789.
-int AdjustYearToLength(int year, int len);
+/// Returns the year modulo 'adjust_factor'.
+/// E.g. AdjustYearToLength(1789, 1000) returns 789.
+int AdjustYearToLength(int year, int adjust_factor);
 }
 
 }

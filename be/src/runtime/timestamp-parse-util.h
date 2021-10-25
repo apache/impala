@@ -70,11 +70,19 @@ class TimestampParser {
       boost::posix_time::time_duration* t) WARN_UNUSED_RESULT;
 
   /// Format the date/time values using the given format context.
+  /// Caller must make sure that it has enough buffer space in 'dst' to hold the output.
+  /// Return total output length that is written into 'dst'. Return -1 If 'd' or 't' is
+  /// invalid.
   /// dt_ctx -- date/time format context
   /// d -- the date value
   /// t -- the time value
-  static std::string Format(const datetime_parse_util::DateTimeFormatContext& dt_ctx,
-      const boost::gregorian::date& d, const boost::posix_time::time_duration& t);
+  /// max_length -- the maximum length of characters that 'dst' can hold. Only used for
+  ///   assertion in debug build. A DCHECK error will be raised if 'max_length' is less
+  ///   than required space. However, this method will not write more than 'max_length'.
+  /// dst -- pointer to destination buffer to write the result
+  static int Format(const datetime_parse_util::DateTimeFormatContext& dt_ctx,
+      const boost::gregorian::date& d, const boost::posix_time::time_duration& t,
+      int max_length, char* dst);
 
  private:
   /// Helper function finding the correct century for 1 or 2 digit year according to
@@ -109,6 +117,20 @@ class TimestampParser {
   /// 'd' date is expected to fall in the [1400, 9999] year range. The returned week
   /// numbering year must also fall in the [1400, 9999] range.
   static int GetIso8601WeekNumberingYear(const boost::gregorian::date& d);
+
+  /// Helper function for FormatStringVal.
+  static ALWAYS_INLINE void AppendToBuffer(
+      const char* buff, int length_to_copy, char* dst, int& pos, int max_length) {
+    int max_to_copy = std::min(length_to_copy, max_length - pos);
+    std::copy(buff, buff + max_to_copy, dst + pos);
+    pos += length_to_copy;
+  }
+  static ALWAYS_INLINE void AppendToBuffer(
+      const string& str, char* dst, int& pos, int max_length) {
+    int max_to_copy = std::min((int)str.length(), max_length - pos);
+    std::copy(str.cbegin(), str.cbegin() + max_to_copy, dst + pos);
+    pos += str.length();
+  }
 };
 
 }

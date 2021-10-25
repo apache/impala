@@ -189,7 +189,8 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
           TimestampValue::ParseSimpleDateFormat(val.c_str(), val.length(), dt_ctx);
       ValidateTimestamp(tv, fmt, val, fmt_val, year, month, day, hours, mins, secs,
           frac);
-      string buff = tv.Format(dt_ctx);
+      string buff;
+      tv.Format(dt_ctx, buff);
       EXPECT_TRUE(!buff.empty()) << fmt_val;
       EXPECT_LE(buff.length(), dt_ctx.fmt_len) << fmt_val;
       EXPECT_EQ(buff, val) << fmt_val <<  " " << buff;
@@ -217,7 +218,8 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
             TimestampValue::ParseSimpleDateFormat(val.c_str(), val.length(), dt_ctx);
         ValidateTimestamp(tv, fmt, val, fmt_val, year, month, day, hours, mins, secs,
             frac);
-        string buff = tv.Format(dt_ctx);
+        string buff;
+        tv.Format(dt_ctx, buff);
         EXPECT_TRUE(!buff.empty()) << fmt_val;
         EXPECT_LE(buff.length(), dt_ctx.fmt_len) << fmt_val;
         EXPECT_EQ(buff, val) << fmt_val <<  " " << buff;
@@ -670,7 +672,8 @@ TEST(TimestampTest, Basic) {
       EXPECT_EQ(test_case.expected_fraction, cust_time.fractional_seconds()) << "TC: "
           << i;
       if (!test_case.should_format) continue;
-      string buff = cust_tv.Format(dt_ctx);
+      string buff;
+      cust_tv.Format(dt_ctx, buff);
       EXPECT_TRUE(!buff.empty()) << "TC: " << i;
       EXPECT_LE(buff.length(), dt_ctx.fmt_len) << "TC: " << i;
       EXPECT_EQ(string(test_case.str, strlen(test_case.str)), buff) << "TC: " << i;
@@ -710,7 +713,8 @@ TEST(TimestampTest, Basic) {
     EXPECT_NE(cust_tv.date(), not_a_date) << "TC: " << i;
     EXPECT_NE(cust_tv.time(), not_a_date_time) << "TC: " << i;
     EXPECT_GE(dt_ctx.fmt_out_len, dt_ctx.fmt_len);
-    string buff = cust_tv.Format(dt_ctx);
+    string buff;
+    cust_tv.Format(dt_ctx, buff);
     EXPECT_TRUE(!buff.empty()) << "TC: " << i;
     EXPECT_LE(buff.length(), dt_ctx.fmt_out_len) << "TC: " << i;
     EXPECT_EQ(buff, string(test_case.str, strlen(test_case.str))) << "TC: " << i;

@@ -1384,7 +1384,7 @@ void PrintSample(const ReservoirSample<DecimalVal>& v, ostream* os) {
 
 template <>
 void PrintSample(const ReservoirSample<TimestampVal>& v, ostream* os) {
-  *os << TimestampValue::FromTimestampVal(v.val).ToString();
+  *os << TimestampValue::FromTimestampVal(v.val);
 }
 
 template <>

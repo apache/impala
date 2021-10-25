@@ -24,7 +24,6 @@
 #include "runtime/datetime-simple-date-format-parser.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
-#include "runtime/timestamp-value.inline.h"
 #include "udf/udf-internal.h"
 #include "udf/udf.h"
 

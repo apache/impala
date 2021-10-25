@@ -17,24 +17,19 @@
 
 #include "runtime/timestamp-parse-util.h"
 
-#include <algorithm>
 #include <cctype>
 #include <cstdint>
 #include <ostream>
 #include <vector>
 
-#include <boost/date_time/date.hpp>
 #include <boost/date_time/gregorian/greg_calendar.hpp>
 #include <boost/date_time/gregorian/greg_duration.hpp>
-#include <boost/date_time/gregorian_calendar.hpp>
 #include <boost/date_time/posix_time/posix_time_config.hpp>
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <boost/date_time/posix_time/ptime.hpp>
 #include <boost/date_time/special_defs.hpp>
-#include <boost/date_time/time.hpp>
-#include <boost/date_time/time_duration.hpp>
-#include <boost/date_time/time_system_split.hpp>
 #include <boost/exception/exception.hpp>
+#include <gutil/strings/numbers.h>
 
 #include "runtime/datetime-iso-sql-format-parser.h"
 #include "runtime/datetime-simple-date-format-parser.h"
@@ -42,7 +37,6 @@
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "udf/udf-internal.h"
-#include "util/string-parser.h"
 
 #include "common/names.h"
 
@@ -231,19 +225,19 @@ bool TimestampParser::ParseIsoSqlFormat(const char* str, int len,
   return true;
 }
 
-string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& d,
-      const time_duration& t) {
+int TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& d,
+    const time_duration& t, int max_length, char* dst) {
   DCHECK(dt_ctx.toks.size() > 0);
-  if (dt_ctx.has_date_toks && d.is_special()) return "";
-  if (dt_ctx.has_time_toks && t.is_special()) return "";
-  string result;
-  result.reserve(dt_ctx.fmt_out_len);
+  if (dt_ctx.has_date_toks && d.is_special()) return -1;
+  if (dt_ctx.has_time_toks && t.is_special()) return -1;
+  int pos = 0;
+  char buff[12];
   for (const DateTimeFormatToken& tok: dt_ctx.toks) {
     int32_t num_val = -1;
     switch (tok.type) {
       case YEAR:
       case ROUND_YEAR: {
-        num_val = AdjustYearToLength(d.year(), tok.len);
+        num_val = AdjustYearToLength(d.year(), tok.divisor);
         break;
       }
       case QUARTER_OF_YEAR: {
@@ -253,7 +247,7 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
       case MONTH_IN_YEAR: num_val = d.month().as_number(); break;
       case MONTH_NAME:
       case MONTH_NAME_SHORT: {
-        result.append(FormatMonthName(d.month().as_number(), tok));
+        AppendToBuffer(FormatMonthName(d.month().as_number(), tok), dst, pos, max_length);
         break;
       }
       case WEEK_OF_YEAR: {
@@ -276,7 +270,7 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
       }
       case DAY_NAME:
       case DAY_NAME_SHORT: {
-        result.append(FormatDayName(d.day_of_week() + 1, tok));
+        AppendToBuffer(FormatDayName(d.day_of_week() + 1, tok), dst, pos, max_length);
         break;
       }
       case HOUR_IN_DAY: num_val = t.hours(); break;
@@ -291,8 +285,8 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
         if (t.hours() >= 12) {
           indicator_txt = (tok.len == 2) ? &PM : &PM_LONG;
         }
-        result.append((isupper(*tok.val)) ? indicator_txt->first : indicator_txt->second,
-            tok.len);
+        AppendToBuffer((isupper(*tok.val)) ? indicator_txt->first : indicator_txt->second,
+            tok.len, dst, pos, max_length);
         break;
       }
       case MINUTE_IN_HOUR: num_val = t.minutes(); break;
@@ -303,24 +297,24 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
       }
       case FRACTION: {
         num_val = t.fractional_seconds();
-        if (num_val > 0) for (int j = tok.len; j < 9; ++j) num_val /= 10;
+        if (num_val > 0 && tok.divisor > 1) num_val /= tok.divisor;
         break;
       }
       case SEPARATOR:
       case ISO8601_TIME_INDICATOR:
       case ISO8601_ZULU_INDICATOR: {
-        result.append(tok.val, tok.len);
+        AppendToBuffer(tok.val, tok.len, dst, pos, max_length);
         break;
       }
       case TZ_OFFSET: {
         break;
       }
       case TEXT: {
-        result.append(FormatTextToken(tok));
+        AppendToBuffer(FormatTextToken(tok), dst, pos, max_length);
         break;
       }
       case ISO8601_WEEK_NUMBERING_YEAR: {
-        num_val = AdjustYearToLength(GetIso8601WeekNumberingYear(d), tok.len);
+        num_val = AdjustYearToLength(GetIso8601WeekNumberingYear(d), tok.divisor);
         break;
       }
       case ISO8601_WEEK_OF_YEAR: {
@@ -337,14 +331,20 @@ string TimestampParser::Format(const DateTimeFormatContext& dt_ctx, const date& 
       default: DCHECK(false) << "Unknown date/time format token";
     }
     if (num_val > -1) {
-      string tmp_str = std::to_string(num_val);
-      if (!tok.fm_modifier && tmp_str.length() < tok.len) {
-        tmp_str.insert(0, tok.len - tmp_str.length(), '0');
+      char* buff_end = FastInt32ToBufferLeft(num_val, &buff[0]);
+      int written_length = buff_end - (&buff[0]);
+      DCHECK_GT(written_length, 0);
+      if (!tok.fm_modifier && written_length < tok.len) {
+        for (int i = (tok.len - written_length); (i > 0) && (pos < max_length); i--) {
+          *(dst + pos) = '0';
+          pos++;
+        }
       }
-      result.append(tmp_str);
+      AppendToBuffer(&buff[0], written_length, dst, pos, max_length);
     }
+    DCHECK_LE(pos, max_length) << "Maximum buffer length exceeded!";
   }
-  return result;
+  return pos;
 }
 
 int TimestampParser::GetIso8601WeekNumberingYear(const boost::gregorian::date& d) {

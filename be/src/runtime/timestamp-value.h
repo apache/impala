@@ -184,7 +184,17 @@ class TimestampValue {
   bool HasTime() const { return !time_.is_special(); }
   bool HasDateAndTime() const { return HasDate() && HasTime(); }
 
+  /// Write the string representation of this TimestampValue.
+  /// Caller should try to use the variant with output argument and reuse the 'dst' string
+  /// as much as possible if calling ToString multiple times (see IMPALA-10984).
+  void ToString(string& dst) const;
   std::string ToString() const;
+
+  /// Return the StringVal representation of TimestampValue.
+  /// Return StringVal::null() if timestamp is invalid.
+  impala_udf::StringVal ToStringVal(impala_udf::FunctionContext* ctx) const;
+  impala_udf::StringVal ToStringVal(impala_udf::FunctionContext* ctx,
+      const datetime_parse_util::DateTimeFormatContext& dt_ctx) const;
 
   /// Verifies that the date falls into a valid range (years 1400..9999).
   static inline bool IsValidDate(const boost::gregorian::date& date) {
@@ -217,9 +227,12 @@ class TimestampValue {
         && time.total_nanoseconds() < NANOS_PER_DAY;
   }
 
-  /// Formats the timestamp using the given date/time context and returns the result.
-  /// dt_ctx -- the date/time context containing the format to use
-  std::string Format(const datetime_parse_util::DateTimeFormatContext& dt_ctx) const;
+  /// Formats the timestamp using the given date/time context and write the result to
+  /// destination string. The destination string will be cleared if timestamp is invalid.
+  /// dt_ctx -- the date/time context containing the format to use.
+  /// dst -- destination string where the result should be written into.
+  void Format(
+      const datetime_parse_util::DateTimeFormatContext& dt_ctx, string& dst) const;
 
   /// Interpret 'this' as a timestamp in UTC and convert to unix time.
   /// Returns false if the conversion failed ('unix_time' will be undefined), otherwise

@@ -22,7 +22,6 @@
 #include "cctz/civil_time.h"
 #include "common/names.h"
 #include "runtime/string-value.h"
-#include "runtime/string-value.inline.h"
 #include "util/string-parser.h"
 
 using boost::unordered_map;
@@ -37,6 +36,7 @@ bool SimpleDateFormatTokenizer::initialized = false;
 const int SimpleDateFormatTokenizer::DEFAULT_DATE_FMT_LEN = 10;
 const int SimpleDateFormatTokenizer::DEFAULT_SHORT_DATE_TIME_FMT_LEN = 19;
 const int SimpleDateFormatTokenizer::DEFAULT_DATE_TIME_FMT_LEN = 29;
+const int SimpleDateFormatTokenizer::FRACTIONAL_MAX_LEN = 9;
 
 DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_SHORT_DATE_TIME_CTX;
 DateTimeFormatContext SimpleDateFormatTokenizer::DEFAULT_SHORT_ISO_DATE_TIME_CTX;
@@ -49,7 +49,6 @@ void SimpleDateFormatTokenizer::InitCtx() {
 
   // Setup the default date/time context yyyy-MM-dd HH:mm:ss.SSSSSSSSS
   const char* DATE_TIME_CTX_FMT = "yyyy-MM-dd HH:mm:ss.SSSSSSSSS";
-  const int FRACTIONAL_MAX_LEN = 9;
   for (int i = FRACTIONAL_MAX_LEN; i >= 0; --i) {
     DEFAULT_DATE_TIME_CTX[i].Reset(DATE_TIME_CTX_FMT,
         DEFAULT_DATE_TIME_FMT_LEN - (FRACTIONAL_MAX_LEN - i));
@@ -174,6 +173,11 @@ bool SimpleDateFormatTokenizer::Tokenize(
     if (tok_len == 1) ++dt_ctx->fmt_out_len;
     DateTimeFormatToken tok(tok_type, str - str_begin, tok_len, str);
     str += tok.len;
+    if (tok_type == YEAR) {
+      tok.divisor = std::pow(10, tok_len);
+    } else if (tok_type == FRACTION) {
+      tok.divisor = std::pow(10, FRACTIONAL_MAX_LEN - tok_len);
+    }
     dt_ctx->toks.push_back(tok);
   }
   if (cast_mode == PARSE) return (dt_ctx->has_date_toks);

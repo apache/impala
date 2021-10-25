@@ -1163,7 +1163,7 @@ string MinMaxFilter::DebugString(const ColumnValuePB& v, const ColumnType& col_t
   } else if (v.has_binary_val()) {
     ss << v.binary_val();
   } else if (v.has_timestamp_val()) {
-    ss << TimestampValue::FromColumnValuePB(v).ToString();
+    ss << TimestampValue::FromColumnValuePB(v);
   } else if (v.has_decimal_val()) {
     double d = 0.0;
     switch (col_type.GetByteSize()) {

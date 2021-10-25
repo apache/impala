@@ -86,6 +86,9 @@ private:
   /// strings.
   static const int MAX_FORMAT_LENGTH;
 
+  /// Maximum length of fractional second digits.
+  static const int FRACTIONAL_MAX_LEN;
+
   /// When parsing is in progress this contains the format tokens that we have found in
   /// the input format string so far.
   std::unordered_set<std::string> used_tokens_;

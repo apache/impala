@@ -26,11 +26,19 @@
 #include <chrono>
 
 #include "exprs/timezone_db.h"
-#include "kudu/util/int128.h"
 #include "gutil/walltime.h"
+#include "kudu/util/int128.h"
+#include "runtime/datetime-simple-date-format-parser.h"
+#include "runtime/timestamp-parse-util.h"
+#include "udf/udf.h"
 #include "util/arithmetic-util.h"
 
 namespace impala {
+
+using datetime_parse_util::DateTimeFormatContext;
+using datetime_parse_util::SimpleDateFormatTokenizer;
+using impala_udf::FunctionContext;
+using impala_udf::StringVal;
 
 template <int32_t TICKS_PER_SEC>
 inline TimestampValue TimestampValue::UtcFromUnixTimeTicks(int64_t unix_time_ticks) {
@@ -206,6 +214,25 @@ inline bool TimestampValue::ToSubsecondUnixTime(const Timezone* local_tz,
   return true;
 }
 
+inline StringVal TimestampValue::ToStringVal(
+    FunctionContext* ctx, const DateTimeFormatContext& dt_ctx) const {
+  int max_length = dt_ctx.fmt_out_len;
+  StringVal sv(ctx, max_length);
+  int written = TimestampParser::Format(
+      dt_ctx, date_, time_, max_length, reinterpret_cast<char*>(sv.ptr));
+  if (UNLIKELY(written < 0)) {
+    sv.is_null = true;
+  } else {
+    sv.Resize(ctx, written);
+  }
+  return sv;
+}
+
+inline StringVal TimestampValue::ToStringVal(FunctionContext* ctx) const {
+  const DateTimeFormatContext* dt_ctx =
+      SimpleDateFormatTokenizer::GetDefaultTimestampFormatContext(time_);
+  return ToStringVal(ctx, *dt_ctx);
+}
 }
 
 #endif

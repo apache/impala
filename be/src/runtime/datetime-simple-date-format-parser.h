@@ -76,6 +76,7 @@ public:
   static const int DEFAULT_DATE_FMT_LEN;
   static const int DEFAULT_SHORT_DATE_TIME_FMT_LEN;
   static const int DEFAULT_DATE_TIME_FMT_LEN;
+  static const int FRACTIONAL_MAX_LEN;
 
   /// Parse the date/time format into tokens and place them in the context.
   /// dt_ctx -- output date/time format context
@@ -109,6 +110,16 @@ public:
   /// otherwise.
   static const DateTimeFormatContext* GetDefaultFormatContext(const char* str, int len,
       bool accept_time_toks);
+
+  /// Return default date/time format context for a timestamp parsing.
+  /// If 'time' has a fractional seconds, context with pattern
+  /// "yyyy-MM-dd HH:mm:ss.SSSSSSSSS" will be returned. Otherwise, return context with
+  /// pattern "yyyy-MM-dd HH:mm:ss".
+  static ALWAYS_INLINE const DateTimeFormatContext* GetDefaultTimestampFormatContext(
+      const boost::posix_time::time_duration& time) {
+    return time.fractional_seconds() > 0 ? &DEFAULT_DATE_TIME_CTX[9] :
+                                           &DEFAULT_SHORT_DATE_TIME_CTX;
+  }
 
   /// Initialize the default format contexts. This *must* be called before using
   /// GetDefaultFormatContext().

@@ -20,7 +20,6 @@
 #include <ctime>
 #include <iomanip>
 
-#include <boost/date_time/compiler_config.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/date_time/gregorian/gregorian_types.hpp>
 #include <gutil/strings/substitute.h>
@@ -71,10 +70,7 @@ StringVal TimestampFunctions::StringValFromTimestamp(FunctionContext* context,
     }
   }
 
-  string formatted_timestamp = tv.Format(*dt_ctx);
-  if (formatted_timestamp.empty()) return StringVal::null();
-  StringVal result = AnyValUtil::FromString(context, formatted_timestamp);
-  return result;
+  return tv.ToStringVal(context, *dt_ctx);
 }
 
 template <class TIME>
@@ -82,8 +78,7 @@ StringVal TimestampFunctions::FromUnix(FunctionContext* context, const TIME& int
   if (intp.is_null) return StringVal::null();
   const TimestampValue tv = TimestampValue::FromUnixTime(intp.val,
       context->impl()->state()->time_zone_for_unix_time_conversions());
-  if (!tv.HasDateAndTime()) return StringVal::null();
-  return AnyValUtil::FromString(context, tv.ToString());
+  return tv.ToStringVal(context);
 }
 
 template <class TIME>

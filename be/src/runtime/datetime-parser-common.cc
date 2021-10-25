@@ -408,9 +408,8 @@ int GetWeekOfMonth(int day) {
   return (day - 1) / 7 + 1;
 }
 
-int AdjustYearToLength(int year, int len) {
-  if (len < 4) {
-    int adjust_factor = std::pow(10, len);
+int AdjustYearToLength(int year, int adjust_factor) {
+  if (adjust_factor < 10000) {
     return year % adjust_factor;
   }
   return year;

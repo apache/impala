@@ -17,12 +17,10 @@
 
 #include "runtime/timestamp-value.h"
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-
 #include "exprs/timestamp-functions.h"
 #include "exprs/timezone_db.h"
+#include "runtime/datetime-simple-date-format-parser.h"
 #include "runtime/timestamp-parse-util.h"
-#include "runtime/timestamp-value.h"
 #include "runtime/timestamp-value.inline.h"
 
 #include "common/names.h"
@@ -44,6 +42,9 @@ const int64_t EPOCH_DAY_NUMBER =
 namespace impala {
 
 using datetime_parse_util::DateTimeFormatContext;
+using datetime_parse_util::SimpleDateFormatTokenizer;
+using impala_udf::FunctionContext;
+using impala_udf::StringVal;
 
 const char* TimestampValue::LLVM_CLASS_NAME = "class.impala::TimestampValue";
 const double TimestampValue::ONE_BILLIONTH = 0.000000001;
@@ -74,8 +75,15 @@ TimestampValue TimestampValue::ParseIsoSqlFormat(const char* str, int len,
   return tv;
 }
 
-string TimestampValue::Format(const DateTimeFormatContext& dt_ctx) const {
-  return TimestampParser::Format(dt_ctx, date_, time_);
+void TimestampValue::Format(const DateTimeFormatContext& dt_ctx, string& dst) const {
+  int max_length = dt_ctx.fmt_out_len;
+  dst.resize(max_length);
+  int written = TimestampParser::Format(dt_ctx, date_, time_, max_length, &dst[0]);
+  if (UNLIKELY(written < 0)) {
+    dst.clear();
+  } else {
+    dst.resize(written);
+  }
 }
 
 namespace {
@@ -202,16 +210,14 @@ TimestampValue TimestampValue::FromUnixTime(time_t unix_time, const Timezone* lo
   }
 }
 
+void TimestampValue::ToString(string& dst) const {
+  Format(*SimpleDateFormatTokenizer::GetDefaultTimestampFormatContext(time_), dst);
+}
+
 string TimestampValue::ToString() const {
-  stringstream ss;
-  if (HasDate()) {
-    ss << boost::gregorian::to_iso_extended_string(date_);
-  }
-  if (HasTime()) {
-    if (HasDate()) ss << " ";
-    ss << boost::posix_time::to_simple_string(time_);
-  }
-  return ss.str();
+  string dst;
+  Format(*SimpleDateFormatTokenizer::GetDefaultTimestampFormatContext(time_), dst);
+  return dst;
 }
 
 TimestampValue TimestampValue::Add(const boost::posix_time::time_duration& t) const {

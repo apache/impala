@@ -79,7 +79,7 @@ struct ExprTestData {
 // error handling.
 class Planner {
  public:
-  Planner() : mem_pool_(&tracker_) {
+  Planner() : expr_perm_pool_(&tracker_), expr_results_pool_(&tracker_) {
     frontend_.SetCatalogIsReady();
     ABORT_IF_ERROR(exec_env_.InitForFeSupport());
     query_options_.enable_expr_rewrites = false;
@@ -134,8 +134,8 @@ class Planner {
     RETURN_IF_ERROR(
         ScalarExpr::Create(texprs[0], RowDescriptor(), fragment_state, &expr));
     ScalarExprEvaluator* eval;
-    RETURN_IF_ERROR(
-        ScalarExprEvaluator::Create(*expr, state, &pool_, &mem_pool_, &mem_pool_, &eval));
+    RETURN_IF_ERROR(ScalarExprEvaluator::Create(
+        *expr, state, state->obj_pool(), &expr_perm_pool_, &expr_results_pool_, &eval));
 
     // UDFs which cannot be interpreted need to be handled by codegen.
     // This follow examples from fe-support.cc
@@ -153,6 +153,10 @@ class Planner {
     return Status::OK();
   }
 
+  void ClearExprPermPool() { expr_perm_pool_.Clear(); }
+
+  void ClearExprResultsPool() { expr_results_pool_.Clear(); }
+
  private:
   Frontend frontend_;
   ExecEnv exec_env_;
@@ -162,7 +166,8 @@ class Planner {
 
   ObjectPool pool_;
   MemTracker tracker_;
-  MemPool mem_pool_;
+  MemPool expr_perm_pool_;
+  MemPool expr_results_pool_;
 };
 
 Planner* planner;
@@ -199,6 +204,10 @@ void BenchmarkQueryFn(int batch_size, void* d) {
       data->dummy_result_ += reinterpret_cast<int64_t>(value);
     }
   }
+}
+
+void SetupBenchmark(void* d) {
+  planner->ClearExprResultsPool();
 }
 
 #define BENCHMARK(name, stmt) \
@@ -764,72 +773,74 @@ Benchmark* BenchmarkMathFunctions(bool codegen) {
 // TimestampFn:               Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                             literal               34.4     34.6     34.8         1X         1X         1X
-//                           to_string               2.09     2.12     2.12    0.0609X    0.0611X    0.0607X
-//                            add_year               16.7     16.7     16.8     0.485X     0.481X     0.482X
-//                           sub_month               16.5     16.5     16.6      0.48X     0.476X     0.477X
-//                           add_weeks               20.9     20.9     21.1     0.609X     0.604X     0.605X
-//                            sub_days               19.7     19.7     19.8     0.574X      0.57X     0.569X
-//                                 add               20.7     20.9     21.1     0.604X     0.604X     0.605X
-//                           sub_hours               19.4     19.5     19.6     0.563X     0.564X     0.563X
-//                         add_minutes               19.9     19.9       20      0.58X     0.575X     0.575X
-//                         sub_seconds               19.9     19.9       20      0.58X     0.575X     0.574X
-//                           add_milli               18.3     18.3     18.5     0.534X     0.529X      0.53X
-//                           sub_micro               18.3     18.3     18.5     0.534X     0.529X      0.53X
-//                            add_nano               18.7     18.9       19     0.544X     0.545X     0.546X
-//                     unix_timestamp1               38.7     38.9     39.1      1.13X      1.12X      1.12X
-//                     unix_timestamp2                 53     53.3     53.5      1.54X      1.54X      1.54X
-//                          from_unix1               6.11     6.11     6.19     0.178X     0.176X     0.178X
-//                          from_unix2               10.7     10.9     11.2     0.312X     0.316X     0.321X
-//                                year               38.9     39.1     39.3      1.13X      1.13X      1.13X
-//                               month               39.1     39.3     39.5      1.14X      1.13X      1.13X
-//                        day of month               38.7     38.7     38.9      1.13X      1.12X      1.12X
-//                         day of year               34.6     34.8     34.8      1.01X      1.01X         1X
-//                        week of year               33.3     33.6     33.8      0.97X     0.971X      0.97X
-//                                hour               76.7     77.4     78.4      2.23X      2.24X      2.25X
-//                              minute               76.5       77     78.1      2.23X      2.22X      2.24X
-//                              second               74.6     75.4     76.4      2.17X      2.18X      2.19X
-//                             to date                 19     19.1     19.2     0.554X     0.551X     0.552X
-//                           date diff               17.5     17.5     17.6     0.509X     0.505X     0.505X
-//                            from utc               22.1     22.4     22.4     0.644X     0.646X     0.644X
-//                              to utc               18.9     18.9       19      0.55X     0.545X     0.546X
-//                                 now                290      293      295      8.44X      8.47X      8.48X
-//                      unix_timestamp                209      211      213      6.09X      6.08X      6.11X
+//                             literal               33.8       34     34.1         1X         1X         1X
+//                           to_string               13.3     13.4     13.5     0.395X     0.395X     0.395X
+//                            add_year               16.5     16.7     16.8     0.488X      0.49X     0.492X
+//                           sub_month               16.3     16.3     16.4     0.482X      0.48X     0.481X
+//                           add_weeks               20.4     20.4     20.5     0.603X     0.599X     0.601X
+//                            sub_days               19.4     19.4     19.5     0.573X     0.569X     0.572X
+//                                 add               20.6     20.6     20.7     0.608X     0.605X     0.608X
+//                           sub_hours               18.7     18.7     18.9     0.553X      0.55X     0.553X
+//                         add_minutes               19.4     19.5     19.6     0.573X     0.575X     0.575X
+//                         sub_seconds               19.1     19.4     19.4     0.564X     0.569X     0.569X
+//                           add_milli               18.5     18.5     18.7     0.548X     0.545X     0.546X
+//                           sub_micro               17.9     17.9     18.1     0.529X     0.526X     0.529X
+//                            add_nano               18.3     18.3     18.5     0.542X      0.54X     0.541X
+//                     unix_timestamp1               37.9     37.9     38.1      1.12X      1.11X      1.12X
+//                     unix_timestamp2               51.9     52.2     52.5      1.54X      1.54X      1.54X
+//                          from_unix1               30.4     30.7     30.9     0.899X     0.902X     0.904X
+//                          from_unix2               43.3     43.5       44      1.28X      1.28X      1.29X
+//                          from_unix3               30.7     31.1     31.3      0.91X     0.916X     0.917X
+//                                year               39.3     39.4     39.7      1.16X      1.16X      1.16X
+//                               month               39.5     40.1     40.3      1.17X      1.18X      1.18X
+//                        day of month               38.2     38.4     38.5      1.13X      1.13X      1.13X
+//                         day of year               35.4     35.6     35.8      1.05X      1.05X      1.05X
+//                        week of year               34.6     34.6     34.8      1.02X      1.02X      1.02X
+//                                hour               81.5     81.9     82.5      2.41X      2.41X      2.42X
+//                              minute                 80     80.5     81.5      2.37X      2.37X      2.39X
+//                              second               81.2     82.2     82.9       2.4X      2.42X      2.43X
+//                             to date               19.4     19.4     19.5     0.573X     0.569X      0.57X
+//                           date diff               17.5     17.5     17.6     0.518X     0.515X     0.514X
+//                            from utc               21.9     21.9     22.2     0.649X     0.646X     0.649X
+//                              to utc               19.4     19.4     19.4     0.573X     0.569X     0.569X
+//                                 now                286      287      290      8.45X      8.45X       8.5X
+//                      unix_timestamp                207      208      211      6.13X      6.13X      6.17X
 //
 // TimestampFnCodegen:        Function  iters/ms   10%ile   50%ile   90%ile     10%ile     50%ile     90%ile
 //                                                                          (relative) (relative) (relative)
 // ---------------------------------------------------------------------------------------------------------
-//                             literal               37.2     37.4     37.5         1X         1X         1X
-//                           to_string               2.14     2.16     2.16    0.0576X    0.0577X    0.0575X
-//                            add_year               18.5     18.5     18.7     0.498X     0.495X     0.497X
-//                           sub_month               18.3     18.3     18.5     0.493X      0.49X     0.492X
-//                           add_weeks               23.9       24     24.1     0.641X     0.641X     0.641X
-//                            sub_days               22.1     22.1     22.3     0.595X     0.592X     0.593X
-//                                 add               23.6     23.6     23.8     0.634X     0.631X     0.634X
-//                           sub_hours               21.9     21.9       22      0.59X     0.587X     0.587X
-//                         add_minutes               22.4     22.6     22.7     0.602X     0.604X     0.606X
-//                         sub_seconds               22.4     22.4     22.6     0.602X     0.599X     0.602X
-//                           add_milli               20.6     20.6     20.7     0.552X      0.55X     0.552X
-//                           sub_micro               20.6     20.7     20.9     0.552X     0.554X     0.556X
-//                            add_nano               21.1     21.3     21.4     0.567X     0.568X      0.57X
-//                     unix_timestamp1               46.9     46.9     47.1      1.26X      1.25X      1.25X
-//                     unix_timestamp2               64.2     64.4     64.7      1.72X      1.72X      1.72X
-//                          from_unix1                6.3      6.3     6.37     0.169X     0.168X      0.17X
-//                          from_unix2               11.3     11.6     11.8     0.305X     0.309X     0.315X
-//                                year               59.3     59.4     59.8      1.59X      1.59X      1.59X
-//                               month               59.3     59.4     59.7      1.59X      1.59X      1.59X
-//                        day of month               58.8     59.3     59.6      1.58X      1.58X      1.59X
-//                         day of year               53.4     53.5     53.8      1.44X      1.43X      1.43X
-//                        week of year               50.4     50.6     51.2      1.35X      1.35X      1.36X
-//                                hour                126      127      129      3.38X       3.4X      3.44X
-//                              minute                126      126      129      3.38X      3.38X      3.43X
-//                              second                126      127      128      3.38X       3.4X      3.42X
-//                             to date               23.1     23.1     23.4     0.622X     0.619X     0.623X
-//                           date diff               22.4     22.4     22.6     0.602X     0.599X     0.601X
-//                            from utc               38.9     39.4     39.6      1.05X      1.05X      1.06X
-//                              to utc               21.8     21.8     21.9     0.585X     0.582X     0.582X
-//                                 now                517      522      527      13.9X        14X        14X
-//                      unix_timestamp                378      381      384      10.2X      10.2X      10.2X
+//                             literal               38.2     38.4     38.6         1X         1X         1X
+//                           to_string                 15     15.3     15.3     0.392X     0.398X     0.396X
+//                            add_year               18.3     18.3     18.5     0.479X     0.477X     0.478X
+//                           sub_month               17.9     18.1     18.1     0.469X      0.47X      0.47X
+//                           add_weeks               23.8     23.8     23.9     0.622X     0.619X     0.619X
+//                            sub_days               22.6     22.6     22.7      0.59X     0.588X     0.589X
+//                                 add               23.4     23.4     23.5     0.613X      0.61X     0.609X
+//                           sub_hours               21.8     21.8     21.9     0.569X     0.566X     0.566X
+//                         add_minutes               21.9     21.9       22     0.574X     0.571X      0.57X
+//                         sub_seconds               21.9     21.9       22     0.574X     0.571X      0.57X
+//                           add_milli               20.9     20.9     21.1     0.547X     0.545X     0.547X
+//                           sub_micro               20.1     20.1     20.2     0.525X     0.523X     0.523X
+//                            add_nano               21.1     21.1     21.3     0.552X     0.549X     0.551X
+//                     unix_timestamp1                 47     47.2     47.5      1.23X      1.23X      1.23X
+//                     unix_timestamp2               61.3     61.5     61.8       1.6X       1.6X       1.6X
+//                          from_unix1               34.8       35     35.3      0.91X     0.911X     0.914X
+//                          from_unix2               51.5     51.5       52      1.35X      1.34X      1.35X
+//                          from_unix3               34.8       35     35.3      0.91X     0.911X     0.914X
+//                                year               57.4     57.8     58.5       1.5X       1.5X      1.51X
+//                               month               58.4     58.6     59.1      1.53X      1.53X      1.53X
+//                        day of month               58.9     59.1     59.4      1.54X      1.54X      1.54X
+//                         day of year               53.2     53.7     54.3      1.39X       1.4X      1.41X
+//                        week of year               50.9     51.1     51.4      1.33X      1.33X      1.33X
+//                                hour                125      132      134      3.26X      3.43X      3.48X
+//                              minute                132      133      134      3.46X      3.46X      3.48X
+//                              second                132      133      135      3.46X      3.47X      3.49X
+//                             to date               24.2     24.3     24.6     0.632X     0.631X     0.637X
+//                           date diff               22.6     22.6     22.7     0.591X     0.588X     0.589X
+//                            from utc               38.1     38.5     38.8     0.995X         1X         1X
+//                              to utc               22.1     22.1     22.4     0.579X     0.576X      0.58X
+//                                 now                517      520      524      13.5X      13.5X      13.6X
+//                      unix_timestamp                399      403      406      10.4X      10.5X      10.5X
 Benchmark* BenchmarkTimestampFunctions(bool codegen) {
   Benchmark* suite = new Benchmark(BenchmarkName("TimestampFn", codegen));
   BENCHMARK("literal", "cast('2012-01-01 09:10:11.123456789' as timestamp)");
@@ -863,6 +874,7 @@ Benchmark* BenchmarkTimestampFunctions(bool codegen) {
       "unix_timestamp('1970-10-01', 'yyyy-MM-dd')");
   BENCHMARK("from_unix1", "from_unixtime(0, 'yyyy-MM-dd HH:mm:ss')");
   BENCHMARK("from_unix2", "from_unixtime(0, 'yyyy-MM-dd')");
+  BENCHMARK("from_unix3", "from_unixtime(0)");
   BENCHMARK("year", "year(cast('2011-12-22' as timestamp))");
   BENCHMARK("month", "month(cast('2011-12-22' as timestamp))");
   BENCHMARK("day of month", "dayofmonth(cast('2011-12-22' as timestamp))");
@@ -919,9 +931,10 @@ int main(int argc, char** argv) {
   cout << Benchmark::GetMachineInfo() << endl;
   for (auto& benchmark : benchmarks) {
     for (int codegen = 0; codegen <= 1; codegen++) {
+      planner->ClearExprPermPool();
       planner->EnableCodegen(codegen);
       Benchmark* suite = (*benchmark)(codegen);
-      cout << suite->Measure() << endl;
+      cout << suite->Measure(50, 10, SetupBenchmark) << endl;
     }
   }
 
